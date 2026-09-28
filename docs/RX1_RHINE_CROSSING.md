@@ -70,7 +70,7 @@ Stored Rhine 321 canvas Y ~1781–1864 is the world_full mercator bake (`use_mer
 | `tools/eoa_rx1_bridge_live_progress_guard.sh` | Windowed smoke: viewport mouse on Build Bridge. **Not the product.** |
 | `HeadlessRx1RhineVisibilityTest` | Units on top: labels 18 < river/road < DemoUnitIcon 28; screen-space widths; gold spine; U + BtnUnitsView; spine chrome absent on Neuss 710413; `run_godot.sh` import-if-needed. |
 | `HeadlessRx1RhinePanelStateTest` | Köln never re-offers Build Road Spine after built; bridge chrome only on Neuss 710413 / Mettmann 710412. |
-| `tools/eoa_rx1_pixel_guard.sh` | **WINDOWED** (xvfb) live `TestScenario` captures. Units OFF: Rhine + gold spine at mid/close. Units ON: counter pixels win over the river. U hide/restore, sim unchanged. Real PNGs, not mocks. Smoke harness is **not** the product. |
+| `tools/eoa_rx1_pixel_guard.sh` | **WINDOWED** (xvfb) live `TestScenario` captures. Units OFF: Rhine at mid/close **plus continuity** along the whole Bonn–Köln–Leverkusen gold path (coverage % + longest gap). Units ON: counter pixels win over the river **and** over the spine. U hide/restore, sim unchanged. Real PNGs, not mocks. Smoke harness is **not** the product. |
 
 Must **FAIL** on `816cdc9` (pixels + Köln re-offer + bridge leak) and **PASS** on this tip. IX-1 headless + python stay green. The FIX1 z-order check alone is not evidence — Play MIXED `816cdc9` passed it while the screen stayed empty.
 
@@ -90,7 +90,7 @@ Köln after `state=built` re-offered **Build Road Spine** because `should_show_r
 
 Owner: undo the FIX1 raise that put Rhine z=90 / roads z=88 above DemoUnitIcon z=28. Map layers sit **below** units. Keep theater-scale, screen-space widths, close-zoom label hide, Köln built state, and status-leak scoping.
 
-- z stack: nation Labels **18** < RoadLayer / spine **21** < Rhine **22** < DemoUnitIcon **28**
+- z stack: nation Labels **18** < RoadLayer **21** < Rhine **22** < joined gold spine **23** < DemoUnitIcon **28**
 - **U** = show/hide unit counters + stack chips / selection rings / pin pulse / battle bubbles. Default **shown**. View-only — no sim, selection, orders, or save data. Search LineEdit focus swallows U. **Shift+U** is supply/sealane flow (was plain U).
 - HUD `BtnUnitsView` on the time-speed strip stays in sync with the hotkey.
 - Built spine uses gold `ROAD_EXPLICIT_COLOR` (0.92, 0.62, 0.08) so the pixel sample cannot pass on tan land.
@@ -119,6 +119,21 @@ Guard table — real xvfb, `tools/run_godot.sh`, never `EOA_SKIP_TITLE`. Officia
 **Gold spine:** `ROAD_EXPLICIT_COLOR` (0.92, 0.62, 0.08) composites to ~(245, 103, 9) on GER red. The matcher accepts that and rejects tan land / old tan road (128, 92, 36). 816cdc9 road hit is **0.000** — the tan false-pass is gone. Tip 0.192 is a thin gold-over-GER stroke (honest; floor 0.15).
 
 **Gaps:** framed captures still read as a wide theater view even when MapCamera reports Köln at zoom 2.10 (same class as the earlier Home fight). River/gold samples use canvas transforms + local course, not a claim that the whole PNG is a street-level Köln close-up. Köln bridge-status leak was **false** on this 816cdc9 run (panel node inspect); the re-offer / missing-built fails still stand.
+
+## IX-1 gold-spine continuity (this draft)
+
+Two unjoined RoadLayer Line2Ds at z=21 under the Rhine (z=22) read as a broken Bonn–Köln–Leverkusen line at close zoom. Tip draws one hub-local polyline (`Ix1GoldSpineDraw`) at **z=23** (above Rhine, below units 28) with screen-pixel width + round join discs. Continuity samples every 3 screen px along the projected centroids (neighborhood 3). Smoke harness is **not** the product.
+
+| Check (units OFF unless noted) | `dbbdef4` + new guard | this tip |
+|--------------------------------|-----------------------|----------------|
+| mid continuity cover / longest gap | **0.222 / 12.0 px FAIL** (2/9 hits) | **1.000 / 0.0 px PASS** (9/9) |
+| close continuity cover / longest gap | **0.125 / 42.0 px FAIL** (2/16 hits) | **1.000 / 0.0 px PASS** (16/16) |
+| gold spine hit (legacy count, need ≥0.15) | 0.227 (count can pass a broken line) | 1.000 |
+| mid / close river | 1.000 / 0.977 | 0.775 / 0.920 |
+| units ON over river | chip 1.000 | chip 0.977 |
+| units ON over spine | chip 0.039 / gold 0.476 (same-frame park; not a product fail) | **chip 0.932 / gold 0.000 PASS** |
+| U toggle + Köln built / no re-offer | PASS | PASS |
+| `WindowedRx1RhinePixelGuard` | **RESULT=FAIL** (`mid_spine_continuity_cover`, `close_spine_continuity_cover`, `close_spine_continuity_gap`) | **RESULT=PASS** |
 
 ## Fresh checkout (FIX1)
 

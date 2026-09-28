@@ -13,7 +13,12 @@ extends SceneTree
 ##     FAIL on 816cdc9 / PASS on tip. 816cdc9 has no U toggle: hide
 ##     DemoUnitIcon_*/StackBadge/PinFocusPulse/LandBattleBubbleLayer nodes
 ##     directly via _hide_unit_nodes_direct (documented in RX1_RHINE_CROSSING.md).
+## (a2) Units OFF — CONTINUITY along the whole Bonn–Köln–Leverkusen centroid
+##     path at mid and close (every few screen px). Gold at each sample with
+##     a small neighborhood. Reports coverage % and longest gap. Must FAIL
+##     on dbbdef4 (two unjoined segments under the Rhine) and PASS on tip.
 ## (b) Units ON — sample a counter over the river; counter pixels must win.
+##     Also park a counter on the spine; chip pixels must win over gold.
 ## (c) U hides, U restores, sim fingerprint unchanged. Button stays in sync.
 ## Panel-state checks (Köln built / no re-offer / no leak) stay.
 ## Smoke harness is not the product. Artifacts are real viewport captures.
@@ -32,6 +37,12 @@ const ROAD_MIN_HIT := 0.15
 const UNIT_MIN_HIT := 0.22
 const SAMPLE_RADIUS := 5
 const LOCAL_RIVER_WORLD := 120.0
+## Continuity along Bonn→Köln→Leverkusen. Tight neighborhood so a broken
+## joint / river-buried segment fails (dbbdef4). Tip must clear with margin.
+const SPINE_CONT_STEP_PX := 3.0
+const SPINE_CONT_NEIGHBOR := 3
+const SPINE_CONT_MIN_COVER := 0.80
+const SPINE_CONT_MAX_GAP_PX := 18.0
 
 enum Phase {
 	WAIT_MAP,
@@ -40,6 +51,7 @@ enum Phase {
 	DO_CLOSE,
 	DO_ROADS,
 	DO_UNITS_ON,
+	DO_UNITS_ON_SPINE,
 	DO_TOGGLE,
 	DO_PANEL_KOLN,
 	DO_PANEL_NEUSS,
@@ -55,8 +67,14 @@ var _out_dir: String = ""
 var _mid_river_hit: float = 0.0
 var _close_river_hit: float = 0.0
 var _road_hit: float = 0.0
+var _mid_spine_cover: float = 0.0
+var _mid_spine_gap: float = 0.0
+var _close_spine_cover: float = 0.0
+var _close_spine_gap: float = 0.0
 var _units_on_hit: float = 0.0
 var _units_on_river_under: float = 0.0
+var _units_on_spine_chip: float = 0.0
+var _units_on_spine_gold: float = 0.0
 var _toggle_ok: bool = false
 var _used_direct_unit_hide: bool = false
 var _koln_panel: Dictionary = {}
@@ -65,6 +83,8 @@ var _captures: PackedStringArray = PackedStringArray()
 var _last_wait_log: int = -1
 var _parked_unit: Node2D = null
 var _parked_unit_pos: Vector2 = Vector2.ZERO
+var _parked_unit_parent: Node = null
+var _parked_unit_index: int = -1
 
 
 func _init() -> void:
@@ -107,6 +127,8 @@ func _on_process() -> void:
 			_tick_wait_map()
 		Phase.SETTLE:
 			_reassert_camera()
+			if _after_settle == Phase.DO_UNITS_ON_SPINE:
+				_reassert_parked_unit()
 			_settle_left -= 1
 			if _settle_left <= 0:
 				_phase = _after_settle
@@ -118,6 +140,8 @@ func _on_process() -> void:
 			_do_roads()
 		Phase.DO_UNITS_ON:
 			_do_units_on()
+		Phase.DO_UNITS_ON_SPINE:
+			_do_units_on_spine()
 		Phase.DO_TOGGLE:
 			_do_toggle()
 		Phase.DO_PANEL_KOLN:
@@ -160,6 +184,7 @@ func _tick_wait_map() -> void:
 	_log("EOA_RX1_PIXEL_GUARD who=guard.frame_start elapsed=%d n=%d" % [elapsed, _province_count()])
 	_freeze_boot_camera_fighters()
 	_set_units_view(false)
+	_ensure_spine_built()
 	_frame_over_koln(MID_ZOOM, true)
 	_go_settle(Phase.DO_MID)
 
@@ -174,6 +199,24 @@ func _do_mid() -> void:
 	])
 	if _mid_river_hit < RIVER_MIN_HIT:
 		_fail_reasons.append("mid_river_hit")
+	var mid_cont: Dictionary = _sample_spine_continuity(img, _spine_centroid_pts(), _map_canvas_item())
+	_mid_spine_cover = float(mid_cont.get("cover", 0.0))
+	_mid_spine_gap = float(mid_cont.get("gap_px", 999.0))
+	_log(
+		"EOA_RX1_PIXEL_GUARD who=guard.mid_spine_continuity units=off cover=%.3f gap_px=%.1f hits=%d total=%d need_cover>=%.2f max_gap<=%.1f"
+		% [
+			_mid_spine_cover,
+			_mid_spine_gap,
+			int(mid_cont.get("hits", 0)),
+			int(mid_cont.get("total", 0)),
+			SPINE_CONT_MIN_COVER,
+			SPINE_CONT_MAX_GAP_PX,
+		]
+	)
+	if _mid_spine_cover < SPINE_CONT_MIN_COVER:
+		_fail_reasons.append("mid_spine_continuity_cover")
+	if _mid_spine_gap > SPINE_CONT_MAX_GAP_PX:
+		_fail_reasons.append("mid_spine_continuity_gap")
 	_frame_over_koln(CLOSE_ZOOM, true)
 	_go_settle(Phase.DO_CLOSE)
 
@@ -196,9 +239,9 @@ func _do_roads() -> void:
 	var layer := _ensure_gold_spine_layer()
 	var img := _capture("rx1_pixel_road_spine_units_off")
 	if layer == null:
-		layer = _rhine_layer()
-	var line_hit := _sample_polyline(img, _spine_pts(), layer, "road")
-	var box_hit := _sample_spine_bbox(img, _spine_pts(), layer)
+		layer = _map_canvas_item()
+	var line_hit := _sample_polyline(img, _spine_centroid_pts(), layer, "road")
+	var box_hit := _sample_spine_bbox(img, _spine_centroid_pts(), layer)
 	_road_hit = maxf(line_hit, box_hit)
 	_log(
 		"EOA_RX1_PIXEL_GUARD who=guard.road_spine units=off line=%.3f box=%.3f hit=%.3f need>=%.2f gold_matcher=1"
@@ -206,6 +249,24 @@ func _do_roads() -> void:
 	)
 	if _road_hit < ROAD_MIN_HIT:
 		_fail_reasons.append("road_hit")
+	var close_cont: Dictionary = _sample_spine_continuity(img, _spine_centroid_pts(), _map_canvas_item())
+	_close_spine_cover = float(close_cont.get("cover", 0.0))
+	_close_spine_gap = float(close_cont.get("gap_px", 999.0))
+	_log(
+		"EOA_RX1_PIXEL_GUARD who=guard.close_spine_continuity units=off cover=%.3f gap_px=%.1f hits=%d total=%d need_cover>=%.2f max_gap<=%.1f"
+		% [
+			_close_spine_cover,
+			_close_spine_gap,
+			int(close_cont.get("hits", 0)),
+			int(close_cont.get("total", 0)),
+			SPINE_CONT_MIN_COVER,
+			SPINE_CONT_MAX_GAP_PX,
+		]
+	)
+	if _close_spine_cover < SPINE_CONT_MIN_COVER:
+		_fail_reasons.append("close_spine_continuity_cover")
+	if _close_spine_gap > SPINE_CONT_MAX_GAP_PX:
+		_fail_reasons.append("close_spine_continuity_gap")
 	_set_units_view(true)
 	_park_unit_over_river()
 	_frame_over_koln(CLOSE_ZOOM, true)
@@ -224,6 +285,26 @@ func _do_units_on() -> void:
 	)
 	if _units_on_hit < UNIT_MIN_HIT or _units_on_hit <= _units_on_river_under:
 		_fail_reasons.append("units_do_not_win")
+	# Same-frame park + force_draw left the plate at the river pixel (tip2:
+	# chip stayed at 818,445 while the sample jumped to 847,495 gold). Settle
+	# so the DemoUnitIcon transform actually paints on the spine.
+	_park_unit_over_spine()
+	_go_settle(Phase.DO_UNITS_ON_SPINE)
+
+
+func _do_units_on_spine() -> void:
+	_reassert_camera()
+	_reassert_parked_unit()
+	var spine_img := _capture("rx1_pixel_close_koeln_units_on_spine")
+	var spine_sample := _sample_parked_unit(spine_img)
+	_units_on_spine_chip = float(spine_sample.get("chip", 0.0))
+	_units_on_spine_gold = float(spine_sample.get("gold", 0.0))
+	_log(
+		"EOA_RX1_PIXEL_GUARD who=guard.units_on_spine chip=%.3f gold=%.3f need_chip>=%.2f and chip>gold"
+		% [_units_on_spine_chip, _units_on_spine_gold, UNIT_MIN_HIT]
+	)
+	if _units_on_spine_chip < UNIT_MIN_HIT or _units_on_spine_chip <= _units_on_spine_gold:
+		_fail_reasons.append("units_do_not_win_spine")
 	_restore_parked_unit()
 	_set_units_view(true)
 	_go_settle(Phase.DO_TOGGLE)
@@ -397,6 +478,11 @@ func _frame_over_koln(zoom: float, hide_inspector: bool) -> void:
 	var ol := _find_named("InfrastructureOverlayLayer")
 	if ol != null and ol.has_method("_apply_screen_space_road_widths"):
 		ol.call("_apply_screen_space_road_widths")
+	if ol != null and ol.has_method("refresh_ix1_gold_spine"):
+		ol.call("refresh_ix1_gold_spine", true)
+	var gold: Node = _find_named("Ix1GoldSpine")
+	if gold != null and gold.has_method("redraw_gold_spine"):
+		gold.call("redraw_gold_spine")
 	_log("EOA_RX1_PIXEL_GUARD who=guard.frame zoom=%.2f pos=%.1f,%.1f" % [zoom, pos.x, pos.y])
 
 
@@ -533,6 +619,101 @@ func _capture(name: String) -> Image:
 		% [path, img.get_width(), img.get_height()]
 	)
 	return img
+
+
+func _map_canvas_item() -> CanvasItem:
+	var rl := _road_layer()
+	if rl != null:
+		return rl
+	var ol := _find_named("InfrastructureOverlayLayer")
+	if ol is CanvasItem:
+		return ol as CanvasItem
+	return _rhine_layer()
+
+
+func _spine_centroid_pts() -> PackedVector2Array:
+	# Always Bonn → Köln → Leverkusen in that order. Do not concatenate
+	# per-segment Line2D children (that path is not the corridor).
+	var out := PackedVector2Array()
+	var mm := _map_manager()
+	if mm != null and mm.has_method("get_province_centroid"):
+		var b: Vector2 = mm.call("get_province_centroid", BONN)
+		var k: Vector2 = mm.call("get_province_centroid", KOELN)
+		var l: Vector2 = mm.call("get_province_centroid", LEV)
+		if b != Vector2.ZERO and k != Vector2.ZERO and l != Vector2.ZERO:
+			out.append(b)
+			out.append(k)
+			out.append(l)
+			return out
+	out.append(Vector2(4257.18 * 1.728, 951.42 * 1.728))
+	out.append(Vector2(4254.32 * 1.728, 944.10 * 1.728))
+	out.append(Vector2(4254.88 * 1.728, 940.99 * 1.728))
+	return out
+
+
+func _sample_spine_continuity(img: Image, pts: PackedVector2Array, layer: CanvasItem) -> Dictionary:
+	# Walk the projected centroid path every few screen px. Gold must be
+	# present in a tight neighborhood. Reports coverage and longest miss gap.
+	var empty := {"cover": 0.0, "gap_px": 999.0, "hits": 0, "total": 0}
+	if img == null or pts.size() < 2:
+		return empty
+	var xform := Transform2D.IDENTITY
+	if layer != null:
+		xform = layer.get_global_transform_with_canvas()
+	var w := img.get_width()
+	var h := img.get_height()
+	var hits := 0
+	var total := 0
+	var run_miss := 0
+	var longest_miss := 0
+	for i in range(1, pts.size()):
+		var a: Vector2 = xform * pts[i - 1]
+		var b: Vector2 = xform * pts[i]
+		var dist := a.distance_to(b)
+		if not is_finite(dist) or dist < 0.5:
+			continue
+		var steps := maxi(2, int(ceil(dist / SPINE_CONT_STEP_PX)))
+		for s in range(steps + 1):
+			var t := float(s) / float(maxi(steps, 1))
+			var p := a.lerp(b, t)
+			var ix := int(round(p.x))
+			var iy := int(round(p.y))
+			if ix < 0 or iy < 0 or ix >= w or iy >= h:
+				continue
+			total += 1
+			if _neighborhood_gold(img, ix, iy, SPINE_CONT_NEIGHBOR):
+				hits += 1
+				if run_miss > longest_miss:
+					longest_miss = run_miss
+				run_miss = 0
+			else:
+				run_miss += 1
+	if run_miss > longest_miss:
+		longest_miss = run_miss
+	if total <= 0:
+		_log("EOA_RX1_PIXEL_GUARD who=guard.continuity total=0 (off-screen or no layer)")
+		return empty
+	var cover := float(hits) / float(total)
+	var gap_px := float(longest_miss) * SPINE_CONT_STEP_PX
+	_log(
+		"EOA_RX1_PIXEL_GUARD who=guard.continuity cover=%.3f gap_px=%.1f hits=%d total=%d longest_miss=%d"
+		% [cover, gap_px, hits, total, longest_miss]
+	)
+	return {"cover": cover, "gap_px": gap_px, "hits": hits, "total": total, "longest_miss": longest_miss}
+
+
+func _neighborhood_gold(img: Image, x: int, y: int, rad: int) -> bool:
+	var w := img.get_width()
+	var h := img.get_height()
+	for dy in range(-rad, rad + 1):
+		for dx in range(-rad, rad + 1):
+			var xx := x + dx
+			var yy := y + dy
+			if xx < 0 or yy < 0 or xx >= w or yy >= h:
+				continue
+			if _is_road_color(img.get_pixel(xx, yy)):
+				return true
+	return false
 
 
 func _sample_polyline(img: Image, pts: PackedVector2Array, layer: CanvasItem, kind: String) -> float:
@@ -698,6 +879,23 @@ func _is_unit_chip_color(c: Color) -> bool:
 	return false
 
 
+func _is_unit_chip_or_plate_color(c: Color) -> bool:
+	if _is_unit_chip_color(c):
+		return true
+	if _is_river_color(c) or _is_road_color(c):
+		return false
+	# GER/ENG nation plates are mid-grey (low chroma). Count them only at the
+	# parked-icon sample so a plate covering the spine still wins.
+	var r := c.r * 255.0
+	var g := c.g * 255.0
+	var b := c.b * 255.0
+	var chroma := maxf(r, maxf(g, b)) - minf(r, minf(g, b))
+	var lum := (r + g + b) / 3.0
+	if chroma < 28.0 and lum > 22.0 and lum < 170.0:
+		return true
+	return false
+
+
 func _local_course_pts() -> PackedVector2Array:
 	var all := _course_pts()
 	var k := _koln_world()
@@ -741,34 +939,7 @@ func _road_layer() -> CanvasItem:
 
 
 func _spine_pts() -> PackedVector2Array:
-	var out := PackedVector2Array()
-	var rl := _road_layer()
-	if rl != null:
-		for c in rl.get_children():
-			if not (c is Line2D):
-				continue
-			var line := c as Line2D
-			var explicit := bool(line.get_meta("explicit", false)) or bool(line.get_meta("rx1_gold_spine", false))
-			if not explicit:
-				continue
-			for p in line.points:
-				out.append(p)
-		if out.size() >= 2:
-			return out
-	var mm := _map_manager()
-	if mm != null and mm.has_method("get_province_centroid"):
-		var b: Vector2 = mm.call("get_province_centroid", BONN)
-		var k: Vector2 = mm.call("get_province_centroid", KOELN)
-		var l: Vector2 = mm.call("get_province_centroid", LEV)
-		if b != Vector2.ZERO and k != Vector2.ZERO and l != Vector2.ZERO:
-			out.append(b)
-			out.append(k)
-			out.append(l)
-			return out
-	out.append(Vector2(4257.18 * 1.728, 951.42 * 1.728))
-	out.append(Vector2(4254.32 * 1.728, 944.10 * 1.728))
-	out.append(Vector2(4254.88 * 1.728, 940.99 * 1.728))
-	return out
+	return _spine_centroid_pts()
 
 
 func _ensure_spine_built() -> void:
@@ -788,6 +959,8 @@ func _ensure_gold_spine_layer() -> CanvasItem:
 	if ol != null and ol.has_method("force_paint_ix1_gold_spine"):
 		var n: int = int(ol.call("force_paint_ix1_gold_spine"))
 		_log("EOA_RX1_PIXEL_GUARD who=guard.gold_spine painted=%d (tip API)" % n)
+	if ol != null and ol.has_method("refresh_ix1_gold_spine"):
+		ol.call("refresh_ix1_gold_spine", true)
 	var rl := _road_layer()
 	if rl != null:
 		rl.visible = true
@@ -957,7 +1130,31 @@ func _sim_fingerprint() -> Dictionary:
 func _find_unit_icon() -> Node2D:
 	if root == null:
 		return null
+	var vis := _find_visible_unit_icon_on_screen()
+	if vis != null:
+		return vis
 	return _find_named_prefix(root, "DemoUnitIcon_") as Node2D
+
+
+func _find_visible_unit_icon_on_screen() -> Node2D:
+	if root == null:
+		return null
+	var best: Node2D = null
+	var best_d := 1.0e12
+	var koln := _koln_world()
+	var stack: Array[Node] = [root]
+	while not stack.is_empty():
+		var n: Node = stack.pop_back()
+		if n is Node2D and str(n.name).begins_with("DemoUnitIcon_"):
+			var icon := n as Node2D
+			if icon.visible:
+				var d := icon.global_position.distance_squared_to(koln)
+				if d < best_d:
+					best_d = d
+					best = icon
+		for c in n.get_children():
+			stack.append(c)
+	return best
 
 
 func _find_named_prefix(n: Node, prefix: String) -> Node:
@@ -972,6 +1169,62 @@ func _find_named_prefix(n: Node, prefix: String) -> Node:
 	return null
 
 
+func _park_unit_over_spine() -> void:
+	# Keep the already-visible river-parked chip if it is still on screen.
+	# Do not grab DemoUnitIcon_710000 (Thrace, often culled) — that node can
+	# sit on Köln while its sprite never paints, so the gold join disc "wins".
+	var icon: Node2D = null
+	if _parked_unit != null and is_instance_valid(_parked_unit) and _parked_unit.visible:
+		icon = _parked_unit
+	else:
+		_restore_parked_unit()
+		icon = _find_unit_icon()
+	if icon == null:
+		_log("EOA_RX1_PIXEL_GUARD who=guard.park_spine no DemoUnitIcon (units-on spine sample may fail)")
+		return
+	var pts := _spine_centroid_pts()
+	var dest := _koln_world()
+	if pts.size() >= 2:
+		dest = pts[0].lerp(pts[1], 0.45)
+	if _parked_unit != icon:
+		_parked_unit_pos = icon.global_position
+		_parked_unit_parent = icon.get_parent()
+		_parked_unit_index = icon.get_index()
+		_parked_unit = icon
+	# Reparent onto the map so a province host cannot keep the plate at the
+	# home centroid after the river park (same-frame force_draw left the
+	# sprite at 818,445 while the sample jumped to the gold join).
+	var host := _map_renderer() as Node
+	if host != null and icon.get_parent() != host:
+		if icon.get_parent() != null:
+			icon.get_parent().remove_child(icon)
+		host.add_child(icon)
+	_apply_parked_unit_pose(icon, dest)
+	_log("EOA_RX1_PIXEL_GUARD who=guard.park_spine unit=%s to=%.1f,%.1f (visual only)" % [str(icon.name), dest.x, dest.y])
+
+
+func _reassert_parked_unit() -> void:
+	if _parked_unit == null or not is_instance_valid(_parked_unit):
+		return
+	var pts := _spine_centroid_pts()
+	var dest := _koln_world()
+	if pts.size() >= 2:
+		dest = pts[0].lerp(pts[1], 0.45)
+	_apply_parked_unit_pose(_parked_unit, dest)
+
+
+func _apply_parked_unit_pose(icon: Node2D, dest: Vector2) -> void:
+	icon.z_as_relative = false
+	icon.z_index = 28
+	icon.visible = true
+	icon.modulate = Color(1, 1, 1, 1)
+	icon.global_position = dest
+	for c in icon.get_children():
+		if c is CanvasItem:
+			(c as CanvasItem).visible = true
+			(c as CanvasItem).modulate = Color(1, 1, 1, 1)
+
+
 func _park_unit_over_river() -> void:
 	_restore_parked_unit()
 	var icon := _find_unit_icon()
@@ -984,52 +1237,80 @@ func _park_unit_over_river() -> void:
 		dest = pts[int(pts.size() / 2)]
 	_parked_unit = icon
 	_parked_unit_pos = icon.global_position
+	_parked_unit_parent = icon.get_parent()
+	_parked_unit_index = icon.get_index()
+	icon.z_as_relative = false
+	icon.z_index = 28
+	icon.visible = true
 	icon.global_position = dest
-	_log("EOA_RX1_PIXEL_GUARD who=guard.park unit=%s to=%.1f,%.1f (visual only)" % [str(icon.name), dest.x, dest.y])
+	_log("EOA_RX1_PIXEL_GUARD who=guard.park unit=%s to=%.1f,%.1f vis=%s (visual only)" % [str(icon.name), dest.x, dest.y, str(icon.visible)])
 
 
 func _restore_parked_unit() -> void:
 	if _parked_unit != null and is_instance_valid(_parked_unit):
+		if _parked_unit_parent != null and is_instance_valid(_parked_unit_parent):
+			if _parked_unit.get_parent() != _parked_unit_parent:
+				if _parked_unit.get_parent() != null:
+					_parked_unit.get_parent().remove_child(_parked_unit)
+				_parked_unit_parent.add_child(_parked_unit)
+				if _parked_unit_index >= 0 and _parked_unit_index < _parked_unit_parent.get_child_count():
+					_parked_unit_parent.move_child(_parked_unit, _parked_unit_index)
 		_parked_unit.global_position = _parked_unit_pos
 	_parked_unit = null
 	_parked_unit_pos = Vector2.ZERO
+	_parked_unit_parent = null
+	_parked_unit_index = -1
 
 
-func _sample_parked_unit(img: Image) -> Dictionary:
+func _parked_unit_sample_center(icon: Node2D) -> Vector2:
+	# StatBars (org green) sit on the painted plate; sample there so a grey
+	# GER NationPlate at the Node2D origin is not mistaken for "no chip".
+	var bars := icon.get_node_or_null("StatBars")
+	if bars is Node2D:
+		return (bars as Node2D).get_global_transform_with_canvas() * Vector2.ZERO
+	var plate := icon.get_node_or_null("NationPlate")
+	if plate is CanvasItem:
+		return (plate as CanvasItem).get_global_transform_with_canvas() * Vector2.ZERO
+	return icon.get_global_transform_with_canvas() * Vector2.ZERO
+
+
+func _sample_parked_unit(img: Image, rad: int = 10) -> Dictionary:
 	if img == null:
-		return {"chip": 0.0, "river": 0.0}
+		return {"chip": 0.0, "river": 0.0, "gold": 0.0}
 	var icon := _parked_unit
 	if icon == null or not is_instance_valid(icon):
 		icon = _find_unit_icon()
 	if icon == null:
 		_log("EOA_RX1_PIXEL_GUARD who=guard.sample_unit no icon")
-		return {"chip": 0.0, "river": 0.0}
-	var xform := icon.get_global_transform_with_canvas()
-	var center: Vector2 = xform * Vector2.ZERO
+		return {"chip": 0.0, "river": 0.0, "gold": 0.0}
+	var center: Vector2 = _parked_unit_sample_center(icon)
 	var w := img.get_width()
 	var h := img.get_height()
 	var chip := 0
 	var river := 0
+	var gold := 0
 	var total := 0
-	var rad := 10
-	for dy in range(-rad, rad + 1):
-		for dx in range(-rad, rad + 1):
+	var use_rad := maxi(rad, 1)
+	for dy in range(-use_rad, use_rad + 1):
+		for dx in range(-use_rad, use_rad + 1):
 			var xx := int(round(center.x)) + dx
 			var yy := int(round(center.y)) + dy
 			if xx < 0 or yy < 0 or xx >= w or yy >= h:
 				continue
 			total += 1
 			var c := img.get_pixel(xx, yy)
-			if _is_unit_chip_color(c):
+			if _is_unit_chip_or_plate_color(c):
 				chip += 1
 			if _is_river_color(c):
 				river += 1
+			if _is_road_color(c):
+				gold += 1
 	if total <= 0:
-		return {"chip": 0.0, "river": 0.0}
-	_log("EOA_RX1_PIXEL_GUARD who=guard.sample_unit chip=%d river=%d total=%d at=%.1f,%.1f" % [
-		chip, river, total, center.x, center.y
+		return {"chip": 0.0, "river": 0.0, "gold": 0.0}
+	_log("EOA_RX1_PIXEL_GUARD who=guard.sample_unit chip=%d river=%d gold=%d total=%d at=%.1f,%.1f" % [
+		chip, river, gold, total, center.x, center.y
 	])
-	return {"chip": float(chip) / float(total), "river": float(river) / float(total)}
+	return {"chip": float(chip) / float(total), "river": float(river) / float(total), "gold": float(gold) / float(total)}
 
 
 func _log(msg: String) -> void:
@@ -1044,13 +1325,19 @@ func _finish(ok: bool) -> void:
 		process_frame.disconnect(_on_process)
 	var verdict := "PASS" if ok else "FAIL"
 	_log(
-		"EOA_RX1_PIXEL_GUARD mid_river=%.3f close_river=%.3f road=%.3f units_on_chip=%.3f units_on_river=%.3f toggle=%s direct_hide=%s koln_offer=%s koln_built=%s koln_bridge_leak=%s neuss_spine_leak=%s %s"
+		"EOA_RX1_PIXEL_GUARD mid_river=%.3f close_river=%.3f road=%.3f mid_spine_cover=%.3f mid_spine_gap=%.1f close_spine_cover=%.3f close_spine_gap=%.1f units_on_chip=%.3f units_on_river=%.3f units_on_spine_chip=%.3f units_on_spine_gold=%.3f toggle=%s direct_hide=%s koln_offer=%s koln_built=%s koln_bridge_leak=%s neuss_spine_leak=%s %s"
 		% [
 			_mid_river_hit,
 			_close_river_hit,
 			_road_hit,
+			_mid_spine_cover,
+			_mid_spine_gap,
+			_close_spine_cover,
+			_close_spine_gap,
 			_units_on_hit,
 			_units_on_river_under,
+			_units_on_spine_chip,
+			_units_on_spine_gold,
 			str(_toggle_ok),
 			str(_used_direct_unit_hide),
 			str(_koln_panel.get("offers_build_road_spine", "?")),

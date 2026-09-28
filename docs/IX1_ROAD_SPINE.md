@@ -10,7 +10,7 @@
 |--|------------------------|--------------------|
 | Player order | Invest raises an infra **number** + construction ring. F10 Invest is debug. | Inspector **Build Road Spine** on the corridor starts a real Invest-style project (ETA / bar / ring). |
 | Road edges | `Province.built_road_neighbors` + `MapManager.build_road_connection` existed but were not a front-door order. | Complete calls `build_road_connection` on the corridor edges. |
-| Look | RoadLayer Line2D existed; political / F1 hid it; F10 / Infra mapmode only. | Three corridor states: **queued** faint dashed `_draw`, **construction** hatched/partial advancing with `%`, **built** existing RoadLayer at playable mid-zoom (`z > 0.10`) without F10. Preview is not Line2D and is not rebuilt on zoom. |
+| Look | RoadLayer Line2D existed; political / F1 hid it; F10 / Infra mapmode only. | Three corridor states: **queued** faint dashed `_draw`, **construction** hatched/partial advancing with `%`, **built** one joined gold polyline (Bonn→Köln→Leverkusen, round joins/caps, screen-pixel width) at playable mid **and** close zoom without F10. Per-edge Line2Ds stay for reports. Preview is not Line2D and is not rebuilt on zoom. |
 | Impact | `get_movement_cost()` used infra only. | Infra +1 **and** a `built_road_neighbors` discount. Spine move/supply cost is **strictly less** than pre-build and cheaper than off-spine Essen at the same starting infra. |
 
 ## Theater (one corridor)
@@ -96,7 +96,7 @@ New front door: `InfrastructureDevelopmentManager.try_start_road_spine` / `link_
 ## PASS criteria
 
 1. SCRIPT_ERROR **0**. Esc → Command Center **HARD PASS** unchanged.
-2. **Look:** readable road line on Bonn–Köln–Leverkusen at playable zoom (not F10-only).
+2. **Look:** one continuous gold line Bonn–Köln–Leverkusen at mid **and** close zoom with units hidden (not F10-only; not two unjoined segments). Pixel-guard continuity **FAIL** on `dbbdef4` (mid cover **0.222** gap **12.0 px**, close cover **0.125** gap **42.0 px**) and **PASS** on this tip (mid/close cover **1.000** gap **0**). Units ON over the spine: chip **0.932** / gold **0.000**. Smoke harness is **not** the product.
 3. **Impact:** spine `get_movement_cost` **strictly less** than pre-build; cheaper than off-spine Essen control.
 4. Thin unittest `test_ix1_road_spine_product` green (edges present + cost delta + GER 1936 day-0 Mandate gate).
 5. Tyrrhenian / Ligurian / Flanders / SE England / pale-map / Fill%·TOE **untouched**.
