@@ -70,7 +70,7 @@ Stored Rhine 321 canvas Y ~1781–1864 is the world_full mercator bake (`use_mer
 | `tools/eoa_rx1_bridge_live_progress_guard.sh` | Windowed smoke: viewport mouse on Build Bridge. **Not the product.** |
 | `HeadlessRx1RhineVisibilityTest` | Units on top: labels 18 < river/road < DemoUnitIcon 28; screen-space widths; gold spine; U + BtnUnitsView; spine chrome absent on Neuss 710413; `run_godot.sh` import-if-needed. |
 | `HeadlessRx1RhinePanelStateTest` | Köln never re-offers Build Road Spine after built; bridge chrome only on Neuss 710413 / Mettmann 710412. |
-| `tools/eoa_rx1_pixel_guard.sh` | **WINDOWED** (xvfb) live `TestScenario` captures. Units OFF: Rhine + gold spine at mid/close. Units ON: counter pixels win over the river. U hide/restore, sim unchanged. Real PNGs, not mocks. Smoke harness is **not** the product. |
+| `tools/eoa_rx1_pixel_guard.sh` | **WINDOWED** (xvfb) live `TestScenario` captures. Units OFF: Rhine at mid/close **plus continuity** along the whole Bonn–Köln–Leverkusen gold path (coverage % + longest gap). Units ON: counter pixels win over the river **and** over the spine. U hide/restore, sim unchanged. Real PNGs, not mocks. Smoke harness is **not** the product. |
 
 Must **FAIL** on `816cdc9` (pixels + Köln re-offer + bridge leak) and **PASS** on this tip. IX-1 headless + python stay green. The FIX1 z-order check alone is not evidence — Play MIXED `816cdc9` passed it while the screen stayed empty.
 
@@ -90,7 +90,7 @@ Köln after `state=built` re-offered **Build Road Spine** because `should_show_r
 
 Owner: undo the FIX1 raise that put Rhine z=90 / roads z=88 above DemoUnitIcon z=28. Map layers sit **below** units. Keep theater-scale, screen-space widths, close-zoom label hide, Köln built state, and status-leak scoping.
 
-- z stack: nation Labels **18** < RoadLayer / spine **21** < Rhine **22** < DemoUnitIcon **28**
+- z stack: nation Labels **18** < RoadLayer **21** < Rhine **22** < joined gold spine **23** < DemoUnitIcon **28**
 - **U** = show/hide unit counters + stack chips / selection rings / pin pulse / battle bubbles. Default **shown**. View-only — no sim, selection, orders, or save data. Search LineEdit focus swallows U. **Shift+U** is supply/sealane flow (was plain U).
 - HUD `BtnUnitsView` on the time-speed strip stays in sync with the hotkey.
 - Built spine uses gold `ROAD_EXPLICIT_COLOR` (0.92, 0.62, 0.08) so the pixel sample cannot pass on tan land.

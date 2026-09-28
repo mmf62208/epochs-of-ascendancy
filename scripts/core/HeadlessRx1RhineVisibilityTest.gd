@@ -118,7 +118,18 @@ func _test_z_order() -> void:
 	if "ROAD_EXPLICIT_COLOR" not in infra:
 		_fail("InfrastructureOverlayLayer missing gold ROAD_EXPLICIT_COLOR")
 		return
-	_pass("Rhine z=%d and Road z=%d sit above labels 18 and below units 28" % [rhine_z, road_z])
+	if "class Ix1GoldSpineDraw" not in infra or "func refresh_ix1_gold_spine" not in infra:
+		_fail("InfrastructureOverlayLayer missing joined Ix1GoldSpineDraw")
+		return
+	var gold_z := _const_int(infra, "GOLD_SPINE_Z")
+	if gold_z >= 28 or gold_z <= 18:
+		_fail("GOLD_SPINE_Z=%d must sit above labels 18 and below units 28" % gold_z)
+		return
+	var guard := _read("res://scripts/core/WindowedRx1RhinePixelGuard.gd")
+	if "_sample_spine_continuity" not in guard:
+		_fail("pixel guard must sample spine continuity along Bonn–Köln–Leverkusen")
+		return
+	_pass("Rhine z=%d Road z=%d gold z=%d sit above labels 18 and below units 28" % [rhine_z, road_z, gold_z])
 
 
 func _test_spine_chrome_scope() -> void:

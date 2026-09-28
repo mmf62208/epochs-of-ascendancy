@@ -3563,6 +3563,12 @@ func _layout_info_panel_inner() -> void:
 		header_h = 68.0
 	if _btn_build_rhine_bridge != null and is_instance_valid(_btn_build_rhine_bridge) and _btn_build_rhine_bridge.visible:
 		header_h = maxf(header_h, 96.0)
+	# Status line sits in chrome below Settle / Build, not over the province title.
+	if _label_spine_progress != null and is_instance_valid(_label_spine_progress) and _label_spine_progress.visible:
+		if _btn_build_road_spine != null and is_instance_valid(_btn_build_road_spine) and _btn_build_road_spine.visible:
+			header_h = maxf(header_h, 128.0)
+		else:
+			header_h = maxf(header_h, 100.0)
 
 	if btn_national_spirits != null:
 		btn_national_spirits.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
@@ -3593,6 +3599,7 @@ func _layout_info_panel_inner() -> void:
 	var scroll_w := maxf(panel_w - PAD_L - PAD_R, 120.0)
 	var scroll_h := maxf(panel_h - header_h - FOOTER_PAD, 80.0)
 	_layout_road_spine_chrome_button()
+	_layout_spine_progress_label()
 	var text_w := maxf(scroll_w - INNER_L - INNER_R - SCROLLBAR_W, 100.0)
 
 	var scroll := ip.get_node_or_null("InfoScroll") as ScrollContainer
@@ -20842,8 +20849,12 @@ func _layout_spine_progress_label() -> void:
 	if panel_w < 80.0:
 		panel_w = maxf(ip.size.x, 520.0)
 	_label_spine_progress.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
-	_label_spine_progress.position = Vector2(8.0, 94.0)
-	_label_spine_progress.custom_minimum_size = Vector2(minf(480.0, maxf(280.0, panel_w - 24.0)), 22.0)
+	# Below Settle (y=38–62). If Build Road Spine is showing (y=66–92), sit under it.
+	var status_y := 70.0
+	if _btn_build_road_spine != null and is_instance_valid(_btn_build_road_spine) and _btn_build_road_spine.visible:
+		status_y = 98.0
+	_label_spine_progress.position = Vector2(8.0, status_y)
+	_label_spine_progress.custom_minimum_size = Vector2(minf(480.0, maxf(280.0, panel_w - 24.0)), 26.0)
 	_label_spine_progress.size = _label_spine_progress.custom_minimum_size
 	_layout_spine_start_notice()
 
@@ -20875,7 +20886,10 @@ func _layout_spine_start_notice() -> void:
 	if panel_w < 80.0:
 		panel_w = maxf(ip.size.x, 520.0)
 	_label_spine_start_notice.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
-	_label_spine_start_notice.position = Vector2(8.0, 120.0)
+	var notice_y := 128.0
+	if _label_spine_progress != null and is_instance_valid(_label_spine_progress) and _label_spine_progress.visible:
+		notice_y = _label_spine_progress.position.y + _label_spine_progress.size.y + 6.0
+	_label_spine_start_notice.position = Vector2(8.0, notice_y)
 	_label_spine_start_notice.custom_minimum_size = Vector2(minf(500.0, maxf(280.0, panel_w - 24.0)), 22.0)
 	_label_spine_start_notice.size = _label_spine_start_notice.custom_minimum_size
 

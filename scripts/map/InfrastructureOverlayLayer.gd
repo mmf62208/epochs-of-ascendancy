@@ -64,6 +64,8 @@ var sites_layer: Node2D  # For airfields, ports, shipyards etc. as toggleable/ed
 var industry_layer: Node2D
 ## IX-1 queued/construction preview. Persistent _draw child — never Line2D churn on zoom.
 var spine_preview_layer: Node2D
+## Built Bonn–Köln–Leverkusen gold spine. One joined polyline (_draw), not two unjoined segments.
+var gold_spine_layer: Node2D
 
 ## Era band for sparse 1918 vs default 1936 vs dense 2026+ infra visualization.
 var _last_era_band: int = -1
@@ -96,9 +98,15 @@ const LAYER_PROV_CACHE_MS := 400
 const UNIT_COUNTER_Z := 28
 const ROAD_BELOW_UNITS_Z := 21
 const SPINE_BELOW_UNITS_Z := 21
+## Joined gold spine sits above the Rhine (22) and below DemoUnitIcon (28).
+## Generic RoadLayer Line2Ds stay at ROAD_BELOW_UNITS_Z so RX-1 order is unchanged.
+const GOLD_SPINE_Z := 23
 const ROAD_EXPLICIT_SCREEN_PX := 7.0
 const ROAD_INFERRED_SCREEN_PX := 4.0
+const GOLD_SPINE_SCREEN_PX := 9.0
+const GOLD_SPINE_HALO_SCREEN_PX := 13.0
 const ROAD_EXPLICIT_COLOR := Color(0.92, 0.62, 0.08, 0.96)
+const GOLD_SPINE_HALO_COLOR := Color(0.38, 0.18, 0.02, 0.88)
 
 func _ready():
     infrastructure_manager = get_node_or_null("/root/InfrastructureDevelopmentManager")
@@ -182,6 +190,17 @@ func _ensure_sub_layers():
     if spine_preview_layer != null:
         spine_preview_layer.z_as_relative = false
         spine_preview_layer.z_index = SPINE_BELOW_UNITS_Z
+    if gold_spine_layer == null:
+        gold_spine_layer = get_node_or_null("Ix1GoldSpine")
+        if gold_spine_layer == null:
+            gold_spine_layer = Ix1GoldSpineDraw.new()
+            gold_spine_layer.name = "Ix1GoldSpine"
+            gold_spine_layer.z_as_relative = false
+            gold_spine_layer.z_index = GOLD_SPINE_Z
+            add_child(gold_spine_layer)
+    if gold_spine_layer != null:
+        gold_spine_layer.z_as_relative = false
+        gold_spine_layer.z_index = GOLD_SPINE_Z
 
 func _apply_layer_visibilities():
     _update_sub_layer_visibilities()
@@ -207,6 +226,11 @@ func _update_sub_layer_visibilities() -> void:
         # Visibility only — never rebuild/create nodes on zoom (silent-exit class).
         var prev_state := str(spine_preview_layer.get("state"))
         spine_preview_layer.visible = prev_state in ["queued", "construction"] and z > 0.10
+    if gold_spine_layer:
+        var gold_built := bool(gold_spine_layer.get("built"))
+        gold_spine_layer.visible = gold_built and z > 0.10
+        if gold_spine_layer.has_method("redraw_gold_spine"):
+            gold_spine_layer.call("redraw_gold_spine")
     if rail_layer:
         rail_layer.visible = show_rails and z > 0.14
     if city_layer or sites_layer:
@@ -578,6 +602,9 @@ func _rebuild_road_layer_inner() -> void:
                 if has_explicit:
                     line.default_color = ROAD_EXPLICIT_COLOR
                     line.width = _road_world_width(ROAD_EXPLICIT_SCREEN_PX)
+                    line.begin_cap_mode = Line2D.LINE_CAP_ROUND
+                    line.end_cap_mode = Line2D.LINE_CAP_ROUND
+                    line.joint_mode = Line2D.LINE_JOINT_ROUND
                     line.z_as_relative = false
                     line.z_index = ROAD_BELOW_UNITS_Z
                 elif tier >= 2:
@@ -600,6 +627,7 @@ func _rebuild_road_layer_inner() -> void:
             road_layer.add_child(line)
     # Explicit IX-1 edges even if adjacency cache missed the corridor.
     _paint_explicit_ix1_spine_if_missing(provinces, drawn)
+    refresh_ix1_gold_spine()
     if road_layer.get_child_count() > 0 and _get_current_zoom() > 0.10:
         road_layer.visible = true
 
@@ -634,6 +662,9 @@ func _paint_explicit_ix1_spine_if_missing(provinces: Dictionary, drawn: Dictiona
             line.antialiased = true
             line.default_color = ROAD_EXPLICIT_COLOR
             line.width = _road_world_width(ROAD_EXPLICIT_SCREEN_PX)
+            line.begin_cap_mode = Line2D.LINE_CAP_ROUND
+            line.end_cap_mode = Line2D.LINE_CAP_ROUND
+            line.joint_mode = Line2D.LINE_JOINT_ROUND
             line.z_as_relative = false
             line.z_index = ROAD_BELOW_UNITS_Z
             line.set_meta("p1", pid)
@@ -646,6 +677,8 @@ func _paint_explicit_ix1_spine_if_missing(provinces: Dictionary, drawn: Dictiona
 
 ## Pixel-guard / inspector: paint the built Bonn–Köln–Leverkusen gold spine
 ## even if the layer cull missed the edges. View-only; does not change sim.
+## The readable stroke is the joined Ix1GoldSpineDraw polyline (round joins/caps,
+## screen-pixel width). Per-edge Line2Ds stay for find_road_node / IX-1 reports.
 func force_paint_ix1_gold_spine() -> int:
     _ensure_sub_layers()
     if road_layer == null or map_manager == null:
@@ -665,9 +698,15 @@ func force_paint_ix1_gold_spine() -> int:
             el.points = PackedVector2Array([c1, c2])
             el.default_color = ROAD_EXPLICIT_COLOR
             el.width = _road_world_width(ROAD_EXPLICIT_SCREEN_PX)
+            el.begin_cap_mode = Line2D.LINE_CAP_ROUND
+            el.end_cap_mode = Line2D.LINE_CAP_ROUND
+            el.joint_mode = Line2D.LINE_JOINT_ROUND
             el.visible = true
             el.z_as_relative = false
             el.z_index = ROAD_BELOW_UNITS_Z
+            el.set_meta("p1", a)
+            el.set_meta("p2", b)
+            el.set_meta("explicit", true)
             painted += 1
             continue
         var line := Line2D.new()
@@ -676,15 +715,71 @@ func force_paint_ix1_gold_spine() -> int:
         line.antialiased = true
         line.default_color = ROAD_EXPLICIT_COLOR
         line.width = _road_world_width(ROAD_EXPLICIT_SCREEN_PX)
+        line.begin_cap_mode = Line2D.LINE_CAP_ROUND
+        line.end_cap_mode = Line2D.LINE_CAP_ROUND
+        line.joint_mode = Line2D.LINE_JOINT_ROUND
         line.z_as_relative = false
         line.z_index = ROAD_BELOW_UNITS_Z
+        line.set_meta("p1", a)
+        line.set_meta("p2", b)
         line.set_meta("explicit", true)
         line.set_meta("rx1_gold_spine", true)
         road_layer.add_child(line)
         painted += 1
     road_layer.visible = true
     _apply_screen_space_road_widths()
+    refresh_ix1_gold_spine(true)
     return painted
+
+
+func _ix1_gold_spine_centroids() -> Dictionary:
+    var cents: Dictionary = {}
+    if map_manager == null:
+        return cents
+    for spine_pid in [710416, 710417, 710418]:
+        var c: Vector2 = Vector2.ZERO
+        if map_manager.has_method("get_province_centroid"):
+            c = map_manager.get_province_centroid(spine_pid)
+        if c == Vector2.ZERO and map_manager.has_method("get_province"):
+            var p: Province = map_manager.get_province(spine_pid)
+            if p != null:
+                c = p.coordinates
+        cents[spine_pid] = c
+    return cents
+
+
+func _ix1_gold_spine_edges_present() -> bool:
+    if find_road_node(710417, 710416) != null and find_road_node(710417, 710418) != null:
+        return true
+    if map_manager == null or not map_manager.has_method("get_province"):
+        return false
+    var p: Province = map_manager.get_province(710417)
+    if p == null:
+        return false
+    return (710416 in p.built_road_neighbors) and (710418 in p.built_road_neighbors)
+
+
+## One joined Bonn→Köln→Leverkusen gold polyline. force=true is the pixel-guard path.
+func refresh_ix1_gold_spine(force: bool = false) -> int:
+    _ensure_sub_layers()
+    if gold_spine_layer == null:
+        return 0
+    var cents: Dictionary = _ix1_gold_spine_centroids()
+    var built := force or _ix1_gold_spine_edges_present()
+    var ok := 0
+    for spine_pid in [710416, 710417, 710418]:
+        var c: Vector2 = cents.get(spine_pid, Vector2.ZERO)
+        if typeof(c) == TYPE_VECTOR2 and c != Vector2.ZERO:
+            ok += 1
+    if ok < 3:
+        built = false
+    if gold_spine_layer.has_method("setup_gold_spine"):
+        gold_spine_layer.call("setup_gold_spine", cents, built)
+    var z := _get_current_zoom()
+    if not is_finite(z):
+        z = 1.0
+    gold_spine_layer.visible = built and z > 0.10
+    return ok if built else 0
 
 ## Similar for rails - higher threshold, distinct style (e.g. dashed via multiple segments or color)
 func rebuild_rail_layer():
@@ -1242,6 +1337,8 @@ func set_show_roads(enabled: bool):
 
 
 func _road_layer_has_explicit_lines() -> bool:
+    if gold_spine_layer != null and bool(gold_spine_layer.get("built")):
+        return true
     if road_layer == null:
         return false
     for c in road_layer.get_children():
@@ -1891,18 +1988,19 @@ func _road_world_width(screen_px: float) -> float:
 
 
 func _apply_screen_space_road_widths() -> void:
-    if road_layer == null:
-        return
-    var explicit_w := _road_world_width(ROAD_EXPLICIT_SCREEN_PX)
-    var inferred_w := _road_world_width(ROAD_INFERRED_SCREEN_PX)
-    for child in road_layer.get_children():
-        if not (child is Line2D):
-            continue
-        var line := child as Line2D
-        if bool(line.get_meta("explicit", false)):
-            line.width = explicit_w
-        elif show_roads:
-            line.width = inferred_w
+    if road_layer != null:
+        var explicit_w := _road_world_width(ROAD_EXPLICIT_SCREEN_PX)
+        var inferred_w := _road_world_width(ROAD_INFERRED_SCREEN_PX)
+        for child in road_layer.get_children():
+            if not (child is Line2D):
+                continue
+            var line := child as Line2D
+            if bool(line.get_meta("explicit", false)):
+                line.width = explicit_w
+            elif show_roads:
+                line.width = inferred_w
+    if gold_spine_layer != null and gold_spine_layer.has_method("redraw_gold_spine"):
+        gold_spine_layer.call("redraw_gold_spine")
 
 
 func _get_current_zoom() -> float:
@@ -2144,3 +2242,88 @@ class Ix1SpinePreviewDraw extends Node2D:
                 last_draw_segs += 1
             walked += step
             n += 1
+
+
+## Built IX-1 gold spine: ONE joined Bonn→Köln→Leverkusen polyline.
+## Screen-pixel width (same class as Rx1RhineLayer THEATER_SCALE + 1/zoom).
+## Round joins/caps via vertex discs so the Köln joint does not open a gap.
+## Hub-local draw (AABB stays tiny). z=GOLD_SPINE_Z (23) — above Rhine 22, below units 28.
+class Ix1GoldSpineDraw extends Node2D:
+    var built: bool = false
+    var cents: Dictionary = {}
+    var _last_zoom: float = -1.0
+    var _in_draw: bool = false
+
+    func _ready() -> void:
+        z_as_relative = false
+        z_index = GOLD_SPINE_Z
+        set_process(true)
+        visible = false
+
+    func setup_gold_spine(new_cents: Dictionary, is_built: bool) -> void:
+        cents = new_cents.duplicate()
+        built = is_built
+        var hub_c: Vector2 = _as_finite_vec(cents.get(710417, Vector2.ZERO))
+        if hub_c != Vector2.ZERO:
+            position = hub_c
+        visible = built
+        if not _in_draw:
+            queue_redraw()
+
+    func redraw_gold_spine() -> void:
+        if not _in_draw:
+            queue_redraw()
+
+    func _process(_delta: float) -> void:
+        var z := _canvas_zoom()
+        if absf(z - _last_zoom) > 0.008:
+            _last_zoom = z
+            if built:
+                queue_redraw()
+
+    func _canvas_zoom() -> float:
+        var vp := get_viewport()
+        if vp != null:
+            var cam := vp.get_camera_2d()
+            if cam != null:
+                return maxf(absf(cam.zoom.x), absf(cam.zoom.y))
+        return 1.0
+
+    func _world_width(screen_px: float) -> float:
+        return maxf(screen_px, 7.0) / maxf(_canvas_zoom(), 0.04)
+
+    func _as_finite_vec(v: Variant) -> Vector2:
+        if typeof(v) != TYPE_VECTOR2:
+            return Vector2.ZERO
+        var vec: Vector2 = v
+        if not is_finite(vec.x) or not is_finite(vec.y):
+            return Vector2.ZERO
+        return vec
+
+    func _draw() -> void:
+        if _in_draw:
+            return
+        _in_draw = true
+        if not built:
+            _in_draw = false
+            return
+        var origin: Vector2 = position
+        var bonn: Vector2 = _as_finite_vec(cents.get(710416, Vector2.ZERO))
+        var koeln: Vector2 = _as_finite_vec(cents.get(710417, Vector2.ZERO))
+        var lev: Vector2 = _as_finite_vec(cents.get(710418, Vector2.ZERO))
+        if bonn == Vector2.ZERO or koeln == Vector2.ZERO or lev == Vector2.ZERO:
+            _in_draw = false
+            return
+        var pts := PackedVector2Array([bonn - origin, koeln - origin, lev - origin])
+        var halo_w := _world_width(GOLD_SPINE_HALO_SCREEN_PX)
+        var gold_w := _world_width(GOLD_SPINE_SCREEN_PX)
+        # Halo first so the gold reads through river/fill. One polyline = one joint at Köln.
+        draw_polyline(pts, GOLD_SPINE_HALO_COLOR, halo_w, true)
+        draw_polyline(pts, ROAD_EXPLICIT_COLOR, gold_w, true)
+        # Round joins/caps: discs at Bonn, Köln, Leverkusen so the joint cannot open.
+        var cap_r := gold_w * 0.5
+        var halo_r := halo_w * 0.5
+        for p in pts:
+            draw_circle(p, halo_r, GOLD_SPINE_HALO_COLOR)
+            draw_circle(p, cap_r, ROAD_EXPLICIT_COLOR)
+        _in_draw = false

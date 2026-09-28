@@ -154,6 +154,11 @@ SHIPPED_API_NEEDLES: Tuple[Tuple[Path, str], ...] = (
     (INFRA_OVERLAY_GD, "ROAD_EXPLICIT_SCREEN_PX"),
     (INFRA_OVERLAY_GD, "ROAD_EXPLICIT_COLOR"),
     (INFRA_OVERLAY_GD, "func force_paint_ix1_gold_spine"),
+    (INFRA_OVERLAY_GD, "func refresh_ix1_gold_spine"),
+    (INFRA_OVERLAY_GD, "class Ix1GoldSpineDraw"),
+    (INFRA_OVERLAY_GD, "GOLD_SPINE_SCREEN_PX"),
+    (PIXEL_GUARD_GD, "_sample_spine_continuity"),
+    (PIXEL_GUARD_GD, "SPINE_CONT_MIN_COVER"),
     (RENDERER_GD, "func set_unit_counters_visible"),
     (RENDERER_GD, "func units_view_report"),
     (RENDERER_GD, "inspector_should_show_spine_status"),
@@ -626,6 +631,7 @@ def visibility_order() -> Dict[str, Any]:
     unit_z = _const_int(layer, "UNIT_COUNTER_Z")
     label_z = _const_int(layer, "NATION_LABEL_Z")
     road_z = _const_int(infra, "ROAD_BELOW_UNITS_Z")
+    gold_z = _const_int(infra, "GOLD_SPINE_Z")
     overlay_unit = _const_int(infra, "UNIT_COUNTER_Z")
     spine_ok = (
         "inspector_should_show_spine_status" in ren
@@ -646,6 +652,7 @@ def visibility_order() -> Dict[str, Any]:
         and label_z == 18
         and 18 < rhine_z < 28
         and 18 < road_z < 28
+        and 18 < gold_z < 28
         and "ABOVE_UNIT_COUNTERS_Z" not in layer
         and "ROAD_ABOVE_UNIT_COUNTERS_Z" not in infra
     )
@@ -654,6 +661,7 @@ def visibility_order() -> Dict[str, Any]:
         "ok": ok,
         "rhine_z": rhine_z,
         "road_z": road_z,
+        "gold_z": gold_z,
         "unit_z": unit_z,
         "label_z": label_z,
         "units_on_top": units_on_top,
@@ -678,11 +686,13 @@ def units_view_toggle() -> Dict[str, Any]:
     )
     hud_ok = "BtnUnitsView" in bar and "func sync_units_view_button" in bar
     hide_ok = "_hide_unit_nodes_direct" in guard
+    cont_ok = "_sample_spine_continuity" in guard and "SPINE_CONT_MIN_COVER" in guard
     return {
-        "ok": api_ok and hud_ok and hide_ok,
+        "ok": api_ok and hud_ok and hide_ok and cont_ok,
         "api_ok": api_ok,
         "hud_ok": hud_ok,
         "direct_hide_816cdc9": hide_ok,
+        "spine_continuity": cont_ok,
     }
 
 
