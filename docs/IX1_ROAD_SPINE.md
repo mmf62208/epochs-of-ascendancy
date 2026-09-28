@@ -96,7 +96,7 @@ New front door: `InfrastructureDevelopmentManager.try_start_road_spine` / `link_
 ## PASS criteria
 
 1. SCRIPT_ERROR **0**. Esc → Command Center **HARD PASS** unchanged.
-2. **Look:** one continuous gold line Bonn–Köln–Leverkusen at mid **and** close zoom with units hidden (not F10-only; not two unjoined segments). Pixel-guard continuity (coverage + longest gap) must FAIL on `dbbdef4` and PASS on tip. Units still draw on top of the spine.
+2. **Look:** one continuous gold line Bonn–Köln–Leverkusen at mid **and** close zoom with units hidden (not F10-only; not two unjoined segments). Pixel-guard continuity **FAIL** on `dbbdef4` (mid cover **0.222** gap **12.0 px**, close cover **0.125** gap **42.0 px**) and **PASS** on this tip (mid/close cover **1.000** gap **0**). Units ON over the spine: chip **0.932** / gold **0.000**. Smoke harness is **not** the product.
 3. **Impact:** spine `get_movement_cost` **strictly less** than pre-build; cheaper than off-spine Essen control.
 4. Thin unittest `test_ix1_road_spine_product` green (edges present + cost delta + GER 1936 day-0 Mandate gate).
 5. Tyrrhenian / Ligurian / Flanders / SE England / pale-map / Fill%·TOE **untouched**.

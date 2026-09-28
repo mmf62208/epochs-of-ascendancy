@@ -120,6 +120,21 @@ Guard table — real xvfb, `tools/run_godot.sh`, never `EOA_SKIP_TITLE`. Officia
 
 **Gaps:** framed captures still read as a wide theater view even when MapCamera reports Köln at zoom 2.10 (same class as the earlier Home fight). River/gold samples use canvas transforms + local course, not a claim that the whole PNG is a street-level Köln close-up. Köln bridge-status leak was **false** on this 816cdc9 run (panel node inspect); the re-offer / missing-built fails still stand.
 
+## IX-1 gold-spine continuity (this draft)
+
+Two unjoined RoadLayer Line2Ds at z=21 under the Rhine (z=22) read as a broken Bonn–Köln–Leverkusen line at close zoom. Tip draws one hub-local polyline (`Ix1GoldSpineDraw`) at **z=23** (above Rhine, below units 28) with screen-pixel width + round join discs. Continuity samples every 3 screen px along the projected centroids (neighborhood 3). Smoke harness is **not** the product.
+
+| Check (units OFF unless noted) | `dbbdef4` + new guard | this tip |
+|--------------------------------|-----------------------|----------------|
+| mid continuity cover / longest gap | **0.222 / 12.0 px FAIL** (2/9 hits) | **1.000 / 0.0 px PASS** (9/9) |
+| close continuity cover / longest gap | **0.125 / 42.0 px FAIL** (2/16 hits) | **1.000 / 0.0 px PASS** (16/16) |
+| gold spine hit (legacy count, need ≥0.15) | 0.227 (count can pass a broken line) | 1.000 |
+| mid / close river | 1.000 / 0.977 | 0.775 / 0.920 |
+| units ON over river | chip 1.000 | chip 0.977 |
+| units ON over spine | chip 0.039 / gold 0.476 (same-frame park; not a product fail) | **chip 0.932 / gold 0.000 PASS** |
+| U toggle + Köln built / no re-offer | PASS | PASS |
+| `WindowedRx1RhinePixelGuard` | **RESULT=FAIL** (`mid_spine_continuity_cover`, `close_spine_continuity_cover`, `close_spine_continuity_gap`) | **RESULT=PASS** |
+
 ## Fresh checkout (FIX1)
 
 Stale `.godot/global_script_class_cache.cfg` (gitignored) used to parse-fail GameData (`Identifier Rx1RhineCrossing not declared`) and blank the map. `tools/run_godot.sh` runs a one-time `--headless --import` when the cache is missing or lacks `Rx1RhineCrossing`. Autoloads (GameData / MapManager / IDM) **preload** `res://scripts/map/Rx1RhineCrossing.gd` so they do not depend on class_name at parse. Smoke wrappers already `exec` `run_godot.sh`.
