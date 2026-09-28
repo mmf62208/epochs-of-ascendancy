@@ -319,6 +319,8 @@ var _outline_pulse_phase: float = 0.0
 var _last_zoom: float = 1.0
 var _hover_fill_province_id: int = -1
 ## Map-space selection outline (reliable when per-node polys are thin/hidden).
+## S1: stays below Ix1GoldSpineDraw (z=23) so the Köln hex cannot bury the spine.
+const SELECT_OUTLINE_Z := 22
 var _select_outline_layer: Node2D = null
 var _select_outline_line: Line2D = null
 var _select_outline_glow: Line2D = null
@@ -14207,6 +14209,8 @@ func hide_info_panel() -> void:
 	if _province_id_badge != null:
 		_province_id_badge.visible = false
 	_selected_coarse_id = 0
+	# S1: selection hex must clear when the province panel closes.
+	_clear_selection()
 
 
 func _inspector_stack_blocking_input() -> bool:
@@ -18254,6 +18258,10 @@ func _clear_hover_state() -> void:
 	_set_agent_highlight(-1)
 	_sync_hovered_strategic_region(null)
 	_hide_hover_tooltip()
+	# S3: salmon/orange compare-candidate rings west of the Rhine were left
+	# painted because hover-exit skipped _refresh_compare_candidate_outlines.
+	_clear_compare_preview_outline()
+	_refresh_compare_candidate_outlines()
 
 
 func _on_mouse_entered(node: Node2D, province: Province):
@@ -24844,7 +24852,8 @@ func _ensure_select_outline_layer() -> void:
 		return
 	_select_outline_layer = Node2D.new()
 	_select_outline_layer.name = "ProvinceSelectionOutlineLayer"
-	_select_outline_layer.z_index = 80
+	# S1: outline only, below the gold spine (z=23) so Köln select cannot cover it.
+	_select_outline_layer.z_index = SELECT_OUTLINE_Z
 	_select_outline_layer.z_as_relative = false
 	var host: Node = container if container != null else self
 	host.add_child(_select_outline_layer)
