@@ -771,8 +771,7 @@ func _rss_kb() -> int:
 
 func _rss_kb_fallback() -> int:
 	var out: Array = []
-	var err: Array = []
-	var code := OS.execute("awk", PackedStringArray(["/VmRSS/{print $2}", "/proc/self/status"]), out, err, false)
+	var code := OS.execute("awk", PackedStringArray(["/VmRSS/{print $2}", "/proc/self/status"]), out, true)
 	if code == 0 and not out.is_empty():
 		var s := str(out[0]).strip_edges()
 		if s.is_valid_int():
