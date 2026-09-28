@@ -2318,8 +2318,9 @@ class Ix1GoldSpineDraw extends Node2D:
         var halo_w := _world_width(GOLD_SPINE_HALO_SCREEN_PX)
         var gold_w := _world_width(GOLD_SPINE_SCREEN_PX)
         # Halo first so the gold reads through river/fill. One polyline = one joint at Köln.
-        draw_polyline(pts, GOLD_SPINE_HALO_COLOR, halo_w, true)
-        draw_polyline(pts, ROAD_EXPLICIT_COLOR, gold_w, true)
+        # No AA — same OOM class as Ix1SpinePreviewDraw (9ebd17f). Round discs join the stroke.
+        draw_polyline(pts, GOLD_SPINE_HALO_COLOR, halo_w, false)
+        draw_polyline(pts, ROAD_EXPLICIT_COLOR, gold_w, false)
         # Round joins/caps: discs at Bonn, Köln, Leverkusen so the joint cannot open.
         var cap_r := gold_w * 0.5
         var halo_r := halo_w * 0.5
