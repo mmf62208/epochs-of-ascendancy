@@ -15977,7 +15977,8 @@ func _pixel_guard_camera_locked() -> bool:
 
 
 func lock_pixel_guard_camera(pos: Vector2, zoom: float) -> void:
-	# Smoke harness: pin MapCamera so process_frame captures are Köln, not Europe Home.
+	# Legacy RX-1 smoke pin. RT-1 guards must NOT call this — they use
+	# player_path_europe_home / player_path_search_go / player_path_wheel_toward_world.
 	var z := maxf(zoom, 0.04)
 	var cam := get_node_or_null("MapCamera") as Camera2D
 	if cam == null and get_viewport():
@@ -15993,6 +15994,45 @@ func lock_pixel_guard_camera(pos: Vector2, zoom: float) -> void:
 	_close_camera_locked = true
 	_europe_focus_retry = 99
 	_hold_camera_until_msec = Time.get_ticks_msec() + 120000
+
+
+func player_path_europe_home() -> void:
+	# Same Home the F5 player hits after eoa_play_f5_smoke_auto_begin.sh.
+	_unlock_close_camera()
+	_inspector_held_closed = false
+	_hold_camera_until_msec = 0
+	var tree := get_tree()
+	if tree != null and tree.root != null:
+		tree.root.set_meta("eoa_rx1_pixel_lock_camera", false)
+	center_europe_in_world_view()
+
+
+func player_path_search_go(province_id: int) -> bool:
+	# Live Search → Go. Soft-pan only (no tactical lock).
+	return open_province_inspector_from_search(province_id)
+
+
+func player_path_wheel_toward_world(world: Vector2, target_zoom: float) -> float:
+	# Warp the cursor over `world` then run the same `_zoom_toward_mouse` the
+	# wheel handler calls. No lock_pixel_guard_camera.
+	var cam := get_node_or_null("MapCamera") as Camera2D
+	if cam == null and get_viewport():
+		cam = get_viewport().get_camera_2d()
+	if cam == null:
+		return 1.0
+	var screen: Vector2 = cam.get_canvas_transform() * world
+	if DisplayServer.get_name() != "headless":
+		DisplayServer.warp_mouse(Vector2i(int(round(screen.x)), int(round(screen.y))))
+	var factor_in: float = 1.0 + zoom_speed * 1.35
+	var factor_out: float = 1.0 - zoom_speed * 1.35
+	var guard: int = 0
+	while guard < 48:
+		var z: float = maxf(absf(cam.zoom.x), absf(cam.zoom.y))
+		if absf(z - target_zoom) <= 0.045:
+			break
+		_zoom_toward_mouse(factor_in if z < target_zoom else factor_out)
+		guard += 1
+	return maxf(absf(cam.zoom.x), absf(cam.zoom.y))
 
 
 func center_europe_in_world_view() -> void:

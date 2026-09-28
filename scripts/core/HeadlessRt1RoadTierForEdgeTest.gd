@@ -93,15 +93,19 @@ func _run() -> void:
 
 
 func _test_lod_cull() -> void:
-	# Europe Home (~0.33–0.69) must hide remapped dirt/paved.
-	if RoadTierVisualScript.tier_visible_at_zoom(0, false, 2, 0.40):
-		_fail("europe zoom must not show remapped highway")
+	# Europe Home: rare display highways (top few %) + explicit. Not paved/dirt.
+	if RoadTierVisualScript.tier_visible_at_zoom(0, false, 1, 0.40):
+		_fail("europe zoom must hide remapped paved")
 	else:
-		_pass("europe zoom hides remapped highway")
+		_pass("europe zoom hides remapped paved")
+	if not RoadTierVisualScript.tier_visible_at_zoom(0, false, 2, 0.40):
+		_fail("europe zoom must keep rare display highway")
+	else:
+		_pass("europe zoom keeps rare display highway")
 	if not RoadTierVisualScript.tier_visible_at_zoom(2, false, 2, 0.40):
-		_fail("europe zoom must keep formula highway")
+		_fail("europe zoom must keep formula+display highway")
 	else:
-		_pass("europe zoom keeps formula highway")
+		_pass("europe zoom keeps formula+display highway")
 	if not RoadTierVisualScript.tier_visible_at_zoom(0, true, 2, 0.40):
 		_fail("europe zoom must keep explicit highway")
 	else:
@@ -129,15 +133,100 @@ func _test_display_rank() -> void:
 		_fail("rank 0.10 should be dirt")
 	else:
 		_pass("rank 0.10 → dirt")
-	if RoadTierVisualScript.display_tier_from_rank(0.50, false) != 1:
-		_fail("rank 0.50 should be paved")
+	if RoadTierVisualScript.display_tier_from_rank(0.55, false) != 1:
+		_fail("rank 0.55 should be paved")
 	else:
-		_pass("rank 0.50 → paved")
-	if RoadTierVisualScript.display_tier_from_rank(0.80, false) != 2:
-		_fail("rank 0.80 should be highway")
+		_pass("rank 0.55 → paved")
+	if RoadTierVisualScript.display_tier_from_rank(0.80, false) != 1:
+		_fail("rank 0.80 should be paved (highways are top few % only)")
 	else:
-		_pass("rank 0.80 → highway")
+		_pass("rank 0.80 → paved")
+	if RoadTierVisualScript.display_tier_from_rank(0.97, false) != 2:
+		_fail("rank 0.97 should be rare highway")
+	else:
+		_pass("rank 0.97 → highway")
 	if RoadTierVisualScript.display_tier_from_rank(0.0, true) != 2:
 		_fail("explicit rank 0 should be highway")
 	else:
 		_pass("explicit → highway")
+	_test_trunk_sparsifier()
+
+
+func _test_trunk_sparsifier() -> void:
+	# Square cycle A-B-C-D-A. Full mesh has 2 triangles if we add both diagonals;
+	# four sides have 0 triangles but 1 cycle. Add a chord to make 1 triangle.
+	var a := Vector2(0, 0)
+	var b := Vector2(10, 0)
+	var c := Vector2(10, 10)
+	var d := Vector2(0, 10)
+	var cands: Array = [
+		{"p1": 1, "p2": 2, "c1": a, "c2": b, "avg_infra": 2.0, "weight": 1.0, "w1": 1.0, "w2": 1.0, "explicit": false, "tier": 0},
+		{"p1": 2, "p2": 3, "c1": b, "c2": c, "avg_infra": 2.0, "weight": 1.0, "w1": 1.0, "w2": 1.0, "explicit": false, "tier": 0},
+		{"p1": 3, "p2": 4, "c1": c, "c2": d, "avg_infra": 2.0, "weight": 1.0, "w1": 1.0, "w2": 1.0, "explicit": false, "tier": 0},
+		{"p1": 4, "p2": 1, "c1": d, "c2": a, "avg_infra": 2.0, "weight": 1.0, "w1": 1.0, "w2": 1.0, "explicit": false, "tier": 0},
+		{"p1": 1, "p2": 3, "c1": a, "c2": c, "avg_infra": 1.0, "weight": 1.0, "w1": 1.0, "w2": 1.0, "explicit": false, "tier": 0},
+	]
+	if RoadTierVisualScript.count_undirected_triangles(cands) < 1:
+		_fail("square+diagonal must have a triangle before trunk")
+	else:
+		_pass("pre-trunk triangle present")
+	var trunk: Array = RoadTierVisualScript.select_trunk_edges(cands)
+	var tri: int = RoadTierVisualScript.count_undirected_triangles(trunk)
+	if tri != 0:
+		_fail("trunk must drop triangles got=%d edges=%d" % [tri, trunk.size()])
+	else:
+		_pass("trunk has 0 triangles edges=%d" % trunk.size())
+	if trunk.size() >= cands.size():
+		_fail("trunk must drop cyclic extras got=%d from=%d" % [trunk.size(), cands.size()])
+	else:
+		_pass("trunk dropped cyclic extras %d→%d" % [cands.size(), trunk.size()])
+	var deg: Dictionary = RoadTierVisualScript.degree_stats(trunk)
+	if int(deg.get("max", 99)) > RoadTierVisualScript.TRUNK_HUB_DEGREE_CAP:
+		_fail("trunk max degree %d exceeds hub cap" % int(deg.get("max", 99)))
+	else:
+		_pass("trunk max degree=%d" % int(deg.get("max", 0)))
+	# Must-draw Bonn–Köln survives even among junk.
+	var must_cands: Array = cands.duplicate()
+	must_cands.append({
+		"p1": RoadTierVisualScript.BONN_ID,
+		"p2": RoadTierVisualScript.KOELN_ID,
+		"c1": Vector2(100, 100),
+		"c2": Vector2(104, 100),
+		"avg_infra": 1.0,
+		"weight": 1.0,
+		"explicit": false,
+		"tier": 0,
+	})
+	var must_trunk: Array = RoadTierVisualScript.select_trunk_edges(must_cands)
+	var kept := false
+	var want := RoadTierVisualScript.edge_key(
+		RoadTierVisualScript.BONN_ID, RoadTierVisualScript.KOELN_ID
+	)
+	for row_v in must_trunk:
+		var row: Dictionary = row_v
+		if RoadTierVisualScript.edge_key(int(row.get("p1", 0)), int(row.get("p2", 0))) == want:
+			kept = true
+			break
+	if not kept:
+		_fail("must-draw Bonn–Köln missing from trunk")
+	else:
+		_pass("must-draw Bonn–Köln kept")
+	# Overlay must call the sparsifier (not terciles).
+	var ol_src := ""
+	if FileAccess.file_exists("res://scripts/map/InfrastructureOverlayLayer.gd"):
+		var f := FileAccess.open("res://scripts/map/InfrastructureOverlayLayer.gd", FileAccess.READ)
+		if f != null:
+			ol_src = f.get_as_text()
+			f.close()
+	if "select_trunk_edges" not in ol_src or "assign_rare_display_tiers" not in ol_src:
+		_fail("overlay must call select_trunk_edges + assign_rare_display_tiers")
+	else:
+		_pass("overlay uses trunk + rare highways")
+	if "GOLD_SPINE_SCREEN_PX := 16.0" not in ol_src:
+		_fail("gold spine must be 16 px (thicker than 8.5 casing)")
+	else:
+		_pass("gold spine 16 px")
+	if "draw_line(pts[i - 1], pts[i], ROAD_EXPLICIT_COLOR, gold_w, true)" in ol_src:
+		_fail("gold spine must not use antialiased draw_line")
+	else:
+		_pass("gold spine non-AA")

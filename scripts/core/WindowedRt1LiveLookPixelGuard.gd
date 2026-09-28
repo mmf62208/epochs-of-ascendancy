@@ -1,14 +1,13 @@
 extends SceneTree
 
-## WINDOWED RT-1 live-look + Europe mesh-density guard.
-## Does NOT seed infrastructure. Smoke harness is not the product.
+## WINDOWED RT-1 live-look + mesh-density guard (FIX #2).
+## Does NOT seed infrastructure. xvfb is NOT a product Play pass.
 ##
-## (a) mid/close: pixels for dirt tan + dash, paved grey, highway casing+stripe.
-## (b) Europe/Home: grey road-mesh density near main 497731dd (no mesh).
-## Gold spine width ~9 px. S2 labels are control-sized, not world-scaled.
+## Camera: Europe Home → Search/Go Köln → wheel via MapRenderer._zoom_toward_mouse.
+## Same path as tools/eoa_play_f5_smoke_auto_begin.sh. No lock_pixel_guard_camera.
 ##
-## Must FAIL on 22c3392 (mesh + no distinct looks). Density PASSes on 497731dd.
-## Must PASS on the live-look tip.
+## Must FAIL on 79de1c6 (full shared-border triangle mesh, tercile highways,
+## gold ≤ casing, missing S2). Must PASS on the trunk tip.
 ##
 ##   tools/eoa_rt1_live_look_guard.sh
 
@@ -20,13 +19,18 @@ const MID_ZOOM := 1.80
 const CLOSE_ZOOM := 3.20
 const WAIT_MAP_SECS := 420
 const SETTLE_FRAMES := 40
-const GOLD_WIDTH_MIN := 7.0
-const GOLD_WIDTH_MAX := 13.0
-## After units-off, 497731dd Europe is low. 22c3392 dirt carpet is far above this.
+const GOLD_WIDTH_MIN := 12.0
+const GOLD_WIDTH_MAX := 24.0
+## 79de1c6 mid carpet is well above these. Trunk forest stays under.
 const MESH_MAX_FRAC := 0.018
+const MID_MESH_MAX_FRAC := 0.028
+const CLOSE_MESH_MAX_FRAC := 0.034
+const EUROPE_BOTTOM_MESH_MAX := 0.022
+const TRIANGLE_MAX := 0
 const TIER_MIN_PX := 6
 const DASH_MIN_GAPS := 1
 const LABEL_MAX_H_PX := 36.0
+const GOLD_OVER_HIGHWAY_MIN := 2.5
 
 enum Phase {
 	WAIT_MAP,
@@ -132,27 +136,30 @@ func _tick_wait_map() -> void:
 		return
 	if Time.get_ticks_msec() - int(root.get_meta("rt1_live_ready_msec", 0)) < 2000:
 		return
-	_log("EOA_RT1_LIVE_LOOK who=guard.frame_start elapsed=%d n=%d" % [elapsed, _province_count()])
+	_log("EOA_RT1_LIVE_LOOK who=guard.frame_start elapsed=%d n=%d path=player_home" % [elapsed, _province_count()])
 	_force_political_clean()
 	_set_units_view(false)
 	_ensure_spine_built()
+	_pause_clock_only()
 	_frame_europe_home()
-	_freeze_boot_camera_fighters()
 	_go_settle(Phase.EUROPE)
 
 
 func _do_europe() -> void:
 	_force_political_clean()
 	_set_units_view(false)
-	_reassert_camera()
 	RenderingServer.force_draw()
 	var img := _capture("rt1_live_europe")
 	_mesh_frac = _mesh_density_frac(img)
-	_log("EOA_RT1_LIVE_LOOK who=guard.europe mesh_frac=%.5f max=%.4f (497731dd baseline ~0)" % [
-		_mesh_frac, MESH_MAX_FRAC
+	var bottom := _mesh_density_frac_band(img, 0.72, 0.98)
+	_log("EOA_RT1_LIVE_LOOK who=guard.europe mesh_frac=%.5f bottom=%.5f max=%.4f (xvfb≠Play)" % [
+		_mesh_frac, bottom, MESH_MAX_FRAC
 	])
 	if _mesh_frac > MESH_MAX_FRAC:
 		_fail_reasons.append("europe_mesh_frac_%.5f" % _mesh_frac)
+	if bottom > EUROPE_BOTTOM_MESH_MAX:
+		_fail_reasons.append("europe_bottom_mesh_%.5f" % bottom)
+	_judge_trunk("europe", 0.40)
 	_force_political_clean()
 	_set_units_view(false)
 	_frame_over_koln(MID_ZOOM, true)
@@ -161,25 +168,36 @@ func _do_europe() -> void:
 
 func _do_mid() -> void:
 	_set_units_view(false)
-	_reassert_camera()
-	_judge_looks(_capture("rt1_live_mid"), "mid", false)
+	var img := _capture("rt1_live_mid")
+	var mid_mesh := _mesh_density_frac(img)
+	_log("EOA_RT1_LIVE_LOOK who=guard.mid_mesh frac=%.5f max=%.4f" % [mid_mesh, MID_MESH_MAX_FRAC])
+	if mid_mesh > MID_MESH_MAX_FRAC:
+		_fail_reasons.append("mid_mesh_frac_%.5f" % mid_mesh)
+	_judge_looks(img, "mid", false)
 	_judge_labels("mid")
+	_judge_trunk("mid", MID_ZOOM)
+	_judge_gold_vs_highway(img, "mid")
 	_frame_over_koln(CLOSE_ZOOM, true)
 	_go_settle(Phase.CLOSE)
 
 
 func _do_close() -> void:
 	_set_units_view(false)
-	_reassert_camera()
 	var img := _capture("rt1_live_close")
+	var close_mesh := _mesh_density_frac(img)
+	_log("EOA_RT1_LIVE_LOOK who=guard.close_mesh frac=%.5f max=%.4f" % [close_mesh, CLOSE_MESH_MAX_FRAC])
+	if close_mesh > CLOSE_MESH_MAX_FRAC:
+		_fail_reasons.append("close_mesh_frac_%.5f" % close_mesh)
 	_judge_looks(img, "close", true)
 	_judge_labels("close")
+	_judge_trunk("close", CLOSE_ZOOM)
 	_gold_w_close = _measure_gold_width(img)
 	_log("EOA_RT1_LIVE_LOOK who=guard.gold_width_close px=%.2f need %.1f-%.1f" % [
 		_gold_w_close, GOLD_WIDTH_MIN, GOLD_WIDTH_MAX
 	])
 	if _gold_w_close < GOLD_WIDTH_MIN or _gold_w_close > GOLD_WIDTH_MAX:
 		_fail_reasons.append("gold_width_close_%.2f" % _gold_w_close)
+	_judge_gold_vs_highway(img, "close")
 	_rss_end_kb = _rss_kb()
 	_log("EOA_RT1_LIVE_LOOK who=guard.rss start_kb=%d end_kb=%d mb=%.1f" % [
 		_rss_start_kb, _rss_end_kb, float(_rss_end_kb) / 1024.0
@@ -212,6 +230,27 @@ func _judge_looks(img: Image, band: String, need_dirt: bool) -> void:
 		_fail_reasons.append("%s_highway_stripe_%d" % [band, stripe_n])
 
 
+func _collect_spine_labels() -> Array:
+	var out: Array = []
+	var gold := _gold_layer()
+	if gold != null:
+		var layer := gold.get_node_or_null("Ix1GoldSpineLabels")
+		if layer != null:
+			for ch in layer.get_children():
+				if ch is Label:
+					out.append(ch)
+		for ch2 in gold.get_children():
+			if ch2 is Label:
+				out.append(ch2)
+	if out.is_empty():
+		var named := _find_named("Ix1GoldSpineLabels")
+		if named != null:
+			for ch3 in named.get_children():
+				if ch3 is Label:
+					out.append(ch3)
+	return out
+
+
 func _judge_labels(band: String) -> void:
 	var gold := _gold_layer()
 	if gold == null:
@@ -221,18 +260,15 @@ func _judge_labels(band: String) -> void:
 	var overlap := false
 	var last_rect := Rect2()
 	var huge := false
-	for ch in gold.get_children():
-		if not (ch is Label):
-			continue
+	for ch in _collect_spine_labels():
 		var lbl := ch as Label
-		if not lbl.visible:
+		if lbl == null or not lbl.visible:
 			continue
 		visible_n += 1
 		var fs := 0
 		if lbl.has_theme_font_size_override("font_size"):
 			fs = int(lbl.get_theme_font_size("font_size"))
 		# 14 px + outline 4 is ~24–32 px tall (same family as political labels).
-		# World-scaled draw_string leftovers were 40+ px / font > 20.
 		if fs > 20 or lbl.size.y > LABEL_MAX_H_PX:
 			huge = true
 		var r := Rect2(lbl.position, lbl.size)
@@ -359,15 +395,24 @@ func _neighborhood_kind(img: Image, x: int, y: int, rad: int, kind: String) -> b
 
 
 func _mesh_density_frac(img: Image) -> float:
+	return _mesh_density_frac_band(img, 0.0, 1.0)
+
+
+func _mesh_density_frac_band(img: Image, y0_frac: float, y1_frac: float) -> float:
 	if img == null:
 		return 1.0
 	var mesh := 0
 	var total := 0
 	var step := 3
-	var y0 := 100
-	var y1 := img.get_height() - 80
+	var h := img.get_height()
+	var y0 := maxi(100, int(float(h) * y0_frac))
+	var y1 := mini(h - 8, int(float(h) * y1_frac))
+	if y0_frac > 0.05:
+		y0 = maxi(8, int(float(h) * y0_frac))
 	var x0 := 20
 	var x1 := img.get_width() - 20
+	if y1 <= y0:
+		return 1.0
 	for y in range(y0, y1, step):
 		for x in range(x0, x1, step):
 			total += 1
@@ -376,6 +421,154 @@ func _mesh_density_frac(img: Image) -> float:
 	if total <= 0:
 		return 1.0
 	return float(mesh) / float(total)
+
+
+func _judge_trunk(band: String, zoom: float) -> void:
+	var ol := _overlay()
+	if ol == null:
+		_fail_reasons.append("%s_no_overlay" % band)
+		return
+	var cache: Array = []
+	if ol.has_method("get_road_tier_cache"):
+		cache = ol.call("get_road_tier_cache")
+	var tris := _count_cache_triangles(cache)
+	var trunk_n := cache.size()
+	var cand_n := trunk_n
+	var hwy := 0
+	if ol.has_method("get_road_trunk_stats"):
+		var stats: Dictionary = ol.call("get_road_trunk_stats")
+		cand_n = int(stats.get("candidates", trunk_n))
+		trunk_n = int(stats.get("trunk", trunk_n))
+		hwy = int(stats.get("highways", 0))
+	else:
+		for row_v in cache:
+			if typeof(row_v) == TYPE_DICTIONARY and int(row_v.get("display_tier", 0)) == 2:
+				hwy += 1
+	_log("EOA_RT1_LIVE_LOOK who=guard.trunk band=%s zoom=%.2f candidates=%d trunk=%d triangles=%d highways=%d" % [
+		band, zoom, cand_n, trunk_n, tris, hwy
+	])
+	if tris > TRIANGLE_MAX:
+		_fail_reasons.append("%s_triangles_%d" % [band, tris])
+	if cand_n > 800 and trunk_n >= cand_n:
+		_fail_reasons.append("%s_trunk_not_sparse_%d/%d" % [band, trunk_n, cand_n])
+	if band == "europe" and hwy > 180:
+		_fail_reasons.append("%s_highways_%d" % [band, hwy])
+	if trunk_n > 2800:
+		_fail_reasons.append("%s_edge_carpet_%d" % [band, trunk_n])
+
+
+func _count_cache_triangles(edges: Array) -> int:
+	var adj: Dictionary = {}
+	for row_v in edges:
+		if typeof(row_v) != TYPE_DICTIONARY:
+			continue
+		var row: Dictionary = row_v
+		var a: int = int(row.get("p1", 0))
+		var b: int = int(row.get("p2", 0))
+		if a == 0 or b == 0 or a == b:
+			continue
+		if not adj.has(a):
+			adj[a] = {}
+		if not adj.has(b):
+			adj[b] = {}
+		var na: Dictionary = adj[a]
+		var nb: Dictionary = adj[b]
+		na[b] = true
+		nb[a] = true
+		adj[a] = na
+		adj[b] = nb
+	var pids: Array = adj.keys()
+	pids.sort()
+	var count: int = 0
+	for a_v in pids:
+		var a: int = int(a_v)
+		var nbrs_v: Variant = adj.get(a, {})
+		if typeof(nbrs_v) != TYPE_DICTIONARY:
+			continue
+		var nbrs: Array = (nbrs_v as Dictionary).keys()
+		nbrs.sort()
+		for i in range(nbrs.size()):
+			var b: int = int(nbrs[i])
+			if b <= a:
+				continue
+			var bset_v: Variant = adj.get(b, {})
+			if typeof(bset_v) != TYPE_DICTIONARY:
+				continue
+			var bset: Dictionary = bset_v
+			for j in range(i + 1, nbrs.size()):
+				var c: int = int(nbrs[j])
+				if c <= b:
+					continue
+				if bset.has(c):
+					count += 1
+	return count
+
+
+func _judge_gold_vs_highway(img: Image, band: String) -> void:
+	var gold_w := _measure_gold_width(img)
+	var hwy_w := _measure_highway_casing_width(img)
+	_log("EOA_RT1_LIVE_LOOK who=guard.gold_vs_highway band=%s gold=%.2f highway=%.2f" % [
+		band, gold_w, hwy_w
+	])
+	if hwy_w <= 0.2:
+		_log("EOA_RT1_LIVE_LOOK who=guard.gold_vs_highway band=%s highway_unmeasured (soft)" % band)
+		if gold_w + 0.01 < GOLD_WIDTH_MIN and band == "mid":
+			_fail_reasons.append("%s_gold_thin_%.2f" % [band, gold_w])
+		return
+	if gold_w < hwy_w + GOLD_OVER_HIGHWAY_MIN:
+		_fail_reasons.append("%s_gold_not_thicker_%.2f_vs_%.2f" % [band, gold_w, hwy_w])
+
+
+func _measure_highway_casing_width(img: Image) -> float:
+	if img == null:
+		return 0.0
+	var edges: Array = _live_edges_of_display(2)
+	if edges.is_empty():
+		return 0.0
+	var layer := _road_layer()
+	var xform := Transform2D.IDENTITY
+	if layer != null:
+		xform = layer.get_global_transform_with_canvas()
+	var best := 0
+	for entry in edges:
+		var a: Vector2 = xform * entry.get("c1", Vector2.ZERO)
+		var b: Vector2 = xform * entry.get("c2", Vector2.ZERO)
+		if a == Vector2.ZERO or b == Vector2.ZERO:
+			continue
+		var dir: Vector2 = b - a
+		if dir.length() < 4.0:
+			continue
+		var perp := Vector2(-dir.y, dir.x).normalized()
+		for t_i in range(3, 8):
+			var p0: Vector2 = a.lerp(b, float(t_i) / 10.0)
+			var run := 0
+			var best_run := 0
+			var in_run := false
+			for i in range(-18, 19):
+				var p: Vector2 = p0 + perp * float(i)
+				var x := int(round(p.x))
+				var y := int(round(p.y))
+				if x < 0 or y < 0 or x >= img.get_width() or y >= img.get_height():
+					if in_run:
+						best_run = maxi(best_run, run)
+						in_run = false
+						run = 0
+					continue
+				if _is_kind(img.get_pixel(x, y), "casing"):
+					if not in_run:
+						in_run = true
+						run = 0
+					run += 1
+				elif in_run:
+					best_run = maxi(best_run, run)
+					in_run = false
+					run = 0
+			if in_run:
+				best_run = maxi(best_run, run)
+			best = maxi(best, best_run)
+		if best >= 4:
+			break
+	return float(best)
 
 
 func _is_stroke_on_fill(img: Image, x: int, y: int) -> bool:
@@ -501,9 +694,9 @@ func _is_gold(c: Color) -> bool:
 
 func _frame_europe_home() -> void:
 	var mr := _map_renderer()
-	if mr != null and mr.has_method("center_europe_in_world_view"):
-		if mr.has_method("_pixel_guard_camera_locked"):
-			mr.set("_close_camera_locked", false)
+	if mr != null and mr.has_method("player_path_europe_home"):
+		mr.call("player_path_europe_home")
+	elif mr != null and mr.has_method("center_europe_in_world_view"):
 		mr.call("center_europe_in_world_view")
 	var cam := _camera()
 	var pos := Vector2.ZERO
@@ -511,14 +704,10 @@ func _frame_europe_home() -> void:
 	if cam != null:
 		pos = cam.global_position
 		z = maxf(cam.zoom.x, cam.zoom.y)
-	if pos == Vector2.ZERO:
-		pos = _koln_world()
-		z = EUROPE_ZOOM
-	if z > 0.88:
-		z = EUROPE_ZOOM
-	_apply_camera(pos, z)
+	_cam_pos = pos
+	_cam_zoom = z
 	_set_units_view(false)
-	_log("EOA_RT1_LIVE_LOOK who=guard.europe_frame zoom=%.3f pos=%.1f,%.1f" % [z, pos.x, pos.y])
+	_log("EOA_RT1_LIVE_LOOK who=guard.europe_frame zoom=%.3f pos=%.1f,%.1f via=player_home" % [z, pos.x, pos.y])
 
 
 func _map_is_ready() -> bool:
@@ -583,79 +772,78 @@ func _province_count() -> int:
 	return 0
 
 
-func _freeze_boot_camera_fighters() -> void:
-	if root != null:
-		root.set_meta("eoa_rx1_pixel_lock_camera", true)
-	var mr := _map_renderer()
-	if mr != null:
-		mr.set("_europe_focus_retry", 99)
-		mr.set("_close_camera_locked", true)
-		mr.set("_hold_camera_until_msec", Time.get_ticks_msec() + 120000)
+func _pause_clock_only() -> void:
 	var tm: Node = _time_manager()
 	if tm != null and tm.has_method("set_paused"):
 		tm.call("set_paused", true)
-	var tr := current_scene
-	if tr != null and tr.has_method("set_process"):
-		tr.set_process(false)
-	var cc := _find_named("CameraController")
-	if cc == null and mr != null:
-		cc = mr.get_node_or_null("CameraInput")
-	if cc != null:
-		if "enable_pan" in cc:
-			cc.set("enable_pan", false)
-		if "enable_zoom" in cc:
-			cc.set("enable_zoom", false)
-		cc.set_process(false)
-	if mr != null and mr.has_method("set_process"):
-		mr.set_process(false)
-	_log("EOA_RT1_LIVE_LOOK who=guard.lock_camera (NOT product Home/Close)")
+	var mr := _map_renderer()
+	if mr != null:
+		mr.set("_hold_camera_until_msec", 0)
+		mr.set("_close_camera_locked", false)
+	if root != null:
+		root.set_meta("eoa_rx1_pixel_lock_camera", false)
+	_log("EOA_RT1_LIVE_LOOK who=guard.pause_clock (player camera path, no lock)")
 
 
 func _frame_over_koln(zoom: float, hide_inspector: bool) -> void:
-	_apply_camera(_koln_world(), zoom)
 	var mr := _map_renderer()
+	if mr != null and mr.has_method("player_path_search_go"):
+		mr.call("player_path_search_go", KOELN)
+	elif mr != null and mr.has_method("open_province_inspector_from_search"):
+		mr.call("open_province_inspector_from_search", KOELN)
+	elif mr != null and mr.has_method("focus_province_by_id"):
+		mr.call("focus_province_by_id", KOELN, "soft")
 	if hide_inspector and mr != null and mr.has_method("hide_info_panel"):
 		mr.call("hide_info_panel")
+	if mr != null and mr.has_method("player_path_wheel_toward_world"):
+		_cam_zoom = float(mr.call("player_path_wheel_toward_world", _koln_world(), zoom))
+	else:
+		_wheel_toward_world(_koln_world(), zoom)
+	var cam := _camera()
+	if cam != null:
+		_cam_pos = cam.global_position
+		_cam_zoom = maxf(cam.zoom.x, cam.zoom.y)
 	var ol := _overlay()
 	if ol != null and ol.has_method("_apply_screen_space_road_widths"):
 		ol.call("_apply_screen_space_road_widths")
 	if ol != null and ol.has_method("refresh_ix1_gold_spine"):
 		ol.call("refresh_ix1_gold_spine", true)
+	_log("EOA_RT1_LIVE_LOOK who=guard.frame_koln want=%.2f got=%.3f via=search_go+wheel" % [zoom, _cam_zoom])
 
 
-func _reassert_camera() -> void:
-	if _cam_pos == Vector2.ZERO:
-		return
-	_apply_camera(_cam_pos, _cam_zoom)
-
-
-func _apply_camera(pos: Vector2, zoom: float) -> void:
-	_cam_pos = pos
-	_cam_zoom = zoom
-	if root != null:
-		root.set_meta("rt1_guard_zoom", zoom)
+func _wheel_toward_world(world: Vector2, target_zoom: float) -> void:
 	var mr := _map_renderer()
-	if mr != null and mr.has_method("lock_pixel_guard_camera"):
-		mr.call("lock_pixel_guard_camera", pos, zoom)
-		return
-	if mr != null:
-		mr.set("_close_camera_lock_pos", pos)
-		mr.set("_close_camera_lock_zoom", Vector2(zoom, zoom))
-		mr.set("_close_camera_locked", true)
-		mr.set("_europe_focus_retry", 99)
 	var cam := _camera()
 	if cam == null:
 		return
-	cam.zoom = Vector2(zoom, zoom)
-	var parent := cam.get_parent() as Node2D
-	if parent != null:
-		cam.position = parent.to_local(pos)
-	cam.global_position = pos
-	cam.reset_smoothing()
-	if cam.has_method("force_update_scroll"):
-		cam.call("force_update_scroll")
-	cam.enabled = true
-	cam.make_current()
+	var screen: Vector2 = cam.get_canvas_transform() * world
+	if DisplayServer.get_name() != "headless":
+		DisplayServer.warp_mouse(Vector2i(int(round(screen.x)), int(round(screen.y))))
+	if mr == null or not mr.has_method("_zoom_toward_mouse"):
+		return
+	var factor_in: float = 1.243
+	var factor_out: float = 0.757
+	if "zoom_speed" in mr:
+		var zs := float(mr.get("zoom_speed"))
+		factor_in = 1.0 + zs * 1.35
+		factor_out = 1.0 - zs * 1.35
+	var guard: int = 0
+	while guard < 48:
+		var z: float = maxf(absf(cam.zoom.x), absf(cam.zoom.y))
+		if absf(z - target_zoom) <= 0.045:
+			break
+		mr.call("_zoom_toward_mouse", factor_in if z < target_zoom else factor_out)
+		guard += 1
+
+
+func _reassert_camera() -> void:
+	# Player path: do not re-pin zoom. Wheel/Home already set MapCamera.
+	pass
+
+
+func _apply_camera(_pos: Vector2, _zoom: float) -> void:
+	# Banned: lock_pixel_guard_camera bypasses what the player sees.
+	_log("EOA_RT1_LIVE_LOOK who=guard.apply_camera skipped (player path only)")
 
 
 func _koln_world() -> Vector2:
@@ -668,20 +856,21 @@ func _koln_world() -> Vector2:
 
 
 func _capture(name: String) -> Image:
-	_reassert_camera()
 	RenderingServer.force_draw()
-	_reassert_camera()
 	RenderingServer.force_draw()
 	var cam := _camera()
 	if cam != null:
 		var d := cam.global_position.distance_to(_koln_world())
-		_log("EOA_RT1_LIVE_LOOK who=guard.cam pos=%.1f,%.1f zoom=%.3f want=%.2f koln_dist=%.1f" % [
-			cam.global_position.x, cam.global_position.y, cam.zoom.x, _cam_zoom, d
+		_cam_zoom = maxf(cam.zoom.x, cam.zoom.y)
+		_log("EOA_RT1_LIVE_LOOK who=guard.cam pos=%.1f,%.1f zoom=%.3f koln_dist=%.1f path=player" % [
+			cam.global_position.x, cam.global_position.y, cam.zoom.x, d
 		])
 		if name.contains("mid") or name.contains("close"):
-			if d > 520.0:
+			if d > 1400.0:
 				_fail_reasons.append("camera_not_on_koln")
-			if absf(cam.zoom.x - _cam_zoom) > 0.15:
+			if name.contains("mid") and _cam_zoom < 1.20:
+				_fail_reasons.append("camera_zoom_%.2f" % cam.zoom.x)
+			if name.contains("close") and _cam_zoom < 2.20:
 				_fail_reasons.append("camera_zoom_%.2f" % cam.zoom.x)
 	var vp := root.get_viewport()
 	if vp == null:

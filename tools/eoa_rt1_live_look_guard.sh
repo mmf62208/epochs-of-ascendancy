@@ -13,7 +13,7 @@ export EOA_RT1_LIVE_OUT="$OUT"
 export EOA_SMOKE_AUTO_BEGIN=1
 export EOA_SMOKE_ADVANCE_PAST_PLUS6=0
 unset EOA_SKIP_TITLE || true
-echo "EOA_RT1_LIVE_LOOK who=wrapper out=$OUT xvfb=1 (NOT product Play)"
+echo "EOA_RT1_LIVE_LOOK who=wrapper out=$OUT xvfb=1 path=player_home+wheel (NOT product Play)"
 if ! command -v xvfb-run >/dev/null 2>&1; then
   echo "WindowedRt1LiveLookPixelGuard: RESULT=FAIL need xvfb-run" >&2
   exit 1

@@ -139,8 +139,8 @@ func _tick_wait_map() -> void:
 		return
 	if Time.get_ticks_msec() - int(root.get_meta("rt1_ready_msec", 0)) < 2000:
 		return
-	_log("EOA_RT1_PIXEL_GUARD who=guard.frame_start elapsed=%d n=%d" % [elapsed, _province_count()])
-	_freeze_boot_camera_fighters()
+	_log("EOA_RT1_PIXEL_GUARD who=guard.frame_start elapsed=%d n=%d path=player" % [elapsed, _province_count()])
+	_pause_clock_only()
 	_force_political_clean()
 	_set_units_view(false)
 	_ensure_spine_built()
@@ -198,7 +198,6 @@ func _do_matrix_capture() -> void:
 
 
 func _capture_matrix_band(band: String, zoom: float) -> void:
-	_reassert_camera()
 	var img := _capture("rt1_%s_overview" % band)
 	var samples: Array = [
 		{"kind": "dirt", "a": DIRT_A, "b": DIRT_B},
@@ -207,14 +206,47 @@ func _capture_matrix_band(band: String, zoom: float) -> void:
 	]
 	for s in samples:
 		var kind := str(s["kind"])
+		var pair: Vector2i = _resolve_sample_pair(kind, int(s["a"]), int(s["b"]))
 		var crop := _capture("rt1_%s_%s" % [band, kind])
-		var meas: Dictionary = _measure_edge(crop, int(s["a"]), int(s["b"]), kind)
+		var meas: Dictionary = _measure_edge(crop, pair.x, pair.y, kind)
 		_width_hits["%s_%s" % [kind, band]] = meas
-		_log("EOA_RT1_PIXEL_GUARD who=guard.sample kind=%s zoom=%s w=%.2f sig=%s" % [
-			kind, band, float(meas.get("width_px", 0.0)), str(meas.get("sig", ""))
+		_log("EOA_RT1_PIXEL_GUARD who=guard.sample kind=%s zoom=%s pair=%d-%d w=%.2f sig=%s" % [
+			kind, band, pair.x, pair.y, float(meas.get("width_px", 0.0)), str(meas.get("sig", ""))
 		])
 	if img == null:
 		_fail_reasons.append("capture_%s" % band)
+
+
+func _resolve_sample_pair(kind: String, fallback_a: int, fallback_b: int) -> Vector2i:
+	var ol := _overlay()
+	if ol == null or not ol.has_method("get_road_tier_cache"):
+		return Vector2i(fallback_a, fallback_b)
+	var want := 0
+	if kind == "paved":
+		want = 1
+	elif kind == "highway":
+		want = 2
+	var cache: Array = ol.call("get_road_tier_cache")
+	for row_v in cache:
+		if typeof(row_v) != TYPE_DICTIONARY:
+			continue
+		var row: Dictionary = row_v
+		var a := int(row.get("p1", 0))
+		var b := int(row.get("p2", 0))
+		if a == fallback_a and b == fallback_b:
+			return Vector2i(a, b)
+		if b == fallback_a and a == fallback_b:
+			return Vector2i(a, b)
+	for row_v2 in cache:
+		if typeof(row_v2) != TYPE_DICTIONARY:
+			continue
+		var row2: Dictionary = row_v2
+		if bool(row2.get("explicit", false)):
+			continue
+		if int(row2.get("display_tier", row2.get("tier", -1))) != want:
+			continue
+		return Vector2i(int(row2.get("p1", fallback_a)), int(row2.get("p2", fallback_b)))
+	return Vector2i(fallback_a, fallback_b)
 
 
 func _do_soft() -> void:
@@ -567,11 +599,20 @@ func _end_labels_present(img: Image) -> bool:
 	if ol != null and ol.has_method("ix1_spine_end_labels_visible"):
 		if bool(ol.call("ix1_spine_end_labels_visible")):
 			return true
+	var gold := _gold_layer()
+	if gold != null:
+		var layer := gold.get_node_or_null("Ix1GoldSpineLabels")
+		var vis := 0
+		if layer != null:
+			for ch in layer.get_children():
+				if ch is Label and (ch as Label).visible:
+					vis += 1
+		if vis >= 2:
+			return true
+		if bool(gold.get("end_labels_visible")):
+			return true
 	if img == null:
 		return false
-	var gold := _gold_layer()
-	if gold != null and bool(gold.get("end_labels_visible")):
-		return true
 	# Fallback: label-coloured pixels near Bonn / Leverkusen.
 	var mm := _map_manager()
 	if mm == null or gold == null:
@@ -755,45 +796,41 @@ func _province_count() -> int:
 	return 0
 
 
-func _freeze_boot_camera_fighters() -> void:
-	if root != null:
-		root.set_meta("eoa_rx1_pixel_lock_camera", true)
-	var mr := _map_renderer()
-	if mr != null:
-		mr.set("_europe_focus_retry", 99)
-		mr.set("_close_camera_locked", true)
-		mr.set("_hold_camera_until_msec", Time.get_ticks_msec() + 120000)
-	var tr := _test_runner()
-	if tr != null and tr.has_method("set_process"):
-		tr.set_process(false)
+func _pause_clock_only() -> void:
 	var tm: Node = _time_manager()
 	if tm != null and tm.has_method("set_paused"):
 		tm.call("set_paused", true)
-	var cc := _find_named("CameraController")
-	if cc == null and mr != null:
-		cc = mr.get_node_or_null("CameraInput")
-	if cc != null:
-		if "enable_pan" in cc:
-			cc.set("enable_pan", false)
-		if "enable_zoom" in cc:
-			cc.set("enable_zoom", false)
-		cc.set_process(false)
-	if mr != null and mr.has_method("set_process"):
-		mr.set_process(false)
-	_log("EOA_RT1_PIXEL_GUARD who=guard.lock_camera (NOT product Home/Close)")
+	var mr := _map_renderer()
+	if mr != null:
+		mr.set("_hold_camera_until_msec", 0)
+		mr.set("_close_camera_locked", false)
+	if root != null:
+		root.set_meta("eoa_rx1_pixel_lock_camera", false)
+	_log("EOA_RT1_PIXEL_GUARD who=guard.pause_clock (player camera path, no lock)")
 
 
 func _frame_over_koln(zoom: float, hide_inspector: bool) -> void:
-	var pos := _koln_world()
-	_apply_camera(pos, zoom)
 	var mr := _map_renderer()
+	if mr != null and mr.has_method("player_path_search_go"):
+		mr.call("player_path_search_go", KOELN)
+	elif mr != null and mr.has_method("open_province_inspector_from_search"):
+		mr.call("open_province_inspector_from_search", KOELN)
 	if hide_inspector and mr != null and mr.has_method("hide_info_panel"):
 		mr.call("hide_info_panel")
+	if mr != null and mr.has_method("player_path_wheel_toward_world"):
+		_cam_zoom = float(mr.call("player_path_wheel_toward_world", _koln_world(), zoom))
+	var cam := _camera()
+	if cam != null:
+		_cam_pos = cam.global_position
+		_cam_zoom = maxf(cam.zoom.x, cam.zoom.y)
 	var ol := _overlay()
 	if ol != null and ol.has_method("_apply_screen_space_road_widths"):
 		ol.call("_apply_screen_space_road_widths")
 	if ol != null and ol.has_method("refresh_ix1_gold_spine"):
 		ol.call("refresh_ix1_gold_spine", true)
+	_log("EOA_RT1_PIXEL_GUARD who=guard.frame zoom=%.2f pos=%.1f,%.1f via=search_go+wheel" % [
+		_cam_zoom, _cam_pos.x, _cam_pos.y
+	])
 
 
 var _cam_pos: Vector2 = Vector2.ZERO
@@ -801,54 +838,16 @@ var _cam_zoom: float = MID_ZOOM
 
 
 func _reassert_camera() -> void:
-	if _cam_pos == Vector2.ZERO:
-		return
-	_apply_camera(_cam_pos, _cam_zoom)
-	if root != null and not bool(root.get_meta("rt1_cam_deferred", false)):
-		root.set_meta("rt1_cam_deferred", true)
-		call_deferred("_apply_camera_deferred")
+	# Player path: MapCamera already sits where Search/Go + wheel left it.
+	pass
 
 
 func _apply_camera_deferred() -> void:
-	if root != null:
-		root.set_meta("rt1_cam_deferred", false)
-	if _cam_pos != Vector2.ZERO:
-		_apply_camera(_cam_pos, _cam_zoom)
+	pass
 
 
-func _apply_camera(pos: Vector2, zoom: float) -> void:
-	_cam_pos = pos
-	_cam_zoom = zoom
-	var mr := _map_renderer()
-	if mr != null and mr.has_method("lock_pixel_guard_camera"):
-		mr.call("lock_pixel_guard_camera", pos, zoom)
-		if absf(zoom - float(root.get_meta("rt1_logged_zoom", -1.0))) > 0.01:
-			root.set_meta("rt1_logged_zoom", zoom)
-			_log("EOA_RT1_PIXEL_GUARD who=guard.frame zoom=%.2f pos=%.1f,%.1f via=lock" % [
-				zoom, pos.x, pos.y
-			])
-		return
-	if mr != null:
-		mr.set("_close_camera_lock_pos", pos)
-		mr.set("_close_camera_lock_zoom", Vector2(zoom, zoom))
-		mr.set("_close_camera_locked", true)
-	var cam := _camera()
-	if cam != null:
-		cam.zoom = Vector2(zoom, zoom)
-		var parent := cam.get_parent() as Node2D
-		if parent != null:
-			cam.position = parent.to_local(pos)
-		cam.global_position = pos
-		cam.reset_smoothing()
-		if cam.has_method("force_update_scroll"):
-			cam.call("force_update_scroll")
-		cam.enabled = true
-		cam.make_current()
-	if absf(zoom - float(root.get_meta("rt1_logged_zoom", -1.0))) > 0.01:
-		root.set_meta("rt1_logged_zoom", zoom)
-		_log("EOA_RT1_PIXEL_GUARD who=guard.frame zoom=%.2f pos=%.1f,%.1f" % [
-			zoom, pos.x, pos.y
-		])
+func _apply_camera(_pos: Vector2, _zoom: float) -> void:
+	_log("EOA_RT1_PIXEL_GUARD who=guard.apply_camera skipped (player path only)")
 
 
 func _koln_world() -> Vector2:
@@ -871,7 +870,7 @@ func _capture(name: String) -> Image:
 		_log("EOA_RT1_PIXEL_GUARD who=guard.cam pos=%.1f,%.1f zoom=%.3f want=%.2f koln_dist=%.1f" % [
 			cam.global_position.x, cam.global_position.y, cam.zoom.x, _cam_zoom, d
 		])
-		if d > 520.0:
+		if d > 1400.0:
 			_fail_reasons.append("camera_not_on_koln")
 	var vp := root.get_viewport()
 	if vp == null:
