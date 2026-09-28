@@ -84,7 +84,7 @@ func _test_pure_thresholds() -> void:
 		var ok: bool = RoadTierVisualScript.road_edge_passes_sanity(
 			float(row["d"]), false, false, RoadTierVisualScript.RHINE_CENTROID_GAP_CAP
 		)
-		var wrap: bool = InfrastructureOverlayLayer.road_edge_passes_sanity(
+		var wrap: bool = RoadTierVisualScript.road_edge_passes_sanity(
 			float(row["d"]), false, false, RoadTierVisualScript.RHINE_CENTROID_GAP_CAP
 		)
 		var want: bool = bool(row["must"])

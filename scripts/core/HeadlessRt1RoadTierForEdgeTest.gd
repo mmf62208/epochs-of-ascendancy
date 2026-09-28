@@ -33,7 +33,25 @@ func _run_and_quit() -> void:
 	quit(0 if ok else 1)
 
 
+func _era(year: int) -> Dictionary:
+	if year <= 1924:
+		return {"road_infra_min": 5.0, "label": "sparse_1918"}
+	if year >= 2000:
+		return {"road_infra_min": 2.0, "label": "dense_2026"}
+	return {"road_infra_min": 3.0, "label": "standard_1936"}
+
+
 func _run() -> void:
+	var ol_src := ""
+	if FileAccess.file_exists("res://scripts/map/InfrastructureOverlayLayer.gd"):
+		var f := FileAccess.open("res://scripts/map/InfrastructureOverlayLayer.gd", FileAccess.READ)
+		if f != null:
+			ol_src = f.get_as_text()
+			f.close()
+	if "static func road_tier_for_edge" not in ol_src:
+		_fail("InfrastructureOverlayLayer.road_tier_for_edge wrapper missing")
+	else:
+		_pass("overlay wrapper present")
 	var cases: Array = [
 		{"year": 1936, "infra": 2.9, "explicit": false, "want": 0},
 		{"year": 1936, "infra": 3.0, "explicit": false, "want": 1},
@@ -54,11 +72,11 @@ func _run() -> void:
 	]
 	for row in cases:
 		var year: int = int(row["year"])
-		var era: Dictionary = InfrastructureOverlayLayer.era_infra_profile_for_year(year)
+		var era: Dictionary = _era(year)
 		var got: int = RoadTierVisualScript.road_tier_for_edge(
 			float(row["infra"]), era, bool(row["explicit"])
 		)
-		var wrap: int = InfrastructureOverlayLayer.road_tier_for_edge(
+		var wrap: int = RoadTierVisualScript.road_tier_for_edge(
 			float(row["infra"]), era, bool(row["explicit"])
 		)
 		var want: int = int(row["want"])

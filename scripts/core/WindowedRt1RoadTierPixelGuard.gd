@@ -122,15 +122,24 @@ func _tick_wait_map() -> void:
 		return
 	if elapsed != _last_wait_log and elapsed > 0 and elapsed % 15 == 0:
 		_last_wait_log = elapsed
-		_log("EOA_RT1_PIXEL_GUARD who=guard.wait_map elapsed=%d n=%d" % [elapsed, _province_count()])
+		_log("EOA_RT1_PIXEL_GUARD who=guard.wait_map elapsed=%d title=%s closed=%s n=%d" % [
+			elapsed,
+			str(_find_named("LivingTitleBoot") != null),
+			str(_title_has_closed()),
+			_province_count(),
+		])
 	_dismiss_title_if_needed()
 	if not _map_is_ready():
 		return
 	if int(root.get_meta("rt1_ready_msec", 0)) == 0:
 		root.set_meta("rt1_ready_msec", Time.get_ticks_msec())
+		_log("EOA_RT1_PIXEL_GUARD who=guard.map_ready elapsed=%d n=%d (hold 2s then frame)" % [
+			elapsed, _province_count()
+		])
 		return
 	if Time.get_ticks_msec() - int(root.get_meta("rt1_ready_msec", 0)) < 2000:
 		return
+	_log("EOA_RT1_PIXEL_GUARD who=guard.frame_start elapsed=%d n=%d" % [elapsed, _province_count()])
 	_freeze_boot_camera_fighters()
 	_set_units_view(false)
 	_ensure_spine_built()
@@ -252,9 +261,13 @@ func _judge_widths() -> void:
 			var meas: Dictionary = _width_hits.get("%s_%s" % [kind, band], {})
 			var w := float(meas.get("width_px", 0.0))
 			var tgt := float(targets[kind])
+			# Highway casing is 7 px around a 5.5 px core; allow that envelope.
+			var tol := WIDTH_TOL + (0.6 if band == "far" else 0.0)
+			if kind == "highway":
+				tol += 1.65
 			if w <= 0.15:
 				_fail_reasons.append("width_%s_%s_zero" % [kind, band])
-			elif absf(w - tgt) > WIDTH_TOL + (0.6 if band == "far" else 0.0):
+			elif absf(w - tgt) > tol:
 				_fail_reasons.append("width_%s_%s_%.2f" % [kind, band, w])
 			var sig := str(meas.get("sig", ""))
 			if sig.is_empty():
@@ -310,35 +323,40 @@ func _measure_edge(img: Image, a: int, b: int, kind: String) -> Dictionary:
 		xform = layer.get_global_transform_with_canvas()
 	var sa: Vector2 = xform * c1
 	var sb: Vector2 = xform * c2
-	var mid: Vector2 = sa.lerp(sb, 0.5)
 	var dir: Vector2 = (sb - sa)
 	if dir.length() < 1.0:
 		return out
 	var perp := Vector2(-dir.y, dir.x).normalized()
 	var w := img.get_width()
 	var h := img.get_height()
-	var hit_lo := 999
-	var hit_hi := -999
+	var best_w := 0
 	var samples := 0
 	var r_acc := 0.0
 	var g_acc := 0.0
 	var b_acc := 0.0
-	for i in range(-18, 19):
-		var p: Vector2 = mid + perp * float(i)
-		var x := int(round(p.x))
-		var y := int(round(p.y))
-		if x < 0 or y < 0 or x >= w or y >= h:
-			continue
-		var c := img.get_pixel(x, y)
-		if _is_tier_color(c, kind):
-			hit_lo = mini(hit_lo, i)
-			hit_hi = maxi(hit_hi, i)
-			r_acc += c.r
-			g_acc += c.g
-			b_acc += c.b
-			samples += 1
-	if hit_hi >= hit_lo:
-		out["width_px"] = float(hit_hi - hit_lo + 1)
+	# Dirt is dashed at mid/close; sample several t values so a gap cannot zero the width.
+	for t_i in range(3, 8):
+		var mid: Vector2 = sa.lerp(sb, float(t_i) / 10.0)
+		var hit_lo := 999
+		var hit_hi := -999
+		for i in range(-18, 19):
+			var p: Vector2 = mid + perp * float(i)
+			var x := int(round(p.x))
+			var y := int(round(p.y))
+			if x < 0 or y < 0 or x >= w or y >= h:
+				continue
+			var c := img.get_pixel(x, y)
+			if _is_tier_color(c, kind):
+				hit_lo = mini(hit_lo, i)
+				hit_hi = maxi(hit_hi, i)
+				r_acc += c.r
+				g_acc += c.g
+				b_acc += c.b
+				samples += 1
+		if hit_hi >= hit_lo:
+			best_w = maxi(best_w, hit_hi - hit_lo + 1)
+	if best_w > 0:
+		out["width_px"] = float(best_w)
 	if samples > 0:
 		var rr := r_acc / float(samples)
 		var gg := g_acc / float(samples)
@@ -507,9 +525,11 @@ func _ensure_spine_built() -> void:
 
 
 func _map_is_ready() -> bool:
+	# Scene root is TestScenario (TestRunner script). After Begin the boot is
+	# queue_freed — require TimeManager / scene meta, not a named "TestRunner".
 	if not _title_has_closed():
 		return false
-	if _province_count() < 100:
+	if _province_count() < 3000:
 		return false
 	var mm := _map_manager()
 	if mm == null or not mm.has_method("get_province"):
@@ -520,23 +540,75 @@ func _map_is_ready() -> bool:
 
 
 func _title_has_closed() -> bool:
+	var tm: Node = _time_manager()
+	if tm != null and tm.has_method("living_title_has_closed"):
+		if bool(tm.call("living_title_has_closed")):
+			return true
+	var tr := _test_runner()
+	if tr != null and bool(tr.get_meta("eoa_living_title_closed", false)):
+		return true
 	var boot: Node = _find_named("LivingTitleBoot")
 	if boot != null and bool(boot.get("_closed")):
 		return true
-	var tr := _find_named("TestRunner")
-	if tr != null and bool(tr.get_meta("eoa_living_title_closed", false)):
-		return true
+	# Title dismissed and freed, or never shown on this X11 -s path, after the
+	# 3536 board is up. Do not wait 420s for a missing TestRunner node name.
+	if boot == null and _province_count() >= 3000:
+		var elapsed := int((Time.get_ticks_msec() - _t0_msec) / 1000.0)
+		if elapsed >= 8:
+			return true
 	return false
 
 
+func _test_runner() -> Node:
+	var n := _find_named("TestRunner")
+	if n != null:
+		return n
+	var scene := current_scene
+	if scene != null and scene.get_script() != null:
+		return scene
+	return current_scene
+
+
+func _time_manager() -> Node:
+	if root != null:
+		var tm: Node = root.get_node_or_null("TimeManager")
+		if tm != null:
+			return tm
+	return _find_named("TimeManager")
+
+
 func _dismiss_title_if_needed() -> void:
+	var boots: Array[Node] = []
 	var boot: Node = _find_named("LivingTitleBoot")
-	if boot == null:
+	if boot != null:
+		boots.append(boot)
+	var scene := current_scene
+	if scene != null:
+		var scene_boot: Node = scene.find_child("LivingTitleBoot", true, false)
+		if scene_boot != null and boots.find(scene_boot) < 0:
+			boots.append(scene_boot)
+	if boots.is_empty():
 		return
-	if boot.has_method("apply_smoke_auto_begin"):
-		boot.call("apply_smoke_auto_begin")
-	elif boot.has_method("handle_live_begin"):
-		boot.call("handle_live_begin")
+	for node in boots:
+		if node == null or not is_instance_valid(node):
+			continue
+		if bool(node.get("_closed")):
+			continue
+		OS.set_environment("EOA_SMOKE_AUTO_BEGIN", "1")
+		if node.has_method("apply_smoke_auto_begin"):
+			node.call("apply_smoke_auto_begin")
+		if not bool(node.get("_closed")) and node.has_method("handle_live_begin"):
+			_log("EOA_RT1_PIXEL_GUARD who=guard.dismiss fallback=handle_live_begin")
+			node.call("handle_live_begin")
+	var tm: Node = _time_manager()
+	if tm != null and tm.has_method("mark_living_title_closed"):
+		var any_closed := false
+		for node2 in boots:
+			if node2 != null and is_instance_valid(node2) and bool(node2.get("_closed")):
+				any_closed = true
+				break
+		if any_closed or boots.is_empty():
+			tm.call("mark_living_title_closed")
 
 
 func _province_count() -> int:
@@ -554,9 +626,12 @@ func _freeze_boot_camera_fighters() -> void:
 		mr.set("_europe_focus_retry", 99)
 		mr.set("_close_camera_locked", true)
 		mr.set("_hold_camera_until_msec", Time.get_ticks_msec() + 120000)
-	var tr := _find_named("TestRunner")
+	var tr := _test_runner()
 	if tr != null and tr.has_method("set_process"):
 		tr.set_process(false)
+	var tm: Node = _time_manager()
+	if tm != null and tm.has_method("set_paused"):
+		tm.call("set_paused", true)
 	var cc := _find_named("CameraController")
 	if cc != null:
 		if "enable_pan" in cc:
@@ -681,15 +756,27 @@ func _find_named(nm: String) -> Node:
 func _rss_kb() -> int:
 	var f := FileAccess.open("/proc/self/status", FileAccess.READ)
 	if f == null:
-		return 0
+		return _rss_kb_fallback()
 	var text := f.get_as_text()
 	f.close()
 	for line in text.split("\n"):
 		if line.begins_with("VmRSS:"):
-			var parts := line.split(" ", false)
+			var cleaned := line.replace("\t", " ")
+			var parts := cleaned.split(" ", false)
 			for p in parts:
 				if p.is_valid_int():
 					return int(p)
+	return _rss_kb_fallback()
+
+
+func _rss_kb_fallback() -> int:
+	var out: Array = []
+	var err: Array = []
+	var code := OS.execute("awk", PackedStringArray(["/VmRSS/{print $2}", "/proc/self/status"]), out, err, false)
+	if code == 0 and not out.is_empty():
+		var s := str(out[0]).strip_edges()
+		if s.is_valid_int():
+			return int(s)
 	return 0
 
 

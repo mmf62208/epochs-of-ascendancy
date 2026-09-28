@@ -31,6 +31,8 @@ tools/run_godot.sh --headless --path . -s res://scripts/core/HeadlessRt1RoadNoRe
 tools/eoa_rt1_pixel_guard.sh   # xvfb; NOT product Play
 ```
 
+The windowed guard dismisses the living title via `EOA_SMOKE_AUTO_BEGIN` (never `EOA_SKIP_TITLE`), then waits on `TimeManager.living_title_has_closed` / the TestScenario scene meta — the scene root is not named `TestRunner`. Companion `EOA_SMOKE_ADVANCE_PAST_PLUS6=0` keeps January 1936 for the 3×3 matrix.
+
 Every new guard must **FAIL on 497731dd** and **PASS on tip**.
 
 Kept regressions: GS-1 spine continuity (`tools/eoa_rx1_pixel_guard.sh`), RX-1 river sample, units-on chip-over-spine, Search→Go (`HeadlessIx1SearchGoInspectorTest`).
