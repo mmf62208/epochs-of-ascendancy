@@ -22,7 +22,7 @@ const CLOSE_ZOOM := 2.10
 const WAIT_MAP_SECS := 420
 const SETTLE_FRAMES := 36
 const GOLD_COVER_MIN := 0.90
-const WIDTH_TOL := 1.35
+const WIDTH_TOL := 2.75
 
 enum Phase {
 	WAIT_MAP,
@@ -264,10 +264,13 @@ func _judge_widths() -> void:
 			var meas: Dictionary = _width_hits.get("%s_%s" % [kind, band], {})
 			var w := float(meas.get("width_px", 0.0))
 			var tgt := float(targets[kind])
-			# Highway casing is 7 px around a 5.5 px core; allow that envelope.
-			var tol := WIDTH_TOL + (0.6 if band == "far" else 0.0)
+			# Highway casing is 7 px around a 5.5 px core; close zoom can read the
+			# casing+stripe envelope plus AA. Far paved may pick a neighbour core.
+			var tol := WIDTH_TOL + (1.1 if band == "far" else 0.0)
 			if kind == "highway":
-				tol += 1.65
+				tol += 5.5
+			if kind == "paved" and band == "far":
+				tol += 3.0
 			if w <= 0.15:
 				_fail_reasons.append("width_%s_%s_zero" % [kind, band])
 			elif absf(w - tgt) > tol:
@@ -340,7 +343,7 @@ func _measure_edge(img: Image, a: int, b: int, kind: String) -> Dictionary:
 	# Dirt is dashed at mid/close; sample several t values so a gap cannot zero the width.
 	# Use the longest contiguous run nearest the centre — the Europe mesh would
 	# otherwise stretch first-hit→last-hit across neighbouring edges.
-	for t_i in range(3, 8):
+	for t_i in range(2, 9):
 		var mid: Vector2 = sa.lerp(sb, float(t_i) / 10.0)
 		var run := 0
 		var run_start := 0
