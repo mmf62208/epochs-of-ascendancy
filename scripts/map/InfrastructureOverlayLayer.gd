@@ -2709,7 +2709,7 @@ class Ix1GoldSpineDraw extends Node2D:
         lbl.add_theme_font_size_override("font_size", RoadTierVisualScript.END_LABEL_FONT_PX)
         lbl.add_theme_color_override("font_color", Color(0.96, 0.97, 1.0, 0.96))
         lbl.add_theme_color_override("font_outline_color", Color(0.02, 0.03, 0.06, 0.95))
-        lbl.add_theme_constant_override("outline_size", 3)
+        lbl.add_theme_constant_override("outline_size", 4)
         lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
         lbl.clip_text = false
@@ -2731,11 +2731,23 @@ class Ix1GoldSpineDraw extends Node2D:
             return
         var xf := get_global_transform_with_canvas()
         var origin: Vector2 = position
+        var koeln: Vector2 = _as_finite_vec(cents.get(710417, Vector2.ZERO))
         var bonn_s: Vector2 = xf * (bonn - origin)
         var lev_s: Vector2 = xf * (lev - origin)
-        # Opposite sides of the spine, away from the Köln hub / tooltip.
-        var bonn_pos: Vector2 = bonn_s + Vector2(-46.0, 26.0)
-        var lev_pos: Vector2 = lev_s + Vector2(36.0, -34.0)
+        var koeln_s: Vector2 = xf * (koeln - origin)
+        # Push along the spine, away from the Köln hub / tooltip, opposite sides.
+        var bonn_away: Vector2 = bonn_s - koeln_s
+        var lev_away: Vector2 = lev_s - koeln_s
+        if bonn_away.length() < 1.0:
+            bonn_away = Vector2(-1.0, 0.6)
+        if lev_away.length() < 1.0:
+            lev_away = Vector2(1.0, -0.6)
+        bonn_away = bonn_away.normalized()
+        lev_away = lev_away.normalized()
+        var bonn_perp := Vector2(-bonn_away.y, bonn_away.x)
+        var lev_perp := Vector2(-lev_away.y, lev_away.x)
+        var bonn_pos: Vector2 = bonn_s + bonn_away * 36.0 + bonn_perp * 22.0
+        var lev_pos: Vector2 = lev_s + lev_away * 36.0 - lev_perp * 22.0
         var vp := get_viewport()
         var vr := Rect2(Vector2.ZERO, Vector2(1280, 720))
         if vp != null:

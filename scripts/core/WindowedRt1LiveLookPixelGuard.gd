@@ -16,7 +16,7 @@ const KOELN := 710417
 const BONN := 710416
 const LEV := 710418
 const EUROPE_ZOOM := 0.42
-const MID_ZOOM := 1.70
+const MID_ZOOM := 1.20
 const CLOSE_ZOOM := 2.20
 const WAIT_MAP_SECS := 420
 const SETTLE_FRAMES := 40
@@ -240,7 +240,8 @@ func _judge_labels(band: String) -> void:
 	_log("EOA_RT1_LIVE_LOOK who=guard.labels band=%s visible=%d huge=%s overlap=%s" % [
 		band, visible_n, str(huge), str(overlap)
 	])
-	if band == "close" or band == "mid":
+	# S2 labels are close-only (zoom >= 1.55). Mid 1.20 must not require them.
+	if band == "close":
 		if visible_n < 2:
 			_fail_reasons.append("%s_labels_%d" % [band, visible_n])
 		if huge:
@@ -591,8 +592,21 @@ func _freeze_boot_camera_fighters() -> void:
 	var tm: Node = _time_manager()
 	if tm != null and tm.has_method("set_paused"):
 		tm.call("set_paused", true)
+	var tr := current_scene
+	if tr != null and tr.has_method("set_process"):
+		tr.set_process(false)
+	var cc := _find_named("CameraController")
+	if cc == null and mr != null:
+		cc = mr.get_node_or_null("CameraInput")
+	if cc != null:
+		if "enable_pan" in cc:
+			cc.set("enable_pan", false)
+		if "enable_zoom" in cc:
+			cc.set("enable_zoom", false)
+		cc.set_process(false)
 	if mr != null and mr.has_method("set_process"):
 		mr.set_process(false)
+	_log("EOA_RT1_LIVE_LOOK who=guard.lock_camera (NOT product Home/Close)")
 
 
 func _frame_over_koln(zoom: float, hide_inspector: bool) -> void:
@@ -621,32 +635,25 @@ func _apply_camera(pos: Vector2, zoom: float) -> void:
 	var mr := _map_renderer()
 	if mr != null and mr.has_method("lock_pixel_guard_camera"):
 		mr.call("lock_pixel_guard_camera", pos, zoom)
+		return
 	if mr != null:
 		mr.set("_close_camera_lock_pos", pos)
 		mr.set("_close_camera_lock_zoom", Vector2(zoom, zoom))
 		mr.set("_close_camera_locked", true)
 		mr.set("_europe_focus_retry", 99)
-	var cams: Array[Camera2D] = []
-	_collect_cameras(root, cams)
-	var vp_cam := _camera()
-	if vp_cam != null and cams.find(vp_cam) < 0:
-		cams.append(vp_cam)
-	for cam in cams:
-		cam.zoom = Vector2(zoom, zoom)
-		var parent := cam.get_parent() as Node2D
-		if parent != null:
-			cam.position = parent.to_local(pos)
-		cam.global_position = pos
-		cam.reset_smoothing()
-		cam.enabled = true
-		cam.make_current()
-
-
-func _collect_cameras(n: Node, out: Array[Camera2D]) -> void:
-	if n is Camera2D:
-		out.append(n as Camera2D)
-	for c in n.get_children():
-		_collect_cameras(c, out)
+	var cam := _camera()
+	if cam == null:
+		return
+	cam.zoom = Vector2(zoom, zoom)
+	var parent := cam.get_parent() as Node2D
+	if parent != null:
+		cam.position = parent.to_local(pos)
+	cam.global_position = pos
+	cam.reset_smoothing()
+	if cam.has_method("force_update_scroll"):
+		cam.call("force_update_scroll")
+	cam.enabled = true
+	cam.make_current()
 
 
 func _koln_world() -> Vector2:
@@ -655,12 +662,25 @@ func _koln_world() -> Vector2:
 		var c: Vector2 = mm.call("get_province_centroid", KOELN)
 		if c != Vector2.ZERO:
 			return c
-	return Vector2(4254.32, 944.10)
+	return Vector2(4254.32 * 1.728, 944.10 * 1.728)
 
 
 func _capture(name: String) -> Image:
 	_reassert_camera()
 	RenderingServer.force_draw()
+	_reassert_camera()
+	RenderingServer.force_draw()
+	var cam := _camera()
+	if cam != null:
+		var d := cam.global_position.distance_to(_koln_world())
+		_log("EOA_RT1_LIVE_LOOK who=guard.cam pos=%.1f,%.1f zoom=%.3f want=%.2f koln_dist=%.1f" % [
+			cam.global_position.x, cam.global_position.y, cam.zoom.x, _cam_zoom, d
+		])
+		if name.contains("mid") or name.contains("close"):
+			if d > 520.0:
+				_fail_reasons.append("camera_not_on_koln")
+			if absf(cam.zoom.x - _cam_zoom) > 0.15:
+				_fail_reasons.append("camera_zoom_%.2f" % cam.zoom.x)
 	var vp := root.get_viewport()
 	if vp == null:
 		return null
@@ -708,6 +728,11 @@ func _map_manager() -> Node:
 
 
 func _camera() -> Camera2D:
+	var mr := _map_renderer()
+	if mr != null:
+		var named_cam := mr.get_node_or_null("MapCamera") as Camera2D
+		if named_cam != null:
+			return named_cam
 	var vp := root.get_viewport()
 	if vp != null:
 		return vp.get_camera_2d()

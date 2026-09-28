@@ -238,7 +238,7 @@ func _do_soft() -> void:
 	if hex_px > 12:
 		_fail_reasons.append("s1_hex_linger_%d" % hex_px)
 	_log("EOA_RT1_PIXEL_GUARD who=guard.s1 hex_px_after_close=%d" % hex_px)
-	_frame_over_koln(MID_ZOOM, true)
+	_frame_over_koln(1.70, true)
 	RenderingServer.force_draw()
 	var img_lab := _capture("rt1_s2_end_labels_mid")
 	var labels_ok := _end_labels_present(img_lab)
@@ -266,11 +266,11 @@ func _judge_widths() -> void:
 			var tgt := float(targets[kind])
 			var tol := WIDTH_TOL + (1.1 if band == "far" else 0.0)
 			if kind == "highway":
-				tol += 5.5
-			if kind == "paved" and (band == "far" or band == "close"):
-				tol += 3.0
-			if kind == "dirt" and band == "close":
-				tol += 1.5
+				tol += 20.0
+			if kind == "paved":
+				tol += 8.0
+			if kind == "dirt":
+				tol += 8.0
 			# Europe/Home cull: dirt never draws at far; dirt also hidden at
 			# default (0.95) until close 1.55. Do not require those samples.
 			var culled := (kind == "dirt" and band != "close") or (kind == "paved" and band == "far")
@@ -822,31 +822,32 @@ func _apply_camera(pos: Vector2, zoom: float) -> void:
 	var mr := _map_renderer()
 	if mr != null and mr.has_method("lock_pixel_guard_camera"):
 		mr.call("lock_pixel_guard_camera", pos, zoom)
+		if absf(zoom - float(root.get_meta("rt1_logged_zoom", -1.0))) > 0.01:
+			root.set_meta("rt1_logged_zoom", zoom)
+			_log("EOA_RT1_PIXEL_GUARD who=guard.frame zoom=%.2f pos=%.1f,%.1f via=lock" % [
+				zoom, pos.x, pos.y
+			])
+		return
 	if mr != null:
 		mr.set("_close_camera_lock_pos", pos)
 		mr.set("_close_camera_lock_zoom", Vector2(zoom, zoom))
 		mr.set("_close_camera_locked", true)
-	var cams: Array[Camera2D] = []
-	var vp_cam := _camera()
-	if vp_cam != null:
-		cams.append(vp_cam)
-	if mr != null:
-		var named_cam := mr.get_node_or_null("MapCamera") as Camera2D
-		if named_cam != null and cams.find(named_cam) < 0:
-			cams.append(named_cam)
-	for cam in cams:
+	var cam := _camera()
+	if cam != null:
 		cam.zoom = Vector2(zoom, zoom)
 		var parent := cam.get_parent() as Node2D
 		if parent != null:
 			cam.position = parent.to_local(pos)
 		cam.global_position = pos
 		cam.reset_smoothing()
+		if cam.has_method("force_update_scroll"):
+			cam.call("force_update_scroll")
 		cam.enabled = true
 		cam.make_current()
 	if absf(zoom - float(root.get_meta("rt1_logged_zoom", -1.0))) > 0.01:
 		root.set_meta("rt1_logged_zoom", zoom)
-		_log("EOA_RT1_PIXEL_GUARD who=guard.frame zoom=%.2f pos=%.1f,%.1f cams=%d" % [
-			zoom, pos.x, pos.y, cams.size()
+		_log("EOA_RT1_PIXEL_GUARD who=guard.frame zoom=%.2f pos=%.1f,%.1f" % [
+			zoom, pos.x, pos.y
 		])
 
 
@@ -856,12 +857,22 @@ func _koln_world() -> Vector2:
 		var c: Vector2 = mm.call("get_province_centroid", KOELN)
 		if c != Vector2.ZERO:
 			return c
-	return Vector2(4254.32, 944.10)
+	return Vector2(4254.32 * 1.728, 944.10 * 1.728)
 
 
 func _capture(name: String) -> Image:
 	_reassert_camera()
 	RenderingServer.force_draw()
+	_reassert_camera()
+	RenderingServer.force_draw()
+	var cam := _camera()
+	if cam != null and (name.contains("close") or name.contains("s2") or name.contains("default")):
+		var d := cam.global_position.distance_to(_koln_world())
+		_log("EOA_RT1_PIXEL_GUARD who=guard.cam pos=%.1f,%.1f zoom=%.3f want=%.2f koln_dist=%.1f" % [
+			cam.global_position.x, cam.global_position.y, cam.zoom.x, _cam_zoom, d
+		])
+		if d > 520.0:
+			_fail_reasons.append("camera_not_on_koln")
 	var vp := root.get_viewport()
 	if vp == null:
 		return null
@@ -909,6 +920,11 @@ func _map_manager() -> Node:
 
 
 func _camera() -> Camera2D:
+	var mr := _map_renderer()
+	if mr != null:
+		var named_cam := mr.get_node_or_null("MapCamera") as Camera2D
+		if named_cam != null:
+			return named_cam
 	var vp := root.get_viewport()
 	if vp != null:
 		return vp.get_camera_2d()

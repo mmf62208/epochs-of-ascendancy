@@ -13,13 +13,13 @@ The smoke harness and headless guards are **not** a live product Play PASS.
 |------|-----|
 | Tier formula | Same era-relative rule as `_rebuild_road_layer_inner` (`road_infra_min` / +3 / +6; explicit `built_road_neighbors` ⇒ highway). Extracted to `RoadTierVisual.road_tier_for_edge`. |
 | Looks | Screen-pixel strokes: dirt ~2.6 px dashed tan (dash/gap in screen px); paved ~4 px solid; highway ~8.5 px dark casing + pale stripe. 1936 display terciles so mid/close is not a dirt carpet. Formula `tier` unchanged. |
-| LOD | Europe/Home (`zoom <= 0.88`): formula highways only (or nothing). Mid: paved+highway. Close (`>= 1.55`): dirt too. No cache rebuild on zoom. |
+| LOD | Europe/Home (`zoom <= 1.05`): formula highways only (or nothing). Mid: paved+highway. Close (`>= 1.55`): dirt too. No cache rebuild on zoom. |
 | Batching | One `RoadTierDraw` node per tier. Per-edge `Line2D`s remain only as hidden explicit lookup stubs (`find_road_node` / IX-1 reports). |
 | Edge filter | Shared-border from quantized rings when geometry exists; else Rhineland centroid-gap cap **11.0**. Must-draw Bonn–Köln / Köln–Leverkusen. Must-not Köln–Essen / Köln–Düren. |
 | Visibility | Intact tiers on the political map inside the NUTS3 id block (`710000–799999`). Infra mode keeps its extras. |
 | Gold spine | z=23, **9 px** screen gold on 13 px halo (`draw_line` AA, Rhine-class `px/zoom`). Continuous, above tiers and Rhine. |
 | S1 | Selection outline z=22 (below spine). Cleared on `hide_info_panel`. |
-| S2 | Constant-screen 13 px Control Labels (outline, opposite sides of the spine, z=20 under counters). Visible at `zoom >= 1.55`. |
+| S2 | Constant-screen 14 px Control Labels (same outline family as political map labels, opposite sides of the spine, z=20 under counters). Visible at `zoom >= 1.55`. |
 | S3 | Hover-exit now clears compare-candidate / preview rings (salmon/orange leftover west of the Rhine). |
 
 **Not in this slice:** damage states, move-cost scaling, construction UI, other boards.
