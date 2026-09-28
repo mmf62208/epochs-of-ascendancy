@@ -1175,8 +1175,11 @@ func _park_unit_over_river() -> void:
 		dest = pts[int(pts.size() / 2)]
 	_parked_unit = icon
 	_parked_unit_pos = icon.global_position
+	icon.z_as_relative = false
+	icon.z_index = 28
+	icon.visible = true
 	icon.global_position = dest
-	_log("EOA_RX1_PIXEL_GUARD who=guard.park unit=%s to=%.1f,%.1f (visual only)" % [str(icon.name), dest.x, dest.y])
+	_log("EOA_RX1_PIXEL_GUARD who=guard.park unit=%s to=%.1f,%.1f vis=%s (visual only)" % [str(icon.name), dest.x, dest.y, str(icon.visible)])
 
 
 func _restore_parked_unit() -> void:
