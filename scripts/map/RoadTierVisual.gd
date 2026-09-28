@@ -11,25 +11,31 @@ const TIER_PAVED := 1
 const TIER_HIGHWAY := 2
 
 ## Screen-pixel design widths (recomputed from zoom in _draw, never world-locked).
-const DIRT_SCREEN_PX := 2.0
-const PAVED_SCREEN_PX := 3.5
-const PAVED_EDGE_SCREEN_PX := 1.0
-const HIGHWAY_SCREEN_PX := 5.5
-const HIGHWAY_CASING_SCREEN_PX := 7.0
-const HIGHWAY_STRIPE_SCREEN_PX := 1.15
+const DIRT_SCREEN_PX := 2.6
+const PAVED_SCREEN_PX := 4.0
+const PAVED_EDGE_SCREEN_PX := 1.2
+const HIGHWAY_SCREEN_PX := 6.0
+const HIGHWAY_CASING_SCREEN_PX := 8.5
+const HIGHWAY_STRIPE_SCREEN_PX := 1.6
+const DIRT_DASH_SCREEN_PX := 9.0
+const DIRT_GAP_SCREEN_PX := 6.0
 
-## Palette: readable on the pale political map, quieter than borders / labels.
-const DIRT_COLOR := Color(0.58, 0.44, 0.30, 0.78)
-const PAVED_COLOR := Color(0.48, 0.50, 0.53, 0.86)
-const PAVED_EDGE_COLOR := Color(0.30, 0.32, 0.34, 0.70)
-const HIGHWAY_CASING_COLOR := Color(0.20, 0.22, 0.24, 0.88)
-const HIGHWAY_STRIPE_COLOR := Color(0.86, 0.86, 0.88, 0.92)
+## Palette: saturated enough to read on political fills (not thin grey).
+const DIRT_COLOR := Color(0.84, 0.56, 0.18, 0.96)
+const PAVED_COLOR := Color(0.34, 0.36, 0.40, 0.94)
+const PAVED_EDGE_COLOR := Color(0.16, 0.17, 0.20, 0.82)
+const HIGHWAY_CASING_COLOR := Color(0.05, 0.05, 0.07, 0.96)
+const HIGHWAY_CORE_COLOR := Color(0.22, 0.24, 0.28, 0.95)
+const HIGHWAY_STRIPE_COLOR := Color(0.98, 0.94, 0.62, 0.98)
 
-## Zoom LOD bands (camera zoom.x). Far = width+colour only; dirt may hide.
-const ZOOM_FAR_MAX := 0.45
+## Zoom LOD. Europe Home is ~0.33–0.69 (strategic / low operational). The
+## previous FAR_MAX=0.45 left Home in the mid band, so every NUTS3 dirt
+## edge painted a continent-wide grey mesh. Europe/Home = highways only.
+const ZOOM_FAR_MAX := 0.88
 const ZOOM_CLOSE_MIN := 1.55
-const DIRT_ZOOM_FLOOR := 0.22
-const END_LABEL_ZOOM_MIN := 0.55
+const DIRT_ZOOM_FLOOR := 1.55
+const END_LABEL_ZOOM_MIN := 1.55
+const END_LABEL_FONT_PX := 13
 
 ## Fallback when the board has no usable shared-border set.
 ## Tuned on the Rhineland: Bonn–Köln 7.86 and Köln–Leverkusen 3.15 pass;
@@ -76,8 +82,40 @@ static func dirt_hidden_at_zoom(zoom: float) -> bool:
 	return zoom < DIRT_ZOOM_FLOOR
 
 
+## Europe/Home: only formula highways (or explicit). Mid: paved+highway.
+## Close: dirt+paved+highway. Remapped display highways do NOT show at Europe.
+static func tier_visible_at_zoom(formula_tier: int, explicit: bool, display_tier: int, zoom: float) -> bool:
+	var z: float = zoom
+	if not is_finite(z):
+		z = 1.0
+	var lod: int = lod_band_for_zoom(z)
+	if lod <= 0:
+		return explicit or formula_tier == TIER_HIGHWAY
+	if lod == 1:
+		return display_tier >= TIER_PAVED
+	return true
+
+
+static func display_tier_from_rank(rank01: float, explicit: bool) -> int:
+	if explicit:
+		return TIER_HIGHWAY
+	var r: float = rank01
+	if not is_finite(r):
+		r = 0.0
+	r = clampf(r, 0.0, 0.999)
+	if r >= 0.67:
+		return TIER_HIGHWAY
+	if r >= 0.34:
+		return TIER_PAVED
+	return TIER_DIRT
+
+
 static func end_labels_visible_at_zoom(zoom: float) -> bool:
 	return zoom >= END_LABEL_ZOOM_MIN
+
+
+static func end_labels_visible_for_span(zoom: float, _spine_span_world: float) -> bool:
+	return end_labels_visible_at_zoom(zoom)
 
 
 static func screen_width_for_tier(tier: int, lod_band: int) -> float:

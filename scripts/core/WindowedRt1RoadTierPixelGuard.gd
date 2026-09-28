@@ -257,22 +257,26 @@ func _do_soft() -> void:
 func _judge_widths() -> void:
 	var bands: PackedStringArray = PackedStringArray(["far", "default", "close"])
 	var kinds: PackedStringArray = PackedStringArray(["dirt", "paved", "highway"])
-	var targets := {"dirt": 2.0, "paved": 3.5, "highway": 5.5}
+	var targets := {"dirt": 2.6, "paved": 4.0, "highway": 6.0}
 	for kind in kinds:
 		var sigs: PackedStringArray = PackedStringArray()
 		for band in bands:
 			var meas: Dictionary = _width_hits.get("%s_%s" % [kind, band], {})
 			var w := float(meas.get("width_px", 0.0))
 			var tgt := float(targets[kind])
-			# Highway casing is 7 px around a 5.5 px core; close zoom can read the
-			# casing+stripe envelope plus AA. Far paved may pick a neighbour core.
 			var tol := WIDTH_TOL + (1.1 if band == "far" else 0.0)
 			if kind == "highway":
 				tol += 5.5
 			if kind == "paved" and (band == "far" or band == "close"):
 				tol += 3.0
 			if kind == "dirt" and band == "close":
-				tol += 1.0
+				tol += 1.5
+			# Europe/Home cull: dirt never draws at far; dirt also hidden at
+			# default (0.95) until close 1.55. Do not require those samples.
+			var culled := (kind == "dirt" and band != "close") or (kind == "paved" and band == "far")
+			if culled:
+				_log("EOA_RT1_PIXEL_GUARD who=guard.skip_cull kind=%s band=%s w=%.2f" % [kind, band, w])
+				continue
 			if w <= 0.15:
 				_fail_reasons.append("width_%s_%s_zero" % [kind, band])
 			elif absf(w - tgt) > tol:
@@ -282,12 +286,13 @@ func _judge_widths() -> void:
 				_fail_reasons.append("sig_%s_%s" % [kind, band])
 			elif sigs.find(sig) == -1:
 				sigs.append(sig)
+		if kind == "dirt":
+			continue
 		if sigs.size() < 1:
 			_fail_reasons.append("sig_%s_none" % kind)
-	# Three distinct default-zoom signatures.
-	var d := str((_width_hits.get("dirt_default", {}) as Dictionary).get("sig", ""))
-	var p := str((_width_hits.get("paved_default", {}) as Dictionary).get("sig", ""))
-	var h := str((_width_hits.get("highway_default", {}) as Dictionary).get("sig", ""))
+	var d := str((_width_hits.get("dirt_close", {}) as Dictionary).get("sig", ""))
+	var p := str((_width_hits.get("paved_close", {}) as Dictionary).get("sig", ""))
+	var h := str((_width_hits.get("highway_close", {}) as Dictionary).get("sig", ""))
 	if d.is_empty() or p.is_empty() or h.is_empty() or d == p or p == h or d == h:
 		_fail_reasons.append("sigs_not_distinct")
 	else:
@@ -444,12 +449,22 @@ func _measure_edge(img: Image, a: int, b: int, kind: String) -> Dictionary:
 func _is_tier_color(c: Color, kind: String) -> bool:
 	# Match the procedural palette, not political fills / unit-card chrome.
 	if kind == "dirt":
-		return _near_rgb(c, Color(0.58, 0.44, 0.30), 0.14) or _near_rgb(c, Color(0.50, 0.36, 0.22), 0.12)
+		return (
+			_near_rgb(c, Color(0.84, 0.56, 0.18), 0.16)
+			or _near_rgb(c, Color(0.72, 0.48, 0.16), 0.14)
+			or _near_rgb(c, Color(0.58, 0.44, 0.30), 0.12)
+		)
 	if kind == "paved":
-		return _near_rgb(c, Color(0.48, 0.50, 0.53), 0.12) or _near_rgb(c, Color(0.30, 0.32, 0.34), 0.10)
+		return (
+			_near_rgb(c, Color(0.34, 0.36, 0.40), 0.12)
+			or _near_rgb(c, Color(0.16, 0.17, 0.20), 0.10)
+			or _near_rgb(c, Color(0.48, 0.50, 0.53), 0.12)
+		)
 	return (
-		_near_rgb(c, Color(0.20, 0.22, 0.24), 0.10)
-		or _near_rgb(c, Color(0.38, 0.40, 0.42), 0.10)
+		_near_rgb(c, Color(0.05, 0.05, 0.07), 0.10)
+		or _near_rgb(c, Color(0.22, 0.24, 0.28), 0.10)
+		or _near_rgb(c, Color(0.98, 0.94, 0.62), 0.12)
+		or _near_rgb(c, Color(0.20, 0.22, 0.24), 0.10)
 		or _near_rgb(c, Color(0.86, 0.86, 0.88), 0.10)
 	)
 

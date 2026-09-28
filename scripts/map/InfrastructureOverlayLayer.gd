@@ -611,6 +611,8 @@ func _rebuild_road_layer_inner() -> void:
                 "c1": c1,
                 "c2": c2,
                 "tier": tier,
+                "display_tier": tier,
+                "avg_infra": avg_infra,
                 "explicit": has_explicit,
                 "corridor": on_corridor,
             }
@@ -620,6 +622,7 @@ func _rebuild_road_layer_inner() -> void:
             if has_explicit:
                 _add_explicit_lookup_line(c1, c2, int(pid), int(nid), tier, on_corridor)
     _paint_explicit_ix1_spine_if_missing(provinces, drawn, cache)
+    _assign_display_tiers(cache)
     _apply_road_tier_cache(cache)
     refresh_ix1_gold_spine()
     if (not cache.is_empty() or road_layer.get_child_count() > 0) and _get_current_zoom() > 0.10:
@@ -658,6 +661,8 @@ func _paint_explicit_ix1_spine_if_missing(provinces: Dictionary, drawn: Dictiona
                 "c1": c1,
                 "c2": c2,
                 "tier": 2,
+                "display_tier": 2,
+                "avg_infra": 10.0,
                 "explicit": true,
                 "corridor": false,
             })
@@ -1445,12 +1450,45 @@ func _road_edge_passes_filter(p1: int, p2: int, c1: Vector2, c2: Vector2) -> boo
     )
 
 
+func _display_tier_less(a: Dictionary, b: Dictionary) -> bool:
+    var ia := float(a.get("avg_infra", 0.0))
+    var ib := float(b.get("avg_infra", 0.0))
+    if ia < ib:
+        return true
+    if ia > ib:
+        return false
+    var ka := RoadTierVisualScript.edge_key(int(a.get("p1", 0)), int(a.get("p2", 0)))
+    var kb := RoadTierVisualScript.edge_key(int(b.get("p1", 0)), int(b.get("p2", 0)))
+    return ka < kb
+
+
+## Visual-only spread so 1936 NUTS3 (mostly infra 1–2, formula dirt) still
+## paints three looks at mid/close. Formula `tier` is unchanged for Europe cull.
+func _assign_display_tiers(cache: Array[Dictionary]) -> void:
+    var inferred: Array[Dictionary] = []
+    for entry in cache:
+        if bool(entry.get("explicit", false)):
+            entry["display_tier"] = RoadTierVisualScript.TIER_HIGHWAY
+            continue
+        inferred.append(entry)
+    if inferred.is_empty():
+        return
+    inferred.sort_custom(_display_tier_less)
+    var n: int = inferred.size()
+    for i in range(n):
+        var rank: float = 0.0 if n <= 1 else float(i) / float(n)
+        var row: Dictionary = inferred[i]
+        row["display_tier"] = RoadTierVisualScript.display_tier_from_rank(
+            rank, bool(row.get("explicit", false))
+        )
+
+
 func _apply_road_tier_cache(cache: Array[Dictionary]) -> void:
     _road_edge_cache = cache
     _ensure_road_tier_draw_nodes()
     var by_tier: Dictionary = {0: [], 1: [], 2: []}
     for entry in cache:
-        var t: int = clampi(int(entry.get("tier", 0)), 0, 2)
+        var t: int = clampi(int(entry.get("display_tier", entry.get("tier", 0))), 0, 2)
         var bucket: Array = by_tier[t]
         bucket.append(entry)
         by_tier[t] = bucket
@@ -2493,64 +2531,71 @@ class RoadTierDraw extends Node2D:
         return 1.0
 
     func _world_width(screen_px: float) -> float:
-        return maxf(screen_px, 0.75) / maxf(_canvas_zoom(), 0.04)
+        return screen_px / maxf(_canvas_zoom(), 0.04)
+
+    func _edge_visible(entry: Dictionary, zoom: float) -> bool:
+        return RoadTierVisualScript.tier_visible_at_zoom(
+            int(entry.get("tier", 0)),
+            bool(entry.get("explicit", false)),
+            int(entry.get("display_tier", entry.get("tier", 0))),
+            zoom
+        )
 
     func _draw() -> void:
         if _in_draw:
             return
         _in_draw = true
         var z := _canvas_zoom()
-        if tier == 0 and RoadTierVisualScript.dirt_hidden_at_zoom(z):
-            _in_draw = false
-            return
         var lod: int = RoadTierVisualScript.lod_band_for_zoom(z)
-        var far: bool = lod <= 0
         match tier:
             1:
-                _draw_paved(lod, far)
+                _draw_paved(lod, z)
             2:
-                _draw_highway(lod, far)
+                _draw_highway(lod, z)
             _:
-                _draw_dirt(lod, far)
+                _draw_dirt(lod, z)
         _in_draw = false
 
-    func _draw_dirt(_lod: int, far: bool) -> void:
+    func _draw_dirt(_lod: int, zoom: float) -> void:
+        if RoadTierVisualScript.dirt_hidden_at_zoom(zoom):
+            return
         var w := _world_width(RoadTierVisualScript.DIRT_SCREEN_PX)
         var col := RoadTierVisualScript.DIRT_COLOR
         for entry in edges:
+            if not _edge_visible(entry, zoom):
+                continue
             var a: Vector2 = entry.get("c1", Vector2.ZERO)
             var b: Vector2 = entry.get("c2", Vector2.ZERO)
             if a == Vector2.ZERO or b == Vector2.ZERO:
                 continue
-            if far:
-                draw_line(a, b, col, w, false)
-            else:
-                _draw_dashed(a, b, col, w)
+            _draw_dashed(a, b, col, w, zoom)
 
-    func _draw_paved(_lod: int, far: bool) -> void:
+    func _draw_paved(_lod: int, zoom: float) -> void:
         var core_w := _world_width(RoadTierVisualScript.PAVED_SCREEN_PX)
         var edge_w := _world_width(RoadTierVisualScript.PAVED_SCREEN_PX + RoadTierVisualScript.PAVED_EDGE_SCREEN_PX)
         var core := RoadTierVisualScript.PAVED_COLOR
         var edge := RoadTierVisualScript.PAVED_EDGE_COLOR
         for entry in edges:
+            if not _edge_visible(entry, zoom):
+                continue
             var a: Vector2 = entry.get("c1", Vector2.ZERO)
             var b: Vector2 = entry.get("c2", Vector2.ZERO)
             if a == Vector2.ZERO or b == Vector2.ZERO:
                 continue
-            if far:
-                draw_line(a, b, core, core_w, false)
-            else:
-                draw_line(a, b, edge, edge_w, false)
-                draw_line(a, b, core, core_w, false)
+            draw_line(a, b, edge, edge_w, false)
+            draw_line(a, b, core, core_w, false)
 
-    func _draw_highway(_lod: int, far: bool) -> void:
+    func _draw_highway(_lod: int, zoom: float) -> void:
         var case_w := _world_width(RoadTierVisualScript.HIGHWAY_CASING_SCREEN_PX)
         var core_w := _world_width(RoadTierVisualScript.HIGHWAY_SCREEN_PX)
         var stripe_w := _world_width(RoadTierVisualScript.HIGHWAY_STRIPE_SCREEN_PX)
         var casing := RoadTierVisualScript.HIGHWAY_CASING_COLOR
         var stripe := RoadTierVisualScript.HIGHWAY_STRIPE_COLOR
-        var core := Color(0.38, 0.40, 0.42, 0.90)
+        var core := RoadTierVisualScript.HIGHWAY_CORE_COLOR
+        var far: bool = _lod <= 0
         for entry in edges:
+            if not _edge_visible(entry, zoom):
+                continue
             var a: Vector2 = entry.get("c1", Vector2.ZERO)
             var b: Vector2 = entry.get("c2", Vector2.ZERO)
             if a == Vector2.ZERO or b == Vector2.ZERO:
@@ -2560,18 +2605,19 @@ class RoadTierDraw extends Node2D:
             if not far:
                 draw_line(a, b, stripe, stripe_w, false)
 
-    func _draw_dashed(from: Vector2, to: Vector2, col: Color, width: float) -> void:
+    func _draw_dashed(from: Vector2, to: Vector2, col: Color, width: float, zoom: float) -> void:
         var delta: Vector2 = to - from
         var length := delta.length()
         if not is_finite(length) or length < 0.75:
             return
         var dir: Vector2 = delta / length
-        var dash := 5.5
-        var gap := 3.5
-        var step := maxf(dash + gap, 1.0)
+        var z := maxf(zoom, 0.04)
+        var dash := RoadTierVisualScript.DIRT_DASH_SCREEN_PX / z
+        var gap := RoadTierVisualScript.DIRT_GAP_SCREEN_PX / z
+        var step := maxf(dash + gap, 0.35)
         var walked := 0.0
         var n := 0
-        while walked < length and n < 48:
+        while walked < length and n < 64:
             var a: Vector2 = from + dir * walked
             var b: Vector2 = from + dir * minf(walked + dash, length)
             draw_line(a, b, col, width, false)
@@ -2583,18 +2629,22 @@ class RoadTierDraw extends Node2D:
 ## Screen-pixel width (same class as Rx1RhineLayer THEATER_SCALE + 1/zoom).
 ## Round joins/caps via vertex discs so the Köln joint does not open a gap.
 ## Hub-local draw (AABB stays tiny). z=GOLD_SPINE_Z (23) — above Rhine 22, below units 28.
+## S2 end labels are Control Labels (constant screen font), not world-scaled draw_string.
 class Ix1GoldSpineDraw extends Node2D:
     var built: bool = false
     var cents: Dictionary = {}
     var end_labels_visible: bool = false
     var _last_zoom: float = -1.0
     var _in_draw: bool = false
+    var _bonn_label: Label = null
+    var _lev_label: Label = null
 
     func _ready() -> void:
         z_as_relative = false
         z_index = GOLD_SPINE_Z
         set_process(true)
         visible = false
+        _ensure_end_labels()
 
     func setup_gold_spine(new_cents: Dictionary, is_built: bool) -> void:
         cents = new_cents.duplicate()
@@ -2603,10 +2653,13 @@ class Ix1GoldSpineDraw extends Node2D:
         if hub_c != Vector2.ZERO:
             position = hub_c
         visible = built
+        _ensure_end_labels()
+        _sync_end_labels()
         if not _in_draw:
             queue_redraw()
 
     func redraw_gold_spine() -> void:
+        _sync_end_labels()
         if not _in_draw:
             queue_redraw()
 
@@ -2614,6 +2667,7 @@ class Ix1GoldSpineDraw extends Node2D:
         var z := _canvas_zoom()
         if absf(z - _last_zoom) > 0.008:
             _last_zoom = z
+            _sync_end_labels()
             if built:
                 queue_redraw()
 
@@ -2626,7 +2680,7 @@ class Ix1GoldSpineDraw extends Node2D:
         return 1.0
 
     func _world_width(screen_px: float) -> float:
-        return maxf(screen_px, 7.0) / maxf(_canvas_zoom(), 0.04)
+        return screen_px / maxf(_canvas_zoom(), 0.04)
 
     func _as_finite_vec(v: Variant) -> Vector2:
         if typeof(v) != TYPE_VECTOR2:
@@ -2635,6 +2689,83 @@ class Ix1GoldSpineDraw extends Node2D:
         if not is_finite(vec.x) or not is_finite(vec.y):
             return Vector2.ZERO
         return vec
+
+    func _ensure_end_labels() -> void:
+        if _bonn_label == null or not is_instance_valid(_bonn_label):
+            _bonn_label = _make_end_label("Bonn")
+            add_child(_bonn_label)
+        if _lev_label == null or not is_instance_valid(_lev_label):
+            _lev_label = _make_end_label("Leverkusen")
+            add_child(_lev_label)
+
+    func _make_end_label(text: String) -> Label:
+        var lbl := Label.new()
+        lbl.text = text
+        lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        lbl.top_level = true
+        lbl.visible = false
+        lbl.z_as_relative = false
+        lbl.z_index = 20
+        lbl.add_theme_font_size_override("font_size", RoadTierVisualScript.END_LABEL_FONT_PX)
+        lbl.add_theme_color_override("font_color", Color(0.96, 0.97, 1.0, 0.96))
+        lbl.add_theme_color_override("font_outline_color", Color(0.02, 0.03, 0.06, 0.95))
+        lbl.add_theme_constant_override("outline_size", 3)
+        lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+        lbl.clip_text = false
+        lbl.autowrap_mode = TextServer.AUTOWRAP_OFF
+        return lbl
+
+    func _sync_end_labels() -> void:
+        _ensure_end_labels()
+        var z := _canvas_zoom()
+        var bonn: Vector2 = _as_finite_vec(cents.get(710416, Vector2.ZERO))
+        var lev: Vector2 = _as_finite_vec(cents.get(710418, Vector2.ZERO))
+        var span: float = 0.0
+        if bonn != Vector2.ZERO and lev != Vector2.ZERO:
+            span = bonn.distance_to(lev)
+        end_labels_visible = built and RoadTierVisualScript.end_labels_visible_for_span(z, span)
+        if not end_labels_visible:
+            _bonn_label.visible = false
+            _lev_label.visible = false
+            return
+        var xf := get_global_transform_with_canvas()
+        var origin: Vector2 = position
+        var bonn_s: Vector2 = xf * (bonn - origin)
+        var lev_s: Vector2 = xf * (lev - origin)
+        # Opposite sides of the spine, away from the Köln hub / tooltip.
+        var bonn_pos: Vector2 = bonn_s + Vector2(-46.0, 26.0)
+        var lev_pos: Vector2 = lev_s + Vector2(36.0, -34.0)
+        var vp := get_viewport()
+        var vr := Rect2(Vector2.ZERO, Vector2(1280, 720))
+        if vp != null:
+            vr = Rect2(Vector2.ZERO, Vector2(vp.get_visible_rect().size))
+        _bonn_label.reset_size()
+        _lev_label.reset_size()
+        var bs: Vector2 = _bonn_label.get_minimum_size()
+        var ls: Vector2 = _lev_label.get_minimum_size()
+        _bonn_label.custom_minimum_size = Vector2(bs.x + 8.0, bs.y + 4.0)
+        _lev_label.custom_minimum_size = Vector2(ls.x + 8.0, ls.y + 4.0)
+        _bonn_label.reset_size()
+        _lev_label.reset_size()
+        bonn_pos = _clamp_label_pos(bonn_pos, _bonn_label.size, vr)
+        lev_pos = _clamp_label_pos(lev_pos, _lev_label.size, vr)
+        var br := Rect2(bonn_pos, _bonn_label.size)
+        var lr := Rect2(lev_pos, _lev_label.size)
+        if br.intersects(lr):
+            lev_pos.y -= _lev_label.size.y + 10.0
+            lev_pos = _clamp_label_pos(lev_pos, _lev_label.size, vr)
+        _bonn_label.position = bonn_pos
+        _lev_label.position = lev_pos
+        _bonn_label.visible = true
+        _lev_label.visible = true
+
+    func _clamp_label_pos(pos: Vector2, size: Vector2, vr: Rect2) -> Vector2:
+        var p: Vector2 = pos
+        var pad := 6.0
+        p.x = clampf(p.x, vr.position.x + pad, vr.position.x + vr.size.x - size.x - pad)
+        p.y = clampf(p.y, vr.position.y + 86.0, vr.position.y + vr.size.y - size.y - pad)
+        return p
 
     func _draw() -> void:
         if _in_draw:
@@ -2653,28 +2784,13 @@ class Ix1GoldSpineDraw extends Node2D:
         var pts := PackedVector2Array([bonn - origin, koeln - origin, lev - origin])
         var halo_w := _world_width(GOLD_SPINE_HALO_SCREEN_PX)
         var gold_w := _world_width(GOLD_SPINE_SCREEN_PX)
-        # Halo first so the gold reads through river/fill. One polyline = one joint at Köln.
-        # No AA — same OOM class as Ix1SpinePreviewDraw (9ebd17f). Round discs join the stroke.
-        draw_polyline(pts, GOLD_SPINE_HALO_COLOR, halo_w, false)
-        draw_polyline(pts, ROAD_EXPLICIT_COLOR, gold_w, false)
-        # Round joins/caps: discs at Bonn, Köln, Leverkusen so the joint cannot open.
+        # Rhine-class screen-px width (9 / zoom). draw_line AA so close zoom stays 9 px.
+        for i in range(1, pts.size()):
+            draw_line(pts[i - 1], pts[i], GOLD_SPINE_HALO_COLOR, halo_w, true)
+            draw_line(pts[i - 1], pts[i], ROAD_EXPLICIT_COLOR, gold_w, true)
         var cap_r := gold_w * 0.5
         var halo_r := halo_w * 0.5
         for p in pts:
             draw_circle(p, halo_r, GOLD_SPINE_HALO_COLOR)
             draw_circle(p, cap_r, ROAD_EXPLICIT_COLOR)
-        var z := _canvas_zoom()
-        end_labels_visible = RoadTierVisualScript.end_labels_visible_at_zoom(z)
-        if end_labels_visible:
-            var font := ThemeDB.fallback_font
-            if font:
-                var fs := 11
-                var label_col := Color(0.96, 0.90, 0.62, 0.95)
-                var outline := Color(0.10, 0.06, 0.02, 0.90)
-                var bonn_pt: Vector2 = pts[0] + Vector2(-16.0 / maxf(z, 0.08), -10.0 / maxf(z, 0.08))
-                var lev_pt: Vector2 = pts[2] + Vector2(-22.0 / maxf(z, 0.08), -10.0 / maxf(z, 0.08))
-                draw_string(font, bonn_pt, "Bonn", HORIZONTAL_ALIGNMENT_LEFT, -1, fs, outline)
-                draw_string(font, bonn_pt + Vector2(-0.6, -0.6), "Bonn", HORIZONTAL_ALIGNMENT_LEFT, -1, fs, label_col)
-                draw_string(font, lev_pt, "Leverkusen", HORIZONTAL_ALIGNMENT_LEFT, -1, fs, outline)
-                draw_string(font, lev_pt + Vector2(-0.6, -0.6), "Leverkusen", HORIZONTAL_ALIGNMENT_LEFT, -1, fs, label_col)
         _in_draw = false

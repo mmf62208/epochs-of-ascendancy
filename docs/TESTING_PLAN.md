@@ -348,7 +348,7 @@ Watch `godot.log` for `EOA_SMOKE_AUTO_BEGIN who=title.apply_smoke_auto_begin` th
 
 ### RT-1 Readable road tiers (intact, visual only, draft HOLD)
 
-Pure helpers in `scripts/map/RoadTierVisual.gd`. Headless: `HeadlessRt1RoadTierForEdgeTest` (1936 3/6/9 + eras + explicit⇒highway) + `HeadlessRt1RoadEdgeFilterTest` (Bonn–Köln / Köln–Leverkusen must-draw; Köln–Essen / Köln–Düren must-not) + `HeadlessRt1RoadNoRebuildTest` (zoom/pan 0 rebuilds; one `infrastructure` notify → +1). Windowed `tools/eoa_rt1_pixel_guard.sh` captures the 3×3 zoom matrix and S1/S2 soft notes. Must **FAIL on 497731dd** / **PASS on tip**. The smoke harness is **not** the product. Live −12% road move bonus is unchanged.
+Pure helpers in `scripts/map/RoadTierVisual.gd`. Headless: `HeadlessRt1RoadTierForEdgeTest` (1936 3/6/9 + eras + explicit⇒highway + Europe LOD cull) + `HeadlessRt1RoadEdgeFilterTest` (Bonn–Köln / Köln–Leverkusen must-draw; Köln–Essen / Köln–Düren must-not) + `HeadlessRt1RoadNoRebuildTest` (zoom/pan 0 rebuilds; one `infrastructure` notify → +1). Windowed seeded `tools/eoa_rt1_pixel_guard.sh` (3×3 + S1/S2). Windowed **live-look** `tools/eoa_rt1_live_look_guard.sh` does **not** seed infra: (a) mid/close dirt-dash + paved + highway casing/stripe pixels (b) Europe/Home grey-mesh density near `497731dd`. Must **FAIL on 22c3392** (looks + mesh); density **PASS on 497731dd**; all **PASS on tip**. xvfb ≠ product Play. Live −12% road move bonus is unchanged.
 
 ### RX-1 Rhine Crossing (Phase B draft)
 
