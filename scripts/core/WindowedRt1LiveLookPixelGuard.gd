@@ -31,6 +31,9 @@ const TIER_MIN_PX := 6
 const DASH_MIN_GAPS := 1
 const LABEL_MAX_H_PX := 36.0
 const GOLD_OVER_HIGHWAY_MIN := 2.5
+const HIGHWAY_OVER_PAVED_MIN := 2.5
+const HIGHWAY_WIDTH_MIN := 8.0
+const LABEL_NEED := 3
 
 enum Phase {
 	WAIT_MAP,
@@ -177,6 +180,7 @@ func _do_mid() -> void:
 	_judge_labels("mid")
 	_judge_trunk("mid", MID_ZOOM)
 	_judge_gold_vs_highway(img, "mid")
+	_judge_highway_vs_paved(img, "mid")
 	_frame_over_koln(CLOSE_ZOOM, true)
 	_go_settle(Phase.CLOSE)
 
@@ -198,6 +202,7 @@ func _do_close() -> void:
 	if _gold_w_close < GOLD_WIDTH_MIN or _gold_w_close > GOLD_WIDTH_MAX:
 		_fail_reasons.append("gold_width_close_%.2f" % _gold_w_close)
 	_judge_gold_vs_highway(img, "close")
+	_judge_highway_vs_paved(img, "close")
 	_rss_end_kb = _rss_kb()
 	_log("EOA_RT1_LIVE_LOOK who=guard.rss start_kb=%d end_kb=%d mb=%.1f" % [
 		_rss_start_kb, _rss_end_kb, float(_rss_end_kb) / 1024.0
@@ -258,13 +263,15 @@ func _judge_labels(band: String) -> void:
 		return
 	var visible_n := 0
 	var overlap := false
-	var last_rect := Rect2()
 	var huge := false
+	var names: PackedStringArray = PackedStringArray()
+	var rects: Array = []
 	for ch in _collect_spine_labels():
 		var lbl := ch as Label
 		if lbl == null or not lbl.visible:
 			continue
 		visible_n += 1
+		names.append(str(lbl.text))
 		var fs := 0
 		if lbl.has_theme_font_size_override("font_size"):
 			fs = int(lbl.get_theme_font_size("font_size"))
@@ -272,16 +279,23 @@ func _judge_labels(band: String) -> void:
 		if fs > 20 or lbl.size.y > LABEL_MAX_H_PX:
 			huge = true
 		var r := Rect2(lbl.position, lbl.size)
-		if visible_n > 1 and last_rect.intersects(r):
-			overlap = true
-		last_rect = r
-	_log("EOA_RT1_LIVE_LOOK who=guard.labels band=%s visible=%d huge=%s overlap=%s" % [
-		band, visible_n, str(huge), str(overlap)
+		for prev_v in rects:
+			var prev: Rect2 = prev_v
+			if prev.intersects(r):
+				overlap = true
+		rects.append(r)
+	_log("EOA_RT1_LIVE_LOOK who=guard.labels band=%s visible=%d names=%s huge=%s overlap=%s" % [
+		band, visible_n, ",".join(names), str(huge), str(overlap)
 	])
-	# S2 labels are close-only (zoom >= 2.60). Mid 1.80 must not require them.
-	if band == "close":
-		if visible_n < 2:
+	if band == "close" or band == "mid":
+		if visible_n < LABEL_NEED:
 			_fail_reasons.append("%s_labels_%d" % [band, visible_n])
+		if not _label_names_have(names, "Bonn"):
+			_fail_reasons.append("%s_label_missing_bonn" % band)
+		if not _label_names_have(names, "Leverkusen"):
+			_fail_reasons.append("%s_label_missing_leverkusen" % band)
+		if not _label_names_have_koln(names):
+			_fail_reasons.append("%s_label_missing_koln" % band)
 		if huge:
 			_fail_reasons.append("%s_labels_huge" % band)
 		if overlap:
@@ -370,7 +384,11 @@ func _live_edges_of_display(display_tier: int) -> Array:
 	if ol == null or not ol.has_method("get_road_tier_cache"):
 		return []
 	var cache: Array = ol.call("get_road_tier_cache")
-	var out: Array = []
+	var mm := _map_manager()
+	var hub := Vector2.ZERO
+	if mm != null and mm.has_method("get_province_centroid"):
+		hub = mm.call("get_province_centroid", KOELN)
+	var scored: Array = []
 	for row_v in cache:
 		if typeof(row_v) != TYPE_DICTIONARY:
 			continue
@@ -380,8 +398,17 @@ func _live_edges_of_display(display_tier: int) -> Array:
 			continue
 		if bool(row.get("explicit", false)):
 			continue
-		out.append(row)
-		if out.size() >= 12:
+		var mid: Vector2 = (row.get("c1", Vector2.ZERO) as Vector2).lerp(row.get("c2", Vector2.ZERO), 0.5)
+		var d: float = mid.distance_to(hub) if hub != Vector2.ZERO else 0.0
+		scored.append({"d": d, "row": row})
+	scored.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return float(a.get("d", 0.0)) < float(b.get("d", 0.0))
+	)
+	var out: Array = []
+	for item_v in scored:
+		var item: Dictionary = item_v
+		out.append(item.get("row", {}))
+		if out.size() >= 16:
 			break
 	return out
 
@@ -504,6 +531,38 @@ func _count_cache_triangles(edges: Array) -> int:
 	return count
 
 
+func _label_names_have(names: PackedStringArray, want: String) -> bool:
+	var w := want.to_lower()
+	for n in names:
+		if str(n).to_lower() == w:
+			return true
+	return false
+
+
+func _label_names_have_koln(names: PackedStringArray) -> bool:
+	for n in names:
+		var t := str(n).to_lower()
+		if t == "köln" or t == "koln" or t == "koeln" or t == "cologne":
+			return true
+	return false
+
+
+func _judge_highway_vs_paved(img: Image, band: String) -> void:
+	var hwy_w := _measure_highway_casing_width(img)
+	var paved_w := _measure_paved_width(img)
+	_log("EOA_RT1_LIVE_LOOK who=guard.highway_vs_paved band=%s highway=%.2f paved=%.2f" % [
+		band, hwy_w, paved_w
+	])
+	if hwy_w < HIGHWAY_WIDTH_MIN:
+		_fail_reasons.append("%s_highway_thin_%.2f" % [band, hwy_w])
+		return
+	if paved_w <= 0.2:
+		_log("EOA_RT1_LIVE_LOOK who=guard.highway_vs_paved band=%s paved_unmeasured (soft)" % band)
+		return
+	if hwy_w < paved_w + HIGHWAY_OVER_PAVED_MIN:
+		_fail_reasons.append("%s_highway_not_wider_%.2f_vs_%.2f" % [band, hwy_w, paved_w])
+
+
 func _judge_gold_vs_highway(img: Image, band: String) -> void:
 	var gold_w := _measure_gold_width(img)
 	var hwy_w := _measure_highway_casing_width(img)
@@ -567,6 +626,58 @@ func _measure_highway_casing_width(img: Image) -> float:
 				best_run = maxi(best_run, run)
 			best = maxi(best, best_run)
 		if best >= 4:
+			break
+	return float(best)
+
+
+func _measure_paved_width(img: Image) -> float:
+	if img == null:
+		return 0.0
+	var edges: Array = _live_edges_of_display(1)
+	if edges.is_empty():
+		return 0.0
+	var layer := _road_layer()
+	var xform := Transform2D.IDENTITY
+	if layer != null:
+		xform = layer.get_global_transform_with_canvas()
+	var best := 0
+	for entry in edges:
+		var a: Vector2 = xform * entry.get("c1", Vector2.ZERO)
+		var b: Vector2 = xform * entry.get("c2", Vector2.ZERO)
+		if a == Vector2.ZERO or b == Vector2.ZERO:
+			continue
+		var dir: Vector2 = b - a
+		if dir.length() < 4.0:
+			continue
+		var perp := Vector2(-dir.y, dir.x).normalized()
+		for t_i in range(3, 8):
+			var p0: Vector2 = a.lerp(b, float(t_i) / 10.0)
+			var run := 0
+			var best_run := 0
+			var in_run := false
+			for i in range(-14, 15):
+				var p: Vector2 = p0 + perp * float(i)
+				var x := int(round(p.x))
+				var y := int(round(p.y))
+				if x < 0 or y < 0 or x >= img.get_width() or y >= img.get_height():
+					if in_run:
+						best_run = maxi(best_run, run)
+						in_run = false
+						run = 0
+					continue
+				if _is_kind(img.get_pixel(x, y), "paved"):
+					if not in_run:
+						in_run = true
+						run = 0
+					run += 1
+				elif in_run:
+					best_run = maxi(best_run, run)
+					in_run = false
+					run = 0
+			if in_run:
+				best_run = maxi(best_run, run)
+			best = maxi(best, best_run)
+		if best >= 3:
 			break
 	return float(best)
 

@@ -280,14 +280,23 @@ func _do_soft() -> void:
 	if hex_px > 12:
 		_fail_reasons.append("s1_hex_linger_%d" % hex_px)
 	_log("EOA_RT1_PIXEL_GUARD who=guard.s1 hex_px_after_close=%d" % hex_px)
+	_frame_over_koln(MID_ZOOM, true)
+	RenderingServer.force_draw()
+	var img_lab_mid := _capture("rt1_s2_end_labels_mid")
+	var labels_mid := _end_labels_present(img_lab_mid)
+	_soft["end_labels_mid"] = labels_mid
+	if not labels_mid:
+		_fail_reasons.append("s2_end_labels_mid")
 	_frame_over_koln(3.20, true)
 	RenderingServer.force_draw()
-	var img_lab := _capture("rt1_s2_end_labels_mid")
+	var img_lab := _capture("rt1_s2_end_labels_close")
 	var labels_ok := _end_labels_present(img_lab)
 	_soft["end_labels"] = labels_ok
 	if not labels_ok:
 		_fail_reasons.append("s2_end_labels")
-	_log("EOA_RT1_PIXEL_GUARD who=guard.s2 end_labels=%s" % str(labels_ok))
+	_log("EOA_RT1_PIXEL_GUARD who=guard.s2 end_labels_mid=%s end_labels_close=%s" % [
+		str(labels_mid), str(labels_ok)
+	])
 	_judge_widths()
 	_rss_end_kb = _rss_kb()
 	_log("EOA_RT1_PIXEL_GUARD who=guard.rss start_kb=%d end_kb=%d mb=%.1f" % [
@@ -299,7 +308,7 @@ func _do_soft() -> void:
 func _judge_widths() -> void:
 	var bands: PackedStringArray = PackedStringArray(["far", "default", "close"])
 	var kinds: PackedStringArray = PackedStringArray(["dirt", "paved", "highway"])
-	var targets := {"dirt": 2.6, "paved": 4.0, "highway": 6.0}
+	var targets := {"dirt": 2.6, "paved": 4.0, "highway": 11.0}
 	for kind in kinds:
 		var sigs: PackedStringArray = PackedStringArray()
 		for band in bands:
@@ -621,7 +630,7 @@ func _end_labels_present(img: Image) -> bool:
 			for ch in layer.get_children():
 				if ch is Label and (ch as Label).visible:
 					vis += 1
-		if vis >= 2:
+		if vis >= 3:
 			return true
 		if bool(gold.get("end_labels_visible")):
 			return true

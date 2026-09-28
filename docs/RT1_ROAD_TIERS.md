@@ -12,7 +12,7 @@ The smoke harness and headless guards are **not** a live product Play PASS.
 | Item | Tip |
 |------|-----|
 | Tier formula | Same era-relative rule as `_rebuild_road_layer_inner` (`road_infra_min` / +3 / +6; explicit `built_road_neighbors` ⇒ highway). Extracted to `RoadTierVisual.road_tier_for_edge`. |
-| Looks | Screen-pixel strokes: dirt ~2.6 px dashed tan; paved ~4 px solid; highway ~8.5 px dark casing + pale stripe. 1936 highways = explicit + top ~4% of the **visual trunk** (not terciles — those painted NL/UK/BE as highways). Formula `tier` unchanged. |
+| Looks | Screen-pixel strokes: dirt ~2.6 px dashed tan; paved ~4 px solid; highway **11 px** dark casing + pale stripe as **non-AA quads** (thicker than paved, thinner than gold 16). Far/Europe uses a 5.5 px casing so Home stays clean. 1936 highways = explicit + top ~4% of the **visual trunk**. Formula `tier` unchanged. |
 | Visual network | Shared-border candidates → nearest 1–2 neighbours → degree-capped Kruskal forest. Gameplay adjacency / movement / formula stay intact. Far: rare highways. Mid: paved+highway of the tree. Close: + dirt. |
 | LOD | Europe/Home (`zoom <= 1.15`): rare highways only. Mid: paved+highway. Close (`>= 2.60`): dirt too. No cache rebuild on zoom. |
 | Batching | One `RoadTierDraw` node per tier. Per-edge `Line2D`s remain only as hidden explicit lookup stubs (`find_road_node` / IX-1 reports). |
@@ -20,7 +20,7 @@ The smoke harness and headless guards are **not** a live product Play PASS.
 | Visibility | Intact tiers on the political map inside the NUTS3 id block (`710000–799999`). Infra mode keeps its extras. |
 | Gold spine | z=23, **16 px** non-AA filled quads on 20 px halo (MapCamera zoom). Must read thicker than 8.5 px casing at mid and close. Never `draw_line(..., true)` (IX-1 windowed OOM). |
 | S1 | Selection outline z=22 (below spine). Cleared on `hide_info_panel`. |
-| S2 | Constant-screen 14 px Labels on a **CanvasLayer** (same outline family as political map labels). Visible at `zoom >= 2.60`. |
+| S2 | Constant-screen 14 px Labels on a **CanvasLayer**: Bonn, **Köln**, Leverkusen. Visible at mid and close (`zoom >= 1.50`). No overlap with each other or the gold hub. |
 | S3 | Hover-exit now clears compare-candidate / preview rings (salmon/orange leftover west of the Rhine). |
 
 **Not in this slice:** damage states, move-cost scaling, construction UI, other boards.

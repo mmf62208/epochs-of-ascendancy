@@ -2649,13 +2649,23 @@ class RoadTierDraw extends Node2D:
             draw_line(a, b, core, core_w, false)
 
     func _draw_highway(_lod: int, zoom: float) -> void:
-        var case_w := _world_width(RoadTierVisualScript.HIGHWAY_CASING_SCREEN_PX)
-        var core_w := _world_width(RoadTierVisualScript.HIGHWAY_SCREEN_PX)
+        ## Non-AA quads so the player-seen width matches HIGHWAY_*_SCREEN_PX.
+        ## Never antialiased draw_line (IX-1 windowed OOM).
+        var far: bool = _lod <= 0
+        var case_px: float = (
+            RoadTierVisualScript.HIGHWAY_FAR_CASING_SCREEN_PX if far
+            else RoadTierVisualScript.HIGHWAY_CASING_SCREEN_PX
+        )
+        var core_px: float = (
+            RoadTierVisualScript.HIGHWAY_FAR_CORE_SCREEN_PX if far
+            else RoadTierVisualScript.HIGHWAY_SCREEN_PX
+        )
+        var case_w := _world_width(case_px)
+        var core_w := _world_width(core_px)
         var stripe_w := _world_width(RoadTierVisualScript.HIGHWAY_STRIPE_SCREEN_PX)
         var casing := RoadTierVisualScript.HIGHWAY_CASING_COLOR
         var stripe := RoadTierVisualScript.HIGHWAY_STRIPE_COLOR
         var core := RoadTierVisualScript.HIGHWAY_CORE_COLOR
-        var far: bool = _lod <= 0
         for entry in edges:
             if not _edge_visible(entry, zoom):
                 continue
@@ -2663,10 +2673,21 @@ class RoadTierDraw extends Node2D:
             var b: Vector2 = entry.get("c2", Vector2.ZERO)
             if a == Vector2.ZERO or b == Vector2.ZERO:
                 continue
-            draw_line(a, b, casing, case_w, false)
-            draw_line(a, b, core, core_w, false)
+            _draw_road_quad(a, b, casing, case_w)
+            _draw_road_quad(a, b, core, core_w)
             if not far:
-                draw_line(a, b, stripe, stripe_w, false)
+                _draw_road_quad(a, b, stripe, stripe_w)
+
+    func _draw_road_quad(from: Vector2, to: Vector2, col: Color, world_w: float) -> void:
+        var delta: Vector2 = to - from
+        var length := delta.length()
+        if not is_finite(length) or length < 0.05:
+            return
+        var dir: Vector2 = delta / length
+        var half: float = world_w * 0.5
+        var perp := Vector2(-dir.y, dir.x) * half
+        var poly := PackedVector2Array([from + perp, to + perp, to - perp, from - perp])
+        draw_colored_polygon(poly, col)
 
     func _draw_dashed(from: Vector2, to: Vector2, col: Color, width: float, zoom: float) -> void:
         var delta: Vector2 = to - from
@@ -2700,6 +2721,7 @@ class Ix1GoldSpineDraw extends Node2D:
     var _in_draw: bool = false
     var _label_layer: CanvasLayer = null
     var _bonn_label: Label = null
+    var _koln_label: Label = null
     var _lev_label: Label = null
 
     func _ready() -> void:
@@ -2771,6 +2793,9 @@ class Ix1GoldSpineDraw extends Node2D:
         if _bonn_label == null or not is_instance_valid(_bonn_label):
             _bonn_label = _make_end_label("Bonn")
             _label_layer.add_child(_bonn_label)
+        if _koln_label == null or not is_instance_valid(_koln_label):
+            _koln_label = _make_end_label("Köln")
+            _label_layer.add_child(_koln_label)
         if _lev_label == null or not is_instance_valid(_lev_label):
             _lev_label = _make_end_label("Leverkusen")
             _label_layer.add_child(_lev_label)
@@ -2801,8 +2826,12 @@ class Ix1GoldSpineDraw extends Node2D:
             span = bonn.distance_to(lev)
         end_labels_visible = built and RoadTierVisualScript.end_labels_visible_for_span(z, span)
         if not end_labels_visible:
-            _bonn_label.visible = false
-            _lev_label.visible = false
+            if _bonn_label != null:
+                _bonn_label.visible = false
+            if _koln_label != null:
+                _koln_label.visible = false
+            if _lev_label != null:
+                _lev_label.visible = false
             return
         var xf := get_global_transform_with_canvas()
         var origin: Vector2 = position
@@ -2821,31 +2850,59 @@ class Ix1GoldSpineDraw extends Node2D:
         lev_away = lev_away.normalized()
         var bonn_perp := Vector2(-bonn_away.y, bonn_away.x)
         var lev_perp := Vector2(-lev_away.y, lev_away.x)
+        var spine_dir: Vector2 = lev_s - bonn_s
+        if spine_dir.length() < 1.0:
+            spine_dir = Vector2(0.0, -1.0)
+        spine_dir = spine_dir.normalized()
+        var west := Vector2(-spine_dir.y, spine_dir.x)
+        if west.x > 0.0:
+            west = -west
         var bonn_pos: Vector2 = bonn_s + bonn_away * 36.0 + bonn_perp * 22.0
         var lev_pos: Vector2 = lev_s + lev_away * 36.0 - lev_perp * 22.0
+        ## Köln sits west of the hub so it misses the gold stroke and the inspector.
+        var koln_pos: Vector2 = koeln_s + west * 44.0 - spine_dir * 10.0
         var vp := get_viewport()
         var vr := Rect2(Vector2.ZERO, Vector2(1280, 720))
         if vp != null:
             vr = Rect2(Vector2.ZERO, Vector2(vp.get_visible_rect().size))
-        _bonn_label.reset_size()
-        _lev_label.reset_size()
-        var bs: Vector2 = _bonn_label.get_minimum_size()
-        var ls: Vector2 = _lev_label.get_minimum_size()
-        _bonn_label.custom_minimum_size = Vector2(bs.x + 8.0, bs.y + 4.0)
-        _lev_label.custom_minimum_size = Vector2(ls.x + 8.0, ls.y + 4.0)
-        _bonn_label.reset_size()
-        _lev_label.reset_size()
+        _size_end_label(_bonn_label)
+        _size_end_label(_koln_label)
+        _size_end_label(_lev_label)
         bonn_pos = _clamp_label_pos(bonn_pos, _bonn_label.size, vr)
         lev_pos = _clamp_label_pos(lev_pos, _lev_label.size, vr)
+        koln_pos = _clamp_label_pos(koln_pos, _koln_label.size, vr)
         var br := Rect2(bonn_pos, _bonn_label.size)
         var lr := Rect2(lev_pos, _lev_label.size)
+        var kr := Rect2(koln_pos, _koln_label.size)
         if br.intersects(lr):
             lev_pos.y -= _lev_label.size.y + 10.0
             lev_pos = _clamp_label_pos(lev_pos, _lev_label.size, vr)
+            lr = Rect2(lev_pos, _lev_label.size)
+        if kr.intersects(br) or kr.intersects(lr):
+            koln_pos += west * 28.0
+            koln_pos = _clamp_label_pos(koln_pos, _koln_label.size, vr)
+            kr = Rect2(koln_pos, _koln_label.size)
+        if kr.intersects(br) or kr.intersects(lr):
+            koln_pos.y -= _koln_label.size.y + 12.0
+            koln_pos = _clamp_label_pos(koln_pos, _koln_label.size, vr)
+        var hub_hit := Rect2(koeln_s - Vector2(18, 18), Vector2(36, 36))
+        if Rect2(koln_pos, _koln_label.size).intersects(hub_hit):
+            koln_pos += west * 24.0
+            koln_pos = _clamp_label_pos(koln_pos, _koln_label.size, vr)
         _bonn_label.position = bonn_pos
+        _koln_label.position = koln_pos
         _lev_label.position = lev_pos
         _bonn_label.visible = true
+        _koln_label.visible = true
         _lev_label.visible = true
+
+    func _size_end_label(lbl: Label) -> void:
+        if lbl == null:
+            return
+        lbl.reset_size()
+        var ms: Vector2 = lbl.get_minimum_size()
+        lbl.custom_minimum_size = Vector2(ms.x + 8.0, ms.y + 4.0)
+        lbl.reset_size()
 
     func _clamp_label_pos(pos: Vector2, size: Vector2, vr: Rect2) -> Vector2:
         var p: Vector2 = pos

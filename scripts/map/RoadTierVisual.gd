@@ -14,9 +14,13 @@ const TIER_HIGHWAY := 2
 const DIRT_SCREEN_PX := 2.6
 const PAVED_SCREEN_PX := 4.0
 const PAVED_EDGE_SCREEN_PX := 1.2
-const HIGHWAY_SCREEN_PX := 6.0
-const HIGHWAY_CASING_SCREEN_PX := 8.5
-const HIGHWAY_STRIPE_SCREEN_PX := 1.6
+## Mid/close: casing must read wider than paved (~5.2) and thinner than gold (16).
+const HIGHWAY_SCREEN_PX := 7.5
+const HIGHWAY_CASING_SCREEN_PX := 11.0
+const HIGHWAY_STRIPE_SCREEN_PX := 2.6
+## Europe/Home only: keep the rare trunk visible without a continent carpet.
+const HIGHWAY_FAR_CASING_SCREEN_PX := 5.5
+const HIGHWAY_FAR_CORE_SCREEN_PX := 3.2
 const DIRT_DASH_SCREEN_PX := 9.0
 const DIRT_GAP_SCREEN_PX := 6.0
 
@@ -35,7 +39,8 @@ const HIGHWAY_STRIPE_COLOR := Color(0.98, 0.94, 0.62, 0.98)
 const ZOOM_FAR_MAX := 1.15
 const ZOOM_CLOSE_MIN := 2.60
 const DIRT_ZOOM_FLOOR := 2.60
-const END_LABEL_ZOOM_MIN := 2.60
+## Bonn / Köln / Leverkusen city labels: mid (1.80) and close. Europe Home stays off.
+const END_LABEL_ZOOM_MIN := 1.50
 const END_LABEL_FONT_PX := 14
 
 ## Visual-only trunk. Gameplay adjacency / movement / formula tier stay intact.
@@ -93,15 +98,18 @@ static func dirt_hidden_at_zoom(zoom: float) -> bool:
 	return zoom < DIRT_ZOOM_FLOOR
 
 
-## Europe/Home: rare highways only (explicit + top few percent). Mid: paved+
-## highway of the visual trunk. Close: dirt too. Formula `tier` is unchanged.
+## Europe/Home: rare highways only (explicit + top few percent). Mid AND close:
+## highways stay on (the mid band is paved+highway). Close also shows dirt.
+## Formula `tier` is unchanged.
 static func tier_visible_at_zoom(formula_tier: int, explicit: bool, display_tier: int, zoom: float) -> bool:
 	var z: float = zoom
 	if not is_finite(z):
 		z = 1.0
 	var lod: int = lod_band_for_zoom(z)
+	if display_tier == TIER_HIGHWAY or explicit:
+		return true
 	if lod <= 0:
-		return explicit or display_tier == TIER_HIGHWAY
+		return false
 	if lod == 1:
 		return display_tier >= TIER_PAVED
 	# Close: every trunk edge. formula_tier is the intact gameplay/formula value.
@@ -138,12 +146,9 @@ static func screen_width_for_tier(tier: int, lod_band: int) -> float:
 		TIER_PAVED:
 			w = PAVED_SCREEN_PX
 		TIER_HIGHWAY:
-			w = HIGHWAY_SCREEN_PX
+			w = HIGHWAY_CASING_SCREEN_PX if lod_band >= 1 else HIGHWAY_FAR_CASING_SCREEN_PX
 		_:
 			w = DIRT_SCREEN_PX
-	# Close zoom: cap so strokes do not blow out; far uses colour+width only.
-	if lod_band >= 2:
-		w = minf(w, HIGHWAY_SCREEN_PX)
 	return w
 
 

@@ -118,6 +118,18 @@ func _test_lod_cull() -> void:
 		_fail("mid zoom must show paved")
 	else:
 		_pass("mid zoom shows paved")
+	if not RoadTierVisualScript.tier_visible_at_zoom(0, false, 2, 1.80):
+		_fail("mid zoom must show highway")
+	else:
+		_pass("mid zoom shows highway")
+	if not RoadTierVisualScript.end_labels_visible_at_zoom(1.80):
+		_fail("mid zoom must show Bonn/Köln/Leverkusen labels")
+	else:
+		_pass("mid zoom shows city labels")
+	if RoadTierVisualScript.end_labels_visible_at_zoom(0.40):
+		_fail("Europe Home must hide city labels")
+	else:
+		_pass("Europe Home hides city labels")
 	if not RoadTierVisualScript.tier_visible_at_zoom(0, false, 0, 2.80):
 		_fail("close zoom must show dirt")
 	else:
@@ -223,9 +235,27 @@ func _test_trunk_sparsifier() -> void:
 	else:
 		_pass("overlay uses trunk + rare highways")
 	if "GOLD_SPINE_SCREEN_PX := 16.0" not in ol_src:
-		_fail("gold spine must be 16 px (thicker than 8.5 casing)")
+		_fail("gold spine must be 16 px (thicker than 11 px highway casing)")
 	else:
 		_pass("gold spine 16 px")
+	var vis_src := ""
+	if FileAccess.file_exists("res://scripts/map/RoadTierVisual.gd"):
+		var vf := FileAccess.open("res://scripts/map/RoadTierVisual.gd", FileAccess.READ)
+		if vf != null:
+			vis_src = vf.get_as_text()
+			vf.close()
+	if "HIGHWAY_CASING_SCREEN_PX := 11.0" not in vis_src:
+		_fail("highway casing must be 11 px (wider than paved, thinner than gold)")
+	else:
+		_pass("highway casing 11 px")
+	if "_draw_road_quad" not in ol_src:
+		_fail("highways must use non-AA filled quads")
+	else:
+		_pass("highway non-AA quads")
+	if "_make_end_label(\"Köln\")" not in ol_src:
+		_fail("S2 must include a Köln city label")
+	else:
+		_pass("Köln city label")
 	if "draw_line(pts[i - 1], pts[i], ROAD_EXPLICIT_COLOR, gold_w, true)" in ol_src:
 		_fail("gold spine must not use antialiased draw_line")
 	else:
