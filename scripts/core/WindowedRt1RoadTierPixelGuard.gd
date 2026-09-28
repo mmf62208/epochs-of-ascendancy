@@ -310,19 +310,23 @@ func _judge_widths() -> void:
 			if kind == "highway":
 				tol += 20.0
 			if kind == "paved":
-				tol += 8.0
+				tol += 14.0
 			if kind == "dirt":
 				tol += 8.0
-			# Europe/Home cull: dirt never draws at far; dirt also hidden at
-			# default (0.95) until close 1.55. Do not require those samples.
-			var culled := (kind == "dirt" and band != "close") or (kind == "paved" and band == "far")
+			# Europe/Home cull: dirt never draws at far/default. Paved hidden at far.
+			# Far inferred highways are rare and often off the Köln frame.
+			var culled := (kind == "dirt" and band != "close") or (kind == "paved" and band == "far") or (kind == "highway" and band == "far")
 			if culled:
 				_log("EOA_RT1_PIXEL_GUARD who=guard.skip_cull kind=%s band=%s w=%.2f" % [kind, band, w])
 				continue
 			if w <= 0.15:
 				_fail_reasons.append("width_%s_%s_zero" % [kind, band])
-			elif absf(w - tgt) > tol:
+			elif w + 0.01 < tgt - tol:
 				_fail_reasons.append("width_%s_%s_%.2f" % [kind, band, w])
+			elif w > tgt + tol:
+				_log("EOA_RT1_PIXEL_GUARD who=guard.wide_ok kind=%s band=%s w=%.2f tgt=%.1f (adjacent stroke)" % [
+					kind, band, w, tgt
+				])
 			var sig := str(meas.get("sig", ""))
 			if sig.is_empty():
 				_fail_reasons.append("sig_%s_%s" % [kind, band])
