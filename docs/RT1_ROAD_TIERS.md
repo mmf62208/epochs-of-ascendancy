@@ -5,6 +5,8 @@
 
 The smoke harness and headless guards are **not** a live product Play PASS.
 
+**Harness (tip `b437cb70`, not product Play):** headless tier / edge-filter / no-rebuild **RESULT=PASS**. Windowed `tools/eoa_rt1_pixel_guard.sh` **RESULT=PASS** (S1 gold_cover=1.000, hex after close=0, S2 labels, 3×3 captures=15). RSS peak **2027 MB** (xvfb llvmpipe). Every new guard **FAIL** on `497731dd` (missing `RoadTierVisual.gd` / `RoadTierDraw`).
+
 ## What changed
 
 | Item | Tip |

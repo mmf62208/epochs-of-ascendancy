@@ -30,7 +30,7 @@ Every Cursor / Grok / human session on this tree:
 | **Machine** | `--quick` **PASS** + `HeadlessWorldAccurateUnitOrderLoopTest` **RESULT=PASS** (organize/train/priority included). Soft 30fps still FAIL honest. |
 | **GitHub** | `origin/main` @ `497731dd` (GS-1 gold spine KEEP). **RT-1** readable road tiers is a **draft** slice — **HOLD merge**. Do not force-push over June Cursor history. |
 | **RX-1 Rhine Crossing** | Vector Rhine Bonn→Köln→Düsseldorf→Duisburg. Units on top (labels 18 < river 22 / roads 21 < joined gold spine 23 < counters 28); theater-scale + screen-space; view-only **Units** HUD + **U**. Pixel guard xvfb continuity **FAIL** `dbbdef4` (mid 0.222/12px, close 0.125/42px) / **PASS** tip (1.000/0 both zooms); units ON chip 0.932 over spine. HOLD merge on the continuity slice. |
-| **RT-1 road tiers** | Visual only (intact). Dirt/paved/highway screen-px strokes on political NUTS3; batched `RoadTierDraw`; shared-border / Rhineland gap-cap filter. Gold spine unchanged. S1 select z=22 + clear on panel close; S2 Bonn/Leverkusen labels; S3 hover-exit clears salmon compare rings. Headless/smoke ≠ product Play. |
+| **RT-1 road tiers** | Visual only (intact). Dirt/paved/highway screen-px strokes on political NUTS3; batched `RoadTierDraw`; shared-border / Rhineland gap-cap filter. Gold spine unchanged. S1 select z=22 + clear on panel close; S2 Bonn/Leverkusen labels; S3 hover-exit clears salmon compare rings. Headless + xvfb pixel **RESULT=PASS** on tip / **FAIL** on `497731dd`. Headless/smoke ≠ product Play. HOLD merge. |
 
 **This DAG (PR 1–3 under `505d91d`; this file is PR 4 — not the only PR):**
 
