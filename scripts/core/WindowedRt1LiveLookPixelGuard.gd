@@ -31,6 +31,8 @@ const TIER_MIN_PX := 6
 const DASH_MIN_GAPS := 1
 const LABEL_MAX_H_PX := 36.0
 const GOLD_OVER_HIGHWAY_MIN := 1.0
+const GOLD_OVER_HIGHWAY_RATIO_MID := 1.8
+const SAGE_WEB_MAX_FRAC := 0.035
 const HIGHWAY_OVER_PAVED_MIN := 2.0
 const HIGHWAY_WIDTH_MIN := 9.0
 const LABEL_NEED := 3
@@ -72,7 +74,13 @@ func _start() -> void:
 		_fail_reasons.append("headless_display")
 		_finish(false)
 		return
-	DisplayServer.window_set_size(Vector2i(1280, 720))
+	# Live Play is a real window (~1600×900). 1280×720 xvfb + hide-NUTS
+	# made the sage web invisible to the guard; require the live size.
+	DisplayServer.window_set_size(Vector2i(1600, 900))
+	var win := DisplayServer.window_get_size()
+	_log("EOA_RT1_LIVE_LOOK who=guard.window size=%dx%d (xvfb≠Play)" % [win.x, win.y])
+	if win.x < 1500 or win.y < 800:
+		_fail_reasons.append("viewport_not_live_size_%dx%d" % [win.x, win.y])
 	_out_dir = OS.get_environment("EOA_RT1_LIVE_OUT").strip_edges()
 	if _out_dir.is_empty():
 		_out_dir = "/tmp/eoa-rt1-live-look"
@@ -180,6 +188,7 @@ func _do_mid() -> void:
 	_judge_labels("mid")
 	_judge_trunk("mid", MID_ZOOM)
 	_judge_gold_vs_highway(img, "mid")
+	_judge_sage_web(img, "mid")
 	_judge_highway_vs_paved(img, "mid")
 	_frame_over_koln(CLOSE_ZOOM, true)
 	_go_settle(Phase.CLOSE)
@@ -202,6 +211,7 @@ func _do_close() -> void:
 	if _gold_w_close < GOLD_WIDTH_MIN or _gold_w_close > GOLD_WIDTH_MAX:
 		_fail_reasons.append("gold_width_close_%.2f" % _gold_w_close)
 	_judge_gold_vs_highway(img, "close")
+	_judge_sage_web(img, "close")
 	_judge_highway_vs_paved(img, "close")
 	_rss_end_kb = _rss_kb()
 	_log("EOA_RT1_LIVE_LOOK who=guard.rss start_kb=%d end_kb=%d mb=%.1f" % [
@@ -574,8 +584,58 @@ func _judge_gold_vs_highway(img: Image, band: String) -> void:
 		if gold_w + 0.01 < GOLD_WIDTH_MIN and band == "mid":
 			_fail_reasons.append("%s_gold_thin_%.2f" % [band, gold_w])
 		return
+	if band == "mid":
+		var need: float = hwy_w * GOLD_OVER_HIGHWAY_RATIO_MID
+		if gold_w + 0.01 < need:
+			_fail_reasons.append("%s_gold_ratio_%.2f_vs_%.2f_need_%.2fx" % [
+				band, gold_w, hwy_w, GOLD_OVER_HIGHWAY_RATIO_MID
+			])
+		return
 	if gold_w < hwy_w + GOLD_OVER_HIGHWAY_MIN:
 		_fail_reasons.append("%s_gold_not_thicker_%.2f_vs_%.2f" % [band, gold_w, hwy_w])
+
+
+func _judge_sage_web(img: Image, band: String) -> void:
+	if img == null:
+		return
+	var w: int = img.get_width()
+	var h: int = img.get_height()
+	if w < 8 or h < 8:
+		return
+	var step := 3
+	var n := 0
+	var sage := 0
+	var y0 := 110
+	for y in range(y0, h - 8, step):
+		for x in range(4, w - 4, step):
+			var c: Color = img.get_pixel(x, y)
+			n += 1
+			if _is_sage_web_pixel(c):
+				sage += 1
+	var frac: float = 0.0 if n <= 0 else float(sage) / float(n)
+	_log("EOA_RT1_LIVE_LOOK who=guard.sage_web band=%s frac=%.5f n=%d max=%.3f (xvfb≠Play)" % [
+		band, frac, n, SAGE_WEB_MAX_FRAC
+	])
+	if frac > SAGE_WEB_MAX_FRAC:
+		_fail_reasons.append("%s_sage_web_%.5f" % [band, frac])
+
+
+func _is_sage_web_pixel(c: Color) -> bool:
+	if _is_gold(c):
+		return false
+	var mx: float = maxf(c.r, maxf(c.g, c.b))
+	var mn: float = minf(c.r, minf(c.g, c.b))
+	var sat: float = mx - mn
+	var lum: float = (c.r + c.g + c.b) / 3.0
+	if lum < 0.42 or lum > 0.90:
+		return false
+	if c.g + 0.015 < c.r:
+		return false
+	if c.g < c.b + 0.03:
+		return false
+	if sat < 0.05 or sat > 0.42:
+		return false
+	return true
 
 
 func _measure_highway_casing_width(img: Image) -> float:
@@ -1024,6 +1084,10 @@ func _capture(name: String) -> Image:
 	var img := tex.get_image()
 	if img == null:
 		return null
+	if img.get_width() < 1500 or img.get_height() < 800:
+		var size_fail := "capture_not_live_size_%dx%d" % [img.get_width(), img.get_height()]
+		if not _fail_reasons.has(size_fail):
+			_fail_reasons.append(size_fail)
 	var path := "%s/%s.png" % [_out_dir, name]
 	img.save_png(path)
 	_captures.append(path)

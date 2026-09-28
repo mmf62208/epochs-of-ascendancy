@@ -104,10 +104,12 @@ const SPINE_BELOW_UNITS_Z := 21
 const GOLD_SPINE_Z := 23
 const ROAD_EXPLICIT_SCREEN_PX := 7.0
 const ROAD_INFERRED_SCREEN_PX := 4.0
-## Non-AA filled quads. 16 px gold must read thicker than 8.5 px highway casing
-## at the player's MapCamera zoom (Play measured AA 9 px as 5–6).
+## Non-AA filled quads. Close/far stay 16/20 (Play PASS). Mid only is 28/34
+## so on-screen gold ≥ 1.8× the 12 px highway casing.
 const GOLD_SPINE_SCREEN_PX := 16.0
 const GOLD_SPINE_HALO_SCREEN_PX := 20.0
+const GOLD_SPINE_MID_SCREEN_PX := 28.0
+const GOLD_SPINE_MID_HALO_SCREEN_PX := 34.0
 const ROAD_EXPLICIT_COLOR := Color(0.92, 0.62, 0.08, 0.96)
 const GOLD_SPINE_HALO_COLOR := Color(0.38, 0.18, 0.02, 0.88)
 ## RT-1: one _draw node per intact tier. Cache rebuilds only on infra/owner/era/load.
@@ -2710,8 +2712,8 @@ class RoadTierDraw extends Node2D:
 
 
 ## Built IX-1 gold spine: ONE joined Bonn→Köln→Leverkusen polyline.
-## Non-AA filled quads at GOLD_SPINE_SCREEN_PX (16) so the player-seen width
-## matches the constant. Antialiased draw_line is banned (IX-1 windowed OOM).
+## Non-AA filled quads. Close/far = GOLD_SPINE_SCREEN_PX (16) / halo 20.
+## Mid lod only = 28 / halo 34. Never antialiased draw_line (IX-1 windowed OOM).
 ## S2 labels live on a CanvasLayer (screen space), not Node2D-child Controls.
 class Ix1GoldSpineDraw extends Node2D:
     var built: bool = false
@@ -2723,12 +2725,15 @@ class Ix1GoldSpineDraw extends Node2D:
     var _bonn_label: Label = null
     var _koln_label: Label = null
     var _lev_label: Label = null
+    var _band_gold_px: float = GOLD_SPINE_SCREEN_PX
+    var _band_halo_px: float = GOLD_SPINE_HALO_SCREEN_PX
 
     func _ready() -> void:
         z_as_relative = false
         z_index = GOLD_SPINE_Z
         set_process(true)
         visible = false
+        _refresh_gold_band(_canvas_zoom())
         _ensure_end_labels()
 
     func setup_gold_spine(new_cents: Dictionary, is_built: bool) -> void:
@@ -2738,12 +2743,14 @@ class Ix1GoldSpineDraw extends Node2D:
         if hub_c != Vector2.ZERO:
             position = hub_c
         visible = built
+        _refresh_gold_band(_canvas_zoom())
         _ensure_end_labels()
         _sync_end_labels()
         if not _in_draw:
             queue_redraw()
 
     func redraw_gold_spine() -> void:
+        _refresh_gold_band(_canvas_zoom())
         _sync_end_labels()
         if not _in_draw:
             queue_redraw()
@@ -2752,9 +2759,19 @@ class Ix1GoldSpineDraw extends Node2D:
         var z := _canvas_zoom()
         if absf(z - _last_zoom) > 0.008:
             _last_zoom = z
+            _refresh_gold_band(z)
             _sync_end_labels()
             if built:
                 queue_redraw()
+
+    func _refresh_gold_band(zoom: float) -> void:
+        var lod: int = RoadTierVisualScript.lod_band_for_zoom(zoom)
+        if lod == 1:
+            _band_gold_px = GOLD_SPINE_MID_SCREEN_PX
+            _band_halo_px = GOLD_SPINE_MID_HALO_SCREEN_PX
+        else:
+            _band_gold_px = GOLD_SPINE_SCREEN_PX
+            _band_halo_px = GOLD_SPINE_HALO_SCREEN_PX
 
     func _canvas_zoom() -> float:
         var tree := get_tree()
@@ -2926,9 +2943,9 @@ class Ix1GoldSpineDraw extends Node2D:
             _in_draw = false
             return
         var pts := PackedVector2Array([bonn - origin, koeln - origin, lev - origin])
-        var halo_w := _world_width(GOLD_SPINE_HALO_SCREEN_PX)
-        var gold_w := _world_width(GOLD_SPINE_SCREEN_PX)
-        # Non-AA quads. Width = screen_px / MapCamera.zoom so the player sees 16 px.
+        var halo_w := _world_width(_band_halo_px)
+        var gold_w := _world_width(_band_gold_px)
+        # Non-AA quads. Mid uses 28/34; close/far stay 16/20.
         for i in range(1, pts.size()):
             _draw_spine_quad(pts[i - 1], pts[i], GOLD_SPINE_HALO_COLOR, halo_w)
             _draw_spine_quad(pts[i - 1], pts[i], ROAD_EXPLICIT_COLOR, gold_w)

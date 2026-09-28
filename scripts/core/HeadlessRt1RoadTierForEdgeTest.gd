@@ -235,9 +235,17 @@ func _test_trunk_sparsifier() -> void:
 	else:
 		_pass("overlay uses trunk + rare highways")
 	if "GOLD_SPINE_SCREEN_PX := 16.0" not in ol_src:
-		_fail("gold spine must be 16 px (thicker than 11 px highway casing)")
+		_fail("close/far gold spine must stay 16 px")
 	else:
-		_pass("gold spine 16 px")
+		_pass("close/far gold spine 16 px")
+	if "GOLD_SPINE_HALO_SCREEN_PX := 20.0" not in ol_src:
+		_fail("close/far gold halo must stay 20 px")
+	else:
+		_pass("close/far gold halo 20 px")
+	if "GOLD_SPINE_MID_SCREEN_PX := 28.0" not in ol_src or "GOLD_SPINE_MID_HALO_SCREEN_PX := 34.0" not in ol_src:
+		_fail("mid-zoom gold must be 28 px on 34 px halo")
+	else:
+		_pass("mid-zoom gold 28/34")
 	var vis_src := ""
 	if FileAccess.file_exists("res://scripts/map/RoadTierVisual.gd"):
 		var vf := FileAccess.open("res://scripts/map/RoadTierVisual.gd", FileAccess.READ)
