@@ -243,6 +243,9 @@ func _resolve_sample_pair(kind: String, fallback_a: int, fallback_b: int) -> Vec
 			continue
 		if int(row.get("display_tier", row.get("tier", -1))) != want:
 			continue
+		# Gold spine neighbours read as 16 px amber, not the paved/dirt look.
+		if a == KOELN or b == KOELN or a == BONN or b == BONN or a == LEV or b == LEV:
+			continue
 		var c1: Vector2 = row.get("c1", Vector2.ZERO)
 		var c2: Vector2 = row.get("c2", Vector2.ZERO)
 		var mid: Vector2 = c1.lerp(c2, 0.5)
