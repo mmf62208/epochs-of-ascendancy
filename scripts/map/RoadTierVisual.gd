@@ -15,9 +15,9 @@ const DIRT_SCREEN_PX := 2.6
 const PAVED_SCREEN_PX := 4.0
 const PAVED_EDGE_SCREEN_PX := 1.2
 ## Mid/close: casing must read wider than paved (~5.2) and thinner than gold (16).
-const HIGHWAY_SCREEN_PX := 7.5
-const HIGHWAY_CASING_SCREEN_PX := 11.0
-const HIGHWAY_STRIPE_SCREEN_PX := 2.6
+const HIGHWAY_SCREEN_PX := 8.0
+const HIGHWAY_CASING_SCREEN_PX := 12.0
+const HIGHWAY_STRIPE_SCREEN_PX := 3.2
 ## Europe/Home only: keep the rare trunk visible without a continent carpet.
 const HIGHWAY_FAR_CASING_SCREEN_PX := 5.5
 const HIGHWAY_FAR_CORE_SCREEN_PX := 3.2

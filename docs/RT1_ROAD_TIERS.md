@@ -12,7 +12,7 @@ The smoke harness and headless guards are **not** a live product Play PASS.
 | Item | Tip |
 |------|-----|
 | Tier formula | Same era-relative rule as `_rebuild_road_layer_inner` (`road_infra_min` / +3 / +6; explicit `built_road_neighbors` ⇒ highway). Extracted to `RoadTierVisual.road_tier_for_edge`. |
-| Looks | Screen-pixel strokes: dirt ~2.6 px dashed tan; paved ~4 px solid; highway **11 px** dark casing + pale stripe as **non-AA quads** (thicker than paved, thinner than gold 16). Far/Europe uses a 5.5 px casing so Home stays clean. 1936 highways = explicit + top ~4% of the **visual trunk**. Formula `tier` unchanged. |
+| Looks | Screen-pixel strokes: dirt ~2.6 px dashed tan; paved ~4 px solid; highway **12 px** dark casing + pale stripe as **non-AA quads** (thicker than paved, thinner than gold 16). Far/Europe uses a 5.5 px casing so Home stays clean. 1936 highways = explicit + top ~4% of the **visual trunk**. Formula `tier` unchanged. |
 | Visual network | Shared-border candidates → nearest 1–2 neighbours → degree-capped Kruskal forest. Gameplay adjacency / movement / formula stay intact. Far: rare highways. Mid: paved+highway of the tree. Close: + dirt. |
 | LOD | Europe/Home (`zoom <= 1.15`): rare highways only. Mid: paved+highway. Close (`>= 2.60`): dirt too. No cache rebuild on zoom. |
 | Batching | One `RoadTierDraw` node per tier. Per-edge `Line2D`s remain only as hidden explicit lookup stubs (`find_road_node` / IX-1 reports). |

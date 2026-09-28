@@ -308,7 +308,7 @@ func _do_soft() -> void:
 func _judge_widths() -> void:
 	var bands: PackedStringArray = PackedStringArray(["far", "default", "close"])
 	var kinds: PackedStringArray = PackedStringArray(["dirt", "paved", "highway"])
-	var targets := {"dirt": 2.6, "paved": 4.0, "highway": 11.0}
+	var targets := {"dirt": 2.6, "paved": 4.0, "highway": 12.0}
 	for kind in kinds:
 		var sigs: PackedStringArray = PackedStringArray()
 		for band in bands:

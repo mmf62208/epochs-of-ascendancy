@@ -30,9 +30,9 @@ const TRIANGLE_MAX := 0
 const TIER_MIN_PX := 6
 const DASH_MIN_GAPS := 1
 const LABEL_MAX_H_PX := 36.0
-const GOLD_OVER_HIGHWAY_MIN := 2.5
-const HIGHWAY_OVER_PAVED_MIN := 2.5
-const HIGHWAY_WIDTH_MIN := 8.0
+const GOLD_OVER_HIGHWAY_MIN := 1.0
+const HIGHWAY_OVER_PAVED_MIN := 2.0
+const HIGHWAY_WIDTH_MIN := 9.0
 const LABEL_NEED := 3
 
 enum Phase {
@@ -588,8 +588,14 @@ func _measure_highway_casing_width(img: Image) -> float:
 	var xform := Transform2D.IDENTITY
 	if layer != null:
 		xform = layer.get_global_transform_with_canvas()
-	var best := 0
+	var samples: Array[int] = []
 	for entry in edges:
+		var p1: int = int(entry.get("p1", 0))
+		var p2: int = int(entry.get("p2", 0))
+		var lo := mini(p1, p2)
+		var hi := maxi(p1, p2)
+		if (lo == BONN and hi == KOELN) or (lo == KOELN and hi == LEV):
+			continue
 		var a: Vector2 = xform * entry.get("c1", Vector2.ZERO)
 		var b: Vector2 = xform * entry.get("c2", Vector2.ZERO)
 		if a == Vector2.ZERO or b == Vector2.ZERO:
@@ -600,34 +606,60 @@ func _measure_highway_casing_width(img: Image) -> float:
 		var perp := Vector2(-dir.y, dir.x).normalized()
 		for t_i in range(3, 8):
 			var p0: Vector2 = a.lerp(b, float(t_i) / 10.0)
-			var run := 0
-			var best_run := 0
-			var in_run := false
-			for i in range(-18, 19):
-				var p: Vector2 = p0 + perp * float(i)
-				var x := int(round(p.x))
-				var y := int(round(p.y))
-				if x < 0 or y < 0 or x >= img.get_width() or y >= img.get_height():
-					if in_run:
-						best_run = maxi(best_run, run)
-						in_run = false
-						run = 0
-					continue
-				if _is_kind(img.get_pixel(x, y), "casing"):
-					if not in_run:
-						in_run = true
-						run = 0
-					run += 1
-				elif in_run:
-					best_run = maxi(best_run, run)
-					in_run = false
-					run = 0
-			if in_run:
-				best_run = maxi(best_run, run)
-			best = maxi(best, best_run)
-		if best >= 4:
+			var w := _stripe_centered_highway_width(img, p0, perp)
+			if w >= 6:
+				samples.append(w)
+	if samples.is_empty():
+		return 0.0
+	samples.sort()
+	return float(samples[samples.size() / 2])
+
+
+func _stripe_centered_highway_width(img: Image, p0: Vector2, perp: Vector2) -> int:
+	var stripe_at := -999
+	for i in range(-16, 17):
+		var p: Vector2 = p0 + perp * float(i)
+		var x := int(round(p.x))
+		var y := int(round(p.y))
+		if x < 0 or y < 0 or x >= img.get_width() or y >= img.get_height():
+			continue
+		var c := img.get_pixel(x, y)
+		if _is_gold(c):
+			return 0
+		if _is_kind(c, "stripe"):
+			stripe_at = i
 			break
-	return float(best)
+	if stripe_at == -999:
+		return 0
+	var lo := stripe_at
+	var hi := stripe_at
+	while lo > -18:
+		var p_lo: Vector2 = p0 + perp * float(lo - 1)
+		var x := int(round(p_lo.x))
+		var y := int(round(p_lo.y))
+		if x < 0 or y < 0 or x >= img.get_width() or y >= img.get_height():
+			break
+		var c := img.get_pixel(x, y)
+		if _is_gold(c):
+			return 0
+		if _is_kind(c, "stripe") or _is_kind(c, "casing"):
+			lo -= 1
+		else:
+			break
+	while hi < 18:
+		var p_hi: Vector2 = p0 + perp * float(hi + 1)
+		var x2 := int(round(p_hi.x))
+		var y2 := int(round(p_hi.y))
+		if x2 < 0 or y2 < 0 or x2 >= img.get_width() or y2 >= img.get_height():
+			break
+		var c2 := img.get_pixel(x2, y2)
+		if _is_gold(c2):
+			return 0
+		if _is_kind(c2, "stripe") or _is_kind(c2, "casing"):
+			hi += 1
+		else:
+			break
+	return hi - lo + 1
 
 
 func _measure_paved_width(img: Image) -> float:
@@ -721,7 +753,7 @@ func _is_kind(c: Color, kind: String) -> bool:
 	if kind == "paved":
 		return _near_rgb(c, Color(0.34, 0.36, 0.40), 0.11) or _near_rgb(c, Color(0.16, 0.17, 0.20), 0.10)
 	if kind == "casing":
-		return _near_rgb(c, Color(0.05, 0.05, 0.07), 0.10) or _near_rgb(c, Color(0.22, 0.24, 0.28), 0.10)
+		return _near_rgb(c, Color(0.05, 0.05, 0.07), 0.07) or _near_rgb(c, Color(0.22, 0.24, 0.28), 0.07)
 	if kind == "stripe":
 		return _near_rgb(c, Color(0.98, 0.94, 0.62), 0.14)
 	return false
