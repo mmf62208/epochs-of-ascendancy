@@ -384,6 +384,7 @@ var _btn_attack: Button = null
 var _btn_open_fight: Button = null
 var border_layer: Node2D = null
 var _border_lod_tier_built: int = -999  # last tier used when frontiers were rebuilt
+var _border_internal_visible: bool = false
 var _political_labels_layer: Node2D = null
 var _political_labels_rebuild_pending: bool = false
 var _region_highlight_layer: Node2D = null
@@ -14357,6 +14358,8 @@ func _refresh_province_detail_visibility() -> void:
 				_apply_hover_visuals(_hover_province.id, true)
 			elif _hover_outline_province_id >= 0:
 				_apply_hover_visuals(_hover_outline_province_id, false)
+	# Mid and close are both tactical; internals must toggle on zoom, not tier.
+	_apply_internal_border_zoom_visibility()
 
 	_sync_viewport_culling()
 	# Zoom/Home can cross the chip floor while paused process skips this path;
@@ -15021,16 +15024,18 @@ func _sync_hovered_strategic_region(province: Province) -> void:
 func _sync_border_lod(tier: int) -> void:
 	if border_layer == null or not is_instance_valid(border_layer):
 		return
-	# Rebuild when internal-border policy changes (strategic/operational hide, tactical shows).
-	var want_internal := MapZoomLODScript.show_province_internal_borders(tier)
-	var had_internal := MapZoomLODScript.show_province_internal_borders(_border_lod_tier_built) if _border_lod_tier_built >= 0 else false
-	if _border_lod_tier_built < 0 or want_internal != had_internal or border_layer.get_child_count() == 0:
+	# Create internals at tactical. Visibility is zoom-banded (mid off, close on)
+	# so crossing 2.60 does not rebuild every NUTS edge.
+	var want_create := MapZoomLODScript.show_province_internal_borders(tier)
+	var had_create := MapZoomLODScript.show_province_internal_borders(_border_lod_tier_built) if _border_lod_tier_built >= 0 else false
+	if _border_lod_tier_built < 0 or want_create != had_create or border_layer.get_child_count() == 0:
 		_update_country_borders()
 		_border_lod_tier_built = tier
 	var w: float = MapZoomLODScript.country_border_width(tier)
 	var a: float = MapZoomLODScript.country_border_alpha(tier)
 	var cw: float = MapZoomLODScript.coast_border_width(tier)
 	var iw: float = MapZoomLODScript.province_internal_border_width(tier)
+	var want_paint := MapZoomLODScript.show_province_internal_borders_at_zoom(_get_camera_zoom())
 	for child in border_layer.get_children():
 		if not (child is Line2D):
 			continue
@@ -15045,7 +15050,22 @@ func _sync_border_lod(tier: int) -> void:
 			seg.width = cw
 		elif nm.begins_with(PROVINCE_EDGE_PREFIX):
 			seg.width = iw
-			seg.visible = want_internal
+			seg.visible = want_paint
+	_border_internal_visible = want_paint
+
+
+func _apply_internal_border_zoom_visibility() -> void:
+	if border_layer == null or not is_instance_valid(border_layer):
+		return
+	var want_paint := MapZoomLODScript.show_province_internal_borders_at_zoom(_get_camera_zoom())
+	if want_paint == _border_internal_visible:
+		return
+	for child in border_layer.get_children():
+		if not (child is Line2D):
+			continue
+		if str(child.name).begins_with(PROVINCE_EDGE_PREFIX):
+			(child as Line2D).visible = want_paint
+	_border_internal_visible = want_paint
 
 
 func _get_camera_world_rect(margin_ratio: float = 0.10) -> Rect2:
@@ -28242,9 +28262,11 @@ func _sync_shared_edge_frontiers(_scan_pids: Array) -> void:
 			iseg.begin_cap_mode = Line2D.LINE_CAP_ROUND
 			iseg.end_cap_mode = Line2D.LINE_CAP_ROUND
 			iseg.z_index = 0
+			# Created at tactical; mid stays hidden so NUTS cells do not read as dirt.
+			iseg.visible = MapZoomLODScript.show_province_internal_borders_at_zoom(_get_camera_zoom())
 			border_layer.add_child(iseg)
 			internal_idx += 1
-
+	_border_internal_visible = MapZoomLODScript.show_province_internal_borders_at_zoom(_get_camera_zoom())
 
 
 func _live_owner_tag(province_id: int) -> String:

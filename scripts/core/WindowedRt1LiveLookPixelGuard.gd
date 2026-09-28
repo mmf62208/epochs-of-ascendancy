@@ -1,5 +1,7 @@
 extends SceneTree
 
+const RoadTierVisualScript = preload("res://scripts/map/RoadTierVisual.gd")
+
 ## WINDOWED RT-1 live-look + mesh-density guard (FIX #2).
 ## Does NOT seed infrastructure. xvfb is NOT a product Play pass.
 ##
@@ -31,9 +33,12 @@ const TIER_MIN_PX := 6
 const DASH_MIN_GAPS := 1
 const LABEL_MAX_H_PX := 36.0
 const GOLD_OVER_HIGHWAY_MIN := 1.0
+const GOLD_OVER_HIGHWAY_RATIO_MID := 1.8
 const HIGHWAY_OVER_PAVED_MIN := 2.0
 const HIGHWAY_WIDTH_MIN := 9.0
 const LABEL_NEED := 3
+const RHINE_BOX_HALF := 420.0
+const TAN_CELL_PIXEL_MAX := 8
 
 enum Phase {
 	WAIT_MAP,
@@ -58,6 +63,9 @@ var _cam_pos: Vector2 = Vector2.ZERO
 var _cam_zoom: float = EUROPE_ZOOM
 var _mesh_frac: float = -1.0
 var _gold_w_close: float = 0.0
+var _gold_w_mid: float = 0.0
+var _hwy_w_mid: float = 0.0
+var _tan_cells_mid: int = -1
 
 
 func _init() -> void:
@@ -179,7 +187,10 @@ func _do_mid() -> void:
 	_judge_looks(img, "mid", false)
 	_judge_labels("mid")
 	_judge_trunk("mid", MID_ZOOM)
+	_log_tan_cell_diagnosis("mid")
+	_judge_tan_cells(img, "mid")
 	_judge_gold_vs_highway(img, "mid")
+	_judge_gold_covers_labels(img, "mid")
 	_judge_highway_vs_paved(img, "mid")
 	_frame_over_koln(CLOSE_ZOOM, true)
 	_go_settle(Phase.CLOSE)
@@ -566,16 +577,262 @@ func _judge_highway_vs_paved(img: Image, band: String) -> void:
 func _judge_gold_vs_highway(img: Image, band: String) -> void:
 	var gold_w := _measure_gold_width(img)
 	var hwy_w := _measure_highway_casing_width(img)
-	_log("EOA_RT1_LIVE_LOOK who=guard.gold_vs_highway band=%s gold=%.2f highway=%.2f" % [
-		band, gold_w, hwy_w
+	if band == "mid":
+		_gold_w_mid = gold_w
+		_hwy_w_mid = hwy_w
+	_log("EOA_RT1_LIVE_LOOK who=guard.gold_vs_highway band=%s gold=%.2f highway=%.2f ratio=%.2f" % [
+		band, gold_w, hwy_w, (gold_w / hwy_w) if hwy_w > 0.2 else 0.0
 	])
 	if hwy_w <= 0.2:
 		_log("EOA_RT1_LIVE_LOOK who=guard.gold_vs_highway band=%s highway_unmeasured (soft)" % band)
 		if gold_w + 0.01 < GOLD_WIDTH_MIN and band == "mid":
 			_fail_reasons.append("%s_gold_thin_%.2f" % [band, gold_w])
 		return
+	if band == "mid":
+		var need: float = hwy_w * GOLD_OVER_HIGHWAY_RATIO_MID
+		if gold_w + 0.01 < need:
+			_fail_reasons.append("%s_gold_ratio_%.2f_vs_%.2f_need_%.2fx" % [
+				band, gold_w, hwy_w, GOLD_OVER_HIGHWAY_RATIO_MID
+			])
+		return
 	if gold_w < hwy_w + GOLD_OVER_HIGHWAY_MIN:
 		_fail_reasons.append("%s_gold_not_thicker_%.2f_vs_%.2f" % [band, gold_w, hwy_w])
+
+
+func _rhineland_world_rect() -> Rect2:
+	var hub := _koln_world()
+	return Rect2(hub - Vector2(RHINE_BOX_HALF, RHINE_BOX_HALF * 0.9), Vector2(RHINE_BOX_HALF * 2.0, RHINE_BOX_HALF * 1.8))
+
+
+func _edge_in_rhineland(entry: Dictionary) -> bool:
+	var box := _rhineland_world_rect()
+	var mid: Vector2 = (entry.get("c1", Vector2.ZERO) as Vector2).lerp(entry.get("c2", Vector2.ZERO), 0.5)
+	return box.has_point(mid)
+
+
+func _drawn_edges_of_display_in_rhineland(display_tier: int, zoom: float) -> Array:
+	var ol := _overlay()
+	if ol == null or not ol.has_method("get_road_tier_cache"):
+		return []
+	var cache: Array = ol.call("get_road_tier_cache")
+	var out: Array = []
+	for row_v in cache:
+		if typeof(row_v) != TYPE_DICTIONARY:
+			continue
+		var row: Dictionary = row_v
+		var dt := int(row.get("display_tier", row.get("tier", -1)))
+		if dt != display_tier:
+			continue
+		if not _edge_in_rhineland(row):
+			continue
+		if not RoadTierVisualScript.tier_visible_at_zoom(
+			int(row.get("tier", 0)),
+			bool(row.get("explicit", false)),
+			dt,
+			zoom
+		):
+			continue
+		if display_tier == 0 and RoadTierVisualScript.dirt_hidden_at_zoom(zoom):
+			continue
+		out.append(row)
+	return out
+
+
+func _border_internal_edges_in_rhineland(visible_only: bool) -> Array:
+	var bl := _find_named("BorderLayer")
+	if bl == null:
+		return []
+	var box := _rhineland_world_rect()
+	var out: Array = []
+	var world_xf := Transform2D.IDENTITY
+	if bl is CanvasItem:
+		world_xf = (bl as CanvasItem).get_global_transform()
+	for ch in bl.get_children():
+		if not (ch is Line2D):
+			continue
+		if not str(ch.name).begins_with("ProvEdge_"):
+			continue
+		var seg := ch as Line2D
+		if visible_only and not seg.visible:
+			continue
+		if seg.points.size() < 2:
+			continue
+		var local_a: Vector2 = seg.points[0]
+		var local_b: Vector2 = seg.points[1]
+		var mid: Vector2 = world_xf * local_a.lerp(local_b, 0.5)
+		if not box.has_point(mid):
+			continue
+		out.append({
+			"p1": int(round(local_a.x)) * 10007 + int(round(local_a.y)),
+			"p2": int(round(local_b.x)) * 10007 + int(round(local_b.y)),
+			"c1": local_a,
+			"c2": local_b,
+			"layer": "BorderLayer",
+			"node": str(seg.name),
+			"color": seg.default_color,
+		})
+	return out
+
+
+func _tan_line2d_strokes(layer_name: String) -> Array:
+	var layer := _find_named(layer_name)
+	if layer == null:
+		return []
+	var out: Array = []
+	for ch in layer.get_children():
+		if not (ch is Line2D):
+			continue
+		var seg := ch as Line2D
+		if not seg.visible:
+			continue
+		var col: Color = seg.default_color
+		if not (_is_kind(col, "dirt") or _is_tan_stroke(col)):
+			continue
+		if seg.points.size() < 2:
+			continue
+		out.append({
+			"layer": layer_name,
+			"node": str(seg.name),
+			"p1": int(seg.get_meta("p1", 0)),
+			"p2": int(seg.get_meta("p2", 0)),
+			"c1": seg.points[0],
+			"c2": seg.points[1],
+			"color": col,
+		})
+	return out
+
+
+func _is_tan_stroke(c: Color) -> bool:
+	if _is_gold(c):
+		return false
+	return _near_rgb(c, Color(0.84, 0.56, 0.18), 0.18) or _near_rgb(c, Color(0.72, 0.48, 0.16), 0.16)
+
+
+func _log_tan_cell_diagnosis(band: String) -> void:
+	var cam := _camera()
+	var z: float = _cam_zoom
+	if cam != null:
+		z = maxf(absf(cam.zoom.x), absf(cam.zoom.y))
+	var dirt_hidden := RoadTierVisualScript.dirt_hidden_at_zoom(z)
+	var lod: int = RoadTierVisualScript.lod_band_for_zoom(z)
+	var dirt_drawn: Array = _drawn_edges_of_display_in_rhineland(0, z)
+	var paved_drawn: Array = _drawn_edges_of_display_in_rhineland(1, z)
+	var hwy_drawn: Array = _drawn_edges_of_display_in_rhineland(2, z)
+	var dirt_cyc: int = RoadTierVisualScript.count_undirected_cycles(dirt_drawn)
+	var paved_cyc: int = RoadTierVisualScript.count_undirected_cycles(paved_drawn)
+	var hwy_cyc: int = RoadTierVisualScript.count_undirected_cycles(hwy_drawn)
+	var internals: Array = _border_internal_edges_in_rhineland(true)
+	var internal_cyc: int = RoadTierVisualScript.count_undirected_cycles(internals)
+	var rail_tan: Array = _tan_line2d_strokes("RailLayer")
+	var road_tan: Array = _tan_line2d_strokes("RoadLayer")
+	var dirt_keys: PackedStringArray = PackedStringArray()
+	for row_v in dirt_drawn:
+		var row: Dictionary = row_v
+		dirt_keys.append(RoadTierVisualScript.edge_key(int(row.get("p1", 0)), int(row.get("p2", 0))))
+		if dirt_keys.size() >= 8:
+			break
+	var edge_keys: PackedStringArray = PackedStringArray()
+	for row2_v in internals:
+		var row2: Dictionary = row2_v
+		edge_keys.append("%s:%s" % [str(row2.get("layer", "")), str(row2.get("node", ""))])
+		if edge_keys.size() >= 8:
+			break
+	_log(
+		"EOA_RT1B_DIAG who=guard.tan_cells band=%s zoom=%.3f lod=%d dirt_hidden=%s dirt_n=%d dirt_cyc=%d paved_cyc=%d hwy_cyc=%d internal_n=%d internal_cyc=%d rail_tan=%d road_tan_line2d=%d dirt_keys=%s internal_nodes=%s"
+		% [
+			band, z, lod, str(dirt_hidden), dirt_drawn.size(), dirt_cyc, paved_cyc, hwy_cyc,
+			internals.size(), internal_cyc, rail_tan.size(), road_tan.size(),
+			",".join(dirt_keys), ",".join(edge_keys)
+		]
+	)
+	if internals.size() > 0:
+		_log("EOA_RT1B_DIAG who=guard.tan_source layer=BorderLayer/ProvEdge_ count=%d (NUTS internal cells at mid)" % internals.size())
+	if dirt_drawn.size() > 0:
+		_log("EOA_RT1B_DIAG who=guard.tan_source layer=RoadTierDraw_0 count=%d" % dirt_drawn.size())
+	if rail_tan.size() > 0:
+		_log("EOA_RT1B_DIAG who=guard.tan_source layer=RailLayer count=%d" % rail_tan.size())
+
+
+func _judge_tan_cells(img: Image, band: String) -> void:
+	if band != "mid":
+		return
+	var cam := _camera()
+	var z: float = _cam_zoom
+	if cam != null:
+		z = maxf(absf(cam.zoom.x), absf(cam.zoom.y))
+	var dirt_drawn: Array = _drawn_edges_of_display_in_rhineland(0, z)
+	var dirt_cyc: int = RoadTierVisualScript.count_undirected_cycles(dirt_drawn)
+	var internals: Array = _border_internal_edges_in_rhineland(true)
+	var internal_cyc: int = RoadTierVisualScript.count_undirected_cycles(internals)
+	var pix: int = _count_tan_cell_pixels(img)
+	_tan_cells_mid = internal_cyc + dirt_cyc
+	_log("EOA_RT1_LIVE_LOOK who=guard.tan_cells band=%s dirt_cyc=%d internal_cyc=%d pix=%d cells=%d" % [
+		band, dirt_cyc, internal_cyc, pix, _tan_cells_mid
+	])
+	if dirt_cyc > 0:
+		_fail_reasons.append("%s_dirt_cycles_%d" % [band, dirt_cyc])
+	if internals.size() > 0 or internal_cyc > 0:
+		_fail_reasons.append("%s_tan_internal_cells_%d_cyc_%d" % [band, internals.size(), internal_cyc])
+	if pix > TAN_CELL_PIXEL_MAX:
+		_fail_reasons.append("%s_tan_cell_px_%d" % [band, pix])
+
+
+func _count_tan_cell_pixels(img: Image) -> int:
+	if img == null:
+		return 0
+	var hits := 0
+	var bl := _find_named("BorderLayer")
+	var bx := Transform2D.IDENTITY
+	if bl is CanvasItem:
+		bx = (bl as CanvasItem).get_global_transform_with_canvas()
+	var internals: Array = _border_internal_edges_in_rhineland(true)
+	for row_v in internals:
+		var row: Dictionary = row_v
+		var a: Vector2 = bx * (row.get("c1", Vector2.ZERO) as Vector2)
+		var b: Vector2 = bx * (row.get("c2", Vector2.ZERO) as Vector2)
+		var mid: Vector2 = a.lerp(b, 0.5)
+		var x := int(round(mid.x))
+		var y := int(round(mid.y))
+		if x < 2 or y < 2 or x >= img.get_width() - 2 or y >= img.get_height() - 2:
+			continue
+		if _is_gold(img.get_pixel(x, y)):
+			continue
+		if _neighborhood_kind(img, x, y, 1, "dirt") or _is_internal_stroke(img.get_pixel(x, y)):
+			hits += 1
+	return hits
+
+
+func _is_internal_stroke(c: Color) -> bool:
+	var lum := (c.r + c.g + c.b) / 3.0
+	var sat := maxf(c.r, maxf(c.g, c.b)) - minf(c.r, minf(c.g, c.b))
+	return lum < 0.28 and sat < 0.18 and c.a > 0.04
+
+
+func _judge_gold_covers_labels(img: Image, band: String) -> void:
+	if img == null:
+		return
+	var covered := 0
+	for ch in _collect_spine_labels():
+		var lbl := ch as Label
+		if lbl == null or not lbl.visible:
+			continue
+		var r := Rect2(lbl.position, lbl.size)
+		var samples: Array[Vector2] = [
+			r.get_center(),
+			r.position + Vector2(4, 4),
+			r.position + Vector2(r.size.x - 4.0, 4.0),
+		]
+		for p_v in samples:
+			var p: Vector2 = p_v
+			var x := int(round(p.x))
+			var y := int(round(p.y))
+			if x < 0 or y < 0 or x >= img.get_width() or y >= img.get_height():
+				continue
+			if _is_gold(img.get_pixel(x, y)):
+				covered += 1
+	_log("EOA_RT1_LIVE_LOOK who=guard.gold_over_labels band=%s gold_hits=%d" % [band, covered])
+	if covered > 0:
+		_fail_reasons.append("%s_gold_covers_labels_%d" % [band, covered])
 
 
 func _measure_highway_casing_width(img: Image) -> float:
@@ -788,7 +1045,7 @@ func _measure_gold_width(img: Image) -> float:
 		var run := 0
 		var best_run := 0
 		var in_run := false
-		for i in range(-16, 17):
+		for i in range(-28, 29):
 			var p: Vector2 = p0 + perp * float(i)
 			var x := int(round(p.x))
 			var y := int(round(p.y))
@@ -951,6 +1208,9 @@ func _frame_over_koln(zoom: float, hide_inspector: bool) -> void:
 		ol.call("_apply_screen_space_road_widths")
 	if ol != null and ol.has_method("refresh_ix1_gold_spine"):
 		ol.call("refresh_ix1_gold_spine", true)
+	var mr2 := _map_renderer()
+	if mr2 != null and mr2.has_method("_apply_internal_border_zoom_visibility"):
+		mr2.call("_apply_internal_border_zoom_visibility")
 	_log("EOA_RT1_LIVE_LOOK who=guard.frame_koln want=%.2f got=%.3f via=search_go+wheel" % [zoom, _cam_zoom])
 
 
@@ -1156,8 +1416,9 @@ func _finish(ok: bool) -> void:
 	_phase = Phase.DONE
 	if not ok and _fail_reasons.is_empty():
 		_fail_reasons.append("unknown")
-	_log("WindowedRt1LiveLookPixelGuard: mesh_frac=%.5f gold_w=%.2f RESULT=%s reasons=%s captures=%d" % [
-		_mesh_frac, _gold_w_close, "PASS" if ok else "FAIL", ",".join(_fail_reasons), _captures.size()
+	_log("WindowedRt1LiveLookPixelGuard: mesh_frac=%.5f gold_mid=%.2f hwy_mid=%.2f gold_close=%.2f tan_cells=%d RESULT=%s reasons=%s captures=%d (xvfb≠Play)" % [
+		_mesh_frac, _gold_w_mid, _hwy_w_mid, _gold_w_close, _tan_cells_mid,
+		"PASS" if ok else "FAIL", ",".join(_fail_reasons), _captures.size()
 	])
 	if OS.has_method("flush_stdout"):
 		OS.call("flush_stdout")

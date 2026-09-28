@@ -119,13 +119,33 @@ static func coast_border_width(t: Tier) -> float:
 			return 1.0
 
 
-## Subtle same-owner province edges — tactical only (avoids NUTS spiderweb at operational).
+## Subtle same-owner province edges. Create at tactical so zoom can toggle
+## visibility without a full frontier rebuild. Paint only at close zoom
+## (>= 2.60, same floor as dirt roads) so mid does not grow a NUTS cell web.
+const INTERNAL_BORDER_ZOOM_FLOOR: float = 2.60
+
+
 static func show_province_internal_borders(t: Tier) -> bool:
 	return t == Tier.TACTICAL
 
 
+## Mid (1.15–2.60) is already tactical, but internals look like a dashed tan
+## dirt web of closed province cells. Hide until close.
+static func show_province_internal_borders_at_zoom(zoom: float) -> bool:
+	var z: float = zoom
+	if not is_finite(z):
+		return false
+	return z >= INTERNAL_BORDER_ZOOM_FLOOR
+
+
 static func province_internal_border_width(t: Tier) -> float:
 	if t != Tier.TACTICAL:
+		return 0.0
+	return 0.9
+
+
+static func province_internal_border_width_at_zoom(zoom: float) -> float:
+	if not show_province_internal_borders_at_zoom(zoom):
 		return 0.0
 	return 0.9
 
