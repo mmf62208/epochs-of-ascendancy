@@ -106,15 +106,15 @@ func _test_lod_cull() -> void:
 		_fail("europe zoom must keep explicit highway")
 	else:
 		_pass("europe zoom keeps explicit highway")
-	if RoadTierVisualScript.tier_visible_at_zoom(0, false, 0, 1.20):
+	if RoadTierVisualScript.tier_visible_at_zoom(0, false, 0, 1.80):
 		_fail("mid zoom must hide dirt")
 	else:
 		_pass("mid zoom hides dirt")
-	if not RoadTierVisualScript.tier_visible_at_zoom(0, false, 1, 1.20):
+	if not RoadTierVisualScript.tier_visible_at_zoom(0, false, 1, 1.80):
 		_fail("mid zoom must show paved")
 	else:
 		_pass("mid zoom shows paved")
-	if not RoadTierVisualScript.tier_visible_at_zoom(0, false, 0, 1.70):
+	if not RoadTierVisualScript.tier_visible_at_zoom(0, false, 0, 2.80):
 		_fail("close zoom must show dirt")
 	else:
 		_pass("close zoom shows dirt")

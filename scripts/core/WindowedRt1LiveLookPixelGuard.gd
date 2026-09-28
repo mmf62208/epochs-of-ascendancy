@@ -16,8 +16,8 @@ const KOELN := 710417
 const BONN := 710416
 const LEV := 710418
 const EUROPE_ZOOM := 0.42
-const MID_ZOOM := 1.20
-const CLOSE_ZOOM := 2.20
+const MID_ZOOM := 1.80
+const CLOSE_ZOOM := 3.20
 const WAIT_MAP_SECS := 420
 const SETTLE_FRAMES := 40
 const GOLD_WIDTH_MIN := 7.0
@@ -26,7 +26,7 @@ const GOLD_WIDTH_MAX := 13.0
 const MESH_MAX_FRAC := 0.018
 const TIER_MIN_PX := 6
 const DASH_MIN_GAPS := 1
-const LABEL_MAX_H_PX := 22.0
+const LABEL_MAX_H_PX := 36.0
 
 enum Phase {
 	WAIT_MAP,
@@ -231,7 +231,9 @@ func _judge_labels(band: String) -> void:
 		var fs := 0
 		if lbl.has_theme_font_size_override("font_size"):
 			fs = int(lbl.get_theme_font_size("font_size"))
-		if fs > 16 or lbl.size.y > LABEL_MAX_H_PX:
+		# 14 px + outline 4 is ~24–32 px tall (same family as political labels).
+		# World-scaled draw_string leftovers were 40+ px / font > 20.
+		if fs > 20 or lbl.size.y > LABEL_MAX_H_PX:
 			huge = true
 		var r := Rect2(lbl.position, lbl.size)
 		if visible_n > 1 and last_rect.intersects(r):
@@ -240,7 +242,7 @@ func _judge_labels(band: String) -> void:
 	_log("EOA_RT1_LIVE_LOOK who=guard.labels band=%s visible=%d huge=%s overlap=%s" % [
 		band, visible_n, str(huge), str(overlap)
 	])
-	# S2 labels are close-only (zoom >= 1.55). Mid 1.20 must not require them.
+	# S2 labels are close-only (zoom >= 2.60). Mid 1.80 must not require them.
 	if band == "close":
 		if visible_n < 2:
 			_fail_reasons.append("%s_labels_%d" % [band, visible_n])

@@ -32,10 +32,10 @@ const HIGHWAY_STRIPE_COLOR := Color(0.98, 0.94, 0.62, 0.98)
 ## previous FAR_MAX=0.45 left Home in the mid band, so every NUTS3 dirt
 ## edge painted a continent-wide grey mesh. Keep far above Home so the
 ## first wheel-in still hides paved. Europe/Home = highways only.
-const ZOOM_FAR_MAX := 1.05
-const ZOOM_CLOSE_MIN := 1.55
-const DIRT_ZOOM_FLOOR := 1.55
-const END_LABEL_ZOOM_MIN := 1.55
+const ZOOM_FAR_MAX := 1.15
+const ZOOM_CLOSE_MIN := 2.60
+const DIRT_ZOOM_FLOOR := 2.60
+const END_LABEL_ZOOM_MIN := 2.60
 const END_LABEL_FONT_PX := 14
 
 ## Fallback when the board has no usable shared-border set.

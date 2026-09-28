@@ -18,7 +18,7 @@ const HWY_A := 710412 ## Mettmann
 const HWY_B := 710424 ## Rheinisch-Bergischer
 const FAR_ZOOM := 0.32
 const MID_ZOOM := 0.95
-const CLOSE_ZOOM := 2.10
+const CLOSE_ZOOM := 3.20
 const WAIT_MAP_SECS := 420
 const SETTLE_FRAMES := 36
 const GOLD_COVER_MIN := 0.90
@@ -238,7 +238,7 @@ func _do_soft() -> void:
 	if hex_px > 12:
 		_fail_reasons.append("s1_hex_linger_%d" % hex_px)
 	_log("EOA_RT1_PIXEL_GUARD who=guard.s1 hex_px_after_close=%d" % hex_px)
-	_frame_over_koln(1.70, true)
+	_frame_over_koln(3.20, true)
 	RenderingServer.force_draw()
 	var img_lab := _capture("rt1_s2_end_labels_mid")
 	var labels_ok := _end_labels_present(img_lab)
