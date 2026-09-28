@@ -239,10 +239,10 @@ func _test_trunk_sparsifier() -> void:
 		_fail("close-zoom gold spine must stay 16 px")
 	else:
 		_pass("close-zoom gold spine 16 px")
-	if "GOLD_SPINE_MID_SCREEN_PX := 24.0" not in ol_src or "GOLD_SPINE_MID_HALO_SCREEN_PX := 30.0" not in ol_src:
-		_fail("mid-zoom gold must be 24 px on 30 px halo")
+	if "GOLD_SPINE_MID_SCREEN_PX := 28.0" not in ol_src or "GOLD_SPINE_MID_HALO_SCREEN_PX := 34.0" not in ol_src:
+		_fail("mid-zoom gold must be 28 px on 34 px halo")
 	else:
-		_pass("mid-zoom gold 24/30")
+		_pass("mid-zoom gold 28/34")
 	if "GOLD_SPINE_HALO_SCREEN_PX := 20.0" not in ol_src:
 		_fail("close-zoom gold halo must stay 20 px")
 	else:

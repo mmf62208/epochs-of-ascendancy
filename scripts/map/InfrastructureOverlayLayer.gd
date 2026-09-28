@@ -108,8 +108,8 @@ const ROAD_INFERRED_SCREEN_PX := 4.0
 ## so gold reads ≥1.8× the 12 px highway casing (xvfb main was 17 vs 13).
 const GOLD_SPINE_SCREEN_PX := 16.0
 const GOLD_SPINE_HALO_SCREEN_PX := 20.0
-const GOLD_SPINE_MID_SCREEN_PX := 24.0
-const GOLD_SPINE_MID_HALO_SCREEN_PX := 30.0
+const GOLD_SPINE_MID_SCREEN_PX := 28.0
+const GOLD_SPINE_MID_HALO_SCREEN_PX := 34.0
 const ROAD_EXPLICIT_COLOR := Color(0.92, 0.62, 0.08, 0.96)
 const GOLD_SPINE_HALO_COLOR := Color(0.38, 0.18, 0.02, 0.88)
 ## RT-1: one _draw node per intact tier. Cache rebuilds only on infra/owner/era/load.
@@ -2713,7 +2713,7 @@ class RoadTierDraw extends Node2D:
 
 ## Built IX-1 gold spine: ONE joined Bonn→Köln→Leverkusen polyline.
 ## Non-AA filled quads. Close/far = GOLD_SPINE_SCREEN_PX (16) / halo 20.
-## Mid lod only = 24 / halo 30 so gold ≥ 1.8× highway. Never antialiased draw_line (IX-1 windowed OOM).
+## Mid lod only = 28 / halo 34 so measured gold ≥ 1.8× highway. Never antialiased draw_line (IX-1 windowed OOM).
 ## Widths are precomputed per band; _draw reuses packed buffers (no alloc).
 ## S2 labels live on a CanvasLayer (screen space), not Node2D-child Controls.
 class Ix1GoldSpineDraw extends Node2D:
@@ -2888,7 +2888,7 @@ class Ix1GoldSpineDraw extends Node2D:
         if west.x > 0.0:
             west = -west
         var lod: int = RoadTierVisualScript.lod_band_for_zoom(z)
-        var mid_boost: float = 18.0 if lod == 1 else 0.0
+        var mid_boost: float = 22.0 if lod == 1 else 0.0
         var bonn_pos: Vector2 = bonn_s + bonn_away * (36.0 + mid_boost) + bonn_perp * (22.0 + mid_boost * 0.45)
         var lev_pos: Vector2 = lev_s + lev_away * (36.0 + mid_boost) - lev_perp * (22.0 + mid_boost * 0.45)
         ## Köln sits west of the hub so it misses the gold stroke and the inspector.
