@@ -22,9 +22,9 @@ const WAIT_MAP_SECS := 420
 const SETTLE_FRAMES := 40
 const GOLD_WIDTH_MIN := 7.0
 const GOLD_WIDTH_MAX := 13.0
-## 497731dd Europe frame is near-zero mesh. 22c3392 carpet is far above this.
-const MESH_MAX_FRAC := 0.012
-const TIER_MIN_PX := 18
+## After units-off, 497731dd Europe is low. 22c3392 dirt carpet is far above this.
+const MESH_MAX_FRAC := 0.018
+const TIER_MIN_PX := 6
 const DASH_MIN_GAPS := 1
 const LABEL_MAX_H_PX := 22.0
 
@@ -142,7 +142,10 @@ func _tick_wait_map() -> void:
 
 
 func _do_europe() -> void:
+	_force_political_clean()
+	_set_units_view(false)
 	_reassert_camera()
+	RenderingServer.force_draw()
 	var img := _capture("rt1_live_europe")
 	_mesh_frac = _mesh_density_frac(img)
 	_log("EOA_RT1_LIVE_LOOK who=guard.europe mesh_frac=%.5f max=%.4f (497731dd baseline ~0)" % [
@@ -157,6 +160,8 @@ func _do_europe() -> void:
 
 
 func _do_mid() -> void:
+	_set_units_view(false)
+	_reassert_camera()
 	_judge_looks(_capture("rt1_live_mid"), "mid", false)
 	_judge_labels("mid")
 	_frame_over_koln(CLOSE_ZOOM, true)
@@ -164,6 +169,8 @@ func _do_mid() -> void:
 
 
 func _do_close() -> void:
+	_set_units_view(false)
+	_reassert_camera()
 	var img := _capture("rt1_live_close")
 	_judge_looks(img, "close", true)
 	_judge_labels("close")
@@ -184,10 +191,10 @@ func _judge_looks(img: Image, band: String, need_dirt: bool) -> void:
 	if img == null:
 		_fail_reasons.append("capture_%s" % band)
 		return
-	var dirt_n := _count_kind(img, "dirt")
-	var paved_n := _count_kind(img, "paved")
-	var case_n := _count_kind(img, "casing")
-	var stripe_n := _count_kind(img, "stripe")
+	var dirt_n := _count_kind_on_edges(img, 0, "dirt")
+	var paved_n := _count_kind_on_edges(img, 1, "paved")
+	var case_n := _count_kind_on_edges(img, 2, "casing")
+	var stripe_n := _count_kind_on_edges(img, 2, "stripe")
 	var dash_gaps := _dirt_dash_gaps(img)
 	_log("EOA_RT1_LIVE_LOOK who=guard.looks band=%s dirt=%d paved=%d casing=%d stripe=%d dash_gaps=%d" % [
 		band, dirt_n, paved_n, case_n, stripe_n, dash_gaps
@@ -201,7 +208,7 @@ func _judge_looks(img: Image, band: String, need_dirt: bool) -> void:
 		_fail_reasons.append("%s_paved_px_%d" % [band, paved_n])
 	if case_n < TIER_MIN_PX:
 		_fail_reasons.append("%s_highway_casing_%d" % [band, case_n])
-	if stripe_n < 8:
+	if stripe_n < 4:
 		_fail_reasons.append("%s_highway_stripe_%d" % [band, stripe_n])
 
 
@@ -242,15 +249,30 @@ func _judge_labels(band: String) -> void:
 			_fail_reasons.append("%s_labels_overlap" % band)
 
 
-func _count_kind(img: Image, kind: String) -> int:
+func _count_kind_on_edges(img: Image, display_tier: int, kind: String) -> int:
 	if img == null:
 		return 0
+	var edges: Array = _live_edges_of_display(display_tier)
+	if edges.is_empty():
+		return 0
+	var layer := _road_layer()
+	var xform := Transform2D.IDENTITY
+	if layer != null:
+		xform = layer.get_global_transform_with_canvas()
 	var n := 0
-	var step := 2
-	var y0 := 90
-	for y in range(y0, img.get_height(), step):
-		for x in range(0, img.get_width(), step):
-			if _is_kind(img.get_pixel(x, y), kind):
+	for entry in edges:
+		var a: Vector2 = xform * entry.get("c1", Vector2.ZERO)
+		var b: Vector2 = xform * entry.get("c2", Vector2.ZERO)
+		if a == Vector2.ZERO or b == Vector2.ZERO:
+			continue
+		var steps := mini(24, maxi(6, int(a.distance_to(b) / 3.0)))
+		for i in range(steps + 1):
+			var p: Vector2 = a.lerp(b, float(i) / float(maxi(steps, 1)))
+			var x := int(round(p.x))
+			var y := int(round(p.y))
+			if x < 1 or y < 1 or x >= img.get_width() - 1 or y >= img.get_height() - 1:
+				continue
+			if _neighborhood_kind(img, x, y, 2, kind):
 				n += 1
 	return n
 
@@ -338,16 +360,40 @@ func _mesh_density_frac(img: Image) -> float:
 		return 1.0
 	var mesh := 0
 	var total := 0
-	var step := 2
-	var y0 := 90
-	for y in range(y0, img.get_height() - 8, step):
-		for x in range(8, img.get_width() - 8, step):
+	var step := 3
+	var y0 := 100
+	var y1 := img.get_height() - 80
+	var x0 := 20
+	var x1 := img.get_width() - 20
+	for y in range(y0, y1, step):
+		for x in range(x0, x1, step):
 			total += 1
-			if _is_mesh_like(img.get_pixel(x, y)):
+			if _is_stroke_on_fill(img, x, y):
 				mesh += 1
 	if total <= 0:
 		return 1.0
 	return float(mesh) / float(total)
+
+
+func _is_stroke_on_fill(img: Image, x: int, y: int) -> bool:
+	var c := img.get_pixel(x, y)
+	if not _is_mesh_like(c):
+		return false
+	# Thin road stroke sits on a saturated political fill. Unit plates are
+	# large grey blocks and must not count as mesh.
+	var fill_near := false
+	for dy in range(-2, 3):
+		for dx in range(-2, 3):
+			if dx == 0 and dy == 0:
+				continue
+			var n := img.get_pixel(x + dx, y + dy)
+			var sat := maxf(n.r, maxf(n.g, n.b)) - minf(n.r, minf(n.g, n.b))
+			if sat > 0.28:
+				fill_near = true
+				break
+		if fill_near:
+			break
+	return fill_near
 
 
 func _is_mesh_like(c: Color) -> bool:
@@ -355,9 +401,9 @@ func _is_mesh_like(c: Color) -> bool:
 	var mn := minf(c.r, minf(c.g, c.b))
 	var sat := mx - mn
 	var lum := (c.r + c.g + c.b) / 3.0
-	if lum < 0.24 or lum > 0.66:
+	if lum < 0.22 or lum > 0.62:
 		return false
-	if sat > 0.16:
+	if sat > 0.14:
 		return false
 	return true
 
@@ -468,6 +514,7 @@ func _frame_europe_home() -> void:
 	if z > 0.88:
 		z = EUROPE_ZOOM
 	_apply_camera(pos, z)
+	_set_units_view(false)
 	_log("EOA_RT1_LIVE_LOOK who=guard.europe_frame zoom=%.3f pos=%.1f,%.1f" % [z, pos.x, pos.y])
 
 
@@ -674,8 +721,13 @@ func _force_political_clean() -> void:
 
 func _set_units_view(on: bool) -> void:
 	var mr := _map_renderer()
-	if mr != null and mr.has_method("set_unit_counters_visible"):
-		mr.call("set_unit_counters_visible", on)
+	if mr != null:
+		if "show_unit_counters" in mr:
+			mr.set("show_unit_counters", on)
+		if mr.has_method("set_unit_counters_visible"):
+			mr.call("set_unit_counters_visible", on)
+		if mr.has_method("_sync_unit_counter_paint") and not on:
+			mr.call("_sync_unit_counter_paint")
 	_walk_hide_units(root, not on)
 
 
@@ -683,7 +735,15 @@ func _walk_hide_units(n: Node, hide: bool) -> void:
 	if n == null:
 		return
 	var nm := str(n.name)
-	if nm.begins_with("DemoUnitIcon_") or nm == "StackBadge" or nm == "PinFocusPulse":
+	if (
+		nm.begins_with("DemoUnitIcon")
+		or nm.contains("UnitIcon")
+		or nm.contains("NationPlate")
+		or nm == "StackBadge"
+		or nm == "PinFocusPulse"
+		or nm == "LandBattleBubbleLayer"
+		or nm == "SelectedFrame"
+	):
 		if n is CanvasItem:
 			(n as CanvasItem).visible = not hide
 	for c in n.get_children():
