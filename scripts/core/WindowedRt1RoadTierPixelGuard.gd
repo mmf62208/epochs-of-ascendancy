@@ -141,6 +141,7 @@ func _tick_wait_map() -> void:
 		return
 	_log("EOA_RT1_PIXEL_GUARD who=guard.frame_start elapsed=%d n=%d" % [elapsed, _province_count()])
 	_freeze_boot_camera_fighters()
+	_force_political_clean()
 	_set_units_view(false)
 	_ensure_spine_built()
 	_frame_over_koln(MID_ZOOM, true)
@@ -174,6 +175,8 @@ func _begin_matrix_band() -> void:
 		_go_settle(Phase.SOFT)
 		return
 	var row: Dictionary = zooms[_matrix_i]
+	_force_political_clean()
+	_set_units_view(false)
 	_frame_over_koln(float(row["z"]), true)
 	_settle_left = SETTLE_FRAMES
 	_phase = Phase.MATRIX_SETTLE
@@ -371,20 +374,20 @@ func _measure_edge(img: Image, a: int, b: int, kind: String) -> Dictionary:
 
 
 func _is_tier_color(c: Color, kind: String) -> bool:
-	var r := c.r
-	var g := c.g
-	var b := c.b
-	var lum := (r + g + b) / 3.0
+	# Match the procedural palette, not political fills / unit-card chrome.
 	if kind == "dirt":
-		return r > 0.38 and g > 0.22 and b < 0.42 and r > b + 0.08 and lum < 0.78
+		return _near_rgb(c, Color(0.58, 0.44, 0.30), 0.14) or _near_rgb(c, Color(0.50, 0.36, 0.22), 0.12)
 	if kind == "paved":
-		return absf(r - g) < 0.10 and absf(g - b) < 0.10 and lum > 0.28 and lum < 0.72
-	# highway casing / stripe / dark core
-	if absf(r - g) < 0.10 and absf(g - b) < 0.10 and lum < 0.38:
-		return true
-	if r > 0.70 and g > 0.70 and b > 0.70 and lum > 0.72:
-		return true
-	return false
+		return _near_rgb(c, Color(0.48, 0.50, 0.53), 0.12) or _near_rgb(c, Color(0.30, 0.32, 0.34), 0.10)
+	return (
+		_near_rgb(c, Color(0.20, 0.22, 0.24), 0.10)
+		or _near_rgb(c, Color(0.38, 0.40, 0.42), 0.10)
+		or _near_rgb(c, Color(0.86, 0.86, 0.88), 0.10)
+	)
+
+
+func _near_rgb(c: Color, target: Color, tol: float) -> bool:
+	return absf(c.r - target.r) + absf(c.g - target.g) + absf(c.b - target.b) <= tol * 3.0
 
 
 func _sample_gold_on_spine(img: Image) -> float:
@@ -507,6 +510,38 @@ func _set_units_view(on: bool) -> void:
 	var mr := _map_renderer()
 	if mr != null and mr.has_method("set_unit_counters_visible"):
 		mr.call("set_unit_counters_visible", on)
+	_hide_unit_nodes_direct(not on)
+
+
+func _hide_unit_nodes_direct(hide: bool) -> void:
+	if root == null:
+		return
+	_walk_hide_units(root, hide)
+
+
+func _walk_hide_units(n: Node, hide: bool) -> void:
+	if n == null:
+		return
+	var nm := str(n.name)
+	if (
+		nm.begins_with("DemoUnitIcon_")
+		or nm == "StackBadge"
+		or nm == "PinFocusPulse"
+		or nm == "LandBattleBubbleLayer"
+		or nm == "SelectedFrame"
+	):
+		if n is CanvasItem:
+			(n as CanvasItem).visible = not hide
+	for c in n.get_children():
+		_walk_hide_units(c, hide)
+
+
+func _force_political_clean() -> void:
+	var mr := _map_renderer()
+	if mr != null and mr.has_method("set_map_mode"):
+		mr.call("set_map_mode", "political")
+	if mr != null and "current_map_mode" in mr:
+		mr.set("current_map_mode", "political")
 
 
 func _ensure_spine_built() -> void:
@@ -633,6 +668,8 @@ func _freeze_boot_camera_fighters() -> void:
 	if tm != null and tm.has_method("set_paused"):
 		tm.call("set_paused", true)
 	var cc := _find_named("CameraController")
+	if cc == null and mr != null:
+		cc = mr.get_node_or_null("CameraInput")
 	if cc != null:
 		if "enable_pan" in cc:
 			cc.set("enable_pan", false)
@@ -641,6 +678,7 @@ func _freeze_boot_camera_fighters() -> void:
 		cc.set_process(false)
 	if mr != null and mr.has_method("set_process"):
 		mr.set_process(false)
+	_log("EOA_RT1_PIXEL_GUARD who=guard.lock_camera (NOT product Home/Close)")
 
 
 func _frame_over_koln(zoom: float, hide_inspector: bool) -> void:
@@ -664,6 +702,16 @@ func _reassert_camera() -> void:
 	if _cam_pos == Vector2.ZERO:
 		return
 	_apply_camera(_cam_pos, _cam_zoom)
+	if root != null and not bool(root.get_meta("rt1_cam_deferred", false)):
+		root.set_meta("rt1_cam_deferred", true)
+		call_deferred("_apply_camera_deferred")
+
+
+func _apply_camera_deferred() -> void:
+	if root != null:
+		root.set_meta("rt1_cam_deferred", false)
+	if _cam_pos != Vector2.ZERO:
+		_apply_camera(_cam_pos, _cam_zoom)
 
 
 func _apply_camera(pos: Vector2, zoom: float) -> void:
@@ -672,14 +720,30 @@ func _apply_camera(pos: Vector2, zoom: float) -> void:
 	var mr := _map_renderer()
 	if mr != null and mr.has_method("lock_pixel_guard_camera"):
 		mr.call("lock_pixel_guard_camera", pos, zoom)
-		return
-	var cam := _camera()
-	if cam != null:
+	if mr != null:
+		mr.set("_close_camera_lock_pos", pos)
+		mr.set("_close_camera_lock_zoom", Vector2(zoom, zoom))
+		mr.set("_close_camera_locked", true)
+	var cams: Array[Camera2D] = []
+	var vp_cam := _camera()
+	if vp_cam != null:
+		cams.append(vp_cam)
+	if mr != null:
+		var named_cam := mr.get_node_or_null("MapCamera") as Camera2D
+		if named_cam != null and cams.find(named_cam) < 0:
+			cams.append(named_cam)
+	for cam in cams:
 		cam.zoom = Vector2(zoom, zoom)
+		var parent := cam.get_parent() as Node2D
+		if parent != null:
+			cam.position = parent.to_local(pos)
 		cam.global_position = pos
 		cam.reset_smoothing()
 		cam.enabled = true
 		cam.make_current()
+	_log("EOA_RT1_PIXEL_GUARD who=guard.frame zoom=%.2f pos=%.1f,%.1f cams=%d" % [
+		zoom, pos.x, pos.y, cams.size()
+	])
 
 
 func _koln_world() -> Vector2:
