@@ -2690,7 +2690,7 @@ class RoadTierDraw extends Node2D:
 
 ## Built IX-1 gold spine: ONE joined Bonn→Köln→Leverkusen polyline.
 ## Non-AA filled quads at GOLD_SPINE_SCREEN_PX (16) so the player-seen width
-## matches the constant. Never draw_line(..., true) — IX-1 OOM guard.
+## matches the constant. Antialiased draw_line is banned (IX-1 windowed OOM).
 ## S2 labels live on a CanvasLayer (screen space), not Node2D-child Controls.
 class Ix1GoldSpineDraw extends Node2D:
     var built: bool = false
