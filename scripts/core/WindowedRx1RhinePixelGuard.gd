@@ -51,6 +51,7 @@ enum Phase {
 	DO_CLOSE,
 	DO_ROADS,
 	DO_UNITS_ON,
+	DO_UNITS_ON_SPINE,
 	DO_TOGGLE,
 	DO_PANEL_KOLN,
 	DO_PANEL_NEUSS,
@@ -82,6 +83,8 @@ var _captures: PackedStringArray = PackedStringArray()
 var _last_wait_log: int = -1
 var _parked_unit: Node2D = null
 var _parked_unit_pos: Vector2 = Vector2.ZERO
+var _parked_unit_parent: Node = null
+var _parked_unit_index: int = -1
 
 
 func _init() -> void:
@@ -124,6 +127,8 @@ func _on_process() -> void:
 			_tick_wait_map()
 		Phase.SETTLE:
 			_reassert_camera()
+			if _after_settle == Phase.DO_UNITS_ON_SPINE:
+				_reassert_parked_unit()
 			_settle_left -= 1
 			if _settle_left <= 0:
 				_phase = _after_settle
@@ -135,6 +140,8 @@ func _on_process() -> void:
 			_do_roads()
 		Phase.DO_UNITS_ON:
 			_do_units_on()
+		Phase.DO_UNITS_ON_SPINE:
+			_do_units_on_spine()
 		Phase.DO_TOGGLE:
 			_do_toggle()
 		Phase.DO_PANEL_KOLN:
@@ -278,7 +285,16 @@ func _do_units_on() -> void:
 	)
 	if _units_on_hit < UNIT_MIN_HIT or _units_on_hit <= _units_on_river_under:
 		_fail_reasons.append("units_do_not_win")
+	# Same-frame park + force_draw left the plate at the river pixel (tip2:
+	# chip stayed at 818,445 while the sample jumped to 847,495 gold). Settle
+	# so the DemoUnitIcon transform actually paints on the spine.
 	_park_unit_over_spine()
+	_go_settle(Phase.DO_UNITS_ON_SPINE)
+
+
+func _do_units_on_spine() -> void:
+	_reassert_camera()
+	_reassert_parked_unit()
 	var spine_img := _capture("rx1_pixel_close_koeln_units_on_spine")
 	var spine_sample := _sample_parked_unit(spine_img)
 	_units_on_spine_chip = float(spine_sample.get("chip", 0.0))
@@ -863,6 +879,23 @@ func _is_unit_chip_color(c: Color) -> bool:
 	return false
 
 
+func _is_unit_chip_or_plate_color(c: Color) -> bool:
+	if _is_unit_chip_color(c):
+		return true
+	if _is_river_color(c) or _is_road_color(c):
+		return false
+	# GER/ENG nation plates are mid-grey (low chroma). Count them only at the
+	# parked-icon sample so a plate covering the spine still wins.
+	var r := c.r * 255.0
+	var g := c.g * 255.0
+	var b := c.b * 255.0
+	var chroma := maxf(r, maxf(g, b)) - minf(r, minf(g, b))
+	var lum := (r + g + b) / 3.0
+	if chroma < 28.0 and lum > 22.0 and lum < 170.0:
+		return true
+	return false
+
+
 func _local_course_pts() -> PackedVector2Array:
 	var all := _course_pts()
 	var k := _koln_world()
@@ -1155,12 +1188,41 @@ func _park_unit_over_spine() -> void:
 		dest = pts[0].lerp(pts[1], 0.45)
 	if _parked_unit != icon:
 		_parked_unit_pos = icon.global_position
+		_parked_unit_parent = icon.get_parent()
+		_parked_unit_index = icon.get_index()
 		_parked_unit = icon
+	# Reparent onto the map so a province host cannot keep the plate at the
+	# home centroid after the river park (same-frame force_draw left the
+	# sprite at 818,445 while the sample jumped to the gold join).
+	var host := _map_renderer() as Node
+	if host != null and icon.get_parent() != host:
+		if icon.get_parent() != null:
+			icon.get_parent().remove_child(icon)
+		host.add_child(icon)
+	_apply_parked_unit_pose(icon, dest)
+	_log("EOA_RX1_PIXEL_GUARD who=guard.park_spine unit=%s to=%.1f,%.1f (visual only)" % [str(icon.name), dest.x, dest.y])
+
+
+func _reassert_parked_unit() -> void:
+	if _parked_unit == null or not is_instance_valid(_parked_unit):
+		return
+	var pts := _spine_centroid_pts()
+	var dest := _koln_world()
+	if pts.size() >= 2:
+		dest = pts[0].lerp(pts[1], 0.45)
+	_apply_parked_unit_pose(_parked_unit, dest)
+
+
+func _apply_parked_unit_pose(icon: Node2D, dest: Vector2) -> void:
 	icon.z_as_relative = false
 	icon.z_index = 28
 	icon.visible = true
+	icon.modulate = Color(1, 1, 1, 1)
 	icon.global_position = dest
-	_log("EOA_RX1_PIXEL_GUARD who=guard.park_spine unit=%s to=%.1f,%.1f (visual only)" % [str(icon.name), dest.x, dest.y])
+	for c in icon.get_children():
+		if c is CanvasItem:
+			(c as CanvasItem).visible = true
+			(c as CanvasItem).modulate = Color(1, 1, 1, 1)
 
 
 func _park_unit_over_river() -> void:
@@ -1175,6 +1237,8 @@ func _park_unit_over_river() -> void:
 		dest = pts[int(pts.size() / 2)]
 	_parked_unit = icon
 	_parked_unit_pos = icon.global_position
+	_parked_unit_parent = icon.get_parent()
+	_parked_unit_index = icon.get_index()
 	icon.z_as_relative = false
 	icon.z_index = 28
 	icon.visible = true
@@ -1184,12 +1248,33 @@ func _park_unit_over_river() -> void:
 
 func _restore_parked_unit() -> void:
 	if _parked_unit != null and is_instance_valid(_parked_unit):
+		if _parked_unit_parent != null and is_instance_valid(_parked_unit_parent):
+			if _parked_unit.get_parent() != _parked_unit_parent:
+				if _parked_unit.get_parent() != null:
+					_parked_unit.get_parent().remove_child(_parked_unit)
+				_parked_unit_parent.add_child(_parked_unit)
+				if _parked_unit_index >= 0 and _parked_unit_index < _parked_unit_parent.get_child_count():
+					_parked_unit_parent.move_child(_parked_unit, _parked_unit_index)
 		_parked_unit.global_position = _parked_unit_pos
 	_parked_unit = null
 	_parked_unit_pos = Vector2.ZERO
+	_parked_unit_parent = null
+	_parked_unit_index = -1
 
 
-func _sample_parked_unit(img: Image) -> Dictionary:
+func _parked_unit_sample_center(icon: Node2D) -> Vector2:
+	# StatBars (org green) sit on the painted plate; sample there so a grey
+	# GER NationPlate at the Node2D origin is not mistaken for "no chip".
+	var bars := icon.get_node_or_null("StatBars")
+	if bars is Node2D:
+		return (bars as Node2D).get_global_transform_with_canvas() * Vector2.ZERO
+	var plate := icon.get_node_or_null("NationPlate")
+	if plate is CanvasItem:
+		return (plate as CanvasItem).get_global_transform_with_canvas() * Vector2.ZERO
+	return icon.get_global_transform_with_canvas() * Vector2.ZERO
+
+
+func _sample_parked_unit(img: Image, rad: int = 10) -> Dictionary:
 	if img == null:
 		return {"chip": 0.0, "river": 0.0, "gold": 0.0}
 	var icon := _parked_unit
@@ -1198,24 +1283,23 @@ func _sample_parked_unit(img: Image) -> Dictionary:
 	if icon == null:
 		_log("EOA_RX1_PIXEL_GUARD who=guard.sample_unit no icon")
 		return {"chip": 0.0, "river": 0.0, "gold": 0.0}
-	var xform := icon.get_global_transform_with_canvas()
-	var center: Vector2 = xform * Vector2.ZERO
+	var center: Vector2 = _parked_unit_sample_center(icon)
 	var w := img.get_width()
 	var h := img.get_height()
 	var chip := 0
 	var river := 0
 	var gold := 0
 	var total := 0
-	var rad := 10
-	for dy in range(-rad, rad + 1):
-		for dx in range(-rad, rad + 1):
+	var use_rad := maxi(rad, 1)
+	for dy in range(-use_rad, use_rad + 1):
+		for dx in range(-use_rad, use_rad + 1):
 			var xx := int(round(center.x)) + dx
 			var yy := int(round(center.y)) + dy
 			if xx < 0 or yy < 0 or xx >= w or yy >= h:
 				continue
 			total += 1
 			var c := img.get_pixel(xx, yy)
-			if _is_unit_chip_color(c):
+			if _is_unit_chip_or_plate_color(c):
 				chip += 1
 			if _is_river_color(c):
 				river += 1
