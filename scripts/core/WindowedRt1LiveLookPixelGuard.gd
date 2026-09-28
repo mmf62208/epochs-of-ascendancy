@@ -616,6 +616,8 @@ func _reassert_camera() -> void:
 func _apply_camera(pos: Vector2, zoom: float) -> void:
 	_cam_pos = pos
 	_cam_zoom = zoom
+	if root != null:
+		root.set_meta("rt1_guard_zoom", zoom)
 	var mr := _map_renderer()
 	if mr != null and mr.has_method("lock_pixel_guard_camera"):
 		mr.call("lock_pixel_guard_camera", pos, zoom)
@@ -623,14 +625,12 @@ func _apply_camera(pos: Vector2, zoom: float) -> void:
 		mr.set("_close_camera_lock_pos", pos)
 		mr.set("_close_camera_lock_zoom", Vector2(zoom, zoom))
 		mr.set("_close_camera_locked", true)
+		mr.set("_europe_focus_retry", 99)
 	var cams: Array[Camera2D] = []
+	_collect_cameras(root, cams)
 	var vp_cam := _camera()
-	if vp_cam != null:
+	if vp_cam != null and cams.find(vp_cam) < 0:
 		cams.append(vp_cam)
-	if mr != null:
-		var named_cam := mr.get_node_or_null("MapCamera") as Camera2D
-		if named_cam != null and cams.find(named_cam) < 0:
-			cams.append(named_cam)
 	for cam in cams:
 		cam.zoom = Vector2(zoom, zoom)
 		var parent := cam.get_parent() as Node2D
@@ -640,6 +640,13 @@ func _apply_camera(pos: Vector2, zoom: float) -> void:
 		cam.reset_smoothing()
 		cam.enabled = true
 		cam.make_current()
+
+
+func _collect_cameras(n: Node, out: Array[Camera2D]) -> void:
+	if n is Camera2D:
+		out.append(n as Camera2D)
+	for c in n.get_children():
+		_collect_cameras(c, out)
 
 
 func _koln_world() -> Vector2:
