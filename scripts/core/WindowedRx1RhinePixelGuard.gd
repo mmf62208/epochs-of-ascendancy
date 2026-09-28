@@ -1097,7 +1097,31 @@ func _sim_fingerprint() -> Dictionary:
 func _find_unit_icon() -> Node2D:
 	if root == null:
 		return null
+	var vis := _find_visible_unit_icon_on_screen()
+	if vis != null:
+		return vis
 	return _find_named_prefix(root, "DemoUnitIcon_") as Node2D
+
+
+func _find_visible_unit_icon_on_screen() -> Node2D:
+	if root == null:
+		return null
+	var best: Node2D = null
+	var best_d := 1.0e12
+	var koln := _koln_world()
+	var stack: Array[Node] = [root]
+	while not stack.is_empty():
+		var n: Node = stack.pop_back()
+		if n is Node2D and str(n.name).begins_with("DemoUnitIcon_"):
+			var icon := n as Node2D
+			if icon.visible:
+				var d := icon.global_position.distance_squared_to(koln)
+				if d < best_d:
+					best_d = d
+					best = icon
+		for c in n.get_children():
+			stack.append(c)
+	return best
 
 
 func _find_named_prefix(n: Node, prefix: String) -> Node:
@@ -1113,14 +1137,28 @@ func _find_named_prefix(n: Node, prefix: String) -> Node:
 
 
 func _park_unit_over_spine() -> void:
-	_restore_parked_unit()
-	var icon := _find_unit_icon()
+	# Keep the already-visible river-parked chip if it is still on screen.
+	# Do not grab DemoUnitIcon_710000 (Thrace, often culled) — that node can
+	# sit on Köln while its sprite never paints, so the gold join disc "wins".
+	var icon: Node2D = null
+	if _parked_unit != null and is_instance_valid(_parked_unit) and _parked_unit.visible:
+		icon = _parked_unit
+	else:
+		_restore_parked_unit()
+		icon = _find_unit_icon()
 	if icon == null:
 		_log("EOA_RX1_PIXEL_GUARD who=guard.park_spine no DemoUnitIcon (units-on spine sample may fail)")
 		return
+	var pts := _spine_centroid_pts()
 	var dest := _koln_world()
-	_parked_unit = icon
-	_parked_unit_pos = icon.global_position
+	if pts.size() >= 2:
+		dest = pts[0].lerp(pts[1], 0.45)
+	if _parked_unit != icon:
+		_parked_unit_pos = icon.global_position
+		_parked_unit = icon
+	icon.z_as_relative = false
+	icon.z_index = 28
+	icon.visible = true
 	icon.global_position = dest
 	_log("EOA_RX1_PIXEL_GUARD who=guard.park_spine unit=%s to=%.1f,%.1f (visual only)" % [str(icon.name), dest.x, dest.y])
 
