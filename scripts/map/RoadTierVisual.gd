@@ -306,57 +306,6 @@ static func _weight_less(a: Dictionary, b: Dictionary) -> bool:
 	return wa < wb
 
 
-## Independent cycles in an undirected simple graph: E − V + C.
-static func count_undirected_cycles(edges: Array) -> int:
-	var adj: Dictionary = {}
-	var ecount: int = 0
-	for row_v in edges:
-		if typeof(row_v) != TYPE_DICTIONARY:
-			continue
-		var row: Dictionary = row_v
-		var a: int = int(row.get("p1", 0))
-		var b: int = int(row.get("p2", 0))
-		if a == 0 or b == 0 or a == b:
-			continue
-		if not adj.has(a):
-			adj[a] = {}
-		if not adj.has(b):
-			adj[b] = {}
-		var na: Dictionary = adj[a]
-		var nb: Dictionary = adj[b]
-		if na.has(b):
-			continue
-		na[b] = true
-		nb[a] = true
-		adj[a] = na
-		adj[b] = nb
-		ecount += 1
-	var n: int = adj.size()
-	if n <= 0:
-		return 0
-	var seen: Dictionary = {}
-	var comps: int = 0
-	for start_v in adj.keys():
-		var start: int = int(start_v)
-		if seen.has(start):
-			continue
-		comps += 1
-		var stack: Array = [start]
-		while not stack.is_empty():
-			var u: int = int(stack.pop_back())
-			if seen.has(u):
-				continue
-			seen[u] = true
-			var nbrs_v: Variant = adj.get(u, {})
-			if typeof(nbrs_v) != TYPE_DICTIONARY:
-				continue
-			for v_v in (nbrs_v as Dictionary).keys():
-				var v: int = int(v_v)
-				if not seen.has(v):
-					stack.append(v)
-	return maxi(0, ecount - n + comps)
-
-
 static func count_undirected_triangles(edges: Array) -> int:
 	var adj: Dictionary = {}
 	for row_v in edges:

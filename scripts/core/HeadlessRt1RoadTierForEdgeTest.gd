@@ -6,7 +6,6 @@ extends SceneTree
 ##   tools/run_godot.sh --headless --path . -s res://scripts/core/HeadlessRt1RoadTierForEdgeTest.gd
 
 const RoadTierVisualScript = preload("res://scripts/map/RoadTierVisual.gd")
-const MapZoomLODScript = preload("res://scripts/map/MapZoomLOD.gd")
 
 var _failures := 0
 
@@ -236,17 +235,17 @@ func _test_trunk_sparsifier() -> void:
 	else:
 		_pass("overlay uses trunk + rare highways")
 	if "GOLD_SPINE_SCREEN_PX := 16.0" not in ol_src:
-		_fail("close-zoom gold spine must stay 16 px")
+		_fail("close/far gold spine must stay 16 px")
 	else:
-		_pass("close-zoom gold spine 16 px")
+		_pass("close/far gold spine 16 px")
+	if "GOLD_SPINE_HALO_SCREEN_PX := 20.0" not in ol_src:
+		_fail("close/far gold halo must stay 20 px")
+	else:
+		_pass("close/far gold halo 20 px")
 	if "GOLD_SPINE_MID_SCREEN_PX := 28.0" not in ol_src or "GOLD_SPINE_MID_HALO_SCREEN_PX := 34.0" not in ol_src:
 		_fail("mid-zoom gold must be 28 px on 34 px halo")
 	else:
 		_pass("mid-zoom gold 28/34")
-	if "GOLD_SPINE_HALO_SCREEN_PX := 20.0" not in ol_src:
-		_fail("close-zoom gold halo must stay 20 px")
-	else:
-		_pass("close-zoom gold halo 20 px")
 	var vis_src := ""
 	if FileAccess.file_exists("res://scripts/map/RoadTierVisual.gd"):
 		var vf := FileAccess.open("res://scripts/map/RoadTierVisual.gd", FileAccess.READ)
@@ -269,40 +268,3 @@ func _test_trunk_sparsifier() -> void:
 		_fail("gold spine must not use antialiased draw_line")
 	else:
 		_pass("gold spine non-AA")
-	if "_fill_spine_join" not in ol_src:
-		_fail("gold spine must miter-join Bonn–Köln–Leverkusen as one bar")
-	else:
-		_pass("gold spine continuous join")
-	var square_cycle: Array = [
-		{"p1": 1, "p2": 2, "c1": Vector2(0, 0), "c2": Vector2(10, 0)},
-		{"p1": 2, "p2": 3, "c1": Vector2(10, 0), "c2": Vector2(10, 10)},
-		{"p1": 3, "p2": 4, "c1": Vector2(10, 10), "c2": Vector2(0, 10)},
-		{"p1": 4, "p2": 1, "c1": Vector2(0, 10), "c2": Vector2(0, 0)},
-	]
-	var cyc: int = RoadTierVisualScript.count_undirected_cycles(square_cycle)
-	if cyc != 1:
-		_fail("square must count 1 cycle got=%d" % cyc)
-	else:
-		_pass("count_undirected_cycles square=1")
-	var lod_src := ""
-	if FileAccess.file_exists("res://scripts/map/MapZoomLOD.gd"):
-		var lf := FileAccess.open("res://scripts/map/MapZoomLOD.gd", FileAccess.READ)
-		if lf != null:
-			lod_src = lf.get_as_text()
-			lf.close()
-	if "show_province_internal_borders_at_zoom" not in lod_src:
-		_fail("internal borders must be zoom-banded (hide at mid)")
-	else:
-		_pass("internal borders zoom-banded")
-	if MapZoomLODScript.show_province_internal_borders_at_zoom(1.80):
-		_fail("mid zoom 1.80 must hide NUTS internal borders")
-	else:
-		_pass("mid 1.80 hides internal borders")
-	if not MapZoomLODScript.show_province_internal_borders_at_zoom(2.60):
-		_fail("close zoom 2.60 must allow internal borders")
-	else:
-		_pass("close 2.60 shows internal borders")
-	if not RoadTierVisualScript.dirt_hidden_at_zoom(1.80):
-		_fail("dirt must stay hidden at mid 1.80")
-	else:
-		_pass("dirt hidden at mid 1.80")

@@ -104,8 +104,8 @@ const SPINE_BELOW_UNITS_Z := 21
 const GOLD_SPINE_Z := 23
 const ROAD_EXPLICIT_SCREEN_PX := 7.0
 const ROAD_INFERRED_SCREEN_PX := 4.0
-## Non-AA filled quads. Close/far stay 16/20 (Play PASS). Mid is zoom-banded
-## so gold reads ≥1.8× the 12 px highway casing (xvfb main was 17 vs 13).
+## Non-AA filled quads. Close/far stay 16/20 (Play PASS). Mid only is 28/34
+## so on-screen gold ≥ 1.8× the 12 px highway casing.
 const GOLD_SPINE_SCREEN_PX := 16.0
 const GOLD_SPINE_HALO_SCREEN_PX := 20.0
 const GOLD_SPINE_MID_SCREEN_PX := 28.0
@@ -2713,8 +2713,7 @@ class RoadTierDraw extends Node2D:
 
 ## Built IX-1 gold spine: ONE joined Bonn→Köln→Leverkusen polyline.
 ## Non-AA filled quads. Close/far = GOLD_SPINE_SCREEN_PX (16) / halo 20.
-## Mid lod only = 28 / halo 34 so measured gold ≥ 1.8× highway. Never antialiased draw_line (IX-1 windowed OOM).
-## Widths are precomputed per band; _draw reuses packed buffers (no alloc).
+## Mid lod only = 28 / halo 34. Never antialiased draw_line (IX-1 windowed OOM).
 ## S2 labels live on a CanvasLayer (screen space), not Node2D-child Controls.
 class Ix1GoldSpineDraw extends Node2D:
     var built: bool = false
@@ -2728,18 +2727,12 @@ class Ix1GoldSpineDraw extends Node2D:
     var _lev_label: Label = null
     var _band_gold_px: float = GOLD_SPINE_SCREEN_PX
     var _band_halo_px: float = GOLD_SPINE_HALO_SCREEN_PX
-    var _quad_buf: PackedVector2Array = PackedVector2Array()
-    var _join_buf: PackedVector2Array = PackedVector2Array()
-    var _spine_pts: PackedVector2Array = PackedVector2Array()
 
     func _ready() -> void:
         z_as_relative = false
         z_index = GOLD_SPINE_Z
         set_process(true)
         visible = false
-        _quad_buf.resize(4)
-        _join_buf.resize(3)
-        _spine_pts.resize(3)
         _refresh_gold_band(_canvas_zoom())
         _ensure_end_labels()
 
@@ -2779,12 +2772,6 @@ class Ix1GoldSpineDraw extends Node2D:
         else:
             _band_gold_px = GOLD_SPINE_SCREEN_PX
             _band_halo_px = GOLD_SPINE_HALO_SCREEN_PX
-
-    func gold_spine_screen_px() -> float:
-        return _band_gold_px
-
-    func gold_spine_halo_screen_px() -> float:
-        return _band_halo_px
 
     func _canvas_zoom() -> float:
         var tree := get_tree()
@@ -2887,12 +2874,10 @@ class Ix1GoldSpineDraw extends Node2D:
         var west := Vector2(-spine_dir.y, spine_dir.x)
         if west.x > 0.0:
             west = -west
-        var lod: int = RoadTierVisualScript.lod_band_for_zoom(z)
-        var mid_boost: float = 22.0 if lod == 1 else 0.0
-        var bonn_pos: Vector2 = bonn_s + bonn_away * (36.0 + mid_boost) + bonn_perp * (22.0 + mid_boost * 0.45)
-        var lev_pos: Vector2 = lev_s + lev_away * (36.0 + mid_boost) - lev_perp * (22.0 + mid_boost * 0.45)
+        var bonn_pos: Vector2 = bonn_s + bonn_away * 36.0 + bonn_perp * 22.0
+        var lev_pos: Vector2 = lev_s + lev_away * 36.0 - lev_perp * 22.0
         ## Köln sits west of the hub so it misses the gold stroke and the inspector.
-        var koln_pos: Vector2 = koeln_s + west * (44.0 + mid_boost) - spine_dir * 10.0
+        var koln_pos: Vector2 = koeln_s + west * 44.0 - spine_dir * 10.0
         var vp := get_viewport()
         var vr := Rect2(Vector2.ZERO, Vector2(1280, 720))
         if vp != null:
@@ -2917,10 +2902,9 @@ class Ix1GoldSpineDraw extends Node2D:
         if kr.intersects(br) or kr.intersects(lr):
             koln_pos.y -= _koln_label.size.y + 12.0
             koln_pos = _clamp_label_pos(koln_pos, _koln_label.size, vr)
-        var hub_pad: float = 22.0 if lod == 1 else 18.0
-        var hub_hit := Rect2(koeln_s - Vector2(hub_pad, hub_pad), Vector2(hub_pad * 2.0, hub_pad * 2.0))
+        var hub_hit := Rect2(koeln_s - Vector2(18, 18), Vector2(36, 36))
         if Rect2(koln_pos, _koln_label.size).intersects(hub_hit):
-            koln_pos += west * (24.0 + mid_boost)
+            koln_pos += west * 24.0
             koln_pos = _clamp_label_pos(koln_pos, _koln_label.size, vr)
         _bonn_label.position = bonn_pos
         _koln_label.position = koln_pos
@@ -2958,27 +2942,18 @@ class Ix1GoldSpineDraw extends Node2D:
         if bonn == Vector2.ZERO or koeln == Vector2.ZERO or lev == Vector2.ZERO:
             _in_draw = false
             return
-        if _spine_pts.size() < 3:
-            _spine_pts.resize(3)
-        _spine_pts[0] = bonn - origin
-        _spine_pts[1] = koeln - origin
-        _spine_pts[2] = lev - origin
+        var pts := PackedVector2Array([bonn - origin, koeln - origin, lev - origin])
         var halo_w := _world_width(_band_halo_px)
         var gold_w := _world_width(_band_gold_px)
-        # One continuous bar: two quads + miter at Köln. End caps only.
-        # Never a hub bead (that read as a three-capsule chain).
-        _draw_spine_quad(_spine_pts[0], _spine_pts[1], GOLD_SPINE_HALO_COLOR, halo_w)
-        _draw_spine_quad(_spine_pts[1], _spine_pts[2], GOLD_SPINE_HALO_COLOR, halo_w)
-        _fill_spine_join(_spine_pts[0], _spine_pts[1], _spine_pts[2], GOLD_SPINE_HALO_COLOR, halo_w)
-        _draw_spine_quad(_spine_pts[0], _spine_pts[1], ROAD_EXPLICIT_COLOR, gold_w)
-        _draw_spine_quad(_spine_pts[1], _spine_pts[2], ROAD_EXPLICIT_COLOR, gold_w)
-        _fill_spine_join(_spine_pts[0], _spine_pts[1], _spine_pts[2], ROAD_EXPLICIT_COLOR, gold_w)
+        # Non-AA quads. Mid uses 28/34; close/far stay 16/20.
+        for i in range(1, pts.size()):
+            _draw_spine_quad(pts[i - 1], pts[i], GOLD_SPINE_HALO_COLOR, halo_w)
+            _draw_spine_quad(pts[i - 1], pts[i], ROAD_EXPLICIT_COLOR, gold_w)
         var cap_r := gold_w * 0.5
         var halo_r := halo_w * 0.5
-        draw_circle(_spine_pts[0], halo_r, GOLD_SPINE_HALO_COLOR)
-        draw_circle(_spine_pts[0], cap_r, ROAD_EXPLICIT_COLOR)
-        draw_circle(_spine_pts[2], halo_r, GOLD_SPINE_HALO_COLOR)
-        draw_circle(_spine_pts[2], cap_r, ROAD_EXPLICIT_COLOR)
+        for p in pts:
+            draw_circle(p, halo_r, GOLD_SPINE_HALO_COLOR)
+            draw_circle(p, cap_r, ROAD_EXPLICIT_COLOR)
         _in_draw = false
 
     func _draw_spine_quad(from: Vector2, to: Vector2, col: Color, world_w: float) -> void:
@@ -2989,36 +2964,5 @@ class Ix1GoldSpineDraw extends Node2D:
         var dir: Vector2 = delta / length
         var half: float = world_w * 0.5
         var perp := Vector2(-dir.y, dir.x) * half
-        if _quad_buf.size() < 4:
-            _quad_buf.resize(4)
-        _quad_buf[0] = from + perp
-        _quad_buf[1] = to + perp
-        _quad_buf[2] = to - perp
-        _quad_buf[3] = from - perp
-        draw_colored_polygon(_quad_buf, col)
-
-    func _fill_spine_join(a: Vector2, hub: Vector2, c: Vector2, col: Color, world_w: float) -> void:
-        var d1: Vector2 = hub - a
-        var d2: Vector2 = c - hub
-        var len1 := d1.length()
-        var len2 := d2.length()
-        if not is_finite(len1) or not is_finite(len2) or len1 < 0.05 or len2 < 0.05:
-            return
-        d1 /= len1
-        d2 /= len2
-        var cross: float = d1.x * d2.y - d1.y * d2.x
-        if absf(cross) < 0.02:
-            return
-        var half: float = world_w * 0.5
-        var p1 := Vector2(-d1.y, d1.x) * half
-        var p2 := Vector2(-d2.y, d2.x) * half
-        if _join_buf.size() < 3:
-            _join_buf.resize(3)
-        _join_buf[0] = hub + p1
-        _join_buf[1] = hub + p2
-        _join_buf[2] = hub
-        draw_colored_polygon(_join_buf, col)
-        _join_buf[0] = hub - p1
-        _join_buf[1] = hub - p2
-        _join_buf[2] = hub
-        draw_colored_polygon(_join_buf, col)
+        var poly := PackedVector2Array([from + perp, to + perp, to - perp, from - perp])
+        draw_colored_polygon(poly, col)
