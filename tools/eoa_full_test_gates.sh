@@ -240,6 +240,15 @@ else
   run_step launch_rx1_visibility \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessRx1RhineVisibilityTest.gd || fail
 
+  run_step launch_rt1_road_tier \
+    tools/run_godot.sh --headless -s res://scripts/core/HeadlessRt1RoadTierForEdgeTest.gd || fail
+
+  run_step launch_rt1_edge_filter \
+    tools/run_godot.sh --headless -s res://scripts/core/HeadlessRt1RoadEdgeFilterTest.gd || fail
+
+  run_step launch_rt1_no_rebuild \
+    tools/run_godot.sh --headless -s res://scripts/core/HeadlessRt1RoadNoRebuildTest.gd || fail
+
   run_step launch_rx1_panel_state \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessRx1RhinePanelStateTest.gd || fail
 

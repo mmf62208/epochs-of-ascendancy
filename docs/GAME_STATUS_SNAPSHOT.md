@@ -28,8 +28,9 @@ Every Cursor / Grok / human session on this tree:
 |------|--------|
 | **Human** | Not required for units. When you do open the map: Maginot chips sit on the hex (centroid), player is GER. M6 20d/60d still open. |
 | **Machine** | `--quick` **PASS** + `HeadlessWorldAccurateUnitOrderLoopTest` **RESULT=PASS** (organize/train/priority included). Soft 30fps still FAIL honest. |
-| **GitHub** | `origin/main` @ `dbbdef48` (RX-1 merged, Play confirm PASS 8/8). IX-1 gold-spine **continuity** is a **draft** slice — **HOLD merge**. Do not force-push over June Cursor history. |
+| **GitHub** | `origin/main` @ `497731dd` (GS-1 gold spine KEEP). **RT-1** readable road tiers is a **draft** slice — **HOLD merge**. Do not force-push over June Cursor history. |
 | **RX-1 Rhine Crossing** | Vector Rhine Bonn→Köln→Düsseldorf→Duisburg. Units on top (labels 18 < river 22 / roads 21 < joined gold spine 23 < counters 28); theater-scale + screen-space; view-only **Units** HUD + **U**. Pixel guard xvfb continuity **FAIL** `dbbdef4` (mid 0.222/12px, close 0.125/42px) / **PASS** tip (1.000/0 both zooms); units ON chip 0.932 over spine. HOLD merge on the continuity slice. |
+| **RT-1 road tiers** | Visual only (intact). Play at `27440415` **MIXED**: trunk/gold/S1/S3/units PASS; highway thinner than paved and missing at mid; no Köln label. FIX #3: highway **12 px non-AA quads** (dark casing + pale stripe, wider than paved, thinner than gold 16); mid+close city labels Bonn/Köln/Leverkusen. Trunk topology unchanged. xvfb ≠ product Play. HOLD merge. |
 
 **This DAG (PR 1–3 under `505d91d`; this file is PR 4 — not the only PR):**
 

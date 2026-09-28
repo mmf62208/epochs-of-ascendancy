@@ -319,6 +319,8 @@ var _outline_pulse_phase: float = 0.0
 var _last_zoom: float = 1.0
 var _hover_fill_province_id: int = -1
 ## Map-space selection outline (reliable when per-node polys are thin/hidden).
+## S1: stays below Ix1GoldSpineDraw (z=23) so the Köln hex cannot bury the spine.
+const SELECT_OUTLINE_Z := 22
 var _select_outline_layer: Node2D = null
 var _select_outline_line: Line2D = null
 var _select_outline_glow: Line2D = null
@@ -14207,6 +14209,8 @@ func hide_info_panel() -> void:
 	if _province_id_badge != null:
 		_province_id_badge.visible = false
 	_selected_coarse_id = 0
+	# S1: selection hex must clear when the province panel closes.
+	_clear_selection()
 
 
 func _inspector_stack_blocking_input() -> bool:
@@ -15973,7 +15977,8 @@ func _pixel_guard_camera_locked() -> bool:
 
 
 func lock_pixel_guard_camera(pos: Vector2, zoom: float) -> void:
-	# Smoke harness: pin MapCamera so process_frame captures are Köln, not Europe Home.
+	# Legacy RX-1 smoke pin. RT-1 guards must NOT call this — they use
+	# player_path_europe_home / player_path_search_go / player_path_wheel_toward_world.
 	var z := maxf(zoom, 0.04)
 	var cam := get_node_or_null("MapCamera") as Camera2D
 	if cam == null and get_viewport():
@@ -15989,6 +15994,45 @@ func lock_pixel_guard_camera(pos: Vector2, zoom: float) -> void:
 	_close_camera_locked = true
 	_europe_focus_retry = 99
 	_hold_camera_until_msec = Time.get_ticks_msec() + 120000
+
+
+func player_path_europe_home() -> void:
+	# Same Home the F5 player hits after eoa_play_f5_smoke_auto_begin.sh.
+	_unlock_close_camera()
+	_inspector_held_closed = false
+	_hold_camera_until_msec = 0
+	var tree := get_tree()
+	if tree != null and tree.root != null:
+		tree.root.set_meta("eoa_rx1_pixel_lock_camera", false)
+	center_europe_in_world_view()
+
+
+func player_path_search_go(province_id: int) -> bool:
+	# Live Search → Go. Soft-pan only (no tactical lock).
+	return open_province_inspector_from_search(province_id)
+
+
+func player_path_wheel_toward_world(world: Vector2, target_zoom: float) -> float:
+	# Warp the cursor over `world` then run the same `_zoom_toward_mouse` the
+	# wheel handler calls. No lock_pixel_guard_camera.
+	var cam := get_node_or_null("MapCamera") as Camera2D
+	if cam == null and get_viewport():
+		cam = get_viewport().get_camera_2d()
+	if cam == null:
+		return 1.0
+	var screen: Vector2 = cam.get_canvas_transform() * world
+	if DisplayServer.get_name() != "headless":
+		DisplayServer.warp_mouse(Vector2i(int(round(screen.x)), int(round(screen.y))))
+	var factor_in: float = 1.0 + zoom_speed * 1.35
+	var factor_out: float = 1.0 - zoom_speed * 1.35
+	var guard: int = 0
+	while guard < 48:
+		var z: float = maxf(absf(cam.zoom.x), absf(cam.zoom.y))
+		if absf(z - target_zoom) <= 0.045:
+			break
+		_zoom_toward_mouse(factor_in if z < target_zoom else factor_out)
+		guard += 1
+	return maxf(absf(cam.zoom.x), absf(cam.zoom.y))
 
 
 func center_europe_in_world_view() -> void:
@@ -18254,6 +18298,10 @@ func _clear_hover_state() -> void:
 	_set_agent_highlight(-1)
 	_sync_hovered_strategic_region(null)
 	_hide_hover_tooltip()
+	# S3: salmon/orange compare-candidate rings west of the Rhine were left
+	# painted because hover-exit skipped _refresh_compare_candidate_outlines.
+	_clear_compare_preview_outline()
+	_refresh_compare_candidate_outlines()
 
 
 func _on_mouse_entered(node: Node2D, province: Province):
@@ -24844,7 +24892,8 @@ func _ensure_select_outline_layer() -> void:
 		return
 	_select_outline_layer = Node2D.new()
 	_select_outline_layer.name = "ProvinceSelectionOutlineLayer"
-	_select_outline_layer.z_index = 80
+	# S1: outline only, below the gold spine (z=23) so Köln select cannot cover it.
+	_select_outline_layer.z_index = SELECT_OUTLINE_Z
 	_select_outline_layer.z_as_relative = false
 	var host: Node = container if container != null else self
 	host.add_child(_select_outline_layer)
