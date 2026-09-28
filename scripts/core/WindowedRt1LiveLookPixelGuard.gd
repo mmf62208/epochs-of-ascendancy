@@ -1,6 +1,7 @@
 extends SceneTree
 
 const RoadTierVisualScript = preload("res://scripts/map/RoadTierVisual.gd")
+const MapZoomLODScript = preload("res://scripts/map/MapZoomLOD.gd")
 
 ## WINDOWED RT-1 live-look + mesh-density guard (FIX #2).
 ## Does NOT seed infrastructure. xvfb is NOT a product Play pass.
@@ -179,6 +180,7 @@ func _do_europe() -> void:
 
 func _do_mid() -> void:
 	_set_units_view(false)
+	_force_border_lod_sync()
 	var img := _capture("rt1_live_mid")
 	var mid_mesh := _mesh_density_frac(img)
 	_log("EOA_RT1_LIVE_LOOK who=guard.mid_mesh frac=%.5f max=%.4f" % [mid_mesh, MID_MESH_MAX_FRAC])
@@ -206,6 +208,7 @@ func _do_close() -> void:
 	_judge_looks(img, "close", true)
 	_judge_labels("close")
 	_judge_trunk("close", CLOSE_ZOOM)
+	_log_tan_cell_diagnosis("close")
 	_gold_w_close = _measure_gold_width(img)
 	_log("EOA_RT1_LIVE_LOOK who=guard.gold_width_close px=%.2f need %.1f-%.1f" % [
 		_gold_w_close, GOLD_WIDTH_MIN, GOLD_WIDTH_MAX
@@ -708,6 +711,41 @@ func _is_tan_stroke(c: Color) -> bool:
 	return _near_rgb(c, Color(0.84, 0.56, 0.18), 0.18) or _near_rgb(c, Color(0.72, 0.48, 0.16), 0.16)
 
 
+func _force_border_lod_sync() -> void:
+	var mr := _map_renderer()
+	if mr == null:
+		return
+	if mr.has_method("_refresh_province_detail_visibility"):
+		mr.call("_refresh_province_detail_visibility")
+	var z: float = _cam_zoom
+	var cam := _camera()
+	if cam != null:
+		z = maxf(absf(cam.zoom.x), absf(cam.zoom.y))
+	var tier: int = int(MapZoomLODScript.tier_for_zoom(z))
+	if mr.has_method("_sync_border_lod"):
+		mr.call("_sync_border_lod", tier)
+	if mr.has_method("_apply_internal_border_zoom_visibility"):
+		mr.call("_apply_internal_border_zoom_visibility")
+
+
+func _prov_edge_census() -> Dictionary:
+	var bl := _find_named("BorderLayer")
+	var total := 0
+	var visible_n := 0
+	var kids := 0
+	if bl != null:
+		kids = bl.get_child_count()
+		for ch in bl.get_children():
+			if not (ch is Line2D):
+				continue
+			if not str(ch.name).begins_with("ProvEdge_"):
+				continue
+			total += 1
+			if (ch as Line2D).visible:
+				visible_n += 1
+	return {"layer": bl != null, "kids": kids, "prov_total": total, "prov_visible": visible_n}
+
+
 func _log_tan_cell_diagnosis(band: String) -> void:
 	var cam := _camera()
 	var z: float = _cam_zoom
@@ -723,6 +761,7 @@ func _log_tan_cell_diagnosis(band: String) -> void:
 	var hwy_cyc: int = RoadTierVisualScript.count_undirected_cycles(hwy_drawn)
 	var internals: Array = _border_internal_edges_in_rhineland(true)
 	var internal_cyc: int = RoadTierVisualScript.count_undirected_cycles(internals)
+	var census: Dictionary = _prov_edge_census()
 	var rail_tan: Array = _tan_line2d_strokes("RailLayer")
 	var road_tan: Array = _tan_line2d_strokes("RoadLayer")
 	var dirt_keys: PackedStringArray = PackedStringArray()
@@ -738,10 +777,12 @@ func _log_tan_cell_diagnosis(band: String) -> void:
 		if edge_keys.size() >= 8:
 			break
 	_log(
-		"EOA_RT1B_DIAG who=guard.tan_cells band=%s zoom=%.3f lod=%d dirt_hidden=%s dirt_n=%d dirt_cyc=%d paved_cyc=%d hwy_cyc=%d internal_n=%d internal_cyc=%d rail_tan=%d road_tan_line2d=%d dirt_keys=%s internal_nodes=%s"
+		"EOA_RT1B_DIAG who=guard.tan_cells band=%s zoom=%.3f lod=%d dirt_hidden=%s dirt_n=%d dirt_cyc=%d paved_cyc=%d hwy_cyc=%d internal_n=%d internal_cyc=%d prov_total=%d prov_visible=%d border_kids=%d rail_tan=%d road_tan_line2d=%d dirt_keys=%s internal_nodes=%s"
 		% [
 			band, z, lod, str(dirt_hidden), dirt_drawn.size(), dirt_cyc, paved_cyc, hwy_cyc,
-			internals.size(), internal_cyc, rail_tan.size(), road_tan.size(),
+			internals.size(), internal_cyc, int(census.get("prov_total", 0)),
+			int(census.get("prov_visible", 0)), int(census.get("kids", 0)),
+			rail_tan.size(), road_tan.size(),
 			",".join(dirt_keys), ",".join(edge_keys)
 		]
 	)
@@ -764,15 +805,19 @@ func _judge_tan_cells(img: Image, band: String) -> void:
 	var dirt_cyc: int = RoadTierVisualScript.count_undirected_cycles(dirt_drawn)
 	var internals: Array = _border_internal_edges_in_rhineland(true)
 	var internal_cyc: int = RoadTierVisualScript.count_undirected_cycles(internals)
+	var census: Dictionary = _prov_edge_census()
+	var vis_all: int = int(census.get("prov_visible", 0))
 	var pix: int = _count_tan_cell_pixels(img)
-	_tan_cells_mid = internal_cyc + dirt_cyc
-	_log("EOA_RT1_LIVE_LOOK who=guard.tan_cells band=%s dirt_cyc=%d internal_cyc=%d pix=%d cells=%d" % [
-		band, dirt_cyc, internal_cyc, pix, _tan_cells_mid
+	_tan_cells_mid = internal_cyc + dirt_cyc + vis_all
+	_log("EOA_RT1_LIVE_LOOK who=guard.tan_cells band=%s dirt_cyc=%d internal_cyc=%d vis_all=%d pix=%d cells=%d" % [
+		band, dirt_cyc, internal_cyc, vis_all, pix, _tan_cells_mid
 	])
 	if dirt_cyc > 0:
 		_fail_reasons.append("%s_dirt_cycles_%d" % [band, dirt_cyc])
-	if internals.size() > 0 or internal_cyc > 0:
-		_fail_reasons.append("%s_tan_internal_cells_%d_cyc_%d" % [band, internals.size(), internal_cyc])
+	if internals.size() > 0 or internal_cyc > 0 or vis_all > 0:
+		_fail_reasons.append("%s_tan_internal_cells_%d_cyc_%d_vis_%d" % [
+			band, internals.size(), internal_cyc, vis_all
+		])
 	if pix > TAN_CELL_PIXEL_MAX:
 		_fail_reasons.append("%s_tan_cell_px_%d" % [band, pix])
 
@@ -1209,8 +1254,7 @@ func _frame_over_koln(zoom: float, hide_inspector: bool) -> void:
 	if ol != null and ol.has_method("refresh_ix1_gold_spine"):
 		ol.call("refresh_ix1_gold_spine", true)
 	var mr2 := _map_renderer()
-	if mr2 != null and mr2.has_method("_apply_internal_border_zoom_visibility"):
-		mr2.call("_apply_internal_border_zoom_visibility")
+	_force_border_lod_sync()
 	_log("EOA_RT1_LIVE_LOOK who=guard.frame_koln want=%.2f got=%.3f via=search_go+wheel" % [zoom, _cam_zoom])
 
 
