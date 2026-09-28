@@ -338,26 +338,52 @@ func _measure_edge(img: Image, a: int, b: int, kind: String) -> Dictionary:
 	var g_acc := 0.0
 	var b_acc := 0.0
 	# Dirt is dashed at mid/close; sample several t values so a gap cannot zero the width.
+	# Use the longest contiguous run nearest the centre — the Europe mesh would
+	# otherwise stretch first-hit→last-hit across neighbouring edges.
 	for t_i in range(3, 8):
 		var mid: Vector2 = sa.lerp(sb, float(t_i) / 10.0)
-		var hit_lo := 999
-		var hit_hi := -999
-		for i in range(-18, 19):
+		var run := 0
+		var run_start := 0
+		var best_run := 0
+		var best_run_dist := 999
+		var in_run := false
+		for i in range(-12, 13):
 			var p: Vector2 = mid + perp * float(i)
 			var x := int(round(p.x))
 			var y := int(round(p.y))
 			if x < 0 or y < 0 or x >= w or y >= h:
+				if in_run:
+					var dist := mini(absi(run_start), absi(i - 1))
+					if run > best_run or (run == best_run and dist < best_run_dist):
+						best_run = run
+						best_run_dist = dist
+					in_run = false
+					run = 0
 				continue
 			var c := img.get_pixel(x, y)
 			if _is_tier_color(c, kind):
-				hit_lo = mini(hit_lo, i)
-				hit_hi = maxi(hit_hi, i)
+				if not in_run:
+					in_run = true
+					run_start = i
+					run = 0
+				run += 1
 				r_acc += c.r
 				g_acc += c.g
 				b_acc += c.b
 				samples += 1
-		if hit_hi >= hit_lo:
-			best_w = maxi(best_w, hit_hi - hit_lo + 1)
+			elif in_run:
+				var dist2 := mini(absi(run_start), absi(i - 1))
+				if run > best_run or (run == best_run and dist2 < best_run_dist):
+					best_run = run
+					best_run_dist = dist2
+				in_run = false
+				run = 0
+		if in_run:
+			var dist3 := mini(absi(run_start), 12)
+			if run > best_run or (run == best_run and dist3 < best_run_dist):
+				best_run = run
+		if best_run > best_w:
+			best_w = best_run
 	if best_w > 0:
 		out["width_px"] = float(best_w)
 	if samples > 0:
@@ -401,7 +427,10 @@ func _sample_gold_on_spine(img: Image) -> float:
 		mm.call("get_province_centroid", KOELN),
 		mm.call("get_province_centroid", LEV),
 	])
-	var layer := _gold_layer()
+	# Gold spine is hub-local (position = Köln). Sample in overlay/road space.
+	var layer := _road_layer()
+	if layer == null:
+		layer = _overlay() as CanvasItem
 	var xform := Transform2D.IDENTITY
 	if layer != null:
 		xform = layer.get_global_transform_with_canvas()
@@ -451,13 +480,29 @@ func _count_select_hex_pixels(img: Image) -> int:
 		return 0
 	var n := 0
 	var step := 2
-	for y in range(0, img.get_height(), step):
-		for x in range(0, img.get_width(), step):
+	var origin := _koln_screen()
+	var rad := 90
+	var x0 := maxi(0, int(origin.x) - rad)
+	var y0 := maxi(0, int(origin.y) - rad)
+	var x1 := mini(img.get_width() - 1, int(origin.x) + rad)
+	var y1 := mini(img.get_height() - 1, int(origin.y) + rad)
+	for y in range(y0, y1 + 1, step):
+		for x in range(x0, x1 + 1, step):
 			var c := img.get_pixel(x, y)
 			# Pink select outline Color(0.98, 0.42, 0.88)
 			if c.r > 0.70 and c.b > 0.45 and c.g < 0.62 and c.r > c.g + 0.18:
 				n += 1
 	return n
+
+
+func _koln_screen() -> Vector2:
+	var layer := _road_layer()
+	if layer == null:
+		layer = _overlay() as CanvasItem
+	var xform := Transform2D.IDENTITY
+	if layer != null:
+		xform = layer.get_global_transform_with_canvas()
+	return xform * _koln_world()
 
 
 func _end_labels_present(img: Image) -> bool:
@@ -741,9 +786,11 @@ func _apply_camera(pos: Vector2, zoom: float) -> void:
 		cam.reset_smoothing()
 		cam.enabled = true
 		cam.make_current()
-	_log("EOA_RT1_PIXEL_GUARD who=guard.frame zoom=%.2f pos=%.1f,%.1f cams=%d" % [
-		zoom, pos.x, pos.y, cams.size()
-	])
+	if absf(zoom - float(root.get_meta("rt1_logged_zoom", -1.0))) > 0.01:
+		root.set_meta("rt1_logged_zoom", zoom)
+		_log("EOA_RT1_PIXEL_GUARD who=guard.frame zoom=%.2f pos=%.1f,%.1f cams=%d" % [
+			zoom, pos.x, pos.y, cams.size()
+		])
 
 
 func _koln_world() -> Vector2:
