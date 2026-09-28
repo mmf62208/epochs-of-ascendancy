@@ -17,7 +17,7 @@ const PAVED_B := 710413 ## Neuss
 const HWY_A := 710412 ## Mettmann
 const HWY_B := 710424 ## Rheinisch-Bergischer
 const FAR_ZOOM := 0.32
-const MID_ZOOM := 0.95
+const MID_ZOOM := 1.80
 const CLOSE_ZOOM := 3.20
 const WAIT_MAP_SECS := 420
 const SETTLE_FRAMES := 36
@@ -227,25 +227,32 @@ func _resolve_sample_pair(kind: String, fallback_a: int, fallback_b: int) -> Vec
 	elif kind == "highway":
 		want = 2
 	var cache: Array = ol.call("get_road_tier_cache")
+	var koln := _koln_world()
+	var best := Vector2i(fallback_a, fallback_b)
+	var best_d := 999999.0
+	var found := false
 	for row_v in cache:
 		if typeof(row_v) != TYPE_DICTIONARY:
 			continue
 		var row: Dictionary = row_v
 		var a := int(row.get("p1", 0))
 		var b := int(row.get("p2", 0))
-		if a == fallback_a and b == fallback_b:
+		if (a == fallback_a and b == fallback_b) or (b == fallback_a and a == fallback_b):
 			return Vector2i(a, b)
-		if b == fallback_a and a == fallback_b:
-			return Vector2i(a, b)
-	for row_v2 in cache:
-		if typeof(row_v2) != TYPE_DICTIONARY:
+		if bool(row.get("explicit", false)):
 			continue
-		var row2: Dictionary = row_v2
-		if bool(row2.get("explicit", false)):
+		if int(row.get("display_tier", row.get("tier", -1))) != want:
 			continue
-		if int(row2.get("display_tier", row2.get("tier", -1))) != want:
-			continue
-		return Vector2i(int(row2.get("p1", fallback_a)), int(row2.get("p2", fallback_b)))
+		var c1: Vector2 = row.get("c1", Vector2.ZERO)
+		var c2: Vector2 = row.get("c2", Vector2.ZERO)
+		var mid: Vector2 = c1.lerp(c2, 0.5)
+		var d: float = mid.distance_to(koln)
+		if d < best_d:
+			best_d = d
+			best = Vector2i(a, b)
+			found = true
+	if found:
+		return best
 	return Vector2i(fallback_a, fallback_b)
 
 
