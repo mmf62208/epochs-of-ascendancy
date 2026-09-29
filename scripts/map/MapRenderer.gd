@@ -19905,6 +19905,19 @@ func mv1_unit_card_title_text() -> String:
 	return ""
 
 
+func mv1_open_fight_button_screen_pos() -> Vector2:
+	var ui := get_node_or_null("UI") as CanvasLayer
+	if ui == null:
+		return Vector2.ZERO
+	var pop: Node = ui.get_node_or_null("UnitDetailPopup")
+	if pop == null or not _overlay_node_is_up(pop):
+		return Vector2.ZERO
+	var btn: Button = pop.find_child("BtnOpenFight", true, false) as Button
+	if btn == null or not is_instance_valid(btn) or not btn.visible:
+		return Vector2.ZERO
+	return btn.get_global_rect().get_center()
+
+
 func mv1_close_button_screen_pos() -> Vector2:
 	var ui := get_node_or_null("UI") as CanvasLayer
 	var btn: Button = null

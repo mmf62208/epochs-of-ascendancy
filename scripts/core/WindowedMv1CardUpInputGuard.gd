@@ -345,7 +345,10 @@ func _do_select() -> void:
 		_fail_reasons.append("unit_counter_screen_pos_missing")
 		_finish(false)
 		return
-	_log("EOA_MV1_CARD_UP_INPUT_GUARD who=guard.select_click pos=%.1f,%.1f fid=%s (NOT live Play)" % [pos.x, pos.y, _fid])
+	_log(
+		"EOA_MV1_CARD_UP_INPUT_GUARD who=guard.select_click pos=%.1f,%.1f fid=%s already=%s (NOT live Play)"
+		% [pos.x, pos.y, _fid, already]
+	)
 	_click_still(pos)
 	_phase = Phase.WAIT_RESELECT if from_reselect else Phase.WAIT_SELECT
 	_settle_left = LEFTOVER_FRAMES
@@ -764,11 +767,17 @@ func _do_openfight() -> void:
 		_fail_reasons.append("no_map_renderer")
 		_finish(false)
 		return
-	var pos: Vector2 = mr.call("mv1_province_screen_pos", KOELN) as Vector2
+	var pos := Vector2.ZERO
+	if mr.has_method("mv1_open_fight_button_screen_pos"):
+		pos = mr.call("mv1_open_fight_button_screen_pos") as Vector2
 	if pos == Vector2.ZERO:
-		pos = Vector2(820, 380)
-	_log("EOA_MV1_CARD_UP_INPUT_GUARD who=guard.openfight_ctrl_click pos=%.1f,%.1f (NOT live Play)" % [pos.x, pos.y])
-	_click_still(pos, true, false)
+		# Fallback: Ctrl+click a map point away from the preview chip.
+		pos = Vector2(200, 120)
+		_log("EOA_MV1_CARD_UP_INPUT_GUARD who=guard.openfight_ctrl_fallback pos=%.1f,%.1f (NOT live Play)" % [pos.x, pos.y])
+		_click_still(pos, true, false)
+	else:
+		_log("EOA_MV1_CARD_UP_INPUT_GUARD who=guard.openfight_btn pos=%.1f,%.1f (NOT live Play)" % [pos.x, pos.y])
+		_click_still(pos)
 	_phase = Phase.WAIT_OPENFIGHT
 	_settle_left = LEFTOVER_FRAMES
 
