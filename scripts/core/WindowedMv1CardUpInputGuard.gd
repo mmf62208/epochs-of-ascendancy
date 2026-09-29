@@ -149,6 +149,7 @@ var _cap_star_empty_ok: bool = false
 var _air_disk_ok: bool = false
 var _land_near_air_ok: bool = false
 var _cap_neighbor_pid: int = -1
+var _cap_hover_step: int = 0
 var _fid_air: String = ""
 var _fid_fra: String = ""
 var _esc_left: int = 0
@@ -1887,15 +1888,15 @@ func _do_cap_hover() -> void:
 		_fail_reasons.append("no_map_renderer")
 		_finish(false)
 		return
-	var dest: Vector2 = _province_march_screen(mr, BERLIN)
-	if dest == Vector2.ZERO:
-		_fail_reasons.append("berlin_screen_pos_missing")
-		_finish(false)
-		return
-	_log("EOA_MV1_CARD_UP_INPUT_GUARD who=guard.cap_hover pos=%.1f,%.1f (NOT live Play)" % [dest.x, dest.y])
-	_move_mouse(dest)
+	# Spatial hover refreshes the march chip only on province change.
+	# Neighbor / star disks around Berlin can already be dest=Berlin, so
+	# first move to a corner miss to clear hover.
+	_cap_hover_step = 0
+	var away := Vector2(72, 72)
+	_log("EOA_MV1_CARD_UP_INPUT_GUARD who=guard.cap_hover_away pos=%.1f,%.1f (NOT live Play)" % [away.x, away.y])
+	_move_mouse(away)
 	_phase = Phase.WAIT_CAP_HOVER
-	_settle_left = 20
+	_settle_left = 14
 
 
 func _check_cap_hover() -> void:
@@ -1904,13 +1905,29 @@ func _check_cap_hover() -> void:
 		_fail_reasons.append("no_map_renderer")
 		_finish(false)
 		return
+	if _cap_hover_step == 0:
+		var dest: Vector2 = _capital_star_screen(mr)
+		if dest == Vector2.ZERO:
+			_fail_reasons.append("berlin_screen_pos_missing")
+			_finish(false)
+			return
+		_cap_hover_step = 1
+		_log("EOA_MV1_CARD_UP_INPUT_GUARD who=guard.cap_hover_berlin pos=%.1f,%.1f (NOT live Play)" % [dest.x, dest.y])
+		_move_mouse(dest)
+		_phase = Phase.WAIT_CAP_HOVER
+		_settle_left = 24
+		return
 	if not mr.has_method("mv1_preview_report"):
 		_fail_reasons.append("no_mv1_preview_report")
 		_finish(false)
 		return
 	var report: Dictionary = mr.call("mv1_preview_report") as Dictionary
 	_chip_text = str(report.get("chip_text", ""))
-	_log("EOA_MV1_CARD_UP_INPUT_GUARD who=guard.cap_hover_report report=%s (NOT live Play)" % str(report))
+	var hover_pid := _screen_hex_pid(mr, _last_mouse)
+	_log(
+		"EOA_MV1_CARD_UP_INPUT_GUARD who=guard.cap_hover_report hover_pid=%d report=%s (NOT live Play)"
+		% [hover_pid, str(report)]
+	)
 	if not bool(report.get("ok", false)) or int(report.get("hops", 0)) <= 0:
 		_fail_reasons.append("cap_preview_not_valid_hops")
 	if "hop" not in _chip_text.to_lower():
