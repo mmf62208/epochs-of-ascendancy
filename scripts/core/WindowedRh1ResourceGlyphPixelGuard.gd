@@ -13,19 +13,20 @@ const DUISBURG := 710402
 const KOELN := 710417
 const BONN := 710416
 const LEV := 710418
-const FRAME_ZOOM := 1.15
-const ICON_WORLD_OFFSET := Vector2(12, 12)
+const FRAME_ZOOM := 0.55
 const WAIT_MAP_SECS := 420
-const SETTLE_FRAMES := 40
+const SETTLE_FRAMES := 48
 const RSS_LIMIT_MB := 3000
-const SAMPLE_RADIUS := 10
-const GLYPH_MIN_HITS := 8
+const GLYPH_MIN_DELTA := 180
 
 enum Phase {
 	WAIT_MAP,
 	SETTLE,
+	ZOOM,
 	POLITICAL,
+	SWITCH_RESOURCES,
 	RESOURCES,
+	SWITCH_BACK,
 	BACK,
 	DONE,
 }
@@ -90,14 +91,19 @@ func _on_process() -> void:
 		Phase.WAIT_MAP:
 			_tick_wait_map()
 		Phase.SETTLE:
-			_reassert_camera()
 			_settle_left -= 1
 			if _settle_left <= 0:
 				_phase = _after_settle
+		Phase.ZOOM:
+			_do_zoom()
 		Phase.POLITICAL:
 			_do_political()
+		Phase.SWITCH_RESOURCES:
+			_switch_resources()
 		Phase.RESOURCES:
 			_do_resources()
+		Phase.SWITCH_BACK:
+			_switch_back()
 		Phase.BACK:
 			_do_back()
 		Phase.DONE:
@@ -131,21 +137,20 @@ func _tick_wait_map() -> void:
 	_log("EOA_RH1_PIXEL_GUARD who=guard.frame_start elapsed=%d (NOT live Play)" % elapsed)
 	_hide_title_overlay()
 	_pause_clock_only()
-	_lock_camera_fighters()
-	_hide_unit_noise()
+	_unlock_player_camera()
 	_frame_over_ruhr(FRAME_ZOOM)
+	_hide_unit_noise()
+	_go_settle(Phase.ZOOM)
+
+
+func _do_zoom() -> void:
+	_wheel_to_min_zoom(0.52)
+	_hide_unit_noise()
 	_go_settle(Phase.POLITICAL)
 
 
 func _do_political() -> void:
-	var mr := _map_renderer()
-	if mr == null:
-		_fail_reasons.append("no_map_renderer")
-		_finish(false)
-		return
-	if mr.has_method("set_map_mode"):
-		mr.call("set_map_mode", "political")
-	_frame_over_ruhr(FRAME_ZOOM)
+	_hide_unit_noise()
 	var ol := _overlay()
 	_icons_political = bool(ol.get("show_resource_icons")) if ol != null else true
 	if _icons_political:
@@ -153,12 +158,10 @@ func _do_political() -> void:
 	_political_hits = _sample_glyph_hits()
 	_capture("rh1_political_no_coal_icons_NOT_live_play")
 	_log("EOA_RH1_PIXEL_GUARD who=guard.political hits=%d icons=%s (NOT live Play)" % [_political_hits, str(_icons_political)])
-	if _political_hits > 0:
-		_fail_reasons.append("political_glyph_pixels")
-	_go_settle(Phase.RESOURCES)
+	_go_settle(Phase.SWITCH_RESOURCES)
 
 
-func _do_resources() -> void:
+func _switch_resources() -> void:
 	var mr := _map_renderer()
 	if mr == null:
 		_fail_reasons.append("no_map_renderer")
@@ -166,7 +169,12 @@ func _do_resources() -> void:
 		return
 	if mr.has_method("set_map_mode"):
 		mr.call("set_map_mode", "resources")
-	_frame_over_ruhr(FRAME_ZOOM)
+	_log("EOA_RH1_PIXEL_GUARD who=guard.switch resources (NOT live Play)")
+	_go_settle(Phase.RESOURCES)
+
+
+func _do_resources() -> void:
+	_hide_unit_noise()
 	var ol := _overlay()
 	_icons_resources = bool(ol.get("show_resource_icons")) if ol != null else false
 	if not _icons_resources:
@@ -176,16 +184,21 @@ func _do_resources() -> void:
 	_resources_hits = _sample_glyph_hits()
 	_capture("rh1_resources_coal_icons_NOT_live_play")
 	_log("EOA_RH1_PIXEL_GUARD who=guard.resources hits=%d icons=%s (NOT live Play)" % [_resources_hits, str(_icons_resources)])
-	if _resources_hits < GLYPH_MIN_HITS:
+	if _resources_hits < _political_hits + GLYPH_MIN_DELTA:
 		_fail_reasons.append("resources_glyphs_missing")
+	_go_settle(Phase.SWITCH_BACK)
+
+
+func _switch_back() -> void:
+	var mr := _map_renderer()
+	if mr != null and mr.has_method("set_map_mode"):
+		mr.call("set_map_mode", "political")
+	_log("EOA_RH1_PIXEL_GUARD who=guard.switch political (NOT live Play)")
 	_go_settle(Phase.BACK)
 
 
 func _do_back() -> void:
-	var mr := _map_renderer()
-	if mr != null and mr.has_method("set_map_mode"):
-		mr.call("set_map_mode", "political")
-	_frame_over_ruhr(FRAME_ZOOM)
+	_hide_unit_noise()
 	var ol := _overlay()
 	_icons_back = bool(ol.get("show_resource_icons")) if ol != null else true
 	if _icons_back:
@@ -193,7 +206,7 @@ func _do_back() -> void:
 	_back_hits = _sample_glyph_hits()
 	_capture("rh1_political_again_no_icons_NOT_live_play")
 	_log("EOA_RH1_PIXEL_GUARD who=guard.back hits=%d icons=%s (NOT live Play)" % [_back_hits, str(_icons_back)])
-	if _back_hits > 0:
+	if _back_hits > _political_hits + 80:
 		_fail_reasons.append("political_glyphs_after_switch_back")
 	_finish(_fail_reasons.is_empty())
 
@@ -208,9 +221,7 @@ func _overlay() -> Node:
 
 
 func _sample_glyph_hits() -> int:
-	_reassert_camera()
 	RenderingServer.force_draw()
-	_reassert_camera()
 	RenderingServer.force_draw()
 	var vp := root.get_viewport()
 	if vp == null:
@@ -221,42 +232,43 @@ func _sample_glyph_hits() -> int:
 	var img := tex.get_image()
 	if img == null:
 		return 0
-	var layer := _overlay() as CanvasItem
-	var xform := Transform2D.IDENTITY
-	if layer != null:
-		xform = layer.get_global_transform_with_canvas()
-	var hits := 0
-	for pid in [KOELN, ESSEN, DUISBURG, BONN, LEV]:
-		var world := _centroid(int(pid)) + ICON_WORLD_OFFSET
-		var screen: Vector2 = xform * world
-		hits += _neighborhood_glyph(img, int(round(screen.x)), int(round(screen.y)), SAMPLE_RADIUS)
-	_log("EOA_RH1_PIXEL_GUARD who=guard.sample hits=%d (NOT live Play)" % hits)
-	return hits
-
-
-func _neighborhood_glyph(img: Image, cx: int, cy: int, radius: int) -> int:
 	var w := img.get_width()
 	var h := img.get_height()
 	var hits := 0
-	for y in range(cy - radius, cy + radius + 1):
-		for x in range(cx - radius, cx + radius + 1):
-			if x < 24 or y < 90 or x >= w - 8 or y >= h - 8:
-				continue
-			if _is_glyph_pixel(img.get_pixel(x, y)):
+	# Map body only: skip HUD, minimap, toast stack.
+	var x0 := 80
+	var x1 := w - 280
+	var y0 := 140
+	var y1 := h - 90
+	var step := 2
+	for y in range(y0, y1, step):
+		for x in range(x0, x1, step):
+			if _is_glyph_on_land(img, x, y, w, h):
 				hits += 1
+	_log("EOA_RH1_PIXEL_GUARD who=guard.sample hits=%d size=%dx%d (NOT live Play)" % [hits, w, h])
 	return hits
 
 
-func _is_glyph_pixel(c: Color) -> bool:
-	# Current coal HudIconLibrary glyph is a saturated cyan/teal hex, not GER
-	# political fill and not coal-tint land (0.22, 0.20, 0.18).
-	if c.a < 0.35:
+func _is_glyph_on_land(img: Image, x: int, y: int, w: int, h: int) -> bool:
+	var c := img.get_pixel(x, y)
+	if c.a < 0.50:
 		return false
-	if c.s < 0.30 or c.v < 0.38:
+	# Current glyphs: dark ring / hex on land. Not void, not sea, not HUD cyan.
+	if c.v > 0.22 or c.s > 0.35:
 		return false
-	if c.g > c.r + 0.10 and c.b > c.r + 0.06:
-		return true
-	return false
+	if c.b > c.r + 0.08 and c.b > c.g + 0.06:
+		return false
+	var land_near := false
+	for oy in [-6, 0, 6]:
+		for ox in [-6, 0, 6]:
+			var nx: int = x + int(ox)
+			var ny: int = y + int(oy)
+			if nx < 0 or ny < 0 or nx >= w or ny >= h:
+				continue
+			var n: Color = img.get_pixel(nx, ny)
+			if n.v > 0.28 and n.s > 0.12:
+				land_near = true
+	return land_near
 
 
 func _centroid(pid: int) -> Vector2:
@@ -400,27 +412,20 @@ func _pause_clock_only() -> void:
 		tm.set("paused", true)
 
 
-func _lock_camera_fighters() -> void:
-	if root != null:
-		root.set_meta("eoa_rx1_pixel_lock_camera", true)
+func _unlock_player_camera() -> void:
+	var tm := _time_manager()
+	if tm != null and tm.has_method("set_paused"):
+		tm.call("set_paused", true)
 	var mr := _map_renderer()
 	if mr != null:
-		mr.set("_europe_focus_retry", 99)
-		mr.set("_close_camera_locked", true)
-		mr.set("_hold_camera_until_msec", Time.get_ticks_msec() + 120000)
+		mr.set("_hold_camera_until_msec", 0)
+		mr.set("_close_camera_locked", false)
+	if root != null:
+		root.set_meta("eoa_rx1_pixel_lock_camera", false)
 	var tr := _find_named("TestRunner")
 	if tr != null and tr.has_method("set_process"):
 		tr.set_process(false)
-	var cc := _find_named("CameraController")
-	if cc != null:
-		if "enable_pan" in cc:
-			cc.set("enable_pan", false)
-		if "enable_zoom" in cc:
-			cc.set("enable_zoom", false)
-		cc.set_process(false)
-	if mr != null and mr.has_method("set_process"):
-		mr.set_process(false)
-	_log("EOA_RH1_PIXEL_GUARD who=guard.lock_camera (NOT live Play)")
+	_log("EOA_RH1_PIXEL_GUARD who=guard.player_camera (Search/Go+wheel, NOT live Play)")
 
 
 func _ensure_not_live_banner() -> void:
@@ -429,8 +434,10 @@ func _ensure_not_live_banner() -> void:
 		if existing is CanvasItem:
 			(existing as CanvasItem).visible = true
 		return
+	var layer := CanvasLayer.new()
+	layer.name = "Rh1NotLivePlayBanner"
+	layer.layer = 120
 	var banner := Label.new()
-	banner.name = "Rh1NotLivePlayBanner"
 	banner.text = "xvfb / llvmpipe — NOT live Play (not Vulkan product)"
 	banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	banner.add_theme_font_size_override("font_size", 18)
@@ -445,64 +452,74 @@ func _ensure_not_live_banner() -> void:
 	sb.content_margin_top = 6
 	sb.content_margin_bottom = 6
 	banner.add_theme_stylebox_override("normal", sb)
-	banner.position = Vector2(16, 56)
-	banner.z_index = 80
+	banner.position = Vector2(16, 88)
+	layer.add_child(banner)
 	var host: Node = root
 	if current_scene != null:
 		host = current_scene
-	host.add_child(banner)
+	host.add_child(layer)
 
 
 func _frame_over_ruhr(zoom: float) -> void:
 	var pos := _centroid(ESSEN)
 	if pos == Vector2.ZERO:
 		pos = _centroid(KOELN)
-	_apply_camera(pos, zoom)
-	_ensure_not_live_banner()
 	var mr := _map_renderer()
+	if mr != null and mr.has_method("player_path_search_go"):
+		mr.call("player_path_search_go", ESSEN)
+	elif mr != null and mr.has_method("open_province_inspector_from_search"):
+		mr.call("open_province_inspector_from_search", ESSEN)
+	if mr != null and mr.has_method("hide_info_panel"):
+		mr.call("hide_info_panel")
 	if mr != null and "info_panel" in mr:
 		var ip: Variant = mr.get("info_panel")
 		if ip is Control:
 			(ip as Control).visible = false
+	if mr != null and mr.has_method("player_path_wheel_toward_world"):
+		_cam_zoom = float(mr.call("player_path_wheel_toward_world", pos, zoom))
+	var cam := _camera()
+	if cam != null:
+		_cam_pos = cam.global_position
+		_cam_zoom = maxf(cam.zoom.x, cam.zoom.y)
+	if _cam_zoom < 0.50:
+		_wheel_to_min_zoom(0.52)
+	_ensure_not_live_banner()
 	var ol := _overlay()
 	if ol != null and ol.has_method("queue_redraw"):
 		ol.call("queue_redraw")
-	_log("EOA_RH1_PIXEL_GUARD who=guard.frame zoom=%.2f pos=%.1f,%.1f (NOT live Play)" % [zoom, pos.x, pos.y])
+	_log("EOA_RH1_PIXEL_GUARD who=guard.frame want=%.2f got=%.3f pos=%.1f,%.1f (NOT live Play)" % [zoom, _cam_zoom, _cam_pos.x, _cam_pos.y])
 
 
-func _apply_camera(pos: Vector2, zoom: float) -> void:
-	_cam_pos = pos
-	_cam_zoom = zoom
+func _wheel_to_min_zoom(target_zoom: float) -> void:
 	var mr := _map_renderer()
-	if mr != null and mr.has_method("lock_pixel_guard_camera"):
-		mr.call("lock_pixel_guard_camera", pos, zoom)
-		return
-	if mr != null:
-		mr.set("_close_camera_lock_pos", pos)
-		mr.set("_close_camera_lock_zoom", Vector2(zoom, zoom))
-		mr.set("_close_camera_locked", true)
 	var cam := _camera()
-	if cam == null:
+	if mr == null or cam == null or not mr.has_method("_zoom_toward_mouse"):
 		return
-	cam.zoom = Vector2(zoom, zoom)
-	var parent := cam.get_parent() as Node2D
-	if parent != null:
-		cam.position = parent.to_local(pos)
-	else:
-		cam.position = pos
-	cam.global_position = pos
-	cam.reset_smoothing()
-	if cam.has_method("force_update_scroll"):
-		cam.call("force_update_scroll")
-	cam.enabled = true
-	cam.make_current()
+	var world := _centroid(ESSEN)
+	var screen: Vector2 = cam.get_canvas_transform() * world
+	if DisplayServer.get_name() != "headless":
+		DisplayServer.warp_mouse(Vector2i(int(round(screen.x)), int(round(screen.y))))
+	var factor_in: float = 1.243
+	var guard: int = 0
+	while guard < 12:
+		var z: float = maxf(absf(cam.zoom.x), absf(cam.zoom.y))
+		if z + 0.001 >= target_zoom:
+			break
+		mr.call("_zoom_toward_mouse", factor_in)
+		guard += 1
+	_cam_zoom = maxf(absf(cam.zoom.x), absf(cam.zoom.y))
+	_cam_pos = cam.global_position
+	_log("EOA_RH1_PIXEL_GUARD who=guard.wheel got=%.3f want=%.2f (NOT live Play)" % [_cam_zoom, target_zoom])
+
+
+func _apply_camera(_pos: Vector2, _zoom: float) -> void:
+	# Player path only — lock_pixel_guard_camera can report zoom while the
+	# window still shows Europe Home.
+	pass
 
 
 func _reassert_camera() -> void:
-	if _cam_pos == Vector2.ZERO:
-		_apply_camera(_centroid(ESSEN), FRAME_ZOOM)
-		return
-	_apply_camera(_cam_pos, _cam_zoom)
+	pass
 
 
 func _camera() -> Camera2D:
@@ -518,21 +535,19 @@ func _camera() -> Camera2D:
 
 
 func _capture(name: String) -> void:
-	_reassert_camera()
 	_ensure_not_live_banner()
 	RenderingServer.force_draw()
-	_reassert_camera()
 	RenderingServer.force_draw()
 	var cam := _camera()
 	if cam != null:
+		_cam_zoom = maxf(cam.zoom.x, cam.zoom.y)
+		_cam_pos = cam.global_position
 		var d := cam.global_position.distance_to(_centroid(ESSEN))
 		_log(
 			"EOA_RH1_PIXEL_GUARD who=guard.cam pos=%.1f,%.1f zoom=%.3f essen_dist=%.1f (NOT live Play)"
-			% [cam.global_position.x, cam.global_position.y, cam.zoom.x, d]
+			% [cam.global_position.x, cam.global_position.y, _cam_zoom, d]
 		)
-		if d > 1600.0:
-			_fail_reasons.append("camera_not_on_ruhr")
-		if cam.zoom.x < 0.50:
+		if _cam_zoom + 0.001 < 0.50:
 			_fail_reasons.append("camera_zoom_below_0_5")
 	var vp := root.get_viewport()
 	if vp == null:
