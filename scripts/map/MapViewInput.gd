@@ -40,14 +40,10 @@ static func modal_blocks_map_nav(viewport: Viewport) -> bool:
 	return _any_visible_blocking_popup(viewport)
 
 
-## True when the hovered GUI should block map edge-scroll (includes TopInfoBar / HUD chrome).
-## Also returns true if any blocking popup/Window/Screen is currently *open and visible* anywhere
-## (so edge pan is suppressed even when mouse is at screen edge over the bare map while a dialog is up).
-static func edge_pan_blocked_by_gui(viewport: Viewport) -> bool:
-	if viewport == null:
-		return false
-	var hovered: Control = viewport.gui_get_hovered_control()
-	var node: Node = hovered
+## True when this control or an ancestor is map chrome that must freeze edge-pan
+## (province inspector, docked unit card, TopInfoBar, named popups). Walks
+## ancestors; also honors `blocks_edge_pan` / `unit_card_dock` meta on roots.
+static func control_or_ancestor_blocks_edge_pan(node: Node) -> bool:
 	const BLOCKING_POPUP_NAMES: PackedStringArray = [
 		"LeaderAssignmentScreen", "PolicyLawScreen", "LeaderPickerPopup", "LeaderDetailScreen",
 		"LeaderReplacementPickerPopup", "NationalSpiritsScreen", "ProductionAssignmentScreen", "OrderCommandPanel",
@@ -56,10 +52,20 @@ static func edge_pan_blocked_by_gui(viewport: Viewport) -> bool:
 		"MissionPickerPopup", "TrainingPathScreen", "FormationPickerPopup", "SaveManagerPopup",
 		"MainMenuPopup", "DraggablePanel",
 	]
-	# First pass: only block when hovering real HUD/modals — NOT every STOP Control
-	# (was returning true for any STOP, so edge pan never worked near legend/notices/map UI).
-	while node != null:
-		var nname := str(node.name)
+	var walk: Node = node
+	while walk != null:
+		if walk.has_meta("blocks_edge_pan") and bool(walk.get_meta("blocks_edge_pan")):
+			return true
+		if walk.has_meta("unit_card_dock") and bool(walk.get_meta("unit_card_dock")):
+			return true
+		var nname := str(walk.name)
+		# Province inspector + docked unit card / UnitDetailPopup (name, not Panel-only).
+		if (
+			nname == "InfoPanel"
+			or nname == "UnitDetailPopup"
+			or nname.begins_with("UnitDetailPopup")
+		):
+			return true
 		# Top bar MUST block edge-pan — otherwise mouse over 1x/Prod continuously
 		# pans the camera and thrash-redraws world_full (no hover flash, no wheel scroll).
 		if nname == "TopInfoBar" or nname == "MapModeToolbar" or nname == "Minimap" or nname == "StrategicMinimap":
@@ -69,9 +75,9 @@ static func edge_pan_blocked_by_gui(viewport: Viewport) -> bool:
 		# DiplomacyView / TradeMarketView are popups; bare "View" suffix is too broad (blocked map chrome).
 		if nname in ["DiplomacyView", "TradeMarketView", "SpaceLayerBoardView", "MatchmakingLobbyView"]:
 			return true
-		if node is Window and (node as Window).visible:
+		if walk is Window and (walk as Window).visible:
 			return true
-		if node is Panel or node is PanelContainer:
+		if walk is Panel or walk is PanelContainer:
 			var panel_name := nname
 			if panel_name in [
 				"InfoPanel",
@@ -83,7 +89,70 @@ static func edge_pan_blocked_by_gui(viewport: Viewport) -> bool:
 				"TechnologyScreen",
 			]:
 				return true
-		node = node.get_parent()
+		walk = walk.get_parent()
+	return false
+
+
+static func _visible_control_contains_mouse(ctrl: Node, mouse: Vector2) -> bool:
+	if ctrl == null or not (ctrl is Control):
+		return false
+	var c: Control = ctrl as Control
+	if not c.visible:
+		return false
+	return c.get_global_rect().has_point(mouse)
+
+
+## Fallback when gui_get_hovered_control is null at the screen edge: mouse
+## still sits on InfoPanel / UnitDetailPopup / docked card Close.
+static func _mouse_over_map_chrome_blocks_edge_pan(viewport: Viewport) -> bool:
+	if viewport == null or viewport.get_tree() == null:
+		return false
+	var mouse: Vector2 = viewport.get_mouse_position()
+	var mrs: Array = viewport.get_tree().get_nodes_in_group("map_renderer")
+	for mr_v in mrs:
+		if mr_v == null or not (mr_v is Node):
+			continue
+		var mr: Node = mr_v as Node
+		var ui: Node = mr.get_node_or_null("UI")
+		if ui == null:
+			continue
+		var ip: Node = ui.get_node_or_null("InfoPanel")
+		if _visible_control_contains_mouse(ip, mouse):
+			if ip is Node and not ip.has_meta("blocks_edge_pan"):
+				ip.set_meta("blocks_edge_pan", true)
+			return true
+		var card: Node = ui.get_node_or_null("UnitDetailPopup")
+		if _visible_control_contains_mouse(card, mouse):
+			if card is Node and not card.has_meta("blocks_edge_pan"):
+				card.set_meta("blocks_edge_pan", true)
+			return true
+		for ch in ui.get_children():
+			if ch == null or not (ch is Control):
+				continue
+			var ch_c: Control = ch as Control
+			if not ch_c.visible:
+				continue
+			var docked: bool = ch_c.has_meta("unit_card_dock") and bool(ch_c.get_meta("unit_card_dock"))
+			var flagged: bool = ch_c.has_meta("blocks_edge_pan") and bool(ch_c.get_meta("blocks_edge_pan"))
+			if (docked or flagged) and ch_c.get_global_rect().has_point(mouse):
+				return true
+	return false
+
+
+## True when the hovered GUI should block map edge-scroll (includes TopInfoBar / HUD chrome).
+## Also returns true if any blocking popup/Window/Screen is currently *open and visible* anywhere
+## (so edge pan is suppressed even when mouse is at screen edge over the bare map while a dialog is up).
+static func edge_pan_blocked_by_gui(viewport: Viewport) -> bool:
+	if viewport == null:
+		return false
+	var hovered: Control = viewport.gui_get_hovered_control()
+	# First pass: only block when hovering real HUD/modals — NOT every STOP Control
+	# (was returning true for any STOP, so edge pan never worked near legend/notices/map UI).
+	if control_or_ancestor_blocks_edge_pan(hovered):
+		return true
+	# Close sits in the north/bottom edge bands; hover can be null there.
+	if _mouse_over_map_chrome_blocks_edge_pan(viewport):
+		return true
 	# NOTE: do NOT treat every MOUSE_FILTER_STOP as a block — map hit areas / labels used STOP
 	# and that disabled edge pan on most of the board.
 

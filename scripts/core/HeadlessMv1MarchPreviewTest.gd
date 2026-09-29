@@ -151,6 +151,20 @@ func _test_source_needles() -> void:
 	if "antialiased = true" in preview_line or ", true)" in preview_line:
 		_fail("MarchPreviewLine must not be antialiased")
 		return
+	var open_unit := _slice_func(ren, "_try_open_unit_at_world")
+	if "player_only" not in open_unit or "_formation_is_player_tag" not in open_unit:
+		_fail("_try_open_unit_at_world must gate player_only + _formation_is_player_tag")
+		return
+	if "_select_map_unit(fo)" in open_unit and "if not _formation_is_player_tag(fo):" not in open_unit:
+		_fail("_try_open_unit_at_world must refuse non-player before _select_map_unit")
+		return
+	if "_mv1_selected_own_land_ready_to_commit" not in ren:
+		_fail("preview==commit skip helper missing")
+		return
+	var spill := _slice_func(ren, "_nearest_player_land_formation_at_world")
+	if "CHROME_SPILL_WORLD" not in spill or "340.0" not in spill:
+		_fail("CHROME_SPILL_WORLD fallback must stay frozen at 340")
+		return
 	_pass("preview API is pure; enqueue uses it; hover BFS is change-only")
 
 
