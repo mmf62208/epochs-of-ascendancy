@@ -2146,6 +2146,8 @@ func _do_air_disk_setup() -> void:
 	_camera_unlocked = false
 	_lock_camera_keep_process()
 	_frame_over_berlin()
+	if "show_unit_counters" in mr:
+		mr.set("show_unit_counters", true)
 	_set_stationed(_fid_air, BERLIN)
 	_park_ger_at(_cap_neighbor_pid, NAME_A)
 	_vacate_other_player_land_to(_fid, BONN)
@@ -2158,10 +2160,10 @@ func _do_air_disk_setup() -> void:
 		"EOA_MV1_CARD_UP_INPUT_GUARD who=guard.air_disk_setup air=%s land=%s neighbor=%d (NOT live Play)"
 		% [_fid_air, _fid, _cap_neighbor_pid]
 	)
-	_press_esc()
+	# Inspector already hidden. Esc here opens Command Center and blocks the air disk.
 	_after_settle = Phase.AIR_DISK_CLICK
 	_phase = Phase.SETTLE
-	_settle_left = 14
+	_settle_left = 16
 
 
 func _do_air_disk_click() -> void:
