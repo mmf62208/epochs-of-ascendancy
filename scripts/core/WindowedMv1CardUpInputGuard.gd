@@ -817,6 +817,50 @@ func _click_still_release(pos: Vector2, ctrl: bool = false, alt: bool = false) -
 	_release_at(pos, ctrl, alt)
 
 
+func _click_still_once(pos: Vector2, ctrl: bool = false, alt: bool = false) -> void:
+	_press_at_once(pos, ctrl, alt)
+	var hold := pos
+	call_deferred("_click_still_release_once", hold, ctrl, alt)
+
+
+func _click_still_release_once(pos: Vector2, ctrl: bool = false, alt: bool = false) -> void:
+	_release_at_once(pos, ctrl, alt)
+
+
+func _press_at_once(pos: Vector2, ctrl: bool = false, alt: bool = false) -> void:
+	_warp(pos)
+	var ev := InputEventMouseButton.new()
+	ev.button_index = MOUSE_BUTTON_LEFT
+	ev.pressed = true
+	ev.position = pos
+	ev.global_position = pos
+	ev.ctrl_pressed = ctrl
+	ev.alt_pressed = alt
+	var vp := root.get_viewport()
+	if vp != null:
+		vp.push_input(ev, true)
+	else:
+		Input.parse_input_event(ev)
+	_last_mouse = pos
+
+
+func _release_at_once(pos: Vector2, ctrl: bool = false, alt: bool = false) -> void:
+	_warp(pos)
+	var ev := InputEventMouseButton.new()
+	ev.button_index = MOUSE_BUTTON_LEFT
+	ev.pressed = false
+	ev.position = pos
+	ev.global_position = pos
+	ev.ctrl_pressed = ctrl
+	ev.alt_pressed = alt
+	var vp := root.get_viewport()
+	if vp != null:
+		vp.push_input(ev, true)
+	else:
+		Input.parse_input_event(ev)
+	_last_mouse = pos
+
+
 func _press_at(pos: Vector2, ctrl: bool = false, alt: bool = false) -> void:
 	_warp(pos)
 	var ev := InputEventMouseButton.new()
@@ -1952,7 +1996,9 @@ func _do_cap_click() -> void:
 		_finish(false)
 		return
 	_log("EOA_MV1_CARD_UP_INPUT_GUARD who=guard.cap_star_click pos=%.1f,%.1f (NOT live Play)" % [pos.x, pos.y])
-	_click_still(pos)
+	# One viewport event. parse+push double-fires: first commit clears the
+	# preview, second hits the star and inspects (Play sends one release).
+	_click_still_once(pos)
 	_phase = Phase.WAIT_CAP_CLICK
 	_settle_left = LEFTOVER_FRAMES
 
@@ -2042,7 +2088,7 @@ func _do_cap_star_empty() -> void:
 		_finish(false)
 		return
 	_log("EOA_MV1_CARD_UP_INPUT_GUARD who=guard.cap_star_empty pos=%.1f,%.1f (NOT live Play)" % [pos.x, pos.y])
-	_click_still(pos)
+	_click_still_once(pos)
 	_phase = Phase.WAIT_CAP_STAR_EMPTY
 	_settle_left = LEFTOVER_FRAMES
 
