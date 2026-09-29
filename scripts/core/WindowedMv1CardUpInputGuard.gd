@@ -1498,8 +1498,24 @@ func _check_air_click() -> void:
 		_finish(false)
 		return
 	_air_ok = true
-	_esc_left = 3
+	# One Esc dismisses the air card and can restore the province inspector.
+	# Extra Esc dismisses that panel (800ms pick-block) or opens Command Center.
+	_esc_left = 1
 	_phase = Phase.EDGE_CLEAR
+
+
+func _inspector_visible() -> bool:
+	var mr := _map_renderer()
+	if mr != null and mr.has_method("mv1_inspector_is_visible"):
+		return bool(mr.call("mv1_inspector_is_visible"))
+	return false
+
+
+func _card_visible() -> bool:
+	var mr := _map_renderer()
+	if mr != null and mr.has_method("mv1_unit_card_is_visible"):
+		return bool(mr.call("mv1_unit_card_is_visible"))
+	return false
 
 
 func _check_edge_clear() -> void:
@@ -1507,18 +1523,23 @@ func _check_edge_clear() -> void:
 	var selected := ""
 	if mr != null and "selected_formation_id" in mr:
 		selected = str(mr.get("selected_formation_id"))
+	var vis := _inspector_visible()
+	var card := _card_visible()
 	_log(
-		"EOA_MV1_CARD_UP_INPUT_GUARD who=guard.edge_clear selected=%s esc_left=%d (NOT live Play)"
-		% [selected, _esc_left]
+		"EOA_MV1_CARD_UP_INPUT_GUARD who=guard.edge_clear selected=%s vis=%s card=%s esc_left=%d (NOT live Play)"
+		% [selected, str(vis), str(card), _esc_left]
 	)
-	if selected.is_empty():
-		_phase = Phase.EDGE_INSPECTOR
+	# Esc on the unit card restores the province inspector. Use that panel —
+	# another Esc hides it and blocks the next hex pick for 800ms.
+	if vis:
+		_phase = Phase.WAIT_EDGE_INSPECTOR
+		_settle_left = 1
 		return
-	if _esc_left > 0:
+	if (card or not selected.is_empty()) and _esc_left > 0:
 		_phase = Phase.EDGE_CLEAR
 		return
-	# Selection leftover must not block inspector open; continue anyway.
-	_phase = Phase.EDGE_INSPECTOR
+	# Inspector still down: wait out Close pick-block, then alt-click empty Bonn.
+	_go_settle(Phase.EDGE_INSPECTOR, 60)
 
 
 func _check_edge_reopen_card() -> void:
@@ -1544,9 +1565,21 @@ func _do_edge_inspector() -> void:
 		_fail_reasons.append("no_map_renderer")
 		_finish(false)
 		return
-	var pos: Vector2 = mr.call("mv1_province_screen_pos", KOELN) as Vector2
+	# Empty Bonn: land vacated to Berlin, air is on Leverkusen, FRA on Köln.
+	# Alt prefers the hex inspector. Do not click the air disk (that re-opens
+	# the card) or leftover selected land (that would commit a march).
+	var pos: Vector2 = Vector2.ZERO
+	if mr.has_method("mv1_province_screen_pos"):
+		pos = mr.call("mv1_province_screen_pos", BONN) as Vector2
+	for fid_off in [_fid_air, _fid_fra, _fid, _fid_b]:
+		if fid_off.is_empty() or not mr.has_method("mv1_formation_screen_pos"):
+			continue
+		var chip: Vector2 = mr.call("mv1_formation_screen_pos", fid_off) as Vector2
+		if chip != Vector2.ZERO and pos.distance_to(chip) < 36.0:
+			pos += Vector2(-40, 32)
+			break
 	if pos == Vector2.ZERO:
-		pos = Vector2(800, 400)
+		pos = Vector2(720, 520)
 	_log("EOA_MV1_CARD_UP_INPUT_GUARD who=guard.edge_inspector pos=%.1f,%.1f (NOT live Play)" % [pos.x, pos.y])
 	_click_still(pos, false, true)
 	_phase = Phase.WAIT_EDGE_INSPECTOR
