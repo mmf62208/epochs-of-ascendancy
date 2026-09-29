@@ -19432,8 +19432,8 @@ func _ensure_march_preview_line() -> Line2D:
 	# Dimmer than committed MarchPathLine (3.2 / alpha 0.88). Never antialiased.
 	line.default_color = Color(1.0, 0.82, 0.22, 0.42)
 	line.joint_mode = Line2D.LINE_JOINT_SHARP
-	line.begin_cap_mode = Line2D.LINE_CAP_FLAT
-	line.end_cap_mode = Line2D.LINE_CAP_FLAT
+	line.begin_cap_mode = Line2D.LINE_CAP_NONE
+	line.end_cap_mode = Line2D.LINE_CAP_NONE
 	line.antialiased = false
 	line.texture = _ensure_march_preview_dash_tex()
 	line.texture_mode = Line2D.LINE_TEXTURE_TILE

@@ -227,7 +227,7 @@ def build_unit_own_land_march_product() -> Dict[str, Any]:
         _plines = fm[_pi:].splitlines()
         _pout = [_plines[0]]
         for _ln in _plines[1:]:
-            if _ln.startswith("func "):
+            if _ln.startswith("func ") or _ln.startswith("static func "):
                 break
             _pout.append(_ln)
         prev_fn = "\n".join(_pout)
@@ -241,7 +241,7 @@ def build_unit_own_land_march_product() -> Dict[str, Any]:
         _elines = fm[_ei:].splitlines()
         _eout = [_elines[0]]
         for _ln in _elines[1:]:
-            if _ln.startswith("func "):
+            if _ln.startswith("func ") or _ln.startswith("static func "):
                 break
             _eout.append(_ln)
         enq_fn = "\n".join(_eout)

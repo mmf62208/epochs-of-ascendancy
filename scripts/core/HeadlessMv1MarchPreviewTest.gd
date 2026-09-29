@@ -24,6 +24,7 @@ const DESIGN := "infantry_1936"
 var _failures := 0
 var _lm: Node = null
 var _mm: Node = null
+var _mv: Script = null
 
 
 func _init() -> void:
@@ -64,8 +65,12 @@ func _run() -> void:
 	_test_source_needles()
 	_lm = _autoload("LeaderManager")
 	_mm = _autoload("MapManager")
+	_mv = load("res://scripts/formations/FormationMovement.gd") as Script
 	if _lm == null or _mm == null:
 		_fail("autoloads missing")
+		return
+	if _mv == null:
+		_fail("FormationMovement.gd missing")
 		return
 	if _lm.has_method("set_player_country_tag"):
 		_lm.call("set_player_country_tag", GER_TAG)
@@ -97,7 +102,15 @@ func _slice_func(src: String, func_name: String) -> String:
 	var i := src.find(needle)
 	if i < 0:
 		return ""
-	var nxt := src.find("\nfunc ", i + needle.length())
+	var nxt_a := src.find("\nfunc ", i + needle.length())
+	var nxt_b := src.find("\nstatic func ", i + needle.length())
+	var nxt := -1
+	if nxt_a >= 0 and nxt_b >= 0:
+		nxt = mini(nxt_a, nxt_b)
+	elif nxt_a >= 0:
+		nxt = nxt_a
+	else:
+		nxt = nxt_b
 	if nxt < 0:
 		return src.substr(i)
 	return src.substr(i, nxt - i)
@@ -235,16 +248,20 @@ func _make_form(fid: String, tag: String, design: String, station: int) -> void:
 
 
 func _station(pid: int) -> void:
-	if typeof(LeaderManager) == TYPE_NIL or not LeaderManager.has_method("get_formation"):
+	if _lm == null:
 		return
-	var f: Object = LeaderManager.get_formation(FID)
+	var f: Object = null
+	if _lm.has_method("get_formation"):
+		f = _lm.call("get_formation", FID)
+	elif "formations" in _lm:
+		f = _lm.formations.get(FID)
 	if f != null:
 		f.set("stationed_province_id", pid)
 
 
 func _clear_order() -> void:
-	if typeof(FormationMovement) != TYPE_NIL:
-		FormationMovement.clear_march(FID)
+	if _mv != null:
+		_mv.call("clear_march", FID)
 
 
 func _paths_equal(a: Array, b: Array) -> bool:
@@ -261,11 +278,11 @@ func _paths_equal(a: Array, b: Array) -> bool:
 func _assert_preview_commit(from_id: int, dest_id: int, label: String) -> void:
 	_station(from_id)
 	_clear_order()
-	var preview: Dictionary = FormationMovement.preview_own_land_march(FID, dest_id, GER_TAG)
-	if FormationMovement.has_march(FID):
+	var preview: Dictionary = _mv.call("preview_own_land_march", FID, dest_id, GER_TAG)
+	if bool(_mv.call("has_march", FID)):
 		_fail("%s: preview wrote an order" % label)
 		return
-	var commit: Dictionary = FormationMovement.enqueue_own_land_march(FID, dest_id, GER_TAG)
+	var commit: Dictionary = _mv.call("enqueue_own_land_march", FID, dest_id, GER_TAG)
 	if not bool(preview.get("ok", false)) or not bool(commit.get("ok", false)):
 		_fail("%s: preview/commit not ok preview=%s commit=%s" % [label, str(preview), str(commit)])
 		_clear_order()
@@ -297,14 +314,15 @@ func _assert_preview_commit(from_id: int, dest_id: int, label: String) -> void:
 func _test_preview_writes_nothing() -> void:
 	_station(BONN)
 	_clear_order()
-	var preview: Dictionary = FormationMovement.preview_own_land_march(FID, LEV, GER_TAG)
+	var preview: Dictionary = _mv.call("preview_own_land_march", FID, LEV, GER_TAG)
 	if not bool(preview.get("ok", false)):
 		_fail("spine preview not ok: %s" % str(preview))
 		return
-	if FormationMovement.has_march(FID):
+	if bool(_mv.call("has_march", FID)):
 		_fail("has_march true after preview")
 		return
-	if not FormationMovement.list_marches().is_empty():
+	var listed: Array = _mv.call("list_marches")
+	if not listed.is_empty():
 		_fail("list_marches not empty after preview")
 		return
 	_pass("preview creates no order (has_march false)")
@@ -321,29 +339,29 @@ func _test_preview_equals_commit_pairs() -> void:
 func _test_reasons() -> void:
 	_station(BONN)
 	_clear_order()
-	var here: Dictionary = FormationMovement.preview_own_land_march(FID, BONN, GER_TAG)
+	var here: Dictionary = _mv.call("preview_own_land_march", FID, BONN, GER_TAG)
 	if bool(here.get("ok", true)) or str(here.get("reason", "")) != "already here" or not bool(here.get("already_here", false)):
 		_fail("already here reason: %s" % str(here))
-	elif FormationMovement.has_march(FID):
+	elif bool(_mv.call("has_march", FID)):
 		_fail("already here preview wrote an order")
 	else:
 		_pass("reason already here")
-	var enemy: Dictionary = FormationMovement.preview_own_land_march(FID, FRA_FRONT, GER_TAG)
+	var enemy: Dictionary = _mv.call("preview_own_land_march", FID, FRA_FRONT, GER_TAG)
 	if bool(enemy.get("ok", true)) or str(enemy.get("reason", "")) != "not your land":
 		_fail("not your land (FRA): %s" % str(enemy))
 	else:
 		_pass("reason not your land (enemy)")
-	var sea: Dictionary = FormationMovement.preview_own_land_march(FID, SEA_ID, GER_TAG)
+	var sea: Dictionary = _mv.call("preview_own_land_march", FID, SEA_ID, GER_TAG)
 	if bool(sea.get("ok", true)) or str(sea.get("reason", "")) != "not your land":
 		_fail("not your land (sea): %s" % str(sea))
 	else:
 		_pass("reason not your land (sea)")
-	var nopath: Dictionary = FormationMovement.preview_own_land_march(FID, BERLIN, GER_TAG)
+	var nopath: Dictionary = _mv.call("preview_own_land_march", FID, BERLIN, GER_TAG)
 	if bool(nopath.get("ok", true)) or str(nopath.get("reason", "")) != "no own-land path":
 		_fail("no own-land path (Berlin): %s" % str(nopath))
 	else:
 		_pass("reason no own-land path")
-	if FormationMovement.has_march(FID):
+	if bool(_mv.call("has_march", FID)):
 		_fail("reason previews wrote an order")
 
 
@@ -351,9 +369,9 @@ func _test_spine_faster_than_offroad() -> void:
 	_seed_ix1_spine_roads()
 	_station(BONN)
 	_clear_order()
-	var spine: Dictionary = FormationMovement.preview_own_land_march(FID, KOELN, GER_TAG)
+	var spine: Dictionary = _mv.call("preview_own_land_march", FID, KOELN, GER_TAG)
 	_station(KOELN)
-	var off: Dictionary = FormationMovement.preview_own_land_march(FID, ESSEN, GER_TAG)
+	var off: Dictionary = _mv.call("preview_own_land_march", FID, ESSEN, GER_TAG)
 	if not bool(spine.get("ok", false)) or not bool(off.get("ok", false)):
 		_fail("spine/off-road preview not ok spine=%s off=%s" % [str(spine), str(off)])
 		return
@@ -367,9 +385,9 @@ func _test_spine_faster_than_offroad() -> void:
 		return
 	# Same 2-hop corridor with roads vs without.
 	_station(BONN)
-	var spine2: Dictionary = FormationMovement.preview_own_land_march(FID, LEV, GER_TAG)
+	var spine2: Dictionary = _mv.call("preview_own_land_march", FID, LEV, GER_TAG)
 	_clear_ix1_spine_roads()
-	var off2: Dictionary = FormationMovement.preview_own_land_march(FID, LEV, GER_TAG)
+	var off2: Dictionary = _mv.call("preview_own_land_march", FID, LEV, GER_TAG)
 	_seed_ix1_spine_roads()
 	if not bool(spine2.get("ok", false)) or not bool(off2.get("ok", false)):
 		_fail("2-hop spine/off preview not ok")
@@ -383,7 +401,7 @@ func _test_spine_faster_than_offroad() -> void:
 			% [float(spine2.get("eta_days")), float(off2.get("eta_days"))]
 		)
 		return
-	if FormationMovement.has_march(FID):
+	if bool(_mv.call("has_march", FID)):
 		_fail("spine/off-road preview wrote an order")
 		return
 	_pass(
