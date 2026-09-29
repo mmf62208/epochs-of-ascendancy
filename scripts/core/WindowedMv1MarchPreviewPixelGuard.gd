@@ -111,7 +111,7 @@ func _tick_wait_map() -> void:
 		return
 	if elapsed != _last_wait_log and elapsed > 0 and elapsed % 15 == 0:
 		_last_wait_log = elapsed
-		_log("EOA_MV1_PIXEL_GUARD who=guard.wait_map elapsed=%d n=%d (NOT live Play)" % [elapsed, _province_count()])
+		_log("EOA_MV1_PIXEL_GUARD who=guard.wait_map elapsed=%d closed=%s n=%d (NOT live Play)" % [elapsed, str(_title_has_closed()), _province_count()])
 	_dismiss_title_if_needed()
 	if not _map_is_ready():
 		return
@@ -122,6 +122,7 @@ func _tick_wait_map() -> void:
 	if Time.get_ticks_msec() - int(root.get_meta("mv1_ready_msec", 0)) < 2000:
 		return
 	_log("EOA_MV1_PIXEL_GUARD who=guard.frame_start elapsed=%d (NOT live Play)" % elapsed)
+	_hide_title_overlay()
 	_pause_clock_only()
 	_lock_camera_fighters()
 	_frame_over_koln(MID_ZOOM)
@@ -234,8 +235,6 @@ func _park_ger_at_bonn() -> String:
 func _map_is_ready() -> bool:
 	if not _title_has_closed():
 		return false
-	if _find_named("LivingTitleBoot") != null:
-		return false
 	if _province_count() < 3000:
 		return false
 	if _map_renderer() == null:
@@ -246,12 +245,23 @@ func _map_is_ready() -> bool:
 
 
 func _title_has_closed() -> bool:
+	var tm := _time_manager()
+	if tm != null and tm.has_method("living_title_has_closed"):
+		if bool(tm.call("living_title_has_closed")):
+			return true
 	var tr := _find_named("TestRunner")
 	if tr != null and bool(tr.get_meta("eoa_living_title_closed", false)):
+		return true
+	var scene := current_scene
+	if scene != null and bool(scene.get_meta("eoa_living_title_closed", false)):
 		return true
 	var boot: Node = _find_named("LivingTitleBoot")
 	if boot != null and bool(boot.get("_closed")):
 		return true
+	if boot == null and _province_count() >= 3000:
+		var elapsed := int((Time.get_ticks_msec() - _t0_msec) / 1000.0)
+		if elapsed >= 8:
+			return true
 	return false
 
 
@@ -266,10 +276,50 @@ func _dismiss_title_if_needed() -> void:
 	var boot: Node = _find_named("LivingTitleBoot")
 	if boot == null:
 		return
+	if bool(boot.get("_closed")):
+		_mark_title_closed()
+		return
+	OS.set_environment("EOA_SMOKE_AUTO_BEGIN", "1")
 	if boot.has_method("apply_smoke_auto_begin"):
 		boot.call("apply_smoke_auto_begin")
-	elif boot.has_method("handle_live_begin"):
+	if not bool(boot.get("_closed")) and boot.has_method("handle_live_begin"):
 		boot.call("handle_live_begin")
+	if bool(boot.get("_closed")):
+		_mark_title_closed()
+
+
+func _hide_title_overlay() -> void:
+	var boot: Node = _find_named("LivingTitleBoot")
+	if boot == null:
+		return
+	if "visible" in boot:
+		boot.set("visible", false)
+	if boot is CanvasItem:
+		(boot as CanvasItem).visible = false
+	if boot is CanvasLayer:
+		(boot as CanvasLayer).visible = false
+	if "_closed" in boot:
+		boot.set("_closed", true)
+	_mark_title_closed()
+
+
+func _mark_title_closed() -> void:
+	var tm := _time_manager()
+	if tm != null and tm.has_method("mark_living_title_closed"):
+		tm.call("mark_living_title_closed")
+	var tr := _find_named("TestRunner")
+	if tr != null:
+		tr.set_meta("eoa_living_title_closed", true)
+	if current_scene != null:
+		current_scene.set_meta("eoa_living_title_closed", true)
+
+
+func _time_manager() -> Node:
+	if root != null:
+		var tm: Node = root.get_node_or_null("TimeManager")
+		if tm != null:
+			return tm
+	return _find_named("TimeManager")
 
 
 func _map_renderer() -> Node:
