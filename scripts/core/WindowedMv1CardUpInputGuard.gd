@@ -324,6 +324,9 @@ func _do_park() -> void:
 		mr.call("mv1_rebuild_unit_icons")
 	elif mr.has_method("_update_unit_icons_for_test"):
 		mr.call("_update_unit_icons_for_test")
+	if _mv_scr != null:
+		_mv_scr.call("clear_march", _fid)
+		_mv_scr.call("clear_march", _fid_b)
 	_log("EOA_MV1_CARD_UP_INPUT_GUARD who=guard.park fid_a=%s fid_b=%s (NOT live Play)" % [_fid, _fid_b])
 	_go_settle(Phase.INSPECTOR, 18)
 
@@ -875,7 +878,13 @@ func _do_switch_b() -> void:
 		_fail_reasons.append("unit_b_screen_pos_missing")
 		_finish(false)
 		return
-	_log("EOA_MV1_CARD_UP_INPUT_GUARD who=guard.switch_b pos=%.1f,%.1f fid_b=%s (NOT live Play)" % [pos.x, pos.y, _fid_b])
+	var has_before := false
+	if _mv_scr != null:
+		has_before = bool(_mv_scr.call("has_march", _fid))
+	_log(
+		"EOA_MV1_CARD_UP_INPUT_GUARD who=guard.switch_b pos=%.1f,%.1f fid_b=%s has_a_before=%s (NOT live Play)"
+		% [pos.x, pos.y, _fid_b, str(has_before)]
+	)
 	_click_still(pos)
 	_phase = Phase.WAIT_SWITCH
 	_settle_left = LEFTOVER_FRAMES
@@ -894,14 +903,18 @@ func _check_switch_then_reselect_a() -> void:
 	if mr.has_method("mv1_unit_card_title_text"):
 		title = str(mr.call("mv1_unit_card_title_text"))
 	var has_a := false
+	var dest_a := -1
 	if _mv_scr != null:
 		has_a = bool(_mv_scr.call("has_march", _fid))
+		if has_a:
+			var order_a: Dictionary = _mv_scr.call("get_march", _fid) as Dictionary
+			dest_a = int(order_a.get("dest_id", -1))
 	var rel: Dictionary = {}
 	if mr.has_method("mv1_left_release_report"):
 		rel = mr.call("mv1_left_release_report") as Dictionary
 	_log(
-		"EOA_MV1_CARD_UP_INPUT_GUARD who=guard.switch_result selected=%s title=%s has_a=%s rel=%s (NOT live Play)"
-		% [selected, title, str(has_a), str(rel)]
+		"EOA_MV1_CARD_UP_INPUT_GUARD who=guard.switch_result selected=%s title=%s has_a=%s dest_a=%d rel=%s (NOT live Play)"
+		% [selected, title, str(has_a), dest_a, str(rel)]
 	)
 	if selected != _fid_b:
 		_fail_reasons.append("plain_click_did_not_switch_to_b")
