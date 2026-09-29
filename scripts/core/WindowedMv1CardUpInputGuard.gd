@@ -93,6 +93,8 @@ var _still_pass: int = 0
 var _march_dest_before_drag2: int = -1
 var _inspector_before_drag2: bool = false
 var _after_fight: bool = false
+var _has_a_before_switch: bool = false
+var _dest_a_before_switch: int = -1
 var _cam_pos: Vector2 = Vector2.ZERO
 var _cam_zoom: float = MID_ZOOM
 var _cam_before_drag: Vector2 = Vector2.ZERO
@@ -878,12 +880,16 @@ func _do_switch_b() -> void:
 		_fail_reasons.append("unit_b_screen_pos_missing")
 		_finish(false)
 		return
-	var has_before := false
+	_has_a_before_switch = false
+	_dest_a_before_switch = -1
 	if _mv_scr != null:
-		has_before = bool(_mv_scr.call("has_march", _fid))
+		_has_a_before_switch = bool(_mv_scr.call("has_march", _fid))
+		if _has_a_before_switch:
+			var ob: Dictionary = _mv_scr.call("get_march", _fid) as Dictionary
+			_dest_a_before_switch = int(ob.get("dest_id", -1))
 	_log(
-		"EOA_MV1_CARD_UP_INPUT_GUARD who=guard.switch_b pos=%.1f,%.1f fid_b=%s has_a_before=%s (NOT live Play)"
-		% [pos.x, pos.y, _fid_b, str(has_before)]
+		"EOA_MV1_CARD_UP_INPUT_GUARD who=guard.switch_b pos=%.1f,%.1f fid_b=%s has_a_before=%s dest_a_before=%d (NOT live Play)"
+		% [pos.x, pos.y, _fid_b, str(_has_a_before_switch), _dest_a_before_switch]
 	)
 	_click_still(pos)
 	_phase = Phase.WAIT_SWITCH
@@ -920,7 +926,7 @@ func _check_switch_then_reselect_a() -> void:
 		_fail_reasons.append("plain_click_did_not_switch_to_b")
 	if NAME_B not in title:
 		_fail_reasons.append("card_title_not_unit_b")
-	if has_a:
+	if has_a and (not _has_a_before_switch or dest_a != _dest_a_before_switch):
 		_fail_reasons.append("switch_queued_march_for_a")
 	if bool(rel.get("dragged", false)):
 		_fail_reasons.append("switch_click_classified_dragged")
