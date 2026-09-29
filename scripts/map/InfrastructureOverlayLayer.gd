@@ -43,6 +43,9 @@ var _supply_corridor_edges: Dictionary = {}
 var show_rails: bool = false
 var show_cities: bool = false  # Off by default — toggle C or F10; draw fallback was grey-box spam at playtest zoom.
 var show_sites: bool = false  # Off by default on political; enable via Y / Infra mapmode / F10
+## Resource goods glyphs — F9 resources mapmode only. Political stays clean fills.
+var show_resource_icons: bool = false
+var _glyph_map_mode: String = "political"
 var proposed_children: Array = []
 var proposed_data_loaded: bool = false
 const PROPOSED_SPLIT_PATH := "res://tools/map_generation/output/phase1_europe/proposed_children_geometry.json"
@@ -1760,7 +1763,8 @@ func _draw():
         if not (city_layer and city_layer.get_child_count() > 0):
             _draw_cities_culled(zoom, draw_provs)
 
-    _draw_resource_icons_culled(zoom, draw_provs)
+    if show_resource_icons:
+        _draw_resource_icons_culled(zoom, draw_provs)
 
     if show_proposed_splits and OS.is_debug_build():
         _draw_proposed_splits(zoom)
@@ -2127,7 +2131,16 @@ func _draw_cities_culled(zoom: float, provinces: Dictionary) -> void:
 
 # === Simple Resource Icons (map improvement for visibility) ===
 # Draws small indicators for primary resources when zoomed in.
+func set_map_mode_for_glyphs(mode: String) -> void:
+    var m := mode.strip_edges().to_lower()
+    _glyph_map_mode = m
+    show_resource_icons = m == "resources"
+    queue_redraw()
+
+
 func _draw_resource_icons(zoom: float = 1.0) -> void:
+    if not show_resource_icons:
+        return
     _draw_resource_icons_culled(zoom, _get_provinces_for_layers())
 
 
@@ -2179,6 +2192,8 @@ func _resource_tex(key: String) -> Texture2D:
 
 
 func _draw_resource_icons_culled(zoom: float, provinces: Dictionary) -> void:
+    if not show_resource_icons:
+        return
     if not map_manager:
         return
 

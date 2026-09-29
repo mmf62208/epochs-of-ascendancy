@@ -50,6 +50,13 @@ class TestMapResourcesMapmodeProduct(unittest.TestCase):
         tb = TOOLBAR.read_text(encoding="utf-8")
         self.assertIn('"resources"', tb)
         self.assertIn("Resources", tb)
+        overlay = (ROOT / "scripts" / "map" / "InfrastructureOverlayLayer.gd").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("set_map_mode_for_glyphs", ren)
+        self.assertIn('ol_res.call("set_map_mode_for_glyphs", m)', ren)
+        self.assertIn("func set_map_mode_for_glyphs", overlay)
+        self.assertIn("var show_resource_icons: bool = false", overlay)
 
 
 if __name__ == "__main__":
