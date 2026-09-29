@@ -1257,7 +1257,9 @@ func _do_steal_setup() -> void:
 	_vacate_pid_except(LEV, _fid_air)
 	_vacate_pid_except(KOELN, _fid_fra)
 	_park_ger_at(BONN, NAME_A)
-	_park_ger_at(NEUSS, NAME_B, _fid)
+	# Only the selected land stays in the Rhineland so a nearby GER
+	# disk cannot switch on the air-chip click (item 4 fallback frozen).
+	_vacate_other_player_land(_fid)
 	if "show_unit_counters" in mr:
 		mr.set("show_unit_counters", true)
 	if mr.has_method("mv1_rebuild_unit_icons"):
@@ -1318,12 +1320,12 @@ func _do_steal_click() -> void:
 		_fail_reasons.append("no_map_renderer")
 		_finish(false)
 		return
-	var pos: Vector2 = mr.call("mv1_formation_screen_pos", _fid_air) as Vector2
+	var pos: Vector2 = _steal_click_pos(mr)
 	if pos == Vector2.ZERO:
 		_fail_reasons.append("air_chip_screen_pos_missing")
 		_finish(false)
 		return
-	_log("EOA_MV1_CARD_UP_INPUT_GUARD who=guard.steal_click air=%.1f,%.1f (NOT live Play)" % [pos.x, pos.y])
+	_log("EOA_MV1_CARD_UP_INPUT_GUARD who=guard.steal_click pos=%.1f,%.1f (NOT live Play)" % [pos.x, pos.y])
 	_click_still(pos)
 	_phase = Phase.WAIT_STEAL_CLICK
 	_settle_left = LEFTOVER_FRAMES
@@ -1627,6 +1629,55 @@ func _press_esc() -> void:
 	Input.parse_input_event(ev2)
 	if vp != null:
 		vp.push_input(ev2, true)
+
+
+func _steal_click_pos(mr: Node) -> Vector2:
+	# Point on the air disk whose hex is still Leverkusen (preview dest).
+	var air: Vector2 = Vector2.ZERO
+	if mr.has_method("mv1_formation_screen_pos"):
+		air = mr.call("mv1_formation_screen_pos", _fid_air) as Vector2
+	var lev: Vector2 = _march_dest_screen(mr)
+	if air == Vector2.ZERO:
+		return lev
+	if _screen_hex_pid(mr, air) == LEV:
+		return air
+	var t: float = 0.15
+	while t <= 1.0:
+		var sample: Vector2 = air.lerp(lev, t)
+		if _screen_hex_pid(mr, sample) == LEV:
+			return sample
+		t += 0.15
+	return lev
+
+
+func _screen_hex_pid(mr: Node, screen: Vector2) -> int:
+	if mr == null or not mr.has_method("_screen_to_world"):
+		return -1
+	var world: Vector2 = mr.call("_screen_to_world", screen) as Vector2
+	if mr.has_method("_resolve_hex_pick_pid"):
+		return int(mr.call("_resolve_hex_pick_pid", world))
+	return -1
+
+
+func _vacate_other_player_land(keep_fid: String) -> void:
+	var lm := root.get_node_or_null("LeaderManager")
+	if lm == null or not ("formations" in lm):
+		return
+	for fid_v in lm.formations.keys():
+		var fid_s := str(fid_v)
+		if fid_s == keep_fid:
+			continue
+		var f: Object = lm.formations[fid_v]
+		if f == null:
+			continue
+		var tag := str(f.get("country_tag")).strip_edges().to_upper() if "country_tag" in f else ""
+		var ft := str(f.get("formation_type")) if "formation_type" in f else ""
+		if tag != "GER":
+			continue
+		if ft == "air_wing" or ft == "fleet" or ft == "space_wing":
+			continue
+		if "stationed_province_id" in f:
+			f.set("stationed_province_id", BERLIN)
 
 
 func _vacate_pid_except(pid: int, keep_fid: String) -> void:
