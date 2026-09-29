@@ -2092,10 +2092,10 @@ func _do_cap_star_empty() -> void:
 		_finish(false)
 		return
 	_hide_info_panel()
-	# Rebuild can re-park the Berlin Home garrison. Vacate again with no
-	# second rebuild so the star click is not a land-spill first-select.
-	_vacate_other_player_land_to("", BONN)
-	_move_off_pid(BERLIN, "", BONN)
+	# Land chips beat stars. Hide counters so this click is a pure star pick
+	# (Play: star inspects when land-open is false). Restore in air-disk setup.
+	if "show_unit_counters" in mr:
+		mr.set("show_unit_counters", false)
 	# Pixel-guard lock makes show_info_panel a no-op (_camera_is_held).
 	# Live Play is not locked; drop the hold so the star inspects.
 	if mr.has_method("_unlock_close_camera"):
