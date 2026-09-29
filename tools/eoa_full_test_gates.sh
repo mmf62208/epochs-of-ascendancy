@@ -224,6 +224,9 @@ else
   run_step launch_rh1_resource_glyphs \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessRh1ResourceGlyphMapModeTest.gd || fail
 
+  run_step launch_mv1b_input_gate \
+    tools/run_godot.sh --headless -s res://scripts/core/HeadlessMv1bInputGateTest.gd || fail
+
   run_step launch_ix1_mandate_gate \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessIx1RoadSpineMandateGateTest.gd || fail
 
