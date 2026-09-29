@@ -356,7 +356,7 @@ tools/eoa_rh1_pixel_guard.sh
 python3 -m unittest tools.map_generation.tests.test_resource_icon_lod tools.map_generation.tests.test_map_resources_mapmode_product -v
 ```
 
-On `tools/eoa_full_test_gates.sh` (`--quick` has the py needles; full has headless + xvfb). xvfb Ruhr/Essen zoom ≥ 0.5: no glyph pixels in political, glyphs present in resources. Label **NOT live Play**. Peak RSS < 3 GB. Merge **HOLD**.
+On `tools/eoa_full_test_gates.sh` (`--quick` has the py needles; full has headless + xvfb). Headless `HeadlessRh1ResourceGlyphMapModeTest` **RESULT=PASS** (failures=0): default/political/diplomacy/other `show_resource_icons=false`; resources true; switch-back false. xvfb `tools/eoa_rh1_pixel_guard.sh` **RESULT=PASS** at zoom **0.638** over Essen (`political_hits=907` / `resources_hits=1252` / `back_hits=907`, icons false/true/false; wrapper peak **2030.0 MB**). Label **NOT live Play**. Peak RSS < 3 GB. Merge **HOLD**.
 
 ### MV-1 move ETA preview (gameplay UI, draft HOLD)
 
