@@ -1260,17 +1260,20 @@ func _begin_left_map_gesture(new_press: bool = false) -> void:
 	var genuine_new_press: bool = (
 		new_press and physically_down and _left_button_was_up and not _left_in_leftover_hold()
 	)
-	if not genuine_new_press:
-		if keep_this_drag and (leftover or not new_press):
+	# FIX #2: a real MouseButton press never inherits the previous gesture.
+	# Play: `_mark_left_pan_blocked_pick` left `_left_gesture_dragged` +
+	# `_left_ready_for_still_click=false`; leftover/`not ready` early-return
+	# re-latched every later still-click as dragged=true (22 dead clicks).
+	if not new_press and not genuine_new_press:
+		if keep_this_drag and leftover:
 			_left_btn_down = true
 			return
-		if new_press and not physically_down:
-			_left_btn_down = true
-			return
-		if new_press and (_left_gesture_dragged or _left_slop_is_drag() or _left_skip_next_pick):
-			if leftover or not _left_ready_for_still_click:
-				_left_btn_down = true
-				return
+	if new_press and not physically_down:
+		pass
+	if new_press and (_left_gesture_dragged or _left_slop_is_drag() or _left_skip_next_pick):
+		if leftover or not _left_ready_for_still_click:
+			pass
+	_reset_left_gesture_state(mouse)
 	_left_btn_down = true
 	_left_gesture_dragged = false
 	_left_gesture_origin = mouse
@@ -1289,6 +1292,7 @@ func _begin_left_map_gesture(new_press: bool = false) -> void:
 	_left_sticky_valid = true
 	_left_sticky_slop_sq = 0.0
 	_left_cam_moved_this_down = false
+	_left_ready_for_still_click = true
 	_left_button_was_up = false
 	var cam: Camera2D = get_viewport().get_camera_2d() if get_viewport() else null
 	if cam != null:
@@ -1317,10 +1321,18 @@ func _note_left_gesture_motion() -> void:
 	var vp: Viewport = get_viewport()
 	if vp == null:
 		return
-	var slop_sq: float = vp.get_mouse_position().distance_squared_to(_left_gesture_origin)
+	var mouse_note: Vector2 = vp.get_mouse_position()
+	var slop_sq: float = mouse_note.distance_squared_to(_left_gesture_origin)
+	if _left_origin_valid:
+		slop_sq = maxf(slop_sq, mouse_note.distance_squared_to(_left_origin_screen))
+	if _left_sticky_valid:
+		slop_sq = maxf(slop_sq, mouse_note.distance_squared_to(_left_sticky_origin))
 	if slop_sq > _left_max_slop_sq:
 		_left_max_slop_sq = slop_sq
-	if slop_sq >= LEFT_PAN_SLOP_PX * LEFT_PAN_SLOP_PX:
+	# Peak slop from THIS press origin latches dragged for the rest of the
+	# gesture, even if the release lands back near the origin (Play: card-up
+	# drag returned near press and opened Worcestershire).
+	if _left_max_slop_sq >= LEFT_PAN_SLOP_PX * LEFT_PAN_SLOP_PX:
 		_mark_left_pan_blocked_pick()
 
 
@@ -1339,6 +1351,38 @@ func _end_left_button_down() -> void:
 		_left_release_screen_valid = true
 	# Keep sticky slop. Leftover pressed=true must not reset `_left_release_screen`
 	# origin. Home clears sticky; leftover hold is frames after this `_end`.
+
+
+func _reset_left_gesture_state(mouse: Vector2 = Vector2.INF) -> void:
+	# FIX #2: fresh press / inspector / Open-fight open+close. A new press
+	# must never inherit origin/sticky/dragged/ready/slop from the last gesture.
+	var pos: Vector2 = mouse
+	if pos.x == INF or pos.y == INF:
+		var vp_rs: Viewport = get_viewport()
+		pos = vp_rs.get_mouse_position() if vp_rs != null else Vector2.ZERO
+	_left_btn_down = false
+	_left_pan_armed = false
+	_left_pan_active = false
+	_left_gesture_dragged = false
+	_left_gesture_origin = pos
+	_left_origin_screen = pos
+	_left_origin_valid = true
+	_left_max_slop_sq = 0.0
+	_left_press_screen = pos
+	_left_slop_latched = false
+	_left_gesture_panned = false
+	_left_skip_next_pick = false
+	_left_pan_committed = false
+	_left_press_cam_valid = false
+	_left_release_frame = -1
+	_left_release_screen_valid = false
+	_left_sticky_origin = pos
+	_left_sticky_valid = true
+	_left_sticky_slop_sq = 0.0
+	_left_cam_moved_this_down = false
+	_left_ready_for_still_click = true
+	_left_button_was_up = true
+	_last_mouse_pos = pos
 
 
 func _clear_left_slop_after_still_click() -> void:
@@ -3008,12 +3052,23 @@ func _unhandled_input(event: InputEvent) -> void:
 		# Land division chips beat capital stars (Play: chips opened Praha inspector).
 		# Air/fleet still lose to stars (Berlin star vs Air Wing PASS).
 		# Alt-click / infra empty-terrain prefers province (IX-1 Köln under garrison).
+		# FIX #2: with a unit selected, plain click switches only a DIFFERENT
+		# own counter (disk hit). Selected unit's own chip area is the move
+		# target. Ctrl stays assault. First-select still uses the unchanged
+		# `_try_open_land_unit_at_world` fallback.
 		if not event.alt_pressed:
 			var disk_only: bool = _map_prefers_province_over_unit()
-			if selected_formation_id.is_empty() or event.ctrl_pressed:
-				if _try_open_land_unit_at_world(world_pos, event.ctrl_pressed, disk_only):
+			if event.ctrl_pressed:
+				if _try_open_land_unit_at_world(world_pos, true, disk_only):
 					get_viewport().set_input_as_handled()
 					return
+			elif selected_formation_id.is_empty():
+				if _try_open_land_unit_at_world(world_pos, false, disk_only):
+					get_viewport().set_input_as_handled()
+					return
+			elif _try_switch_own_land_counter_at_world(world_pos):
+				get_viewport().set_input_as_handled()
+				return
 		# Capital gold star wins over a colocated air/fleet chip.
 		# Star click inspects the capital and does not arm MARCH.
 		# THIS drag already exceeded 8px: do not snap-select any capital
@@ -14333,11 +14388,9 @@ func _dismiss_inspector_and_restore_input() -> void:
 	_viewport_cull_suspend_until_msec = Time.get_ticks_msec() + 2500
 	_viewport_cull_hold_after_close = true
 	_map_pick_block_until_msec = Time.get_ticks_msec() + 800
-	_left_skip_next_pick = true
-	_left_gesture_panned = true
-	_left_pan_armed = false
-	_left_pan_active = false
-	_left_slop_latched = true
+	# FIX #2: Close must not leave dragged/not-ready so the next map press
+	# can still-click (Play: "inspector Close restored input" then 22 dead clicks).
+	_reset_left_gesture_state()
 	var ui := get_node_or_null("UI") as CanvasLayer
 	if ui != null:
 		var fight_sheet := ui.get_node_or_null("OpenFightSheet")
@@ -18670,7 +18723,10 @@ func show_info_panel(province: Province, force_open: bool = false, keep_camera: 
 		return
 	_inspector_held_closed = false
 	_layout_map_ui()
+	var inspector_was_up: bool = info_panel.visible
 	info_panel.visible = true
+	if not inspector_was_up:
+		_reset_left_gesture_state()
 	if info_panel is Control:
 		(info_panel as Control).mouse_filter = Control.MOUSE_FILTER_STOP
 	_layout_info_panel_inner()
@@ -19046,6 +19102,22 @@ func _try_living_title_map_pick(pid: int) -> bool:
 	return true
 
 
+func _try_switch_own_land_counter_at_world(world_pos: Vector2) -> bool:
+	# Disk-only: a DIFFERENT own land counter. Does not use hex-station or
+	# nearest-icon fallback (`_try_open_land_unit_at_world` stays untouched).
+	if selected_formation_id.is_empty():
+		return false
+	var fo: Object = _pick_land_unit_formation_at_world(world_pos)
+	if fo == null:
+		return false
+	var fid := str(fo.formation_id) if "formation_id" in fo else ""
+	if fid.is_empty() or fid == selected_formation_id:
+		return false
+	_select_map_unit(fo)
+	_show_unit_detail_popup(fo)
+	return true
+
+
 func _try_open_land_chip_from_input(ctrl_click: bool = false) -> bool:
 	# `_input` still-click path: beat GUI so a follow-mouse glance card cannot
 	# swallow GER Division. Search / Close / unit-card / modal stay theirs.
@@ -19056,11 +19128,15 @@ func _try_open_land_chip_from_input(ctrl_click: bool = false) -> bool:
 		return false
 	if MapViewInput.modal_blocks_map_nav(get_viewport()):
 		return false
-	# Already commanding a unit: this still-click is a march / province pick.
-	# Adjacent NUTS3 sit inside the painted-chip hit disk + nearest-land
-	# fallback, which would re-arm and never reach enqueue (Play MV-1).
-	# `_try_open_land_unit_at_world` itself is unchanged (first-select fallback stays).
+	# FIX #2 input model (plain click): a DIFFERENT own counter switches
+	# selection. The selected unit's own chip area is a move target (or no-op
+	# on its own province) — not a re-arm. Ctrl stays assault / Open fight.
+	# `_try_open_land_unit_at_world` is unchanged (first-select fallback stays).
 	if not selected_formation_id.is_empty() and not ctrl_click:
+		var world_pos_sw: Vector2 = _screen_to_world(get_viewport().get_mouse_position())
+		if _try_switch_own_land_counter_at_world(world_pos_sw):
+			get_viewport().set_input_as_handled()
+			return true
 		return false
 	var world_pos: Vector2 = _screen_to_world(get_viewport().get_mouse_position())
 	var disk_only: bool = _map_prefers_province_over_unit()
@@ -19785,7 +19861,89 @@ func mv1_left_release_report() -> Dictionary:
 		"sticky_valid": _left_sticky_valid,
 		"btn_down": _left_btn_down,
 		"was_up": _left_button_was_up,
+		"ready": _left_ready_for_still_click,
+		"max_slop": _left_max_slop_sq,
+		"inspector": mv1_inspector_is_visible(),
+		"open_fight": mv1_open_fight_is_visible(),
 	}
+
+
+func mv1_inspector_is_visible() -> bool:
+	if info_panel == null or not is_instance_valid(info_panel):
+		return false
+	if info_panel is CanvasItem:
+		return (info_panel as CanvasItem).visible
+	return false
+
+
+func mv1_open_fight_is_visible() -> bool:
+	var ui := get_node_or_null("UI") as CanvasLayer
+	if ui == null:
+		return false
+	return _overlay_node_is_up(ui.get_node_or_null("OpenFightSheet"))
+
+
+func mv1_unit_card_title_text() -> String:
+	var ui := get_node_or_null("UI") as CanvasLayer
+	if ui == null:
+		return ""
+	var pop: Node = ui.get_node_or_null("UnitDetailPopup")
+	if pop == null or not is_instance_valid(pop):
+		return ""
+	var labels: Array = pop.find_children("*", "Label", true, false)
+	for lab_v in labels:
+		if lab_v is Label:
+			var t: String = (lab_v as Label).text.strip_edges()
+			if not t.is_empty() and t != "Open fight" and t != "Close":
+				return t
+	return ""
+
+
+func mv1_close_button_screen_pos() -> Vector2:
+	var ui := get_node_or_null("UI") as CanvasLayer
+	var btn: Button = null
+	if ui != null:
+		var fight: Node = ui.get_node_or_null("OpenFightSheet")
+		if fight != null and _overlay_node_is_up(fight):
+			btn = fight.find_child("BtnClose", true, false) as Button
+	if btn == null and info_panel != null and mv1_inspector_is_visible():
+		btn = info_panel.find_child("BtnClose", true, false) as Button
+	if btn == null:
+		btn = btn_close
+	if btn == null or not is_instance_valid(btn) or not btn.visible:
+		return Vector2.ZERO
+	var r: Rect2 = btn.get_global_rect()
+	return r.get_center()
+
+
+func mv1_screen_pos_in_chip_over_province(fid: String, dest_id: int) -> Vector2:
+	# Point whose hex is dest and whose land-disk pick is this fid (adjacent
+	# NUTS3 sitting inside the selected unit's painted chip).
+	var want := fid.strip_edges()
+	var dest := int(dest_id)
+	if want.is_empty() or dest <= 0:
+		return Vector2.ZERO
+	var chip_scr: Vector2 = mv1_formation_screen_pos(want)
+	var dest_scr: Vector2 = mv1_province_screen_pos(dest)
+	if chip_scr == Vector2.ZERO or dest_scr == Vector2.ZERO:
+		return Vector2.ZERO
+	var samples: Array[float] = [0.15, 0.25, 0.35, 0.45, 0.55, 0.65, 0.75, 0.85]
+	for t_v in samples:
+		var t: float = t_v
+		var screen: Vector2 = chip_scr.lerp(dest_scr, t)
+		var world: Vector2 = _screen_to_world(screen)
+		var pid: int = _resolve_hex_pick_pid(world)
+		if pid <= 0:
+			pid = _resolve_map_pick_pid(world)
+		if pid != dest:
+			continue
+		var fo: Object = _pick_land_unit_formation_at_world(world)
+		if fo == null:
+			continue
+		var fo_id := str(fo.formation_id) if "formation_id" in fo else ""
+		if fo_id == want:
+			return screen
+	return Vector2.ZERO
 
 
 func mv1_rebuild_unit_icons() -> void:
@@ -22187,6 +22345,7 @@ func _show_open_fight_sheet(
 	if ui == null:
 		return
 	_hold_camera_now()
+	_reset_left_gesture_state()
 	if info_panel != null and info_panel is CanvasItem:
 		(info_panel as CanvasItem).visible = false
 	# Unit card docks the same bottom-left as the Maginot sheet (Play: Open fight

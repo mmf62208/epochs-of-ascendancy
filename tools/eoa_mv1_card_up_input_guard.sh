@@ -2,6 +2,8 @@
 # WINDOWED MV-1 card-up real-input guard. xvfb / llvmpipe is NOT live Play.
 # Selects the unit by simulated mouse press+release at the counter (normal
 # _input / _unhandled_input path). Never sets selected_formation_id.
+# FIX #2: inspector + Open-fight open/close, plain-click switch A→B,
+# adjacent-in-chip commit, return-to-origin drag, 5 still clicks after drag.
 # Never EOA_SKIP_TITLE. Uses EOA_SMOKE_AUTO_BEGIN only to dismiss the title.
 #
 #   tools/eoa_mv1_card_up_input_guard.sh

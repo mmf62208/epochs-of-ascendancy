@@ -13,21 +13,40 @@ extends SceneTree
 const KOELN := 710417
 const BONN := 710416
 const LEV := 710418
+const NEUSS := 710413
 const MID_ZOOM := 2.80
 const WAIT_MAP_SECS := 420
 const SETTLE_FRAMES := 24
 const LEFTOVER_FRAMES := 22
 const RSS_LIMIT_MB := 3000
 const DRAG_PX := 24.0
+const NAME_A := "GER MV-1 A"
+const NAME_B := "GER MV-1 B"
 
 enum Phase {
 	WAIT_MAP,
 	SETTLE,
 	PARK,
+	INSPECTOR,
+	WAIT_INSPECTOR,
+	CLOSE_INSPECTOR,
+	WAIT_CLOSE_INSPECTOR,
 	SELECT,
 	WAIT_SELECT,
 	HOVER,
 	WAIT_HOVER,
+	OPENFIGHT,
+	WAIT_OPENFIGHT,
+	CLOSE_FIGHT,
+	WAIT_CLOSE_FIGHT,
+	RESELECT,
+	WAIT_RESELECT,
+	SWITCH_B,
+	WAIT_SWITCH,
+	RESELECT_A,
+	WAIT_RESELECT_A,
+	CHIP_DISK,
+	WAIT_CHIP_DISK,
 	COMMIT,
 	WAIT_COMMIT,
 	UNLOCK_DRAG,
@@ -35,6 +54,13 @@ enum Phase {
 	DRAG_MOVE,
 	DRAG_RELEASE,
 	WAIT_DRAG,
+	DRAG2_PRESS,
+	DRAG2_OUT,
+	DRAG2_BACK,
+	DRAG2_RELEASE,
+	WAIT_DRAG2,
+	STILL_CLICK,
+	WAIT_STILL,
 	DONE,
 }
 
@@ -49,12 +75,23 @@ var _last_wait_log: int = -1
 var _rss_start_kb: int = 0
 var _rss_peak_kb: int = 0
 var _fid: String = ""
+var _fid_b: String = ""
 var _chip_text: String = ""
 var _hover_ok: bool = false
 var _commit_ok: bool = false
 var _drag_ok: bool = false
+var _switch_ok: bool = false
+var _inspector_ok: bool = false
+var _openfight_ok: bool = false
+var _chip_disk_ok: bool = false
+var _drag2_ok: bool = false
+var _stills_ok: bool = false
 var _preview_path: Array = []
 var _preview_days: int = -1
+var _still_left: int = 0
+var _still_pass: int = 0
+var _march_dest_before_drag2: int = -1
+var _inspector_before_drag2: bool = false
 var _cam_pos: Vector2 = Vector2.ZERO
 var _cam_zoom: float = MID_ZOOM
 var _cam_before_drag: Vector2 = Vector2.ZERO
@@ -112,6 +149,20 @@ func _on_process() -> void:
 				_phase = _after_settle
 		Phase.PARK:
 			_do_park()
+		Phase.INSPECTOR:
+			_do_inspector()
+		Phase.WAIT_INSPECTOR:
+			_reassert_camera()
+			_settle_left -= 1
+			if _settle_left <= 0:
+				_check_inspector()
+		Phase.CLOSE_INSPECTOR:
+			_do_close_panel("inspector")
+		Phase.WAIT_CLOSE_INSPECTOR:
+			_reassert_camera()
+			_settle_left -= 1
+			if _settle_left <= 0:
+				_check_close_then_select()
 		Phase.SELECT:
 			_do_select()
 		Phase.WAIT_SELECT:
@@ -124,7 +175,48 @@ func _on_process() -> void:
 		Phase.WAIT_HOVER:
 			_settle_left -= 1
 			if _settle_left <= 0:
-				_check_hover_then_commit()
+				_check_hover_then_openfight()
+		Phase.OPENFIGHT:
+			_do_openfight()
+		Phase.WAIT_OPENFIGHT:
+			_reassert_camera()
+			_settle_left -= 1
+			if _settle_left <= 0:
+				_check_openfight()
+		Phase.CLOSE_FIGHT:
+			_do_close_panel("open_fight")
+		Phase.WAIT_CLOSE_FIGHT:
+			_reassert_camera()
+			_settle_left -= 1
+			if _settle_left <= 0:
+				_check_close_fight_then_reselect()
+		Phase.RESELECT:
+			_do_select()
+		Phase.WAIT_RESELECT:
+			_reassert_camera()
+			_settle_left -= 1
+			if _settle_left <= 0:
+				_check_reselect_then_switch()
+		Phase.SWITCH_B:
+			_do_switch_b()
+		Phase.WAIT_SWITCH:
+			_reassert_camera()
+			_settle_left -= 1
+			if _settle_left <= 0:
+				_check_switch_then_reselect_a()
+		Phase.RESELECT_A:
+			_do_reselect_a()
+		Phase.WAIT_RESELECT_A:
+			_reassert_camera()
+			_settle_left -= 1
+			if _settle_left <= 0:
+				_check_reselect_a_then_chip()
+		Phase.CHIP_DISK:
+			_do_chip_disk()
+		Phase.WAIT_CHIP_DISK:
+			_settle_left -= 1
+			if _settle_left <= 0:
+				_check_chip_disk_then_commit()
 		Phase.COMMIT:
 			_do_commit()
 		Phase.WAIT_COMMIT:
@@ -150,6 +242,33 @@ func _on_process() -> void:
 			_settle_left -= 1
 			if _settle_left <= 0:
 				_check_drag_and_finish()
+		Phase.DRAG2_PRESS:
+			if _settle_left > 0:
+				_settle_left -= 1
+			else:
+				_do_drag2_press()
+		Phase.DRAG2_OUT:
+			_settle_left -= 1
+			if _settle_left <= 0:
+				_do_drag2_out()
+		Phase.DRAG2_BACK:
+			_settle_left -= 1
+			if _settle_left <= 0:
+				_do_drag2_back()
+		Phase.DRAG2_RELEASE:
+			_settle_left -= 1
+			if _settle_left <= 0:
+				_do_drag2_release()
+		Phase.WAIT_DRAG2:
+			_settle_left -= 1
+			if _settle_left <= 0:
+				_check_drag2_then_stills()
+		Phase.STILL_CLICK:
+			_do_still_repeat()
+		Phase.WAIT_STILL:
+			_settle_left -= 1
+			if _settle_left <= 0:
+				_check_still_repeat()
 		Phase.DONE:
 			pass
 
@@ -192,8 +311,9 @@ func _do_park() -> void:
 		_fail_reasons.append("no_map_renderer")
 		_finish(false)
 		return
-	_fid = _park_ger_at_bonn()
-	if _fid.is_empty():
+	_fid = _park_ger_at(BONN, NAME_A)
+	_fid_b = _park_ger_at(NEUSS, NAME_B, _fid)
+	if _fid.is_empty() or _fid_b.is_empty():
 		_fail_reasons.append("no_ger_formation")
 		_finish(false)
 		return
@@ -203,8 +323,8 @@ func _do_park() -> void:
 		mr.call("mv1_rebuild_unit_icons")
 	elif mr.has_method("_update_unit_icons_for_test"):
 		mr.call("_update_unit_icons_for_test")
-	_log("EOA_MV1_CARD_UP_INPUT_GUARD who=guard.park fid=%s (NOT live Play)" % _fid)
-	_go_settle(Phase.SELECT, 18)
+	_log("EOA_MV1_CARD_UP_INPUT_GUARD who=guard.park fid_a=%s fid_b=%s (NOT live Play)" % [_fid, _fid_b])
+	_go_settle(Phase.INSPECTOR, 18)
 
 
 func _do_select() -> void:
@@ -214,10 +334,11 @@ func _do_select() -> void:
 		_finish(false)
 		return
 	# Must NOT assign selected_formation_id — click the painted counter.
+	var from_reselect: bool = _phase == Phase.RESELECT
 	var already := ""
 	if "selected_formation_id" in mr:
 		already = str(mr.get("selected_formation_id"))
-	if not already.is_empty():
+	if not already.is_empty() and not from_reselect:
 		_fail_reasons.append("selected_already_set_before_click")
 		_finish(false)
 		return
@@ -228,7 +349,7 @@ func _do_select() -> void:
 		return
 	_log("EOA_MV1_CARD_UP_INPUT_GUARD who=guard.select_click pos=%.1f,%.1f fid=%s (NOT live Play)" % [pos.x, pos.y, _fid])
 	_click_still(pos)
-	_phase = Phase.WAIT_SELECT
+	_phase = Phase.WAIT_RESELECT if from_reselect else Phase.WAIT_SELECT
 	_settle_left = LEFTOVER_FRAMES
 
 
@@ -292,7 +413,7 @@ func _do_hover() -> void:
 	_settle_left = 20
 
 
-func _check_hover_then_commit() -> void:
+func _check_hover_then_openfight() -> void:
 	var mr := _map_renderer()
 	if mr == null:
 		_fail_reasons.append("no_map_renderer")
@@ -322,7 +443,7 @@ func _check_hover_then_commit() -> void:
 	if not _fail_reasons.is_empty():
 		_finish(false)
 		return
-	_phase = Phase.COMMIT
+	_phase = Phase.OPENFIGHT
 
 
 func _preview_path_from_cache(mr: Node) -> Array:
@@ -473,7 +594,11 @@ func _check_drag_and_finish() -> void:
 		_fail_reasons.append("drag_changed_march_dest")
 	_drag_ok = moved >= 2.0 and dragged and dest == LEV
 	_capture("mv1_card_up_drag_pan_NOT_live_play")
-	_finish(_fail_reasons.is_empty())
+	if not _fail_reasons.is_empty():
+		_finish(false)
+		return
+	_phase = Phase.DRAG2_PRESS
+	_settle_left = 8
 
 
 func _march_dest_screen(mr: Node) -> Vector2:
@@ -486,24 +611,26 @@ func _march_dest_screen(mr: Node) -> Vector2:
 	return Vector2.ZERO
 
 
-func _click_still(pos: Vector2) -> void:
-	_press_at(pos)
+func _click_still(pos: Vector2, ctrl: bool = false, alt: bool = false) -> void:
+	_press_at(pos, ctrl, alt)
 	# Same-position release after a couple of idle frames (still click).
 	var hold := pos
-	call_deferred("_click_still_release", hold)
+	call_deferred("_click_still_release", hold, ctrl, alt)
 
 
-func _click_still_release(pos: Vector2) -> void:
-	_release_at(pos)
+func _click_still_release(pos: Vector2, ctrl: bool = false, alt: bool = false) -> void:
+	_release_at(pos, ctrl, alt)
 
 
-func _press_at(pos: Vector2) -> void:
+func _press_at(pos: Vector2, ctrl: bool = false, alt: bool = false) -> void:
 	_warp(pos)
 	var ev := InputEventMouseButton.new()
 	ev.button_index = MOUSE_BUTTON_LEFT
 	ev.pressed = true
 	ev.position = pos
 	ev.global_position = pos
+	ev.ctrl_pressed = ctrl
+	ev.alt_pressed = alt
 	Input.parse_input_event(ev)
 	var vp := root.get_viewport()
 	if vp != null:
@@ -511,13 +638,15 @@ func _press_at(pos: Vector2) -> void:
 	_last_mouse = pos
 
 
-func _release_at(pos: Vector2) -> void:
+func _release_at(pos: Vector2, ctrl: bool = false, alt: bool = false) -> void:
 	_warp(pos)
 	var ev := InputEventMouseButton.new()
 	ev.button_index = MOUSE_BUTTON_LEFT
 	ev.pressed = false
 	ev.position = pos
 	ev.global_position = pos
+	ev.ctrl_pressed = ctrl
+	ev.alt_pressed = alt
 	Input.parse_input_event(ev)
 	var vp := root.get_viewport()
 	if vp != null:
@@ -543,7 +672,442 @@ func _warp(pos: Vector2) -> void:
 		DisplayServer.warp_mouse(Vector2i(int(round(pos.x)), int(round(pos.y))))
 
 
-func _park_ger_at_bonn() -> String:
+func _do_inspector() -> void:
+	var mr := _map_renderer()
+	if mr == null:
+		_fail_reasons.append("no_map_renderer")
+		_finish(false)
+		return
+	var pos: Vector2 = _march_dest_screen(mr)
+	if pos == Vector2.ZERO:
+		pos = mr.call("mv1_province_screen_pos", LEV) as Vector2
+	_log("EOA_MV1_CARD_UP_INPUT_GUARD who=guard.inspector_click pos=%.1f,%.1f (NOT live Play)" % [pos.x, pos.y])
+	# Alt prefers hex inspector over the nearest-land fallback (first-select).
+	_click_still(pos, false, true)
+	_phase = Phase.WAIT_INSPECTOR
+	_settle_left = LEFTOVER_FRAMES
+
+
+func _check_inspector() -> void:
+	var mr := _map_renderer()
+	if mr == null:
+		_fail_reasons.append("no_map_renderer")
+		_finish(false)
+		return
+	var vis := false
+	if mr.has_method("mv1_inspector_is_visible"):
+		vis = bool(mr.call("mv1_inspector_is_visible"))
+	var rel: Dictionary = {}
+	if mr.has_method("mv1_left_release_report"):
+		rel = mr.call("mv1_left_release_report") as Dictionary
+	_log("EOA_MV1_CARD_UP_INPUT_GUARD who=guard.inspector vis=%s rel=%s (NOT live Play)" % [str(vis), str(rel)])
+	if not vis:
+		_fail_reasons.append("inspector_not_visible")
+		_finish(false)
+		return
+	if bool(rel.get("dragged", false)):
+		_fail_reasons.append("inspector_click_classified_dragged")
+		_finish(false)
+		return
+	_inspector_ok = true
+	_phase = Phase.CLOSE_INSPECTOR
+
+
+func _do_close_panel(kind: String) -> void:
+	var mr := _map_renderer()
+	if mr == null:
+		_fail_reasons.append("no_map_renderer")
+		_finish(false)
+		return
+	var pos := Vector2.ZERO
+	if mr.has_method("mv1_close_button_screen_pos"):
+		pos = mr.call("mv1_close_button_screen_pos") as Vector2
+	_log("EOA_MV1_CARD_UP_INPUT_GUARD who=guard.close_%s pos=%.1f,%.1f (NOT live Play)" % [kind, pos.x, pos.y])
+	if pos == Vector2.ZERO:
+		_fail_reasons.append("close_button_missing_%s" % kind)
+		_finish(false)
+		return
+	_click_still(pos)
+	if kind == "inspector":
+		_phase = Phase.WAIT_CLOSE_INSPECTOR
+	else:
+		_phase = Phase.WAIT_CLOSE_FIGHT
+	_settle_left = LEFTOVER_FRAMES
+
+
+func _check_close_then_select() -> void:
+	var mr := _map_renderer()
+	if mr == null:
+		_fail_reasons.append("no_map_renderer")
+		_finish(false)
+		return
+	var vis := true
+	if mr.has_method("mv1_inspector_is_visible"):
+		vis = bool(mr.call("mv1_inspector_is_visible"))
+	var rel: Dictionary = {}
+	if mr.has_method("mv1_left_release_report"):
+		rel = mr.call("mv1_left_release_report") as Dictionary
+	_log("EOA_MV1_CARD_UP_INPUT_GUARD who=guard.close_inspector vis=%s rel=%s (NOT live Play)" % [str(vis), str(rel)])
+	if vis:
+		_fail_reasons.append("inspector_still_visible_after_close")
+	if bool(rel.get("dragged", false)):
+		_fail_reasons.append("inspector_close_classified_dragged")
+	if bool(rel.get("ready", true)) == false:
+		_fail_reasons.append("ready_false_after_inspector_close")
+	if not _fail_reasons.is_empty():
+		_finish(false)
+		return
+	_phase = Phase.SELECT
+
+
+func _do_openfight() -> void:
+	var mr := _map_renderer()
+	if mr == null:
+		_fail_reasons.append("no_map_renderer")
+		_finish(false)
+		return
+	var pos: Vector2 = mr.call("mv1_province_screen_pos", KOELN) as Vector2
+	if pos == Vector2.ZERO:
+		pos = Vector2(820, 380)
+	_log("EOA_MV1_CARD_UP_INPUT_GUARD who=guard.openfight_ctrl_click pos=%.1f,%.1f (NOT live Play)" % [pos.x, pos.y])
+	_click_still(pos, true, false)
+	_phase = Phase.WAIT_OPENFIGHT
+	_settle_left = LEFTOVER_FRAMES
+
+
+func _check_openfight() -> void:
+	var mr := _map_renderer()
+	if mr == null:
+		_fail_reasons.append("no_map_renderer")
+		_finish(false)
+		return
+	var vis := false
+	if mr.has_method("mv1_open_fight_is_visible"):
+		vis = bool(mr.call("mv1_open_fight_is_visible"))
+	var rel: Dictionary = {}
+	if mr.has_method("mv1_left_release_report"):
+		rel = mr.call("mv1_left_release_report") as Dictionary
+	_log("EOA_MV1_CARD_UP_INPUT_GUARD who=guard.openfight vis=%s rel=%s (NOT live Play)" % [str(vis), str(rel)])
+	if not vis:
+		_fail_reasons.append("open_fight_not_visible")
+		_finish(false)
+		return
+	_openfight_ok = true
+	_phase = Phase.CLOSE_FIGHT
+
+
+func _check_close_fight_then_reselect() -> void:
+	var mr := _map_renderer()
+	if mr == null:
+		_fail_reasons.append("no_map_renderer")
+		_finish(false)
+		return
+	var vis := true
+	if mr.has_method("mv1_open_fight_is_visible"):
+		vis = bool(mr.call("mv1_open_fight_is_visible"))
+	var rel: Dictionary = {}
+	if mr.has_method("mv1_left_release_report"):
+		rel = mr.call("mv1_left_release_report") as Dictionary
+	_log("EOA_MV1_CARD_UP_INPUT_GUARD who=guard.close_fight vis=%s rel=%s (NOT live Play)" % [str(vis), str(rel)])
+	if vis:
+		_fail_reasons.append("open_fight_still_visible_after_close")
+	if bool(rel.get("dragged", false)):
+		_fail_reasons.append("open_fight_close_classified_dragged")
+	if bool(rel.get("ready", true)) == false:
+		_fail_reasons.append("ready_false_after_open_fight_close")
+	if not _fail_reasons.is_empty():
+		_finish(false)
+		return
+	_phase = Phase.RESELECT
+
+
+func _check_reselect_then_switch() -> void:
+	var mr := _map_renderer()
+	if mr == null:
+		_fail_reasons.append("no_map_renderer")
+		_finish(false)
+		return
+	var selected := ""
+	if "selected_formation_id" in mr:
+		selected = str(mr.get("selected_formation_id"))
+	var card_up := false
+	if mr.has_method("mv1_unit_card_is_visible"):
+		card_up = bool(mr.call("mv1_unit_card_is_visible"))
+	var rel: Dictionary = {}
+	if mr.has_method("mv1_left_release_report"):
+		rel = mr.call("mv1_left_release_report") as Dictionary
+	_log(
+		"EOA_MV1_CARD_UP_INPUT_GUARD who=guard.reselect selected=%s card=%s rel=%s (NOT live Play)"
+		% [selected, str(card_up), str(rel)]
+	)
+	if selected != _fid:
+		_fail_reasons.append("reselect_after_open_fight_failed")
+	if not card_up:
+		_fail_reasons.append("card_not_visible_after_reselect")
+	if bool(rel.get("dragged", false)):
+		_fail_reasons.append("reselect_classified_dragged")
+	if not _fail_reasons.is_empty():
+		_finish(false)
+		return
+	_phase = Phase.SWITCH_B
+
+
+func _do_switch_b() -> void:
+	var mr := _map_renderer()
+	if mr == null:
+		_fail_reasons.append("no_map_renderer")
+		_finish(false)
+		return
+	var pos: Vector2 = mr.call("mv1_formation_screen_pos", _fid_b) as Vector2
+	if pos == Vector2.ZERO:
+		_fail_reasons.append("unit_b_screen_pos_missing")
+		_finish(false)
+		return
+	_log("EOA_MV1_CARD_UP_INPUT_GUARD who=guard.switch_b pos=%.1f,%.1f fid_b=%s (NOT live Play)" % [pos.x, pos.y, _fid_b])
+	_click_still(pos)
+	_phase = Phase.WAIT_SWITCH
+	_settle_left = LEFTOVER_FRAMES
+
+
+func _check_switch_then_reselect_a() -> void:
+	var mr := _map_renderer()
+	if mr == null:
+		_fail_reasons.append("no_map_renderer")
+		_finish(false)
+		return
+	var selected := ""
+	if "selected_formation_id" in mr:
+		selected = str(mr.get("selected_formation_id"))
+	var title := ""
+	if mr.has_method("mv1_unit_card_title_text"):
+		title = str(mr.call("mv1_unit_card_title_text"))
+	var has_a := false
+	if _mv_scr != null:
+		has_a = bool(_mv_scr.call("has_march", _fid))
+	var rel: Dictionary = {}
+	if mr.has_method("mv1_left_release_report"):
+		rel = mr.call("mv1_left_release_report") as Dictionary
+	_log(
+		"EOA_MV1_CARD_UP_INPUT_GUARD who=guard.switch_result selected=%s title=%s has_a=%s rel=%s (NOT live Play)"
+		% [selected, title, str(has_a), str(rel)]
+	)
+	if selected != _fid_b:
+		_fail_reasons.append("plain_click_did_not_switch_to_b")
+	if NAME_B not in title:
+		_fail_reasons.append("card_title_not_unit_b")
+	if has_a:
+		_fail_reasons.append("switch_queued_march_for_a")
+	if bool(rel.get("dragged", false)):
+		_fail_reasons.append("switch_click_classified_dragged")
+	_capture("mv1_card_switched_to_unit_b_NOT_live_play")
+	if not _fail_reasons.is_empty():
+		_finish(false)
+		return
+	_switch_ok = true
+	_phase = Phase.RESELECT_A
+
+
+func _do_reselect_a() -> void:
+	var mr := _map_renderer()
+	if mr == null:
+		_fail_reasons.append("no_map_renderer")
+		_finish(false)
+		return
+	var pos: Vector2 = mr.call("mv1_formation_screen_pos", _fid) as Vector2
+	if pos == Vector2.ZERO:
+		_fail_reasons.append("unit_a_screen_pos_missing")
+		_finish(false)
+		return
+	_log("EOA_MV1_CARD_UP_INPUT_GUARD who=guard.reselect_a pos=%.1f,%.1f (NOT live Play)" % [pos.x, pos.y])
+	_click_still(pos)
+	_phase = Phase.WAIT_RESELECT_A
+	_settle_left = LEFTOVER_FRAMES
+
+
+func _check_reselect_a_then_chip() -> void:
+	var mr := _map_renderer()
+	if mr == null:
+		_fail_reasons.append("no_map_renderer")
+		_finish(false)
+		return
+	var selected := ""
+	if "selected_formation_id" in mr:
+		selected = str(mr.get("selected_formation_id"))
+	if selected != _fid:
+		_fail_reasons.append("reselect_a_failed")
+		_finish(false)
+		return
+	_phase = Phase.CHIP_DISK
+
+
+func _do_chip_disk() -> void:
+	var mr := _map_renderer()
+	if mr == null:
+		_fail_reasons.append("no_map_renderer")
+		_finish(false)
+		return
+	var pos := Vector2.ZERO
+	if mr.has_method("mv1_screen_pos_in_chip_over_province"):
+		pos = mr.call("mv1_screen_pos_in_chip_over_province", _fid, KOELN) as Vector2
+	if pos == Vector2.ZERO:
+		_fail_reasons.append("chip_disk_point_missing")
+		_finish(false)
+		return
+	_log("EOA_MV1_CARD_UP_INPUT_GUARD who=guard.chip_disk pos=%.1f,%.1f (NOT live Play)" % [pos.x, pos.y])
+	_click_still(pos)
+	_phase = Phase.WAIT_CHIP_DISK
+	_settle_left = LEFTOVER_FRAMES
+
+
+func _check_chip_disk_then_commit() -> void:
+	var mr := _map_renderer()
+	if mr == null:
+		_fail_reasons.append("no_map_renderer")
+		_finish(false)
+		return
+	var selected := ""
+	if "selected_formation_id" in mr:
+		selected = str(mr.get("selected_formation_id"))
+	var has := false
+	var dest := -1
+	if _mv_scr != null:
+		has = bool(_mv_scr.call("has_march", _fid))
+		var order: Dictionary = _mv_scr.call("get_march", _fid) as Dictionary
+		dest = int(order.get("dest_id", -1))
+	var rel: Dictionary = {}
+	if mr.has_method("mv1_left_release_report"):
+		rel = mr.call("mv1_left_release_report") as Dictionary
+	_log(
+		"EOA_MV1_CARD_UP_INPUT_GUARD who=guard.chip_disk_result selected=%s has=%s dest=%d rel=%s (NOT live Play)"
+		% [selected, str(has), dest, str(rel)]
+	)
+	if selected != _fid:
+		_fail_reasons.append("chip_disk_rearmed_or_switched")
+	if not has or dest != KOELN:
+		_fail_reasons.append("chip_disk_did_not_commit_a_to_koln")
+	if bool(rel.get("dragged", false)):
+		_fail_reasons.append("chip_disk_classified_dragged")
+	if not _fail_reasons.is_empty():
+		_finish(false)
+		return
+	_chip_disk_ok = true
+	_phase = Phase.COMMIT
+
+
+func _do_drag2_press() -> void:
+	var mr := _map_renderer()
+	if mr == null:
+		_fail_reasons.append("no_map_renderer")
+		_finish(false)
+		return
+	if _mv_scr != null:
+		var order: Dictionary = _mv_scr.call("get_march", _fid) as Dictionary
+		_march_dest_before_drag2 = int(order.get("dest_id", -1))
+	if mr.has_method("mv1_inspector_is_visible"):
+		_inspector_before_drag2 = bool(mr.call("mv1_inspector_is_visible"))
+	_drag_start = Vector2(900, 420)
+	if mr.has_method("mv1_province_screen_pos"):
+		var k: Vector2 = mr.call("mv1_province_screen_pos", KOELN) as Vector2
+		if k != Vector2.ZERO:
+			_drag_start = k + Vector2(80, -60)
+	_log("EOA_MV1_CARD_UP_INPUT_GUARD who=guard.drag2_press start=%.1f,%.1f (NOT live Play)" % [_drag_start.x, _drag_start.y])
+	_press_at(_drag_start)
+	_phase = Phase.DRAG2_OUT
+	_settle_left = 3
+
+
+func _do_drag2_out() -> void:
+	_move_mouse(_drag_start + Vector2(DRAG_PX, DRAG_PX))
+	_phase = Phase.DRAG2_BACK
+	_settle_left = 4
+
+
+func _do_drag2_back() -> void:
+	_move_mouse(_drag_start)
+	_phase = Phase.DRAG2_RELEASE
+	_settle_left = 3
+
+
+func _do_drag2_release() -> void:
+	_release_at(_drag_start)
+	_phase = Phase.WAIT_DRAG2
+	_settle_left = LEFTOVER_FRAMES
+
+
+func _check_drag2_then_stills() -> void:
+	var mr := _map_renderer()
+	var rel: Dictionary = {}
+	if mr != null and mr.has_method("mv1_left_release_report"):
+		rel = mr.call("mv1_left_release_report") as Dictionary
+	var dragged := bool(rel.get("dragged", false))
+	if mr != null and mr.has_method("mv1_last_left_release_was_drag"):
+		dragged = bool(mr.call("mv1_last_left_release_was_drag"))
+	var dest := -1
+	if _mv_scr != null:
+		var order: Dictionary = _mv_scr.call("get_march", _fid) as Dictionary
+		dest = int(order.get("dest_id", -1))
+	var inspector_now := false
+	if mr != null and mr.has_method("mv1_inspector_is_visible"):
+		inspector_now = bool(mr.call("mv1_inspector_is_visible"))
+	_log(
+		"EOA_MV1_CARD_UP_INPUT_GUARD who=guard.drag2_return rel=%s dest=%d inspector=%s (NOT live Play)"
+		% [str(rel), dest, str(inspector_now)]
+	)
+	if not dragged:
+		_fail_reasons.append("return_to_origin_drag_not_classified_dragged")
+	if dest != _march_dest_before_drag2:
+		_fail_reasons.append("return_to_origin_drag_committed_march")
+	if inspector_now and not _inspector_before_drag2:
+		_fail_reasons.append("return_to_origin_drag_opened_panel")
+	if not _fail_reasons.is_empty():
+		_finish(false)
+		return
+	_drag2_ok = true
+	_still_left = 5
+	_still_pass = 0
+	_phase = Phase.STILL_CLICK
+
+
+func _do_still_repeat() -> void:
+	var pos := Vector2(640, 200)
+	var mr := _map_renderer()
+	if mr != null and mr.has_method("mv1_province_screen_pos"):
+		var k: Vector2 = mr.call("mv1_province_screen_pos", KOELN) as Vector2
+		if k != Vector2.ZERO:
+			pos = k + Vector2(-70, 50)
+	_log("EOA_MV1_CARD_UP_INPUT_GUARD who=guard.still_repeat n=%d pos=%.1f,%.1f (NOT live Play)" % [_still_pass + 1, pos.x, pos.y])
+	_click_still(pos)
+	_phase = Phase.WAIT_STILL
+	_settle_left = LEFTOVER_FRAMES
+
+
+func _check_still_repeat() -> void:
+	var mr := _map_renderer()
+	var dragged := true
+	var rel: Dictionary = {}
+	if mr != null and mr.has_method("mv1_left_release_report"):
+		rel = mr.call("mv1_left_release_report") as Dictionary
+		dragged = bool(rel.get("dragged", true))
+	if mr != null and mr.has_method("mv1_last_left_release_was_drag"):
+		dragged = bool(mr.call("mv1_last_left_release_was_drag"))
+	_log(
+		"EOA_MV1_CARD_UP_INPUT_GUARD who=guard.still_repeat_result n=%d dragged=%s rel=%s (NOT live Play)"
+		% [_still_pass + 1, str(dragged), str(rel)]
+	)
+	if dragged:
+		_fail_reasons.append("still_click_%d_after_drag_latched" % (_still_pass + 1))
+		_finish(false)
+		return
+	_still_pass += 1
+	_still_left -= 1
+	if _still_left > 0:
+		_phase = Phase.STILL_CLICK
+		return
+	_stills_ok = true
+	_finish(_fail_reasons.is_empty())
+
+
+func _park_ger_at(pid: int, unit_name: String, skip_fid: String = "") -> String:
 	var lm := root.get_node_or_null("LeaderManager")
 	if lm == null:
 		return ""
@@ -561,8 +1125,12 @@ func _park_ger_at_bonn() -> String:
 				continue
 			if ft != "" and ft != "division":
 				continue
-			f.set("stationed_province_id", BONN)
-			picked = str(fid_v)
+			var fid_s := str(fid_v)
+			if fid_s == skip_fid:
+				continue
+			f.set("stationed_province_id", pid)
+			f.set("name", unit_name)
+			picked = fid_s
 			break
 	if picked.is_empty():
 		var scr: Script = load("res://scripts/formations/Formation.gd") as Script
@@ -571,13 +1139,13 @@ func _park_ger_at_bonn() -> String:
 		var f2: Object = scr.new()
 		if f2 == null:
 			return ""
-		picked = "mv1_card_up_ger"
+		picked = "mv1_card_up_%s" % unit_name.replace(" ", "_")
 		f2.set("formation_id", picked)
 		f2.set("country_tag", "GER")
 		f2.set("formation_type", "division")
 		f2.set("design_id", "infantry_1936")
-		f2.set("stationed_province_id", BONN)
-		f2.set("name", "GER MV-1 card-up")
+		f2.set("stationed_province_id", pid)
+		f2.set("name", unit_name)
 		if "formations" in lm:
 			lm.formations[picked] = f2
 	return picked
@@ -866,12 +1434,18 @@ func _finish(ok: bool) -> void:
 		ok = false
 	var result := "PASS" if ok else "FAIL"
 	_log(
-		"WindowedMv1CardUpInputGuard: RESULT=%s hover=%s commit=%s drag=%s chip=%s rss_mb=%.1f peak_kb=%d captures=%s reasons=%s (xvfb NOT live Play)"
+		"WindowedMv1CardUpInputGuard: RESULT=%s hover=%s commit=%s drag=%s switch=%s inspector=%s fight=%s chip_disk=%s drag2=%s stills=%s chip=%s rss_mb=%.1f peak_kb=%d captures=%s reasons=%s (xvfb NOT live Play)"
 		% [
 			result,
 			str(_hover_ok),
 			str(_commit_ok),
 			str(_drag_ok),
+			str(_switch_ok),
+			str(_inspector_ok),
+			str(_openfight_ok),
+			str(_chip_disk_ok),
+			str(_drag2_ok),
+			str(_stills_ok),
 			_chip_text,
 			rss_mb,
 			_rss_peak_kb,
