@@ -14391,6 +14391,12 @@ func _dismiss_inspector_and_restore_input() -> void:
 	# FIX #2: Close must not leave dragged/not-ready so the next map press
 	# can still-click (Play: "inspector Close restored input" then 22 dead clicks).
 	_reset_left_gesture_state()
+	# Same Close button-down: the release must not pick the hex / counter
+	# under the button. Next fresh press resets skip via `_begin`.
+	if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+		_left_skip_next_pick = true
+		_left_btn_down = true
+		_left_button_was_up = false
 	var ui := get_node_or_null("UI") as CanvasLayer
 	if ui != null:
 		var fight_sheet := ui.get_node_or_null("OpenFightSheet")

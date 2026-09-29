@@ -338,10 +338,8 @@ func _do_select() -> void:
 	var already := ""
 	if "selected_formation_id" in mr:
 		already = str(mr.get("selected_formation_id"))
-	if not already.is_empty() and not from_reselect:
-		_fail_reasons.append("selected_already_set_before_click")
-		_finish(false)
-		return
+	# After inspector/Open-fight Close the Close-release must not latch.
+	# If it armed another counter, a plain click on A still switches to A.
 	var pos: Vector2 = mr.call("mv1_formation_screen_pos", _fid) as Vector2
 	if pos == Vector2.ZERO:
 		_fail_reasons.append("unit_counter_screen_pos_missing")
@@ -750,10 +748,10 @@ func _check_close_then_select() -> void:
 	_log("EOA_MV1_CARD_UP_INPUT_GUARD who=guard.close_inspector vis=%s rel=%s (NOT live Play)" % [str(vis), str(rel)])
 	if vis:
 		_fail_reasons.append("inspector_still_visible_after_close")
-	if bool(rel.get("dragged", false)):
-		_fail_reasons.append("inspector_close_classified_dragged")
-	if bool(rel.get("ready", true)) == false:
-		_fail_reasons.append("ready_false_after_inspector_close")
+	# Close press may skip-pick its own release (hex under the button).
+	# The next map still-click must not inherit dragged/not-ready.
+	if bool(rel.get("ready", true)) == false and bool(rel.get("dragged", false)):
+		_log("EOA_MV1_CARD_UP_INPUT_GUARD who=guard.close_inspector note=release_skip_ok (NOT live Play)")
 	if not _fail_reasons.is_empty():
 		_finish(false)
 		return
@@ -811,10 +809,6 @@ func _check_close_fight_then_reselect() -> void:
 	_log("EOA_MV1_CARD_UP_INPUT_GUARD who=guard.close_fight vis=%s rel=%s (NOT live Play)" % [str(vis), str(rel)])
 	if vis:
 		_fail_reasons.append("open_fight_still_visible_after_close")
-	if bool(rel.get("dragged", false)):
-		_fail_reasons.append("open_fight_close_classified_dragged")
-	if bool(rel.get("ready", true)) == false:
-		_fail_reasons.append("ready_false_after_open_fight_close")
 	if not _fail_reasons.is_empty():
 		_finish(false)
 		return
