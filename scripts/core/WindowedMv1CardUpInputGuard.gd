@@ -1905,7 +1905,7 @@ func _do_cap_select() -> void:
 		_finish(false)
 		return
 	_log("EOA_MV1_CARD_UP_INPUT_GUARD who=guard.cap_select pos=%.1f,%.1f (NOT live Play)" % [pos.x, pos.y])
-	_click_still(pos)
+	_click_still_once(pos)
 	_phase = Phase.WAIT_CAP_SELECT
 	_settle_left = LEFTOVER_FRAMES
 
@@ -1923,6 +1923,7 @@ func _check_cap_select() -> void:
 		_fail_reasons.append("cap_select_did_not_arm_land")
 		_finish(false)
 		return
+	_hide_info_panel()
 	_phase = Phase.CAP_HOVER
 
 
@@ -1993,6 +1994,11 @@ func _do_cap_click() -> void:
 	var pos: Vector2 = _capital_star_screen(mr)
 	if pos == Vector2.ZERO:
 		_fail_reasons.append("berlin_star_screen_pos_missing")
+		_finish(false)
+		return
+	_hide_info_panel()
+	if _inspector_visible():
+		_fail_reasons.append("cap_inspector_visible_before_star_click")
 		_finish(false)
 		return
 	_log("EOA_MV1_CARD_UP_INPUT_GUARD who=guard.cap_star_click pos=%.1f,%.1f (NOT live Play)" % [pos.x, pos.y])
@@ -2161,7 +2167,7 @@ func _do_air_disk_click() -> void:
 		_finish(false)
 		return
 	_log("EOA_MV1_CARD_UP_INPUT_GUARD who=guard.air_disk_click pos=%.1f,%.1f (NOT live Play)" % [pos.x, pos.y])
-	_click_still(pos)
+	_click_still_once(pos)
 	_phase = Phase.WAIT_AIR_DISK
 	_settle_left = LEFTOVER_FRAMES
 
@@ -2215,7 +2221,7 @@ func _do_land_near_air() -> void:
 		_finish(false)
 		return
 	_log("EOA_MV1_CARD_UP_INPUT_GUARD who=guard.land_near_air pos=%.1f,%.1f (NOT live Play)" % [pos.x, pos.y])
-	_click_still(pos)
+	_click_still_once(pos)
 	_phase = Phase.WAIT_LAND_NEAR_AIR
 	_settle_left = LEFTOVER_FRAMES
 
