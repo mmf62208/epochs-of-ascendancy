@@ -92,6 +92,7 @@ var _still_left: int = 0
 var _still_pass: int = 0
 var _march_dest_before_drag2: int = -1
 var _inspector_before_drag2: bool = false
+var _after_fight: bool = false
 var _cam_pos: Vector2 = Vector2.ZERO
 var _cam_zoom: float = MID_ZOOM
 var _cam_before_drag: Vector2 = Vector2.ZERO
@@ -444,7 +445,7 @@ func _check_hover_then_openfight() -> void:
 	if not _fail_reasons.is_empty():
 		_finish(false)
 		return
-	_phase = Phase.OPENFIGHT
+	_phase = Phase.SWITCH_B
 
 
 func _preview_path_from_cache(mr: Node) -> Array:
@@ -509,12 +510,13 @@ func _check_commit_then_drag() -> void:
 		_fail_reasons.append("commit_days_ne_preview")
 	if not _preview_path.is_empty() and not path.is_empty() and str(path) != str(_preview_path):
 		_fail_reasons.append("commit_path_ne_preview")
-	_commit_ok = has and dest == LEV and not dragged
-	_capture("mv1_card_up_commit_NOT_live_play")
+	if not _after_fight:
+		_commit_ok = has and dest == LEV and not dragged
+		_capture("mv1_card_up_commit_NOT_live_play")
 	if not _fail_reasons.is_empty():
 		_finish(false)
 		return
-	_phase = Phase.UNLOCK_DRAG
+	_phase = Phase.UNLOCK_DRAG if _after_fight else Phase.OPENFIGHT
 
 
 func _do_unlock_drag() -> void:
@@ -821,7 +823,14 @@ func _check_close_fight_then_reselect() -> void:
 	if not _fail_reasons.is_empty():
 		_finish(false)
 		return
-	_phase = Phase.RESELECT
+	# Open fight first-session sheet teleports GER to Maginot. Re-park so
+	# select + commit still work via real clicks (not selected_formation_id).
+	_park_ger_at(BONN, NAME_A)
+	_park_ger_at(NEUSS, NAME_B, _fid)
+	if mr.has_method("mv1_rebuild_unit_icons"):
+		mr.call("mv1_rebuild_unit_icons")
+	_after_fight = true
+	_go_settle(Phase.RESELECT, 18)
 
 
 func _check_reselect_then_switch() -> void:
@@ -852,7 +861,7 @@ func _check_reselect_then_switch() -> void:
 	if not _fail_reasons.is_empty():
 		_finish(false)
 		return
-	_phase = Phase.SWITCH_B
+	_phase = Phase.COMMIT
 
 
 func _do_switch_b() -> void:
