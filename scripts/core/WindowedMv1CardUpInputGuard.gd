@@ -84,10 +84,14 @@ enum Phase {
 	WAIT_FRA,
 	AIR_CLICK,
 	WAIT_AIR,
+	EDGE_CLEAR,
+	WAIT_EDGE_CLEAR,
 	EDGE_INSPECTOR,
 	WAIT_EDGE_INSPECTOR,
 	EDGE_REST_PANEL,
 	WAIT_EDGE_PANEL,
+	EDGE_REOPEN_CARD,
+	WAIT_EDGE_REOPEN,
 	EDGE_REST_CARD,
 	WAIT_EDGE_CARD,
 	DONE,
@@ -350,6 +354,12 @@ func _on_process() -> void:
 			_settle_left -= 1
 			if _settle_left <= 0:
 				_check_air_click()
+		Phase.EDGE_CLEAR:
+			_do_deselect_esc()
+		Phase.WAIT_EDGE_CLEAR:
+			_settle_left -= 1
+			if _settle_left <= 0:
+				_check_edge_clear()
 		Phase.EDGE_INSPECTOR:
 			_do_edge_inspector()
 		Phase.WAIT_EDGE_INSPECTOR:
@@ -360,6 +370,12 @@ func _on_process() -> void:
 			_do_edge_rest_start("panel")
 		Phase.WAIT_EDGE_PANEL:
 			_tick_edge_rest("panel")
+		Phase.EDGE_REOPEN_CARD:
+			_do_air_click()
+		Phase.WAIT_EDGE_REOPEN:
+			_settle_left -= 1
+			if _settle_left <= 0:
+				_check_edge_reopen_card()
 		Phase.EDGE_REST_CARD:
 			_do_edge_rest_start("card")
 		Phase.WAIT_EDGE_CARD:
@@ -1374,7 +1390,7 @@ func _check_steal_click() -> void:
 func _do_deselect_esc() -> void:
 	_press_esc()
 	_esc_left -= 1
-	_phase = Phase.WAIT_DESELECT
+	_phase = Phase.WAIT_EDGE_CLEAR if _phase == Phase.EDGE_CLEAR else Phase.WAIT_DESELECT
 	_settle_left = 12
 
 
@@ -1448,7 +1464,7 @@ func _do_air_click() -> void:
 		return
 	_log("EOA_MV1_CARD_UP_INPUT_GUARD who=guard.air_click pos=%.1f,%.1f (NOT live Play)" % [pos.x, pos.y])
 	_click_still(pos)
-	_phase = Phase.WAIT_AIR
+	_phase = Phase.WAIT_EDGE_REOPEN if _phase == Phase.EDGE_REOPEN_CARD else Phase.WAIT_AIR
 	_settle_left = LEFTOVER_FRAMES
 
 
@@ -1482,7 +1498,44 @@ func _check_air_click() -> void:
 		_finish(false)
 		return
 	_air_ok = true
+	_esc_left = 3
+	_phase = Phase.EDGE_CLEAR
+
+
+func _check_edge_clear() -> void:
+	var mr := _map_renderer()
+	var selected := ""
+	if mr != null and "selected_formation_id" in mr:
+		selected = str(mr.get("selected_formation_id"))
+	_log(
+		"EOA_MV1_CARD_UP_INPUT_GUARD who=guard.edge_clear selected=%s esc_left=%d (NOT live Play)"
+		% [selected, _esc_left]
+	)
+	if selected.is_empty():
+		_phase = Phase.EDGE_INSPECTOR
+		return
+	if _esc_left > 0:
+		_phase = Phase.EDGE_CLEAR
+		return
+	# Selection leftover must not block inspector open; continue anyway.
 	_phase = Phase.EDGE_INSPECTOR
+
+
+func _check_edge_reopen_card() -> void:
+	var mr := _map_renderer()
+	var card_up := false
+	if mr != null and mr.has_method("mv1_unit_card_is_visible"):
+		card_up = bool(mr.call("mv1_unit_card_is_visible"))
+	var pos: Vector2 = _close_screen_pos("card")
+	_log(
+		"EOA_MV1_CARD_UP_INPUT_GUARD who=guard.edge_reopen card=%s close=%.1f,%.1f (NOT live Play)"
+		% [str(card_up), pos.x, pos.y]
+	)
+	if pos == Vector2.ZERO:
+		_fail_reasons.append("unit_card_close_missing_after_reopen")
+		_finish(false)
+		return
+	_phase = Phase.EDGE_REST_CARD
 
 
 func _do_edge_inspector() -> void:
@@ -1606,7 +1659,7 @@ func _tick_edge_rest(kind: String) -> void:
 		return
 	if kind == "panel":
 		_edge_panel_ok = true
-		_phase = Phase.EDGE_REST_CARD
+		_phase = Phase.EDGE_REOPEN_CARD
 	else:
 		_edge_card_ok = true
 		_capture("mv1b_close_edge_pan_NOT_live_play")
