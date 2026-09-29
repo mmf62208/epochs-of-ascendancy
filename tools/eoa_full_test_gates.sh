@@ -216,6 +216,9 @@ else
   run_step launch_unit_order \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessWorldAccurateUnitOrderLoopTest.gd || fail
 
+  run_step launch_mv1_march_preview \
+    tools/run_godot.sh --headless -s res://scripts/core/HeadlessMv1MarchPreviewTest.gd || fail
+
   run_step launch_ix1_mandate_gate \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessIx1RoadSpineMandateGateTest.gd || fail
 
@@ -254,6 +257,12 @@ else
 
   run_step launch_rx1_pixel \
     tools/eoa_rx1_pixel_guard.sh || fail
+
+  run_step launch_mv1_pixel \
+    tools/eoa_mv1_pixel_guard.sh || fail
+
+  run_step launch_mv1_card_up_input \
+    tools/eoa_mv1_card_up_input_guard.sh || fail
 
   run_step launch_rx1_live_stay_alive_tick \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessRx1RhineLiveStayAliveTickTest.gd || fail

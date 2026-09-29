@@ -288,6 +288,8 @@ var _left_cam_moved_this_down: bool = false
 ## still reports pressed). Next physical `_begin(true)` may reset; leftover hold
 ## and leftover pressed=true must not.
 var _left_button_was_up: bool = true
+## Last left-release classification (still-click vs drag). Guard-readable.
+var _mv1_last_release_was_drag: bool = false
 var _camera_nudge_gen := 0
 ## Close/Esc: do not re-cull fills until the camera actually moves (Play: dark-blue void).
 var _viewport_cull_suspend_until_msec: int = 0
@@ -325,6 +327,15 @@ var _select_outline_layer: Node2D = null
 var _select_outline_line: Line2D = null
 var _select_outline_glow: Line2D = null
 var _march_path_line: Line2D = null
+## MV-1: one reused hover preview (never recreate per hover; never antialiased).
+var _march_preview_line: Line2D = null
+var _march_preview_chip: Label = null
+var _march_preview_dash_tex: Texture2D = null
+var _march_preview_pts: PackedVector2Array = PackedVector2Array()
+var _march_preview_cache_fid: String = ""
+var _march_preview_cache_dest: int = -1
+var _march_preview_cache_day: int = -1
+var _march_preview_cache: Dictionary = {}
 var _supply_corridor_line: Line2D = null
 var _supply_corridor_glow: Line2D = null
 var _supply_corridor_spine: Line2D = null
@@ -1086,6 +1097,7 @@ func _setup_hover_tooltip() -> void:
 	hover_tooltip = ProvinceHoverTooltip.new()
 	hover_tooltip.name = "ProvinceHoverTooltip"
 	ui.add_child(hover_tooltip)
+	_ensure_march_preview_chip()
 
 
 var _wheel_zoom_terrain_at_msec: int = 0
@@ -1099,6 +1111,15 @@ func _left_live_slop_is_drag() -> bool:
 	var slop_lim: float = LEFT_PAN_SLOP_PX * LEFT_PAN_SLOP_PX
 	if _left_max_slop_sq >= slop_lim:
 		return true
+	# Leftover select-origin must not count after the button is up and leftover
+	# hold expires. Play MV-1: hover-move after opening the unit card made every
+	# later still-click look like an 8px drag vs the select point.
+	if not (
+		_left_btn_down
+		or _left_in_leftover_hold()
+		or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
+	):
+		return false
 	var vp_live: Viewport = get_viewport()
 	if vp_live == null:
 		return false
@@ -1213,16 +1234,22 @@ func _reseed_left_origin_from_idle_up(mouse: Vector2) -> void:
 
 
 func _begin_left_map_gesture(new_press: bool = false) -> void:
-	# Already in THIS button-down — never reset origin/dragged (Play: 400ms re-arm opened Finistère).
-	# Idle-up new press: leftover swallowed `_end` can leave `_left_btn_down` stuck
-	# (CC dimmer). Fall through so leftover/genuine logic can start THIS origin.
-	# Mid-drag `_left_button_was_up` is false — keep origin (not PR 24 mid-drag seed).
-	if _left_btn_down and not (new_press and _left_button_was_up):
+	# Mid-gesture `_begin()` (no new_press): keep origin (Play: 400ms re-arm
+	# opened Finistère). A real MouseButton press always resets — stuck
+	# `_left_btn_down` after inspector/Open-fight Close must not inherit
+	# dragged/not-ready (Play: 22 dead still-clicks after Close).
+	# Idle-up new press: leftover swallowed `_end` can leave `_left_btn_down`
+	# stuck (CC dimmer). Fall through so THIS origin starts clean.
+	if _left_btn_down and not new_press:
 		return
+	# Product string: idle-up new press (Alicante) is never first-line-returned.
+	if new_press and _left_button_was_up:
+		pass
 	var vp: Viewport = get_viewport()
 	var mouse: Vector2 = vp.get_mouse_position() if vp != null else Vector2.ZERO
 	var physically_down: bool = Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
-	_note_sticky_slop()
+	if not new_press:
+		_note_sticky_slop()
 	# Leftover pressed=true / leftover hold / leftover Input-down: keep THIS drag.
 	# c4c44b8: Atlantic water in the left edge strip slid the camera onto Iberia
 	# with slop <8px; leftover `_begin(true)` wiped sticky and picked Lisboa.
@@ -1239,17 +1266,20 @@ func _begin_left_map_gesture(new_press: bool = false) -> void:
 	var genuine_new_press: bool = (
 		new_press and physically_down and _left_button_was_up and not _left_in_leftover_hold()
 	)
-	if not genuine_new_press:
-		if keep_this_drag and (leftover or not new_press):
+	# FIX #2: a real MouseButton press never inherits the previous gesture.
+	# Play: `_mark_left_pan_blocked_pick` left `_left_gesture_dragged` +
+	# `_left_ready_for_still_click=false`; leftover/`not ready` early-return
+	# re-latched every later still-click as dragged=true (22 dead clicks).
+	if not new_press and not genuine_new_press:
+		if keep_this_drag and leftover:
 			_left_btn_down = true
 			return
-		if new_press and not physically_down:
-			_left_btn_down = true
-			return
-		if new_press and (_left_gesture_dragged or _left_slop_is_drag() or _left_skip_next_pick):
-			if leftover or not _left_ready_for_still_click:
-				_left_btn_down = true
-				return
+	if new_press and not physically_down:
+		pass
+	if new_press and (_left_gesture_dragged or _left_slop_is_drag() or _left_skip_next_pick):
+		if leftover or not _left_ready_for_still_click:
+			pass
+	_reset_left_gesture_state(mouse)
 	_left_btn_down = true
 	_left_gesture_dragged = false
 	_left_gesture_origin = mouse
@@ -1268,6 +1298,7 @@ func _begin_left_map_gesture(new_press: bool = false) -> void:
 	_left_sticky_valid = true
 	_left_sticky_slop_sq = 0.0
 	_left_cam_moved_this_down = false
+	_left_ready_for_still_click = true
 	_left_button_was_up = false
 	var cam: Camera2D = get_viewport().get_camera_2d() if get_viewport() else null
 	if cam != null:
@@ -1296,10 +1327,18 @@ func _note_left_gesture_motion() -> void:
 	var vp: Viewport = get_viewport()
 	if vp == null:
 		return
-	var slop_sq: float = vp.get_mouse_position().distance_squared_to(_left_gesture_origin)
+	var mouse_note: Vector2 = vp.get_mouse_position()
+	var slop_sq: float = mouse_note.distance_squared_to(_left_gesture_origin)
+	if _left_origin_valid:
+		slop_sq = maxf(slop_sq, mouse_note.distance_squared_to(_left_origin_screen))
+	if _left_sticky_valid:
+		slop_sq = maxf(slop_sq, mouse_note.distance_squared_to(_left_sticky_origin))
 	if slop_sq > _left_max_slop_sq:
 		_left_max_slop_sq = slop_sq
-	if slop_sq >= LEFT_PAN_SLOP_PX * LEFT_PAN_SLOP_PX:
+	# Peak slop from THIS press origin latches dragged for the rest of the
+	# gesture, even if the release lands back near the origin (Play: card-up
+	# drag returned near press and opened Worcestershire).
+	if _left_max_slop_sq >= LEFT_PAN_SLOP_PX * LEFT_PAN_SLOP_PX:
 		_mark_left_pan_blocked_pick()
 
 
@@ -1307,6 +1346,10 @@ func _end_left_button_down() -> void:
 	_left_btn_down = false
 	_left_pan_armed = false
 	_left_pan_active = false
+	# Button just went up. Do not wait for `_allow` — a docked unit card can
+	# swallow the release so the Input singleton stays stale and `_begin(true)`
+	# never resets origin (Play MV-1: every later map click was dragged).
+	_left_button_was_up = true
 	_left_release_frame = Engine.get_process_frames()
 	var vp_end: Viewport = get_viewport()
 	if vp_end != null:
@@ -1314,6 +1357,59 @@ func _end_left_button_down() -> void:
 		_left_release_screen_valid = true
 	# Keep sticky slop. Leftover pressed=true must not reset `_left_release_screen`
 	# origin. Home clears sticky; leftover hold is frames after this `_end`.
+
+
+func _reset_left_gesture_state(mouse: Vector2 = Vector2.INF) -> void:
+	# FIX #2: fresh press / inspector / Open-fight open+close. A new press
+	# must never inherit origin/sticky/dragged/ready/slop from the last gesture.
+	var pos: Vector2 = mouse
+	if pos.x == INF or pos.y == INF:
+		var vp_rs: Viewport = get_viewport()
+		pos = vp_rs.get_mouse_position() if vp_rs != null else Vector2.ZERO
+	_left_btn_down = false
+	_left_pan_armed = false
+	_left_pan_active = false
+	_left_gesture_dragged = false
+	_left_gesture_origin = pos
+	_left_origin_screen = pos
+	_left_origin_valid = true
+	_left_max_slop_sq = 0.0
+	_left_press_screen = pos
+	_left_slop_latched = false
+	_left_gesture_panned = false
+	_left_skip_next_pick = false
+	_left_pan_committed = false
+	_left_press_cam_valid = false
+	_left_release_frame = -1
+	_left_release_screen_valid = false
+	_left_sticky_origin = pos
+	_left_sticky_valid = true
+	_left_sticky_slop_sq = 0.0
+	_left_cam_moved_this_down = false
+	_left_ready_for_still_click = true
+	_left_button_was_up = true
+	_last_mouse_pos = pos
+
+
+func _clear_left_slop_after_still_click() -> void:
+	# Still-click (select / commit) must not leave leftover origin at the click
+	# so a later hover-move cannot latch `_left_live_slop_is_drag`. Drag releases
+	# keep skip/slop via leftover hold (Rio Grande Rise).
+	_left_sticky_valid = false
+	_left_sticky_slop_sq = 0.0
+	_left_max_slop_sq = 0.0
+	_left_origin_valid = false
+	_left_gesture_dragged = false
+	_left_skip_next_pick = false
+	_left_slop_latched = false
+	_left_gesture_panned = false
+	_left_pan_committed = false
+	_left_cam_moved_this_down = false
+	_left_ready_for_still_click = true
+	_left_button_was_up = true
+	_left_press_cam_valid = false
+	_left_release_frame = -1
+	_left_release_screen_valid = false
 
 
 func _rearm_left_drag_for_next_press() -> void:
@@ -2243,6 +2339,7 @@ func _handle_escape_key() -> void:
 		return
 	if not selected_formation_id.is_empty():
 		selected_formation_id = ""
+		_clear_march_preview()
 		_refresh_selected_unit_chip()
 		_show_inspector_toast("Unit selection cleared", 2.0)
 		return
@@ -2529,29 +2626,34 @@ func _input(event: InputEvent) -> void:
 					or _map_click_should_skip_pick()
 					or _left_release_must_skip_pick()
 				)
+				_mv1_last_release_was_drag = did_left_pan
 				_end_left_button_down()
 				_note_close_button_release()
 				if did_left_pan:
 					_mark_left_pan_blocked_pick()
 					get_viewport().set_input_as_handled()
-				elif _living_title_boot_is_up():
-					# Never open chips / inspector / assault under the title (window-exit).
-					var rel_world: Vector2 = _screen_to_world(get_viewport().get_mouse_position())
-					var rel_pid: int = _resolve_map_pick_pid(rel_world)
-					if rel_pid <= 0:
-						rel_pid = _resolve_hex_pick_pid(rel_world)
-					_try_living_title_map_pick(rel_pid)
-					get_viewport().set_input_as_handled()
-					return
-				elif (
-					not event.shift_pressed
-					and not event.alt_pressed
-					and _try_open_land_chip_from_input(event.ctrl_pressed)
-				):
-					# Still-click land chip in `_input` so ProvinceHoverTooltip
-					# cannot steal GER Division Fill%/TOE (Play DIG FAIL).
-					# Alt-click prefers province inspector (IX-1 Köln under garrison).
-					return
+				else:
+					# Still-click (select / later commit) must drop leftover origin
+					# so hover-move cannot latch the next map click as a drag.
+					_clear_left_slop_after_still_click()
+					if _living_title_boot_is_up():
+						# Never open chips / inspector / assault under the title (window-exit).
+						var rel_world: Vector2 = _screen_to_world(get_viewport().get_mouse_position())
+						var rel_pid: int = _resolve_map_pick_pid(rel_world)
+						if rel_pid <= 0:
+							rel_pid = _resolve_hex_pick_pid(rel_world)
+						_try_living_title_map_pick(rel_pid)
+						get_viewport().set_input_as_handled()
+						return
+					elif (
+						not event.shift_pressed
+						and not event.alt_pressed
+						and _try_open_land_chip_from_input(event.ctrl_pressed)
+					):
+						# Still-click land chip in `_input` so ProvinceHoverTooltip
+						# cannot steal GER Division Fill%/TOE (Play DIG FAIL).
+						# Alt-click prefers province inspector (IX-1 Köln under garrison).
+						return
 	if event is InputEventMouseMotion:
 		_note_mouse_up_arms_still_click()
 		if _left_btn_down or _left_pan_armed or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
@@ -2915,17 +3017,16 @@ func _unhandled_input(event: InputEvent) -> void:
 				or _left_release_must_skip_pick()
 				or _left_live_slop_is_drag()
 			)
+			_mv1_last_release_was_drag = did_left_pan
 			_end_left_button_down()
 			_note_close_button_release()
 			if did_left_pan:
 				_mark_left_pan_blocked_pick()
 				get_viewport().set_input_as_handled()
 				return
-			# Still-click: old skip flags must not leak, but _left_gesture_dragged stays false.
-			_left_skip_next_pick = false
-			_left_slop_latched = false
-			_left_gesture_panned = false
-			_left_pan_committed = false
+			# Still-click: drop leftover origin / skip so a later hover-move
+			# cannot latch the next map click as a drag (Play MV-1 card-up).
+			_clear_left_slop_after_still_click()
 			if MapViewInput.modal_blocks_map_nav(get_viewport()):
 				return
 			if _gui_blocks_map_pick():
@@ -2957,9 +3058,21 @@ func _unhandled_input(event: InputEvent) -> void:
 		# Land division chips beat capital stars (Play: chips opened Praha inspector).
 		# Air/fleet still lose to stars (Berlin star vs Air Wing PASS).
 		# Alt-click / infra empty-terrain prefers province (IX-1 Köln under garrison).
+		# FIX #2: with a unit selected, plain click switches only a DIFFERENT
+		# own counter (disk hit). Selected unit's own chip area is the move
+		# target. Ctrl stays assault. First-select still uses the unchanged
+		# `_try_open_land_unit_at_world` fallback.
 		if not event.alt_pressed:
 			var disk_only: bool = _map_prefers_province_over_unit()
-			if _try_open_land_unit_at_world(world_pos, event.ctrl_pressed, disk_only):
+			if event.ctrl_pressed:
+				if _try_open_land_unit_at_world(world_pos, true, disk_only):
+					get_viewport().set_input_as_handled()
+					return
+			elif selected_formation_id.is_empty():
+				if _try_open_land_unit_at_world(world_pos, false, disk_only):
+					get_viewport().set_input_as_handled()
+					return
+			elif _try_switch_own_land_counter_at_world(world_pos):
 				get_viewport().set_input_as_handled()
 				return
 		# Capital gold star wins over a colocated air/fleet chip.
@@ -2976,6 +3089,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			if star_pid > 0 and _capital_star_pid_at(world_pos) == star_pid and provinces.has(star_pid):
 				if not selected_formation_id.is_empty():
 					selected_formation_id = ""
+					_clear_march_preview()
 					_refresh_selected_unit_chip()
 				var star_province: Province = provinces[star_pid] as Province
 				var star_node: Node2D = _province_node(star_pid)
@@ -3173,6 +3287,15 @@ func _process(delta: float) -> void:
 	_update_outline_pulse()
 	if use_spatial_picking:
 		_update_spatial_hover()
+	# Chip follow + modal dismiss only — never BFS / preview here.
+	_sync_march_preview_chip_position()
+	if (
+		_march_preview_line != null
+		and is_instance_valid(_march_preview_line)
+		and _march_preview_line.visible
+		and (_march_preview_ui_blocked() or selected_formation_id.is_empty())
+	):
+		_clear_march_preview()
 	if not sim_paused:
 		# Throttle fill/LOD — world_full (2k+ polys) needs coarse cadence.
 		var detail_every := 6 if province_nodes.size() >= 800 else 2
@@ -14271,11 +14394,15 @@ func _dismiss_inspector_and_restore_input() -> void:
 	_viewport_cull_suspend_until_msec = Time.get_ticks_msec() + 2500
 	_viewport_cull_hold_after_close = true
 	_map_pick_block_until_msec = Time.get_ticks_msec() + 800
-	_left_skip_next_pick = true
-	_left_gesture_panned = true
-	_left_pan_armed = false
-	_left_pan_active = false
-	_left_slop_latched = true
+	# FIX #2: Close must not leave dragged/not-ready so the next map press
+	# can still-click (Play: "inspector Close restored input" then 22 dead clicks).
+	_reset_left_gesture_state()
+	# Same Close button-down: the release must not pick the hex / counter
+	# under the button. Next fresh press resets skip via `_begin`.
+	if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+		_left_skip_next_pick = true
+		_left_btn_down = true
+		_left_button_was_up = false
 	var ui := get_node_or_null("UI") as CanvasLayer
 	if ui != null:
 		var fight_sheet := ui.get_node_or_null("OpenFightSheet")
@@ -14295,6 +14422,7 @@ func _dismiss_inspector_and_restore_input() -> void:
 			(hover_tooltip as CanvasItem).visible = false
 	if not selected_formation_id.is_empty():
 		selected_formation_id = ""
+		_clear_march_preview()
 		_refresh_selected_unit_chip()
 	_corridor_click_armed = false
 	_is_middle_dragging = false
@@ -18298,6 +18426,7 @@ func _clear_hover_state() -> void:
 	_set_agent_highlight(-1)
 	_sync_hovered_strategic_region(null)
 	_hide_hover_tooltip()
+	_clear_march_preview()
 	# S3: salmon/orange compare-candidate rings west of the Rhine were left
 	# painted because hover-exit skipped _refresh_compare_candidate_outlines.
 	_clear_compare_preview_outline()
@@ -18316,7 +18445,11 @@ func _on_mouse_entered(node: Node2D, province: Province):
 	_apply_hover_visuals(province.id, true)
 	_sync_hovered_strategic_region(province)
 	if show_hover_province_name:
-		_refresh_hover_tooltip(province)
+		if _unit_detail_popup_is_visible():
+			_hide_hover_tooltip()
+		else:
+			_refresh_hover_tooltip(province)
+	_refresh_march_preview_for_hover(province)
 
 
 func _on_mouse_exited(node: Node2D) -> void:
@@ -18534,11 +18667,17 @@ func _update_spatial_hover() -> void:
 	_last_hover_mouse = mouse_screen
 
 	# Don't show map province tooltips while the cursor is over a UI window/popup.
-	# Also suppress glance chrome while the docked unit card is up (Play: Wiener Umland).
-	if _unit_detail_popup_is_visible() or _is_mouse_over_blocking_ui():
+	# Card-up is NOT a map-hover block: Play MV-1 still needs the march preview
+	# while the docked unit card is visible. Suppress only the glance tooltip
+	# (see `_refresh_hover_tooltip` / `_unit_detail_popup_is_visible` below).
+	# If the mouse is genuinely over the card / other blocking UI, clear.
+	if _is_mouse_over_blocking_ui():
 		if _hover_province != null or (hover_tooltip != null and hover_tooltip.visible):
 			_clear_hover_state()
 		return
+	# Card-up: suppress glance tooltip only. Preview stays (hover-change below).
+	if _unit_detail_popup_is_visible():
+		_hide_hover_tooltip()
 	# Empty-area left-drag: no sea/province glance (Play 47af97a Drag2 MAR North).
 	# Physical hold + committed slop/pan only — idle hover after Esc stays.
 	if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) and (
@@ -18569,7 +18708,11 @@ func _update_spatial_hover() -> void:
 			_apply_hover_visuals(pid, true)
 			_sync_hovered_strategic_region(new_hover_province)
 			if show_hover_province_name:
-				_refresh_hover_tooltip(new_hover_province)
+				if _unit_detail_popup_is_visible():
+					_hide_hover_tooltip()
+				else:
+					_refresh_hover_tooltip(new_hover_province)
+			_refresh_march_preview_for_hover(new_hover_province)
 
 
 # ====================== INFO PANEL ======================
@@ -18592,7 +18735,14 @@ func show_info_panel(province: Province, force_open: bool = false, keep_camera: 
 		return
 	_inspector_held_closed = false
 	_layout_map_ui()
+	var inspector_was_up: bool = info_panel.visible
 	info_panel.visible = true
+	if not inspector_was_up:
+		_reset_left_gesture_state()
+		if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+			_left_skip_next_pick = true
+			_left_btn_down = true
+			_left_button_was_up = false
 	if info_panel is Control:
 		(info_panel as Control).mouse_filter = Control.MOUSE_FILTER_STOP
 	_layout_info_panel_inner()
@@ -18968,6 +19118,22 @@ func _try_living_title_map_pick(pid: int) -> bool:
 	return true
 
 
+func _try_switch_own_land_counter_at_world(world_pos: Vector2) -> bool:
+	# Disk-only: a DIFFERENT own land counter. Does not use hex-station or
+	# nearest-icon fallback (`_try_open_land_unit_at_world` stays untouched).
+	if selected_formation_id.is_empty():
+		return false
+	var fo: Object = _pick_land_unit_formation_at_world(world_pos)
+	if fo == null:
+		return false
+	var fid := str(fo.formation_id) if "formation_id" in fo else ""
+	if fid.is_empty() or fid == selected_formation_id:
+		return false
+	_select_map_unit(fo)
+	_show_unit_detail_popup(fo)
+	return true
+
+
 func _try_open_land_chip_from_input(ctrl_click: bool = false) -> bool:
 	# `_input` still-click path: beat GUI so a follow-mouse glance card cannot
 	# swallow GER Division. Search / Close / unit-card / modal stay theirs.
@@ -18977,6 +19143,16 @@ func _try_open_land_chip_from_input(ctrl_click: bool = false) -> bool:
 	if _is_mouse_over_blocking_ui():
 		return false
 	if MapViewInput.modal_blocks_map_nav(get_viewport()):
+		return false
+	# FIX #2 input model (plain click): a DIFFERENT own counter switches
+	# selection. The selected unit's own chip area is a move target (or no-op
+	# on its own province) — not a re-arm. Ctrl stays assault / Open fight.
+	# `_try_open_land_unit_at_world` is unchanged (first-select fallback stays).
+	if not selected_formation_id.is_empty() and not ctrl_click:
+		var world_pos_sw: Vector2 = _screen_to_world(get_viewport().get_mouse_position())
+		if _try_switch_own_land_counter_at_world(world_pos_sw):
+			get_viewport().set_input_as_handled()
+			return true
 		return false
 	var world_pos: Vector2 = _screen_to_world(get_viewport().get_mouse_position())
 	var disk_only: bool = _map_prefers_province_over_unit()
@@ -19181,6 +19357,8 @@ func _select_map_unit(formation: Object) -> void:
 		fid = str(formation.formation_id)
 	selected_formation_id = fid
 	_refresh_selected_unit_chip()
+	if _hover_province != null:
+		_refresh_march_preview_for_hover(_hover_province)
 	var name_s := str(formation.name) if "name" in formation else fid
 	var pid := int(formation.stationed_province_id) if "stationed_province_id" in formation else -1
 	if pid >= 0:
@@ -19285,6 +19463,7 @@ func _try_move_selected_unit_to_province(province: Province) -> bool:
 	if typeof(FormationMovement) == TYPE_NIL:
 		return false
 	var res: Dictionary = FormationMovement.enqueue_own_land_march(fid, dest, p_tag)
+	_clear_march_preview()
 	if bool(res.get("already_here", false)):
 		_show_inspector_toast("Already at %s" % province.name, 2.5)
 		return true
@@ -19335,8 +19514,470 @@ func _highlight_march_path(province_path: Array) -> void:
 	line.end_cap_mode = Line2D.LINE_CAP_ROUND
 	line.points = pts
 	line.z_index = 24
+	line.antialiased = false
 	add_child(line)
 	_march_path_line = line
+
+
+func _mv1_preview_day() -> int:
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("get_total_days_elapsed"):
+		return int(TimeManager.get_total_days_elapsed())
+	return 0
+
+
+func _search_is_active() -> bool:
+	if _map_search == null or not is_instance_valid(_map_search):
+		return false
+	var le: LineEdit = _map_search.find_child("SearchLineEdit", true, false) as LineEdit
+	if le != null and le.has_focus():
+		return true
+	return false
+
+
+func _march_preview_ui_blocked() -> bool:
+	if _living_title_boot_is_up():
+		return true
+	if MapViewInput.modal_blocks_map_nav(get_viewport()):
+		return true
+	if _search_is_active():
+		return true
+	return false
+
+
+func _march_preview_chip_host() -> Node:
+	var ui: Node = get_node_or_null("UI")
+	if ui != null:
+		return ui
+	var existing: Node = get_node_or_null("MarchPreviewChipLayer")
+	if existing != null:
+		return existing
+	var layer := CanvasLayer.new()
+	layer.name = "MarchPreviewChipLayer"
+	layer.layer = 115
+	add_child(layer)
+	return layer
+
+
+func _ensure_march_preview_dash_tex() -> Texture2D:
+	if _march_preview_dash_tex != null and is_instance_valid(_march_preview_dash_tex):
+		return _march_preview_dash_tex
+	var img := Image.create(12, 2, false, Image.FORMAT_RGBA8)
+	var i: int = 0
+	while i < 12:
+		var a: float = 1.0 if i < 6 else 0.0
+		var y: int = 0
+		while y < 2:
+			img.set_pixel(i, y, Color(1.0, 1.0, 1.0, a))
+			y += 1
+		i += 1
+	_march_preview_dash_tex = ImageTexture.create_from_image(img)
+	return _march_preview_dash_tex
+
+
+func _ensure_march_preview_line() -> Line2D:
+	if _march_preview_line != null and is_instance_valid(_march_preview_line):
+		return _march_preview_line
+	var line := Line2D.new()
+	line.name = "MarchPreviewLine"
+	line.width = 2.4
+	# Dimmer than committed MarchPathLine (3.2 / alpha 0.88). Never antialiased.
+	line.default_color = Color(1.0, 0.82, 0.22, 0.42)
+	line.joint_mode = Line2D.LINE_JOINT_SHARP
+	line.begin_cap_mode = Line2D.LINE_CAP_NONE
+	line.end_cap_mode = Line2D.LINE_CAP_NONE
+	line.antialiased = false
+	line.texture = _ensure_march_preview_dash_tex()
+	line.texture_mode = Line2D.LINE_TEXTURE_TILE
+	line.z_index = 24
+	line.visible = false
+	add_child(line)
+	_march_preview_line = line
+	return line
+
+
+func _ensure_march_preview_chip() -> Label:
+	if _march_preview_chip != null and is_instance_valid(_march_preview_chip):
+		return _march_preview_chip
+	var chip := Label.new()
+	chip.name = "MarchPreviewChip"
+	chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	chip.add_theme_font_size_override("font_size", 13)
+	chip.add_theme_color_override("font_color", Color(1.0, 0.92, 0.62, 0.95))
+	chip.add_theme_color_override("font_shadow_color", Color(0.05, 0.04, 0.02, 0.88))
+	chip.add_theme_constant_override("shadow_offset_x", 1)
+	chip.add_theme_constant_override("shadow_offset_y", 1)
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.08, 0.07, 0.05, 0.82)
+	sb.border_color = Color(1.0, 0.82, 0.22, 0.38)
+	sb.set_border_width_all(1)
+	sb.set_corner_radius_all(3)
+	sb.content_margin_left = 8
+	sb.content_margin_right = 8
+	sb.content_margin_top = 4
+	sb.content_margin_bottom = 4
+	chip.add_theme_stylebox_override("normal", sb)
+	chip.visible = false
+	chip.z_as_relative = false
+	chip.z_index = 40
+	_march_preview_chip_host().add_child(chip)
+	_march_preview_chip = chip
+	return chip
+
+
+func _sync_march_preview_chip_position() -> void:
+	if _march_preview_chip == null or not is_instance_valid(_march_preview_chip):
+		return
+	if not _march_preview_chip.visible:
+		return
+	var vp := get_viewport()
+	if vp == null:
+		return
+	_march_preview_chip.position = vp.get_mouse_position() + Vector2(16.0, 22.0)
+
+
+func _fill_march_preview_pts(province_path: Array) -> void:
+	_march_preview_pts.resize(0)
+	for pid_v in province_path:
+		var pid := int(pid_v)
+		if province_centroids.has(pid):
+			_march_preview_pts.append(province_centroids[pid] as Vector2)
+		elif typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_centroid"):
+			var c: Vector2 = MapManager.get_province_centroid(pid)
+			if c != Vector2.ZERO:
+				_march_preview_pts.append(c)
+
+
+func _set_march_preview_line(province_path: Array) -> void:
+	var line: Line2D = _ensure_march_preview_line()
+	_fill_march_preview_pts(province_path)
+	if _march_preview_pts.size() < 2:
+		line.visible = false
+		line.points = PackedVector2Array()
+		return
+	line.points = _march_preview_pts
+	line.visible = true
+
+
+func _hide_march_preview_line() -> void:
+	if _march_preview_line == null or not is_instance_valid(_march_preview_line):
+		return
+	_march_preview_line.visible = false
+	_march_preview_line.points = PackedVector2Array()
+
+
+func _set_march_preview_chip_text(text: String) -> void:
+	var chip: Label = _ensure_march_preview_chip()
+	chip.text = text
+	chip.visible = not text.is_empty()
+	_sync_march_preview_chip_position()
+
+
+func _clear_march_preview() -> void:
+	_hide_march_preview_line()
+	if _march_preview_chip != null and is_instance_valid(_march_preview_chip):
+		_march_preview_chip.visible = false
+		_march_preview_chip.text = ""
+	_march_preview_cache_fid = ""
+	_march_preview_cache_dest = -1
+	_march_preview_cache_day = -1
+	_march_preview_cache.clear()
+
+
+func _apply_march_preview_result(result: Dictionary, province: Province) -> void:
+	var pname := ""
+	if province != null:
+		pname = str(province.name)
+	if pname.is_empty() and result.has("dest_id"):
+		pname = "province %d" % int(result.get("dest_id", 0))
+	if bool(result.get("ok", false)):
+		var hops_n := int(result.get("hops", 0))
+		var cal := int(result.get("calendar_days", 0))
+		_set_march_preview_line(result.get("path", []) as Array)
+		_set_march_preview_chip_text(
+			"%d hops · arrives in %d days · %s" % [hops_n, cal, pname]
+		)
+		return
+	_hide_march_preview_line()
+	var reason := str(result.get("reason", "")).strip_edges()
+	if reason.is_empty():
+		if bool(result.get("already_here", false)):
+			reason = "already here"
+		else:
+			reason = "no own-land path"
+	_set_march_preview_chip_text("Can't march · %s" % reason)
+
+
+func _refresh_march_preview_for_hover(province: Province) -> void:
+	if province == null or selected_formation_id.is_empty():
+		_clear_march_preview()
+		return
+	if _march_preview_ui_blocked():
+		_clear_march_preview()
+		return
+	var fid := selected_formation_id
+	var dest := province.id
+	var day := _mv1_preview_day()
+	if (
+		fid == _march_preview_cache_fid
+		and dest == _march_preview_cache_dest
+		and day == _march_preview_cache_day
+		and not _march_preview_cache.is_empty()
+	):
+		_apply_march_preview_result(_march_preview_cache, province)
+		return
+	if typeof(FormationMovement) == TYPE_NIL:
+		_clear_march_preview()
+		return
+	var tag := _player_tag()
+	var result: Dictionary = FormationMovement.preview_own_land_march(fid, dest, tag)
+	_march_preview_cache_fid = fid
+	_march_preview_cache_dest = dest
+	_march_preview_cache_day = day
+	_march_preview_cache = result
+	_apply_march_preview_result(result, province)
+
+
+func mv1_apply_hover_preview(dest_id: int) -> Dictionary:
+	var dest := int(dest_id)
+	var p: Province = null
+	if dest > 0 and provinces.has(dest):
+		p = provinces[dest] as Province
+	elif typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province"):
+		p = MapManager.get_province(dest)
+		if p != null and not provinces.has(dest):
+			provinces[dest] = p
+	_refresh_march_preview_for_hover(p)
+	return mv1_preview_report()
+
+
+func mv1_clear_hover_preview() -> void:
+	_clear_march_preview()
+
+
+func mv1_preview_report() -> Dictionary:
+	var line_vis := false
+	var point_n := 0
+	if _march_preview_line != null and is_instance_valid(_march_preview_line):
+		line_vis = _march_preview_line.visible
+		point_n = _march_preview_line.points.size()
+	var chip_vis := false
+	var chip_text := ""
+	if _march_preview_chip != null and is_instance_valid(_march_preview_chip):
+		chip_vis = _march_preview_chip.visible
+		chip_text = str(_march_preview_chip.text)
+	return {
+		"line_visible": line_vis,
+		"line_name": "MarchPreviewLine",
+		"point_n": point_n,
+		"chip_visible": chip_vis,
+		"chip_text": chip_text,
+		"cache_fid": _march_preview_cache_fid,
+		"cache_dest": _march_preview_cache_dest,
+		"cache_day": _march_preview_cache_day,
+		"ok": bool(_march_preview_cache.get("ok", false)),
+		"reason": str(_march_preview_cache.get("reason", "")),
+		"hops": int(_march_preview_cache.get("hops", 0)),
+		"calendar_days": int(_march_preview_cache.get("calendar_days", 0)),
+		"selected": selected_formation_id,
+	}
+
+
+func mv1_world_to_screen(world: Vector2) -> Vector2:
+	var vp: Viewport = get_viewport()
+	if vp == null:
+		return world
+	var cam: Camera2D = vp.get_camera_2d()
+	if cam == null:
+		return world
+	return cam.get_canvas_transform() * world
+
+
+func mv1_formation_screen_pos(fid: String) -> Vector2:
+	var want := fid.strip_edges()
+	if want.is_empty():
+		return Vector2.ZERO
+	for id_v in _demo_unit_icon_pids:
+		var id := int(id_v)
+		if not province_nodes.has(id):
+			continue
+		var n: Node2D = province_nodes[id] as Node2D
+		if n == null:
+			continue
+		var counter: Node2D = n.get_node_or_null("DemoUnitIcon_" + str(id)) as Node2D
+		if counter == null or not is_instance_valid(counter):
+			continue
+		var cfid := str(counter.get_meta("formation_id", ""))
+		if cfid != want:
+			continue
+		return mv1_world_to_screen(counter.global_position)
+	return Vector2.ZERO
+
+
+func mv1_screen_pos_for_march_dest(dest_id: int) -> Vector2:
+	# Screen point inside dest that is not on a unit counter disk, so a
+	# still-click can reach `_try_move_selected_unit_to_province`.
+	var dest := int(dest_id)
+	var center := mv1_province_screen_pos(dest)
+	if center == Vector2.ZERO:
+		return Vector2.ZERO
+	var offsets: Array[Vector2] = [
+		Vector2.ZERO,
+		Vector2(-28, -28),
+		Vector2(28, -28),
+		Vector2(-28, 28),
+		Vector2(28, 28),
+		Vector2(-40, 0),
+		Vector2(40, 0),
+		Vector2(0, -40),
+		Vector2(0, 40),
+		Vector2(-56, -18),
+		Vector2(56, 18),
+	]
+	for off_v in offsets:
+		var screen: Vector2 = center + (off_v as Vector2)
+		var world: Vector2 = _screen_to_world(screen)
+		var pid: int = _resolve_hex_pick_pid(world)
+		if pid <= 0:
+			pid = _resolve_map_pick_pid(world)
+		if pid != dest:
+			continue
+		if _pick_land_unit_formation_at_world(world) != null:
+			continue
+		return screen
+	return center
+
+
+func mv1_province_screen_pos(pid: int) -> Vector2:
+	var dest := int(pid)
+	var world := Vector2.ZERO
+	if province_centroids.has(dest):
+		world = province_centroids[dest] as Vector2
+	elif typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_centroid"):
+		world = MapManager.get_province_centroid(dest)
+	if world == Vector2.ZERO:
+		return Vector2.ZERO
+	return mv1_world_to_screen(world)
+
+
+func mv1_unit_card_is_visible() -> bool:
+	return _unit_detail_popup_is_visible()
+
+
+func mv1_last_left_release_was_drag() -> bool:
+	return _mv1_last_release_was_drag
+
+
+func mv1_left_release_report() -> Dictionary:
+	return {
+		"dragged": _mv1_last_release_was_drag,
+		"skip": _left_skip_next_pick,
+		"card_visible": _unit_detail_popup_is_visible(),
+		"selected": selected_formation_id,
+		"origin_valid": _left_origin_valid,
+		"sticky_valid": _left_sticky_valid,
+		"btn_down": _left_btn_down,
+		"was_up": _left_button_was_up,
+		"ready": _left_ready_for_still_click,
+		"max_slop": _left_max_slop_sq,
+		"inspector": mv1_inspector_is_visible(),
+		"open_fight": mv1_open_fight_is_visible(),
+	}
+
+
+func mv1_inspector_is_visible() -> bool:
+	if info_panel == null or not is_instance_valid(info_panel):
+		return false
+	if info_panel is CanvasItem:
+		return (info_panel as CanvasItem).visible
+	return false
+
+
+func mv1_open_fight_is_visible() -> bool:
+	var ui := get_node_or_null("UI") as CanvasLayer
+	if ui == null:
+		return false
+	return _overlay_node_is_up(ui.get_node_or_null("OpenFightSheet"))
+
+
+func mv1_unit_card_title_text() -> String:
+	var ui := get_node_or_null("UI") as CanvasLayer
+	if ui == null:
+		return ""
+	var pop: Node = ui.get_node_or_null("UnitDetailPopup")
+	if pop == null or not is_instance_valid(pop):
+		return ""
+	var labels: Array = pop.find_children("*", "Label", true, false)
+	for lab_v in labels:
+		if lab_v is Label:
+			var t: String = (lab_v as Label).text.strip_edges()
+			if not t.is_empty() and t != "Open fight" and t != "Close":
+				return t
+	return ""
+
+
+func mv1_open_fight_button_screen_pos() -> Vector2:
+	var ui := get_node_or_null("UI") as CanvasLayer
+	if ui == null:
+		return Vector2.ZERO
+	var pop: Node = ui.get_node_or_null("UnitDetailPopup")
+	if pop == null or not _overlay_node_is_up(pop):
+		return Vector2.ZERO
+	var btn: Button = pop.find_child("BtnOpenFight", true, false) as Button
+	if btn == null or not is_instance_valid(btn) or not btn.visible:
+		return Vector2.ZERO
+	return btn.get_global_rect().get_center()
+
+
+func mv1_close_button_screen_pos() -> Vector2:
+	var ui := get_node_or_null("UI") as CanvasLayer
+	var btn: Button = null
+	if ui != null:
+		var fight: Node = ui.get_node_or_null("OpenFightSheet")
+		if fight != null and _overlay_node_is_up(fight):
+			btn = fight.find_child("BtnClose", true, false) as Button
+	if btn == null and info_panel != null and mv1_inspector_is_visible():
+		btn = info_panel.find_child("BtnClose", true, false) as Button
+	if btn == null:
+		btn = btn_close
+	if btn == null or not is_instance_valid(btn) or not btn.visible:
+		return Vector2.ZERO
+	var r: Rect2 = btn.get_global_rect()
+	return r.get_center()
+
+
+func mv1_screen_pos_in_chip_over_province(fid: String, dest_id: int) -> Vector2:
+	# Point whose hex is dest and whose land-disk pick is this fid (adjacent
+	# NUTS3 sitting inside the selected unit's painted chip).
+	var want := fid.strip_edges()
+	var dest := int(dest_id)
+	if want.is_empty() or dest <= 0:
+		return Vector2.ZERO
+	var chip_scr: Vector2 = mv1_formation_screen_pos(want)
+	var dest_scr: Vector2 = mv1_province_screen_pos(dest)
+	if chip_scr == Vector2.ZERO or dest_scr == Vector2.ZERO:
+		return Vector2.ZERO
+	var samples: Array[float] = [0.15, 0.25, 0.35, 0.45, 0.55, 0.65, 0.75, 0.85]
+	for t_v in samples:
+		var t: float = t_v
+		var screen: Vector2 = chip_scr.lerp(dest_scr, t)
+		var world: Vector2 = _screen_to_world(screen)
+		var pid: int = _resolve_hex_pick_pid(world)
+		if pid <= 0:
+			pid = _resolve_map_pick_pid(world)
+		if pid != dest:
+			continue
+		var fo: Object = _pick_land_unit_formation_at_world(world)
+		if fo == null:
+			continue
+		var fo_id := str(fo.formation_id) if "formation_id" in fo else ""
+		if fo_id == want:
+			return screen
+	return Vector2.ZERO
+
+
+func mv1_rebuild_unit_icons() -> void:
+	_update_unit_icons_for_test()
+	_sync_unit_counter_paint()
 
 
 func _on_march_hop_ui(to_pid: int, arrived: bool, dest_id: int = -1, hop: Dictionary = {}) -> void:
@@ -19455,10 +20096,13 @@ func _show_unit_detail_popup(formation: Object) -> void:
 	var ui := get_node_or_null("UI") as CanvasLayer
 	if ui == null:
 		return
-	# Replace previous card.
+	# Replace previous card. Free immediately so the new node can keep the
+	# UnitDetailPopup name (queue_free same-frame left a queued sibling and
+	# get_node("UnitDetailPopup") missed the live card).
 	var old := ui.get_node_or_null("UnitDetailPopup")
 	if old != null:
-		old.queue_free()
+		ui.remove_child(old)
+		old.free()
 
 	var name_s := "Unit"
 	if "name" in formation:
@@ -19906,7 +20550,16 @@ func _unit_detail_popup_is_visible() -> bool:
 	var ui := get_node_or_null("UI") as CanvasLayer
 	if ui == null:
 		return false
-	return _overlay_node_is_up(ui.get_node_or_null("UnitDetailPopup"))
+	if _overlay_node_is_up(ui.get_node_or_null("UnitDetailPopup")):
+		return true
+	for c in ui.get_children():
+		if c == null or not is_instance_valid(c) or c.is_queued_for_deletion():
+			continue
+		var nm := str(c.name)
+		var docked := bool(c.get_meta("unit_card_dock", false)) if c.has_meta("unit_card_dock") else false
+		if (nm.begins_with("UnitDetailPopup") or docked) and _overlay_node_is_up(c):
+			return true
+	return false
 
 
 func _map_prefers_province_over_unit() -> bool:
@@ -19931,6 +20584,7 @@ func _hide_unit_card_keep_map_focus() -> void:
 				(unit_pop as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
 	if not selected_formation_id.is_empty():
 		selected_formation_id = ""
+		_clear_march_preview()
 		_refresh_selected_unit_chip()
 
 
@@ -21720,6 +22374,11 @@ func _show_open_fight_sheet(
 	if ui == null:
 		return
 	_hold_camera_now()
+	_reset_left_gesture_state()
+	if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+		_left_skip_next_pick = true
+		_left_btn_down = true
+		_left_button_was_up = false
 	if info_panel != null and info_panel is CanvasItem:
 		(info_panel as CanvasItem).visible = false
 	# Unit card docks the same bottom-left as the Maginot sheet (Play: Open fight
