@@ -2046,9 +2046,13 @@ func _check_cap_click() -> void:
 
 
 func _do_cap_deselect() -> void:
-	# Vacate air so the empty star click is not an air-disk hit.
+	# Vacate air and nearby land so the empty star click is not a chip/spill hit.
 	if not _fid_air.is_empty():
 		_set_stationed(_fid_air, LEV)
+	_park_ger_at(BONN, NAME_A)
+	_vacate_other_player_land_to(_fid, BONN)
+	_move_off_pid(BERLIN, "", BONN)
+	_move_off_pid(_cap_neighbor_pid, "", BONN)
 	var mr := _map_renderer()
 	if mr != null and mr.has_method("mv1_rebuild_unit_icons"):
 		mr.call("mv1_rebuild_unit_icons")
@@ -2088,6 +2092,14 @@ func _do_cap_star_empty() -> void:
 		_finish(false)
 		return
 	_hide_info_panel()
+	# Pixel-guard lock makes show_info_panel a no-op (_camera_is_held).
+	# Live Play is not locked; drop the hold so the star inspects.
+	if mr.has_method("_unlock_close_camera"):
+		mr.call("_unlock_close_camera")
+	mr.set("_close_camera_locked", false)
+	mr.set("_hold_camera_until_msec", 0)
+	mr.set("_close_click_guard", false)
+	mr.set("_map_pick_block_until_msec", 0)
 	var pos: Vector2 = _capital_star_screen(mr)
 	if pos == Vector2.ZERO:
 		_fail_reasons.append("berlin_star_empty_pos_missing")
