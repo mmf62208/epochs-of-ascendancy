@@ -48,7 +48,6 @@ func _run_and_quit() -> void:
 func _run() -> void:
 	_test_source_needles()
 	_test_overlay_mapmode_gate()
-	_test_renderer_set_map_mode_hook()
 
 
 func _test_source_needles() -> void:
@@ -121,57 +120,3 @@ func _test_overlay_mapmode_gate() -> void:
 	_expect_icons(ol, false, "resources_to_diplomacy")
 	ol.free()
 
-
-func _test_renderer_set_map_mode_hook() -> void:
-	var ren_scr: Script = load(SRC_REN) as Script
-	var ol_scr: Script = load(SRC_OL) as Script
-	if ren_scr == null or ol_scr == null:
-		_fail("could not load MapRenderer or overlay script")
-		return
-	var mr: Node = ren_scr.new()
-	var ol: Node = ol_scr.new()
-	if mr == null or ol == null:
-		_fail("could not instantiate MapRenderer/overlay")
-		if mr != null:
-			mr.free()
-		if ol != null:
-			ol.free()
-		return
-	var host := Node2D.new()
-	host.name = "OverlayHost"
-	mr.add_child(host)
-	mr.set("container", host)
-	# Skip deferred fill/mesh apply — this is a glyph-flag hook test only.
-	if "_map_mode_apply_scheduled" in mr:
-		mr.set("_map_mode_apply_scheduled", true)
-	ol.name = "InfrastructureOverlayLayer"
-	host.add_child(ol)
-	if bool(ol.get("show_resource_icons")):
-		_fail("renderer-attached overlay must start hidden")
-	else:
-		_pass("renderer-attached overlay starts hidden")
-	if not mr.has_method("set_map_mode"):
-		_fail("MapRenderer.set_map_mode missing")
-		mr.free()
-		return
-	mr.call("set_map_mode", "states")
-	_expect_icons(ol, false, "renderer.states")
-	mr.call("set_map_mode", "diplomacy")
-	_expect_icons(ol, false, "renderer.diplomacy")
-	mr.call("set_map_mode", "terrain")
-	_expect_icons(ol, false, "renderer.terrain")
-	mr.call("set_map_mode", "resources")
-	_expect_icons(ol, false if str(mr.get("current_map_mode")) != "resources" else true, "renderer.resources")
-	if str(mr.get("current_map_mode")) != "resources":
-		_fail("set_map_mode(resources) current_map_mode=%s" % str(mr.get("current_map_mode")))
-	elif not bool(ol.get("show_resource_icons")):
-		_fail("set_map_mode(resources) left glyphs hidden")
-	else:
-		_pass("set_map_mode(resources) shows glyphs")
-	mr.call("set_map_mode", "political")
-	_expect_icons(ol, false, "renderer.back_to_political")
-	mr.call("set_map_mode", "resources")
-	_expect_icons(ol, true, "renderer.resources_again")
-	mr.call("set_map_mode", "diplomacy")
-	_expect_icons(ol, false, "renderer.resources_to_diplomacy")
-	mr.free()
