@@ -76,6 +76,11 @@ static func control_or_ancestor_blocks_edge_pan(node: Node) -> bool:
 		if nname in ["DiplomacyView", "TradeMarketView", "SpaceLayerBoardView", "MatchmakingLobbyView"]:
 			return true
 		if walk is Window and (walk as Window).visible:
+			# Main game Window is the scene-tree root. Treating it as a modal
+			# would freeze edge-pan for every hovered Control (incl. Close tests).
+			# Real picker Windows are parented under the tree.
+			if walk.get_parent() == null:
+				break
 			return true
 		if walk is Panel or walk is PanelContainer:
 			var panel_name := nname
