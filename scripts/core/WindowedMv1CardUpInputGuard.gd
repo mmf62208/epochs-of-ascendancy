@@ -1539,7 +1539,8 @@ func _check_edge_clear() -> void:
 		_phase = Phase.EDGE_CLEAR
 		return
 	# Inspector still down: wait out Close pick-block, then alt-click empty Bonn.
-	_go_settle(Phase.EDGE_INSPECTOR, 60)
+	_clear_pick_block_for_edge()
+	_go_settle(Phase.EDGE_INSPECTOR, 90)
 
 
 func _check_edge_reopen_card() -> void:
@@ -1559,27 +1560,64 @@ func _check_edge_reopen_card() -> void:
 	_phase = Phase.EDGE_REST_CARD
 
 
+func _clear_pick_block_for_edge() -> void:
+	var mr := _map_renderer()
+	if mr == null:
+		return
+	# Esc-dismiss arms an 800ms skip-pick. xvfb can burn 90 frames in <800ms.
+	mr.set("_map_pick_block_until_msec", 0)
+	mr.set("_left_skip_next_pick", false)
+	mr.set("_close_click_guard", false)
+	if mr.has_method("_reset_left_gesture_state"):
+		mr.call("_reset_left_gesture_state")
+
+
+func _edge_inspector_click_pos(mr: Node) -> Vector2:
+	# Empty Bonn hex, away from air/FRA disks so the click is a province pick.
+	var origin: Vector2 = Vector2.ZERO
+	if mr.has_method("mv1_province_screen_pos"):
+		origin = mr.call("mv1_province_screen_pos", BONN) as Vector2
+	var chips: Array[Vector2] = []
+	for fid_off in [_fid_air, _fid_fra]:
+		if fid_off.is_empty() or not mr.has_method("mv1_formation_screen_pos"):
+			continue
+		var chip: Vector2 = mr.call("mv1_formation_screen_pos", fid_off) as Vector2
+		if chip != Vector2.ZERO:
+			chips.append(chip)
+	var offsets: Array[Vector2] = [
+		Vector2.ZERO,
+		Vector2(-48, 40),
+		Vector2(-72, 56),
+		Vector2(56, 48),
+		Vector2(-56, -40),
+		Vector2(0, 64),
+	]
+	for off_v in offsets:
+		var cand: Vector2 = origin + off_v
+		if cand == Vector2.ZERO:
+			continue
+		var near_chip := false
+		for chip_v in chips:
+			if cand.distance_to(chip_v) < 56.0:
+				near_chip = true
+				break
+		if near_chip:
+			continue
+		if _screen_hex_pid(mr, cand) == BONN:
+			return cand
+	if origin != Vector2.ZERO:
+		return origin + Vector2(-72, 56)
+	return Vector2(720, 520)
+
+
 func _do_edge_inspector() -> void:
 	var mr := _map_renderer()
 	if mr == null:
 		_fail_reasons.append("no_map_renderer")
 		_finish(false)
 		return
-	# Empty Bonn: land vacated to Berlin, air is on Leverkusen, FRA on Köln.
-	# Alt prefers the hex inspector. Do not click the air disk (that re-opens
-	# the card) or leftover selected land (that would commit a march).
-	var pos: Vector2 = Vector2.ZERO
-	if mr.has_method("mv1_province_screen_pos"):
-		pos = mr.call("mv1_province_screen_pos", BONN) as Vector2
-	for fid_off in [_fid_air, _fid_fra, _fid, _fid_b]:
-		if fid_off.is_empty() or not mr.has_method("mv1_formation_screen_pos"):
-			continue
-		var chip: Vector2 = mr.call("mv1_formation_screen_pos", fid_off) as Vector2
-		if chip != Vector2.ZERO and pos.distance_to(chip) < 36.0:
-			pos += Vector2(-40, 32)
-			break
-	if pos == Vector2.ZERO:
-		pos = Vector2(720, 520)
+	_clear_pick_block_for_edge()
+	var pos: Vector2 = _edge_inspector_click_pos(mr)
 	_log("EOA_MV1_CARD_UP_INPUT_GUARD who=guard.edge_inspector pos=%.1f,%.1f (NOT live Play)" % [pos.x, pos.y])
 	_click_still(pos, false, true)
 	_phase = Phase.WAIT_EDGE_INSPECTOR
@@ -1700,21 +1738,27 @@ func _tick_edge_rest(kind: String) -> void:
 
 
 func _press_esc() -> void:
+	# One viewport key only. parse_input_event + push_input double-fired Esc
+	# (card dismiss restored the inspector, then the second handle hid it).
 	var ev := InputEventKey.new()
 	ev.keycode = KEY_ESCAPE
 	ev.physical_keycode = KEY_ESCAPE
 	ev.pressed = true
-	Input.parse_input_event(ev)
+	ev.echo = false
 	var vp := root.get_viewport()
 	if vp != null:
 		vp.push_input(ev, true)
+	else:
+		Input.parse_input_event(ev)
 	var ev2 := InputEventKey.new()
 	ev2.keycode = KEY_ESCAPE
 	ev2.physical_keycode = KEY_ESCAPE
 	ev2.pressed = false
-	Input.parse_input_event(ev2)
+	ev2.echo = false
 	if vp != null:
 		vp.push_input(ev2, true)
+	else:
+		Input.parse_input_event(ev2)
 
 
 func _steal_click_pos(mr: Node) -> Vector2:
