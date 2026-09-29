@@ -97,6 +97,29 @@ func _test_source_needles() -> void:
 	if "_mv1_selected_own_land_ready_to_commit" not in ren:
 		_fail("preview==commit skip helper missing from MapRenderer")
 		return
+	if "var mv1_commit: bool" not in ren:
+		_fail("mv1_commit must be computed once after the land-counter block")
+		return
+	if "if not mv1_commit and not event.shift_pressed" not in ren:
+		_fail("capital-star branch must skip when mv1_commit")
+		return
+	var empty_i := ren.find("elif selected_formation_id.is_empty():")
+	var switch_i := ren.find("elif _try_switch_own_land_counter_at_world")
+	if empty_i < 0 or switch_i < 0 or empty_i > switch_i:
+		_fail("empty-select arm missing before land-counter switch")
+		return
+	var empty_arm := ren.substr(empty_i, switch_i - empty_i)
+	var air_i := empty_arm.find("_try_open_unit_at_world")
+	var land_i := empty_arm.find("_try_open_land_unit_at_world")
+	if air_i < 0 or land_i < 0 or air_i > land_i:
+		_fail("empty-select must open own air/fleet disk before land fallback")
+		return
+	var chip_in := _slice_func(ren, "_try_open_land_chip_from_input")
+	var chip_air := chip_in.find("_try_open_unit_at_world(world_pos)")
+	var chip_land := chip_in.find("_try_open_land_unit_at_world(world_pos")
+	if chip_air < 0 or chip_land < 0 or chip_air > chip_land:
+		_fail("_input land-chip path must open own air/fleet disk before land fallback")
+		return
 	var spill := _slice_func(ren, "_nearest_player_land_formation_at_world")
 	if "CHROME_SPILL_WORLD" not in spill or "340.0" not in spill:
 		_fail("fallback CHROME_SPILL_WORLD must stay 340 (item 4 out of scope)")
@@ -117,7 +140,7 @@ func _test_source_needles() -> void:
 	if "blocks_edge_pan" not in _slice_func(inp, "control_or_ancestor_blocks_edge_pan"):
 		_fail("ancestry helper must honor blocks_edge_pan meta")
 		return
-	_pass("source needles: player-tag gate + preview skip + edge-pan ancestry")
+	_pass("source needles: player-tag gate + mv1_commit star skip + air disk first + edge-pan ancestry")
 
 
 func _test_edge_pan_ancestry_and_meta() -> void:

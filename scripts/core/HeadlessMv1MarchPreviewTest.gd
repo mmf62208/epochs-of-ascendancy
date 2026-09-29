@@ -161,6 +161,12 @@ func _test_source_needles() -> void:
 	if "_mv1_selected_own_land_ready_to_commit" not in ren:
 		_fail("preview==commit skip helper missing")
 		return
+	if "var mv1_commit: bool" not in ren:
+		_fail("mv1_commit must be computed once after the land-counter block")
+		return
+	if "if not mv1_commit and not event.shift_pressed" not in ren:
+		_fail("capital-star branch must skip when mv1_commit")
+		return
 	var spill := _slice_func(ren, "_nearest_player_land_formation_at_world")
 	if "CHROME_SPILL_WORLD" not in spill or "340.0" not in spill:
 		_fail("CHROME_SPILL_WORLD fallback must stay frozen at 340")

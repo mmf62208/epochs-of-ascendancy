@@ -3069,17 +3069,29 @@ func _unhandled_input(event: InputEvent) -> void:
 					get_viewport().set_input_as_handled()
 					return
 			elif selected_formation_id.is_empty():
+				# MV-1b FIX #1 item 2: own air/fleet/space disk before land spill.
+				if _try_open_unit_at_world(world_pos):
+					get_viewport().set_input_as_handled()
+					return
 				if _try_open_land_unit_at_world(world_pos, false, disk_only):
 					get_viewport().set_input_as_handled()
 					return
 			elif _try_switch_own_land_counter_at_world(world_pos):
 				get_viewport().set_input_as_handled()
 				return
+		# FIX #1: own land + N-hops preview dest → skip star / air-open /
+		# inspector so the still click commits like a non-capital province.
+		var mv1_commit: bool = (
+			not event.ctrl_pressed
+			and not event.shift_pressed
+			and not event.alt_pressed
+			and _mv1_selected_own_land_ready_to_commit(world_pos)
+		)
 		# Capital gold star wins over a colocated air/fleet chip.
 		# Star click inspects the capital and does not arm MARCH.
 		# THIS drag already exceeded 8px: do not snap-select any capital
 		# (Play: Atlantic pan opened Paris via zoom-aware star disk).
-		if not event.shift_pressed:
+		if not mv1_commit and not event.shift_pressed:
 			if not event.ctrl_pressed and (
 				_left_release_must_skip_pick() or _left_live_slop_is_drag() or _left_map_pick_blocked()
 			):
@@ -3122,15 +3134,14 @@ func _unhandled_input(event: InputEvent) -> void:
 		# Remaining chips (air/fleet) after star.
 		# MV-1b: own land selected + no Ctrl + chip shows N hops → the still
 		# click must commit that preview. Do not let an air/fleet chip steal it.
-		if not (
-			not event.ctrl_pressed
-			and _mv1_selected_own_land_ready_to_commit(world_pos)
-		):
+		if not mv1_commit:
 			if _try_open_unit_at_world(world_pos):
 				get_viewport().set_input_as_handled()
 				return
 		var pid := -1
-		if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_at_world_pos"):
+		if mv1_commit and _march_preview_cache_dest > 0:
+			pid = _march_preview_cache_dest
+		elif typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_at_world_pos"):
 			pid = MapManager.get_province_at_world_pos(world_pos, true)
 			if MapManager.has_method("resolve_pick_province_id"):
 				pid = MapManager.resolve_pick_province_id(pid)
@@ -3153,7 +3164,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			):
 				get_viewport().set_input_as_handled()
 				return
-			if _try_living_title_map_pick(pid):
+			if not mv1_commit and _try_living_title_map_pick(pid):
 				get_viewport().set_input_as_handled()
 				return
 			_toast_living_diplomacy_pick(pid)
@@ -3187,6 +3198,9 @@ func _unhandled_input(event: InputEvent) -> void:
 					_select_province(resolved_province, resolved_node)
 					get_viewport().set_input_as_handled()
 					return
+			if mv1_commit:
+				get_viewport().set_input_as_handled()
+				return
 			# G click-to-show: hex pick draws a budgeted corridor (never on the G key frame).
 			if _corridor_click_armed and not event.ctrl_pressed:
 				if _left_release_must_skip_pick() or _left_live_slop_is_drag() or _left_map_pick_blocked():
@@ -19172,6 +19186,11 @@ func _try_open_land_chip_from_input(ctrl_click: bool = false) -> bool:
 			return true
 		return false
 	var world_pos: Vector2 = _screen_to_world(get_viewport().get_mouse_position())
+	# MV-1b FIX #1 item 2: own air/fleet/space disk before land first-select.
+	if selected_formation_id.is_empty() and not ctrl_click:
+		if _try_open_unit_at_world(world_pos):
+			get_viewport().set_input_as_handled()
+			return true
 	var disk_only: bool = _map_prefers_province_over_unit()
 	if _try_open_land_unit_at_world(world_pos, ctrl_click, disk_only):
 		get_viewport().set_input_as_handled()

@@ -12,6 +12,10 @@ extends SceneTree
 ## (b) nothing selected + FRA fleet click does not select FRA;
 ## (c) nothing selected + own air chip still opens;
 ## (d) rest 1s on province Close then unit-card Close — camera unchanged.
+## FIX #1: own air on Berlin + land selected + N-hops chip → still click
+## on the capital star commits the march (selection stays, no inspector).
+## Nothing selected: star still opens the inspector. Item 2: empty-select
+## air disk opens the air wing; land disk off the air chip still first-selects land.
 ##
 ##   tools/eoa_mv1_card_up_input_guard.sh
 
@@ -94,6 +98,22 @@ enum Phase {
 	WAIT_EDGE_REOPEN,
 	EDGE_REST_CARD,
 	WAIT_EDGE_CARD,
+	CAP_SETUP,
+	CAP_SELECT,
+	WAIT_CAP_SELECT,
+	CAP_HOVER,
+	WAIT_CAP_HOVER,
+	CAP_CLICK,
+	WAIT_CAP_CLICK,
+	CAP_DESELECT,
+	WAIT_CAP_DESELECT,
+	CAP_STAR_EMPTY,
+	WAIT_CAP_STAR_EMPTY,
+	AIR_DISK_SETUP,
+	AIR_DISK_CLICK,
+	WAIT_AIR_DISK,
+	LAND_NEAR_AIR,
+	WAIT_LAND_NEAR_AIR,
 	DONE,
 }
 
@@ -124,6 +144,11 @@ var _fra_ok: bool = false
 var _air_ok: bool = false
 var _edge_panel_ok: bool = false
 var _edge_card_ok: bool = false
+var _cap_commit_ok: bool = false
+var _cap_star_empty_ok: bool = false
+var _air_disk_ok: bool = false
+var _land_near_air_ok: bool = false
+var _cap_neighbor_pid: int = -1
 var _fid_air: String = ""
 var _fid_fra: String = ""
 var _esc_left: int = 0
@@ -380,6 +405,53 @@ func _on_process() -> void:
 			_do_edge_rest_start("card")
 		Phase.WAIT_EDGE_CARD:
 			_tick_edge_rest("card")
+		Phase.CAP_SETUP:
+			_do_cap_setup()
+		Phase.CAP_SELECT:
+			_do_cap_select()
+		Phase.WAIT_CAP_SELECT:
+			_reassert_camera()
+			_settle_left -= 1
+			if _settle_left <= 0:
+				_check_cap_select()
+		Phase.CAP_HOVER:
+			_do_cap_hover()
+		Phase.WAIT_CAP_HOVER:
+			_settle_left -= 1
+			if _settle_left <= 0:
+				_check_cap_hover()
+		Phase.CAP_CLICK:
+			_do_cap_click()
+		Phase.WAIT_CAP_CLICK:
+			_settle_left -= 1
+			if _settle_left <= 0:
+				_check_cap_click()
+		Phase.CAP_DESELECT:
+			_do_cap_deselect()
+		Phase.WAIT_CAP_DESELECT:
+			_settle_left -= 1
+			if _settle_left <= 0:
+				_check_cap_deselect()
+		Phase.CAP_STAR_EMPTY:
+			_do_cap_star_empty()
+		Phase.WAIT_CAP_STAR_EMPTY:
+			_settle_left -= 1
+			if _settle_left <= 0:
+				_check_cap_star_empty()
+		Phase.AIR_DISK_SETUP:
+			_do_air_disk_setup()
+		Phase.AIR_DISK_CLICK:
+			_do_air_disk_click()
+		Phase.WAIT_AIR_DISK:
+			_settle_left -= 1
+			if _settle_left <= 0:
+				_check_air_disk()
+		Phase.LAND_NEAR_AIR:
+			_do_land_near_air()
+		Phase.WAIT_LAND_NEAR_AIR:
+			_settle_left -= 1
+			if _settle_left <= 0:
+				_check_land_near_air()
 		Phase.DONE:
 			pass
 
@@ -1734,7 +1806,472 @@ func _tick_edge_rest(kind: String) -> void:
 	else:
 		_edge_card_ok = true
 		_capture("mv1b_close_edge_pan_NOT_live_play")
-		_finish(_fail_reasons.is_empty())
+		_phase = Phase.CAP_SETUP
+
+
+func _do_cap_setup() -> void:
+	var mr := _map_renderer()
+	if mr == null:
+		_fail_reasons.append("no_map_renderer")
+		_finish(false)
+		return
+	_camera_unlocked = false
+	_lock_camera_keep_process()
+	_frame_over_berlin()
+	_cap_neighbor_pid = _berlin_neighbor_pid()
+	if _cap_neighbor_pid <= 0:
+		_fail_reasons.append("berlin_neighbor_missing")
+		_finish(false)
+		return
+	if _fid_air.is_empty():
+		_fid_air = _park_typed_at(BERLIN, NAME_AIR, "GER", "air_wing")
+	else:
+		_set_stationed(_fid_air, BERLIN)
+	_park_ger_at(_cap_neighbor_pid, NAME_A)
+	_vacate_other_player_land_to(_fid, BONN)
+	_move_off_pid(BERLIN, _fid_air, BONN)
+	if _mv_scr != null:
+		_mv_scr.call("clear_march", _fid)
+		_mv_scr.call("clear_march", _fid_b)
+	if "show_unit_counters" in mr:
+		mr.set("show_unit_counters", true)
+	if mr.has_method("mv1_rebuild_unit_icons"):
+		mr.call("mv1_rebuild_unit_icons")
+	_hide_info_panel()
+	_log(
+		"EOA_MV1_CARD_UP_INPUT_GUARD who=guard.cap_setup air=%s land=%s neighbor=%d (NOT live Play)"
+		% [_fid_air, _fid, _cap_neighbor_pid]
+	)
+	_press_esc()
+	_after_settle = Phase.CAP_SELECT
+	_phase = Phase.SETTLE
+	_settle_left = 14
+
+
+func _do_cap_select() -> void:
+	var mr := _map_renderer()
+	if mr == null:
+		_fail_reasons.append("no_map_renderer")
+		_finish(false)
+		return
+	var pos: Vector2 = mr.call("mv1_formation_screen_pos", _fid) as Vector2
+	if pos == Vector2.ZERO:
+		_fail_reasons.append("cap_land_screen_pos_missing")
+		_finish(false)
+		return
+	_log("EOA_MV1_CARD_UP_INPUT_GUARD who=guard.cap_select pos=%.1f,%.1f (NOT live Play)" % [pos.x, pos.y])
+	_click_still(pos)
+	_phase = Phase.WAIT_CAP_SELECT
+	_settle_left = LEFTOVER_FRAMES
+
+
+func _check_cap_select() -> void:
+	var mr := _map_renderer()
+	if mr == null:
+		_fail_reasons.append("no_map_renderer")
+		_finish(false)
+		return
+	var selected := ""
+	if "selected_formation_id" in mr:
+		selected = str(mr.get("selected_formation_id"))
+	if selected != _fid:
+		_fail_reasons.append("cap_select_did_not_arm_land")
+		_finish(false)
+		return
+	_phase = Phase.CAP_HOVER
+
+
+func _do_cap_hover() -> void:
+	var mr := _map_renderer()
+	if mr == null:
+		_fail_reasons.append("no_map_renderer")
+		_finish(false)
+		return
+	var dest: Vector2 = _province_march_screen(mr, BERLIN)
+	if dest == Vector2.ZERO:
+		_fail_reasons.append("berlin_screen_pos_missing")
+		_finish(false)
+		return
+	_log("EOA_MV1_CARD_UP_INPUT_GUARD who=guard.cap_hover pos=%.1f,%.1f (NOT live Play)" % [dest.x, dest.y])
+	_move_mouse(dest)
+	_phase = Phase.WAIT_CAP_HOVER
+	_settle_left = 20
+
+
+func _check_cap_hover() -> void:
+	var mr := _map_renderer()
+	if mr == null:
+		_fail_reasons.append("no_map_renderer")
+		_finish(false)
+		return
+	if not mr.has_method("mv1_preview_report"):
+		_fail_reasons.append("no_mv1_preview_report")
+		_finish(false)
+		return
+	var report: Dictionary = mr.call("mv1_preview_report") as Dictionary
+	_chip_text = str(report.get("chip_text", ""))
+	_log("EOA_MV1_CARD_UP_INPUT_GUARD who=guard.cap_hover_report report=%s (NOT live Play)" % str(report))
+	if not bool(report.get("ok", false)) or int(report.get("hops", 0)) <= 0:
+		_fail_reasons.append("cap_preview_not_valid_hops")
+	if "hop" not in _chip_text.to_lower():
+		_fail_reasons.append("cap_chip_missing_hops")
+	if int(report.get("cache_dest", -1)) != BERLIN:
+		_fail_reasons.append("cap_preview_dest_not_berlin")
+	if not _fail_reasons.is_empty():
+		_finish(false)
+		return
+	_phase = Phase.CAP_CLICK
+
+
+func _do_cap_click() -> void:
+	var mr := _map_renderer()
+	if mr == null:
+		_fail_reasons.append("no_map_renderer")
+		_finish(false)
+		return
+	var pos: Vector2 = _capital_star_screen(mr)
+	if pos == Vector2.ZERO:
+		_fail_reasons.append("berlin_star_screen_pos_missing")
+		_finish(false)
+		return
+	_log("EOA_MV1_CARD_UP_INPUT_GUARD who=guard.cap_star_click pos=%.1f,%.1f (NOT live Play)" % [pos.x, pos.y])
+	_click_still(pos)
+	_phase = Phase.WAIT_CAP_CLICK
+	_settle_left = LEFTOVER_FRAMES
+
+
+func _check_cap_click() -> void:
+	var mr := _map_renderer()
+	if mr == null:
+		_fail_reasons.append("no_map_renderer")
+		_finish(false)
+		return
+	var selected := ""
+	if "selected_formation_id" in mr:
+		selected = str(mr.get("selected_formation_id"))
+	var has := false
+	var dest := -1
+	if _mv_scr != null:
+		has = bool(_mv_scr.call("has_march", _fid))
+		var order: Dictionary = _mv_scr.call("get_march", _fid) as Dictionary
+		dest = int(order.get("dest_id", -1))
+	var vis := _inspector_visible()
+	_log(
+		"EOA_MV1_CARD_UP_INPUT_GUARD who=guard.cap_result selected=%s want=%s has=%s dest=%d inspector=%s (NOT live Play)"
+		% [selected, _fid, str(has), dest, str(vis)]
+	)
+	if selected == _fid_air:
+		_fail_reasons.append("cap_selected_air_wing")
+	if selected != _fid:
+		_fail_reasons.append("cap_selection_left_land")
+	if not has or dest != BERLIN:
+		_fail_reasons.append("cap_did_not_commit_berlin")
+	if vis:
+		_fail_reasons.append("cap_opened_inspector")
+	_capture("mv1b_capital_star_commit_NOT_live_play")
+	if not _fail_reasons.is_empty():
+		_finish(false)
+		return
+	_cap_commit_ok = true
+	_phase = Phase.CAP_DESELECT
+
+
+func _do_cap_deselect() -> void:
+	# Vacate air so the empty star click is not an air-disk hit.
+	if not _fid_air.is_empty():
+		_set_stationed(_fid_air, LEV)
+	var mr := _map_renderer()
+	if mr != null and mr.has_method("mv1_rebuild_unit_icons"):
+		mr.call("mv1_rebuild_unit_icons")
+	_esc_left = 3
+	_press_esc()
+	_phase = Phase.WAIT_CAP_DESELECT
+	_settle_left = 14
+
+
+func _check_cap_deselect() -> void:
+	var mr := _map_renderer()
+	var selected := ""
+	if mr != null and "selected_formation_id" in mr:
+		selected = str(mr.get("selected_formation_id"))
+	_log(
+		"EOA_MV1_CARD_UP_INPUT_GUARD who=guard.cap_deselect selected=%s esc_left=%d (NOT live Play)"
+		% [selected, _esc_left]
+	)
+	if selected.is_empty():
+		_hide_info_panel()
+		_phase = Phase.CAP_STAR_EMPTY
+		return
+	if _esc_left > 0:
+		_esc_left -= 1
+		_press_esc()
+		_phase = Phase.WAIT_CAP_DESELECT
+		_settle_left = 12
+		return
+	_fail_reasons.append("cap_deselect_did_not_clear")
+	_finish(false)
+
+
+func _do_cap_star_empty() -> void:
+	var mr := _map_renderer()
+	if mr == null:
+		_fail_reasons.append("no_map_renderer")
+		_finish(false)
+		return
+	_hide_info_panel()
+	var pos: Vector2 = _capital_star_screen(mr)
+	if pos == Vector2.ZERO:
+		_fail_reasons.append("berlin_star_empty_pos_missing")
+		_finish(false)
+		return
+	_log("EOA_MV1_CARD_UP_INPUT_GUARD who=guard.cap_star_empty pos=%.1f,%.1f (NOT live Play)" % [pos.x, pos.y])
+	_click_still(pos)
+	_phase = Phase.WAIT_CAP_STAR_EMPTY
+	_settle_left = LEFTOVER_FRAMES
+
+
+func _check_cap_star_empty() -> void:
+	var vis := _inspector_visible()
+	var mr := _map_renderer()
+	var selected := ""
+	if mr != null and "selected_formation_id" in mr:
+		selected = str(mr.get("selected_formation_id"))
+	_log(
+		"EOA_MV1_CARD_UP_INPUT_GUARD who=guard.cap_star_empty_result inspector=%s selected=%s (NOT live Play)"
+		% [str(vis), selected]
+	)
+	if not vis:
+		_fail_reasons.append("cap_star_empty_did_not_open_inspector")
+	if selected == _fid_air:
+		_fail_reasons.append("cap_star_empty_opened_air")
+	_capture("mv1b_capital_star_empty_inspector_NOT_live_play")
+	if not _fail_reasons.is_empty():
+		_finish(false)
+		return
+	_cap_star_empty_ok = true
+	_phase = Phase.AIR_DISK_SETUP
+
+
+func _do_air_disk_setup() -> void:
+	var mr := _map_renderer()
+	if mr == null:
+		_fail_reasons.append("no_map_renderer")
+		_finish(false)
+		return
+	_set_stationed(_fid_air, BERLIN)
+	_park_ger_at(_cap_neighbor_pid, NAME_A)
+	_vacate_other_player_land_to(_fid, BONN)
+	_move_off_pid(BERLIN, _fid_air, BONN)
+	if mr.has_method("mv1_rebuild_unit_icons"):
+		mr.call("mv1_rebuild_unit_icons")
+	_hide_info_panel()
+	_esc_left = 2
+	_log(
+		"EOA_MV1_CARD_UP_INPUT_GUARD who=guard.air_disk_setup air=%s land=%s neighbor=%d (NOT live Play)"
+		% [_fid_air, _fid, _cap_neighbor_pid]
+	)
+	_press_esc()
+	_after_settle = Phase.AIR_DISK_CLICK
+	_phase = Phase.SETTLE
+	_settle_left = 14
+
+
+func _do_air_disk_click() -> void:
+	var mr := _map_renderer()
+	if mr == null:
+		_fail_reasons.append("no_map_renderer")
+		_finish(false)
+		return
+	var selected := ""
+	if "selected_formation_id" in mr:
+		selected = str(mr.get("selected_formation_id"))
+	if not selected.is_empty() and _esc_left > 0:
+		_esc_left -= 1
+		_press_esc()
+		_after_settle = Phase.AIR_DISK_CLICK
+		_phase = Phase.SETTLE
+		_settle_left = 10
+		return
+	var pos: Vector2 = mr.call("mv1_formation_screen_pos", _fid_air) as Vector2
+	if pos == Vector2.ZERO:
+		_fail_reasons.append("air_disk_screen_pos_missing")
+		_finish(false)
+		return
+	_log("EOA_MV1_CARD_UP_INPUT_GUARD who=guard.air_disk_click pos=%.1f,%.1f (NOT live Play)" % [pos.x, pos.y])
+	_click_still(pos)
+	_phase = Phase.WAIT_AIR_DISK
+	_settle_left = LEFTOVER_FRAMES
+
+
+func _check_air_disk() -> void:
+	var mr := _map_renderer()
+	if mr == null:
+		_fail_reasons.append("no_map_renderer")
+		_finish(false)
+		return
+	var selected := ""
+	if "selected_formation_id" in mr:
+		selected = str(mr.get("selected_formation_id"))
+	_log(
+		"EOA_MV1_CARD_UP_INPUT_GUARD who=guard.air_disk_result selected=%s air=%s land=%s (NOT live Play)"
+		% [selected, _fid_air, _fid]
+	)
+	if selected != _fid_air:
+		_fail_reasons.append("air_disk_did_not_open_air")
+	if selected == _fid:
+		_fail_reasons.append("air_disk_opened_land_fallback")
+	_capture("mv1b_air_disk_first_select_NOT_live_play")
+	if not _fail_reasons.is_empty():
+		_finish(false)
+		return
+	_air_disk_ok = true
+	_press_esc()
+	_after_settle = Phase.LAND_NEAR_AIR
+	_phase = Phase.SETTLE
+	_settle_left = 14
+
+
+func _do_land_near_air() -> void:
+	var mr := _map_renderer()
+	if mr == null:
+		_fail_reasons.append("no_map_renderer")
+		_finish(false)
+		return
+	var selected := ""
+	if "selected_formation_id" in mr:
+		selected = str(mr.get("selected_formation_id"))
+	if not selected.is_empty():
+		_press_esc()
+		_after_settle = Phase.LAND_NEAR_AIR
+		_phase = Phase.SETTLE
+		_settle_left = 10
+		return
+	var pos: Vector2 = mr.call("mv1_formation_screen_pos", _fid) as Vector2
+	if pos == Vector2.ZERO:
+		_fail_reasons.append("land_near_air_screen_pos_missing")
+		_finish(false)
+		return
+	_log("EOA_MV1_CARD_UP_INPUT_GUARD who=guard.land_near_air pos=%.1f,%.1f (NOT live Play)" % [pos.x, pos.y])
+	_click_still(pos)
+	_phase = Phase.WAIT_LAND_NEAR_AIR
+	_settle_left = LEFTOVER_FRAMES
+
+
+func _check_land_near_air() -> void:
+	var mr := _map_renderer()
+	if mr == null:
+		_fail_reasons.append("no_map_renderer")
+		_finish(false)
+		return
+	var selected := ""
+	if "selected_formation_id" in mr:
+		selected = str(mr.get("selected_formation_id"))
+	_log(
+		"EOA_MV1_CARD_UP_INPUT_GUARD who=guard.land_near_air_result selected=%s land=%s air=%s (NOT live Play)"
+		% [selected, _fid, _fid_air]
+	)
+	if selected != _fid:
+		_fail_reasons.append("land_near_air_did_not_first_select_land")
+	if selected == _fid_air:
+		_fail_reasons.append("land_near_air_opened_air")
+	_capture("mv1b_land_off_air_disk_NOT_live_play")
+	if not _fail_reasons.is_empty():
+		_finish(false)
+		return
+	_land_near_air_ok = true
+	_finish(true)
+
+
+func _move_off_pid(pid: int, keep_fid: String, dest: int) -> void:
+	var lm := root.get_node_or_null("LeaderManager")
+	if lm == null or not ("formations" in lm):
+		return
+	for fid_v in lm.formations.keys():
+		var fid_s := str(fid_v)
+		if fid_s == keep_fid:
+			continue
+		var f: Object = lm.formations[fid_v]
+		if f == null or not ("stationed_province_id" in f):
+			continue
+		if int(f.get("stationed_province_id")) != pid:
+			continue
+		f.set("stationed_province_id", dest)
+
+
+func _set_stationed(fid: String, pid: int) -> void:
+	if fid.is_empty():
+		return
+	var lm := root.get_node_or_null("LeaderManager")
+	if lm == null or not ("formations" in lm):
+		return
+	if not lm.formations.has(fid):
+		return
+	var f: Object = lm.formations[fid]
+	if f != null and "stationed_province_id" in f:
+		f.set("stationed_province_id", pid)
+
+
+func _hide_info_panel() -> void:
+	var mr := _map_renderer()
+	if mr != null and "info_panel" in mr:
+		var ip: Variant = mr.get("info_panel")
+		if ip is Control:
+			(ip as Control).visible = false
+
+
+func _province_march_screen(mr: Node, pid: int) -> Vector2:
+	if mr != null and mr.has_method("mv1_screen_pos_for_march_dest"):
+		var picked: Vector2 = mr.call("mv1_screen_pos_for_march_dest", pid) as Vector2
+		if picked != Vector2.ZERO:
+			return picked
+	if mr != null and mr.has_method("mv1_province_screen_pos"):
+		return mr.call("mv1_province_screen_pos", pid) as Vector2
+	return Vector2.ZERO
+
+
+func _capital_star_screen(mr: Node) -> Vector2:
+	if mr != null and mr.has_method("mv1_province_screen_pos"):
+		return mr.call("mv1_province_screen_pos", BERLIN) as Vector2
+	return Vector2.ZERO
+
+
+func _berlin_world() -> Vector2:
+	var mm := root.get_node_or_null("MapManager")
+	if mm != null and mm.has_method("get_province_centroid"):
+		var c: Vector2 = mm.call("get_province_centroid", BERLIN)
+		if c != Vector2.ZERO:
+			return c
+	return Vector2.ZERO
+
+
+func _frame_over_berlin() -> void:
+	var pos := _berlin_world()
+	if pos == Vector2.ZERO:
+		pos = _koln_world()
+	_apply_camera(pos, MID_ZOOM)
+	_ensure_not_live_banner()
+	_hide_info_panel()
+	_log("EOA_MV1_CARD_UP_INPUT_GUARD who=guard.frame_berlin pos=%.1f,%.1f (NOT live Play)" % [pos.x, pos.y])
+
+
+func _berlin_neighbor_pid() -> int:
+	var mm := root.get_node_or_null("MapManager")
+	if mm == null or not mm.has_method("get_adjacent_provinces"):
+		return -1
+	var adj: Array = mm.call("get_adjacent_provinces", BERLIN, true)
+	var fallback := -1
+	for pid_v in adj:
+		var pid := int(pid_v)
+		if pid <= 0 or pid == BERLIN:
+			continue
+		if fallback < 0:
+			fallback = pid
+		var owner := ""
+		if mm.has_method("get_province_owner"):
+			owner = str(mm.call("get_province_owner", pid)).strip_edges().to_upper()
+		if owner == "GER":
+			return pid
+	return fallback
 
 
 func _press_esc() -> void:
@@ -1790,6 +2327,10 @@ func _screen_hex_pid(mr: Node, screen: Vector2) -> int:
 
 
 func _vacate_other_player_land(keep_fid: String) -> void:
+	_vacate_other_player_land_to(keep_fid, BERLIN)
+
+
+func _vacate_other_player_land_to(keep_fid: String, dest: int) -> void:
 	var lm := root.get_node_or_null("LeaderManager")
 	if lm == null or not ("formations" in lm):
 		return
@@ -1807,7 +2348,7 @@ func _vacate_other_player_land(keep_fid: String) -> void:
 		if ft == "air_wing" or ft == "fleet" or ft == "space_wing":
 			continue
 		if "stationed_province_id" in f:
-			f.set("stationed_province_id", BERLIN)
+			f.set("stationed_province_id", dest)
 
 
 func _vacate_pid_except(pid: int, keep_fid: String) -> void:
@@ -2181,7 +2722,7 @@ func _finish(ok: bool) -> void:
 		ok = false
 	var result := "PASS" if ok else "FAIL"
 	_log(
-		"WindowedMv1CardUpInputGuard: RESULT=%s hover=%s commit=%s drag=%s switch=%s inspector=%s fight=%s chip_disk=%s drag2=%s stills=%s steal=%s fra=%s air=%s edge_panel=%s edge_card=%s chip=%s rss_mb=%.1f peak_kb=%d captures=%s reasons=%s (xvfb NOT live Play)"
+		"WindowedMv1CardUpInputGuard: RESULT=%s hover=%s commit=%s drag=%s switch=%s inspector=%s fight=%s chip_disk=%s drag2=%s stills=%s steal=%s fra=%s air=%s edge_panel=%s edge_card=%s cap_commit=%s cap_star_empty=%s air_disk=%s land_near_air=%s chip=%s rss_mb=%.1f peak_kb=%d captures=%s reasons=%s (xvfb NOT live Play)"
 		% [
 			result,
 			str(_hover_ok),
@@ -2198,6 +2739,10 @@ func _finish(ok: bool) -> void:
 			str(_air_ok),
 			str(_edge_panel_ok),
 			str(_edge_card_ok),
+			str(_cap_commit_ok),
+			str(_cap_star_empty_ok),
+			str(_air_disk_ok),
+			str(_land_near_air_ok),
 			_chip_text,
 			rss_mb,
 			_rss_peak_kb,
