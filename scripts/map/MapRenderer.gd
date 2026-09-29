@@ -325,6 +325,15 @@ var _select_outline_layer: Node2D = null
 var _select_outline_line: Line2D = null
 var _select_outline_glow: Line2D = null
 var _march_path_line: Line2D = null
+## MV-1: one reused hover preview (never recreate per hover; never antialiased).
+var _march_preview_line: Line2D = null
+var _march_preview_chip: Label = null
+var _march_preview_dash_tex: Texture2D = null
+var _march_preview_pts: PackedVector2Array = PackedVector2Array()
+var _march_preview_cache_fid: String = ""
+var _march_preview_cache_dest: int = -1
+var _march_preview_cache_day: int = -1
+var _march_preview_cache: Dictionary = {}
 var _supply_corridor_line: Line2D = null
 var _supply_corridor_glow: Line2D = null
 var _supply_corridor_spine: Line2D = null
@@ -1086,6 +1095,7 @@ func _setup_hover_tooltip() -> void:
 	hover_tooltip = ProvinceHoverTooltip.new()
 	hover_tooltip.name = "ProvinceHoverTooltip"
 	ui.add_child(hover_tooltip)
+	_ensure_march_preview_chip()
 
 
 var _wheel_zoom_terrain_at_msec: int = 0
@@ -2243,6 +2253,7 @@ func _handle_escape_key() -> void:
 		return
 	if not selected_formation_id.is_empty():
 		selected_formation_id = ""
+		_clear_march_preview()
 		_refresh_selected_unit_chip()
 		_show_inspector_toast("Unit selection cleared", 2.0)
 		return
@@ -2976,6 +2987,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			if star_pid > 0 and _capital_star_pid_at(world_pos) == star_pid and provinces.has(star_pid):
 				if not selected_formation_id.is_empty():
 					selected_formation_id = ""
+					_clear_march_preview()
 					_refresh_selected_unit_chip()
 				var star_province: Province = provinces[star_pid] as Province
 				var star_node: Node2D = _province_node(star_pid)
@@ -3173,6 +3185,15 @@ func _process(delta: float) -> void:
 	_update_outline_pulse()
 	if use_spatial_picking:
 		_update_spatial_hover()
+	# Chip follow + modal dismiss only — never BFS / preview here.
+	_sync_march_preview_chip_position()
+	if (
+		_march_preview_line != null
+		and is_instance_valid(_march_preview_line)
+		and _march_preview_line.visible
+		and (_march_preview_ui_blocked() or selected_formation_id.is_empty())
+	):
+		_clear_march_preview()
 	if not sim_paused:
 		# Throttle fill/LOD — world_full (2k+ polys) needs coarse cadence.
 		var detail_every := 6 if province_nodes.size() >= 800 else 2
@@ -14295,6 +14316,7 @@ func _dismiss_inspector_and_restore_input() -> void:
 			(hover_tooltip as CanvasItem).visible = false
 	if not selected_formation_id.is_empty():
 		selected_formation_id = ""
+		_clear_march_preview()
 		_refresh_selected_unit_chip()
 	_corridor_click_armed = false
 	_is_middle_dragging = false
@@ -18298,6 +18320,7 @@ func _clear_hover_state() -> void:
 	_set_agent_highlight(-1)
 	_sync_hovered_strategic_region(null)
 	_hide_hover_tooltip()
+	_clear_march_preview()
 	# S3: salmon/orange compare-candidate rings west of the Rhine were left
 	# painted because hover-exit skipped _refresh_compare_candidate_outlines.
 	_clear_compare_preview_outline()
@@ -18317,6 +18340,7 @@ func _on_mouse_entered(node: Node2D, province: Province):
 	_sync_hovered_strategic_region(province)
 	if show_hover_province_name:
 		_refresh_hover_tooltip(province)
+	_refresh_march_preview_for_hover(province)
 
 
 func _on_mouse_exited(node: Node2D) -> void:
@@ -18570,6 +18594,7 @@ func _update_spatial_hover() -> void:
 			_sync_hovered_strategic_region(new_hover_province)
 			if show_hover_province_name:
 				_refresh_hover_tooltip(new_hover_province)
+			_refresh_march_preview_for_hover(new_hover_province)
 
 
 # ====================== INFO PANEL ======================
@@ -19181,6 +19206,8 @@ func _select_map_unit(formation: Object) -> void:
 		fid = str(formation.formation_id)
 	selected_formation_id = fid
 	_refresh_selected_unit_chip()
+	if _hover_province != null:
+		_refresh_march_preview_for_hover(_hover_province)
 	var name_s := str(formation.name) if "name" in formation else fid
 	var pid := int(formation.stationed_province_id) if "stationed_province_id" in formation else -1
 	if pid >= 0:
@@ -19285,6 +19312,7 @@ func _try_move_selected_unit_to_province(province: Province) -> bool:
 	if typeof(FormationMovement) == TYPE_NIL:
 		return false
 	var res: Dictionary = FormationMovement.enqueue_own_land_march(fid, dest, p_tag)
+	_clear_march_preview()
 	if bool(res.get("already_here", false)):
 		_show_inspector_toast("Already at %s" % province.name, 2.5)
 		return true
@@ -19335,8 +19363,272 @@ func _highlight_march_path(province_path: Array) -> void:
 	line.end_cap_mode = Line2D.LINE_CAP_ROUND
 	line.points = pts
 	line.z_index = 24
+	line.antialiased = false
 	add_child(line)
 	_march_path_line = line
+
+
+func _mv1_preview_day() -> int:
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("get_total_days_elapsed"):
+		return int(TimeManager.get_total_days_elapsed())
+	return 0
+
+
+func _search_is_active() -> bool:
+	if _map_search == null or not is_instance_valid(_map_search):
+		return false
+	var le: LineEdit = _map_search.find_child("SearchLineEdit", true, false) as LineEdit
+	if le != null and le.has_focus():
+		return true
+	return false
+
+
+func _march_preview_ui_blocked() -> bool:
+	if _living_title_boot_is_up():
+		return true
+	if MapViewInput.modal_blocks_map_nav(get_viewport()):
+		return true
+	if _search_is_active():
+		return true
+	return false
+
+
+func _march_preview_chip_host() -> Node:
+	var ui: Node = get_node_or_null("UI")
+	if ui != null:
+		return ui
+	var existing: Node = get_node_or_null("MarchPreviewChipLayer")
+	if existing != null:
+		return existing
+	var layer := CanvasLayer.new()
+	layer.name = "MarchPreviewChipLayer"
+	layer.layer = 115
+	add_child(layer)
+	return layer
+
+
+func _ensure_march_preview_dash_tex() -> Texture2D:
+	if _march_preview_dash_tex != null and is_instance_valid(_march_preview_dash_tex):
+		return _march_preview_dash_tex
+	var img := Image.create(12, 2, false, Image.FORMAT_RGBA8)
+	var i: int = 0
+	while i < 12:
+		var a: float = 1.0 if i < 6 else 0.0
+		var y: int = 0
+		while y < 2:
+			img.set_pixel(i, y, Color(1.0, 1.0, 1.0, a))
+			y += 1
+		i += 1
+	_march_preview_dash_tex = ImageTexture.create_from_image(img)
+	return _march_preview_dash_tex
+
+
+func _ensure_march_preview_line() -> Line2D:
+	if _march_preview_line != null and is_instance_valid(_march_preview_line):
+		return _march_preview_line
+	var line := Line2D.new()
+	line.name = "MarchPreviewLine"
+	line.width = 2.4
+	# Dimmer than committed MarchPathLine (3.2 / alpha 0.88). Never antialiased.
+	line.default_color = Color(1.0, 0.82, 0.22, 0.42)
+	line.joint_mode = Line2D.LINE_JOINT_SHARP
+	line.begin_cap_mode = Line2D.LINE_CAP_FLAT
+	line.end_cap_mode = Line2D.LINE_CAP_FLAT
+	line.antialiased = false
+	line.texture = _ensure_march_preview_dash_tex()
+	line.texture_mode = Line2D.LINE_TEXTURE_TILE
+	line.z_index = 24
+	line.visible = false
+	add_child(line)
+	_march_preview_line = line
+	return line
+
+
+func _ensure_march_preview_chip() -> Label:
+	if _march_preview_chip != null and is_instance_valid(_march_preview_chip):
+		return _march_preview_chip
+	var chip := Label.new()
+	chip.name = "MarchPreviewChip"
+	chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	chip.add_theme_font_size_override("font_size", 13)
+	chip.add_theme_color_override("font_color", Color(1.0, 0.92, 0.62, 0.95))
+	chip.add_theme_color_override("font_shadow_color", Color(0.05, 0.04, 0.02, 0.88))
+	chip.add_theme_constant_override("shadow_offset_x", 1)
+	chip.add_theme_constant_override("shadow_offset_y", 1)
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.08, 0.07, 0.05, 0.82)
+	sb.border_color = Color(1.0, 0.82, 0.22, 0.38)
+	sb.set_border_width_all(1)
+	sb.set_corner_radius_all(3)
+	sb.content_margin_left = 8
+	sb.content_margin_right = 8
+	sb.content_margin_top = 4
+	sb.content_margin_bottom = 4
+	chip.add_theme_stylebox_override("normal", sb)
+	chip.visible = false
+	chip.z_as_relative = false
+	chip.z_index = 40
+	_march_preview_chip_host().add_child(chip)
+	_march_preview_chip = chip
+	return chip
+
+
+func _sync_march_preview_chip_position() -> void:
+	if _march_preview_chip == null or not is_instance_valid(_march_preview_chip):
+		return
+	if not _march_preview_chip.visible:
+		return
+	var vp := get_viewport()
+	if vp == null:
+		return
+	_march_preview_chip.position = vp.get_mouse_position() + Vector2(16.0, 22.0)
+
+
+func _fill_march_preview_pts(province_path: Array) -> void:
+	_march_preview_pts.resize(0)
+	for pid_v in province_path:
+		var pid := int(pid_v)
+		if province_centroids.has(pid):
+			_march_preview_pts.append(province_centroids[pid] as Vector2)
+		elif typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_centroid"):
+			var c: Vector2 = MapManager.get_province_centroid(pid)
+			if c != Vector2.ZERO:
+				_march_preview_pts.append(c)
+
+
+func _set_march_preview_line(province_path: Array) -> void:
+	var line: Line2D = _ensure_march_preview_line()
+	_fill_march_preview_pts(province_path)
+	if _march_preview_pts.size() < 2:
+		line.visible = false
+		line.points = PackedVector2Array()
+		return
+	line.points = _march_preview_pts
+	line.visible = true
+
+
+func _hide_march_preview_line() -> void:
+	if _march_preview_line == null or not is_instance_valid(_march_preview_line):
+		return
+	_march_preview_line.visible = false
+	_march_preview_line.points = PackedVector2Array()
+
+
+func _set_march_preview_chip_text(text: String) -> void:
+	var chip: Label = _ensure_march_preview_chip()
+	chip.text = text
+	chip.visible = not text.is_empty()
+	_sync_march_preview_chip_position()
+
+
+func _clear_march_preview() -> void:
+	_hide_march_preview_line()
+	if _march_preview_chip != null and is_instance_valid(_march_preview_chip):
+		_march_preview_chip.visible = false
+		_march_preview_chip.text = ""
+	_march_preview_cache_fid = ""
+	_march_preview_cache_dest = -1
+	_march_preview_cache_day = -1
+	_march_preview_cache.clear()
+
+
+func _apply_march_preview_result(result: Dictionary, province: Province) -> void:
+	var pname := ""
+	if province != null:
+		pname = str(province.name)
+	if pname.is_empty() and result.has("dest_id"):
+		pname = "province %d" % int(result.get("dest_id", 0))
+	if bool(result.get("ok", false)):
+		var hops_n := int(result.get("hops", 0))
+		var cal := int(result.get("calendar_days", 0))
+		_set_march_preview_line(result.get("path", []) as Array)
+		_set_march_preview_chip_text(
+			"%d hops · arrives in %d days · %s" % [hops_n, cal, pname]
+		)
+		return
+	_hide_march_preview_line()
+	var reason := str(result.get("reason", "")).strip_edges()
+	if reason.is_empty():
+		if bool(result.get("already_here", false)):
+			reason = "already here"
+		else:
+			reason = "no own-land path"
+	_set_march_preview_chip_text("Can't march · %s" % reason)
+
+
+func _refresh_march_preview_for_hover(province: Province) -> void:
+	if province == null or selected_formation_id.is_empty():
+		_clear_march_preview()
+		return
+	if _march_preview_ui_blocked():
+		_clear_march_preview()
+		return
+	var fid := selected_formation_id
+	var dest := province.id
+	var day := _mv1_preview_day()
+	if (
+		fid == _march_preview_cache_fid
+		and dest == _march_preview_cache_dest
+		and day == _march_preview_cache_day
+		and not _march_preview_cache.is_empty()
+	):
+		_apply_march_preview_result(_march_preview_cache, province)
+		return
+	if typeof(FormationMovement) == TYPE_NIL:
+		_clear_march_preview()
+		return
+	var tag := _player_tag()
+	var result: Dictionary = FormationMovement.preview_own_land_march(fid, dest, tag)
+	_march_preview_cache_fid = fid
+	_march_preview_cache_dest = dest
+	_march_preview_cache_day = day
+	_march_preview_cache = result
+	_apply_march_preview_result(result, province)
+
+
+func mv1_apply_hover_preview(dest_id: int) -> Dictionary:
+	var dest := int(dest_id)
+	var p: Province = null
+	if dest > 0 and provinces.has(dest):
+		p = provinces[dest] as Province
+	elif typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province"):
+		p = MapManager.get_province(dest)
+		if p != null and not provinces.has(dest):
+			provinces[dest] = p
+	_refresh_march_preview_for_hover(p)
+	return mv1_preview_report()
+
+
+func mv1_clear_hover_preview() -> void:
+	_clear_march_preview()
+
+
+func mv1_preview_report() -> Dictionary:
+	var line_vis := false
+	var point_n := 0
+	if _march_preview_line != null and is_instance_valid(_march_preview_line):
+		line_vis = _march_preview_line.visible
+		point_n = _march_preview_line.points.size()
+	var chip_vis := false
+	var chip_text := ""
+	if _march_preview_chip != null and is_instance_valid(_march_preview_chip):
+		chip_vis = _march_preview_chip.visible
+		chip_text = str(_march_preview_chip.text)
+	return {
+		"line_visible": line_vis,
+		"line_name": "MarchPreviewLine",
+		"point_n": point_n,
+		"chip_visible": chip_vis,
+		"chip_text": chip_text,
+		"cache_fid": _march_preview_cache_fid,
+		"cache_dest": _march_preview_cache_dest,
+		"cache_day": _march_preview_cache_day,
+		"ok": bool(_march_preview_cache.get("ok", false)),
+		"reason": str(_march_preview_cache.get("reason", "")),
+		"hops": int(_march_preview_cache.get("hops", 0)),
+		"calendar_days": int(_march_preview_cache.get("calendar_days", 0)),
+		"selected": selected_formation_id,
+	}
 
 
 func _on_march_hop_ui(to_pid: int, arrived: bool, dest_id: int = -1, hop: Dictionary = {}) -> void:
@@ -19931,6 +20223,7 @@ func _hide_unit_card_keep_map_focus() -> void:
 				(unit_pop as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
 	if not selected_formation_id.is_empty():
 		selected_formation_id = ""
+		_clear_march_preview()
 		_refresh_selected_unit_chip()
 
 

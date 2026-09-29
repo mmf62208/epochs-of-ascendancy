@@ -28,6 +28,14 @@ class TestUnitOwnLandMarchProduct(unittest.TestCase):
         self.assertTrue(p.get("ok"), msg=p)
         self.assertEqual(p.get("status"), "PASS", msg=p)
         self.assertEqual(list(p.get("fail") or []), [], msg=p)
+        for key in (
+            "preview_api",
+            "preview_writes_nothing",
+            "enqueue_uses_preview",
+            "renderer_hover_preview",
+            "hover_tooltip_no_bfs",
+        ):
+            self.assertIn(key, p.get("pass") or [], msg=p)
 
     def test_integrity(self) -> None:
         g = unit_own_land_march_integrity()

@@ -31,6 +31,7 @@ Every Cursor / Grok / human session on this tree:
 | **GitHub** | `origin/main` @ `497731dd` (GS-1 gold spine KEEP). **RT-1** readable road tiers is a **draft** slice — **HOLD merge**. Do not force-push over June Cursor history. |
 | **RX-1 Rhine Crossing** | Vector Rhine Bonn→Köln→Düsseldorf→Duisburg. Units on top (labels 18 < river 22 / roads 21 < joined gold spine 23 < counters 28); theater-scale + screen-space; view-only **Units** HUD + **U**. Pixel guard xvfb continuity **FAIL** `dbbdef4` (mid 0.222/12px, close 0.125/42px) / **PASS** tip (1.000/0 both zooms); units ON chip 0.932 over spine. HOLD merge on the continuity slice. |
 | **RT-1 road tiers** | Visual only (intact). Main `94295fc` Play **PASS** (PR 59). **RT-1b** draft **gold-only**: mid gold **28/34** (≥1.8× highway; close stays 16/20). `ProvEdge_` hide + forced `_sync_border_lod` **reverted** after live Play **FAIL** `5c60f366` (sage web; Köln click hit Luxembourg). Tan NUTS cells at mid are **backlog** (borders, needed for pick). xvfb ≠ product Play. HOLD merge. |
+| **MV-1 move ETA preview** | Gameplay UI only. Hover own land with a unit selected → dimmer dashed `MarchPreviewLine` + chip before click; commit uses the same `preview_own_land_march` path/ETA. Map drawing layers **untouched**. xvfb ≠ live Play. **HOLD merge** until live Play. |
 
 **This DAG (PR 1–3 under `505d91d`; this file is PR 4 — not the only PR):**
 

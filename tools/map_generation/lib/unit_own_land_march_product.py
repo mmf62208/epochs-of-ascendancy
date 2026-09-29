@@ -217,6 +217,38 @@ def build_unit_own_land_march_product() -> Dict[str, Any]:
         passes.append("movement_queue_api")
     else:
         fails.append("movement_queue_api")
+    if "func preview_own_land_march" in fm:
+        passes.append("preview_api")
+    else:
+        fails.append("preview_api")
+    prev_fn = ""
+    _pi = fm.find("func preview_own_land_march")
+    if _pi >= 0:
+        _plines = fm[_pi:].splitlines()
+        _pout = [_plines[0]]
+        for _ln in _plines[1:]:
+            if _ln.startswith("func "):
+                break
+            _pout.append(_ln)
+        prev_fn = "\n".join(_pout)
+    if prev_fn and "_orders[" not in prev_fn and "_orders." not in prev_fn:
+        passes.append("preview_writes_nothing")
+    else:
+        fails.append("preview_writes_nothing")
+    enq_fn = ""
+    _ei = fm.find("func enqueue_own_land_march")
+    if _ei >= 0:
+        _elines = fm[_ei:].splitlines()
+        _eout = [_elines[0]]
+        for _ln in _elines[1:]:
+            if _ln.startswith("func "):
+                break
+            _eout.append(_ln)
+        enq_fn = "\n".join(_eout)
+    if "preview_own_land_march" in enq_fn and "_orders[fid]" in enq_fn:
+        passes.append("enqueue_uses_preview")
+    else:
+        fails.append("enqueue_uses_preview")
     if "_tick_own_land_marches" in tm and "tick_all_marches" in tm:
         passes.append("time_manager_day_tick")
     else:
@@ -235,6 +267,28 @@ def build_unit_own_land_march_product() -> Dict[str, Any]:
         passes.append("renderer_enqueues_not_teleports")
     else:
         fails.append("renderer_enqueues_not_teleports")
+    if "MarchPreviewLine" in ren and "_refresh_march_preview_for_hover" in ren:
+        passes.append("renderer_hover_preview")
+    else:
+        fails.append("renderer_hover_preview")
+    hover_fn = ""
+    _hi = ren.find("func _refresh_hover_tooltip")
+    if _hi >= 0:
+        _hlines = ren[_hi:].splitlines()
+        _hout = [_hlines[0]]
+        for _ln in _hlines[1:]:
+            if _ln.startswith("func "):
+                break
+            _hout.append(_ln)
+        hover_fn = "\n".join(_hout)
+    if (
+        hover_fn
+        and "preview_own_land_march" not in hover_fn
+        and "_refresh_march_preview_for_hover" not in hover_fn
+    ):
+        passes.append("hover_tooltip_no_bfs")
+    else:
+        fails.append("hover_tooltip_no_bfs")
 
     ok = len(fails) == 0
     fixtures: Dict[str, Any] = {

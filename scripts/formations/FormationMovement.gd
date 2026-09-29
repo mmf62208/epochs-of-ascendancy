@@ -240,7 +240,31 @@ static func remaining_eta_days(order: Dictionary) -> float:
 	return left
 
 
-static func enqueue_own_land_march(
+static func _preview_fail(
+	fid: String,
+	dest_id: int,
+	reason: String,
+	from_id: int = -1,
+	already_here: bool = false,
+) -> Dictionary:
+	var empty_path: Array[int] = []
+	return {
+		"ok": false,
+		"reason": reason,
+		"already_here": already_here,
+		"path": empty_path,
+		"hops": 0,
+		"eta_days": 0.0,
+		"calendar_days": 0,
+		"from_id": from_id,
+		"dest_id": dest_id,
+		"formation_id": fid,
+	}
+
+
+## Same checks / BFS / ETA as enqueue_own_land_march, but writes nothing.
+## Safe to call on hover. Return shape is the SOT for commit.
+static func preview_own_land_march(
 	formation_id: String,
 	dest_id: int,
 	country_tag: String,
@@ -248,31 +272,73 @@ static func enqueue_own_land_march(
 	var fid := formation_id.strip_edges()
 	var tag := country_tag.strip_edges().to_upper()
 	if fid.is_empty() or tag.is_empty() or dest_id <= 0:
-		return {"ok": false, "reason": "bad args"}
+		return _preview_fail(fid, dest_id, "bad args")
 	if typeof(LeaderManager) == TYPE_NIL or not LeaderManager.has_method("get_formation"):
-		return {"ok": false, "reason": "no formation"}
+		return _preview_fail(fid, dest_id, "no formation")
 	var f: Formation = LeaderManager.get_formation(fid)
 	if f == null:
-		return {"ok": false, "reason": "unknown unit"}
+		return _preview_fail(fid, dest_id, "unknown unit")
 	if str(f.country_tag).strip_edges().to_upper() != tag:
-		return {"ok": false, "reason": "not your unit"}
+		return _preview_fail(fid, dest_id, "not your unit")
 	var from_id := int(f.stationed_province_id) if "stationed_province_id" in f else -1
 	if from_id < 0:
-		return {"ok": false, "reason": "no station"}
+		return _preview_fail(fid, dest_id, "no station", from_id)
 	if from_id == dest_id:
-		return {"ok": false, "reason": "already here", "already_here": true}
+		return _preview_fail(fid, dest_id, "already here", from_id, true)
 	if typeof(MapManager) == TYPE_NIL:
-		return {"ok": false, "reason": "no map"}
+		return _preview_fail(fid, dest_id, "no map", from_id)
 	var dest: Province = MapManager.get_province(dest_id)
 	if dest == null:
-		return {"ok": false, "reason": "no dest"}
+		return _preview_fail(fid, dest_id, "no dest", from_id)
 	if not march_legal(_ctrl_tag(dest), tag, not bool(dest.is_sea)):
-		return {"ok": false, "reason": "not your land"}
+		return _preview_fail(fid, dest_id, "not your land", from_id)
 	var path: Array[int] = find_own_land_path(from_id, dest_id, tag)
 	if path.size() < 2:
-		return {"ok": false, "reason": "no own-land path"}
+		return _preview_fail(fid, dest_id, "no own-land path", from_id)
 	var prof: Dictionary = template_profile(f)
 	var first_cost := _hop_cost_into(int(path[1]), prof, int(path[0]))
+	# Local order only — remaining_eta_days is read-only and this dict is not stored.
+	var order := {
+		"formation_id": fid,
+		"country_tag": tag,
+		"path": path,
+		"hop_index": 1,
+		"progress": 0.0,
+		"hop_cost": first_cost,
+		"dest_id": dest_id,
+		"from_id": from_id,
+		"order_type": ORDER_OWN_LAND_MARCH,
+	}
+	var eta := remaining_eta_days(order)
+	var hops_n := path.size() - 1
+	return {
+		"ok": true,
+		"reason": "",
+		"already_here": false,
+		"path": path,
+		"hops": hops_n,
+		"eta_days": eta,
+		"calendar_days": calendar_days(eta),
+		"from_id": from_id,
+		"dest_id": dest_id,
+		"formation_id": fid,
+		"hop_cost": first_cost,
+	}
+
+
+static func enqueue_own_land_march(
+	formation_id: String,
+	dest_id: int,
+	country_tag: String,
+) -> Dictionary:
+	var preview: Dictionary = preview_own_land_march(formation_id, dest_id, country_tag)
+	if not bool(preview.get("ok", false)):
+		return preview
+	var fid := str(preview.get("formation_id", formation_id.strip_edges()))
+	var tag := country_tag.strip_edges().to_upper()
+	var path: Array = preview.get("path", []) as Array
+	var from_id := int(preview.get("from_id", -1))
+	var first_cost := float(preview.get("hop_cost", 1.0))
 	var order := {
 		"formation_id": fid,
 		"country_tag": tag,
@@ -285,20 +351,9 @@ static func enqueue_own_land_march(
 		"order_type": ORDER_OWN_LAND_MARCH,
 	}
 	_orders[fid] = order
-	var eta := remaining_eta_days(order)
-	var hops_n := path.size() - 1
-	return {
-		"ok": true,
-		"reason": "",
-		"path": path,
-		"hops": hops_n,
-		"eta_days": eta,
-		"calendar_days": calendar_days(eta),
-		"from_id": from_id,
-		"dest_id": dest_id,
-		"formation_id": fid,
-		"replaced": true,
-	}
+	var out: Dictionary = preview.duplicate(true)
+	out["replaced"] = true
+	return out
 
 
 ## Adjacent-sea hop only (no land BFS, no 3520 scan). Fleet / TF / ship.
