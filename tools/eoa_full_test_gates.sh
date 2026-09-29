@@ -154,6 +154,8 @@ run_step unit_board_play_path \
     tools.map_generation.tests.test_unit_composition_combat_product \
     tools.map_generation.tests.test_equipment_flow_product \
     tools.map_generation.tests.test_era_resource_deposits_product \
+    tools.map_generation.tests.test_resource_icon_lod \
+    tools.map_generation.tests.test_map_resources_mapmode_product \
     -v || fail
 
 run_step unit_save_path \
@@ -219,6 +221,9 @@ else
   run_step launch_mv1_march_preview \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessMv1MarchPreviewTest.gd || fail
 
+  run_step launch_rh1_resource_glyphs \
+    tools/run_godot.sh --headless -s res://scripts/core/HeadlessRh1ResourceGlyphMapModeTest.gd || fail
+
   run_step launch_ix1_mandate_gate \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessIx1RoadSpineMandateGateTest.gd || fail
 
@@ -263,6 +268,9 @@ else
 
   run_step launch_mv1_card_up_input \
     tools/eoa_mv1_card_up_input_guard.sh || fail
+
+  run_step launch_rh1_pixel \
+    tools/eoa_rh1_pixel_guard.sh || fail
 
   run_step launch_rx1_live_stay_alive_tick \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessRx1RhineLiveStayAliveTickTest.gd || fail

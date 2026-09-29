@@ -14057,6 +14057,14 @@ func set_map_mode(mode: String = "political") -> void:
 		var ol_n := get_overlay_layer("InfrastructureOverlayLayer")
 		if ol_n and ol_n.has_method("queue_redraw"):
 			ol_n.queue_redraw()
+	var ol_res := get_overlay_layer("InfrastructureOverlayLayer")
+	if ol_res:
+		if ol_res.has_method("set_map_mode_for_glyphs"):
+			ol_res.call("set_map_mode_for_glyphs", m)
+		else:
+			ol_res.set("show_resource_icons", m == "resources")
+			if ol_res.has_method("queue_redraw"):
+				ol_res.queue_redraw()
 	if m == "weather":
 		debug_tint_mode = "weather"
 	elif m == "munitions":
@@ -14910,6 +14918,9 @@ func _render_provinces_finish(raster_preserved: Dictionary) -> void:
 	_setup_agent_presence_layer()
 	_setup_agent_layer()
 	_setup_infrastructure_overlay_layer()
+	var ol_glyphs := get_overlay_layer("InfrastructureOverlayLayer")
+	if ol_glyphs != null and ol_glyphs.has_method("set_map_mode_for_glyphs"):
+		ol_glyphs.call("set_map_mode_for_glyphs", current_map_mode)
 	_setup_rx1_rhine_layer()
 	call_deferred("_setup_terrain_layer_stack")
 	call_deferred("_setup_weather_overlay_layer")

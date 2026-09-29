@@ -33,6 +33,20 @@ class TestResourceIconLOD(unittest.TestCase):
         self.assertIn("_draw_resource_icons_culled", self.src)
         self.assertIn("max_resource_icons_for_board", self.src)
 
+    def test_resource_glyphs_hidden_except_resources_mapmode(self) -> None:
+        self.assertIn("var show_resource_icons: bool = false", self.src)
+        self.assertIn('var _glyph_map_mode: String = "political"', self.src)
+        self.assertIn("func set_map_mode_for_glyphs", self.src)
+        self.assertIn('show_resource_icons = m == "resources"', self.src)
+        draw_idx = self.src.find("func _draw():")
+        culled_idx = self.src.find("func _draw_resource_icons_culled")
+        self.assertGreater(draw_idx, 0)
+        self.assertGreater(culled_idx, draw_idx)
+        draw_body = self.src[draw_idx:culled_idx]
+        self.assertIn("if show_resource_icons:", draw_body)
+        self.assertIn("_draw_resource_icons_culled", draw_body)
+        self.assertIn("if not show_resource_icons:", self.src)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
