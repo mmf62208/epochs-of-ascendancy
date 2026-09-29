@@ -34,6 +34,7 @@ class TestUnitOwnLandMarchProduct(unittest.TestCase):
             "enqueue_uses_preview",
             "renderer_hover_preview",
             "hover_tooltip_no_bfs",
+            "card_up_hover_preview",
         ):
             self.assertIn(key, p.get("pass") or [], msg=p)
 

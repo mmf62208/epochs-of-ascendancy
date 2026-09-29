@@ -261,6 +261,9 @@ else
   run_step launch_mv1_pixel \
     tools/eoa_mv1_pixel_guard.sh || fail
 
+  run_step launch_mv1_card_up_input \
+    tools/eoa_mv1_card_up_input_guard.sh || fail
+
   run_step launch_rx1_live_stay_alive_tick \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessRx1RhineLiveStayAliveTickTest.gd || fail
 

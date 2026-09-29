@@ -289,6 +289,25 @@ def build_unit_own_land_march_product() -> Dict[str, Any]:
         passes.append("hover_tooltip_no_bfs")
     else:
         fails.append("hover_tooltip_no_bfs")
+    spatial_fn = ""
+    _si = ren.find("func _update_spatial_hover")
+    if _si >= 0:
+        _slines = ren[_si:].splitlines()
+        _sout = [_slines[0]]
+        for _ln in _slines[1:]:
+            if _ln.startswith("func "):
+                break
+            _sout.append(_ln)
+        spatial_fn = "\n".join(_sout)
+    if (
+        spatial_fn
+        and "_unit_detail_popup_is_visible() or _is_mouse_over_blocking_ui()" not in spatial_fn
+        and "_refresh_march_preview_for_hover" in spatial_fn
+        and "_clear_left_slop_after_still_click" in ren
+    ):
+        passes.append("card_up_hover_preview")
+    else:
+        fails.append("card_up_hover_preview")
 
     ok = len(fails) == 0
     fixtures: Dict[str, Any] = {

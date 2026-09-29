@@ -133,6 +133,16 @@ func _test_source_needles() -> void:
 	if "MarchPreviewLine" not in ren or "_refresh_march_preview_for_hover" not in ren:
 		_fail("MapRenderer missing MarchPreviewLine / hover-change hook")
 		return
+	var spatial := _slice_func(ren, "_update_spatial_hover")
+	if "_unit_detail_popup_is_visible() or _is_mouse_over_blocking_ui()" in spatial:
+		_fail("_update_spatial_hover must not early-return on card-visible OR blocking-UI")
+		return
+	if "_refresh_march_preview_for_hover" not in spatial:
+		_fail("_update_spatial_hover must still refresh march preview with the card up")
+		return
+	if "_clear_left_slop_after_still_click" not in ren:
+		_fail("still-click slop clear missing")
+		return
 	var hover_fn := _slice_func(ren, "_refresh_hover_tooltip")
 	if "preview_own_land_march" in hover_fn or "_refresh_march_preview_for_hover" in hover_fn:
 		_fail("_refresh_hover_tooltip must not BFS / preview (per-frame path)")

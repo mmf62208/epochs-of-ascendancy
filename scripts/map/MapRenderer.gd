@@ -288,6 +288,8 @@ var _left_cam_moved_this_down: bool = false
 ## still reports pressed). Next physical `_begin(true)` may reset; leftover hold
 ## and leftover pressed=true must not.
 var _left_button_was_up: bool = true
+## Last left-release classification (still-click vs drag). Guard-readable.
+var _mv1_last_release_was_drag: bool = false
 var _camera_nudge_gen := 0
 ## Close/Esc: do not re-cull fills until the camera actually moves (Play: dark-blue void).
 var _viewport_cull_suspend_until_msec: int = 0
@@ -1109,6 +1111,15 @@ func _left_live_slop_is_drag() -> bool:
 	var slop_lim: float = LEFT_PAN_SLOP_PX * LEFT_PAN_SLOP_PX
 	if _left_max_slop_sq >= slop_lim:
 		return true
+	# Leftover select-origin must not count after the button is up and leftover
+	# hold expires. Play MV-1: hover-move after opening the unit card made every
+	# later still-click look like an 8px drag vs the select point.
+	if not (
+		_left_btn_down
+		or _left_in_leftover_hold()
+		or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
+	):
+		return false
 	var vp_live: Viewport = get_viewport()
 	if vp_live == null:
 		return false
@@ -1317,6 +1328,10 @@ func _end_left_button_down() -> void:
 	_left_btn_down = false
 	_left_pan_armed = false
 	_left_pan_active = false
+	# Button just went up. Do not wait for `_allow` — a docked unit card can
+	# swallow the release so the Input singleton stays stale and `_begin(true)`
+	# never resets origin (Play MV-1: every later map click was dragged).
+	_left_button_was_up = true
 	_left_release_frame = Engine.get_process_frames()
 	var vp_end: Viewport = get_viewport()
 	if vp_end != null:
@@ -1324,6 +1339,27 @@ func _end_left_button_down() -> void:
 		_left_release_screen_valid = true
 	# Keep sticky slop. Leftover pressed=true must not reset `_left_release_screen`
 	# origin. Home clears sticky; leftover hold is frames after this `_end`.
+
+
+func _clear_left_slop_after_still_click() -> void:
+	# Still-click (select / commit) must not leave leftover origin at the click
+	# so a later hover-move cannot latch `_left_live_slop_is_drag`. Drag releases
+	# keep skip/slop via leftover hold (Rio Grande Rise).
+	_left_sticky_valid = false
+	_left_sticky_slop_sq = 0.0
+	_left_max_slop_sq = 0.0
+	_left_origin_valid = false
+	_left_gesture_dragged = false
+	_left_skip_next_pick = false
+	_left_slop_latched = false
+	_left_gesture_panned = false
+	_left_pan_committed = false
+	_left_cam_moved_this_down = false
+	_left_ready_for_still_click = true
+	_left_button_was_up = true
+	_left_press_cam_valid = false
+	_left_release_frame = -1
+	_left_release_screen_valid = false
 
 
 func _rearm_left_drag_for_next_press() -> void:
@@ -2540,29 +2576,34 @@ func _input(event: InputEvent) -> void:
 					or _map_click_should_skip_pick()
 					or _left_release_must_skip_pick()
 				)
+				_mv1_last_release_was_drag = did_left_pan
 				_end_left_button_down()
 				_note_close_button_release()
 				if did_left_pan:
 					_mark_left_pan_blocked_pick()
 					get_viewport().set_input_as_handled()
-				elif _living_title_boot_is_up():
-					# Never open chips / inspector / assault under the title (window-exit).
-					var rel_world: Vector2 = _screen_to_world(get_viewport().get_mouse_position())
-					var rel_pid: int = _resolve_map_pick_pid(rel_world)
-					if rel_pid <= 0:
-						rel_pid = _resolve_hex_pick_pid(rel_world)
-					_try_living_title_map_pick(rel_pid)
-					get_viewport().set_input_as_handled()
-					return
-				elif (
-					not event.shift_pressed
-					and not event.alt_pressed
-					and _try_open_land_chip_from_input(event.ctrl_pressed)
-				):
-					# Still-click land chip in `_input` so ProvinceHoverTooltip
-					# cannot steal GER Division Fill%/TOE (Play DIG FAIL).
-					# Alt-click prefers province inspector (IX-1 Köln under garrison).
-					return
+				else:
+					# Still-click (select / later commit) must drop leftover origin
+					# so hover-move cannot latch the next map click as a drag.
+					_clear_left_slop_after_still_click()
+					if _living_title_boot_is_up():
+						# Never open chips / inspector / assault under the title (window-exit).
+						var rel_world: Vector2 = _screen_to_world(get_viewport().get_mouse_position())
+						var rel_pid: int = _resolve_map_pick_pid(rel_world)
+						if rel_pid <= 0:
+							rel_pid = _resolve_hex_pick_pid(rel_world)
+						_try_living_title_map_pick(rel_pid)
+						get_viewport().set_input_as_handled()
+						return
+					elif (
+						not event.shift_pressed
+						and not event.alt_pressed
+						and _try_open_land_chip_from_input(event.ctrl_pressed)
+					):
+						# Still-click land chip in `_input` so ProvinceHoverTooltip
+						# cannot steal GER Division Fill%/TOE (Play DIG FAIL).
+						# Alt-click prefers province inspector (IX-1 Köln under garrison).
+						return
 	if event is InputEventMouseMotion:
 		_note_mouse_up_arms_still_click()
 		if _left_btn_down or _left_pan_armed or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
@@ -2926,17 +2967,16 @@ func _unhandled_input(event: InputEvent) -> void:
 				or _left_release_must_skip_pick()
 				or _left_live_slop_is_drag()
 			)
+			_mv1_last_release_was_drag = did_left_pan
 			_end_left_button_down()
 			_note_close_button_release()
 			if did_left_pan:
 				_mark_left_pan_blocked_pick()
 				get_viewport().set_input_as_handled()
 				return
-			# Still-click: old skip flags must not leak, but _left_gesture_dragged stays false.
-			_left_skip_next_pick = false
-			_left_slop_latched = false
-			_left_gesture_panned = false
-			_left_pan_committed = false
+			# Still-click: drop leftover origin / skip so a later hover-move
+			# cannot latch the next map click as a drag (Play MV-1 card-up).
+			_clear_left_slop_after_still_click()
 			if MapViewInput.modal_blocks_map_nav(get_viewport()):
 				return
 			if _gui_blocks_map_pick():
@@ -18339,7 +18379,10 @@ func _on_mouse_entered(node: Node2D, province: Province):
 	_apply_hover_visuals(province.id, true)
 	_sync_hovered_strategic_region(province)
 	if show_hover_province_name:
-		_refresh_hover_tooltip(province)
+		if _unit_detail_popup_is_visible():
+			_hide_hover_tooltip()
+		else:
+			_refresh_hover_tooltip(province)
 	_refresh_march_preview_for_hover(province)
 
 
@@ -18558,11 +18601,17 @@ func _update_spatial_hover() -> void:
 	_last_hover_mouse = mouse_screen
 
 	# Don't show map province tooltips while the cursor is over a UI window/popup.
-	# Also suppress glance chrome while the docked unit card is up (Play: Wiener Umland).
-	if _unit_detail_popup_is_visible() or _is_mouse_over_blocking_ui():
+	# Card-up is NOT a map-hover block: Play MV-1 still needs the march preview
+	# while the docked unit card is visible. Suppress only the glance tooltip
+	# (see `_refresh_hover_tooltip` / `_unit_detail_popup_is_visible` below).
+	# If the mouse is genuinely over the card / other blocking UI, clear.
+	if _is_mouse_over_blocking_ui():
 		if _hover_province != null or (hover_tooltip != null and hover_tooltip.visible):
 			_clear_hover_state()
 		return
+	# Card-up: suppress glance tooltip only. Preview stays (hover-change below).
+	if _unit_detail_popup_is_visible():
+		_hide_hover_tooltip()
 	# Empty-area left-drag: no sea/province glance (Play 47af97a Drag2 MAR North).
 	# Physical hold + committed slop/pan only — idle hover after Esc stays.
 	if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) and (
@@ -18593,7 +18642,10 @@ func _update_spatial_hover() -> void:
 			_apply_hover_visuals(pid, true)
 			_sync_hovered_strategic_region(new_hover_province)
 			if show_hover_province_name:
-				_refresh_hover_tooltip(new_hover_province)
+				if _unit_detail_popup_is_visible():
+					_hide_hover_tooltip()
+				else:
+					_refresh_hover_tooltip(new_hover_province)
 			_refresh_march_preview_for_hover(new_hover_province)
 
 
@@ -19629,6 +19681,75 @@ func mv1_preview_report() -> Dictionary:
 		"calendar_days": int(_march_preview_cache.get("calendar_days", 0)),
 		"selected": selected_formation_id,
 	}
+
+
+func mv1_world_to_screen(world: Vector2) -> Vector2:
+	var vp: Viewport = get_viewport()
+	if vp == null:
+		return world
+	var cam: Camera2D = vp.get_camera_2d()
+	if cam == null:
+		return world
+	return cam.get_canvas_transform() * world
+
+
+func mv1_formation_screen_pos(fid: String) -> Vector2:
+	var want := fid.strip_edges()
+	if want.is_empty():
+		return Vector2.ZERO
+	for id_v in _demo_unit_icon_pids:
+		var id := int(id_v)
+		if not province_nodes.has(id):
+			continue
+		var n: Node2D = province_nodes[id] as Node2D
+		if n == null:
+			continue
+		var counter: Node2D = n.get_node_or_null("DemoUnitIcon_" + str(id)) as Node2D
+		if counter == null or not is_instance_valid(counter):
+			continue
+		var cfid := str(counter.get_meta("formation_id", ""))
+		if cfid != want:
+			continue
+		return mv1_world_to_screen(counter.global_position)
+	return Vector2.ZERO
+
+
+func mv1_province_screen_pos(pid: int) -> Vector2:
+	var dest := int(pid)
+	var world := Vector2.ZERO
+	if province_centroids.has(dest):
+		world = province_centroids[dest] as Vector2
+	elif typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_centroid"):
+		world = MapManager.get_province_centroid(dest)
+	if world == Vector2.ZERO:
+		return Vector2.ZERO
+	return mv1_world_to_screen(world)
+
+
+func mv1_unit_card_is_visible() -> bool:
+	return _unit_detail_popup_is_visible()
+
+
+func mv1_last_left_release_was_drag() -> bool:
+	return _mv1_last_release_was_drag
+
+
+func mv1_left_release_report() -> Dictionary:
+	return {
+		"dragged": _mv1_last_release_was_drag,
+		"skip": _left_skip_next_pick,
+		"card_visible": _unit_detail_popup_is_visible(),
+		"selected": selected_formation_id,
+		"origin_valid": _left_origin_valid,
+		"sticky_valid": _left_sticky_valid,
+		"btn_down": _left_btn_down,
+		"was_up": _left_button_was_up,
+	}
+
+
+func mv1_rebuild_unit_icons() -> void:
+	_update_unit_icons_for_test()
+	_sync_unit_counter_paint()
 
 
 func _on_march_hop_ui(to_pid: int, arrived: bool, dest_id: int = -1, hop: Dictionary = {}) -> void:
