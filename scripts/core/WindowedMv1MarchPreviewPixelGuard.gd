@@ -41,6 +41,8 @@ var _fid: String = ""
 var _hover_ok: bool = false
 var _unhover_ok: bool = false
 var _chip_text: String = ""
+var _cam_pos: Vector2 = Vector2.ZERO
+var _cam_zoom: float = MID_ZOOM
 
 
 func _init() -> void:
@@ -336,7 +338,7 @@ func _find_named(nm: String) -> Node:
 
 
 func _pause_clock_only() -> void:
-	var tm := root.get_node_or_null("TimeManager")
+	var tm := _time_manager()
 	if tm != null and tm.has_method("set_paused"):
 		tm.call("set_paused", true)
 	elif tm != null and "paused" in tm:
@@ -344,10 +346,15 @@ func _pause_clock_only() -> void:
 
 
 func _lock_camera_fighters() -> void:
+	# Play MIXED 816cdc9 / prior MV-1 capture: TestRunner deferred
+	# center_europe_in_world_view won the camera so Köln mid-zoom never stuck.
+	if root != null:
+		root.set_meta("eoa_rx1_pixel_lock_camera", true)
 	var mr := _map_renderer()
 	if mr != null:
 		mr.set("_europe_focus_retry", 99)
 		mr.set("_close_camera_locked", true)
+		mr.set("_hold_camera_until_msec", Time.get_ticks_msec() + 120000)
 	var tr := _find_named("TestRunner")
 	if tr != null and tr.has_method("set_process"):
 		tr.set_process(false)
@@ -358,23 +365,73 @@ func _lock_camera_fighters() -> void:
 		if "enable_zoom" in cc:
 			cc.set("enable_zoom", false)
 		cc.set_process(false)
+	if mr != null and mr.has_method("set_process"):
+		mr.set_process(false)
+	_log("EOA_MV1_PIXEL_GUARD who=guard.lock_camera (NOT product Home/Close; NOT live Play)")
+
+
+func _ensure_not_live_banner() -> void:
+	var existing: Node = _find_named("Mv1NotLivePlayBanner")
+	if existing != null:
+		if existing is CanvasItem:
+			(existing as CanvasItem).visible = true
+		return
+	var banner := Label.new()
+	banner.name = "Mv1NotLivePlayBanner"
+	banner.text = "xvfb / llvmpipe — NOT live Play (not Vulkan product)"
+	banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	banner.add_theme_font_size_override("font_size", 18)
+	banner.add_theme_color_override("font_color", Color(1.0, 0.92, 0.35, 1.0))
+	banner.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.9))
+	banner.add_theme_constant_override("shadow_offset_x", 1)
+	banner.add_theme_constant_override("shadow_offset_y", 1)
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.08, 0.05, 0.02, 0.82)
+	sb.content_margin_left = 8
+	sb.content_margin_right = 8
+	sb.content_margin_top = 6
+	sb.content_margin_bottom = 6
+	banner.add_theme_stylebox_override("normal", sb)
+	banner.position = Vector2(16, 56)
+	banner.z_index = 80
+	var host: Node = root
+	if current_scene != null:
+		host = current_scene
+	host.add_child(banner)
 
 
 func _frame_over_koln(zoom: float) -> void:
 	var pos := _koln_world()
 	_apply_camera(pos, zoom)
+	_ensure_not_live_banner()
 	var mr := _map_renderer()
 	if mr != null and "info_panel" in mr:
 		var ip: Variant = mr.get("info_panel")
 		if ip is Control:
 			(ip as Control).visible = false
+	_log("EOA_MV1_PIXEL_GUARD who=guard.frame zoom=%.2f pos=%.1f,%.1f (NOT live Play)" % [zoom, pos.x, pos.y])
 
 
 func _apply_camera(pos: Vector2, zoom: float) -> void:
+	_cam_pos = pos
+	_cam_zoom = zoom
+	var mr := _map_renderer()
+	if mr != null and mr.has_method("lock_pixel_guard_camera"):
+		mr.call("lock_pixel_guard_camera", pos, zoom)
+		return
+	if mr != null:
+		mr.set("_close_camera_lock_pos", pos)
+		mr.set("_close_camera_lock_zoom", Vector2(zoom, zoom))
+		mr.set("_close_camera_locked", true)
 	var cam := _camera()
 	if cam == null:
 		return
 	cam.zoom = Vector2(zoom, zoom)
+	var parent := cam.get_parent() as Node2D
+	if parent != null:
+		cam.position = parent.to_local(pos)
+	else:
+		cam.position = pos
 	cam.global_position = pos
 	cam.reset_smoothing()
 	if cam.has_method("force_update_scroll"):
@@ -384,7 +441,10 @@ func _apply_camera(pos: Vector2, zoom: float) -> void:
 
 
 func _reassert_camera() -> void:
-	_apply_camera(_koln_world(), MID_ZOOM)
+	if _cam_pos == Vector2.ZERO:
+		_apply_camera(_koln_world(), MID_ZOOM)
+		return
+	_apply_camera(_cam_pos, _cam_zoom)
 
 
 func _camera() -> Camera2D:
@@ -410,9 +470,21 @@ func _koln_world() -> Vector2:
 
 func _capture(name: String) -> void:
 	_reassert_camera()
+	_ensure_not_live_banner()
 	RenderingServer.force_draw()
 	_reassert_camera()
 	RenderingServer.force_draw()
+	var cam := _camera()
+	if cam != null:
+		var d := cam.global_position.distance_to(_koln_world())
+		_log(
+			"EOA_MV1_PIXEL_GUARD who=guard.cam pos=%.1f,%.1f zoom=%.3f koln_dist=%.1f (NOT live Play)"
+			% [cam.global_position.x, cam.global_position.y, cam.zoom.x, d]
+		)
+		if d > 1400.0:
+			_fail_reasons.append("camera_not_on_koln")
+		if cam.zoom.x < 0.80:
+			_fail_reasons.append("camera_not_mid_zoom")
 	var vp := root.get_viewport()
 	if vp == null:
 		return
