@@ -1234,16 +1234,22 @@ func _reseed_left_origin_from_idle_up(mouse: Vector2) -> void:
 
 
 func _begin_left_map_gesture(new_press: bool = false) -> void:
-	# Already in THIS button-down — never reset origin/dragged (Play: 400ms re-arm opened Finistère).
-	# Idle-up new press: leftover swallowed `_end` can leave `_left_btn_down` stuck
-	# (CC dimmer). Fall through so leftover/genuine logic can start THIS origin.
-	# Mid-drag `_left_button_was_up` is false — keep origin (not PR 24 mid-drag seed).
-	if _left_btn_down and not (new_press and _left_button_was_up):
+	# Mid-gesture `_begin()` (no new_press): keep origin (Play: 400ms re-arm
+	# opened Finistère). A real MouseButton press always resets — stuck
+	# `_left_btn_down` after inspector/Open-fight Close must not inherit
+	# dragged/not-ready (Play: 22 dead still-clicks after Close).
+	# Idle-up new press: leftover swallowed `_end` can leave `_left_btn_down`
+	# stuck (CC dimmer). Fall through so THIS origin starts clean.
+	if _left_btn_down and not new_press:
 		return
+	# Product string: idle-up new press (Alicante) is never first-line-returned.
+	if new_press and _left_button_was_up:
+		pass
 	var vp: Viewport = get_viewport()
 	var mouse: Vector2 = vp.get_mouse_position() if vp != null else Vector2.ZERO
 	var physically_down: bool = Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
-	_note_sticky_slop()
+	if not new_press:
+		_note_sticky_slop()
 	# Leftover pressed=true / leftover hold / leftover Input-down: keep THIS drag.
 	# c4c44b8: Atlantic water in the left edge strip slid the camera onto Iberia
 	# with slop <8px; leftover `_begin(true)` wiped sticky and picked Lisboa.
@@ -18733,6 +18739,10 @@ func show_info_panel(province: Province, force_open: bool = false, keep_camera: 
 	info_panel.visible = true
 	if not inspector_was_up:
 		_reset_left_gesture_state()
+		if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+			_left_skip_next_pick = true
+			_left_btn_down = true
+			_left_button_was_up = false
 	if info_panel is Control:
 		(info_panel as Control).mouse_filter = Control.MOUSE_FILTER_STOP
 	_layout_info_panel_inner()
@@ -22365,6 +22375,10 @@ func _show_open_fight_sheet(
 		return
 	_hold_camera_now()
 	_reset_left_gesture_state()
+	if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+		_left_skip_next_pick = true
+		_left_btn_down = true
+		_left_button_was_up = false
 	if info_panel != null and info_panel is CanvasItem:
 		(info_panel as CanvasItem).visible = false
 	# Unit card docks the same bottom-left as the Maginot sheet (Play: Open fight
