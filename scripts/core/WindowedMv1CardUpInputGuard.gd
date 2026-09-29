@@ -2139,6 +2139,9 @@ func _do_air_disk_setup() -> void:
 		_fail_reasons.append("no_map_renderer")
 		_finish(false)
 		return
+	_camera_unlocked = false
+	_lock_camera_keep_process()
+	_frame_over_berlin()
 	_set_stationed(_fid_air, BERLIN)
 	_park_ger_at(_cap_neighbor_pid, NAME_A)
 	_vacate_other_player_land_to(_fid, BONN)
