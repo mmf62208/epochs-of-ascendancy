@@ -13,7 +13,7 @@ extends SceneTree
 const KOELN := 710417
 const BONN := 710416
 const LEV := 710418
-const MID_ZOOM := 1.15
+const MID_ZOOM := 2.80
 const WAIT_MAP_SECS := 420
 const SETTLE_FRAMES := 24
 const LEFTOVER_FRAMES := 22
@@ -247,9 +247,19 @@ func _check_select_then_hover() -> void:
 	var rel: Dictionary = {}
 	if mr.has_method("mv1_left_release_report"):
 		rel = mr.call("mv1_left_release_report") as Dictionary
+	var ui_names := ""
+	var ui_node: Node = mr.get_node_or_null("UI")
+	if ui_node != null:
+		var bits: PackedStringArray = PackedStringArray()
+		for c in ui_node.get_children():
+			var vis := false
+			if c is CanvasItem:
+				vis = (c as CanvasItem).visible
+			bits.append("%s vis=%s" % [str(c.name), str(vis)])
+		ui_names = ",".join(bits)
 	_log(
-		"EOA_MV1_CARD_UP_INPUT_GUARD who=guard.select_result selected=%s card=%s rel=%s (NOT live Play)"
-		% [selected, str(card_up), str(rel)]
+		"EOA_MV1_CARD_UP_INPUT_GUARD who=guard.select_result selected=%s card=%s rel=%s ui=%s (NOT live Play)"
+		% [selected, str(card_up), str(rel), ui_names]
 	)
 	if selected.is_empty():
 		_fail_reasons.append("select_did_not_arm_formation")
@@ -271,7 +281,7 @@ func _do_hover() -> void:
 		_fail_reasons.append("no_map_renderer")
 		_finish(false)
 		return
-	var lev: Vector2 = mr.call("mv1_province_screen_pos", LEV) as Vector2
+	var lev: Vector2 = _march_dest_screen(mr)
 	if lev == Vector2.ZERO:
 		_fail_reasons.append("lev_screen_pos_missing")
 		_finish(false)
@@ -331,7 +341,7 @@ func _do_commit() -> void:
 		_fail_reasons.append("no_map_renderer")
 		_finish(false)
 		return
-	var lev: Vector2 = mr.call("mv1_province_screen_pos", LEV) as Vector2
+	var lev: Vector2 = _march_dest_screen(mr)
 	_log("EOA_MV1_CARD_UP_INPUT_GUARD who=guard.commit_click lev=%.1f,%.1f (NOT live Play)" % [lev.x, lev.y])
 	_click_still(lev)
 	_phase = Phase.WAIT_COMMIT
@@ -464,6 +474,16 @@ func _check_drag_and_finish() -> void:
 	_drag_ok = moved >= 2.0 and dragged and dest == LEV
 	_capture("mv1_card_up_drag_pan_NOT_live_play")
 	_finish(_fail_reasons.is_empty())
+
+
+func _march_dest_screen(mr: Node) -> Vector2:
+	if mr != null and mr.has_method("mv1_screen_pos_for_march_dest"):
+		var picked: Vector2 = mr.call("mv1_screen_pos_for_march_dest", LEV) as Vector2
+		if picked != Vector2.ZERO:
+			return picked
+	if mr != null and mr.has_method("mv1_province_screen_pos"):
+		return mr.call("mv1_province_screen_pos", LEV) as Vector2
+	return Vector2.ZERO
 
 
 func _click_still(pos: Vector2) -> void:

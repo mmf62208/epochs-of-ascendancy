@@ -3010,9 +3010,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		# Alt-click / infra empty-terrain prefers province (IX-1 Köln under garrison).
 		if not event.alt_pressed:
 			var disk_only: bool = _map_prefers_province_over_unit()
-			if _try_open_land_unit_at_world(world_pos, event.ctrl_pressed, disk_only):
-				get_viewport().set_input_as_handled()
-				return
+			if selected_formation_id.is_empty() or event.ctrl_pressed:
+				if _try_open_land_unit_at_world(world_pos, event.ctrl_pressed, disk_only):
+					get_viewport().set_input_as_handled()
+					return
 		# Capital gold star wins over a colocated air/fleet chip.
 		# Star click inspects the capital and does not arm MARCH.
 		# THIS drag already exceeded 8px: do not snap-select any capital
@@ -19055,6 +19056,12 @@ func _try_open_land_chip_from_input(ctrl_click: bool = false) -> bool:
 		return false
 	if MapViewInput.modal_blocks_map_nav(get_viewport()):
 		return false
+	# Already commanding a unit: this still-click is a march / province pick.
+	# Adjacent NUTS3 sit inside the painted-chip hit disk + nearest-land
+	# fallback, which would re-arm and never reach enqueue (Play MV-1).
+	# `_try_open_land_unit_at_world` itself is unchanged (first-select fallback stays).
+	if not selected_formation_id.is_empty() and not ctrl_click:
+		return false
 	var world_pos: Vector2 = _screen_to_world(get_viewport().get_mouse_position())
 	var disk_only: bool = _map_prefers_province_over_unit()
 	if _try_open_land_unit_at_world(world_pos, ctrl_click, disk_only):
@@ -19714,6 +19721,40 @@ func mv1_formation_screen_pos(fid: String) -> Vector2:
 	return Vector2.ZERO
 
 
+func mv1_screen_pos_for_march_dest(dest_id: int) -> Vector2:
+	# Screen point inside dest that is not on a unit counter disk, so a
+	# still-click can reach `_try_move_selected_unit_to_province`.
+	var dest := int(dest_id)
+	var center := mv1_province_screen_pos(dest)
+	if center == Vector2.ZERO:
+		return Vector2.ZERO
+	var offsets: Array[Vector2] = [
+		Vector2.ZERO,
+		Vector2(-28, -28),
+		Vector2(28, -28),
+		Vector2(-28, 28),
+		Vector2(28, 28),
+		Vector2(-40, 0),
+		Vector2(40, 0),
+		Vector2(0, -40),
+		Vector2(0, 40),
+		Vector2(-56, -18),
+		Vector2(56, 18),
+	]
+	for off_v in offsets:
+		var screen: Vector2 = center + (off_v as Vector2)
+		var world: Vector2 = _screen_to_world(screen)
+		var pid: int = _resolve_hex_pick_pid(world)
+		if pid <= 0:
+			pid = _resolve_map_pick_pid(world)
+		if pid != dest:
+			continue
+		if _pick_land_unit_formation_at_world(world) != null:
+			continue
+		return screen
+	return center
+
+
 func mv1_province_screen_pos(pid: int) -> Vector2:
 	var dest := int(pid)
 	var world := Vector2.ZERO
@@ -19868,10 +19909,13 @@ func _show_unit_detail_popup(formation: Object) -> void:
 	var ui := get_node_or_null("UI") as CanvasLayer
 	if ui == null:
 		return
-	# Replace previous card.
+	# Replace previous card. Free immediately so the new node can keep the
+	# UnitDetailPopup name (queue_free same-frame left a queued sibling and
+	# get_node("UnitDetailPopup") missed the live card).
 	var old := ui.get_node_or_null("UnitDetailPopup")
 	if old != null:
-		old.queue_free()
+		ui.remove_child(old)
+		old.free()
 
 	var name_s := "Unit"
 	if "name" in formation:
@@ -20319,7 +20363,16 @@ func _unit_detail_popup_is_visible() -> bool:
 	var ui := get_node_or_null("UI") as CanvasLayer
 	if ui == null:
 		return false
-	return _overlay_node_is_up(ui.get_node_or_null("UnitDetailPopup"))
+	if _overlay_node_is_up(ui.get_node_or_null("UnitDetailPopup")):
+		return true
+	for c in ui.get_children():
+		if c == null or not is_instance_valid(c) or c.is_queued_for_deletion():
+			continue
+		var nm := str(c.name)
+		var docked := bool(c.get_meta("unit_card_dock", false)) if c.has_meta("unit_card_dock") else false
+		if (nm.begins_with("UnitDetailPopup") or docked) and _overlay_node_is_up(c):
+			return true
+	return false
 
 
 func _map_prefers_province_over_unit() -> bool:
