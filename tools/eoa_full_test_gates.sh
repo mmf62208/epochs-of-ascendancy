@@ -156,6 +156,7 @@ run_step unit_board_play_path \
     tools.map_generation.tests.test_era_resource_deposits_product \
     tools.map_generation.tests.test_resource_icon_lod \
     tools.map_generation.tests.test_map_resources_mapmode_product \
+    tools.map_generation.tests.test_fac1a_airfield_icons \
     -v || fail
 
 run_step unit_save_path \
@@ -224,6 +225,9 @@ else
   run_step launch_rh1_resource_glyphs \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessRh1ResourceGlyphMapModeTest.gd || fail
 
+  run_step launch_fac1a_airfield_icons \
+    tools/run_godot.sh --headless -s res://scripts/core/HeadlessFac1aAirfieldIconTest.gd || fail
+
   run_step launch_mv1b_input_gate \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessMv1bInputGateTest.gd || fail
 
@@ -274,6 +278,9 @@ else
 
   run_step launch_rh1_pixel \
     tools/eoa_rh1_pixel_guard.sh || fail
+
+  run_step launch_fac1a_pixel \
+    tools/eoa_fac1a_pixel_guard.sh || fail
 
   run_step launch_rx1_live_stay_alive_tick \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessRx1RhineLiveStayAliveTickTest.gd || fail

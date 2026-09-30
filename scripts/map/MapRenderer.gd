@@ -14132,6 +14132,9 @@ func _apply_map_mode_visuals() -> void:
 	var ol_infra2 := get_overlay_layer("InfrastructureOverlayLayer")
 	if ol_infra2 != null and ol_infra2.has_method("queue_redraw"):
 		ol_infra2.queue_redraw()
+	var ol_fac := get_overlay_layer("FacilityIconLayer")
+	if ol_fac != null and ol_fac.has_method("queue_redraw"):
+		ol_fac.queue_redraw()
 	if info_panel and info_panel is CanvasItem and info_panel.visible and selected_province_id >= 0 and provinces.has(selected_province_id):
 		show_info_panel(provinces[selected_province_id])
 	if m in ["occupation", "resistance", "compliance"]:
@@ -14941,6 +14944,7 @@ func _render_provinces_finish(raster_preserved: Dictionary) -> void:
 	var ol_glyphs := get_overlay_layer("InfrastructureOverlayLayer")
 	if ol_glyphs != null and ol_glyphs.has_method("set_map_mode_for_glyphs"):
 		ol_glyphs.call("set_map_mode_for_glyphs", current_map_mode)
+	_setup_facility_icon_layer()
 	_setup_rx1_rhine_layer()
 	call_deferred("_setup_terrain_layer_stack")
 	call_deferred("_setup_weather_overlay_layer")
@@ -24226,6 +24230,31 @@ func _setup_infrastructure_overlay_layer() -> void:
 
 func setup_demo_infrastructure_overlay() -> void:
 	_setup_infrastructure_overlay_layer()
+
+
+func _setup_facility_icon_layer() -> void:
+	## FAC-1a overlay. Sibling of InfrastructureOverlayLayer. z=24: above roads, below units.
+	if container == null:
+		return
+	var existing := get_overlay_layer("FacilityIconLayer")
+	if existing != null and is_instance_valid(existing):
+		if existing.has_method("notify_sites_changed"):
+			existing.call("notify_sites_changed")
+		return
+	var LayerScript := load("res://scripts/map/FacilityIconLayer.gd")
+	if LayerScript == null:
+		push_error("MapRenderer: Could not load FacilityIconLayer.gd")
+		return
+	var layer: Node = null
+	if LayerScript is GDScript:
+		layer = LayerScript.new()
+	if layer == null:
+		return
+	add_overlay_layer("FacilityIconLayer", layer as Node2D, 24)
+	if layer is Node2D:
+		(layer as Node2D).z_as_relative = false
+		(layer as Node2D).z_index = 24
+	print("MapRenderer: FacilityIconLayer created (airfield icons; show_facilities default ON).")
 
 
 func _setup_terrain_layer_stack() -> void:

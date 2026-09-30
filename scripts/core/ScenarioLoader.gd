@@ -600,6 +600,110 @@ func _load_project_sites_layer(data_dir: String = ""):
 			province_projects_by_id[pid] = []
 		province_projects_by_id[pid].append(site)
 
+## FAC-1a: turn project_sites.json airfield rows into Province.special_sites.
+## Idempotent. Other project_type rows (major_port / mega_factory) stay projects-only.
+func apply_seeded_special_sites_to_provinces(target: Dictionary = {}) -> int:
+	var dest: Dictionary = target
+	if dest.is_empty():
+		dest = provinces
+	var applied := 0
+	for pid_v in dest.keys():
+		var p: Province = dest[pid_v] as Province
+		if p == null:
+			continue
+		if _apply_seeded_special_sites_to_province(p):
+			applied += 1
+	return applied
+
+
+func _apply_seeded_special_sites_to_province(p: Province) -> bool:
+	if p == null:
+		return false
+	var recs: Variant = province_projects_by_id.get(p.id, [])
+	if typeof(recs) != TYPE_ARRAY:
+		return false
+	var added := false
+	for rec_v in recs:
+		if typeof(rec_v) != TYPE_DICTIONARY:
+			continue
+		var rec: Dictionary = rec_v
+		if not _project_site_is_airfield(rec):
+			continue
+		if _province_has_site_id(p, _airfield_site_id_from_record(rec)):
+			continue
+		var site: SpecialSite = _create_airfield_special_site_from_record(rec, p)
+		if site == null:
+			continue
+		p.add_special_site(site)
+		added = true
+	return added
+
+
+func _project_site_is_airfield(rec: Dictionary) -> bool:
+	var ptype := str(rec.get("project_type", rec.get("site_type", ""))).strip_edges().to_lower()
+	var sid := str(rec.get("site_id", "")).strip_edges().to_lower()
+	if ptype.begins_with("airfield") or ptype == "airbase":
+		return true
+	if sid.begins_with("airfield"):
+		return true
+	return false
+
+
+func _airfield_site_id_from_record(rec: Dictionary) -> String:
+	var sid := str(rec.get("site_id", "")).strip_edges()
+	if not sid.is_empty():
+		return sid
+	var tier := clampi(int(rec.get("tier", rec.get("max_level", 1))), 1, 4)
+	return "airfield_tier_%d" % tier
+
+
+func _province_has_site_id(p: Province, site_id: String) -> bool:
+	if p == null or site_id.is_empty():
+		return false
+	for site in p.special_sites:
+		if site != null and str(site.id) == site_id:
+			return true
+	return false
+
+
+func _create_airfield_special_site_from_record(rec: Dictionary, p: Province) -> SpecialSite:
+	var site_id := _airfield_site_id_from_record(rec)
+	var owner := str(p.owner_tag).strip_edges()
+	var site: SpecialSite = null
+	if typeof(SpecialSiteManager) != TYPE_NIL and SpecialSiteManager.has_method("create_special_site"):
+		site = SpecialSiteManager.create_special_site(site_id, p.id, owner)
+	if site == null:
+		site = SpecialSite.new()
+		site.id = site_id
+		site.province_id = p.id
+		site.owner_tag = owner
+		site.site_type = SpecialSite.SiteType.AIRFIELD
+		site.complete_construction()
+	site.site_type = SpecialSite.SiteType.AIRFIELD
+	var tier := clampi(int(rec.get("tier", site.tier)), 1, 4)
+	if site_id.ends_with("_4"):
+		tier = 4
+	elif site_id.ends_with("_3"):
+		tier = maxi(tier, 3)
+	site.tier = tier
+	var dmg := int(rec.get("damage_level", 0))
+	if dmg > 0:
+		site.damage_level = dmg
+		site.construction_state = SpecialSite.ConstructionState.DAMAGED
+	var st := str(rec.get("construction_state", "")).strip_edges().to_upper()
+	if st == "DAMAGED":
+		site.construction_state = SpecialSite.ConstructionState.DAMAGED
+		if site.damage_level <= 0:
+			site.damage_level = 1
+	elif st == "DESTROYED":
+		site.construction_state = SpecialSite.ConstructionState.DESTROYED
+		if site.damage_level <= 0:
+			site.damage_level = site.max_damage_level
+	elif st == "COMPLETED" or st.is_empty():
+		if site.damage_level <= 0:
+			site.construction_state = SpecialSite.ConstructionState.COMPLETED
+	return site
+
 func load_base_provinces(data_dir: String = ""):
 	if data_dir.is_empty():
 		data_dir = current_province_data_dir
@@ -656,6 +760,7 @@ func load_base_provinces(data_dir: String = ""):
 		_apply_layer_data_to_province(p)
 		base_provinces[p.id] = p
 	_infer_port_access_for_all(base_provinces)
+	apply_seeded_special_sites_to_provinces(base_provinces)
 	print("✅ Base provinces loaded: ", base_provinces.size(), " provinces (from ", data_dir, ") — will prune to 471 phase1 children if geometry match")
 
 ## Helper to report progress to a dynamically added LoadingScreen (if present in the current scene/root).
@@ -806,6 +911,8 @@ func load_scenario(scenario_name: String) -> bool:
 		if typeof(MapManager) != TYPE_NIL and MapManager.has_method("rebuild_pick_grid"):
 			MapManager.rebuild_pick_grid(64.0)
 			print("ScenarioLoader: Second post-prune phase1 children pick rebuild completed.")
+
+	apply_seeded_special_sites_to_provinces(provinces)
 
 	# Apply overrides with heavy debug
 	print("=== APPLYING SCENARIO OVERRIDES ===")
@@ -2398,6 +2505,12 @@ func _duplicate_province_from_base(base_p: Province) -> Province:
 	p.victory_points = base_p.victory_points
 	p.special_features = base_p.special_features.duplicate(true)
 	p.tags = base_p.tags.duplicate()
+	p.special_sites.clear()
+	for site in base_p.special_sites:
+		if site != null:
+			var copied: SpecialSite = site.duplicate(true) as SpecialSite
+			if copied != null:
+				p.special_sites.append(copied)
 	return p
 
 
@@ -4296,6 +4409,7 @@ func _apply_layer_data_to_province(p: Province):
 
 	if province_region_by_id.has(p.id):
 		p.strategic_region_id = int(province_region_by_id[p.id])
+	_apply_seeded_special_sites_to_province(p)
 
 func _print_phase11_depth_evidence() -> void:
 	var al_ticks := 0

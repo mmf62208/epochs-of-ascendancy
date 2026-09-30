@@ -1,1 +1,40 @@
-{"sites":[]}
+{
+  "sites": [
+    {
+      "province_id": 710416,
+      "project_type": "airfield",
+      "site_id": "airfield_tier_1",
+      "tier": 1,
+      "construction_state": "COMPLETED",
+      "damage_level": 0
+    },
+    {
+      "province_id": 710418,
+      "project_type": "airfield",
+      "site_id": "airfield_tier_2",
+      "tier": 2,
+      "construction_state": "COMPLETED",
+      "damage_level": 0
+    },
+    {
+      "province_id": 710417,
+      "project_type": "airfield",
+      "site_id": "airfield_tier_3",
+      "tier": 3,
+      "construction_state": "COMPLETED",
+      "damage_level": 0
+    },
+    {
+      "province_id": 710413,
+      "project_type": "airfield",
+      "site_id": "airfield_tier_4",
+      "tier": 4,
+      "construction_state": "COMPLETED",
+      "damage_level": 0
+    }
+  ],
+  "meta": {
+    "source": "fac1a_rhineland_airfields",
+    "note": "FAC-1a test seeds on the NUTS3 pilot board: Bonn L1, Leverkusen L2, Köln L3, Neuss L4."
+  }
+}
