@@ -13,7 +13,7 @@ sys.path.insert(0, str(ROOT / "tools" / "map_generation" / "lib"))
 from facility_icon_anchor_product import (  # noqa: E402
     AHRWEILER,
     CLUSTER_PAIR,
-    MAYEN_KOBLENZ,
+    HUNSRUECK,
     OBERBERGISCHER,
     SEED_NAMES,
     SEED_TIERS,
@@ -61,6 +61,7 @@ class TestFac1aAirfieldIcons(unittest.TestCase):
             self.assertNotIn(710418, got)
             self.assertNotIn(710413, got)
             self.assertNotIn(710421, got)
+            self.assertNotIn(710459, got)
             self.assertNotIn(710426, got)
             self.assertNotIn(710469, got)
 
@@ -69,9 +70,9 @@ class TestFac1aAirfieldIcons(unittest.TestCase):
         self.assertTrue(product.get("ok"), product.get("reasons"))
         self.assertGreaterEqual(float(product.get("min_pair_world_raw") or 0), 16.0)
         cluster_d = float(product.get("cluster_pair_raw") or 0)
-        self.assertGreaterEqual(cluster_d, 17.0)
-        self.assertLessEqual(cluster_d, 20.5)
-        self.assertEqual(tuple(CLUSTER_PAIR), (AHRWEILER, MAYEN_KOBLENZ))
+        self.assertGreaterEqual(cluster_d, 25.0)
+        self.assertLessEqual(cluster_d, 28.0)
+        self.assertEqual(tuple(CLUSTER_PAIR), (AHRWEILER, OBERBERGISCHER))
         anchors = product.get("anchors") or {}
         pair = set(CLUSTER_PAIR)
         for pid, rec in anchors.items():
@@ -88,7 +89,7 @@ class TestFac1aAirfieldIcons(unittest.TestCase):
         self.assertGreater(pr, 3.0)
         self.assertTrue(ANCHOR_JSON.is_file())
         blob = json.loads(ANCHOR_JSON.read_text(encoding="utf-8"))
-        for pid in (VIERSEN, OBERBERGISCHER, AHRWEILER, MAYEN_KOBLENZ):
+        for pid in (VIERSEN, HUNSRUECK, OBERBERGISCHER, AHRWEILER):
             rec = blob["anchors"][str(pid)]
             self.assertEqual(rec["name"], SEED_NAMES[pid])
             self.assertGreater(float(rec["edge_dist"]), 0.4)

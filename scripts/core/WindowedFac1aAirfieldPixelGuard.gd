@@ -14,8 +14,8 @@ const BONN := 710416
 const VIERSEN := 710414
 const OBERBERGISCHER := 710423
 const AHRWEILER := 710455
-const MAYEN_KOBLENZ := 710459
-const PIDS: Array[int] = [VIERSEN, OBERBERGISCHER, AHRWEILER, MAYEN_KOBLENZ]
+const HUNSRUECK := 710464
+const PIDS: Array[int] = [VIERSEN, HUNSRUECK, OBERBERGISCHER, AHRWEILER]
 const CLUSTER_EXPECT_COUNT := 2
 const CLUSTER_EXPECT_LEVEL := 4
 const NEIGHBOR_PID := AHRWEILER
@@ -227,6 +227,7 @@ func _do_political_mid() -> void:
 	_capture_fix2("02_mid_z0.99_badges_or_cluster_NOT_live_play")
 	_capture_fix2b("02_mid_z0.99_cluster_NOT_live_play")
 	_cluster_mid_ok = _assert_cluster_at_zoom(MID_ZOOM)
+	_log_pair_worlds()
 	_log("EOA_FAC1A_PIXEL_GUARD who=guard.mid anchors=%d layer=%d zoom=%.3f badge=%.1f cluster=%s (NOT live Play)" % [_mid_anchors, _layer_mid, _cam_zoom, _badge_px, str(_cluster_mid_ok)])
 	if not _cluster_mid_ok:
 		_fail_reasons.append("mid_cluster_missing")
@@ -449,6 +450,22 @@ func _markers_at(zoom: float) -> Array:
 	if ol.has_method("get_last_markers"):
 		return ol.call("get_last_markers")
 	return []
+
+
+func _log_pair_worlds() -> void:
+	var ol := _facility_layer()
+	if ol == null or not ol.has_method("get_draw_world"):
+		return
+	for i in range(PIDS.size()):
+		var a: int = PIDS[i]
+		var wa: Vector2 = ol.call("get_draw_world", a)
+		for j in range(i + 1, PIDS.size()):
+			var b: int = PIDS[j]
+			var wb: Vector2 = ol.call("get_draw_world", b)
+			_log(
+				"EOA_FAC1A_PIXEL_GUARD who=guard.pair a=%d b=%d world=%.2f (NOT live Play)"
+				% [a, b, wa.distance_to(wb)]
+			)
 
 
 func _assert_cluster_at_zoom(zoom: float) -> bool:
