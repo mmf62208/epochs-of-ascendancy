@@ -819,7 +819,15 @@ func _cluster_items(items: Array[Dictionary]) -> Array[Dictionary]:
 		## Never the raw member centroid — that sat on the Rhine south end
 		## and dropped RX-1 mid_river 0.749 → 0.631 while individual-icon
 		## occlusion still passed (cluster marker was unsampled).
-		var world := _nudge_cluster_world(host_pid, host_world, z, half)
+		var others: Array[Vector2] = []
+		for rec in _icons:
+			var opid := int(rec.get("pid", 0))
+			if opid == host_pid or pids.has(opid):
+				continue
+			var ow: Vector2 = rec.get("world", Vector2.ZERO) as Vector2
+			if ow.is_finite() and ow != Vector2.ZERO:
+				others.append(ow)
+		var world := _nudge_cluster_world(host_pid, host_world, z, half, others)
 		var scr := _screen_of(world)
 		out.append({
 			"pid": host_pid,
@@ -855,7 +863,13 @@ func _pick_cluster_host(items: Array[Dictionary], idxs: Array) -> Dictionary:
 	return best
 
 
-func _nudge_cluster_world(pid: int, cand: Vector2, zoom: float, half_px: float) -> Vector2:
+func _nudge_cluster_world(
+	pid: int,
+	cand: Vector2,
+	zoom: float,
+	half_px: float,
+	others: Array[Vector2] = [],
+) -> Vector2:
 	if not cand.is_finite() or pid <= 0:
 		return cand
 	## Headless dummy rings have no Rhine / spine — keep the host interior.
@@ -865,20 +879,27 @@ func _nudge_cluster_world(pid: int, cand: Vector2, zoom: float, half_px: float) 
 	var half_world := half_px / z
 	var badge_extra := (_icon_screen_px(z) + 4.0) * 0.28 / z
 	var need := half_world + badge_extra + 2.0
+	## Screen-rect AABB (not Euclidean): a west walk of ~8u kept Viersen
+	## "clear" by distance while the 0.70 cluster/isolate squares crossed.
+	var isolate_half := _icon_screen_px(z) * 0.5 + BADGE_PX * 0.35
+	var iso_need := (half_px + isolate_half + 2.0) / z
 	var lines := _corridor_polylines()
-	if _cluster_site_clear(pid, cand, need, lines, z):
+	if (
+		_cluster_site_clear(pid, cand, need, lines, z)
+		and _cluster_iso_clear(cand, others, iso_need)
+	):
 		return cand
 	var best := cand
 	var best_s := _cluster_site_score(cand, lines, z)
-	var step := maxf(1.4, need * 0.22)
+	var step := maxf(1.4, need * 0.18)
 	var r := step
-	while r <= need * 3.2:
+	while r <= need * 2.2:
 		var ang := 0.0
 		while ang < TAU:
 			var q: Vector2 = cand + Vector2(cos(ang), sin(ang)) * r
-			if _cluster_own_interior(pid, q):
+			if _cluster_own_interior(pid, q) and _cluster_iso_clear(q, others, iso_need):
 				var s := _cluster_site_score(q, lines, z)
-				if s > best_s:
+				if s > best_s + 0.4:
 					best_s = s
 					best = q
 				if s >= need:
@@ -886,6 +907,13 @@ func _nudge_cluster_world(pid: int, cand: Vector2, zoom: float, half_px: float) 
 			ang += PI / 8.0
 		r += step
 	return best
+
+
+func _cluster_iso_clear(world: Vector2, others: Array[Vector2], need: float) -> bool:
+	for o in others:
+		if absf(world.x - o.x) < need and absf(world.y - o.y) < need:
+			return false
+	return true
 
 
 func _cluster_own_interior(pid: int, world: Vector2) -> bool:
