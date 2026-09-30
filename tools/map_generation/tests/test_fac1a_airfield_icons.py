@@ -1,12 +1,27 @@
 #!/usr/bin/env python3
-"""Pure FAC-1a needles: seeds, tier-4 def, layer safety, mipmaps, RH-1 untouched."""
+"""Pure FAC-1a needles: spread seeds, interior anchors, layer safety, RH-1 untouched."""
 from __future__ import annotations
 
 import json
+import sys
 import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(ROOT / "tools" / "map_generation" / "lib"))
+
+from facility_icon_anchor_product import (  # noqa: E402
+    AACHEN,
+    BORKEN,
+    SEED_NAMES,
+    SEED_TIERS,
+    SIEGEN,
+    TRIER_SAARBURG,
+    build_facility_icon_anchor_product,
+    point_in_ring,
+    polylabel,
+)
+
 LAYER = ROOT / "scripts" / "map" / "FacilityIconLayer.gd"
 REN = ROOT / "scripts" / "map" / "MapRenderer.gd"
 OL = ROOT / "scripts" / "map" / "InfrastructureOverlayLayer.gd"
@@ -15,9 +30,9 @@ TIER4 = ROOT / "data" / "map" / "special_sites" / "airfield_tier_4.json"
 FAC_DIR = ROOT / "assets" / "graphics" / "icons" / "facilities"
 ACCURATE = ROOT / "data" / "provinces_world_accurate" / "project_sites.json"
 PILOT = ROOT / "data" / "provinces_pilot_europe_nuts3" / "project_sites.json"
+ANCHOR_JSON = ROOT / "data" / "provinces_world_accurate" / "facility_icon_anchors.json"
 
-SEED_PIDS = {710416, 710418, 710417, 710413}
-SEED_TIERS = {710416: 1, 710418: 2, 710417: 3, 710413: 4}
+SEED_PIDS = set(SEED_TIERS.keys())
 
 
 class TestFac1aAirfieldIcons(unittest.TestCase):
@@ -40,6 +55,27 @@ class TestFac1aAirfieldIcons(unittest.TestCase):
             got = {int(s["province_id"]): int(s.get("tier", 0)) for s in air}
             self.assertEqual(got, SEED_TIERS, path)
             self.assertEqual(set(got), SEED_PIDS)
+            self.assertNotIn(710417, got)
+            self.assertNotIn(710416, got)
+            self.assertNotIn(710418, got)
+            self.assertNotIn(710413, got)
+
+    def test_interior_anchors_product(self) -> None:
+        product = build_facility_icon_anchor_product(write=False)
+        self.assertTrue(product.get("ok"), product.get("reasons"))
+        self.assertGreaterEqual(float(product.get("min_pair_world_raw") or 0), 30.0)
+        square = [(0.0, 0.0), (10.0, 0.0), (10.0, 10.0), (0.0, 10.0)]
+        px, py, pr = polylabel(square, precision=0.2)
+        self.assertTrue(point_in_ring(px, py, square))
+        self.assertGreater(pr, 3.0)
+        self.assertTrue(ANCHOR_JSON.is_file())
+        blob = json.loads(ANCHOR_JSON.read_text(encoding="utf-8"))
+        for pid in (AACHEN, TRIER_SAARBURG, BORKEN, SIEGEN):
+            rec = blob["anchors"][str(pid)]
+            self.assertEqual(rec["name"], SEED_NAMES[pid])
+            self.assertGreater(float(rec["edge_dist"]), 0.4)
+            self.assertGreater(float(rec["spine_dist"]), 8.0)
+            self.assertGreater(float(rec["rhine_dist"]), 8.0)
 
     def test_art_and_mipmaps(self) -> None:
         for level in (1, 2, 3, 4):
@@ -62,10 +98,15 @@ class TestFac1aAirfieldIcons(unittest.TestCase):
         src = LAYER.read_text(encoding="utf-8")
         self.assertIn("class_name FacilityIconLayer", src)
         self.assertIn("draw_texture_rect", src)
+        self.assertIn("draw_circle", src)
         self.assertIn("var show_facilities: bool = true", src)
         self.assertIn("func rebuild_icon_list", src)
-        self.assertIn("CORRIDOR_OFFSET_SCREEN_PX", src)
-        self.assertIn("_landward_draw_world", src)
+        self.assertIn("const BADGE_PX := 16.0", src)
+        self.assertIn("func _polylabel", src)
+        self.assertIn("func _cluster_items", src)
+        self.assertIn("SPLIT_GAP_PX", src)
+        self.assertNotIn("CORRIDOR_OFFSET_SCREEN_PX", src)
+        self.assertNotIn("_landward_draw_world", src)
         self.assertNotIn("Line2D.new", src)
         proc = src[src.find("func _process") : src.find("func _unhandled_input")]
         self.assertNotIn("rebuild_icon_list", proc)

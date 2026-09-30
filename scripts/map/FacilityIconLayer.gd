@@ -1,26 +1,27 @@
 # scripts/map/FacilityIconLayer.gd
 ## FAC-1a: transparent top-down airfield icons on the political map.
-## One _draw() pass with draw_texture_rect. No Line2D children, no per-icon
-## nodes, no absolute-coordinate AA polylines (IX-1 OOM/hang class).
+## One _draw() pass (draw_texture_rect + draw_circle). No Line2D children,
+## no per-icon nodes, no absolute-coordinate AA polylines.
 ## Cached icon list rebuilds on site data change only — never on zoom.
+## World anchors are interior (polylabel) points, computed once on rebuild.
 class_name FacilityIconLayer
 extends Node2D
 
 const FAC_DIR := "res://assets/graphics/icons/facilities/"
-const MID_ICON_PX := 18.0
+const ANCHOR_RES := "res://data/provinces_world_accurate/facility_icon_anchors.json"
+const MID_ICON_PX := 22.0
 const CLOSE_ICON_PX := 26.0
+const CLOSE_GROW_PX := 32.0
 const CLOSE_ZOOM := 1.0
+const GROW_ZOOM := 2.0
+const BADGE_PX := 16.0
+const BADGE_OUTLINE_PX := 1.5
 const MAP_Z := 24
-## Above roads (~21) / Rhine (22), below DemoUnitIcon (28) and name labels (82).
 const UNIT_COUNTER_Z := 28
-## Screen-space shift off the Bonn–Köln–Lev centroid corridor (gold spine + Rhine).
-## Applied in _draw only — does not rebuild the icon list.
-const CORRIDOR_OFFSET_SCREEN_PX := 28.0
-const CORRIDOR_BONN := 710416
-const CORRIDOR_KOELN := 710417
-const CORRIDOR_LEV := 710418
+const THEATER_SCALE := 1.728
+const MERGE_GAP_PX := 2.0
+const SPLIT_GAP_PX := 10.0
 const VISIBLE_MODES: Array[String] = ["political", "diplomacy", "infra"]
-## SpecialSite.SiteType.AIRFIELD / ConstructionState — ints so -s tests can duck-type.
 const SITE_AIRFIELD := 1
 const STATE_NOT_BUILT := 0
 const STATE_DAMAGED := 3
@@ -35,9 +36,14 @@ var _last_cam_pos: Vector2 = Vector2.INF
 var _tex_cache: Dictionary = {}
 var _test_provinces: Dictionary = {}
 var _test_centroids: Dictionary = {}
+var _test_polygons: Dictionary = {}
 var _test_zoom: float = -1.0
 var _test_board_n: int = 0
 var _test_map_mode: String = ""
+var _test_counter_rects: Array[Rect2] = []
+var _json_anchors: Dictionary = {}
+var _clustered: bool = false
+var _last_markers: Array[Dictionary] = []
 
 
 func _ready() -> void:
@@ -47,10 +53,10 @@ func _ready() -> void:
 	visible = true
 	set_process(true)
 	set_process_unhandled_input(true)
-	## Debug / keep-green: EOA_FAC1A_SHOW=0 hides icons (default ON when unset).
 	var env_show := OS.get_environment("EOA_FAC1A_SHOW").strip_edges().to_lower()
 	if env_show == "0" or env_show == "false" or env_show == "off":
 		show_facilities = false
+	_load_json_anchors()
 	var ssm := _special_site_manager()
 	if ssm != null and ssm.has_signal("special_site_created"):
 		if not ssm.special_site_created.is_connected(_on_special_site_created):
@@ -91,26 +97,46 @@ func get_last_drawn_count() -> int:
 	return _drawn_count
 
 
+func get_last_markers() -> Array[Dictionary]:
+	return _last_markers
+
+
+func is_clustered() -> bool:
+	return _clustered
+
+
 func count_icons_that_would_draw() -> int:
-	## Headless-safe: same gates as _draw, no viewport / GPU required.
 	if not _should_draw():
 		return 0
 	return _icons.size()
 
 
+func get_badge_screen_px(zoom: float = -1.0) -> float:
+	var z := zoom if zoom >= 0.0 else _canvas_zoom()
+	if z < _site_min_zoom():
+		return 0.0
+	return BADGE_PX
+
+
 func get_draw_world(pid: int) -> Vector2:
-	## Province centroid plus the landward corridor offset (current zoom).
 	for rec in _icons:
-		if int(rec.get("pid", -1)) != pid:
-			continue
-		var world: Vector2 = rec.get("world", Vector2.ZERO) as Vector2
-		return _landward_draw_world(pid, world)
+		if int(rec.get("pid", -1)) == pid:
+			return rec.get("world", Vector2.ZERO) as Vector2
 	return Vector2.ZERO
 
 
-func setup_for_test(provinces: Dictionary, centroids: Dictionary, board_n: int = 0) -> void:
+func compute_markers_at_zoom(zoom: float) -> Array[Dictionary]:
+	var prev := _test_zoom
+	_test_zoom = zoom
+	var markers := _build_markers()
+	_test_zoom = prev
+	return markers
+
+
+func setup_for_test(provinces: Dictionary, centroids: Dictionary, board_n: int = 0, polygons: Dictionary = {}) -> void:
 	_test_provinces = provinces
 	_test_centroids = centroids
+	_test_polygons = polygons
 	_test_board_n = board_n
 	rebuild_icon_list()
 
@@ -125,8 +151,14 @@ func set_test_map_mode(mode: String) -> void:
 	queue_redraw()
 
 
+func set_test_counter_rects(rects: Array) -> void:
+	_test_counter_rects.clear()
+	for r in rects:
+		if r is Rect2:
+			_test_counter_rects.append(r as Rect2)
+
+
 func max_facility_icons_for_board(province_count: int) -> int:
-	## Local budget (do not edit MapZoomLOD). Mirrors the resource-icon style.
 	if province_count >= 3000:
 		return 180
 	if province_count >= 800:
@@ -135,7 +167,6 @@ func max_facility_icons_for_board(province_count: int) -> int:
 
 
 static func visual_state_for_site(site: Object) -> String:
-	## Damaged is a data flag only for FAC-1a. DESTROYED counts as damaged.
 	if site == null:
 		return "intact"
 	if int(site.get("damage_level")) > 0:
@@ -157,6 +188,7 @@ static func texture_key_for_level(level: int, state: String) -> String:
 func rebuild_icon_list() -> void:
 	_rebuild_count += 1
 	_icons.clear()
+	_load_json_anchors()
 	var provinces: Dictionary = _provinces_for_scan()
 	var budget: int = max_facility_icons_for_board(_board_province_count(provinces))
 	var added: int = 0
@@ -171,12 +203,13 @@ func rebuild_icon_list() -> void:
 			continue
 		var level: int = clampi(int(site.get("tier")), 1, 4)
 		var state: String = visual_state_for_site(site)
-		## FAC-1a: no damaged art yet — draw intact + TODO in _draw.
 		var tex_key := texture_key_for_level(level, "intact")
-		var world: Vector2 = _centroid_for(int(p.get("id")), p)
+		var pid := int(p.get("id"))
+		var world: Vector2 = _interior_world_for(pid, p)
 		_icons.append({
-			"pid": int(p.get("id")),
+			"pid": pid,
 			"world": world,
+			"centroid": _centroid_for(pid, p),
 			"level": level,
 			"state": state,
 			"tex_key": tex_key,
@@ -264,6 +297,186 @@ func _centroid_for(pid: int, p: Object) -> Vector2:
 	return Vector2.ZERO
 
 
+func _load_json_anchors() -> void:
+	if not _json_anchors.is_empty():
+		return
+	if not FileAccess.file_exists(ANCHOR_RES):
+		return
+	var f := FileAccess.open(ANCHOR_RES, FileAccess.READ)
+	if f == null:
+		return
+	var txt := f.get_as_text()
+	f.close()
+	var parser := JSON.new()
+	if parser.parse(txt) != OK or typeof(parser.data) != TYPE_DICTIONARY:
+		return
+	var blob: Dictionary = parser.data
+	var raw: Variant = blob.get("anchors", {})
+	if raw is Dictionary:
+		_json_anchors = raw as Dictionary
+
+
+func _ring_for(pid: int, p: Object) -> PackedVector2Array:
+	if _test_polygons.has(pid):
+		var tp: Variant = _test_polygons[pid]
+		if tp is PackedVector2Array:
+			return tp as PackedVector2Array
+		if tp is Array:
+			var acc := PackedVector2Array()
+			for q in tp as Array:
+				if q is Vector2:
+					acc.append(q as Vector2)
+			return acc
+	var mm := _map_manager()
+	if mm != null and mm.has_method("get_province_geometry"):
+		var geo: Dictionary = mm.call("get_province_geometry", pid)
+		var pts: Variant = geo.get("points", [])
+		return _variant_ring_to_packed(pts)
+	if p != null:
+		var raw: Variant = p.get("boundary")
+		return _variant_ring_to_packed(raw)
+	return PackedVector2Array()
+
+
+func _variant_ring_to_packed(raw: Variant) -> PackedVector2Array:
+	var out := PackedVector2Array()
+	if raw is PackedVector2Array:
+		return raw as PackedVector2Array
+	if raw is Array:
+		for p in raw as Array:
+			if p is Vector2:
+				out.append(p as Vector2)
+			elif p is Array and (p as Array).size() >= 2:
+				out.append(Vector2(float(p[0]), float(p[1])))
+	return out
+
+
+func _interior_world_for(pid: int, p: Object) -> Vector2:
+	var centroid := _centroid_for(pid, p)
+	var key := str(pid)
+	if _test_polygons.is_empty() and _json_anchors.has(key):
+		var rec: Variant = _json_anchors[key]
+		if rec is Dictionary:
+			var w: Variant = (rec as Dictionary).get("world", [])
+			if w is Array and (w as Array).size() >= 2:
+				return Vector2(float(w[0]), float(w[1]))
+			var raw: Variant = (rec as Dictionary).get("raw", [])
+			if raw is Array and (raw as Array).size() >= 2:
+				return Vector2(float(raw[0]) * THEATER_SCALE, float(raw[1]) * THEATER_SCALE)
+	var ring := _ring_for(pid, p)
+	if ring.size() >= 3:
+		var raw_like := _ring_looks_raw(ring, centroid)
+		var pole := _polylabel(ring)
+		if raw_like and centroid != Vector2.ZERO:
+			var c_raw := _mean_ring(ring)
+			if c_raw != Vector2.ZERO:
+				pole = centroid + (pole - c_raw) * THEATER_SCALE
+		if pole != Vector2.ZERO:
+			return pole
+	return centroid
+
+
+func _ring_looks_raw(ring: PackedVector2Array, world_centroid: Vector2) -> bool:
+	if ring.is_empty() or world_centroid == Vector2.ZERO:
+		return false
+	var mean := _mean_ring(ring)
+	if mean == Vector2.ZERO:
+		return false
+	return mean.distance_to(world_centroid) > 8.0 and mean.length() * 1.2 < world_centroid.length()
+
+
+func _mean_ring(ring: PackedVector2Array) -> Vector2:
+	if ring.is_empty():
+		return Vector2.ZERO
+	var acc := Vector2.ZERO
+	for p in ring:
+		acc += p
+	return acc / float(ring.size())
+
+
+func _signed_edge(x: float, y: float, ring: PackedVector2Array) -> float:
+	if ring.size() < 3:
+		return -1.0e9
+	var best := 1.0e18
+	var n := ring.size()
+	for i in range(n):
+		var a := ring[i]
+		var b := ring[(i + 1) % n]
+		var d := _dist_seg(Vector2(x, y), a, b)
+		if d < best:
+			best = d
+	if Geometry2D.is_point_in_polygon(Vector2(x, y), ring):
+		return best
+	return -best
+
+
+func _dist_seg(p: Vector2, a: Vector2, b: Vector2) -> float:
+	var ab := b - a
+	var den := ab.length_squared()
+	if den < 0.0000001:
+		return p.distance_to(a)
+	var t := clampf((p - a).dot(ab) / den, 0.0, 1.0)
+	return p.distance_to(a + ab * t)
+
+
+func _polylabel(ring: PackedVector2Array) -> Vector2:
+	if ring.size() < 3:
+		return _mean_ring(ring)
+	var min_v := ring[0]
+	var max_v := ring[0]
+	for p in ring:
+		min_v.x = minf(min_v.x, p.x)
+		min_v.y = minf(min_v.y, p.y)
+		max_v.x = maxf(max_v.x, p.x)
+		max_v.y = maxf(max_v.y, p.y)
+	var width := max_v.x - min_v.x
+	var height := max_v.y - min_v.y
+	var cell := minf(width, height)
+	if cell < 0.0001:
+		return _mean_ring(ring)
+	var best := _mean_ring(ring)
+	var best_d := _signed_edge(best.x, best.y, ring)
+	var precision := 0.18
+	var heap: Array[Dictionary] = []
+	var h := cell * 0.5
+	var x := min_v.x + h
+	while x < max_v.x:
+		var y := min_v.y + h
+		while y < max_v.y:
+			_push_cell(heap, ring, x, y, h)
+			y += cell
+		x += cell
+	var guard := 0
+	while not heap.is_empty() and guard < 400:
+		guard += 1
+		heap.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a.get("pot", 0.0)) > float(b.get("pot", 0.0)))
+		var cell_d: Dictionary = heap[0]
+		heap.remove_at(0)
+		var d: float = float(cell_d.get("d", -1.0e9))
+		var cx: float = float(cell_d.get("x", 0.0))
+		var cy: float = float(cell_d.get("y", 0.0))
+		var half: float = float(cell_d.get("h", 0.0))
+		if d > best_d:
+			best = Vector2(cx, cy)
+			best_d = d
+		if float(cell_d.get("pot", 0.0)) - best_d <= precision:
+			continue
+		var nh := half * 0.5
+		if nh < precision * 0.5:
+			continue
+		_push_cell(heap, ring, cx - nh, cy - nh, nh)
+		_push_cell(heap, ring, cx + nh, cy - nh, nh)
+		_push_cell(heap, ring, cx - nh, cy + nh, nh)
+		_push_cell(heap, ring, cx + nh, cy + nh, nh)
+	return best
+
+
+func _push_cell(heap: Array[Dictionary], ring: PackedVector2Array, x: float, y: float, half: float) -> void:
+	var d := _signed_edge(x, y, ring)
+	var pot := d + half * 1.41421356
+	heap.append({"x": x, "y": y, "h": half, "d": d, "pot": pot})
+
+
 func _scenario_loader() -> Node:
 	var tree := get_tree()
 	if tree == null:
@@ -342,7 +555,6 @@ func _process(_delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	## KEY_P is unused on MapRenderer / MapViewInput. Layer-local so MV-1 paths stay untouched.
 	if not (event is InputEventKey):
 		return
 	var key := event as InputEventKey
@@ -367,41 +579,16 @@ func _should_draw() -> bool:
 
 
 func _icon_screen_px(zoom: float) -> float:
+	if zoom >= GROW_ZOOM:
+		return CLOSE_GROW_PX
 	if zoom >= CLOSE_ZOOM:
-		return CLOSE_ICON_PX
+		var t := (zoom - CLOSE_ZOOM) / maxf(GROW_ZOOM - CLOSE_ZOOM, 0.01)
+		return lerpf(CLOSE_ICON_PX, CLOSE_GROW_PX, clampf(t, 0.0, 1.0))
 	return MID_ICON_PX
 
 
 func _world_size(screen_px: float) -> float:
 	return screen_px / maxf(_canvas_zoom(), 0.04)
-
-
-func _rhineland_tangent() -> Vector2:
-	## Bonn → Leverkusen along the IX-1 / RT-1 gold spine.
-	var a := _centroid_for(CORRIDOR_BONN, null)
-	var b := _centroid_for(CORRIDOR_LEV, null)
-	if a == Vector2.ZERO or b == Vector2.ZERO:
-		return Vector2(0.0, -1.0)
-	var t := b - a
-	if t.length_squared() < 0.0001:
-		return Vector2(0.0, -1.0)
-	return t.normalized()
-
-
-func _landward_draw_world(pid: int, centroid: Vector2) -> Vector2:
-	if not centroid.is_finite() or centroid == Vector2.ZERO:
-		return centroid
-	var tangent := _rhineland_tangent()
-	var n := Vector2(-tangent.y, tangent.x)
-	if n.length_squared() < 0.0001:
-		n = Vector2(1.0, 0.0)
-	else:
-		n = n.normalized()
-	## East / +x is the land side of this Rhine stretch (river + spine stay west).
-	if n.x < 0.0:
-		n = -n
-	var world_off := CORRIDOR_OFFSET_SCREEN_PX / maxf(_canvas_zoom(), 0.04)
-	return centroid + n * world_off
 
 
 func _load_tex(stem: String, px: int) -> Texture2D:
@@ -434,51 +621,185 @@ func _in_viewport(world: Vector2, pad_px: float) -> bool:
 	return r.has_point(screen)
 
 
+func _screen_of(world: Vector2) -> Vector2:
+	var cam := _player_map_camera()
+	if cam == null:
+		return world * _canvas_zoom()
+	return cam.get_canvas_transform() * world
+
+
+func _build_markers() -> Array[Dictionary]:
+	var z := _canvas_zoom()
+	var icon_px := _icon_screen_px(z)
+	var items: Array[Dictionary] = []
+	for rec in _icons:
+		var world: Vector2 = rec.get("world", Vector2.ZERO) as Vector2
+		if not world.is_finite():
+			continue
+		var scr := _screen_of(world)
+		var half := icon_px * 0.5 + BADGE_PX * 0.35
+		var rect := Rect2(scr - Vector2(half, half), Vector2(half, half) * 2.0)
+		items.append({
+			"pid": int(rec.get("pid", 0)),
+			"world": world,
+			"screen": scr,
+			"rect": rect,
+			"level": clampi(int(rec.get("level", 1)), 1, 4),
+			"state": str(rec.get("state", "intact")),
+			"tex_key": str(rec.get("tex_key", "")),
+		})
+	if items.size() < 2:
+		_clustered = false
+		return items
+	var min_gap := 1.0e9
+	for i in range(items.size()):
+		var a: Rect2 = items[i].get("rect", Rect2()) as Rect2
+		for j in range(i + 1, items.size()):
+			var b: Rect2 = items[j].get("rect", Rect2()) as Rect2
+			var gap := _rect_gap(a, b)
+			if gap < min_gap:
+				min_gap = gap
+	if _clustered:
+		if min_gap >= SPLIT_GAP_PX:
+			_clustered = false
+	else:
+		if min_gap < MERGE_GAP_PX:
+			_clustered = true
+	if not _clustered:
+		return items
+	return _cluster_items(items)
+
+
+func _rect_gap(a: Rect2, b: Rect2) -> float:
+	if a.intersects(b):
+		return -1.0
+	var dx := 0.0
+	if a.end.x < b.position.x:
+		dx = b.position.x - a.end.x
+	elif b.end.x < a.position.x:
+		dx = a.position.x - b.end.x
+	var dy := 0.0
+	if a.end.y < b.position.y:
+		dy = b.position.y - a.end.y
+	elif b.end.y < a.position.y:
+		dy = a.position.y - b.end.y
+	return maxf(dx, dy)
+
+
+func _uf_find(parent: Array[int], i: int) -> int:
+	var x := i
+	while parent[x] != x:
+		parent[x] = parent[parent[x]]
+		x = parent[x]
+	return x
+
+
+func _cluster_items(items: Array[Dictionary]) -> Array[Dictionary]:
+	var n := items.size()
+	var parent: Array[int] = []
+	parent.resize(n)
+	for i in range(n):
+		parent[i] = i
+	for i in range(n):
+		var ai: Rect2 = items[i].get("rect", Rect2()) as Rect2
+		for j in range(i + 1, n):
+			var bj: Rect2 = items[j].get("rect", Rect2()) as Rect2
+			if _rect_gap(ai, bj) < MERGE_GAP_PX:
+				var ra := _uf_find(parent, i)
+				var rb := _uf_find(parent, j)
+				if ra != rb:
+					parent[rb] = ra
+	var groups: Dictionary = {}
+	for i in range(n):
+		var r := _uf_find(parent, i)
+		if not groups.has(r):
+			groups[r] = []
+		(groups[r] as Array).append(i)
+	var out: Array[Dictionary] = []
+	for g_v in groups.values():
+		var idxs: Array = g_v
+		if idxs.size() <= 1:
+			out.append(items[int(idxs[0])])
+			continue
+		var acc := Vector2.ZERO
+		var hi := 1
+		var pids: Array[int] = []
+		for ii in idxs:
+			var it: Dictionary = items[int(ii)]
+			acc += it.get("world", Vector2.ZERO) as Vector2
+			hi = maxi(hi, int(it.get("level", 1)))
+			pids.append(int(it.get("pid", 0)))
+		var world := acc / float(idxs.size())
+		var scr := _screen_of(world)
+		var z := _canvas_zoom()
+		var icon_px := _icon_screen_px(z) + 4.0
+		var half := icon_px * 0.5 + BADGE_PX * 0.35
+		out.append({
+			"pid": pids[0],
+			"pids": pids,
+			"cluster": true,
+			"count": idxs.size(),
+			"world": world,
+			"screen": scr,
+			"rect": Rect2(scr - Vector2(half, half), Vector2(half, half) * 2.0),
+			"level": hi,
+			"state": "intact",
+			"tex_key": texture_key_for_level(hi, "intact"),
+		})
+	return out
+
+
 func _draw() -> void:
 	_drawn_count = 0
+	_last_markers.clear()
 	if not _should_draw():
 		return
 	var z := _canvas_zoom()
+	var markers := _build_markers()
+	_last_markers = markers
 	var screen_px := _icon_screen_px(z)
-	var world_px := _world_size(screen_px)
 	var close := z >= CLOSE_ZOOM
-	var badge_px: float = 11.0 if not close else 12.0
-	var pips_px: float = screen_px * 0.55
-	for rec in _icons:
-		var centroid: Vector2 = rec.get("world", Vector2.ZERO) as Vector2
-		if not centroid.is_finite():
+	for rec in markers:
+		var world: Vector2 = rec.get("world", Vector2.ZERO) as Vector2
+		if not world.is_finite():
 			continue
-		var world := _landward_draw_world(int(rec.get("pid", 0)), centroid)
-		if not _in_viewport(world, screen_px + 20.0):
+		if not _in_viewport(world, screen_px + BADGE_PX + 20.0):
 			continue
 		var level: int = clampi(int(rec.get("level", 1)), 1, 4)
-		var state: String = str(rec.get("state", "intact"))
 		var tex_key: String = str(rec.get("tex_key", texture_key_for_level(level, "intact")))
 		var icon_tex := _load_tex(tex_key, 32)
 		if icon_tex == null:
 			continue
+		var px := screen_px
+		if bool(rec.get("cluster", false)):
+			px = screen_px + 4.0
+		var world_px := _world_size(px)
 		var rect := Rect2(world - Vector2(world_px, world_px) * 0.5, Vector2(world_px, world_px))
 		draw_texture_rect(icon_tex, rect, false)
-		## TODO(FAC-1a): damaged art not shipped — intact texture is drawn when state==damaged.
-		if state == "damaged":
+		if str(rec.get("state", "intact")) == "damaged":
 			pass
-		if close:
+		var badge_n := int(rec.get("count", 0)) if bool(rec.get("cluster", false)) else (level if not close else 0)
+		if close and not bool(rec.get("cluster", false)):
 			var pips := _load_tex("level_pips_l%d" % level, 32)
 			if pips != null:
-				var pw := _world_size(pips_px)
+				var pw := _world_size(px * 0.55)
 				var ph := pw * 0.25
-				var pip_rect := Rect2(
-					Vector2(world.x - pw * 0.5, world.y + world_px * 0.18),
-					Vector2(pw, ph)
+				draw_texture_rect(
+					pips,
+					Rect2(Vector2(world.x - pw * 0.5, world.y + world_px * 0.18), Vector2(pw, ph)),
+					false
 				)
-				draw_texture_rect(pips, pip_rect, false)
-		else:
-			var badge := _load_tex("level_badge_l%d" % level, 16)
-			if badge != null:
-				var bw := _world_size(badge_px)
-				var badge_rect := Rect2(
-					Vector2(world.x + world_px * 0.18, world.y + world_px * 0.18),
-					Vector2(bw, bw)
-				)
-				draw_texture_rect(badge, badge_rect, false)
+		if badge_n >= 1:
+			_draw_outlined_badge(world, world_px, badge_n)
 		_drawn_count += 1
+
+
+func _draw_outlined_badge(world: Vector2, icon_world: float, number: int) -> void:
+	var bw := _world_size(BADGE_PX)
+	var outline := _world_size(BADGE_PX + BADGE_OUTLINE_PX * 2.0)
+	var center := Vector2(world.x + icon_world * 0.28, world.y + icon_world * 0.28)
+	draw_circle(center + Vector2(bw, bw) * 0.0, outline * 0.52, Color(0.05, 0.04, 0.03, 0.92))
+	var n := clampi(number, 1, 5)
+	var badge := _load_tex("level_badge_l%d" % n, 16)
+	if badge != null:
+		draw_texture_rect(badge, Rect2(center - Vector2(bw, bw) * 0.5, Vector2(bw, bw)), false)

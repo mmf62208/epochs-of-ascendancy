@@ -360,7 +360,7 @@ On `tools/eoa_full_test_gates.sh` (`--quick` has the py needles; full has headle
 
 ### FAC-1a airfield facility icons (L1–L4, draft HOLD)
 
-Default F5 board is **`world_accurate`**. Four Rhineland airfields seed through `project_sites.json` → `ScenarioLoader.apply_seeded_special_sites_to_provinces` so `Province.special_sites` has real `SpecialSite` AIRFIELD rows (Bonn `710416` L1, Leverkusen `710418` L2, Köln `710417` L3, Neuss `710413` L4). Same IDs on `provinces_pilot_europe_nuts3`. New `FacilityIconLayer` (`_draw` + `draw_texture_rect` only; no Line2D / per-icon nodes). `show_facilities` defaults **ON**; **P** toggles on the layer (MapRenderer input untouched). Hidden below `MapZoomLOD.site_marker_min_zoom_for_board` (0.62 on the default board). Hidden in F9 resources. Old `rebuild_sites_layer` stays default-off. Damaged is a data flag (intact art + TODO). `set_map_mode` RH-1 glyph lines **untouched**.
+Default F5 board is **`world_accurate`**. Four Rhineland airfields seed through `project_sites.json` → `ScenarioLoader.apply_seeded_special_sites_to_provinces` so `Province.special_sites` has real `SpecialSite` AIRFIELD rows. **FIX #2 reseed (never renumbered):** Aachen `710426` L1, Trier-Saarburg `710469` L2, Borken `710430` L3, Siegen-Wittgenstein `710451` L4. Same IDs on `provinces_pilot_europe_nuts3`. New `FacilityIconLayer` (`_draw` + `draw_texture_rect` + `draw_circle` badge disc; no Line2D / per-icon nodes). World-space **polylabel** interior anchors precomputed on rebuild (JSON + GDScript). Cluster + hysteresis when screen rects collide. Badges **16px** with dark disc. Close icons grow to **32px** at zoom ≥2.0. `show_facilities` defaults **ON**; **P** toggles on the layer (MapRenderer input untouched). Hidden below `MapZoomLOD.site_marker_min_zoom_for_board` (0.62 on the default board). Hidden in F9 resources. Old `rebuild_sites_layer` stays default-off. Damaged is a data flag (intact art + TODO). `set_map_mode` RH-1 glyph lines **untouched**.
 
 ```bash
 python3 -m unittest tools.map_generation.tests.test_fac1a_airfield_icons -v
@@ -368,7 +368,7 @@ tools/run_godot.sh --headless --path . -s res://scripts/core/HeadlessFac1aAirfie
 tools/eoa_fac1a_pixel_guard.sh
 ```
 
-xvfb screenshots go to `/opt/cursor/artifacts/fac1a/` and are **NOT live Play**. Peak RSS must stay under 3 GB. Merge **HOLD**.
+xvfb screenshots go to `/opt/cursor/artifacts/fac1a/` and `/opt/cursor/artifacts/fac1a_fix2/` and are **NOT live Play**. Peak RSS must stay under 3 GB (isolated process tree — do not sum leftover Godot). Merge **HOLD**.
 
 **FIX #1 occlusion (A/B/C prove, xvfb ≠ live Play):** icons sat on Bonn–Köln–Lev centroids (gold spine + Rhine). Same commands:
 
@@ -394,7 +394,13 @@ Fix: landward screen-space offset (28px, east of the corridor) in `_draw` only �
 | xvfb_rt1_seeded | xvfb | PASS s1_gold_cover=1.000 | 2067.8 |
 | xvfb_rt1_live_look | xvfb | PASS mesh_frac=0.00078 gold_w=14 | 2238.5 |
 
-Screenshots (NOT live Play): `/opt/cursor/artifacts/fac1a/fac1a_political_mid_NOT_live_play.png`, `fac1a_political_close_NOT_live_play.png`, `fac1a_zoomed_out_NOT_live_play.png`, `fac1a_resources_F9_NOT_live_play.png`, `fac1a_political_back_NOT_live_play.png`.
+Screenshots FIX #1 (NOT live Play): `/opt/cursor/artifacts/fac1a/fac1a_political_mid_NOT_live_play.png`, `fac1a_political_close_NOT_live_play.png`, `fac1a_zoomed_out_NOT_live_play.png`, `fac1a_resources_F9_NOT_live_play.png`, `fac1a_political_back_NOT_live_play.png`.
+
+**FIX #2 (live Play MIXED look on `2e5bc186`):** 28px screen offset + adjacent NUTS3 centroids clumped four icons (~40px), mid badges ~11px, Köln unit buried all four, Neuss sat on Rhine ≥1.9 / gold ≥1.35, Köln icon click marched to Rheinisch-Bergischer Kreis. Drop the screen offset. Interior polylabel + reseed (Aachen/Trier-Saarburg/Borken/Siegen). Cluster+hysteresis. 16px outlined badges. 32px at zoom ≥2.0. RT-1 `s1_gold_cover=1.000` false-passed because S1 walks Bonn–Köln–Lev **centroids only** — Neuss / Leverkusen cap were never sampled. New FAC-1a occlusion (ON vs OFF gold/river ≤5% at 1.35/1.9/2.3, anchors + spine walk including Neuss), no-overlap (0.70/0.99/1.30/1.90/2.30 + Köln counter), click-own (`get_province_at_world_pos` at icon center), badge ≥16px. RX-1/RT-1 thresholds **untouched**. Input / `set_map_mode` / label LOD / RoadTierVisual / Rhine / MapZoomLOD **untouched**.
+
+Keep-green after FIX #2 (isolated RSS; xvfb ≠ live Play; `py_eoa_quick` map_qc FAIL is pre-existing on base `8b7e46de`, Pillow) — numbers filled after the isolated run.
+
+Screenshots FIX #2 (xvfb **NOT live Play**, matching Play composites): `/opt/cursor/artifacts/fac1a_fix2/01_operational_z1.30_all4_airfields_NOT_live_play.png`, `02_mid_z0.99_badges_or_cluster_NOT_live_play.png`, `03_close_koln_z2.27_counters_NOT_live_play.png`.
 
 ### MV-1 move ETA preview (gameplay UI, draft HOLD)
 

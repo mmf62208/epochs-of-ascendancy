@@ -1,7 +1,7 @@
 {
   "sites": [
     {
-      "province_id": 710416,
+      "province_id": 710426,
       "project_type": "airfield",
       "site_id": "airfield_tier_1",
       "tier": 1,
@@ -9,7 +9,7 @@
       "damage_level": 0
     },
     {
-      "province_id": 710418,
+      "province_id": 710469,
       "project_type": "airfield",
       "site_id": "airfield_tier_2",
       "tier": 2,
@@ -17,7 +17,7 @@
       "damage_level": 0
     },
     {
-      "province_id": 710417,
+      "province_id": 710430,
       "project_type": "airfield",
       "site_id": "airfield_tier_3",
       "tier": 3,
@@ -25,7 +25,7 @@
       "damage_level": 0
     },
     {
-      "province_id": 710413,
+      "province_id": 710451,
       "project_type": "airfield",
       "site_id": "airfield_tier_4",
       "tier": 4,
@@ -34,7 +34,7 @@
     }
   ],
   "meta": {
-    "source": "fac1a_rhineland_airfields",
-    "note": "FAC-1a test seeds: Bonn L1, Leverkusen L2, Köln L3, Neuss L4. Intact. Default world_accurate board."
+    "source": "fac1a_rhineland_airfields_fix2",
+    "note": "FAC-1a FIX #2 spread seeds: Aachen L1, Trier-Saarburg L2, Borken L3, Siegen-Wittgenstein L4. Intact. Default world_accurate."
   }
 }

@@ -13,10 +13,11 @@ const SRC_OL := "res://scripts/map/InfrastructureOverlayLayer.gd"
 const SRC_LOADER := "res://scripts/core/ScenarioLoader.gd"
 const SRC_ZOOM := "res://scripts/map/MapZoomLOD.gd"
 
-const BONN := 710416
+const AACHEN := 710426
+const TRIER_SAARBURG := 710469
+const BORKEN := 710430
+const SIEGEN := 710451
 const KOELN := 710417
-const LEV := 710418
-const NEUSS := 710413
 
 const SITE_AIRFIELD := 1
 const STATE_COMPLETED := 2
@@ -101,6 +102,7 @@ func _run() -> void:
 	_test_source_needles()
 	_test_tier4_def()
 	_test_board_seeds_and_layer()
+	_test_cluster_hysteresis()
 	_test_damaged_mapping()
 
 
@@ -138,6 +140,18 @@ func _test_source_needles() -> void:
 		_fail("KEY_P toggle missing on layer")
 	else:
 		_pass("KEY_P on layer (MapRenderer input untouched)")
+	if "CORRIDOR_OFFSET_SCREEN_PX" in layer or "_landward_draw_world" in layer:
+		_fail("FIX #1 screen offset must be removed")
+	else:
+		_pass("no fixed 28px screen offset")
+	if "func _polylabel" not in layer or "const BADGE_PX := 16.0" not in layer:
+		_fail("interior polylabel / 16px badge missing")
+	else:
+		_pass("polylabel + BADGE_PX 16")
+	if "SPLIT_GAP_PX" not in layer:
+		_fail("cluster hysteresis missing")
+	else:
+		_pass("cluster hysteresis present")
 	if "_setup_facility_icon_layer" not in ren:
 		_fail("MapRenderer missing _setup_facility_icon_layer")
 	else:
@@ -189,11 +203,30 @@ func _test_tier4_def() -> void:
 
 func _dummy_centroids() -> Dictionary:
 	return {
-		BONN: Vector2(100, 100),
-		LEV: Vector2(140, 60),
-		KOELN: Vector2(120, 80),
-		NEUSS: Vector2(80, 70),
+		AACHEN: Vector2(100, 100),
+		TRIER_SAARBURG: Vector2(260, 40),
+		BORKEN: Vector2(40, 240),
+		SIEGEN: Vector2(280, 220),
 	}
+
+
+func _dummy_polygons() -> Dictionary:
+	## Large squares so interior poles stay inside and pairwise gaps stay wide.
+	var out := {}
+	var cents := _dummy_centroids()
+	for pid in cents.keys():
+		var c: Vector2 = cents[pid]
+		out[int(pid)] = PackedVector2Array([
+			c + Vector2(-18, -18),
+			c + Vector2(18, -18),
+			c + Vector2(18, 18),
+			c + Vector2(-18, 18),
+		])
+	return out
+
+
+func _point_in_poly(pt: Vector2, ring: PackedVector2Array) -> bool:
+	return Geometry2D.is_point_in_polygon(pt, ring)
 
 
 func _state_from_record(rec: Dictionary) -> int:
@@ -209,7 +242,7 @@ func _state_from_record(rec: Dictionary) -> int:
 
 func _seed_provinces_from_json(board: String) -> Dictionary:
 	var dest: Dictionary = {}
-	for pid in [BONN, LEV, KOELN, NEUSS]:
+	for pid in [AACHEN, TRIER_SAARBURG, BORKEN, SIEGEN]:
 		var p := DummyProv.new()
 		p.id = int(pid)
 		p.name = "FAC1a %d" % int(pid)
@@ -268,7 +301,7 @@ func _airfield_count(provs: Dictionary) -> int:
 
 
 func _expect_tiers(provs: Dictionary, board: String) -> void:
-	var want: Dictionary = {BONN: 1, LEV: 2, KOELN: 3, NEUSS: 4}
+	var want: Dictionary = {AACHEN: 1, TRIER_SAARBURG: 2, BORKEN: 3, SIEGEN: 4}
 	for pid in want.keys():
 		if not provs.has(pid):
 			_fail("%s missing province %d" % [board, int(pid)])
@@ -313,7 +346,7 @@ func _test_board_seeds_and_layer() -> void:
 			_pass("%s applied 4 airfield sites" % board)
 		_expect_tiers(provs, board)
 		var board_n := 3520 if board == "provinces_world_accurate" else 1514
-		_layer.call("setup_for_test", provs, _dummy_centroids(), board_n)
+		_layer.call("setup_for_test", provs, _dummy_centroids(), board_n, _dummy_polygons())
 		var icons: Array = _layer.call("get_icon_list")
 		if icons.size() != 4:
 			_fail("%s layer icons=%d want 4" % [board, icons.size()])
@@ -347,13 +380,23 @@ func _test_board_seeds_and_layer() -> void:
 			_fail("%s political mid zoom drew %d" % [board, mid_n])
 		else:
 			_pass("%s visible at operational zoom" % board)
-		var cents: Dictionary = _dummy_centroids()
-		var dw: Vector2 = _layer.call("get_draw_world", KOELN)
-		var c0: Vector2 = cents[KOELN] as Vector2
-		if dw.distance_to(c0) < 8.0:
-			_fail("%s draw world not offset off centroid (FIX #1)" % board)
+		var polys: Dictionary = _dummy_polygons()
+		var click_ok := true
+		for pid in [AACHEN, TRIER_SAARBURG, BORKEN, SIEGEN]:
+			var dw: Vector2 = _layer.call("get_draw_world", pid)
+			var ring: PackedVector2Array = polys[pid]
+			if not _point_in_poly(dw, ring):
+				_fail("%s pid %d interior not inside own polygon" % [board, pid])
+				click_ok = false
+		if click_ok:
+			_pass("%s click-ownership: icon center inside own province" % board)
+		var badge_px: float = float(_layer.call("get_badge_screen_px", 0.80))
+		if badge_px + 0.01 < 16.0:
+			_fail("%s mid badge_px=%.1f want>=16" % [board, badge_px])
 		else:
-			_pass("%s landward offset %.1f from centroid" % [board, dw.distance_to(c0)])
+			_pass("%s mid badge %.1fpx" % [board, badge_px])
+		if int(_layer.call("count_icons_that_would_draw")) != 4:
+			_fail("%s expected 4 sites after interior rebuild" % board)
 		_layer.call("set_test_map_mode", "diplomacy")
 		if int(_layer.call("count_icons_that_would_draw")) != 4:
 			_fail("%s diplomacy hid icons" % board)
@@ -379,6 +422,45 @@ func _test_board_seeds_and_layer() -> void:
 			_fail("%s zoom rebuilt list %d → %d" % [board, before, after])
 		else:
 			_pass("%s zoom did not rebuild icon list" % board)
+
+
+func _test_cluster_hysteresis() -> void:
+	if _layer == null or not is_instance_valid(_layer):
+		_fail("no layer for cluster hysteresis")
+		return
+	var tight: Dictionary = {
+		AACHEN: Vector2(0, 0),
+		TRIER_SAARBURG: Vector2(36, 0),
+		BORKEN: Vector2(0, 36),
+		SIEGEN: Vector2(36, 36),
+	}
+	var polys := {}
+	for pid in tight.keys():
+		var c: Vector2 = tight[pid]
+		polys[int(pid)] = PackedVector2Array([
+			c + Vector2(-8, -8),
+			c + Vector2(8, -8),
+			c + Vector2(8, 8),
+			c + Vector2(-8, 8),
+		])
+	var provs := _seed_provinces_from_json("provinces_world_accurate")
+	_layer.call("setup_for_test", provs, tight, 3520, polys)
+	_layer.call("set_test_map_mode", "political")
+	_layer.call("set_show_facilities", true)
+	_layer.set("_clustered", false)
+	var mid_m: Array = _layer.call("compute_markers_at_zoom", 0.80)
+	var mid_n := mid_m.size()
+	if mid_n >= 4:
+		_fail("tight mid markers=%d should cluster" % mid_n)
+	else:
+		_pass("tight mid clustered to %d markers" % mid_n)
+	## Same worlds at close/grow: screen gaps open → hysteresis splits.
+	_layer.set("_clustered", true)
+	var close_m: Array = _layer.call("compute_markers_at_zoom", 2.30)
+	if close_m.size() < 4 and bool(_layer.get("_clustered")):
+		_fail("close zoom should split clusters (n=%d clustered=%s)" % [close_m.size(), str(_layer.get("_clustered"))])
+	else:
+		_pass("close zoom split to %d markers" % close_m.size())
 
 
 func _test_damaged_mapping() -> void:
