@@ -64,6 +64,7 @@ var _last_wait_log: int = -1
 var _rss_start_kb: int = 0
 var _rss_peak_kb: int = 0
 var _cam_zoom: float = MID_ZOOM
+var _cam_pos: Vector2 = Vector2.ZERO
 var _mid_anchors: int = 0
 var _close_anchors: int = 0
 var _out_anchors: int = 0
@@ -120,6 +121,7 @@ func _start() -> void:
 
 func _on_process() -> void:
 	_note_rss()
+	_reassert_camera()
 	match _phase:
 		Phase.WAIT_MAP:
 			_tick_wait_map()
@@ -873,23 +875,38 @@ func _frame_over_rhineland(zoom: float) -> void:
 		var ip: Variant = mr.get("info_panel")
 		if ip is Control:
 			(ip as Control).visible = false
-	if mr != null and mr.has_method("lock_pixel_guard_camera"):
-		mr.call("lock_pixel_guard_camera", pos, zoom)
-		_cam_zoom = zoom
-	else:
-		var cam := _camera()
-		if cam != null:
-			cam.zoom = Vector2(zoom, zoom)
-			cam.global_position = pos
-			cam.reset_smoothing()
-			cam.enabled = true
-			cam.make_current()
-			_cam_zoom = maxf(cam.zoom.x, cam.zoom.y)
-	var cam2 := _camera()
-	if cam2 != null:
-		_cam_zoom = maxf(cam2.zoom.x, cam2.zoom.y)
+	_apply_camera(pos, zoom)
 	_ensure_not_live_banner()
 	_log("EOA_FAC1A_PIXEL_GUARD who=guard.frame want=%.2f got=%.3f pos=%.1f,%.1f (NOT live Play)" % [zoom, _cam_zoom, pos.x, pos.y])
+
+
+func _apply_camera(pos: Vector2, zoom: float) -> void:
+	if pos == Vector2.ZERO:
+		return
+	_cam_pos = pos
+	_cam_zoom = zoom
+	var mr := _map_renderer()
+	if mr != null and mr.has_method("lock_pixel_guard_camera"):
+		mr.call("lock_pixel_guard_camera", pos, zoom)
+		return
+	if mr != null:
+		mr.set("_close_camera_lock_pos", pos)
+		mr.set("_close_camera_lock_zoom", Vector2(zoom, zoom))
+		mr.set("_close_camera_locked", true)
+	var cam := _camera()
+	if cam != null:
+		cam.zoom = Vector2(zoom, zoom)
+		cam.global_position = pos
+		cam.reset_smoothing()
+		cam.enabled = true
+		cam.make_current()
+		_cam_zoom = maxf(cam.zoom.x, cam.zoom.y)
+
+
+func _reassert_camera() -> void:
+	if _cam_pos == Vector2.ZERO:
+		return
+	_apply_camera(_cam_pos, _cam_zoom)
 
 
 func _freeze_boot_camera_fighters() -> void:

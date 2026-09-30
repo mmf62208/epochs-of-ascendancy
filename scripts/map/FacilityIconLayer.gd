@@ -371,11 +371,33 @@ func _interior_world_for(pid: int, p: Object) -> Vector2:
 			if raw is Array and craw is Array and (raw as Array).size() >= 2 and (craw as Array).size() >= 2 and centroid != Vector2.ZERO:
 				var cand := centroid + (Vector2(float(raw[0]), float(raw[1])) - Vector2(float(craw[0]), float(craw[1]))) * THEATER_SCALE
 				if Geometry2D.is_point_in_polygon(cand, world_ring):
-					return cand
+					return _snap_to_own_pick(pid, cand, centroid)
 	var pole := _polylabel(world_ring)
 	if pole != Vector2.ZERO and Geometry2D.is_point_in_polygon(pole, world_ring):
-		return pole
-	return centroid
+		return _snap_to_own_pick(pid, pole, centroid)
+	return _snap_to_own_pick(pid, centroid, centroid)
+
+
+func _snap_to_own_pick(pid: int, cand: Vector2, centroid: Vector2) -> Vector2:
+	## Existing province hit-test (untouched) must resolve the icon center to
+	## this pid. Walk toward the MapManager centroid until it does.
+	var mm := _map_manager()
+	if mm == null or not mm.has_method("get_province_at_world_pos"):
+		return cand
+	var hit := int(mm.call("get_province_at_world_pos", cand, true))
+	if hit == pid:
+		return cand
+	if centroid != Vector2.ZERO:
+		var ch := int(mm.call("get_province_at_world_pos", centroid, true))
+		if ch == pid:
+			var t := 0.15
+			while t <= 1.001:
+				var p: Vector2 = cand.lerp(centroid, t)
+				if int(mm.call("get_province_at_world_pos", p, true)) == pid:
+					return p
+				t += 0.15
+			return centroid
+	return cand if cand != Vector2.ZERO else centroid
 
 
 func _world_ring(ring: PackedVector2Array, world_centroid: Vector2) -> PackedVector2Array:
