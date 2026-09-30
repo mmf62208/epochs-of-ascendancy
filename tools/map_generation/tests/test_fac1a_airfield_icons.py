@@ -11,8 +11,8 @@ ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "tools" / "map_generation" / "lib"))
 
 from facility_icon_anchor_product import (  # noqa: E402
+    AHRWEILER,
     CLUSTER_PAIR,
-    EUSKIRCHEN,
     MAYEN_KOBLENZ,
     OBERBERGISCHER,
     SEED_NAMES,
@@ -60,6 +60,7 @@ class TestFac1aAirfieldIcons(unittest.TestCase):
             self.assertNotIn(710416, got)
             self.assertNotIn(710418, got)
             self.assertNotIn(710413, got)
+            self.assertNotIn(710421, got)
             self.assertNotIn(710426, got)
             self.assertNotIn(710469, got)
 
@@ -70,14 +71,14 @@ class TestFac1aAirfieldIcons(unittest.TestCase):
         cluster_d = float(product.get("cluster_pair_raw") or 0)
         self.assertGreaterEqual(cluster_d, 17.0)
         self.assertLessEqual(cluster_d, 20.5)
-        self.assertEqual(tuple(CLUSTER_PAIR), (EUSKIRCHEN, MAYEN_KOBLENZ))
+        self.assertEqual(tuple(CLUSTER_PAIR), (AHRWEILER, MAYEN_KOBLENZ))
         square = [(0.0, 0.0), (10.0, 0.0), (10.0, 10.0), (0.0, 10.0)]
         px, py, pr = polylabel(square, precision=0.2)
         self.assertTrue(point_in_ring(px, py, square))
         self.assertGreater(pr, 3.0)
         self.assertTrue(ANCHOR_JSON.is_file())
         blob = json.loads(ANCHOR_JSON.read_text(encoding="utf-8"))
-        for pid in (VIERSEN, OBERBERGISCHER, EUSKIRCHEN, MAYEN_KOBLENZ):
+        for pid in (VIERSEN, OBERBERGISCHER, AHRWEILER, MAYEN_KOBLENZ):
             rec = blob["anchors"][str(pid)]
             self.assertEqual(rec["name"], SEED_NAMES[pid])
             self.assertGreater(float(rec["edge_dist"]), 0.4)

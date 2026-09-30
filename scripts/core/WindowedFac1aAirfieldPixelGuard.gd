@@ -13,12 +13,12 @@ const KOELN := 710417
 const BONN := 710416
 const VIERSEN := 710414
 const OBERBERGISCHER := 710423
-const EUSKIRCHEN := 710421
+const AHRWEILER := 710455
 const MAYEN_KOBLENZ := 710459
-const PIDS: Array[int] = [VIERSEN, OBERBERGISCHER, EUSKIRCHEN, MAYEN_KOBLENZ]
-const CLUSTER_EXPECT_COUNT := 3
+const PIDS: Array[int] = [VIERSEN, OBERBERGISCHER, AHRWEILER, MAYEN_KOBLENZ]
+const CLUSTER_EXPECT_COUNT := 2
 const CLUSTER_EXPECT_LEVEL := 4
-const NEIGHBOR_PID := EUSKIRCHEN
+const NEIGHBOR_PID := AHRWEILER
 const MID_ZOOM := 0.99
 const OPS_ZOOM := 1.30
 const CLOSE_ZOOM := 2.27
@@ -457,7 +457,7 @@ func _assert_cluster_at_zoom(zoom: float) -> bool:
 		if typeof(rec_v) != TYPE_DICTIONARY:
 			continue
 		var rec: Dictionary = rec_v
-		if bool(rec.get("cluster", false)) and int(rec.get("count", 0)) >= 2 and int(rec.get("level", 0)) == CLUSTER_EXPECT_LEVEL:
+		if bool(rec.get("cluster", false)) and int(rec.get("count", 0)) >= CLUSTER_EXPECT_COUNT and int(rec.get("level", 0)) == CLUSTER_EXPECT_LEVEL:
 			_log("EOA_FAC1A_PIXEL_GUARD who=guard.cluster z=%.2f count=%d level=%d (NOT live Play)" % [zoom, int(rec.get("count", 0)), int(rec.get("level", 0))])
 			return true
 	_log("EOA_FAC1A_PIXEL_GUARD who=guard.cluster MISS z=%.2f markers=%d (NOT live Play)" % [zoom, markers.size()])

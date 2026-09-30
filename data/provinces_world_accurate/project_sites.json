@@ -17,7 +17,7 @@
       "damage_level": 0
     },
     {
-      "province_id": 710421,
+      "province_id": 710455,
       "project_type": "airfield",
       "site_id": "airfield_tier_3",
       "tier": 3,
@@ -35,6 +35,6 @@
   ],
   "meta": {
     "source": "fac1a_rhineland_airfields_fix2b",
-    "note": "FAC-1a FIX #2b Rhineland seeds: Viersen L1, Oberbergischer Kreis L2, Euskirchen L3, Mayen-Koblenz L4. Intact. Default world_accurate."
+    "note": "FAC-1a FIX #2b Rhineland seeds: Viersen L1, Oberbergischer Kreis L2, Ahrweiler L3, Mayen-Koblenz L4. Intact. Default world_accurate."
   }
 }

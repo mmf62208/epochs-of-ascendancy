@@ -26,44 +26,45 @@ CITY_LAYER = ROOT / "data" / "provinces_world_accurate" / "province_city_layer.j
 
 # FIX #2b Rhineland reseed (never renumber). NRW west of ~7.6°E / south of
 # the Ruhr + northern Rheinland-Pfalz. Off Köln / Bonn / Leverkusen and off
-# LUX-border (Aachen / Trier-Saarburg). Euskirchen is Bonn-adjacent so a
-# Köln counter exercises clearance. Forced interiors cluster at mid 0.99
-# and split at ≥1.9.
+# LUX-border (Aachen / Trier-Saarburg). Ahrweiler is Bonn-adjacent so a
+# Köln counter exercises clearance. Forced interiors: Ahrweiler–Mayen
+# cluster at mid 0.99 and split at ≥1.9. Viersen / Ober stay isolated.
 VIERSEN = 710414
 OBERBERGISCHER = 710423
-EUSKIRCHEN = 710421
+AHRWEILER = 710455
 MAYEN_KOBLENZ = 710459
 # Aliases kept so older test imports resolve to the live FIX #2b seeds.
+EUSKIRCHEN = AHRWEILER
 AACHEN = VIERSEN
 TRIER_SAARBURG = OBERBERGISCHER
-BORKEN = EUSKIRCHEN
+BORKEN = AHRWEILER
 SIEGEN = MAYEN_KOBLENZ
 EMSLAND = VIERSEN
 ORTENAU = OBERBERGISCHER
-GOTTINGEN = EUSKIRCHEN
+GOTTINGEN = AHRWEILER
 ANSBACH = MAYEN_KOBLENZ
 SEED_TIERS: Dict[int, int] = {
     VIERSEN: 1,
     OBERBERGISCHER: 2,
-    EUSKIRCHEN: 3,
+    AHRWEILER: 3,
     MAYEN_KOBLENZ: 4,
 }
 SEED_NAMES: Dict[int, str] = {
     VIERSEN: "Viersen",
     OBERBERGISCHER: "Oberbergischer Kreis",
-    EUSKIRCHEN: "Euskirchen",
+    AHRWEILER: "Ahrweiler",
     MAYEN_KOBLENZ: "Mayen-Koblenz",
 }
-# World-space interiors (raw). Pair Euskirchen–Mayen ~19.2 and
-# Mayen–Oberbergisch ~19.8 cluster at 0.99 and split at 1.9. All four
-# clear an 80×56 Köln counter at zoom 2.27.
+# World-space interiors (raw). Pair Ahrweiler–Mayen ~17.4 clusters at
+# 0.99 and splits at 1.9. Ahrweiler clears a Köln 28×20 counter at 2.27.
+# Other pairs stay ≥20.7 so they do not join the mid cluster (RX-1 spine).
 SEED_FORCE_RAW: Dict[int, Tuple[float, float]] = {
-    VIERSEN: (4237.92, 934.46),
-    EUSKIRCHEN: (4243.90, 957.97),
-    OBERBERGISCHER: (4270.07, 943.80),
-    MAYEN_KOBLENZ: (4262.61, 962.15),
+    VIERSEN: (4235.47, 935.21),
+    AHRWEILER: (4250.96, 960.03),
+    OBERBERGISCHER: (4271.07, 943.10),
+    MAYEN_KOBLENZ: (4267.81, 964.35),
 }
-CLUSTER_PAIR: Tuple[int, int] = (EUSKIRCHEN, MAYEN_KOBLENZ)
+CLUSTER_PAIR: Tuple[int, int] = (AHRWEILER, MAYEN_KOBLENZ)
 KOELN_PID = 710417
 BONN_PID = 710416
 
@@ -397,7 +398,7 @@ def apply_seed_files() -> None:
             "source": "fac1a_rhineland_airfields_fix2b",
             "note": (
                 "FAC-1a FIX #2b Rhineland seeds: Viersen L1, Oberbergischer "
-                "Kreis L2, Euskirchen L3, Mayen-Koblenz L4. Intact. Default "
+                "Kreis L2, Ahrweiler L3, Mayen-Koblenz L4. Intact. Default "
                 "world_accurate."
             ),
         },
@@ -414,6 +415,7 @@ __all__ = [
     "CLUSTER_PAIR",
     "VIERSEN",
     "OBERBERGISCHER",
+    "AHRWEILER",
     "EUSKIRCHEN",
     "MAYEN_KOBLENZ",
     "polylabel",
