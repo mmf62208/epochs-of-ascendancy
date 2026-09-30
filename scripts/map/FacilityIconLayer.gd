@@ -10,6 +10,7 @@ extends Node2D
 const FAC_DIR := "res://assets/graphics/icons/facilities/"
 const ANCHOR_RES := "res://data/provinces_world_accurate/facility_icon_anchors.json"
 const MapCanvasConfigScript = preload("res://scripts/map/MapCanvasConfig.gd")
+const Rx1RhineCrossingScript = preload("res://scripts/map/Rx1RhineCrossing.gd")
 const MID_ICON_PX := 22.0
 const CLOSE_ICON_PX := 26.0
 const CLOSE_GROW_PX := 32.0
@@ -26,6 +27,9 @@ const SPINE_PIDS: Array[int] = [710416, 710417, 710418]
 const RHINE_WALK_PIDS: Array[int] = [710416, 710417, 710401, 710402]
 const LUX_CAPITAL_PID := 710977
 const KOELN_PID := 710417
+## Live cluster half at RX-1 mid (0.95) is ~20–29 world. Neuwied's whole
+## province is ≤5.2 raw (~9 world) from the real course — it cannot host.
+const RHINE_HOST_MIN_WORLD := 22.0
 const VISIBLE_MODES: Array[String] = ["political", "diplomacy", "infra"]
 const SITE_AIRFIELD := 1
 const STATE_NOT_BUILT := 0
@@ -849,11 +853,20 @@ func _pick_cluster_host(items: Array[Dictionary], idxs: Array) -> Dictionary:
 	for ii in idxs:
 		mean += items[int(ii)].get("world", Vector2.ZERO) as Vector2
 	mean /= float(maxi(idxs.size(), 1))
-	var best: Dictionary = items[int(idxs[0])]
+	var course := _rhine_course_line()
+	var pool: Array[int] = []
+	for ii in idxs:
+		var w: Vector2 = items[int(ii)].get("world", Vector2.ZERO) as Vector2
+		if course.size() < 2 or _dist_to_polyline(w, course) >= RHINE_HOST_MIN_WORLD:
+			pool.append(int(ii))
+	if pool.is_empty():
+		for ii in idxs:
+			pool.append(int(ii))
+	var best: Dictionary = items[pool[0]]
 	var best_lv := int(best.get("level", 1))
 	var best_d := (best.get("world", Vector2.ZERO) as Vector2).distance_to(mean)
-	for ii in idxs:
-		var it: Dictionary = items[int(ii)]
+	for ii in pool:
+		var it: Dictionary = items[ii]
 		var lv := int(it.get("level", 1))
 		var d := (it.get("world", Vector2.ZERO) as Vector2).distance_to(mean)
 		if lv > best_lv or (lv == best_lv and d < best_d - 0.01):
@@ -968,10 +981,25 @@ func _corridor_polylines() -> Array:
 	var out: Array = []
 	var spine := _pids_polyline(SPINE_PIDS)
 	var rhine := _pids_polyline(RHINE_WALK_PIDS)
+	var course := _rhine_course_line()
 	if spine.size() >= 2:
 		out.append(spine)
 	if rhine.size() >= 2:
 		out.append(rhine)
+	if course.size() >= 2:
+		out.append(course)
+	return out
+
+
+func _rhine_course_line() -> PackedVector2Array:
+	if not _test_polygons.is_empty():
+		return PackedVector2Array()
+	if Rx1RhineCrossingScript == null or not Rx1RhineCrossingScript.has_method("course_points"):
+		return PackedVector2Array()
+	var raw: PackedVector2Array = Rx1RhineCrossingScript.call("course_points") as PackedVector2Array
+	var out := PackedVector2Array()
+	for p in raw:
+		out.append(p * THEATER_SCALE)
 	return out
 
 

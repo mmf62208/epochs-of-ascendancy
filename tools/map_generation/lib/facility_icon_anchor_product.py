@@ -66,7 +66,7 @@ SEED_NAMES: Dict[int, str] = {
 SEED_FORCE_RAW: Dict[int, Tuple[float, float]] = {
     VIERSEN: (4234.82, 935.41),
     NEUWIED: (4268.40, 956.88),
-    OBERBERGISCHER: (4267.42, 940.45),
+    OBERBERGISCHER: (4270.67, 940.95),
     HUNSRUECK: (4267.73, 973.10),
 }
 CLUSTER_PAIR: Tuple[int, int] = (NEUWIED, OBERBERGISCHER)

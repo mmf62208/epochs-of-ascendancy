@@ -124,6 +124,8 @@ class TestFac1aAirfieldIcons(unittest.TestCase):
         self.assertIn("func _pick_cluster_host", src)
         self.assertIn("func _nudge_cluster_world", src)
         self.assertIn("func _cluster_iso_clear", src)
+        self.assertIn("func _rhine_course_line", src)
+        self.assertIn("RHINE_HOST_MIN_WORLD", src)
         self.assertNotIn("acc / float(idxs.size())", src)
         self.assertIn("SPLIT_GAP_PX", src)
         self.assertNotIn("CORRIDOR_OFFSET_SCREEN_PX", src)
