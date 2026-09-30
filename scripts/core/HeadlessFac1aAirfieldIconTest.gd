@@ -176,6 +176,10 @@ func _test_source_needles() -> void:
 		_fail("FIX #5 oval hit / chrome gap missing")
 	else:
 		_pass("FIX #5 oval hit + cluster_chrome_gap_px")
+	if "func _art_is_round" not in layer or "func _art_body_rect" not in layer or "func silhouette_inside_samples" not in layer:
+		_fail("FIX #6 art-body hit / silhouette samples missing")
+	else:
+		_pass("FIX #6 art-body hit + silhouette_inside_samples")
 	if "Color(0.98, 0.93, 0.70" in layer:
 		_fail("FIX #5 cream selection-box halo must be gone")
 	else:
@@ -478,6 +482,21 @@ func _test_board_seeds_and_layer() -> void:
 			_fail("%s 2px outside oval/badge still hit-tested" % board)
 		else:
 			_pass("%s 2px outside oval/badge is GIS" % board)
+		var inside_ok := true
+		for lay_i in layouts_out:
+			if typeof(lay_i) != TYPE_DICTIONARY:
+				continue
+			var want_i: int = int((lay_i as Dictionary).get("pid", -1))
+			var samples_in: Array = _layer.call("silhouette_inside_samples", lay_i, 0.97, 2.0)
+			for s2_v in samples_in:
+				var s2: Vector2 = s2_v
+				var ih: int = int(_layer.call("hit_test_at_zoom", s2, 0.97))
+				if ih != want_i and ih <= 0:
+					inside_ok = false
+		if not inside_ok:
+			_fail("%s 2px inside silhouette missed" % board)
+		else:
+			_pass("%s 2px inside silhouette owns click" % board)
 		_layer.call("set_test_zoom", 1.30)
 		var lone_ok := false
 		var layouts_130: Array = _layer.call("get_hit_rects_at_zoom", 1.30)

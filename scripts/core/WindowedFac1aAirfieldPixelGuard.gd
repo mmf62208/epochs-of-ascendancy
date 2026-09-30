@@ -28,7 +28,8 @@ const OCCL_ZOOMS: Array[float] = [0.70, 0.99, 1.30, 1.35, 1.90, 2.30]
 const CLUSTER_OCCL_ZOOMS: Array[float] = [0.70, 0.99, 1.30]
 const OVERLAP_ZOOMS: Array[float] = [0.70, 0.99, 1.30, 1.53, 1.90, 2.30]
 const CLEAR_ZOOMS: Array[float] = [0.65, 0.77, 0.99, 1.30, 1.53, 1.90, 2.27]
-const CLICK_ZOOMS: Array[float] = [0.92, 0.97, 1.30, 2.25]
+const CLICK_ZOOMS: Array[float] = [0.93, 0.97, 1.30, 2.25]
+const SILHOUETTE_ZOOMS: Array[float] = [0.93, 0.97, 1.30, 2.25]
 const BADGE_INSIDE_ZOOMS: Array[float] = [0.93, 0.97, 0.99, 1.00]
 const CHROME_ZOOMS: Array[float] = [0.93, 0.97, 0.99]
 const OUTSIDE_PAD_PX := 2.0
@@ -96,14 +97,17 @@ var _fix2c_dir: String = ""
 var _fix3_dir: String = ""
 var _fix4_dir: String = ""
 var _fix5_dir: String = ""
+var _fix6_dir: String = ""
 var _click_fail: int = 0
 var _noop_fail: int = 0
+var _silhouette_fail: int = 0
 var _priority_ok: bool = false
 var _badge_inside_ok: bool = false
 var _digit_ok: bool = false
 var _chrome_ok: bool = false
 var _stale_ok: bool = false
 var _tight_outside_ok: bool = false
+var _silhouette_ok: bool = false
 var _cluster_prom_ok: bool = false
 var _lone_size_ok: bool = false
 var _occl_max: float = 0.0
@@ -145,12 +149,14 @@ func _start() -> void:
 		DirAccess.make_dir_recursive_absolute("/opt/cursor/artifacts/fac1a_fix3")
 		DirAccess.make_dir_recursive_absolute("/opt/cursor/artifacts/fac1a_fix4")
 		DirAccess.make_dir_recursive_absolute("/opt/cursor/artifacts/fac1a_fix5")
+		DirAccess.make_dir_recursive_absolute("/opt/cursor/artifacts/fac1a_fix6")
 	_fix2_dir = "/opt/cursor/artifacts/fac1a_fix2"
 	_fix2b_dir = "/opt/cursor/artifacts/fac1a_fix2b"
 	_fix2c_dir = "/opt/cursor/artifacts/fac1a_fix2c"
 	_fix3_dir = "/opt/cursor/artifacts/fac1a_fix3"
 	_fix4_dir = "/opt/cursor/artifacts/fac1a_fix4"
 	_fix5_dir = "/opt/cursor/artifacts/fac1a_fix5"
+	_fix6_dir = "/opt/cursor/artifacts/fac1a_fix6"
 	if OS.get_environment("EOA_SMOKE_AUTO_BEGIN").strip_edges() != "1":
 		OS.set_environment("EOA_SMOKE_AUTO_BEGIN", "1")
 	_rss_start_kb = _rss_kb()
@@ -647,6 +653,10 @@ func _do_ownership() -> void:
 	_stale_ok = _assert_stale_hover_override()
 	if not _stale_ok:
 		_fail_reasons.append("stale_hover")
+	_silhouette_ok = _assert_silhouette_inside()
+	if not _silhouette_ok:
+		_fail_reasons.append("silhouette_inside")
+	_capture_hit_overlays()
 	_priority_ok = _assert_counter_priority()
 	if not _priority_ok:
 		_fail_reasons.append("priority_counter")
@@ -722,6 +732,15 @@ func _capture_fix5(name: String) -> void:
 		return
 	var prev := _out_dir
 	_out_dir = _fix5_dir
+	_capture(name)
+	_out_dir = prev
+
+
+func _capture_fix6(name: String) -> void:
+	if _fix6_dir.is_empty():
+		return
+	var prev := _out_dir
+	_out_dir = _fix6_dir
 	_capture(name)
 	_out_dir = prev
 
@@ -1091,6 +1110,99 @@ func _assert_stale_hover_override() -> bool:
 	_pause_clock_only()
 	_log("EOA_FAC1A_PIXEL_GUARD who=guard.stale ok=%s (NOT live Play)" % str(ok))
 	return ok
+
+
+func _assert_silhouette_inside() -> bool:
+	var ol := _facility_layer()
+	if ol == null or not ol.has_method("silhouette_inside_samples"):
+		return false
+	var ok := true
+	_silhouette_fail = 0
+	for selected in [false, true]:
+		if selected:
+			_select_parked_unit()
+		else:
+			_clear_selected_unit()
+		for z in SILHOUETTE_ZOOMS:
+			_frame_over_rhineland(z)
+			_redraw_layer()
+			var layouts := _hit_layouts(z)
+			var saw_oval := false
+			var saw_round := false
+			var saw_cluster := false
+			var saw_badge := false
+			var saw_tag := false
+			for layout_v in layouts:
+				if typeof(layout_v) != TYPE_DICTIONARY:
+					continue
+				var layout: Dictionary = layout_v
+				var want: int = int(layout.get("pid", -1))
+				if bool(layout.get("cluster", false)):
+					saw_cluster = true
+				elif bool(layout.get("round_art", false)):
+					saw_round = true
+				else:
+					saw_oval = true
+				if (layout.get("badge_rect", Rect2()) as Rect2).size.x > 0.0:
+					saw_badge = true
+				if (layout.get("tag_rect", Rect2()) as Rect2).size.x > 0.0:
+					saw_tag = true
+				var samples: Array = ol.call("silhouette_inside_samples", layout, z, OUTSIDE_PAD_PX)
+				for s_v in samples:
+					var sample: Vector2 = s_v
+					if _counter_contains_world(sample, z):
+						continue
+					var hit: int = int(ol.call("hit_test_at_zoom", sample, z))
+					var fac: int = _facility_pid_at(sample)
+					if hit != want or fac != want:
+						ok = false
+						_silhouette_fail += 1
+						_click_fail += 1
+						_fail_reasons.append("sil_z%.2f_pid%d_hit%d_sel%s" % [z, want, hit, str(selected)])
+						_log(
+							"EOA_FAC1A_PIXEL_GUARD who=guard.silhouette FAIL z=%.2f want=%d hit=%d fac=%d sel=%s (NOT live Play)"
+							% [z, want, hit, fac, str(selected)]
+						)
+						return false
+			if z + 0.001 < SPLIT_ZOOM and not saw_cluster:
+				ok = false
+				_log("EOA_FAC1A_PIXEL_GUARD who=guard.silhouette MISS cluster z=%.2f (NOT live Play)" % z)
+			if z + 0.001 >= SPLIT_ZOOM:
+				if not saw_round:
+					ok = false
+					_log("EOA_FAC1A_PIXEL_GUARD who=guard.silhouette MISS lone_l4 z=%.2f (NOT live Play)" % z)
+				if not saw_oval:
+					ok = false
+					_log("EOA_FAC1A_PIXEL_GUARD who=guard.silhouette MISS lone_oval z=%.2f (NOT live Play)" % z)
+			if z + 0.001 < SPLIT_ZOOM and not saw_badge:
+				ok = false
+				_log("EOA_FAC1A_PIXEL_GUARD who=guard.silhouette MISS badge z=%.2f (NOT live Play)" % z)
+			if z + 0.001 < SPLIT_ZOOM and not saw_tag:
+				ok = false
+				_log("EOA_FAC1A_PIXEL_GUARD who=guard.silhouette MISS tag z=%.2f (NOT live Play)" % z)
+			_log(
+				"EOA_FAC1A_PIXEL_GUARD who=guard.silhouette z=%.2f sel=%s oval=%s round=%s cluster=%s badge=%s tag=%s (NOT live Play)"
+				% [z, str(selected), str(saw_oval), str(saw_round), str(saw_cluster), str(saw_badge), str(saw_tag)]
+			)
+	_log("EOA_FAC1A_PIXEL_GUARD who=guard.silhouette ok=%s fails=%d (NOT live Play)" % [str(ok), _silhouette_fail])
+	return ok
+
+
+func _capture_hit_overlays() -> void:
+	var ol := _facility_layer()
+	if ol == null:
+		return
+	if ol.has_method("set_debug_hit_overlay"):
+		ol.call("set_debug_hit_overlay", true)
+	_frame_over_rhineland(0.97)
+	_redraw_layer()
+	_capture_fix6("01_l4_cluster_hit_overlay_z0.97_NOT_live_play")
+	_frame_over_rhineland(2.25)
+	_redraw_layer()
+	_capture_fix6("02_lone_hit_overlay_z2.25_NOT_live_play")
+	if ol.has_method("set_debug_hit_overlay"):
+		ol.call("set_debug_hit_overlay", false)
+	_redraw_layer()
 
 
 func _assert_lone_min_size() -> bool:
@@ -1978,7 +2090,7 @@ func _finish(ok: bool) -> void:
 		ok = false
 	var result := "PASS" if ok else "FAIL"
 	_log(
-		"WindowedFac1aAirfieldPixelGuard: RESULT=%s mid=%d close=%d out=%d res=%d back=%d layer=%d/%d/%d/%d badge=%.1f occl_max=%.3f overlap_fail=%d own_fail=%d click_fail=%d noop_fail=%d badge_in=%s digit=%s chrome=%s stale=%s outside=%s prom=%s lone=%s priority=%s cluster_mid=%s split_close=%s counter_clear=%s counter_drawn=%s rx1_mid_on=%.3f rx1_mid_off=%.3f rss_mb=%.1f peak_kb=%d captures=%s reasons=%s (xvfb NOT live Play)"
+		"WindowedFac1aAirfieldPixelGuard: RESULT=%s mid=%d close=%d out=%d res=%d back=%d layer=%d/%d/%d/%d badge=%.1f occl_max=%.3f overlap_fail=%d own_fail=%d click_fail=%d noop_fail=%d sil_fail=%d badge_in=%s digit=%s chrome=%s stale=%s outside=%s sil=%s prom=%s lone=%s priority=%s cluster_mid=%s split_close=%s counter_clear=%s counter_drawn=%s rx1_mid_on=%.3f rx1_mid_off=%.3f rss_mb=%.1f peak_kb=%d captures=%s reasons=%s (xvfb NOT live Play)"
 		% [
 			result,
 			_mid_anchors,
@@ -1996,11 +2108,13 @@ func _finish(ok: bool) -> void:
 			_own_fail,
 			_click_fail,
 			_noop_fail,
+			_silhouette_fail,
 			str(_badge_inside_ok),
 			str(_digit_ok),
 			str(_chrome_ok),
 			str(_stale_ok),
 			str(_tight_outside_ok),
+			str(_silhouette_ok),
 			str(_cluster_prom_ok),
 			str(_lone_size_ok),
 			str(_priority_ok),

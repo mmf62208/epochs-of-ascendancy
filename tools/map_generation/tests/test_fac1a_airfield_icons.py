@@ -142,6 +142,9 @@ class TestFac1aAirfieldIcons(unittest.TestCase):
         self.assertIn("OVAL_W_FRAC", src)
         self.assertIn("func _point_in_oval", src)
         self.assertIn("func cluster_chrome_gap_px", src)
+        self.assertIn("func _art_is_round", src)
+        self.assertIn("func _art_body_rect", src)
+        self.assertIn("func silhouette_inside_samples", src)
         self.assertNotIn("Color(0.98, 0.93, 0.70", src)
         self.assertIn('"L%d"', src)
         self.assertIn("CLEAR_MARGIN_PX", src)
@@ -191,6 +194,7 @@ class TestFac1aAirfieldIcons(unittest.TestCase):
         self.assertIn("CHROME_ZOOMS", gsrc)
         self.assertIn("STALE_HOVER_PID", gsrc)
         self.assertIn("OUTSIDE_PAD_PX", gsrc)
+        self.assertIn("SILHOUETTE_ZOOMS", gsrc)
 
     def test_old_sites_layer_untouched(self) -> None:
         ol = OL.read_text(encoding="utf-8")

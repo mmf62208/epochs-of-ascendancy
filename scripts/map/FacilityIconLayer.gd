@@ -67,6 +67,7 @@ var _test_counter_rects: Array[Rect2] = []
 var _json_anchors: Dictionary = {}
 var _clustered: bool = false
 var _last_markers: Array[Dictionary] = []
+var _debug_hit_overlay: bool = false
 
 
 func _ready() -> void:
@@ -175,6 +176,34 @@ func _oval_rect(icon_rect: Rect2) -> Rect2:
 	return Rect2(Vector2(x, y), Vector2(w, h))
 
 
+## L4 / cluster tex is a filled circle. L1–L3 are tilted ovals with empty top padding.
+func _art_is_round(rec: Dictionary) -> bool:
+	var level: int = clampi(int(rec.get("level", 1)), 1, 4)
+	var tex_key := str(rec.get("tex_key", texture_key_for_level(level, "intact")))
+	if tex_key.find("airfield_l4") >= 0:
+		return true
+	return bool(rec.get("cluster", false))
+
+
+func _art_body_rect(icon_rect: Rect2, is_round: bool) -> Rect2:
+	if is_round:
+		var s := minf(icon_rect.size.x, icon_rect.size.y)
+		var c := icon_rect.get_center()
+		return Rect2(c - Vector2(s, s) * 0.5, Vector2(s, s))
+	return _oval_rect(icon_rect)
+
+
+func _halo_grow_world(zoom: float) -> float:
+	if zoom + 0.0001 < CLOSE_ZOOM:
+		return 0.0
+	return _world_size_at(HALO_PX, zoom)
+
+
+func set_debug_hit_overlay(enabled: bool) -> void:
+	_debug_hit_overlay = enabled
+	queue_redraw()
+
+
 func _point_in_oval(r: Rect2, p: Vector2) -> bool:
 	if r.size.x <= 0.0 or r.size.y <= 0.0:
 		return false
@@ -236,23 +265,27 @@ func _layout_drawn_marker(rec: Dictionary, zoom: float) -> Dictionary:
 	var icon_px := _drawn_icon_px(zoom, cluster)
 	var world_px := _world_size_at(icon_px, zoom)
 	var icon_rect := Rect2(world - Vector2(world_px, world_px) * 0.5, Vector2(world_px, world_px))
+	var is_round := _art_is_round(rec)
+	var art_rect := _art_body_rect(icon_rect, is_round)
+	var halo_w := _halo_grow_world(zoom)
+	var hit_icon := art_rect.grow(halo_w) if halo_w > 0.0 else art_rect
 	var oval_rect := _oval_rect(icon_rect)
-	var hits: Array[Rect2] = [oval_rect]
+	var hits: Array[Rect2] = [hit_icon]
 	var badge_rect := Rect2()
 	var tag_rect := Rect2()
 	var gap := _world_size_at(CHROME_GAP_PX, zoom)
+	var body_cy := art_rect.get_center().y
 	if cluster:
 		var disc_w := _world_size_at(COUNT_DISC_PX, zoom)
 		var tag_w := _world_size_at(CLUSTER_TAG_PX, zoom)
-		var cy := oval_rect.get_center().y
 		var count_n := maxi(int(rec.get("count", 0)), 1)
 		if count_n >= 1:
 			var bx := icon_rect.position.x + gap
-			badge_rect = Rect2(Vector2(bx, cy - disc_w * 0.5), Vector2(disc_w, disc_w))
+			badge_rect = Rect2(Vector2(bx, body_cy - disc_w * 0.5), Vector2(disc_w, disc_w))
 			badge_rect = _clamp_rect_inside(badge_rect, icon_rect)
 			hits.append(badge_rect)
 		var tx := icon_rect.end.x - tag_w - gap
-		tag_rect = Rect2(Vector2(tx, cy - tag_w * 0.5), Vector2(tag_w, tag_w))
+		tag_rect = Rect2(Vector2(tx, body_cy - tag_w * 0.5), Vector2(tag_w, tag_w))
 		tag_rect = _clamp_rect_inside(tag_rect, icon_rect)
 		if badge_rect.size.x > 0.0 and tag_rect.position.x < badge_rect.end.x + gap:
 			tag_rect.position.x = badge_rect.end.x + gap
@@ -260,17 +293,19 @@ func _layout_drawn_marker(rec: Dictionary, zoom: float) -> Dictionary:
 		hits.append(tag_rect)
 	elif count >= 1:
 		var bw := _world_size_at(MID_BADGE_PX, zoom)
-		var raw_badge2 := Rect2(oval_rect.get_center() - Vector2(bw, bw) * 0.5, Vector2(bw, bw))
-		badge_rect = _clamp_rect_inside(raw_badge2, oval_rect)
+		var raw_badge2 := Rect2(art_rect.get_center() - Vector2(bw, bw) * 0.5, Vector2(bw, bw))
+		badge_rect = _clamp_rect_inside(raw_badge2, art_rect)
 		hits.append(badge_rect)
 	return {
 		"pid": int(rec.get("pid", -1)),
 		"cluster": cluster,
+		"round_art": is_round,
 		"world": world,
 		"icon_px": icon_px,
 		"icon_rect": icon_rect,
+		"art_rect": art_rect,
 		"oval_rect": oval_rect,
-		"hit_icon": oval_rect,
+		"hit_icon": hit_icon,
 		"badge_rect": badge_rect,
 		"tag_rect": tag_rect,
 		"hits": hits,
@@ -278,7 +313,7 @@ func _layout_drawn_marker(rec: Dictionary, zoom: float) -> Dictionary:
 		"level": level,
 		"digit_px": COUNT_DIGIT_PX if cluster else 0.0,
 		"digit_h_px": cluster_digit_screen_h_px(zoom) if cluster else 0.0,
-		"halo_px": HALO_PX if zoom + 0.0001 >= CLOSE_ZOOM else 0.0,
+		"halo_px": HALO_PX if halo_w > 0.0 else 0.0,
 	}
 
 
@@ -300,8 +335,8 @@ func hit_test_at_zoom(world: Vector2, zoom: float) -> int:
 
 
 func _layout_owns_world(layout: Dictionary, world: Vector2) -> bool:
-	var oval: Rect2 = layout.get("oval_rect", Rect2()) as Rect2
-	if _point_in_oval(oval, world):
+	var body: Rect2 = layout.get("hit_icon", layout.get("art_rect", Rect2())) as Rect2
+	if _point_in_oval(body, world):
 		return true
 	var badge: Rect2 = layout.get("badge_rect", Rect2()) as Rect2
 	if _point_in_oval(badge, world):
@@ -314,12 +349,28 @@ func _layout_owns_world(layout: Dictionary, world: Vector2) -> bool:
 
 func tight_hit_samples(layout: Dictionary) -> Array[Vector2]:
 	var out: Array[Vector2] = []
-	var oval: Rect2 = layout.get("oval_rect", Rect2()) as Rect2
-	out.append_array(_ellipse_cardinals(oval, 0.15))
+	var body: Rect2 = layout.get("hit_icon", layout.get("art_rect", Rect2())) as Rect2
+	var is_round := bool(layout.get("round_art", false))
+	out.append_array(_ellipse_cardinals(body, 0.15))
+	if is_round:
+		out.append_array(_ellipse_diagonal_cardinals(body, 0.15))
 	var badge: Rect2 = layout.get("badge_rect", Rect2()) as Rect2
 	out.append_array(_ellipse_cardinals(badge, 0.15))
 	var tag: Rect2 = layout.get("tag_rect", Rect2()) as Rect2
 	out.append_array(_ellipse_cardinals(tag, 0.15))
+	return out
+
+
+func silhouette_inside_samples(layout: Dictionary, zoom: float, pad_px: float = 2.0) -> Array[Vector2]:
+	var pad := _world_size_at(pad_px, zoom)
+	var out: Array[Vector2] = []
+	var body: Rect2 = layout.get("hit_icon", layout.get("art_rect", Rect2())) as Rect2
+	var is_round := bool(layout.get("round_art", false))
+	out.append_array(_ellipse_inset_points(body, pad, is_round))
+	var badge: Rect2 = layout.get("badge_rect", Rect2()) as Rect2
+	out.append_array(_ellipse_inset_points(badge, pad, true))
+	var tag: Rect2 = layout.get("tag_rect", Rect2()) as Rect2
+	out.append_array(_ellipse_inset_points(tag, pad, true))
 	return out
 
 
@@ -336,9 +387,9 @@ func drawn_outside_samples(layout: Dictionary, zoom: float, pad_px: float = 2.0)
 
 func _drawn_bound_rects(layout: Dictionary) -> Array[Rect2]:
 	var out: Array[Rect2] = []
-	var oval: Rect2 = layout.get("oval_rect", Rect2()) as Rect2
-	if oval.size.x > 0.0:
-		out.append(oval)
+	var body: Rect2 = layout.get("hit_icon", layout.get("art_rect", Rect2())) as Rect2
+	if body.size.x > 0.0:
+		out.append(body)
 	var badge: Rect2 = layout.get("badge_rect", Rect2()) as Rect2
 	if badge.size.x > 0.0:
 		out.append(badge)
@@ -349,17 +400,62 @@ func _drawn_bound_rects(layout: Dictionary) -> Array[Rect2]:
 
 
 func _ellipse_cardinals(r: Rect2, inset: float) -> Array[Vector2]:
+	return _ellipse_inset_points(r, 0.0, false) if inset <= 0.0 else _ellipse_frac_points(r, inset, false)
+
+
+func _ellipse_diagonal_cardinals(r: Rect2, inset: float) -> Array[Vector2]:
+	var all := _ellipse_frac_points(r, inset, true)
+	var out: Array[Vector2] = []
+	var i := 5
+	while i < all.size():
+		out.append(all[i])
+		i += 1
+	return out
+
+
+func _ellipse_frac_points(r: Rect2, inset: float, diagonals: bool) -> Array[Vector2]:
 	var out: Array[Vector2] = []
 	if r.size.x <= 0.0 or r.size.y <= 0.0:
 		return out
+	var t := 1.0 - clampf(inset, 0.0, 0.45)
 	var c := r.get_center()
-	var rx := r.size.x * 0.5 * (1.0 - clampf(inset, 0.0, 0.45))
-	var ry := r.size.y * 0.5 * (1.0 - clampf(inset, 0.0, 0.45))
+	var rx := r.size.x * 0.5 * t
+	var ry := r.size.y * 0.5 * t
 	out.append(c)
 	out.append(c + Vector2(0.0, -ry))
 	out.append(c + Vector2(rx, 0.0))
 	out.append(c + Vector2(0.0, ry))
 	out.append(c + Vector2(-rx, 0.0))
+	if diagonals:
+		var d := 0.70710678
+		out.append(c + Vector2(d * rx, -d * ry))
+		out.append(c + Vector2(d * rx, d * ry))
+		out.append(c + Vector2(-d * rx, d * ry))
+		out.append(c + Vector2(-d * rx, -d * ry))
+	return out
+
+
+func _ellipse_inset_points(r: Rect2, pad: float, diagonals: bool) -> Array[Vector2]:
+	var out: Array[Vector2] = []
+	if r.size.x <= 0.0 or r.size.y <= 0.0:
+		return out
+	var c := r.get_center()
+	var rx := r.size.x * 0.5 - pad
+	var ry := r.size.y * 0.5 - pad
+	if rx <= 0.0 or ry <= 0.0:
+		out.append(c)
+		return out
+	out.append(c)
+	out.append(c + Vector2(0.0, -ry))
+	out.append(c + Vector2(rx, 0.0))
+	out.append(c + Vector2(0.0, ry))
+	out.append(c + Vector2(-rx, 0.0))
+	if diagonals:
+		var d := 0.70710678
+		out.append(c + Vector2(d * rx, -d * ry))
+		out.append(c + Vector2(d * rx, d * ry))
+		out.append(c + Vector2(-d * rx, d * ry))
+		out.append(c + Vector2(-d * rx, -d * ry))
 	return out
 
 
@@ -390,11 +486,11 @@ func get_hit_rects_at_zoom(zoom: float) -> Array[Dictionary]:
 func badge_inside_footprint_at(zoom: float) -> bool:
 	for layout_v in get_hit_rects_at_zoom(zoom):
 		var layout: Dictionary = layout_v
-		var oval: Rect2 = layout.get("oval_rect", Rect2()) as Rect2
+		var art: Rect2 = layout.get("art_rect", layout.get("oval_rect", Rect2())) as Rect2
 		var badge: Rect2 = layout.get("badge_rect", Rect2()) as Rect2
 		if bool(layout.get("cluster", false)):
 			continue
-		if not _rect_inside_oval(oval, badge):
+		if not _rect_inside_oval(art, badge):
 			return false
 	return true
 
@@ -1375,10 +1471,14 @@ func _draw() -> void:
 		if icon_tex == null:
 			continue
 		var icon_rect: Rect2 = layout.get("icon_rect", Rect2()) as Rect2
+		var art_rect: Rect2 = layout.get("art_rect", Rect2()) as Rect2
 		var cluster := bool(rec.get("cluster", false))
 		if z + 0.0001 >= CLOSE_ZOOM:
-			_draw_icon_halo(icon_rect, z)
+			_draw_icon_halo(art_rect, z)
 		draw_texture_rect(icon_tex, icon_rect, false)
+		if _debug_hit_overlay:
+			var hit: Rect2 = layout.get("hit_icon", art_rect) as Rect2
+			_draw_ellipse_outline(hit, Color(0.15, 0.95, 0.95, 0.95), _world_size_at(1.6, z))
 		if z + 0.0001 >= CLOSE_ZOOM and not cluster:
 			var pips := _load_tex("level_pips_l%d" % level, 32)
 			if pips != null:
@@ -1456,13 +1556,34 @@ func disc_sample_worlds(world: Vector2, zoom: float, cluster: bool = false) -> A
 	return out
 
 
-func _draw_icon_halo(icon_rect: Rect2, zoom: float) -> void:
+func _draw_icon_halo(art_rect: Rect2, zoom: float) -> void:
 	var halo := _world_size_at(HALO_PX, zoom)
-	if halo <= 0.0:
+	if halo <= 0.0 or art_rect.size.x <= 0.0:
 		return
-	var oval := _oval_rect(icon_rect)
-	_draw_ellipse_outline(oval.grow(halo), Color(0.04, 0.03, 0.02, 0.62), halo * 1.15)
-	_draw_ellipse_outline(oval.grow(halo * 0.45), Color(0.07, 0.06, 0.05, 0.80), halo * 0.70)
+	var outer := art_rect.grow(halo)
+	## Filled silhouette behind the tex so the ring matches the art (circle for
+	## L4, oval for L1–L3) and red map does not show through a loose outline.
+	_draw_ellipse_filled(outer, Color(0.04, 0.03, 0.02, 0.62))
+	_draw_ellipse_outline(outer, Color(0.06, 0.05, 0.04, 0.88), halo * 0.70)
+
+
+func _draw_ellipse_filled(r: Rect2, color: Color) -> void:
+	if r.size.x <= 0.0 or r.size.y <= 0.0:
+		return
+	var c := r.get_center()
+	var rx := r.size.x * 0.5
+	var ry := r.size.y * 0.5
+	if absf(rx - ry) <= 0.08:
+		draw_circle(c, rx, color)
+		return
+	var pts := PackedVector2Array()
+	var n := 28
+	var i := 0
+	while i < n:
+		var a := TAU * float(i) / float(n)
+		pts.append(c + Vector2(cos(a) * rx, sin(a) * ry))
+		i += 1
+	draw_colored_polygon(pts, color)
 
 
 func _draw_ellipse_outline(r: Rect2, color: Color, width: float) -> void:
