@@ -13,10 +13,10 @@ const SRC_OL := "res://scripts/map/InfrastructureOverlayLayer.gd"
 const SRC_LOADER := "res://scripts/core/ScenarioLoader.gd"
 const SRC_ZOOM := "res://scripts/map/MapZoomLOD.gd"
 
-const VIERSEN := 710414
+const VIERSEN := 710430
 const OBERBERGISCHER := 710423
-const NEUWIED := 710460
-const HUNSRUECK := 710464
+const NEUWIED := 710451
+const HUNSRUECK := 710457
 const AHRWEILER := NEUWIED
 const MAYEN_KOBLENZ := HUNSRUECK
 const EUSKIRCHEN := NEUWIED
@@ -160,6 +160,10 @@ func _test_source_needles() -> void:
 		_fail("cluster hysteresis missing")
 	else:
 		_pass("cluster hysteresis present")
+	if "func _draw_level_tag" not in layer or "CLEAR_MARGIN_PX" not in layer:
+		_fail("FIX #3 level tag / clearance margin missing")
+	else:
+		_pass("FIX #3 L4 tag + CLEAR_MARGIN_PX")
 	if "_setup_facility_icon_layer" not in ren:
 		_fail("MapRenderer missing _setup_facility_icon_layer")
 	else:
@@ -477,6 +481,17 @@ func _test_cluster_hysteresis() -> void:
 		_fail("cluster marker not on highest-level member interior")
 	elif host_ok:
 		_pass("cluster marker on highest-level member interior")
+	var tag_ok := false
+	for rec_v2 in mid_m:
+		if typeof(rec_v2) != TYPE_DICTIONARY:
+			continue
+		var rec2: Dictionary = rec_v2
+		if bool(rec2.get("cluster", false)) and str(rec2.get("level_tag", "")) == "L4":
+			tag_ok = true
+	if mid_n < 4 and not tag_ok:
+		_fail("cluster marker missing L4 tag")
+	elif tag_ok:
+		_pass("cluster marker L4 tag")
 	## Same worlds at close/grow: screen gaps open → hysteresis splits.
 	_layer.set("_clustered", true)
 	var close_m: Array = _layer.call("compute_markers_at_zoom", 2.30)

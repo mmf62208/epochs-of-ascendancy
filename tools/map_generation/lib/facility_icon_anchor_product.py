@@ -1,11 +1,7 @@
-"""FAC-1a FIX #2: world-space interior airfield anchors (polylabel).
+"""FAC-1a FIX #3: world-space interior airfield anchors (clearance).
 
-Pole-of-inaccessibility for a province ring, then a clearance push so the
-point stays inside the polygon and away from:
-  - the province centroid / label (unit-counter footprint)
-  - a reserved Rhine / gold-spine corridor (Bonn–Köln–Leverkusen)
-
-Precomputed once (never per frame). Never renumbers IDs.
+Precomputed once (never per frame). Each seed maximizes clearance from the
+real Rhine course, the gold spine, and its own border. Never renumbers IDs.
 """
 from __future__ import annotations
 
@@ -24,55 +20,57 @@ SITES_PILOT = ROOT / "data" / "provinces_pilot_europe_nuts3" / "project_sites.js
 LAYER_GD = ROOT / "scripts" / "map" / "FacilityIconLayer.gd"
 CITY_LAYER = ROOT / "data" / "provinces_world_accurate" / "province_city_layer.json"
 
-# FIX #2b Rhineland reseed (never renumber). NRW west of ~7.6°E / south of
-# the Ruhr + northern Rheinland-Pfalz. Off Köln / Bonn / Leverkusen and off
-# LUX-border (Aachen / Trier-Saarburg / Euskirchen / Ahrweiler / Bitburg-Prüm).
-# Ahrweiler 710455 is unusable: every interior sits inside the LUX capital-star
-# disk (min 56 world units), so snap walked NE into the Köln counter.
-# Neuwied 710460 is Bonn-adjacent, LUX-disk-safe (~70u), and L4 so the mid
-# cluster carries max level. Cluster is Neuwied–Ober (raw ~16.5, live ~28):
-# merges at 0.99, splits at ≥1.9. Hunsrück may join that mid cluster and
-# also splits at 1.9. Viersen stays isolated. Mayen-Koblenz dropped.
-VIERSEN = 710414
+# FIX #3 Rhineland reseed (never renumber). Play MIXED 234e12b8: Neuwied L4
+# sits on the Rhine once split; Viersen L1 hangs over the NLD border
+# (center click → Midden-Limburg at 0.977). No NUTS3 can contain a 22px
+# disc at zoom 0.62 (need ~14 raw inradius; poles are ~2–5). Report those
+# cannot-fits; do not cap below 22px (badge/icon spec). Reseed L1/L2/L4 to
+# interiors that meet Rhine+spine disc clearance (~24 world) and maximize
+# border inset. Cluster is Ober L3 + Siegen L4 (raw ~16.5); splits at ~1.59.
+BORKEN = 710430
+KREUZNACH = 710457
 OBERBERGISCHER = 710423
-NEUWIED = 710460
-HUNSRUECK = 710464
+SIEGEN = 710451
+# L1/L2/L4 reseeds keep old constant names so tests/aliases still import.
+VIERSEN = BORKEN
+HUNSRUECK = KREUZNACH
+NEUWIED = SIEGEN
 AHRWEILER = NEUWIED
 MAYEN_KOBLENZ = HUNSRUECK
-# Aliases kept so older test imports resolve to the live FIX #2b seeds.
 EUSKIRCHEN = NEUWIED
 AACHEN = VIERSEN
 TRIER_SAARBURG = OBERBERGISCHER
-BORKEN = NEUWIED
-SIEGEN = HUNSRUECK
 EMSLAND = VIERSEN
 ORTENAU = OBERBERGISCHER
 GOTTINGEN = NEUWIED
 ANSBACH = HUNSRUECK
 SEED_TIERS: Dict[int, int] = {
-    VIERSEN: 1,
-    HUNSRUECK: 2,
+    BORKEN: 1,
+    KREUZNACH: 2,
     OBERBERGISCHER: 3,
-    NEUWIED: 4,
+    SIEGEN: 4,
 }
 SEED_NAMES: Dict[int, str] = {
-    VIERSEN: "Viersen",
-    HUNSRUECK: "Rhein-Hunsrück-Kreis",
+    BORKEN: "Borken",
+    KREUZNACH: "Bad Kreuznach",
     OBERBERGISCHER: "Oberbergischer Kreis",
-    NEUWIED: "Neuwied",
+    SIEGEN: "Siegen-Wittgenstein",
 }
-# Own-pick interiors (LUX capital-star disk does not steal). Neuwied is L4
-# so the mid cluster carries max level. Hunsrück south; Viersen west.
 SEED_FORCE_RAW: Dict[int, Tuple[float, float]] = {
-    VIERSEN: (4234.82, 935.41),
-    NEUWIED: (4268.40, 956.88),
-    OBERBERGISCHER: (4270.67, 940.95),
-    HUNSRUECK: (4267.73, 973.10),
+    BORKEN: (4254.63, 911.32),
+    KREUZNACH: (4269.17, 977.56),
+    OBERBERGISCHER: (4270.29, 943.16),
+    SIEGEN: (4286.75, 941.99),
 }
-CLUSTER_PAIR: Tuple[int, int] = (NEUWIED, OBERBERGISCHER)
-NEIGHBOR_PID = NEUWIED
+CLUSTER_PAIR: Tuple[int, int] = (OBERBERGISCHER, SIEGEN)
+NEIGHBOR_PID = OBERBERGISCHER
 KOELN_PID = 710417
 BONN_PID = 710416
+CANNOT_FIT_PREVIOUS: Tuple[Tuple[int, str, str], ...] = (
+    (710460, "Neuwied", "rhine_through_province"),
+    (710414, "Viersen", "nld_border_and_full_disc"),
+    (710464, "Rhein-Hunsrück-Kreis", "rhine_course_short"),
+)
 
 # Gold-spine / Rhine corridor (centroids of the IX-1 / RX-1 walk). Not sampled as
 # S1 gold-cover — that walk never included Neuss, which is why FIX #1 false-passed.
@@ -85,8 +83,13 @@ EDGE_MARGIN_FRAC = 0.12
 MIN_PAIR_WORLD = 16.0
 CLUSTER_PAIR_MIN = 16.0
 CLUSTER_PAIR_MAX = 17.5
-ISO_PID = VIERSEN
+ISO_PID = BORKEN
 ISO_MIN = 20.7
+RX1_COURSE_PATH = ROOT / "data" / "map" / "rx1_rhine_crossings.json"
+SITE_MIN_ZOOM = 0.62
+MARGIN_PX = 4.0
+MID_ICON_PX = 22.0
+CLEAR_ZOOMS: Tuple[float, ...] = (0.62, 0.65, 0.77, 0.99, 1.30, 1.59, 1.90, 2.27, 3.0)
 
 
 Pt = Tuple[float, float]
@@ -145,6 +148,36 @@ def signed_edge_distance(x: float, y: float, ring: Sequence[Pt]) -> float:
     if not point_in_ring(x, y, ring):
         return -best
     return best
+
+
+def icon_screen_px(zoom: float) -> float:
+    if zoom >= 2.0:
+        return 32.0
+    if zoom >= 1.0:
+        return 26.0 + 6.0 * (zoom - 1.0)
+    return MID_ICON_PX
+
+
+def disc_need_world(zoom: float, cluster: bool = False) -> float:
+    px = icon_screen_px(zoom) + (4.0 if cluster else 0.0)
+    half = px * 0.5 + (16.0 * 0.35 if cluster else 0.0)
+    return (half + MARGIN_PX) / max(zoom, 0.04)
+
+
+def max_disc_need_world(cluster: bool = False) -> float:
+    return max(disc_need_world(z, cluster) for z in CLEAR_ZOOMS)
+
+
+def load_rhine_course() -> List[Pt]:
+    if not RX1_COURSE_PATH.is_file():
+        return []
+    data = json.loads(RX1_COURSE_PATH.read_text(encoding="utf-8"))
+    raw = ((data.get("course") or {}) if isinstance(data, dict) else {}).get("points") or []
+    out: List[Pt] = []
+    for p in raw:
+        if isinstance(p, (list, tuple)) and len(p) >= 2:
+            out.append((float(p[0]), float(p[1])))
+    return out
 
 
 def dist_to_polyline(x: float, y: float, line: Sequence[Pt]) -> float:
@@ -216,38 +249,43 @@ def pick_cleared_interior(
     forbidden: Sequence[Sequence[Pt]],
     *,
     counter_pt: Optional[Pt] = None,
+    corridor_need_raw: float = 0.0,
+    edge_floor: float = 0.7,
 ) -> Dict[str, Any]:
     pole_x, pole_y, pole_r = polylabel(ring, precision=0.15)
     minx, miny, maxx, maxy = _bbox(ring)
     min_dim = min(maxx - minx, maxy - miny)
-    edge_need = max(0.35, min_dim * EDGE_MARGIN_FRAC)
     counter = counter_pt if counter_pt is not None else _centroid(ring)
-    counter_need = max(1.2, min_dim * COUNTER_CLEAR_FRAC)
-
-    def score(x: float, y: float) -> float:
-        edge = signed_edge_distance(x, y, ring)
-        if edge < edge_need * 0.55:
-            return -1e9
-        cd = math.hypot(x - counter[0], y - counter[1])
-        fd = 1e18
-        for line in forbidden:
-            fd = min(fd, dist_to_polyline(x, y, line))
-        return edge * 1.4 + min(cd, counter_need * 2.0) * 1.1 + min(fd, 8.0) * 0.8
-
-    best = (pole_x, pole_y)
-    best_s = score(pole_x, pole_y)
-    step = max(0.35, min_dim / 10.0)
-    x = minx + step * 0.5
+    need = max(0.0, corridor_need_raw)
+    step = max(0.18, min_dim / 18.0)
+    best: Optional[Pt] = None
+    best_s = -1e18
+    n_ok = 0
+    x = minx + step * 0.4
     while x < maxx:
-        y = miny + step * 0.5
+        y = miny + step * 0.4
         while y < maxy:
             if point_in_ring(x, y, ring):
-                s = score(x, y)
+                edge = signed_edge_distance(x, y, ring)
+                if edge < edge_floor:
+                    y += step
+                    continue
+                fd = 1e18
+                for line in forbidden:
+                    fd = min(fd, dist_to_polyline(x, y, line))
+                if need > 0.0 and fd < need:
+                    y += step
+                    continue
+                n_ok += 1
+                s = min(edge, fd) * 10.0 + fd * 0.15 + edge * 0.35
                 if s > best_s:
                     best_s = s
                     best = (x, y)
             y += step
         x += step
+    if best is None:
+        best = (pole_x, pole_y)
+        best_s = -1.0
     return {
         "x": best[0],
         "y": best[1],
@@ -258,6 +296,8 @@ def pick_cleared_interior(
         "counter_dist": math.hypot(best[0] - counter[0], best[1] - counter[1]),
         "inside": point_in_ring(best[0], best[1], ring),
         "score": best_s,
+        "n_ok": n_ok,
+        "met_need": n_ok > 0 and need > 0.0,
     }
 
 
@@ -289,12 +329,18 @@ def _line_from_pids(geo: Mapping[int, Mapping[str, Any]], pids: Sequence[int]) -
 def build_facility_icon_anchor_product(write: bool = False) -> Dict[str, Any]:
     geo = _load_geo()
     spine = _line_from_pids(geo, SPINE_PIDS)
-    rhine = _line_from_pids(geo, RHINE_WALK_PIDS)
-    forbidden = [spine, rhine]
+    rhine_walk = _line_from_pids(geo, RHINE_WALK_PIDS)
+    course = load_rhine_course()
+    forbidden = [spine, course if course else rhine_walk]
+    disc_need_raw = max_disc_need_world(False) / THEATER_SCALE
+    clus_need_raw = max_disc_need_world(True) / THEATER_SCALE
     anchors: Dict[str, Any] = {}
     ok = True
     reasons: List[str] = []
     worlds: Dict[int, Pt] = {}
+    cannot_fit: List[Dict[str, Any]] = []
+    for pid, name, why in CANNOT_FIT_PREVIOUS:
+        cannot_fit.append({"pid": pid, "name": name, "reason": why})
     for pid, tier in SEED_TIERS.items():
         rec = geo.get(pid)
         if rec is None:
@@ -305,6 +351,7 @@ def build_facility_icon_anchor_product(write: bool = False) -> Dict[str, Any]:
         la = rec.get("label_anchor") or []
         counter = (float(la[0]), float(la[1])) if isinstance(la, (list, tuple)) and len(la) >= 2 else _centroid(ring)
         forced = SEED_FORCE_RAW.get(pid)
+        picked: Dict[str, Any]
         if forced is not None and point_in_ring(forced[0], forced[1], ring):
             picked = {
                 "x": forced[0],
@@ -316,18 +363,47 @@ def build_facility_icon_anchor_product(write: bool = False) -> Dict[str, Any]:
                 "counter_dist": math.hypot(forced[0] - counter[0], forced[1] - counter[1]),
                 "inside": True,
                 "score": 0.0,
+                "n_ok": 1,
+                "met_need": True,
             }
         else:
-            picked = pick_cleared_interior(ring, forbidden, counter_pt=counter)
+            picked = pick_cleared_interior(
+                ring,
+                forbidden,
+                counter_pt=counter,
+                corridor_need_raw=disc_need_raw,
+                edge_floor=0.8,
+            )
         worlds[pid] = (picked["x"], picked["y"])
         fd_spine = dist_to_polyline(picked["x"], picked["y"], spine)
-        fd_rhine = dist_to_polyline(picked["x"], picked["y"], rhine)
+        fd_rhine = dist_to_polyline(picked["x"], picked["y"], course if course else rhine_walk)
+        edge_w = float(picked["edge_dist"]) * THEATER_SCALE
+        full_disc_ok_zooms: List[float] = []
+        for z in CLEAR_ZOOMS:
+            if edge_w + 1e-6 >= disc_need_world(z, False):
+                full_disc_ok_zooms.append(z)
+        if not full_disc_ok_zooms:
+            cannot_fit.append(
+                {
+                    "pid": pid,
+                    "name": SEED_NAMES[pid],
+                    "reason": "full_disc_exceeds_inradius",
+                    "edge_world": edge_w,
+                    "need_world": max_disc_need_world(False),
+                }
+            )
         if not picked["inside"]:
             ok = False
             reasons.append("outside_%d" % pid)
         if picked["edge_dist"] < 0.25:
             ok = False
             reasons.append("edge_%d" % pid)
+        if fd_rhine * THEATER_SCALE + 0.05 < max_disc_need_world(False):
+            ok = False
+            reasons.append("rhine_%d" % pid)
+        if fd_spine * THEATER_SCALE + 0.05 < max_disc_need_world(False):
+            ok = False
+            reasons.append("spine_%d" % pid)
         anchors[str(pid)] = {
             "pid": pid,
             "name": SEED_NAMES[pid],
@@ -339,6 +415,7 @@ def build_facility_icon_anchor_product(write: bool = False) -> Dict[str, Any]:
             "counter_dist": picked["counter_dist"],
             "spine_dist": fd_spine,
             "rhine_dist": fd_rhine,
+            "full_disc_ok_zooms": full_disc_ok_zooms,
         }
     ids = list(SEED_TIERS)
     min_pair = 1e18
@@ -380,9 +457,12 @@ def build_facility_icon_anchor_product(write: bool = False) -> Dict[str, Any]:
     blob = {
         "ok": ok,
         "reasons": reasons,
-        "source": "fac1a_fix2b_rhineland_anchors",
+        "source": "fac1a_fix3_rhineland_anchors",
         "cluster_pair_raw": cluster_d,
         "theater_scale": THEATER_SCALE,
+        "disc_need_world": max_disc_need_world(False),
+        "cluster_need_world": max_disc_need_world(True),
+        "cannot_fit": cannot_fit,
         "seeds": SEED_TIERS,
         "names": SEED_NAMES,
         "min_pair_world_raw": min_pair if min_pair < 1e17 else 0.0,
@@ -411,11 +491,11 @@ def apply_seed_files() -> None:
     payload = {
         "sites": sites,
         "meta": {
-            "source": "fac1a_rhineland_airfields_fix2b",
+            "source": "fac1a_rhineland_airfields_fix3",
             "note": (
-                "FAC-1a FIX #2b Rhineland seeds: Viersen L1, Rhein-Hunsrück-"
-                "Kreis L2, Oberbergischer Kreis L3, Neuwied L4. Intact. "
-                "Default world_accurate."
+                "FAC-1a FIX #3 Rhineland seeds: Borken L1, Bad Kreuznach L2, "
+                "Oberbergischer Kreis L3, Siegen-Wittgenstein L4. Intact. "
+                "Default world_accurate. Neuwied/Viersen/Hunsrück cannot-fit."
             ),
         },
     }
@@ -437,9 +517,15 @@ __all__ = [
     "EUSKIRCHEN",
     "HUNSRUECK",
     "MAYEN_KOBLENZ",
+    "BORKEN",
+    "KREUZNACH",
+    "SIEGEN",
+    "CANNOT_FIT_PREVIOUS",
     "polylabel",
     "point_in_ring",
     "pick_cleared_interior",
     "build_facility_icon_anchor_product",
     "apply_seed_files",
+    "load_rhine_course",
+    "max_disc_need_world",
 ]

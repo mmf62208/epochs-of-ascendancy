@@ -23,6 +23,7 @@ const UNIT_COUNTER_Z := 28
 const THEATER_SCALE := 1.728
 const MERGE_GAP_PX := 2.0
 const SPLIT_GAP_PX := 10.0
+const CLEAR_MARGIN_PX := 4.0
 const SPINE_PIDS: Array[int] = [710416, 710417, 710418]
 const RHINE_WALK_PIDS: Array[int] = [710416, 710417, 710401, 710402]
 const LUX_CAPITAL_PID := 710977
@@ -842,6 +843,7 @@ func _cluster_items(items: Array[Dictionary]) -> Array[Dictionary]:
 			"screen": scr,
 			"rect": Rect2(scr - Vector2(half, half), Vector2(half, half) * 2.0),
 			"level": hi,
+			"level_tag": "L%d" % hi,
 			"state": "intact",
 			"tex_key": texture_key_for_level(hi, "intact"),
 		})
@@ -889,9 +891,9 @@ func _nudge_cluster_world(
 	if not _test_polygons.is_empty():
 		return cand
 	var z := maxf(zoom, 0.04)
-	var half_world := half_px / z
-	var badge_extra := (_icon_screen_px(z) + 4.0) * 0.28 / z
-	var need := half_world + badge_extra + 2.0
+	## FIX #3: edge of the cluster rect must sit ≥ CLEAR_MARGIN_PX from
+	## Rhine / spine at this zoom (hardest at site-min ~0.62).
+	var need := (half_px + CLEAR_MARGIN_PX) / z
 	## Screen-rect AABB (not Euclidean): a west walk of ~8u kept Viersen
 	## "clear" by distance while the 0.70 cluster/isolate squares crossed.
 	var isolate_half := _icon_screen_px(z) * 0.5 + BADGE_PX * 0.35
@@ -1059,7 +1061,88 @@ func _draw() -> void:
 				)
 		if badge_n >= 1:
 			_draw_outlined_badge(world, world_px, badge_n)
+		if bool(rec.get("cluster", false)):
+			_draw_level_tag(world, world_px, level)
 		_drawn_count += 1
+
+
+func anchor_edge_world(pid: int) -> float:
+	var rec: Variant = _json_anchors.get(str(pid), {})
+	if rec is Dictionary:
+		return float((rec as Dictionary).get("edge_dist", 0.0)) * THEATER_SCALE
+	return 0.0
+
+
+func get_cluster_level_tag() -> String:
+	for rec in _last_markers:
+		if bool(rec.get("cluster", false)):
+			return str(rec.get("level_tag", "L%d" % int(rec.get("level", 0))))
+	return ""
+
+
+func marker_half_px(zoom: float, cluster: bool) -> float:
+	var px := _icon_screen_px(zoom)
+	if cluster:
+		px += 4.0
+	return px * 0.5 + BADGE_PX * 0.35
+
+
+func report_clearance_at_zoom(zoom: float) -> Dictionary:
+	var markers := compute_markers_at_zoom(zoom)
+	var course := _rhine_course_line()
+	var spine := _pids_polyline(SPINE_PIDS)
+	var worst := 1.0e9
+	var fails: Array[int] = []
+	for rec_v in markers:
+		var rec: Dictionary = rec_v
+		var world: Vector2 = rec.get("world", Vector2.ZERO) as Vector2
+		var cluster := bool(rec.get("cluster", false))
+		var half := marker_half_px(zoom, cluster)
+		var d_r := _dist_to_polyline(world, course) * zoom - half
+		var d_s := _dist_to_polyline(world, spine) * zoom - half
+		worst = minf(worst, minf(d_r, d_s))
+		if d_r + 0.01 < CLEAR_MARGIN_PX or d_s + 0.01 < CLEAR_MARGIN_PX:
+			fails.append(int(rec.get("pid", 0)))
+	return {
+		"ok": fails.is_empty(),
+		"worst": worst,
+		"fail_pids": fails,
+		"count": markers.size(),
+	}
+
+
+func disc_sample_worlds(world: Vector2, zoom: float, cluster: bool = false) -> Array[Vector2]:
+	var half := marker_half_px(zoom, cluster) / maxf(zoom, 0.04)
+	var out: Array[Vector2] = [world]
+	var i := 0
+	while i < 8:
+		var ang := float(i) * TAU / 8.0
+		out.append(world + Vector2(cos(ang), sin(ang)) * half)
+		out.append(world + Vector2(cos(ang), sin(ang)) * half * 0.5)
+		i += 1
+	return out
+
+
+func _draw_level_tag(world: Vector2, icon_world: float, level: int) -> void:
+	var outline := _world_size(BADGE_PX + BADGE_OUTLINE_PX * 2.0)
+	var center := Vector2(world.x - icon_world * 0.30, world.y + icon_world * 0.28)
+	draw_circle(center, outline * 0.52, Color(0.05, 0.04, 0.03, 0.92))
+	var font: Font = ThemeDB.fallback_font
+	if font == null:
+		return
+	var z := maxf(_canvas_zoom(), 0.04)
+	var font_sz := maxi(10, int(round(16.0 / z)))
+	var tag := "L%d" % clampi(level, 1, 4)
+	var sz: Vector2 = font.get_string_size(tag, HORIZONTAL_ALIGNMENT_LEFT, -1, font_sz)
+	draw_string(
+		font,
+		center + Vector2(-sz.x * 0.5, sz.y * 0.28),
+		tag,
+		HORIZONTAL_ALIGNMENT_LEFT,
+		-1,
+		font_sz,
+		Color(0.96, 0.88, 0.48, 1.0)
+	)
 
 
 func _draw_outlined_badge(world: Vector2, icon_world: float, number: int) -> void:

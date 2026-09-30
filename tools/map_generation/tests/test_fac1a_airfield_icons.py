@@ -11,12 +11,15 @@ ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "tools" / "map_generation" / "lib"))
 
 from facility_icon_anchor_product import (  # noqa: E402
+    BORKEN,
     CLUSTER_PAIR,
     HUNSRUECK,
+    KREUZNACH,
     NEUWIED,
     OBERBERGISCHER,
     SEED_NAMES,
     SEED_TIERS,
+    SIEGEN,
     VIERSEN,
     build_facility_icon_anchor_product,
     point_in_ring,
@@ -65,6 +68,9 @@ class TestFac1aAirfieldIcons(unittest.TestCase):
             self.assertNotIn(710426, got)
             self.assertNotIn(710469, got)
             self.assertNotIn(710455, got)
+            self.assertNotIn(710414, got)
+            self.assertNotIn(710460, got)
+            self.assertNotIn(710464, got)
 
     def test_interior_anchors_product(self) -> None:
         product = build_facility_icon_anchor_product(write=False)
@@ -73,20 +79,21 @@ class TestFac1aAirfieldIcons(unittest.TestCase):
         cluster_d = float(product.get("cluster_pair_raw") or 0)
         self.assertGreaterEqual(cluster_d, 16.0)
         self.assertLessEqual(cluster_d, 17.5)
-        self.assertEqual(tuple(CLUSTER_PAIR), (NEUWIED, OBERBERGISCHER))
+        self.assertEqual(set(CLUSTER_PAIR), {OBERBERGISCHER, SIEGEN})
         anchors = product.get("anchors") or {}
-        v_raw = (anchors.get(str(VIERSEN)) or {}).get("raw") or [0.0, 0.0]
+        v_raw = (anchors.get(str(BORKEN)) or {}).get("raw") or [0.0, 0.0]
         for member in CLUSTER_PAIR:
             other = (anchors.get(str(member)) or {}).get("raw") or [0.0, 0.0]
             iso = ((float(v_raw[0]) - float(other[0])) ** 2 + (float(v_raw[1]) - float(other[1])) ** 2) ** 0.5
-            self.assertGreaterEqual(iso, 20.7, "Viersen vs %s" % member)
+            self.assertGreaterEqual(iso, 20.7, "Borken vs %s" % member)
         square = [(0.0, 0.0), (10.0, 0.0), (10.0, 10.0), (0.0, 10.0)]
         px, py, pr = polylabel(square, precision=0.2)
         self.assertTrue(point_in_ring(px, py, square))
         self.assertGreater(pr, 3.0)
         self.assertTrue(ANCHOR_JSON.is_file())
         blob = json.loads(ANCHOR_JSON.read_text(encoding="utf-8"))
-        for pid in (VIERSEN, HUNSRUECK, OBERBERGISCHER, NEUWIED):
+        self.assertTrue(any(int(c.get("pid", 0)) == 710460 for c in blob.get("cannot_fit") or []))
+        for pid in (BORKEN, KREUZNACH, OBERBERGISCHER, SIEGEN):
             rec = blob["anchors"][str(pid)]
             self.assertEqual(rec["name"], SEED_NAMES[pid])
             self.assertGreater(float(rec["edge_dist"]), 0.4)
@@ -126,6 +133,9 @@ class TestFac1aAirfieldIcons(unittest.TestCase):
         self.assertIn("func _cluster_iso_clear", src)
         self.assertIn("func _rhine_course_line", src)
         self.assertIn("RHINE_HOST_MIN_WORLD", src)
+        self.assertIn("func _draw_level_tag", src)
+        self.assertIn('"L%d"', src)
+        self.assertIn("CLEAR_MARGIN_PX", src)
         self.assertNotIn("acc / float(idxs.size())", src)
         self.assertIn("SPLIT_GAP_PX", src)
         self.assertNotIn("CORRIDOR_OFFSET_SCREEN_PX", src)
