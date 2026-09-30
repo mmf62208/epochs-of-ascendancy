@@ -994,13 +994,9 @@ func _corridor_polylines() -> Array:
 func _rhine_course_line() -> PackedVector2Array:
 	if not _test_polygons.is_empty():
 		return PackedVector2Array()
-	if Rx1RhineCrossingScript == null or not Rx1RhineCrossingScript.has_method("course_points"):
-		return PackedVector2Array()
-	var raw: PackedVector2Array = Rx1RhineCrossingScript.call("course_points") as PackedVector2Array
-	var out := PackedVector2Array()
-	for p in raw:
-		out.append(p * THEATER_SCALE)
-	return out
+	## Static course_points() — do not .call()/.has_method() on the class
+	## (Godot parse: those are instance methods; -s instantiate then fails).
+	return MapCanvasConfigScript.scale_points(Rx1RhineCrossingScript.course_points())
 
 
 func _pids_polyline(pids: Array[int]) -> PackedVector2Array:
