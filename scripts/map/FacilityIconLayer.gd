@@ -176,13 +176,14 @@ func _oval_rect(icon_rect: Rect2) -> Rect2:
 	return Rect2(Vector2(x, y), Vector2(w, h))
 
 
-## L4 / cluster tex is a filled circle. L1–L3 are tilted ovals with empty top padding.
+## Circle only for L4 tex (lone Siegen or an L4 cluster). L1–L3 clusters
+## are drawn as ovals — they must not inherit a 34px circle hit.
 func _art_is_round(rec: Dictionary) -> bool:
 	var level: int = clampi(int(rec.get("level", 1)), 1, 4)
 	var tex_key := str(rec.get("tex_key", texture_key_for_level(level, "intact")))
 	if tex_key.find("airfield_l4") >= 0:
 		return true
-	return bool(rec.get("cluster", false))
+	return level == 4
 
 
 func _art_body_rect(icon_rect: Rect2, is_round: bool) -> Rect2:

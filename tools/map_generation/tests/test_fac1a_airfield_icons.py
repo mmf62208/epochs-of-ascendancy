@@ -145,6 +145,7 @@ class TestFac1aAirfieldIcons(unittest.TestCase):
         self.assertIn("func _art_is_round", src)
         self.assertIn("func _art_body_rect", src)
         self.assertIn("func silhouette_inside_samples", src)
+        self.assertNotIn('return bool(rec.get("cluster", false))', src)
         self.assertNotIn("Color(0.98, 0.93, 0.70", src)
         self.assertIn('"L%d"', src)
         self.assertIn("CLEAR_MARGIN_PX", src)
@@ -170,6 +171,9 @@ class TestFac1aAirfieldIcons(unittest.TestCase):
         self.assertIn("FacilityIconLayer", apply)
         self.assertIn("func _facility_icon_pid_at", ren)
         self.assertIn("func _still_click_province_pid", ren)
+        self.assertIn("func _map_pick_screen_pos", ren)
+        self.assertIn("func _map_pick_world_from_event", ren)
+        self.assertIn("_map_pick_world_from_event(event)", ren)
         dest_start = ren.find("func _mv1_preview_dest_matches_world")
         dest_end = ren.find("\nfunc ", dest_start + 10)
         dest_body = ren[dest_start:dest_end]
@@ -195,6 +199,9 @@ class TestFac1aAirfieldIcons(unittest.TestCase):
         self.assertIn("STALE_HOVER_PID", gsrc)
         self.assertIn("OUTSIDE_PAD_PX", gsrc)
         self.assertIn("SILHOUETTE_ZOOMS", gsrc)
+        self.assertIn("STALE_LAG_ITERS", gsrc)
+        self.assertIn("_assert_cluster_variant_hits", gsrc)
+        self.assertIn("_assert_stale_lag_event_pos", gsrc)
 
     def test_old_sites_layer_untouched(self) -> None:
         ol = OL.read_text(encoding="utf-8")

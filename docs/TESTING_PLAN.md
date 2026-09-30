@@ -412,6 +412,8 @@ Screenshots FIX #5 (xvfb **NOT live Play**): `/opt/cursor/artifacts/fac1a_fix5/0
 
 Screenshots FIX #6 (xvfb **NOT live Play**): `/opt/cursor/artifacts/fac1a_fix6/01_l4_cluster_hit_overlay_z0.97_NOT_live_play.png`, `02_lone_hit_overlay_z2.25_NOT_live_play.png`.
 
+**FIX #7 (Play MIXED `5d42888a`):** L2 cluster oval hit + press/release `event.position`. Seeds / MV-1 gates unchanged. Isolated keep-green pending xvfb after this revision.
+
 **FIX #3 (Play MIXED `234e12b8`):** Rhine/spine/border clearance + cluster L4 tag. Split expected ~1.59. Isolated keep-green (`637ca02e`):
 
 | gate | kind | result | peak MB isolated |

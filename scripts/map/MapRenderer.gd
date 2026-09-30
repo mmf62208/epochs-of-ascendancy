@@ -2648,7 +2648,7 @@ func _input(event: InputEvent) -> void:
 					elif (
 						not event.shift_pressed
 						and not event.alt_pressed
-						and _try_open_land_chip_from_input(event.ctrl_pressed)
+						and _try_open_land_chip_from_input(event.ctrl_pressed, event)
 					):
 						# Still-click land chip in `_input` so ProvinceHoverTooltip
 						# cannot steal GER Division Fill%/TOE (Play DIG FAIL).
@@ -3046,7 +3046,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				get_viewport().set_input_as_handled()
 				return
 		_release_search_focus()
-		var world_pos := _screen_to_world(get_viewport().get_mouse_position())
+		var world_pos := _map_pick_world_from_event(event)
 		# Living title owns map clicks: never open inspector / chips / assault (window-exit class).
 		if _living_title_boot_is_up():
 			var title_pid := _resolve_map_pick_pid(world_pos)
@@ -3545,6 +3545,21 @@ func _zoom_toward_mouse(zoom_change: float) -> void:
 		"EOA_ZOOM_END who=MapRenderer._zoom_toward_mouse z=%.3f ok=1"
 		% new_zoom.x
 	)
+
+## Press/release pick uses the event's own position so a lagged
+## get_viewport().get_mouse_position() cannot steal the click (FAC-1a FIX #7).
+func _map_pick_screen_pos(event: InputEvent) -> Vector2:
+	if event is InputEventMouse:
+		return (event as InputEventMouse).position
+	var vp := get_viewport()
+	if vp != null:
+		return vp.get_mouse_position()
+	return Vector2.ZERO
+
+
+func _map_pick_world_from_event(event: InputEvent) -> Vector2:
+	return _screen_to_world(_map_pick_screen_pos(event))
+
 
 ## Converts screen (pixel) mouse position to world/map space using the active Camera2D.
 ## This is the key bridge for using MapPickGrid / MapManager picking.
@@ -19193,7 +19208,7 @@ func _try_switch_own_land_counter_at_world(world_pos: Vector2) -> bool:
 	return true
 
 
-func _try_open_land_chip_from_input(ctrl_click: bool = false) -> bool:
+func _try_open_land_chip_from_input(ctrl_click: bool = false, event: InputEvent = null) -> bool:
 	# `_input` still-click path: beat GUI so a follow-mouse glance card cannot
 	# swallow GER Division. Search / Close / unit-card / modal stay theirs.
 	# Esc helpers + Dig2 / Drag2+3 pan helpers untouched.
@@ -19208,12 +19223,12 @@ func _try_open_land_chip_from_input(ctrl_click: bool = false) -> bool:
 	# on its own province) — not a re-arm. Ctrl stays assault / Open fight.
 	# `_try_open_land_unit_at_world` is unchanged (first-select fallback stays).
 	if not selected_formation_id.is_empty() and not ctrl_click:
-		var world_pos_sw: Vector2 = _screen_to_world(get_viewport().get_mouse_position())
+		var world_pos_sw: Vector2 = _screen_to_world(_map_pick_screen_pos(event))
 		if _try_switch_own_land_counter_at_world(world_pos_sw):
 			get_viewport().set_input_as_handled()
 			return true
 		return false
-	var world_pos: Vector2 = _screen_to_world(get_viewport().get_mouse_position())
+	var world_pos: Vector2 = _screen_to_world(_map_pick_screen_pos(event))
 	# MV-1b FIX #1 item 2: own air/fleet/space disk before land first-select.
 	if selected_formation_id.is_empty() and not ctrl_click:
 		if _try_open_unit_at_world(world_pos):

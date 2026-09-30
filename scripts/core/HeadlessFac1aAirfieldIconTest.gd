@@ -180,6 +180,19 @@ func _test_source_needles() -> void:
 		_fail("FIX #6 art-body hit / silhouette samples missing")
 	else:
 		_pass("FIX #6 art-body hit + silhouette_inside_samples")
+	if "return bool(rec.get(\"cluster\", false))" in layer:
+		_fail("FIX #7 L1–L3 clusters must not inherit a circle hit")
+	else:
+		_pass("FIX #7 circle only for L4 art")
+	if "func _map_pick_world_from_event" not in ren or "func _map_pick_screen_pos" not in ren:
+		_fail("FIX #7 event-position pick helpers missing")
+	else:
+		_pass("FIX #7 press/release pick uses event.position")
+	var un_fn := _slice_func(ren, "_unhandled_input")
+	if un_fn.find("_map_pick_world_from_event(event)") < 0:
+		_fail("_unhandled_input pick must use _map_pick_world_from_event")
+	else:
+		_pass("_unhandled_input pick uses event position")
 	if "Color(0.98, 0.93, 0.70" in layer:
 		_fail("FIX #5 cream selection-box halo must be gone")
 	else:
@@ -568,6 +581,16 @@ func _test_cluster_hysteresis() -> void:
 	if _layer == null or not is_instance_valid(_layer):
 		_fail("no layer for cluster hysteresis")
 		return
+	var l2c: Dictionary = {"cluster": true, "level": 2, "tex_key": "airfield_l2_intact"}
+	var l4c: Dictionary = {"cluster": true, "level": 4, "tex_key": "airfield_l4_intact"}
+	if bool(_layer.call("_art_is_round", l2c)):
+		_fail("L2 cluster must use oval hit, not circle")
+	else:
+		_pass("L2 cluster is oval art")
+	if not bool(_layer.call("_art_is_round", l4c)):
+		_fail("L4 cluster must use circle hit")
+	else:
+		_pass("L4 cluster is round art")
 	var tight: Dictionary = {
 		AACHEN: Vector2(0, 0),
 		TRIER_SAARBURG: Vector2(36, 0),

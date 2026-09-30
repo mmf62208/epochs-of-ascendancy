@@ -35,6 +35,8 @@ const CHROME_ZOOMS: Array[float] = [0.93, 0.97, 0.99]
 const OUTSIDE_PAD_PX := 2.0
 const STALE_HOVER_PID := 710368
 const STALE_SPEEDS: Array[float] = [1.0, 4.0]
+const STALE_LAG_ITERS := 15
+const STALE_LAG_SCALE := 4.0
 const LONE_SIZE_ZOOM := 1.30
 const LONE_MIN_PX := 36.0
 const RX1_MID_ZOOM := 0.95
@@ -106,8 +108,10 @@ var _badge_inside_ok: bool = false
 var _digit_ok: bool = false
 var _chrome_ok: bool = false
 var _stale_ok: bool = false
+var _stale_lag_ok: bool = false
 var _tight_outside_ok: bool = false
 var _silhouette_ok: bool = false
+var _cluster_var_ok: bool = false
 var _cluster_prom_ok: bool = false
 var _lone_size_ok: bool = false
 var _occl_max: float = 0.0
@@ -654,6 +658,12 @@ func _do_ownership() -> void:
 	_stale_ok = _assert_stale_hover_override()
 	if not _stale_ok:
 		_fail_reasons.append("stale_hover")
+	_stale_lag_ok = _assert_stale_lag_event_pos()
+	if not _stale_lag_ok:
+		_fail_reasons.append("stale_lag")
+	_cluster_var_ok = _assert_cluster_variant_hits()
+	if not _cluster_var_ok:
+		_fail_reasons.append("cluster_variant")
 	_silhouette_ok = _assert_silhouette_inside()
 	if not _silhouette_ok:
 		_fail_reasons.append("silhouette_inside")
@@ -1110,6 +1120,187 @@ func _assert_stale_hover_override() -> bool:
 		tm.call("set_time_scale", 1.0)
 	_pause_clock_only()
 	_log("EOA_FAC1A_PIXEL_GUARD who=guard.stale ok=%s (NOT live Play)" % str(ok))
+	return ok
+
+
+func _world_to_screen(world: Vector2) -> Vector2:
+	var cam := _camera()
+	if cam == null:
+		return world
+	return cam.get_canvas_transform() * world
+
+
+func _assert_stale_lag_event_pos() -> bool:
+	var mr := _map_renderer()
+	var ol := _facility_layer()
+	if mr == null or ol == null:
+		return false
+	if not mr.has_method("_map_pick_world_from_event") or not mr.has_method("_still_click_province_pid"):
+		_log("EOA_FAC1A_PIXEL_GUARD who=guard.stale_lag MISSING _map_pick_world_from_event (NOT live Play)")
+		return false
+	_select_parked_unit()
+	var tm := _time_manager()
+	if tm != null and tm.has_method("set_time_scale"):
+		tm.call("set_time_scale", STALE_LAG_SCALE)
+	_frame_over_rhineland(0.97)
+	_redraw_layer()
+	var x_world := _centroid(STALE_HOVER_PID)
+	if x_world == Vector2.ZERO:
+		x_world = _mm_centroid(STALE_HOVER_PID)
+	var screen_x := _world_to_screen(x_world)
+	if DisplayServer.get_name() != "headless":
+		DisplayServer.warp_mouse(Vector2i(int(round(screen_x.x)), int(round(screen_x.y))))
+	mr.set("_march_preview_cache_dest", STALE_HOVER_PID)
+	if "provinces" in mr:
+		var provs: Variant = mr.get("provinces")
+		if provs is Dictionary and (provs as Dictionary).has(STALE_HOVER_PID):
+			mr.set("_hover_province", (provs as Dictionary)[STALE_HOVER_PID])
+	var targets: Array[Dictionary] = []
+	for layout_v in _hit_layouts(0.97):
+		if typeof(layout_v) != TYPE_DICTIONARY:
+			continue
+		var layout: Dictionary = layout_v
+		var body: Rect2 = layout.get("hit_icon", layout.get("art_rect", Rect2())) as Rect2
+		var click := body.get_center()
+		if click == Vector2.ZERO:
+			click = layout.get("world", Vector2.ZERO) as Vector2
+		targets.append({
+			"want": int(layout.get("pid", -1)),
+			"click": click,
+			"cluster": bool(layout.get("cluster", false)),
+		})
+	var saw_lone := false
+	var saw_cluster := false
+	var fail := 0
+	var i := 0
+	while i < STALE_LAG_ITERS:
+		for t in targets:
+			var want: int = int(t.get("want", -1))
+			var click: Vector2 = t.get("click", Vector2.ZERO) as Vector2
+			if bool(t.get("cluster", false)):
+				saw_cluster = true
+			else:
+				saw_lone = true
+			var screen_y := _world_to_screen(click)
+			var mot := InputEventMouseMotion.new()
+			mot.position = screen_x
+			var press := InputEventMouseButton.new()
+			press.button_index = MOUSE_BUTTON_LEFT
+			press.pressed = true
+			press.position = screen_y
+			var rel := InputEventMouseButton.new()
+			rel.button_index = MOUSE_BUTTON_LEFT
+			rel.pressed = false
+			rel.position = screen_y
+			## Same-frame: motion to X is queued but the pick reads event Y.
+			var world: Vector2 = mr.call("_map_pick_world_from_event", rel)
+			var got: int = int(mr.call("_still_click_province_pid", world, true))
+			var matches := true
+			if mr.has_method("_mv1_preview_dest_matches_world"):
+				matches = bool(mr.call("_mv1_preview_dest_matches_world", world))
+			if got != want or not matches:
+				fail += 1
+				_log(
+					"EOA_FAC1A_PIXEL_GUARD who=guard.stale_lag FAIL iter=%d want=%d got=%d matches=%s (NOT live Play)"
+					% [i, want, got, str(matches)]
+				)
+		i += 1
+	if tm != null and tm.has_method("set_time_scale"):
+		tm.call("set_time_scale", 1.0)
+	_pause_clock_only()
+	var ok := fail == 0 and saw_lone and saw_cluster
+	if not saw_lone or not saw_cluster:
+		_log("EOA_FAC1A_PIXEL_GUARD who=guard.stale_lag MISS lone=%s cluster=%s (NOT live Play)" % [str(saw_lone), str(saw_cluster)])
+	_log(
+		"EOA_FAC1A_PIXEL_GUARD who=guard.stale_lag ok=%s fails=%d iters=%d lone=%s cluster=%s (NOT live Play)"
+		% [str(ok), fail, STALE_LAG_ITERS, str(saw_lone), str(saw_cluster)]
+	)
+	return ok
+
+
+func _assert_cluster_variant_hits() -> bool:
+	var ol := _facility_layer()
+	if ol == null or not ol.has_method("silhouette_inside_samples"):
+		return false
+	var ok := true
+	var saw_oval_cluster := false
+	var saw_round_cluster := false
+	for z in SILHOUETTE_ZOOMS:
+		_frame_over_rhineland(z)
+		_redraw_layer()
+		var saw_cluster := false
+		for layout_v in _hit_layouts(z):
+			if typeof(layout_v) != TYPE_DICTIONARY:
+				continue
+			var layout: Dictionary = layout_v
+			if not bool(layout.get("cluster", false)):
+				continue
+			saw_cluster = true
+			var is_round := bool(layout.get("round_art", false))
+			if is_round:
+				saw_round_cluster = true
+			else:
+				saw_oval_cluster = true
+			var want: int = int(layout.get("pid", -1))
+			var insides: Array = ol.call("silhouette_inside_samples", layout, z, OUTSIDE_PAD_PX)
+			for s_v in insides:
+				var sample: Vector2 = s_v
+				if _counter_contains_world(sample, z):
+					continue
+				var hit: int = int(ol.call("hit_test_at_zoom", sample, z))
+				if hit != want:
+					ok = false
+					_fail_reasons.append("clustervar_in_z%.2f_pid%d" % [z, want])
+					_log(
+						"EOA_FAC1A_PIXEL_GUARD who=guard.clustervar IN FAIL z=%.2f want=%d hit=%d round=%s (NOT live Play)"
+						% [z, want, hit, str(is_round)]
+					)
+			var outs: Array = ol.call("drawn_outside_samples", layout, z, OUTSIDE_PAD_PX)
+			for o_v in outs:
+				var o: Vector2 = o_v
+				var oh: int = int(ol.call("hit_test_at_zoom", o, z))
+				if oh == want:
+					ok = false
+					_fail_reasons.append("clustervar_out_z%.2f_pid%d" % [z, want])
+					_log(
+						"EOA_FAC1A_PIXEL_GUARD who=guard.clustervar OUT FAIL still=%d z=%.2f round=%s (NOT live Play)"
+						% [oh, z, str(is_round)]
+					)
+			if not is_round:
+				var body: Rect2 = layout.get("hit_icon", layout.get("art_rect", Rect2())) as Rect2
+				var pad := 0.0
+				if ol.has_method("_world_size_at"):
+					pad = float(ol.call("_world_size_at", OUTSIDE_PAD_PX, z))
+				else:
+					pad = OUTSIDE_PAD_PX / maxf(z, 0.04)
+				var c := body.get_center()
+				var extras: Array[Vector2] = [
+					Vector2(c.x, body.position.y - pad),
+					Vector2(c.x, body.end.y + pad),
+					Vector2(body.end.x + pad, c.y),
+				]
+				for e in extras:
+					var eh: int = int(ol.call("hit_test_at_zoom", e, z))
+					if eh == want:
+						ok = false
+						_log(
+							"EOA_FAC1A_PIXEL_GUARD who=guard.clustervar L2 edge OUT FAIL still=%d z=%.2f (NOT live Play)"
+							% [eh, z]
+						)
+		if z + 0.001 < SPLIT_ZOOM and not saw_cluster:
+			ok = false
+			_log("EOA_FAC1A_PIXEL_GUARD who=guard.clustervar MISS cluster z=%.2f (NOT live Play)" % z)
+		_log(
+			"EOA_FAC1A_PIXEL_GUARD who=guard.clustervar z=%.2f cluster=%s oval_c=%s round_c=%s (NOT live Play)"
+			% [z, str(saw_cluster), str(saw_oval_cluster), str(saw_round_cluster)]
+		)
+	if not saw_oval_cluster:
+		ok = false
+		_log("EOA_FAC1A_PIXEL_GUARD who=guard.clustervar MISS L2 oval cluster (NOT live Play)")
+	if not saw_round_cluster:
+		ok = false
+		_log("EOA_FAC1A_PIXEL_GUARD who=guard.clustervar MISS L4 round cluster (NOT live Play)")
+	_log("EOA_FAC1A_PIXEL_GUARD who=guard.clustervar ok=%s (NOT live Play)" % str(ok))
 	return ok
 
 
@@ -2107,7 +2298,7 @@ func _finish(ok: bool) -> void:
 		ok = false
 	var result := "PASS" if ok else "FAIL"
 	_log(
-		"WindowedFac1aAirfieldPixelGuard: RESULT=%s mid=%d close=%d out=%d res=%d back=%d layer=%d/%d/%d/%d badge=%.1f occl_max=%.3f overlap_fail=%d own_fail=%d click_fail=%d noop_fail=%d sil_fail=%d badge_in=%s digit=%s chrome=%s stale=%s outside=%s sil=%s prom=%s lone=%s priority=%s cluster_mid=%s split_close=%s counter_clear=%s counter_drawn=%s rx1_mid_on=%.3f rx1_mid_off=%.3f rss_mb=%.1f peak_kb=%d captures=%s reasons=%s (xvfb NOT live Play)"
+		"WindowedFac1aAirfieldPixelGuard: RESULT=%s mid=%d close=%d out=%d res=%d back=%d layer=%d/%d/%d/%d badge=%.1f occl_max=%.3f overlap_fail=%d own_fail=%d click_fail=%d noop_fail=%d sil_fail=%d badge_in=%s digit=%s chrome=%s stale=%s stale_lag=%s clustervar=%s outside=%s sil=%s prom=%s lone=%s priority=%s cluster_mid=%s split_close=%s counter_clear=%s counter_drawn=%s rx1_mid_on=%.3f rx1_mid_off=%.3f rss_mb=%.1f peak_kb=%d captures=%s reasons=%s (xvfb NOT live Play)"
 		% [
 			result,
 			_mid_anchors,
@@ -2130,6 +2321,8 @@ func _finish(ok: bool) -> void:
 			str(_digit_ok),
 			str(_chrome_ok),
 			str(_stale_ok),
+			str(_stale_lag_ok),
+			str(_cluster_var_ok),
 			str(_tight_outside_ok),
 			str(_silhouette_ok),
 			str(_cluster_prom_ok),
