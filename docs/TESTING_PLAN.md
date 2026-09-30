@@ -370,7 +370,19 @@ tools/eoa_fac1a_pixel_guard.sh
 
 xvfb screenshots go to `/opt/cursor/artifacts/fac1a/`, `/opt/cursor/artifacts/fac1a_fix2/`, `/opt/cursor/artifacts/fac1a_fix2b/`, `/opt/cursor/artifacts/fac1a_fix2c/`, `/opt/cursor/artifacts/fac1a_fix3/`, and `/opt/cursor/artifacts/fac1a_fix4/` and are **NOT live Play**. Peak RSS must stay under 3 GB (isolated process tree — do not sum leftover Godot). Merge **HOLD**.
 
-**FIX #4 (Play MIXED `76fb4808`):** click ownership + badge-in-footprint + cluster digit + lone min size + split guard 1.53. Seeds unchanged. Isolated keep-green recorded after the xvfb run.
+**FIX #4 (Play MIXED `76fb4808`):** click ownership + badge-in-footprint + cluster digit + lone min size + split guard 1.53. Seeds unchanged. Isolated keep-green:
+
+| gate | kind | result | peak MB isolated |
+|---|---|---|---|
+| py_fac1a | py | PASS | — |
+| hd_fac1a | headless | PASS (hit_test, badge-in, digit 12px, lone ≥36) | — |
+| xvfb_fac1a | xvfb | PASS click=0 noop=0 badge_in digit lone split 1.53 clearance all tiers occl=0.000 rx1 0.843/0.843 | **2030.8** |
+| xvfb_rx1 ON / OFF | xvfb | PASS mid_river **0.749 / 0.749** close 0.775 / 0.775 spine 1.000 | isolated |
+| hd_mv1 / hd_mv1b / hd_rh1 | headless | PASS | — |
+| hd_ix1 (6) / hd_rx1 (4) / hd_rt1 (3) | headless | PASS | — |
+| xvfb_mv1 / xvfb_mv1_card / xvfb_rh1 | xvfb | PASS | **2038.1 / 2036.6 / 2033.5** |
+
+Screenshots FIX #4 (xvfb **NOT live Play**): `/opt/cursor/artifacts/fac1a_fix4/01_badge_z0.97_NOT_live_play.png`, `02_cluster_digit_z0.99_NOT_live_play.png`, `03_lone_icon_z1.30_NOT_live_play.png`, `04_split_boundary_z1.53_NOT_live_play.png`.
 
 **FIX #3 (Play MIXED `234e12b8`):** Rhine/spine/border clearance + cluster L4 tag. Split expected ~1.59. Isolated keep-green (`637ca02e`):
 
