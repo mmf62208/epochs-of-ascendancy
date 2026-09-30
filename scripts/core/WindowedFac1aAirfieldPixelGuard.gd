@@ -29,7 +29,11 @@ const CLUSTER_OCCL_ZOOMS: Array[float] = [0.70, 0.99, 1.30]
 const OVERLAP_ZOOMS: Array[float] = [0.70, 0.99, 1.30, 1.53, 1.90, 2.30]
 const CLEAR_ZOOMS: Array[float] = [0.65, 0.77, 0.99, 1.30, 1.53, 1.90, 2.27]
 const CLICK_ZOOMS: Array[float] = [0.92, 0.97, 1.30, 2.25]
-const BADGE_INSIDE_ZOOMS: Array[float] = [0.93, 0.97, 1.00]
+const BADGE_INSIDE_ZOOMS: Array[float] = [0.93, 0.97, 0.99, 1.00]
+const CHROME_ZOOMS: Array[float] = [0.93, 0.97, 0.99]
+const OUTSIDE_PAD_PX := 2.0
+const STALE_HOVER_PID := 710368
+const STALE_SPEEDS: Array[float] = [1.0, 4.0]
 const LONE_SIZE_ZOOM := 1.30
 const LONE_MIN_PX := 36.0
 const RX1_MID_ZOOM := 0.95
@@ -91,11 +95,16 @@ var _fix2b_dir: String = ""
 var _fix2c_dir: String = ""
 var _fix3_dir: String = ""
 var _fix4_dir: String = ""
+var _fix5_dir: String = ""
 var _click_fail: int = 0
 var _noop_fail: int = 0
 var _priority_ok: bool = false
 var _badge_inside_ok: bool = false
 var _digit_ok: bool = false
+var _chrome_ok: bool = false
+var _stale_ok: bool = false
+var _tight_outside_ok: bool = false
+var _cluster_prom_ok: bool = false
 var _lone_size_ok: bool = false
 var _occl_max: float = 0.0
 var _rx1_mid_on: float = -1.0
@@ -135,11 +144,13 @@ func _start() -> void:
 		DirAccess.make_dir_recursive_absolute("/opt/cursor/artifacts/fac1a_fix2c")
 		DirAccess.make_dir_recursive_absolute("/opt/cursor/artifacts/fac1a_fix3")
 		DirAccess.make_dir_recursive_absolute("/opt/cursor/artifacts/fac1a_fix4")
+		DirAccess.make_dir_recursive_absolute("/opt/cursor/artifacts/fac1a_fix5")
 	_fix2_dir = "/opt/cursor/artifacts/fac1a_fix2"
 	_fix2b_dir = "/opt/cursor/artifacts/fac1a_fix2b"
 	_fix2c_dir = "/opt/cursor/artifacts/fac1a_fix2c"
 	_fix3_dir = "/opt/cursor/artifacts/fac1a_fix3"
 	_fix4_dir = "/opt/cursor/artifacts/fac1a_fix4"
+	_fix5_dir = "/opt/cursor/artifacts/fac1a_fix5"
 	if OS.get_environment("EOA_SMOKE_AUTO_BEGIN").strip_edges() != "1":
 		OS.set_environment("EOA_SMOKE_AUTO_BEGIN", "1")
 	_rss_start_kb = _rss_kb()
@@ -259,6 +270,11 @@ func _do_political_mid() -> void:
 	_capture_fix2c("02_mid_z0.99_cluster_NOT_live_play")
 	_capture_fix3("02_mid_z0.99_cluster_tag_NOT_live_play")
 	_capture_fix4("02_cluster_digit_z0.99_NOT_live_play")
+	_frame_over_rhineland(0.97)
+	_redraw_layer()
+	_capture_fix5("01_cluster_count_tag_z0.97_NOT_live_play")
+	_frame_over_rhineland(MID_ZOOM)
+	_redraw_layer()
 	_cluster_mid_ok = _assert_cluster_at_zoom(MID_ZOOM)
 	if not _assert_cluster_tag_l4(MID_ZOOM):
 		_fail_reasons.append("mid_cluster_tag")
@@ -280,6 +296,7 @@ func _do_political_ops() -> void:
 	_capture_fix2c("01_operational_z1.30_rhineland_NOT_live_play")
 	_capture_fix3("01_operational_z1.30_rhineland_NOT_live_play")
 	_capture_fix4("03_lone_icon_z1.30_NOT_live_play")
+	_capture_fix5("02_lone_and_cluster_z1.30_NOT_live_play")
 	_log("EOA_FAC1A_PIXEL_GUARD who=guard.ops anchors=%d zoom=%.3f (NOT live Play)" % [hits, _cam_zoom])
 	if hits < 1:
 		_fail_reasons.append("ops_missing_icons")
@@ -581,6 +598,8 @@ func _do_ownership() -> void:
 		return
 	_frame_l1_isolate(0.92)
 	_capture_fix3("05_l1_z0.92_NOT_live_play")
+	_frame_l1_isolate(0.93)
+	_capture_fix5("03_borken_top_edge_z0.93_NOT_live_play")
 	_frame_l1_isolate(0.97)
 	_capture_fix4("01_badge_z0.97_NOT_live_play")
 	_frame_l1_isolate(0.98)
@@ -613,9 +632,21 @@ func _do_ownership() -> void:
 	_digit_ok = _assert_cluster_digit()
 	if not _digit_ok:
 		_fail_reasons.append("cluster_digit")
+	_chrome_ok = _assert_cluster_chrome()
+	if not _chrome_ok:
+		_fail_reasons.append("cluster_chrome")
 	_lone_size_ok = _assert_lone_min_size()
 	if not _lone_size_ok:
 		_fail_reasons.append("lone_min_size")
+	_cluster_prom_ok = _assert_cluster_prominence()
+	if not _cluster_prom_ok:
+		_fail_reasons.append("cluster_prominence")
+	_tight_outside_ok = _assert_tight_outside_gis()
+	if not _tight_outside_ok:
+		_fail_reasons.append("tight_outside")
+	_stale_ok = _assert_stale_hover_override()
+	if not _stale_ok:
+		_fail_reasons.append("stale_hover")
 	_priority_ok = _assert_counter_priority()
 	if not _priority_ok:
 		_fail_reasons.append("priority_counter")
@@ -682,6 +713,15 @@ func _capture_fix4(name: String) -> void:
 		return
 	var prev := _out_dir
 	_out_dir = _fix4_dir
+	_capture(name)
+	_out_dir = prev
+
+
+func _capture_fix5(name: String) -> void:
+	if _fix5_dir.is_empty():
+		return
+	var prev := _out_dir
+	_out_dir = _fix5_dir
 	_capture(name)
 	_out_dir = prev
 
@@ -806,32 +846,36 @@ func _assert_click_ownership(zoom: float, unit_selected: bool) -> void:
 			continue
 		var layout: Dictionary = layout_v
 		var want: int = int(layout.get("pid", -1))
-		var hits: Array = layout.get("hits", [])
-		for r_v in hits:
-			if not (r_v is Rect2):
+		var samples: Array = []
+		if ol.has_method("tight_hit_samples"):
+			samples = ol.call("tight_hit_samples", layout)
+		else:
+			var hits: Array = layout.get("hits", [])
+			for r_v in hits:
+				if r_v is Rect2:
+					samples.append_array(_sample_rect_points(r_v as Rect2))
+		for sample_v in samples:
+			var sample: Vector2 = sample_v
+			if _counter_contains_world(sample, zoom):
 				continue
-			var r: Rect2 = r_v
-			for sample in _sample_rect_points(r):
-				if _counter_contains_world(sample, zoom):
-					continue
-				var hit: int = int(ol.call("hit_test_at_zoom", sample, zoom))
-				var fac: int = _facility_pid_at(sample)
-				var resolved: int = _resolve_pick_pid(sample)
-				if hit != want or fac != want:
-					_click_fail += 1
-					_own_fail += 1
-					_fail_reasons.append("click_z%.2f_pid%d_hit%d_sel%s" % [zoom, want, hit, str(unit_selected)])
-					_log("EOA_FAC1A_PIXEL_GUARD who=guard.click FAIL z=%.2f want=%d hit=%d fac=%d sel=%s" % [zoom, want, hit, fac, str(unit_selected)])
-					return
-				var star := -1
-				var mr := _map_renderer()
-				if mr != null and mr.has_method("_capital_star_pid_at"):
-					star = int(mr.call("_capital_star_pid_at", sample))
-				if star <= 0 and resolved != want:
-					_click_fail += 1
-					_fail_reasons.append("resolve_z%.2f_pid%d_got%d" % [zoom, want, resolved])
-					_log("EOA_FAC1A_PIXEL_GUARD who=guard.resolve FAIL z=%.2f want=%d got=%d sel=%s" % [zoom, want, resolved, str(unit_selected)])
-					return
+			var hit: int = int(ol.call("hit_test_at_zoom", sample, zoom))
+			var fac: int = _facility_pid_at(sample)
+			var resolved: int = _resolve_pick_pid(sample)
+			if hit != want or fac != want:
+				_click_fail += 1
+				_own_fail += 1
+				_fail_reasons.append("click_z%.2f_pid%d_hit%d_sel%s" % [zoom, want, hit, str(unit_selected)])
+				_log("EOA_FAC1A_PIXEL_GUARD who=guard.click FAIL z=%.2f want=%d hit=%d fac=%d sel=%s" % [zoom, want, hit, fac, str(unit_selected)])
+				return
+			var star := -1
+			var mr := _map_renderer()
+			if mr != null and mr.has_method("_capital_star_pid_at"):
+				star = int(mr.call("_capital_star_pid_at", sample))
+			if star <= 0 and resolved != want:
+				_click_fail += 1
+				_fail_reasons.append("resolve_z%.2f_pid%d_got%d" % [zoom, want, resolved])
+				_log("EOA_FAC1A_PIXEL_GUARD who=guard.resolve FAIL z=%.2f want=%d got=%d sel=%s" % [zoom, want, resolved, str(unit_selected)])
+				return
 	_log("EOA_FAC1A_PIXEL_GUARD who=guard.click z=%.2f selected=%s layouts=%d PASS (NOT live Play)" % [zoom, str(unit_selected), layouts.size()])
 
 
@@ -843,28 +887,34 @@ func _assert_click_noop(zoom: float) -> void:
 	for layout_v in layouts:
 		if typeof(layout_v) != TYPE_DICTIONARY:
 			continue
-		var hits: Array = (layout_v as Dictionary).get("hits", [])
-		for r_v in hits:
-			if not (r_v is Rect2):
+		var want: int = int((layout_v as Dictionary).get("pid", -1))
+		var samples: Array = []
+		if ol.has_method("drawn_outside_samples"):
+			samples = ol.call("drawn_outside_samples", layout_v, zoom, OUTSIDE_PAD_PX)
+		else:
+			var hits: Array = (layout_v as Dictionary).get("hits", [])
+			for r_v in hits:
+				if r_v is Rect2:
+					samples.append_array(_sample_outside_points(r_v as Rect2, zoom))
+		for sample_v in samples:
+			var sample: Vector2 = sample_v
+			if _counter_contains_world(sample, zoom):
 				continue
-			for sample in _sample_outside_points(r_v as Rect2, zoom):
-				if _point_in_any_hit(sample, layouts):
-					continue
-				if _counter_contains_world(sample, zoom):
-					continue
-				var fac: int = int(ol.call("hit_test_at_zoom", sample, zoom))
-				if fac > 0:
-					_noop_fail += 1
-					_fail_reasons.append("noop_inside_z%.2f" % zoom)
-					_log("EOA_FAC1A_PIXEL_GUARD who=guard.noop FAIL still_hit=%d z=%.2f" % [fac, zoom])
-					return
-				var base := _base_pick_pid(sample)
-				var got := _resolve_pick_pid(sample)
-				if got != base:
-					_noop_fail += 1
-					_fail_reasons.append("noop_z%.2f_base%d_got%d" % [zoom, base, got])
-					_log("EOA_FAC1A_PIXEL_GUARD who=guard.noop FAIL base=%d got=%d z=%.2f" % [base, got, zoom])
-					return
+			var fac: int = int(ol.call("hit_test_at_zoom", sample, zoom))
+			if fac == want:
+				_noop_fail += 1
+				_fail_reasons.append("noop_inside_z%.2f" % zoom)
+				_log("EOA_FAC1A_PIXEL_GUARD who=guard.noop FAIL still_hit=%d z=%.2f" % [fac, zoom])
+				return
+			if fac > 0:
+				continue
+			var base := _base_pick_pid(sample)
+			var got := _resolve_pick_pid(sample)
+			if got != base:
+				_noop_fail += 1
+				_fail_reasons.append("noop_z%.2f_base%d_got%d" % [zoom, base, got])
+				_log("EOA_FAC1A_PIXEL_GUARD who=guard.noop FAIL base=%d got=%d z=%.2f" % [base, got, zoom])
+				return
 	_log("EOA_FAC1A_PIXEL_GUARD who=guard.noop z=%.2f PASS (NOT live Play)" % zoom)
 
 
@@ -893,8 +943,154 @@ func _assert_cluster_digit() -> bool:
 	var lum_bg := 0.2126 * bg.r + 0.7152 * bg.g + 0.0722 * bg.b
 	if absf(lum_fg - lum_bg) < 0.55:
 		contrast_ok = false
-	_log("EOA_FAC1A_PIXEL_GUARD who=guard.digit px=%.1f contrast=%s cluster=%s (NOT live Play)" % [px, str(contrast_ok), str(found)])
-	return found and px + 0.01 >= 10.0 and contrast_ok
+	var h_ok := true
+	for cz in CHROME_ZOOMS:
+		var h := px
+		if ol.has_method("cluster_digit_screen_h_px"):
+			h = float(ol.call("cluster_digit_screen_h_px", cz))
+		if h + 0.01 < 10.0:
+			h_ok = false
+			_log("EOA_FAC1A_PIXEL_GUARD who=guard.digit FAIL h=%.1f z=%.2f (NOT live Play)" % [h, cz])
+	_log("EOA_FAC1A_PIXEL_GUARD who=guard.digit px=%.1f contrast=%s cluster=%s h_ok=%s (NOT live Play)" % [px, str(contrast_ok), str(found), str(h_ok)])
+	return found and px + 0.01 >= 10.0 and contrast_ok and h_ok
+
+
+func _assert_cluster_chrome() -> bool:
+	var ol := _facility_layer()
+	if ol == null or not ol.has_method("cluster_chrome_gap_px"):
+		return false
+	var ok := true
+	for z in CHROME_ZOOMS:
+		_frame_over_rhineland(z)
+		_redraw_layer()
+		var gap: float = float(ol.call("cluster_chrome_gap_px", z))
+		_log("EOA_FAC1A_PIXEL_GUARD who=guard.chrome z=%.2f gap=%.2f (NOT live Play)" % [z, gap])
+		if gap + 0.01 < 2.0:
+			ok = false
+	return ok
+
+
+func _assert_cluster_prominence() -> bool:
+	var ol := _facility_layer()
+	if ol == null:
+		return false
+	_frame_over_rhineland(LONE_SIZE_ZOOM)
+	_redraw_layer()
+	var lone_px := 0.0
+	var cluster_px := 0.0
+	var lone_halo := 0.0
+	var cluster_halo := 0.0
+	for layout_v in _hit_layouts(LONE_SIZE_ZOOM):
+		if typeof(layout_v) != TYPE_DICTIONARY:
+			continue
+		var layout: Dictionary = layout_v
+		var px := float(layout.get("icon_px", 0.0))
+		var halo := float(layout.get("halo_px", 0.0))
+		if bool(layout.get("cluster", false)):
+			cluster_px = maxf(cluster_px, px)
+			cluster_halo = maxf(cluster_halo, halo)
+		else:
+			lone_px = maxf(lone_px, px)
+			lone_halo = maxf(lone_halo, halo)
+	var ok := cluster_px + 0.01 >= lone_px and cluster_px + 0.01 >= LONE_MIN_PX and cluster_halo + 0.01 >= 2.0 and lone_halo + 0.01 >= 2.0
+	_log("EOA_FAC1A_PIXEL_GUARD who=guard.prominence lone=%.1f cluster=%.1f halo_l=%.1f halo_c=%.1f ok=%s (NOT live Play)" % [lone_px, cluster_px, lone_halo, cluster_halo, str(ok)])
+	return ok
+
+
+func _assert_tight_outside_gis() -> bool:
+	var ol := _facility_layer()
+	if ol == null or not ol.has_method("drawn_outside_samples"):
+		return false
+	var ok := true
+	for z in [0.93, 0.97, 1.30]:
+		_frame_over_rhineland(z)
+		_redraw_layer()
+		for layout_v in _hit_layouts(z):
+			if typeof(layout_v) != TYPE_DICTIONARY:
+				continue
+			var want: int = int((layout_v as Dictionary).get("pid", -1))
+			var samples: Array = ol.call("drawn_outside_samples", layout_v, z, OUTSIDE_PAD_PX)
+			for s_v in samples:
+				var sample: Vector2 = s_v
+				var fac: int = int(ol.call("hit_test_at_zoom", sample, z))
+				if fac == want:
+					ok = false
+					_log("EOA_FAC1A_PIXEL_GUARD who=guard.outside FAIL still=%d z=%.2f (NOT live Play)" % [fac, z])
+	_log("EOA_FAC1A_PIXEL_GUARD who=guard.outside ok=%s (NOT live Play)" % str(ok))
+	return ok
+
+
+func _assert_stale_hover_override() -> bool:
+	var mr := _map_renderer()
+	var ol := _facility_layer()
+	if mr == null or ol == null or not mr.has_method("_still_click_province_pid"):
+		return false
+	_select_parked_unit()
+	var tm := _time_manager()
+	var ok := true
+	for scale in STALE_SPEEDS:
+		if tm != null and tm.has_method("set_time_scale"):
+			tm.call("set_time_scale", scale)
+		mr.set("_march_preview_cache_dest", STALE_HOVER_PID)
+		if "provinces" in mr:
+			var provs: Variant = mr.get("provinces")
+			if provs is Dictionary and (provs as Dictionary).has(STALE_HOVER_PID):
+				mr.set("_hover_province", (provs as Dictionary)[STALE_HOVER_PID])
+		for z in [0.97, 1.30]:
+			_frame_over_rhineland(z)
+			_redraw_layer()
+			var saw_lone := false
+			var saw_cluster := false
+			for layout_v in _hit_layouts(z):
+				if typeof(layout_v) != TYPE_DICTIONARY:
+					continue
+				var layout: Dictionary = layout_v
+				var want: int = int(layout.get("pid", -1))
+				var oval: Rect2 = layout.get("oval_rect", Rect2()) as Rect2
+				var click := oval.get_center()
+				if click == Vector2.ZERO:
+					click = layout.get("world", Vector2.ZERO) as Vector2
+				var matches := true
+				if mr.has_method("_mv1_preview_dest_matches_world"):
+					matches = bool(mr.call("_mv1_preview_dest_matches_world", click))
+				var got: int = int(mr.call("_still_click_province_pid", click, true))
+				if got != want or not matches:
+					ok = false
+					_log(
+						"EOA_FAC1A_PIXEL_GUARD who=guard.stale FAIL scale=%.0f z=%.2f want=%d got=%d matches=%s (NOT live Play)"
+						% [scale, z, want, got, str(matches)]
+					)
+				else:
+					if bool(layout.get("cluster", false)):
+						saw_cluster = true
+					else:
+						saw_lone = true
+			if not saw_lone or not saw_cluster:
+				ok = false
+				_log("EOA_FAC1A_PIXEL_GUARD who=guard.stale FAIL scale=%.0f z=%.2f lone=%s cluster=%s (NOT live Play)" % [scale, z, str(saw_lone), str(saw_cluster)])
+			var miss_ok := false
+			for layout_v2 in _hit_layouts(z):
+				if typeof(layout_v2) != TYPE_DICTIONARY:
+					continue
+				var outs: Array = ol.call("drawn_outside_samples", layout_v2, z, OUTSIDE_PAD_PX)
+				for o_v in outs:
+					var o: Vector2 = o_v
+					if int(ol.call("hit_test_at_zoom", o, z)) > 0:
+						continue
+					var miss_pid: int = int(mr.call("_still_click_province_pid", o, true))
+					if miss_pid == STALE_HOVER_PID:
+						miss_ok = true
+						break
+				if miss_ok:
+					break
+			if not miss_ok:
+				ok = false
+				_log("EOA_FAC1A_PIXEL_GUARD who=guard.stale FAIL miss-path cache dest scale=%.0f z=%.2f (NOT live Play)" % [scale, z])
+	if tm != null and tm.has_method("set_time_scale"):
+		tm.call("set_time_scale", 1.0)
+	_pause_clock_only()
+	_log("EOA_FAC1A_PIXEL_GUARD who=guard.stale ok=%s (NOT live Play)" % str(ok))
+	return ok
 
 
 func _assert_lone_min_size() -> bool:
@@ -1782,7 +1978,7 @@ func _finish(ok: bool) -> void:
 		ok = false
 	var result := "PASS" if ok else "FAIL"
 	_log(
-		"WindowedFac1aAirfieldPixelGuard: RESULT=%s mid=%d close=%d out=%d res=%d back=%d layer=%d/%d/%d/%d badge=%.1f occl_max=%.3f overlap_fail=%d own_fail=%d click_fail=%d noop_fail=%d badge_in=%s digit=%s lone=%s priority=%s cluster_mid=%s split_close=%s counter_clear=%s counter_drawn=%s rx1_mid_on=%.3f rx1_mid_off=%.3f rss_mb=%.1f peak_kb=%d captures=%s reasons=%s (xvfb NOT live Play)"
+		"WindowedFac1aAirfieldPixelGuard: RESULT=%s mid=%d close=%d out=%d res=%d back=%d layer=%d/%d/%d/%d badge=%.1f occl_max=%.3f overlap_fail=%d own_fail=%d click_fail=%d noop_fail=%d badge_in=%s digit=%s chrome=%s stale=%s outside=%s prom=%s lone=%s priority=%s cluster_mid=%s split_close=%s counter_clear=%s counter_drawn=%s rx1_mid_on=%.3f rx1_mid_off=%.3f rss_mb=%.1f peak_kb=%d captures=%s reasons=%s (xvfb NOT live Play)"
 		% [
 			result,
 			_mid_anchors,
@@ -1802,6 +1998,10 @@ func _finish(ok: bool) -> void:
 			_noop_fail,
 			str(_badge_inside_ok),
 			str(_digit_ok),
+			str(_chrome_ok),
+			str(_stale_ok),
+			str(_tight_outside_ok),
+			str(_cluster_prom_ok),
 			str(_lone_size_ok),
 			str(_priority_ok),
 			str(_cluster_mid_ok),

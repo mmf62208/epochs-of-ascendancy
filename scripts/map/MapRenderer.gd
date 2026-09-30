@@ -3138,16 +3138,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			if _try_open_unit_at_world(world_pos):
 				get_viewport().set_input_as_handled()
 				return
-		var pid := -1
-		if mv1_commit and _march_preview_cache_dest > 0:
-			pid = _march_preview_cache_dest
-		else:
-			# Units / chips / capital-star already ran. Facility rects next; miss is GIS.
-			pid = _resolve_map_pick_pid(world_pos)
-			if pid <= 0 and typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_at_world_pos"):
-				pid = MapManager.get_province_at_world_pos(world_pos, true)
-				if MapManager.has_method("resolve_pick_province_id"):
-					pid = MapManager.resolve_pick_province_id(pid)
+		var pid: int = _still_click_province_pid(world_pos, mv1_commit)
 		if pid < 0 or not provinces.has(pid):
 			# Coarse world territory fallback: when no detailed province (e.g. panned to Africa/Aus/E Asia on stitched world grand), hit large strategic region for "click to get into".
 			# Gives grand strategy world map the feel that every area has a clickable territory/region, even if detailed provs are Europe-focused for current scenario.
@@ -19098,6 +19089,22 @@ func _resolve_map_pick_pid(world_pos: Vector2) -> int:
 	return pid
 
 
+## FIX #5: a facility icon at the click point overrides a stale hover / cache dest.
+## Miss of every facility rect keeps the MV-1 cache-dest / GIS path as on base.
+func _still_click_province_pid(world_pos: Vector2, mv1_commit: bool) -> int:
+	var fac_click: int = _facility_icon_pid_at(world_pos)
+	if fac_click > 0:
+		return fac_click
+	if mv1_commit and _march_preview_cache_dest > 0:
+		return _march_preview_cache_dest
+	var pid := _resolve_map_pick_pid(world_pos)
+	if pid <= 0 and typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_at_world_pos"):
+		pid = MapManager.get_province_at_world_pos(world_pos, true)
+		if MapManager.has_method("resolve_pick_province_id"):
+			pid = MapManager.resolve_pick_province_id(pid)
+	return pid
+
+
 ## Drawn facility icon / badge / cluster rects from FacilityIconLayer._draw layout.
 ## Hidden layer (P, F9, below site zoom) owns no clicks. Miss is -1.
 func _facility_icon_pid_at(world_pos: Vector2) -> int:
@@ -19406,11 +19413,12 @@ func _mv1_preview_dest_matches_world(world_pos: Vector2) -> bool:
 	var dest: int = _march_preview_cache_dest
 	if dest <= 0:
 		return false
-	if _hover_province != null and int(_hover_province.id) == dest:
-		return true
 	var fac_pid: int = _facility_icon_pid_at(world_pos)
 	if fac_pid > 0:
-		return fac_pid == dest
+		## Icon hit allows commit; `_unhandled_input` overrides dest to fac_pid.
+		return true
+	if _hover_province != null and int(_hover_province.id) == dest:
+		return true
 	var click_pid: int = -1
 	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_at_world_pos"):
 		click_pid = int(MapManager.get_province_at_world_pos(world_pos, true))

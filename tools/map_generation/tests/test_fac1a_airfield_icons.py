@@ -139,6 +139,10 @@ class TestFac1aAirfieldIcons(unittest.TestCase):
         self.assertIn("func _layout_drawn_marker", src)
         self.assertIn("COUNT_DIGIT_PX", src)
         self.assertIn("OPS_MIN_ICON_PX", src)
+        self.assertIn("OVAL_W_FRAC", src)
+        self.assertIn("func _point_in_oval", src)
+        self.assertIn("func cluster_chrome_gap_px", src)
+        self.assertNotIn("Color(0.98, 0.93, 0.70", src)
         self.assertIn('"L%d"', src)
         self.assertIn("CLEAR_MARGIN_PX", src)
         self.assertNotIn("acc / float(idxs.size())", src)
@@ -162,6 +166,14 @@ class TestFac1aAirfieldIcons(unittest.TestCase):
         apply = ren[ren.find("func _apply_map_mode_visuals") : ren.find("func _apply_map_mode_visuals") + 2500]
         self.assertIn("FacilityIconLayer", apply)
         self.assertIn("func _facility_icon_pid_at", ren)
+        self.assertIn("func _still_click_province_pid", ren)
+        dest_start = ren.find("func _mv1_preview_dest_matches_world")
+        dest_end = ren.find("\nfunc ", dest_start + 10)
+        dest_body = ren[dest_start:dest_end]
+        self.assertLess(
+            dest_body.find("_facility_icon_pid_at"),
+            dest_body.find("_hover_province"),
+        )
         hex_start = ren.find("func _resolve_hex_pick_pid")
         hex_end = ren.find("\nfunc ", hex_start + 10)
         hex_body = ren[hex_start:hex_end]
@@ -176,6 +188,9 @@ class TestFac1aAirfieldIcons(unittest.TestCase):
         gsrc = guard.read_text(encoding="utf-8")
         self.assertIn("const SPLIT_ZOOM := 1.53", gsrc)
         self.assertIn("CLICK_ZOOMS", gsrc)
+        self.assertIn("CHROME_ZOOMS", gsrc)
+        self.assertIn("STALE_HOVER_PID", gsrc)
+        self.assertIn("OUTSIDE_PAD_PX", gsrc)
 
     def test_old_sites_layer_untouched(self) -> None:
         ol = OL.read_text(encoding="utf-8")

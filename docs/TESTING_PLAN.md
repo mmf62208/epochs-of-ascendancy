@@ -384,6 +384,20 @@ xvfb screenshots go to `/opt/cursor/artifacts/fac1a/`, `/opt/cursor/artifacts/fa
 
 Screenshots FIX #4 (xvfb **NOT live Play**): `/opt/cursor/artifacts/fac1a_fix4/01_badge_z0.97_NOT_live_play.png`, `02_cluster_digit_z0.99_NOT_live_play.png`, `03_lone_icon_z1.30_NOT_live_play.png`, `04_split_boundary_z1.53_NOT_live_play.png`.
 
+**FIX #5 (Play MIXED `3bb534c0`, last polish):** stale-hover override + tight oval/badge hits + cluster chrome + dark halo. Seeds unchanged. Isolated keep-green:
+
+| gate | kind | result | peak MB isolated |
+|---|---|---|---|
+| py_fac1a | py | PASS | — |
+| hd_fac1a | headless | PASS (facility-first dest_matches, oval hit, chrome gap, 2px GIS) | — |
+| xvfb_fac1a | xvfb | PASS stale 1×/4× lone+cluster, tight outside, chrome 0.93/0.97/0.99, dark halo, clearance all tiers | isolated |
+| xvfb_rx1 ON / OFF | xvfb | PASS mid_river **0.749 / 0.749** | isolated |
+| hd_mv1 / hd_mv1b / hd_rh1 | headless | PASS (unedited) | — |
+| hd_ix1 / hd_rx1 / hd_rt1 | headless | PASS | — |
+| xvfb_mv1 / xvfb_mv1_card / xvfb_rh1 | xvfb | PASS | isolated |
+
+Screenshots FIX #5 (xvfb **NOT live Play**): `/opt/cursor/artifacts/fac1a_fix5/01_cluster_count_tag_z0.97_NOT_live_play.png`, `02_lone_and_cluster_z1.30_NOT_live_play.png`, `03_borken_top_edge_z0.93_NOT_live_play.png`.
+
 **FIX #3 (Play MIXED `234e12b8`):** Rhine/spine/border clearance + cluster L4 tag. Split expected ~1.59. Isolated keep-green (`637ca02e`):
 
 | gate | kind | result | peak MB isolated |

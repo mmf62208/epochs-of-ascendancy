@@ -172,6 +172,25 @@ func _test_source_needles() -> void:
 		_fail("FIX #4 cluster digit / lone min size missing")
 	else:
 		_pass("FIX #4 COUNT_DIGIT_PX + OPS_MIN_ICON_PX")
+	if "OVAL_W_FRAC" not in layer or "func _point_in_oval" not in layer or "func cluster_chrome_gap_px" not in layer:
+		_fail("FIX #5 oval hit / chrome gap missing")
+	else:
+		_pass("FIX #5 oval hit + cluster_chrome_gap_px")
+	if "Color(0.98, 0.93, 0.70" in layer:
+		_fail("FIX #5 cream selection-box halo must be gone")
+	else:
+		_pass("FIX #5 dark halo (no cream frame)")
+	if "func _still_click_province_pid" not in ren:
+		_fail("MapRenderer missing _still_click_province_pid")
+	else:
+		_pass("MapRenderer _still_click_province_pid")
+	var dest_fn := _slice_func(ren, "_mv1_preview_dest_matches_world")
+	var fac_i := dest_fn.find("_facility_icon_pid_at")
+	var hover_i := dest_fn.find("_hover_province")
+	if fac_i < 0 or hover_i < 0 or fac_i > hover_i:
+		_fail("_mv1_preview_dest_matches_world must check facility before hover")
+	else:
+		_pass("dest_matches facility-first (stale hover override)")
 	if "func _facility_icon_pid_at" not in ren:
 		_fail("MapRenderer missing _facility_icon_pid_at")
 	else:
@@ -429,12 +448,36 @@ func _test_board_seeds_and_layer() -> void:
 			_fail("%s mid badge_px=%.1f want>=8" % [board, badge_px])
 		else:
 			_pass("%s mid badge %.1fpx (inside footprint)" % [board, badge_px])
-		for bz in [0.93, 0.97, 1.00]:
+		for bz in [0.93, 0.97, 0.99, 1.00]:
 			_layer.call("set_test_zoom", bz)
 			if not bool(_layer.call("badge_inside_footprint_at", bz)):
-				_fail("%s badge outside footprint at %.2f" % [board, bz])
+				_fail("%s badge outside oval at %.2f" % [board, bz])
 			else:
-				_pass("%s badge inside footprint at %.2f" % [board, bz])
+				_pass("%s badge inside oval at %.2f" % [board, bz])
+			var gap_px: float = float(_layer.call("cluster_chrome_gap_px", bz))
+			if gap_px + 0.01 < 2.0 and gap_px > 0.0:
+				_fail("%s cluster chrome gap %.2f < 2 at %.2f" % [board, gap_px, bz])
+			var digit_h: float = float(_layer.call("cluster_digit_screen_h_px", bz))
+			if digit_h + 0.01 < 10.0:
+				_fail("%s cluster digit height %.1f < 10 at %.2f" % [board, digit_h, bz])
+			else:
+				_pass("%s digit h=%.1f chrome_gap=%.1f at %.2f" % [board, digit_h, gap_px, bz])
+		_layer.call("set_test_zoom", 0.97)
+		var layouts_out: Array = _layer.call("get_hit_rects_at_zoom", 0.97)
+		var outside_ok := true
+		for lay_o in layouts_out:
+			if typeof(lay_o) != TYPE_DICTIONARY:
+				continue
+			var samples_out: Array = _layer.call("drawn_outside_samples", lay_o, 0.97, 2.0)
+			for s_v in samples_out:
+				var s: Vector2 = s_v
+				var oh: int = int(_layer.call("hit_test_at_zoom", s, 0.97))
+				if oh > 0:
+					outside_ok = false
+		if not outside_ok:
+			_fail("%s 2px outside oval/badge still hit-tested" % board)
+		else:
+			_pass("%s 2px outside oval/badge is GIS" % board)
 		_layer.call("set_test_zoom", 1.30)
 		var lone_ok := false
 		var layouts_130: Array = _layer.call("get_hit_rects_at_zoom", 1.30)
@@ -558,6 +601,11 @@ func _test_cluster_hysteresis() -> void:
 		_fail("cluster marker missing L4 tag")
 	elif tag_ok:
 		_pass("cluster marker L4 tag")
+	var chrome_gap: float = float(_layer.call("cluster_chrome_gap_px", 0.80))
+	if chrome_gap + 0.01 < 2.0:
+		_fail("tight cluster chrome gap %.2f < 2px" % chrome_gap)
+	else:
+		_pass("tight cluster chrome gap %.1fpx" % chrome_gap)
 	## Same worlds at close/grow: screen gaps open → hysteresis splits.
 	_layer.set("_clustered", true)
 	var close_m: Array = _layer.call("compute_markers_at_zoom", 2.30)
