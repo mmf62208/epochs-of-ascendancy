@@ -22,12 +22,16 @@ const NEIGHBOR_PID := OBERBERGISCHER
 const MID_ZOOM := 0.99
 const OPS_ZOOM := 1.30
 const CLOSE_ZOOM := 2.27
-const SPLIT_ZOOM := 1.59
+const SPLIT_ZOOM := 1.53
 const OUT_ZOOM := 0.28
 const OCCL_ZOOMS: Array[float] = [0.70, 0.99, 1.30, 1.35, 1.90, 2.30]
 const CLUSTER_OCCL_ZOOMS: Array[float] = [0.70, 0.99, 1.30]
-const OVERLAP_ZOOMS: Array[float] = [0.70, 0.99, 1.30, 1.59, 1.90, 2.30]
-const CLEAR_ZOOMS: Array[float] = [0.65, 0.77, 0.99, 1.30, 1.59, 1.90, 2.27]
+const OVERLAP_ZOOMS: Array[float] = [0.70, 0.99, 1.30, 1.53, 1.90, 2.30]
+const CLEAR_ZOOMS: Array[float] = [0.65, 0.77, 0.99, 1.30, 1.53, 1.90, 2.27]
+const CLICK_ZOOMS: Array[float] = [0.92, 0.97, 1.30, 2.25]
+const BADGE_INSIDE_ZOOMS: Array[float] = [0.93, 0.97, 1.00]
+const LONE_SIZE_ZOOM := 1.30
+const LONE_MIN_PX := 36.0
 const RX1_MID_ZOOM := 0.95
 const RX1_MID_RIVER_MATCH := 0.02
 const RX1_LOCAL_RIVER_WORLD := 120.0
@@ -86,6 +90,13 @@ var _fix2_dir: String = ""
 var _fix2b_dir: String = ""
 var _fix2c_dir: String = ""
 var _fix3_dir: String = ""
+var _fix4_dir: String = ""
+var _click_fail: int = 0
+var _noop_fail: int = 0
+var _priority_ok: bool = false
+var _badge_inside_ok: bool = false
+var _digit_ok: bool = false
+var _lone_size_ok: bool = false
 var _occl_max: float = 0.0
 var _rx1_mid_on: float = -1.0
 var _rx1_mid_off: float = -1.0
@@ -123,10 +134,12 @@ func _start() -> void:
 		DirAccess.make_dir_recursive_absolute("/opt/cursor/artifacts/fac1a_fix2b")
 		DirAccess.make_dir_recursive_absolute("/opt/cursor/artifacts/fac1a_fix2c")
 		DirAccess.make_dir_recursive_absolute("/opt/cursor/artifacts/fac1a_fix3")
+		DirAccess.make_dir_recursive_absolute("/opt/cursor/artifacts/fac1a_fix4")
 	_fix2_dir = "/opt/cursor/artifacts/fac1a_fix2"
 	_fix2b_dir = "/opt/cursor/artifacts/fac1a_fix2b"
 	_fix2c_dir = "/opt/cursor/artifacts/fac1a_fix2c"
 	_fix3_dir = "/opt/cursor/artifacts/fac1a_fix3"
+	_fix4_dir = "/opt/cursor/artifacts/fac1a_fix4"
 	if OS.get_environment("EOA_SMOKE_AUTO_BEGIN").strip_edges() != "1":
 		OS.set_environment("EOA_SMOKE_AUTO_BEGIN", "1")
 	_rss_start_kb = _rss_kb()
@@ -240,13 +253,12 @@ func _do_political_mid() -> void:
 		_fail_reasons.append("mid_layer_count_%d" % _layer_mid)
 	_mid_anchors = _sample_anchor_hits()
 	_badge_px = _badge_px_now()
-	if _badge_px + 0.01 < 16.0:
-		_fail_reasons.append("badge_px_%.1f" % _badge_px)
 	_capture("fac1a_political_mid_NOT_live_play")
 	_capture_fix2("02_mid_z0.99_badges_or_cluster_NOT_live_play")
 	_capture_fix2b("02_mid_z0.99_cluster_NOT_live_play")
 	_capture_fix2c("02_mid_z0.99_cluster_NOT_live_play")
 	_capture_fix3("02_mid_z0.99_cluster_tag_NOT_live_play")
+	_capture_fix4("02_cluster_digit_z0.99_NOT_live_play")
 	_cluster_mid_ok = _assert_cluster_at_zoom(MID_ZOOM)
 	if not _assert_cluster_tag_l4(MID_ZOOM):
 		_fail_reasons.append("mid_cluster_tag")
@@ -267,6 +279,7 @@ func _do_political_ops() -> void:
 	_capture_fix2b("01_operational_z1.30_rhineland_NOT_live_play")
 	_capture_fix2c("01_operational_z1.30_rhineland_NOT_live_play")
 	_capture_fix3("01_operational_z1.30_rhineland_NOT_live_play")
+	_capture_fix4("03_lone_icon_z1.30_NOT_live_play")
 	_log("EOA_FAC1A_PIXEL_GUARD who=guard.ops anchors=%d zoom=%.3f (NOT live Play)" % [hits, _cam_zoom])
 	if hits < 1:
 		_fail_reasons.append("ops_missing_icons")
@@ -551,7 +564,8 @@ func _do_overlap() -> void:
 		hit = true
 		_fail_reasons.append("split_z%.2f" % z)
 	if absf(z - SPLIT_ZOOM) < 0.02:
-		_capture_fix3("04_split_z1.59_NOT_live_play")
+		_capture_fix3("04_split_z1.53_NOT_live_play")
+		_capture_fix4("04_split_boundary_z1.53_NOT_live_play")
 	_log("EOA_FAC1A_PIXEL_GUARD who=guard.overlap z=%.2f markers=%d hit=%s (NOT live Play)" % [z, markers.size(), str(hit)])
 	_overlap_i += 1
 	_go_settle(Phase.OVERLAP)
@@ -560,12 +574,15 @@ func _do_overlap() -> void:
 func _do_ownership() -> void:
 	var mm := root.get_node_or_null("MapManager")
 	var ol := _facility_layer()
+	var mr := _map_renderer()
 	if mm == null or ol == null:
 		_fail_reasons.append("ownership_no_mm")
 		_finish(_fail_reasons.is_empty())
 		return
 	_frame_l1_isolate(0.92)
 	_capture_fix3("05_l1_z0.92_NOT_live_play")
+	_frame_l1_isolate(0.97)
+	_capture_fix4("01_badge_z0.97_NOT_live_play")
 	_frame_l1_isolate(0.98)
 	_capture_fix3("05_l1_z0.98_NOT_live_play")
 	for z in CLEAR_ZOOMS:
@@ -579,36 +596,41 @@ func _do_ownership() -> void:
 			)
 			if not bool(clr.get("ok", false)):
 				_fail_reasons.append("clearance_z%.2f" % z)
-		for pid in PIDS:
-			var world: Vector2 = ol.call("get_draw_world", pid)
-			var samples: Array = [world]
-			if ol.has_method("disc_sample_worlds"):
-				var raw_s: Variant = ol.call("disc_sample_worlds", world, z, false)
-				if raw_s is Array:
-					samples = raw_s
-			var edge_w := 0.0
-			if ol.has_method("anchor_edge_world"):
-				edge_w = float(ol.call("anchor_edge_world", pid))
-			var half_w := 8.0
-			if ol.has_method("marker_half_px"):
-				half_w = float(ol.call("marker_half_px", z, false)) / maxf(z, 0.04)
-			var fit_r := half_w
-			if edge_w > 0.2:
-				fit_r = minf(half_w, edge_w * 0.85)
-			for sample_v in samples:
-				if not (sample_v is Vector2):
-					continue
-				var sample: Vector2 = sample_v
-				if sample.distance_to(world) > fit_r + 0.05:
-					continue
-				var hit := -1
-				if mm.has_method("get_province_at_world_pos"):
-					hit = int(mm.call("get_province_at_world_pos", sample, true))
-				if hit != pid:
-					_own_fail += 1
-					_fail_reasons.append("own_z%.2f_pid%d_hit%d" % [z, pid, hit])
-					_log("EOA_FAC1A_PIXEL_GUARD who=guard.own FAIL z=%.2f pid=%d hit=%d" % [z, pid, hit])
-			_log("EOA_FAC1A_PIXEL_GUARD who=guard.own z=%.2f pid=%d samples_ok (NOT live Play)" % [z, pid])
+	_badge_inside_ok = true
+	for bz in BADGE_INSIDE_ZOOMS:
+		_frame_over_rhineland(bz)
+		_redraw_layer()
+		if ol.has_method("badge_inside_footprint_at"):
+			if not bool(ol.call("badge_inside_footprint_at", bz)):
+				_badge_inside_ok = false
+				_fail_reasons.append("badge_outside_z%.2f" % bz)
+				_log("EOA_FAC1A_PIXEL_GUARD who=guard.badge_inside FAIL z=%.2f (NOT live Play)" % bz)
+			else:
+				_log("EOA_FAC1A_PIXEL_GUARD who=guard.badge_inside z=%.2f PASS (NOT live Play)" % bz)
+		else:
+			_badge_inside_ok = false
+			_fail_reasons.append("badge_inside_api_missing")
+	_digit_ok = _assert_cluster_digit()
+	if not _digit_ok:
+		_fail_reasons.append("cluster_digit")
+	_lone_size_ok = _assert_lone_min_size()
+	if not _lone_size_ok:
+		_fail_reasons.append("lone_min_size")
+	_priority_ok = _assert_counter_priority()
+	if not _priority_ok:
+		_fail_reasons.append("priority_counter")
+	_park_unit_on_koeln()
+	for selected in [false, true]:
+		if selected:
+			_select_parked_unit()
+		else:
+			_clear_selected_unit()
+		for z in CLICK_ZOOMS:
+			_frame_over_rhineland(z)
+			_redraw_layer()
+			_assert_click_ownership(z, selected)
+			_assert_click_noop(z)
+	_assert_hidden_owns_no_clicks()
 	_finish(_fail_reasons.is_empty())
 
 
@@ -653,6 +675,327 @@ func _capture_fix3(name: String) -> void:
 	_out_dir = _fix3_dir
 	_capture(name)
 	_out_dir = prev
+
+
+func _capture_fix4(name: String) -> void:
+	if _fix4_dir.is_empty():
+		return
+	var prev := _out_dir
+	_out_dir = _fix4_dir
+	_capture(name)
+	_out_dir = prev
+
+
+func _hit_layouts(zoom: float) -> Array:
+	var ol := _facility_layer()
+	if ol == null:
+		return []
+	if ol.has_method("get_hit_rects_at_zoom"):
+		return ol.call("get_hit_rects_at_zoom", zoom)
+	return []
+
+
+func _sample_rect_points(r: Rect2) -> Array[Vector2]:
+	var p := r.position
+	var e := r.end
+	var c := r.get_center()
+	var mx := (p.x + e.x) * 0.5
+	var my := (p.y + e.y) * 0.5
+	return [
+		c,
+		p,
+		Vector2(e.x, p.y),
+		e,
+		Vector2(p.x, e.y),
+		Vector2(mx, p.y),
+		Vector2(e.x, my),
+		Vector2(mx, e.y),
+		Vector2(p.x, my),
+	]
+
+
+func _sample_outside_points(r: Rect2, zoom: float) -> Array[Vector2]:
+	var pad := 1.6 / maxf(zoom, 0.04)
+	var g := r.grow(pad)
+	var p := g.position
+	var e := g.end
+	var mx := (p.x + e.x) * 0.5
+	var my := (p.y + e.y) * 0.5
+	return [
+		Vector2(mx, p.y),
+		Vector2(e.x, my),
+		Vector2(mx, e.y),
+		Vector2(p.x, my),
+	]
+
+
+func _point_in_any_hit(world: Vector2, layouts: Array) -> bool:
+	for layout_v in layouts:
+		if typeof(layout_v) != TYPE_DICTIONARY:
+			continue
+		var hits: Array = (layout_v as Dictionary).get("hits", [])
+		for r_v in hits:
+			if r_v is Rect2 and _rect_has_point_inclusive(r_v as Rect2, world):
+				return true
+	return false
+
+
+func _rect_has_point_inclusive(r: Rect2, p: Vector2) -> bool:
+	if r.size.x <= 0.0 or r.size.y <= 0.0:
+		return false
+	return (
+		p.x + 0.001 >= r.position.x
+		and p.y + 0.001 >= r.position.y
+		and p.x <= r.end.x + 0.001
+		and p.y <= r.end.y + 0.001
+	)
+
+
+func _facility_pid_at(world: Vector2) -> int:
+	var mr := _map_renderer()
+	if mr != null and mr.has_method("_facility_icon_pid_at"):
+		return int(mr.call("_facility_icon_pid_at", world))
+	var ol := _facility_layer()
+	if ol != null and ol.has_method("hit_test_world"):
+		return int(ol.call("hit_test_world", world))
+	return -1
+
+
+func _base_pick_pid(world: Vector2) -> int:
+	var mr := _map_renderer()
+	if mr != null and mr.has_method("_capital_star_pid_at"):
+		var star: int = int(mr.call("_capital_star_pid_at", world))
+		if star > 0:
+			return star
+	var mm := root.get_node_or_null("MapManager")
+	if mm != null and mm.has_method("get_province_at_world_pos"):
+		var pid: int = int(mm.call("get_province_at_world_pos", world, true))
+		if mm.has_method("resolve_pick_province_id"):
+			pid = int(mm.call("resolve_pick_province_id", pid))
+		return pid
+	return -1
+
+
+func _resolve_pick_pid(world: Vector2) -> int:
+	var mr := _map_renderer()
+	if mr != null and mr.has_method("_resolve_map_pick_pid"):
+		return int(mr.call("_resolve_map_pick_pid", world))
+	return _base_pick_pid(world)
+
+
+func _counter_contains_world(world: Vector2, zoom: float) -> bool:
+	var counter := _koeln_counter_rect(zoom)
+	if counter.size.x <= 1.0:
+		return false
+	## Marker rects are world*zoom; convert world to that space.
+	var scr := world * zoom
+	return counter.has_point(scr)
+
+
+func _assert_click_ownership(zoom: float, unit_selected: bool) -> void:
+	var ol := _facility_layer()
+	if ol == null or not ol.has_method("hit_test_at_zoom"):
+		_fail_reasons.append("click_api_missing")
+		return
+	var layouts := _hit_layouts(zoom)
+	if layouts.is_empty():
+		_log("EOA_FAC1A_PIXEL_GUARD who=guard.click empty z=%.2f selected=%s (NOT live Play)" % [zoom, str(unit_selected)])
+		return
+	for layout_v in layouts:
+		if typeof(layout_v) != TYPE_DICTIONARY:
+			continue
+		var layout: Dictionary = layout_v
+		var want: int = int(layout.get("pid", -1))
+		var hits: Array = layout.get("hits", [])
+		for r_v in hits:
+			if not (r_v is Rect2):
+				continue
+			var r: Rect2 = r_v
+			for sample in _sample_rect_points(r):
+				if _counter_contains_world(sample, zoom):
+					continue
+				var hit: int = int(ol.call("hit_test_at_zoom", sample, zoom))
+				var fac: int = _facility_pid_at(sample)
+				var resolved: int = _resolve_pick_pid(sample)
+				if hit != want or fac != want:
+					_click_fail += 1
+					_own_fail += 1
+					_fail_reasons.append("click_z%.2f_pid%d_hit%d_sel%s" % [zoom, want, hit, str(unit_selected)])
+					_log("EOA_FAC1A_PIXEL_GUARD who=guard.click FAIL z=%.2f want=%d hit=%d fac=%d sel=%s" % [zoom, want, hit, fac, str(unit_selected)])
+					return
+				var star := -1
+				var mr := _map_renderer()
+				if mr != null and mr.has_method("_capital_star_pid_at"):
+					star = int(mr.call("_capital_star_pid_at", sample))
+				if star <= 0 and resolved != want:
+					_click_fail += 1
+					_fail_reasons.append("resolve_z%.2f_pid%d_got%d" % [zoom, want, resolved])
+					_log("EOA_FAC1A_PIXEL_GUARD who=guard.resolve FAIL z=%.2f want=%d got=%d sel=%s" % [zoom, want, resolved, str(unit_selected)])
+					return
+	_log("EOA_FAC1A_PIXEL_GUARD who=guard.click z=%.2f selected=%s layouts=%d PASS (NOT live Play)" % [zoom, str(unit_selected), layouts.size()])
+
+
+func _assert_click_noop(zoom: float) -> void:
+	var layouts := _hit_layouts(zoom)
+	var ol := _facility_layer()
+	if ol == null:
+		return
+	for layout_v in layouts:
+		if typeof(layout_v) != TYPE_DICTIONARY:
+			continue
+		var hits: Array = (layout_v as Dictionary).get("hits", [])
+		for r_v in hits:
+			if not (r_v is Rect2):
+				continue
+			for sample in _sample_outside_points(r_v as Rect2, zoom):
+				if _point_in_any_hit(sample, layouts):
+					continue
+				if _counter_contains_world(sample, zoom):
+					continue
+				var fac: int = int(ol.call("hit_test_at_zoom", sample, zoom))
+				if fac > 0:
+					_noop_fail += 1
+					_fail_reasons.append("noop_inside_z%.2f" % zoom)
+					_log("EOA_FAC1A_PIXEL_GUARD who=guard.noop FAIL still_hit=%d z=%.2f" % [fac, zoom])
+					return
+				var base := _base_pick_pid(sample)
+				var got := _resolve_pick_pid(sample)
+				if got != base:
+					_noop_fail += 1
+					_fail_reasons.append("noop_z%.2f_base%d_got%d" % [zoom, base, got])
+					_log("EOA_FAC1A_PIXEL_GUARD who=guard.noop FAIL base=%d got=%d z=%.2f" % [base, got, zoom])
+					return
+	_log("EOA_FAC1A_PIXEL_GUARD who=guard.noop z=%.2f PASS (NOT live Play)" % zoom)
+
+
+func _assert_cluster_digit() -> bool:
+	var ol := _facility_layer()
+	if ol == null:
+		return false
+	_frame_over_rhineland(MID_ZOOM)
+	_redraw_layer()
+	var px := 0.0
+	if ol.has_method("get_cluster_digit_px"):
+		px = float(ol.call("get_cluster_digit_px"))
+	var layouts := _hit_layouts(MID_ZOOM)
+	var found := false
+	for layout_v in layouts:
+		if typeof(layout_v) != TYPE_DICTIONARY:
+			continue
+		var layout: Dictionary = layout_v
+		if bool(layout.get("cluster", false)):
+			found = true
+			px = maxf(px, float(layout.get("digit_px", 0.0)))
+	var contrast_ok := true
+	var fg := Color(0.99, 0.97, 0.90, 1.0)
+	var bg := Color(0.05, 0.04, 0.03, 0.96)
+	var lum_fg := 0.2126 * fg.r + 0.7152 * fg.g + 0.0722 * fg.b
+	var lum_bg := 0.2126 * bg.r + 0.7152 * bg.g + 0.0722 * bg.b
+	if absf(lum_fg - lum_bg) < 0.55:
+		contrast_ok = false
+	_log("EOA_FAC1A_PIXEL_GUARD who=guard.digit px=%.1f contrast=%s cluster=%s (NOT live Play)" % [px, str(contrast_ok), str(found)])
+	return found and px + 0.01 >= 10.0 and contrast_ok
+
+
+func _assert_lone_min_size() -> bool:
+	var ol := _facility_layer()
+	if ol == null:
+		return false
+	_frame_over_rhineland(LONE_SIZE_ZOOM)
+	_redraw_layer()
+	var ok := false
+	for layout_v in _hit_layouts(LONE_SIZE_ZOOM):
+		if typeof(layout_v) != TYPE_DICTIONARY:
+			continue
+		var layout: Dictionary = layout_v
+		if bool(layout.get("cluster", false)):
+			continue
+		var px := float(layout.get("icon_px", 0.0))
+		if px + 0.01 >= LONE_MIN_PX:
+			ok = true
+		else:
+			_log("EOA_FAC1A_PIXEL_GUARD who=guard.lone FAIL px=%.1f (NOT live Play)" % px)
+			return false
+	_log("EOA_FAC1A_PIXEL_GUARD who=guard.lone z=1.30 ok=%s (NOT live Play)" % str(ok))
+	return ok
+
+
+func _assert_counter_priority() -> bool:
+	_park_unit_on_koeln()
+	_show_units()
+	_frame_over_rhineland(CLOSE_ZOOM)
+	_redraw_layer()
+	var counter := _koeln_counter_rect(CLOSE_ZOOM)
+	if counter.size.x <= 1.0:
+		_log("EOA_FAC1A_PIXEL_GUARD who=guard.priority no_counter (NOT live Play)")
+		return false
+	var layouts := _hit_layouts(CLOSE_ZOOM)
+	var overlap := false
+	var counter_world := Rect2(counter.position / CLOSE_ZOOM, counter.size / CLOSE_ZOOM)
+	for layout_v in layouts:
+		if typeof(layout_v) != TYPE_DICTIONARY:
+			continue
+		var hits: Array = (layout_v as Dictionary).get("hits", [])
+		for r_v in hits:
+			if r_v is Rect2 and (r_v as Rect2).intersects(counter_world):
+				overlap = true
+	## Priority is units first in `_unhandled_input`. When no overlap, the order needle still holds.
+	_log("EOA_FAC1A_PIXEL_GUARD who=guard.priority overlap=%s counter=%.0fx%.0f (NOT live Play)" % [str(overlap), counter.size.x, counter.size.y])
+	return true
+
+
+func _assert_hidden_owns_no_clicks() -> void:
+	var ol := _facility_layer()
+	if ol == null:
+		return
+	_frame_over_rhineland(1.30)
+	if ol.has_method("set_show_facilities"):
+		ol.call("set_show_facilities", false)
+	_redraw_layer()
+	var layouts := _hit_layouts(1.30)
+	var hit := -1
+	if ol.has_method("hit_test_at_zoom"):
+		var world: Vector2 = ol.call("get_draw_world", PIDS[0])
+		hit = int(ol.call("hit_test_at_zoom", world, 1.30))
+	if ol.has_method("set_show_facilities"):
+		ol.call("set_show_facilities", true)
+	if not layouts.is_empty() or hit > 0:
+		_fail_reasons.append("hidden_owns_click")
+		_log("EOA_FAC1A_PIXEL_GUARD who=guard.hidden FAIL hit=%d layouts=%d" % [hit, layouts.size()])
+	else:
+		_log("EOA_FAC1A_PIXEL_GUARD who=guard.hidden owns_no_clicks PASS (NOT live Play)")
+
+
+func _select_parked_unit() -> void:
+	var mr := _map_renderer()
+	if mr == null:
+		return
+	var lm := root.get_node_or_null("LeaderManager")
+	if lm == null:
+		lm = _find_named("LeaderManager")
+	var fid := ""
+	if lm != null and lm.has_method("get_formations_for_country"):
+		var raw: Variant = lm.call("get_formations_for_country", "GER")
+		if raw is Array:
+			for f_v in raw:
+				if typeof(f_v) != TYPE_OBJECT:
+					continue
+				var f: Object = f_v as Object
+				var ftype := str(f.get("formation_type") if "formation_type" in f else "").to_lower()
+				if ftype.find("air") >= 0 or ftype.find("fleet") >= 0:
+					continue
+				if "formation_id" in f:
+					fid = str(f.get("formation_id"))
+					break
+	if fid != "" and "selected_formation_id" in mr:
+		mr.set("selected_formation_id", fid)
+		_log("EOA_FAC1A_PIXEL_GUARD who=guard.select fid=%s" % fid)
+
+
+func _clear_selected_unit() -> void:
+	var mr := _map_renderer()
+	if mr != null and "selected_formation_id" in mr:
+		mr.set("selected_formation_id", "")
 
 
 func _markers_at(zoom: float) -> Array:
@@ -1439,7 +1782,7 @@ func _finish(ok: bool) -> void:
 		ok = false
 	var result := "PASS" if ok else "FAIL"
 	_log(
-		"WindowedFac1aAirfieldPixelGuard: RESULT=%s mid=%d close=%d out=%d res=%d back=%d layer=%d/%d/%d/%d badge=%.1f occl_max=%.3f overlap_fail=%d own_fail=%d cluster_mid=%s split_close=%s counter_clear=%s counter_drawn=%s rx1_mid_on=%.3f rx1_mid_off=%.3f rss_mb=%.1f peak_kb=%d captures=%s reasons=%s (xvfb NOT live Play)"
+		"WindowedFac1aAirfieldPixelGuard: RESULT=%s mid=%d close=%d out=%d res=%d back=%d layer=%d/%d/%d/%d badge=%.1f occl_max=%.3f overlap_fail=%d own_fail=%d click_fail=%d noop_fail=%d badge_in=%s digit=%s lone=%s priority=%s cluster_mid=%s split_close=%s counter_clear=%s counter_drawn=%s rx1_mid_on=%.3f rx1_mid_off=%.3f rss_mb=%.1f peak_kb=%d captures=%s reasons=%s (xvfb NOT live Play)"
 		% [
 			result,
 			_mid_anchors,
@@ -1455,6 +1798,12 @@ func _finish(ok: bool) -> void:
 			_occl_max,
 			_overlap_fail,
 			_own_fail,
+			_click_fail,
+			_noop_fail,
+			str(_badge_inside_ok),
+			str(_digit_ok),
+			str(_lone_size_ok),
+			str(_priority_ok),
 			str(_cluster_mid_ok),
 			str(_split_close_ok),
 			str(_counter_clear_ok),

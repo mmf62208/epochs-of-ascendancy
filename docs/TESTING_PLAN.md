@@ -368,7 +368,9 @@ tools/run_godot.sh --headless --path . -s res://scripts/core/HeadlessFac1aAirfie
 tools/eoa_fac1a_pixel_guard.sh
 ```
 
-xvfb screenshots go to `/opt/cursor/artifacts/fac1a/`, `/opt/cursor/artifacts/fac1a_fix2/`, `/opt/cursor/artifacts/fac1a_fix2b/`, `/opt/cursor/artifacts/fac1a_fix2c/`, and `/opt/cursor/artifacts/fac1a_fix3/` and are **NOT live Play**. Peak RSS must stay under 3 GB (isolated process tree — do not sum leftover Godot). Merge **HOLD**.
+xvfb screenshots go to `/opt/cursor/artifacts/fac1a/`, `/opt/cursor/artifacts/fac1a_fix2/`, `/opt/cursor/artifacts/fac1a_fix2b/`, `/opt/cursor/artifacts/fac1a_fix2c/`, `/opt/cursor/artifacts/fac1a_fix3/`, and `/opt/cursor/artifacts/fac1a_fix4/` and are **NOT live Play**. Peak RSS must stay under 3 GB (isolated process tree — do not sum leftover Godot). Merge **HOLD**.
+
+**FIX #4 (Play MIXED `76fb4808`):** click ownership + badge-in-footprint + cluster digit + lone min size + split guard 1.53. Seeds unchanged. Isolated keep-green recorded after the xvfb run.
 
 **FIX #3 (Play MIXED `234e12b8`):** Rhine/spine/border clearance + cluster L4 tag. Split expected ~1.59. Isolated keep-green (`637ca02e`):
 

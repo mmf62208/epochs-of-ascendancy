@@ -164,6 +164,28 @@ func _test_source_needles() -> void:
 		_fail("FIX #3 level tag / clearance margin missing")
 	else:
 		_pass("FIX #3 L4 tag + CLEAR_MARGIN_PX")
+	if "func hit_test_world" not in layer or "func _layout_drawn_marker" not in layer:
+		_fail("FIX #4 hit-test / shared layout missing")
+	else:
+		_pass("FIX #4 hit_test_world + _layout_drawn_marker")
+	if "COUNT_DIGIT_PX" not in layer or "OPS_MIN_ICON_PX" not in layer:
+		_fail("FIX #4 cluster digit / lone min size missing")
+	else:
+		_pass("FIX #4 COUNT_DIGIT_PX + OPS_MIN_ICON_PX")
+	if "func _facility_icon_pid_at" not in ren:
+		_fail("MapRenderer missing _facility_icon_pid_at")
+	else:
+		_pass("MapRenderer _facility_icon_pid_at")
+	var hex_fn := _slice_func(ren, "_resolve_hex_pick_pid")
+	if "FacilityIcon" in hex_fn or "_facility_icon" in hex_fn:
+		_fail("_resolve_hex_pick_pid must stay GIS-only")
+	else:
+		_pass("_resolve_hex_pick_pid GIS-only")
+	var land_fn := _slice_func(ren, "_try_open_land_unit_at_world")
+	if "FacilityIcon" in land_fn or "_facility_icon" in land_fn:
+		_fail("_try_open_land_unit_at_world must not mention FacilityIcon")
+	else:
+		_pass("_try_open_land_unit_at_world untouched by facility")
 	if "_setup_facility_icon_layer" not in ren:
 		_fail("MapRenderer missing _setup_facility_icon_layer")
 	else:
@@ -403,10 +425,54 @@ func _test_board_seeds_and_layer() -> void:
 		if click_ok:
 			_pass("%s click-ownership: icon center inside own province" % board)
 		var badge_px: float = float(_layer.call("get_badge_screen_px", 0.80))
-		if badge_px + 0.01 < 16.0:
-			_fail("%s mid badge_px=%.1f want>=16" % [board, badge_px])
+		if badge_px + 0.01 < 8.0:
+			_fail("%s mid badge_px=%.1f want>=8" % [board, badge_px])
 		else:
-			_pass("%s mid badge %.1fpx" % [board, badge_px])
+			_pass("%s mid badge %.1fpx (inside footprint)" % [board, badge_px])
+		for bz in [0.93, 0.97, 1.00]:
+			_layer.call("set_test_zoom", bz)
+			if not bool(_layer.call("badge_inside_footprint_at", bz)):
+				_fail("%s badge outside footprint at %.2f" % [board, bz])
+			else:
+				_pass("%s badge inside footprint at %.2f" % [board, bz])
+		_layer.call("set_test_zoom", 1.30)
+		var lone_ok := false
+		var layouts_130: Array = _layer.call("get_hit_rects_at_zoom", 1.30)
+		for lay_v in layouts_130:
+			if typeof(lay_v) != TYPE_DICTIONARY:
+				continue
+			var lay: Dictionary = lay_v
+			if bool(lay.get("cluster", false)):
+				continue
+			if float(lay.get("icon_px", 0.0)) + 0.01 >= 36.0:
+				lone_ok = true
+		if not lone_ok:
+			_fail("%s lone icon at 1.30 below 36px" % board)
+		else:
+			_pass("%s lone icon ≥36px at 1.30" % board)
+		var digit_px: float = float(_layer.call("get_cluster_digit_px"))
+		if digit_px + 0.01 < 10.0:
+			_fail("%s cluster digit %.1f < 10" % [board, digit_px])
+		else:
+			_pass("%s cluster digit %.1fpx" % [board, digit_px])
+		_layer.call("set_test_zoom", 0.97)
+		for pid in SEED_PIDS:
+			var dw2: Vector2 = _layer.call("get_draw_world", pid)
+			var hid: int = int(_layer.call("hit_test_at_zoom", dw2, 0.97))
+			if hid != int(pid) and hid <= 0:
+				## Cluster host may own the click at mid; that is still a site pid.
+				var clustered_ok := hid == VIERSEN or hid == HUNSRUECK or hid == OBERBERGISCHER or hid == NEUWIED
+				if not clustered_ok:
+					_fail("%s hit_test at %d centre → %d" % [board, int(pid), hid])
+			else:
+				_pass("%s hit_test centre pid=%d → %d" % [board, int(pid), hid])
+		_layer.call("set_show_facilities", false)
+		var hidden_hit: int = int(_layer.call("hit_test_at_zoom", _layer.call("get_draw_world", VIERSEN), 0.97))
+		if hidden_hit > 0:
+			_fail("%s hidden layer still owns click %d" % [board, hidden_hit])
+		else:
+			_pass("%s hidden layer owns no clicks" % board)
+		_layer.call("set_show_facilities", true)
 		if int(_layer.call("count_icons_that_would_draw")) != 4:
 			_fail("%s expected 4 sites after interior rebuild" % board)
 		_layer.call("set_test_map_mode", "diplomacy")

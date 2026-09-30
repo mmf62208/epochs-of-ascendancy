@@ -3141,10 +3141,13 @@ func _unhandled_input(event: InputEvent) -> void:
 		var pid := -1
 		if mv1_commit and _march_preview_cache_dest > 0:
 			pid = _march_preview_cache_dest
-		elif typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_at_world_pos"):
-			pid = MapManager.get_province_at_world_pos(world_pos, true)
-			if MapManager.has_method("resolve_pick_province_id"):
-				pid = MapManager.resolve_pick_province_id(pid)
+		else:
+			# Units / chips / capital-star already ran. Facility rects next; miss is GIS.
+			pid = _resolve_map_pick_pid(world_pos)
+			if pid <= 0 and typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_at_world_pos"):
+				pid = MapManager.get_province_at_world_pos(world_pos, true)
+				if MapManager.has_method("resolve_pick_province_id"):
+					pid = MapManager.resolve_pick_province_id(pid)
 		if pid < 0 or not provinces.has(pid):
 			# Coarse world territory fallback: when no detailed province (e.g. panned to Africa/Aus/E Asia on stitched world grand), hit large strategic region for "click to get into".
 			# Gives grand strategy world map the feel that every area has a clickable territory/region, even if detailed provs are Europe-focused for current scenario.
@@ -19079,17 +19082,31 @@ func _capital_star_pid_at(world_pos: Vector2) -> int:
 	return int(MapManager.prefer_capital_province_at(world_pos, -1))
 
 
-## Same resolve for hover tooltip and click (capital star disk, then hex pick).
+## Same resolve for hover tooltip and click (capital star disk, then facility icon, then hex pick).
 func _resolve_map_pick_pid(world_pos: Vector2) -> int:
 	var star_pid := _capital_star_pid_at(world_pos)
 	if star_pid > 0:
 		return star_pid
+	var fac_pid := _facility_icon_pid_at(world_pos)
+	if fac_pid > 0:
+		return fac_pid
 	var pid := -1
 	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_at_world_pos"):
 		pid = MapManager.get_province_at_world_pos(world_pos, true)
 		if MapManager.has_method("resolve_pick_province_id"):
 			pid = MapManager.resolve_pick_province_id(pid)
 	return pid
+
+
+## Drawn facility icon / badge / cluster rects from FacilityIconLayer._draw layout.
+## Hidden layer (P, F9, below site zoom) owns no clicks. Miss is -1.
+func _facility_icon_pid_at(world_pos: Vector2) -> int:
+	var ol := get_overlay_layer("FacilityIconLayer")
+	if ol == null or not is_instance_valid(ol):
+		return -1
+	if ol.has_method("hit_test_world"):
+		return int(ol.call("hit_test_world", world_pos))
+	return -1
 
 
 ## Hex/land under cursor only — no capital-star prefer.
@@ -19391,6 +19408,9 @@ func _mv1_preview_dest_matches_world(world_pos: Vector2) -> bool:
 		return false
 	if _hover_province != null and int(_hover_province.id) == dest:
 		return true
+	var fac_pid: int = _facility_icon_pid_at(world_pos)
+	if fac_pid > 0:
+		return fac_pid == dest
 	var click_pid: int = -1
 	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_at_world_pos"):
 		click_pid = int(MapManager.get_province_at_world_pos(world_pos, true))

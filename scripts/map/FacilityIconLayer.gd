@@ -18,6 +18,12 @@ const CLOSE_ZOOM := 1.0
 const GROW_ZOOM := 2.0
 const BADGE_PX := 16.0
 const BADGE_OUTLINE_PX := 1.5
+const MID_BADGE_PX := 10.0
+const OPS_MIN_ICON_PX := 36.0
+const OPS_SIZE_ZOOM := 1.20
+const HALO_PX := 2.0
+const COUNT_DIGIT_MIN_PX := 10.0
+const COUNT_DIGIT_PX := 12.0
 const MAP_Z := 24
 const UNIT_COUNTER_Z := 28
 const THEATER_SCALE := 1.728
@@ -125,7 +131,171 @@ func get_badge_screen_px(zoom: float = -1.0) -> float:
 	var z := zoom if zoom >= 0.0 else _canvas_zoom()
 	if z < _site_min_zoom():
 		return 0.0
-	return BADGE_PX
+	if z + 0.0001 >= CLOSE_ZOOM:
+		return 0.0
+	return MID_BADGE_PX
+
+
+func get_cluster_digit_px() -> float:
+	return COUNT_DIGIT_PX
+
+
+func _world_size_at(screen_px: float, zoom: float) -> float:
+	return screen_px / maxf(zoom, 0.04)
+
+
+func _drawn_icon_px(zoom: float, cluster: bool) -> float:
+	var px := _icon_screen_px(zoom)
+	if cluster:
+		return px + 4.0
+	if zoom + 0.0001 >= OPS_SIZE_ZOOM:
+		return maxf(px, OPS_MIN_ICON_PX)
+	return px
+
+
+func _should_draw_at(zoom: float) -> bool:
+	if not show_facilities:
+		return false
+	if not _mode_allows_facilities():
+		return false
+	if zoom < _site_min_zoom():
+		return false
+	return true
+
+
+func _rect_has_point_inclusive(r: Rect2, p: Vector2) -> bool:
+	if r.size.x <= 0.0 or r.size.y <= 0.0:
+		return false
+	return (
+		p.x + 0.001 >= r.position.x
+		and p.y + 0.001 >= r.position.y
+		and p.x <= r.end.x + 0.001
+		and p.y <= r.end.y + 0.001
+	)
+
+
+func _rect_contains_rect(outer: Rect2, inner: Rect2) -> bool:
+	if inner.size.x <= 0.0 or inner.size.y <= 0.0:
+		return true
+	return (
+		inner.position.x + 0.001 >= outer.position.x
+		and inner.position.y + 0.001 >= outer.position.y
+		and inner.end.x <= outer.end.x + 0.001
+		and inner.end.y <= outer.end.y + 0.001
+	)
+
+
+func _clamp_rect_inside(inner: Rect2, outer: Rect2) -> Rect2:
+	if inner.size.x <= 0.0 or outer.size.x <= 0.0:
+		return inner
+	var w := minf(inner.size.x, outer.size.x)
+	var h := minf(inner.size.y, outer.size.y)
+	var x := clampf(inner.position.x, outer.position.x, outer.end.x - w)
+	var y := clampf(inner.position.y, outer.position.y, outer.end.y - h)
+	return Rect2(Vector2(x, y), Vector2(w, h))
+
+
+func _layout_drawn_marker(rec: Dictionary, zoom: float) -> Dictionary:
+	var world: Vector2 = rec.get("world", Vector2.ZERO) as Vector2
+	var cluster := bool(rec.get("cluster", false))
+	var level: int = clampi(int(rec.get("level", 1)), 1, 4)
+	var count: int = int(rec.get("count", 0)) if cluster else (level if zoom + 0.0001 < CLOSE_ZOOM else 0)
+	var icon_px := _drawn_icon_px(zoom, cluster)
+	var world_px := _world_size_at(icon_px, zoom)
+	var icon_rect := Rect2(world - Vector2(world_px, world_px) * 0.5, Vector2(world_px, world_px))
+	var halo_world := 0.0
+	if not cluster and zoom + 0.0001 >= CLOSE_ZOOM:
+		halo_world = _world_size_at(HALO_PX, zoom)
+	var hit_icon := icon_rect.grow(halo_world)
+	var hits: Array[Rect2] = [hit_icon]
+	var badge_rect := Rect2()
+	var tag_rect := Rect2()
+	var pad := _world_size_at(1.0, zoom)
+	if cluster:
+		var disc_px := maxf(COUNT_DIGIT_MIN_PX + 4.0, 14.0)
+		var disc_w := _world_size_at(disc_px, zoom)
+		var count_n := maxi(int(rec.get("count", 0)), 1)
+		if count_n >= 1:
+			var raw_badge := Rect2(
+				Vector2(icon_rect.position.x + pad, icon_rect.end.y - disc_w - pad),
+				Vector2(disc_w, disc_w)
+			)
+			badge_rect = _clamp_rect_inside(raw_badge, icon_rect)
+			hits.append(badge_rect)
+		var tag_w := _world_size_at(BADGE_PX, zoom)
+		var raw_tag := Rect2(
+			Vector2(icon_rect.end.x - tag_w - pad, icon_rect.end.y - tag_w - pad),
+			Vector2(tag_w, tag_w)
+		)
+		tag_rect = _clamp_rect_inside(raw_tag, icon_rect)
+		hits.append(tag_rect)
+	elif count >= 1:
+		var bpx := MID_BADGE_PX
+		var bw := _world_size_at(bpx, zoom)
+		var raw_badge2 := Rect2(
+			Vector2(icon_rect.position.x + (icon_rect.size.x - bw) * 0.5, icon_rect.end.y - bw - pad),
+			Vector2(bw, bw)
+		)
+		badge_rect = _clamp_rect_inside(raw_badge2, icon_rect)
+		hits.append(badge_rect)
+	return {
+		"pid": int(rec.get("pid", -1)),
+		"cluster": cluster,
+		"world": world,
+		"icon_px": icon_px,
+		"icon_rect": icon_rect,
+		"hit_icon": hit_icon,
+		"badge_rect": badge_rect,
+		"tag_rect": tag_rect,
+		"hits": hits,
+		"count": count if not cluster else int(rec.get("count", 0)),
+		"level": level,
+		"digit_px": COUNT_DIGIT_PX if cluster else 0.0,
+	}
+
+
+func hit_test_world(world: Vector2) -> int:
+	if not _should_draw():
+		return -1
+	return hit_test_at_zoom(world, _canvas_zoom())
+
+
+func hit_test_at_zoom(world: Vector2, zoom: float) -> int:
+	if not _should_draw_at(zoom):
+		return -1
+	var layouts := get_hit_rects_at_zoom(zoom)
+	for layout_v in layouts:
+		var layout: Dictionary = layout_v
+		var hit_list: Array = layout.get("hits", [])
+		for r_v in hit_list:
+			if r_v is Rect2 and _rect_has_point_inclusive(r_v as Rect2, world):
+				return int(layout.get("pid", -1))
+	return -1
+
+
+func get_hit_rects_at_zoom(zoom: float) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if not _should_draw_at(zoom):
+		return out
+	var markers := compute_markers_at_zoom(zoom)
+	for rec_v in markers:
+		if typeof(rec_v) != TYPE_DICTIONARY:
+			continue
+		out.append(_layout_drawn_marker(rec_v as Dictionary, zoom))
+	return out
+
+
+func badge_inside_footprint_at(zoom: float) -> bool:
+	for layout_v in get_hit_rects_at_zoom(zoom):
+		var layout: Dictionary = layout_v
+		var icon: Rect2 = layout.get("icon_rect", Rect2()) as Rect2
+		var badge: Rect2 = layout.get("badge_rect", Rect2()) as Rect2
+		var tag: Rect2 = layout.get("tag_rect", Rect2()) as Rect2
+		if not _rect_contains_rect(icon, badge):
+			return false
+		if not _rect_contains_rect(icon, tag):
+			return false
+	return true
 
 
 func get_draw_world(pid: int) -> Vector2:
@@ -672,7 +842,7 @@ func _icon_screen_px(zoom: float) -> float:
 
 
 func _world_size(screen_px: float) -> float:
-	return screen_px / maxf(_canvas_zoom(), 0.04)
+	return _world_size_at(screen_px, _canvas_zoom())
 
 
 func _load_tex(stem: String, px: int) -> Texture2D:
@@ -1027,42 +1197,40 @@ func _draw() -> void:
 	var z := _canvas_zoom()
 	var markers := _build_markers()
 	_last_markers = markers
-	var screen_px := _icon_screen_px(z)
-	var close := z >= CLOSE_ZOOM
 	for rec in markers:
 		var world: Vector2 = rec.get("world", Vector2.ZERO) as Vector2
 		if not world.is_finite():
 			continue
-		if not _in_viewport(world, screen_px + BADGE_PX + 20.0):
+		var layout := _layout_drawn_marker(rec, z)
+		var icon_px: float = float(layout.get("icon_px", 0.0))
+		if not _in_viewport(world, icon_px + 20.0):
 			continue
-		var level: int = clampi(int(rec.get("level", 1)), 1, 4)
+		var level: int = clampi(int(layout.get("level", 1)), 1, 4)
 		var tex_key: String = str(rec.get("tex_key", texture_key_for_level(level, "intact")))
 		var icon_tex := _load_tex(tex_key, 32)
 		if icon_tex == null:
 			continue
-		var px := screen_px
-		if bool(rec.get("cluster", false)):
-			px = screen_px + 4.0
-		var world_px := _world_size(px)
-		var rect := Rect2(world - Vector2(world_px, world_px) * 0.5, Vector2(world_px, world_px))
-		draw_texture_rect(icon_tex, rect, false)
-		if str(rec.get("state", "intact")) == "damaged":
-			pass
-		var badge_n := int(rec.get("count", 0)) if bool(rec.get("cluster", false)) else (level if not close else 0)
-		if close and not bool(rec.get("cluster", false)):
+		var icon_rect: Rect2 = layout.get("icon_rect", Rect2()) as Rect2
+		var cluster := bool(rec.get("cluster", false))
+		if not cluster and z + 0.0001 >= CLOSE_ZOOM:
+			_draw_icon_halo(icon_rect, z)
+		draw_texture_rect(icon_tex, icon_rect, false)
+		if z + 0.0001 >= CLOSE_ZOOM and not cluster:
 			var pips := _load_tex("level_pips_l%d" % level, 32)
 			if pips != null:
-				var pw := _world_size(px * 0.55)
+				var pw := icon_rect.size.x * 0.55
 				var ph := pw * 0.25
-				draw_texture_rect(
-					pips,
-					Rect2(Vector2(world.x - pw * 0.5, world.y + world_px * 0.18), Vector2(pw, ph)),
-					false
+				var pip_rect := Rect2(
+					Vector2(icon_rect.position.x + (icon_rect.size.x - pw) * 0.5, icon_rect.position.y + icon_rect.size.y * 0.62),
+					Vector2(pw, ph)
 				)
-		if badge_n >= 1:
-			_draw_outlined_badge(world, world_px, badge_n)
-		if bool(rec.get("cluster", false)):
-			_draw_level_tag(world, world_px, level)
+				pip_rect = _clamp_rect_inside(pip_rect, icon_rect)
+				draw_texture_rect(pips, pip_rect, false)
+		if cluster:
+			_draw_cluster_count(layout, z)
+			_draw_level_tag_in(layout, z)
+		elif int(layout.get("count", 0)) >= 1:
+			_draw_outlined_badge_in(layout)
 		_drawn_count += 1
 
 
@@ -1081,10 +1249,11 @@ func get_cluster_level_tag() -> String:
 
 
 func marker_half_px(zoom: float, cluster: bool) -> float:
-	var px := _icon_screen_px(zoom)
-	if cluster:
-		return (px + 4.0) * 0.5 + BADGE_PX * 0.35
-	return px * 0.5
+	var px := _drawn_icon_px(zoom, cluster)
+	var halo := 0.0
+	if not cluster and zoom + 0.0001 >= CLOSE_ZOOM:
+		halo = HALO_PX
+	return px * 0.5 + halo
 
 
 func report_clearance_at_zoom(zoom: float) -> Dictionary:
@@ -1123,16 +1292,55 @@ func disc_sample_worlds(world: Vector2, zoom: float, cluster: bool = false) -> A
 	return out
 
 
-func _draw_level_tag(world: Vector2, icon_world: float, level: int) -> void:
-	var outline := _world_size(BADGE_PX + BADGE_OUTLINE_PX * 2.0)
-	var center := Vector2(world.x - icon_world * 0.30, world.y + icon_world * 0.28)
-	draw_circle(center, outline * 0.52, Color(0.05, 0.04, 0.03, 0.92))
+func _draw_icon_halo(icon_rect: Rect2, zoom: float) -> void:
+	var halo := _world_size_at(HALO_PX, zoom)
+	if halo <= 0.0:
+		return
+	var outer := icon_rect.grow(halo)
+	draw_rect(outer, Color(0.98, 0.93, 0.70, 0.92), false, halo)
+	draw_rect(icon_rect.grow(halo * 0.35), Color(0.06, 0.05, 0.03, 0.88), false, halo * 0.55)
+
+
+func _draw_cluster_count(layout: Dictionary, zoom: float) -> void:
+	var badge: Rect2 = layout.get("badge_rect", Rect2()) as Rect2
+	if badge.size.x <= 0.01:
+		return
+	var center := badge.get_center()
+	var radius := badge.size.x * 0.5
+	draw_circle(center, radius, Color(0.05, 0.04, 0.03, 0.96))
+	var rim := _world_size_at(1.1, zoom)
+	draw_arc(center, radius * 0.90, 0.0, TAU, 28, Color(0.94, 0.90, 0.74, 0.90), rim)
 	var font: Font = ThemeDB.fallback_font
 	if font == null:
 		return
-	var z := maxf(_canvas_zoom(), 0.04)
-	var font_sz := maxi(10, int(round(16.0 / z)))
-	var tag := "L%d" % clampi(level, 1, 4)
+	var z := maxf(zoom, 0.04)
+	var font_sz := maxi(1, int(round(COUNT_DIGIT_PX / z)))
+	var n := clampi(int(layout.get("count", 1)), 1, 9)
+	var digit := str(n)
+	var sz: Vector2 = font.get_string_size(digit, HORIZONTAL_ALIGNMENT_LEFT, -1, font_sz)
+	draw_string(
+		font,
+		center + Vector2(-sz.x * 0.5, sz.y * 0.32),
+		digit,
+		HORIZONTAL_ALIGNMENT_LEFT,
+		-1,
+		font_sz,
+		Color(0.99, 0.97, 0.90, 1.0)
+	)
+
+
+func _draw_level_tag_in(layout: Dictionary, zoom: float) -> void:
+	var tag_rect: Rect2 = layout.get("tag_rect", Rect2()) as Rect2
+	if tag_rect.size.x <= 0.01:
+		return
+	var center := tag_rect.get_center()
+	draw_circle(center, tag_rect.size.x * 0.52, Color(0.05, 0.04, 0.03, 0.92))
+	var font: Font = ThemeDB.fallback_font
+	if font == null:
+		return
+	var z := maxf(zoom, 0.04)
+	var font_sz := maxi(1, int(round(14.0 / z)))
+	var tag := "L%d" % clampi(int(layout.get("level", 1)), 1, 4)
 	var sz: Vector2 = font.get_string_size(tag, HORIZONTAL_ALIGNMENT_LEFT, -1, font_sz)
 	draw_string(
 		font,
@@ -1145,12 +1353,30 @@ func _draw_level_tag(world: Vector2, icon_world: float, level: int) -> void:
 	)
 
 
+func _draw_outlined_badge_in(layout: Dictionary) -> void:
+	var badge: Rect2 = layout.get("badge_rect", Rect2()) as Rect2
+	if badge.size.x <= 0.01:
+		return
+	draw_circle(badge.get_center(), badge.size.x * 0.52, Color(0.05, 0.04, 0.03, 0.92))
+	var n := clampi(int(layout.get("count", 1)), 1, 5)
+	var tex := _load_tex("level_badge_l%d" % n, 16)
+	if tex != null:
+		draw_texture_rect(tex, badge, false)
+
+
+func _draw_level_tag(world: Vector2, icon_world: float, level: int) -> void:
+	## Kept for headless needles. Draw uses `_draw_level_tag_in` (same geometry as hit-test).
+	var rec := {"world": world, "cluster": true, "level": level, "count": 1, "pid": 0}
+	var layout := _layout_drawn_marker(rec, _canvas_zoom())
+	_draw_level_tag_in(layout, _canvas_zoom())
+	if icon_world <= 0.0:
+		pass
+
+
 func _draw_outlined_badge(world: Vector2, icon_world: float, number: int) -> void:
-	var bw := _world_size(BADGE_PX)
-	var outline := _world_size(BADGE_PX + BADGE_OUTLINE_PX * 2.0)
-	var center := Vector2(world.x + icon_world * 0.28, world.y + icon_world * 0.28)
-	draw_circle(center + Vector2(bw, bw) * 0.0, outline * 0.52, Color(0.05, 0.04, 0.03, 0.92))
-	var n := clampi(number, 1, 5)
-	var badge := _load_tex("level_badge_l%d" % n, 16)
-	if badge != null:
-		draw_texture_rect(badge, Rect2(center - Vector2(bw, bw) * 0.5, Vector2(bw, bw)), false)
+	## Kept for headless needles. Draw uses `_draw_outlined_badge_in`.
+	var rec := {"world": world, "cluster": false, "level": number, "count": number, "pid": 0}
+	var layout := _layout_drawn_marker(rec, _canvas_zoom())
+	_draw_outlined_badge_in(layout)
+	if icon_world <= 0.0:
+		pass

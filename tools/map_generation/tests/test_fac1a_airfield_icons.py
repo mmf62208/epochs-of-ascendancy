@@ -135,6 +135,10 @@ class TestFac1aAirfieldIcons(unittest.TestCase):
         self.assertIn("func _rhine_course_line", src)
         self.assertIn("RHINE_HOST_MIN_WORLD", src)
         self.assertIn("func _draw_level_tag", src)
+        self.assertIn("func hit_test_world", src)
+        self.assertIn("func _layout_drawn_marker", src)
+        self.assertIn("COUNT_DIGIT_PX", src)
+        self.assertIn("OPS_MIN_ICON_PX", src)
         self.assertIn('"L%d"', src)
         self.assertIn("CLEAR_MARGIN_PX", src)
         self.assertNotIn("acc / float(idxs.size())", src)
@@ -157,6 +161,21 @@ class TestFac1aAirfieldIcons(unittest.TestCase):
         self.assertNotIn("FacilityIconLayer", body)
         apply = ren[ren.find("func _apply_map_mode_visuals") : ren.find("func _apply_map_mode_visuals") + 2500]
         self.assertIn("FacilityIconLayer", apply)
+        self.assertIn("func _facility_icon_pid_at", ren)
+        hex_start = ren.find("func _resolve_hex_pick_pid")
+        hex_end = ren.find("\nfunc ", hex_start + 10)
+        hex_body = ren[hex_start:hex_end]
+        self.assertNotIn("FacilityIcon", hex_body)
+        self.assertNotIn("_facility_icon", hex_body)
+        land_start = ren.find("func _try_open_land_unit_at_world")
+        land_end = ren.find("\nfunc ", land_start + 10)
+        land_body = ren[land_start:land_end]
+        self.assertNotIn("FacilityIcon", land_body)
+        self.assertNotIn("_facility_icon", land_body)
+        guard = ROOT / "scripts" / "core" / "WindowedFac1aAirfieldPixelGuard.gd"
+        gsrc = guard.read_text(encoding="utf-8")
+        self.assertIn("const SPLIT_ZOOM := 1.53", gsrc)
+        self.assertIn("CLICK_ZOOMS", gsrc)
 
     def test_old_sites_layer_untouched(self) -> None:
         ol = OL.read_text(encoding="utf-8")
