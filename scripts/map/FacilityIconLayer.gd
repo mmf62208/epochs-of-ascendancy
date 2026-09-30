@@ -367,9 +367,17 @@ func _interior_world_for(pid: int, p: Object) -> Vector2:
 		var rec: Variant = _json_anchors[key]
 		if rec is Dictionary:
 			var raw: Variant = (rec as Dictionary).get("raw", [])
-			var craw: Variant = (rec as Dictionary).get("centroid_raw", [])
-			if raw is Array and craw is Array and (raw as Array).size() >= 2 and (craw as Array).size() >= 2 and centroid != Vector2.ZERO:
-				var cand := centroid + (Vector2(float(raw[0]), float(raw[1])) - Vector2(float(craw[0]), float(craw[1]))) * THEATER_SCALE
+			if raw is Array and (raw as Array).size() >= 2 and centroid != Vector2.ZERO:
+				var raw_pt := Vector2(float(raw[0]), float(raw[1]))
+				## Same offset as `_world_ring` fallback (ring mean, not label
+				## anchor). Label-anchor remap put opposite-edge seeds outside
+				## the world ring, so polylabel snapped them together.
+				var raw_mean := _mean_ring(ring)
+				var cand := centroid + (raw_pt - raw_mean) * THEATER_SCALE
+				if not Geometry2D.is_point_in_polygon(cand, world_ring):
+					var craw: Variant = (rec as Dictionary).get("centroid_raw", [])
+					if craw is Array and (craw as Array).size() >= 2:
+						cand = centroid + (raw_pt - Vector2(float(craw[0]), float(craw[1]))) * THEATER_SCALE
 				if Geometry2D.is_point_in_polygon(cand, world_ring):
 					return _snap_to_own_pick(pid, cand, centroid)
 	var pole := _polylabel(world_ring)
@@ -387,6 +395,17 @@ func _snap_to_own_pick(pid: int, cand: Vector2, centroid: Vector2) -> Vector2:
 		return cand
 	if int(mm.call("get_province_at_world_pos", cand, true)) == pid:
 		return cand
+	## Prefer a nearby own-pick so opposite-edge cluster seeds do not collapse
+	## onto the centroid (Ahrweiler–Mayen centroids are only ~9 raw apart).
+	var near := 0.7
+	while near <= 4.2:
+		var ang := 0.0
+		while ang < TAU:
+			var nq: Vector2 = cand + Vector2(cos(ang), sin(ang)) * near
+			if int(mm.call("get_province_at_world_pos", nq, true)) == pid:
+				return nq
+			ang += PI / 6.0
+		near += 0.7
 	if centroid != Vector2.ZERO:
 		if int(mm.call("get_province_at_world_pos", centroid, true)) == pid:
 			var t := 0.08
@@ -678,6 +697,10 @@ func _in_viewport(world: Vector2, pad_px: float) -> bool:
 
 
 func _screen_of(world: Vector2) -> Vector2:
+	## compute_markers_at_zoom must project at the requested zoom, not the
+	## live Home camera. Pairwise gaps only need world*zoom (translation cancels).
+	if _test_zoom >= 0.0:
+		return world * _test_zoom
 	var cam := _player_map_camera()
 	if cam == null:
 		return world * _canvas_zoom()

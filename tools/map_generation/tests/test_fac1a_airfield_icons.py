@@ -72,6 +72,16 @@ class TestFac1aAirfieldIcons(unittest.TestCase):
         self.assertGreaterEqual(cluster_d, 17.0)
         self.assertLessEqual(cluster_d, 20.5)
         self.assertEqual(tuple(CLUSTER_PAIR), (AHRWEILER, MAYEN_KOBLENZ))
+        anchors = product.get("anchors") or {}
+        pair = set(CLUSTER_PAIR)
+        for pid, rec in anchors.items():
+            if int(pid) in pair:
+                continue
+            raw = rec.get("raw") or [0.0, 0.0]
+            for member in CLUSTER_PAIR:
+                other = (anchors.get(str(member)) or {}).get("raw") or [0.0, 0.0]
+                iso = ((float(raw[0]) - float(other[0])) ** 2 + (float(raw[1]) - float(other[1])) ** 2) ** 0.5
+                self.assertGreaterEqual(iso, 20.7, "%s vs %s" % (pid, member))
         square = [(0.0, 0.0), (10.0, 0.0), (10.0, 10.0), (0.0, 10.0)]
         px, py, pr = polylabel(square, precision=0.2)
         self.assertTrue(point_in_ring(px, py, square))
@@ -111,6 +121,7 @@ class TestFac1aAirfieldIcons(unittest.TestCase):
         self.assertIn("func rebuild_icon_list", src)
         self.assertIn("const BADGE_PX := 16.0", src)
         self.assertIn("func _polylabel", src)
+        self.assertIn("_mean_ring(ring)", src)
         self.assertIn("func _cluster_items", src)
         self.assertIn("SPLIT_GAP_PX", src)
         self.assertNotIn("CORRIDOR_OFFSET_SCREEN_PX", src)

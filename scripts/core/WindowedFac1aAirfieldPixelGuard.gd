@@ -376,7 +376,7 @@ func _do_overlap() -> void:
 			if a.intersects(b):
 				hit = true
 		if z + 0.001 >= 2.20:
-			var counter := _koeln_counter_rect()
+			var counter := _koeln_counter_rect(z)
 			if counter.size.x > 1.0 and a.intersects(counter):
 				hit = true
 				_fail_reasons.append("overlap_counter_z%.2f" % z)
@@ -488,7 +488,7 @@ func _assert_split_at_zoom(zoom: float) -> bool:
 
 func _assert_neighbor_clears_counter() -> bool:
 	var markers := _markers_at(CLOSE_ZOOM)
-	var counter := _koeln_counter_rect()
+	var counter := _koeln_counter_rect(CLOSE_ZOOM)
 	if counter.size.x <= 1.0:
 		_log("EOA_FAC1A_PIXEL_GUARD who=guard.counter no_chip (NOT live Play)")
 		return false
@@ -656,7 +656,7 @@ func _show_units() -> void:
 			stack.append(ch)
 
 
-func _koeln_counter_rect() -> Rect2:
+func _koeln_counter_rect(zoom: float = -1.0) -> Rect2:
 	var cam := _camera()
 	if cam == null:
 		return Rect2()
@@ -665,7 +665,8 @@ func _koeln_counter_rect() -> Rect2:
 		var n: Node = stack.pop_back()
 		if str(n.name).begins_with("DemoUnitIcon") and n is CanvasItem and (n as CanvasItem).visible:
 			var world := (n as Node2D).global_position if n is Node2D else Vector2.ZERO
-			var scr: Vector2 = cam.get_canvas_transform() * world
+			## compute_markers_at_zoom rects are world*zoom (translation cancels).
+			var scr: Vector2 = world * zoom if zoom >= 0.0 else cam.get_canvas_transform() * world
 			var half := Vector2(28, 20)
 			var r := Rect2(scr - half, half * 2.0)
 			var mm := root.get_node_or_null("MapManager")
@@ -994,7 +995,13 @@ func _frame_over_rhineland(zoom: float) -> void:
 			(ip as Control).visible = false
 	_apply_camera(pos, zoom)
 	_ensure_not_live_banner()
-	_log("EOA_FAC1A_PIXEL_GUARD who=guard.frame want=%.2f got=%.3f pos=%.1f,%.1f (NOT live Play)" % [zoom, _cam_zoom, pos.x, pos.y])
+	var live_z := _cam_zoom
+	var live_p := pos
+	var cam_f := _camera()
+	if cam_f != null:
+		live_z = maxf(absf(cam_f.zoom.x), absf(cam_f.zoom.y))
+		live_p = cam_f.global_position
+	_log("EOA_FAC1A_PIXEL_GUARD who=guard.frame want=%.2f got=%.3f pos=%.1f,%.1f live=%.1f,%.1f (NOT live Play)" % [zoom, live_z, pos.x, pos.y, live_p.x, live_p.y])
 
 
 func _apply_camera(pos: Vector2, zoom: float) -> void:
@@ -1005,19 +1012,23 @@ func _apply_camera(pos: Vector2, zoom: float) -> void:
 	var mr := _map_renderer()
 	if mr != null and mr.has_method("lock_pixel_guard_camera"):
 		mr.call("lock_pixel_guard_camera", pos, zoom)
-		return
-	if mr != null:
+	elif mr != null:
 		mr.set("_close_camera_lock_pos", pos)
 		mr.set("_close_camera_lock_zoom", Vector2(zoom, zoom))
 		mr.set("_close_camera_locked", true)
 	var cam := _camera()
 	if cam != null:
 		cam.zoom = Vector2(zoom, zoom)
+		var parent := cam.get_parent() as Node2D
+		if parent != null:
+			cam.position = parent.to_local(pos)
 		cam.global_position = pos
 		cam.reset_smoothing()
+		if cam.has_method("force_update_scroll"):
+			cam.call("force_update_scroll")
 		cam.enabled = true
 		cam.make_current()
-		_cam_zoom = maxf(cam.zoom.x, cam.zoom.y)
+		_cam_zoom = zoom
 
 
 func _reassert_camera() -> void:
@@ -1101,12 +1112,16 @@ func _camera() -> Camera2D:
 
 
 func _capture(name: String) -> void:
+	_frame_over_rhineland(_cam_zoom)
 	_ensure_not_live_banner()
 	RenderingServer.force_draw()
 	RenderingServer.force_draw()
 	var cam := _camera()
 	if cam != null:
-		_cam_zoom = maxf(cam.zoom.x, cam.zoom.y)
+		_log(
+			"EOA_FAC1A_PIXEL_GUARD who=guard.capture_cam want=%.3f got=%.3f pos=%.1f,%.1f (NOT live Play)"
+			% [_cam_zoom, maxf(cam.zoom.x, cam.zoom.y), cam.global_position.x, cam.global_position.y]
+		)
 	var vp := root.get_viewport()
 	if vp == null:
 		return

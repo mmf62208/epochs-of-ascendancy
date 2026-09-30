@@ -26,9 +26,10 @@ CITY_LAYER = ROOT / "data" / "provinces_world_accurate" / "province_city_layer.j
 
 # FIX #2b Rhineland reseed (never renumber). NRW west of ~7.6°E / south of
 # the Ruhr + northern Rheinland-Pfalz. Off Köln / Bonn / Leverkusen and off
-# LUX-border (Aachen / Trier-Saarburg). Ahrweiler is Bonn-adjacent so a
-# Köln counter exercises clearance. Forced interiors: Ahrweiler–Mayen
-# cluster at mid 0.99 and split at ≥1.9. Viersen / Ober stay isolated.
+# LUX-border (Aachen / Trier-Saarburg / Euskirchen). Ahrweiler is Bonn-adjacent
+# so a Köln counter exercises clearance. Forced interiors: Ahrweiler–Mayen
+# raw ~17.4 clusters at mid 0.99 (screen gap < 2 after ×1.728) and splits at
+# ≥1.9 (gap ≥ 10). Viersen / Ober stay ≥26 from the pair so they do not join.
 VIERSEN = 710414
 OBERBERGISCHER = 710423
 AHRWEILER = 710455
@@ -55,14 +56,14 @@ SEED_NAMES: Dict[int, str] = {
     AHRWEILER: "Ahrweiler",
     MAYEN_KOBLENZ: "Mayen-Koblenz",
 }
-# World-space interiors (raw). Pair Ahrweiler–Mayen ~17.4 clusters at
-# 0.99 and splits at 1.9. Ahrweiler clears a Köln 28×20 counter at 2.27.
-# Other pairs stay ≥20.7 so they do not join the mid cluster (RX-1 spine).
+# Raw interiors. Pair Ahrweiler–Mayen ~17.36 clusters at 0.99 and splits at
+# 1.9 after theater×zoom. Ahrweiler clears a Köln 28×20 counter at 2.27.
+# Ober / Viersen stay ≥26 from the pair (RX-1 spine + no 3-site cluster).
 SEED_FORCE_RAW: Dict[int, Tuple[float, float]] = {
-    VIERSEN: (4235.47, 935.21),
-    AHRWEILER: (4250.96, 960.03),
-    OBERBERGISCHER: (4271.07, 943.10),
-    MAYEN_KOBLENZ: (4267.81, 964.35),
+    VIERSEN: (4237.92, 932.86),
+    AHRWEILER: (4250.51, 960.28),
+    OBERBERGISCHER: (4270.22, 942.60),
+    MAYEN_KOBLENZ: (4267.46, 964.05),
 }
 CLUSTER_PAIR: Tuple[int, int] = (AHRWEILER, MAYEN_KOBLENZ)
 KOELN_PID = 710417
@@ -351,6 +352,16 @@ def build_facility_icon_anchor_product(write: bool = False) -> Dict[str, Any]:
         if cluster_d < CLUSTER_PAIR_MIN or cluster_d > CLUSTER_PAIR_MAX:
             ok = False
             reasons.append("cluster_pair_%.1f" % cluster_d)
+        for pid, pt in worlds.items():
+            if pid in CLUSTER_PAIR:
+                continue
+            for member in CLUSTER_PAIR:
+                if member not in worlds:
+                    continue
+                d_iso = math.hypot(pt[0] - worlds[member][0], pt[1] - worlds[member][1])
+                if d_iso < 20.7:
+                    ok = False
+                    reasons.append("iso_%d_%d_%.1f" % (pid, member, d_iso))
     koel = geo.get(KOELN_PID)
     if koel is not None:
         kla = koel.get("label_anchor") or []
