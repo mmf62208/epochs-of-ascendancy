@@ -408,11 +408,22 @@ Keep-green after FIX #2c `86bdd723` (isolated process-tree RSS via `pgrep -P` on
 | hd_ix1 (6) / hd_rx1 (4) / hd_rt1 (3) / hd_rh1 | headless | PASS | ~1194 isolated |
 | xvfb_fac1a | xvfb | PASS cluster_mid count=3 L4 · split 1.9/2.27 · counter_drawn · counter_clear Neuwied · occl=0.000 · overlap=0 · own=0 · rx1_mid ON/OFF 0.843/0.843 | **2056.4** isolated |
 | xvfb_mv1 / xvfb_mv1_card / xvfb_rh1 | xvfb | PASS | 2065 / 2061 / 2061 |
-| xvfb_rx1_seeded | xvfb | PASS mid_river=0.664 close_river=0.749 spine=1.000 | **2046.7** isolated |
+| xvfb_rx1_seeded | xvfb | PASS mid_river=0.664 close_river=0.749 spine=1.000 (later proved FAC-1a vs OFF/base 0.749) | **2046.7** isolated |
 | xvfb_rt1_seeded | xvfb | PASS s1_gold_cover=1.000 | 2071.0 |
 | xvfb_rt1_live_look | xvfb | PASS mesh_frac=0.00079 gold_w=14 | 2061.2 |
 
 Screenshots FIX #2c (xvfb **NOT live Play**): `/opt/cursor/artifacts/fac1a_fix2c/01_operational_z1.30_rhineland_NOT_live_play.png`, `02_mid_z0.99_cluster_NOT_live_play.png` (3-cluster off the Rhine + Viersen isolate), `03_close_koln_bonn_z2.27_counter_NOT_live_play.png` (Neuwied beside drawn Köln counter).
+
+Keep-green after FIX #2c Rhine-host `1d7e3219` (isolated `pgrep -P` tree RSS; xvfb ≠ live Play). Seeded RX-1 on `beb3ed09` ON 0.664 vs OFF/base 0.749 proved FAC-1a (Neuwied L4 on the real course). Host prefers ≥22 world from `Rx1RhineCrossing.course_points()` (Ober L3).
+
+| gate | kind | result | peak MB |
+|---|---|---|---|
+| py_fac1a | py | PASS | 1.9 |
+| hd_fac1a | headless | PASS | 1193.9 |
+| xvfb_fac1a | xvfb | PASS cluster_mid · split_close · counter_drawn/clear · occl=0.000 · overlap_z0.70=0 · rx1_mid 0.843/0.843 | **2056.9** isolated |
+| xvfb_rx1_seeded ON | xvfb | PASS mid_river=0.749 close_river=0.749 spine=1.000 | **2050.0** isolated |
+| xvfb_rx1_seeded OFF | xvfb | PASS mid_river=0.749 close_river=0.775 spine=1.000 | **2050.0** isolated |
+| xvfb_rx1_seeded base `8b7e46de` | xvfb | PASS mid_river=0.749 close_river=0.775 spine=1.000 | **2045.0** isolated |
 
 **FIX #2b:** same mechanics; Rhineland-only reseed so Play can see cluster-split and counter clearance. Viersen `710414` L1, Rhein-Hunsrück-Kreis `710464` L2, Oberbergischer Kreis `710423` L3, Neuwied `710460` L4 (Bonn-adjacent, LUX-disk-safe — Ahrweiler `710455` interiors sit inside the LUX capital-star disk and snapped into the Köln counter). Cluster is Neuwied–Ober (live world ~28). xvfb asserts cluster at 0.99 (count=3, max L4), split at ≥1.9, Neuwied vs Köln counter at 2.27, occlusion ≤5%, click-own all 4. Composites `/opt/cursor/artifacts/fac1a_fix2b/` — **NOT live Play**.
 
