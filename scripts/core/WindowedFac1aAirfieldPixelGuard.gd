@@ -199,6 +199,9 @@ func _tick_wait_map() -> void:
 	_pause_clock_only()
 	_unlock_player_camera()
 	_hide_unit_noise()
+	var ol_boot := _facility_layer()
+	if ol_boot != null and ol_boot.has_method("rebuild_icon_list"):
+		ol_boot.call("rebuild_icon_list")
 	_go_settle(Phase.FRAME_MID)
 
 
@@ -361,10 +364,10 @@ func _do_overlap() -> void:
 	_redraw_layer()
 	var ol := _facility_layer()
 	var markers: Array = []
-	if ol != null and ol.has_method("get_last_markers"):
-		markers = ol.call("get_last_markers")
-	if markers.is_empty() and ol != null and ol.has_method("compute_markers_at_zoom"):
+	if ol != null and ol.has_method("compute_markers_at_zoom"):
 		markers = ol.call("compute_markers_at_zoom", z)
+	elif ol != null and ol.has_method("get_last_markers"):
+		markers = ol.call("get_last_markers")
 	var hit := false
 	for i in range(markers.size()):
 		var a: Rect2 = (markers[i] as Dictionary).get("rect", Rect2()) as Rect2
@@ -372,7 +375,7 @@ func _do_overlap() -> void:
 			var b: Rect2 = (markers[j] as Dictionary).get("rect", Rect2()) as Rect2
 			if a.intersects(b):
 				hit = true
-		if z + 0.001 >= 1.90:
+		if z + 0.001 >= 2.20:
 			var counter := _koeln_counter_rect()
 			if counter.size.x > 1.0 and a.intersects(counter):
 				hit = true
@@ -625,6 +628,17 @@ func _park_unit_on_koeln() -> void:
 		mr.call("_sync_unit_counter_paint")
 	if not parked:
 		_log("EOA_FAC1A_PIXEL_GUARD who=guard.park_koeln none")
+	var kc := _mm_centroid(KOELN)
+	if kc != Vector2.ZERO:
+		var stack: Array[Node] = [root]
+		while not stack.is_empty():
+			var n: Node = stack.pop_back()
+			if str(n.name).begins_with("DemoUnitIcon") and n is Node2D:
+				if (n as Node2D).global_position.distance_to(kc) < 80.0:
+					(n as Node2D).global_position = kc
+					break
+			for ch in n.get_children():
+				stack.append(ch)
 
 
 func _show_units() -> void:
@@ -652,11 +666,12 @@ func _koeln_counter_rect() -> Rect2:
 		if str(n.name).begins_with("DemoUnitIcon") and n is CanvasItem and (n as CanvasItem).visible:
 			var world := (n as Node2D).global_position if n is Node2D else Vector2.ZERO
 			var scr: Vector2 = cam.get_canvas_transform() * world
-			var r := Rect2(scr - Vector2(40, 28), Vector2(80, 56))
+			var half := Vector2(28, 20)
+			var r := Rect2(scr - half, half * 2.0)
 			var mm := root.get_node_or_null("MapManager")
 			if mm != null and mm.has_method("get_province_centroid"):
 				var kc: Vector2 = mm.call("get_province_centroid", KOELN)
-				if world.distance_to(kc) < 40.0:
+				if world.distance_to(kc) < 48.0:
 					return r
 		for ch in n.get_children():
 			stack.append(ch)

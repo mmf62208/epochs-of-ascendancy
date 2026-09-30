@@ -380,23 +380,32 @@ func _interior_world_for(pid: int, p: Object) -> Vector2:
 
 func _snap_to_own_pick(pid: int, cand: Vector2, centroid: Vector2) -> Vector2:
 	## Existing province hit-test (untouched) must resolve the icon center to
-	## this pid. Walk toward the MapManager centroid until it does.
+	## this pid. Walk toward the MapManager centroid, then sample nearby
+	## interiors, until it does (LUX inflation can steal a first cand).
 	var mm := _map_manager()
 	if mm == null or not mm.has_method("get_province_at_world_pos"):
 		return cand
-	var hit := int(mm.call("get_province_at_world_pos", cand, true))
-	if hit == pid:
+	if int(mm.call("get_province_at_world_pos", cand, true)) == pid:
 		return cand
 	if centroid != Vector2.ZERO:
-		var ch := int(mm.call("get_province_at_world_pos", centroid, true))
-		if ch == pid:
-			var t := 0.15
+		if int(mm.call("get_province_at_world_pos", centroid, true)) == pid:
+			var t := 0.08
 			while t <= 1.001:
 				var p: Vector2 = cand.lerp(centroid, t)
 				if int(mm.call("get_province_at_world_pos", p, true)) == pid:
 					return p
-				t += 0.15
+				t += 0.08
 			return centroid
+		var step := 1.6
+		var r := step
+		while r <= 12.0:
+			var a := 0.0
+			while a < TAU:
+				var q: Vector2 = centroid + Vector2(cos(a), sin(a)) * r
+				if int(mm.call("get_province_at_world_pos", q, true)) == pid:
+					return q
+				a += PI / 6.0
+			r += step
 	return cand if cand != Vector2.ZERO else centroid
 
 
