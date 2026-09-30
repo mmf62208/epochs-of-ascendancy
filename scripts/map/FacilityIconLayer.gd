@@ -14,6 +14,11 @@ const MAP_Z := 24
 ## Above roads (~21) / Rhine (22), below DemoUnitIcon (28) and name labels (82).
 const UNIT_COUNTER_Z := 28
 const VISIBLE_MODES: Array[String] = ["political", "diplomacy", "infra"]
+## SpecialSite.SiteType.AIRFIELD / ConstructionState — ints so -s tests can duck-type.
+const SITE_AIRFIELD := 1
+const STATE_NOT_BUILT := 0
+const STATE_DAMAGED := 3
+const STATE_DESTROYED := 4
 
 var show_facilities: bool = true
 var _icons: Array[Dictionary] = []
@@ -36,14 +41,15 @@ func _ready() -> void:
 	visible = true
 	set_process(true)
 	set_process_unhandled_input(true)
-	if typeof(SpecialSiteManager) != TYPE_NIL and SpecialSiteManager.has_signal("special_site_created"):
-		if not SpecialSiteManager.special_site_created.is_connected(_on_special_site_created):
-			SpecialSiteManager.special_site_created.connect(_on_special_site_created)
+	var ssm := _special_site_manager()
+	if ssm != null and ssm.has_signal("special_site_created"):
+		if not ssm.special_site_created.is_connected(_on_special_site_created):
+			ssm.special_site_created.connect(_on_special_site_created)
 	rebuild_icon_list()
 	queue_redraw()
 
 
-func _on_special_site_created(_site: SpecialSite, _province_id: int) -> void:
+func _on_special_site_created(_site: Object, _province_id: int) -> void:
 	notify_sites_changed()
 
 
@@ -108,15 +114,14 @@ func max_facility_icons_for_board(province_count: int) -> int:
 	return 9999
 
 
-static func visual_state_for_site(site: SpecialSite) -> String:
+static func visual_state_for_site(site: Object) -> String:
 	## Damaged is a data flag only for FAC-1a. DESTROYED counts as damaged.
 	if site == null:
 		return "intact"
-	if int(site.damage_level) > 0:
+	if int(site.get("damage_level")) > 0:
 		return "damaged"
-	if site.construction_state == SpecialSite.ConstructionState.DAMAGED:
-		return "damaged"
-	if site.construction_state == SpecialSite.ConstructionState.DESTROYED:
+	var st: int = int(site.get("construction_state"))
+	if st == STATE_DAMAGED or st == STATE_DESTROYED:
 		return "damaged"
 	return "intact"
 
@@ -138,52 +143,73 @@ func rebuild_icon_list() -> void:
 	for pid_v in provinces.keys():
 		if added >= budget:
 			break
-		var p: Province = provinces[pid_v] as Province
-		if p == null or p.is_sea:
+		var p: Object = provinces[pid_v] as Object
+		if p == null or bool(p.get("is_sea")):
 			continue
-		var site: SpecialSite = _best_airfield_on_province(p)
+		var site: Object = _best_airfield_on_province(p)
 		if site == null:
 			continue
-		var level: int = clampi(int(site.tier), 1, 4)
+		var level: int = clampi(int(site.get("tier")), 1, 4)
 		var state: String = visual_state_for_site(site)
 		## FAC-1a: no damaged art yet — draw intact + TODO in _draw.
 		var tex_key := texture_key_for_level(level, "intact")
-		var world: Vector2 = _centroid_for(int(p.id), p)
+		var world: Vector2 = _centroid_for(int(p.get("id")), p)
 		_icons.append({
-			"pid": int(p.id),
+			"pid": int(p.get("id")),
 			"world": world,
 			"level": level,
 			"state": state,
 			"tex_key": tex_key,
-			"site_id": str(site.id),
+			"site_id": str(site.get("id")),
 		})
 		added += 1
 
 
-func _best_airfield_on_province(p: Province) -> SpecialSite:
-	if p == null or p.special_sites.is_empty():
+func _best_airfield_on_province(p: Object) -> Object:
+	if p == null:
 		return null
-	var best: SpecialSite = null
+	var raw: Variant = p.get("special_sites")
+	if typeof(raw) != TYPE_ARRAY:
+		return null
+	var best: Object = null
 	var best_tier: int = -1
-	for site in p.special_sites:
+	for site_v in raw:
+		if typeof(site_v) != TYPE_OBJECT:
+			continue
+		var site: Object = site_v as Object
 		if site == null:
 			continue
-		if site.site_type != SpecialSite.SiteType.AIRFIELD:
+		if int(site.get("site_type")) != SITE_AIRFIELD:
 			continue
-		if site.construction_state == SpecialSite.ConstructionState.NOT_BUILT:
+		if int(site.get("construction_state")) == STATE_NOT_BUILT:
 			continue
-		var t: int = int(site.tier)
+		var t: int = int(site.get("tier"))
 		if t > best_tier:
 			best = site
 			best_tier = t
 	return best
 
 
+func _special_site_manager() -> Node:
+	var tree := get_tree()
+	if tree == null:
+		return null
+	return tree.root.get_node_or_null("SpecialSiteManager")
+
+
+func _map_manager() -> Node:
+	var tree := get_tree()
+	if tree == null:
+		return null
+	return tree.root.get_node_or_null("MapManager")
+
+
 func _provinces_for_scan() -> Dictionary:
 	if not _test_provinces.is_empty():
 		return _test_provinces
-	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_all_provinces"):
-		var all: Variant = MapManager.get_all_provinces()
+	var mm := _map_manager()
+	if mm != null and mm.has_method("get_all_provinces"):
+		var all: Variant = mm.call("get_all_provinces")
 		if all is Dictionary:
 			return all as Dictionary
 	var loader: Node = _scenario_loader()
@@ -197,20 +223,24 @@ func _provinces_for_scan() -> Dictionary:
 func _board_province_count(provinces: Dictionary) -> int:
 	if _test_board_n > 0:
 		return _test_board_n
-	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_count"):
-		return maxi(provinces.size(), int(MapManager.get_province_count()))
+	var mm := _map_manager()
+	if mm != null and mm.has_method("get_province_count"):
+		return maxi(provinces.size(), int(mm.call("get_province_count")))
 	return provinces.size()
 
 
-func _centroid_for(pid: int, p: Province) -> Vector2:
+func _centroid_for(pid: int, p: Object) -> Vector2:
 	if _test_centroids.has(pid):
 		return _test_centroids[pid] as Vector2
-	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_centroid"):
-		var c: Vector2 = MapManager.get_province_centroid(pid)
+	var mm := _map_manager()
+	if mm != null and mm.has_method("get_province_centroid"):
+		var c: Vector2 = mm.call("get_province_centroid", pid)
 		if c != Vector2.ZERO:
 			return c
 	if p != null:
-		return p.coordinates
+		var coords: Variant = p.get("coordinates")
+		if coords is Vector2:
+			return coords as Vector2
 	return Vector2.ZERO
 
 

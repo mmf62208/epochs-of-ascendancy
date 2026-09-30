@@ -2,10 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
+uid="uid://duatiar3mdvtk"
+path="res://.godot/imported/level_pips_l5_64.png-b39ebc961208c0bf9518fbb69a81f0d6.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/graphics/icons/facilities/level_pips_l5_64.png"
+dest_files=["res://.godot/imported/level_pips_l5_64.png-b39ebc961208c0bf9518fbb69a81f0d6.ctex"]
 
 [params]
 

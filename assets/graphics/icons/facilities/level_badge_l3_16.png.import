@@ -2,10 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
+uid="uid://bfmkd5p2b3u20"
+path="res://.godot/imported/level_badge_l3_16.png-a5a78777fcbbc8a1ee795b0d9a3bb58c.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/graphics/icons/facilities/level_badge_l3_16.png"
+dest_files=["res://.godot/imported/level_badge_l3_16.png-a5a78777fcbbc8a1ee795b0d9a3bb58c.ctex"]
 
 [params]
 

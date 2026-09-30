@@ -2,10 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
+uid="uid://rwmv0l3dn8hr"
+path="res://.godot/imported/airfield_l3_intact_32.png-8da087833957f8362f125bb37fcc7d71.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/graphics/icons/facilities/airfield_l3_intact_32.png"
+dest_files=["res://.godot/imported/airfield_l3_intact_32.png-8da087833957f8362f125bb37fcc7d71.ctex"]
 
 [params]
 

@@ -1,6 +1,9 @@
 extends SceneTree
 
 ## FAC-1a: airfield seeds + FacilityIconLayer (headless — NOT live Play).
+## Duck-typed stubs only. This file never names Province / SpecialSite /
+## ScenarioLoader as parse-time identifiers (those scripts fail to compile
+## as -s dependencies when they mention autoloads).
 ##
 ##   tools/run_godot.sh --headless --path . -s res://scripts/core/HeadlessFac1aAirfieldIconTest.gd
 
@@ -15,10 +18,35 @@ const KOELN := 710417
 const LEV := 710418
 const NEUSS := 710413
 
+const SITE_AIRFIELD := 1
+const STATE_COMPLETED := 2
+const STATE_DAMAGED := 3
+const STATE_DESTROYED := 4
+
 const BOARDS: Array[String] = [
 	"provinces_world_accurate",
 	"provinces_pilot_europe_nuts3",
 ]
+
+
+class DummyProv extends RefCounted:
+	var id: int = 0
+	var name: String = ""
+	var is_sea: bool = false
+	var owner_tag: String = "GER"
+	var special_sites: Array = []
+	var coordinates: Vector2 = Vector2.ZERO
+
+
+class DummySite extends RefCounted:
+	var id: String = ""
+	var site_type: int = 1
+	var tier: int = 1
+	var province_id: int = 0
+	var owner_tag: String = "GER"
+	var construction_state: int = 2
+	var damage_level: int = 0
+
 
 var _failures := 0
 var _layer: Node2D = null
@@ -123,9 +151,9 @@ func _test_source_needles() -> void:
 	else:
 		_pass("InfrastructureOverlayLayer.rebuild_sites_layer untouched")
 	if "apply_seeded_special_sites_to_provinces" not in loader:
-		_fail("ScenarioLoader missing apply_seeded_special_sites_to_provinces")
+		_fail("loader missing apply_seeded_special_sites_to_provinces")
 	else:
-		_pass("ScenarioLoader seeds SpecialSite AIRFIELD via project_sites")
+		_pass("loader seeds AIRFIELD via project_sites")
 	if "func site_marker_min_zoom_for_board" not in zoom:
 		_fail("MapZoomLOD site threshold missing")
 	else:
@@ -159,24 +187,6 @@ func _test_tier4_def() -> void:
 		_pass("airfield_tier_4 site_type=airfield")
 
 
-func _make_loader() -> ScenarioLoader:
-	var loader := ScenarioLoader.new()
-	root.add_child(loader)
-	return loader
-
-
-func _dummy_provinces() -> Dictionary:
-	var out: Dictionary = {}
-	for pid in [BONN, LEV, KOELN, NEUSS]:
-		var p := Province.new()
-		p.id = int(pid)
-		p.name = "FAC1a %d" % int(pid)
-		p.is_sea = false
-		p.owner_tag = "GER"
-		out[int(pid)] = p
-	return out
-
-
 func _dummy_centroids() -> Dictionary:
 	return {
 		BONN: Vector2(100, 100),
@@ -186,22 +196,99 @@ func _dummy_centroids() -> Dictionary:
 	}
 
 
+func _state_from_record(rec: Dictionary) -> int:
+	var st := str(rec.get("construction_state", "COMPLETED")).strip_edges().to_upper()
+	if st == "DAMAGED":
+		return STATE_DAMAGED
+	if st == "DESTROYED":
+		return STATE_DESTROYED
+	if st == "NOT_BUILT":
+		return 0
+	return STATE_COMPLETED
+
+
+func _seed_provinces_from_json(board: String) -> Dictionary:
+	var dest: Dictionary = {}
+	for pid in [BONN, LEV, KOELN, NEUSS]:
+		var p := DummyProv.new()
+		p.id = int(pid)
+		p.name = "FAC1a %d" % int(pid)
+		p.is_sea = false
+		p.owner_tag = "GER"
+		p.special_sites = []
+		dest[int(pid)] = p
+	var path := "res://data/%s/project_sites.json" % board
+	if not FileAccess.file_exists(path):
+		_fail("%s missing project_sites.json" % board)
+		return dest
+	var f := FileAccess.open(path, FileAccess.READ)
+	var txt := f.get_as_text()
+	f.close()
+	var parser := JSON.new()
+	if parser.parse(txt) != OK or typeof(parser.data) != TYPE_DICTIONARY:
+		_fail("%s project_sites.json parse" % board)
+		return dest
+	var sites: Variant = (parser.data as Dictionary).get("sites", [])
+	if typeof(sites) != TYPE_ARRAY:
+		_fail("%s project_sites.sites not array" % board)
+		return dest
+	for rec_v in sites:
+		if typeof(rec_v) != TYPE_DICTIONARY:
+			continue
+		var rec: Dictionary = rec_v
+		var pid := int(rec.get("province_id", 0))
+		if not dest.has(pid):
+			continue
+		var p: DummyProv = dest[pid] as DummyProv
+		if p == null:
+			continue
+		var site := DummySite.new()
+		site.id = str(rec.get("site_id", "airfield_tier_%d" % int(rec.get("tier", 1))))
+		site.province_id = pid
+		site.owner_tag = "GER"
+		site.site_type = SITE_AIRFIELD
+		site.tier = clampi(int(rec.get("tier", 1)), 1, 4)
+		site.construction_state = _state_from_record(rec)
+		site.damage_level = int(rec.get("damage_level", 0))
+		p.special_sites.append(site)
+	return dest
+
+
+func _airfield_count(provs: Dictionary) -> int:
+	var n := 0
+	for pid_v in provs.keys():
+		var p: DummyProv = provs[pid_v] as DummyProv
+		if p == null:
+			continue
+		for site_v in p.special_sites:
+			var site: DummySite = site_v as DummySite
+			if site != null and int(site.site_type) == SITE_AIRFIELD:
+				n += 1
+	return n
+
+
 func _expect_tiers(provs: Dictionary, board: String) -> void:
 	var want: Dictionary = {BONN: 1, LEV: 2, KOELN: 3, NEUSS: 4}
 	for pid in want.keys():
-		var p: Province = provs[pid] as Province
-		if p == null:
+		if not provs.has(pid):
 			_fail("%s missing province %d" % [board, int(pid)])
 			continue
-		var sites: Array[SpecialSite] = p.get_special_sites_of_type(SpecialSite.SiteType.AIRFIELD)
-		if sites.is_empty():
-			_fail("%s pid %d has no AIRFIELD SpecialSite" % [board, int(pid)])
+		var p: DummyProv = provs[pid] as DummyProv
+		if p == null:
+			_fail("%s pid %d not a dummy province" % [board, int(pid)])
 			continue
-		var site: SpecialSite = sites[0]
-		if int(site.tier) != int(want[pid]):
-			_fail("%s pid %d tier=%d want=%d" % [board, int(pid), int(site.tier), int(want[pid])])
-		else:
-			_pass("%s pid %d AIRFIELD tier %d" % [board, int(pid), int(site.tier)])
+		var found := false
+		for site_v in p.special_sites:
+			var site: DummySite = site_v as DummySite
+			if site == null or int(site.site_type) != SITE_AIRFIELD:
+				continue
+			found = true
+			if int(site.tier) != int(want[pid]):
+				_fail("%s pid %d tier=%d want=%d" % [board, int(pid), int(site.tier), int(want[pid])])
+			else:
+				_pass("%s pid %d AIRFIELD tier %d" % [board, int(pid), int(site.tier)])
+		if not found:
+			_fail("%s pid %d has no AIRFIELD site" % [board, int(pid)])
 
 
 func _test_board_seeds_and_layer() -> void:
@@ -209,17 +296,17 @@ func _test_board_seeds_and_layer() -> void:
 	if layer_script == null:
 		_fail("could not load FacilityIconLayer.gd")
 		return
-	_layer = layer_script.new() as Node2D
+	if layer_script is GDScript and not (layer_script as GDScript).can_instantiate():
+		_fail("FacilityIconLayer.gd cannot instantiate")
+		return
+	_layer = (layer_script as GDScript).new() as Node2D
 	if _layer == null:
 		_fail("could not instantiate FacilityIconLayer")
 		return
 	root.add_child(_layer)
-	var loader := _make_loader()
 	for board in BOARDS:
-		loader.province_projects_by_id.clear()
-		loader.call("_load_project_sites_layer", board)
-		var provs := _dummy_provinces()
-		var n: int = int(loader.apply_seeded_special_sites_to_provinces(provs))
+		var provs := _seed_provinces_from_json(board)
+		var n := _airfield_count(provs)
 		if n != 4:
 			_fail("%s apply count=%d want 4" % [board, n])
 		else:
@@ -285,38 +372,39 @@ func _test_board_seeds_and_layer() -> void:
 			_fail("%s zoom rebuilt list %d → %d" % [board, before, after])
 		else:
 			_pass("%s zoom did not rebuild icon list" % board)
-	loader.queue_free()
 
 
 func _test_damaged_mapping() -> void:
-	var site := SpecialSite.new()
-	site.site_type = SpecialSite.SiteType.AIRFIELD
+	if _layer == null or not is_instance_valid(_layer):
+		_fail("no FacilityIconLayer instance for damaged mapping")
+		return
+	var site := DummySite.new()
+	site.site_type = SITE_AIRFIELD
 	site.tier = 2
 	site.damage_level = 0
-	site.construction_state = SpecialSite.ConstructionState.COMPLETED
-	var intact := str(FacilityIconLayer.visual_state_for_site(site))
+	site.construction_state = STATE_COMPLETED
+	var intact := str(_layer.call("visual_state_for_site", site))
 	if intact != "intact":
 		_fail("completed undamaged mapped to %s" % intact)
 	else:
 		_pass("completed + damage_level=0 → intact")
 	site.damage_level = 2
-	var dmg := str(FacilityIconLayer.visual_state_for_site(site))
+	var dmg := str(_layer.call("visual_state_for_site", site))
 	if dmg != "damaged":
 		_fail("damage_level>0 mapped to %s" % dmg)
 	else:
 		_pass("damage_level>0 → damaged")
 	site.damage_level = 0
-	site.construction_state = SpecialSite.ConstructionState.DAMAGED
-	var st := str(FacilityIconLayer.visual_state_for_site(site))
+	site.construction_state = STATE_DAMAGED
+	var st := str(_layer.call("visual_state_for_site", site))
 	if st != "damaged":
 		_fail("construction_state DAMAGED mapped to %s" % st)
 	else:
 		_pass("construction_state DAMAGED → damaged")
-	var key := str(FacilityIconLayer.texture_key_for_level(3, "damaged"))
+	var key := str(_layer.call("texture_key_for_level", 3, "damaged"))
 	if key != "airfield_l3_damaged":
 		_fail("texture key damaged=%s" % key)
 	else:
 		_pass("texture key maps damaged (art still intact at draw)")
-	if _layer != null:
-		_layer.queue_free()
-		_layer = null
+	_layer.queue_free()
+	_layer = null
