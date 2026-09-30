@@ -378,7 +378,23 @@ xvfb screenshots go to `/opt/cursor/artifacts/fac1a/` and are **NOT live Play**.
 | (b) tip ON | **0.653 FAIL** | **0.556 FAIL** |
 | (c) tip OFF | **0.749 PASS** | **1.000 PASS** |
 
-Fix: landward screen-space offset (28px, east of the corridor) in `_draw` only — not under fills, not a threshold weaken, not a guard disable. Headless **RESULT=PASS** (offset asserted).
+Fix: landward screen-space offset (28px, east of the corridor) in `_draw` only — not under fills, not a threshold weaken, not a guard disable. Headless **RESULT=PASS** (offset asserted). Post-offset seeded xvfb (same thresholds, icons ON): RX-1 `mid_river=0.749` / spine cover `1.000` **PASS** (isolated peak **2046.7 MB**); RT-1 `s1_gold_cover=1.000` **PASS** (2067.8 MB). Sequential keep-green first marked RX-1 FAIL at 4446.3 MB because the sampler summed leftover Godot; isolated tree RSS is under 3 GB.
+
+**Keep-green after FIX #1** (xvfb ≠ live Play; `py_eoa_quick` map_qc FAIL is pre-existing on base `8b7e46de`, Pillow):
+
+| gate | kind | result | peak MB |
+|---|---|---|---|
+| py_fac1a / py_ix1_rx1_march_resource | py | PASS | 2.0 / 58.3 |
+| py_eoa_quick | py | FAIL (base map_qc) | 100.3 |
+| hd_fac1a / hd_mv1 / hd_mv1b | headless | PASS | 2388 / 2388 / 2388 |
+| hd_ix1 (6) / hd_rx1 (4) / hd_rt1 (3) / hd_rh1 | headless | PASS | ~2388 |
+| xvfb_fac1a | xvfb | PASS mid=4 close=4 out=4 res=4 back=4 | 2061.3 |
+| xvfb_mv1 / xvfb_mv1_card / xvfb_rh1 | xvfb | PASS | 2065 / 2066 / 2066 |
+| xvfb_rx1_seeded | xvfb | PASS mid_river=0.749 spine=1.000 | **2046.7** isolated |
+| xvfb_rt1_seeded | xvfb | PASS s1_gold_cover=1.000 | 2067.8 |
+| xvfb_rt1_live_look | xvfb | PASS mesh_frac=0.00078 gold_w=14 | 2238.5 |
+
+Screenshots (NOT live Play): `/opt/cursor/artifacts/fac1a/fac1a_political_mid_NOT_live_play.png`, `fac1a_political_close_NOT_live_play.png`, `fac1a_zoomed_out_NOT_live_play.png`, `fac1a_resources_F9_NOT_live_play.png`, `fac1a_political_back_NOT_live_play.png`.
 
 ### MV-1 move ETA preview (gameplay UI, draft HOLD)
 
