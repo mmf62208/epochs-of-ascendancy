@@ -308,7 +308,7 @@ func _airfield_count(provs: Dictionary) -> int:
 
 
 func _expect_tiers(provs: Dictionary, board: String) -> void:
-	var want: Dictionary = {VIERSEN: 1, OBERBERGISCHER: 2, AHRWEILER: 3, MAYEN_KOBLENZ: 4}
+	var want: Dictionary = {VIERSEN: 1, HUNSRUECK: 2, OBERBERGISCHER: 3, AHRWEILER: 4}
 	for pid in want.keys():
 		if not provs.has(pid):
 			_fail("%s missing province %d" % [board, int(pid)])

@@ -27,10 +27,11 @@ CITY_LAYER = ROOT / "data" / "provinces_world_accurate" / "province_city_layer.j
 # FIX #2b Rhineland reseed (never renumber). NRW west of ~7.6°E / south of
 # the Ruhr + northern Rheinland-Pfalz. Off Köln / Bonn / Leverkusen and off
 # LUX-border (Aachen / Trier-Saarburg / Euskirchen). Ahrweiler is Bonn-adjacent
-# so a Köln counter exercises clearance. Live xvfb showed Ahrweiler–Mayen
-# world ~22 (too tight to split at 1.9). Cluster is Ahrweiler–Ober (~28.6
-# live world): merges at 0.99, splits at ≥1.9. Viersen / Hunsrück stay off
-# the pair. Mayen-Koblenz dropped (always joins Ahrweiler).
+# so a Köln counter exercises clearance. West-edge Ahrweiler interiors are
+# stolen by inflated Vulkaneifel / Euskirchen (snap walked the icon into the
+# Köln counter). Own-pick interiors only. Cluster is Ahrweiler–Ober (live
+# world ~44): merges at 0.99, splits at ≥1.9. Viersen stays isolated; Hunsrück
+# may join the mid cluster but splits at 1.9. Mayen-Koblenz dropped.
 VIERSEN = 710414
 OBERBERGISCHER = 710423
 AHRWEILER = 710455
@@ -58,13 +59,13 @@ SEED_NAMES: Dict[int, str] = {
     OBERBERGISCHER: "Oberbergischer Kreis",
     AHRWEILER: "Ahrweiler",
 }
-# Live-proven OA pair (xvfb mid screens → world ~28.6). Hunsrück south of
-# Ahrweiler; Viersen west. Ahrweiler is L4 so the mid cluster carries max level.
+# Own-pick interiors (LUX / Vulkaneifel / Euskirchen do not steal). Ahrweiler
+# is L4 so the mid cluster carries max level. Hunsrück south; Viersen west.
 SEED_FORCE_RAW: Dict[int, Tuple[float, float]] = {
-    VIERSEN: (4237.92, 932.86),
-    AHRWEILER: (4250.51, 960.28),
-    OBERBERGISCHER: (4270.22, 942.60),
-    HUNSRUECK: (4270.08, 971.85),
+    VIERSEN: (4238.42, 935.41),
+    AHRWEILER: (4251.61, 959.93),
+    OBERBERGISCHER: (4270.12, 942.70),
+    HUNSRUECK: (4269.53, 970.40),
 }
 CLUSTER_PAIR: Tuple[int, int] = (AHRWEILER, OBERBERGISCHER)
 KOELN_PID = 710417
