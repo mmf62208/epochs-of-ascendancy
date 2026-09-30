@@ -412,7 +412,17 @@ Screenshots FIX #5 (xvfb **NOT live Play**): `/opt/cursor/artifacts/fac1a_fix5/0
 
 Screenshots FIX #6 (xvfb **NOT live Play**): `/opt/cursor/artifacts/fac1a_fix6/01_l4_cluster_hit_overlay_z0.97_NOT_live_play.png`, `02_lone_hit_overlay_z2.25_NOT_live_play.png`.
 
-**FIX #7 (Play MIXED `5d42888a`):** L2 cluster oval hit + press/release `event.position`. Seeds / MV-1 gates unchanged. Isolated keep-green pending xvfb after this revision.
+**FIX #7 (Play MIXED `5d42888a`):** L2 cluster oval hit + press/release `event.position`. Seeds / MV-1 gates unchanged. Isolated keep-green (`a5b4b4da`):
+
+| gate | kind | result | peak MB isolated |
+|---|---|---|---|
+| py_fac1a | py | PASS | — |
+| hd_fac1a | headless | PASS (L2 oval / L4 circle, event-position pick) | — |
+| xvfb_fac1a | xvfb | PASS stale=true stale_lag=true (15/15 lone+cluster) clustervar=true sil_fail=0 click=0 noop=0 clearance all tiers worst 12.81 occl=0.000 rx1 0.843/0.843 | **2035.5** |
+| xvfb_rx1 ON / OFF | xvfb | PASS mid_river **0.749 / 0.749** close 0.775 / 0.775 spine 1.000 | **2031.5 / 2031.4** |
+| hd_mv1 / hd_mv1b / hd_rh1 | headless | PASS (unedited) | **1194.1 / 1194.1 / 1195.0** |
+| hd_ix1 (6) / hd_rx1 (4) / hd_rt1 (3) | headless | PASS | ~1194–1195 |
+| xvfb_mv1 / xvfb_mv1_card / xvfb_rh1 | xvfb | PASS | **2031.4 / 2033.0 / 2030.1** |
 
 **FIX #3 (Play MIXED `234e12b8`):** Rhine/spine/border clearance + cluster L4 tag. Split expected ~1.59. Isolated keep-green (`637ca02e`):
 
