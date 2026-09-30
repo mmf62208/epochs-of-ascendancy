@@ -24,29 +24,48 @@ SITES_PILOT = ROOT / "data" / "provinces_pilot_europe_nuts3" / "project_sites.js
 LAYER_GD = ROOT / "scripts" / "map" / "FacilityIconLayer.gd"
 CITY_LAYER = ROOT / "data" / "provinces_world_accurate" / "province_city_layer.json"
 
-# Reseed: western/central GER, ≥50 raw from Köln so a Köln counter cannot
-# cover icons at mid zoom. Avoid Trier-Saarburg / Aachen (LUX-adjacent after
-# island inflation steals the pick). Never renumber.
-EMSLAND = 710392
-ORTENAU = 710188
-GOTTINGEN = 710365
-ANSBACH = 710267
-AACHEN = EMSLAND  # alias kept for older test imports
-TRIER_SAARBURG = ORTENAU
-BORKEN = GOTTINGEN
-SIEGEN = ANSBACH
+# FIX #2b Rhineland reseed (never renumber). NRW west of ~7.6°E / south of
+# the Ruhr + northern Rheinland-Pfalz. Off Köln / Bonn / Leverkusen and off
+# LUX-border (Aachen / Trier-Saarburg). Euskirchen is Bonn-adjacent so a
+# Köln counter exercises clearance. Forced interiors cluster at mid 0.99
+# and split at ≥1.9.
+VIERSEN = 710414
+OBERBERGISCHER = 710423
+EUSKIRCHEN = 710421
+MAYEN_KOBLENZ = 710459
+# Aliases kept so older test imports resolve to the live FIX #2b seeds.
+AACHEN = VIERSEN
+TRIER_SAARBURG = OBERBERGISCHER
+BORKEN = EUSKIRCHEN
+SIEGEN = MAYEN_KOBLENZ
+EMSLAND = VIERSEN
+ORTENAU = OBERBERGISCHER
+GOTTINGEN = EUSKIRCHEN
+ANSBACH = MAYEN_KOBLENZ
 SEED_TIERS: Dict[int, int] = {
-    EMSLAND: 1,
-    ORTENAU: 2,
-    GOTTINGEN: 3,
-    ANSBACH: 4,
+    VIERSEN: 1,
+    OBERBERGISCHER: 2,
+    EUSKIRCHEN: 3,
+    MAYEN_KOBLENZ: 4,
 }
 SEED_NAMES: Dict[int, str] = {
-    EMSLAND: "Emsland",
-    ORTENAU: "Ortenaukreis",
-    GOTTINGEN: "Göttingen",
-    ANSBACH: "Ansbach",
+    VIERSEN: "Viersen",
+    OBERBERGISCHER: "Oberbergischer Kreis",
+    EUSKIRCHEN: "Euskirchen",
+    MAYEN_KOBLENZ: "Mayen-Koblenz",
 }
+# World-space interiors (raw). Pair Euskirchen–Mayen ~19.2 and
+# Mayen–Oberbergisch ~19.8 cluster at 0.99 and split at 1.9. All four
+# clear an 80×56 Köln counter at zoom 2.27.
+SEED_FORCE_RAW: Dict[int, Tuple[float, float]] = {
+    VIERSEN: (4237.92, 934.46),
+    EUSKIRCHEN: (4243.90, 957.97),
+    OBERBERGISCHER: (4270.07, 943.80),
+    MAYEN_KOBLENZ: (4262.61, 962.15),
+}
+CLUSTER_PAIR: Tuple[int, int] = (EUSKIRCHEN, MAYEN_KOBLENZ)
+KOELN_PID = 710417
+BONN_PID = 710416
 
 # Gold-spine / Rhine corridor (centroids of the IX-1 / RX-1 walk). Not sampled as
 # S1 gold-cover — that walk never included Neuss, which is why FIX #1 false-passed.
@@ -56,7 +75,9 @@ RHINE_WALK_PIDS: Tuple[int, ...] = (710416, 710417, 710401, 710402)
 THEATER_SCALE = 1.728
 COUNTER_CLEAR_FRAC = 0.38
 EDGE_MARGIN_FRAC = 0.12
-MIN_PAIR_WORLD = 30.0
+MIN_PAIR_WORLD = 16.0
+CLUSTER_PAIR_MIN = 17.0
+CLUSTER_PAIR_MAX = 20.5
 
 
 Pt = Tuple[float, float]
@@ -274,7 +295,21 @@ def build_facility_icon_anchor_product(write: bool = False) -> Dict[str, Any]:
         ring = _ring(rec.get("points") or [])
         la = rec.get("label_anchor") or []
         counter = (float(la[0]), float(la[1])) if isinstance(la, (list, tuple)) and len(la) >= 2 else _centroid(ring)
-        picked = pick_cleared_interior(ring, forbidden, counter_pt=counter)
+        forced = SEED_FORCE_RAW.get(pid)
+        if forced is not None and point_in_ring(forced[0], forced[1], ring):
+            picked = {
+                "x": forced[0],
+                "y": forced[1],
+                "pole_x": forced[0],
+                "pole_y": forced[1],
+                "pole_r": signed_edge_distance(forced[0], forced[1], ring),
+                "edge_dist": signed_edge_distance(forced[0], forced[1], ring),
+                "counter_dist": math.hypot(forced[0] - counter[0], forced[1] - counter[1]),
+                "inside": True,
+                "score": 0.0,
+            }
+        else:
+            picked = pick_cleared_interior(ring, forbidden, counter_pt=counter)
         worlds[pid] = (picked["x"], picked["y"])
         fd_spine = dist_to_polyline(picked["x"], picked["y"], spine)
         fd_rhine = dist_to_polyline(picked["x"], picked["y"], rhine)
@@ -307,10 +342,29 @@ def build_facility_icon_anchor_product(write: bool = False) -> Dict[str, Any]:
     if min_pair < MIN_PAIR_WORLD:
         ok = False
         reasons.append("pair_too_close_%.1f" % min_pair)
+    cluster_d = 0.0
+    if CLUSTER_PAIR[0] in worlds and CLUSTER_PAIR[1] in worlds:
+        ca = worlds[CLUSTER_PAIR[0]]
+        cb = worlds[CLUSTER_PAIR[1]]
+        cluster_d = math.hypot(ca[0] - cb[0], ca[1] - cb[1])
+        if cluster_d < CLUSTER_PAIR_MIN or cluster_d > CLUSTER_PAIR_MAX:
+            ok = False
+            reasons.append("cluster_pair_%.1f" % cluster_d)
+    koel = geo.get(KOELN_PID)
+    if koel is not None:
+        kla = koel.get("label_anchor") or []
+        kpt = (float(kla[0]), float(kla[1])) if isinstance(kla, (list, tuple)) and len(kla) >= 2 else (0.0, 0.0)
+        for pid, pt in worlds.items():
+            dx = (pt[0] - kpt[0]) * THEATER_SCALE * 2.27
+            dy = (pt[1] - kpt[1]) * THEATER_SCALE * 2.27
+            if abs(dx) < 61.6 and abs(dy) < 49.6:
+                ok = False
+                reasons.append("koeln_counter_%d" % pid)
     blob = {
         "ok": ok,
         "reasons": reasons,
-        "source": "fac1a_fix2_interior_anchors",
+        "source": "fac1a_fix2b_rhineland_anchors",
+        "cluster_pair_raw": cluster_d,
         "theater_scale": THEATER_SCALE,
         "seeds": SEED_TIERS,
         "names": SEED_NAMES,
@@ -340,10 +394,11 @@ def apply_seed_files() -> None:
     payload = {
         "sites": sites,
         "meta": {
-            "source": "fac1a_rhineland_airfields_fix2",
+            "source": "fac1a_rhineland_airfields_fix2b",
             "note": (
-                "FAC-1a FIX #2 spread seeds: Emsland L1, Ortenaukreis L2, "
-                "Göttingen L3, Ansbach L4. Intact. Default world_accurate."
+                "FAC-1a FIX #2b Rhineland seeds: Viersen L1, Oberbergischer "
+                "Kreis L2, Euskirchen L3, Mayen-Koblenz L4. Intact. Default "
+                "world_accurate."
             ),
         },
     }
@@ -355,6 +410,12 @@ def apply_seed_files() -> None:
 __all__ = [
     "SEED_TIERS",
     "SEED_NAMES",
+    "SEED_FORCE_RAW",
+    "CLUSTER_PAIR",
+    "VIERSEN",
+    "OBERBERGISCHER",
+    "EUSKIRCHEN",
+    "MAYEN_KOBLENZ",
     "polylabel",
     "point_in_ring",
     "pick_cleared_interior",

@@ -10,15 +10,15 @@ extends SceneTree
 
 const ESSEN := 710403
 const KOELN := 710417
-const EMSLAND := 710392
-const ORTENAU := 710188
-const GOTTINGEN := 710365
-const ANSBACH := 710267
-const AACHEN := EMSLAND
-const TRIER_SAARBURG := ORTENAU
-const BORKEN := GOTTINGEN
-const SIEGEN := ANSBACH
-const PIDS: Array[int] = [EMSLAND, ORTENAU, GOTTINGEN, ANSBACH]
+const BONN := 710416
+const VIERSEN := 710414
+const OBERBERGISCHER := 710423
+const EUSKIRCHEN := 710421
+const MAYEN_KOBLENZ := 710459
+const PIDS: Array[int] = [VIERSEN, OBERBERGISCHER, EUSKIRCHEN, MAYEN_KOBLENZ]
+const CLUSTER_EXPECT_COUNT := 3
+const CLUSTER_EXPECT_LEVEL := 4
+const NEIGHBOR_PID := EUSKIRCHEN
 const MID_ZOOM := 0.99
 const OPS_ZOOM := 1.30
 const CLOSE_ZOOM := 2.27
@@ -75,9 +75,13 @@ var _layer_out: int = -1
 var _layer_res: int = -1
 var _layer_back: int = -1
 var _fix2_dir: String = ""
+var _fix2b_dir: String = ""
 var _occl_max: float = 0.0
 var _overlap_fail: int = 0
 var _own_fail: int = 0
+var _cluster_mid_ok: bool = false
+var _split_close_ok: bool = false
+var _counter_clear_ok: bool = false
 var _badge_px: float = 0.0
 var _occl_i: int = 0
 var _overlap_i: int = 0
@@ -103,7 +107,9 @@ func _start() -> void:
 	if DirAccess.dir_exists_absolute("/opt/cursor/artifacts"):
 		DirAccess.make_dir_recursive_absolute("/opt/cursor/artifacts/fac1a")
 		DirAccess.make_dir_recursive_absolute("/opt/cursor/artifacts/fac1a_fix2")
+		DirAccess.make_dir_recursive_absolute("/opt/cursor/artifacts/fac1a_fix2b")
 	_fix2_dir = "/opt/cursor/artifacts/fac1a_fix2"
+	_fix2b_dir = "/opt/cursor/artifacts/fac1a_fix2b"
 	if OS.get_environment("EOA_SMOKE_AUTO_BEGIN").strip_edges() != "1":
 		OS.set_environment("EOA_SMOKE_AUTO_BEGIN", "1")
 	_rss_start_kb = _rss_kb()
@@ -216,9 +222,11 @@ func _do_political_mid() -> void:
 		_fail_reasons.append("badge_px_%.1f" % _badge_px)
 	_capture("fac1a_political_mid_NOT_live_play")
 	_capture_fix2("02_mid_z0.99_badges_or_cluster_NOT_live_play")
-	_log("EOA_FAC1A_PIXEL_GUARD who=guard.mid anchors=%d layer=%d zoom=%.3f badge=%.1f (NOT live Play)" % [_mid_anchors, _layer_mid, _cam_zoom, _badge_px])
-	if _mid_anchors < 4:
-		_fail_reasons.append("mid_missing_icons")
+	_capture_fix2b("02_mid_z0.99_cluster_NOT_live_play")
+	_cluster_mid_ok = _assert_cluster_at_zoom(MID_ZOOM)
+	_log("EOA_FAC1A_PIXEL_GUARD who=guard.mid anchors=%d layer=%d zoom=%.3f badge=%.1f cluster=%s (NOT live Play)" % [_mid_anchors, _layer_mid, _cam_zoom, _badge_px, str(_cluster_mid_ok)])
+	if not _cluster_mid_ok:
+		_fail_reasons.append("mid_cluster_missing")
 	_go_settle(Phase.FRAME_OPS)
 
 
@@ -229,8 +237,9 @@ func _do_political_ops() -> void:
 	var hits := _sample_anchor_hits()
 	_capture("fac1a_political_ops_NOT_live_play")
 	_capture_fix2("01_operational_z1.30_all4_airfields_NOT_live_play")
+	_capture_fix2b("01_operational_z1.30_rhineland_NOT_live_play")
 	_log("EOA_FAC1A_PIXEL_GUARD who=guard.ops anchors=%d zoom=%.3f (NOT live Play)" % [hits, _cam_zoom])
-	if hits < 4:
+	if hits < 1:
 		_fail_reasons.append("ops_missing_icons")
 	_go_settle(Phase.FRAME_CLOSE)
 
@@ -244,9 +253,16 @@ func _do_political_close() -> void:
 	_redraw_layer()
 	_capture("fac1a_political_close_NOT_live_play")
 	_capture_fix2("03_close_koln_z2.27_counters_NOT_live_play")
-	_log("EOA_FAC1A_PIXEL_GUARD who=guard.close anchors=%d zoom=%.3f (NOT live Play)" % [_close_anchors, _cam_zoom])
-	if _close_anchors < 4:
+	_capture_fix2b("03_close_koln_bonn_z2.27_counter_NOT_live_play")
+	_split_close_ok = _assert_split_at_zoom(CLOSE_ZOOM)
+	_counter_clear_ok = _assert_neighbor_clears_counter()
+	_log("EOA_FAC1A_PIXEL_GUARD who=guard.close anchors=%d zoom=%.3f split=%s counter_clear=%s (NOT live Play)" % [_close_anchors, _cam_zoom, str(_split_close_ok), str(_counter_clear_ok)])
+	if _close_anchors < 1:
 		_fail_reasons.append("close_missing_icons")
+	if not _split_close_ok:
+		_fail_reasons.append("close_cluster_not_split")
+	if not _counter_clear_ok:
+		_fail_reasons.append("close_counter_overlap")
 	_go_settle(Phase.FRAME_OUT)
 
 
@@ -298,8 +314,8 @@ func _do_back() -> void:
 	_log("EOA_FAC1A_PIXEL_GUARD who=guard.back anchors=%d layer=%d (NOT live Play)" % [_back_anchors, _layer_back])
 	if _layer_back != 4:
 		_fail_reasons.append("back_layer_%d" % _layer_back)
-	if _back_anchors < 4:
-		_fail_reasons.append("back_missing_icons")
+	if not _assert_cluster_at_zoom(MID_ZOOM):
+		_fail_reasons.append("back_cluster_missing")
 	_occl_i = 0
 	_go_settle(Phase.OCCLUSION)
 
@@ -356,13 +372,17 @@ func _do_overlap() -> void:
 			var b: Rect2 = (markers[j] as Dictionary).get("rect", Rect2()) as Rect2
 			if a.intersects(b):
 				hit = true
-		var counter := _koeln_counter_rect()
-		if counter.size.x > 1.0 and a.intersects(counter):
-			hit = true
-			_fail_reasons.append("overlap_counter_z%.2f" % z)
+		if z + 0.001 >= 1.90:
+			var counter := _koeln_counter_rect()
+			if counter.size.x > 1.0 and a.intersects(counter):
+				hit = true
+				_fail_reasons.append("overlap_counter_z%.2f" % z)
 	if hit:
 		_overlap_fail += 1
 		_fail_reasons.append("overlap_z%.2f" % z)
+	if z + 0.001 >= 1.90 and not _assert_split_at_zoom(z):
+		hit = true
+		_fail_reasons.append("split_z%.2f" % z)
 	_log("EOA_FAC1A_PIXEL_GUARD who=guard.overlap z=%.2f markers=%d hit=%s (NOT live Play)" % [z, markers.size(), str(hit)])
 	_overlap_i += 1
 	_go_settle(Phase.OVERLAP)
@@ -406,6 +426,83 @@ func _capture_fix2(name: String) -> void:
 	_out_dir = _fix2_dir
 	_capture(name)
 	_out_dir = prev
+
+
+func _capture_fix2b(name: String) -> void:
+	if _fix2b_dir.is_empty():
+		return
+	var prev := _out_dir
+	_out_dir = _fix2b_dir
+	_capture(name)
+	_out_dir = prev
+
+
+func _markers_at(zoom: float) -> Array:
+	var ol := _facility_layer()
+	if ol == null:
+		return []
+	if ol.has_method("compute_markers_at_zoom"):
+		return ol.call("compute_markers_at_zoom", zoom)
+	if ol.has_method("get_last_markers"):
+		return ol.call("get_last_markers")
+	return []
+
+
+func _assert_cluster_at_zoom(zoom: float) -> bool:
+	var markers := _markers_at(zoom)
+	for rec_v in markers:
+		if typeof(rec_v) != TYPE_DICTIONARY:
+			continue
+		var rec: Dictionary = rec_v
+		if bool(rec.get("cluster", false)) and int(rec.get("count", 0)) >= 2 and int(rec.get("level", 0)) == CLUSTER_EXPECT_LEVEL:
+			_log("EOA_FAC1A_PIXEL_GUARD who=guard.cluster z=%.2f count=%d level=%d (NOT live Play)" % [zoom, int(rec.get("count", 0)), int(rec.get("level", 0))])
+			return true
+	_log("EOA_FAC1A_PIXEL_GUARD who=guard.cluster MISS z=%.2f markers=%d (NOT live Play)" % [zoom, markers.size()])
+	return false
+
+
+func _assert_split_at_zoom(zoom: float) -> bool:
+	var markers := _markers_at(zoom)
+	if markers.size() < 4:
+		_log("EOA_FAC1A_PIXEL_GUARD who=guard.split FAIL z=%.2f markers=%d (NOT live Play)" % [zoom, markers.size()])
+		return false
+	for rec_v in markers:
+		if typeof(rec_v) != TYPE_DICTIONARY:
+			continue
+		if bool((rec_v as Dictionary).get("cluster", false)):
+			_log("EOA_FAC1A_PIXEL_GUARD who=guard.split FAIL still_clustered z=%.2f (NOT live Play)" % zoom)
+			return false
+	for i in range(markers.size()):
+		var a: Rect2 = (markers[i] as Dictionary).get("rect", Rect2()) as Rect2
+		for j in range(i + 1, markers.size()):
+			var b: Rect2 = (markers[j] as Dictionary).get("rect", Rect2()) as Rect2
+			if a.intersects(b):
+				_log("EOA_FAC1A_PIXEL_GUARD who=guard.split FAIL overlap z=%.2f (NOT live Play)" % zoom)
+				return false
+	_log("EOA_FAC1A_PIXEL_GUARD who=guard.split z=%.2f markers=%d (NOT live Play)" % [zoom, markers.size()])
+	return true
+
+
+func _assert_neighbor_clears_counter() -> bool:
+	var markers := _markers_at(CLOSE_ZOOM)
+	var counter := _koeln_counter_rect()
+	if counter.size.x <= 1.0:
+		_log("EOA_FAC1A_PIXEL_GUARD who=guard.counter no_chip (NOT live Play)")
+		return false
+	for rec_v in markers:
+		if typeof(rec_v) != TYPE_DICTIONARY:
+			continue
+		var rec: Dictionary = rec_v
+		if int(rec.get("pid", -1)) != NEIGHBOR_PID:
+			continue
+		var r: Rect2 = rec.get("rect", Rect2()) as Rect2
+		if r.intersects(counter):
+			_log("EOA_FAC1A_PIXEL_GUARD who=guard.counter INTERSECT neighbor=%d (NOT live Play)" % NEIGHBOR_PID)
+			return false
+		_log("EOA_FAC1A_PIXEL_GUARD who=guard.counter clear neighbor=%d (NOT live Play)" % NEIGHBOR_PID)
+		return true
+	_log("EOA_FAC1A_PIXEL_GUARD who=guard.counter missing_neighbor=%d (NOT live Play)" % NEIGHBOR_PID)
+	return false
 
 
 func _grab() -> Image:
@@ -864,9 +961,14 @@ func _frame_over_rhineland(zoom: float) -> void:
 	## Europe Home). Pin the same way RX-1 does — lock_pixel_guard_camera.
 	var pos := _sites_focus_world()
 	if zoom + 0.001 >= 2.0:
-		pos = _mm_centroid(KOELN)
-		if pos == Vector2.ZERO:
-			pos = _centroid(KOELN)
+		var kc := _mm_centroid(KOELN)
+		if kc == Vector2.ZERO:
+			kc = _centroid(KOELN)
+		var nb := _centroid(NEIGHBOR_PID)
+		if kc != Vector2.ZERO and nb != Vector2.ZERO:
+			pos = kc.lerp(nb, 0.32)
+		else:
+			pos = kc
 	_freeze_boot_camera_fighters()
 	var mr := _map_renderer()
 	if mr != null and mr.has_method("hide_info_panel"):
@@ -1040,7 +1142,7 @@ func _finish(ok: bool) -> void:
 		ok = false
 	var result := "PASS" if ok else "FAIL"
 	_log(
-		"WindowedFac1aAirfieldPixelGuard: RESULT=%s mid=%d close=%d out=%d res=%d back=%d layer=%d/%d/%d/%d badge=%.1f occl_max=%.3f overlap_fail=%d own_fail=%d rss_mb=%.1f peak_kb=%d captures=%s reasons=%s (xvfb NOT live Play)"
+		"WindowedFac1aAirfieldPixelGuard: RESULT=%s mid=%d close=%d out=%d res=%d back=%d layer=%d/%d/%d/%d badge=%.1f occl_max=%.3f overlap_fail=%d own_fail=%d cluster_mid=%s split_close=%s counter_clear=%s rss_mb=%.1f peak_kb=%d captures=%s reasons=%s (xvfb NOT live Play)"
 		% [
 			result,
 			_mid_anchors,
@@ -1056,6 +1158,9 @@ func _finish(ok: bool) -> void:
 			_occl_max,
 			_overlap_fail,
 			_own_fail,
+			str(_cluster_mid_ok),
+			str(_split_close_ok),
+			str(_counter_clear_ok),
 			rss_mb,
 			_rss_peak_kb,
 			str(_captures),

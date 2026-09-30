@@ -1,7 +1,7 @@
 {
   "sites": [
     {
-      "province_id": 710392,
+      "province_id": 710414,
       "project_type": "airfield",
       "site_id": "airfield_tier_1",
       "tier": 1,
@@ -9,7 +9,7 @@
       "damage_level": 0
     },
     {
-      "province_id": 710188,
+      "province_id": 710423,
       "project_type": "airfield",
       "site_id": "airfield_tier_2",
       "tier": 2,
@@ -17,7 +17,7 @@
       "damage_level": 0
     },
     {
-      "province_id": 710365,
+      "province_id": 710421,
       "project_type": "airfield",
       "site_id": "airfield_tier_3",
       "tier": 3,
@@ -25,7 +25,7 @@
       "damage_level": 0
     },
     {
-      "province_id": 710267,
+      "province_id": 710459,
       "project_type": "airfield",
       "site_id": "airfield_tier_4",
       "tier": 4,
@@ -34,7 +34,7 @@
     }
   ],
   "meta": {
-    "source": "fac1a_rhineland_airfields_fix2",
-    "note": "FAC-1a FIX #2 spread seeds: Emsland L1, Ortenaukreis L2, G\u00f6ttingen L3, Ansbach L4. Intact. Default world_accurate."
+    "source": "fac1a_rhineland_airfields_fix2b",
+    "note": "FAC-1a FIX #2b Rhineland seeds: Viersen L1, Oberbergischer Kreis L2, Euskirchen L3, Mayen-Koblenz L4. Intact. Default world_accurate."
   }
 }

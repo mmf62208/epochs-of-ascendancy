@@ -13,15 +13,16 @@ const SRC_OL := "res://scripts/map/InfrastructureOverlayLayer.gd"
 const SRC_LOADER := "res://scripts/core/ScenarioLoader.gd"
 const SRC_ZOOM := "res://scripts/map/MapZoomLOD.gd"
 
-const EMSLAND := 710392
-const ORTENAU := 710188
-const GOTTINGEN := 710365
-const ANSBACH := 710267
-const AACHEN := EMSLAND
-const TRIER_SAARBURG := ORTENAU
-const BORKEN := GOTTINGEN
-const SIEGEN := ANSBACH
+const VIERSEN := 710414
+const OBERBERGISCHER := 710423
+const EUSKIRCHEN := 710421
+const MAYEN_KOBLENZ := 710459
+const AACHEN := VIERSEN
+const TRIER_SAARBURG := OBERBERGISCHER
+const BORKEN := EUSKIRCHEN
+const SIEGEN := MAYEN_KOBLENZ
 const KOELN := 710417
+const SEED_PIDS: Array[int] = [VIERSEN, OBERBERGISCHER, EUSKIRCHEN, MAYEN_KOBLENZ]
 
 const SITE_AIRFIELD := 1
 const STATE_COMPLETED := 2
@@ -246,7 +247,7 @@ func _state_from_record(rec: Dictionary) -> int:
 
 func _seed_provinces_from_json(board: String) -> Dictionary:
 	var dest: Dictionary = {}
-	for pid in [AACHEN, TRIER_SAARBURG, BORKEN, SIEGEN]:
+	for pid in SEED_PIDS:
 		var p := DummyProv.new()
 		p.id = int(pid)
 		p.name = "FAC1a %d" % int(pid)
@@ -305,7 +306,7 @@ func _airfield_count(provs: Dictionary) -> int:
 
 
 func _expect_tiers(provs: Dictionary, board: String) -> void:
-	var want: Dictionary = {AACHEN: 1, TRIER_SAARBURG: 2, BORKEN: 3, SIEGEN: 4}
+	var want: Dictionary = {VIERSEN: 1, OBERBERGISCHER: 2, EUSKIRCHEN: 3, MAYEN_KOBLENZ: 4}
 	for pid in want.keys():
 		if not provs.has(pid):
 			_fail("%s missing province %d" % [board, int(pid)])
@@ -386,7 +387,7 @@ func _test_board_seeds_and_layer() -> void:
 			_pass("%s visible at operational zoom" % board)
 		var polys: Dictionary = _dummy_polygons()
 		var click_ok := true
-		for pid in [AACHEN, TRIER_SAARBURG, BORKEN, SIEGEN]:
+		for pid in SEED_PIDS:
 			var dw: Vector2 = _layer.call("get_draw_world", pid)
 			var ring: PackedVector2Array = polys[pid]
 			if not _point_in_poly(dw, ring):
