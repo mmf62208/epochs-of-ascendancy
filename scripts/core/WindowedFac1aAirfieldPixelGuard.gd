@@ -21,6 +21,8 @@ const WAIT_MAP_SECS := 420
 const SETTLE_FRAMES := 48
 const RSS_LIMIT_MB := 3000
 const ANCHOR_MIN_HITS := 6
+## Icons sit a landward screen offset off the centroid corridor (FIX #1).
+const SAMPLE_RADIUS := 40
 
 enum Phase {
 	WAIT_MAP,
@@ -304,7 +306,7 @@ func _sample_anchor_hits() -> int:
 	for pid in PIDS:
 		var world := _centroid(pid)
 		var screen: Vector2 = cam.get_canvas_transform() * world
-		var hits := _sample_disk(img, int(round(screen.x)), int(round(screen.y)), 16, w, h)
+		var hits := _sample_disk(img, int(round(screen.x)), int(round(screen.y)), SAMPLE_RADIUS, w, h)
 		if hits >= ANCHOR_MIN_HITS:
 			found += 1
 		_log("EOA_FAC1A_PIXEL_GUARD who=guard.anchor pid=%d screen=%.0f,%.0f hits=%d (NOT live Play)" % [pid, screen.x, screen.y, hits])
@@ -336,6 +338,11 @@ func _is_icon_pixel(c: Color) -> bool:
 
 
 func _centroid(pid: int) -> Vector2:
+	var ol := _facility_layer()
+	if ol != null and ol.has_method("get_draw_world"):
+		var dw: Vector2 = ol.call("get_draw_world", pid)
+		if dw != Vector2.ZERO and dw.is_finite():
+			return dw
 	var mm := root.get_node_or_null("MapManager")
 	if mm != null and mm.has_method("get_province_centroid"):
 		var c: Vector2 = mm.call("get_province_centroid", pid)

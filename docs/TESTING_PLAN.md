@@ -370,7 +370,15 @@ tools/eoa_fac1a_pixel_guard.sh
 
 xvfb screenshots go to `/opt/cursor/artifacts/fac1a/` and are **NOT live Play**. Peak RSS must stay under 3 GB. Merge **HOLD**.
 
-**Machine evidence (`23f271e9`, xvfb/headless ≠ live Play):** FAC-1a headless **RESULT=PASS** (both boards, 4 icons L1–L4, zoom/mode/toggle/rebuild/damaged). xvfb pixel **RESULT=PASS** mid=4 close=4 layer=4/0/0/4 wrapper **2064 MB**. Keep-green: MV-1 / MV-1b / IX-1 (6) / RX-1 (4) / RT-1 (3) / RH-1 headless **PASS**; MV-1 pixel + card-up + RH-1 pixel + RT-1 live-look **PASS**. RX-1 / RT-1 *seeded* xvfb **FAIL** (`mid_river=0.653` / `s1_gold_cover=0.556`) — Rhine + `RoadTierVisual` diffs empty vs `8b7e46de`; same xvfb≠Play class as those HOLD slices. `--quick` unit-pick needles fail identically on base `8b7e46de`; map_qc needs Pillow (env).
+**FIX #1 occlusion (A/B/C prove, xvfb ≠ live Play):** icons sat on Bonn–Köln–Lev centroids (gold spine + Rhine). Same commands:
+
+| | RX-1 `mid_river` | RT-1 `s1_gold_cover` |
+|---|---|---|
+| (a) base `8b7e46de` | **0.749 PASS** | **1.000 PASS** |
+| (b) tip ON | **0.653 FAIL** | **0.556 FAIL** |
+| (c) tip OFF | **0.749 PASS** | **1.000 PASS** |
+
+Fix: landward screen-space offset (28px, east of the corridor) in `_draw` only — not under fills, not a threshold weaken, not a guard disable. Headless **RESULT=PASS** (offset asserted).
 
 ### MV-1 move ETA preview (gameplay UI, draft HOLD)
 

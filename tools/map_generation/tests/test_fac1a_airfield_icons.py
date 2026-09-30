@@ -64,6 +64,8 @@ class TestFac1aAirfieldIcons(unittest.TestCase):
         self.assertIn("draw_texture_rect", src)
         self.assertIn("var show_facilities: bool = true", src)
         self.assertIn("func rebuild_icon_list", src)
+        self.assertIn("CORRIDOR_OFFSET_SCREEN_PX", src)
+        self.assertIn("_landward_draw_world", src)
         self.assertNotIn("Line2D.new", src)
         proc = src[src.find("func _process") : src.find("func _unhandled_input")]
         self.assertNotIn("rebuild_icon_list", proc)

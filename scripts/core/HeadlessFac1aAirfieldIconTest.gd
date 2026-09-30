@@ -347,6 +347,13 @@ func _test_board_seeds_and_layer() -> void:
 			_fail("%s political mid zoom drew %d" % [board, mid_n])
 		else:
 			_pass("%s visible at operational zoom" % board)
+		var cents: Dictionary = _dummy_centroids()
+		var dw: Vector2 = _layer.call("get_draw_world", KOELN)
+		var c0: Vector2 = cents[KOELN] as Vector2
+		if dw.distance_to(c0) < 8.0:
+			_fail("%s draw world not offset off centroid (FIX #1)" % board)
+		else:
+			_pass("%s landward offset %.1f from centroid" % [board, dw.distance_to(c0)])
 		_layer.call("set_test_map_mode", "diplomacy")
 		if int(_layer.call("count_icons_that_would_draw")) != 4:
 			_fail("%s diplomacy hid icons" % board)

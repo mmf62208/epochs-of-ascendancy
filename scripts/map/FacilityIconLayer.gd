@@ -13,6 +13,12 @@ const CLOSE_ZOOM := 1.0
 const MAP_Z := 24
 ## Above roads (~21) / Rhine (22), below DemoUnitIcon (28) and name labels (82).
 const UNIT_COUNTER_Z := 28
+## Screen-space shift off the Bonn–Köln–Lev centroid corridor (gold spine + Rhine).
+## Applied in _draw only — does not rebuild the icon list.
+const CORRIDOR_OFFSET_SCREEN_PX := 28.0
+const CORRIDOR_BONN := 710416
+const CORRIDOR_KOELN := 710417
+const CORRIDOR_LEV := 710418
 const VISIBLE_MODES: Array[String] = ["political", "diplomacy", "infra"]
 ## SpecialSite.SiteType.AIRFIELD / ConstructionState — ints so -s tests can duck-type.
 const SITE_AIRFIELD := 1
@@ -41,6 +47,10 @@ func _ready() -> void:
 	visible = true
 	set_process(true)
 	set_process_unhandled_input(true)
+	## Debug / keep-green: EOA_FAC1A_SHOW=0 hides icons (default ON when unset).
+	var env_show := OS.get_environment("EOA_FAC1A_SHOW").strip_edges().to_lower()
+	if env_show == "0" or env_show == "false" or env_show == "off":
+		show_facilities = false
 	var ssm := _special_site_manager()
 	if ssm != null and ssm.has_signal("special_site_created"):
 		if not ssm.special_site_created.is_connected(_on_special_site_created):
@@ -86,6 +96,16 @@ func count_icons_that_would_draw() -> int:
 	if not _should_draw():
 		return 0
 	return _icons.size()
+
+
+func get_draw_world(pid: int) -> Vector2:
+	## Province centroid plus the landward corridor offset (current zoom).
+	for rec in _icons:
+		if int(rec.get("pid", -1)) != pid:
+			continue
+		var world: Vector2 = rec.get("world", Vector2.ZERO) as Vector2
+		return _landward_draw_world(pid, world)
+	return Vector2.ZERO
 
 
 func setup_for_test(provinces: Dictionary, centroids: Dictionary, board_n: int = 0) -> void:
@@ -356,6 +376,34 @@ func _world_size(screen_px: float) -> float:
 	return screen_px / maxf(_canvas_zoom(), 0.04)
 
 
+func _rhineland_tangent() -> Vector2:
+	## Bonn → Leverkusen along the IX-1 / RT-1 gold spine.
+	var a := _centroid_for(CORRIDOR_BONN, null)
+	var b := _centroid_for(CORRIDOR_LEV, null)
+	if a == Vector2.ZERO or b == Vector2.ZERO:
+		return Vector2(0.0, -1.0)
+	var t := b - a
+	if t.length_squared() < 0.0001:
+		return Vector2(0.0, -1.0)
+	return t.normalized()
+
+
+func _landward_draw_world(pid: int, centroid: Vector2) -> Vector2:
+	if not centroid.is_finite() or centroid == Vector2.ZERO:
+		return centroid
+	var tangent := _rhineland_tangent()
+	var n := Vector2(-tangent.y, tangent.x)
+	if n.length_squared() < 0.0001:
+		n = Vector2(1.0, 0.0)
+	else:
+		n = n.normalized()
+	## East / +x is the land side of this Rhine stretch (river + spine stay west).
+	if n.x < 0.0:
+		n = -n
+	var world_off := CORRIDOR_OFFSET_SCREEN_PX / maxf(_canvas_zoom(), 0.04)
+	return centroid + n * world_off
+
+
 func _load_tex(stem: String, px: int) -> Texture2D:
 	var cache_key := "%s_%d" % [stem, px]
 	if _tex_cache.has(cache_key):
@@ -397,9 +445,10 @@ func _draw() -> void:
 	var badge_px: float = 11.0 if not close else 12.0
 	var pips_px: float = screen_px * 0.55
 	for rec in _icons:
-		var world: Vector2 = rec.get("world", Vector2.ZERO) as Vector2
-		if not world.is_finite():
+		var centroid: Vector2 = rec.get("world", Vector2.ZERO) as Vector2
+		if not centroid.is_finite():
 			continue
+		var world := _landward_draw_world(int(rec.get("pid", 0)), centroid)
 		if not _in_viewport(world, screen_px + 20.0):
 			continue
 		var level: int = clampi(int(rec.get("level", 1)), 1, 4)
