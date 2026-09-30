@@ -15,16 +15,17 @@ const SRC_ZOOM := "res://scripts/map/MapZoomLOD.gd"
 
 const VIERSEN := 710414
 const OBERBERGISCHER := 710423
-const AHRWEILER := 710455
+const NEUWIED := 710460
 const HUNSRUECK := 710464
+const AHRWEILER := NEUWIED
 const MAYEN_KOBLENZ := HUNSRUECK
-const EUSKIRCHEN := AHRWEILER
+const EUSKIRCHEN := NEUWIED
 const AACHEN := VIERSEN
 const TRIER_SAARBURG := OBERBERGISCHER
-const BORKEN := AHRWEILER
+const BORKEN := NEUWIED
 const SIEGEN := HUNSRUECK
 const KOELN := 710417
-const SEED_PIDS: Array[int] = [VIERSEN, HUNSRUECK, OBERBERGISCHER, AHRWEILER]
+const SEED_PIDS: Array[int] = [VIERSEN, HUNSRUECK, OBERBERGISCHER, NEUWIED]
 
 const SITE_AIRFIELD := 1
 const STATE_COMPLETED := 2
@@ -308,7 +309,7 @@ func _airfield_count(provs: Dictionary) -> int:
 
 
 func _expect_tiers(provs: Dictionary, board: String) -> void:
-	var want: Dictionary = {VIERSEN: 1, HUNSRUECK: 2, OBERBERGISCHER: 3, AHRWEILER: 4}
+	var want: Dictionary = {VIERSEN: 1, HUNSRUECK: 2, OBERBERGISCHER: 3, NEUWIED: 4}
 	for pid in want.keys():
 		if not provs.has(pid):
 			_fail("%s missing province %d" % [board, int(pid)])

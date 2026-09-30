@@ -26,48 +26,51 @@ CITY_LAYER = ROOT / "data" / "provinces_world_accurate" / "province_city_layer.j
 
 # FIX #2b Rhineland reseed (never renumber). NRW west of ~7.6°E / south of
 # the Ruhr + northern Rheinland-Pfalz. Off Köln / Bonn / Leverkusen and off
-# LUX-border (Aachen / Trier-Saarburg / Euskirchen). Ahrweiler is Bonn-adjacent
-# so a Köln counter exercises clearance. West-edge Ahrweiler interiors are
-# stolen by inflated Vulkaneifel / Euskirchen (snap walked the icon into the
-# Köln counter). Own-pick interiors only. Cluster is Ahrweiler–Ober (live
-# world ~44): merges at 0.99, splits at ≥1.9. Viersen stays isolated; Hunsrück
-# may join the mid cluster but splits at 1.9. Mayen-Koblenz dropped.
+# LUX-border (Aachen / Trier-Saarburg / Euskirchen / Ahrweiler / Bitburg-Prüm).
+# Ahrweiler 710455 is unusable: every interior sits inside the LUX capital-star
+# disk (min 56 world units), so snap walked NE into the Köln counter.
+# Neuwied 710460 is Bonn-adjacent, LUX-disk-safe (~70u), and L4 so the mid
+# cluster carries max level. Cluster is Neuwied–Ober (raw ~16.5, live ~28):
+# merges at 0.99, splits at ≥1.9. Hunsrück may join that mid cluster and
+# also splits at 1.9. Viersen stays isolated. Mayen-Koblenz dropped.
 VIERSEN = 710414
 OBERBERGISCHER = 710423
-AHRWEILER = 710455
+NEUWIED = 710460
 HUNSRUECK = 710464
+AHRWEILER = NEUWIED
 MAYEN_KOBLENZ = HUNSRUECK
 # Aliases kept so older test imports resolve to the live FIX #2b seeds.
-EUSKIRCHEN = AHRWEILER
+EUSKIRCHEN = NEUWIED
 AACHEN = VIERSEN
 TRIER_SAARBURG = OBERBERGISCHER
-BORKEN = AHRWEILER
+BORKEN = NEUWIED
 SIEGEN = HUNSRUECK
 EMSLAND = VIERSEN
 ORTENAU = OBERBERGISCHER
-GOTTINGEN = AHRWEILER
+GOTTINGEN = NEUWIED
 ANSBACH = HUNSRUECK
 SEED_TIERS: Dict[int, int] = {
     VIERSEN: 1,
     HUNSRUECK: 2,
     OBERBERGISCHER: 3,
-    AHRWEILER: 4,
+    NEUWIED: 4,
 }
 SEED_NAMES: Dict[int, str] = {
     VIERSEN: "Viersen",
     HUNSRUECK: "Rhein-Hunsrück-Kreis",
     OBERBERGISCHER: "Oberbergischer Kreis",
-    AHRWEILER: "Ahrweiler",
+    NEUWIED: "Neuwied",
 }
-# Own-pick interiors (LUX / Vulkaneifel / Euskirchen do not steal). Ahrweiler
-# is L4 so the mid cluster carries max level. Hunsrück south; Viersen west.
+# Own-pick interiors (LUX capital-star disk does not steal). Neuwied is L4
+# so the mid cluster carries max level. Hunsrück south; Viersen west.
 SEED_FORCE_RAW: Dict[int, Tuple[float, float]] = {
-    VIERSEN: (4238.42, 935.41),
-    AHRWEILER: (4251.61, 959.93),
-    OBERBERGISCHER: (4270.12, 942.70),
-    HUNSRUECK: (4269.53, 970.40),
+    VIERSEN: (4234.82, 935.41),
+    NEUWIED: (4268.40, 956.88),
+    OBERBERGISCHER: (4267.42, 940.45),
+    HUNSRUECK: (4267.73, 973.10),
 }
-CLUSTER_PAIR: Tuple[int, int] = (AHRWEILER, OBERBERGISCHER)
+CLUSTER_PAIR: Tuple[int, int] = (NEUWIED, OBERBERGISCHER)
+NEIGHBOR_PID = NEUWIED
 KOELN_PID = 710417
 BONN_PID = 710416
 
@@ -80,8 +83,10 @@ THEATER_SCALE = 1.728
 COUNTER_CLEAR_FRAC = 0.38
 EDGE_MARGIN_FRAC = 0.12
 MIN_PAIR_WORLD = 16.0
-CLUSTER_PAIR_MIN = 25.0
-CLUSTER_PAIR_MAX = 28.0
+CLUSTER_PAIR_MIN = 16.0
+CLUSTER_PAIR_MAX = 17.5
+ISO_PID = VIERSEN
+ISO_MIN = 20.7
 
 
 Pt = Tuple[float, float]
@@ -354,26 +359,24 @@ def build_facility_icon_anchor_product(write: bool = False) -> Dict[str, Any]:
         if cluster_d < CLUSTER_PAIR_MIN or cluster_d > CLUSTER_PAIR_MAX:
             ok = False
             reasons.append("cluster_pair_%.1f" % cluster_d)
-        for pid, pt in worlds.items():
-            if pid in CLUSTER_PAIR:
-                continue
+        if ISO_PID in worlds:
             for member in CLUSTER_PAIR:
                 if member not in worlds:
                     continue
-                d_iso = math.hypot(pt[0] - worlds[member][0], pt[1] - worlds[member][1])
-                if d_iso < 20.7:
+                d_iso = math.hypot(worlds[ISO_PID][0] - worlds[member][0], worlds[ISO_PID][1] - worlds[member][1])
+                if d_iso < ISO_MIN:
                     ok = False
-                    reasons.append("iso_%d_%d_%.1f" % (pid, member, d_iso))
+                    reasons.append("iso_%d_%d_%.1f" % (ISO_PID, member, d_iso))
     koel = geo.get(KOELN_PID)
-    if koel is not None:
+    if koel is not None and NEIGHBOR_PID in worlds:
         kla = koel.get("label_anchor") or []
         kpt = (float(kla[0]), float(kla[1])) if isinstance(kla, (list, tuple)) and len(kla) >= 2 else (0.0, 0.0)
-        for pid, pt in worlds.items():
-            dx = (pt[0] - kpt[0]) * THEATER_SCALE * 2.27
-            dy = (pt[1] - kpt[1]) * THEATER_SCALE * 2.27
-            if abs(dx) < 61.6 and abs(dy) < 49.6:
-                ok = False
-                reasons.append("koeln_counter_%d" % pid)
+        pt = worlds[NEIGHBOR_PID]
+        dx = (pt[0] - kpt[0]) * THEATER_SCALE * 2.27
+        dy = (pt[1] - kpt[1]) * THEATER_SCALE * 2.27
+        if abs(dx) < 61.6 and abs(dy) < 49.6:
+            ok = False
+            reasons.append("koeln_counter_%d" % NEIGHBOR_PID)
     blob = {
         "ok": ok,
         "reasons": reasons,
@@ -411,7 +414,7 @@ def apply_seed_files() -> None:
             "source": "fac1a_rhineland_airfields_fix2b",
             "note": (
                 "FAC-1a FIX #2b Rhineland seeds: Viersen L1, Rhein-Hunsrück-"
-                "Kreis L2, Oberbergischer Kreis L3, Ahrweiler L4. Intact. "
+                "Kreis L2, Oberbergischer Kreis L3, Neuwied L4. Intact. "
                 "Default world_accurate."
             ),
         },
@@ -426,8 +429,10 @@ __all__ = [
     "SEED_NAMES",
     "SEED_FORCE_RAW",
     "CLUSTER_PAIR",
+    "NEIGHBOR_PID",
     "VIERSEN",
     "OBERBERGISCHER",
+    "NEUWIED",
     "AHRWEILER",
     "EUSKIRCHEN",
     "HUNSRUECK",

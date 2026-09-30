@@ -396,7 +396,7 @@ func _snap_to_own_pick(pid: int, cand: Vector2, centroid: Vector2) -> Vector2:
 	if int(mm.call("get_province_at_world_pos", cand, true)) == pid:
 		return cand
 	## Prefer a nearby own-pick so opposite-edge cluster seeds do not collapse
-	## onto the centroid (Ahrweiler–Mayen centroids are only ~9 raw apart).
+	## onto the centroid (nearby NUTS3 centroids can sit only ~9 raw apart).
 	var near := 0.7
 	while near <= 4.2:
 		var ang := 0.0
