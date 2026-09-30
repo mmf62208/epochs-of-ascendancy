@@ -9,7 +9,7 @@
       "damage_level": 0
     },
     {
-      "province_id": 710457,
+      "province_id": 710434,
       "project_type": "airfield",
       "site_id": "airfield_tier_2",
       "tier": 2,
@@ -35,6 +35,6 @@
   ],
   "meta": {
     "source": "fac1a_rhineland_airfields_fix3",
-    "note": "FAC-1a FIX #3 Rhineland seeds: Borken L1, Bad Kreuznach L2, Oberbergischer Kreis L3, Siegen-Wittgenstein L4. Intact. Default world_accurate. Neuwied/Viersen/Hunsr\u00fcck cannot-fit."
+    "note": "FAC-1a FIX #3 Rhineland seeds: Borken L1, Warendorf L2, Oberbergischer Kreis L3, Siegen-Wittgenstein L4. Intact. Default world_accurate. Neuwied/Viersen/Hunsr\u00fcck/Kreuznach cannot-fit."
   }
 }

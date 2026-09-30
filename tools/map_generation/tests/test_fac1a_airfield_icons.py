@@ -14,7 +14,7 @@ from facility_icon_anchor_product import (  # noqa: E402
     BORKEN,
     CLUSTER_PAIR,
     HUNSRUECK,
-    KREUZNACH,
+    WARENDORF,
     NEUWIED,
     OBERBERGISCHER,
     SEED_NAMES,
@@ -71,6 +71,7 @@ class TestFac1aAirfieldIcons(unittest.TestCase):
             self.assertNotIn(710414, got)
             self.assertNotIn(710460, got)
             self.assertNotIn(710464, got)
+            self.assertNotIn(710457, got)
 
     def test_interior_anchors_product(self) -> None:
         product = build_facility_icon_anchor_product(write=False)
@@ -93,7 +94,7 @@ class TestFac1aAirfieldIcons(unittest.TestCase):
         self.assertTrue(ANCHOR_JSON.is_file())
         blob = json.loads(ANCHOR_JSON.read_text(encoding="utf-8"))
         self.assertTrue(any(int(c.get("pid", 0)) == 710460 for c in blob.get("cannot_fit") or []))
-        for pid in (BORKEN, KREUZNACH, OBERBERGISCHER, SIEGEN):
+        for pid in (BORKEN, WARENDORF, OBERBERGISCHER, SIEGEN):
             rec = blob["anchors"][str(pid)]
             self.assertEqual(rec["name"], SEED_NAMES[pid])
             self.assertGreater(float(rec["edge_dist"]), 0.4)

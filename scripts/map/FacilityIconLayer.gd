@@ -1083,8 +1083,8 @@ func get_cluster_level_tag() -> String:
 func marker_half_px(zoom: float, cluster: bool) -> float:
 	var px := _icon_screen_px(zoom)
 	if cluster:
-		px += 4.0
-	return px * 0.5 + BADGE_PX * 0.35
+		return (px + 4.0) * 0.5 + BADGE_PX * 0.35
+	return px * 0.5
 
 
 func report_clearance_at_zoom(zoom: float) -> Dictionary:

@@ -44,6 +44,30 @@
         1574.76096
       ]
     },
+    "710434": {
+      "centroid_raw": [
+        4276.175610234517,
+        917.3476358161618
+      ],
+      "counter_dist": 0.4843567612577405,
+      "edge_dist": 4.712961714776666,
+      "full_disc_ok_zooms": [
+        3.0
+      ],
+      "name": "Warendorf",
+      "pid": 710434,
+      "raw": [
+        4276.64,
+        917.21
+      ],
+      "rhine_dist": 30.321140084106652,
+      "spine_dist": 32.235142081168384,
+      "tier": 2,
+      "world": [
+        7390.033920000001,
+        1584.9388800000002
+      ]
+    },
     "710451": {
       "centroid_raw": [
         4281.58192640207,
@@ -65,28 +89,6 @@
         7407.504,
         1627.75872
       ]
-    },
-    "710457": {
-      "centroid_raw": [
-        4270.406271350227,
-        977.5962908847498
-      ],
-      "counter_dist": 1.2368038970298374,
-      "edge_dist": 3.553059424777376,
-      "full_disc_ok_zooms": [],
-      "name": "Bad Kreuznach",
-      "pid": 710457,
-      "raw": [
-        4269.17,
-        977.56
-      ],
-      "rhine_dist": 14.203017425885246,
-      "spine_dist": 28.7627936687484,
-      "tier": 2,
-      "world": [
-        7377.12576,
-        1689.2236799999998
-      ]
     }
   },
   "cannot_fit": [
@@ -106,17 +108,15 @@
       "reason": "rhine_course_short"
     },
     {
+      "name": "Bad Kreuznach",
+      "pid": 710457,
+      "reason": "lux_capital_star_disk"
+    },
+    {
       "edge_world": 6.231999077901167,
       "name": "Borken",
       "need_world": 24.193548387096776,
       "pid": 710430,
-      "reason": "full_disc_exceeds_inradius"
-    },
-    {
-      "edge_world": 6.139686686015306,
-      "name": "Bad Kreuznach",
-      "need_world": 24.193548387096776,
-      "pid": 710457,
       "reason": "full_disc_exceeds_inradius"
     },
     {
@@ -141,16 +141,16 @@
   "names": {
     "710423": "Oberbergischer Kreis",
     "710430": "Borken",
-    "710451": "Siegen-Wittgenstein",
-    "710457": "Bad Kreuznach"
+    "710434": "Warendorf",
+    "710451": "Siegen-Wittgenstein"
   },
   "ok": true,
   "reasons": [],
   "seeds": {
     "710423": 3,
     "710430": 1,
-    "710451": 4,
-    "710457": 2
+    "710434": 2,
+    "710451": 4
   },
   "source": "fac1a_fix3_rhineland_anchors",
   "theater_scale": 1.728

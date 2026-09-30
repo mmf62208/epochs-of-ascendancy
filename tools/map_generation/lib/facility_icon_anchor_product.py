@@ -28,12 +28,13 @@ CITY_LAYER = ROOT / "data" / "provinces_world_accurate" / "province_city_layer.j
 # interiors that meet Rhine+spine disc clearance (~24 world) and maximize
 # border inset. Cluster is Ober L3 + Siegen L4 (raw ~16.5); splits at ~1.59.
 BORKEN = 710430
-KREUZNACH = 710457
+WARENDORF = 710434
+KREUZNACH = WARENDORF
 OBERBERGISCHER = 710423
 SIEGEN = 710451
 # L1/L2/L4 reseeds keep old constant names so tests/aliases still import.
 VIERSEN = BORKEN
-HUNSRUECK = KREUZNACH
+HUNSRUECK = WARENDORF
 NEUWIED = SIEGEN
 AHRWEILER = NEUWIED
 MAYEN_KOBLENZ = HUNSRUECK
@@ -46,19 +47,19 @@ GOTTINGEN = NEUWIED
 ANSBACH = HUNSRUECK
 SEED_TIERS: Dict[int, int] = {
     BORKEN: 1,
-    KREUZNACH: 2,
+    WARENDORF: 2,
     OBERBERGISCHER: 3,
     SIEGEN: 4,
 }
 SEED_NAMES: Dict[int, str] = {
     BORKEN: "Borken",
-    KREUZNACH: "Bad Kreuznach",
+    WARENDORF: "Warendorf",
     OBERBERGISCHER: "Oberbergischer Kreis",
     SIEGEN: "Siegen-Wittgenstein",
 }
 SEED_FORCE_RAW: Dict[int, Tuple[float, float]] = {
     BORKEN: (4254.63, 911.32),
-    KREUZNACH: (4269.17, 977.56),
+    WARENDORF: (4276.64, 917.21),
     OBERBERGISCHER: (4270.29, 943.16),
     SIEGEN: (4286.75, 941.99),
 }
@@ -70,6 +71,7 @@ CANNOT_FIT_PREVIOUS: Tuple[Tuple[int, str, str], ...] = (
     (710460, "Neuwied", "rhine_through_province"),
     (710414, "Viersen", "nld_border_and_full_disc"),
     (710464, "Rhein-Hunsrück-Kreis", "rhine_course_short"),
+    (710457, "Bad Kreuznach", "lux_capital_star_disk"),
 )
 
 # Gold-spine / Rhine corridor (centroids of the IX-1 / RX-1 walk). Not sampled as
@@ -493,9 +495,9 @@ def apply_seed_files() -> None:
         "meta": {
             "source": "fac1a_rhineland_airfields_fix3",
             "note": (
-                "FAC-1a FIX #3 Rhineland seeds: Borken L1, Bad Kreuznach L2, "
+                "FAC-1a FIX #3 Rhineland seeds: Borken L1, Warendorf L2, "
                 "Oberbergischer Kreis L3, Siegen-Wittgenstein L4. Intact. "
-                "Default world_accurate. Neuwied/Viersen/Hunsrück cannot-fit."
+                "Default world_accurate. Neuwied/Viersen/Hunsrück/Kreuznach cannot-fit."
             ),
         },
     }
@@ -519,6 +521,7 @@ __all__ = [
     "MAYEN_KOBLENZ",
     "BORKEN",
     "KREUZNACH",
+    "WARENDORF",
     "SIEGEN",
     "CANNOT_FIT_PREVIOUS",
     "polylabel",
