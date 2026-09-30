@@ -398,7 +398,17 @@ Screenshots FIX #4 (xvfb **NOT live Play**): `/opt/cursor/artifacts/fac1a_fix4/0
 
 Screenshots FIX #5 (xvfb **NOT live Play**): `/opt/cursor/artifacts/fac1a_fix5/01_cluster_count_tag_z0.97_NOT_live_play.png`, `02_lone_and_cluster_z1.30_NOT_live_play.png`, `03_borken_top_edge_z0.93_NOT_live_play.png`.
 
-**FIX #6 (Play MIXED `752a5529`):** hit shape = drawn art per variant. Seeds / stale-hover / MV-1 gates unchanged. Isolated keep-green pending xvfb after this revision.
+**FIX #6 (Play MIXED `752a5529`):** hit shape = drawn art per variant. Seeds / stale-hover / MV-1 gates unchanged. Isolated keep-green (`1cc32e8e`):
+
+| gate | kind | result | peak MB isolated |
+|---|---|---|---|
+| py_fac1a | py | PASS | — |
+| hd_fac1a | headless | PASS (art-body hit, 2px inside silhouette owns click) | — |
+| xvfb_fac1a | xvfb | PASS stale=true sil=true sil_fail=0 chrome=2.00 outside=true prom 36/36 halo=2 click=0 noop=0 badge_in digit lone split 1.53 clearance all tiers worst 12.81 occl=0.000 rx1 0.843/0.843 | **2034.4** |
+| xvfb_rx1 ON / OFF | xvfb | PASS mid_river **0.749 / 0.749** close 0.775 / 0.775 spine 1.000 | **2028.1 / 2024.5** |
+| hd_mv1 / hd_mv1b / hd_rh1 | headless | PASS (unedited) | **1194.1 / 1194.0 / 1193.8** |
+| hd_ix1 (6) / hd_rx1 (4) / hd_rt1 (3) | headless | PASS | ~1194–1198 |
+| xvfb_mv1 / xvfb_mv1_card / xvfb_rh1 | xvfb | PASS | **2031.4 / 2037.5 / 2028.1** |
 
 Screenshots FIX #6 (xvfb **NOT live Play**): `/opt/cursor/artifacts/fac1a_fix6/01_l4_cluster_hit_overlay_z0.97_NOT_live_play.png`, `02_lone_hit_overlay_z2.25_NOT_live_play.png`.
 
