@@ -398,7 +398,19 @@ Screenshots FIX #1 (NOT live Play): `/opt/cursor/artifacts/fac1a/fac1a_political
 
 **FIX #2 (live Play MIXED look on `2e5bc186`):** 28px screen offset + adjacent NUTS3 centroids clumped four icons (~40px), mid badges ~11px, Köln unit buried all four, Neuss sat on Rhine ≥1.9 / gold ≥1.35, Köln icon click marched to Rheinisch-Bergischer Kreis. Drop the screen offset. Interior polylabel + reseed (Emsland/Ortenaukreis/Göttingen/Ansbach). Cluster+hysteresis. 16px outlined badges. 32px at zoom ≥2.0. RT-1 `s1_gold_cover=1.000` false-passed because S1 walks Bonn–Köln–Lev **centroids only** — Neuss / Leverkusen cap were never sampled. New FAC-1a occlusion (ON vs OFF gold/river ≤5% at 1.35/1.9/2.3, anchors + spine walk including Neuss), no-overlap (0.70/0.99/1.30/1.90/2.30 + Köln counter), click-own (`get_province_at_world_pos` at icon center), badge ≥16px. RX-1/RT-1 thresholds **untouched**. Input / `set_map_mode` / label LOD / RoadTierVisual / Rhine / MapZoomLOD **untouched**.
 
-Keep-green after FIX #2 (isolated RSS; xvfb ≠ live Play; `py_eoa_quick` map_qc FAIL is pre-existing on base `8b7e46de`, Pillow) — numbers filled after the isolated run.
+Keep-green after FIX #2 (isolated process-tree RSS; xvfb ≠ live Play; `py_eoa_quick` map_qc FAIL is pre-existing on base `8b7e46de`, Pillow):
+
+| gate | kind | result | peak MB |
+|---|---|---|---|
+| py_fac1a / py_ix1_rx1_march_resource | py | PASS | 2.1 / 76.6 |
+| py_eoa_quick | py | FAIL (base map_qc) | 106.3 |
+| hd_fac1a / hd_mv1 / hd_mv1b | headless | PASS | 1194 / 1194 / 1194 |
+| hd_ix1 (6) / hd_rx1 (4) / hd_rt1 (3) / hd_rh1 | headless | PASS | ~1194 isolated |
+| xvfb_fac1a | xvfb | PASS mid=4 close=4 out=1 res=0 back=4 badge=16 occl=0.000 overlap=0 own=0 | **2063.3** isolated |
+| xvfb_mv1 / xvfb_mv1_card / xvfb_rh1 | xvfb | PASS | 2060 / 2062 / 2061 |
+| xvfb_rx1_seeded | xvfb | PASS mid_river=0.749 spine=1.000 | **2046.7** isolated |
+| xvfb_rt1_seeded | xvfb | PASS s1_gold_cover=1.000 | 2062.0 |
+| xvfb_rt1_live_look | xvfb | PASS mesh_frac=0.00079 gold_w=14 | 2098.7 |
 
 Screenshots FIX #2 (xvfb **NOT live Play**, matching Play composites): `/opt/cursor/artifacts/fac1a_fix2/01_operational_z1.30_all4_airfields_NOT_live_play.png`, `02_mid_z0.99_badges_or_cluster_NOT_live_play.png`, `03_close_koln_z2.27_counters_NOT_live_play.png`.
 

@@ -917,6 +917,10 @@ func _freeze_boot_camera_fighters() -> void:
 		mr.set("_europe_focus_retry", 99)
 		mr.set("_close_camera_locked", true)
 		mr.set("_hold_camera_until_msec", Time.get_ticks_msec() + 120000)
+		## Home / theater auto-fit were resetting MapCamera after lock so
+		## composites stayed on Europe. Guard-only; product Play untouched.
+		if mr.has_method("set_process"):
+			mr.set_process(false)
 	var tr := _find_named("TestRunner")
 	if tr != null and tr.has_method("set_process"):
 		tr.set_process(false)
