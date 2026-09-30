@@ -396,6 +396,8 @@ Fix: landward screen-space offset (28px, east of the corridor) in `_draw` only �
 
 Screenshots FIX #1 (NOT live Play): `/opt/cursor/artifacts/fac1a/fac1a_political_mid_NOT_live_play.png`, `fac1a_political_close_NOT_live_play.png`, `fac1a_zoomed_out_NOT_live_play.png`, `fac1a_resources_F9_NOT_live_play.png`, `fac1a_political_back_NOT_live_play.png`.
 
+**FIX #2c:** same seeds; cluster marker sits on the highest-level member interior (nudged inside that province if the larger rect still hits Rhine/spine/star/counter). Occlusion samples cluster markers at 0.70 / 0.99 / 1.30. RX-1 mid_river ON vs OFF must match within 0.02 (expect ~0.749). Close 03 is Köln Play-style with the unit counter drawn. Composites `/opt/cursor/artifacts/fac1a_fix2c/` — **NOT live Play**.
+
 **FIX #2b:** same mechanics; Rhineland-only reseed so Play can see cluster-split and counter clearance. Viersen `710414` L1, Rhein-Hunsrück-Kreis `710464` L2, Oberbergischer Kreis `710423` L3, Neuwied `710460` L4 (Bonn-adjacent, LUX-disk-safe — Ahrweiler `710455` interiors sit inside the LUX capital-star disk and snapped into the Köln counter). Cluster is Neuwied–Ober (live world ~28). xvfb asserts cluster at 0.99 (count=3, max L4), split at ≥1.9, Neuwied vs Köln counter at 2.27, occlusion ≤5%, click-own all 4. Composites `/opt/cursor/artifacts/fac1a_fix2b/` — **NOT live Play**.
 
 Keep-green after FIX #2b Neuwied reseed `e32095ed` (isolated process-tree RSS via `pgrep -P` only; xvfb ≠ live Play; `py_eoa_quick` map_qc FAIL is pre-existing on base `8b7e46de`, Pillow):

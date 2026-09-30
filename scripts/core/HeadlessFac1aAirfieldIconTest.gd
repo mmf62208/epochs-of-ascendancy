@@ -462,6 +462,21 @@ func _test_cluster_hysteresis() -> void:
 		_fail("tight mid markers=%d should cluster" % mid_n)
 	else:
 		_pass("tight mid clustered to %d markers" % mid_n)
+	var host_ok := false
+	for rec_v in mid_m:
+		if typeof(rec_v) != TYPE_DICTIONARY:
+			continue
+		var rec: Dictionary = rec_v
+		if not bool(rec.get("cluster", false)):
+			continue
+		var cw: Vector2 = rec.get("world", Vector2.ZERO) as Vector2
+		## Highest-level member is NEUWIED / BORKEN at (0, 36), not the mean.
+		if cw.distance_to(Vector2(0, 36)) < 0.05:
+			host_ok = true
+	if mid_n < 4 and not host_ok:
+		_fail("cluster marker not on highest-level member interior")
+	elif host_ok:
+		_pass("cluster marker on highest-level member interior")
 	## Same worlds at close/grow: screen gaps open → hysteresis splits.
 	_layer.set("_clustered", true)
 	var close_m: Array = _layer.call("compute_markers_at_zoom", 2.30)

@@ -22,6 +22,10 @@ const UNIT_COUNTER_Z := 28
 const THEATER_SCALE := 1.728
 const MERGE_GAP_PX := 2.0
 const SPLIT_GAP_PX := 10.0
+const SPINE_PIDS: Array[int] = [710416, 710417, 710418]
+const RHINE_WALK_PIDS: Array[int] = [710416, 710417, 710401, 710402]
+const LUX_CAPITAL_PID := 710977
+const KOELN_PID := 710417
 const VISIBLE_MODES: Array[String] = ["political", "diplomacy", "infra"]
 const SITE_AIRFIELD := 1
 const STATE_NOT_BUILT := 0
@@ -800,21 +804,25 @@ func _cluster_items(items: Array[Dictionary]) -> Array[Dictionary]:
 		if idxs.size() <= 1:
 			out.append(items[int(idxs[0])])
 			continue
-		var acc := Vector2.ZERO
-		var hi := 1
+		var host := _pick_cluster_host(items, idxs)
+		var hi := int(host.get("level", 1))
 		var pids: Array[int] = []
 		for ii in idxs:
 			var it: Dictionary = items[int(ii)]
-			acc += it.get("world", Vector2.ZERO) as Vector2
 			hi = maxi(hi, int(it.get("level", 1)))
 			pids.append(int(it.get("pid", 0)))
-		var world := acc / float(idxs.size())
-		var scr := _screen_of(world)
 		var z := _canvas_zoom()
 		var icon_px := _icon_screen_px(z) + 4.0
 		var half := icon_px * 0.5 + BADGE_PX * 0.35
+		var host_pid := int(host.get("pid", 0))
+		var host_world: Vector2 = host.get("world", Vector2.ZERO) as Vector2
+		## Never the raw member centroid — that sat on the Rhine south end
+		## and dropped RX-1 mid_river 0.749 → 0.631 while individual-icon
+		## occlusion still passed (cluster marker was unsampled).
+		var world := _nudge_cluster_world(host_pid, host_world, z, half)
+		var scr := _screen_of(world)
 		out.append({
-			"pid": pids[0],
+			"pid": host_pid,
 			"pids": pids,
 			"cluster": true,
 			"count": idxs.size(),
@@ -826,6 +834,135 @@ func _cluster_items(items: Array[Dictionary]) -> Array[Dictionary]:
 			"tex_key": texture_key_for_level(hi, "intact"),
 		})
 	return out
+
+
+func _pick_cluster_host(items: Array[Dictionary], idxs: Array) -> Dictionary:
+	var mean := Vector2.ZERO
+	for ii in idxs:
+		mean += items[int(ii)].get("world", Vector2.ZERO) as Vector2
+	mean /= float(maxi(idxs.size(), 1))
+	var best: Dictionary = items[int(idxs[0])]
+	var best_lv := int(best.get("level", 1))
+	var best_d := (best.get("world", Vector2.ZERO) as Vector2).distance_to(mean)
+	for ii in idxs:
+		var it: Dictionary = items[int(ii)]
+		var lv := int(it.get("level", 1))
+		var d := (it.get("world", Vector2.ZERO) as Vector2).distance_to(mean)
+		if lv > best_lv or (lv == best_lv and d < best_d - 0.01):
+			best = it
+			best_lv = lv
+			best_d = d
+	return best
+
+
+func _nudge_cluster_world(pid: int, cand: Vector2, zoom: float, half_px: float) -> Vector2:
+	if not cand.is_finite() or pid <= 0:
+		return cand
+	## Headless dummy rings have no Rhine / spine — keep the host interior.
+	if not _test_polygons.is_empty():
+		return cand
+	var z := maxf(zoom, 0.04)
+	var half_world := half_px / z
+	var badge_extra := (_icon_screen_px(z) + 4.0) * 0.28 / z
+	var need := half_world + badge_extra + 2.0
+	var lines := _corridor_polylines()
+	if _cluster_site_clear(pid, cand, need, lines, z):
+		return cand
+	var best := cand
+	var best_s := _cluster_site_score(cand, lines, z)
+	var step := maxf(1.4, need * 0.22)
+	var r := step
+	while r <= need * 3.2:
+		var ang := 0.0
+		while ang < TAU:
+			var q: Vector2 = cand + Vector2(cos(ang), sin(ang)) * r
+			if _cluster_own_interior(pid, q):
+				var s := _cluster_site_score(q, lines, z)
+				if s > best_s:
+					best_s = s
+					best = q
+				if s >= need:
+					return q
+			ang += PI / 8.0
+		r += step
+	return best
+
+
+func _cluster_own_interior(pid: int, world: Vector2) -> bool:
+	var p: Object = _provinces_for_scan().get(pid, null)
+	var ring := _ring_for(pid, p)
+	var centroid := _centroid_for(pid, p)
+	var wr := _world_ring(ring, centroid)
+	if wr.size() >= 3 and not Geometry2D.is_point_in_polygon(world, wr):
+		return false
+	var mm := _map_manager()
+	if mm != null and mm.has_method("get_province_at_world_pos"):
+		return int(mm.call("get_province_at_world_pos", world, true)) == pid
+	return true
+
+
+func _cluster_site_clear(pid: int, world: Vector2, need: float, lines: Array, zoom: float) -> bool:
+	if not _cluster_own_interior(pid, world):
+		return false
+	return _cluster_site_score(world, lines, zoom) >= need
+
+
+func _cluster_site_score(world: Vector2, lines: Array, zoom: float) -> float:
+	var best := 1.0e9
+	for line_v in lines:
+		if not (line_v is PackedVector2Array):
+			continue
+		var line: PackedVector2Array = line_v
+		best = minf(best, _dist_to_polyline(world, line))
+	var kc := _mm_centroid(KOELN_PID)
+	if kc != Vector2.ZERO:
+		var chx := 28.0 / maxf(zoom, 0.04)
+		var chy := 20.0 / maxf(zoom, 0.04)
+		var dx := absf(world.x - kc.x) - chx
+		var dy := absf(world.y - kc.y) - chy
+		best = minf(best, maxf(dx, dy))
+	var lux := _mm_centroid(LUX_CAPITAL_PID)
+	if lux != Vector2.ZERO:
+		best = minf(best, world.distance_to(lux) - 56.0)
+	return best
+
+
+func _dist_to_polyline(p: Vector2, line: PackedVector2Array) -> float:
+	if line.size() < 2:
+		return 1.0e9
+	var best := 1.0e9
+	for i in range(line.size() - 1):
+		best = minf(best, _dist_seg(p, line[i], line[i + 1]))
+	return best
+
+
+func _corridor_polylines() -> Array:
+	var out: Array = []
+	var spine := _pids_polyline(SPINE_PIDS)
+	var rhine := _pids_polyline(RHINE_WALK_PIDS)
+	if spine.size() >= 2:
+		out.append(spine)
+	if rhine.size() >= 2:
+		out.append(rhine)
+	return out
+
+
+func _pids_polyline(pids: Array[int]) -> PackedVector2Array:
+	var line := PackedVector2Array()
+	for pid in pids:
+		var c := _mm_centroid(pid)
+		if c != Vector2.ZERO:
+			line.append(c)
+	return line
+
+
+func _mm_centroid(pid: int) -> Vector2:
+	var mm := _map_manager()
+	if mm != null and mm.has_method("get_province_centroid"):
+		var c: Vector2 = mm.call("get_province_centroid", pid)
+		if c != Vector2.ZERO:
+			return c
+	return Vector2.ZERO
 
 
 func _draw() -> void:

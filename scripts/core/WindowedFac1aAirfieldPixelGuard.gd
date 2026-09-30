@@ -23,8 +23,13 @@ const MID_ZOOM := 0.99
 const OPS_ZOOM := 1.30
 const CLOSE_ZOOM := 2.27
 const OUT_ZOOM := 0.28
-const OCCL_ZOOMS: Array[float] = [1.35, 1.90, 2.30]
+const OCCL_ZOOMS: Array[float] = [0.70, 0.99, 1.30, 1.35, 1.90, 2.30]
+const CLUSTER_OCCL_ZOOMS: Array[float] = [0.70, 0.99, 1.30]
 const OVERLAP_ZOOMS: Array[float] = [0.70, 0.99, 1.30, 1.90, 2.30]
+const RX1_MID_ZOOM := 0.95
+const RX1_MID_RIVER_MATCH := 0.02
+const RX1_LOCAL_RIVER_WORLD := 120.0
+const RX1_RIVER_NEIGHBOR := 5
 const WAIT_MAP_SECS := 420
 const SETTLE_FRAMES := 48
 const RSS_LIMIT_MB := 3000
@@ -48,6 +53,7 @@ enum Phase {
 	SWITCH_BACK,
 	BACK,
 	OCCLUSION,
+	RX1_CROSSCHECK,
 	OVERLAP,
 	OWNERSHIP,
 	DONE,
@@ -76,7 +82,11 @@ var _layer_res: int = -1
 var _layer_back: int = -1
 var _fix2_dir: String = ""
 var _fix2b_dir: String = ""
+var _fix2c_dir: String = ""
 var _occl_max: float = 0.0
+var _rx1_mid_on: float = -1.0
+var _rx1_mid_off: float = -1.0
+var _counter_drawn_ok: bool = false
 var _overlap_fail: int = 0
 var _own_fail: int = 0
 var _cluster_mid_ok: bool = false
@@ -108,8 +118,10 @@ func _start() -> void:
 		DirAccess.make_dir_recursive_absolute("/opt/cursor/artifacts/fac1a")
 		DirAccess.make_dir_recursive_absolute("/opt/cursor/artifacts/fac1a_fix2")
 		DirAccess.make_dir_recursive_absolute("/opt/cursor/artifacts/fac1a_fix2b")
+		DirAccess.make_dir_recursive_absolute("/opt/cursor/artifacts/fac1a_fix2c")
 	_fix2_dir = "/opt/cursor/artifacts/fac1a_fix2"
 	_fix2b_dir = "/opt/cursor/artifacts/fac1a_fix2b"
+	_fix2c_dir = "/opt/cursor/artifacts/fac1a_fix2c"
 	if OS.get_environment("EOA_SMOKE_AUTO_BEGIN").strip_edges() != "1":
 		OS.set_environment("EOA_SMOKE_AUTO_BEGIN", "1")
 	_rss_start_kb = _rss_kb()
@@ -162,6 +174,8 @@ func _on_process() -> void:
 			_do_back()
 		Phase.OCCLUSION:
 			_do_occlusion()
+		Phase.RX1_CROSSCHECK:
+			_do_rx1_crosscheck()
 		Phase.OVERLAP:
 			_do_overlap()
 		Phase.OWNERSHIP:
@@ -226,6 +240,7 @@ func _do_political_mid() -> void:
 	_capture("fac1a_political_mid_NOT_live_play")
 	_capture_fix2("02_mid_z0.99_badges_or_cluster_NOT_live_play")
 	_capture_fix2b("02_mid_z0.99_cluster_NOT_live_play")
+	_capture_fix2c("02_mid_z0.99_cluster_NOT_live_play")
 	_cluster_mid_ok = _assert_cluster_at_zoom(MID_ZOOM)
 	_log_pair_worlds()
 	_log("EOA_FAC1A_PIXEL_GUARD who=guard.mid anchors=%d layer=%d zoom=%.3f badge=%.1f cluster=%s (NOT live Play)" % [_mid_anchors, _layer_mid, _cam_zoom, _badge_px, str(_cluster_mid_ok)])
@@ -242,6 +257,7 @@ func _do_political_ops() -> void:
 	_capture("fac1a_political_ops_NOT_live_play")
 	_capture_fix2("01_operational_z1.30_all4_airfields_NOT_live_play")
 	_capture_fix2b("01_operational_z1.30_rhineland_NOT_live_play")
+	_capture_fix2c("01_operational_z1.30_rhineland_NOT_live_play")
 	_log("EOA_FAC1A_PIXEL_GUARD who=guard.ops anchors=%d zoom=%.3f (NOT live Play)" % [hits, _cam_zoom])
 	if hits < 1:
 		_fail_reasons.append("ops_missing_icons")
@@ -255,16 +271,20 @@ func _do_political_close() -> void:
 	_close_anchors = _sample_anchor_hits()
 	_show_units()
 	_redraw_layer()
+	_counter_drawn_ok = _koeln_counter_rect(CLOSE_ZOOM).size.x > 1.0
 	_capture("fac1a_political_close_NOT_live_play")
 	_capture_fix2("03_close_koln_z2.27_counters_NOT_live_play")
 	_capture_fix2b("03_close_koln_bonn_z2.27_counter_NOT_live_play")
+	_capture_fix2c("03_close_koln_bonn_z2.27_counter_NOT_live_play")
 	_split_close_ok = _assert_split_at_zoom(CLOSE_ZOOM)
 	_counter_clear_ok = _assert_neighbor_clears_counter()
-	_log("EOA_FAC1A_PIXEL_GUARD who=guard.close anchors=%d zoom=%.3f split=%s counter_clear=%s (NOT live Play)" % [_close_anchors, _cam_zoom, str(_split_close_ok), str(_counter_clear_ok)])
+	_log("EOA_FAC1A_PIXEL_GUARD who=guard.close anchors=%d zoom=%.3f split=%s counter_clear=%s counter_drawn=%s (NOT live Play)" % [_close_anchors, _cam_zoom, str(_split_close_ok), str(_counter_clear_ok), str(_counter_drawn_ok)])
 	if _close_anchors < 1:
 		_fail_reasons.append("close_missing_icons")
 	if not _split_close_ok:
 		_fail_reasons.append("close_cluster_not_split")
+	if not _counter_drawn_ok:
+		_fail_reasons.append("close_counter_not_drawn")
 	if not _counter_clear_ok:
 		_fail_reasons.append("close_counter_overlap")
 	_go_settle(Phase.FRAME_OUT)
@@ -326,8 +346,7 @@ func _do_back() -> void:
 
 func _do_occlusion() -> void:
 	if _occl_i >= OCCL_ZOOMS.size():
-		_overlap_i = 0
-		_go_settle(Phase.OVERLAP)
+		_go_settle(Phase.RX1_CROSSCHECK)
 		return
 	var z: float = OCCL_ZOOMS[_occl_i]
 	_frame_over_rhineland(z)
@@ -344,13 +363,147 @@ func _do_occlusion() -> void:
 	var off_img := _grab()
 	if ol != null and ol.has_method("set_show_facilities"):
 		ol.call("set_show_facilities", true)
-	var frac := _occlusion_frac(on_img, off_img)
+	var frac := _occlusion_frac(on_img, off_img, z)
 	_occl_max = maxf(_occl_max, frac)
 	_log("EOA_FAC1A_PIXEL_GUARD who=guard.occlusion z=%.2f frac=%.3f need<=0.05 (NOT live Play)" % [z, frac])
 	if frac > OCCLUSION_MAX + 0.0001:
 		_fail_reasons.append("occlusion_z%.2f_%.3f" % [z, frac])
 	_occl_i += 1
 	_go_settle(Phase.OCCLUSION)
+
+
+func _do_rx1_crosscheck() -> void:
+	## Same pose as WindowedRx1RhinePixelGuard mid (Köln, 0.95). Icons ON vs
+	## OFF mid_river must match within 0.02 so a cluster-on-Rhine cannot
+	## hide behind FAC-1a individual-icon occlusion.
+	_hide_unit_noise()
+	_set_mode("political")
+	var kc := _mm_centroid(KOELN)
+	if kc == Vector2.ZERO:
+		kc = _centroid(KOELN)
+	_apply_camera(kc, RX1_MID_ZOOM)
+	_sync_close_layers(RX1_MID_ZOOM)
+	var ol := _facility_layer()
+	if ol != null and ol.has_method("set_show_facilities"):
+		ol.call("set_show_facilities", true)
+	_redraw_layer()
+	var on_img := _grab()
+	if ol != null and ol.has_method("set_show_facilities"):
+		ol.call("set_show_facilities", false)
+	_redraw_layer()
+	var off_img := _grab()
+	if ol != null and ol.has_method("set_show_facilities"):
+		ol.call("set_show_facilities", true)
+	_rx1_mid_on = _sample_rx1_mid_river(on_img)
+	_rx1_mid_off = _sample_rx1_mid_river(off_img)
+	var d := absf(_rx1_mid_on - _rx1_mid_off)
+	_log(
+		"EOA_FAC1A_PIXEL_GUARD who=guard.rx1_mid_river on=%.3f off=%.3f d=%.3f need<=%.2f (NOT live Play)"
+		% [_rx1_mid_on, _rx1_mid_off, d, RX1_MID_RIVER_MATCH]
+	)
+	if d > RX1_MID_RIVER_MATCH + 0.0001:
+		_fail_reasons.append("rx1_mid_river_d_%.3f" % d)
+	_overlap_i = 0
+	_go_settle(Phase.OVERLAP)
+
+
+func _sync_close_layers(zoom: float) -> void:
+	var labels: Node = _find_named("PoliticalLabelsLayer")
+	if labels != null and labels.has_method("sync_camera_zoom"):
+		labels.call("sync_camera_zoom", zoom)
+	var rhine: Node = _find_named("Rx1RhineLayer")
+	if rhine != null and rhine.has_method("refresh"):
+		rhine.call("refresh")
+	var iol := _find_named("InfrastructureOverlayLayer")
+	if iol != null and iol.has_method("refresh_ix1_gold_spine"):
+		iol.call("refresh_ix1_gold_spine", true)
+	var gold: Node = _find_named("Ix1GoldSpine")
+	if gold != null and gold.has_method("redraw_gold_spine"):
+		gold.call("redraw_gold_spine")
+
+
+func _sample_rx1_mid_river(img: Image) -> float:
+	if img == null:
+		return 0.0
+	var pts := _rx1_local_course_pts()
+	var layer := _find_named("Rx1RhineLayer") as CanvasItem
+	if pts.size() < 2:
+		return 0.0
+	var xform := Transform2D.IDENTITY
+	if layer != null:
+		xform = layer.get_global_transform_with_canvas()
+	var hits := 0
+	var total := 0
+	var w := img.get_width()
+	var h := img.get_height()
+	for i in range(1, pts.size()):
+		var a: Vector2 = xform * pts[i - 1]
+		var b: Vector2 = xform * pts[i]
+		var steps := maxi(4, int(a.distance_to(b) / 3.0))
+		for s in range(steps + 1):
+			var t := float(s) / float(maxi(steps, 1))
+			var p := a.lerp(b, t)
+			var ix := int(round(p.x))
+			var iy := int(round(p.y))
+			if ix < 0 or iy < 0 or ix >= w or iy >= h:
+				continue
+			total += 1
+			if _rx1_river_neighborhood(img, ix, iy):
+				hits += 1
+	if total <= 0:
+		return 0.0
+	return float(hits) / float(total)
+
+
+func _rx1_local_course_pts() -> PackedVector2Array:
+	var raw := PackedVector2Array()
+	var scr: Script = load("res://scripts/map/Rx1RhineCrossing.gd") as Script
+	if scr != null and scr.has_method("course_points"):
+		raw = scr.call("course_points") as PackedVector2Array
+	var scaled := PackedVector2Array()
+	for p in raw:
+		scaled.append(p * 1.728)
+	var k := _mm_centroid(KOELN)
+	if k == Vector2.ZERO:
+		return scaled
+	var out := PackedVector2Array()
+	for p in scaled:
+		if p.distance_to(k) <= RX1_LOCAL_RIVER_WORLD:
+			out.append(p)
+	if out.size() >= 2:
+		return out
+	return scaled
+
+
+func _rx1_river_neighborhood(img: Image, x: int, y: int) -> bool:
+	var w := img.get_width()
+	var h := img.get_height()
+	var rad := RX1_RIVER_NEIGHBOR
+	for dy in range(-rad, rad + 1):
+		for dx in range(-rad, rad + 1):
+			var xx := x + dx
+			var yy := y + dy
+			if xx < 0 or yy < 0 or xx >= w or yy >= h:
+				continue
+			if _is_rx1_river_color(img.get_pixel(xx, yy)):
+				return true
+	return false
+
+
+func _is_rx1_river_color(c: Color) -> bool:
+	var r := c.r * 255.0
+	var g := c.g * 255.0
+	var b := c.b * 255.0
+	if r + g + b < 80.0:
+		return false
+	if g > 200.0 and b > 200.0 and r < 80.0:
+		return false
+	var river_d := absf(r - 56.0) + absf(g - 148.0) + absf(b - 235.0)
+	if river_d < 110.0:
+		return true
+	if b > 170.0 and b > g + 35.0 and b > r + 70.0 and r < 110.0 and g > 70.0 and g < 190.0:
+		return true
+	return false
 
 
 func _do_overlap() -> void:
@@ -437,6 +590,15 @@ func _capture_fix2b(name: String) -> void:
 		return
 	var prev := _out_dir
 	_out_dir = _fix2b_dir
+	_capture(name)
+	_out_dir = prev
+
+
+func _capture_fix2c(name: String) -> void:
+	if _fix2c_dir.is_empty():
+		return
+	var prev := _out_dir
+	_out_dir = _fix2c_dir
 	_capture(name)
 	_out_dir = prev
 
@@ -545,7 +707,7 @@ func _is_gold_or_river(c: Color) -> bool:
 	return gold or river
 
 
-func _occlusion_frac(on_img: Image, off_img: Image) -> float:
+func _occlusion_frac(on_img: Image, off_img: Image, zoom: float = -1.0) -> float:
 	if on_img == null or off_img == null:
 		return 0.0
 	var cam := _camera()
@@ -557,6 +719,19 @@ func _occlusion_frac(on_img: Image, off_img: Image) -> float:
 	## Neighborhood around each airfield draw-world (where icons actually sit).
 	for pid in PIDS:
 		_acc_cover(acc, on_img, off_img, cam, _centroid(pid), 40, w, h)
+	## Cluster markers are larger and were unsampled — mid_river 0.749→0.631
+	## false-passed while individual interiors stayed off the Rhine.
+	if zoom >= 0.0:
+		for rec_v in _markers_at(zoom):
+			if typeof(rec_v) != TYPE_DICTIONARY:
+				continue
+			var rec: Dictionary = rec_v
+			if not bool(rec.get("cluster", false)):
+				continue
+			var cw: Vector2 = rec.get("world", Vector2.ZERO) as Vector2
+			if cw != Vector2.ZERO:
+				_acc_cover(acc, on_img, off_img, cam, cw, 52, w, h)
+				_log("EOA_FAC1A_PIXEL_GUARD who=guard.occl_cluster z=%.2f world=%.1f,%.1f count=%d (NOT live Play)" % [zoom, cw.x, cw.y, int(rec.get("count", 0))])
 	## In-game gold spine + Rhine walk (Bonn–Köln–Lev + Neuss + Düsseldorf–Duisburg).
 	## FIX #1 s1_gold_cover false-passed because S1 never sampled Neuss / the
 	## Leverkusen cap — only Bonn/Köln/Lev centroids. Walk those centroids PLUS
@@ -994,12 +1169,13 @@ func _frame_over_rhineland(zoom: float) -> void:
 	## Europe Home). Pin the same way RX-1 does — lock_pixel_guard_camera.
 	var pos := _sites_focus_world()
 	if zoom + 0.001 >= 2.0:
+		## Play Search+Go Köln at close: counter centered, Neuwied beside it.
 		var kc := _mm_centroid(KOELN)
 		if kc == Vector2.ZERO:
 			kc = _centroid(KOELN)
 		var nb := _centroid(NEIGHBOR_PID)
 		if kc != Vector2.ZERO and nb != Vector2.ZERO:
-			pos = kc.lerp(nb, 0.32)
+			pos = kc.lerp(nb, 0.42)
 		else:
 			pos = kc
 	_freeze_boot_camera_fighters()
@@ -1011,6 +1187,7 @@ func _frame_over_rhineland(zoom: float) -> void:
 		if ip is Control:
 			(ip as Control).visible = false
 	_apply_camera(pos, zoom)
+	_sync_close_layers(zoom)
 	_ensure_not_live_banner()
 	var live_z := _cam_zoom
 	var live_p := pos
@@ -1189,7 +1366,7 @@ func _finish(ok: bool) -> void:
 		ok = false
 	var result := "PASS" if ok else "FAIL"
 	_log(
-		"WindowedFac1aAirfieldPixelGuard: RESULT=%s mid=%d close=%d out=%d res=%d back=%d layer=%d/%d/%d/%d badge=%.1f occl_max=%.3f overlap_fail=%d own_fail=%d cluster_mid=%s split_close=%s counter_clear=%s rss_mb=%.1f peak_kb=%d captures=%s reasons=%s (xvfb NOT live Play)"
+		"WindowedFac1aAirfieldPixelGuard: RESULT=%s mid=%d close=%d out=%d res=%d back=%d layer=%d/%d/%d/%d badge=%.1f occl_max=%.3f overlap_fail=%d own_fail=%d cluster_mid=%s split_close=%s counter_clear=%s counter_drawn=%s rx1_mid_on=%.3f rx1_mid_off=%.3f rss_mb=%.1f peak_kb=%d captures=%s reasons=%s (xvfb NOT live Play)"
 		% [
 			result,
 			_mid_anchors,
@@ -1208,6 +1385,9 @@ func _finish(ok: bool) -> void:
 			str(_cluster_mid_ok),
 			str(_split_close_ok),
 			str(_counter_clear_ok),
+			str(_counter_drawn_ok),
+			_rx1_mid_on,
+			_rx1_mid_off,
 			rss_mb,
 			_rss_peak_kb,
 			str(_captures),
