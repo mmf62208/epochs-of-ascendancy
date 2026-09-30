@@ -389,12 +389,12 @@ Screenshots FIX #4 (xvfb **NOT live Play**): `/opt/cursor/artifacts/fac1a_fix4/0
 | gate | kind | result | peak MB isolated |
 |---|---|---|---|
 | py_fac1a | py | PASS | — |
-| hd_fac1a | headless | PASS (facility-first dest_matches, oval hit, chrome gap, 2px GIS) | — |
-| xvfb_fac1a | xvfb | PASS stale 1×/4× lone+cluster, tight outside, chrome 0.93/0.97/0.99, dark halo, clearance all tiers | isolated |
-| xvfb_rx1 ON / OFF | xvfb | PASS mid_river **0.749 / 0.749** | isolated |
+| hd_fac1a | headless | PASS (facility-first dest_matches, oval hit, chrome gap 2px, 2px GIS) | — |
+| xvfb_fac1a | xvfb | PASS stale=true chrome=2.00 outside=true prom 36/36 halo=2 click=0 noop=0 badge_in digit lone split 1.53 clearance all tiers occl=0.000 rx1 0.843/0.843 | **2039.1** |
+| xvfb_rx1 ON / OFF | xvfb | PASS mid_river **0.749 / 0.749** close 0.775 / 0.775 spine 1.000 | isolated |
 | hd_mv1 / hd_mv1b / hd_rh1 | headless | PASS (unedited) | — |
-| hd_ix1 / hd_rx1 / hd_rt1 | headless | PASS | — |
-| xvfb_mv1 / xvfb_mv1_card / xvfb_rh1 | xvfb | PASS | isolated |
+| hd_ix1 (6) / hd_rx1 (4) / hd_rt1 (3) | headless | PASS | — |
+| xvfb_mv1 / xvfb_mv1_card / xvfb_rh1 | xvfb | PASS | **2109.2 / 2032.8 / 2034.7** |
 
 Screenshots FIX #5 (xvfb **NOT live Play**): `/opt/cursor/artifacts/fac1a_fix5/01_cluster_count_tag_z0.97_NOT_live_play.png`, `02_lone_and_cluster_z1.30_NOT_live_play.png`, `03_borken_top_edge_z0.93_NOT_live_play.png`.
 
