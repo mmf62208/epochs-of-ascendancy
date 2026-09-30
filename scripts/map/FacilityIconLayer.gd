@@ -9,6 +9,7 @@ extends Node2D
 
 const FAC_DIR := "res://assets/graphics/icons/facilities/"
 const ANCHOR_RES := "res://data/provinces_world_accurate/facility_icon_anchors.json"
+const MapCanvasConfigScript = preload("res://scripts/map/MapCanvasConfig.gd")
 const MID_ICON_PX := 22.0
 const CLOSE_ICON_PX := 26.0
 const CLOSE_GROW_PX := 32.0
@@ -353,27 +354,51 @@ func _variant_ring_to_packed(raw: Variant) -> PackedVector2Array:
 
 func _interior_world_for(pid: int, p: Object) -> Vector2:
 	var centroid := _centroid_for(pid, p)
+	var ring := _ring_for(pid, p)
+	if ring.size() < 3:
+		return centroid
+	## Test polygons are already in the dummy world the headless harness uses.
+	if not _test_polygons.is_empty():
+		var pole_t := _polylabel(ring)
+		return pole_t if pole_t != Vector2.ZERO else centroid
+	var world_ring := _world_ring(ring, centroid)
 	var key := str(pid)
-	if _test_polygons.is_empty() and _json_anchors.has(key):
+	if _json_anchors.has(key):
 		var rec: Variant = _json_anchors[key]
 		if rec is Dictionary:
-			var w: Variant = (rec as Dictionary).get("world", [])
-			if w is Array and (w as Array).size() >= 2:
-				return Vector2(float(w[0]), float(w[1]))
 			var raw: Variant = (rec as Dictionary).get("raw", [])
-			if raw is Array and (raw as Array).size() >= 2:
-				return Vector2(float(raw[0]) * THEATER_SCALE, float(raw[1]) * THEATER_SCALE)
-	var ring := _ring_for(pid, p)
-	if ring.size() >= 3:
-		var raw_like := _ring_looks_raw(ring, centroid)
-		var pole := _polylabel(ring)
-		if raw_like and centroid != Vector2.ZERO:
-			var c_raw := _mean_ring(ring)
-			if c_raw != Vector2.ZERO:
-				pole = centroid + (pole - c_raw) * THEATER_SCALE
-		if pole != Vector2.ZERO:
-			return pole
+			var craw: Variant = (rec as Dictionary).get("centroid_raw", [])
+			if raw is Array and craw is Array and (raw as Array).size() >= 2 and (craw as Array).size() >= 2 and centroid != Vector2.ZERO:
+				var cand := centroid + (Vector2(float(raw[0]), float(raw[1])) - Vector2(float(craw[0]), float(craw[1]))) * THEATER_SCALE
+				if Geometry2D.is_point_in_polygon(cand, world_ring):
+					return cand
+	var pole := _polylabel(world_ring)
+	if pole != Vector2.ZERO and Geometry2D.is_point_in_polygon(pole, world_ring):
+		return pole
 	return centroid
+
+
+func _world_ring(ring: PackedVector2Array, world_centroid: Vector2) -> PackedVector2Array:
+	if ring.size() < 3:
+		return ring
+	var native := true
+	var mm := _map_manager()
+	if mm != null and "_geometry_world_native" in mm:
+		native = bool(mm.get("_geometry_world_native"))
+	var world_mode := true
+	if mm != null and mm.has_method("get_world_bounds"):
+		var b: Rect2 = mm.call("get_world_bounds")
+		world_mode = MapCanvasConfigScript.is_world_mode(b) or native
+	var transformed: PackedVector2Array = MapCanvasConfigScript.transform_province_points(ring, world_mode, true, native)
+	if transformed.size() >= 3:
+		return transformed
+	if world_centroid != Vector2.ZERO and _ring_looks_raw(ring, world_centroid):
+		var c_raw := _mean_ring(ring)
+		var acc := PackedVector2Array()
+		for q in ring:
+			acc.append(world_centroid + (q - c_raw) * THEATER_SCALE)
+		return acc
+	return ring
 
 
 func _ring_looks_raw(ring: PackedVector2Array, world_centroid: Vector2) -> bool:

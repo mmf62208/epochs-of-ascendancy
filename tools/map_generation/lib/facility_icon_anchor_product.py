@@ -24,22 +24,28 @@ SITES_PILOT = ROOT / "data" / "provinces_pilot_europe_nuts3" / "project_sites.js
 LAYER_GD = ROOT / "scripts" / "map" / "FacilityIconLayer.gd"
 CITY_LAYER = ROOT / "data" / "provinces_world_accurate" / "province_city_layer.json"
 
-# Reseed: large, spread-out western-GER / Rhineland Landkreise (not Köln clump).
-AACHEN = 710426
-TRIER_SAARBURG = 710469
-BORKEN = 710430
-SIEGEN = 710451
+# Reseed: western/central GER, ≥50 raw from Köln so a Köln counter cannot
+# cover icons at mid zoom. Avoid Trier-Saarburg / Aachen (LUX-adjacent after
+# island inflation steals the pick). Never renumber.
+EMSLAND = 710392
+ORTENAU = 710188
+GOTTINGEN = 710365
+ANSBACH = 710267
+AACHEN = EMSLAND  # alias kept for older test imports
+TRIER_SAARBURG = ORTENAU
+BORKEN = GOTTINGEN
+SIEGEN = ANSBACH
 SEED_TIERS: Dict[int, int] = {
-    AACHEN: 1,
-    TRIER_SAARBURG: 2,
-    BORKEN: 3,
-    SIEGEN: 4,
+    EMSLAND: 1,
+    ORTENAU: 2,
+    GOTTINGEN: 3,
+    ANSBACH: 4,
 }
 SEED_NAMES: Dict[int, str] = {
-    AACHEN: "Städteregion Aachen",
-    TRIER_SAARBURG: "Trier-Saarburg",
-    BORKEN: "Borken",
-    SIEGEN: "Siegen-Wittgenstein",
+    EMSLAND: "Emsland",
+    ORTENAU: "Ortenaukreis",
+    GOTTINGEN: "Göttingen",
+    ANSBACH: "Ansbach",
 }
 
 # Gold-spine / Rhine corridor (centroids of the IX-1 / RX-1 walk). Not sampled as
@@ -336,8 +342,8 @@ def apply_seed_files() -> None:
         "meta": {
             "source": "fac1a_rhineland_airfields_fix2",
             "note": (
-                "FAC-1a FIX #2 spread seeds: Aachen L1, Trier-Saarburg L2, "
-                "Borken L3, Siegen-Wittgenstein L4. Intact. Default world_accurate."
+                "FAC-1a FIX #2 spread seeds: Emsland L1, Ortenaukreis L2, "
+                "Göttingen L3, Ansbach L4. Intact. Default world_accurate."
             ),
         },
     }

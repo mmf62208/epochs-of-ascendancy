@@ -10,11 +10,15 @@ extends SceneTree
 
 const ESSEN := 710403
 const KOELN := 710417
-const AACHEN := 710426
-const TRIER_SAARBURG := 710469
-const BORKEN := 710430
-const SIEGEN := 710451
-const PIDS: Array[int] = [AACHEN, TRIER_SAARBURG, BORKEN, SIEGEN]
+const EMSLAND := 710392
+const ORTENAU := 710188
+const GOTTINGEN := 710365
+const ANSBACH := 710267
+const AACHEN := EMSLAND
+const TRIER_SAARBURG := ORTENAU
+const BORKEN := GOTTINGEN
+const SIEGEN := ANSBACH
+const PIDS: Array[int] = [EMSLAND, ORTENAU, GOTTINGEN, ANSBACH]
 const MID_ZOOM := 0.99
 const OPS_ZOOM := 1.30
 const CLOSE_ZOOM := 2.27
@@ -557,11 +561,8 @@ func _koeln_counter_rect() -> Rect2:
 					return r
 		for ch in n.get_children():
 			stack.append(ch)
-	var mm2 := root.get_node_or_null("MapManager")
-	if cam != null and mm2 != null and mm2.has_method("get_province_centroid"):
-		var kc2: Vector2 = mm2.call("get_province_centroid", KOELN)
-		var scr2: Vector2 = cam.get_canvas_transform() * kc2
-		return Rect2(scr2 - Vector2(40, 28), Vector2(80, 56))
+	## No synthetic Köln box — a fallback 80×56 at the centroid false-overlapped
+	## nearby icons at mid zoom when no chip was actually there.
 	return Rect2()
 
 
@@ -646,12 +647,11 @@ func _sample_disk(img: Image, cx: int, cy: int, radius: int, w: int, h: int) -> 
 func _is_icon_pixel(c: Color) -> bool:
 	if c.a < 0.45:
 		return false
-	## Ink airfield: dirt orange, asphalt grey, brass badge/pips, dark keyline.
-	var brass := c.r > 0.55 and c.g > 0.40 and c.b < 0.50 and c.s > 0.22
-	var dirt := c.r > 0.55 and c.g > 0.28 and c.g < 0.70 and c.b < 0.38 and c.s > 0.28
-	var keyline := c.v < 0.20 and c.s < 0.25
-	var asphalt := c.s < 0.18 and c.v > 0.22 and c.v < 0.55 and absf(c.r - c.g) < 0.08
-	return brass or dirt or keyline or asphalt
+	## Ink airfield only — do not count political country fill (GER red matched dirt).
+	var brass := c.r > 0.62 and c.g > 0.42 and c.g < 0.82 and c.b < 0.38 and c.s > 0.38
+	var dirt := c.r > 0.58 and c.g > 0.30 and c.g < 0.58 and c.b < 0.28 and c.s > 0.40
+	var asphalt := c.s < 0.12 and c.v > 0.28 and c.v < 0.48 and absf(c.r - c.g) < 0.05 and absf(c.g - c.b) < 0.05
+	return brass or dirt or asphalt
 
 
 func _centroid(pid: int) -> Vector2:
@@ -857,32 +857,59 @@ func _sites_focus_world() -> Vector2:
 
 
 func _frame_over_rhineland(zoom: float) -> void:
-	var focus_pid := KOELN if zoom + 0.001 >= 2.0 else AACHEN
+	## Guard-only pose. Product Play still uses the player camera / wheel.
+	## Home / Close / TestRunner were winning player_path_wheel (xvfb sat on
+	## Europe Home). Pin the same way RX-1 does — lock_pixel_guard_camera.
 	var pos := _sites_focus_world()
 	if zoom + 0.001 >= 2.0:
-		pos = _centroid(KOELN)
+		pos = _mm_centroid(KOELN)
+		if pos == Vector2.ZERO:
+			pos = _centroid(KOELN)
+	_freeze_boot_camera_fighters()
 	var mr := _map_renderer()
-	if mr != null and mr.has_method("player_path_search_go"):
-		mr.call("player_path_search_go", focus_pid)
-	elif mr != null and mr.has_method("open_province_inspector_from_search"):
-		mr.call("open_province_inspector_from_search", focus_pid)
 	if mr != null and mr.has_method("hide_info_panel"):
 		mr.call("hide_info_panel")
 	if mr != null and "info_panel" in mr:
 		var ip: Variant = mr.get("info_panel")
 		if ip is Control:
 			(ip as Control).visible = false
-	if mr != null and mr.has_method("player_path_wheel_toward_world"):
-		_cam_zoom = float(mr.call("player_path_wheel_toward_world", pos, zoom))
-	var cam := _camera()
-	if cam != null:
-		if zoom + 0.001 < 0.45:
-			_wheel_to_max_zoom(zoom)
-		elif _cam_zoom + 0.001 < zoom:
-			_wheel_to_min_zoom(zoom)
-		_cam_zoom = maxf(cam.zoom.x, cam.zoom.y)
+	if mr != null and mr.has_method("lock_pixel_guard_camera"):
+		mr.call("lock_pixel_guard_camera", pos, zoom)
+		_cam_zoom = zoom
+	else:
+		var cam := _camera()
+		if cam != null:
+			cam.zoom = Vector2(zoom, zoom)
+			cam.global_position = pos
+			cam.reset_smoothing()
+			cam.enabled = true
+			cam.make_current()
+			_cam_zoom = maxf(cam.zoom.x, cam.zoom.y)
+	var cam2 := _camera()
+	if cam2 != null:
+		_cam_zoom = maxf(cam2.zoom.x, cam2.zoom.y)
 	_ensure_not_live_banner()
-	_log("EOA_FAC1A_PIXEL_GUARD who=guard.frame want=%.2f got=%.3f (NOT live Play)" % [zoom, _cam_zoom])
+	_log("EOA_FAC1A_PIXEL_GUARD who=guard.frame want=%.2f got=%.3f pos=%.1f,%.1f (NOT live Play)" % [zoom, _cam_zoom, pos.x, pos.y])
+
+
+func _freeze_boot_camera_fighters() -> void:
+	if root != null:
+		root.set_meta("eoa_rx1_pixel_lock_camera", true)
+	var mr := _map_renderer()
+	if mr != null:
+		mr.set("_europe_focus_retry", 99)
+		mr.set("_close_camera_locked", true)
+		mr.set("_hold_camera_until_msec", Time.get_ticks_msec() + 120000)
+	var tr := _find_named("TestRunner")
+	if tr != null and tr.has_method("set_process"):
+		tr.set_process(false)
+	var cc := _find_named("CameraController")
+	if cc != null:
+		if "enable_pan" in cc:
+			cc.set("enable_pan", false)
+		if "enable_zoom" in cc:
+			cc.set("enable_zoom", false)
+		cc.set_process(false)
 
 
 func _wheel_to_min_zoom(target_zoom: float) -> void:

@@ -13,10 +13,14 @@ const SRC_OL := "res://scripts/map/InfrastructureOverlayLayer.gd"
 const SRC_LOADER := "res://scripts/core/ScenarioLoader.gd"
 const SRC_ZOOM := "res://scripts/map/MapZoomLOD.gd"
 
-const AACHEN := 710426
-const TRIER_SAARBURG := 710469
-const BORKEN := 710430
-const SIEGEN := 710451
+const EMSLAND := 710392
+const ORTENAU := 710188
+const GOTTINGEN := 710365
+const ANSBACH := 710267
+const AACHEN := EMSLAND
+const TRIER_SAARBURG := ORTENAU
+const BORKEN := GOTTINGEN
+const SIEGEN := ANSBACH
 const KOELN := 710417
 
 const SITE_AIRFIELD := 1
