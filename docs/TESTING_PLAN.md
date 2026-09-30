@@ -360,7 +360,7 @@ On `tools/eoa_full_test_gates.sh` (`--quick` has the py needles; full has headle
 
 ### FAC-1a airfield facility icons (L1–L4, draft HOLD)
 
-Default F5 board is **`world_accurate`**. Four Rhineland airfields seed through `project_sites.json` → `ScenarioLoader.apply_seeded_special_sites_to_provinces` so `Province.special_sites` has real `SpecialSite` AIRFIELD rows. **FIX #2b Rhineland reseed (never renumbered):** Viersen `710414` L1, Rhein-Hunsrück-Kreis `710464` L2, Oberbergischer Kreis `710423` L3, Neuwied `710460` L4. Same IDs on `provinces_pilot_europe_nuts3`. New `FacilityIconLayer` (`_draw` + `draw_texture_rect` + `draw_circle` badge disc; no Line2D / per-icon nodes). World-space **polylabel** interior anchors precomputed on rebuild (JSON + GDScript). Cluster + hysteresis when screen rects collide. Badges **16px** with dark disc. Close icons grow to **32px** at zoom ≥2.0. `show_facilities` defaults **ON**; **P** toggles on the layer (MapRenderer input untouched). Hidden below `MapZoomLOD.site_marker_min_zoom_for_board` (0.62 on the default board). Hidden in F9 resources. Old `rebuild_sites_layer` stays default-off. Damaged is a data flag (intact art + TODO). `set_map_mode` RH-1 glyph lines **untouched**.
+Default F5 board is **`world_accurate`**. Four Rhineland airfields seed through `project_sites.json` → `ScenarioLoader.apply_seeded_special_sites_to_provinces` so `Province.special_sites` has real `SpecialSite` AIRFIELD rows. **FIX #3 reseed (never renumbered):** Borken `710430` L1, Warendorf `710434` L2, Oberbergischer Kreis `710423` L3, Siegen-Wittgenstein `710451` L4. Cannot-fit: Neuwied `710460`, Viersen `710414`, Hunsrück `710464`, Kreuznach `710457`. Same IDs on `provinces_pilot_europe_nuts3`. New `FacilityIconLayer` (`_draw` + `draw_texture_rect` + `draw_circle` badge disc; no Line2D / per-icon nodes). World-space **polylabel** interior anchors precomputed on rebuild (JSON + GDScript). Cluster + hysteresis when screen rects collide. Badges **16px** with dark disc. Close icons grow to **32px** at zoom ≥2.0. `show_facilities` defaults **ON**; **P** toggles on the layer (MapRenderer input untouched). Hidden below `MapZoomLOD.site_marker_min_zoom_for_board` (0.62 on the default board). Hidden in F9 resources. Old `rebuild_sites_layer` stays default-off. Damaged is a data flag (intact art + TODO). `set_map_mode` RH-1 glyph lines **untouched**.
 
 ```bash
 python3 -m unittest tools.map_generation.tests.test_fac1a_airfield_icons -v
@@ -368,7 +368,26 @@ tools/run_godot.sh --headless --path . -s res://scripts/core/HeadlessFac1aAirfie
 tools/eoa_fac1a_pixel_guard.sh
 ```
 
-xvfb screenshots go to `/opt/cursor/artifacts/fac1a/`, `/opt/cursor/artifacts/fac1a_fix2/`, and `/opt/cursor/artifacts/fac1a_fix2b/` and are **NOT live Play**. Peak RSS must stay under 3 GB (isolated process tree — do not sum leftover Godot). Merge **HOLD**.
+xvfb screenshots go to `/opt/cursor/artifacts/fac1a/`, `/opt/cursor/artifacts/fac1a_fix2/`, `/opt/cursor/artifacts/fac1a_fix2b/`, `/opt/cursor/artifacts/fac1a_fix2c/`, and `/opt/cursor/artifacts/fac1a_fix3/` and are **NOT live Play**. Peak RSS must stay under 3 GB (isolated process tree — do not sum leftover Godot). Merge **HOLD**.
+
+**FIX #3 (Play MIXED `234e12b8`):** Rhine/spine/border clearance + cluster L4 tag. Split expected ~1.59. Isolated keep-green (`637ca02e`):
+
+| gate | kind | result | peak MB isolated |
+|---|---|---|---|
+| py_fac1a | py | PASS | 1.9 |
+| hd_fac1a | headless | PASS (L4 tag, 710430/434/423/451) | 1194.1 |
+| xvfb_fac1a | xvfb | PASS clearance 0.65–2.27 · own=0 · cluster L4 count=2 · split 1.59 · occl=0.000 · rx1 0.843/0.843 | **2056.6** |
+| xvfb_rx1 ON / OFF | xvfb | PASS mid_river **0.749 / 0.749** close 0.775 / 0.775 spine 1.000 | **2046.7 / 2050.0** |
+| xvfb_rt1_seeded | xvfb | PASS | **2067.6** |
+| py_ix1 | py | PASS | 54.7 |
+| hd_mv1 / hd_mv1b / hd_rh1 | headless | PASS | 1193.9 / 1193.9 / 1193.8 |
+| hd_ix1_* (6) | headless | PASS | ~1194 |
+| hd_rx1_* (4) | headless | PASS | ~1194 |
+| hd_rt1_* (3) | headless | PASS | ~1194 |
+| xvfb_mv1 / xvfb_mv1_card / xvfb_rh1 | xvfb | PASS | 2063.3 / 2067.3 / 2063.2 |
+| xvfb_rt1_live_look | xvfb | PASS | 2064.4 |
+
+Screenshots FIX #3 (xvfb **NOT live Play**): `/opt/cursor/artifacts/fac1a_fix3/01_operational_z1.30_rhineland_NOT_live_play.png`, `02_mid_z0.99_cluster_tag_NOT_live_play.png`, `03_close_koln_bonn_z2.25_counter_NOT_live_play.png`, `04_split_z1.59_NOT_live_play.png`, `05_l1_z0.92_NOT_live_play.png`, `05_l1_z0.98_NOT_live_play.png`.
 
 **FIX #1 occlusion (A/B/C prove, xvfb ≠ live Play):** icons sat on Bonn–Köln–Lev centroids (gold spine + Rhine). Same commands:
 
