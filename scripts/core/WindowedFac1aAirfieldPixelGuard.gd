@@ -122,6 +122,7 @@ var _counter_clear_ok: bool = false
 var _badge_px: float = 0.0
 var _occl_i: int = 0
 var _overlap_i: int = 0
+var _capture_skip_reframe: bool = false
 
 
 func _init() -> void:
@@ -1192,17 +1193,32 @@ func _capture_hit_overlays() -> void:
 	var ol := _facility_layer()
 	if ol == null:
 		return
+	_clear_selected_unit()
+	_hide_unit_noise()
+	_capture_skip_reframe = true
 	if ol.has_method("set_debug_hit_overlay"):
 		ol.call("set_debug_hit_overlay", true)
-	_frame_over_rhineland(0.97)
+	## Sites centroid — not the Köln Search+Go close pose — so the cluster
+	## and the four lone icons stay in frame. Guard-only; product Play untouched.
+	_frame_sites_overlay(0.97)
 	_redraw_layer()
 	_capture_fix6("01_l4_cluster_hit_overlay_z0.97_NOT_live_play")
-	_frame_over_rhineland(2.25)
+	_frame_sites_overlay(2.25)
 	_redraw_layer()
 	_capture_fix6("02_lone_hit_overlay_z2.25_NOT_live_play")
 	if ol.has_method("set_debug_hit_overlay"):
 		ol.call("set_debug_hit_overlay", false)
+	_capture_skip_reframe = false
 	_redraw_layer()
+
+
+func _frame_sites_overlay(zoom: float) -> void:
+	_freeze_boot_camera_fighters()
+	var pos := _sites_focus_world()
+	_apply_camera(pos, zoom)
+	_sync_close_layers(zoom)
+	_ensure_not_live_banner()
+	_log("EOA_FAC1A_PIXEL_GUARD who=guard.overlay_frame want=%.2f pos=%.1f,%.1f (NOT live Play)" % [zoom, pos.x, pos.y])
 
 
 func _assert_lone_min_size() -> bool:
@@ -2030,7 +2046,8 @@ func _camera() -> Camera2D:
 
 
 func _capture(name: String) -> void:
-	_frame_over_rhineland(_cam_zoom)
+	if not _capture_skip_reframe:
+		_frame_over_rhineland(_cam_zoom)
 	_ensure_not_live_banner()
 	RenderingServer.force_draw()
 	RenderingServer.force_draw()

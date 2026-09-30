@@ -1478,7 +1478,14 @@ func _draw() -> void:
 		draw_texture_rect(icon_tex, icon_rect, false)
 		if _debug_hit_overlay:
 			var hit: Rect2 = layout.get("hit_icon", art_rect) as Rect2
-			_draw_ellipse_outline(hit, Color(0.15, 0.95, 0.95, 0.95), _world_size_at(1.6, z))
+			_draw_ellipse_filled(hit, Color(0.10, 0.95, 0.95, 0.32))
+			_draw_ellipse_outline(hit, Color(0.15, 0.98, 0.98, 1.0), _world_size_at(2.6, z))
+			var badge_h: Rect2 = layout.get("badge_rect", Rect2()) as Rect2
+			if badge_h.size.x > 0.0:
+				_draw_ellipse_outline(badge_h, Color(0.95, 0.85, 0.15, 0.95), _world_size_at(1.8, z))
+			var tag_h: Rect2 = layout.get("tag_rect", Rect2()) as Rect2
+			if tag_h.size.x > 0.0:
+				_draw_ellipse_outline(tag_h, Color(0.95, 0.85, 0.15, 0.95), _world_size_at(1.8, z))
 		if z + 0.0001 >= CLOSE_ZOOM and not cluster:
 			var pips := _load_tex("level_pips_l%d" % level, 32)
 			if pips != null:
