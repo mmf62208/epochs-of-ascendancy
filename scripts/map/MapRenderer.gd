@@ -251,11 +251,16 @@ var _close_camera_lock_pos := Vector2.ZERO
 var _close_camera_lock_zoom := Vector2.ONE
 var _close_click_guard := false
 var _close_release_seen := false
-## CRASH-1 FIX #1: unit-card Halt / Press / Hold / Withdraw / Assign fire on
-## button-down and rebuild the card. The matching mouse-up must not still-click
-## the map under the old button (Play: inspector + camera jump / other unit).
+## CRASH-1 FIX #1 / CRASH-1b: unit-card Halt / Press / Hold / Withdraw / Assign
+## fire on button-down and rebuild the card. Swallow only the matching left
+## release so it cannot still-click the map. The latch must not linger —
+## clear after that one release, on any new left press (UI or map), and after
+## a short safety timeout (Play: leftover eaten swallowed later top-bar ups).
+const UNIT_CARD_LATCH_SAFETY_SEC := 0.5
 var _unit_card_consumed_press := false
 var _unit_card_release_eaten := false
+var _unit_card_latch_arm_sec := 0.0
+var _unit_card_eaten_frame: int = -1
 ## One Esc press = one stack step (TopInfoBar + MapRenderer `_input` / `_unhandled_input`).
 var _esc_stack_frame: int = -1
 ## Close button sits in the north edge-pan strip — suppress edge until the mouse leaves that click.
@@ -1306,7 +1311,7 @@ func _begin_left_map_gesture(new_press: bool = false) -> void:
 	_left_ready_for_still_click = true
 	_left_button_was_up = false
 	if new_press:
-		_unit_card_release_eaten = false
+		_clear_unit_card_press_consume_latch()
 	var cam: Camera2D = get_viewport().get_camera_2d() if get_viewport() else null
 	if cam != null:
 		_left_press_cam_pos = cam.global_position
@@ -1601,21 +1606,60 @@ func _note_close_button_release() -> void:
 		_close_release_seen = true
 
 
+func _clear_unit_card_press_consume_latch() -> void:
+	_unit_card_consumed_press = false
+	_unit_card_release_eaten = false
+	_unit_card_latch_arm_sec = 0.0
+	_unit_card_eaten_frame = -1
+
+
+func _clear_unit_card_press_consume_on_new_left_press() -> void:
+	# Any new left press (top-bar, other UI, or map) drops a leftover swallow.
+	if _unit_card_consumed_press or _unit_card_release_eaten:
+		_clear_unit_card_press_consume_latch()
+
+
+func _tick_unit_card_press_consume_latch(delta: float) -> void:
+	if _unit_card_consumed_press:
+		_unit_card_latch_arm_sec += delta
+		if _unit_card_latch_arm_sec >= UNIT_CARD_LATCH_SAFETY_SEC:
+			_clear_unit_card_press_consume_latch()
+			return
+	if _unit_card_release_eaten and _unit_card_eaten_frame >= 0:
+		if Engine.get_process_frames() > _unit_card_eaten_frame:
+			_clear_unit_card_press_consume_latch()
+
+
 func _arm_unit_card_press_consume() -> void:
 	# Halt / Press / Hold / Withdraw / Assign (ACTION_MODE_BUTTON_PRESS).
 	# Latch before the card rebuild so the matching LMB release cannot pick.
 	_unit_card_consumed_press = true
 	_unit_card_release_eaten = false
+	_unit_card_latch_arm_sec = 0.0
+	_unit_card_eaten_frame = -1
 	var vp: Viewport = get_viewport()
 	if vp != null:
 		vp.set_input_as_handled()
 
 
 func _consume_unit_card_press_release_if_armed() -> bool:
+	# Swallow only the matching left release (CRASH-1). Same-frame eaten
+	# still blocks `_unhandled_input` / skip-pick / land-chip for THAT up.
+	# After that one release the latch must drop (CRASH-1b).
 	if not _unit_card_consumed_press and not _unit_card_release_eaten:
 		return false
+	if _unit_card_release_eaten and not _unit_card_consumed_press:
+		if _unit_card_eaten_frame >= 0 and Engine.get_process_frames() > _unit_card_eaten_frame:
+			_clear_unit_card_press_consume_latch()
+			return false
+		var vp_eaten: Viewport = get_viewport()
+		if vp_eaten != null:
+			vp_eaten.set_input_as_handled()
+		return true
 	_unit_card_consumed_press = false
 	_unit_card_release_eaten = true
+	_unit_card_eaten_frame = Engine.get_process_frames()
+	_unit_card_latch_arm_sec = 0.0
 	_end_left_button_down()
 	_clear_left_slop_after_still_click()
 	var vp: Viewport = get_viewport()
@@ -2562,6 +2606,8 @@ func _input(event: InputEvent) -> void:
 			else:
 				_is_middle_dragging = false
 		elif event.button_index == MOUSE_BUTTON_LEFT:
+			if event.pressed:
+				_clear_unit_card_press_consume_on_new_left_press()
 			if _living_title_boot_is_up():
 				# Play 5adb38e: never swallow title-up presses. Route by event
 				# coords (computerUse may not update get_mouse_position first).
@@ -3186,6 +3232,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				get_viewport().set_input_as_handled()
 				return
 		var pid: int = _still_click_province_pid(world_pos, mv1_commit)
+		pid = _mv1_re_resolve_commit_pid(world_pos, pid, mv1_commit)
 		if pid < 0 or not provinces.has(pid):
 			# Coarse world territory fallback: when no detailed province (e.g. panned to Africa/Aus/E Asia on stitched world grand), hit large strategic region for "click to get into".
 			# Gives grand strategy world map the feel that every area has a clickable territory/region, even if detailed provs are Europe-focused for current scenario.
@@ -3313,6 +3360,7 @@ func _process(delta: float) -> void:
 		_perf_frame_start_usec = Time.get_ticks_usec()
 		_perf.begin("process_total")
 	_expire_map_time_pulse_if_needed()
+	_tick_unit_card_press_consume_latch(delta)
 
 	# When sim is paused, skip heavy LOD/fill/theater work — pan/zoom/UI stay responsive for playtest.
 	var sim_paused := false
@@ -19473,6 +19521,28 @@ func _mv1_preview_shows_hops() -> bool:
 	return "hop" in chip_txt
 
 
+func _mv1_event_province_pid(world_pos: Vector2) -> int:
+	# Event-position pick used by MV-1e commit. Facility first (FAC-1a), then GIS.
+	var fac_pid: int = _facility_icon_pid_at(world_pos)
+	if fac_pid > 0:
+		return fac_pid
+	return _resolve_hex_pick_pid(world_pos)
+
+
+func _mv1_re_resolve_commit_pid(world_pos: Vector2, picked_pid: int, mv1_commit: bool) -> int:
+	# Cached-dest still-click can return the stale hover dest. Re-resolve at
+	# the release world (same pick as dest_matches). Facility hits keep
+	# still_click's icon pid. GIS miss keeps the cache dest (FAC-1a miss-path).
+	if not mv1_commit:
+		return picked_pid
+	if _facility_icon_pid_at(world_pos) > 0:
+		return picked_pid
+	var event_pid: int = _resolve_hex_pick_pid(world_pos)
+	if event_pid > 0:
+		return event_pid
+	return picked_pid
+
+
 func _mv1_preview_dest_matches_world(world_pos: Vector2) -> bool:
 	var dest: int = _march_preview_cache_dest
 	if dest <= 0:
@@ -19481,14 +19551,16 @@ func _mv1_preview_dest_matches_world(world_pos: Vector2) -> bool:
 	if fac_pid > 0:
 		## Icon hit allows commit; `_unhandled_input` overrides dest to fac_pid.
 		return true
+	var click_pid: int = _resolve_hex_pick_pid(world_pos)
+	if click_pid == dest:
+		return true
+	# Hover/preview cache is display-only. A GIS hit on a different province
+	# must not match (MV-1e: Bad Kreuznach vs stale Hildesheim).
+	if click_pid > 0:
+		return false
 	if _hover_province != null and int(_hover_province.id) == dest:
 		return true
-	var click_pid: int = -1
-	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_at_world_pos"):
-		click_pid = int(MapManager.get_province_at_world_pos(world_pos, true))
-		if MapManager.has_method("resolve_pick_province_id"):
-			click_pid = int(MapManager.resolve_pick_province_id(click_pid))
-	return click_pid == dest
+	return false
 
 
 func _mv1_selected_is_own_land() -> bool:

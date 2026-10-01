@@ -122,6 +122,7 @@ func _run() -> void:
 	_test_retarget_other_province()
 	await _test_card_refresh_on_march_start_end()
 	await _test_five_button_release_does_not_click_through()
+	await _test_subsequent_ui_clicks_after_swallowed_release()
 	_cleanup()
 
 
@@ -183,6 +184,22 @@ func _test_source_needles() -> void:
 		return
 	if "_unit_card_consumed_press" not in chip_fn:
 		_fail("land-chip still-click must honor the card-press latch")
+		return
+	if "func _clear_unit_card_press_consume_latch" not in ren:
+		_fail("CRASH-1b latch clear helper missing")
+		return
+	if "func _clear_unit_card_press_consume_on_new_left_press" not in ren:
+		_fail("CRASH-1b must clear the latch on any new left press")
+		return
+	if "UNIT_CARD_LATCH_SAFETY_SEC" not in ren or "func _tick_unit_card_press_consume_latch" not in ren:
+		_fail("CRASH-1b safety timeout tick missing")
+		return
+	if "_clear_unit_card_press_consume_on_new_left_press()" not in input_fn:
+		_fail("_input must drop the swallow latch on a new left press (UI or map)")
+		return
+	var consume_fn := _slice_func(ren, "_consume_unit_card_press_release_if_armed")
+	if "_unit_card_eaten_frame" not in consume_fn:
+		_fail("consume must drop the latch after the matching release frame")
 		return
 	var move_full := _slice_func(ren, "_try_move_selected_unit_to_province")
 	var hop_fn := _slice_func(ren, "_on_march_hop_ui")
@@ -697,6 +714,8 @@ func _show_selected_card() -> void:
 func _assert_no_click_through(label: String, cam_before: Vector2, sel_before: String, pid_before: int, insp_before: bool) -> void:
 	if bool(_mr.get("_unit_card_consumed_press")):
 		_fail("%s latch still armed after release" % label)
+	if bool(_mr.get("_unit_card_release_eaten")):
+		_fail("%s eaten flag must not linger after the matching release frame" % label)
 	if str(_mr.selected_formation_id) != sel_before:
 		_fail("%s release changed selection %s → %s" % [label, sel_before, str(_mr.selected_formation_id)])
 		return
@@ -809,6 +828,113 @@ func _test_five_button_release_does_not_click_through() -> void:
 	_show_selected_card()
 	await _press_button_then_release(_find_card_btn("BtnAssignLeader", "Assign"), "Assign")
 	_clear_injected_battle()
+	_fm("clear_march", FID)
+
+
+func _test_subsequent_ui_clicks_after_swallowed_release() -> void:
+	# CRASH-1b: after Halt eats its one matching release, later UI press+release
+	# must register (live Play: leftover eaten swallowed 4 top-bar ups).
+	_fm("enqueue_own_land_march", FID, KOELN, GER_TAG)
+	if "selected_formation_id" in _mr:
+		_mr.selected_formation_id = FID
+	_show_selected_card()
+	var halt_btn: Button = _find_halt_btn()
+	if halt_btn == null:
+		_fail("Halt missing for subsequent-UI guard")
+		return
+	await _press_button_then_release(halt_btn, "Halt-before-UI")
+	await process_frame
+	if bool(_mr.get("_unit_card_consumed_press")) or bool(_mr.get("_unit_card_release_eaten")):
+		_fail("latch lingered after Halt swallow + 1 frame")
+		return
+	var ui_host := Control.new()
+	ui_host.name = "Ch1UiClickHost"
+	ui_host.position = Vector2(20, 20)
+	ui_host.size = Vector2(420, 40)
+	_ui.add_child(ui_host)
+	var clicks: Array[int] = [0, 0, 0, 0]
+	var btns: Array[Button] = []
+	var i := 0
+	while i < 4:
+		var b := Button.new()
+		b.name = "Ch1UiBtn_%d" % i
+		b.text = "UI%d" % (i + 1)
+		b.position = Vector2(float(i) * 100.0, 0.0)
+		b.size = Vector2(90, 28)
+		var idx := i
+		b.pressed.connect(func() -> void:
+			clicks[idx] = int(clicks[idx]) + 1
+		)
+		ui_host.add_child(b)
+		btns.append(b)
+		i += 1
+	await process_frame
+	var ui_i := 0
+	while ui_i < 4:
+		var btn: Button = btns[ui_i]
+		var pos: Vector2 = _button_screen_pos(btn)
+		if _mr.has_method("_reset_left_gesture_state"):
+			_mr.call("_reset_left_gesture_state", pos)
+		_mr.call("_input", _lmb(true, pos))
+		if bool(_mr.get("_unit_card_consumed_press")) or bool(_mr.get("_unit_card_release_eaten")):
+			_fail("UI press %d re-armed or kept the swallow latch" % (ui_i + 1))
+			return
+		if is_instance_valid(btn):
+			btn.pressed.emit()
+		var consumed_rel: bool = bool(_mr.call("_consume_unit_card_press_release_if_armed"))
+		if consumed_rel:
+			_fail("UI release %d was swallowed by the card latch" % (ui_i + 1))
+			return
+		_mr.call("_input", _lmb(false, pos))
+		_mr.call("_unhandled_input", _lmb(false, pos))
+		await process_frame
+		if int(clicks[ui_i]) < 1:
+			_fail("UI button %d press did not register" % (ui_i + 1))
+			return
+		if bool(_mr.call("_left_release_must_skip_pick")) and bool(_mr.get("_unit_card_release_eaten")):
+			_fail("UI release %d left skip-pick latched by card swallow" % (ui_i + 1))
+			return
+		ui_i += 1
+	if int(clicks[0]) < 1 or int(clicks[1]) < 1 or int(clicks[2]) < 1 or int(clicks[3]) < 1:
+		_fail("expected 4 registered UI clicks, got %s" % str(clicks))
+		return
+	_pass("4 subsequent UI press+release registered after Halt swallow")
+	# Following map still-click must work (not swallowed).
+	_fm("clear_march", FID)
+	if _formation() != null:
+		_formation().set("stationed_province_id", BONN)
+	if "selected_formation_id" in _mr:
+		_mr.selected_formation_id = FID
+	if "selected_province_id" in _mr:
+		_mr.selected_province_id = -1
+	if _info != null:
+		_info.visible = false
+	var dest_p: Object = _koeln_province()
+	if dest_p == null:
+		_fail("Köln missing for post-UI map still-click")
+		return
+	if _mr.has_method("_reset_left_gesture_state"):
+		_mr.call("_reset_left_gesture_state", Vector2(80, 80))
+	_mr.call("_input", _lmb(true, Vector2(80, 80)))
+	_mr.call("_input", _lmb(false, Vector2(80, 80)))
+	if bool(_mr.call("_consume_unit_card_press_release_if_armed")):
+		_fail("map still-click release was swallowed after UI clicks")
+		return
+	if bool(_mr.get("_unit_card_consumed_press")) or bool(_mr.get("_unit_card_release_eaten")):
+		_fail("latch armed during the following map still-click")
+		return
+	if not bool(_mr.call("_try_move_selected_unit_to_province", dest_p)):
+		_fail("following map still-click march did not commit")
+		return
+	if not bool(_fm("has_march", FID)):
+		_fail("following map still-click did not enqueue Köln")
+		return
+	if int(_fm("get_march", FID).get("dest_id", -1)) != KOELN:
+		_fail("following map still-click dest want Köln")
+		return
+	_pass("following map still-click commits normally after 4 UI clicks")
+	if is_instance_valid(ui_host):
+		ui_host.queue_free()
 	_fm("clear_march", FID)
 
 
