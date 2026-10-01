@@ -251,6 +251,11 @@ var _close_camera_lock_pos := Vector2.ZERO
 var _close_camera_lock_zoom := Vector2.ONE
 var _close_click_guard := false
 var _close_release_seen := false
+## CRASH-1 FIX #1: unit-card Halt / Press / Hold / Withdraw / Assign fire on
+## button-down and rebuild the card. The matching mouse-up must not still-click
+## the map under the old button (Play: inspector + camera jump / other unit).
+var _unit_card_consumed_press := false
+var _unit_card_release_eaten := false
 ## One Esc press = one stack step (TopInfoBar + MapRenderer `_input` / `_unhandled_input`).
 var _esc_stack_frame: int = -1
 ## Close button sits in the north edge-pan strip — suppress edge until the mouse leaves that click.
@@ -1300,6 +1305,8 @@ func _begin_left_map_gesture(new_press: bool = false) -> void:
 	_left_cam_moved_this_down = false
 	_left_ready_for_still_click = true
 	_left_button_was_up = false
+	if new_press:
+		_unit_card_release_eaten = false
 	var cam: Camera2D = get_viewport().get_camera_2d() if get_viewport() else null
 	if cam != null:
 		_left_press_cam_pos = cam.global_position
@@ -1491,6 +1498,8 @@ func _map_click_should_skip_pick() -> bool:
 ## Release/pick sites must not call `_note` (that can re-arm mid-release).
 ## Sea hex + jump-zoom play: slop/pan flags were set, then release still picked.
 func _left_release_must_skip_pick() -> bool:
+	if _unit_card_consumed_press or _unit_card_release_eaten:
+		return true
 	if _left_map_pick_blocked():
 		return true
 	if _left_gesture_dragged or _left_pan_committed or _left_skip_next_pick:
@@ -1590,6 +1599,29 @@ func _reassert_locked_close_camera() -> void:
 func _note_close_button_release() -> void:
 	if _close_click_guard:
 		_close_release_seen = true
+
+
+func _arm_unit_card_press_consume() -> void:
+	# Halt / Press / Hold / Withdraw / Assign (ACTION_MODE_BUTTON_PRESS).
+	# Latch before the card rebuild so the matching LMB release cannot pick.
+	_unit_card_consumed_press = true
+	_unit_card_release_eaten = false
+	var vp: Viewport = get_viewport()
+	if vp != null:
+		vp.set_input_as_handled()
+
+
+func _consume_unit_card_press_release_if_armed() -> bool:
+	if not _unit_card_consumed_press and not _unit_card_release_eaten:
+		return false
+	_unit_card_consumed_press = false
+	_unit_card_release_eaten = true
+	_end_left_button_down()
+	_clear_left_slop_after_still_click()
+	var vp: Viewport = get_viewport()
+	if vp != null:
+		vp.set_input_as_handled()
+	return true
 
 
 func _finish_close_click_guard_on_new_press() -> void:
@@ -2600,6 +2632,8 @@ func _input(event: InputEvent) -> void:
 						_mark_left_pan_blocked_pick()
 						get_viewport().set_input_as_handled()
 						return
+			if not event.pressed and _consume_unit_card_press_release_if_armed():
+				return
 			if event.ctrl_pressed or event.shift_pressed:
 				pass
 			elif MapViewInput.modal_blocks_map_nav(get_viewport()):
@@ -2941,6 +2975,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	# Spatial picking click handling — this path makes the system fully functional
 	# even when create_area_nodes_for_fallback=false (pure MapPickGrid mode, zero Area2D nodes).
 	if use_spatial_picking and event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if not event.pressed and _consume_unit_card_press_release_if_armed():
+			return
 		if _living_title_boot_is_up():
 			if event.pressed:
 				var un_act: String = _route_living_title_pointer(event)
@@ -3079,6 +3115,17 @@ func _unhandled_input(event: InputEvent) -> void:
 			elif _try_switch_own_land_counter_at_world(world_pos):
 				get_viewport().set_input_as_handled()
 				return
+		# CRASH-1: still click on the selected unit's current march dest is a
+		# no-op re-issue. Keep selection + order; do not open the inspector
+		# (Berlin star used to deselect and inspect).
+		if (
+			not event.ctrl_pressed
+			and not event.shift_pressed
+			and not event.alt_pressed
+			and _selected_unit_same_march_dest_click(world_pos)
+		):
+			get_viewport().set_input_as_handled()
+			return
 		# FIX #1: own land + N-hops preview dest → skip star / air-open /
 		# inspector so the still click commits like a non-capital province.
 		var mv1_commit: bool = (
@@ -19214,6 +19261,8 @@ func _try_open_land_chip_from_input(ctrl_click: bool = false, event: InputEvent 
 	# Esc helpers + Dig2 / Drag2+3 pan helpers untouched.
 	if _top_bar_owns_click() or _mouse_over_search_control() or _search_ui_owns_click() or _mouse_over_close_control() or _road_spine_btn_owns_click():
 		return false
+	if _unit_card_consumed_press or _unit_card_release_eaten:
+		return false
 	if _is_mouse_over_blocking_ui():
 		return false
 	if MapViewInput.modal_blocks_map_nav(get_viewport()):
@@ -19457,6 +19506,33 @@ func _mv1_selected_is_own_land() -> bool:
 	return _formation_is_player_tag(fo)
 
 
+func _selected_unit_march_dest_id() -> int:
+	if selected_formation_id.is_empty():
+		return -1
+	if typeof(FormationMovement) == TYPE_NIL:
+		return -1
+	var order: Dictionary = FormationMovement.get_march(selected_formation_id)
+	if order.is_empty():
+		return -1
+	return int(order.get("dest_id", -1))
+
+
+func _selected_unit_already_marching_to(dest_id: int) -> bool:
+	return dest_id > 0 and _selected_unit_march_dest_id() == dest_id
+
+
+func _selected_unit_same_march_dest_click(world_pos: Vector2) -> bool:
+	var dest: int = _selected_unit_march_dest_id()
+	if dest <= 0:
+		return false
+	if _capital_star_pid_at(world_pos) == dest:
+		return true
+	var pid: int = _resolve_map_pick_pid(world_pos)
+	if pid <= 0:
+		pid = _resolve_hex_pick_pid(world_pos)
+	return pid == dest
+
+
 func _mv1_selected_own_land_ready_to_commit(world_pos: Vector2) -> bool:
 	# Preview == commit: own land selected, chip shows N hops, dest is the
 	# hovered or clicked province. Skip air/fleet open so the province path
@@ -19538,7 +19614,7 @@ func _refresh_selected_unit_chip() -> void:
 		var counter: Node2D = n.get_node_or_null("DemoUnitIcon_" + str(id)) as Node2D
 		if counter == null or not is_instance_valid(counter):
 			continue
-		# free() same-frame so re-add is not renamed SelectedFrame2 (queue_free leaves sibling).
+		# Visual ring only — no button signals. Safe to free() after detach.
 		var old_sel: Node = counter.get_node_or_null("SelectedFrame")
 		if old_sel != null:
 			counter.remove_child(old_sel)
@@ -19608,6 +19684,10 @@ func _try_move_selected_unit_to_province(province: Province) -> bool:
 	var dest := province.id
 	if typeof(FormationMovement) == TYPE_NIL:
 		return false
+	# CRASH-1: same dest while already marching is a no-op re-issue (keep
+	# hop progress, do not duplicate MarchPathLine / _orders).
+	if _selected_unit_already_marching_to(dest):
+		return true
 	var res: Dictionary = FormationMovement.enqueue_own_land_march(fid, dest, p_tag)
 	_clear_march_preview()
 	if bool(res.get("already_here", false)):
@@ -19631,6 +19711,7 @@ func _try_move_selected_unit_to_province(province: Province) -> bool:
 		% [hops_n, "s" if hops_n != 1 else "", cal, "s" if cal != 1 else "", province.name],
 		5.0
 	)
+	_refresh_open_unit_card_for_selected()
 	return true
 
 
@@ -20144,6 +20225,7 @@ func _on_march_hop_ui(to_pid: int, arrived: bool, dest_id: int = -1, hop: Dictio
 		if arrived:
 			attack_staging_province_id = to_pid
 			debug_combat_attacker_province_id = to_pid
+		_refresh_open_unit_card_for_selected()
 		return
 	if arrived:
 		if _march_path_line != null and is_instance_valid(_march_path_line):
@@ -20156,6 +20238,7 @@ func _on_march_hop_ui(to_pid: int, arrived: bool, dest_id: int = -1, hop: Dictio
 	else:
 		_play_unit_loop_sfx("move", _formation_for_sfx())
 		_show_inspector_toast("Marching · now at %s" % pname, 2.8)
+	_refresh_open_unit_card_for_selected()
 
 
 func _pick_unit_formation_at_world(world_pos: Vector2, land_only: bool = false, player_only: bool = false) -> Object:
@@ -20242,13 +20325,15 @@ func _show_unit_detail_popup(formation: Object) -> void:
 	var ui := get_node_or_null("UI") as CanvasLayer
 	if ui == null:
 		return
-	# Replace previous card. Free immediately so the new node can keep the
-	# UnitDetailPopup name (queue_free same-frame left a queued sibling and
-	# get_node("UnitDetailPopup") missed the live card).
+	# Replace previous card. Never free() while a child button (Halt / Press /
+	# Hold / Withdraw / Assign) is still emitting pressed — that SIGSEGVs
+	# "object freed while a signal is being emitted". Detach + rename so
+	# queue_free cannot clash with the new UnitDetailPopup name this frame.
 	var old := ui.get_node_or_null("UnitDetailPopup")
 	if old != null:
 		ui.remove_child(old)
-		old.free()
+		old.name = "UnitDetailPopup_dying"
+		old.queue_free()
 
 	var name_s := "Unit"
 	if "name" in formation:
@@ -20471,11 +20556,14 @@ func _show_unit_detail_popup(formation: Object) -> void:
 		and bool(FormationMovement.has_march(fid))
 	if marching:
 		var halt_btn := Button.new()
+		halt_btn.name = "BtnHaltMarch"
 		halt_btn.text = "Halt march"
 		halt_btn.focus_mode = Control.FOCUS_NONE
+		halt_btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
 		halt_btn.tooltip_text = "Cancel the queued own-land march; stay on the current hex."
 		RetrowaveTheme.style_secondary_button(halt_btn)
 		halt_btn.pressed.connect(func() -> void:
+			_arm_unit_card_press_consume()
 			if typeof(FormationMovement) != TYPE_NIL:
 				FormationMovement.clear_march(fid)
 			if _march_path_line != null and is_instance_valid(_march_path_line):
@@ -20509,22 +20597,28 @@ func _show_unit_detail_popup(formation: Object) -> void:
 		var cur_st := str(bat.get("att_stance", "press"))
 		if BattleManager.has_method("set_land_battle_stance"):
 			var press_btn := Button.new()
+			press_btn.name = "BtnPressStance"
 			press_btn.text = "Press" if cur_st != "press" else "Press ●"
 			press_btn.focus_mode = Control.FOCUS_NONE
+			press_btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
 			press_btn.tooltip_text = "Hit harder, spend more org and equipment. Use to finish a breaking front."
 			RetrowaveTheme.style_secondary_button(press_btn)
 			press_btn.pressed.connect(func() -> void:
+				_arm_unit_card_press_consume()
 				var r: Dictionary = BattleManager.set_land_battle_stance(fid, "press")
 				_show_inspector_toast(str(r.get("next_hook", "Stance: Press")), 3.5)
 				_show_unit_detail_popup(formation)
 			)
 			stance_row.add_child(press_btn)
 			var hold_btn := Button.new()
+			hold_btn.name = "BtnHoldStance"
 			hold_btn.text = "Hold" if cur_st != "hold" else "Hold ●"
 			hold_btn.focus_mode = Control.FOCUS_NONE
+			hold_btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
 			hold_btn.tooltip_text = "Ease off. Less loss, slower fight. Wait for a reinforcing march."
 			RetrowaveTheme.style_secondary_button(hold_btn)
 			hold_btn.pressed.connect(func() -> void:
+				_arm_unit_card_press_consume()
 				var r2: Dictionary = BattleManager.set_land_battle_stance(fid, "hold")
 				_show_inspector_toast(str(r2.get("next_hook", "Stance: Hold")), 3.5)
 				_show_unit_detail_popup(formation)
@@ -20532,11 +20626,14 @@ func _show_unit_detail_popup(formation: Object) -> void:
 			stance_row.add_child(hold_btn)
 	if in_battle and typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("withdraw_from_land_battle"):
 		var wd_btn := Button.new()
+		wd_btn.name = "BtnWithdraw"
 		wd_btn.text = "Withdraw"
 		wd_btn.focus_mode = Control.FOCUS_NONE
+		wd_btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
 		wd_btn.tooltip_text = "Disengage this unit from the open land battle."
 		RetrowaveTheme.style_secondary_button(wd_btn)
 		wd_btn.pressed.connect(func() -> void:
+			_arm_unit_card_press_consume()
 			var wr: Dictionary = BattleManager.withdraw_from_land_battle(fid)
 			_sync_land_battle_bubbles()
 			_play_map_sfx("error")
@@ -20553,11 +20650,14 @@ func _show_unit_detail_popup(formation: Object) -> void:
 			var L: Variant = avail[0]
 			var lname := str(L.name) if L is Object and "name" in L else "leader"
 			var as_btn := Button.new()
+			as_btn.name = "BtnAssignLeader"
 			as_btn.text = "Assign %s" % lname
 			as_btn.focus_mode = Control.FOCUS_NONE
+			as_btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
 			as_btn.tooltip_text = "Assign an unused leader of this tag."
 			RetrowaveTheme.style_secondary_button(as_btn)
 			as_btn.pressed.connect(func() -> void:
+				_arm_unit_card_press_consume()
 				if formation != null and formation.has_method("assign_leader") and L is Object:
 					formation.assign_leader(L as Object)
 				_show_inspector_toast("Leader assigned · %s" % lname, 3.0)
@@ -20636,6 +20736,20 @@ func _show_unit_detail_popup(formation: Object) -> void:
 	)
 	_apply_unit_detail_popup_min_size(panel)
 	_hide_hover_tooltip()
+
+
+func _refresh_open_unit_card_for_selected() -> void:
+	# Keep Halt visible only while the selected unit is actually marching.
+	# Arrival / halt / re-target used to need a re-select (Play: Halt after arrival).
+	if not _unit_detail_popup_is_visible():
+		return
+	if selected_formation_id.is_empty():
+		return
+	if typeof(LeaderManager) == TYPE_NIL or not LeaderManager.has_method("get_formation"):
+		return
+	var fo: Variant = LeaderManager.get_formation(selected_formation_id)
+	if fo is Object:
+		_show_unit_detail_popup(fo as Object)
 
 
 func _unit_card_combat_strip_ready() -> bool:
@@ -25373,6 +25487,7 @@ func _unit_counter_designation(formation: Object) -> String:
 func _attach_unit_counter_chrome(counter: Node2D, ff: Object, nation_col: Color) -> void:
 	if counter == null:
 		return
+	# Chrome decorations only — no pressed signals into this rebuild. Safe free().
 	for child_name in ["NationPlate", "StatBars", "TypeLetter", "LeaderMark", "StrNum", "Designation", "CombatPulse", "TrainPulse"]:
 		var old_n := counter.get_node_or_null(child_name)
 		if old_n != null:
@@ -28372,6 +28487,7 @@ func _rebuild_demo_unit_icons(only_pids: Dictionary) -> void:
 		var n_clear: Node2D = province_nodes[id_clear] as Node2D
 		if n_clear == null:
 			continue
+		# Pin sprites — clicks go through MapRenderer._input, not icon signals.
 		for c in n_clear.get_children():
 			if str(c.name).begins_with("DemoUnitIcon_"):
 				n_clear.remove_child(c)
