@@ -74,6 +74,16 @@ func _on_boot_closed(_result: Dictionary) -> void:
 
 func _print_hits() -> void:
 	var win: Vector2i = DisplayServer.window_get_position()
+	var host: Window = null
+	if _title.has_method("live_host_window"):
+		host = _title.call("live_host_window") as Window
+	elif _title.get("_host") is Window:
+		host = _title.get("_host") as Window
+	if host != null and is_instance_valid(host):
+		win = host.position
+		print("LEAN_HOST_WINDOW=1 exclusive=%s size=%s pos=%s" % [str(host.exclusive), str(host.size), str(host.position)])
+	else:
+		print("LEAN_HOST_WINDOW=0 (CanvasLayer-only — live Play gap)")
 	var begin: Control = _title.find_child("LivingTitleBegin", true, false) as Control
 	var cc: Control = _title.find_child("LivingTitleCommandCenter", true, false) as Control
 	var chip: Control = _title.find_child("LivingTitleEscChip", true, false) as Control

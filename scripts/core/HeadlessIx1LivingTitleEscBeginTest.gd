@@ -135,6 +135,18 @@ func _test_source_live_input_routing() -> void:
 	if "left_column_is_begin" not in title_src:
 		_fail("LivingTitleBoot must treat the left title column as Begin for offset computerUse clicks")
 		return
+	if "func _attach_host_window" not in title_src or "LivingTitleHost" not in title_src:
+		_fail("LivingTitleBoot must host live title in a native Window (Play main-window clicks never arrive)")
+		return
+	if "exclusive = true" not in title_src or "func _on_host_close_requested" not in title_src:
+		_fail("LivingTitleHost must be exclusive and WM-close must Begin (not quit the game)")
+		return
+	if "func _hide_host_for_command_center" not in title_src:
+		_fail("LivingTitleHost must hide on Esc so Command Center is visible")
+		return
+	if "FLAG_ALWAYS_ON_TOP" in title_src and "_set_live_always_on_top(true)" in title_src:
+		_fail("Do not FLAG_ALWAYS_ON_TOP the main game window (Play Alt+Tab exit class)")
+		return
 	if "ACTION_MODE_BUTTON_PRESS" not in title_src:
 		_fail("Begin must fire on press (MapRenderer can swallow release as a map pick)")
 		return
@@ -274,6 +286,9 @@ func _test_source_live_input_routing() -> void:
 		return
 	if "_is_live_begin_key" not in ren:
 		_fail("MapRenderer must route Enter/Space/B to living-title Begin while title is up")
+		return
+	if "EOA_LIVE_HOST" not in title_src:
+		_fail("LivingTitleBoot must log EOA_LIVE_HOST when the native Window is attached")
 		return
 	_pass("source: live Esc/Begin routing (not layer-only)")
 
