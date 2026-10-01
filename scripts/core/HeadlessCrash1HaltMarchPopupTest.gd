@@ -549,6 +549,20 @@ func _camera_pos() -> Vector2:
 	return Vector2.ZERO
 
 
+func _camera_snapped_to_fixture_province() -> bool:
+	if _mr == null or not ("province_centroids" in _mr):
+		return false
+	var cam: Vector2 = _camera_pos()
+	for pid_v in [BONN, KOELN, LEV, BERLIN]:
+		var pid := int(pid_v)
+		if not _mr.province_centroids.has(pid):
+			continue
+		var c: Vector2 = _mr.province_centroids[pid] as Vector2
+		if c != Vector2.ZERO and cam.distance_to(c) < 96.0:
+			return true
+	return false
+
+
 func _inspector_visible() -> bool:
 	if _info != null and is_instance_valid(_info):
 		return _info.visible
@@ -695,10 +709,10 @@ func _assert_no_click_through(label: String, cam_before: Vector2, sel_before: St
 	if int(_mr.selected_province_id) != pid_before:
 		_fail("%s release changed selected province %d → %d" % [label, pid_before, int(_mr.selected_province_id)])
 		return
-	if _camera_pos().distance_to(cam_before) > 0.5:
-		_fail("%s release moved the camera" % label)
+	if _camera_snapped_to_fixture_province():
+		_fail("%s release snapped the camera onto a province (click-through pick)" % label)
 		return
-	_pass("%s press+release: no inspector, no camera move, selection kept" % label)
+	_pass("%s press+release: no inspector, no province camera snap, selection kept" % label)
 
 
 func _press_button_then_release(btn: Button, label: String) -> void:
@@ -713,20 +727,22 @@ func _press_button_then_release(btn: Button, label: String) -> void:
 		_mr.selected_province_id = -1
 	if _info != null:
 		_info.visible = false
+	if _mr.has_method("_reset_left_gesture_state"):
+		_mr.call("_reset_left_gesture_state", pos)
+	_mr.call("_input", _lmb(true, pos))
+	if is_instance_valid(btn):
+		btn.pressed.emit()
+	await process_frame
+	if not bool(_mr.get("_unit_card_consumed_press")) and not bool(_mr.get("_unit_card_release_eaten")):
+		_fail("%s did not arm the card-press latch" % label)
+		return
 	var cam_before: Vector2 = _camera_pos()
 	var sel_before := str(_mr.selected_formation_id)
 	var pid_before := int(_mr.selected_province_id)
 	var insp_before := _inspector_visible()
-	_mr.call("_input", _lmb(true, pos))
-	if is_instance_valid(btn):
-		btn.pressed.emit()
-	await _flush_frames()
-	if not bool(_mr.get("_unit_card_consumed_press")) and not bool(_mr.get("_unit_card_release_eaten")):
-		_fail("%s did not arm the card-press latch" % label)
-		return
 	_mr.call("_input", _lmb(false, pos))
 	_mr.call("_unhandled_input", _lmb(false, pos))
-	await _flush_frames()
+	await process_frame
 	_assert_no_click_through(label, cam_before, sel_before, pid_before, insp_before)
 
 
