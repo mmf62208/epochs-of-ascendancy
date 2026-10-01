@@ -1,9 +1,10 @@
 extends SceneTree
 
-## CRASH-1 halt-march popup + same-dest re-issue guard.
-## Opens the unit card on a marching unit, fires Halt pressed, waits frames,
-## asserts no crash / no "freed while signal", one live UnitDetailPopup, and
-## the march is cleared. Also: re-issuing the same dest is a no-op.
+## CRASH-1 halt-march popup + same-dest re-issue + FIX #1 release swallow.
+## Opens the unit card, fires Halt / Press / Hold / Withdraw / Assign on
+## press, rebuilds, then releases at the same screen pos. Asserts no
+## inspector, no camera move, selection unchanged. Also: Halt only while
+## marching (refresh on start / arrival / re-target).
 ## Does not load WorldMap.tscn / 3520 polygons.
 ##
 ##   tools/run_godot.sh --headless --path . -s res://scripts/core/HeadlessCrash1HaltMarchPopupTest.gd
@@ -16,16 +17,21 @@ const LEV := 710418
 const BERLIN := 710300
 const GER_TAG := "GER"
 const FID := "crash1_ger_halt"
+const FID_DECOY := "crash1_ger_decoy"
 const DESIGN := "infantry_1936"
 const SRC_REN := "res://scripts/map/MapRenderer.gd"
 const FLUSH_FRAMES := 8
+const LEADER_ID := "crash1_ger_leader"
 
 var _failures := 0
 var _lm: Node = null
 var _mm: Node = null
+var _bm: Node = null
 var _mr: Node = null
 var _ui: CanvasLayer = null
 var _mv: Script = null
+var _cam: Camera2D = null
+var _info: Panel = null
 
 
 func _init() -> void:
@@ -114,6 +120,8 @@ func _run() -> void:
 	await _test_halt_pressed_no_free_during_signal()
 	_test_same_dest_reissue_is_noop()
 	_test_retarget_other_province()
+	await _test_card_refresh_on_march_start_end()
+	await _test_five_button_release_does_not_click_through()
 	_cleanup()
 
 
@@ -145,7 +153,46 @@ func _test_source_needles() -> void:
 	if "_selected_unit_same_march_dest_click(world_pos)" not in ren:
 		_fail("still-click path must consume same-dest re-issue before the star inspector")
 		return
-	_pass("popup detach+queue_free; same-dest no-op needles")
+	if "_arm_unit_card_press_consume()" not in show_pop:
+		_fail("unit-card buttons must arm the press-consume latch")
+		return
+	if show_pop.count("_arm_unit_card_press_consume()") < 5:
+		_fail("Halt/Press/Hold/Withdraw/Assign must each arm the latch")
+		return
+	if "BtnPressStance" not in show_pop or "BtnHoldStance" not in show_pop:
+		_fail("Press/Hold buttons must be named for the guard")
+		return
+	if "BtnWithdraw" not in show_pop or "BtnAssignLeader" not in show_pop:
+		_fail("Withdraw/Assign buttons must be named for the guard")
+		return
+	if "ACTION_MODE_BUTTON_PRESS" not in show_pop:
+		_fail("card command buttons must fire on press")
+		return
+	var input_fn := _slice_func(ren, "_input")
+	var unh_fn := _slice_func(ren, "_unhandled_input")
+	var skip_fn := _slice_func(ren, "_left_release_must_skip_pick")
+	var chip_fn := _slice_func(ren, "_try_open_land_chip_from_input")
+	if "_consume_unit_card_press_release_if_armed()" not in input_fn:
+		_fail("_input must swallow the matching card-button release")
+		return
+	if "_consume_unit_card_press_release_if_armed()" not in unh_fn:
+		_fail("_unhandled_input must swallow the matching card-button release")
+		return
+	if "_unit_card_consumed_press" not in skip_fn:
+		_fail("_left_release_must_skip_pick must honor the card-press latch")
+		return
+	if "_unit_card_consumed_press" not in chip_fn:
+		_fail("land-chip still-click must honor the card-press latch")
+		return
+	var move_full := _slice_func(ren, "_try_move_selected_unit_to_province")
+	var hop_fn := _slice_func(ren, "_on_march_hop_ui")
+	if "_refresh_open_unit_card_for_selected()" not in move_full:
+		_fail("march start/re-target must refresh the open unit card")
+		return
+	if "_refresh_open_unit_card_for_selected()" not in hop_fn:
+		_fail("march hop/arrival must refresh the open unit card")
+		return
+	_pass("popup detach+queue_free; same-dest no-op; release-latch; card-refresh needles")
 
 
 func _setup_nuts3_fixture() -> bool:
@@ -268,7 +315,19 @@ func _setup_map_renderer() -> bool:
 	_ui = CanvasLayer.new()
 	_ui.name = "UI"
 	_mr.add_child(_ui)
+	_info = Panel.new()
+	_info.name = "InfoPanel"
+	_info.visible = false
+	_info.size = Vector2(280, 200)
+	_ui.add_child(_info)
+	_mr.set("info_panel", _info)
+	_cam = Camera2D.new()
+	_cam.name = "MapCamera"
+	_cam.position = Vector2(400, 300)
+	_cam.enabled = true
+	_mr.add_child(_cam)
 	root.add_child(_mr)
+	_cam.make_current()
 	var pids: Array = [BONN, KOELN, LEV, BERLIN]
 	for pid_v in pids:
 		var pid := int(pid_v)
@@ -324,19 +383,23 @@ func _count_named(parent: Node, prefix: String) -> int:
 	return n
 
 
-func _find_halt_btn() -> Button:
+func _find_card_btn(node_name: String, text_prefix: String) -> Button:
 	if _ui == null:
 		return null
 	var pop: Node = _ui.get_node_or_null("UnitDetailPopup")
 	if pop == null:
 		return null
-	var named: Button = pop.find_child("BtnHaltMarch", true, false) as Button
+	var named: Button = pop.find_child(node_name, true, false) as Button
 	if named != null:
 		return named
 	for n in pop.find_children("*", "Button", true, false):
-		if n is Button and str((n as Button).text) == "Halt march":
+		if n is Button and str((n as Button).text).begins_with(text_prefix):
 			return n as Button
 	return null
+
+
+func _find_halt_btn() -> Button:
+	return _find_card_btn("BtnHaltMarch", "Halt march")
 
 
 func _flush_frames() -> void:
@@ -462,10 +525,285 @@ func _test_retarget_other_province() -> void:
 	_pass("different province still re-targets the march")
 
 
+func _lmb(pressed: bool, pos: Vector2) -> InputEventMouseButton:
+	var ev := InputEventMouseButton.new()
+	ev.button_index = MOUSE_BUTTON_LEFT
+	ev.pressed = pressed
+	ev.position = pos
+	ev.global_position = pos
+	return ev
+
+
+func _button_screen_pos(btn: Button) -> Vector2:
+	if btn == null:
+		return Vector2(97, 731)
+	var r: Rect2 = btn.get_global_rect()
+	if r.size.x > 1.0 and r.size.y > 1.0:
+		return r.position + r.size * 0.5
+	return btn.position + Vector2(24, 10)
+
+
+func _camera_pos() -> Vector2:
+	if _cam != null and is_instance_valid(_cam):
+		return _cam.global_position
+	return Vector2.ZERO
+
+
+func _inspector_visible() -> bool:
+	if _info != null and is_instance_valid(_info):
+		return _info.visible
+	return false
+
+
+func _seed_leader() -> void:
+	if _lm == null or not ("leaders" in _lm):
+		return
+	var L: Object = _new_obj("res://scripts/leaders/Leader.gd")
+	if L == null:
+		return
+	L.set("leader_id", LEADER_ID)
+	L.set("name", "Test General")
+	L.set("country_tag", GER_TAG)
+	L.set("assigned_army_id", "")
+	L.set("is_injured", false)
+	L.set("is_deceased", false)
+	L.set("is_retired", false)
+	L.set("is_captured", false)
+	_lm.leaders[LEADER_ID] = L
+
+
+func _seed_decoy_formation() -> Object:
+	var f: Object = _new_obj("res://scripts/formations/Formation.gd")
+	if f == null:
+		return null
+	f.set("formation_id", FID_DECOY)
+	f.set("country_tag", GER_TAG)
+	f.set("formation_type", "division")
+	f.set("design_id", DESIGN)
+	f.set("stationed_province_id", LEV)
+	f.set("strength", 1.0)
+	f.set("organization", 1.0)
+	f.set("readiness", 1.0)
+	f.set("name", "Division 0")
+	if "formations" in _lm:
+		_lm.formations[FID_DECOY] = f
+	return f
+
+
+func _place_decoy_chip_at_screen(screen: Vector2) -> void:
+	if _mr == null:
+		return
+	var decoy: Object = _formation_by_id(FID_DECOY)
+	if decoy == null:
+		decoy = _seed_decoy_formation()
+	if decoy == null:
+		return
+	var world: Vector2 = _mr.call("_screen_to_world", screen) as Vector2
+	var host: Node2D = null
+	if "province_nodes" in _mr and _mr.province_nodes.has(LEV):
+		host = _mr.province_nodes[LEV] as Node2D
+	if host == null:
+		return
+	var old: Node = host.get_node_or_null("DemoUnitIcon_%d" % LEV)
+	if old != null:
+		old.free()
+	var icon := Node2D.new()
+	icon.name = "DemoUnitIcon_%d" % LEV
+	icon.visible = true
+	host.add_child(icon)
+	icon.global_position = world
+	icon.set_meta("formation", decoy)
+	icon.set_meta("formation_id", FID_DECOY)
+	if "show_unit_counters" in _mr:
+		_mr.show_unit_counters = true
+	if "_demo_unit_icon_pids" in _mr:
+		var pids: Array = _mr._demo_unit_icon_pids
+		if not pids.has(LEV):
+			pids.append(LEV)
+			_mr._demo_unit_icon_pids = pids
+
+
+func _formation_by_id(fid: String) -> Object:
+	if _lm != null and _lm.has_method("get_formation"):
+		return _lm.call("get_formation", fid)
+	if _lm != null and "formations" in _lm:
+		return _lm.formations.get(fid)
+	return null
+
+
+func _inject_open_battle() -> void:
+	_bm = _autoload("BattleManager")
+	if _bm == null or not ("_open_land_battles" in _bm):
+		return
+	var rows: Array = _bm._open_land_battles
+	for raw in rows:
+		if raw is Dictionary and str((raw as Dictionary).get("att_fid", "")) == FID:
+			return
+	rows.append({
+		"id": "lb_crash1",
+		"from_id": BONN,
+		"to_id": BERLIN,
+		"att_tag": GER_TAG,
+		"def_tag": "FRA",
+		"att_fid": FID,
+		"def_fid": "crash1_fra_def",
+		"att_fids": [FID],
+		"def_fids": ["crash1_fra_def"],
+		"att_n": 1,
+		"def_n": 1,
+		"att_org": 1.0,
+		"def_org": 1.0,
+		"att_stance": "press",
+		"days_elapsed": 0,
+		"next_hook": "Unpause to fight · Press or Hold",
+	})
+	_bm._open_land_battles = rows
+
+
+func _clear_injected_battle() -> void:
+	if _bm == null or not ("_open_land_battles" in _bm):
+		return
+	var kept: Array = []
+	for raw in _bm._open_land_battles:
+		if raw is Dictionary and str((raw as Dictionary).get("id", "")) == "lb_crash1":
+			continue
+		kept.append(raw)
+	_bm._open_land_battles = kept
+
+
+func _show_selected_card() -> void:
+	var fo: Object = _formation()
+	if fo == null or _mr == null:
+		return
+	if "selected_formation_id" in _mr:
+		_mr.selected_formation_id = FID
+	_mr.call("_show_unit_detail_popup", fo)
+
+
+func _assert_no_click_through(label: String, cam_before: Vector2, sel_before: String, pid_before: int, insp_before: bool) -> void:
+	if bool(_mr.get("_unit_card_consumed_press")):
+		_fail("%s latch still armed after release" % label)
+	if str(_mr.selected_formation_id) != sel_before:
+		_fail("%s release changed selection %s → %s" % [label, sel_before, str(_mr.selected_formation_id)])
+		return
+	if str(_mr.selected_formation_id) == FID_DECOY:
+		_fail("%s release selected the decoy unit" % label)
+		return
+	if _inspector_visible() and not insp_before:
+		_fail("%s release opened the inspector" % label)
+		return
+	if int(_mr.selected_province_id) != pid_before:
+		_fail("%s release changed selected province %d → %d" % [label, pid_before, int(_mr.selected_province_id)])
+		return
+	if _camera_pos().distance_to(cam_before) > 0.5:
+		_fail("%s release moved the camera" % label)
+		return
+	_pass("%s press+release: no inspector, no camera move, selection kept" % label)
+
+
+func _press_button_then_release(btn: Button, label: String) -> void:
+	if btn == null:
+		_fail("%s button missing on card" % label)
+		return
+	var pos: Vector2 = _button_screen_pos(btn)
+	_place_decoy_chip_at_screen(pos)
+	if "selected_formation_id" in _mr:
+		_mr.selected_formation_id = FID
+	if "selected_province_id" in _mr:
+		_mr.selected_province_id = -1
+	if _info != null:
+		_info.visible = false
+	var cam_before: Vector2 = _camera_pos()
+	var sel_before := str(_mr.selected_formation_id)
+	var pid_before := int(_mr.selected_province_id)
+	var insp_before := _inspector_visible()
+	_mr.call("_input", _lmb(true, pos))
+	if is_instance_valid(btn):
+		btn.pressed.emit()
+	await _flush_frames()
+	if not bool(_mr.get("_unit_card_consumed_press")) and not bool(_mr.get("_unit_card_release_eaten")):
+		_fail("%s did not arm the card-press latch" % label)
+		return
+	_mr.call("_input", _lmb(false, pos))
+	_mr.call("_unhandled_input", _lmb(false, pos))
+	await _flush_frames()
+	_assert_no_click_through(label, cam_before, sel_before, pid_before, insp_before)
+
+
+func _test_card_refresh_on_march_start_end() -> void:
+	_fm("clear_march", FID)
+	var fo: Object = _formation()
+	if fo != null:
+		fo.set("stationed_province_id", BONN)
+	if "selected_formation_id" in _mr:
+		_mr.selected_formation_id = FID
+	_mr.call("_show_unit_detail_popup", fo)
+	if _find_halt_btn() != null:
+		_fail("Halt must be absent before a march starts")
+		return
+	var dest_p: Object = _koeln_province()
+	if dest_p == null:
+		_fail("Köln missing for card-refresh")
+		return
+	if not bool(_mr.call("_try_move_selected_unit_to_province", dest_p)):
+		_fail("march start for card-refresh failed")
+		return
+	if _find_halt_btn() == null:
+		_fail("open card must show Halt after march start (no re-select)")
+		return
+	var lev_p: Object = _lev_province()
+	if lev_p != null:
+		if not bool(_mr.call("_try_move_selected_unit_to_province", lev_p)):
+			_fail("re-target for card-refresh failed")
+			return
+		if _find_halt_btn() == null:
+			_fail("open card must keep Halt after re-target")
+			return
+	_fm("clear_march", FID)
+	_mr.call("_on_march_hop_ui", LEV, true)
+	await _flush_frames()
+	if _find_halt_btn() != null:
+		_fail("open card must drop Halt after arrival")
+		return
+	_pass("open card refreshes Halt on start / re-target / arrival")
+
+
+func _test_five_button_release_does_not_click_through() -> void:
+	_seed_leader()
+	_seed_decoy_formation()
+	_inject_open_battle()
+	_fm("enqueue_own_land_march", FID, KOELN, GER_TAG)
+	if "selected_formation_id" in _mr:
+		_mr.selected_formation_id = FID
+	_show_selected_card()
+	await _press_button_then_release(_find_halt_btn(), "Halt")
+	_fm("enqueue_own_land_march", FID, KOELN, GER_TAG)
+	_inject_open_battle()
+	_show_selected_card()
+	await _press_button_then_release(_find_card_btn("BtnPressStance", "Press"), "Press")
+	_inject_open_battle()
+	_show_selected_card()
+	await _press_button_then_release(_find_card_btn("BtnHoldStance", "Hold"), "Hold")
+	_inject_open_battle()
+	_show_selected_card()
+	await _press_button_then_release(_find_card_btn("BtnWithdraw", "Withdraw"), "Withdraw")
+	_seed_leader()
+	if _formation() != null:
+		_formation().set("leader_id", "")
+	_show_selected_card()
+	await _press_button_then_release(_find_card_btn("BtnAssignLeader", "Assign"), "Assign")
+	_clear_injected_battle()
+	_fm("clear_march", FID)
+
+
 func _cleanup() -> void:
 	_fm("clear_march", FID)
+	_clear_injected_battle()
 	if _lm != null and "formations" in _lm and _lm.formations is Dictionary:
 		_lm.formations.erase(FID)
+		_lm.formations.erase(FID_DECOY)
+	if _lm != null and "leaders" in _lm and _lm.leaders is Dictionary:
+		_lm.leaders.erase(LEADER_ID)
 	if _mr != null and is_instance_valid(_mr):
 		_mr.queue_free()
 		_mr = null
