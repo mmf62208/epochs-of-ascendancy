@@ -200,12 +200,7 @@ func _setup_nuts3_fixture() -> bool:
 	if not _edge(BONN, KOELN) or not _edge(KOELN, LEV):
 		_fail("fixture missing Bonn–Köln / Köln–Leverkusen")
 		return false
-	if "_centroids" in _mm:
-		var cents: Dictionary = _mm.get("_centroids")
-		cents[BONN] = WORLD_HOME
-		cents[KOELN] = WORLD_X
-		cents[LEV] = WORLD_Y
-		_mm.set("_centroids", cents)
+	_force_centroids()
 	_pass("nuts3 fixture Bonn/Köln/Leverkusen (X=Köln Y=Leverkusen)")
 	return true
 
@@ -299,8 +294,26 @@ func _setup_map_renderer() -> bool:
 			_mr.province_nodes[pid] = node
 		if "province_centroids" in _mr:
 			_mr.province_centroids[pid] = placed[pid] as Vector2
+	_force_centroids()
 	_pass("MapRenderer + centroids X=Köln Y=Leverkusen")
 	return true
+
+
+func _force_centroids() -> void:
+	# Fixture has no real polygons. Drop the empty pick grid so GIS is
+	# nearest-centroid (WORLD_X=Köln, WORLD_Y=Leverkusen).
+	if _mm != null and "pick_grid" in _mm:
+		_mm.pick_grid = null
+	if _mm != null and "_centroids" in _mm:
+		var cents: Dictionary = _mm.get("_centroids")
+		cents[BONN] = WORLD_HOME
+		cents[KOELN] = WORLD_X
+		cents[LEV] = WORLD_Y
+		_mm.set("_centroids", cents)
+	if _mr != null and "province_centroids" in _mr:
+		_mr.province_centroids[BONN] = WORLD_HOME
+		_mr.province_centroids[KOELN] = WORLD_X
+		_mr.province_centroids[LEV] = WORLD_Y
 
 
 func _formation() -> Object:
@@ -337,8 +350,15 @@ func _seed_stale_preview_x() -> void:
 
 func _test_stale_hover_commit_15x() -> void:
 	_seed_stale_preview_x()
+	_force_centroids()
+	var pick_x := -1
+	if _mm != null and _mm.has_method("get_province_at_world_pos"):
+		pick_x = int(_mm.call("get_province_at_world_pos", WORLD_X, true))
+	if pick_x != KOELN:
+		_fail("GIS at X want Köln %d got %d" % [KOELN, pick_x])
+		return
 	if bool(_mr.call("_mv1_preview_dest_matches_world", WORLD_X)) != true:
-		_fail("dest_matches(X) must stay true for the preview dest")
+		_fail("dest_matches(X) must stay true for the preview dest (pick=%d dest=%d)" % [pick_x, KOELN])
 		return
 	if bool(_mr.call("_mv1_preview_dest_matches_world", WORLD_Y)):
 		_fail("dest_matches(Y) must not trust stale hover/cache dest X")
@@ -357,6 +377,7 @@ func _test_stale_hover_commit_15x() -> void:
 		var fo: Object = _formation()
 		if fo != null:
 			fo.set("stationed_province_id", BONN)
+		_force_centroids()
 		_seed_stale_preview_x()
 		var screen_x: Vector2 = _world_to_screen(WORLD_X)
 		var screen_y: Vector2 = _world_to_screen(WORLD_Y)

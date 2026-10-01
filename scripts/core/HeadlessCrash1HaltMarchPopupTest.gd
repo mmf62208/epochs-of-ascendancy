@@ -201,6 +201,9 @@ func _test_source_needles() -> void:
 	if "_unit_card_eaten_frame" not in consume_fn:
 		_fail("consume must drop the latch after the matching release frame")
 		return
+	if "_clear_unit_card_eaten_after_matching_release" not in consume_fn:
+		_fail("consume must deferred-clear eaten after the matching release")
+		return
 	var move_full := _slice_func(ren, "_try_move_selected_unit_to_province")
 	var hop_fn := _slice_func(ren, "_on_march_hop_ui")
 	if "_refresh_open_unit_card_for_selected()" not in move_full:

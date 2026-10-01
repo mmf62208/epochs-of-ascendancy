@@ -1619,14 +1619,20 @@ func _clear_unit_card_press_consume_on_new_left_press() -> void:
 		_clear_unit_card_press_consume_latch()
 
 
+func _clear_unit_card_eaten_after_matching_release() -> void:
+	# Idle/deferred: drop eaten after `_unhandled_input` has seen THIS release.
+	if _unit_card_release_eaten and not _unit_card_consumed_press:
+		_clear_unit_card_press_consume_latch()
+
+
 func _tick_unit_card_press_consume_latch(delta: float) -> void:
+	if _unit_card_release_eaten and not _unit_card_consumed_press:
+		# Next process after the matching release — never linger into later UI ups.
+		_clear_unit_card_press_consume_latch()
+		return
 	if _unit_card_consumed_press:
 		_unit_card_latch_arm_sec += delta
 		if _unit_card_latch_arm_sec >= UNIT_CARD_LATCH_SAFETY_SEC:
-			_clear_unit_card_press_consume_latch()
-			return
-	if _unit_card_release_eaten and _unit_card_eaten_frame >= 0:
-		if Engine.get_process_frames() > _unit_card_eaten_frame:
 			_clear_unit_card_press_consume_latch()
 
 
@@ -1665,6 +1671,7 @@ func _consume_unit_card_press_release_if_armed() -> bool:
 	var vp: Viewport = get_viewport()
 	if vp != null:
 		vp.set_input_as_handled()
+	call_deferred("_clear_unit_card_eaten_after_matching_release")
 	return true
 
 
