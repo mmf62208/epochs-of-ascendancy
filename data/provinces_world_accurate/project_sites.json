@@ -1,6 +1,40 @@
 {
-  "sites": [],
+  "sites": [
+    {
+      "province_id": 710430,
+      "project_type": "airfield",
+      "site_id": "airfield_tier_1",
+      "tier": 1,
+      "construction_state": "COMPLETED",
+      "damage_level": 0
+    },
+    {
+      "province_id": 710434,
+      "project_type": "airfield",
+      "site_id": "airfield_tier_2",
+      "tier": 2,
+      "construction_state": "COMPLETED",
+      "damage_level": 0
+    },
+    {
+      "province_id": 710423,
+      "project_type": "airfield",
+      "site_id": "airfield_tier_3",
+      "tier": 3,
+      "construction_state": "COMPLETED",
+      "damage_level": 0
+    },
+    {
+      "province_id": 710451,
+      "project_type": "airfield",
+      "site_id": "airfield_tier_4",
+      "tier": 4,
+      "construction_state": "COMPLETED",
+      "damage_level": 0
+    }
+  ],
   "meta": {
-    "source": "stub_world_accurate"
+    "source": "fac1a_rhineland_airfields_fix3",
+    "note": "FAC-1a FIX #3 Rhineland seeds: Borken L1, Warendorf L2, Oberbergischer Kreis L3, Siegen-Wittgenstein L4. Intact. Default world_accurate. Neuwied/Viersen/Hunsr\u00fcck/Kreuznach cannot-fit."
   }
 }

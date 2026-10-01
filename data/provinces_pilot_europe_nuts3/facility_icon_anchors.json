@@ -1,0 +1,157 @@
+{
+  "anchors": {
+    "710423": {
+      "centroid_raw": [
+        4265.9367080704815,
+        941.716135920074
+      ],
+      "counter_dist": 4.586490390801165,
+      "edge_dist": 1.683278417255307,
+      "full_disc_ok_zooms": [],
+      "name": "Oberbergischer Kreis",
+      "pid": 710423,
+      "raw": [
+        4270.29,
+        943.16
+      ],
+      "rhine_dist": 14.26543024237263,
+      "spine_dist": 15.216648294092392,
+      "tier": 3,
+      "world": [
+        7379.06112,
+        1629.78048
+      ]
+    },
+    "710430": {
+      "centroid_raw": [
+        4252.325264416806,
+        914.6742503851686
+      ],
+      "counter_dist": 4.06974222216158,
+      "edge_dist": 3.6064809478594717,
+      "full_disc_ok_zooms": [],
+      "name": "Borken",
+      "pid": 710430,
+      "raw": [
+        4254.63,
+        911.32
+      ],
+      "rhine_dist": 15.207557331800583,
+      "spine_dist": 29.676390116647596,
+      "tier": 1,
+      "world": [
+        7352.00064,
+        1574.76096
+      ]
+    },
+    "710434": {
+      "centroid_raw": [
+        4276.175610234517,
+        917.3476358161618
+      ],
+      "counter_dist": 0.4843567612577405,
+      "edge_dist": 4.712961714776666,
+      "full_disc_ok_zooms": [
+        3.0
+      ],
+      "name": "Warendorf",
+      "pid": 710434,
+      "raw": [
+        4276.64,
+        917.21
+      ],
+      "rhine_dist": 30.321140084106652,
+      "spine_dist": 32.235142081168384,
+      "tier": 2,
+      "world": [
+        7390.033920000001,
+        1584.9388800000002
+      ]
+    },
+    "710451": {
+      "centroid_raw": [
+        4281.58192640207,
+        945.2379935304374
+      ],
+      "counter_dist": 6.103969748236185,
+      "edge_dist": 2.153745244208983,
+      "full_disc_ok_zooms": [],
+      "name": "Siegen-Wittgenstein",
+      "pid": 710451,
+      "raw": [
+        4286.75,
+        941.99
+      ],
+      "rhine_dist": 26.149878003139968,
+      "spine_dist": 31.038962188223667,
+      "tier": 4,
+      "world": [
+        7407.504,
+        1627.75872
+      ]
+    }
+  },
+  "cannot_fit": [
+    {
+      "name": "Neuwied",
+      "pid": 710460,
+      "reason": "rhine_through_province"
+    },
+    {
+      "name": "Viersen",
+      "pid": 710414,
+      "reason": "nld_border_and_full_disc"
+    },
+    {
+      "name": "Rhein-Hunsr\u00fcck-Kreis",
+      "pid": 710464,
+      "reason": "rhine_course_short"
+    },
+    {
+      "name": "Bad Kreuznach",
+      "pid": 710457,
+      "reason": "lux_capital_star_disk"
+    },
+    {
+      "edge_world": 6.231999077901167,
+      "name": "Borken",
+      "need_world": 24.193548387096776,
+      "pid": 710430,
+      "reason": "full_disc_exceeds_inradius"
+    },
+    {
+      "edge_world": 2.9087051050171704,
+      "name": "Oberbergischer Kreis",
+      "need_world": 24.193548387096776,
+      "pid": 710423,
+      "reason": "full_disc_exceeds_inradius"
+    },
+    {
+      "edge_world": 3.721671781993123,
+      "name": "Siegen-Wittgenstein",
+      "need_world": 24.193548387096776,
+      "pid": 710451,
+      "reason": "full_disc_exceeds_inradius"
+    }
+  ],
+  "cluster_need_world": 36.45161290322581,
+  "cluster_pair_raw": 16.50153023207245,
+  "disc_need_world": 24.193548387096776,
+  "min_pair_world_raw": 16.50153023207245,
+  "names": {
+    "710423": "Oberbergischer Kreis",
+    "710430": "Borken",
+    "710434": "Warendorf",
+    "710451": "Siegen-Wittgenstein"
+  },
+  "ok": true,
+  "reasons": [],
+  "seeds": {
+    "710423": 3,
+    "710430": 1,
+    "710434": 2,
+    "710451": 4
+  },
+  "source": "fac1a_fix3_rhineland_anchors",
+  "theater_scale": 1.728
+}

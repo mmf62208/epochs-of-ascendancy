@@ -2648,7 +2648,7 @@ func _input(event: InputEvent) -> void:
 					elif (
 						not event.shift_pressed
 						and not event.alt_pressed
-						and _try_open_land_chip_from_input(event.ctrl_pressed)
+						and _try_open_land_chip_from_input(event.ctrl_pressed, event)
 					):
 						# Still-click land chip in `_input` so ProvinceHoverTooltip
 						# cannot steal GER Division Fill%/TOE (Play DIG FAIL).
@@ -3046,7 +3046,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				get_viewport().set_input_as_handled()
 				return
 		_release_search_focus()
-		var world_pos := _screen_to_world(get_viewport().get_mouse_position())
+		var world_pos := _map_pick_world_from_event(event)
 		# Living title owns map clicks: never open inspector / chips / assault (window-exit class).
 		if _living_title_boot_is_up():
 			var title_pid := _resolve_map_pick_pid(world_pos)
@@ -3138,13 +3138,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			if _try_open_unit_at_world(world_pos):
 				get_viewport().set_input_as_handled()
 				return
-		var pid := -1
-		if mv1_commit and _march_preview_cache_dest > 0:
-			pid = _march_preview_cache_dest
-		elif typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_at_world_pos"):
-			pid = MapManager.get_province_at_world_pos(world_pos, true)
-			if MapManager.has_method("resolve_pick_province_id"):
-				pid = MapManager.resolve_pick_province_id(pid)
+		var pid: int = _still_click_province_pid(world_pos, mv1_commit)
 		if pid < 0 or not provinces.has(pid):
 			# Coarse world territory fallback: when no detailed province (e.g. panned to Africa/Aus/E Asia on stitched world grand), hit large strategic region for "click to get into".
 			# Gives grand strategy world map the feel that every area has a clickable territory/region, even if detailed provs are Europe-focused for current scenario.
@@ -3551,6 +3545,21 @@ func _zoom_toward_mouse(zoom_change: float) -> void:
 		"EOA_ZOOM_END who=MapRenderer._zoom_toward_mouse z=%.3f ok=1"
 		% new_zoom.x
 	)
+
+## Press/release pick uses the event's own position so a lagged
+## get_viewport().get_mouse_position() cannot steal the click (FAC-1a FIX #7).
+func _map_pick_screen_pos(event: InputEvent) -> Vector2:
+	if event is InputEventMouse:
+		return (event as InputEventMouse).position
+	var vp := get_viewport()
+	if vp != null:
+		return vp.get_mouse_position()
+	return Vector2.ZERO
+
+
+func _map_pick_world_from_event(event: InputEvent) -> Vector2:
+	return _screen_to_world(_map_pick_screen_pos(event))
+
 
 ## Converts screen (pixel) mouse position to world/map space using the active Camera2D.
 ## This is the key bridge for using MapPickGrid / MapManager picking.
@@ -14132,6 +14141,9 @@ func _apply_map_mode_visuals() -> void:
 	var ol_infra2 := get_overlay_layer("InfrastructureOverlayLayer")
 	if ol_infra2 != null and ol_infra2.has_method("queue_redraw"):
 		ol_infra2.queue_redraw()
+	var ol_fac := get_overlay_layer("FacilityIconLayer")
+	if ol_fac != null and ol_fac.has_method("queue_redraw"):
+		ol_fac.queue_redraw()
 	if info_panel and info_panel is CanvasItem and info_panel.visible and selected_province_id >= 0 and provinces.has(selected_province_id):
 		show_info_panel(provinces[selected_province_id])
 	if m in ["occupation", "resistance", "compliance"]:
@@ -14941,6 +14953,7 @@ func _render_provinces_finish(raster_preserved: Dictionary) -> void:
 	var ol_glyphs := get_overlay_layer("InfrastructureOverlayLayer")
 	if ol_glyphs != null and ol_glyphs.has_method("set_map_mode_for_glyphs"):
 		ol_glyphs.call("set_map_mode_for_glyphs", current_map_mode)
+	_setup_facility_icon_layer()
 	_setup_rx1_rhine_layer()
 	call_deferred("_setup_terrain_layer_stack")
 	call_deferred("_setup_weather_overlay_layer")
@@ -19075,17 +19088,47 @@ func _capital_star_pid_at(world_pos: Vector2) -> int:
 	return int(MapManager.prefer_capital_province_at(world_pos, -1))
 
 
-## Same resolve for hover tooltip and click (capital star disk, then hex pick).
+## Same resolve for hover tooltip and click (capital star disk, then facility icon, then hex pick).
 func _resolve_map_pick_pid(world_pos: Vector2) -> int:
 	var star_pid := _capital_star_pid_at(world_pos)
 	if star_pid > 0:
 		return star_pid
+	var fac_pid := _facility_icon_pid_at(world_pos)
+	if fac_pid > 0:
+		return fac_pid
 	var pid := -1
 	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_at_world_pos"):
 		pid = MapManager.get_province_at_world_pos(world_pos, true)
 		if MapManager.has_method("resolve_pick_province_id"):
 			pid = MapManager.resolve_pick_province_id(pid)
 	return pid
+
+
+## FIX #5: a facility icon at the click point overrides a stale hover / cache dest.
+## Miss of every facility rect keeps the MV-1 cache-dest / GIS path as on base.
+func _still_click_province_pid(world_pos: Vector2, mv1_commit: bool) -> int:
+	var fac_click: int = _facility_icon_pid_at(world_pos)
+	if fac_click > 0:
+		return fac_click
+	if mv1_commit and _march_preview_cache_dest > 0:
+		return _march_preview_cache_dest
+	var pid := _resolve_map_pick_pid(world_pos)
+	if pid <= 0 and typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_at_world_pos"):
+		pid = MapManager.get_province_at_world_pos(world_pos, true)
+		if MapManager.has_method("resolve_pick_province_id"):
+			pid = MapManager.resolve_pick_province_id(pid)
+	return pid
+
+
+## Drawn facility icon / badge / cluster rects from FacilityIconLayer._draw layout.
+## Hidden layer (P, F9, below site zoom) owns no clicks. Miss is -1.
+func _facility_icon_pid_at(world_pos: Vector2) -> int:
+	var ol := get_overlay_layer("FacilityIconLayer")
+	if ol == null or not is_instance_valid(ol):
+		return -1
+	if ol.has_method("hit_test_world"):
+		return int(ol.call("hit_test_world", world_pos))
+	return -1
 
 
 ## Hex/land under cursor only — no capital-star prefer.
@@ -19165,7 +19208,7 @@ func _try_switch_own_land_counter_at_world(world_pos: Vector2) -> bool:
 	return true
 
 
-func _try_open_land_chip_from_input(ctrl_click: bool = false) -> bool:
+func _try_open_land_chip_from_input(ctrl_click: bool = false, event: InputEvent = null) -> bool:
 	# `_input` still-click path: beat GUI so a follow-mouse glance card cannot
 	# swallow GER Division. Search / Close / unit-card / modal stay theirs.
 	# Esc helpers + Dig2 / Drag2+3 pan helpers untouched.
@@ -19180,12 +19223,12 @@ func _try_open_land_chip_from_input(ctrl_click: bool = false) -> bool:
 	# on its own province) — not a re-arm. Ctrl stays assault / Open fight.
 	# `_try_open_land_unit_at_world` is unchanged (first-select fallback stays).
 	if not selected_formation_id.is_empty() and not ctrl_click:
-		var world_pos_sw: Vector2 = _screen_to_world(get_viewport().get_mouse_position())
+		var world_pos_sw: Vector2 = _screen_to_world(_map_pick_screen_pos(event))
 		if _try_switch_own_land_counter_at_world(world_pos_sw):
 			get_viewport().set_input_as_handled()
 			return true
 		return false
-	var world_pos: Vector2 = _screen_to_world(get_viewport().get_mouse_position())
+	var world_pos: Vector2 = _screen_to_world(_map_pick_screen_pos(event))
 	# MV-1b FIX #1 item 2: own air/fleet/space disk before land first-select.
 	if selected_formation_id.is_empty() and not ctrl_click:
 		if _try_open_unit_at_world(world_pos):
@@ -19385,6 +19428,10 @@ func _mv1_preview_dest_matches_world(world_pos: Vector2) -> bool:
 	var dest: int = _march_preview_cache_dest
 	if dest <= 0:
 		return false
+	var fac_pid: int = _facility_icon_pid_at(world_pos)
+	if fac_pid > 0:
+		## Icon hit allows commit; `_unhandled_input` overrides dest to fac_pid.
+		return true
 	if _hover_province != null and int(_hover_province.id) == dest:
 		return true
 	var click_pid: int = -1
@@ -24226,6 +24273,31 @@ func _setup_infrastructure_overlay_layer() -> void:
 
 func setup_demo_infrastructure_overlay() -> void:
 	_setup_infrastructure_overlay_layer()
+
+
+func _setup_facility_icon_layer() -> void:
+	## FAC-1a overlay. Sibling of InfrastructureOverlayLayer. z=24: above roads, below units.
+	if container == null:
+		return
+	var existing := get_overlay_layer("FacilityIconLayer")
+	if existing != null and is_instance_valid(existing):
+		if existing.has_method("notify_sites_changed"):
+			existing.call("notify_sites_changed")
+		return
+	var LayerScript := load("res://scripts/map/FacilityIconLayer.gd")
+	if LayerScript == null:
+		push_error("MapRenderer: Could not load FacilityIconLayer.gd")
+		return
+	var layer: Node = null
+	if LayerScript is GDScript:
+		layer = LayerScript.new()
+	if layer == null:
+		return
+	add_overlay_layer("FacilityIconLayer", layer as Node2D, 24)
+	if layer is Node2D:
+		(layer as Node2D).z_as_relative = false
+		(layer as Node2D).z_index = 24
+	print("MapRenderer: FacilityIconLayer created (airfield icons; show_facilities default ON).")
 
 
 func _setup_terrain_layer_stack() -> void:

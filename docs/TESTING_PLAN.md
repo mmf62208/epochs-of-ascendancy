@@ -358,6 +358,182 @@ python3 -m unittest tools.map_generation.tests.test_resource_icon_lod tools.map_
 
 On `tools/eoa_full_test_gates.sh` (`--quick` has the py needles; full has headless + xvfb). Headless `HeadlessRh1ResourceGlyphMapModeTest` **RESULT=PASS** (failures=0): default/political/diplomacy/other `show_resource_icons=false`; resources true; switch-back false. xvfb `tools/eoa_rh1_pixel_guard.sh` **RESULT=PASS** at zoom **0.638** over Essen (`political_hits=907` / `resources_hits=1252` / `back_hits=907`, icons false/true/false; wrapper peak **2030.0 MB**). Label **NOT live Play**. Peak RSS < 3 GB. Merge **HOLD**.
 
+### FAC-1a airfield facility icons (L1–L4, draft HOLD)
+
+Default F5 board is **`world_accurate`**. Four Rhineland airfields seed through `project_sites.json` → `ScenarioLoader.apply_seeded_special_sites_to_provinces` so `Province.special_sites` has real `SpecialSite` AIRFIELD rows. **FIX #3 reseed (never renumbered):** Borken `710430` L1, Warendorf `710434` L2, Oberbergischer Kreis `710423` L3, Siegen-Wittgenstein `710451` L4. Cannot-fit: Neuwied `710460`, Viersen `710414`, Hunsrück `710464`, Kreuznach `710457`. Same IDs on `provinces_pilot_europe_nuts3`. New `FacilityIconLayer` (`_draw` + `draw_texture_rect` + `draw_circle` badge disc; no Line2D / per-icon nodes). World-space **polylabel** interior anchors precomputed on rebuild (JSON + GDScript). Cluster + hysteresis when screen rects collide. Badges **16px** with dark disc. Close icons grow to **32px** at zoom ≥2.0. `show_facilities` defaults **ON**; **P** toggles on the layer (MapRenderer input untouched). Hidden below `MapZoomLOD.site_marker_min_zoom_for_board` (0.62 on the default board). Hidden in F9 resources. Old `rebuild_sites_layer` stays default-off. Damaged is a data flag (intact art + TODO). `set_map_mode` RH-1 glyph lines **untouched**.
+
+```bash
+python3 -m unittest tools.map_generation.tests.test_fac1a_airfield_icons -v
+tools/run_godot.sh --headless --path . -s res://scripts/core/HeadlessFac1aAirfieldIconTest.gd
+tools/eoa_fac1a_pixel_guard.sh
+```
+
+xvfb screenshots go to `/opt/cursor/artifacts/fac1a/`, `/opt/cursor/artifacts/fac1a_fix2/`, `/opt/cursor/artifacts/fac1a_fix2b/`, `/opt/cursor/artifacts/fac1a_fix2c/`, `/opt/cursor/artifacts/fac1a_fix3/`, and `/opt/cursor/artifacts/fac1a_fix4/` and are **NOT live Play**. Peak RSS must stay under 3 GB (isolated process tree — do not sum leftover Godot). Merge **HOLD**.
+
+**FIX #4 (Play MIXED `76fb4808`):** click ownership + badge-in-footprint + cluster digit + lone min size + split guard 1.53. Seeds unchanged. Isolated keep-green:
+
+| gate | kind | result | peak MB isolated |
+|---|---|---|---|
+| py_fac1a | py | PASS | — |
+| hd_fac1a | headless | PASS (hit_test, badge-in, digit 12px, lone ≥36) | — |
+| xvfb_fac1a | xvfb | PASS click=0 noop=0 badge_in digit lone split 1.53 clearance all tiers occl=0.000 rx1 0.843/0.843 | **2030.8** |
+| xvfb_rx1 ON / OFF | xvfb | PASS mid_river **0.749 / 0.749** close 0.775 / 0.775 spine 1.000 | isolated |
+| hd_mv1 / hd_mv1b / hd_rh1 | headless | PASS | — |
+| hd_ix1 (6) / hd_rx1 (4) / hd_rt1 (3) | headless | PASS | — |
+| xvfb_mv1 / xvfb_mv1_card / xvfb_rh1 | xvfb | PASS | **2038.1 / 2036.6 / 2033.5** |
+
+Screenshots FIX #4 (xvfb **NOT live Play**): `/opt/cursor/artifacts/fac1a_fix4/01_badge_z0.97_NOT_live_play.png`, `02_cluster_digit_z0.99_NOT_live_play.png`, `03_lone_icon_z1.30_NOT_live_play.png`, `04_split_boundary_z1.53_NOT_live_play.png`.
+
+**FIX #5 (Play MIXED `3bb534c0`, last polish):** stale-hover override + tight oval/badge hits + cluster chrome + dark halo. Seeds unchanged. Isolated keep-green:
+
+| gate | kind | result | peak MB isolated |
+|---|---|---|---|
+| py_fac1a | py | PASS | — |
+| hd_fac1a | headless | PASS (facility-first dest_matches, oval hit, chrome gap 2px, 2px GIS) | — |
+| xvfb_fac1a | xvfb | PASS stale=true chrome=2.00 outside=true prom 36/36 halo=2 click=0 noop=0 badge_in digit lone split 1.53 clearance all tiers occl=0.000 rx1 0.843/0.843 | **2039.1** |
+| xvfb_rx1 ON / OFF | xvfb | PASS mid_river **0.749 / 0.749** close 0.775 / 0.775 spine 1.000 | isolated |
+| hd_mv1 / hd_mv1b / hd_rh1 | headless | PASS (unedited) | — |
+| hd_ix1 (6) / hd_rx1 (4) / hd_rt1 (3) | headless | PASS | — |
+| xvfb_mv1 / xvfb_mv1_card / xvfb_rh1 | xvfb | PASS | **2109.2 / 2032.8 / 2034.7** |
+
+Screenshots FIX #5 (xvfb **NOT live Play**): `/opt/cursor/artifacts/fac1a_fix5/01_cluster_count_tag_z0.97_NOT_live_play.png`, `02_lone_and_cluster_z1.30_NOT_live_play.png`, `03_borken_top_edge_z0.93_NOT_live_play.png`.
+
+**FIX #6 (Play MIXED `752a5529`):** hit shape = drawn art per variant. Seeds / stale-hover / MV-1 gates unchanged. Isolated keep-green (`1cc32e8e`):
+
+| gate | kind | result | peak MB isolated |
+|---|---|---|---|
+| py_fac1a | py | PASS | — |
+| hd_fac1a | headless | PASS (art-body hit, 2px inside silhouette owns click) | — |
+| xvfb_fac1a | xvfb | PASS stale=true sil=true sil_fail=0 chrome=2.00 outside=true prom 36/36 halo=2 click=0 noop=0 badge_in digit lone split 1.53 clearance all tiers worst 12.81 occl=0.000 rx1 0.843/0.843 | **2034.4** |
+| xvfb_rx1 ON / OFF | xvfb | PASS mid_river **0.749 / 0.749** close 0.775 / 0.775 spine 1.000 | **2028.1 / 2024.5** |
+| hd_mv1 / hd_mv1b / hd_rh1 | headless | PASS (unedited) | **1194.1 / 1194.0 / 1193.8** |
+| hd_ix1 (6) / hd_rx1 (4) / hd_rt1 (3) | headless | PASS | ~1194–1198 |
+| xvfb_mv1 / xvfb_mv1_card / xvfb_rh1 | xvfb | PASS | **2031.4 / 2037.5 / 2028.1** |
+
+Screenshots FIX #6 (xvfb **NOT live Play**): `/opt/cursor/artifacts/fac1a_fix6/01_l4_cluster_hit_overlay_z0.97_NOT_live_play.png`, `02_lone_hit_overlay_z2.25_NOT_live_play.png`.
+
+**FIX #7 (Play MIXED `5d42888a`):** L2 cluster oval hit + press/release `event.position`. Seeds / MV-1 gates unchanged. Isolated keep-green (`a5b4b4da`):
+
+| gate | kind | result | peak MB isolated |
+|---|---|---|---|
+| py_fac1a | py | PASS | — |
+| hd_fac1a | headless | PASS (L2 oval / L4 circle, event-position pick) | — |
+| xvfb_fac1a | xvfb | PASS stale=true stale_lag=true (15/15 lone+cluster) clustervar=true sil_fail=0 click=0 noop=0 clearance all tiers worst 12.81 occl=0.000 rx1 0.843/0.843 | **2035.5** |
+| xvfb_rx1 ON / OFF | xvfb | PASS mid_river **0.749 / 0.749** close 0.775 / 0.775 spine 1.000 | **2031.5 / 2031.4** |
+| hd_mv1 / hd_mv1b / hd_rh1 | headless | PASS (unedited) | **1194.1 / 1194.1 / 1195.0** |
+| hd_ix1 (6) / hd_rx1 (4) / hd_rt1 (3) | headless | PASS | ~1194–1195 |
+| xvfb_mv1 / xvfb_mv1_card / xvfb_rh1 | xvfb | PASS | **2031.4 / 2033.0 / 2030.1** |
+
+**FIX #3 (Play MIXED `234e12b8`):** Rhine/spine/border clearance + cluster L4 tag. Split expected ~1.59. Isolated keep-green (`637ca02e`):
+
+| gate | kind | result | peak MB isolated |
+|---|---|---|---|
+| py_fac1a | py | PASS | 1.9 |
+| hd_fac1a | headless | PASS (L4 tag, 710430/434/423/451) | 1194.1 |
+| xvfb_fac1a | xvfb | PASS clearance 0.65–2.27 · own=0 · cluster L4 count=2 · split 1.59 · occl=0.000 · rx1 0.843/0.843 | **2056.6** |
+| xvfb_rx1 ON / OFF | xvfb | PASS mid_river **0.749 / 0.749** close 0.775 / 0.775 spine 1.000 | **2046.7 / 2050.0** |
+| xvfb_rt1_seeded | xvfb | PASS | **2067.6** |
+| py_ix1 | py | PASS | 54.7 |
+| hd_mv1 / hd_mv1b / hd_rh1 | headless | PASS | 1193.9 / 1193.9 / 1193.8 |
+| hd_ix1_* (6) | headless | PASS | ~1194 |
+| hd_rx1_* (4) | headless | PASS | ~1194 |
+| hd_rt1_* (3) | headless | PASS | ~1194 |
+| xvfb_mv1 / xvfb_mv1_card / xvfb_rh1 | xvfb | PASS | 2063.3 / 2067.3 / 2063.2 |
+| xvfb_rt1_live_look | xvfb | PASS | 2064.4 |
+
+Screenshots FIX #3 (xvfb **NOT live Play**): `/opt/cursor/artifacts/fac1a_fix3/01_operational_z1.30_rhineland_NOT_live_play.png`, `02_mid_z0.99_cluster_tag_NOT_live_play.png`, `03_close_koln_bonn_z2.25_counter_NOT_live_play.png`, `04_split_z1.59_NOT_live_play.png`, `05_l1_z0.92_NOT_live_play.png`, `05_l1_z0.98_NOT_live_play.png`.
+
+**FIX #1 occlusion (A/B/C prove, xvfb ≠ live Play):** icons sat on Bonn–Köln–Lev centroids (gold spine + Rhine). Same commands:
+
+| | RX-1 `mid_river` | RT-1 `s1_gold_cover` |
+|---|---|---|
+| (a) base `8b7e46de` | **0.749 PASS** | **1.000 PASS** |
+| (b) tip ON | **0.653 FAIL** | **0.556 FAIL** |
+| (c) tip OFF | **0.749 PASS** | **1.000 PASS** |
+
+Fix: landward screen-space offset (28px, east of the corridor) in `_draw` only — not under fills, not a threshold weaken, not a guard disable. Headless **RESULT=PASS** (offset asserted). Post-offset seeded xvfb (same thresholds, icons ON): RX-1 `mid_river=0.749` / spine cover `1.000` **PASS** (isolated peak **2046.7 MB**); RT-1 `s1_gold_cover=1.000` **PASS** (2067.8 MB). Sequential keep-green first marked RX-1 FAIL at 4446.3 MB because the sampler summed leftover Godot; isolated tree RSS is under 3 GB.
+
+**Keep-green after FIX #1** (xvfb ≠ live Play; `py_eoa_quick` map_qc FAIL is pre-existing on base `8b7e46de`, Pillow):
+
+| gate | kind | result | peak MB |
+|---|---|---|---|
+| py_fac1a / py_ix1_rx1_march_resource | py | PASS | 2.0 / 58.3 |
+| py_eoa_quick | py | FAIL (base map_qc) | 100.3 |
+| hd_fac1a / hd_mv1 / hd_mv1b | headless | PASS | 2388 / 2388 / 2388 |
+| hd_ix1 (6) / hd_rx1 (4) / hd_rt1 (3) / hd_rh1 | headless | PASS | ~2388 |
+| xvfb_fac1a | xvfb | PASS mid=4 close=4 out=4 res=4 back=4 | 2061.3 |
+| xvfb_mv1 / xvfb_mv1_card / xvfb_rh1 | xvfb | PASS | 2065 / 2066 / 2066 |
+| xvfb_rx1_seeded | xvfb | PASS mid_river=0.749 spine=1.000 | **2046.7** isolated |
+| xvfb_rt1_seeded | xvfb | PASS s1_gold_cover=1.000 | 2067.8 |
+| xvfb_rt1_live_look | xvfb | PASS mesh_frac=0.00078 gold_w=14 | 2238.5 |
+
+Screenshots FIX #1 (NOT live Play): `/opt/cursor/artifacts/fac1a/fac1a_political_mid_NOT_live_play.png`, `fac1a_political_close_NOT_live_play.png`, `fac1a_zoomed_out_NOT_live_play.png`, `fac1a_resources_F9_NOT_live_play.png`, `fac1a_political_back_NOT_live_play.png`.
+
+**FIX #2c:** same seeds; cluster marker sits on the highest-level member interior (nudged inside that province if the larger rect still hits Rhine/spine/star/counter; AABB-clear of sibling isolates). Occlusion samples cluster markers at 0.70 / 0.99 / 1.30. RX-1 mid_river ON vs OFF must match within 0.02. Close 03 is Köln Play-style with the unit counter drawn. Composites `/opt/cursor/artifacts/fac1a_fix2c/` — **NOT live Play**.
+
+Keep-green after FIX #2c `86bdd723` (isolated process-tree RSS via `pgrep -P` only; xvfb ≠ live Play; `py_eoa_quick` map_qc FAIL is pre-existing on base `8b7e46de`, Pillow):
+
+| gate | kind | result | peak MB |
+|---|---|---|---|
+| py_fac1a / py_ix1_rx1_march_resource | py | PASS | 1.9 / 61.5 |
+| py_eoa_quick | py | FAIL (base map_qc) | — |
+| hd_fac1a / hd_mv1 / hd_mv1b | headless | PASS | 1194 / 1194 / 1194 |
+| hd_ix1 (6) / hd_rx1 (4) / hd_rt1 (3) / hd_rh1 | headless | PASS | ~1194 isolated |
+| xvfb_fac1a | xvfb | PASS cluster_mid count=3 L4 · split 1.9/2.27 · counter_drawn · counter_clear Neuwied · occl=0.000 · overlap=0 · own=0 · rx1_mid ON/OFF 0.843/0.843 | **2056.4** isolated |
+| xvfb_mv1 / xvfb_mv1_card / xvfb_rh1 | xvfb | PASS | 2065 / 2061 / 2061 |
+| xvfb_rx1_seeded | xvfb | PASS mid_river=0.664 close_river=0.749 spine=1.000 (later proved FAC-1a vs OFF/base 0.749) | **2046.7** isolated |
+| xvfb_rt1_seeded | xvfb | PASS s1_gold_cover=1.000 | 2071.0 |
+| xvfb_rt1_live_look | xvfb | PASS mesh_frac=0.00079 gold_w=14 | 2061.2 |
+
+Screenshots FIX #2c (xvfb **NOT live Play**): `/opt/cursor/artifacts/fac1a_fix2c/01_operational_z1.30_rhineland_NOT_live_play.png`, `02_mid_z0.99_cluster_NOT_live_play.png` (3-cluster off the Rhine + Viersen isolate), `03_close_koln_bonn_z2.27_counter_NOT_live_play.png` (Neuwied beside drawn Köln counter).
+
+Keep-green after FIX #2c Rhine-host `1d7e3219` (isolated `pgrep -P` tree RSS; xvfb ≠ live Play). Seeded RX-1 on `beb3ed09` ON 0.664 vs OFF/base 0.749 proved FAC-1a (Neuwied L4 on the real course). Host prefers ≥22 world from `Rx1RhineCrossing.course_points()` (Ober L3).
+
+| gate | kind | result | peak MB |
+|---|---|---|---|
+| py_fac1a | py | PASS | 1.9 |
+| hd_fac1a | headless | PASS | 1193.9 |
+| xvfb_fac1a | xvfb | PASS cluster_mid · split_close · counter_drawn/clear · occl=0.000 · overlap_z0.70=0 · rx1_mid 0.843/0.843 | **2056.9** isolated |
+| xvfb_rx1_seeded ON | xvfb | PASS mid_river=0.749 close_river=0.749 spine=1.000 | **2050.0** isolated |
+| xvfb_rx1_seeded OFF | xvfb | PASS mid_river=0.749 close_river=0.775 spine=1.000 | **2050.0** isolated |
+| xvfb_rx1_seeded base `8b7e46de` | xvfb | PASS mid_river=0.749 close_river=0.775 spine=1.000 | **2045.0** isolated |
+
+**FIX #2b:** same mechanics; Rhineland-only reseed so Play can see cluster-split and counter clearance. Viersen `710414` L1, Rhein-Hunsrück-Kreis `710464` L2, Oberbergischer Kreis `710423` L3, Neuwied `710460` L4 (Bonn-adjacent, LUX-disk-safe — Ahrweiler `710455` interiors sit inside the LUX capital-star disk and snapped into the Köln counter). Cluster is Neuwied–Ober (live world ~28). xvfb asserts cluster at 0.99 (count=3, max L4), split at ≥1.9, Neuwied vs Köln counter at 2.27, occlusion ≤5%, click-own all 4. Composites `/opt/cursor/artifacts/fac1a_fix2b/` — **NOT live Play**.
+
+Keep-green after FIX #2b Neuwied reseed `e32095ed` (isolated process-tree RSS via `pgrep -P` only; xvfb ≠ live Play; `py_eoa_quick` map_qc FAIL is pre-existing on base `8b7e46de`, Pillow):
+
+| gate | kind | result | peak MB |
+|---|---|---|---|
+| py_fac1a / py_ix1_rx1_march_resource | py | PASS | 1.9 / 54.7 |
+| py_eoa_quick | py | FAIL (base map_qc) | — |
+| hd_fac1a / hd_mv1 / hd_mv1b | headless | PASS | 1194 / 1194 / 1194 |
+| hd_ix1 (6) / hd_rx1 (4) / hd_rt1 (3) / hd_rh1 | headless | PASS | ~1194–1198 isolated |
+| xvfb_fac1a | xvfb | PASS cluster_mid count=3 L4 · split 1.9/2.27 · counter_clear Neuwied · occl=0.000 · own=0 | **2059.6** isolated |
+| xvfb_mv1 / xvfb_mv1_card / xvfb_rh1 | xvfb | PASS | 2158 / 2062 / 2064 |
+| xvfb_rx1_seeded | xvfb | PASS mid_river=0.631 spine=1.000 | **2043.3** isolated |
+| xvfb_rt1_seeded | xvfb | PASS s1_gold_cover=1.000 | 2060.2 |
+| xvfb_rt1_live_look | xvfb | PASS mesh_frac=0.00078 gold_w=14 | 2065.9 |
+
+Screenshots FIX #2b (xvfb **NOT live Play**): `/opt/cursor/artifacts/fac1a_fix2b/01_operational_z1.30_rhineland_NOT_live_play.png`, `02_mid_z0.99_cluster_NOT_live_play.png` (3-cluster + Viersen), `03_close_koln_bonn_z2.27_counter_NOT_live_play.png` (Neuwied beside Köln counter).
+
+**FIX #2 (live Play MIXED look on `2e5bc186`):** 28px screen offset + adjacent NUTS3 centroids clumped four icons (~40px), mid badges ~11px, Köln unit buried all four, Neuss sat on Rhine ≥1.9 / gold ≥1.35, Köln icon click marched to Rheinisch-Bergischer Kreis. Drop the screen offset. Interior polylabel + reseed (later corrected by FIX #2b). Cluster+hysteresis. 16px outlined badges. 32px at zoom ≥2.0. RT-1 `s1_gold_cover=1.000` false-passed because S1 walks Bonn–Köln–Lev **centroids only** — Neuss / Leverkusen cap were never sampled. New FAC-1a occlusion (ON vs OFF gold/river ≤5% at 1.35/1.9/2.3, anchors + spine walk including Neuss), no-overlap (0.70/0.99/1.30/1.90/2.30 + Köln counter), click-own (`get_province_at_world_pos` at icon center), badge ≥16px. RX-1/RT-1 thresholds **untouched**. Input / `set_map_mode` / label LOD / RoadTierVisual / Rhine / MapZoomLOD **untouched**.
+
+Keep-green after FIX #2 (isolated process-tree RSS; xvfb ≠ live Play; `py_eoa_quick` map_qc FAIL is pre-existing on base `8b7e46de`, Pillow):
+
+| gate | kind | result | peak MB |
+|---|---|---|---|
+| py_fac1a / py_ix1_rx1_march_resource | py | PASS | 2.1 / 76.6 |
+| py_eoa_quick | py | FAIL (base map_qc) | 106.3 |
+| hd_fac1a / hd_mv1 / hd_mv1b | headless | PASS | 1194 / 1194 / 1194 |
+| hd_ix1 (6) / hd_rx1 (4) / hd_rt1 (3) / hd_rh1 | headless | PASS | ~1194 isolated |
+| xvfb_fac1a | xvfb | PASS mid=4 close=4 out=1 res=0 back=4 badge=16 occl=0.000 overlap=0 own=0 | **2063.3** isolated |
+| xvfb_mv1 / xvfb_mv1_card / xvfb_rh1 | xvfb | PASS | 2060 / 2062 / 2061 |
+| xvfb_rx1_seeded | xvfb | PASS mid_river=0.749 spine=1.000 | **2046.7** isolated |
+| xvfb_rt1_seeded | xvfb | PASS s1_gold_cover=1.000 | 2062.0 |
+| xvfb_rt1_live_look | xvfb | PASS mesh_frac=0.00079 gold_w=14 | 2098.7 |
+
+Screenshots FIX #2 (xvfb **NOT live Play**, matching Play composites): `/opt/cursor/artifacts/fac1a_fix2/01_operational_z1.30_all4_airfields_NOT_live_play.png`, `02_mid_z0.99_badges_or_cluster_NOT_live_play.png`, `03_close_koln_z2.27_counters_NOT_live_play.png`.
+
 ### MV-1 move ETA preview (gameplay UI, draft HOLD)
 
 With a unit selected, hovering own/controlled land shows a dimmer dashed `MarchPreviewLine` plus a cursor chip (`N hops · arrives in D days · <Province>` or `Can't march · <reason>`) **before click**. `FormationMovement.preview_own_land_march` is the pure SOT (same BFS / `_hop_cost_into` / IX-1 road + RX-1 Rhine multipliers); `enqueue_own_land_march` calls it then writes `_orders`. Hover BFS runs on province **change only** (cached by fid/dest/day). Headless: `HeadlessMv1MarchPreviewTest` **RESULT=PASS** (preview==commit path + calendar_days; no order after preview; reasons; spine ETA < same-length off-road; NUTS3 Bonn/Köln/Leverkusen + Neuss–Mettmann). Windowed xvfb `tools/eoa_mv1_pixel_guard.sh` at **1600×900** **RESULT=PASS** (line on hover, gone after unhover; Köln mid-zoom lock; wrapper peak ~2029 MB) — **not live Play** (llvmpipe/OpenGL can miss Vulkan). **FIX #1 (Play live FAIL `388c5828`):** docked unit card must not wipe the preview (`_update_spatial_hover` still runs `_refresh_march_preview_for_hover` when the card is up and the mouse is on the map; tooltip only is suppressed). Still map click with the card up must not latch as a drag (`_clear_left_slop_after_still_click` + leftover-origin live-slop gate). New xvfb guard `tools/eoa_mv1_card_up_input_guard.sh` selects by simulated real mouse at the counter (never assigns `selected_formation_id`), asserts card + chip `2 hops · arrives in 3 days · Leverkusen`, still-click commit `has_march` with preview==commit, and a real drag pans without committing. **FIX #2 (Play live MIXED `8089bbd4`):** leftover `_begin` early-return on `dragged and not _left_ready_for_still_click` (and stuck `_left_btn_down` after Close) re-latched every click after inspector/Open-fight Close — a real MouseButton press always resets left-gesture state; those panels' open/close also reset. Input model: plain click on a different own counter switches; plain click on empty own land / the selected unit's own chip area commits (or no-op on own province); Ctrl stays assault/Open fight. Peak slop from the press origin latches dragged even if release returns near origin. Guard covers inspector + Open-fight open/close, A→B switch, adjacent-in-chip commit, return-to-origin drag, 5 still clicks after drag. Map drawing layers (roads, borders, labels, `InfrastructureOverlayLayer`, `RoadTierVisual`, `MapZoomLOD`, `BorderLayer`) are **untouched**. Merge **HOLD** until live Play. Ctrl+click assault stays assault (not switch).

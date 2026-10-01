@@ -1,0 +1,27 @@
+{
+  "id": "airfield_tier_4",
+  "site_type": "airfield",
+  "tier": 4,
+  "name": "Major Air Base",
+  "description": "A large air base with crossing runways, hangar row, and a control tower. Supports strategic airlift and sustained air operations.",
+
+  "visual": {
+    "icon": "airfield_4"
+  },
+
+  "effects": {
+    "air_recon_bonus": 42,
+    "interdiction_resistance": 24,
+    "air_operations_efficiency": 18
+  },
+
+  "construction": {
+    "base_days": 100,
+    "political_power_cost": 220,
+    "required_infra_level": 7
+  },
+
+  "damage": {
+    "max_damage_level": 4
+  }
+}
