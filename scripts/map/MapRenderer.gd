@@ -19471,7 +19471,7 @@ func _mv1_selected_is_own_land() -> bool:
 func _selected_unit_march_dest_id() -> int:
 	if selected_formation_id.is_empty():
 		return -1
-	if typeof(FormationMovement) == TYPE_NIL or not FormationMovement.has_method("get_march"):
+	if typeof(FormationMovement) == TYPE_NIL:
 		return -1
 	var order: Dictionary = FormationMovement.get_march(selected_formation_id)
 	if order.is_empty():
