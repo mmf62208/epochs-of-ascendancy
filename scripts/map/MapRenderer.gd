@@ -3079,6 +3079,17 @@ func _unhandled_input(event: InputEvent) -> void:
 			elif _try_switch_own_land_counter_at_world(world_pos):
 				get_viewport().set_input_as_handled()
 				return
+		# CRASH-1: still click on the selected unit's current march dest is a
+		# no-op re-issue. Keep selection + order; do not open the inspector
+		# (Berlin star used to deselect and inspect).
+		if (
+			not event.ctrl_pressed
+			and not event.shift_pressed
+			and not event.alt_pressed
+			and _selected_unit_same_march_dest_click(world_pos)
+		):
+			get_viewport().set_input_as_handled()
+			return
 		# FIX #1: own land + N-hops preview dest → skip star / air-open /
 		# inspector so the still click commits like a non-capital province.
 		var mv1_commit: bool = (
@@ -19457,6 +19468,33 @@ func _mv1_selected_is_own_land() -> bool:
 	return _formation_is_player_tag(fo)
 
 
+func _selected_unit_march_dest_id() -> int:
+	if selected_formation_id.is_empty():
+		return -1
+	if typeof(FormationMovement) == TYPE_NIL or not FormationMovement.has_method("get_march"):
+		return -1
+	var order: Dictionary = FormationMovement.get_march(selected_formation_id)
+	if order.is_empty():
+		return -1
+	return int(order.get("dest_id", -1))
+
+
+func _selected_unit_already_marching_to(dest_id: int) -> bool:
+	return dest_id > 0 and _selected_unit_march_dest_id() == dest_id
+
+
+func _selected_unit_same_march_dest_click(world_pos: Vector2) -> bool:
+	var dest: int = _selected_unit_march_dest_id()
+	if dest <= 0:
+		return false
+	if _capital_star_pid_at(world_pos) == dest:
+		return true
+	var pid: int = _resolve_map_pick_pid(world_pos)
+	if pid <= 0:
+		pid = _resolve_hex_pick_pid(world_pos)
+	return pid == dest
+
+
 func _mv1_selected_own_land_ready_to_commit(world_pos: Vector2) -> bool:
 	# Preview == commit: own land selected, chip shows N hops, dest is the
 	# hovered or clicked province. Skip air/fleet open so the province path
@@ -19538,7 +19576,7 @@ func _refresh_selected_unit_chip() -> void:
 		var counter: Node2D = n.get_node_or_null("DemoUnitIcon_" + str(id)) as Node2D
 		if counter == null or not is_instance_valid(counter):
 			continue
-		# free() same-frame so re-add is not renamed SelectedFrame2 (queue_free leaves sibling).
+		# Visual ring only — no button signals. Safe to free() after detach.
 		var old_sel: Node = counter.get_node_or_null("SelectedFrame")
 		if old_sel != null:
 			counter.remove_child(old_sel)
@@ -19608,6 +19646,10 @@ func _try_move_selected_unit_to_province(province: Province) -> bool:
 	var dest := province.id
 	if typeof(FormationMovement) == TYPE_NIL:
 		return false
+	# CRASH-1: same dest while already marching is a no-op re-issue (keep
+	# hop progress, do not duplicate MarchPathLine / _orders).
+	if _selected_unit_already_marching_to(dest):
+		return true
 	var res: Dictionary = FormationMovement.enqueue_own_land_march(fid, dest, p_tag)
 	_clear_march_preview()
 	if bool(res.get("already_here", false)):
@@ -20242,13 +20284,15 @@ func _show_unit_detail_popup(formation: Object) -> void:
 	var ui := get_node_or_null("UI") as CanvasLayer
 	if ui == null:
 		return
-	# Replace previous card. Free immediately so the new node can keep the
-	# UnitDetailPopup name (queue_free same-frame left a queued sibling and
-	# get_node("UnitDetailPopup") missed the live card).
+	# Replace previous card. Never free() while a child button (Halt / Press /
+	# Hold / Withdraw / Assign) is still emitting pressed — that SIGSEGVs
+	# "object freed while a signal is being emitted". Detach + rename so
+	# queue_free cannot clash with the new UnitDetailPopup name this frame.
 	var old := ui.get_node_or_null("UnitDetailPopup")
 	if old != null:
 		ui.remove_child(old)
-		old.free()
+		old.name = "UnitDetailPopup_dying"
+		old.queue_free()
 
 	var name_s := "Unit"
 	if "name" in formation:
@@ -20471,6 +20515,7 @@ func _show_unit_detail_popup(formation: Object) -> void:
 		and bool(FormationMovement.has_march(fid))
 	if marching:
 		var halt_btn := Button.new()
+		halt_btn.name = "BtnHaltMarch"
 		halt_btn.text = "Halt march"
 		halt_btn.focus_mode = Control.FOCUS_NONE
 		halt_btn.tooltip_text = "Cancel the queued own-land march; stay on the current hex."
@@ -25373,6 +25418,7 @@ func _unit_counter_designation(formation: Object) -> String:
 func _attach_unit_counter_chrome(counter: Node2D, ff: Object, nation_col: Color) -> void:
 	if counter == null:
 		return
+	# Chrome decorations only — no pressed signals into this rebuild. Safe free().
 	for child_name in ["NationPlate", "StatBars", "TypeLetter", "LeaderMark", "StrNum", "Designation", "CombatPulse", "TrainPulse"]:
 		var old_n := counter.get_node_or_null(child_name)
 		if old_n != null:
@@ -28372,6 +28418,7 @@ func _rebuild_demo_unit_icons(only_pids: Dictionary) -> void:
 		var n_clear: Node2D = province_nodes[id_clear] as Node2D
 		if n_clear == null:
 			continue
+		# Pin sprites — clicks go through MapRenderer._input, not icon signals.
 		for c in n_clear.get_children():
 			if str(c.name).begins_with("DemoUnitIcon_"):
 				n_clear.remove_child(c)
