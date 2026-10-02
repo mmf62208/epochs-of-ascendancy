@@ -150,19 +150,23 @@ func _do_home() -> void:
 
 func _do_sea_frame(pid: int, live_c: Vector2, zoom: float, sea_key: String, band: String, first: bool) -> void:
 	_force_viewport()
-	_ensure_fleet_icons(zoom)
+	var settle_key := "fleet2_%s_%s_settle" % [sea_key, band]
+	var settled: bool = int(root.get_meta(settle_key, 0)) == 1
+	# Rebuild only on the first visit. A same-frame rebuild+capture paints empty
+	# water (nodes exist for pick/log, canvas items have not drawn yet).
+	if not settled:
+		_ensure_fleet_icons(zoom)
+	else:
+		_paint_fleet_icons(zoom)
 	var plates: Dictionary = _collect_sea_plates(pid)
 	var cluster: Vector2 = _cluster_of(plates)
 	if cluster == Vector2.ZERO:
 		cluster = live_c
 	_frame_sea_direct(cluster, zoom, "%s_%s" % [sea_key, band])
-	var settle_key := "fleet2_%s_%s_settle" % [sea_key, band]
-	if int(root.get_meta(settle_key, 0)) == 0:
+	if not settled:
 		root.set_meta(settle_key, 1)
 		_go_settle(_phase)
 		return
-	_ensure_fleet_icons(zoom)
-	_frame_sea_direct(cluster, zoom, "%s_%s_refit" % [sea_key, band])
 	plates = _collect_sea_plates(pid)
 	cluster = _cluster_of(plates)
 	if pid == CHANNEL:
@@ -278,6 +282,22 @@ func _go_settle(next_phase: int) -> void:
 	_phase = Phase.SETTLE
 
 
+func _paint_fleet_icons(z: float) -> void:
+	var mr := _map_renderer()
+	if mr == null:
+		return
+	if "show_unit_counters" in mr:
+		mr.show_unit_counters = true
+	var zz: float = z
+	if zz < 0.0:
+		var cam := _camera()
+		zz = maxf(cam.zoom.x, cam.zoom.y) if cam != null else 1.0
+	if mr.has_method("_sync_unit_counter_paint"):
+		mr.call("_sync_unit_counter_paint", zz)
+	if mr.has_method("_sync_sea_nation_fleet_offsets"):
+		mr.call("_sync_sea_nation_fleet_offsets", zz)
+
+
 func _ensure_fleet_icons(z: float) -> void:
 	var mr := _map_renderer()
 	if mr == null:
@@ -290,18 +310,11 @@ func _ensure_fleet_icons(z: float) -> void:
 		mr.call("_update_unit_icons_for_test")
 	elif mr.has_method("_rebuild_demo_unit_icons"):
 		mr.call("_rebuild_demo_unit_icons", {})
-	var zz: float = z
-	if zz < 0.0:
-		var cam := _camera()
-		zz = maxf(cam.zoom.x, cam.zoom.y) if cam != null else 1.0
-	if mr.has_method("_sync_unit_counter_paint"):
-		mr.call("_sync_unit_counter_paint", zz)
-	if mr.has_method("_sync_sea_nation_fleet_offsets"):
-		mr.call("_sync_sea_nation_fleet_offsets", zz)
+	_paint_fleet_icons(z)
 	var n := 0
 	if "_demo_unit_icon_pids" in mr:
 		n = (mr._demo_unit_icon_pids as Array).size()
-	_log("EOA_FLEET2_LIVE who=guard.icons pids=%d z=%.3f" % [n, zz])
+	_log("EOA_FLEET2_LIVE who=guard.icons pids=%d z=%.3f" % [n, z])
 
 
 func _frame_sea_direct(world: Vector2, zoom: float, who: String) -> void:
@@ -425,6 +438,7 @@ func _capture(name: String, zoom: float, cam_world: Vector2) -> bool:
 	if cam != null:
 		cam.global_position = cam_world
 		cam.zoom = Vector2(zoom, zoom)
+	RenderingServer.force_draw()
 	RenderingServer.force_draw()
 	RenderingServer.force_draw()
 	var vp := root.get_viewport()
