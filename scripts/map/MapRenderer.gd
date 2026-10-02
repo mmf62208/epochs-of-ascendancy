@@ -19540,6 +19540,21 @@ func _try_open_land_unit_at_world(
 	ctrl_click: bool = false,
 	chip_disk_only: bool = false
 ) -> bool:
+	# FIX #3 (a): drawn sea-plate body beats Home-band own-land disks.
+	# FIX #3 (b): cluster-pad nearest sea fleet (incl. own GER) binds the
+	# card — do not fall through to the sea-zone inspector.
+	# Köln FRA stays land-stationed / not a sea_nation_disk (MV-1b).
+	var cam_sea := get_viewport().get_camera_2d() if get_viewport() else null
+	var z_sea: float = 1.0
+	if cam_sea:
+		z_sea = maxf(cam_sea.zoom.x, cam_sea.zoom.y)
+	var sea_bind: Object = _pick_sea_nation_plate_drawn_at_world(world_pos, z_sea)
+	if sea_bind == null and not chip_disk_only:
+		sea_bind = _pick_nearest_sea_nation_in_cluster_pad(world_pos, z_sea, false, false)
+	if sea_bind != null and _formation_is_stationed_on_sea(sea_bind):
+		_select_map_unit(sea_bind)
+		_show_unit_detail_popup(sea_bind)
+		return true
 	var fo_any: Object = _pick_unit_formation_at_world(world_pos)
 	var fo: Object = _pick_land_unit_formation_at_world(world_pos)
 	if fo_any != null and _formation_type_blocks_land_open(fo_any):
@@ -20463,6 +20478,18 @@ func _pick_unit_formation_at_world(world_pos: Vector2, land_only: bool = false, 
 				if str(fo.country_tag).strip_edges().to_upper() == p_tag and d <= best_player_d:
 					best_player_d = d
 					best_player = fo
+	# FIX #3: a click inside a sea plate's drawn body wins before the
+	# Home-band own-land disk (up to ~320u). player_only still skips
+	# foreign plates (MV-1b). land_only still skips fleets.
+	var sea_drawn: Object = _pick_sea_nation_plate_drawn_at_world(world_pos, z)
+	if sea_drawn != null:
+		var sea_ok: bool = true
+		if land_only and _formation_type_blocks_land_open(sea_drawn):
+			sea_ok = false
+		if player_only and not _formation_is_player_tag(sea_drawn):
+			sea_ok = false
+		if sea_ok:
+			return sea_drawn
 	if best_player != null:
 		return best_player
 	if best_any != null:
@@ -25872,6 +25899,40 @@ func _world_in_sea_nation_cluster_pad(world_pos: Vector2, icons: Array, z: float
 	return world_pos.x >= minx and world_pos.x <= maxx and world_pos.y >= miny and world_pos.y <= maxy
 
 
+func _pick_sea_nation_plate_drawn_at_world(world_pos: Vector2, z: float = -1.0) -> Object:
+	# Strict drawn NationPlate body (not Home-band land AABB / 340 spill).
+	var zz: float = z
+	if zz < 0.05:
+		var cam := get_viewport().get_camera_2d() if get_viewport() else null
+		zz = 1.0
+		if cam:
+			zz = maxf(cam.zoom.x, cam.zoom.y)
+	var best: Object = null
+	var best_d: float = INF
+	for id_v in _demo_unit_icon_pids:
+		var id: int = int(id_v)
+		for c_v in _iter_demo_unit_icons_at_pid(id):
+			var icon: Node2D = c_v as Node2D
+			if icon == null or not is_instance_valid(icon) or not icon.visible:
+				continue
+			if not bool(icon.get_meta("sea_nation_disk", false)):
+				continue
+			var fo: Object = _formation_from_demo_icon(icon)
+			if fo == null:
+				continue
+			if not _formation_is_stationed_on_sea(fo):
+				continue
+			var chip_pos: Vector2 = _demo_unit_icon_world_pos(icon, id)
+			var hit_r: float = _sea_nation_fleet_disk_radius_world(zz, icon)
+			var d: float = world_pos.distance_to(chip_pos)
+			if d > hit_r:
+				continue
+			if d <= best_d:
+				best_d = d
+				best = fo
+	return best
+
+
 func _formation_from_demo_icon(counter: Node2D) -> Object:
 	if counter == null:
 		return null
@@ -25921,31 +25982,29 @@ func _pick_nearest_sea_nation_in_cluster_pad(
 	return best
 
 
-func _sea_nation_plate_label(fo: Object, tag: String, index: int = 0) -> String:
+func _sea_nation_plate_label(fo: Object, tag: String, _index: int = 0) -> String:
 	var t: String = tag.strip_edges().to_upper()
 	if t.is_empty() and fo != null and "country_tag" in fo:
 		t = str(fo.country_tag).strip_edges().to_upper()
 	if t.is_empty():
 		t = "UNK"
+	# FIX #3 (c): real per-nation ordinal from the unit name / id — never
+	# the sea-stack position (that made POL 3 / USA 4 / SOV 4).
 	var num: int = _formation_fleet_ordinal(fo)
 	if num < 1:
-		# Design ids (king_george / class_bb) have no ordinal — POL/USA/SOV
-		# must still read "TAG Fleet N", never a bare "POL Fleet".
-		num = maxi(index, 0) + 1
-	# Two lines so the 2x2 stays readable without neighbour clip at 0.8/1.5/2.3.
-	return "%s\nFleet %d" % [t, num]
+		num = 1
+	var fid: String = ""
+	if fo != null and "formation_id" in fo:
+		fid = str(fo.formation_id)
+	var label: String = "%s\nFleet %d" % [t, num]
+	print("EOA_FLEET2 who=plate_label fid=%s tag=%s ordinal=%d label='%s'" % [
+		fid, t, num, label.replace("\n", "|")
+	])
+	return label
 
 
-func _formation_fleet_ordinal(fo: Object) -> int:
-	if fo == null:
-		return -1
-	var n: String = ""
-	if "name" in fo:
-		n = str(fo.name).strip_edges()
-	# Ignore design ids (SOV king_george… was truncated to "SOV king_g.").
-	var low: String = n.to_lower()
-	if "king_george" in low or "class_bb" in low or "design" in low:
-		n = ""
+func _trailing_int_token(s: String) -> int:
+	var n: String = s.strip_edges()
 	if n.is_empty():
 		return -1
 	var i: int = n.length() - 1
@@ -25954,6 +26013,69 @@ func _formation_fleet_ordinal(fo: Object) -> int:
 	if i == n.length() - 1:
 		return -1
 	return int(n.substr(i + 1))
+
+
+func _formation_id_fleet_ordinal(fid: String) -> int:
+	var key: String = "_formation_"
+	var i: int = fid.find(key)
+	if i < 0:
+		return -1
+	var tail: String = fid.substr(i + key.length())
+	if tail.is_valid_int():
+		var n: int = int(tail)
+		if n >= 1:
+			return n
+	return -1
+
+
+func _nation_fleet_rank(fo: Object) -> int:
+	if fo == null:
+		return 1
+	var tag: String = ""
+	if "country_tag" in fo:
+		tag = str(fo.country_tag).strip_edges().to_upper()
+	var self_fid: String = str(fo.formation_id) if "formation_id" in fo else ""
+	if tag.is_empty() or typeof(LeaderManager) == TYPE_NIL:
+		return 1
+	if not LeaderManager.has_method("get_formations_for_country"):
+		return 1
+	var ids: PackedStringArray = PackedStringArray()
+	for f_v in LeaderManager.get_formations_for_country(tag):
+		if f_v == null or not (f_v is Object):
+			continue
+		var cand: Object = f_v as Object
+		var ft: String = str(cand.formation_type) if "formation_type" in cand else ""
+		if ft != Formation.TYPE_FLEET and ft != Formation.TYPE_TASK_FORCE and ft != Formation.TYPE_SHIP:
+			continue
+		var cid: String = str(cand.formation_id) if "formation_id" in cand else ""
+		if cid.is_empty():
+			continue
+		ids.append(cid)
+	ids.sort()
+	var idx: int = ids.find(self_fid)
+	if idx < 0:
+		return 1
+	return idx + 1
+
+
+func _formation_fleet_ordinal(fo: Object) -> int:
+	if fo == null:
+		return -1
+	var n: String = ""
+	if "name" in fo:
+		n = str(fo.name).strip_edges()
+	var low: String = n.to_lower()
+	# Design ids (king_george / class_bb) are not fleet numbers.
+	var name_is_design: bool = "king_george" in low or "class_bb" in low or "design" in low
+	if not n.is_empty() and not name_is_design and "fleet" in low:
+		var from_name: int = _trailing_int_token(n)
+		if from_name >= 1:
+			return from_name
+	var fid: String = str(fo.formation_id) if "formation_id" in fo else ""
+	var from_id: int = _formation_id_fleet_ordinal(fid)
+	if from_id >= 1:
+		return from_id
+	return _nation_fleet_rank(fo)
 
 
 func _sea_nation_counter_scale(radius_world: float, z_override: float = -1.0) -> float:

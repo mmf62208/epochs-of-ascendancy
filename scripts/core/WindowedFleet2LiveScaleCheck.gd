@@ -1,8 +1,9 @@
 extends SceneTree
 
-## FLEET-2 FIX #2b live-scale check on the real world_accurate board.
+## FLEET-2 FIX #3 live-scale check on the real world_accurate board.
 ## xvfb exactly 1280x740 · GER · Europe Home · Channel + North Sea at Home zoom
-## and ~1.5. Pixel-assert each plate centre. Click all 8 plates + East Kent.
+## and ~1.5. Pixel-assert each plate centre. Click all 8 plates at 0.318 / 0.40
+## / 0.8 / 1.5 plus East Kent, old ENG chip, and a GER-nearest gap.
 ## xvfb is NOT live Play. Never EOA_SKIP_TITLE.
 ##
 ##   tools/eoa_fleet2_live_scale_check.sh
@@ -20,7 +21,7 @@ const VIEW_H := 740
 const WAIT_MAP_SECS := 420
 const SETTLE_FRAMES := 36
 const GER_TAG := "GER"
-const REPO_DIR := "docs/evidence/fleet2_fix2b"
+const REPO_DIR := "docs/evidence/fleet2_fix3"
 
 enum Phase {
 	WAIT_MAP,
@@ -69,7 +70,7 @@ func _start() -> void:
 		_out_dir = "/tmp/eoa-fleet2-live"
 	DirAccess.make_dir_recursive_absolute(_out_dir)
 	if DirAccess.dir_exists_absolute("/opt/cursor/artifacts"):
-		DirAccess.make_dir_recursive_absolute("/opt/cursor/artifacts/fleet2-fix2b")
+		DirAccess.make_dir_recursive_absolute("/opt/cursor/artifacts/fleet2-fix3")
 	if OS.get_environment("EOA_SMOKE_AUTO_BEGIN").strip_edges() != "1":
 		OS.set_environment("EOA_SMOKE_AUTO_BEGIN", "1")
 	_log("EOA_FLEET2_LIVE who=guard.boot out=%s view=%dx%d (NOT product Play)" % [_out_dir, VIEW_W, VIEW_H])
@@ -199,39 +200,59 @@ func _do_sea_frame(pid: int, live_c: Vector2, zoom: float, sea_key: String, band
 
 
 func _do_clicks() -> void:
-	var rows: Array = []
-	for k in _ch_plates.keys():
-		var rec: Dictionary = _ch_plates[k] as Dictionary
-		rows.append({
-			"who": "CH_%s" % str(k),
-			"pos": rec.get("pos", Vector2.ZERO) as Vector2,
-			"own": false,
-			"want_tags": ["ENG", "ITA", "POL", "USA"],
-		})
-	for k2 in _ns_plates.keys():
-		var rec2: Dictionary = _ns_plates[k2] as Dictionary
-		var tag := str(k2)
-		rows.append({
-			"who": "NS_%s" % tag,
-			"pos": rec2.get("pos", Vector2.ZERO) as Vector2,
-			"own": tag == GER_TAG,
-			"want_tags": ["GER", "FRA", "JAP", "SOV"],
-		})
-	rows.append({
-		"who": "east_kent_711453",
-		"pos": LIVE_RENDER_EAST_KENT,
-		"own": false,
-		"want_tags": ["ENG", "ITA", "POL", "USA"],
-	})
-	rows.append({
-		"who": "old_eng_chip",
-		"pos": LIVE_OLD_ENG_CHIP,
-		"own": false,
-		"want_tags": ["ENG", "ITA", "POL", "USA"],
-	})
-	for row_v in rows:
-		var row: Dictionary = row_v as Dictionary
-		_click_one(row)
+	var zooms: Array = [0.318, 0.40, 0.80, 1.50]
+	for z_v in zooms:
+		var z: float = float(z_v)
+		_frame_sea_direct(_ch_cluster if _ch_cluster != Vector2.ZERO else LIVE_RENDER_CHANNEL, z, "click_z%.3f" % z)
+		var ch: Dictionary = _collect_sea_plates(CHANNEL)
+		var ns: Dictionary = _collect_sea_plates(NORTH_SEA)
+		if ch.size() >= 4:
+			_ch_plates = ch
+		if ns.size() >= 4:
+			_ns_plates = ns
+		for k in _ch_plates.keys():
+			var rec: Dictionary = _ch_plates[k] as Dictionary
+			_click_one({
+				"who": "z%.3f_CH_%s" % [z, str(k)],
+				"pos": rec.get("pos", Vector2.ZERO) as Vector2,
+				"own": false,
+				"want_tags": ["ENG", "ITA", "POL", "USA"],
+			})
+		for k2 in _ns_plates.keys():
+			var rec2: Dictionary = _ns_plates[k2] as Dictionary
+			var tag := str(k2)
+			_click_one({
+				"who": "z%.3f_NS_%s" % [z, tag],
+				"pos": rec2.get("pos", Vector2.ZERO) as Vector2,
+				"own": tag == GER_TAG,
+				"want_tags": ["GER", "FRA", "JAP", "SOV"],
+			})
+		if z == 0.318 or z == 1.50:
+			_click_one({
+				"who": "z%.3f_east_kent_711453" % z,
+				"pos": LIVE_RENDER_EAST_KENT,
+				"own": false,
+				"want_tags": ["ENG", "ITA", "POL", "USA"],
+			})
+			_click_one({
+				"who": "z%.3f_old_eng_chip" % z,
+				"pos": LIVE_OLD_ENG_CHIP,
+				"own": false,
+				"want_tags": ["ENG", "ITA", "POL", "USA"],
+			})
+			var ger_p: Vector2 = Vector2.ZERO
+			var fra_p: Vector2 = Vector2.ZERO
+			if _ns_plates.has("GER"):
+				ger_p = (_ns_plates["GER"] as Dictionary).get("pos", Vector2.ZERO) as Vector2
+			if _ns_plates.has("FRA"):
+				fra_p = (_ns_plates["FRA"] as Dictionary).get("pos", Vector2.ZERO) as Vector2
+			if ger_p != Vector2.ZERO and fra_p != Vector2.ZERO:
+				_click_one({
+					"who": "z%.3f_GER_nearest_gap" % z,
+					"pos": ger_p.lerp(fra_p, 0.38),
+					"own": true,
+					"want_tags": ["GER"],
+				})
 	_finish(_fail_reasons.is_empty())
 
 
@@ -257,20 +278,22 @@ func _click_one(row: Dictionary) -> void:
 	if not opened and mr.has_method("_try_open_land_unit_at_world"):
 		opened = bool(mr.call("_try_open_land_unit_at_world", pos, false, false))
 	var card := _popup_state()
-	var ok := fo != null and ftype == "fleet" and tag in want
-	if who == "east_kent_711453" or who == "old_eng_chip":
-		ok = ok and tag != GER_TAG and fid.find("Div") < 0
+	var ok := fo != null and ftype == "fleet" and tag in want and opened
+	if who.ends_with("east_kent_711453") or who.ends_with("old_eng_chip"):
+		ok = ok and tag != GER_TAG and fid.find("Div") < 0 and fid.find("Garrison") < 0
+	if who.find("GER_nearest_gap") >= 0:
+		ok = ok and tag == GER_TAG and ftype == "fleet"
 	if own:
 		ok = ok and card["open_fight"] and card["assign"]
 	else:
-		ok = ok and opened and not card["open_fight"] and not card["assign"]
+		ok = ok and not card["open_fight"] and not card["assign"]
 	var line := (
 		"EOA_FLEET2_LIVE who=click name=%s world=%.1f,%.1f fid=%s tag=%s type=%s opened=%s own_card=%s fight=%s assign=%s ok=%s"
 		% [who, pos.x, pos.y, fid, tag, ftype, str(opened), str(own), str(card["open_fight"]), str(card["assign"]), str(ok)]
 	)
 	_log(line)
 	_click_log.append(line)
-	if who == "old_eng_chip":
+	if who.ends_with("old_eng_chip") or who.ends_with("east_kent_711453"):
 		_kent_pick = "%s/%s/%s" % [fid, tag, ftype]
 	if not ok:
 		_fail_reasons.append("click_%s_got_%s_%s" % [who, tag, ftype])
@@ -371,6 +394,10 @@ func _record_plate(icon: Node2D, pid: int, out: Dictionary) -> void:
 	var desig: Node = icon.get_node_or_null("Designation")
 	if desig != null:
 		lab = str(desig.get("text")).replace("\n", " ")
+	var fid := str(icon.get_meta("formation_id", ""))
+	var fo: Variant = icon.get_meta("formation") if icon.has_meta("formation") else null
+	if fo is Object and "formation_id" in fo:
+		fid = str((fo as Object).formation_id)
 	var r: float = 0.0
 	if icon.has_meta("sea_nation_radius"):
 		r = float(icon.get_meta("sea_nation_radius"))
@@ -380,6 +407,7 @@ func _record_plate(icon: Node2D, pid: int, out: Dictionary) -> void:
 	out[tag] = {
 		"pos": pos,
 		"label": lab,
+		"fid": fid,
 		"r": r,
 		"hit": hit,
 		"scale": maxf(icon.scale.x, icon.scale.y),
@@ -416,9 +444,9 @@ func _log_plates(who: String, plates: Dictionary, cluster: Vector2, live_c: Vect
 		var rec: Dictionary = plates[k] as Dictionary
 		var p: Vector2 = rec.get("pos", Vector2.ZERO) as Vector2
 		_log(
-			"EOA_FLEET2_LIVE who=plate sea=%s tag=%s world=%.1f,%.1f r=%.2f hit=%.2f scale=%.3f vis=%s parent=%s label='%s' name=%s"
+			"EOA_FLEET2_LIVE who=plate sea=%s tag=%s fid=%s world=%.1f,%.1f r=%.2f hit=%.2f scale=%.3f vis=%s parent=%s label='%s' name=%s"
 			% [
-				who, str(k), p.x, p.y, float(rec.get("r", 0.0)), float(rec.get("hit", 0.0)),
+				who, str(k), str(rec.get("fid", "")), p.x, p.y, float(rec.get("r", 0.0)), float(rec.get("hit", 0.0)),
 				float(rec.get("scale", 0.0)), str(rec.get("visible", false)),
 				str(rec.get("parent", "")), str(rec.get("label", "")), str(rec.get("name", "")),
 			]
@@ -459,8 +487,8 @@ func _capture(name: String, zoom: float, cam_world: Vector2) -> bool:
 	var path := "%s/%s.png" % [_out_dir, name]
 	img.save_png(path)
 	_captures.append(path)
-	if DirAccess.dir_exists_absolute("/opt/cursor/artifacts/fleet2-fix2b"):
-		img.save_png("/opt/cursor/artifacts/fleet2-fix2b/%s.png" % name)
+	if DirAccess.dir_exists_absolute("/opt/cursor/artifacts/fleet2-fix3"):
+		img.save_png("/opt/cursor/artifacts/fleet2-fix3/%s.png" % name)
 	DirAccess.make_dir_recursive_absolute(REPO_DIR)
 	img.save_png("%s/%s.png" % [REPO_DIR, name])
 	var z := 0.0

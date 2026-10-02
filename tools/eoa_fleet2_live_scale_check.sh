@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# FLEET-2 FIX #2b live-scale check: real world_accurate board, xvfb 1280x740.
+# FLEET-2 FIX #3 live-scale check: real world_accurate board, xvfb 1280x740.
 # GER start, Europe Home, Channel + North Sea at Home zoom and ~1.5.
-# Pixel-assert plate centres. Click all 8 plates + East Kent / old ENG chip.
+# Pixel-assert plate centres. Click all 8 plates at 0.318 / 0.40 / 0.8 / 1.5
+# plus East Kent, old ENG chip, and a GER-nearest gap.
 # xvfb / llvmpipe is NOT live Play. Never EOA_SKIP_TITLE.
 #
 #   tools/eoa_fleet2_live_scale_check.sh

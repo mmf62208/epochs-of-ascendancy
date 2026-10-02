@@ -190,6 +190,7 @@ func _run() -> void:
 	_test_h_cluster_pad_nearest()
 	_test_i_labels_have_nation_tag()
 	_test_j_renderer_space_anchor()
+	_test_k_spread_band_live_clicks()
 	_cleanup()
 
 
@@ -271,6 +272,22 @@ func _test_source_needles() -> void:
 		return
 	if "func _sea_nation_counter_scale" not in ren:
 		_fail("sea-nation chip must shrink to the hit disk")
+		return
+	if "func _pick_sea_nation_plate_drawn_at_world" not in ren:
+		_fail("FIX #3 drawn sea-plate pick missing")
+		return
+	if "func _nation_fleet_rank" not in ren:
+		_fail("FIX #3 per-nation fleet ordinal missing")
+		return
+	if "maxi(index, 0) + 1" in ren:
+		_fail("plate label must not use sea-stack index+1")
+		return
+	var land3 := _slice_func(ren, "_try_open_land_unit_at_world")
+	if "_pick_sea_nation_plate_drawn_at_world" not in land3:
+		_fail("land open must bind a drawn sea plate before the own-land disk")
+		return
+	if "_pick_nearest_sea_nation_in_cluster_pad" not in land3:
+		_fail("land open must bind own-GER cluster-pad (not sea-zone inspector)")
 		return
 	_pass("FLEET-2 source needles (FLEET-1 / MV-1b unedited)")
 
@@ -1044,6 +1061,14 @@ func _test_i_labels_have_nation_tag() -> void:
 			if label.length() > 14:
 				_fail("(i) SOV label still too long / truncated path: '%s'" % label)
 				return
+		# FIX #3 (c): POL/USA/SOV are each the nation's only fleet — not stack 3/4.
+		if tag == POL_TAG or tag == USA_TAG or tag == SOV_TAG:
+			if "Fleet 3" in label or "Fleet 4" in label:
+				_fail("(i) %s label '%s' used sea-stack index, not per-nation ordinal" % [tag, label])
+				return
+			if "Fleet 1" not in label:
+				_fail("(i) %s label '%s' want per-nation Fleet 1" % [tag, label])
+				return
 	_pass("(i) plate labels are 'TAG Fleet N'; POL/USA/SOV included; SOV not truncated")
 
 
@@ -1110,6 +1135,62 @@ func _test_j_renderer_space_anchor() -> void:
 		% [str(ch_c), str(LIVE_RENDER_CHANNEL), str(ns_c), str(LIVE_RENDER_NORTH_SEA)]
 	)
 	_pass("(j) cluster centres sit in renderer world (Channel %s / NS %s), not unscaled geo" % [str(ch_c), str(ns_c)])
+
+
+func _apply_zoom(z: float) -> void:
+	if _cam != null:
+		_cam.zoom = Vector2(z, z)
+		_cam.position = Vector2(7160.0, 1480.0)
+		_cam.make_current()
+	if _mr != null and _mr.has_method("_sync_unit_counter_scales"):
+		_mr.call("_sync_unit_counter_scales", z)
+	if _mr != null and _mr.has_method("_sync_sea_nation_fleet_offsets"):
+		_mr.call("_sync_sea_nation_fleet_offsets", z)
+
+
+func _test_k_spread_band_live_clicks() -> void:
+	# Live renderer-world plates at the Play-fail zooms. A nearby GER land
+	# chip reproduces the Home-band steal; drawn sea body must still win.
+	var zooms: Array = [0.318, 0.40]
+	for z_v in zooms:
+		var z: float = float(z_v)
+		_apply_zoom(z)
+		if not _resolve_marker_coords():
+			return
+		var steal: Vector2 = _eng_ch + Vector2(36.0, 24.0)
+		var land_icon: Node2D = _place_land_chip_at(MAGINOT, FID_GER_LAND, steal)
+		if land_icon != null:
+			land_icon.scale = Vector2(8.0, 8.0)
+			land_icon.visible = true
+		var rows: Array = [
+			{"tag": ENG_TAG, "pos": _eng_ch, "fid": FID_ENG_FLEET, "own": false},
+			{"tag": ITA_TAG, "pos": _ita_ch, "fid": FID_ITA_FLEET, "own": false},
+			{"tag": POL_TAG, "pos": _pol_ch, "fid": FID_POL_FLEET, "own": false},
+			{"tag": USA_TAG, "pos": _usa_ch, "fid": FID_USA_FLEET, "own": false},
+			{"tag": GER_TAG, "pos": _ger_ns, "fid": FID_GER_FLEET, "own": true},
+			{"tag": FRA_TAG, "pos": _fra_ns, "fid": FID_FRA_FLEET_SEA, "own": false},
+			{"tag": JAP_TAG, "pos": _jap_ns, "fid": FID_JAP_FLEET, "own": false},
+			{"tag": SOV_TAG, "pos": _sov_ns, "fid": FID_SOV_FLEET, "own": false},
+		]
+		for rec_v in rows:
+			var rec: Dictionary = rec_v as Dictionary
+			var tag: String = str(rec["tag"])
+			var pos: Vector2 = rec["pos"] as Vector2
+			var fid: String = str(rec["fid"])
+			var own: bool = bool(rec["own"])
+			if not _assert_plate_picks_own("(k) z=%.3f %s" % [z, tag], pos, fid, own):
+				return
+			if _selected_fid() == FID_GER_LAND:
+				_fail("(k) z=%.3f %s opened GER land — Home-band steal" % [z, tag])
+				return
+		var gap: Vector2 = _ger_ns.lerp(_fra_ns, 0.38)
+		if not _assert_plate_picks_own("(k) z=%.3f GER-nearest-gap" % z, gap, FID_GER_FLEET, true):
+			return
+		if _selected_fid() == "" or _info != null and _info.visible:
+			_fail("(k) z=%.3f GER-nearest-gap opened the sea-zone inspector" % z)
+			return
+	_apply_zoom(1.0)
+	_pass("(k) all 8 plates at z0.318 and z0.40 open their fleet (GER own / others read-only); GER-nearest gap binds the fleet")
 
 
 func _place_land_chip_at(pid: int, fid: String, world: Vector2) -> Node2D:
