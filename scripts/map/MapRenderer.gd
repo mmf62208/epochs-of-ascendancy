@@ -19489,56 +19489,46 @@ func _nearest_player_land_formation_at_world(world_pos: Vector2) -> Object:
 		return null
 	for id_v in _demo_unit_icon_pids:
 		var id: int = int(id_v)
-		if not province_nodes.has(id):
-			continue
-		var n: Node2D = province_nodes[id] as Node2D
-		if n == null:
-			continue
-		var counter: Node2D = n.get_node_or_null("DemoUnitIcon_" + str(id)) as Node2D
-		if counter == null or not is_instance_valid(counter):
-			continue
-		if not counter.visible:
-			continue
-		# Painted chrome after Home/fit — not AABB-floor widen.
-		var chip_pos: Vector2 = counter.global_position
-		if chip_pos == Vector2.ZERO:
-			chip_pos = counter.position
-			if chip_pos == Vector2.ZERO:
-				chip_pos = province_centroids.get(id, Vector2.ZERO) as Vector2
-				if chip_pos != Vector2.ZERO:
-					chip_pos += _unit_chip_offset_for_pid(id)
-		var hit_r: float = _unit_counter_hit_radius_world(z, counter)
-		var accept_r: float = maxf(hit_r, CHROME_SPILL_WORLD)
-		var d: float = world_pos.distance_to(chip_pos)
-		if d > accept_r:
-			continue
-		var fo: Object = null
-		if counter.has_meta("formation"):
-			var fmeta: Variant = counter.get_meta("formation")
-			if fmeta is Object and is_instance_valid(fmeta as Object):
-				fo = fmeta as Object
-		if fo == null:
-			var fid: String = str(counter.get_meta("formation_id", ""))
-			if not fid.is_empty() and typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_formation"):
-				var f2: Variant = LeaderManager.get_formation(fid)
-				if f2 is Object:
-					fo = f2 as Object
-		# Chrome → station: air/fleet/space pin can sit on a GER land hex.
-		if fo != null and land_only and _formation_type_blocks_land_open(fo):
-			var chrome_pid: int = int(fo.stationed_province_id) if "stationed_province_id" in fo else id
-			fo = _player_land_formation_at_province(chrome_pid)
-		if fo == null:
-			var pin_pid: int = int(counter.get_meta("province_id", id))
-			fo = _player_land_formation_at_province(pin_pid)
-		if fo == null:
-			continue
-		if land_only and _formation_type_blocks_land_open(fo):
-			continue
-		if player_only and not _formation_is_player_tag(fo):
-			continue
-		if d <= best_d:
-			best_d = d
-			best = fo
+		for c_v in _iter_demo_unit_icons_at_pid(id):
+			var counter: Node2D = c_v as Node2D
+			if counter == null or not is_instance_valid(counter):
+				continue
+			if not counter.visible:
+				continue
+			# Painted chrome after Home/fit — not AABB-floor widen.
+			var chip_pos: Vector2 = _demo_unit_icon_world_pos(counter, id)
+			var hit_r: float = _demo_unit_icon_hit_radius_world(z, counter)
+			var accept_r: float = maxf(hit_r, CHROME_SPILL_WORLD)
+			var d: float = world_pos.distance_to(chip_pos)
+			if d > accept_r:
+				continue
+			var fo: Object = null
+			if counter.has_meta("formation"):
+				var fmeta: Variant = counter.get_meta("formation")
+				if fmeta is Object and is_instance_valid(fmeta as Object):
+					fo = fmeta as Object
+			if fo == null:
+				var fid: String = str(counter.get_meta("formation_id", ""))
+				if not fid.is_empty() and typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_formation"):
+					var f2: Variant = LeaderManager.get_formation(fid)
+					if f2 is Object:
+						fo = f2 as Object
+			# Chrome → station: air/fleet/space pin can sit on a GER land hex.
+			if fo != null and land_only and _formation_type_blocks_land_open(fo):
+				var chrome_pid: int = int(fo.stationed_province_id) if "stationed_province_id" in fo else id
+				fo = _player_land_formation_at_province(chrome_pid)
+			if fo == null:
+				var pin_pid: int = int(counter.get_meta("province_id", id))
+				fo = _player_land_formation_at_province(pin_pid)
+			if fo == null:
+				continue
+			if land_only and _formation_type_blocks_land_open(fo):
+				continue
+			if player_only and not _formation_is_player_tag(fo):
+				continue
+			if d <= best_d:
+				best_d = d
+				best = fo
 	return best
 
 
@@ -19778,31 +19768,28 @@ func _refresh_selected_unit_chip() -> void:
 			sel_pid = int(sel_f.stationed_province_id)
 	for id_v in _demo_unit_icon_pids:
 		var id := int(id_v)
-		if not province_nodes.has(id):
-			continue
-		var n: Node2D = province_nodes[id] as Node2D
-		if n == null:
-			continue
-		var counter: Node2D = n.get_node_or_null("DemoUnitIcon_" + str(id)) as Node2D
-		if counter == null or not is_instance_valid(counter):
-			continue
-		# Visual ring only — no button signals. Safe to free() after detach.
-		var old_sel: Node = counter.get_node_or_null("SelectedFrame")
-		if old_sel != null:
-			counter.remove_child(old_sel)
-			old_sel.free()
-		if selected_formation_id.is_empty() or sel_pid < 0:
-			continue
-		# Province pin match (one DemoUnitIcon per pid); formation_id equality is optional fast path.
-		var pin_pid := int(counter.get_meta("province_id", id))
-		var cfid := str(counter.get_meta("formation_id", ""))
-		var match_pin := pin_pid == sel_pid or (not cfid.is_empty() and cfid == selected_formation_id)
-		if not match_pin:
-			continue
-		var frame := _make_unit_nation_frame(gold)
-		frame.name = "SelectedFrame"
-		frame.z_index = 20
-		counter.add_child(frame)
+		for c_v in _iter_demo_unit_icons_at_pid(id):
+			var counter: Node2D = c_v as Node2D
+			if counter == null or not is_instance_valid(counter):
+				continue
+			# Visual ring only — no button signals. Safe to free() after detach.
+			var old_sel: Node = counter.get_node_or_null("SelectedFrame")
+			if old_sel != null:
+				counter.remove_child(old_sel)
+				old_sel.free()
+			if selected_formation_id.is_empty() or sel_pid < 0:
+				continue
+			# Province pin or exact formation (FLEET-2: one disk per sea nation).
+			var pin_pid := int(counter.get_meta("province_id", id))
+			var cfid := str(counter.get_meta("formation_id", ""))
+			var match_fid := not cfid.is_empty() and cfid == selected_formation_id
+			var match_pin := pin_pid == sel_pid and not bool(counter.get_meta("sea_nation_disk", false))
+			if not match_fid and not match_pin:
+				continue
+			var frame := _make_unit_nation_frame(gold)
+			frame.name = "SelectedFrame"
+			frame.z_index = 20
+			counter.add_child(frame)
 
 
 ## Cycle stack at selected unit's province ([ ] keys / unit card buttons). One pin per province.
@@ -20200,18 +20187,14 @@ func mv1_formation_screen_pos(fid: String) -> Vector2:
 		return Vector2.ZERO
 	for id_v in _demo_unit_icon_pids:
 		var id := int(id_v)
-		if not province_nodes.has(id):
-			continue
-		var n: Node2D = province_nodes[id] as Node2D
-		if n == null:
-			continue
-		var counter: Node2D = n.get_node_or_null("DemoUnitIcon_" + str(id)) as Node2D
-		if counter == null or not is_instance_valid(counter):
-			continue
-		var cfid := str(counter.get_meta("formation_id", ""))
-		if cfid != want:
-			continue
-		return mv1_world_to_screen(counter.global_position)
+		for c_v in _iter_demo_unit_icons_at_pid(id):
+			var counter: Node2D = c_v as Node2D
+			if counter == null or not is_instance_valid(counter):
+				continue
+			var cfid := str(counter.get_meta("formation_id", ""))
+			if cfid != want:
+				continue
+			return mv1_world_to_screen(counter.global_position)
 	return Vector2.ZERO
 
 
@@ -20433,60 +20416,50 @@ func _pick_unit_formation_at_world(world_pos: Vector2, land_only: bool = false, 
 	var p_tag := _player_tag()
 	for id_v in _demo_unit_icon_pids:
 		var id := int(id_v)
-		if not province_nodes.has(id):
-			continue
-		var n: Node2D = province_nodes[id] as Node2D
-		if n == null:
-			continue
-		var counter: Node2D = n.get_node_or_null("DemoUnitIcon_" + str(id)) as Node2D
-		if counter == null or not is_instance_valid(counter):
-			continue
-		# Hidden pins (strategic LOD) must not steal hex clicks.
-		if not counter.visible:
-			continue
-		# Live painted plate after Home/fit. Prefer chrome world pos (not AABB-floor widen).
-		var chip_pos: Vector2 = counter.global_position
-		if chip_pos == Vector2.ZERO:
-			chip_pos = counter.position
-			if chip_pos == Vector2.ZERO:
-				chip_pos = province_centroids.get(id, Vector2.ZERO) as Vector2
-				if chip_pos != Vector2.ZERO:
-					chip_pos += _unit_chip_offset_for_pid(id)
-		# Home-band chips paint plate+label; half-plate disk misses chrome/label.
-		var hit_r := _unit_counter_hit_radius_world(z, counter)
-		var hit_r2 := hit_r * hit_r
-		var d := world_pos.distance_squared_to(chip_pos)
-		if d > hit_r2:
-			continue
-		var fo: Object = null
-		if counter.has_meta("formation"):
-			var fmeta: Variant = counter.get_meta("formation")
-			if fmeta is Object and is_instance_valid(fmeta as Object):
-				fo = fmeta as Object
-		if fo == null:
-			var fid := str(counter.get_meta("formation_id", ""))
-			if not fid.is_empty() and typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_formation"):
-				var f2: Variant = LeaderManager.get_formation(fid)
-				if f2 is Object:
-					fo = f2 as Object
-		if fo == null:
-			continue
-		if land_only and _formation_type_blocks_land_open(fo):
-			continue
-		if player_only:
-			if p_tag.is_empty() or not ("country_tag" in fo):
+		for c_v in _iter_demo_unit_icons_at_pid(id):
+			var counter: Node2D = c_v as Node2D
+			if counter == null or not is_instance_valid(counter):
 				continue
-			if str(fo.country_tag).strip_edges().to_upper() != p_tag:
+			# Hidden pins (strategic LOD) must not steal hex clicks.
+			if not counter.visible:
 				continue
-		# Inclusive disk: accept boundary (d == hit_r2) as a valid best.
-		if d <= best_any_d:
-			best_any_d = d
-			best_any = fo
-		# Prefer player-tag pins; closest player pin wins on overlap.
-		if not p_tag.is_empty() and "country_tag" in fo:
-			if str(fo.country_tag).strip_edges().to_upper() == p_tag and d <= best_player_d:
-				best_player_d = d
-				best_player = fo
+			# Live painted plate after Home/fit. Prefer chrome world pos (not AABB-floor widen).
+			var chip_pos: Vector2 = _demo_unit_icon_world_pos(counter, id)
+			# Home-band chips paint plate+label; stacked sea-nation disks use the plate.
+			var hit_r := _demo_unit_icon_hit_radius_world(z, counter)
+			var hit_r2 := hit_r * hit_r
+			var d := world_pos.distance_squared_to(chip_pos)
+			if d > hit_r2:
+				continue
+			var fo: Object = null
+			if counter.has_meta("formation"):
+				var fmeta: Variant = counter.get_meta("formation")
+				if fmeta is Object and is_instance_valid(fmeta as Object):
+					fo = fmeta as Object
+			if fo == null:
+				var fid := str(counter.get_meta("formation_id", ""))
+				if not fid.is_empty() and typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_formation"):
+					var f2: Variant = LeaderManager.get_formation(fid)
+					if f2 is Object:
+						fo = f2 as Object
+			if fo == null:
+				continue
+			if land_only and _formation_type_blocks_land_open(fo):
+				continue
+			if player_only:
+				if p_tag.is_empty() or not ("country_tag" in fo):
+					continue
+				if str(fo.country_tag).strip_edges().to_upper() != p_tag:
+					continue
+			# Inclusive disk: accept boundary (d == hit_r2) as a valid best.
+			if d <= best_any_d:
+				best_any_d = d
+				best_any = fo
+			# Prefer player-tag pins; closest player pin wins on overlap.
+			if not p_tag.is_empty() and "country_tag" in fo:
+				if str(fo.country_tag).strip_edges().to_upper() == p_tag and d <= best_player_d:
+					best_player_d = d
+					best_player = fo
 	if best_player != null:
 		return best_player
 	if player_only:
@@ -25403,6 +25376,101 @@ func _unit_chip_offset_for_pid(pid: int) -> Vector2:
 	return Vector2(0, -12)
 
 
+func _unit_chip_base_world(pid: int) -> Vector2:
+	var chip_pos: Vector2 = _unit_chip_offset_for_pid(pid)
+	if province_centroids.has(pid):
+		chip_pos = (province_centroids[pid] as Vector2) + _unit_chip_offset_for_pid(pid)
+	return chip_pos
+
+
+func _iter_demo_unit_icons_at_pid(id: int) -> Array:
+	var out: Array = []
+	if not province_nodes.has(id):
+		return out
+	var n: Node2D = province_nodes[id] as Node2D
+	if n == null:
+		return out
+	for c in n.get_children():
+		if c is Node2D and str(c.name).begins_with("DemoUnitIcon_"):
+			out.append(c)
+	return out
+
+
+func _demo_unit_icon_world_pos(counter: Node2D, id: int) -> Vector2:
+	if counter == null or not is_instance_valid(counter):
+		return _unit_chip_base_world(id)
+	var chip_pos: Vector2 = counter.global_position
+	if chip_pos == Vector2.ZERO:
+		chip_pos = counter.position
+		if chip_pos == Vector2.ZERO:
+			chip_pos = _unit_chip_base_world(id)
+	return chip_pos
+
+
+func _sea_nation_fleet_disk_radius_world(z: float, counter: Node2D = null) -> float:
+	# Compact plate disk for a stacked sea-nation marker. No 48px floor / label
+	# pad — those inflate Home-band AABB hit and would shove neighbours onto land.
+	var zz: float = maxf(z, 0.05)
+	var cscale: float = 0.0
+	if counter != null and is_instance_valid(counter):
+		cscale = maxf(counter.scale.x, counter.scale.y)
+	if cscale < 0.05:
+		cscale = _unit_counter_scale_for_zoom(zz)
+	var plate_half: float = 0.5 * 32.0 * cscale * sqrt(2.0)
+	return maxf(plate_half + 4.0, 20.0)
+
+
+func _sea_nation_fleet_stack_offsets(count: int, radius: float) -> Array:
+	var out: Array = []
+	if count <= 1:
+		out.append(Vector2.ZERO)
+		return out
+	var gap: float = 8.0
+	var step: float = 2.0 * radius + gap
+	var mid: float = 0.5 * float(count - 1)
+	for i in count:
+		var t: float = float(i) - mid
+		var y: float = 0.0
+		if count >= 3:
+			y = -6.0 if (i % 2) == 0 else 6.0
+		out.append(Vector2(t * step, y))
+	return out
+
+
+func _demo_unit_icon_hit_radius_world(z: float, counter: Node2D = null) -> float:
+	if counter != null and is_instance_valid(counter) and bool(counter.get_meta("sea_nation_disk", false)):
+		return _sea_nation_fleet_disk_radius_world(z, counter)
+	return _unit_counter_hit_radius_world(z, counter)
+
+
+func _sync_sea_nation_fleet_offsets(z: float) -> void:
+	if _demo_unit_icon_pids.is_empty():
+		return
+	for id_v in _demo_unit_icon_pids:
+		var id: int = int(id_v)
+		var stacked: Array = []
+		for c_v in _iter_demo_unit_icons_at_pid(id):
+			var c: Node2D = c_v as Node2D
+			if c == null or not is_instance_valid(c):
+				continue
+			if bool(c.get_meta("sea_nation_disk", false)):
+				stacked.append(c)
+		if stacked.size() <= 1:
+			continue
+		stacked.sort_custom(
+			func(a: Node2D, b: Node2D) -> bool:
+				return int(a.get_meta("sea_nation_index", 0)) < int(b.get_meta("sea_nation_index", 0))
+		)
+		var r: float = _sea_nation_fleet_disk_radius_world(z, stacked[0] as Node2D)
+		var offs: Array = _sea_nation_fleet_stack_offsets(stacked.size(), r)
+		var base: Vector2 = _unit_chip_base_world(id)
+		for i in stacked.size():
+			var icon: Node2D = stacked[i] as Node2D
+			if icon == null:
+				continue
+			icon.position = base + (offs[i] as Vector2)
+
+
 func _sync_unit_counter_scales(z: float = -1.0) -> void:
 	if _demo_unit_icon_pids.is_empty():
 		return
@@ -25418,6 +25486,10 @@ func _sync_unit_counter_scales(z: float = -1.0) -> void:
 		for c in node.get_children():
 			if c is Node2D and str(c.name).begins_with("DemoUnitIcon_"):
 				(c as Node2D).scale = sv
+	var zz: float = z
+	if zz < 0.0:
+		zz = _get_camera_zoom() if has_method("_get_camera_zoom") else 1.0
+	_sync_sea_nation_fleet_offsets(zz)
 
 
 func _unit_counters_want_visible(z: float = -1.0) -> bool:
@@ -28734,6 +28806,10 @@ func _rebuild_demo_unit_icons(only_pids: Dictionary) -> void:
 	if by_pid.has("_samples") and by_pid["_samples"] is Dictionary:
 		stack_samples = by_pid["_samples"] as Dictionary
 		by_pid.erase("_samples")
+	var sea_nations: Dictionary = {}
+	if by_pid.has("_sea_nations") and by_pid["_sea_nations"] is Dictionary:
+		sea_nations = by_pid["_sea_nations"] as Dictionary
+		by_pid.erase("_sea_nations")
 
 	var tex_cache: Dictionary = {}  # path -> Texture2D
 	var icons_placed := 0
@@ -28756,6 +28832,24 @@ func _rebuild_demo_unit_icons(only_pids: Dictionary) -> void:
 			force_tag = str(ff.country_tag)
 		var stack_n := int(stack_counts.get(id, 1))
 		var samples: Array = stack_samples.get(id, []) as Array
+		var sea_jobs: Array = _demo_icon_jobs_for_province(id, ff, force_tag, sea_nations)
+		if sea_jobs.size() > 1:
+			for ji in sea_jobs.size():
+				var job: Dictionary = sea_jobs[ji] as Dictionary
+				_place_sea_nation_fleet_counter(
+					n,
+					id,
+					job.get("fo") as Object if job.get("fo") is Object else ff,
+					str(job.get("tag", force_tag)),
+					str(job.get("name", "DemoUnitIcon_%d" % id)),
+					job.get("offset", Vector2.ZERO) as Vector2,
+					ji,
+					sea_jobs.size(),
+					tex_cache
+				)
+			_demo_unit_icon_pids.append(id)
+			icons_placed += sea_jobs.size()
+			continue
 
 		var counter := Node2D.new()
 		counter.name = "DemoUnitIcon_" + str(id)
@@ -28991,12 +29085,182 @@ func _rebuild_demo_unit_icons(only_pids: Dictionary) -> void:
 		_refresh_selected_unit_chip()
 
 
+func _sorted_sea_nation_tags(tags: Array) -> Array:
+	var out: Array = []
+	var ptag: String = _player_tag()
+	if not ptag.is_empty() and ptag in tags:
+		out.append(ptag)
+	var rest: Array = []
+	for t_v in tags:
+		var t: String = str(t_v).strip_edges().to_upper()
+		if t.is_empty() or t == ptag:
+			continue
+		rest.append(t)
+	rest.sort()
+	for r_v in rest:
+		out.append(str(r_v))
+	return out
+
+
+func _demo_icon_jobs_for_province(id: int, ff: Object, force_tag: String, sea_nations: Dictionary) -> Array:
+	var jobs: Array = []
+	if not _province_id_is_sea(id):
+		jobs.append({
+			"fo": ff,
+			"tag": force_tag,
+			"name": "DemoUnitIcon_" + str(id),
+			"offset": Vector2.ZERO,
+			"sea_disk": false,
+		})
+		return jobs
+	var reps_v: Variant = sea_nations.get(id, [])
+	var reps: Array = reps_v as Array if reps_v is Array else []
+	if reps.size() <= 1:
+		jobs.append({
+			"fo": ff,
+			"tag": force_tag,
+			"name": "DemoUnitIcon_" + str(id),
+			"offset": Vector2.ZERO,
+			"sea_disk": false,
+		})
+		return jobs
+	var z: float = 1.0
+	if has_method("_get_camera_zoom"):
+		z = _get_camera_zoom()
+	var r: float = _sea_nation_fleet_disk_radius_world(z, null)
+	var offs: Array = _sea_nation_fleet_stack_offsets(reps.size(), r)
+	for i in reps.size():
+		var rec: Dictionary = reps[i] as Dictionary if reps[i] is Dictionary else {}
+		var tag: String = str(rec.get("tag", "")).strip_edges().to_upper()
+		var nfo: Object = rec.get("fo") as Object if rec.get("fo") is Object else ff
+		if tag.is_empty():
+			continue
+		jobs.append({
+			"fo": nfo,
+			"tag": tag,
+			"name": "DemoUnitIcon_%d_%s" % [id, tag],
+			"offset": offs[i] as Vector2 if i < offs.size() else Vector2.ZERO,
+			"sea_disk": true,
+			"index": i,
+			"count": reps.size(),
+		})
+	if jobs.is_empty():
+		jobs.append({
+			"fo": ff,
+			"tag": force_tag,
+			"name": "DemoUnitIcon_" + str(id),
+			"offset": Vector2.ZERO,
+			"sea_disk": false,
+		})
+	return jobs
+
+
+func _place_sea_nation_fleet_counter(
+	host: Node2D,
+	id: int,
+	fo: Object,
+	tag: String,
+	icon_name: String,
+	extra_off: Vector2,
+	index: int,
+	count: int,
+	tex_cache: Dictionary
+) -> void:
+	if host == null:
+		return
+	var counter := Node2D.new()
+	counter.name = icon_name
+	counter.position = _unit_chip_base_world(id) + extra_off
+	counter.z_index = 28
+	counter.z_as_relative = false
+	counter.scale = Vector2.ONE * _unit_counter_scale_for_zoom()
+	counter.visible = _unit_counters_want_visible()
+	if fo != null:
+		if "formation_id" in fo:
+			counter.set_meta("formation_id", str(fo.formation_id))
+		counter.set_meta("formation", fo)
+	counter.set_meta("province_id", id)
+	counter.set_meta("sea_nation_disk", true)
+	counter.set_meta("sea_nation_tag", tag)
+	counter.set_meta("sea_nation_index", index)
+	counter.set_meta("sea_nation_count", count)
+	host.add_child(counter)
+	var nation_tag: String = tag
+	var nation_col := Color(0.85, 0.88, 0.95, 1.0)
+	if not nation_tag.is_empty() and typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_country_color"):
+		nation_col = MapManager.get_country_color(nation_tag)
+	var tex_path := "res://assets/graphics/units/retrowave/battleship_32.png"
+	if fo != null:
+		var dsn := ""
+		if "naval_design_id" in fo and str(fo.naval_design_id) != "":
+			dsn = str(fo.naval_design_id).to_lower()
+		elif "design_id" in fo:
+			dsn = str(fo.design_id).to_lower()
+		if "sub" in dsn or "uboat" in dsn:
+			tex_path = "res://assets/graphics/units/nato/ww2/submarine_32.png"
+		elif "carrier" in dsn:
+			tex_path = "res://assets/graphics/units/nato/ww2/carrier_32.png"
+		elif "cruiser" in dsn:
+			tex_path = "res://assets/graphics/units/nato/ww2/cruiser_32.png"
+		elif "destroyer" in dsn or "fletcher" in dsn:
+			tex_path = "res://assets/graphics/units/nato/ww2/destroyer_32.png"
+	tex_path = _prefer_retrowave_unit_icon(tex_path)
+	var tex: Texture2D = null
+	if tex_cache.has(tex_path):
+		tex = tex_cache[tex_path] as Texture2D
+	elif ResourceLoader.exists(tex_path):
+		tex = load(tex_path) as Texture2D
+		tex_cache[tex_path] = tex
+	if tex:
+		var spr := Sprite2D.new()
+		spr.texture = tex
+		spr.centered = true
+		spr.position = Vector2(0, -2)
+		spr.scale = Vector2(0.82, 0.82)
+		spr.z_index = 1
+		spr.modulate = Color.WHITE
+		counter.add_child(spr)
+		if not nation_tag.is_empty():
+			counter.add_child(_make_unit_nation_frame(nation_col))
+	_attach_unit_counter_chrome(counter, fo, nation_col)
+	var z: float = 1.0
+	if has_method("_get_camera_zoom"):
+		z = _get_camera_zoom()
+	var disk_r: float = _sea_nation_fleet_disk_radius_world(z, counter)
+	_attach_sea_nation_fleet_disk(counter, disk_r, nation_col)
+
+
+func _attach_sea_nation_fleet_disk(counter: Node2D, radius_world: float, nation_col: Color) -> void:
+	if counter == null or not is_instance_valid(counter):
+		return
+	var old: Node = counter.get_node_or_null("SeaNationDisk")
+	if old != null:
+		counter.remove_child(old)
+		old.free()
+	var s: float = maxf(counter.scale.x, 0.05)
+	var local_r: float = radius_world / s
+	var disc := Polygon2D.new()
+	disc.name = "SeaNationDisk"
+	var pts := PackedVector2Array()
+	var i := 0
+	while i < 16:
+		var a: float = TAU * float(i) / 16.0
+		pts.append(Vector2(cos(a), sin(a)) * local_r)
+		i += 1
+	disc.polygon = pts
+	disc.color = Color(nation_col.r, nation_col.g, nation_col.b, 0.42)
+	disc.z_index = 0
+	counter.add_child(disc)
+	counter.move_child(disc, 0)
+
+
 ## O(formations + deployments) index for unit icons.
 ## Returns { province_id: Formation|String, "_counts": {...}, "_samples": {pid: Array} }.
 func _build_stationed_formation_index_for_icons() -> Dictionary:
 	var by_pid: Dictionary = {}
 	var counts: Dictionary = {}
 	var samples: Dictionary = {}
+	var sea_nation_buckets: Dictionary = {}
 	# Prefer full Formation objects from LeaderManager (all countries, land/air/naval).
 	if typeof(LeaderManager) != TYPE_NIL and "formations" in LeaderManager:
 		for fid_v in LeaderManager.formations.keys():
@@ -29016,6 +29280,17 @@ func _build_stationed_formation_index_for_icons() -> Dictionary:
 			if arr.size() < 4:
 				arr.append(fo)
 				samples[sid] = arr
+			if _formation_is_fleet_counter(fo) and _province_id_is_sea(sid):
+				var ntag := str(fo.country_tag).strip_edges().to_upper() if "country_tag" in fo else ""
+				if not ntag.is_empty():
+					if not sea_nation_buckets.has(sid):
+						sea_nation_buckets[sid] = {}
+					var bucket: Dictionary = sea_nation_buckets[sid] as Dictionary
+					if not bucket.has(ntag):
+						bucket[ntag] = fo
+					elif _formation_is_player_tag(fo) and not _formation_is_player_tag(bucket[ntag] as Object):
+						bucket[ntag] = fo
+					sea_nation_buckets[sid] = bucket
 	# division_deployments may station engineers/templates without a full Formation object.
 	if typeof(SupplyManager) != TYPE_NIL and "division_deployments" in SupplyManager:
 		var deps: Dictionary = SupplyManager.division_deployments as Dictionary
@@ -29043,8 +29318,21 @@ func _build_stationed_formation_index_for_icons() -> Dictionary:
 			counts[pid2] = int(counts.get(pid2, 0)) + 1
 			if not by_pid.has(pid2):
 				by_pid[pid2] = tag2 if not tag2.is_empty() else "UNK"
+	var sea_list: Dictionary = {}
+	for pid_v2 in sea_nation_buckets.keys():
+		var pid2 := int(pid_v2)
+		var bucket2: Dictionary = sea_nation_buckets[pid_v2] as Dictionary
+		var tags2: Array = _sorted_sea_nation_tags(bucket2.keys())
+		var arr2: Array = []
+		for t_v in tags2:
+			var tg := str(t_v)
+			if bucket2.has(tg):
+				arr2.append({"tag": tg, "fo": bucket2[tg]})
+		if not arr2.is_empty():
+			sea_list[pid2] = arr2
 	by_pid["_counts"] = counts
 	by_pid["_samples"] = samples
+	by_pid["_sea_nations"] = sea_list
 	return by_pid
 
 

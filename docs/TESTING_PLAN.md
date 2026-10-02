@@ -544,7 +544,7 @@ With a unit selected, hovering own/controlled land shows a dimmer dashed `MarchP
 
 ### FLEET-1 land-spill vs foreign fleet / open sea (draft HOLD)
 
-Nearest-own-land chrome spill (`CHROME_SPILL_WORLD` 340) must not steal a click on a foreign fleet counter or on open sea. Gate: `_try_open_land_unit_at_world` calls `_nearest_player_land_formation_at_world` only when GIS at `event.position` is a land province **and** `_pick_unit_formation_at_world` missed every counter (`fo_any == null`). **FIX #1 (Play MIXED `582263e8`):** a foreign fleet disk hit inspects that fleet when the fleet's **own stationed pid is sea**, even if GIS under the cursor is coastal land (ENG Channel chip over East Kent `711453`). Land-stationed foreign fleet (MV-1b Köln FRA `710417`) still falls through. Foreign fleet **and** foreign land cards hide Open fight / Assign leader; march stays blocked. Own cards unchanged. Hit-test priority otherwise unchanged. MV-1 / MV-1b gates **unedited**. Out of scope: one marker per shared sea, Channel / Rio Grande Rise polygons, Pas-de-Calais FRA-land spill.
+Nearest-own-land chrome spill (`CHROME_SPILL_WORLD` 340) must not steal a click on a foreign fleet counter or on open sea. Gate: `_try_open_land_unit_at_world` calls `_nearest_player_land_formation_at_world` only when GIS at `event.position` is a land province **and** `_pick_unit_formation_at_world` missed every counter (`fo_any == null`). **FIX #1 (Play MIXED `582263e8`):** a foreign fleet disk hit inspects that fleet when the fleet's **own stationed pid is sea**, even if GIS under the cursor is coastal land (ENG Channel chip over East Kent `711453`). Land-stationed foreign fleet (MV-1b Köln FRA `710417`) still falls through. Foreign fleet **and** foreign land cards hide Open fight / Assign leader; march stays blocked. Own cards unchanged. Hit-test priority otherwise unchanged. MV-1 / MV-1b gates **unedited**. Out of scope: Channel / Rio Grande Rise polygons, Pas-de-Calais FRA-land spill. Shared-sea one-marker-per-nation is FLEET-2.
 
 Guard: `HeadlessFleet1LandSpillGateTest` + `tools/eoa_fleet1_guard.sh` (hd + xvfb 1280×740). Seeds are real `world_accurate` label_anchors:
 
@@ -581,6 +581,21 @@ Isolated keep-green (`95009fee`; wrapper `rss_mb` preferred; MV-1/MV-1b **unedit
 | MV-1e 15/15 @ 4× | hd+xvfb | PASS | **1195.6 / 1330.6** |
 | Seeded RX-1 mid_river ON/OFF | xvfb | PASS units-off **0.749** / close 0.775 / spine 1.000 | wrapper no RSS (typical isolated ~2046) |
 | UI-1 guard hd+xvfb | both | PASS | **1200.2 / 1343.7** |
+
+### FLEET-2 shared-sea per-nation fleet markers (draft HOLD)
+
+When several nations' fleets share one sea province, draw one marker per nation (side-by-side / small fan) so each has its own clickable disk. Hit-test walks every `DemoUnitIcon_*` and uses the drawn plate radius for stacked sea-nation disks. Own disk → full own card; foreign disk → FLEET-1 read-only card (no Open fight / Assign; march blocked). Single-nation sea provinces keep `DemoUnitIcon_{pid}` at the same chip base. Köln FRA land-stationed fleet stays unselectable (MV-1b). FLEET-1 spill gate and MV-1b **unedited**.
+
+Guard: `HeadlessFleet2SharedSeaMarkerTest` + `tools/eoa_fleet2_guard.sh` (hd + xvfb 1280×740). Seeds are real `world_accurate` label_anchors; stacked disks are offset from the chip base (centroid + `(0,-12)`):
+
+| seed | pid | world |
+|---|---|---|
+| Maginot GER land | `710173` | `(4283.279411, 1010.266854)` |
+| Köln (GER land; FRA fleet) | `710417` | `(4254.322147, 944.095861)` |
+| North Sea chip base | `950000` | `(4164.266667, 761.688889)` |
+| English Channel ENG (single-nation) | `950001` | `(4128.701206, 926.217996)` |
+
+GER/FRA North Sea disk centres are logged by the guard (`[INFO] … GER disk … FRA disk …`). Cases: (a) GER North Sea disk → GER fleet own card; (b) FRA North Sea disk → FRA fleet read-only card; (c) the two hit areas do not overlap and each centre picks its own fleet; (d) Channel ENG single-nation behaves as before; (e) Köln FRA land-fleet still not selected. Headless + xvfb **NOT live Play**.
 
 ### CRASH-1 halt-march popup (draft HOLD)
 
