@@ -10,12 +10,17 @@ extends SceneTree
 ## and never nearest-own-land spill. FLEET-1 / MV-1b stay as today.
 ## Headless / xvfb are NOT live Play.
 ##
-## Real world_accurate label_anchor centroids (provinces_geometry.json):
+## Raw MapManager / provinces_geometry.json centroids (UNSCALED):
 ##   710173 Maginot GER land / GER Div 6    (4283.279411, 1010.266854)
 ##   710417 Köln (GER land; MV-1b FRA)      (4254.322147,  944.095861)
 ##   711453 East Kent (ENG coastal land)    (4119.875715,  938.028287)
 ##   950000 North Sea Zone                  (4164.266667,  773.688889)
 ##   950001 English Channel                 (4128.701206,  938.217996)
+##
+## Live world_accurate renderer centroids (Play RESULT_7387, ×THEATER_SCALE):
+##   950001 Channel  (7134.5, 1622.3)
+##   950000 North Sea (7195.9, 1336.9)
+## Injected geo stays UNSCALED so a missing transform cannot hide again.
 ##
 ##   tools/run_godot.sh --headless --path . -s res://scripts/core/HeadlessFleet2SharedSeaMarkerTest.gd
 ##   tools/eoa_fleet2_guard.sh
@@ -51,6 +56,10 @@ const WORLD_KOLN := Vector2(4254.322147319904, 944.0958606451493)
 const WORLD_EAST_KENT := Vector2(4119.875714645911, 938.0282873606084)
 const WORLD_NORTH_SEA := Vector2(4164.266666666666, 773.6888888888889)
 const WORLD_CHANNEL := Vector2(4128.701206024651, 938.2179956383225)
+const LIVE_RENDER_CHANNEL := Vector2(7134.5, 1622.3)
+const LIVE_RENDER_NORTH_SEA := Vector2(7195.9, 1336.9)
+const LIVE_RENDER_EAST_KENT := Vector2(7119.145, 1620.913)
+const LIVE_OLD_ENG_CHIP := Vector2(7134.5, 1610.3)
 const FLUSH_FRAMES := 4
 
 
@@ -73,6 +82,7 @@ var _ger_r: float = 0.0
 var _fra_r: float = 0.0
 var _ch_r: float = 0.0
 const WORLD_OLD_ENG_CHIP := Vector2(4128.701, 926.218)
+const MAX_CLUSTER_SPACINGS := 3.0
 
 
 func _init() -> void:
@@ -179,6 +189,7 @@ func _run() -> void:
 	_test_g_east_kent_picks_channel()
 	_test_h_cluster_pad_nearest()
 	_test_i_labels_have_nation_tag()
+	_test_j_renderer_space_anchor()
 	_cleanup()
 
 
@@ -247,6 +258,19 @@ func _test_source_needles() -> void:
 		return
 	if "func _sea_nation_plate_label" not in ren:
 		_fail("nation-tag plate label helper missing")
+		return
+	var poly_fn := _slice_func(ren, "_sea_province_poly_world")
+	if "transform_province_points" not in poly_fn:
+		_fail("_sea_province_poly_world must transform MapManager geo into renderer space")
+		return
+	if "func _sea_align_poly_to_renderer_centroid" not in ren:
+		_fail("sea poly must align to province_centroids (renderer world)")
+		return
+	if "func _sea_nation_maybe_fallback_chip_base" not in ren:
+		_fail("chip-base 2x2 fallback missing — Canada drift must not pass")
+		return
+	if "func _sea_nation_counter_scale" not in ren:
+		_fail("sea-nation chip must shrink to the hit disk")
 		return
 	_pass("FLEET-2 source needles (FLEET-1 / MV-1b unedited)")
 
@@ -388,9 +412,9 @@ func _setup_formations() -> bool:
 		return false
 	if not _register_formation(FID_ITA_FLEET, ITA_TAG, "fleet", DESIGN_FLEET, CHANNEL, "ITA Fleet 2"):
 		return false
-	if not _register_formation(FID_POL_FLEET, POL_TAG, "fleet", DESIGN_FLEET, CHANNEL, "POL Fleet 2"):
+	if not _register_formation(FID_POL_FLEET, POL_TAG, "fleet", DESIGN_FLEET, CHANNEL, "POL king_george_v_class_bb"):
 		return false
-	if not _register_formation(FID_USA_FLEET, USA_TAG, "fleet", DESIGN_FLEET, CHANNEL, "USA Fleet 2"):
+	if not _register_formation(FID_USA_FLEET, USA_TAG, "fleet", DESIGN_FLEET, CHANNEL, "USA king_george_v_class_bb"):
 		return false
 	if not _register_formation(FID_FRA_FLEET_KOLN, FRA_TAG, "fleet", DESIGN_FLEET, KOLN, "FRA Köln Fleet"):
 		return false
@@ -476,7 +500,7 @@ func _setup_map_renderer() -> bool:
 	_mr.set("info_panel", _info)
 	_cam = Camera2D.new()
 	_cam.name = "MapCamera"
-	_cam.position = Vector2(4200.0, 900.0)
+	_cam.position = Vector2(7160.0, 1480.0)
 	_cam.zoom = Vector2(1.0, 1.0)
 	_cam.enabled = true
 	_mr.add_child(_cam)
@@ -489,9 +513,9 @@ func _setup_map_renderer() -> bool:
 	var placed: Dictionary = {
 		MAGINOT: WORLD_MAGINOT,
 		KOLN: WORLD_KOLN,
-		EAST_KENT: WORLD_EAST_KENT,
-		NORTH_SEA: WORLD_NORTH_SEA,
-		CHANNEL: WORLD_CHANNEL,
+		EAST_KENT: LIVE_RENDER_EAST_KENT,
+		NORTH_SEA: LIVE_RENDER_NORTH_SEA,
+		CHANNEL: LIVE_RENDER_CHANNEL,
 	}
 	for pid_v in placed.keys():
 		var pid := int(pid_v)
@@ -522,22 +546,22 @@ func _force_centroids() -> void:
 		var cents: Dictionary = _mm.get("_centroids")
 		cents[MAGINOT] = WORLD_MAGINOT
 		cents[KOLN] = WORLD_KOLN
-		cents[EAST_KENT] = WORLD_EAST_KENT
-		cents[NORTH_SEA] = WORLD_NORTH_SEA
-		cents[CHANNEL] = WORLD_CHANNEL
+		cents[EAST_KENT] = LIVE_RENDER_EAST_KENT
+		cents[NORTH_SEA] = LIVE_RENDER_NORTH_SEA
+		cents[CHANNEL] = LIVE_RENDER_CHANNEL
 		_mm.set("_centroids", cents)
 	if _mr != null and "province_centroids" in _mr:
 		_mr.province_centroids[MAGINOT] = WORLD_MAGINOT
 		_mr.province_centroids[KOLN] = WORLD_KOLN
-		_mr.province_centroids[EAST_KENT] = WORLD_EAST_KENT
-		_mr.province_centroids[NORTH_SEA] = WORLD_NORTH_SEA
-		_mr.province_centroids[CHANNEL] = WORLD_CHANNEL
+		_mr.province_centroids[EAST_KENT] = LIVE_RENDER_EAST_KENT
+		_mr.province_centroids[NORTH_SEA] = LIVE_RENDER_NORTH_SEA
+		_mr.province_centroids[CHANNEL] = LIVE_RENDER_CHANNEL
 
 
 func _force_play_zoom() -> void:
 	if _cam != null:
 		_cam.zoom = Vector2(1.0, 1.0)
-		_cam.position = Vector2(4200.0, 900.0)
+		_cam.position = Vector2(7160.0, 1480.0)
 		_cam.make_current()
 	if "show_unit_counters" in _mr:
 		_mr.show_unit_counters = true
@@ -622,8 +646,8 @@ func _resolve_marker_coords() -> bool:
 	_ger_r = _icon_hit_r(ger_icon)
 	_fra_r = _icon_hit_r(fra_icon)
 	_ch_r = _icon_hit_r(eng_icon)
-	var base: Vector2 = WORLD_NORTH_SEA + Vector2(0, -12)
-	var ch_base: Vector2 = WORLD_CHANNEL + Vector2(0, -12)
+	var base: Vector2 = LIVE_RENDER_NORTH_SEA + Vector2(0, -12)
+	var ch_base: Vector2 = LIVE_RENDER_CHANNEL + Vector2(0, -12)
 	print(
 		"  [INFO] HeadlessFleet2SharedSeaMarkerTest: NS GER %s r=%.1f FRA %s JAP %s SOV %s | CH ENG %s ITA %s POL %s USA %s r=%.1f (base NS %s CH %s)"
 		% [
@@ -856,9 +880,9 @@ func _plate_clamped_ok(world: Vector2, pid: int) -> bool:
 func _test_d_channel_production() -> void:
 	# Production Channel holds ENG/ITA/POL/USA — not a single ENG pin.
 	_reset_pick()
-	var hex: int = int(_mr.call("_resolve_hex_pick_pid", WORLD_CHANNEL))
+	var hex: int = int(_mr.call("_resolve_hex_pick_pid", LIVE_RENDER_CHANNEL))
 	if hex != CHANNEL and hex != EAST_KENT:
-		_fail("(d) GIS at Channel centroid want Channel/East Kent got %d" % hex)
+		_fail("(d) GIS at live Channel centroid want Channel/East Kent got %d" % hex)
 		return
 	for rec_v in _channel_plates():
 		var rec: Dictionary = rec_v as Dictionary
@@ -901,14 +925,13 @@ func _test_f_channel_four_plates() -> void:
 
 
 func _test_g_east_kent_picks_channel() -> void:
+	# Live renderer-world East Kent / old ENG chip (Play RESULT_7387).
+	# Unscaled 4119/4128 is the Canada-space miss that hid FIX #1.
 	var samples: Array = [
-		{"name": "East Kent centroid 711453", "pos": WORLD_EAST_KENT},
-		{"name": "old ENG chip", "pos": WORLD_OLD_ENG_CHIP},
-		{"name": "East Kent label anchor", "pos": WORLD_EAST_KENT},
+		{"name": "live East Kent 711453", "pos": LIVE_RENDER_EAST_KENT},
+		{"name": "live old ENG chip", "pos": LIVE_OLD_ENG_CHIP},
+		{"name": "live Channel centroid", "pos": LIVE_RENDER_CHANNEL},
 	]
-	# Extra: exact documented old-ENG + label numbers from the live report.
-	samples.append({"name": "old ENG 4128.701,926.218", "pos": Vector2(4128.701, 926.218)})
-	samples.append({"name": "East Kent 4119.876,938.028", "pos": Vector2(4119.876, 938.028)})
 	for s_v in samples:
 		var s: Dictionary = s_v as Dictionary
 		var pos: Vector2 = s["pos"] as Vector2
@@ -1000,6 +1023,15 @@ func _test_i_labels_have_nation_tag() -> void:
 		if "Fleet" not in label:
 			_fail("(i) %s label '%s' must include Fleet" % [tag, label])
 			return
+		var has_digit := false
+		for ci in label.length():
+			var code: int = label.unicode_at(ci)
+			if code >= 48 and code <= 57:
+				has_digit = true
+				break
+		if not has_digit:
+			_fail("(i) %s label '%s' must be 'TAG Fleet N' (POL/USA/SOV included)" % [tag, label])
+			return
 		if tag == SOV_TAG:
 			var low: String = label.to_lower()
 			if "king" in low or "class_bb" in low or label.ends_with(".") or "king_g" in low:
@@ -1008,7 +1040,72 @@ func _test_i_labels_have_nation_tag() -> void:
 			if label.length() > 14:
 				_fail("(i) SOV label still too long / truncated path: '%s'" % label)
 				return
-	_pass("(i) plate labels include nation tags; SOV is not truncated")
+	_pass("(i) plate labels are 'TAG Fleet N'; POL/USA/SOV included; SOV not truncated")
+
+
+func _cluster_mean(pts: Array) -> Vector2:
+	if pts.is_empty():
+		return Vector2.ZERO
+	var acc := Vector2.ZERO
+	for p_v in pts:
+		acc += p_v as Vector2
+	return acc / float(pts.size())
+
+
+func _assert_cluster_near_live(who: String, cluster: Vector2, live_c: Vector2, chip_base: Vector2, step: float) -> bool:
+	var lim: float = MAX_CLUSTER_SPACINGS * maxf(step, 12.0)
+	if cluster.distance_to(live_c) > lim:
+		_fail("%s cluster %s is %.1f from live renderer centroid %s (lim=%.1f) — geo/renderer space mismatch" % [
+			who, str(cluster), cluster.distance_to(live_c), str(live_c), lim
+		])
+		return false
+	if cluster.distance_to(chip_base) > lim:
+		_fail("%s cluster %s is %.1f from chip base %s (lim=%.1f)" % [
+			who, str(cluster), cluster.distance_to(chip_base), str(chip_base), lim
+		])
+		return false
+	# The FIX #1 Canada site: unscaled Channel/NS centroids.
+	if cluster.distance_to(WORLD_CHANNEL) < 80.0 or cluster.distance_to(WORLD_NORTH_SEA) < 80.0:
+		_fail("%s cluster %s sat on UNSCALED geo (Canada) not renderer world" % [who, str(cluster)])
+		return false
+	return true
+
+
+func _test_j_renderer_space_anchor() -> void:
+	var ch_pts: Array = [_eng_ch, _ita_ch, _pol_ch, _usa_ch]
+	var ns_pts: Array = [_ger_ns, _fra_ns, _jap_ns, _sov_ns]
+	var ch_c: Vector2 = _cluster_mean(ch_pts)
+	var ns_c: Vector2 = _cluster_mean(ns_pts)
+	var ch_base: Vector2 = LIVE_RENDER_CHANNEL + Vector2(0, -12)
+	var ns_base: Vector2 = LIVE_RENDER_NORTH_SEA + Vector2(0, -12)
+	var ch_step: float = maxf(_eng_ch.distance_to(_ita_ch), _eng_ch.distance_to(_pol_ch))
+	var ns_step: float = maxf(_ger_ns.distance_to(_fra_ns), _ger_ns.distance_to(_jap_ns))
+	if not _assert_cluster_near_live("(j) Channel", ch_c, LIVE_RENDER_CHANNEL, ch_base, ch_step):
+		return
+	if not _assert_cluster_near_live("(j) North Sea", ns_c, LIVE_RENDER_NORTH_SEA, ns_base, ns_step):
+		return
+	if _mr.has_method("_sea_province_poly_world") and _mr.has_method("_sea_poly_centroid"):
+		var ch_poly: PackedVector2Array = _mr.call("_sea_province_poly_world", CHANNEL)
+		var ns_poly: PackedVector2Array = _mr.call("_sea_province_poly_world", NORTH_SEA)
+		if ch_poly.size() < 3 or ns_poly.size() < 3:
+			_fail("(j) renderer-space sea poly missing")
+			return
+		var ch_pc: Vector2 = _mr.call("_sea_poly_centroid", ch_poly)
+		var ns_pc: Vector2 = _mr.call("_sea_poly_centroid", ns_poly)
+		if ch_pc.distance_to(LIVE_RENDER_CHANNEL) > 40.0:
+			_fail("(j) Channel poly centroid %s not in renderer space (want %s)" % [str(ch_pc), str(LIVE_RENDER_CHANNEL)])
+			return
+		if ns_pc.distance_to(LIVE_RENDER_NORTH_SEA) > 40.0:
+			_fail("(j) North Sea poly centroid %s not in renderer space (want %s)" % [str(ns_pc), str(LIVE_RENDER_NORTH_SEA)])
+			return
+		if ch_pc.distance_to(WORLD_CHANNEL) < 80.0:
+			_fail("(j) Channel poly still in UNSCALED geo space %s" % str(ch_pc))
+			return
+	print(
+		"  [INFO] HeadlessFleet2SharedSeaMarkerTest: live-space CH cluster %s vs renderer %s | NS cluster %s vs renderer %s"
+		% [str(ch_c), str(LIVE_RENDER_CHANNEL), str(ns_c), str(LIVE_RENDER_NORTH_SEA)]
+	)
+	_pass("(j) cluster centres sit in renderer world (Channel %s / NS %s), not unscaled geo" % [str(ch_c), str(ns_c)])
 
 
 func _place_land_chip_at(pid: int, fid: String, world: Vector2) -> Node2D:

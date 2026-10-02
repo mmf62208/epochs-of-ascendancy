@@ -25431,13 +25431,13 @@ func _sea_nation_fleet_disk_radius_world(z: float, counter: Node2D = null) -> fl
 
 func _sea_nation_fit_radius(pid: int, count: int, default_r: float) -> float:
 	# 3+ plates: shrink the disk so a 2x2 / column can sit in (or next to) the
-	# sea polygon. Channel is ~22 wide — default r≈41 fans across Kent.
+	# sea polygon. Channel renderer AABB is ~38 wide — r>16 fans onto Kent.
 	var r0: float = maxf(default_r, 12.0)
 	if count <= 2 or pid < 0:
 		return r0
 	var poly: PackedVector2Array = _sea_province_poly_world(pid)
 	if poly.size() < 3:
-		return minf(r0, 20.0)
+		return minf(r0, 14.5)
 	var aabb: Rect2 = _sea_poly_aabb(poly)
 	var w: float = aabb.size.x
 	var h: float = aabb.size.y
@@ -25446,11 +25446,10 @@ func _sea_nation_fit_radius(pid: int, count: int, default_r: float) -> float:
 	var r_col: float = h / denom
 	var r_row: float = w / denom
 	var fitted: float = maxf(r_grid, maxf(r_col, r_row))
-	# Keep the inner fit. Do not inflate to (AABB+tol)/2 — that made Channel
-	# r≈23 and a 4-high column that spilled north/south of the strait.
+	# Cap so a 2x2 + label step still sits in the Channel (~38 world wide).
 	if fitted < 12.0:
 		fitted = 12.0
-	return clampf(minf(r0, fitted), 12.0, r0)
+	return clampf(minf(r0, fitted), 12.0, minf(r0, 14.5))
 
 
 func _sea_poly_aabb(poly: PackedVector2Array) -> Rect2:
@@ -25469,8 +25468,9 @@ func _sea_poly_aabb(poly: PackedVector2Array) -> Rect2:
 
 
 func _sea_nation_anchor_shift(pid: int) -> Vector2:
-	# 3+ cluster sits on the sea centroid, not chip_base (0,-12) which shoves
-	# the pack onto the north bank (Channel → East Kent).
+	# 3+ cluster sits on the renderer-space sea centroid (poly already aligned
+	# to province_centroids). Chip base is centroid+(0,-12); a raw-geo centroid
+	# here is what parked the plates over arctic Canada.
 	var poly: PackedVector2Array = _sea_province_poly_world(pid)
 	if poly.size() < 3:
 		return Vector2.ZERO
@@ -25502,11 +25502,14 @@ func _sea_nation_fleet_stack_offsets(count: int, radius: float, pid: int = -1) -
 			cands = shifted
 	if pid < 0:
 		return cands[0] as Array
-	return _sea_nation_choose_clamped_offsets(pid, cands, r)
+	var chosen: Array = _sea_nation_choose_clamped_offsets(pid, cands, r)
+	return _sea_nation_maybe_fallback_chip_base(pid, chosen, r, count)
 
 
 func _sea_nation_layout_candidates(count: int, radius: float) -> Array:
-	var gap: float = 4.0 if count >= 3 else 8.0
+	# Extra gap so "TAG Fleet N" under each disk does not clip its neighbour
+	# at zoom 0.8 / 1.5 / 2.3 (world layout is zoom-invariant).
+	var gap: float = 12.0 if count >= 3 else 8.0
 	var step: float = 2.0 * radius + gap
 	var out: Array = []
 	if count == 2:
@@ -25539,7 +25542,7 @@ func _sea_nation_layout_candidates(count: int, radius: float) -> Array:
 	return out
 
 
-func _sea_province_poly_world(pid: int) -> PackedVector2Array:
+func _sea_province_raw_points(pid: int) -> PackedVector2Array:
 	var empty := PackedVector2Array()
 	if pid < 0 or typeof(MapManager) == TYPE_NIL:
 		return empty
@@ -25560,6 +25563,53 @@ func _sea_province_poly_world(pid: int) -> PackedVector2Array:
 				var a: Array = rp as Array
 				pts.append(Vector2(float(a[0]), float(a[1])))
 	return pts
+
+
+func _sea_align_poly_to_renderer_centroid(pid: int, pts: PackedVector2Array) -> PackedVector2Array:
+	# Residual: island inflate / drawable sanitize vs vertex-mean. Snap the
+	# transformed ring onto the stored renderer centroid so clamp stays in
+	# the same space as DemoUnitIcon / chip_base.
+	if pts.size() < 3 or not province_centroids.has(pid):
+		return pts
+	var want: Vector2 = province_centroids[pid] as Vector2
+	if want == Vector2.ZERO:
+		return pts
+	var have: Vector2 = _sea_poly_centroid(pts)
+	var delta: Vector2 = want - have
+	if delta.length_squared() < 0.25:
+		return pts
+	var out := PackedVector2Array()
+	out.resize(pts.size())
+	for i in pts.size():
+		out[i] = pts[i] + delta
+	return out
+
+
+func _sea_province_poly_world(pid: int) -> PackedVector2Array:
+	# Renderer world — same space as province_centroids / chip_base.
+	# Raw MapManager rings on world_accurate are ~THEATER_SCALE smaller
+	# (Channel 4128 vs live 7134). Using them untransformed parked the
+	# 2x2 over arctic Canada.
+	var pts := PackedVector2Array()
+	if province_nodes.has(pid):
+		var pnode: Node2D = province_nodes[pid] as Node2D
+		if pnode != null:
+			for ch in pnode.get_children():
+				if ch is Polygon2D:
+					var drawn: PackedVector2Array = (ch as Polygon2D).polygon
+					if drawn.size() >= 3:
+						pts = drawn
+						break
+	if pts.size() < 3:
+		pts = _sea_province_raw_points(pid)
+		if pts.size() >= 3:
+			var wn := false
+			if typeof(MapManager) != TYPE_NIL and MapManager.has_method("is_geometry_world_native"):
+				wn = bool(MapManager.is_geometry_world_native())
+			pts = MapCanvasConfig.transform_province_points(
+				pts, _is_world_canvas_active(), true, wn
+			)
+	return _sea_align_poly_to_renderer_centroid(pid, pts)
 
 
 func _sea_point_in_or_near_poly(world: Vector2, poly: PackedVector2Array, slop: float) -> bool:
@@ -25688,6 +25738,34 @@ func _sea_nation_choose_clamped_offsets(pid: int, cands: Array, radius: float) -
 	return best
 
 
+func _sea_nation_chip_base_pack(count: int, radius: float) -> Array:
+	var cands: Array = _sea_nation_layout_candidates(count, radius)
+	if cands.is_empty():
+		return [Vector2.ZERO]
+	if count >= 3 and cands.size() >= 3:
+		return cands[cands.size() - 1] as Array
+	return cands[0] as Array
+
+
+func _sea_nation_maybe_fallback_chip_base(pid: int, offs: Array, radius: float, count: int) -> Array:
+	# Safety: if the cluster drifted more than ~2 plate spacings from the
+	# renderer chip base, the poly was still in the wrong space. Fall back
+	# to a chip-base 2x2 so plates cannot park over Canada again.
+	var packed: Array = _sea_nation_chip_base_pack(count, radius)
+	if offs.is_empty():
+		return packed
+	var base: Vector2 = _unit_chip_base_world(pid)
+	var gap: float = 12.0 if count >= 3 else 8.0
+	var step: float = 2.0 * maxf(radius, 12.0) + gap
+	var acc := Vector2.ZERO
+	for o_v in offs:
+		acc += base + (o_v as Vector2)
+	var cluster: Vector2 = acc / float(offs.size())
+	if cluster.distance_to(base) > 2.0 * step:
+		return packed
+	return offs
+
+
 func _sea_nation_clamp_tolerance_world() -> float:
 	return 12.0
 
@@ -25791,16 +25869,18 @@ func _pick_nearest_sea_nation_in_cluster_pad(
 	return best
 
 
-func _sea_nation_plate_label(fo: Object, tag: String) -> String:
+func _sea_nation_plate_label(fo: Object, tag: String, index: int = 0) -> String:
 	var t: String = tag.strip_edges().to_upper()
 	if t.is_empty() and fo != null and "country_tag" in fo:
 		t = str(fo.country_tag).strip_edges().to_upper()
 	if t.is_empty():
 		t = "UNK"
 	var num: int = _formation_fleet_ordinal(fo)
-	if num >= 0:
-		return "%s Fleet %d" % [t, num]
-	return "%s Fleet" % t
+	if num < 1:
+		# Design ids (king_george / class_bb) have no ordinal — POL/USA/SOV
+		# must still read "TAG Fleet N", never a bare "POL Fleet".
+		num = maxi(index, 0) + 1
+	return "%s Fleet %d" % [t, num]
 
 
 func _formation_fleet_ordinal(fo: Object) -> int:
@@ -25823,9 +25903,19 @@ func _formation_fleet_ordinal(fo: Object) -> int:
 	return int(n.substr(i + 1))
 
 
+func _sea_nation_counter_scale(radius_world: float) -> float:
+	# Land-unit zoom scale (~1.6–2.0) made the painted chip 70–80 px while
+	# the hit disk stayed r=12. Shrink the chrome so the drawn plate fits
+	# the disk; clicks on visible art then hit.
+	var local_half: float = 28.0
+	return clampf(maxf(radius_world, 12.0) / local_half, 0.32, 0.72)
+
+
 func _demo_unit_icon_hit_radius_world(z: float, counter: Node2D = null) -> float:
 	if counter != null and is_instance_valid(counter) and bool(counter.get_meta("sea_nation_disk", false)):
-		return _sea_nation_fleet_disk_radius_world(z, counter)
+		var disk_r: float = _sea_nation_fleet_disk_radius_world(z, counter)
+		# Small pad so the "TAG Fleet N" under the disk stays clickable.
+		return disk_r + 3.0
 	return _unit_counter_hit_radius_world(z, counter)
 
 
@@ -25851,16 +25941,23 @@ func _sync_sea_nation_fleet_offsets(z: float) -> void:
 		var r: float = _sea_nation_fit_radius(id, stacked.size(), default_r)
 		var offs: Array = _sea_nation_fleet_stack_offsets(stacked.size(), r, id)
 		var base: Vector2 = _unit_chip_base_world(id)
+		var plate_s: float = _sea_nation_counter_scale(r)
 		for i in stacked.size():
 			var icon: Node2D = stacked[i] as Node2D
 			if icon == null:
 				continue
 			icon.set_meta("sea_nation_radius", r)
+			icon.scale = Vector2(plate_s, plate_s)
 			icon.position = base + (offs[i] as Vector2)
 			var tag: String = str(icon.get_meta("sea_nation_tag", ""))
 			var col := Color(0.85, 0.88, 0.95, 1.0)
 			if not tag.is_empty() and typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_country_color"):
 				col = MapManager.get_country_color(tag)
+			var fo: Object = _formation_from_demo_icon(icon)
+			var desig: Node = icon.get_node_or_null("Designation")
+			if desig != null:
+				desig.set("text", _sea_nation_plate_label(fo, tag, i))
+				desig.set("font_size", 10)
 			_attach_sea_nation_fleet_disk(icon, r, col)
 
 
@@ -25878,6 +25975,8 @@ func _sync_unit_counter_scales(z: float = -1.0) -> void:
 			continue
 		for c in node.get_children():
 			if c is Node2D and str(c.name).begins_with("DemoUnitIcon_"):
+				if bool((c as Node2D).get_meta("sea_nation_disk", false)):
+					continue
 				(c as Node2D).scale = sv
 	var zz: float = z
 	if zz < 0.0:
@@ -29567,7 +29666,11 @@ func _place_sea_nation_fleet_counter(
 	counter.position = _unit_chip_base_world(id) + extra_off
 	counter.z_index = 28
 	counter.z_as_relative = false
-	counter.scale = Vector2.ONE * _unit_counter_scale_for_zoom()
+	var place_z: float = 1.0
+	if has_method("_get_camera_zoom"):
+		place_z = _get_camera_zoom()
+	var packed_r: float = _sea_nation_fit_radius(id, count, _sea_nation_fleet_disk_radius_world(place_z, null))
+	counter.scale = Vector2.ONE * _sea_nation_counter_scale(packed_r)
 	counter.visible = _unit_counters_want_visible()
 	if fo != null:
 		if "formation_id" in fo:
@@ -29578,10 +29681,6 @@ func _place_sea_nation_fleet_counter(
 	counter.set_meta("sea_nation_tag", tag)
 	counter.set_meta("sea_nation_index", index)
 	counter.set_meta("sea_nation_count", count)
-	var place_z: float = 1.0
-	if has_method("_get_camera_zoom"):
-		place_z = _get_camera_zoom()
-	var packed_r: float = _sea_nation_fit_radius(id, count, _sea_nation_fleet_disk_radius_world(place_z, null))
 	counter.set_meta("sea_nation_radius", packed_r)
 	host.add_child(counter)
 	var nation_tag: String = tag
@@ -29624,8 +29723,8 @@ func _place_sea_nation_fleet_counter(
 	_attach_unit_counter_chrome(counter, fo, nation_col)
 	var desig: Node = counter.get_node_or_null("Designation")
 	if desig != null:
-		desig.set("text", _sea_nation_plate_label(fo, nation_tag))
-		desig.set("font_size", 11)
+		desig.set("text", _sea_nation_plate_label(fo, nation_tag, index))
+		desig.set("font_size", 10)
 	var z: float = 1.0
 	if has_method("_get_camera_zoom"):
 		z = _get_camera_zoom()
