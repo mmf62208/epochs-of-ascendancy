@@ -140,6 +140,7 @@ func _run() -> void:
 	if not _setup_map_renderer():
 		return
 	_force_play_zoom()
+	_isolate_fixture_formations()
 	_rebuild_icons()
 	await _flush()
 	_force_play_zoom()
@@ -274,8 +275,34 @@ func _setup_formations() -> bool:
 		return false
 	if not _register_formation(FID_FRA_FLEET_KOLN, FRA_TAG, "fleet", DESIGN_FLEET, KOLN, "FRA Köln Fleet"):
 		return false
+	_isolate_fixture_formations()
 	_pass("seeded GER+FRA North Sea fleets, ENG Channel, Köln FRA land fleet")
 	return true
+
+
+func _isolate_fixture_formations() -> void:
+	# Live 1936 OOB also stations GER land on Köln / Maginot. First-wins would
+	# hide the FRA land-fleet disk that MV-1b / (e) must still hit-and-refuse.
+	var keep: Dictionary = {
+		FID_GER_LAND: true,
+		FID_GER_FLEET: true,
+		FID_FRA_FLEET_SEA: true,
+		FID_ENG_FLEET: true,
+		FID_FRA_FLEET_KOLN: true,
+	}
+	var pids: Dictionary = {MAGINOT: true, KOLN: true, NORTH_SEA: true, CHANNEL: true}
+	if _lm == null or not ("formations" in _lm) or not (_lm.formations is Dictionary):
+		return
+	for fid_v in _lm.formations.keys():
+		var fid := str(fid_v)
+		if keep.has(fid):
+			continue
+		var fo: Object = _lm.formations[fid_v]
+		if fo == null or not ("stationed_province_id" in fo):
+			continue
+		var sid := int(fo.stationed_province_id)
+		if pids.has(sid):
+			fo.stationed_province_id = -1
 
 
 func _register_formation(fid: String, tag: String, ftype: String, design: String, pid: int, pname: String) -> bool:
@@ -684,8 +711,19 @@ func _test_e_koln_fra_land_fleet() -> void:
 	if bool(_mr.call("_formation_is_stationed_on_sea", fra)):
 		_fail("(e) Köln FRA fleet must stay land-stationed (MV-1b)")
 		return
-	var disk: Object = _mr.call("_pick_unit_formation_at_world", WORLD_KOLN)
-	if disk == null or str(disk.formation_id) != FID_FRA_FLEET_KOLN:
+	var koln_icon: Node2D = _icon_for_fid(KOLN, FID_FRA_FLEET_KOLN)
+	if koln_icon == null:
+		_fail("(e) Köln FRA land-fleet DemoUnitIcon missing after isolate+rebuild")
+		return
+	if bool(koln_icon.get_meta("sea_nation_disk", false)):
+		_fail("(e) Köln land-fleet must not be a sea_nation_disk")
+		return
+	var koln_chip: Vector2 = _icon_world(koln_icon, KOLN)
+	var disk_centroid: Object = _mr.call("_pick_unit_formation_at_world", WORLD_KOLN)
+	var disk_chip: Object = _mr.call("_pick_unit_formation_at_world", koln_chip)
+	var hit_centroid := disk_centroid != null and str(disk_centroid.formation_id) == FID_FRA_FLEET_KOLN
+	var hit_chip := disk_chip != null and str(disk_chip.formation_id) == FID_FRA_FLEET_KOLN
+	if not hit_centroid and not hit_chip:
 		_fail("(e) Köln click must still hit the FRA land-province fleet disk")
 		return
 	var opened: bool = _click_chip_path(WORLD_KOLN)
@@ -695,7 +733,15 @@ func _test_e_koln_fra_land_fleet() -> void:
 	if _selected_fid() == FID_FRA_FLEET_KOLN:
 		_fail("(e) selected FRA Köln fleet — MV-1b leaked")
 		return
-	_pass("(e) Köln FRA land-province fleet at %s still not selected" % str(WORLD_KOLN))
+	_reset_pick()
+	var opened_chip: bool = _click_chip_path(koln_chip)
+	if opened_chip and _selected_fid() == FID_FRA_FLEET_KOLN:
+		_fail("(e) Köln FRA chip centre must stay unselectable")
+		return
+	if _selected_fid() == FID_FRA_FLEET_KOLN:
+		_fail("(e) selected FRA Köln fleet from chip centre — MV-1b leaked")
+		return
+	_pass("(e) Köln FRA land-province fleet at %s / chip %s still not selected" % [str(WORLD_KOLN), str(koln_chip)])
 
 
 func _cleanup() -> void:
