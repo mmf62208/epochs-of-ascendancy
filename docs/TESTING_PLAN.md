@@ -651,6 +651,47 @@ Isolated keep-green (FIX #2b tip; wrapper `rss_mb` preferred; MV-1/MV-1b **unedi
 | UI-1 guard hd+xvfb | both | PASS | **1205.0 / 1348.6** |
 | FLEET-2 live-scale xvfb | xvfb | PASS Home+1.5 plates visible; pixel chrome; 10/10 clicks | **2145.6** |
 
+**FIX #3 (Play MIXED `b66c7724`):** Home-band own-land hit disk (up to ~320 world) stole spread plates below z0.65. Drawn sea-plate body wins first; cluster AABB binds the nearest sea plate (East Kent / old ENG / own-GER gap). Labels use the unit's per-nation ordinal, not stack `index+1`. Guard (k) clicks all 8 plates at z0.318 and z0.40 at live renderer coords. FLEET-1 / MV-1b **unedited**.
+
+Live-scale xvfb FIX #3 (GER Home, RSS **2031.6**, RESULT=PASS, uncropped 1280×740):
+
+| plate | fid | label |
+|---|---|---|
+| NS GER | `GER_formation_2` | GER Fleet 2 |
+| NS FRA | `FRA_formation_2` | FRA Fleet 2 |
+| NS JAP | `JAP_formation_2` | JAP Fleet 2 |
+| NS SOV | `fielded_sov_21559591` | SOV Fleet 1 |
+| CH ENG | `ENG_formation_2` | ENG Fleet 2 |
+| CH ITA | `ITA_formation_2` | ITA Fleet 2 |
+| CH POL | `fielded_pol_21560167` | POL Fleet 1 |
+| CH USA | `fielded_usa_21558889` | USA Fleet 1 |
+
+Clicks: all 8 plates at 0.318 / 0.40 / 0.80 / 1.50 opened their own fleet (GER own card; others read-only). East Kent + old ENG → `ENG_formation_2`. GER-nearest gap → `GER_formation_2` own card. Evidence `docs/evidence/fleet2_fix3/`. Cases (a)–(k).
+
+Isolated keep-green (FIX #3 tip; wrapper `rss_mb` preferred; MV-1/MV-1b **unedited**):
+
+| gate | kind | result | peak RSS MB |
+|---|---|---|---|
+| FLEET-2 hd / xvfb | both | PASS (a–k) | **1206.8 / 1341.4** |
+| FLEET-1 hd / xvfb | both | PASS (a–h, unedited) | **1201.2 / 1340.5** |
+| hd_mv1 | headless | PASS (unedited) | **1201.0** |
+| hd_mv1b | headless | PASS (unedited) | **1201.1** |
+| hd_rh1 | headless | PASS | **1200.8** |
+| hd_ix1 (6) | headless | PASS (MandateGate PASS) | **1200.8–1205.4** |
+| hd_rx1 (4) | headless | PASS | **1200.9–1202.5** |
+| hd_rt1 (3) | headless | PASS | **1200.9** |
+| xvfb_mv1 | xvfb | PASS | **2035.0** |
+| xvfb_mv1_card | xvfb | PASS `fra=true` `edge_panel`/`edge_card`/`cap_commit` | **2036.5** |
+| xvfb_rh1 | xvfb | PASS | **2038.7** |
+| py_fac1a | py | PASS 7/7 | **0.092s** |
+| hd_fac1a | headless | PASS | **1201.2** |
+| xvfb_fac1a | xvfb | PASS stale_lag=true 15/15 lone+cluster rx1 0.843/0.843 | **2041.4** |
+| CRASH-1 10× hd + 10× xvfb | both | PASS | wrapper 10×+10× |
+| MV-1e 15/15 @ 4× | hd+xvfb | PASS | **1201.1 / 1340.4** |
+| Seeded RX-1 mid_river ON/OFF | xvfb | PASS units-off **0.749** / close 0.775 / spine 1.000 (FAC-1a 0.843/0.843) | sibling xvfb ~2040 |
+| UI-1 guard hd+xvfb | both | PASS | **1205.6 / 1349.0** |
+| FLEET-2 live-scale xvfb | xvfb | PASS 8 plates × 4 zooms; East Kent; old ENG; GER-nearest gap | **2031.6** |
+
 ### CRASH-1 halt-march popup (draft HOLD)
 
 Halt / Press / Hold / Withdraw / Assign must not `free()` `UnitDetailPopup` while `pressed` is emitting. Detach + rename `UnitDetailPopup_dying` + `queue_free()`. Same-dest still click is a no-op re-issue. **FIX #1 (Play live MIXED `80b0b542`):** press-mode rebuild dropped the card so the mouse-up still-clicked the map (inspector + camera jump; twice switched/cleared selection). Latch `_unit_card_consumed_press` on those five buttons; `_input` / `_unhandled_input` / `_left_release_must_skip_pick` / land-chip still-click swallow the matching release. Open card refreshes Halt on march start / re-target / arrival. **CRASH-1b (CH-1):** that latch must eat **one** matching left release then clear (new left press anywhere, 1 frame after the eaten release, 0.5s safety) so later top-bar / UI clicks register. Guard: Halt still no click-through; ≥4 UI press+release after swallow; following map still-click commits. Headless `HeadlessCrash1HaltMarchPopupTest` + `tools/eoa_crash1_halt_march_guard.sh` 10× hd + 10× xvfb — **NOT live Play**. MV-1 / MV-1b gates **unedited**.
