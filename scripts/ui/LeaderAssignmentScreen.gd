@@ -5,7 +5,7 @@ extends DraggablePanel
 @export var country_tag: String = "GER"
 
 @onready var title_label: Label = $TitleBar/TitleLabel
-@onready var close_button: Button = $TitleBar/CloseButton
+@onready var close_button: Button = $CloseButton
 
 @onready var total_leaders_label: Label = (
 	$MarginContainer/VBoxContainer/TopSummaryBar/TotalLeadersLabel
@@ -42,6 +42,7 @@ var _detail_traits_box: VBoxContainer
 var _selected_leader_id: String = ""
 var _pending_replacements_button: Button
 var _national_spirits_button: Button
+var _fitting_viewport: bool = false
 
 const NATIONAL_POSITIONS: Array[Dictionary] = [
 	{"key": LeaderManager.POSITION_CHIEF_OF_ARMY, "label": "Chief of Army"},
@@ -63,21 +64,119 @@ const HEADER_SPECS: Array[Dictionary] = [
 	{"text": "Details", "width": 80},
 ]
 const ROW_HEIGHT := 36
+const PANEL_DESIGN_SIZE := Vector2(1440, 800)
+const VIEWPORT_MARGIN := 16.0
 
 
 func _ready() -> void:
 	add_to_group("leader_screen")
 	drag_handle = $TitleBar
 	super._ready()
+	mouse_filter = Control.MOUSE_FILTER_STOP
+	set_process_input(true)
 	_apply_content_margins()
 	_setup_detail_panel()
 	_apply_screen_theme()
 	_setup_headers()
-	close_button.pressed.connect(_on_close_pressed)
+	_wire_close_button()
+	_fit_to_viewport()
+	var vp := get_viewport()
+	if vp != null and not vp.size_changed.is_connected(_on_viewport_size_changed):
+		vp.size_changed.connect(_on_viewport_size_changed)
 	_setup_pending_replacements_badge()
 	_setup_national_spirits_button()
 	_connect_leader_replacement_signals()
 	refresh_screen()
+
+
+func _wire_close_button() -> void:
+	if close_button == null:
+		return
+	close_button.mouse_filter = Control.MOUSE_FILTER_STOP
+	close_button.focus_mode = Control.FOCUS_ALL
+	if not close_button.pressed.is_connected(_on_close_pressed):
+		close_button.pressed.connect(_on_close_pressed)
+	if not close_button.gui_input.is_connected(_on_close_gui_input):
+		close_button.gui_input.connect(_on_close_gui_input)
+
+
+func _on_close_gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton:
+		var mb := event as InputEventMouseButton
+		if mb.button_index == MOUSE_BUTTON_LEFT and mb.pressed:
+			close_screen()
+			accept_event()
+
+
+func _on_viewport_size_changed() -> void:
+	_fit_to_viewport()
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_SIZE_CHANGED or what == NOTIFICATION_RESIZED:
+		_fit_to_viewport()
+	if what == NOTIFICATION_VISIBILITY_CHANGED and visible:
+		_fit_to_viewport()
+
+
+func _fit_to_viewport() -> void:
+	if _fitting_viewport:
+		return
+	var vp := get_viewport()
+	if vp == null:
+		return
+	_fitting_viewport = true
+	var avail: Vector2 = vp.get_visible_rect().size
+	if avail.x < 8.0 or avail.y < 8.0:
+		_fitting_viewport = false
+		return
+	var max_w: float = maxf(avail.x - VIEWPORT_MARGIN * 2.0, 320.0)
+	var max_h: float = maxf(avail.y - VIEWPORT_MARGIN * 2.0, 240.0)
+	var w: float = minf(PANEL_DESIGN_SIZE.x, max_w)
+	var h: float = minf(PANEL_DESIGN_SIZE.y, max_h)
+	custom_minimum_size = Vector2(w, h)
+	size = Vector2(w, h)
+	set_anchors_preset(Control.PRESET_CENTER)
+	offset_left = -w * 0.5
+	offset_right = w * 0.5
+	offset_top = -h * 0.5
+	offset_bottom = h * 0.5
+	clip_contents = true
+	# Keep Close pinned to the fitted panel's top-right (always inside the panel).
+	if close_button != null:
+		close_button.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+		close_button.offset_left = -88.0
+		close_button.offset_top = 6.0
+		close_button.offset_right = -8.0
+		close_button.offset_bottom = 34.0
+		close_button.z_index = 8
+	_fitting_viewport = false
+
+
+func close_screen() -> void:
+	if is_queued_for_deletion():
+		return
+	var vp := get_viewport()
+	if vp != null:
+		vp.gui_release_focus()
+	queue_free()
+
+
+func _input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo:
+		var key := event as InputEventKey
+		var is_esc: bool = (
+			key.keycode == KEY_ESCAPE
+			or key.physical_keycode == KEY_ESCAPE
+			or key.key_label == KEY_ESCAPE
+		)
+		if not is_esc and event.is_action_pressed("ui_cancel"):
+			is_esc = true
+		if is_esc:
+			close_screen()
+			var vp := get_viewport()
+			if vp != null:
+				vp.set_input_as_handled()
 
 
 func _apply_content_margins() -> void:
@@ -100,7 +199,7 @@ func _apply_content_margins() -> void:
 
 
 func _on_close_pressed() -> void:
-	queue_free()
+	close_screen()
 
 
 func _apply_screen_theme() -> void:

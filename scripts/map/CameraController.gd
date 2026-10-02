@@ -127,24 +127,8 @@ func _apply_edge_pan(delta: float) -> void:
 	if MapViewInput.edge_pan_blocked_by_gui(vp):
 		return
 	var nav_delta := MapViewInput.motion_delta(delta)
-	var m := vp.get_mouse_position()
-	var sz: Vector2 = vp.get_visible_rect().size
-	var dir := Vector2.ZERO
-	if m.x <= edge_pan_margin:
-		dir.x -= 1.0
-	elif m.x >= sz.x - edge_pan_margin:
-		dir.x += 1.0
-	if m.y >= sz.y - edge_pan_margin:
-		dir.y += 1.0
-	else:
-		# Pan north under the HUD strip (not raw screen top — avoids thrash over TopInfoBar).
-		var top_safe := 90.0
-		if get_tree() and typeof(TopInfoBar) != TYPE_NIL:
-			var tib = TopInfoBar.find_in_tree(get_tree())
-			if tib != null and tib.has_method("get_bar_height"):
-				top_safe = maxf(top_safe, float(tib.call("get_bar_height")) + 60.0)
-		if m.y >= top_safe and m.y < top_safe + edge_pan_margin:
-			dir.y -= 1.0
+	# UI-1: true outer 6px window strip (not HUD-offset / 56px viewport band).
+	var dir: Vector2 = MapViewInput.edge_pan_direction_screen(vp)
 	if dir.length_squared() < 0.0001:
 		return
 	target.position += dir.normalized() * edge_pan_speed * nav_delta

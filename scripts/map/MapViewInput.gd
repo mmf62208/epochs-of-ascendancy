@@ -9,6 +9,10 @@ static var _last_real_usec: int = 0
 const _PAUSE_DELTA_FALLBACK := 1.0 / 60.0
 const _PAUSE_DELTA_MAX := 0.05
 
+## True outer-window edge-pan strip, in screen pixels (not viewport / content-scale).
+## Play 1280x740: a 64px HUD-offset band at y≈200 and y>676 was the wrong strip.
+const EDGE_PAN_SCREEN_PX := 6.0
+
 ## Known autoload singletons that appear as direct children of the viewport root.
 ## These are plain Nodes (with scripts like GameData.gd) and MUST NEVER have .visible (or other CanvasItem-only props) accessed.
 ## Pre-filtering by name here (name is always valid on Node) + explicit separate type/visible checks below completely prevents
@@ -30,6 +34,94 @@ static func motion_delta(scaled_delta: float) -> float:
 		dt = clampf(float(now - _last_real_usec) / 1_000_000.0, 0.0, _PAUSE_DELTA_MAX)
 	_last_real_usec = now
 	return maxf(dt, _PAUSE_DELTA_FALLBACK * 0.25)
+
+
+## Pure strip math: window client pixels, independent of zoom / stretch / HUD offset.
+static func edge_pan_direction_at(
+	mouse_window: Vector2,
+	window_size: Vector2,
+	hovered_blocks: bool,
+	window_focused: bool = true,
+	mouse_inside_window: bool = true
+) -> Vector2:
+	if not window_focused or not mouse_inside_window:
+		return Vector2.ZERO
+	if hovered_blocks:
+		return Vector2.ZERO
+	if window_size.x < 2.0 or window_size.y < 2.0:
+		return Vector2.ZERO
+	if mouse_window.x < 0.0 or mouse_window.y < 0.0:
+		return Vector2.ZERO
+	if mouse_window.x > window_size.x or mouse_window.y > window_size.y:
+		return Vector2.ZERO
+	var dir := Vector2.ZERO
+	var strip: float = EDGE_PAN_SCREEN_PX
+	if mouse_window.x <= strip:
+		dir.x -= 1.0
+	elif mouse_window.x >= window_size.x - strip:
+		dir.x += 1.0
+	if mouse_window.y <= strip:
+		dir.y -= 1.0
+	elif mouse_window.y >= window_size.y - strip:
+		dir.y += 1.0
+	return dir
+
+
+static func window_allows_edge_pan(viewport: Viewport) -> bool:
+	if viewport == null:
+		return false
+	if DisplayServer.get_name() == "headless":
+		return true
+	var win: Window = viewport.get_window()
+	if win == null:
+		return true
+	return win.has_focus()
+
+
+static func mouse_is_inside_window(viewport: Viewport) -> bool:
+	if viewport == null:
+		return false
+	var win: Window = viewport.get_window()
+	if win == null:
+		return true
+	var mouse: Vector2 = win.get_mouse_position()
+	var sz := Vector2(win.size)
+	return mouse.x >= 0.0 and mouse.y >= 0.0 and mouse.x <= sz.x and mouse.y <= sz.y
+
+
+## Any hovered UI Control that is not the map itself blocks edge pan
+## (toasts, top bar, unit card, panels, popups). IGNORE filters are not hovered.
+static func hovered_ui_blocks_edge_pan(viewport: Viewport) -> bool:
+	if viewport == null:
+		return false
+	var hovered: Control = viewport.gui_get_hovered_control()
+	if hovered == null:
+		return false
+	if hovered.mouse_filter == Control.MOUSE_FILTER_IGNORE:
+		return false
+	var nn := str(hovered.name)
+	if nn == "WorldMap" or nn == "MapRenderer" or nn.begins_with("Province"):
+		return false
+	return true
+
+
+## Screen-pixel edge direction, or ZERO when blocked / not on the true rim.
+static func edge_pan_direction_screen(viewport: Viewport) -> Vector2:
+	if viewport == null:
+		return Vector2.ZERO
+	var win: Window = viewport.get_window()
+	if win == null:
+		return Vector2.ZERO
+	var mouse: Vector2 = win.get_mouse_position()
+	var sz := Vector2(win.size)
+	var inside: bool = mouse.x >= 0.0 and mouse.y >= 0.0 and mouse.x <= sz.x and mouse.y <= sz.y
+	return edge_pan_direction_at(
+		mouse,
+		sz,
+		hovered_ui_blocks_edge_pan(viewport),
+		window_allows_edge_pan(viewport),
+		inside
+	)
 
 
 ## True when a modal / command-center style overlay is open — blocks ALL map nav
