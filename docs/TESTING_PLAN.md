@@ -554,6 +554,27 @@ Fixes: clamp Leaders to viewport−16px and re-fit on resize; Close is not on th
 
 Guard: `HeadlessUi1LeadersEdgePanMarchTest` + `tools/eoa_ui1_guard.sh` — 1280×740 and 1920×1080 panel+Close inside viewport; Close click and Esc each close (no MainMenu, map nav restored); edge rest at (97,731)/y=230/y=710/toast no camera move; x=1279 and y=0 pan; select unit + march → inspector not visible, selection kept. MV-1 / MV-1b **unedited**. Headless + xvfb **NOT live Play**. Seeds: Borken `710430` L1 / Warendorf `710434` L2 / Ober `710423` L3 / Siegen-Wittgenstein `710451` L4.
 
+Isolated keep-green (`ba2291f2`; wrapper `rss_mb` preferred; pgrep overlap noted):
+
+| gate | kind | result | peak RSS MB |
+|---|---|---|---|
+| hd_mv1 | headless | PASS (unedited) | **1208.0** |
+| hd_mv1b | headless | PASS (unedited) | **1207.7** |
+| hd_rh1 | headless | PASS | **1207.1** |
+| hd_ix1 (6) | headless | PASS (MandateGate `PASS failures=0`) | **1209.3** |
+| hd_rx1 (4) | headless | PASS | **1209.1** |
+| hd_rt1 (3) | headless | PASS | **1209.1** |
+| xvfb_mv1 | xvfb | PASS | **~2043** (runner peak 2171.8 leftover overlap) |
+| xvfb_mv1_card | xvfb | PASS `edge_panel`/`edge_card`/`cap_commit` | **2048.7** |
+| xvfb_rh1 | xvfb | PASS | **2045.9** |
+| py_fac1a | py | PASS | **8.4** |
+| hd_fac1a | headless | PASS | **1211.2** |
+| xvfb_fac1a | xvfb | PASS stale_lag=true 15/15 lone+cluster rx1 0.843/0.843 | **2043.8** |
+| CRASH-1 10× hd + 10× xvfb | both | PASS (CRASH-1b latch clear included) | ~1.2 GB/run (wrapper 2397 inflated) |
+| MV-1e 15/15 @ 4× | hd+xvfb | PASS | **1196.6 / 1330.3** |
+| Seeded RX-1 mid_river ON/OFF | xvfb | PASS units-off **0.749** / close 0.775 / spine 1.000 | wrapper 4138 inflated (typical isolated ~2046) |
+| UI-1 guard hd+xvfb | both | PASS | **1199.7 / 1345.5** |
+
 ### CH-1 / MV-1e stale hover commit (draft HOLD)
 
 At 4×, a still click on own land **without** a facility icon must commit to the province under `event.position`, not the cached hover/preview dest. `_mv1_preview_dest_matches_world` re-resolves GIS after the FAC-1a facility check; `_mv1_re_resolve_commit_pid` overrides a stale cache dest when GIS hits Y. Hover/preview update logic unchanged. FAC-1a icon override + miss-of-icon cache dest (direct `still_click(..., true)`) stay. Guard `HeadlessCh1Mv1eStaleHoverCommitTest` + `tools/eoa_ch1_mv1e_stale_hover_guard.sh`: same-frame motion X (Köln) then press/release Y (Leverkusen), 15/15, lone unit, hd+xvfb — **NOT live Play**. Live pair was Bad Kreuznach vs Hildesheim. Seeds unchanged: Borken `710430` L1 / Warendorf `710434` L2 / Ober `710423` L3 / Siegen-Wittgenstein `710451` L4.
