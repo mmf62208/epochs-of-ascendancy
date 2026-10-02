@@ -542,6 +542,46 @@ With a unit selected, hovering own/controlled land shows a dimmer dashed `MarchP
 
 **Backlog (no code this slice):** `_try_open_land_unit_at_world` nearest-player-land-icon fallback can arm a GER division from a French-land click (Play live: `any=FRA_formation_6 fo=GER_formation_7`). Pre-existing; do not change the fallback here. Item 2 (Attack-from-X vs Close overlap) and item 4 (fallback reach) are out of scope.
 
+### FLEET-1 land-spill vs foreign fleet / open sea (draft HOLD)
+
+Nearest-own-land chrome spill (`CHROME_SPILL_WORLD` 340) must not steal a click on a foreign fleet counter or on open sea. Gate: `_try_open_land_unit_at_world` calls `_nearest_player_land_formation_at_world` only when GIS at `event.position` is a land province **and** `_pick_unit_formation_at_world` missed every counter (`fo_any == null`). **FIX #1 (Play MIXED `582263e8`):** a foreign fleet disk hit inspects that fleet when the fleet's **own stationed pid is sea**, even if GIS under the cursor is coastal land (ENG Channel chip over East Kent `711453`). Land-stationed foreign fleet (MV-1b Köln FRA `710417`) still falls through. Foreign fleet **and** foreign land cards hide Open fight / Assign leader; march stays blocked. Own cards unchanged. Hit-test priority otherwise unchanged. MV-1 / MV-1b gates **unedited**. Out of scope: one marker per shared sea, Channel / Rio Grande Rise polygons, Pas-de-Calais FRA-land spill.
+
+Guard: `HeadlessFleet1LandSpillGateTest` + `tools/eoa_fleet1_guard.sh` (hd + xvfb 1280×740). Seeds are real `world_accurate` label_anchors:
+
+| seed | pid | world |
+|---|---|---|
+| Maginot GER land | `710173` | `(4283.279411, 1010.266854)` |
+| Emden (GER coast, no chip) | `710385` | `(4258.130659, 873.294384)` |
+| Köln (GER land; FRA fleet) | `710417` | `(4254.322147, 944.095861)` |
+| East Kent (ENG coastal land) | `711453` | `(4119.875715, 938.028287)` |
+| North Sea GER fleet | `950000` | `(4164.266667, 773.688889)` |
+| English Channel ENG fleet | `950001` | `(4128.701206, 938.217996)` |
+| open sea (perp off Channel disk; GIS Channel) | `950001` | resolved ~`(4162.498, 865.708)` (avoids East Kent) |
+
+Distances from Maginot: Channel **170.5**, North Sea **264.8**, Emden **139.3**, open sea **188.4** — all inside 340. Channel↔East Kent **8.8** (inside fleet disk). Cases: (a) Channel fleet → ENG; (b) open sea → Channel inspector; (c) Emden land → Maginot GER; (d) North Sea → GER fleet; (e) East Kent GIS + ENG disk → ENG fleet; (f) Köln FRA land-fleet not selected; (g) foreign fleet/land cards hide Assign/Open fight, march blocked; (h) own card still shows those buttons. Headless + xvfb **NOT live Play**.
+
+Isolated keep-green (`95009fee`; wrapper `rss_mb` preferred; MV-1/MV-1b **unedited**):
+
+| gate | kind | result | peak RSS MB |
+|---|---|---|---|
+| FLEET-1 hd / xvfb | both | PASS (a–h) | **1196.0 / 1331.1** |
+| hd_mv1 | headless | PASS (unedited) | **1195.6** |
+| hd_mv1b | headless | PASS (unedited) | **1195.7** |
+| hd_rh1 | headless | PASS | **1195.5** |
+| hd_ix1 (6) | headless | PASS (MandateGate `PASS failures=0`) | **1195.5–1197.4** |
+| hd_rx1 (4) | headless | PASS | **1195.5–1195.8** |
+| hd_rt1 (3) | headless | PASS | **1195.5–1195.9** |
+| hd_fac1a | headless | PASS | **1195.8** |
+| py_fac1a | py | PASS 7/7 | **42.8** (`resource.ru_maxrss`) |
+| xvfb_mv1 | xvfb | PASS | **2033.3** |
+| xvfb_mv1_card | xvfb | PASS `fra=true` `edge_panel`/`edge_card`/`cap_commit` | **2041.5** |
+| xvfb_rh1 | xvfb | PASS | **2036.4** |
+| xvfb_fac1a | xvfb | PASS stale_lag=true 15/15 lone+cluster rx1 0.843/0.843 | **2036.2** |
+| CRASH-1 10× hd + 10× xvfb | both | PASS | wrapper no RSS (typical isolated hd ~1.2 GB) |
+| MV-1e 15/15 @ 4× | hd+xvfb | PASS | **1195.6 / 1330.6** |
+| Seeded RX-1 mid_river ON/OFF | xvfb | PASS units-off **0.749** / close 0.775 / spine 1.000 | wrapper no RSS (typical isolated ~2046) |
+| UI-1 guard hd+xvfb | both | PASS | **1200.2 / 1343.7** |
+
 ### CRASH-1 halt-march popup (draft HOLD)
 
 Halt / Press / Hold / Withdraw / Assign must not `free()` `UnitDetailPopup` while `pressed` is emitting. Detach + rename `UnitDetailPopup_dying` + `queue_free()`. Same-dest still click is a no-op re-issue. **FIX #1 (Play live MIXED `80b0b542`):** press-mode rebuild dropped the card so the mouse-up still-clicked the map (inspector + camera jump; twice switched/cleared selection). Latch `_unit_card_consumed_press` on those five buttons; `_input` / `_unhandled_input` / `_left_release_must_skip_pick` / land-chip still-click swallow the matching release. Open card refreshes Halt on march start / re-target / arrival. **CRASH-1b (CH-1):** that latch must eat **one** matching left release then clear (new left press anywhere, 1 frame after the eaten release, 0.5s safety) so later top-bar / UI clicks register. Guard: Halt still no click-through; ≥4 UI press+release after swallow; following map still-click commits. Headless `HeadlessCrash1HaltMarchPopupTest` + `tools/eoa_crash1_halt_march_guard.sh` 10× hd + 10× xvfb — **NOT live Play**. MV-1 / MV-1b gates **unedited**.
