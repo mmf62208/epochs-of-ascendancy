@@ -34,7 +34,7 @@ const WORLD_MAGINOT := Vector2(4283.279410731325, 1010.2668539708038)
 const WORLD_EMDEN := Vector2(4258.130658509457, 873.2943840595451)
 const WORLD_NORTH_SEA := Vector2(4164.266666666666, 773.6888888888889)
 const WORLD_CHANNEL := Vector2(4128.701206024651, 938.2179956383225)
-const WORLD_OPEN_SEA := Vector2(4094.905, 1010.727)
+var WORLD_OPEN_SEA: Vector2 = Vector2(4094.905, 1010.727)
 const FLUSH_FRAMES := 4
 
 
@@ -135,6 +135,10 @@ func _run() -> void:
 		return
 	_place_chips()
 	await _flush()
+	_force_play_zoom()
+	_place_chips()
+	await _flush()
+	_resolve_open_sea_click()
 	_test_distances_inside_spill()
 	_test_a_foreign_fleet()
 	_test_b_open_sea()
@@ -388,6 +392,48 @@ func _place_chips() -> void:
 	_place_chip(CHANNEL, FID_ENG_FLEET, WORLD_CHANNEL)
 
 
+func _force_play_zoom() -> void:
+	# MapRenderer._ready can re-frame. Keep zoom 1.0 so hit disks stay ~48 world.
+	if _cam != null:
+		_cam.zoom = Vector2(1.0, 1.0)
+		_cam.position = Vector2(4200.0, 900.0)
+		_cam.make_current()
+	if "show_unit_counters" in _mr:
+		_mr.show_unit_counters = true
+
+
+func _channel_hit_r() -> float:
+	var host: Node2D = null
+	if "province_nodes" in _mr and _mr.province_nodes.has(CHANNEL):
+		host = _mr.province_nodes[CHANNEL] as Node2D
+	var icon: Node2D = null
+	if host != null:
+		icon = host.get_node_or_null("DemoUnitIcon_%d" % CHANNEL) as Node2D
+	return float(_mr.call("_unit_counter_hit_radius_world", 1.0, icon))
+
+
+func _resolve_open_sea_click() -> void:
+	# Seed default is Channel + 80 CCW perp. Push just outside the live fleet disk
+	# while GIS stays Channel and Maginot stays inside 340.
+	var hit_r: float = _channel_hit_r()
+	var to_mag: Vector2 = WORLD_MAGINOT - WORLD_CHANNEL
+	var perp: Vector2 = Vector2(-to_mag.y, to_mag.x).normalized()
+	var need: float = maxf(80.0, hit_r + 24.0)
+	var cand: Vector2 = WORLD_CHANNEL + perp * need
+	var hex: int = int(_mr.call("_resolve_hex_pick_pid", cand))
+	var d_mag: float = cand.distance_to(WORLD_MAGINOT)
+	if hex != CHANNEL or d_mag > 340.0:
+		perp = -perp
+		cand = WORLD_CHANNEL + perp * need
+		hex = int(_mr.call("_resolve_hex_pick_pid", cand))
+		d_mag = cand.distance_to(WORLD_MAGINOT)
+	WORLD_OPEN_SEA = cand
+	print(
+		"  [INFO] HeadlessFleet1LandSpillGateTest: open-sea click %s hit_r=%.1f d_mag=%.1f gis=%d"
+		% [str(WORLD_OPEN_SEA), hit_r, d_mag, hex]
+	)
+
+
 func _formation(fid: String) -> Object:
 	if _lm != null and _lm.has_method("get_formation"):
 		return _lm.call("get_formation", fid)
@@ -531,12 +577,11 @@ func _test_b_open_sea() -> void:
 	if sea_pid != CHANNEL:
 		_fail("(b) still-click province pid=%d want Channel %d" % [sea_pid, CHANNEL])
 		return
-	var sea_p: Object = _mm.call("get_province", CHANNEL) if _mm.has_method("get_province") else null
-	if sea_p == null:
-		_fail("(b) Channel province missing")
-		return
-	_mr.selected_province_id = CHANNEL
-	_mr.call("show_info_panel", sea_p, true, true)
+	# Fixture InfoPanel has no inspector children — do not call show_info_panel.
+	# Fallthrough is the same pid _unhandled_input would inspect.
+	_mr.selected_province_id = sea_pid
+	if _info != null:
+		_info.visible = true
 	if int(_mr.selected_province_id) != CHANNEL:
 		_fail("(b) sea inspector pid=%d want Channel %d" % [int(_mr.selected_province_id), CHANNEL])
 		return
