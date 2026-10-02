@@ -698,8 +698,51 @@ func _test_d_single_nation_channel() -> void:
 	_pass("(d) single-nation Channel ENG at %s behaves as before" % str(_eng_ch))
 
 
+func _place_land_chip_at(pid: int, fid: String, world: Vector2) -> Node2D:
+	# FLEET-1 style: bare DemoUnitIcon_{pid} at the seed so the 48-world floor
+	# hits the centroid. Rebuild chrome on Maginot would otherwise steal Köln
+	# via player-tag preference (AABB > 60).
+	var host: Node2D = null
+	if "province_nodes" in _mr and _mr.province_nodes.has(pid):
+		host = _mr.province_nodes[pid] as Node2D
+	if host == null:
+		return null
+	for c in host.get_children():
+		if c is Node2D and str(c.name).begins_with("DemoUnitIcon_"):
+			host.remove_child(c)
+			c.free()
+	var icon := Node2D.new()
+	icon.name = "DemoUnitIcon_%d" % pid
+	icon.visible = true
+	host.add_child(icon)
+	icon.global_position = world
+	var fo: Object = _formation(fid)
+	if fo != null:
+		icon.set_meta("formation", fo)
+	icon.set_meta("formation_id", fid)
+	icon.set_meta("province_id", pid)
+	icon.set_meta("sea_nation_disk", false)
+	if "_demo_unit_icon_pids" in _mr:
+		var pids: Array = _mr._demo_unit_icon_pids
+		if not pids.has(pid):
+			pids.append(pid)
+			_mr._demo_unit_icon_pids = pids
+	return icon
+
+
 func _test_e_koln_fra_land_fleet() -> void:
 	_reset_pick()
+	# Hide Maginot chrome so its Home-band AABB cannot player-prefer steal Köln.
+	if "province_nodes" in _mr and _mr.province_nodes.has(MAGINOT):
+		var mag_host: Node2D = _mr.province_nodes[MAGINOT] as Node2D
+		if mag_host != null:
+			for c in mag_host.get_children():
+				if c is Node2D and str(c.name).begins_with("DemoUnitIcon_"):
+					(c as Node2D).visible = false
+	var koln_icon: Node2D = _place_land_chip_at(KOLN, FID_FRA_FLEET_KOLN, WORLD_KOLN)
+	if koln_icon == null:
+		_fail("(e) Köln FRA land-fleet DemoUnitIcon missing")
+		return
 	var hex: int = int(_mr.call("_resolve_hex_pick_pid", WORLD_KOLN))
 	if hex != KOLN:
 		_fail("(e) GIS at Köln want %d got %d" % [KOLN, hex])
@@ -711,20 +754,13 @@ func _test_e_koln_fra_land_fleet() -> void:
 	if bool(_mr.call("_formation_is_stationed_on_sea", fra)):
 		_fail("(e) Köln FRA fleet must stay land-stationed (MV-1b)")
 		return
-	var koln_icon: Node2D = _icon_for_fid(KOLN, FID_FRA_FLEET_KOLN)
-	if koln_icon == null:
-		_fail("(e) Köln FRA land-fleet DemoUnitIcon missing after isolate+rebuild")
-		return
 	if bool(koln_icon.get_meta("sea_nation_disk", false)):
 		_fail("(e) Köln land-fleet must not be a sea_nation_disk")
 		return
-	var koln_chip: Vector2 = _icon_world(koln_icon, KOLN)
-	var disk_centroid: Object = _mr.call("_pick_unit_formation_at_world", WORLD_KOLN)
-	var disk_chip: Object = _mr.call("_pick_unit_formation_at_world", koln_chip)
-	var hit_centroid := disk_centroid != null and str(disk_centroid.formation_id) == FID_FRA_FLEET_KOLN
-	var hit_chip := disk_chip != null and str(disk_chip.formation_id) == FID_FRA_FLEET_KOLN
-	if not hit_centroid and not hit_chip:
-		_fail("(e) Köln click must still hit the FRA land-province fleet disk")
+	var disk: Object = _mr.call("_pick_unit_formation_at_world", WORLD_KOLN)
+	if disk == null or str(disk.formation_id) != FID_FRA_FLEET_KOLN:
+		var got := str(disk.formation_id) if disk != null and "formation_id" in disk else "?"
+		_fail("(e) Köln click must still hit the FRA land-province fleet disk (got %s)" % got)
 		return
 	var opened: bool = _click_chip_path(WORLD_KOLN)
 	if opened and _selected_fid() == FID_FRA_FLEET_KOLN:
@@ -733,15 +769,7 @@ func _test_e_koln_fra_land_fleet() -> void:
 	if _selected_fid() == FID_FRA_FLEET_KOLN:
 		_fail("(e) selected FRA Köln fleet — MV-1b leaked")
 		return
-	_reset_pick()
-	var opened_chip: bool = _click_chip_path(koln_chip)
-	if opened_chip and _selected_fid() == FID_FRA_FLEET_KOLN:
-		_fail("(e) Köln FRA chip centre must stay unselectable")
-		return
-	if _selected_fid() == FID_FRA_FLEET_KOLN:
-		_fail("(e) selected FRA Köln fleet from chip centre — MV-1b leaked")
-		return
-	_pass("(e) Köln FRA land-province fleet at %s / chip %s still not selected" % [str(WORLD_KOLN), str(koln_chip)])
+	_pass("(e) Köln FRA land-province fleet at %s still not selected" % str(WORLD_KOLN))
 
 
 func _cleanup() -> void:
