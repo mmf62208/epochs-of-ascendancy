@@ -219,15 +219,18 @@ func _rect_inside_viewport(ctrl: Control, vp_rect: Rect2, label: String) -> bool
 	return true
 
 
-func _open_leaders() -> LeaderAssignmentScreen:
+func _open_leaders() -> Control:
+	# Do not name LeaderAssignmentScreen at parse time in a -s harness
+	# (class_name pulls LeaderManager and the script fails to compile).
 	var packed: PackedScene = load("res://scenes/ui/LeaderAssignmentScreen.tscn") as PackedScene
 	if packed == null:
 		_fail("LeaderAssignmentScreen.tscn missing")
 		return null
-	var screen: LeaderAssignmentScreen = packed.instantiate() as LeaderAssignmentScreen
-	if screen == null:
+	var inst: Node = packed.instantiate()
+	if inst == null or not (inst is Control):
 		_fail("LeaderAssignmentScreen instantiate failed")
 		return null
+	var screen: Control = inst as Control
 	screen.name = "LeaderAssignmentScreen"
 	root.add_child(screen)
 	return screen
@@ -237,7 +240,7 @@ func _test_leaders_fit_and_close() -> void:
 	for wh in [Vector2i(1280, 740), Vector2i(1920, 1080)]:
 		_set_window_size(wh)
 		await _flush()
-		var screen: LeaderAssignmentScreen = _open_leaders()
+		var screen: Control = _open_leaders()
 		if screen == null:
 			return
 		if screen.has_method("_fit_to_viewport"):
@@ -279,7 +282,8 @@ func _test_leaders_fit_and_close() -> void:
 		ev.echo = false
 		ev.keycode = KEY_ESCAPE
 		ev.physical_keycode = KEY_ESCAPE
-		screen._input(ev)
+		if screen.has_method("_input"):
+			screen.call("_input", ev)
 		await _flush()
 		if is_instance_valid(screen) and not screen.is_queued_for_deletion():
 			_fail("Esc did not close Leaders @ %dx%d" % [wh.x, wh.y])
@@ -427,7 +431,7 @@ func _setup_map_renderer() -> bool:
 func _test_leaders_esc_no_pause() -> void:
 	_set_window_size(Vector2i(1280, 740))
 	await _flush()
-	var screen: LeaderAssignmentScreen = _open_leaders()
+	var screen: Control = _open_leaders()
 	if screen == null:
 		return
 	if _mr.has_method("_handle_escape_key"):
@@ -473,7 +477,25 @@ func _test_edge_pan_rest_and_rim() -> void:
 	]
 	for pos_v in interiors:
 		var pos: Vector2 = pos_v as Vector2
+		var helper_dir: Vector2 = MapViewInput.edge_pan_direction_at(
+			pos, Vector2(1280, 740), pos.x >= 1180.0, true, true
+		)
+		if helper_dir != Vector2.ZERO:
+			_fail("edge rest helper at (%.0f,%.0f) is %s" % [pos.x, pos.y, str(helper_dir)])
+			toast.queue_free()
+			return
 		_warp_mouse_window(pos)
+		await process_frame
+		var win: Window = root.get_window() if root != null else null
+		var landed: Vector2 = win.get_mouse_position() if win != null else Vector2(-1, -1)
+		# Headless warp often stays at (0,0) — that *is* the rim and would pan.
+		# Only apply camera when the cursor actually rests at the interior point.
+		if landed.distance_to(pos) > 4.0:
+			print(
+				"  [INFO] HeadlessUi1: warp miss rest (%.0f,%.0f) landed=%.1f,%.1f — helper ZERO, skip cam"
+				% [pos.x, pos.y, landed.x, landed.y]
+			)
+			continue
 		var before: Vector2 = _cam.global_position
 		var i := 0
 		while i < EDGE_REST_FRAMES:
