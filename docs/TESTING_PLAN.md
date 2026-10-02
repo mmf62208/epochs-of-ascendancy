@@ -548,36 +548,34 @@ Halt / Press / Hold / Withdraw / Assign must not `free()` `UnitDetailPopup` whil
 
 ### UI-1 Leaders close + edge pan + no march inspector (draft HOLD)
 
-**FIX #1 (Play MIXED `0ded8c49`):** TopInfoBar is exempt from the UI-under-cursor block **only** inside the north `0..EDGE_PAN_SCREEN_PX` strip (y=0/1 pans north at any x). The rest of the bar stays non-panning. Toasts / Leaders / unit card / pause menu still block, including when they touch that strip. Unfocused still skips. Leaders Close acts on release and swallows the mouse-up (no leftover map pick). Edge-pan speed unchanged. Guard: y=0/1 at x=10/640/1270 north; ~3–4px below strip no pan; toast-on-strip no pan; prior no-pan points; Close press+release no inspector/select. MV-1/MV-1b **unedited**. Headless + xvfb **NOT live Play**.
-
-
+**FIX #1 (Play MIXED `0ded8c49`, tip `eb6544a8`):** TopInfoBar is exempt from the UI-under-cursor block **only** inside the north `0..EDGE_PAN_SCREEN_PX` strip (y=0/1 pans north at any x). The rest of the bar stays non-panning. Toasts / Leaders / unit card / pause menu still block via hover, including when they touch that strip. Unfocused still skips. Leaders Close acts on release and swallows the mouse-up (no leftover map pick). Edge-pan speed unchanged. Guard: y=0/1 at x=10/640/1270 north; ~3–4px below strip no pan; toast-on-strip no pan; prior no-pan points; Close press+release no inspector/select. MV-1/MV-1b **unedited**. Headless + xvfb **NOT live Play**.
 
 Live Play 1280×740: Leaders 1440×800 left Close off-screen; Esc opened Command Center; Close clicks did nothing. Edge-pan fired at top y≈200–264 and bottom y>705 (64px HUD-offset strip); rest at (97,731) scrolled to Antarctica; right-edge toast panned. March commit opened the destination inspector behind the unit card.
 
 Fixes: clamp Leaders to viewport−16px and re-fit on resize; Close is not on the drag handle and `close_screen()` actually frees; Esc dismisses Leaders in `_input` + `MapRenderer._handle_escape_key` (consumed, no CC). Edge pan is `MapViewInput.EDGE_PAN_SCREEN_PX` (6) in **window** pixels; `hovered_ui_blocks_edge_pan` / unfocused / mouse-outside skip. March sets `_skip_inspector_after_march` and does not `_select_province` the dest. CRASH-1 same-dest no-op + CH-1 MV-1e event-position dest kept.
 
-Guard: `HeadlessUi1LeadersEdgePanMarchTest` + `tools/eoa_ui1_guard.sh` — 1280×740 and 1920×1080 panel+Close inside viewport; Close click and Esc each close (no MainMenu, map nav restored); edge rest at (97,731)/y=230/y=710/toast no camera move; x=1279 and y=0 pan; select unit + march → inspector not visible, selection kept. MV-1 / MV-1b **unedited**. Headless + xvfb **NOT live Play**. Seeds: Borken `710430` L1 / Warendorf `710434` L2 / Ober `710423` L3 / Siegen-Wittgenstein `710451` L4.
+Guard: `HeadlessUi1LeadersEdgePanMarchTest` + `tools/eoa_ui1_guard.sh` — 1280×740 and 1920×1080 panel+Close inside viewport; Close click and Esc each close (no MainMenu, map nav restored); edge rest at (97,731)/y=230/y=710/toast no camera move; x=1279 and y=0/1 at x=10/640/1270 pan (top-bar exempt); ~3–4px below strip no pan; toast-on-strip no pan; Close press+release no map click/select/inspector; select unit + march → inspector not visible, selection kept. MV-1 / MV-1b **unedited**. Headless + xvfb **NOT live Play**. Seeds: Borken `710430` L1 / Warendorf `710434` L2 / Ober `710423` L3 / Siegen-Wittgenstein `710451` L4.
 
-Isolated keep-green (`ba2291f2`; wrapper `rss_mb` preferred; pgrep overlap noted):
+Isolated keep-green (`eb6544a8`; wrapper `rss_mb` preferred; hd Godot ~1195, suite sampler ~2390 was pgrep double-count):
 
 | gate | kind | result | peak RSS MB |
 |---|---|---|---|
-| hd_mv1 | headless | PASS (unedited) | **1208.0** |
-| hd_mv1b | headless | PASS (unedited) | **1207.7** |
-| hd_rh1 | headless | PASS | **1207.1** |
-| hd_ix1 (6) | headless | PASS (MandateGate `PASS failures=0`) | **1209.3** |
-| hd_rx1 (4) | headless | PASS | **1209.1** |
-| hd_rt1 (3) | headless | PASS | **1209.1** |
-| xvfb_mv1 | xvfb | PASS | **~2043** (runner peak 2171.8 leftover overlap) |
-| xvfb_mv1_card | xvfb | PASS `edge_panel`/`edge_card`/`cap_commit` | **2048.7** |
-| xvfb_rh1 | xvfb | PASS | **2045.9** |
-| py_fac1a | py | PASS | **8.4** |
-| hd_fac1a | headless | PASS | **1211.2** |
-| xvfb_fac1a | xvfb | PASS stale_lag=true 15/15 lone+cluster rx1 0.843/0.843 | **2043.8** |
-| CRASH-1 10× hd + 10× xvfb | both | PASS (CRASH-1b latch clear included) | ~1.2 GB/run (wrapper 2397 inflated) |
-| MV-1e 15/15 @ 4× | hd+xvfb | PASS | **1196.6 / 1330.3** |
-| Seeded RX-1 mid_river ON/OFF | xvfb | PASS units-off **0.749** / close 0.775 / spine 1.000 | wrapper 4138 inflated (typical isolated ~2046) |
-| UI-1 guard hd+xvfb | both | PASS | **1199.7 / 1345.5** |
+| hd_mv1 | headless | PASS (unedited) | **~1195** |
+| hd_mv1b | headless | PASS (unedited) | **~1196** |
+| hd_rh1 | headless | PASS | **~1195** |
+| hd_ix1 (6) | headless | PASS (MandateGate `PASS failures=0`) | **~1196** |
+| hd_rx1 (4) | headless | PASS | **~1197** |
+| hd_rt1 (3) | headless | PASS | **~1196** |
+| xvfb_mv1 | xvfb | PASS | **2032.8** |
+| xvfb_mv1_card | xvfb | PASS `edge_panel`/`edge_card`/`cap_commit` | **2034.3** |
+| xvfb_rh1 | xvfb | PASS | **2031.4** |
+| py_fac1a | py | PASS 7/7 | **9.7** |
+| hd_fac1a | headless | PASS | **~1197** |
+| xvfb_fac1a | xvfb | PASS stale_lag=true 15/15 lone+cluster rx1 0.843/0.843 | **2040.5** |
+| CRASH-1 10× hd + 10× xvfb | both | PASS (CRASH-1b latch clear included) | ~1.2 GB/run (sampler 2719 inflated) |
+| MV-1e 15/15 @ 4× | hd+xvfb | PASS | **1196.9 / 1330.4** |
+| Seeded RX-1 mid_river ON/OFF | xvfb | PASS units-off **0.749** / close 0.775 / spine 1.000 | leftover 4073 (typical isolated ~2046) |
+| UI-1 guard hd+xvfb | both | PASS | **1200.4 / 1347.4** |
 
 ### CH-1 / MV-1e stale hover commit (draft HOLD)
 
