@@ -599,6 +599,19 @@ Live-scale xvfb (GER Home, zoom 1.524, RSS **2033.9**, RESULT=PASS):
 
 East Kent `711453` / old ENG chip / Channel centroid → `ENG_formation_2` / ENG / fleet (not GER Div 6).
 
+**FIX #2b (screenshots on `c9fd1c00` did not show plates):** North Sea Home was empty water at the centroid; Channel frames were the choke-diamond trio (Danish + Channel sea centroids), not a labelled 2×2; Channel camera sat over England. Plates now draw on `SeaNationFleetLayer` (`z=40`) above sea fill and overlay chokes. Inverse-zoom floor **0.66** keeps plates ~36–46 screen px; Home (`z<0.65`) spreads the 2×2 by drawn-body radius; compact 0.8 / 1.5 / 2.3 step is **45**. Click area = drawn NationPlate body (`max(half_w, half_h)+2`). Labels are two-line `TAG` / `Fleet N`. Pixel assert samples each logged plate screen centre and requires nation/NATO/label chrome (not sea / choke). Live-scale: `tools/eoa_fleet2_live_scale_check.sh` xvfb **exactly 1280×740**, GER Europe Home, Home + ~1.5 for Channel and North Sea. Evidence `docs/evidence/fleet2_fix2b/`.
+
+Live-scale xvfb FIX #2b (GER Home, RSS **2145.6**, RESULT=PASS, uncropped 1280×740):
+
+| sea / band | zoom | camera | cluster vs Play | r / hit / scale | plates world → screen |
+|---|---|---|---|---|---|
+| Channel Home | 0.318 | `(7134.5, 1645.9)` | `(7134.5, 1645.9)` vs `(7134.5, 1622.3)` d=23.6 | 14.50 / 64.67 / 2.712 | ENG `(7067.9, 1579.2)` `619,349` `ENG Fleet 2` · ITA `(7201.2, 1579.2)` `661,349` · POL `(7067.9, 1712.5)` `619,391` · USA `(7201.2, 1712.5)` `661,391` |
+| Channel ~1.5 | 1.500 | `(7134.5, 1622.3)` | `(7134.5, 1622.3)` d=0.0 | 14.50 / 19.52 / 0.660 | ENG `(7112.0, 1599.8)` `606,336` `ENG Fleet 2` · ITA `(7157.0, 1599.8)` `674,336` · POL `(7112.0, 1644.8)` `606,404` · USA `(7157.0, 1644.8)` `674,404` |
+| North Sea Home | 0.318 | `(7195.8, 1360.5)` | `(7195.8, 1360.5)` vs `(7195.9, 1336.9)` d=23.6 | 14.50 / 64.67 / 2.712 | GER `(7129.2, 1293.8)` `619,349` `GER Fleet 2` · FRA `(7262.5, 1293.8)` `661,349` · JAP `(7129.2, 1427.2)` `619,391` · SOV `(7262.5, 1427.2)` `661,391` |
+| North Sea ~1.5 | 1.500 | `(7195.9, 1336.9)` | `(7195.9, 1336.9)` d=0.1 | 14.50 / 19.52 / 0.660 | GER `(7173.4, 1314.4)` `606,336` `GER Fleet 2` · FRA `(7218.4, 1314.4)` `674,336` · JAP `(7173.4, 1359.4)` `606,404` · SOV `(7218.4, 1359.4)` `674,404` |
+
+Pixel samples: nation/NATO/label chrome present; choke=0 at all 16 plate centres. Live clicks 10/10: CH ENG/ITA/POL/USA opened read-only; NS GER own full card (`fight=true` `assign=true`); NS FRA/JAP/SOV read-only; East Kent `711453` `(7119.1, 1620.9)` + old ENG chip `(7134.5, 1610.3)` → `ENG_formation_2` (Channel fleet, not GER Div 6).
+
 Guard: `HeadlessFleet2SharedSeaMarkerTest` + `tools/eoa_fleet2_guard.sh` (hd + xvfb 1280×740). Seeds are real `world_accurate` label_anchors (production stationing):
 
 | seed | pid | world |
@@ -614,29 +627,29 @@ Cases: (a) GER North Sea disk → GER fleet own card; (b) FRA North Sea disk →
 
 Guard FIX #2 (hd = xvfb, live-space fixtures): NS GER `(7175.352, 1316.435)` hit-r=17.5 · FRA `(7216.352, 1316.435)` · JAP `(7175.352, 1357.435)` · SOV `(7216.352, 1357.435)` · Channel ENG `(7114.0, 1601.8)` · ITA `(7155.0, 1601.8)` · POL `(7114.0, 1642.8)` · USA `(7155.0, 1642.8)` · dist=41.0 > r_sum=35.0 · CH cluster `(7134.5, 1622.3)` · NS cluster `(7195.852, 1336.935)`.
 
-Isolated keep-green (FIX #2 tip; wrapper `rss_mb` preferred; MV-1/MV-1b **unedited**):
+Isolated keep-green (FIX #2b tip; wrapper `rss_mb` preferred; MV-1/MV-1b **unedited**):
 
 | gate | kind | result | peak RSS MB |
 |---|---|---|---|
-| FLEET-2 hd / xvfb | both | PASS (a–j) | **1200.3 / 1341.2** |
-| FLEET-1 hd / xvfb | both | PASS (a–h, unedited) | **1200.4 / 1335.2** |
-| hd_mv1 | headless | PASS (unedited) | **1208.3** |
-| hd_mv1b | headless | PASS (unedited) | **1208.4** |
-| hd_rh1 | headless | PASS | **1208.0** |
-| hd_ix1 (6) | headless | PASS (MandateGate PASS) | **~1199.7–1208.1** |
-| hd_rx1 (4) | headless | PASS | **~1199.7–1201.4** |
-| hd_rt1 (3) | headless | PASS | **~1199.8–1200.8** |
-| xvfb_mv1 | xvfb | PASS | **2040.3** |
-| xvfb_mv1_card | xvfb | PASS | **2039.0** |
-| xvfb_rh1 | xvfb | PASS | **2035.8** |
-| py_fac1a | py | PASS 7/7 | **0.084s** |
-| hd_fac1a | headless | PASS | **1200.3** |
-| xvfb_fac1a | xvfb | PASS stale_lag=true 15/15 lone+cluster rx1 0.843/0.843 | **2040.4** |
+| FLEET-2 hd / xvfb | both | PASS (a–j) | **1200.7 / 1342.1** |
+| FLEET-1 hd / xvfb | both | PASS (a–h, unedited) | **1200.7 / 1335.9** |
+| hd_mv1 | headless | PASS (unedited) | **1209.0** |
+| hd_mv1b | headless | PASS (unedited) | **1208.9** |
+| hd_rh1 | headless | PASS | **1209.1** |
+| hd_ix1 (6) | headless | PASS (MandateGate PASS) | **1208.7–1209.2** |
+| hd_rx1 (4) | headless | PASS | **1208.6–1209.2** |
+| hd_rt1 (3) | headless | PASS | **1208.8** |
+| xvfb_mv1 | xvfb | PASS | **2042.6** |
+| xvfb_mv1_card | xvfb | PASS `fra=true` `edge_panel`/`edge_card`/`cap_commit` | **2042.4** |
+| xvfb_rh1 | xvfb | PASS | **2034.4** |
+| py_fac1a | py | PASS 7/7 | **0.082s** |
+| hd_fac1a | headless | PASS | **1208.9** |
+| xvfb_fac1a | xvfb | PASS stale_lag=true 15/15 lone+cluster rx1 0.843/0.843 | **2037.4** |
 | CRASH-1 10× hd + 10× xvfb | both | PASS | wrapper 10×+10× |
-| MV-1e 15/15 @ 4× | hd+xvfb | PASS | **1200.3 / 1335.0** |
-| Seeded RX-1 mid_river ON/OFF | xvfb | PASS units-off **0.749** / close 0.775 / spine 1.000 (FAC-1a 0.843/0.843) | sibling xvfb ~2040 |
-| UI-1 guard hd+xvfb | both | PASS | **1204.5 / 1351.8** |
-| FLEET-2 live-scale xvfb | xvfb | PASS CH/NS on Play centroids; East Kent → Channel fleet | **2033.9** |
+| MV-1e 15/15 @ 4× | hd+xvfb | PASS | **1200.5 / 1337.2** |
+| Seeded RX-1 mid_river ON/OFF | xvfb | PASS units-off **0.749** / close 0.775 / spine 1.000 (FAC-1a 0.843/0.843) | wrapper exec (sibling xvfb ~2040) |
+| UI-1 guard hd+xvfb | both | PASS | **1205.0 / 1348.6** |
+| FLEET-2 live-scale xvfb | xvfb | PASS Home+1.5 plates visible; pixel chrome; 10/10 clicks | **2145.6** |
 
 ### CRASH-1 halt-march popup (draft HOLD)
 

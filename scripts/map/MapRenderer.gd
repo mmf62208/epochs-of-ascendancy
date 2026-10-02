@@ -26013,7 +26013,7 @@ func _sync_sea_nation_fleet_offsets(z: float) -> void:
 		if z < 0.65 and stacked.size() >= 3:
 			# Home: spread the 2x2 so inverse-zoom plates do not stack.
 			# 0.8 / 1.5 / 2.3 keep the compact in-sea step.
-			var drawn_r: float = 0.5 * sqrt(44.0 * 44.0 + 40.0 * 40.0) * plate_s
+			var drawn_r: float = 22.0 * plate_s + 2.0
 			var compact_step: float = 2.0 * r + 16.0
 			if compact_step > 1.0:
 				spread = maxf(1.0, (2.0 * drawn_r + 10.0) / compact_step)
