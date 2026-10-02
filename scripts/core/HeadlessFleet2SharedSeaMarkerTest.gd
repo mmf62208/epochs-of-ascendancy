@@ -2,17 +2,20 @@ extends SceneTree
 
 ## FLEET-2: one clickable marker per nation when several fleets share a
 ## sea province. Hit disks match the drawn plates and must not overlap.
-## Single-nation sea (ENG Channel) and FLEET-1 / MV-1b rules stay as today.
+## Production stationing (same as `_station_world_major_fleet_chips`):
+##   950000 North Sea  GER, FRA, SOV, JAP
+##   950001 Channel    ENG, ITA, POL, USA
+## FIX #1: 3+ plates use a 2x2 / column clamped to the sea polygon so the
+## Channel cannot fan across East Kent. Cluster pad picks the nearest plate
+## and never nearest-own-land spill. FLEET-1 / MV-1b stay as today.
 ## Headless / xvfb are NOT live Play.
 ##
 ## Real world_accurate label_anchor centroids (provinces_geometry.json):
-##   710173 Maginot GER land               (4283.279411, 1010.266854)
-##   710417 Köln (GER land; MV-1b FRA)     (4254.322147,  944.095861)
-##   950000 North Sea Zone (GER+FRA fleets)(4164.266667,  773.688889)
-##   950001 English Channel (ENG only)     (4128.701206,  938.217996)
-## Stacked North Sea disks are offset from the chip base
-##   centroid + (0, -12)  →  (4164.266667, 761.688889)
-## by `_sea_nation_fleet_stack_offsets` (player-first, then alpha).
+##   710173 Maginot GER land / GER Div 6    (4283.279411, 1010.266854)
+##   710417 Köln (GER land; MV-1b FRA)      (4254.322147,  944.095861)
+##   711453 East Kent (ENG coastal land)    (4119.875715,  938.028287)
+##   950000 North Sea Zone                  (4164.266667,  773.688889)
+##   950001 English Channel                 (4128.701206,  938.217996)
 ##
 ##   tools/run_godot.sh --headless --path . -s res://scripts/core/HeadlessFleet2SharedSeaMarkerTest.gd
 ##   tools/eoa_fleet2_guard.sh
@@ -21,19 +24,31 @@ const SRC_REN := "res://scripts/map/MapRenderer.gd"
 const GER_TAG := "GER"
 const ENG_TAG := "ENG"
 const FRA_TAG := "FRA"
+const ITA_TAG := "ITA"
+const POL_TAG := "POL"
+const USA_TAG := "USA"
+const JAP_TAG := "JAP"
+const SOV_TAG := "SOV"
 const MAGINOT := 710173
 const KOLN := 710417
+const EAST_KENT := 711453
 const NORTH_SEA := 950000
 const CHANNEL := 950001
-const FID_GER_LAND := "fleet2_ger_maginot"
+const FID_GER_LAND := "fleet2_ger_div6"
 const FID_GER_FLEET := "fleet2_ger_north_sea"
 const FID_FRA_FLEET_SEA := "fleet2_fra_north_sea"
+const FID_JAP_FLEET := "fleet2_jap_north_sea"
+const FID_SOV_FLEET := "fleet2_sov_north_sea"
 const FID_ENG_FLEET := "fleet2_eng_channel"
+const FID_ITA_FLEET := "fleet2_ita_channel"
+const FID_POL_FLEET := "fleet2_pol_channel"
+const FID_USA_FLEET := "fleet2_usa_channel"
 const FID_FRA_FLEET_KOLN := "fleet2_fra_koln"
 const DESIGN_LAND := "infantry_1936"
 const DESIGN_FLEET := "king_george_v_class_bb"
 const WORLD_MAGINOT := Vector2(4283.279410731325, 1010.2668539708038)
 const WORLD_KOLN := Vector2(4254.322147319904, 944.0958606451493)
+const WORLD_EAST_KENT := Vector2(4119.875714645911, 938.0282873606084)
 const WORLD_NORTH_SEA := Vector2(4164.266666666666, 773.6888888888889)
 const WORLD_CHANNEL := Vector2(4128.701206024651, 938.2179956383225)
 const FLUSH_FRAMES := 4
@@ -48,9 +63,16 @@ var _cam: Camera2D = null
 var _info: Panel = null
 var _ger_ns: Vector2 = Vector2.ZERO
 var _fra_ns: Vector2 = Vector2.ZERO
+var _jap_ns: Vector2 = Vector2.ZERO
+var _sov_ns: Vector2 = Vector2.ZERO
 var _eng_ch: Vector2 = Vector2.ZERO
+var _ita_ch: Vector2 = Vector2.ZERO
+var _pol_ch: Vector2 = Vector2.ZERO
+var _usa_ch: Vector2 = Vector2.ZERO
 var _ger_r: float = 0.0
 var _fra_r: float = 0.0
+var _ch_r: float = 0.0
+const WORLD_OLD_ENG_CHIP := Vector2(4128.701, 926.218)
 
 
 func _init() -> void:
@@ -151,8 +173,12 @@ func _run() -> void:
 	_test_a_own_north_sea()
 	_test_b_foreign_north_sea()
 	_test_c_disks_do_not_overlap()
-	_test_d_single_nation_channel()
+	_test_d_channel_production()
 	_test_e_koln_fra_land_fleet()
+	_test_f_channel_four_plates()
+	_test_g_east_kent_picks_channel()
+	_test_h_cluster_pad_nearest()
+	_test_i_labels_have_nation_tag()
 	_cleanup()
 
 
@@ -210,6 +236,18 @@ func _test_source_needles() -> void:
 	if "func _province_id_is_sea" not in ren:
 		_fail("_province_id_is_sea helper missing")
 		return
+	if "func _sea_nation_choose_clamped_offsets" not in ren:
+		_fail("compact/clamp sea-nation layout helper missing")
+		return
+	if "func _sea_nation_fit_radius" not in ren:
+		_fail("narrow-sea packed radius helper missing")
+		return
+	if "func _pick_nearest_sea_nation_in_cluster_pad" not in ren:
+		_fail("cluster no-spill pad helper missing")
+		return
+	if "func _sea_nation_plate_label" not in ren:
+		_fail("nation-tag plate label helper missing")
+		return
 	_pass("FLEET-2 source needles (FLEET-1 / MV-1b unedited)")
 
 
@@ -221,6 +259,7 @@ func _setup_fixture() -> bool:
 	var rows: Array = [
 		{"id": MAGINOT, "tag": GER_TAG, "name": "Baden-Baden, Stadtkreis", "c": WORLD_MAGINOT, "sea": false, "domain": "land"},
 		{"id": KOLN, "tag": GER_TAG, "name": "Köln, Kreisfreie Stadt", "c": WORLD_KOLN, "sea": false, "domain": "land"},
+		{"id": EAST_KENT, "tag": ENG_TAG, "name": "East Kent", "c": WORLD_EAST_KENT, "sea": false, "domain": "land"},
 		{"id": NORTH_SEA, "tag": "", "name": "North Sea Zone", "c": WORLD_NORTH_SEA, "sea": true, "domain": "sea"},
 		{"id": CHANNEL, "tag": "", "name": "English Channel Zone", "c": WORLD_CHANNEL, "sea": true, "domain": "strait"},
 	]
@@ -229,6 +268,11 @@ func _setup_fixture() -> bool:
 		GER_TAG: {"tag": GER_TAG, "name": "Germany"},
 		ENG_TAG: {"tag": ENG_TAG, "name": "United Kingdom"},
 		FRA_TAG: {"tag": FRA_TAG, "name": "France"},
+		ITA_TAG: {"tag": ITA_TAG, "name": "Italy"},
+		POL_TAG: {"tag": POL_TAG, "name": "Poland"},
+		USA_TAG: {"tag": USA_TAG, "name": "United States"},
+		JAP_TAG: {"tag": JAP_TAG, "name": "Japan"},
+		SOV_TAG: {"tag": SOV_TAG, "name": "Soviet Union"},
 	}
 	for row in rows:
 		var pid := int(row["id"])
@@ -260,23 +304,98 @@ func _setup_fixture() -> bool:
 		_fail("initialize_from_map_data missing")
 		return false
 	_force_centroids()
-	_pass("fixture Maginot/Köln/North Sea/Channel (real centroids)")
+	_inject_sea_geometry()
+	_pass("fixture Maginot/Köln/East Kent/North Sea/Channel (real centroids+polys)")
 	return true
 
 
+func _inject_sea_geometry() -> void:
+	if _mm == null or not ("_geometry" in _mm):
+		return
+	var geo: Dictionary = _mm.get("_geometry")
+	geo[EAST_KENT] = {
+		"points": PackedVector2Array([
+			Vector2(4114.9487104, 944.9813493100348), Vector2(4113.4305644080705, 942.7185933665803),
+			Vector2(4116.124218215877, 940.9319106924808), Vector2(4118.332788739935, 939.4669805646026),
+			Vector2(4117.989403408163, 937.1441333096208), Vector2(4117.64601807639, 934.8212860546389),
+			Vector2(4117.122924502648, 932.5480340664365), Vector2(4118.877130552647, 932.156054185142),
+			Vector2(4120.631336602646, 931.7640743038475), Vector2(4122.406928312705, 931.8778916986766),
+			Vector2(4124.182520022764, 931.9917090935057), Vector2(4127.733703442882, 932.2193438831639),
+			Vector2(4127.130110564115, 935.3231052665808), Vector2(4126.526517685348, 938.4268666499976),
+			Vector2(4123.578927143997, 939.566869693379), Vector2(4120.631336602646, 940.7068727367603),
+			Vector2(4119.149901307549, 941.2720870561492), Vector2(4117.707925722648, 942.7185933665803),
+			Vector2(4117.239108991306, 944.9597355170483), Vector2(4116.124218215877, 944.9702563969404),
+		]),
+		"label_anchor": WORLD_EAST_KENT,
+	}
+	geo[NORTH_SEA] = {
+		"points": PackedVector2Array([
+			Vector2(4164.274325675988, 732.5307272414757), Vector2(4166.174301006074, 736.4131930852554),
+			Vector2(4168.0742763361595, 740.2956589290352), Vector2(4172.128318089954, 745.8358452922807),
+			Vector2(4175.963693706104, 752.1960435535552), Vector2(4178.243309691046, 754.7113853975154),
+			Vector2(4180.5229256759885, 757.2267272414756), Vector2(4179.799841637543, 765.7169683029913),
+			Vector2(4179.992155628316, 773.6906521075452), Vector2(4179.777676483066, 781.6756368137067),
+			Vector2(4180.5229256759885, 790.1547272414757), Vector2(4178.231561462775, 792.658960245657),
+			Vector2(4175.9401972495625, 795.1631932498385), Vector2(4172.0956657414545, 801.6379180829756),
+			Vector2(4168.082002843649, 807.1851992204645), Vector2(4166.178164259819, 811.01796323097),
+			Vector2(4164.274325675988, 814.8507272414756), Vector2(4162.3548929758845, 811.0002498281735),
+			Vector2(4160.435460275781, 807.1497724148712), Vector2(4156.359980800274, 801.5185916414757),
+			Vector2(4152.573385506481, 795.1383179240686), Vector2(4150.299555591235, 792.6465225827721),
+			Vector2(4148.025725675988, 790.1547272414757), Vector2(4148.791404612467, 781.6756570393595),
+			Vector2(4148.5128249258, 773.6906448413527), Vector2(4148.769384376283, 765.7159952190113),
+			Vector2(4148.025725675988, 757.2267272414756), Vector2(4150.3088036522995, 754.707862920686),
+			Vector2(4152.591881628611, 752.1889985998962), Vector2(4156.393754675988, 745.7430872414757),
+			Vector2(4160.451815521844, 740.1735997399455), Vector2(4162.363070598915, 736.3521634907106),
+		]),
+		"label_anchor": WORLD_NORTH_SEA,
+	}
+	geo[CHANNEL] = {
+		"points": PackedVector2Array([
+			Vector2(4128.484210541551, 910.7763224551429), Vector2(4130.173619088177, 912.7202007272583),
+			Vector2(4133.664048806636, 922.7231159229912), Vector2(4136.518408012873, 923.4433618054113),
+			Vector2(4139.316610541551, 927.2403224551429), Vector2(4139.139687192327, 932.7282974104994),
+			Vector2(4138.962763843103, 938.216272365856), Vector2(4139.139687192327, 943.7042974104995),
+			Vector2(4139.316610541551, 949.1923224551429), Vector2(4136.5075238967065, 953.020052735643),
+			Vector2(4133.698437251862, 956.847783016143), Vector2(4131.091323896706, 961.252052735643),
+			Vector2(4128.484210541551, 965.656322455143), Vector2(4125.84609558298, 961.2122772551429),
+			Vector2(4123.207980624408, 956.7682320551428), Vector2(4120.42989558298, 952.9802772551429),
+			Vector2(4117.651810541551, 949.1923224551429), Vector2(4117.814176958154, 943.7042949884351),
+			Vector2(4117.976543374758, 938.2162675217276), Vector2(4117.814176958154, 932.7282949884352),
+			Vector2(4122.059172102304, 930.031663572581), Vector2(4122.444101436304, 920.1125363671852),
+			Vector2(4123.230496541551, 919.5845624551428), Vector2(4125.857353541551, 915.1804424551428),
+		]),
+		"label_anchor": WORLD_CHANNEL,
+	}
+	_mm.set("_geometry", geo)
+	if _mm.has_method("set_geometry_world_native"):
+		_mm.call("set_geometry_world_native", true)
+	if _mm.has_method("set_geometry_world_space"):
+		_mm.call("set_geometry_world_space", true)
+
+
 func _setup_formations() -> bool:
-	if not _register_formation(FID_GER_LAND, GER_TAG, "division", DESIGN_LAND, MAGINOT, "GER Maginot Div"):
+	if not _register_formation(FID_GER_LAND, GER_TAG, "division", DESIGN_LAND, MAGINOT, "GER Div 6"):
 		return false
-	if not _register_formation(FID_GER_FLEET, GER_TAG, "fleet", DESIGN_FLEET, NORTH_SEA, "GER North Sea Fleet"):
+	if not _register_formation(FID_GER_FLEET, GER_TAG, "fleet", DESIGN_FLEET, NORTH_SEA, "GER Fleet 2"):
 		return false
-	if not _register_formation(FID_FRA_FLEET_SEA, FRA_TAG, "fleet", DESIGN_FLEET, NORTH_SEA, "FRA North Sea Fleet"):
+	if not _register_formation(FID_FRA_FLEET_SEA, FRA_TAG, "fleet", DESIGN_FLEET, NORTH_SEA, "FRA Fleet 2"):
 		return false
-	if not _register_formation(FID_ENG_FLEET, ENG_TAG, "fleet", DESIGN_FLEET, CHANNEL, "ENG Channel Fleet"):
+	if not _register_formation(FID_JAP_FLEET, JAP_TAG, "fleet", DESIGN_FLEET, NORTH_SEA, "JAP Fleet 2"):
+		return false
+	if not _register_formation(FID_SOV_FLEET, SOV_TAG, "fleet", DESIGN_FLEET, NORTH_SEA, "SOV king_george_v_class_bb"):
+		return false
+	if not _register_formation(FID_ENG_FLEET, ENG_TAG, "fleet", DESIGN_FLEET, CHANNEL, "ENG Fleet 2"):
+		return false
+	if not _register_formation(FID_ITA_FLEET, ITA_TAG, "fleet", DESIGN_FLEET, CHANNEL, "ITA Fleet 2"):
+		return false
+	if not _register_formation(FID_POL_FLEET, POL_TAG, "fleet", DESIGN_FLEET, CHANNEL, "POL Fleet 2"):
+		return false
+	if not _register_formation(FID_USA_FLEET, USA_TAG, "fleet", DESIGN_FLEET, CHANNEL, "USA Fleet 2"):
 		return false
 	if not _register_formation(FID_FRA_FLEET_KOLN, FRA_TAG, "fleet", DESIGN_FLEET, KOLN, "FRA Köln Fleet"):
 		return false
 	_isolate_fixture_formations()
-	_pass("seeded GER+FRA North Sea fleets, ENG Channel, Köln FRA land fleet")
+	_pass("seeded production NS (GER/FRA/JAP/SOV) + Channel (ENG/ITA/POL/USA)")
 	return true
 
 
@@ -287,10 +406,15 @@ func _isolate_fixture_formations() -> void:
 		FID_GER_LAND: true,
 		FID_GER_FLEET: true,
 		FID_FRA_FLEET_SEA: true,
+		FID_JAP_FLEET: true,
+		FID_SOV_FLEET: true,
 		FID_ENG_FLEET: true,
+		FID_ITA_FLEET: true,
+		FID_POL_FLEET: true,
+		FID_USA_FLEET: true,
 		FID_FRA_FLEET_KOLN: true,
 	}
-	var pids: Dictionary = {MAGINOT: true, KOLN: true, NORTH_SEA: true, CHANNEL: true}
+	var pids: Dictionary = {MAGINOT: true, KOLN: true, EAST_KENT: true, NORTH_SEA: true, CHANNEL: true}
 	if _lm == null or not ("formations" in _lm) or not (_lm.formations is Dictionary):
 		return
 	for fid_v in _lm.formations.keys():
@@ -365,6 +489,7 @@ func _setup_map_renderer() -> bool:
 	var placed: Dictionary = {
 		MAGINOT: WORLD_MAGINOT,
 		KOLN: WORLD_KOLN,
+		EAST_KENT: WORLD_EAST_KENT,
 		NORTH_SEA: WORLD_NORTH_SEA,
 		CHANNEL: WORLD_CHANNEL,
 	}
@@ -397,12 +522,14 @@ func _force_centroids() -> void:
 		var cents: Dictionary = _mm.get("_centroids")
 		cents[MAGINOT] = WORLD_MAGINOT
 		cents[KOLN] = WORLD_KOLN
+		cents[EAST_KENT] = WORLD_EAST_KENT
 		cents[NORTH_SEA] = WORLD_NORTH_SEA
 		cents[CHANNEL] = WORLD_CHANNEL
 		_mm.set("_centroids", cents)
 	if _mr != null and "province_centroids" in _mr:
 		_mr.province_centroids[MAGINOT] = WORLD_MAGINOT
 		_mr.province_centroids[KOLN] = WORLD_KOLN
+		_mr.province_centroids[EAST_KENT] = WORLD_EAST_KENT
 		_mr.province_centroids[NORTH_SEA] = WORLD_NORTH_SEA
 		_mr.province_centroids[CHANNEL] = WORLD_CHANNEL
 
@@ -465,42 +592,52 @@ func _icon_hit_r(icon: Node2D) -> float:
 func _resolve_marker_coords() -> bool:
 	var ger_icon: Node2D = _icon_for_fid(NORTH_SEA, FID_GER_FLEET)
 	var fra_icon: Node2D = _icon_for_fid(NORTH_SEA, FID_FRA_FLEET_SEA)
+	var jap_icon: Node2D = _icon_for_fid(NORTH_SEA, FID_JAP_FLEET)
+	var sov_icon: Node2D = _icon_for_fid(NORTH_SEA, FID_SOV_FLEET)
 	var eng_icon: Node2D = _icon_for_fid(CHANNEL, FID_ENG_FLEET)
-	if ger_icon == null or fra_icon == null:
-		_fail("North Sea must draw one DemoUnitIcon per nation (GER + FRA)")
+	var ita_icon: Node2D = _icon_for_fid(CHANNEL, FID_ITA_FLEET)
+	var pol_icon: Node2D = _icon_for_fid(CHANNEL, FID_POL_FLEET)
+	var usa_icon: Node2D = _icon_for_fid(CHANNEL, FID_USA_FLEET)
+	if ger_icon == null or fra_icon == null or jap_icon == null or sov_icon == null:
+		_fail("North Sea must draw one DemoUnitIcon per nation (GER/FRA/JAP/SOV)")
 		return false
-	if eng_icon == null:
-		_fail("Channel ENG single-nation marker missing")
+	if eng_icon == null or ita_icon == null or pol_icon == null or usa_icon == null:
+		_fail("Channel must draw one DemoUnitIcon per production nation (ENG/ITA/POL/USA)")
 		return false
-	if not bool(ger_icon.get_meta("sea_nation_disk", false)) or not bool(fra_icon.get_meta("sea_nation_disk", false)):
-		_fail("shared-sea markers must set sea_nation_disk")
-		return false
-	if bool(eng_icon.get_meta("sea_nation_disk", false)):
-		_fail("single-nation Channel marker must stay a normal DemoUnitIcon_{pid}")
-		return false
-	if eng_icon.name != "DemoUnitIcon_%d" % CHANNEL:
-		_fail("Channel icon name=%s want DemoUnitIcon_%d" % [eng_icon.name, CHANNEL])
+	for ic in [ger_icon, fra_icon, jap_icon, sov_icon, eng_icon, ita_icon, pol_icon, usa_icon]:
+		if not bool((ic as Node2D).get_meta("sea_nation_disk", false)):
+			_fail("shared-sea markers must set sea_nation_disk (name=%s)" % (ic as Node2D).name)
+			return false
+	if not str(eng_icon.name).begins_with("DemoUnitIcon_%d_" % CHANNEL):
+		_fail("Channel ENG name=%s want DemoUnitIcon_%d_ENG" % [eng_icon.name, CHANNEL])
 		return false
 	_ger_ns = _icon_world(ger_icon, NORTH_SEA)
 	_fra_ns = _icon_world(fra_icon, NORTH_SEA)
+	_jap_ns = _icon_world(jap_icon, NORTH_SEA)
+	_sov_ns = _icon_world(sov_icon, NORTH_SEA)
 	_eng_ch = _icon_world(eng_icon, CHANNEL)
+	_ita_ch = _icon_world(ita_icon, CHANNEL)
+	_pol_ch = _icon_world(pol_icon, CHANNEL)
+	_usa_ch = _icon_world(usa_icon, CHANNEL)
 	_ger_r = _icon_hit_r(ger_icon)
 	_fra_r = _icon_hit_r(fra_icon)
+	_ch_r = _icon_hit_r(eng_icon)
 	var base: Vector2 = WORLD_NORTH_SEA + Vector2(0, -12)
 	var ch_base: Vector2 = WORLD_CHANNEL + Vector2(0, -12)
 	print(
-		"  [INFO] HeadlessFleet2SharedSeaMarkerTest: GER disk %s r=%.1f FRA disk %s r=%.1f Channel %s (base NS %s CH %s)"
-		% [str(_ger_ns), _ger_r, str(_fra_ns), _fra_r, str(_eng_ch), str(base), str(ch_base)]
+		"  [INFO] HeadlessFleet2SharedSeaMarkerTest: NS GER %s r=%.1f FRA %s JAP %s SOV %s | CH ENG %s ITA %s POL %s USA %s r=%.1f (base NS %s CH %s)"
+		% [
+			str(_ger_ns), _ger_r, str(_fra_ns), str(_jap_ns), str(_sov_ns),
+			str(_eng_ch), str(_ita_ch), str(_pol_ch), str(_usa_ch), _ch_r,
+			str(base), str(ch_base),
+		]
 	)
 	if _ger_ns.distance_to(_fra_ns) < 1.0:
 		_fail("GER and FRA North Sea markers must be offset (same centre)")
 		return false
-	if _eng_ch.distance_to(ch_base) > 2.0:
-		_fail("single-nation Channel chip moved: %s want %s" % [str(_eng_ch), str(ch_base)])
-		return false
 	_pass(
-		"coords GER %s r=%.1f FRA %s r=%.1f Channel %s"
-		% [str(_ger_ns), _ger_r, str(_fra_ns), _fra_r, str(_eng_ch)]
+		"coords NS GER %s r=%.1f FRA %s | CH ENG %s ITA %s POL %s USA %s r=%.1f"
+		% [str(_ger_ns), _ger_r, str(_fra_ns), str(_eng_ch), str(_ita_ch), str(_pol_ch), str(_usa_ch), _ch_r]
 	)
 	return true
 
@@ -672,30 +809,206 @@ func _test_c_disks_do_not_overlap() -> void:
 	_pass("(c) disks do not overlap (dist=%.1f > r_sum=%.1f); each centre picks its fleet" % [dist, need])
 
 
-func _test_d_single_nation_channel() -> void:
+func _is_channel_fid(fid: String) -> bool:
+	return fid == FID_ENG_FLEET or fid == FID_ITA_FLEET or fid == FID_POL_FLEET or fid == FID_USA_FLEET
+
+
+func _channel_plates() -> Array:
+	return [
+		{"fid": FID_ENG_FLEET, "pos": _eng_ch, "tag": ENG_TAG},
+		{"fid": FID_ITA_FLEET, "pos": _ita_ch, "tag": ITA_TAG},
+		{"fid": FID_POL_FLEET, "pos": _pol_ch, "tag": POL_TAG},
+		{"fid": FID_USA_FLEET, "pos": _usa_ch, "tag": USA_TAG},
+	]
+
+
+func _assert_plate_picks_own(who: String, world: Vector2, want_fid: String, own_card: bool) -> bool:
+	_reset_pick()
+	var disk: Object = _mr.call("_pick_unit_formation_at_world", world)
+	var got := str(disk.formation_id) if disk != null and "formation_id" in disk else "?"
+	if disk == null or got != want_fid:
+		_fail("%s disk centre must pick %s (got %s)" % [who, want_fid, got])
+		return false
+	var opened: bool = _click_chip_path(world)
+	if not opened or _selected_fid() != want_fid:
+		_fail("%s click selected=%s want %s" % [who, _selected_fid(), want_fid])
+		return false
+	if not _popup_up():
+		_fail("%s card missing" % who)
+		return false
+	if own_card:
+		if not _popup_has_btn("BtnOpenFight") or not _popup_has_btn("BtnAssignLeader"):
+			_fail("%s own card must show Open fight / Assign" % who)
+			return false
+	elif not _assert_no_command_buttons(who):
+		return false
+	return true
+
+
+func _plate_clamped_ok(world: Vector2, pid: int) -> bool:
+	if _mr != null and _mr.has_method("_sea_nation_plate_clamped_ok"):
+		return bool(_mr.call("_sea_nation_plate_clamped_ok", world, pid))
+	if _mr != null and bool(_mr.call("_province_id_is_sea", int(_mr.call("_resolve_hex_pick_pid", world)))):
+		return true
+	return false
+
+
+func _test_d_channel_production() -> void:
+	# Production Channel holds ENG/ITA/POL/USA — not a single ENG pin.
 	_reset_pick()
 	var hex: int = int(_mr.call("_resolve_hex_pick_pid", WORLD_CHANNEL))
-	if hex != CHANNEL:
-		_fail("(d) GIS at Channel centroid want %d got %d" % [CHANNEL, hex])
+	if hex != CHANNEL and hex != EAST_KENT:
+		_fail("(d) GIS at Channel centroid want Channel/East Kent got %d" % hex)
 		return
-	var opened: bool = _click_chip_path(WORLD_CHANNEL)
-	if not opened:
-		_fail("(d) Channel centroid must still select the ENG fleet")
+	for rec_v in _channel_plates():
+		var rec: Dictionary = rec_v as Dictionary
+		var fid := str(rec["fid"])
+		var pos: Vector2 = rec["pos"] as Vector2
+		var tag := str(rec["tag"])
+		if pos == Vector2.ZERO:
+			_fail("(d) %s Channel plate centre missing" % tag)
+			return
+		if not _assert_plate_picks_own("(d) %s Channel" % tag, pos, fid, false):
+			return
+	_pass("(d) production Channel ENG/ITA/POL/USA each plate picks its fleet (read-only)")
+
+
+func _test_f_channel_four_plates() -> void:
+	var seen: Dictionary = {}
+	for rec_v in _channel_plates():
+		var rec: Dictionary = rec_v as Dictionary
+		var fid := str(rec["fid"])
+		var pos: Vector2 = rec["pos"] as Vector2
+		var tag := str(rec["tag"])
+		if not _assert_plate_picks_own("(f) %s" % tag, pos, fid, false):
+			return
+		if not _plate_clamped_ok(pos, CHANNEL):
+			_fail("(f) %s plate centre %s is not over sea / clamp tolerance" % [tag, str(pos)])
+			return
+		seen[fid] = pos
+	var pts: Array = [_eng_ch, _ita_ch, _pol_ch, _usa_ch]
+	for i in pts.size():
+		for j in range(i + 1, pts.size()):
+			var a: Vector2 = pts[i] as Vector2
+			var b: Vector2 = pts[j] as Vector2
+			if a.distance_to(b) <= (_ch_r + _ch_r):
+				_fail("(f) Channel disks overlap (%s vs %s dist=%.1f r_sum=%.1f)" % [str(a), str(b), a.distance_to(b), _ch_r * 2.0])
+				return
+	if seen.size() != 4:
+		_fail("(f) want 4 distinct Channel fleets")
 		return
-	if _selected_fid() != FID_ENG_FLEET:
-		_fail("(d) selected=%s want ENG Channel fleet %s" % [_selected_fid(), FID_ENG_FLEET])
-		return
-	if not _popup_up():
-		_fail("(d) ENG Channel inspect popup missing")
-		return
-	if not _assert_no_command_buttons("(d) ENG Channel"):
-		return
-	_reset_pick()
-	var mid: bool = _click_chip_path(_eng_ch)
-	if not mid or _selected_fid() != FID_ENG_FLEET:
-		_fail("(d) Channel chip centre %s must still select ENG" % str(_eng_ch))
-		return
-	_pass("(d) single-nation Channel ENG at %s behaves as before" % str(_eng_ch))
+	_pass("(f) Channel 4 plates: each centre picks its fleet and sits over sea/clamp")
+
+
+func _test_g_east_kent_picks_channel() -> void:
+	var samples: Array = [
+		{"name": "East Kent centroid 711453", "pos": WORLD_EAST_KENT},
+		{"name": "old ENG chip", "pos": WORLD_OLD_ENG_CHIP},
+		{"name": "East Kent label anchor", "pos": WORLD_EAST_KENT},
+	]
+	# Extra: exact documented old-ENG + label numbers from the live report.
+	samples.append({"name": "old ENG 4128.701,926.218", "pos": Vector2(4128.701, 926.218)})
+	samples.append({"name": "East Kent 4119.876,938.028", "pos": Vector2(4119.876, 938.028)})
+	for s_v in samples:
+		var s: Dictionary = s_v as Dictionary
+		var pos: Vector2 = s["pos"] as Vector2
+		var name := str(s["name"])
+		_reset_pick()
+		var disk: Object = _mr.call("_pick_unit_formation_at_world", pos)
+		var got := str(disk.formation_id) if disk != null and "formation_id" in disk else "?"
+		if disk == null or not _is_channel_fid(got):
+			_fail("(g) %s pick=%s want a Channel fleet (not GER Div 6)" % [name, got])
+			return
+		if got == FID_GER_LAND:
+			_fail("(g) %s spilled to GER Div 6" % name)
+			return
+		var opened: bool = _click_chip_path(pos)
+		if not opened:
+			_fail("(g) %s click opened nothing (spill/land?)" % name)
+			return
+		if _selected_fid() == FID_GER_LAND:
+			_fail("(g) %s selected GER Div 6 — land spill regression" % name)
+			return
+		if not _is_channel_fid(_selected_fid()):
+			_fail("(g) %s selected=%s want a Channel fleet" % [name, _selected_fid()])
+			return
+		if not _popup_up():
+			_fail("(g) %s Channel card missing" % name)
+			return
+		if not _assert_no_command_buttons("(g) %s" % name):
+			return
+	_pass("(g) East Kent / old ENG chip / label anchor pick a Channel fleet, not GER Div 6")
+
+
+func _test_h_cluster_pad_nearest() -> void:
+	# Mid-point between ENG and ITA (typical 2x2 gap) and the cluster centroid.
+	var mid: Vector2 = (_eng_ch + _ita_ch + _pol_ch + _usa_ch) * 0.25
+	var gap: Vector2 = (_eng_ch + _ita_ch) * 0.5
+	for rec_v in [{"name": "cluster centroid", "pos": mid}, {"name": "ENG/ITA gap", "pos": gap}]:
+		var rec: Dictionary = rec_v as Dictionary
+		var pos: Vector2 = rec["pos"] as Vector2
+		var name := str(rec["name"])
+		_reset_pick()
+		var disk: Object = _mr.call("_pick_unit_formation_at_world", pos)
+		var got := str(disk.formation_id) if disk != null and "formation_id" in disk else "?"
+		if disk == null or not _is_channel_fid(got):
+			_fail("(h) %s pick=%s want nearest Channel plate (not land spill)" % [name, got])
+			return
+		var opened: bool = _click_chip_path(pos)
+		if not opened or not _is_channel_fid(_selected_fid()):
+			_fail("(h) %s selected=%s want a Channel fleet" % [name, _selected_fid()])
+			return
+		if _selected_fid() == FID_GER_LAND:
+			_fail("(h) %s spilled to GER Div 6" % name)
+			return
+		if not _assert_no_command_buttons("(h) %s" % name):
+			return
+	_pass("(h) cluster-pad click picks the nearest Channel plate, not land spill")
+
+
+func _icon_label(pid: int, fid: String) -> String:
+	var icon: Node2D = _icon_for_fid(pid, fid)
+	if icon == null:
+		return ""
+	var desig: Node = icon.get_node_or_null("Designation")
+	if desig == null:
+		return ""
+	return str(desig.get("text"))
+
+
+func _test_i_labels_have_nation_tag() -> void:
+	var rows: Array = [
+		{"pid": NORTH_SEA, "fid": FID_GER_FLEET, "tag": GER_TAG},
+		{"pid": NORTH_SEA, "fid": FID_FRA_FLEET_SEA, "tag": FRA_TAG},
+		{"pid": NORTH_SEA, "fid": FID_JAP_FLEET, "tag": JAP_TAG},
+		{"pid": NORTH_SEA, "fid": FID_SOV_FLEET, "tag": SOV_TAG},
+		{"pid": CHANNEL, "fid": FID_ENG_FLEET, "tag": ENG_TAG},
+		{"pid": CHANNEL, "fid": FID_ITA_FLEET, "tag": ITA_TAG},
+		{"pid": CHANNEL, "fid": FID_POL_FLEET, "tag": POL_TAG},
+		{"pid": CHANNEL, "fid": FID_USA_FLEET, "tag": USA_TAG},
+	]
+	for rec_v in rows:
+		var rec: Dictionary = rec_v as Dictionary
+		var tag := str(rec["tag"])
+		var label: String = _icon_label(int(rec["pid"]), str(rec["fid"]))
+		if label.is_empty():
+			_fail("(i) %s plate label missing" % tag)
+			return
+		if tag not in label:
+			_fail("(i) %s label '%s' must include the nation tag" % [tag, label])
+			return
+		if "Fleet" not in label:
+			_fail("(i) %s label '%s' must include Fleet" % [tag, label])
+			return
+		if tag == SOV_TAG:
+			var low: String = label.to_lower()
+			if "king" in low or "class_bb" in low or label.ends_with(".") or "king_g" in low:
+				_fail("(i) SOV label truncated/design-id: '%s'" % label)
+				return
+			if label.length() > 14:
+				_fail("(i) SOV label still too long / truncated path: '%s'" % label)
+				return
+	_pass("(i) plate labels include nation tags; SOV is not truncated")
 
 
 func _place_land_chip_at(pid: int, fid: String, world: Vector2) -> Node2D:
@@ -777,7 +1090,12 @@ func _cleanup() -> void:
 		_lm.formations.erase(FID_GER_LAND)
 		_lm.formations.erase(FID_GER_FLEET)
 		_lm.formations.erase(FID_FRA_FLEET_SEA)
+		_lm.formations.erase(FID_JAP_FLEET)
+		_lm.formations.erase(FID_SOV_FLEET)
 		_lm.formations.erase(FID_ENG_FLEET)
+		_lm.formations.erase(FID_ITA_FLEET)
+		_lm.formations.erase(FID_POL_FLEET)
+		_lm.formations.erase(FID_USA_FLEET)
 		_lm.formations.erase(FID_FRA_FLEET_KOLN)
 	if _mr != null and is_instance_valid(_mr):
 		_mr.queue_free()

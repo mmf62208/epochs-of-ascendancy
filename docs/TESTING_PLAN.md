@@ -584,18 +584,22 @@ Isolated keep-green (`95009fee`; wrapper `rss_mb` preferred; MV-1/MV-1b **unedit
 
 ### FLEET-2 shared-sea per-nation fleet markers (draft HOLD)
 
-When several nations' fleets share one sea province, draw one marker per nation (side-by-side / small fan) so each has its own clickable disk. Hit-test walks every `DemoUnitIcon_*` and uses the drawn plate radius for stacked sea-nation disks. Own disk → full own card; foreign disk → FLEET-1 read-only card (no Open fight / Assign; march blocked). Single-nation sea provinces keep `DemoUnitIcon_{pid}` at the same chip base. Köln FRA land-stationed fleet stays unselectable (MV-1b). FLEET-1 spill gate and MV-1b **unedited**.
+When several nations' fleets share one sea province, draw one marker per nation so each has its own clickable disk. Hit-test walks every `DemoUnitIcon_*` and uses the drawn plate radius for stacked sea-nation disks. Own disk → full own card; foreign disk → FLEET-1 read-only card (no Open fight / Assign; march blocked). Single-nation sea provinces keep `DemoUnitIcon_{pid}` at the same chip base. Köln FRA land-stationed fleet stays unselectable (MV-1b). FLEET-1 spill gate and MV-1b **unedited**.
 
-Guard: `HeadlessFleet2SharedSeaMarkerTest` + `tools/eoa_fleet2_guard.sh` (hd + xvfb 1280×740). Seeds are real `world_accurate` label_anchors; stacked disks are offset from the chip base (centroid + `(0,-12)`):
+**FIX #1 (Play MIXED `fd970599`):** production Channel `950001` holds ENG/ITA/POL/USA (not a single ENG pin). A horizontal row fanned over East Kent / Belgium; the old ENG chip `(4128.701, 926.218)` sat in the ITA/POL gap and spilled to GER Div 6. 3+ plates pack as a 2×2 / column, fit-radius + clamp to the sea polygon. Cluster AABB + ~9 screen-px pad picks the nearest plate and never nearest-own-land spill. Labels include the nation tag; SOV is not truncated to `SOV king_g.`.
+
+Guard: `HeadlessFleet2SharedSeaMarkerTest` + `tools/eoa_fleet2_guard.sh` (hd + xvfb 1280×740). Seeds are real `world_accurate` label_anchors (production stationing):
 
 | seed | pid | world |
 |---|---|---|
-| Maginot GER land | `710173` | `(4283.279411, 1010.266854)` |
+| Maginot GER land / GER Div 6 | `710173` | `(4283.279411, 1010.266854)` |
 | Köln (GER land; FRA fleet) | `710417` | `(4254.322147, 944.095861)` |
-| North Sea chip base | `950000` | `(4164.266667, 761.688889)` |
-| English Channel ENG (single-nation) | `950001` | `(4128.701206, 926.217996)` |
+| East Kent (ENG coastal land) | `711453` | `(4119.875715, 938.028287)` |
+| North Sea (GER/FRA/JAP/SOV) | `950000` | `(4164.266667, 773.688889)` |
+| English Channel (ENG/ITA/POL/USA) | `950001` | `(4128.701206, 938.217996)` |
+| old ENG Channel chip (pre-FIX #1) | `950001` | `(4128.701, 926.218)` |
 
-Guard zoom 1.0 (hd + xvfb identical): GER `(4118.79, 761.689)` r=41.5 · FRA `(4209.743, 761.689)` r=41.5 · dist=91.0 > r_sum=83.0 · Channel `(4128.701, 926.218)`. Cases: (a) GER North Sea disk → GER fleet own card; (b) FRA North Sea disk → FRA fleet read-only card; (c) the two hit areas do not overlap and each centre picks its own fleet; (d) Channel ENG single-nation behaves as before; (e) Köln FRA land-fleet still not selected. Headless + xvfb **NOT live Play**.
+Cases: (a) GER North Sea disk → GER fleet own card; (b) FRA North Sea disk → FRA fleet read-only card; (c) North Sea hit areas do not overlap and each centre picks its own fleet; (d) production Channel four plates, each centre picks its fleet (read-only for GER); (e) Köln FRA land-fleet still not selected; (f) Channel 4 plate centres each pick their fleet and lie over sea / clamp tolerance; (g) East Kent `711453` / old ENG chip / East Kent label anchor pick a Channel fleet, **not** GER Div 6; (h) cluster-pad click between plates picks the nearest plate, not land spill; (i) labels include the nation tag and SOV is not truncated. Headless + xvfb **NOT live Play**.
 
 Isolated keep-green (`61dcdade`; wrapper `rss_mb` preferred; MV-1/MV-1b **unedited**):
 
