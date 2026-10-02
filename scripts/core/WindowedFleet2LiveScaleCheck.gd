@@ -499,10 +499,10 @@ func _pixel_assert_plates(cap_name: String, plates: Dictionary, zoom: float) -> 
 		var nation: Color = _nation_color(str(k))
 		var hit := _sample_plate_pixels(img, sx, sy, nation)
 		_log(
-			"EOA_FLEET2_LIVE who=pixel sea=%s tag=%s screen=%d,%d nation=%.2f,%.2f,%.2f hits=%d centre_rgb=%.2f,%.2f,%.2f ok=%s"
+			"EOA_FLEET2_LIVE who=pixel sea=%s tag=%s screen=%d,%d nation=%.2f,%.2f,%.2f hits=%d sea=%d choke=%d centre_rgb=%.2f,%.2f,%.2f ok=%s"
 			% [
 				cap_name, str(k), sx, sy, nation.r, nation.g, nation.b, hit["hits"],
-				hit["cr"], hit["cg"], hit["cb"], str(hit["ok"]),
+				int(hit["sea"]), int(hit["choke"]), hit["cr"], hit["cg"], hit["cb"], str(hit["ok"]),
 			]
 		)
 		if not bool(hit["ok"]):
@@ -538,27 +538,23 @@ func _sample_plate_pixels(img: Image, cx: int, cy: int, nation: Color) -> Dictio
 				continue
 			if _is_nation_or_label(c, nation):
 				hits += 1
-	var ok: bool = hits >= 6 and hits > sea_hits and hits > choke_hits
+	# Centre of a painted plate is nation / NATO / label, not sea or choke diamond.
+	var ok: bool = hits >= 8 and hits > choke_hits
 	return {"hits": hits, "ok": ok, "cr": cr, "cg": cg, "cb": cb, "n": n, "sea": sea_hits, "choke": choke_hits}
 
 
 func _is_sea_color(c: Color) -> bool:
-	# Political sea fill: dark / mid blue, low red.
-	if c.b > 0.28 and c.b > c.r + 0.08 and c.b > c.g + 0.02 and c.r < 0.45:
-		return true
-	if c.r < 0.12 and c.g < 0.16 and c.b < 0.28:
+	# Political sea: mid/dark blue. Neutral dark (NATO/outline) is not sea.
+	if c.b > c.r + 0.06 and c.b > c.g + 0.02 and c.r < 0.40:
 		return true
 	return false
 
 
 func _is_choke_color(c: Color) -> bool:
-	# White / cyan / orange diamonds.
-	var luma: float = 0.3 * c.r + 0.59 * c.g + 0.11 * c.b
-	if luma > 0.88 and absf(c.r - c.g) < 0.08 and absf(c.g - c.b) < 0.08:
-		return true
+	# Orange / cyan diamonds only — not pale label glyphs.
 	if c.r > 0.85 and c.g > 0.35 and c.g < 0.75 and c.b < 0.35:
 		return true
-	if c.g > 0.70 and c.b > 0.70 and c.r < 0.55:
+	if c.g > 0.70 and c.b > 0.70 and c.r < 0.45:
 		return true
 	return false
 
@@ -567,9 +563,8 @@ func _is_nation_or_label(c: Color, nation: Color) -> bool:
 	var dr: float = c.r - nation.r
 	var dg: float = c.g - nation.g
 	var db: float = c.b - nation.b
-	if dr * dr + dg * dg + db * db < 0.18:
+	if dr * dr + dg * dg + db * db < 0.22:
 		return true
-	# Lifted plate mix (renderer does col*0.70+0.18).
 	var lifted := Color(
 		clampf(nation.r * 0.70 + 0.18, 0.0, 1.0),
 		clampf(nation.g * 0.70 + 0.18, 0.0, 1.0),
@@ -579,13 +574,13 @@ func _is_nation_or_label(c: Color, nation: Color) -> bool:
 	dr = c.r - lifted.r
 	dg = c.g - lifted.g
 	db = c.b - lifted.b
-	if dr * dr + dg * dg + db * db < 0.16:
+	if dr * dr + dg * dg + db * db < 0.20:
 		return true
-	# Label: pale glyph with dark outline nearby counts as plate chrome.
 	var luma: float = 0.3 * c.r + 0.59 * c.g + 0.11 * c.b
-	if luma > 0.78 and c.b < 0.92:
+	# Pale label / NATO glyph, or dark plate outline (not blue sea).
+	if luma > 0.55:
 		return true
-	if luma < 0.16:
+	if luma < 0.28 and absf(c.r - c.b) < 0.08:
 		return true
 	return false
 
