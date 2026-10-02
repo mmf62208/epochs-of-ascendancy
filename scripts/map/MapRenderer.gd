@@ -20464,8 +20464,11 @@ func _pick_unit_formation_at_world(world_pos: Vector2, land_only: bool = false, 
 		return best_player
 	if best_any != null:
 		return best_any
+	# MV-1b: player-only still-click is disk-hit only. Pad is for gaps so a
+	# foreign plate / East Kent click can inspect the nearest sea fleet
+	# without the player plate stealing the gap (FRA disk → GER card).
 	if player_only:
-		return _pick_nearest_sea_nation_in_cluster_pad(world_pos, z, land_only, true)
+		return null
 	return _pick_nearest_sea_nation_in_cluster_pad(world_pos, z, land_only, false)
 
 
@@ -25443,9 +25446,10 @@ func _sea_nation_fit_radius(pid: int, count: int, default_r: float) -> float:
 	var r_col: float = h / denom
 	var r_row: float = w / denom
 	var fitted: float = maxf(r_grid, maxf(r_col, r_row))
+	# Keep the inner fit. Do not inflate to (AABB+tol)/2 — that made Channel
+	# r≈23 and a 4-high column that spilled north/south of the strait.
 	if fitted < 12.0:
-		var tol: float = _sea_nation_clamp_tolerance_world()
-		fitted = minf(w + 2.0 * tol, h + 2.0 * tol) * 0.5
+		fitted = 12.0
 	return clampf(minf(r0, fitted), 12.0, r0)
 
 
@@ -25638,12 +25642,19 @@ func _sea_nation_layout_score(pid: int, offs: Array, radius: float) -> float:
 	var base: Vector2 = _unit_chip_base_world(pid)
 	var poly: PackedVector2Array = _sea_province_poly_world(pid)
 	var score: float = 0.0
+	var max_d: float = 0.0
 	for o_v in offs:
 		var w: Vector2 = base + (o_v as Vector2)
-		score += _sea_dist_to_poly(w, poly)
-		var hex: int = _resolve_hex_pick_pid(w)
-		if hex > 0 and not _province_id_is_sea(hex):
+		var dpoly: float = _sea_dist_to_poly(w, poly)
+		score += dpoly
+		if dpoly > max_d:
+			max_d = dpoly
+		# Land GIS is fine when the centre is still within clamp slop of the sea.
+		if not _sea_point_in_or_near_poly(w, poly, _sea_nation_clamp_tolerance_world()):
 			score += 80.0
+			var hex: int = _resolve_hex_pick_pid(w)
+			if hex > 0 and not _province_id_is_sea(hex):
+				score += 40.0
 	# Prefer compact clusters when scores tie (Channel 2x2 vs a long row).
 	var minx: float = INF
 	var maxx: float = -INF
@@ -25655,7 +25666,8 @@ func _sea_nation_layout_score(pid: int, offs: Array, radius: float) -> float:
 		maxx = maxf(maxx, o.x)
 		miny = minf(miny, o.y)
 		maxy = maxf(maxy, o.y)
-	score += 0.02 * ((maxx - minx) + (maxy - miny))
+	score += 0.15 * ((maxx - minx) + (maxy - miny))
+	score += 3.0 * max_d
 	return score
 
 
@@ -25681,10 +25693,13 @@ func _sea_nation_clamp_tolerance_world() -> float:
 
 
 func _sea_nation_plate_clamped_ok(world: Vector2, pid: int) -> bool:
-	if _province_id_is_sea(_resolve_hex_pick_pid(world)):
-		return true
+	# Nearest-centroid GIS can still name the sea when the point is 40+ world
+	# off the polygon (Channel column ends). Require the sea poly / slop.
 	var poly: PackedVector2Array = _sea_province_poly_world(pid)
-	return _sea_point_in_or_near_poly(world, poly, _sea_nation_clamp_tolerance_world())
+	if _sea_point_in_or_near_poly(world, poly, _sea_nation_clamp_tolerance_world()):
+		return true
+	var hex: int = _resolve_hex_pick_pid(world)
+	return hex == pid and _province_id_is_sea(hex)
 
 
 func _sea_nation_cluster_pad_world(z: float) -> float:
