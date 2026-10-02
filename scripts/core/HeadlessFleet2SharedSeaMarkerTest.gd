@@ -582,17 +582,21 @@ func _sync_offsets() -> void:
 
 
 func _icon_for_fid(pid: int, fid: String) -> Node2D:
-	var host: Node2D = null
-	if "province_nodes" in _mr and _mr.province_nodes.has(pid):
-		host = _mr.province_nodes[pid] as Node2D
-	if host == null:
-		return null
-	for c in host.get_children():
+	var icons: Array = []
+	if _mr != null and _mr.has_method("_iter_demo_unit_icons_at_pid"):
+		icons = _mr.call("_iter_demo_unit_icons_at_pid", pid) as Array
+	else:
+		var host: Node2D = null
+		if "province_nodes" in _mr and _mr.province_nodes.has(pid):
+			host = _mr.province_nodes[pid] as Node2D
+		if host != null:
+			for c0 in host.get_children():
+				if c0 is Node2D and str(c0.name).begins_with("DemoUnitIcon_"):
+					icons.append(c0)
+	for c in icons:
 		if not (c is Node2D):
 			continue
-		if not str(c.name).begins_with("DemoUnitIcon_"):
-			continue
-		if str(c.get_meta("formation_id", "")) == fid:
+		if str((c as Node2D).get_meta("formation_id", "")) == fid:
 			return c as Node2D
 	return null
 

@@ -443,6 +443,9 @@ var _conflict_layer: ConflictOverlayLayer = null
 ## (triangulation failed spam). Toggle with O / F10 when needed.
 @export var show_occupation_overlay: bool = false
 var _occupation_layer = null  # OccupationOverlayLayer
+## FLEET-2 FIX #2b: sea-nation plates live on this layer (z=40) so they paint
+## above sea fill (province polys) and choke diamonds (infra overlay z=8).
+var _sea_nation_layer: Node2D = null
 #endregion
 #region Phase 2/3 gap-closure overlays
 @export var show_strategic_flow_overlay: bool = false
@@ -25390,15 +25393,68 @@ func _unit_chip_base_world(pid: int) -> Vector2:
 
 func _iter_demo_unit_icons_at_pid(id: int) -> Array:
 	var out: Array = []
-	if not province_nodes.has(id):
-		return out
-	var n: Node2D = province_nodes[id] as Node2D
-	if n == null:
-		return out
-	for c in n.get_children():
-		if c is Node2D and str(c.name).begins_with("DemoUnitIcon_"):
-			out.append(c)
+	var seen: Dictionary = {}
+	if province_nodes.has(id):
+		var n: Node2D = province_nodes[id] as Node2D
+		if n != null:
+			for c in n.get_children():
+				if c is Node2D and str(c.name).begins_with("DemoUnitIcon_"):
+					out.append(c)
+					seen[c] = true
+	# FIX #2b: plates parented to SeaNationFleetLayer (above choke diamonds).
+	var layer: Node2D = _ensure_sea_nation_layer()
+	if layer != null:
+		var prefix := "DemoUnitIcon_%d" % id
+		for c2 in layer.get_children():
+			if not (c2 is Node2D):
+				continue
+			var nm := str(c2.name)
+			if nm == prefix or nm.begins_with(prefix + "_"):
+				if not seen.has(c2):
+					out.append(c2)
 	return out
+
+
+func _ensure_sea_nation_layer() -> Node2D:
+	if _sea_nation_layer != null and is_instance_valid(_sea_nation_layer):
+		return _sea_nation_layer
+	if container == null:
+		return null
+	var existing: Node = container.get_node_or_null("SeaNationFleetLayer")
+	if existing is Node2D:
+		_sea_nation_layer = existing as Node2D
+	else:
+		_sea_nation_layer = Node2D.new()
+		_sea_nation_layer.name = "SeaNationFleetLayer"
+		container.add_child(_sea_nation_layer)
+	_sea_nation_layer.z_index = 40
+	_sea_nation_layer.z_as_relative = false
+	_sea_nation_layer.visible = true
+	return _sea_nation_layer
+
+
+func _clear_sea_nation_layer_icons(only_pid: int = -1) -> void:
+	var layer: Node2D = _ensure_sea_nation_layer()
+	if layer == null:
+		return
+	var prefix := ""
+	if only_pid >= 0:
+		prefix = "DemoUnitIcon_%d" % only_pid
+	var doomed: Array = []
+	for c in layer.get_children():
+		if not (c is Node2D):
+			continue
+		var nm := str(c.name)
+		if not nm.begins_with("DemoUnitIcon_"):
+			continue
+		if only_pid >= 0 and nm != prefix and not nm.begins_with(prefix + "_"):
+			continue
+		doomed.append(c)
+	for d_v in doomed:
+		var d: Node = d_v as Node
+		if d != null:
+			layer.remove_child(d)
+			d.free()
 
 
 func _demo_unit_icon_world_pos(counter: Node2D, id: int) -> Vector2:
@@ -25413,20 +25469,15 @@ func _demo_unit_icon_world_pos(counter: Node2D, id: int) -> Vector2:
 
 
 func _sea_nation_fleet_disk_radius_world(z: float, counter: Node2D = null) -> float:
-	# Compact plate disk for a stacked sea-nation marker. No 48px floor / label
-	# pad — those inflate Home-band AABB hit and would shove neighbours onto land.
-	if counter != null and is_instance_valid(counter) and counter.has_meta("sea_nation_radius"):
-		var stored: float = float(counter.get_meta("sea_nation_radius"))
-		if stored >= 12.0:
-			return stored
-	var zz: float = maxf(z, 0.05)
+	# Click area = drawn NationPlate (44×40 local) half-diagonal + 2.
+	# Layout radius (meta) is the compact in-sea pack; hit follows chrome scale.
 	var cscale: float = 0.0
 	if counter != null and is_instance_valid(counter):
 		cscale = maxf(counter.scale.x, counter.scale.y)
 	if cscale < 0.05:
-		cscale = _unit_counter_scale_for_zoom(zz)
-	var plate_half: float = 0.5 * 32.0 * cscale * sqrt(2.0)
-	return maxf(plate_half + 4.0, 20.0)
+		cscale = _sea_nation_counter_scale(14.5, z)
+	var plate_half: float = 0.5 * sqrt(44.0 * 44.0 + 40.0 * 40.0) * cscale
+	return maxf(plate_half + 2.0, 14.0)
 
 
 func _sea_nation_fit_radius(pid: int, count: int, default_r: float) -> float:
@@ -25507,9 +25558,9 @@ func _sea_nation_fleet_stack_offsets(count: int, radius: float, pid: int = -1) -
 
 
 func _sea_nation_layout_candidates(count: int, radius: float) -> Array:
-	# Extra gap so "TAG Fleet N" under each disk does not clip its neighbour
+	# Extra gap so on-plate "TAG Fleet N" does not clip its neighbour
 	# at zoom 0.8 / 1.5 / 2.3 (world layout is zoom-invariant).
-	var gap: float = 12.0 if count >= 3 else 8.0
+	var gap: float = 16.0 if count >= 3 else 8.0
 	var step: float = 2.0 * radius + gap
 	var out: Array = []
 	if count == 2:
@@ -25755,7 +25806,7 @@ func _sea_nation_maybe_fallback_chip_base(pid: int, offs: Array, radius: float, 
 	if offs.is_empty():
 		return packed
 	var base: Vector2 = _unit_chip_base_world(pid)
-	var gap: float = 12.0 if count >= 3 else 8.0
+	var gap: float = 16.0 if count >= 3 else 8.0
 	var step: float = 2.0 * maxf(radius, 12.0) + gap
 	var acc := Vector2.ZERO
 	for o_v in offs:
@@ -25880,7 +25931,8 @@ func _sea_nation_plate_label(fo: Object, tag: String, index: int = 0) -> String:
 		# Design ids (king_george / class_bb) have no ordinal — POL/USA/SOV
 		# must still read "TAG Fleet N", never a bare "POL Fleet".
 		num = maxi(index, 0) + 1
-	return "%s Fleet %d" % [t, num]
+	# Two lines so the 2x2 stays readable without neighbour clip at 0.8/1.5/2.3.
+	return "%s\nFleet %d" % [t, num]
 
 
 func _formation_fleet_ordinal(fo: Object) -> int:
@@ -25903,12 +25955,26 @@ func _formation_fleet_ordinal(fo: Object) -> int:
 	return int(n.substr(i + 1))
 
 
-func _sea_nation_counter_scale(radius_world: float) -> float:
-	# Land-unit zoom scale (~1.6–2.0) made the painted chip 70–80 px while
-	# the hit disk stayed r=12. Shrink the chrome so the drawn plate fits
-	# the disk; clicks on visible art then hit.
-	var local_half: float = 28.0
-	return clampf(maxf(radius_world, 12.0) / local_half, 0.32, 0.72)
+func _sea_nation_counter_scale(radius_world: float, z_override: float = -1.0) -> float:
+	# FIX #2b: inverse-zoom so Home is not a 6px speck, floor so 1.5 is not
+	# the old r/28 clamp (0.32–0.72 → ~22 screen px). NationPlate is 44 local.
+	var z: float = z_override
+	if z < 0.0:
+		if has_method("_get_camera_zoom"):
+			z = _get_camera_zoom()
+		else:
+			z = 1.0
+	z = maxf(z, 0.04)
+	var screen_px: float = 36.0
+	if z < 0.65:
+		screen_px = 38.0
+	elif z < 1.15:
+		screen_px = 30.0
+	else:
+		screen_px = clampf(24.0 * z, 36.0, 46.0)
+	var target: float = screen_px / (44.0 * z)
+	var packed: float = maxf(radius_world, 12.0) / 28.0
+	return clampf(maxf(target, packed), 0.66, 8.0)
 
 
 func _demo_unit_icon_hit_radius_world(z: float, counter: Node2D = null) -> float:
@@ -25937,28 +26003,35 @@ func _sync_sea_nation_fleet_offsets(z: float) -> void:
 			func(a: Node2D, b: Node2D) -> bool:
 				return int(a.get_meta("sea_nation_index", 0)) < int(b.get_meta("sea_nation_index", 0))
 		)
-		var default_r: float = _sea_nation_fleet_disk_radius_world(z, null)
+		var default_r: float = 14.5
 		var r: float = _sea_nation_fit_radius(id, stacked.size(), default_r)
 		var offs: Array = _sea_nation_fleet_stack_offsets(stacked.size(), r, id)
 		var base: Vector2 = _unit_chip_base_world(id)
-		var plate_s: float = _sea_nation_counter_scale(r)
+		var plate_s: float = _sea_nation_counter_scale(r, z)
+		var spread: float = 1.0
+		if z < 0.65 and stacked.size() >= 3:
+			# Home: spread the 2x2 so inverse-zoom plates do not stack.
+			# 0.8 / 1.5 / 2.3 keep the compact in-sea step.
+			var drawn_r: float = 0.5 * sqrt(44.0 * 44.0 + 40.0 * 40.0) * plate_s
+			var compact_step: float = 2.0 * r + 16.0
+			if compact_step > 1.0:
+				spread = maxf(1.0, (2.0 * drawn_r + 10.0) / compact_step)
 		for i in stacked.size():
 			var icon: Node2D = stacked[i] as Node2D
 			if icon == null:
 				continue
+			icon.visible = true
+			icon.z_index = 40
+			icon.z_as_relative = false
 			icon.set_meta("sea_nation_radius", r)
 			icon.scale = Vector2(plate_s, plate_s)
-			icon.position = base + (offs[i] as Vector2)
+			icon.position = base + (offs[i] as Vector2) * spread
 			var tag: String = str(icon.get_meta("sea_nation_tag", ""))
 			var col := Color(0.85, 0.88, 0.95, 1.0)
 			if not tag.is_empty() and typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_country_color"):
 				col = MapManager.get_country_color(tag)
 			var fo: Object = _formation_from_demo_icon(icon)
-			var desig: Node = icon.get_node_or_null("Designation")
-			if desig != null:
-				desig.set("text", _sea_nation_plate_label(fo, tag, i))
-				desig.set("font_size", 10)
-			_attach_sea_nation_fleet_disk(icon, r, col)
+			_style_sea_nation_plate_chrome(icon, fo, tag, i, col)
 
 
 func _sync_unit_counter_scales(z: float = -1.0) -> void:
@@ -26000,6 +26073,12 @@ func _sync_unit_counter_paint(z: float = -1.0) -> void:
 
 func _sync_unit_counter_visibility(z: float = -1.0) -> void:
 	var vis := _unit_counters_want_visible(z)
+	var sea_layer: Node2D = _ensure_sea_nation_layer()
+	if sea_layer != null:
+		sea_layer.visible = true
+		for sc in sea_layer.get_children():
+			if sc is Node2D and str(sc.name).begins_with("DemoUnitIcon_"):
+				(sc as Node2D).visible = vis
 	if not _demo_unit_icon_pids.is_empty():
 		for id_v in _demo_unit_icon_pids:
 			var id := int(id_v)
@@ -29269,15 +29348,20 @@ func _rebuild_demo_unit_icons(only_pids: Dictionary) -> void:
 			kept.append(id_clear)
 			continue
 		if not province_nodes.has(id_clear):
+			_clear_sea_nation_layer_icons(id_clear)
 			continue
 		var n_clear: Node2D = province_nodes[id_clear] as Node2D
 		if n_clear == null:
+			_clear_sea_nation_layer_icons(id_clear)
 			continue
 		# Pin sprites — clicks go through MapRenderer._input, not icon signals.
 		for c in n_clear.get_children():
 			if str(c.name).begins_with("DemoUnitIcon_"):
 				n_clear.remove_child(c)
 				c.free()
+		_clear_sea_nation_layer_icons(id_clear)
+	if not scoped:
+		_clear_sea_nation_layer_icons(-1)
 	_demo_unit_icon_pids.clear()
 	for k in kept:
 		_demo_unit_icon_pids.append(int(k))
@@ -29659,19 +29743,21 @@ func _place_sea_nation_fleet_counter(
 	count: int,
 	tex_cache: Dictionary
 ) -> void:
-	if host == null:
+	var layer: Node2D = _ensure_sea_nation_layer()
+	var parent: Node2D = layer if layer != null else host
+	if parent == null:
 		return
 	var counter := Node2D.new()
 	counter.name = icon_name
 	counter.position = _unit_chip_base_world(id) + extra_off
-	counter.z_index = 28
+	counter.z_index = 40
 	counter.z_as_relative = false
 	var place_z: float = 1.0
 	if has_method("_get_camera_zoom"):
 		place_z = _get_camera_zoom()
-	var packed_r: float = _sea_nation_fit_radius(id, count, _sea_nation_fleet_disk_radius_world(place_z, null))
-	counter.scale = Vector2.ONE * _sea_nation_counter_scale(packed_r)
-	counter.visible = _unit_counters_want_visible()
+	var packed_r: float = _sea_nation_fit_radius(id, count, 14.5)
+	counter.scale = Vector2.ONE * _sea_nation_counter_scale(packed_r, place_z)
+	counter.visible = true
 	if fo != null:
 		if "formation_id" in fo:
 			counter.set_meta("formation_id", str(fo.formation_id))
@@ -29682,7 +29768,7 @@ func _place_sea_nation_fleet_counter(
 	counter.set_meta("sea_nation_index", index)
 	counter.set_meta("sea_nation_count", count)
 	counter.set_meta("sea_nation_radius", packed_r)
-	host.add_child(counter)
+	parent.add_child(counter)
 	var nation_tag: String = tag
 	var nation_col := Color(0.85, 0.88, 0.95, 1.0)
 	if not nation_tag.is_empty() and typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_country_color"):
@@ -29721,37 +29807,67 @@ func _place_sea_nation_fleet_counter(
 		if not nation_tag.is_empty():
 			counter.add_child(_make_unit_nation_frame(nation_col))
 	_attach_unit_counter_chrome(counter, fo, nation_col)
+	_style_sea_nation_plate_chrome(counter, fo, nation_tag, index, nation_col)
+
+
+func _style_sea_nation_plate_chrome(
+	counter: Node2D, fo: Object, tag: String, index: int, nation_col: Color
+) -> void:
+	if counter == null or not is_instance_valid(counter):
+		return
+	# NATO + nation plate + TAG Fleet N only — bars/type/str clutter the 2x2.
+	for hide_name in ["StatBars", "TypeLetter", "StrNum", "LeaderMark"]:
+		var hide_n: Node = counter.get_node_or_null(hide_name)
+		if hide_n is CanvasItem:
+			(hide_n as CanvasItem).visible = false
+	var plate: Node = counter.get_node_or_null("NationPlate")
+	if plate is Polygon2D:
+		var pcol: Color = nation_col
+		(plate as Polygon2D).color = Color(
+			clampf(pcol.r * 0.70 + 0.18, 0.22, 0.95),
+			clampf(pcol.g * 0.70 + 0.18, 0.22, 0.95),
+			clampf(pcol.b * 0.70 + 0.18, 0.22, 0.95),
+			1.0
+		)
+		(plate as Polygon2D).z_index = -1
 	var desig: Node = counter.get_node_or_null("Designation")
 	if desig != null:
-		desig.set("text", _sea_nation_plate_label(fo, nation_tag, index))
-		desig.set("font_size", 10)
-	var z: float = 1.0
-	if has_method("_get_camera_zoom"):
-		z = _get_camera_zoom()
-	var disk_r: float = _sea_nation_fleet_disk_radius_world(z, counter)
-	_attach_sea_nation_fleet_disk(counter, disk_r, nation_col)
+		desig.set("text", _sea_nation_plate_label(fo, tag, index))
+		desig.set("font_size", 13)
+		desig.set("align_center", true)
+		desig.set("align_right", false)
+		desig.set("font_color", Color(0.99, 0.99, 0.94, 1.0))
+		desig.set("outline_size", 5)
+		if desig is Node2D:
+			(desig as Node2D).position = Vector2(0.0, 6.0)
+			(desig as Node2D).z_index = 5
+			if desig.has_method("queue_redraw"):
+				desig.call("queue_redraw")
+	_attach_sea_nation_fleet_disk(counter, _sea_nation_fleet_disk_radius_world(1.0, counter), nation_col)
 
 
-func _attach_sea_nation_fleet_disk(counter: Node2D, radius_world: float, nation_col: Color) -> void:
+func _attach_sea_nation_fleet_disk(counter: Node2D, _radius_world: float, nation_col: Color) -> void:
 	if counter == null or not is_instance_valid(counter):
 		return
 	var old: Node = counter.get_node_or_null("SeaNationDisk")
 	if old != null:
 		counter.remove_child(old)
 		old.free()
-	var s: float = maxf(counter.scale.x, 0.05)
-	var local_r: float = radius_world / s
+	# Opaque backing so the nation colour reads over sea fill (old a=0.42 vanished).
 	var disc := Polygon2D.new()
 	disc.name = "SeaNationDisk"
-	var pts := PackedVector2Array()
-	var i := 0
-	while i < 16:
-		var a: float = TAU * float(i) / 16.0
-		pts.append(Vector2(cos(a), sin(a)) * local_r)
-		i += 1
-	disc.polygon = pts
-	disc.color = Color(nation_col.r, nation_col.g, nation_col.b, 0.42)
-	disc.z_index = 0
+	var hw := 24.0
+	var hh := 22.0
+	disc.polygon = PackedVector2Array([
+		Vector2(-hw, -hh), Vector2(hw, -hh), Vector2(hw, hh), Vector2(-hw, hh),
+	])
+	disc.color = Color(
+		clampf(nation_col.r * 0.55 + 0.12, 0.16, 0.92),
+		clampf(nation_col.g * 0.55 + 0.12, 0.16, 0.92),
+		clampf(nation_col.b * 0.55 + 0.12, 0.16, 0.92),
+		1.0
+	)
+	disc.z_index = -2
 	counter.add_child(disc)
 	counter.move_child(disc, 0)
 

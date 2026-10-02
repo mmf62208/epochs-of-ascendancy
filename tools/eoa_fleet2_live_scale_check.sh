@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# FLEET-2 FIX #2 live-scale check: real world_accurate board, xvfb 1280x740.
-# GER start, Europe Home, Channel + North Sea at zoom ~1.5, East Kent pick.
+# FLEET-2 FIX #2b live-scale check: real world_accurate board, xvfb 1280x740.
+# GER start, Europe Home, Channel + North Sea at Home zoom and ~1.5.
+# Pixel-assert plate centres. Click all 8 plates + East Kent / old ENG chip.
 # xvfb / llvmpipe is NOT live Play. Never EOA_SKIP_TITLE.
 #
 #   tools/eoa_fleet2_live_scale_check.sh
@@ -24,7 +25,7 @@ LOG="$OUT/live.log"
 RSS_LOG="$OUT/rss.txt"
 : > "$RSS_LOG"
 xvfb-run -a -s "-screen 0 1280x740x24" \
-  "${ROOT}/tools/run_godot.sh" --path . -s "$SCRIPT" >"$LOG" 2>&1 &
+  "${ROOT}/tools/run_godot.sh" --path . --resolution 1280x740 -s "$SCRIPT" >"$LOG" 2>&1 &
 WRAP=$!
 peak_kb=0
 while kill -0 "$WRAP" 2>/dev/null; do
