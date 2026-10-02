@@ -48,11 +48,29 @@ func _on_panel_raise_input(event: InputEvent) -> void:
 			bring_to_front()
 
 
+func _event_is_on_child_button() -> bool:
+	var vp := get_viewport()
+	if vp == null:
+		return false
+	var hov: Control = vp.gui_get_hovered_control()
+	var walk: Node = hov
+	while walk != null and walk != self:
+		if walk is BaseButton:
+			return true
+		walk = walk.get_parent()
+	return false
+
+
 func _on_drag_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
 		if mb.button_index == MOUSE_BUTTON_LEFT:
 			if mb.pressed:
+				# Close / action buttons live on the title bar — do not start a
+				# drag or accept_event, or the button never sees the click.
+				if _event_is_on_child_button():
+					bring_to_front()
+					return
 				bring_to_front()
 				_dragging = true
 				_drag_offset = get_global_mouse_position() - global_position

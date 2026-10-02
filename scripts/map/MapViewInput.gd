@@ -9,6 +9,10 @@ static var _last_real_usec: int = 0
 const _PAUSE_DELTA_FALLBACK := 1.0 / 60.0
 const _PAUSE_DELTA_MAX := 0.05
 
+## True outer-window edge-pan strip, in screen pixels (not viewport / content-scale).
+## Play 1280x740: a 64px HUD-offset band at y≈200 and y>676 was the wrong strip.
+const EDGE_PAN_SCREEN_PX := 6.0
+
 ## Known autoload singletons that appear as direct children of the viewport root.
 ## These are plain Nodes (with scripts like GameData.gd) and MUST NEVER have .visible (or other CanvasItem-only props) accessed.
 ## Pre-filtering by name here (name is always valid on Node) + explicit separate type/visible checks below completely prevents
@@ -30,6 +34,183 @@ static func motion_delta(scaled_delta: float) -> float:
 		dt = clampf(float(now - _last_real_usec) / 1_000_000.0, 0.0, _PAUSE_DELTA_MAX)
 	_last_real_usec = now
 	return maxf(dt, _PAUSE_DELTA_FALLBACK * 0.25)
+
+
+## Pure strip math: window client pixels, independent of zoom / stretch / HUD offset.
+## `top_bar_only`: hovered UI is TopInfoBar (not a toast/panel). Exempt only when
+## y is inside the north strip so the full-width bar cannot swallow north pan.
+static func edge_pan_direction_at(
+	mouse_window: Vector2,
+	window_size: Vector2,
+	hovered_blocks: bool,
+	window_focused: bool = true,
+	mouse_inside_window: bool = true,
+	top_bar_only: bool = false
+) -> Vector2:
+	if not window_focused or not mouse_inside_window:
+		return Vector2.ZERO
+	if window_size.x < 2.0 or window_size.y < 2.0:
+		return Vector2.ZERO
+	if mouse_window.x < 0.0 or mouse_window.y < 0.0:
+		return Vector2.ZERO
+	if mouse_window.x > window_size.x or mouse_window.y > window_size.y:
+		return Vector2.ZERO
+	var strip: float = EDGE_PAN_SCREEN_PX
+	var in_north_strip: bool = mouse_window.y <= strip
+	var blocks: bool = hovered_blocks
+	if blocks and top_bar_only and in_north_strip:
+		blocks = false
+	if blocks:
+		return Vector2.ZERO
+	var dir := Vector2.ZERO
+	if mouse_window.x <= strip:
+		dir.x -= 1.0
+	elif mouse_window.x >= window_size.x - strip:
+		dir.x += 1.0
+	if in_north_strip:
+		dir.y -= 1.0
+	elif mouse_window.y >= window_size.y - strip:
+		dir.y += 1.0
+	return dir
+
+
+static func window_allows_edge_pan(viewport: Viewport) -> bool:
+	if viewport == null:
+		return false
+	if DisplayServer.get_name() == "headless":
+		return true
+	var win: Window = viewport.get_window()
+	if win == null:
+		return true
+	return win.has_focus()
+
+
+static func mouse_is_inside_window(viewport: Viewport) -> bool:
+	if viewport == null:
+		return false
+	var win: Window = viewport.get_window()
+	if win == null:
+		return true
+	var mouse: Vector2 = win.get_mouse_position()
+	var sz := Vector2(win.size)
+	return mouse.x >= 0.0 and mouse.y >= 0.0 and mouse.x <= sz.x and mouse.y <= sz.y
+
+
+## Any hovered UI Control that is not the map itself blocks edge pan
+## (toasts, top bar, unit card, panels, popups). IGNORE filters are not hovered.
+## TopInfoBar is exempt only via `north_strip_top_bar_exempt` / `top_bar_only`.
+static func hovered_ui_blocks_edge_pan(viewport: Viewport) -> bool:
+	if viewport == null:
+		return false
+	var hovered: Control = viewport.gui_get_hovered_control()
+	if hovered == null:
+		return false
+	if hovered.mouse_filter == Control.MOUSE_FILTER_IGNORE:
+		return false
+	var nn := str(hovered.name)
+	if nn == "WorldMap" or nn == "MapRenderer" or nn.begins_with("Province"):
+		return false
+	return true
+
+
+## True when the hovered control is TopInfoBar (or a child of it) and no
+## toast / overlay / card / pause menu sits in the ancestor walk.
+static func hovered_is_top_info_bar_only(hovered: Control) -> bool:
+	if hovered == null:
+		return false
+	var walk: Node = hovered
+	var found_bar: bool = false
+	while walk != null:
+		var nn := str(walk.name)
+		if nn == "TopInfoBar":
+			found_bar = true
+		elif _node_is_non_topbar_edge_blocker(walk):
+			return false
+		walk = walk.get_parent()
+	return found_bar
+
+
+static func _node_is_non_topbar_edge_blocker(n: Node) -> bool:
+	if n == null:
+		return false
+	var nn := str(n.name)
+	if nn == "TopInfoBar" or nn == "WorldMap" or nn == "MapRenderer" or nn.begins_with("Province"):
+		return false
+	if nn == "ToastContainer" or nn == "LeaderNewsLayer" or nn.ends_with("Toast") or "Toast" in nn:
+		return true
+	if nn == "InfoPanel" or nn == "UnitDetailPopup" or nn.begins_with("UnitDetailPopup"):
+		return true
+	if nn == "MainMenu" or nn == "MainMenuPopup":
+		return true
+	if n is DraggablePanel:
+		return true
+	if nn.ends_with("Screen") or nn.ends_with("Popup") or "Picker" in nn:
+		return true
+	if n.has_meta("blocks_edge_pan") and bool(n.get_meta("blocks_edge_pan")):
+		return true
+	if n.has_meta("unit_card_dock") and bool(n.get_meta("unit_card_dock")):
+		return true
+	return false
+
+
+## Toast / Leaders / unit card / pause menu under the cursor (not the top bar).
+static func non_topbar_overlay_contains_mouse(viewport: Viewport) -> bool:
+	if viewport == null:
+		return false
+	var hovered: Control = viewport.gui_get_hovered_control()
+	if hovered == null:
+		return false
+	if hovered_is_top_info_bar_only(hovered):
+		return false
+	if hovered.mouse_filter == Control.MOUSE_FILTER_IGNORE:
+		return false
+	var hname := str(hovered.name)
+	if hname == "WorldMap" or hname == "MapRenderer" or hname.begins_with("Province"):
+		return false
+	return true
+
+
+## TopInfoBar in the true north strip (y 0..EDGE_PAN_SCREEN_PX) does not block.
+## Other UI on that strip still blocks. Unfocused window never pans.
+static func north_strip_top_bar_exempt(viewport: Viewport) -> bool:
+	if viewport == null:
+		return false
+	if not window_allows_edge_pan(viewport):
+		return false
+	var win: Window = viewport.get_window()
+	if win == null:
+		return false
+	var mouse: Vector2 = win.get_mouse_position()
+	if mouse.y < 0.0 or mouse.y > EDGE_PAN_SCREEN_PX:
+		return false
+	if not hovered_is_top_info_bar_only(viewport.gui_get_hovered_control()):
+		return false
+	return not non_topbar_overlay_contains_mouse(viewport)
+
+
+## Screen-pixel edge direction, or ZERO when blocked / not on the true rim.
+static func edge_pan_direction_screen(viewport: Viewport) -> Vector2:
+	if viewport == null:
+		return Vector2.ZERO
+	var win: Window = viewport.get_window()
+	if win == null:
+		return Vector2.ZERO
+	var mouse: Vector2 = win.get_mouse_position()
+	var sz := Vector2(win.size)
+	var inside: bool = mouse.x >= 0.0 and mouse.y >= 0.0 and mouse.x <= sz.x and mouse.y <= sz.y
+	var hovered_blocks: bool = hovered_ui_blocks_edge_pan(viewport)
+	var top_bar_only: bool = hovered_is_top_info_bar_only(viewport.gui_get_hovered_control())
+	if non_topbar_overlay_contains_mouse(viewport):
+		hovered_blocks = true
+		top_bar_only = false
+	return edge_pan_direction_at(
+		mouse,
+		sz,
+		hovered_blocks,
+		window_allows_edge_pan(viewport),
+		inside,
+		top_bar_only
+	)
 
 
 ## True when a modal / command-center style overlay is open — blocks ALL map nav
@@ -149,6 +330,10 @@ static func _mouse_over_map_chrome_blocks_edge_pan(viewport: Viewport) -> bool:
 ## (so edge pan is suppressed even when mouse is at screen edge over the bare map while a dialog is up).
 static func edge_pan_blocked_by_gui(viewport: Viewport) -> bool:
 	if viewport == null:
+		return false
+	# UI-1 FIX #1: full-width TopInfoBar must not swallow the north 6px strip.
+	# Toasts / Leaders / unit card / pause menu still block, including on that strip.
+	if north_strip_top_bar_exempt(viewport):
 		return false
 	var hovered: Control = viewport.gui_get_hovered_control()
 	# First pass: only block when hovering real HUD/modals — NOT every STOP Control

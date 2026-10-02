@@ -1636,8 +1636,24 @@ func _on_matchmaking_pressed() -> void:
 		(view as Window).call_deferred("popup_centered")
 
 
+func _find_named_screen(screen_name: String) -> Node:
+	var tree := get_tree()
+	if tree == null:
+		return null
+	var existing: Node = tree.root.get_node_or_null(screen_name)
+	if existing != null:
+		return existing
+	if tree.current_scene != null:
+		var layer: Node = tree.current_scene.get_node_or_null("UILayer")
+		if layer != null:
+			var uin: Node = layer.get_node_or_null(screen_name)
+			if uin != null:
+				return uin
+	return tree.root.find_child(screen_name, true, false)
+
+
 func _close_screen(screen_name: String) -> void:
-	var existing := get_tree().root.get_node_or_null(screen_name)
+	var existing := _find_named_screen(screen_name)
 	if existing != null:
 		if existing is Window:
 			existing.hide()
@@ -1665,7 +1681,7 @@ func _toggle_root_popup(scene_name: String, scene_path: String, configure: Calla
 
 
 func _toggle_screen(screen_name: String, scene_path: String, configure: Callable) -> void:
-	var existing := get_tree().root.get_node_or_null(screen_name)
+	var existing := _find_named_screen(screen_name)
 	if existing != null:
 		if existing is Window:
 			existing.hide()

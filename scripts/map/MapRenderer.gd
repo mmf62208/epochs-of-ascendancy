@@ -265,6 +265,8 @@ var _unit_card_eaten_frame: int = -1
 var _esc_stack_frame: int = -1
 ## Close button sits in the north edge-pan strip — suppress edge until the mouse leaves that click.
 var _close_suppress_edge := false
+## UI-1: a march commit must not open the destination inspector this click.
+var _skip_inspector_after_march := false
 var _close_click_screen := Vector2.ZERO
 ## Camera at left-press; pick is skipped if this gesture moved the camera (flags can be reset).
 var _left_press_cam_pos := Vector2.ZERO
@@ -1771,6 +1773,15 @@ func _mouse_over_close_control() -> bool:
 	var hov: Control = vp.gui_get_hovered_control()
 	if hov == null:
 		return false
+	# Overlay screens own their Close — MapRenderer must not steal Leaders Close
+	# as inspector Close (text match was "close").
+	var anc: Node = hov
+	while anc != null:
+		var an := str(anc.name)
+		if anc is DraggablePanel or an.ends_with("Screen"):
+			if an != "InfoPanel" and not an.begins_with("UnitDetailPopup"):
+				return false
+		anc = anc.get_parent()
 	var n: Node = hov
 	while n != null:
 		var nn := str(n.name)
@@ -2409,6 +2420,11 @@ func _handle_escape_key() -> void:
 	if _living_title_boot_is_up():
 		_route_living_title_escape()
 		return
+	# UI-1: Leaders (and other top-bar screens) close on Esc before unit-deselect
+	# or Command Center. Consume so this Esc cannot also open the pause menu.
+	if _dismiss_named_overlay_screen("LeaderAssignmentScreen"):
+		_close_release_seen = true
+		return
 	# Garrison / unit card first: Close/Esc restores province inspector (Köln spine)
 	# without GIS lock or a second search.
 	if _unit_detail_popup_is_visible():
@@ -2614,6 +2630,7 @@ func _input(event: InputEvent) -> void:
 				_is_middle_dragging = false
 		elif event.button_index == MOUSE_BUTTON_LEFT:
 			if event.pressed:
+				_skip_inspector_after_march = false
 				_clear_unit_card_press_consume_on_new_left_press()
 			if _living_title_boot_is_up():
 				# Play 5adb38e: never swallow title-up presses. Route by event
@@ -3285,12 +3302,12 @@ func _unhandled_input(event: InputEvent) -> void:
 					get_viewport().set_input_as_handled()
 					return
 			# Unit move: selected pin + click friendly province.
+			# UI-1: do not select/open the destination inspector on a march commit.
 			if not selected_formation_id.is_empty() and not event.ctrl_pressed:
 				if _left_release_must_skip_pick() or _left_live_slop_is_drag() or _left_map_pick_blocked():
 					get_viewport().set_input_as_handled()
 					return
 				if _try_move_selected_unit_to_province(resolved_province):
-					_select_province(resolved_province, resolved_node)
 					get_viewport().set_input_as_handled()
 					return
 			if mv1_commit:
@@ -3516,10 +3533,9 @@ func _handle_camera_input(delta: float) -> void:
 	if Input.is_key_pressed(KEY_A) or Input.is_key_pressed(KEY_LEFT):  key_dir.x -= 1
 	if Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT): key_dir.x += 1
 
-	# Edge scrolling: left/right/bottom + north band just below top HUD (not over the bar itself).
-	# Inspector Close sits in that north strip. On 17cf047 leftover cursor became edge-north,
-	# called _unlock_close_camera(), then flew Europe→Greenland at pan_speed (~2600).
-	# Lock+reassert cannot win if edge-pan unlocks first — do not compute edge while Close-held.
+	# UI-1: true outer 6px of the *window* (screen pixels). The old 64px strip
+	# under the HUD (y≈200–264) and last-64px floor (y>676 @ 740) were wrong.
+	# Hovered UI / unfocused / mouse-outside skip. Close-held still suppresses.
 	var edge_dir: Vector2 = Vector2.ZERO
 	var mouse_pos: Vector2 = get_viewport().get_mouse_position()
 	if _close_suppress_edge:
@@ -3533,18 +3549,7 @@ func _handle_camera_input(delta: float) -> void:
 		and not _close_suppress_edge
 		and not MapViewInput.edge_pan_blocked_by_gui(get_viewport())
 	):
-		var viewport_size := get_viewport().get_visible_rect().size
-		if mouse_pos.x < edge_margin:
-			edge_dir.x -= 1
-		elif mouse_pos.x > viewport_size.x - edge_margin:
-			edge_dir.x += 1
-		if mouse_pos.y > viewport_size.y - edge_margin:
-			edge_dir.y += 1
-		# Pan north via a strip *under* the HUD (not raw y=0 — bar is full-width PASS chrome
-		# and re-enabling true top-edge pan thrashed world_full when hovering 1x/Prod).
-		var top_safe := _map_nav_top_clearance()
-		if mouse_pos.y >= top_safe and mouse_pos.y < top_safe + edge_margin:
-			edge_dir.y -= 1
+		edge_dir = MapViewInput.edge_pan_direction_screen(get_viewport())
 	move_dir = key_dir + edge_dir
 
 	# Left-drag pan after slop (click still picks). Middle / right drag too.
@@ -18316,6 +18321,9 @@ func _on_province_input(_viewport: Node, event: InputEvent, _shape_idx: int, pro
 		if supply_mode and _handle_supply_province_click(resolved_province):
 			_select_province(resolved_province, resolved_node)
 			return
+		if not selected_formation_id.is_empty():
+			if _try_move_selected_unit_to_province(resolved_province):
+				return
 		_select_province(resolved_province, resolved_node)
 		_center_camera_on_province(resolved_province.id, "soft")
 		show_info_panel(resolved_province)
@@ -18864,6 +18872,10 @@ func _update_spatial_hover() -> void:
 # ====================== INFO PANEL ======================
 
 func show_info_panel(province: Province, force_open: bool = false, keep_camera: bool = false) -> void:
+	# UI-1: march commit must not open the destination inspector behind the unit card.
+	# Search / existing inspector paths pass force_open.
+	if _skip_inspector_after_march and not force_open:
+		return
 	# Real province always wins — never redirect back to coarse (that re-teleported camera every
 	# data_changed/air tick after clicking Africa and hard-crashed while panning).
 	if province != null:
@@ -19766,10 +19778,12 @@ func _try_move_selected_unit_to_province(province: Province) -> bool:
 	# CRASH-1: same dest while already marching is a no-op re-issue (keep
 	# hop progress, do not duplicate MarchPathLine / _orders).
 	if _selected_unit_already_marching_to(dest):
+		_skip_inspector_after_march = true
 		return true
 	var res: Dictionary = FormationMovement.enqueue_own_land_march(fid, dest, p_tag)
 	_clear_march_preview()
 	if bool(res.get("already_here", false)):
+		_skip_inspector_after_march = true
 		_show_inspector_toast("Already at %s" % province.name, 2.5)
 		return true
 	if not bool(res.get("ok", false)):
@@ -19780,6 +19794,7 @@ func _try_move_selected_unit_to_province(province: Province) -> bool:
 			true
 		)
 		return true
+	_skip_inspector_after_march = true
 	var hops_n := int(res.get("hops", 1))
 	var cal := int(res.get("calendar_days", 1))
 	var path: Array = res.get("path", []) as Array
@@ -24761,6 +24776,50 @@ func build_supply_network(city_layer: Dictionary, player_tag: String = "USA") ->
 ## Esc / Close affordance: dismiss overlays that trap playtest (supply legend, tech, inspector).
 ## Never queue_free MainMenu here — idle Esc opens Command Center via `_on_menu_pressed`.
 ## Hidden leftovers must not return true (play: inspector gone, Esc still did nothing).
+func _find_named_overlay_screen(screen_name: String) -> Node:
+	var tree := get_tree()
+	if tree == null:
+		return null
+	var n: Node = tree.root.get_node_or_null(screen_name)
+	if n != null:
+		return n
+	if tree.current_scene != null:
+		var layer: Node = tree.current_scene.get_node_or_null("UILayer")
+		if layer != null:
+			var uin: Node = layer.get_node_or_null(screen_name)
+			if uin != null:
+				return uin
+	return tree.root.find_child(screen_name, true, false)
+
+
+func _dismiss_named_overlay_screen(screen_name: String) -> bool:
+	var n: Node = _find_named_overlay_screen(screen_name)
+	if n == null or not is_instance_valid(n):
+		return false
+	# Screen _input may already have queue_free'd — still consume Esc so CC
+	# does not open on the same press.
+	if n.is_queued_for_deletion():
+		var vp_q: Viewport = get_viewport()
+		if vp_q != null:
+			vp_q.set_input_as_handled()
+		return true
+	if not _overlay_node_is_up(n):
+		return false
+	if n is Window:
+		(n as Window).hide()
+	if n.has_method("close_screen"):
+		n.call("close_screen")
+	else:
+		n.queue_free()
+	_show_map_layer_toast("%s closed (Esc)" % screen_name)
+	_release_search_focus()
+	var vp_d: Viewport = get_viewport()
+	if vp_d != null:
+		vp_d.gui_release_focus()
+		vp_d.set_input_as_handled()
+	return true
+
+
 func _dismiss_map_overlays_esc() -> bool:
 	# Snapshot before hide. Idle Esc still falls through to the CC open helper.
 	var pre_cam: Dictionary = _snapshot_pre_dismiss_camera()
@@ -24781,7 +24840,7 @@ func _dismiss_map_overlays_esc() -> bool:
 			return true
 	var tree := get_tree()
 	if tree:
-		for screen_name in ["TechnologyScreen", "AgentAssignmentScreen", "NationalSpiritsScreen"]:
+		for screen_name in ["LeaderAssignmentScreen", "TechnologyScreen", "AgentAssignmentScreen", "NationalSpiritsScreen"]:
 			var n := tree.root.get_node_or_null(screen_name)
 			if n == null and tree.current_scene:
 				var ui := tree.current_scene.get_node_or_null("UILayer/%s" % screen_name)
@@ -24798,7 +24857,7 @@ func _dismiss_map_overlays_esc() -> bool:
 			if layer:
 				for child in layer.get_children():
 					var cn := str(child.name)
-					if cn in ["TechnologyScreen", "AgentAssignmentScreen", "NationalSpiritsScreen"]:
+					if cn in ["LeaderAssignmentScreen", "TechnologyScreen", "AgentAssignmentScreen", "NationalSpiritsScreen"]:
 						if _overlay_node_is_up(child):
 							child.queue_free()
 							dismissed = true

@@ -34,6 +34,7 @@ color = Color(0.058824, 0.058824, 0.117647, 1)
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
+offset_right = -96.0
 offset_bottom = 40.0
 grow_horizontal = 2
 mouse_filter = 0
@@ -44,8 +45,17 @@ layout_mode = 2
 size_flags_horizontal = 3
 text = "Leader Assignment"
 
-[node name="CloseButton" type="Button" parent="TitleBar"]
-layout_mode = 2
+[node name="CloseButton" type="Button" parent="."]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -88.0
+offset_top = 6.0
+offset_right = -8.0
+offset_bottom = 34.0
+grow_horizontal = 0
+mouse_filter = 0
 text = "Close"
 
 [node name="MarginContainer" type="MarginContainer" parent="."]
