@@ -25469,15 +25469,16 @@ func _demo_unit_icon_world_pos(counter: Node2D, id: int) -> Vector2:
 
 
 func _sea_nation_fleet_disk_radius_world(z: float, counter: Node2D = null) -> float:
-	# Click area = drawn NationPlate (44×40 local) half-diagonal + 2.
-	# Layout radius (meta) is the compact in-sea pack; hit follows chrome scale.
+	# Click area = drawn NationPlate body (44×40 local), not the circumcircle —
+	# half-diagonal overlapped the compact 2x2 at z=1.0 (dist 45 < r_sum 50).
 	var cscale: float = 0.0
 	if counter != null and is_instance_valid(counter):
 		cscale = maxf(counter.scale.x, counter.scale.y)
 	if cscale < 0.05:
 		cscale = _sea_nation_counter_scale(14.5, z)
-	var plate_half: float = 0.5 * sqrt(44.0 * 44.0 + 40.0 * 40.0) * cscale
-	return maxf(plate_half + 2.0, 14.0)
+	var half_w: float = 22.0 * cscale
+	var half_h: float = 20.0 * cscale
+	return maxf(maxf(half_w, half_h) + 2.0, 14.0)
 
 
 func _sea_nation_fit_radius(pid: int, count: int, default_r: float) -> float:
