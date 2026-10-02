@@ -548,6 +548,10 @@ Halt / Press / Hold / Withdraw / Assign must not `free()` `UnitDetailPopup` whil
 
 ### UI-1 Leaders close + edge pan + no march inspector (draft HOLD)
 
+**FIX #1 (Play MIXED `0ded8c49`):** TopInfoBar is exempt from the UI-under-cursor block **only** inside the north `0..EDGE_PAN_SCREEN_PX` strip (y=0/1 pans north at any x). The rest of the bar stays non-panning. Toasts / Leaders / unit card / pause menu still block, including when they touch that strip. Unfocused still skips. Leaders Close acts on release and swallows the mouse-up (no leftover map pick). Edge-pan speed unchanged. Guard: y=0/1 at x=10/640/1270 north; ~3–4px below strip no pan; toast-on-strip no pan; prior no-pan points; Close press+release no inspector/select. MV-1/MV-1b **unedited**. Headless + xvfb **NOT live Play**.
+
+
+
 Live Play 1280×740: Leaders 1440×800 left Close off-screen; Esc opened Command Center; Close clicks did nothing. Edge-pan fired at top y≈200–264 and bottom y>705 (64px HUD-offset strip); rest at (97,731) scrolled to Antarctica; right-edge toast panned. March commit opened the destination inspector behind the unit card.
 
 Fixes: clamp Leaders to viewport−16px and re-fit on resize; Close is not on the drag handle and `close_screen()` actually frees; Esc dismisses Leaders in `_input` + `MapRenderer._handle_escape_key` (consumed, no CC). Edge pan is `MapViewInput.EDGE_PAN_SCREEN_PX` (6) in **window** pixels; `hovered_ui_blocks_edge_pan` / unfocused / mouse-outside skip. March sets `_skip_inspector_after_march` and does not `_select_province` the dest. CRASH-1 same-dest no-op + CH-1 MV-1e event-position dest kept.

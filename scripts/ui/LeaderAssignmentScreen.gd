@@ -43,6 +43,7 @@ var _selected_leader_id: String = ""
 var _pending_replacements_button: Button
 var _national_spirits_button: Button
 var _fitting_viewport: bool = false
+var _close_press_armed: bool = false
 
 const NATIONAL_POSITIONS: Array[Dictionary] = [
 	{"key": LeaderManager.POSITION_CHIEF_OF_ARMY, "label": "Chief of Army"},
@@ -94,6 +95,7 @@ func _wire_close_button() -> void:
 		return
 	close_button.mouse_filter = Control.MOUSE_FILTER_STOP
 	close_button.focus_mode = Control.FOCUS_ALL
+	close_button.action_mode = BaseButton.ACTION_MODE_BUTTON_RELEASE
 	if not close_button.pressed.is_connected(_on_close_pressed):
 		close_button.pressed.connect(_on_close_pressed)
 	if not close_button.gui_input.is_connected(_on_close_gui_input):
@@ -103,9 +105,24 @@ func _wire_close_button() -> void:
 func _on_close_gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
-		if mb.button_index == MOUSE_BUTTON_LEFT and mb.pressed:
-			close_screen()
+		if mb.button_index != MOUSE_BUTTON_LEFT:
+			return
+		# Close on release (or swallow the release) so the mouse-up never
+		# reaches the map as a province pick / inspector / march.
+		if mb.pressed:
+			_close_press_armed = true
 			accept_event()
+			var vp_down: Viewport = get_viewport()
+			if vp_down != null:
+				vp_down.set_input_as_handled()
+		else:
+			if _close_press_armed:
+				_close_press_armed = false
+				close_screen()
+			accept_event()
+			var vp_up: Viewport = get_viewport()
+			if vp_up != null:
+				vp_up.set_input_as_handled()
 
 
 func _on_viewport_size_changed() -> void:

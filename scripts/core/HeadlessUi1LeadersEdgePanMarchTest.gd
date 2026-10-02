@@ -120,6 +120,7 @@ func _run() -> void:
 		return
 	await _test_leaders_esc_no_pause()
 	await _test_edge_pan_rest_and_rim()
+	await _test_leaders_close_release_no_map_click()
 	_test_march_commit_no_inspector()
 	_cleanup()
 
@@ -142,6 +143,15 @@ func _test_source_needles() -> void:
 		return
 	if "func edge_pan_direction_at" not in inp or "func hovered_ui_blocks_edge_pan" not in inp:
 		_fail("MapViewInput screen-pixel edge helpers missing")
+		return
+	if "func hovered_is_top_info_bar_only" not in inp or "func north_strip_top_bar_exempt" not in inp:
+		_fail("top-bar north-strip exemption helpers missing")
+		return
+	if "top_bar_only" not in _slice_func(inp, "edge_pan_direction_at"):
+		_fail("edge_pan_direction_at must take top_bar_only")
+		return
+	if "ACTION_MODE_BUTTON_RELEASE" not in lead or "_close_press_armed" not in lead:
+		_fail("Leaders Close must act on release and swallow the mouse-up")
 		return
 	if "edge_pan_direction_screen" not in _slice_func(ren, "_handle_camera_input"):
 		_fail("MapRenderer edge pan must use screen-pixel helper")
@@ -193,7 +203,31 @@ func _test_edge_pan_strip_math() -> void:
 	if top.y >= 0.0:
 		_fail("y=0 must pan north")
 		return
-	_pass("edge-pan strip math: interior/toast/unfocused skip; rim pans")
+	for x_v in [10.0, 640.0, 1270.0]:
+		for y_v in [0.0, 1.0]:
+			var north: Vector2 = MapViewInput.edge_pan_direction_at(
+				Vector2(x_v, y_v), sz, true, true, true, true
+			)
+			if north.y >= 0.0:
+				_fail("top-bar strip y=%.0f x=%.0f must pan north" % [y_v, x_v])
+				return
+	var below_strip: float = MapViewInput.EDGE_PAN_SCREEN_PX + 3.5
+	var below: Vector2 = MapViewInput.edge_pan_direction_at(
+		Vector2(640.0, below_strip), sz, true, true, true, true
+	)
+	if below != Vector2.ZERO:
+		_fail("top bar below strip (y=%.1f) must not pan" % below_strip)
+		return
+	var toast_top: Vector2 = MapViewInput.edge_pan_direction_at(
+		Vector2(640.0, 0.0), sz, true, true, true, false
+	)
+	if toast_top != Vector2.ZERO:
+		_fail("toast/panel on the top strip must not pan")
+		return
+	if MapViewInput.edge_pan_direction_at(Vector2(640.0, 0.0), sz, true, false, true, true) != Vector2.ZERO:
+		_fail("unfocused window must not north-pan even on top bar")
+		return
+	_pass("edge-pan strip math: interior/toast/unfocused skip; rim pans; top-bar strip exempt")
 
 
 func _set_window_size(wh: Vector2i) -> void:
@@ -463,6 +497,12 @@ func _test_edge_pan_rest_and_rim() -> void:
 	if _cam == null or _mr == null:
 		_fail("camera/renderer missing for edge rest")
 		return
+	var top_bar := Panel.new()
+	top_bar.name = "TopInfoBar"
+	top_bar.position = Vector2.ZERO
+	top_bar.size = Vector2(1280, 56)
+	top_bar.mouse_filter = Control.MOUSE_FILTER_STOP
+	root.add_child(top_bar)
 	var toast := Panel.new()
 	toast.name = "Ui1RightEdgeToast"
 	toast.position = Vector2(1180, 300)
@@ -478,11 +518,12 @@ func _test_edge_pan_rest_and_rim() -> void:
 	for pos_v in interiors:
 		var pos: Vector2 = pos_v as Vector2
 		var helper_dir: Vector2 = MapViewInput.edge_pan_direction_at(
-			pos, Vector2(1280, 740), pos.x >= 1180.0, true, true
+			pos, Vector2(1280, 740), pos.x >= 1180.0, true, true, false
 		)
 		if helper_dir != Vector2.ZERO:
 			_fail("edge rest helper at (%.0f,%.0f) is %s" % [pos.x, pos.y, str(helper_dir)])
 			toast.queue_free()
+			top_bar.queue_free()
 			return
 		_warp_mouse_window(pos)
 		await process_frame
@@ -507,8 +548,50 @@ func _test_edge_pan_rest_and_rim() -> void:
 		if moved > 0.5:
 			_fail("edge rest at (%.0f,%.0f) moved camera by %.2f" % [pos.x, pos.y, moved])
 			toast.queue_free()
+			top_bar.queue_free()
 			return
 	_pass("edge rest (97,731) / y=230 / y=710 / toast: no camera move")
+
+	var below_y: float = MapViewInput.EDGE_PAN_SCREEN_PX + 3.5
+	var below_dir: Vector2 = MapViewInput.edge_pan_direction_at(
+		Vector2(640.0, below_y), Vector2(1280, 740), true, true, true, true
+	)
+	if below_dir != Vector2.ZERO:
+		_fail("top bar below strip helper at y=%.1f is %s" % [below_y, str(below_dir)])
+		toast.queue_free()
+		top_bar.queue_free()
+		return
+	_pass("top bar ~3–4px below edge_px: no pan")
+
+	var top_toast := Panel.new()
+	top_toast.name = "Ui1TopStripToast"
+	top_toast.position = Vector2(1100, 0)
+	top_toast.size = Vector2(160, 20)
+	top_toast.mouse_filter = Control.MOUSE_FILTER_STOP
+	root.add_child(top_toast)
+	var toast_strip: Vector2 = MapViewInput.edge_pan_direction_at(
+		Vector2(1180.0, 1.0), Vector2(1280, 740), true, true, true, false
+	)
+	if toast_strip != Vector2.ZERO:
+		_fail("toast/panel on top strip helper must be ZERO")
+		top_toast.queue_free()
+		toast.queue_free()
+		top_bar.queue_free()
+		return
+	if not MapViewInput.hovered_is_top_info_bar_only(top_bar):
+		_fail("TopInfoBar must count as top-bar-only")
+		top_toast.queue_free()
+		toast.queue_free()
+		top_bar.queue_free()
+		return
+	if MapViewInput.hovered_is_top_info_bar_only(top_toast):
+		_fail("top-strip toast must not count as top-bar-only")
+		top_toast.queue_free()
+		toast.queue_free()
+		top_bar.queue_free()
+		return
+	top_toast.queue_free()
+	_pass("toast/panel touching top strip: no pan")
 
 	var rim_ok := 0
 	for pos_v2 in [Vector2(1279, 370), Vector2(640, 0)]:
@@ -517,12 +600,14 @@ func _test_edge_pan_rest_and_rim() -> void:
 			toast.visible = false
 		_warp_mouse_window(rim)
 		await process_frame
+		var over_bar: bool = rim.y <= MapViewInput.EDGE_PAN_SCREEN_PX
 		var dir: Vector2 = MapViewInput.edge_pan_direction_at(
-			rim, Vector2(1280, 740), false, true, true
+			rim, Vector2(1280, 740), over_bar, true, true, over_bar
 		)
 		if dir == Vector2.ZERO:
 			_fail("rim %s helper dir is ZERO" % str(rim))
 			toast.queue_free()
+			top_bar.queue_free()
 			return
 		var before_r: Vector2 = _cam.global_position
 		if _mr.has_method("_handle_camera_input"):
@@ -532,11 +617,91 @@ func _test_edge_pan_rest_and_rim() -> void:
 		# If the camera did move, count it; either way the strip math is the gate.
 		if _cam.global_position.distance_to(before_r) > 0.01 or dir != Vector2.ZERO:
 			rim_ok += 1
+	var north_pts: int = 0
+	for x_n in [10.0, 640.0, 1270.0]:
+		for y_n in [0.0, 1.0]:
+			var npos := Vector2(x_n, y_n)
+			var ndir: Vector2 = MapViewInput.edge_pan_direction_at(
+				npos, Vector2(1280, 740), true, true, true, true
+			)
+			if ndir.y >= 0.0:
+				_fail("north strip %s helper is not north" % str(npos))
+				toast.queue_free()
+				top_bar.queue_free()
+				return
+			north_pts += 1
 	toast.queue_free()
-	if rim_ok < 2:
-		_fail("rim x=1279 / y=0 did not qualify as pan")
+	top_bar.queue_free()
+	if rim_ok < 2 or north_pts < 6:
+		_fail("rim x=1279 / y=0 / top-bar north pts did not qualify as pan")
 		return
-	_pass("rim x=1279 and y=0 do pan (strip math)")
+	_pass("rim x=1279 and y=0/1 at x=10/640/1270 do pan (top-bar exempt)")
+
+
+func _left_mouse(pos: Vector2, pressed: bool) -> InputEventMouseButton:
+	var ev := InputEventMouseButton.new()
+	ev.button_index = MOUSE_BUTTON_LEFT
+	ev.pressed = pressed
+	ev.position = pos
+	ev.global_position = pos
+	return ev
+
+
+func _test_leaders_close_release_no_map_click() -> void:
+	_set_window_size(Vector2i(1280, 740))
+	await _flush()
+	if _mr == null:
+		_fail("MapRenderer missing for Close-release guard")
+		return
+	if "selected_province_id" in _mr:
+		_mr.selected_province_id = -1
+	if _info != null:
+		_info.visible = false
+	var screen: Control = _open_leaders()
+	if screen == null:
+		return
+	if screen.has_method("_fit_to_viewport"):
+		screen.call("_fit_to_viewport")
+	await _flush()
+	var close_btn: Button = screen.get_node_or_null("CloseButton") as Button
+	if close_btn == null:
+		_fail("CloseButton missing for release swallow")
+		screen.queue_free()
+		return
+	var cpos: Vector2 = close_btn.get_global_rect().get_center()
+	_warp_mouse_window(cpos)
+	await process_frame
+	var down: InputEventMouseButton = _left_mouse(cpos, true)
+	var up: InputEventMouseButton = _left_mouse(cpos, false)
+	if screen.has_method("_on_close_gui_input"):
+		screen.call("_on_close_gui_input", down)
+	if _mr.has_method("_input"):
+		_mr.call("_input", down)
+	await process_frame
+	if not is_instance_valid(screen) or screen.is_queued_for_deletion():
+		_fail("Leaders Close closed on press (must wait for release)")
+		return
+	if screen.has_method("_on_close_gui_input"):
+		screen.call("_on_close_gui_input", up)
+	if _mr.has_method("_input"):
+		_mr.call("_input", up)
+	if _mr.has_method("_unhandled_input"):
+		_mr.call("_unhandled_input", up)
+	await _flush()
+	if is_instance_valid(screen) and not screen.is_queued_for_deletion():
+		_fail("Leaders Close release did not close the panel")
+		screen.queue_free()
+		return
+	if _info != null and _info.visible:
+		_fail("Leaders Close release opened the inspector")
+		return
+	if "selected_province_id" in _mr and int(_mr.selected_province_id) >= 0:
+		_fail("Leaders Close release selected a province")
+		return
+	if MapViewInput.modal_blocks_map_nav(root):
+		_fail("map nav still blocked after Close release")
+		return
+	_pass("Leaders Close press+release: no map click / select / inspector")
 
 
 func _koeln_province() -> Object:
