@@ -16,12 +16,15 @@ const LIVE_RENDER_EAST_KENT := Vector2(7119.145, 1620.913)
 const LIVE_OLD_ENG_CHIP := Vector2(7134.5, 1610.3)
 const TARGET_ZOOM := 1.5
 const WAIT_MAP_SECS := 420
+const SETTLE_FRAMES := 40
 const GER_TAG := "GER"
 
-enum Phase { WAIT_MAP, HOME, CHANNEL, NORTH_SEA, EAST_KENT, DONE }
+enum Phase { WAIT_MAP, HOME, SETTLE, CHANNEL, NORTH_SEA, EAST_KENT, DONE }
 
 var _phase: int = Phase.WAIT_MAP
 var _t0_msec: int = 0
+var _settle_left: int = 0
+var _after_settle: int = Phase.HOME
 var _fail_reasons: PackedStringArray = PackedStringArray()
 var _out_dir: String = ""
 var _captures: PackedStringArray = PackedStringArray()
@@ -46,6 +49,7 @@ func _start() -> void:
 		_fail_reasons.append("headless_display")
 		_finish(false)
 		return
+	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
 	DisplayServer.window_set_size(Vector2i(1280, 740))
 	var win := DisplayServer.window_get_size()
 	_log("EOA_FLEET2_LIVE who=guard.window size=%dx%d (xvfb≠Play)" % [win.x, win.y])
@@ -75,6 +79,10 @@ func _on_process() -> void:
 			_tick_wait_map()
 		Phase.HOME:
 			_do_home()
+		Phase.SETTLE:
+			_settle_left -= 1
+			if _settle_left <= 0:
+				_phase = _after_settle
 		Phase.CHANNEL:
 			_do_channel()
 		Phase.NORTH_SEA:
@@ -114,12 +122,19 @@ func _do_home() -> void:
 	elif mr != null and mr.has_method("center_europe_in_world_view"):
 		mr.call("center_europe_in_world_view")
 	_pause_clock()
+	_ensure_fleet_icons()
 	_log("EOA_FLEET2_LIVE who=guard.europe_home ger=%s" % _player_tag())
-	_phase = Phase.CHANNEL
+	_go_settle(Phase.CHANNEL)
 
 
 func _do_channel() -> void:
+	DisplayServer.window_set_size(Vector2i(1280, 740))
+	_ensure_fleet_icons()
 	_frame_sea(LIVE_RENDER_CHANNEL, "channel")
+	if int(root.get_meta("fleet2_ch_settle", 0)) == 0:
+		root.set_meta("fleet2_ch_settle", 1)
+		_go_settle(Phase.CHANNEL)
+		return
 	_ch_plates = _collect_sea_plates(CHANNEL)
 	_ch_cluster = _cluster_of(_ch_plates)
 	_log_plates("Channel 950001", _ch_plates, _ch_cluster, LIVE_RENDER_CHANNEL)
@@ -134,7 +149,12 @@ func _do_channel() -> void:
 
 
 func _do_north_sea() -> void:
+	_ensure_fleet_icons()
 	_frame_sea(LIVE_RENDER_NORTH_SEA, "north_sea")
+	if int(root.get_meta("fleet2_ns_settle", 0)) == 0:
+		root.set_meta("fleet2_ns_settle", 1)
+		_go_settle(Phase.NORTH_SEA)
+		return
 	_ns_plates = _collect_sea_plates(NORTH_SEA)
 	_ns_cluster = _cluster_of(_ns_plates)
 	_log_plates("North Sea 950000", _ns_plates, _ns_cluster, LIVE_RENDER_NORTH_SEA)
@@ -184,6 +204,34 @@ func _do_east_kent() -> void:
 	_finish(_fail_reasons.is_empty())
 
 
+func _go_settle(next_phase: int) -> void:
+	_after_settle = next_phase
+	_settle_left = SETTLE_FRAMES
+	_phase = Phase.SETTLE
+
+
+func _ensure_fleet_icons() -> void:
+	var mr := _map_renderer()
+	if mr == null:
+		return
+	if "show_unit_counters" in mr:
+		mr.show_unit_counters = true
+	if mr.has_method("ensure_playable_front_chips"):
+		mr.call("ensure_playable_front_chips", false)
+	if mr.has_method("_update_unit_icons_for_test"):
+		mr.call("_update_unit_icons_for_test")
+	elif mr.has_method("_rebuild_demo_unit_icons"):
+		mr.call("_rebuild_demo_unit_icons", {})
+	if mr.has_method("_sync_unit_counter_paint"):
+		mr.call("_sync_unit_counter_paint", TARGET_ZOOM)
+	if mr.has_method("_sync_sea_nation_fleet_offsets"):
+		mr.call("_sync_sea_nation_fleet_offsets", TARGET_ZOOM)
+	var n := 0
+	if "_demo_unit_icon_pids" in mr:
+		n = (mr._demo_unit_icon_pids as Array).size()
+	_log("EOA_FLEET2_LIVE who=guard.icons pids=%d" % n)
+
+
 func _frame_sea(world: Vector2, who: String) -> void:
 	var mr := _map_renderer()
 	var cam := _camera()
@@ -206,31 +254,45 @@ func _collect_sea_plates(pid: int) -> Dictionary:
 	var mr := _map_renderer()
 	if mr == null:
 		return out
-	var host: Node2D = null
-	if "province_nodes" in mr and mr.province_nodes.has(pid):
-		host = mr.province_nodes[pid] as Node2D
-	if host == null:
-		return out
-	for c in host.get_children():
-		if not (c is Node2D):
-			continue
-		if not str(c.name).begins_with("DemoUnitIcon_"):
-			continue
-		if not bool((c as Node2D).get_meta("sea_nation_disk", false)):
-			continue
-		var tag := str((c as Node2D).get_meta("sea_nation_tag", ""))
-		var pos: Vector2 = (c as Node2D).global_position
+	var prefix := "DemoUnitIcon_%d_" % pid
+	_collect_sea_plates_walk(mr, prefix, pid, out)
+	if out.is_empty() and root != null:
+		_collect_sea_plates_walk(root, prefix, pid, out)
+	return out
+
+
+func _collect_sea_plates_walk(n: Node, prefix: String, pid: int, out: Dictionary) -> void:
+	if n == null:
+		return
+	if n is Node2D and str(n.name).begins_with(prefix):
+		var icon: Node2D = n as Node2D
+		var tag := str(icon.get_meta("sea_nation_tag", ""))
+		if tag.is_empty():
+			var bits: PackedStringArray = str(icon.name).split("_")
+			if bits.size() >= 3:
+				tag = str(bits[bits.size() - 1])
+		var pos: Vector2 = icon.global_position
 		if pos == Vector2.ZERO:
-			pos = (c as Node2D).position
+			pos = icon.position
+		if mr_has_world_helper():
+			var mr := _map_renderer()
+			if mr != null and mr.has_method("_demo_unit_icon_world_pos"):
+				pos = mr.call("_demo_unit_icon_world_pos", icon, pid) as Vector2
 		var lab := ""
-		var desig: Node = (c as Node2D).get_node_or_null("Designation")
+		var desig: Node = icon.get_node_or_null("Designation")
 		if desig != null:
 			lab = str(desig.get("text"))
 		var r: float = 0.0
-		if (c as Node2D).has_meta("sea_nation_radius"):
-			r = float((c as Node2D).get_meta("sea_nation_radius"))
-		out[tag] = {"pos": pos, "label": lab, "r": r, "name": str(c.name)}
-	return out
+		if icon.has_meta("sea_nation_radius"):
+			r = float(icon.get_meta("sea_nation_radius"))
+		out[tag] = {"pos": pos, "label": lab, "r": r, "name": str(icon.name)}
+	for c in n.get_children():
+		_collect_sea_plates_walk(c, prefix, pid, out)
+
+
+func mr_has_world_helper() -> bool:
+	var mr := _map_renderer()
+	return mr != null and mr.has_method("_demo_unit_icon_world_pos")
 
 
 func _cluster_of(plates: Dictionary) -> Vector2:
