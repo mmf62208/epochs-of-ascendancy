@@ -558,6 +558,28 @@ Guard: `HeadlessFleet1LandSpillGateTest` + `tools/eoa_fleet1_guard.sh` (hd + xvf
 
 Distances from Maginot: Channel **170.5**, North Sea **264.8**, Emden **139.3**, open sea **188.4** — all inside 340. Cases: (a) Channel fleet → ENG selected/inspected; (b) open sea → Channel inspector, not GER land; (c) Emden land → Maginot GER; (d) North Sea → GER fleet. Headless + xvfb **NOT live Play**.
 
+Isolated keep-green (`6fc04487`; wrapper `rss_mb` preferred; MV-1/MV-1b **unedited**):
+
+| gate | kind | result | peak RSS MB |
+|---|---|---|---|
+| FLEET-1 hd / xvfb | both | PASS (a–d) | **1197.1 / 1369.6** |
+| hd_mv1 | headless | PASS (unedited) | **1195.5** |
+| hd_mv1b | headless | PASS (unedited) | **1195.9** |
+| hd_rh1 | headless | PASS | **1195.3** |
+| hd_ix1 (6) | headless | PASS (MandateGate `PASS failures=0`) | **1195.3–1199.8** |
+| hd_rx1 (4) | headless | PASS | **1195.7–1196.9** |
+| hd_rt1 (3) | headless | PASS | **1195.3–1197.1** |
+| hd_fac1a | headless | PASS | **1195.7** |
+| py_fac1a | py | PASS 7/7 | **42.7** (`resource.ru_maxrss`; no `/usr/bin/time`) |
+| xvfb_mv1 | xvfb | PASS | **2040.1** |
+| xvfb_mv1_card | xvfb | PASS `fra=true` `edge_panel`/`edge_card`/`cap_commit` | **2035.8** |
+| xvfb_rh1 | xvfb | PASS | **2036.2** |
+| xvfb_fac1a | xvfb | PASS stale_lag=true 15/15 lone+cluster rx1 0.843/0.843 | **2042.0** |
+| CRASH-1 10× hd + 10× xvfb | both | PASS | wrapper no RSS (typical isolated hd ~1.2 GB) |
+| MV-1e 15/15 @ 4× | hd+xvfb | PASS | **1195.5 / 1332.5** |
+| Seeded RX-1 mid_river ON/OFF | xvfb | PASS units-off **0.749** / close 0.775 / spine 1.000 | wrapper no RSS (typical isolated ~2046) |
+| UI-1 guard hd+xvfb | both | PASS | **1200.0 / 1346.8** |
+
 ### CRASH-1 halt-march popup (draft HOLD)
 
 Halt / Press / Hold / Withdraw / Assign must not `free()` `UnitDetailPopup` while `pressed` is emitting. Detach + rename `UnitDetailPopup_dying` + `queue_free()`. Same-dest still click is a no-op re-issue. **FIX #1 (Play live MIXED `80b0b542`):** press-mode rebuild dropped the card so the mouse-up still-clicked the map (inspector + camera jump; twice switched/cleared selection). Latch `_unit_card_consumed_press` on those five buttons; `_input` / `_unhandled_input` / `_left_release_must_skip_pick` / land-chip still-click swallow the matching release. Open card refreshes Halt on march start / re-target / arrival. **CRASH-1b (CH-1):** that latch must eat **one** matching left release then clear (new left press anywhere, 1 frame after the eaten release, 0.5s safety) so later top-bar / UI clicks register. Guard: Halt still no click-through; ≥4 UI press+release after swallow; following map still-click commits. Headless `HeadlessCrash1HaltMarchPopupTest` + `tools/eoa_crash1_halt_march_guard.sh` 10× hd + 10× xvfb — **NOT live Play**. MV-1 / MV-1b gates **unedited**.
