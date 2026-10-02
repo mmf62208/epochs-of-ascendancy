@@ -153,62 +153,21 @@ static func _node_is_non_topbar_edge_blocker(n: Node) -> bool:
 	return false
 
 
-## Toast / Leaders / unit card / pause menu under the cursor (even if hover is the bar).
+## Toast / Leaders / unit card / pause menu under the cursor (not the top bar).
 static func non_topbar_overlay_contains_mouse(viewport: Viewport) -> bool:
-	if viewport == null or viewport.get_tree() == null:
+	if viewport == null:
 		return false
 	var hovered: Control = viewport.gui_get_hovered_control()
-	if hovered != null and not hovered_is_top_info_bar_only(hovered):
-		if hovered.mouse_filter != Control.MOUSE_FILTER_IGNORE:
-			var hname := str(hovered.name)
-			if hname != "WorldMap" and hname != "MapRenderer" and not hname.begins_with("Province"):
-				return true
-	var mouse: Vector2 = viewport.get_mouse_position()
-	var tree: SceneTree = viewport.get_tree()
-	var evui: Node = tree.root.get_node_or_null("LeaderEventUI")
-	if evui != null:
-		var tc: Node = evui.find_child("ToastContainer", true, false)
-		if tc != null:
-			for ch in tc.get_children():
-				if ch is Control:
-					var toast_c: Control = ch as Control
-					if toast_c.visible and toast_c.get_global_rect().has_point(mouse):
-						return true
-	if _overlay_children_hit(tree.root, mouse, 0):
-		return true
-	return false
-
-
-static func _overlay_children_hit(parent: Node, mouse: Vector2, depth: int) -> bool:
-	if parent == null or depth > 6:
+	if hovered == null:
 		return false
-	for ch in parent.get_children():
-		if ch == null:
-			continue
-		var cn := str(ch.name)
-		if cn in _AUTOLOAD_NODE_NAMES and cn != "LeaderEventUI":
-			continue
-		if cn == "TopInfoBar" or cn == "WorldMap" or cn == "MapRenderer" or cn == "ProvinceContainers":
-			continue
-		if cn.begins_with("Province"):
-			continue
-		if _node_is_non_topbar_edge_blocker(ch) and ch is Control:
-			var c: Control = ch as Control
-			if c.visible and c.get_global_rect().has_point(mouse):
-				return true
-		if cn == "ToastContainer" or cn == "LeaderNewsLayer" or cn == "UI" or cn == "UILayer" or cn == "LeaderEventUI":
-			if _overlay_children_hit(ch, mouse, depth + 1):
-				return true
-			if cn == "ToastContainer":
-				for t in ch.get_children():
-					if t is Control:
-						var tp: Control = t as Control
-						if tp.visible and tp.get_global_rect().has_point(mouse):
-							return true
-		if ch is CanvasLayer and (cn == "MainMenu" or cn == "MainMenuPopup"):
-			if _overlay_children_hit(ch, mouse, depth + 1):
-				return true
-	return false
+	if hovered_is_top_info_bar_only(hovered):
+		return false
+	if hovered.mouse_filter == Control.MOUSE_FILTER_IGNORE:
+		return false
+	var hname := str(hovered.name)
+	if hname == "WorldMap" or hname == "MapRenderer" or hname.begins_with("Province"):
+		return false
+	return true
 
 
 ## TopInfoBar in the true north strip (y 0..EDGE_PAN_SCREEN_PX) does not block.
@@ -226,9 +185,7 @@ static func north_strip_top_bar_exempt(viewport: Viewport) -> bool:
 		return false
 	if not hovered_is_top_info_bar_only(viewport.gui_get_hovered_control()):
 		return false
-	if non_topbar_overlay_contains_mouse(viewport):
-		return false
-	return true
+	return not non_topbar_overlay_contains_mouse(viewport)
 
 
 ## Screen-pixel edge direction, or ZERO when blocked / not on the true rim.
