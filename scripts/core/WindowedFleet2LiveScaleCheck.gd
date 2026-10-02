@@ -577,8 +577,9 @@ func _is_nation_or_label(c: Color, nation: Color) -> bool:
 
 
 func _nation_color(tag: String) -> Color:
-	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_country_color"):
-		return MapManager.get_country_color(tag)
+	var mm := _map_manager()
+	if mm != null and mm.has_method("get_country_color"):
+		return mm.call("get_country_color", tag) as Color
 	match tag:
 		"GER":
 			return Color(0.35, 0.36, 0.38)
