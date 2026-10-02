@@ -266,17 +266,17 @@ func _click_one(row: Dictionary) -> void:
 		_fail_reasons.append("click_%s_no_mr" % who)
 		return
 	_reset_card()
+	var opened := false
+	if mr.has_method("_try_open_unit_at_world"):
+		opened = bool(mr.call("_try_open_unit_at_world", pos))
+	if not opened and mr.has_method("_try_open_land_unit_at_world"):
+		opened = bool(mr.call("_try_open_land_unit_at_world", pos, false, false))
 	var fo: Object = null
 	if mr.has_method("_pick_unit_formation_at_world"):
 		fo = mr.call("_pick_unit_formation_at_world", pos)
 	var fid := str(fo.formation_id) if fo != null and "formation_id" in fo else "null"
 	var tag := str(fo.country_tag).strip_edges().to_upper() if fo != null and "country_tag" in fo else "?"
 	var ftype := str(fo.formation_type) if fo != null and "formation_type" in fo else "?"
-	var opened := false
-	if mr.has_method("_try_open_unit_at_world"):
-		opened = bool(mr.call("_try_open_unit_at_world", pos))
-	if not opened and mr.has_method("_try_open_land_unit_at_world"):
-		opened = bool(mr.call("_try_open_land_unit_at_world", pos, false, false))
 	var card := _popup_state()
 	var ok := fo != null and ftype == "fleet" and tag in want and opened
 	if who.ends_with("east_kent_711453") or who.ends_with("old_eng_chip"):

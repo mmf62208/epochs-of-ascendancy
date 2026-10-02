@@ -279,6 +279,9 @@ func _test_source_needles() -> void:
 	if "func _nation_fleet_rank" not in ren:
 		_fail("FIX #3 per-nation fleet ordinal missing")
 		return
+	if "func _sea_nation_formation_dist_sq" not in ren:
+		_fail("FIX #3 cluster-pad must beat a farther Home-band land hit")
+		return
 	if "maxi(index, 0) + 1" in ren:
 		_fail("plate label must not use sea-stack index+1")
 		return
@@ -1189,8 +1192,31 @@ func _test_k_spread_band_live_clicks() -> void:
 		if _selected_fid() == "" or _info != null and _info.visible:
 			_fail("(k) z=%.3f GER-nearest-gap opened the sea-zone inspector" % z)
 			return
+		if land_icon != null and is_instance_valid(land_icon):
+			land_icon.visible = false
+			if land_icon.get_parent() != null:
+				land_icon.get_parent().remove_child(land_icon)
+			land_icon.free()
+			land_icon = null
+		for extra_v in [
+			{"name": "East Kent 711453", "pos": LIVE_RENDER_EAST_KENT},
+			{"name": "old ENG chip", "pos": LIVE_OLD_ENG_CHIP},
+		]:
+			var extra: Dictionary = extra_v as Dictionary
+			var epos: Vector2 = extra["pos"] as Vector2
+			var ename := str(extra["name"])
+			_reset_pick()
+			var disk: Object = _mr.call("_pick_unit_formation_at_world", epos)
+			var got := str(disk.formation_id) if disk != null and "formation_id" in disk else "?"
+			var gtype := str(disk.formation_type) if disk != null and "formation_type" in disk else "?"
+			if disk == null or not _is_channel_fid(got) or gtype != "fleet":
+				_fail("(k) z=%.3f %s pick=%s/%s want a Channel fleet (not land)" % [z, ename, got, gtype])
+				return
+			if got == FID_GER_LAND or gtype == "division":
+				_fail("(k) z=%.3f %s spilled to land %s" % [z, ename, got])
+				return
 	_apply_zoom(1.0)
-	_pass("(k) all 8 plates at z0.318 and z0.40 open their fleet (GER own / others read-only); GER-nearest gap binds the fleet")
+	_pass("(k) all 8 plates at z0.318 and z0.40 open their fleet (GER own / others read-only); GER-nearest gap binds the fleet; East Kent / old ENG stay Channel")
 
 
 func _place_land_chip_at(pid: int, fid: String, world: Vector2) -> Node2D:
