@@ -8,12 +8,17 @@ extends SceneTree
 ## Real world_accurate label_anchor centroids (provinces_geometry.json):
 ##   710173 Baden-Baden / Maginot GER land  (4283.279411, 1010.266854)
 ##   710385 Emden (GER North Sea coast)     (4258.130659,  873.294384)
+##   710417 Köln (GER land; MV-1b FRA fleet)(4254.322147,  944.095861)
+##   711453 East Kent (ENG coastal land)    (4119.875715,  938.028287)
 ##   950000 North Sea Zone (GER fleet)      (4164.266667,  773.688889)
 ##   950001 English Channel (ENG fleet)     (4128.701206,  938.217996)
 ## Distances: Maginot↔Channel 170.5 · Maginot↔North Sea 264.8 ·
 ## Emden↔Maginot 139.3 — all inside the 340 spill.
+## Channel↔East Kent 8.8 — East Kent GIS is inside the Channel fleet disk.
 ## Open-sea click: Channel + 80 along the CCW perpendicular of
 ## Channel→Maginot = (4094.905, 1010.727) — GIS Channel, outside fleet disk.
+## FIX #1: foreign fleet disk over coastal land still inspects that fleet
+## when the fleet's own stationed pid is sea. Köln FRA land-fleet stays out.
 ##
 ##   tools/run_godot.sh --headless --path . -s res://scripts/core/HeadlessFleet1LandSpillGateTest.gd
 ##   tools/eoa_fleet1_guard.sh
@@ -21,17 +26,24 @@ extends SceneTree
 const SRC_REN := "res://scripts/map/MapRenderer.gd"
 const GER_TAG := "GER"
 const ENG_TAG := "ENG"
+const FRA_TAG := "FRA"
 const MAGINOT := 710173
 const EMDEN := 710385
+const KOLN := 710417
+const EAST_KENT := 711453
 const NORTH_SEA := 950000
 const CHANNEL := 950001
 const FID_GER_LAND := "fleet1_ger_maginot"
 const FID_GER_FLEET := "fleet1_ger_north_sea"
 const FID_ENG_FLEET := "fleet1_eng_channel"
+const FID_FRA_FLEET_KOLN := "fleet1_fra_koln"
+const FID_FRA_LAND := "fleet1_fra_land"
 const DESIGN_LAND := "infantry_1936"
 const DESIGN_FLEET := "king_george_v_class_bb"
 const WORLD_MAGINOT := Vector2(4283.279410731325, 1010.2668539708038)
 const WORLD_EMDEN := Vector2(4258.130658509457, 873.2943840595451)
+const WORLD_KOLN := Vector2(4254.322147319904, 944.0958606451493)
+const WORLD_EAST_KENT := Vector2(4119.875714645911, 938.0282873606084)
 const WORLD_NORTH_SEA := Vector2(4164.266666666666, 773.6888888888889)
 const WORLD_CHANNEL := Vector2(4128.701206024651, 938.2179956383225)
 var WORLD_OPEN_SEA: Vector2 = Vector2(4094.905, 1010.727)
@@ -144,6 +156,10 @@ func _run() -> void:
 	_test_b_open_sea()
 	_test_c_near_own_land()
 	_test_d_own_fleet()
+	_test_e_fleet_disk_over_east_kent()
+	_test_f_koln_fra_land_fleet()
+	_test_g_foreign_cards_readonly()
+	_test_h_own_card_buttons()
 	_cleanup()
 
 
@@ -176,8 +192,29 @@ func _test_source_needles() -> void:
 	if "_formation_is_fleet_counter(fo_any)" not in land_fn:
 		_fail("land-open must inspect a sea foreign fleet disk")
 		return
-	if "not _hex_pick_is_land_province(world_pos)" not in land_fn:
-		_fail("foreign-fleet inspect must stay sea-only (MV-1b land FRA)")
+	if "_formation_is_stationed_on_sea(fo_any)" not in land_fn:
+		_fail("foreign-fleet inspect must key on the fleet location pid (not GIS)")
+		return
+	if "not _hex_pick_is_land_province(world_pos)" in land_fn:
+		_fail("foreign-fleet inspect must not use GIS-under-cursor as the sea gate")
+		return
+	if "func _formation_is_stationed_on_sea" not in ren:
+		_fail("_formation_is_stationed_on_sea helper missing")
+		return
+	var pop_fn := _slice_func(ren, "_show_unit_detail_popup")
+	if "own_card" not in pop_fn or "BtnOpenFight" not in pop_fn:
+		_fail("unit card must still name BtnOpenFight for own units")
+		return
+	if "own_card" not in pop_fn or "BtnAssignLeader" not in pop_fn:
+		_fail("unit card must still name BtnAssignLeader for own units")
+		return
+	if pop_fn.find("if own_card:") < 0:
+		_fail("foreign unit cards must gate Open fight / Assign on own_card")
+		return
+	var move := _read("res://scripts/formations/FormationMovement.gd")
+	var prev_fn := _slice_func(move, "preview_own_land_march")
+	if '"not your unit"' not in prev_fn:
+		_fail("preview_own_land_march must still block foreign units")
 		return
 	var spill := _slice_func(ren, "_nearest_player_land_formation_at_world")
 	if "CHROME_SPILL_WORLD" not in spill or "340.0" not in spill:
@@ -206,6 +243,8 @@ func _setup_coastal_fixture() -> bool:
 	var rows: Array = [
 		{"id": MAGINOT, "tag": GER_TAG, "name": "Baden-Baden, Stadtkreis", "c": WORLD_MAGINOT, "sea": false, "domain": "land"},
 		{"id": EMDEN, "tag": GER_TAG, "name": "Emden, Kreisfreie Stadt", "c": WORLD_EMDEN, "sea": false, "domain": "land"},
+		{"id": KOLN, "tag": GER_TAG, "name": "Köln, Kreisfreie Stadt", "c": WORLD_KOLN, "sea": false, "domain": "land"},
+		{"id": EAST_KENT, "tag": ENG_TAG, "name": "East Kent", "c": WORLD_EAST_KENT, "sea": false, "domain": "land"},
 		{"id": NORTH_SEA, "tag": "", "name": "North Sea Zone", "c": WORLD_NORTH_SEA, "sea": true, "domain": "sea"},
 		{"id": CHANNEL, "tag": "", "name": "English Channel Zone", "c": WORLD_CHANNEL, "sea": true, "domain": "strait"},
 	]
@@ -213,6 +252,7 @@ func _setup_coastal_fixture() -> bool:
 	var countries: Dictionary = {
 		GER_TAG: {"tag": GER_TAG, "name": "Germany"},
 		ENG_TAG: {"tag": ENG_TAG, "name": "United Kingdom"},
+		FRA_TAG: {"tag": FRA_TAG, "name": "France"},
 	}
 	for row in rows:
 		var pid := int(row["id"])
@@ -244,7 +284,7 @@ func _setup_coastal_fixture() -> bool:
 		_fail("initialize_from_map_data missing")
 		return false
 	_force_centroids()
-	_pass("coastal fixture Maginot/Emden/North Sea/Channel (real centroids)")
+	_pass("coastal fixture Maginot/Emden/Köln/East Kent/North Sea/Channel (real centroids)")
 	return true
 
 
@@ -255,7 +295,14 @@ func _setup_formations() -> bool:
 		return false
 	if not _register_formation(FID_ENG_FLEET, ENG_TAG, "fleet", DESIGN_FLEET, CHANNEL, "ENG Channel Fleet"):
 		return false
-	_pass("seeded GER land + GER fleet + ENG fleet")
+	if not _register_formation(FID_FRA_FLEET_KOLN, FRA_TAG, "fleet", DESIGN_FLEET, KOLN, "FRA Köln Fleet"):
+		return false
+	if not _register_formation(FID_FRA_LAND, FRA_TAG, "division", DESIGN_LAND, KOLN, "FRA Köln Div"):
+		return false
+	_seed_leader("fleet1_ger_leader", "GER Test General", GER_TAG)
+	_seed_leader("fleet1_eng_leader", "ENG Test Admiral", ENG_TAG)
+	_seed_leader("fleet1_fra_leader", "FRA Test Admiral", FRA_TAG)
+	_pass("seeded GER/ENG/FRA formations + available leaders")
 	return true
 
 
@@ -319,6 +366,8 @@ func _setup_map_renderer() -> bool:
 	var placed: Dictionary = {
 		MAGINOT: WORLD_MAGINOT,
 		EMDEN: WORLD_EMDEN,
+		KOLN: WORLD_KOLN,
+		EAST_KENT: WORLD_EAST_KENT,
 		NORTH_SEA: WORLD_NORTH_SEA,
 		CHANNEL: WORLD_CHANNEL,
 	}
@@ -350,12 +399,16 @@ func _force_centroids() -> void:
 		var cents: Dictionary = _mm.get("_centroids")
 		cents[MAGINOT] = WORLD_MAGINOT
 		cents[EMDEN] = WORLD_EMDEN
+		cents[KOLN] = WORLD_KOLN
+		cents[EAST_KENT] = WORLD_EAST_KENT
 		cents[NORTH_SEA] = WORLD_NORTH_SEA
 		cents[CHANNEL] = WORLD_CHANNEL
 		_mm.set("_centroids", cents)
 	if _mr != null and "province_centroids" in _mr:
 		_mr.province_centroids[MAGINOT] = WORLD_MAGINOT
 		_mr.province_centroids[EMDEN] = WORLD_EMDEN
+		_mr.province_centroids[KOLN] = WORLD_KOLN
+		_mr.province_centroids[EAST_KENT] = WORLD_EAST_KENT
 		_mr.province_centroids[NORTH_SEA] = WORLD_NORTH_SEA
 		_mr.province_centroids[CHANNEL] = WORLD_CHANNEL
 
@@ -390,6 +443,7 @@ func _place_chips() -> void:
 	_place_chip(MAGINOT, FID_GER_LAND, WORLD_MAGINOT)
 	_place_chip(NORTH_SEA, FID_GER_FLEET, WORLD_NORTH_SEA)
 	_place_chip(CHANNEL, FID_ENG_FLEET, WORLD_CHANNEL)
+	_place_chip(KOLN, FID_FRA_FLEET_KOLN, WORLD_KOLN)
 
 
 func _force_play_zoom() -> void:
@@ -414,23 +468,35 @@ func _channel_hit_r() -> float:
 
 func _resolve_open_sea_click() -> void:
 	# Seed default is Channel + 80 CCW perp. Push just outside the live fleet disk
-	# while GIS stays Channel and Maginot stays inside 340.
+	# while GIS stays Channel and Maginot stays inside 340. East Kent is 8.8 west
+	# of Channel — prefer the perp that does not fall into that land centroid.
 	var hit_r: float = _channel_hit_r()
 	var to_mag: Vector2 = WORLD_MAGINOT - WORLD_CHANNEL
 	var perp: Vector2 = Vector2(-to_mag.y, to_mag.x).normalized()
 	var need: float = maxf(80.0, hit_r + 24.0)
-	var cand: Vector2 = WORLD_CHANNEL + perp * need
-	var hex: int = int(_mr.call("_resolve_hex_pick_pid", cand))
-	var d_mag: float = cand.distance_to(WORLD_MAGINOT)
-	if hex != CHANNEL or d_mag > 340.0:
-		perp = -perp
-		cand = WORLD_CHANNEL + perp * need
-		hex = int(_mr.call("_resolve_hex_pick_pid", cand))
-		d_mag = cand.distance_to(WORLD_MAGINOT)
-	WORLD_OPEN_SEA = cand
+	var chosen: Vector2 = WORLD_CHANNEL + perp * need
+	var chosen_hex: int = -1
+	var chosen_d: float = INF
+	var signs: Array = [1.0, -1.0]
+	var dists: Array = [need, need + 40.0, need + 80.0]
+	for s_v in signs:
+		var s: float = float(s_v)
+		for n_v in dists:
+			var n: float = float(n_v)
+			var cand: Vector2 = WORLD_CHANNEL + perp * s * n
+			var hex: int = int(_mr.call("_resolve_hex_pick_pid", cand))
+			var d_mag: float = cand.distance_to(WORLD_MAGINOT)
+			if hex == CHANNEL and d_mag <= 340.0:
+				chosen = cand
+				chosen_hex = hex
+				chosen_d = d_mag
+				break
+		if chosen_hex == CHANNEL:
+			break
+	WORLD_OPEN_SEA = chosen
 	print(
 		"  [INFO] HeadlessFleet1LandSpillGateTest: open-sea click %s hit_r=%.1f d_mag=%.1f gis=%d"
-		% [str(WORLD_OPEN_SEA), hit_r, d_mag, hex]
+		% [str(WORLD_OPEN_SEA), hit_r, chosen_d, chosen_hex]
 	)
 
 
@@ -484,6 +550,51 @@ func _popup_up() -> bool:
 		return false
 	var pop: Node = _ui.get_node_or_null("UnitDetailPopup")
 	return pop != null and is_instance_valid(pop) and not pop.is_queued_for_deletion()
+
+
+func _popup_has_btn(btn_name: String) -> bool:
+	if _ui == null:
+		return false
+	var pop: Node = _ui.get_node_or_null("UnitDetailPopup")
+	if pop == null or not is_instance_valid(pop):
+		return false
+	return pop.find_child(btn_name, true, false) != null
+
+
+func _seed_leader(leader_id: String, lname: String, tag: String) -> void:
+	if _lm == null or not ("leaders" in _lm):
+		return
+	var L: Object = _new_obj("res://scripts/leaders/Leader.gd")
+	if L == null:
+		return
+	L.set("leader_id", leader_id)
+	L.set("name", lname)
+	L.set("country_tag", tag)
+	L.set("assigned_army_id", "")
+	L.set("is_injured", false)
+	L.set("is_deceased", false)
+	L.set("is_retired", false)
+	L.set("is_captured", false)
+	_lm.leaders[leader_id] = L
+
+
+func _assert_no_command_buttons(who: String) -> bool:
+	if _popup_has_btn("BtnOpenFight"):
+		_fail("%s foreign card must hide Open fight" % who)
+		return false
+	if _popup_has_btn("BtnAssignLeader"):
+		_fail("%s foreign card must hide Assign leader" % who)
+		return false
+	return true
+
+
+func _foreign_unit_blocked(fid: String) -> bool:
+	var fo: Object = _formation(fid)
+	if fo == null:
+		return false
+	if not ("country_tag" in fo):
+		return false
+	return str(fo.country_tag).strip_edges().to_upper() != GER_TAG
 
 
 func _click_chip_path(world: Vector2) -> bool:
@@ -644,11 +755,118 @@ func _test_d_own_fleet() -> void:
 	_pass("(d) own GER fleet at North Sea %s still selected" % str(WORLD_NORTH_SEA))
 
 
+func _test_e_fleet_disk_over_east_kent() -> void:
+	_reset_pick()
+	var hex: int = int(_mr.call("_resolve_hex_pick_pid", WORLD_EAST_KENT))
+	if hex != EAST_KENT:
+		_fail("(e) GIS at East Kent want %d got %d" % [EAST_KENT, hex])
+		return
+	if not bool(_mr.call("_hex_pick_is_land_province", WORLD_EAST_KENT)):
+		_fail("(e) East Kent must count as coastal land")
+		return
+	var eng: Object = _formation(FID_ENG_FLEET)
+	if not bool(_mr.call("_formation_is_stationed_on_sea", eng)):
+		_fail("(e) ENG fleet must be stationed on Channel sea")
+		return
+	var disk: Object = _mr.call("_pick_unit_formation_at_world", WORLD_EAST_KENT)
+	if disk == null or str(disk.formation_id) != FID_ENG_FLEET:
+		_fail("(e) East Kent click must be inside the ENG Channel fleet disk")
+		return
+	var opened: bool = _click_chip_path(WORLD_EAST_KENT)
+	if not opened:
+		_fail("(e) ENG fleet disk over East Kent land must inspect the fleet")
+		return
+	if _selected_fid() != FID_ENG_FLEET:
+		_fail("(e) selected=%s want ENG fleet (GIS East Kent must not steal inspector)" % _selected_fid())
+		return
+	if not _popup_up():
+		_fail("(e) ENG fleet inspect popup missing")
+		return
+	_pass("(e) ENG fleet disk at East Kent %s (GIS %d land) selected ENG fleet" % [str(WORLD_EAST_KENT), EAST_KENT])
+
+
+func _test_f_koln_fra_land_fleet() -> void:
+	_reset_pick()
+	var hex: int = int(_mr.call("_resolve_hex_pick_pid", WORLD_KOLN))
+	if hex != KOLN:
+		_fail("(f) GIS at Köln want %d got %d" % [KOLN, hex])
+		return
+	if not bool(_mr.call("_hex_pick_is_land_province", WORLD_KOLN)):
+		_fail("(f) Köln must count as land")
+		return
+	var fra: Object = _formation(FID_FRA_FLEET_KOLN)
+	if bool(_mr.call("_formation_is_stationed_on_sea", fra)):
+		_fail("(f) Köln FRA fleet must stay land-stationed (MV-1b)")
+		return
+	var disk: Object = _mr.call("_pick_unit_formation_at_world", WORLD_KOLN)
+	if disk == null or str(disk.formation_id) != FID_FRA_FLEET_KOLN:
+		_fail("(f) Köln click must hit the FRA land-province fleet disk")
+		return
+	var opened: bool = _click_chip_path(WORLD_KOLN)
+	if opened and _selected_fid() == FID_FRA_FLEET_KOLN:
+		_fail("(f) Köln FRA land-province fleet must stay unselectable")
+		return
+	if _selected_fid() == FID_FRA_FLEET_KOLN:
+		_fail("(f) selected FRA Köln fleet — MV-1b leaked")
+		return
+	_pass("(f) Köln FRA land-province fleet at %s still not selected" % str(WORLD_KOLN))
+
+
+func _test_g_foreign_cards_readonly() -> void:
+	_reset_pick()
+	var eng: Object = _formation(FID_ENG_FLEET)
+	_mr.call("_show_unit_detail_popup", eng)
+	if not _popup_up():
+		_fail("(g) ENG fleet card missing")
+		return
+	if not _assert_no_command_buttons("(g) ENG fleet"):
+		return
+	if not _foreign_unit_blocked(FID_ENG_FLEET):
+		_fail("(g) ENG fleet must stay a foreign tag (march blocked)")
+		return
+	_reset_pick()
+	var fra_land: Object = _formation(FID_FRA_LAND)
+	_mr.call("_show_unit_detail_popup", fra_land)
+	if not _popup_up():
+		_fail("(g) FRA land card missing")
+		return
+	if not _assert_no_command_buttons("(g) FRA land"):
+		return
+	if not _foreign_unit_blocked(FID_FRA_LAND):
+		_fail("(g) FRA land must stay a foreign tag (march blocked)")
+		return
+	_pass("(g) foreign fleet + land cards hide Assign/Open fight; march blocked")
+
+
+func _test_h_own_card_buttons() -> void:
+	_reset_pick()
+	var opened: bool = _click_chip_path(WORLD_MAGINOT)
+	if not opened or _selected_fid() != FID_GER_LAND:
+		_fail("(h) own Maginot GER card must open (selected=%s)" % _selected_fid())
+		return
+	if not _popup_up():
+		_fail("(h) own GER land card missing")
+		return
+	if not _popup_has_btn("BtnOpenFight"):
+		_fail("(h) own unit card must still show Open fight")
+		return
+	if not _popup_has_btn("BtnAssignLeader"):
+		_fail("(h) own unit card must still show Assign leader")
+		return
+	_pass("(h) own GER land card still shows Open fight + Assign")
+
+
 func _cleanup() -> void:
 	if _lm != null and "formations" in _lm and _lm.formations is Dictionary:
 		_lm.formations.erase(FID_GER_LAND)
 		_lm.formations.erase(FID_GER_FLEET)
 		_lm.formations.erase(FID_ENG_FLEET)
+		_lm.formations.erase(FID_FRA_FLEET_KOLN)
+		_lm.formations.erase(FID_FRA_LAND)
+	if _lm != null and "leaders" in _lm and _lm.leaders is Dictionary:
+		_lm.leaders.erase("fleet1_ger_leader")
+		_lm.leaders.erase("fleet1_eng_leader")
+		_lm.leaders.erase("fleet1_fra_leader")
 	if _mr != null and is_instance_valid(_mr):
 		_mr.queue_free()
 		_mr = null

@@ -19397,6 +19397,37 @@ func _hex_pick_is_land_province(world_pos: Vector2) -> bool:
 	return _province_id_is_land(_resolve_hex_pick_pid(world_pos))
 
 
+func _province_id_is_sea(pid: int) -> bool:
+	if pid < 0:
+		return false
+	if pid >= 950000:
+		return true
+	if not provinces.has(pid):
+		return false
+	var p: Province = provinces[pid] as Province
+	if p == null:
+		return false
+	if bool(p.is_sea):
+		return true
+	var domain: String = ""
+	if "domain" in p:
+		domain = str(p.domain).strip_edges().to_lower()
+	return domain == "sea" or domain == "strait" or domain == "lake"
+
+
+func _formation_stationed_province_id(fo: Object) -> int:
+	if fo == null:
+		return -1
+	if "stationed_province_id" in fo:
+		return int(fo.stationed_province_id)
+	return -1
+
+
+func _formation_is_stationed_on_sea(fo: Object) -> bool:
+	# FLEET-1 FIX #1: fleet location pid, not the GIS hex under the cursor.
+	return _province_id_is_sea(_formation_stationed_province_id(fo))
+
+
 func _formation_is_player_tag(fo: Object) -> bool:
 	if fo == null:
 		return false
@@ -19541,13 +19572,16 @@ func _try_open_land_unit_at_world(
 			# nearest painted player-land icon (station 710173 / ger_nbr).
 			fo = _nearest_player_land_formation_at_world(world_pos)
 	if fo == null:
-		# FLEET-1: direct foreign fleet hit on sea inspects that fleet.
-		# Land-hex foreign fleet (MV-1b Köln FRA) still falls through.
+		# FLEET-1 FIX #1: disk hit on a foreign fleet stationed in a SEA
+		# province inspects that fleet even if GIS under the cursor is
+		# coastal land (ENG Channel chip over East Kent). Key the sea
+		# check on the fleet's own location pid, not the click hex.
+		# Land-stationed foreign fleet (MV-1b Köln FRA) still falls through.
 		if (
 			fo_any != null
 			and _formation_is_fleet_counter(fo_any)
 			and not _formation_is_player_tag(fo_any)
-			and not _hex_pick_is_land_province(world_pos)
+			and _formation_is_stationed_on_sea(fo_any)
 		):
 			_select_map_unit(fo_any)
 			_show_unit_detail_popup(fo_any)
@@ -20593,21 +20627,24 @@ func _show_unit_detail_popup(formation: Object) -> void:
 	fill_bar.show_percentage = false
 	RetrowaveTheme.style_progress_bar(fill_bar)
 	vbox.add_child(fill_bar)
+	var own_card: bool = _formation_is_player_tag(formation)
 	var fight_row := HBoxContainer.new()
 	fight_row.add_theme_constant_override("separation", 6)
 	vbox.add_child(fight_row)
-	var fight_btn := Button.new()
-	fight_btn.name = "BtnOpenFight"
-	fight_btn.text = "Open fight"
-	fight_btn.focus_mode = Control.FOCUS_NONE
-	fight_btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
-	fight_btn.tooltip_text = "Start a multi-day land battle from this unit into an adjacent enemy."
-	RetrowaveTheme.style_primary_button(fight_btn)
-	var fight_fid := fid
-	fight_btn.pressed.connect(func() -> void:
-		_open_fight_from_formation_id(fight_fid)
-	)
-	fight_row.add_child(fight_btn)
+	# FLEET-1 FIX #1: foreign fleet / land cards are read-only.
+	if own_card:
+		var fight_btn := Button.new()
+		fight_btn.name = "BtnOpenFight"
+		fight_btn.text = "Open fight"
+		fight_btn.focus_mode = Control.FOCUS_NONE
+		fight_btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
+		fight_btn.tooltip_text = "Start a multi-day land battle from this unit into an adjacent enemy."
+		RetrowaveTheme.style_primary_button(fight_btn)
+		var fight_fid := fid
+		fight_btn.pressed.connect(func() -> void:
+			_open_fight_from_formation_id(fight_fid)
+		)
+		fight_row.add_child(fight_btn)
 
 	var body := Label.new()
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -20785,7 +20822,7 @@ func _show_unit_detail_popup(formation: Object) -> void:
 			_show_unit_detail_popup(formation)
 		)
 		cmd_row.add_child(wd_btn)
-	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_available_leaders"):
+	if own_card and typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_available_leaders"):
 		var avail: Array = LeaderManager.get_available_leaders(tag)
 		if avail.size() > 0:
 			var L: Variant = avail[0]

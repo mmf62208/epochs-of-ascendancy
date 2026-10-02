@@ -544,7 +544,7 @@ With a unit selected, hovering own/controlled land shows a dimmer dashed `MarchP
 
 ### FLEET-1 land-spill vs foreign fleet / open sea (draft HOLD)
 
-Nearest-own-land chrome spill (`CHROME_SPILL_WORLD` 340) must not steal a click on a foreign fleet counter or on open sea. Gate: `_try_open_land_unit_at_world` calls `_nearest_player_land_formation_at_world` only when GIS at `event.position` is a land province **and** `_pick_unit_formation_at_world` missed every counter (`fo_any == null`). A sea-hex foreign fleet disk selects/inspects that fleet; a land-hex foreign fleet (MV-1b Köln FRA) still falls through. Own land-near-unit spill and own-fleet `_try_open_unit_at_world` first-select stay as today. Hit-test priority otherwise unchanged. MV-1 / MV-1b gates **unedited**.
+Nearest-own-land chrome spill (`CHROME_SPILL_WORLD` 340) must not steal a click on a foreign fleet counter or on open sea. Gate: `_try_open_land_unit_at_world` calls `_nearest_player_land_formation_at_world` only when GIS at `event.position` is a land province **and** `_pick_unit_formation_at_world` missed every counter (`fo_any == null`). **FIX #1 (Play MIXED `582263e8`):** a foreign fleet disk hit inspects that fleet when the fleet's **own stationed pid is sea**, even if GIS under the cursor is coastal land (ENG Channel chip over East Kent `711453`). Land-stationed foreign fleet (MV-1b Köln FRA `710417`) still falls through. Foreign fleet **and** foreign land cards hide Open fight / Assign leader; march stays blocked. Own cards unchanged. Hit-test priority otherwise unchanged. MV-1 / MV-1b gates **unedited**. Out of scope: one marker per shared sea, Channel / Rio Grande Rise polygons, Pas-de-Calais FRA-land spill.
 
 Guard: `HeadlessFleet1LandSpillGateTest` + `tools/eoa_fleet1_guard.sh` (hd + xvfb 1280×740). Seeds are real `world_accurate` label_anchors:
 
@@ -552,11 +552,13 @@ Guard: `HeadlessFleet1LandSpillGateTest` + `tools/eoa_fleet1_guard.sh` (hd + xvf
 |---|---|---|
 | Maginot GER land | `710173` | `(4283.279411, 1010.266854)` |
 | Emden (GER coast, no chip) | `710385` | `(4258.130659, 873.294384)` |
+| Köln (GER land; FRA fleet) | `710417` | `(4254.322147, 944.095861)` |
+| East Kent (ENG coastal land) | `711453` | `(4119.875715, 938.028287)` |
 | North Sea GER fleet | `950000` | `(4164.266667, 773.688889)` |
 | English Channel ENG fleet | `950001` | `(4128.701206, 938.217996)` |
-| open sea (Channel + 80 CCW perp) | `950001` | `(4094.905, 1010.727)` |
+| open sea (perp off Channel disk; GIS Channel) | `950001` | resolved ~`(4162.498, 865.708)` (avoids East Kent) |
 
-Distances from Maginot: Channel **170.5**, North Sea **264.8**, Emden **139.3**, open sea **188.4** — all inside 340. Cases: (a) Channel fleet → ENG selected/inspected; (b) open sea → Channel inspector, not GER land; (c) Emden land → Maginot GER; (d) North Sea → GER fleet. Headless + xvfb **NOT live Play**.
+Distances from Maginot: Channel **170.5**, North Sea **264.8**, Emden **139.3**, open sea **188.4** — all inside 340. Channel↔East Kent **8.8** (inside fleet disk). Cases: (a) Channel fleet → ENG; (b) open sea → Channel inspector; (c) Emden land → Maginot GER; (d) North Sea → GER fleet; (e) East Kent GIS + ENG disk → ENG fleet; (f) Köln FRA land-fleet not selected; (g) foreign fleet/land cards hide Assign/Open fight, march blocked; (h) own card still shows those buttons. Headless + xvfb **NOT live Play**.
 
 Isolated keep-green (`6fc04487`; wrapper `rss_mb` preferred; MV-1/MV-1b **unedited**):
 
