@@ -601,28 +601,30 @@ Guard: `HeadlessFleet2SharedSeaMarkerTest` + `tools/eoa_fleet2_guard.sh` (hd + x
 
 Cases: (a) GER North Sea disk → GER fleet own card; (b) FRA North Sea disk → FRA fleet read-only card; (c) North Sea hit areas do not overlap and each centre picks its own fleet; (d) production Channel four plates, each centre picks its fleet (read-only for GER); (e) Köln FRA land-fleet still not selected; (f) Channel 4 plate centres each pick their fleet and lie over sea / clamp tolerance; (g) East Kent `711453` / old ENG chip / East Kent label anchor pick a Channel fleet, **not** GER Div 6; (h) cluster-pad click between plates picks the nearest plate, not land spill; (i) labels include the nation tag and SOV is not truncated. Headless + xvfb **NOT live Play**.
 
-Isolated keep-green (`61dcdade`; wrapper `rss_mb` preferred; MV-1/MV-1b **unedited**):
+Guard zoom 1.0 FIX #1 (hd = xvfb): NS GER `(4147.317, 756.740)` r=14.9 · FRA `(4181.215, 756.740)` · JAP `(4147.317, 790.638)` · SOV `(4181.215, 790.638)` · Channel 2×2 ENG `(4114.701, 924.218)` r=12.0 · ITA `(4142.701, 924.218)` · POL `(4114.701, 952.218)` · USA `(4142.701, 952.218)`.
+
+Isolated keep-green (`af7d88ee`; wrapper `rss_mb` preferred; MV-1/MV-1b **unedited**):
 
 | gate | kind | result | peak RSS MB |
 |---|---|---|---|
-| FLEET-2 hd / xvfb | both | PASS (a–e) | **1197.3 / 1336.6** |
-| FLEET-1 hd / xvfb | both | PASS (a–h, coords unchanged) | **1197.4 / 1336.5** |
-| hd_mv1 | headless | PASS (unedited) | **1197.1** |
-| hd_mv1b | headless | PASS (unedited) | **1197.2** |
-| hd_rh1 | headless | PASS | **1198.7** |
-| hd_ix1 (6) | headless | PASS (MandateGate `PASS failures=0`) | **1197.0** |
-| hd_rx1 (4) | headless | PASS | **1197.1** |
-| hd_rt1 (3) | headless | PASS | **~1197–1198** |
-| xvfb_mv1 | xvfb | PASS | **2043.8** |
-| xvfb_mv1_card | xvfb | PASS `edge_panel`/`edge_card`/`cap_commit` | **2033.2** |
-| xvfb_rh1 | xvfb | PASS | **2031.5** |
-| py_fac1a | py | PASS 7/7 | **2.1** |
-| hd_fac1a | headless | PASS | **1197.3** |
-| xvfb_fac1a | xvfb | PASS stale_lag=true 15/15 lone+cluster rx1 0.843/0.843 | **2038.9** |
-| CRASH-1 10× hd + 10× xvfb | both | PASS | wrapper no RSS (typical isolated hd ~1.2 GB) |
-| MV-1e 15/15 @ 4× | hd+xvfb | PASS | **1197.1 / 1337.5** |
-| Seeded RX-1 mid_river ON/OFF | xvfb | PASS units-off **0.749** / close 0.775 / spine 1.000 | leftover 2028 (typical isolated ~2046) |
-| UI-1 guard hd+xvfb | both | PASS | **1202.3 / 1347.4** |
+| FLEET-2 hd / xvfb | both | PASS (a–i) | **1204.8 / 1340.4** |
+| FLEET-1 hd / xvfb | both | PASS (a–h, coords unchanged) | **1199.6 / 1335.4** |
+| hd_mv1 | headless | PASS (unedited) | **1199.4** |
+| hd_mv1b | headless | PASS (unedited) | **1199.4** |
+| hd_rh1 | headless | PASS | **1199.2** |
+| hd_ix1 (6) | headless | PASS (MandateGate PASS) | **~1199.2–1199.7** |
+| hd_rx1 (4) | headless | PASS | **~1199.2–1200.8** |
+| hd_rt1 (3) | headless | PASS | **~1199.2–1202.8** |
+| xvfb_mv1 | xvfb | PASS | **2036.6** |
+| xvfb_mv1_card | xvfb | PASS | **2043.4** |
+| xvfb_rh1 | xvfb | PASS | **2226.4** |
+| py_fac1a | py | PASS 7/7 | **0.1** |
+| hd_fac1a | headless | PASS | **1199.9** |
+| xvfb_fac1a | xvfb | PASS stale_lag=true 15/15 lone+cluster rx1 0.843/0.843 | **2048.0** |
+| CRASH-1 10× hd + 10× xvfb | both | PASS | wrapper (typical isolated hd ~1.2 GB) |
+| MV-1e 15/15 @ 4× | hd+xvfb | PASS | **1199.7 / 1335.3** |
+| Seeded RX-1 mid_river ON/OFF | xvfb | PASS units-off **0.749** / close 0.775 / spine 1.000 | **2127.5** |
+| UI-1 guard hd+xvfb | both | PASS | **1204.4 / 1351.1** |
 
 ### CRASH-1 halt-march popup (draft HOLD)
 
