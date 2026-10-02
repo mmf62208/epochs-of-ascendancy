@@ -542,6 +542,22 @@ With a unit selected, hovering own/controlled land shows a dimmer dashed `MarchP
 
 **Backlog (no code this slice):** `_try_open_land_unit_at_world` nearest-player-land-icon fallback can arm a GER division from a French-land click (Play live: `any=FRA_formation_6 fo=GER_formation_7`). Pre-existing; do not change the fallback here. Item 2 (Attack-from-X vs Close overlap) and item 4 (fallback reach) are out of scope.
 
+### FLEET-1 land-spill vs foreign fleet / open sea (draft HOLD)
+
+Nearest-own-land chrome spill (`CHROME_SPILL_WORLD` 340) must not steal a click on a foreign fleet counter or on open sea. Gate: `_try_open_land_unit_at_world` calls `_nearest_player_land_formation_at_world` only when GIS at `event.position` is a land province **and** `_pick_unit_formation_at_world` missed every counter (`fo_any == null`). A sea-hex foreign fleet disk selects/inspects that fleet; a land-hex foreign fleet (MV-1b Köln FRA) still falls through. Own land-near-unit spill and own-fleet `_try_open_unit_at_world` first-select stay as today. Hit-test priority otherwise unchanged. MV-1 / MV-1b gates **unedited**.
+
+Guard: `HeadlessFleet1LandSpillGateTest` + `tools/eoa_fleet1_guard.sh` (hd + xvfb 1280×740). Seeds are real `world_accurate` label_anchors:
+
+| seed | pid | world |
+|---|---|---|
+| Maginot GER land | `710173` | `(4283.279411, 1010.266854)` |
+| Emden (GER coast, no chip) | `710385` | `(4258.130659, 873.294384)` |
+| North Sea GER fleet | `950000` | `(4164.266667, 773.688889)` |
+| English Channel ENG fleet | `950001` | `(4128.701206, 938.217996)` |
+| open sea (Channel + 80 CCW perp) | `950001` | `(4094.905, 1010.727)` |
+
+Distances from Maginot: Channel **170.5**, North Sea **264.8**, Emden **139.3**, open sea **188.4** — all inside 340. Cases: (a) Channel fleet → ENG selected/inspected; (b) open sea → Channel inspector, not GER land; (c) Emden land → Maginot GER; (d) North Sea → GER fleet. Headless + xvfb **NOT live Play**.
+
 ### CRASH-1 halt-march popup (draft HOLD)
 
 Halt / Press / Hold / Withdraw / Assign must not `free()` `UnitDetailPopup` while `pressed` is emitting. Detach + rename `UnitDetailPopup_dying` + `queue_free()`. Same-dest still click is a no-op re-issue. **FIX #1 (Play live MIXED `80b0b542`):** press-mode rebuild dropped the card so the mouse-up still-clicked the map (inspector + camera jump; twice switched/cleared selection). Latch `_unit_card_consumed_press` on those five buttons; `_input` / `_unhandled_input` / `_left_release_must_skip_pick` / land-chip still-click swallow the matching release. Open card refreshes Halt on march start / re-target / arrival. **CRASH-1b (CH-1):** that latch must eat **one** matching left release then clear (new left press anywhere, 1 frame after the eaten release, 0.5s safety) so later top-bar / UI clicks register. Guard: Halt still no click-through; ≥4 UI press+release after swallow; following map still-click commits. Headless `HeadlessCrash1HaltMarchPopupTest` + `tools/eoa_crash1_halt_march_guard.sh` 10× hd + 10× xvfb — **NOT live Play**. MV-1 / MV-1b gates **unedited**.

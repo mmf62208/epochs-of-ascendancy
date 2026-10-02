@@ -19365,6 +19365,38 @@ func _formation_type_blocks_land_open(fo: Object) -> bool:
 	return ft == Formation.TYPE_AIR_WING or ft == Formation.TYPE_FLEET or ft == Formation.TYPE_SPACE_WING
 
 
+func _formation_is_fleet_counter(fo: Object) -> bool:
+	if fo == null:
+		return false
+	var ft: String = str(fo.formation_type) if "formation_type" in fo else ""
+	return ft == Formation.TYPE_FLEET or ft == Formation.TYPE_TASK_FORCE or ft == Formation.TYPE_SHIP
+
+
+func _province_id_is_land(pid: int) -> bool:
+	if pid < 0:
+		return false
+	if pid >= 950000:
+		return false
+	if not provinces.has(pid):
+		return false
+	var p: Province = provinces[pid] as Province
+	if p == null:
+		return false
+	if bool(p.is_sea):
+		return false
+	var domain: String = ""
+	if "domain" in p:
+		domain = str(p.domain).strip_edges().to_lower()
+	if domain == "sea" or domain == "strait" or domain == "lake":
+		return false
+	return true
+
+
+func _hex_pick_is_land_province(world_pos: Vector2) -> bool:
+	# FLEET-1 / MV-1e: GIS at the event world (not hover / get_mouse_position).
+	return _province_id_is_land(_resolve_hex_pick_pid(world_pos))
+
+
 func _formation_is_player_tag(fo: Object) -> bool:
 	if fo == null:
 		return false
@@ -19500,11 +19532,26 @@ func _try_open_land_unit_at_world(
 		# chip_disk_only: infra / empty-terrain prefers province inspector.
 		var miss_pid: int = _resolve_hex_pick_pid(world_pos)
 		fo = _player_land_formation_at_province(miss_pid)
+	# FLEET-1: nearest-own-land chrome spill (CHROME_SPILL_WORLD 340) must not
+	# steal a foreign fleet / other counter disk or an open-sea hex. Land-only.
+	# world_pos is already event.position via _map_pick_world_from_event (MV-1e).
 	if fo == null and not chip_disk_only:
-		# Home chrome over Neustadt / Schwäbisch Hall / FRA / Berlin-Home:
-		# nearest painted player-land icon (station 710173 / ger_nbr).
-		fo = _nearest_player_land_formation_at_world(world_pos)
+		if fo_any == null and _hex_pick_is_land_province(world_pos):
+			# Home chrome over Neustadt / Schwäbisch Hall / FRA / Berlin-Home:
+			# nearest painted player-land icon (station 710173 / ger_nbr).
+			fo = _nearest_player_land_formation_at_world(world_pos)
 	if fo == null:
+		# FLEET-1: direct foreign fleet hit on sea inspects that fleet.
+		# Land-hex foreign fleet (MV-1b Köln FRA) still falls through.
+		if (
+			fo_any != null
+			and _formation_is_fleet_counter(fo_any)
+			and not _formation_is_player_tag(fo_any)
+			and not _hex_pick_is_land_province(world_pos)
+		):
+			_select_map_unit(fo_any)
+			_show_unit_detail_popup(fo_any)
+			return true
 		return false
 	if _formation_type_blocks_land_open(fo):
 		return false
