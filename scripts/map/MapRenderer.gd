@@ -20494,11 +20494,12 @@ func _pick_unit_formation_at_world(world_pos: Vector2, land_only: bool = false, 
 			return sea_drawn
 	var sea_pad: Object = _pick_nearest_sea_nation_in_cluster_pad(world_pos, z, land_only, false)
 	if sea_pad != null:
-		var pad_d: float = _sea_nation_formation_dist_sq(world_pos, sea_pad)
-		if pad_d <= best_player_d and pad_d <= best_any_d:
-			if player_only and not _formation_is_player_tag(sea_pad):
-				return null
-			return sea_pad
+		# FIX #1 contract: cluster AABB + pad binds the nearest sea plate and
+		# never nearest-own-land spill — even when a Home-band land disk is
+		# closer than the spread plate (East Kent / old ENG at z0.318).
+		if player_only and not _formation_is_player_tag(sea_pad):
+			return null
+		return sea_pad
 	if best_player != null:
 		return best_player
 	if best_any != null:
@@ -20506,7 +20507,7 @@ func _pick_unit_formation_at_world(world_pos: Vector2, land_only: bool = false, 
 	# MV-1b: player-only still-click is disk-hit only.
 	if player_only:
 		return null
-	return sea_pad
+	return null
 
 
 func _show_unit_detail_popup(formation: Object) -> void:
@@ -25953,22 +25954,6 @@ func _formation_from_demo_icon(counter: Node2D) -> Object:
 		if f2 is Object:
 			return f2 as Object
 	return null
-
-
-func _sea_nation_formation_dist_sq(world_pos: Vector2, fo: Object) -> float:
-	if fo == null:
-		return INF
-	var want: String = str(fo.formation_id) if "formation_id" in fo else ""
-	var pid: int = int(fo.stationed_province_id) if "stationed_province_id" in fo else -1
-	if pid >= 0:
-		for c_v in _iter_demo_unit_icons_at_pid(pid):
-			var icon: Node2D = c_v as Node2D
-			if icon == null:
-				continue
-			if str(icon.get_meta("formation_id", "")) != want:
-				continue
-			return world_pos.distance_squared_to(_demo_unit_icon_world_pos(icon, pid))
-	return INF
 
 
 func _pick_nearest_sea_nation_in_cluster_pad(

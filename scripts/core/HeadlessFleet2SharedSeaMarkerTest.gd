@@ -224,6 +224,9 @@ func _test_source_needles() -> void:
 	if "_demo_unit_icon_hit_radius_world" not in pick_fn:
 		_fail("pick hit radius must match the drawn disk")
 		return
+	if "_pick_nearest_sea_nation_in_cluster_pad" not in pick_fn:
+		_fail("FIX #3 pick must bind cluster-pad before Home-band land")
+		return
 	var land_fn := _slice_func(ren, "_try_open_land_unit_at_world")
 	if "fo_any == null" not in land_fn:
 		_fail("FLEET-1 spill must still require no direct counter hit")
@@ -278,9 +281,6 @@ func _test_source_needles() -> void:
 		return
 	if "func _nation_fleet_rank" not in ren:
 		_fail("FIX #3 per-nation fleet ordinal missing")
-		return
-	if "func _sea_nation_formation_dist_sq" not in ren:
-		_fail("FIX #3 cluster-pad must beat a farther Home-band land hit")
 		return
 	if "maxi(index, 0) + 1" in ren:
 		_fail("plate label must not use sea-stack index+1")
