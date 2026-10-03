@@ -1,6 +1,6 @@
 # FLEET-2 FIX #4 live-scale clicks (xvfb 1280×740, GER, Europe Home, world_accurate)
 
-Tip `c080e435`. Home zoom **0.318**. RSS peak **2030.0 MB**. RESULT=**PASS**. xvfb ≠ live Play.
+Live-scale tip `c080e435` (docs/keep-green follow on the same branch). Home zoom **0.318**. RSS peak **2030.0 MB**. RESULT=**PASS**. xvfb ≠ live Play.
 
 Option (a): **drawn body first** (not shrink-to-drawn+4px). (c) own land/air cap **40 screen px** below z0.65.
 
