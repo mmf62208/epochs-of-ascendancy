@@ -20483,10 +20483,12 @@ func _pick_unit_formation_at_world(world_pos: Vector2, land_only: bool = false, 
 			var chip_pos: Vector2 = _demo_unit_icon_world_pos(counter, id)
 			var d: float = world_pos.distance_squared_to(chip_pos)
 			var is_sea_disk: bool = bool(counter.get_meta("sea_nation_disk", false))
-			# FIX #5: below z0.65 land/air hit is the painted rect (plate+bars+
+			# FIX #5: below z0.65 land/air hit is the painted body (plate+bars+
 			# label), own and foreign — not the 40 px circle.
 			# FIX #6: painted body is accepted without the ownership block;
 			# topmost draw order wins (not nearest centre).
+			# FLEET-2b: only actually painted pixels (plate, bars, glyph ink).
+			# A fat designation AABB with no ink cannot win.
 			if z < 0.65 and not is_sea_disk:
 				if not _world_in_unit_painted_rect(world_pos, counter):
 					continue
@@ -20507,9 +20509,10 @@ func _pick_unit_formation_at_world(world_pos: Vector2, land_only: bool = false, 
 						fo = f2 as Object
 			if fo == null:
 				continue
-			# FIX #6: painted plate / bars / label under the cursor are never
-			# ownership-blocked. Halo (no painted body) never reaches here at
-			# z<0.65 — those clicks fall through to pad / own-land spill.
+			# FIX #6 / FLEET-2b: painted plate / bars / glyph ink under the
+			# cursor are never ownership-blocked. Halo (no painted pixels)
+			# never reaches here at z<0.65 — those clicks fall through to
+			# pad / own-land spill.
 			if land_only and _formation_type_blocks_land_open(fo):
 				continue
 			if player_only:
@@ -25463,18 +25466,7 @@ func _unit_counter_child_own_rect(item: CanvasItem) -> Rect2:
 			return Rect2(-sz * 0.5, sz)
 		return Rect2(Vector2.ZERO, sz)
 	if "text" in item:
-		var t: String = str(item.get("text"))
-		if t.is_empty():
-			return Rect2()
-		var fs: int = 13
-		if "font_size" in item:
-			fs = int(item.get("font_size"))
-		var w: float = maxf(8.0, float(t.length()) * float(fs) * 0.62)
-		var h: float = float(fs) + 8.0
-		var ox: float = 0.0
-		if "align_right" in item and bool(item.get("align_right")):
-			ox = -w
-		return Rect2(Vector2(ox, -2.0), Vector2(w, h))
+		return _chip_text_glyph_local_rect(item)
 	return Rect2()
 
 
@@ -26305,7 +26297,7 @@ func _pick_drawn_land_air_body_at_world(world_pos: Vector2, z: float = -1.0) -> 
 				continue
 			var chip_pos: Vector2 = _demo_unit_icon_world_pos(icon, id)
 			var d: float = world_pos.distance_to(chip_pos)
-			# FIX #5: painted rect (plate + strength bars + label) below z0.65.
+			# FIX #5 / FLEET-2b: painted pixels (plate + bars + glyph ink).
 			if zz < 0.65:
 				if not _world_in_unit_painted_rect(world_pos, icon):
 					continue
@@ -26380,7 +26372,7 @@ func _unit_counter_painted_class(world_pos: Vector2, counter: Node2D) -> int:
 		return 2
 	if _world_in_unit_nation_plate(world_pos, counter):
 		return 1
-	if _world_in_unit_painted_rect(world_pos, counter):
+	if _world_in_unit_painted_glyphs(world_pos, counter):
 		return 0
 	return -1
 
@@ -26400,13 +26392,15 @@ func _world_in_unit_nation_plate(world_pos: Vector2, counter: Node2D) -> bool:
 
 
 func _world_in_unit_plate_interior(world_pos: Vector2, counter: Node2D) -> bool:
-	# Interior of the 44×40 NationPlate. The outer ~28% is rim — overlapping
-	# StatBars there still win (DNK AW3 +44 on the Emden plate edge).
+	# Inner face of the 44×40 NationPlate. FLEET-2b shrinks this from 72%
+	# to ~60% so StatBars over the outer face / rim win across the visible
+	# strip (Play: DNK AW3 +44 only ±4 at 72%). Emden east +20 is ~13.1
+	# local at Home (20/z/scale) and must stay interior — 13.4 keeps that.
 	if not _world_in_unit_nation_plate(world_pos, counter):
 		return false
 	var xf: Transform2D = counter.get_global_transform()
 	var local: Vector2 = xf.affine_inverse() * world_pos
-	return absf(local.x) <= 22.0 * 0.72 and absf(local.y) <= 20.0 * 0.72
+	return absf(local.x) <= 13.4 and absf(local.y) <= 12.2
 
 
 func _unit_counter_painted_wins(
@@ -26418,7 +26412,12 @@ func _unit_counter_painted_wins(
 	#    Emden centre is NLD plate interior (beats DNK bars that cover it).
 	#    DNK +44 is DNK bars on the NLD rim (bars win). East +20 is still
 	#    NLD interior. Neighbour chip centres stay their own interiors.
-	# 3) same class → nearest painted centre
+	#    FLEET-2b: inner face is ~60% (not 72%) so StatBars over the
+	#    outer face / rim win across the visible strip. Emden centre
+	#    and east +20 stay NLD inner interior. Same-nation piles are
+	#    unchanged (Play +8 → DNK Div 2 by nearer bar centre).
+	# 3) same class → nearest painted *piece* centre (bars use the strip
+	#    centre, not the chip origin).
 	# 4) true distance tie → scene-tree / CanvasItem order
 	# Tree order is not a visual stack at Home-band inverse-zoom (all
 	# DemoUnitIcon_* share z=28), so it is only the last resort.
@@ -26434,6 +26433,14 @@ func _unit_counter_painted_wins(
 	var cb: int = _unit_counter_painted_class(world_pos, b)
 	if ca != cb:
 		return ca > cb
+	var pa: Vector2 = _unit_counter_painted_piece_world(world_pos, a)
+	var pb: Vector2 = _unit_counter_painted_piece_world(world_pos, b)
+	var da: float = world_pos.distance_squared_to(pa)
+	var db: float = world_pos.distance_squared_to(pb)
+	if da < db:
+		return true
+	if da > db:
+		return false
 	if a_d < b_d:
 		return true
 	if a_d > b_d:
@@ -26441,20 +26448,27 @@ func _unit_counter_painted_wins(
 	return a.is_greater_than(b)
 
 
+func _unit_counter_painted_piece_world(world_pos: Vector2, counter: Node2D) -> Vector2:
+	if counter == null or not is_instance_valid(counter):
+		return world_pos
+	var cls: int = _unit_counter_painted_class(world_pos, counter)
+	var xf: Transform2D = counter.get_global_transform()
+	if cls == 2:
+		return xf * Vector2(0.0, 27.0)
+	if cls == 0:
+		var desig: Node = counter.get_node_or_null("Designation")
+		if desig is Node2D:
+			return (desig as Node2D).global_position
+		return xf * Vector2(-20.0, 10.0)
+	return xf.origin
+
+
 func _world_in_unit_plate_or_bars(world_pos: Vector2, counter: Node2D) -> bool:
-	# Tight chip face (NationPlate 44×40 + StatBars). Used for the halo
-	# walk so a fat designation AABB cannot paint an entire GER hex.
+	# Tight chip face (NationPlate 44×40 + StatBars). FLEET-2b wires this
+	# into the z<0.65 hit path so a fat designation AABB cannot win.
 	if counter == null or not is_instance_valid(counter):
 		return false
-	var xf: Transform2D = counter.get_global_transform()
-	var local: Vector2 = xf.affine_inverse() * world_pos
-	var plate: Rect2 = Rect2(Vector2(-22.0, -20.0), Vector2(44.0, 40.0)).grow(0.5)
-	if (
-		local.x >= plate.position.x
-		and local.y >= plate.position.y
-		and local.x <= plate.position.x + plate.size.x
-		and local.y <= plate.position.y + plate.size.y
-	):
+	if _world_in_unit_nation_plate(world_pos, counter):
 		return true
 	return _world_in_unit_stat_bars(world_pos, counter)
 
@@ -26541,57 +26555,112 @@ func _world_in_unit_stat_bars(world_pos: Vector2, counter: Node2D) -> bool:
 
 
 func _world_in_unit_painted_rect(world_pos: Vector2, counter: Node2D) -> bool:
+	# FLEET-2b: only actually painted pixels. Plate + StatBars via
+	# `_world_in_unit_plate_or_bars`. Glyph ink counts only on/near the
+	# face (plate grown 3 local) so a designation estimate cannot steal
+	# Heidekreis 40 px east of Emden NLD.
+	if _world_in_unit_plate_or_bars(world_pos, counter):
+		return true
+	if not _world_in_unit_painted_glyphs(world_pos, counter):
+		return false
+	return _world_in_unit_plate_grown(world_pos, counter, 2.0)
+
+
+func _world_in_unit_plate_grown(world_pos: Vector2, counter: Node2D, grow_local: float) -> bool:
 	if counter == null or not is_instance_valid(counter):
 		return false
 	var xf: Transform2D = counter.get_global_transform()
 	var local: Vector2 = xf.affine_inverse() * world_pos
-	var r: Rect2 = _unit_counter_painted_local_rect(counter).grow(0.5)
+	var plate: Rect2 = Rect2(Vector2(-22.0, -20.0), Vector2(44.0, 40.0)).grow(grow_local)
 	return (
-		local.x >= r.position.x
-		and local.y >= r.position.y
-		and local.x <= r.position.x + r.size.x
-		and local.y <= r.position.y + r.size.y
+		local.x >= plate.position.x
+		and local.y >= plate.position.y
+		and local.x <= plate.position.x + plate.size.x
+		and local.y <= plate.position.y + plate.size.y
 	)
 
 
-func _province_owner_tag(pid: int) -> String:
-	if pid < 0:
-		return ""
-	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_owner"):
-		var from_mm: String = str(MapManager.get_province_owner(pid)).strip_edges().to_upper()
-		if not from_mm.is_empty():
-			return from_mm
-	if provinces.has(pid):
-		var p: Province = provinces[pid] as Province
-		if p != null:
-			if "owner_tag" in p:
-				var ot: String = str(p.owner_tag).strip_edges().to_upper()
-				if not ot.is_empty():
-					return ot
-			if "controller_tag" in p:
-				var ct: String = str(p.controller_tag).strip_edges().to_upper()
-				if not ct.is_empty():
-					return ct
-	return ""
+func _world_in_unit_painted_glyphs(world_pos: Vector2, counter: Node2D) -> bool:
+	if counter == null or not is_instance_valid(counter):
+		return false
+	var names: PackedStringArray = PackedStringArray([
+		"Designation", "TypeLetter", "StrNum", "LeaderMark"
+	])
+	for nm in names:
+		var n: Node = counter.get_node_or_null(nm)
+		if n == null or not (n is CanvasItem):
+			continue
+		var r: Rect2 = _chip_text_glyph_local_rect(n as CanvasItem).grow(0.75)
+		if r.size.x <= 0.0 and r.size.y <= 0.0:
+			continue
+		var xf: Transform2D = counter.get_global_transform()
+		if n is Node2D:
+			xf = (n as Node2D).get_global_transform()
+		var local: Vector2 = xf.affine_inverse() * world_pos
+		if (
+			local.x >= r.position.x
+			and local.y >= r.position.y
+			and local.x <= r.position.x + r.size.x
+			and local.y <= r.position.y + r.size.y
+		):
+			return true
+	return false
 
 
-func _foreign_land_air_blocked_on_player_hex(world_pos: Vector2, fo: Object) -> bool:
-	# Halo / fallback only (FIX #6). Do not apply when a painted plate,
-	# strength-bar strip or label is under the click — that painted body
-	# wins (Emden east / DNK bars). Cuxhaven / Heidekreis stay GER when
-	# the click misses every painted body and spills to own land.
-	if fo == null or _formation_is_player_tag(fo):
-		return false
-	if _formation_is_fleet_counter(fo):
-		return false
-	if not _hex_pick_is_land_province(world_pos):
-		return false
-	var pid: int = _resolve_hex_pick_pid(world_pos)
-	var owner: String = _province_owner_tag(pid)
-	var p_tag: String = _player_tag()
-	if owner.is_empty() or p_tag.is_empty() or owner != p_tag:
-		return false
-	return _formation_stationed_province_id(fo) != pid
+func _chip_text_glyph_local_rect(item: CanvasItem) -> Rect2:
+	# Actual drawn string box (fallback font + outline), not length*0.62.
+	if item == null or not ("text" in item):
+		return Rect2()
+	var t: String = str(item.get("text"))
+	if t.is_empty():
+		return Rect2()
+	var fs: int = 13
+	if "font_size" in item:
+		fs = int(item.get("font_size"))
+	var outline: float = 0.0
+	if "outline_size" in item:
+		# Ink halo only — full outline_size 4 at font 9 was a fat box.
+		outline = minf(float(item.get("outline_size")), 1.5)
+	var font: Font = ThemeDB.fallback_font
+	var align_right: bool = "align_right" in item and bool(item.get("align_right"))
+	var align_center: bool = "align_center" in item and bool(item.get("align_center"))
+	if font == null:
+		var w_est: float = maxf(8.0, float(t.length()) * float(fs) * 0.50)
+		var ox_est: float = 0.0
+		if align_right:
+			ox_est = -w_est
+		elif align_center:
+			ox_est = -w_est * 0.5
+		return Rect2(
+			Vector2(ox_est - outline, -float(fs) - outline),
+			Vector2(w_est + 2.0 * outline, float(fs) + 4.0 + 2.0 * outline)
+		)
+	var acc: Rect2 = Rect2()
+	var has_any: bool = false
+	var y: float = 0.0
+	var ascent: float = font.get_ascent(fs)
+	var descent: float = font.get_descent(fs)
+	for line in t.split("\n"):
+		var sz: Vector2 = font.get_string_size(line, HORIZONTAL_ALIGNMENT_LEFT, -1, fs)
+		var w: float = maxf(sz.x, 1.0)
+		var ox: float = 0.0
+		if align_right:
+			ox = -w
+		elif align_center:
+			ox = -w * 0.5
+		var piece: Rect2 = Rect2(
+			Vector2(ox - outline, y - ascent - outline),
+			Vector2(w + 2.0 * outline, ascent + descent + 2.0 * outline)
+		)
+		if not has_any:
+			acc = piece
+			has_any = true
+		else:
+			acc = acc.merge(piece)
+		y += float(fs) + 1.0
+	if has_any:
+		return acc
+	return Rect2()
 
 
 func _demo_unit_icon_hit_radius_world(z: float, counter: Node2D = null) -> float:

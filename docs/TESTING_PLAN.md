@@ -817,6 +817,49 @@ Isolated keep-green (FIX #6 tip `d15ac739`; wrapper `rss_mb` preferred; MV-1/MV-
 | UI-1 guard hd+xvfb | both | PASS | **1207.9 / 1353.7** |
 | FLEET-2 live-scale xvfb | xvfb | PASS 8 plates × 4 zooms; East Kent; GER gap; Emden east +20 NLD; DNK bars +44 DNK; AW3 bars/corner own | **2031.4** |
 
+**FLEET-2b (Play soft notes on FIX #6):** empty designation AABB cannot win (Heidekreis 710380 z0.40 never `NLD_formation_1`). `_world_in_unit_plate_or_bars` + glyph ink clipped to the plate. Inner face ~60% so StatBars over the outer rim win across more of the DNK AW3 strip; Emden centre / east +20 stay NLD. Removed `_foreign_land_air_blocked_on_player_hex` / `_province_owner_tag`. Guard (o)(p). FLEET-1 / MV-1b **unedited**. Same-nation piles unedited.
+
+Live-scale xvfb FLEET-2b (GER Home, RSS **2037.5**, RESULT=PASS, uncropped 1280×740):
+
+| click | z0.318 | z0.400 |
+|---|---|---|
+| ENG / BEL / NLD / FRA / Emden / DNK anchors | own unit (24/24) | same |
+| Emden NLD east +20 | `NLD_formation_1` | `NLD_formation_1` |
+| DNK AW3 bars +44 / ±4 | `DNK_formation_3` | `DNK_formation_3` |
+| DNK AW3 bars ±8 | −8 NLD inner / +8 DNK_2 pile | both `DNK_formation_3` |
+| DNK AW3 2 px sweep | 21/21 | 21/21 |
+| Heidekreis `710380` | covered_by_paint DNK_2 | halo own GER/province (never NLD empty label) |
+| NLD label-east | not NLD paint | local 28/32 halo; +40 px DNK_3 paint |
+| GER AW3 bars +46 / corner | `GER_formation_3` own | same |
+| own GER Div 6 / 7 / Garr 4 / AW3 | own cards | own cards |
+| Emden grid | 28 cells: 8 NLD_1 + 20 named topmost | 15 cells: 4 NLD_1 + 11 named topmost |
+
+All 8 plates at 0.318 / 0.40 / 0.80 / 1.50 opened their own fleet. East Kent + old ENG → `ENG_formation_2`. GER-nearest gap → `GER_formation_2` own card. Evidence `docs/evidence/fleet2b/`. Cases (a)–(p).
+
+Isolated keep-green (FLEET-2b tip `c62d85b6`; wrapper `rss_mb` preferred; MV-1/MV-1b **unedited**):
+
+| gate | kind | result | peak RSS MB |
+|---|---|---|---|
+| FLEET-2 hd / xvfb | both | PASS (a–p) | **1209.1 / 1344.6** |
+| FLEET-1 hd / xvfb | both | PASS (a–h, unedited) | **1203.7 / 1340.5** |
+| hd_mv1 | headless | PASS (unedited) | **1203.5** |
+| hd_mv1b | headless | PASS (unedited) | **1203.5** |
+| hd_rh1 | headless | PASS | **1203.2** |
+| hd_ix1 (6) | headless | PASS (MandateGate PASS) | **1203.2–1208.0** |
+| hd_rx1 (4) | headless | PASS | **1203.2–1203.4** |
+| hd_rt1 (3) | headless | PASS | **1203.2–1205.0** |
+| xvfb_mv1 | xvfb | PASS | **2077.8** |
+| xvfb_mv1_card | xvfb | PASS | **2043.9** |
+| xvfb_rh1 | xvfb | PASS | **2042.4** |
+| py_fac1a | py | PASS 7/7 | — |
+| hd_fac1a | headless | PASS | **1203.9** |
+| xvfb_fac1a | xvfb | PASS stale_lag=true 15/15 lone+cluster rx1 0.843/0.843 | **2047.2** |
+| CRASH-1 10× hd + 10× xvfb | both | PASS | wrapper 10×+10× |
+| MV-1e 15/15 @ 4× | hd+xvfb | PASS | **1203.4 / 1338.6** |
+| Seeded RX-1 mid_river ON/OFF | xvfb | PASS units-off **0.749** / close 0.775 / spine 1.000 | isolated |
+| UI-1 guard hd+xvfb | both | PASS | **1208.1 / 1347.4** |
+| FLEET-2 live-scale xvfb | xvfb | PASS 8 plates × 4 zooms; East Kent; GER gap; Emden east +20 NLD; DNK ±4 DNK_3; Heidekreis z0.40 never NLD empty label | **2037.5** |
+
 ### CRASH-1 halt-march popup (draft HOLD)
 
 Halt / Press / Hold / Withdraw / Assign must not `free()` `UnitDetailPopup` while `pressed` is emitting. Detach + rename `UnitDetailPopup_dying` + `queue_free()`. Same-dest still click is a no-op re-issue. **FIX #1 (Play live MIXED `80b0b542`):** press-mode rebuild dropped the card so the mouse-up still-clicked the map (inspector + camera jump; twice switched/cleared selection). Latch `_unit_card_consumed_press` on those five buttons; `_input` / `_unhandled_input` / `_left_release_must_skip_pick` / land-chip still-click swallow the matching release. Open card refreshes Halt on march start / re-target / arrival. **CRASH-1b (CH-1):** that latch must eat **one** matching left release then clear (new left press anywhere, 1 frame after the eaten release, 0.5s safety) so later top-bar / UI clicks register. Guard: Halt still no click-through; ≥4 UI press+release after swallow; following map still-click commits. Headless `HeadlessCrash1HaltMarchPopupTest` + `tools/eoa_crash1_halt_march_guard.sh` 10× hd + 10× xvfb — **NOT live Play**. MV-1 / MV-1b gates **unedited**.
