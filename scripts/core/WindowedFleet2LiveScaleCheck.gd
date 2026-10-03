@@ -463,25 +463,23 @@ func _click_dnk_aw3_bars(z: float) -> void:
 		return
 	var icon: Node2D = hit.get("icon", null) as Node2D
 	var base: Vector2 = hit.get("pos", Vector2.ZERO) as Vector2
+	var want_fid: String = str(hit.get("fid", ""))
 	var bars: Vector2 = base + Vector2(0.0, 44.0 / maxf(z, 0.05))
 	if icon != null and is_instance_valid(icon):
 		var xf: Transform2D = icon.get_global_transform()
 		var local_bars: Vector2 = xf * Vector2(0.0, 27.0)
-		if _world_in_icon_painted(icon, bars):
-			pass
-		else:
-			bars = local_bars
-		# If +44 sits on a nearer foreign plate (Emden NLD at Home), walk
-		# the bar strip so the probe stays on DNK bars and off that plate.
-		if _other_plate_owns(bars, icon):
-			for lx_v in [8, -8, 14, -14, 20, -20]:
-				var cand: Vector2 = xf * Vector2(float(lx_v), 27.0)
-				if _world_in_icon_stat_bars(icon, cand) and not _other_plate_owns(cand, icon):
-					bars = cand
-					_log("EOA_FLEET2_LIVE who=dnk_bars_walk z=%.3f lx=%d world=%.1f,%.1f" % [
-						z, int(lx_v), bars.x, bars.y
-					])
-					break
+		if not _world_in_icon_stat_bars(icon, bars):
+			if _world_in_icon_painted(icon, bars):
+				pass
+			else:
+				bars = local_bars
+		# +44 at Home sits on the Emden NLD plate (nearer). Walk the
+		# painted bar strip for a pixel that already picks DNK — first a
+		# bars-only pixel (off every other plate), then any bar pixel
+		# whose current pick is DNK.
+		var picked: Vector2 = _dnk_bars_pick_point(icon, bars, want_fid, z)
+		if picked != bars:
+			bars = picked
 	_click_one({
 		"who": "z%.3f_DNK_AW3_bars44" % z,
 		"pos": bars,
@@ -489,8 +487,61 @@ func _click_dnk_aw3_bars(z: float) -> void:
 		"kind": "land",
 		"want_tags": ["DNK"],
 		"want_type": "air_wing",
-		"want_fid": str(hit.get("fid", "")),
+		"want_fid": want_fid,
 	})
+
+
+func _dnk_bars_pick_point(icon: Node2D, start: Vector2, want_fid: String, z: float) -> Vector2:
+	var xf: Transform2D = icon.get_global_transform()
+	var cands: Array = [start, xf * Vector2(0.0, 27.0)]
+	var lxs: Array = [6, 8, 10, 12, 14, 16, 18, 20, -6, -8, -10, 4, -4, 22, -12, -14, -16, -18, -20]
+	var lys: Array = [27, 24, 30, 22, 32]
+	for lx_v in lxs:
+		for ly_v in lys:
+			cands.append(xf * Vector2(float(lx_v), float(ly_v)))
+	var mr := _map_renderer()
+	var off_plate: Vector2 = Vector2.ZERO
+	var have_off: bool = false
+	for cand_v in cands:
+		var cand: Vector2 = cand_v as Vector2
+		if not _world_in_icon_stat_bars(icon, cand):
+			continue
+		if not _other_plate_owns(cand, icon):
+			if not have_off:
+				off_plate = cand
+				have_off = true
+			if _pick_fid_at(mr, cand) == want_fid:
+				_log("EOA_FLEET2_LIVE who=dnk_bars_walk z=%.3f world=%.1f,%.1f off_plate=1 fid=%s" % [
+					z, cand.x, cand.y, want_fid
+				])
+				return cand
+	if have_off:
+		_log("EOA_FLEET2_LIVE who=dnk_bars_walk z=%.3f world=%.1f,%.1f off_plate=1 fid=search" % [
+			z, off_plate.x, off_plate.y
+		])
+		return off_plate
+	for cand_v2 in cands:
+		var cand2: Vector2 = cand_v2 as Vector2
+		if not _world_in_icon_stat_bars(icon, cand2):
+			continue
+		if _pick_fid_at(mr, cand2) == want_fid:
+			_log("EOA_FLEET2_LIVE who=dnk_bars_walk z=%.3f world=%.1f,%.1f off_plate=0 fid=%s" % [
+				z, cand2.x, cand2.y, want_fid
+			])
+			return cand2
+	_log("EOA_FLEET2_LIVE who=dnk_bars_walk z=%.3f world=%.1f,%.1f off_plate=0 fid=none" % [
+		z, start.x, start.y
+	])
+	return start
+
+
+func _pick_fid_at(mr: Node, world: Vector2) -> String:
+	if mr == null or not mr.has_method("_pick_unit_formation_at_world"):
+		return ""
+	var fo: Object = mr.call("_pick_unit_formation_at_world", world)
+	if fo != null and "formation_id" in fo:
+		return str(fo.formation_id)
+	return ""
 
 
 func _click_emden_grid(z: float) -> void:
@@ -573,6 +624,9 @@ func _halo_point_in_province(pid: int, start: Vector2, z: float) -> Vector2:
 
 
 func _any_painted_at(world: Vector2) -> bool:
+	# Full painted body (plate + bars + label). A designation overhang
+	# still counts as painted — Heidekreis centroid at z0.40 sits just
+	# outside the tight plate but inside NLD's label AABB.
 	var mr := _map_renderer()
 	if mr == null or not ("_demo_unit_icon_pids" in mr):
 		return false
@@ -588,6 +642,9 @@ func _any_painted_at(world: Vector2) -> bool:
 				continue
 			if _world_in_icon_painted(icon, world):
 				return true
+			if mr.has_method("_world_in_unit_plate_or_bars"):
+				if bool(mr.call("_world_in_unit_plate_or_bars", world, icon)):
+					return true
 	return false
 
 
@@ -810,7 +867,7 @@ func _write_clicks_md() -> void:
 		return
 	f.store_string("# FLEET-2 FIX #6 live-scale clicks\n\n")
 	f.store_string("xvfb 1280x740 · GER · Europe Home · world_accurate. NOT live Play.\n\n")
-	f.store_string("Topmost painted counter (z_index, then scene-tree / CanvasItem order) wins. Ownership only in the halo.\n\n")
+	f.store_string("Topmost painted: higher CanvasItem z_index, then chip face (plate∪bars) over a designation-only overhang, then nearest painted centre. Tree/CanvasItem order only on a true distance tie. Ownership block is halo-only (no painted body under the click).\n\n")
 	f.store_string("| click | result |\n|---|---|\n")
 	for line_v in _click_log:
 		var line := str(line_v)

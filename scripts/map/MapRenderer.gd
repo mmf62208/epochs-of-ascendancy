@@ -26369,11 +26369,15 @@ func _unit_counter_is_drawn_above(a: Node2D, b: Node2D) -> bool:
 func _unit_counter_painted_wins(
 	a: Node2D, b: Node2D, world_pos: Vector2, a_d: float, b_d: float
 ) -> bool:
-	# FIX #6: a higher CanvasItem z_index is actually on top and wins.
-	# A StatBars overhang beats another chip's plate-only overlap
-	# (DNK AW3 +44 vs a nearer NLD plate). Same z_index then uses
-	# nearest painted centre — tree order is not a visual stack at
-	# Home-band inverse-zoom.
+	# FIX #6 topmost painted body:
+	# 1) higher CanvasItem z_index (actual draw stack)
+	# 2) chip face (NationPlate ∪ StatBars) beats a designation/label-only
+	#    overhang — DNK bars past the NLD plate still open DNK; Emden
+	#    centre stays NLD because both faces contain it and NLD is nearer
+	# 3) same z + same face-class → nearest painted centre
+	# 4) true distance tie → scene-tree / CanvasItem order
+	# Tree order is not a visual stack at Home-band inverse-zoom (all
+	# DemoUnitIcon_* share z=28), so it is only the last resort.
 	if a == null or not is_instance_valid(a):
 		return false
 	if b == null or not is_instance_valid(b):
@@ -26382,6 +26386,10 @@ func _unit_counter_painted_wins(
 	var zb: int = _unit_counter_effective_z_index(b)
 	if za != zb:
 		return za > zb
+	var a_face: bool = _world_in_unit_plate_or_bars(world_pos, a)
+	var b_face: bool = _world_in_unit_plate_or_bars(world_pos, b)
+	if a_face != b_face:
+		return a_face
 	if a_d < b_d:
 		return true
 	if a_d > b_d:
