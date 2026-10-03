@@ -304,6 +304,9 @@ func _test_source_needles() -> void:
 	if "func _unit_counter_drawn_body_radius_world" not in ren:
 		_fail("FIX #4 drawn land/air body radius helper missing")
 		return
+	if "func _land_air_body_blocked_by_cluster_hole" not in ren:
+		_fail("FIX #4 cluster-hole land-spill guard missing")
+		return
 	if "40.0 / maxf(z, 0.05)" not in ren:
 		_fail("FIX #4 own land/air screen-px cap (40) missing")
 		return

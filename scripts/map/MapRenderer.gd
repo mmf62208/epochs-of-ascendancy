@@ -19549,11 +19549,27 @@ func _try_open_land_unit_at_world(
 	if cam_sea:
 		z_sea = maxf(cam_sea.zoom.x, cam_sea.zoom.y)
 	var sea_bind: Object = _pick_sea_nation_plate_drawn_at_world(world_pos, z_sea)
+	var land_air_body: Object = _pick_drawn_land_air_body_at_world(world_pos, z_sea)
+	if land_air_body != null and _land_air_body_blocked_by_cluster_hole(world_pos, land_air_body, z_sea):
+		land_air_body = null
+	if (
+		sea_bind != null
+		and land_air_body != null
+		and not _formation_is_fleet_counter(land_air_body)
+		and _formation_icon_distance(world_pos, land_air_body) <= _formation_icon_distance(world_pos, sea_bind)
+	):
+		_select_map_unit(land_air_body)
+		_show_unit_detail_popup(land_air_body)
+		if _formation_is_player_tag(land_air_body):
+			var pid_la0: int = int(land_air_body.stationed_province_id) if "stationed_province_id" in land_air_body else -1
+			if pid_la0 >= 0:
+				attack_staging_province_id = pid_la0
+				debug_combat_attacker_province_id = pid_la0
+		return true
 	if sea_bind != null and _formation_is_stationed_on_sea(sea_bind):
 		_select_map_unit(sea_bind)
 		_show_unit_detail_popup(sea_bind)
 		return true
-	var land_air_body: Object = _pick_drawn_land_air_body_at_world(world_pos, z_sea)
 	if land_air_body != null and not _formation_is_fleet_counter(land_air_body):
 		_select_map_unit(land_air_body)
 		_show_unit_detail_popup(land_air_body)
@@ -20492,10 +20508,23 @@ func _pick_unit_formation_at_world(world_pos: Vector2, land_only: bool = false, 
 				if str(fo.country_tag).strip_edges().to_upper() == p_tag and d <= best_player_d:
 					best_player_d = d
 					best_player = fo
-	# FIX #4 (a): drawn body under the cursor (sea plate or land/air)
-	# wins. Gap bind is only when no body is under the click.
+	# FIX #4 (a): nearest DRAWN body wins (plate or land/air). A land/air
+	# chip whose centre sits *outside* a between-plates hole must not
+	# spill into that hole (East Kent / old ENG stay Channel).
 	# player_only still skips foreign plates (MV-1b). land_only skips fleets.
 	var sea_drawn: Object = _pick_sea_nation_plate_drawn_at_world(world_pos, z)
+	var land_body: Object = best_any
+	if land_body != null and _land_air_body_blocked_by_cluster_hole(world_pos, land_body, z):
+		land_body = null
+		best_player = null
+	if sea_drawn != null and land_body != null:
+		var sea_d: float = _formation_icon_distance(world_pos, sea_drawn)
+		var land_d: float = _formation_icon_distance(world_pos, land_body)
+		if land_d <= sea_d:
+			if player_only:
+				return best_player
+			if not (land_only and _formation_type_blocks_land_open(land_body)):
+				return land_body
 	if sea_drawn != null:
 		if land_only and _formation_type_blocks_land_open(sea_drawn):
 			pass
@@ -20504,11 +20533,10 @@ func _pick_unit_formation_at_world(world_pos: Vector2, land_only: bool = false, 
 			return null
 		else:
 			return sea_drawn
-	if best_any != null:
-		# Nearest drawn land/air body — not player-prefer over a neighbour.
+	if land_body != null:
 		if player_only:
 			return best_player
-		return best_any
+		return land_body
 	var sea_pad: Object = _pick_nearest_sea_nation_in_cluster_pad(world_pos, z, land_only, false)
 	if sea_pad != null:
 		# BETWEEN plates only (East Kent / own-GER gap). No outer margin.
@@ -25932,6 +25960,56 @@ func _world_in_sea_nation_cluster_pad(world_pos: Vector2, icons: Array, z: float
 		and world_pos.y >= miny - slack
 		and world_pos.y <= maxy + slack
 	)
+
+
+func _formation_chip_world(fo: Object) -> Vector2:
+	if fo == null:
+		return Vector2(INF, INF)
+	var want: String = str(fo.formation_id) if "formation_id" in fo else ""
+	if want.is_empty():
+		return Vector2(INF, INF)
+	for id_v in _demo_unit_icon_pids:
+		var id: int = int(id_v)
+		for c_v in _iter_demo_unit_icons_at_pid(id):
+			var icon: Node2D = c_v as Node2D
+			if icon == null or not is_instance_valid(icon):
+				continue
+			var cand: Object = _formation_from_demo_icon(icon)
+			if cand == null or not ("formation_id" in cand):
+				continue
+			if str(cand.formation_id) != want:
+				continue
+			return _demo_unit_icon_world_pos(icon, id)
+	return Vector2(INF, INF)
+
+
+func _formation_icon_distance(world_pos: Vector2, fo: Object) -> float:
+	var p: Vector2 = _formation_chip_world(fo)
+	if p.x >= INF * 0.5:
+		return INF
+	return world_pos.distance_to(p)
+
+
+func _click_in_cluster_hole_outside_chip(world_pos: Vector2, chip_pos: Vector2, z: float) -> bool:
+	# East Kent / old ENG sit in the 2×2 hole. A land chip parked outside
+	# that hole must not spill its Home-band body into the gap.
+	if chip_pos.x >= INF * 0.5:
+		return false
+	for id_v in _demo_unit_icon_pids:
+		var id: int = int(id_v)
+		var icons: Array = _sea_nation_cluster_icons_at_pid(id)
+		if icons.size() < 2:
+			continue
+		if not _world_in_sea_nation_cluster_pad(world_pos, icons, z):
+			continue
+		if _world_in_sea_nation_cluster_pad(chip_pos, icons, z):
+			continue
+		return true
+	return false
+
+
+func _land_air_body_blocked_by_cluster_hole(world_pos: Vector2, fo: Object, z: float) -> bool:
+	return _click_in_cluster_hole_outside_chip(world_pos, _formation_chip_world(fo), z)
 
 
 func _pick_sea_nation_plate_drawn_at_world(world_pos: Vector2, z: float = -1.0) -> Object:
