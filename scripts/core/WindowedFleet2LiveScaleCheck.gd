@@ -543,7 +543,27 @@ func _halo_point_in_province(pid: int, start: Vector2, z: float) -> Vector2:
 
 
 func _any_painted_at(world: Vector2) -> bool:
-	return not _name_topmost_painted(world).is_empty()
+	# Halo uses the tight plate+bars so a fat designation AABB cannot
+	# cover an entire GER coast hex.
+	var mr := _map_renderer()
+	if mr == null or not ("_demo_unit_icon_pids" in mr):
+		return false
+	for id_v in mr._demo_unit_icon_pids:
+		var id: int = int(id_v)
+		if not mr.has_method("_iter_demo_unit_icons_at_pid"):
+			continue
+		for c_v in mr.call("_iter_demo_unit_icons_at_pid", id) as Array:
+			var icon: Node2D = c_v as Node2D
+			if icon == null or not is_instance_valid(icon) or not icon.visible:
+				continue
+			if bool(icon.get_meta("sea_nation_disk", false)):
+				continue
+			if mr.has_method("_world_in_unit_plate_or_bars"):
+				if bool(mr.call("_world_in_unit_plate_or_bars", world, icon)):
+					return true
+			elif _world_in_icon_painted(icon, world):
+				return true
+	return false
 
 
 func _name_topmost_painted(world: Vector2) -> String:
@@ -552,6 +572,7 @@ func _name_topmost_painted(world: Vector2) -> String:
 		return ""
 	var best: Node2D = null
 	var best_fid := ""
+	var best_d: float = INF
 	for id_v in mr._demo_unit_icon_pids:
 		var id: int = int(id_v)
 		if not mr.has_method("_iter_demo_unit_icons_at_pid"):
@@ -561,10 +582,10 @@ func _name_topmost_painted(world: Vector2) -> String:
 			if icon == null or not is_instance_valid(icon) or not icon.visible:
 				continue
 			var painted: bool = false
+			var chip_pos: Vector2 = icon.global_position
+			if mr.has_method("_demo_unit_icon_world_pos"):
+				chip_pos = mr.call("_demo_unit_icon_world_pos", icon, id) as Vector2
 			if bool(icon.get_meta("sea_nation_disk", false)):
-				var chip_pos: Vector2 = icon.global_position
-				if mr.has_method("_demo_unit_icon_world_pos"):
-					chip_pos = mr.call("_demo_unit_icon_world_pos", icon, id) as Vector2
 				var hit_r: float = 14.5
 				if mr.has_method("_demo_unit_icon_hit_radius_world"):
 					hit_r = float(mr.call("_demo_unit_icon_hit_radius_world", 1.0, icon))
@@ -577,18 +598,21 @@ func _name_topmost_painted(world: Vector2) -> String:
 			if mr.has_method("_formation_from_demo_icon"):
 				fo = mr.call("_formation_from_demo_icon", icon)
 			var fid := str(fo.formation_id) if fo != null and "formation_id" in fo else str(icon.get_meta("formation_id", ""))
+			var d: float = world.distance_to(chip_pos)
 			if best == null:
 				best = icon
 				best_fid = fid
+				best_d = d
 				continue
-			var above: bool = false
-			if mr.has_method("_unit_counter_is_drawn_above"):
-				above = bool(mr.call("_unit_counter_is_drawn_above", icon, best))
-			else:
-				above = icon.is_greater_than(best)
-			if above:
+			var wins: bool = false
+			if mr.has_method("_unit_counter_painted_wins"):
+				wins = bool(mr.call("_unit_counter_painted_wins", icon, best, world, d, best_d))
+			elif d < best_d:
+				wins = true
+			if wins:
 				best = icon
 				best_fid = fid
+				best_d = d
 	return best_fid
 
 

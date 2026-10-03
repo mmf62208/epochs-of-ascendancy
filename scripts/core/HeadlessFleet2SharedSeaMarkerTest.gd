@@ -332,16 +332,22 @@ func _test_source_needles() -> void:
 	if "func _unit_counter_effective_z_index" not in ren:
 		_fail("FIX #6 CanvasItem z_index helper missing")
 		return
+	if "func _unit_counter_painted_wins" not in ren:
+		_fail("FIX #6 painted-win (z_index then nearest) helper missing")
+		return
+	if "func _world_in_unit_plate_or_bars" not in ren:
+		_fail("FIX #6 tight plate+bars halo helper missing")
+		return
 	var drawn_fn := _slice_func(ren, "_pick_drawn_land_air_body_at_world")
 	if "_foreign_land_air_blocked_on_player_hex" in drawn_fn:
 		_fail("FIX #6 painted-body pick must not apply the ownership block")
 		return
-	if "_unit_counter_is_drawn_above" not in drawn_fn:
-		_fail("FIX #6 painted-body pick must use draw order, not only nearest centre")
+	if "_unit_counter_painted_wins" not in drawn_fn:
+		_fail("FIX #6 painted-body pick must use z_index-then-nearest")
 		return
 	var pick6 := _slice_func(ren, "_pick_unit_formation_at_world")
-	if "_unit_counter_is_drawn_above" not in pick6:
-		_fail("FIX #6 unit pick must use topmost draw order on painted bodies")
+	if "_unit_counter_painted_wins" not in pick6:
+		_fail("FIX #6 unit pick must use z_index-then-nearest on painted bodies")
 		return
 	var pad_fn := _slice_func(ren, "_world_in_sea_nation_cluster_pad")
 	if "p.x - rr" in pad_fn or "hit_r + pad" in pad_fn:

@@ -20518,9 +20518,12 @@ func _pick_unit_formation_at_world(world_pos: Vector2, land_only: bool = false, 
 				if str(fo.country_tag).strip_edges().to_upper() != p_tag:
 					continue
 			if z < 0.65 and not is_sea_disk:
-				if painted_counter == null or _unit_counter_is_drawn_above(counter, painted_counter):
+				if painted_counter == null or _unit_counter_painted_wins(
+					counter, painted_counter, world_pos, d, best_any_d
+				):
 					painted_counter = counter
 					painted_fo = fo
+					best_any_d = d
 				if _formation_is_player_tag(fo) and _world_in_unit_stat_bars(world_pos, counter):
 					if own_bars_counter == null or _unit_counter_is_drawn_above(counter, own_bars_counter):
 						own_bars_counter = counter
@@ -26311,9 +26314,12 @@ func _pick_drawn_land_air_body_at_world(world_pos: Vector2, z: float = -1.0) -> 
 				if d > hit_r:
 					continue
 			if zz < 0.65:
-				if best_counter == null or _unit_counter_is_drawn_above(icon, best_counter):
+				if best_counter == null or _unit_counter_painted_wins(
+					icon, best_counter, world_pos, d, best_d
+				):
 					best_counter = icon
 					best = fo
+					best_d = d
 				if _formation_is_player_tag(fo) and _world_in_unit_stat_bars(world_pos, icon):
 					if best_bar_counter == null or _unit_counter_is_drawn_above(icon, best_bar_counter):
 						best_bar_counter = icon
@@ -26358,6 +26364,46 @@ func _unit_counter_is_drawn_above(a: Node2D, b: Node2D) -> bool:
 	if za != zb:
 		return za > zb
 	return a.is_greater_than(b)
+
+
+func _unit_counter_painted_wins(
+	a: Node2D, b: Node2D, world_pos: Vector2, a_d: float, b_d: float
+) -> bool:
+	# FIX #6: a higher CanvasItem z_index is actually on top and wins.
+	# All DemoUnitIcon_* share z=28, so same-layer overlaps use nearest
+	# painted centre — tree order is not a visual stack at Home-band
+	# inverse-zoom (one late chip would steal every overlapping AABB).
+	if a == null or not is_instance_valid(a):
+		return false
+	if b == null or not is_instance_valid(b):
+		return true
+	var za: int = _unit_counter_effective_z_index(a)
+	var zb: int = _unit_counter_effective_z_index(b)
+	if za != zb:
+		return za > zb
+	if a_d < b_d:
+		return true
+	if a_d > b_d:
+		return false
+	return a.is_greater_than(b)
+
+
+func _world_in_unit_plate_or_bars(world_pos: Vector2, counter: Node2D) -> bool:
+	# Tight chip face (NationPlate 44×40 + StatBars). Used for the halo
+	# walk so a fat designation AABB cannot paint an entire GER hex.
+	if counter == null or not is_instance_valid(counter):
+		return false
+	var xf: Transform2D = counter.get_global_transform()
+	var local: Vector2 = xf.affine_inverse() * world_pos
+	var plate: Rect2 = Rect2(Vector2(-22.0, -20.0), Vector2(44.0, 40.0)).grow(0.5)
+	if (
+		local.x >= plate.position.x
+		and local.y >= plate.position.y
+		and local.x <= plate.position.x + plate.size.x
+		and local.y <= plate.position.y + plate.size.y
+	):
+		return true
+	return _world_in_unit_stat_bars(world_pos, counter)
 
 
 func _unit_counter_painted_local_rect(counter: Node2D) -> Rect2:
