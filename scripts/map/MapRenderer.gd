@@ -20463,8 +20463,6 @@ func _pick_unit_formation_at_world(world_pos: Vector2, land_only: bool = false, 
 	var best_player_d := INF
 	var best_any: Object = null
 	var best_any_d := INF
-	var best_bar: Object = null
-	var best_bar_d: float = INF
 	var best_bar_player: Object = null
 	var best_bar_player_d: float = INF
 	var p_tag := _player_tag()
@@ -20521,26 +20519,22 @@ func _pick_unit_formation_at_world(world_pos: Vector2, land_only: bool = false, 
 				if str(fo.country_tag).strip_edges().to_upper() == p_tag and d <= best_player_d:
 					best_player_d = d
 					best_player = fo
-			# Strength-bar / label strip wins over a nearer foreign plate
-			# that only overlaps the bars (Berlin AW3 +46 → CZE).
-			if z < 0.65 and not is_sea_disk and _world_in_unit_stat_bars(world_pos, counter):
-				if d <= best_bar_d:
-					best_bar_d = d
-					best_bar = fo
-				if not p_tag.is_empty() and "country_tag" in fo:
-					if str(fo.country_tag).strip_edges().to_upper() == p_tag and d <= best_bar_player_d:
-						best_bar_player_d = d
-						best_bar_player = fo
+			# Own strength-bar strip beats a nearer foreign plate that only
+			# overlaps the bars (Berlin AW3 +46 → CZE). Foreign StatBars
+			# must not steal a neighbour chip centre.
+			if z < 0.65 and not is_sea_disk and _formation_is_player_tag(fo):
+				if _world_in_unit_stat_bars(world_pos, counter) and d <= best_bar_player_d:
+					best_bar_player_d = d
+					best_bar_player = fo
 	# FIX #4 (a): nearest DRAWN body wins (plate or land/air). A land/air
 	# chip whose centre sits *outside* a between-plates hole must not
 	# spill into that hole (East Kent / old ENG stay Channel).
 	# player_only still skips foreign plates (MV-1b). land_only skips fleets.
 	var sea_drawn: Object = _pick_sea_nation_plate_drawn_at_world(world_pos, z)
 	var land_body: Object = best_any
-	if best_bar != null:
-		land_body = best_bar
-		if best_bar_player != null:
-			best_player = best_bar_player
+	if best_bar_player != null:
+		land_body = best_bar_player
+		best_player = best_bar_player
 	if land_body != null and _land_air_body_blocked_by_cluster_hole(world_pos, land_body, z):
 		land_body = null
 		best_player = null
@@ -26296,7 +26290,7 @@ func _pick_drawn_land_air_body_at_world(world_pos: Vector2, z: float = -1.0) -> 
 				var hit_r: float = _demo_unit_icon_hit_radius_world(zz, icon)
 				if d > hit_r:
 					continue
-			if zz < 0.65 and _world_in_unit_stat_bars(world_pos, icon):
+			if zz < 0.65 and _formation_is_player_tag(fo) and _world_in_unit_stat_bars(world_pos, icon):
 				if d <= best_bar_d:
 					best_bar_d = d
 					best_bar = fo
