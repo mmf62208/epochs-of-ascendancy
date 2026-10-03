@@ -525,15 +525,17 @@ func _click_emden_grid(z: float) -> void:
 
 
 func _halo_point_in_province(pid: int, start: Vector2, z: float) -> Vector2:
+	# Match the picker's painted-body test so a designation-only overhang
+	# is treated as painted (Heidekreis) and we walk off it.
 	if not _any_painted_at(start):
 		return start
 	var mr := _map_renderer()
 	var zz: float = maxf(z, 0.05)
-	var radii: Array = [12, 24, 36, 48, 64, 80, 100, 128]
+	var radii: Array = [8, 10, 12, 14, 16, 18, 20, 22, 24, 28, 32, 40, 48, 64, 80, 100, 128, 160, 200]
 	for r_v in radii:
 		var r: float = float(r_v) / zz
-		for i in 16:
-			var p: Vector2 = start + Vector2(r, 0.0).rotated(TAU * float(i) / 16.0)
+		for i in 24:
+			var p: Vector2 = start + Vector2(r, 0.0).rotated(TAU * float(i) / 24.0)
 			var hid: int = -1
 			if mr != null and mr.has_method("_resolve_hex_pick_pid"):
 				hid = int(mr.call("_resolve_hex_pick_pid", p))
@@ -543,8 +545,6 @@ func _halo_point_in_province(pid: int, start: Vector2, z: float) -> Vector2:
 
 
 func _any_painted_at(world: Vector2) -> bool:
-	# Halo uses the tight plate+bars so a fat designation AABB cannot
-	# cover an entire GER coast hex.
 	var mr := _map_renderer()
 	if mr == null or not ("_demo_unit_icon_pids" in mr):
 		return false
@@ -558,10 +558,7 @@ func _any_painted_at(world: Vector2) -> bool:
 				continue
 			if bool(icon.get_meta("sea_nation_disk", false)):
 				continue
-			if mr.has_method("_world_in_unit_plate_or_bars"):
-				if bool(mr.call("_world_in_unit_plate_or_bars", world, icon)):
-					return true
-			elif _world_in_icon_painted(icon, world):
+			if _world_in_icon_painted(icon, world):
 				return true
 	return false
 

@@ -26370,13 +26370,18 @@ func _unit_counter_painted_wins(
 	a: Node2D, b: Node2D, world_pos: Vector2, a_d: float, b_d: float
 ) -> bool:
 	# FIX #6: a higher CanvasItem z_index is actually on top and wins.
-	# All DemoUnitIcon_* share z=28, so same-layer overlaps use nearest
-	# painted centre — tree order is not a visual stack at Home-band
-	# inverse-zoom (one late chip would steal every overlapping AABB).
+	# A StatBars overhang beats another chip's plate-only overlap
+	# (DNK AW3 +44 vs a nearer NLD plate). Same z_index then uses
+	# nearest painted centre — tree order is not a visual stack at
+	# Home-band inverse-zoom.
 	if a == null or not is_instance_valid(a):
 		return false
 	if b == null or not is_instance_valid(b):
 		return true
+	var a_bars: bool = _world_in_unit_stat_bars(world_pos, a)
+	var b_bars: bool = _world_in_unit_stat_bars(world_pos, b)
+	if a_bars != b_bars:
+		return a_bars
 	var za: int = _unit_counter_effective_z_index(a)
 	var zb: int = _unit_counter_effective_z_index(b)
 	if za != zb:
