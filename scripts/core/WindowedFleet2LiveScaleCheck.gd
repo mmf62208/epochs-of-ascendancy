@@ -403,16 +403,33 @@ func _click_coast_hex(z: float, pid: int) -> void:
 		_fail_reasons.append("coast_%d_no_centroid" % pid)
 		return
 	# Halo probe: if the centroid sits on a painted foreign plate (Emden
-	# NLD overhangs Cuxhaven), walk to a point that still GIS-resolves to
-	# this hex but misses every painted body — that is the FIX #5 coast fix.
+	# NLD covers all of Cuxhaven at Home scale), walk to a point that still
+	# GIS-resolves to this hex but misses every painted body.
 	var halo: Vector2 = _halo_point_in_province(pid, pos, z)
 	if halo.distance_to(pos) > 0.5:
 		_log("EOA_FLEET2_LIVE who=coast_halo pid=%d centroid=%.1f,%.1f halo=%.1f,%.1f z=%.3f" % [
 			pid, pos.x, pos.y, halo.x, halo.y, z
 		])
+		_click_one({
+			"who": "z%.3f_coast_%d" % [z, pid],
+			"pos": halo,
+			"own": false,
+			"kind": "hex_own_or_province",
+			"want_tags": ["GER"],
+		})
+		return
+	if _any_painted_at(pos):
+		# Whole hex sits under a painted body (Cuxhaven inside Emden plate).
+		# Painted-body rule applies; do not demand GER spill.
+		var top := _name_topmost_painted(pos)
+		_log("EOA_FLEET2_LIVE who=coast_covered_by_paint pid=%d world=%.1f,%.1f topmost=%s z=%.3f" % [
+			pid, pos.x, pos.y, top, z
+		])
+		_click_log.append("coast %d covered_by_paint topmost=%s" % [pid, top])
+		return
 	_click_one({
 		"who": "z%.3f_coast_%d" % [z, pid],
-		"pos": halo,
+		"pos": pos,
 		"own": false,
 		"kind": "hex_own_or_province",
 		"want_tags": ["GER"],
@@ -454,6 +471,17 @@ func _click_dnk_aw3_bars(z: float) -> void:
 			pass
 		else:
 			bars = local_bars
+		# If +44 sits on a nearer foreign plate (Emden NLD at Home), walk
+		# the bar strip so the probe stays on DNK bars and off that plate.
+		if _other_plate_owns(bars, icon):
+			for lx_v in [8, -8, 14, -14, 20, -20]:
+				var cand: Vector2 = xf * Vector2(float(lx_v), 27.0)
+				if _world_in_icon_stat_bars(icon, cand) and not _other_plate_owns(cand, icon):
+					bars = cand
+					_log("EOA_FLEET2_LIVE who=dnk_bars_walk z=%.3f lx=%d world=%.1f,%.1f" % [
+						z, int(lx_v), bars.x, bars.y
+					])
+					break
 	_click_one({
 		"who": "z%.3f_DNK_AW3_bars44" % z,
 		"pos": bars,
@@ -657,6 +685,35 @@ func _world_in_icon_painted(icon: Node2D, world: Vector2) -> bool:
 	if mr != null and mr.has_method("_world_in_unit_painted_rect"):
 		return bool(mr.call("_world_in_unit_painted_rect", world, icon))
 	return true
+
+
+func _world_in_icon_stat_bars(icon: Node2D, world: Vector2) -> bool:
+	var mr := _map_renderer()
+	if mr != null and mr.has_method("_world_in_unit_stat_bars"):
+		return bool(mr.call("_world_in_unit_stat_bars", world, icon))
+	return false
+
+
+func _other_plate_owns(world: Vector2, self_icon: Node2D) -> bool:
+	var mr := _map_renderer()
+	if mr == null or not ("_demo_unit_icon_pids" in mr):
+		return false
+	for id_v in mr._demo_unit_icon_pids:
+		var id: int = int(id_v)
+		if not mr.has_method("_iter_demo_unit_icons_at_pid"):
+			continue
+		for c_v in mr.call("_iter_demo_unit_icons_at_pid", id) as Array:
+			var icon: Node2D = c_v as Node2D
+			if icon == null or icon == self_icon or not is_instance_valid(icon) or not icon.visible:
+				continue
+			if bool(icon.get_meta("sea_nation_disk", false)):
+				continue
+			if mr.has_method("_world_in_unit_plate_or_bars"):
+				if bool(mr.call("_world_in_unit_plate_or_bars", world, icon)):
+					return true
+			elif _world_in_icon_painted(icon, world):
+				return true
+	return false
 
 
 func _collect_land_air_counters() -> Array:

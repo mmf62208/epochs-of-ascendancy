@@ -26378,10 +26378,6 @@ func _unit_counter_painted_wins(
 		return false
 	if b == null or not is_instance_valid(b):
 		return true
-	var a_bars: bool = _world_in_unit_stat_bars(world_pos, a)
-	var b_bars: bool = _world_in_unit_stat_bars(world_pos, b)
-	if a_bars != b_bars:
-		return a_bars
 	var za: int = _unit_counter_effective_z_index(a)
 	var zb: int = _unit_counter_effective_z_index(b)
 	if za != zb:
