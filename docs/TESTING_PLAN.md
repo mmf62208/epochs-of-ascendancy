@@ -544,7 +544,7 @@ With a unit selected, hovering own/controlled land shows a dimmer dashed `MarchP
 
 ### FLEET-1 land-spill vs foreign fleet / open sea (draft HOLD)
 
-Nearest-own-land chrome spill (`CHROME_SPILL_WORLD` 340) must not steal a click on a foreign fleet counter or on open sea. Gate: `_try_open_land_unit_at_world` calls `_nearest_player_land_formation_at_world` only when GIS at `event.position` is a land province **and** `_pick_unit_formation_at_world` missed every counter (`fo_any == null`). **FIX #1 (Play MIXED `582263e8`):** a foreign fleet disk hit inspects that fleet when the fleet's **own stationed pid is sea**, even if GIS under the cursor is coastal land (ENG Channel chip over East Kent `711453`). Land-stationed foreign fleet (MV-1b Köln FRA `710417`) still falls through. Foreign fleet **and** foreign land cards hide Open fight / Assign leader; march stays blocked. Own cards unchanged. Hit-test priority otherwise unchanged. MV-1 / MV-1b gates **unedited**. Out of scope: one marker per shared sea, Channel / Rio Grande Rise polygons, Pas-de-Calais FRA-land spill.
+Nearest-own-land chrome spill (`CHROME_SPILL_WORLD` 340) must not steal a click on a foreign fleet counter or on open sea. Gate: `_try_open_land_unit_at_world` calls `_nearest_player_land_formation_at_world` only when GIS at `event.position` is a land province **and** `_pick_unit_formation_at_world` missed every counter (`fo_any == null`). **FIX #1 (Play MIXED `582263e8`):** a foreign fleet disk hit inspects that fleet when the fleet's **own stationed pid is sea**, even if GIS under the cursor is coastal land (ENG Channel chip over East Kent `711453`). Land-stationed foreign fleet (MV-1b Köln FRA `710417`) still falls through. Foreign fleet **and** foreign land cards hide Open fight / Assign leader; march stays blocked. Own cards unchanged. Hit-test priority otherwise unchanged. MV-1 / MV-1b gates **unedited**. Out of scope: Channel / Rio Grande Rise polygons, Pas-de-Calais FRA-land spill. Shared-sea one-marker-per-nation is FLEET-2.
 
 Guard: `HeadlessFleet1LandSpillGateTest` + `tools/eoa_fleet1_guard.sh` (hd + xvfb 1280×740). Seeds are real `world_accurate` label_anchors:
 
@@ -581,6 +581,241 @@ Isolated keep-green (`95009fee`; wrapper `rss_mb` preferred; MV-1/MV-1b **unedit
 | MV-1e 15/15 @ 4× | hd+xvfb | PASS | **1195.6 / 1330.6** |
 | Seeded RX-1 mid_river ON/OFF | xvfb | PASS units-off **0.749** / close 0.775 / spine 1.000 | wrapper no RSS (typical isolated ~2046) |
 | UI-1 guard hd+xvfb | both | PASS | **1200.2 / 1343.7** |
+
+### FLEET-2 shared-sea per-nation fleet markers (draft HOLD)
+
+When several nations' fleets share one sea province, draw one marker per nation so each has its own clickable disk. Hit-test walks every `DemoUnitIcon_*` and uses the drawn plate radius for stacked sea-nation disks. Own disk → full own card; foreign disk → FLEET-1 read-only card (no Open fight / Assign; march blocked). Single-nation sea provinces keep `DemoUnitIcon_{pid}` at the same chip base. Köln FRA land-stationed fleet stays unselectable (MV-1b). FLEET-1 spill gate and MV-1b **unedited**.
+
+**FIX #1 (Play MIXED `fd970599`):** production Channel `950001` holds ENG/ITA/POL/USA (not a single ENG pin). A horizontal row fanned over East Kent / Belgium; the old ENG chip `(4128.701, 926.218)` sat in the ITA/POL gap and spilled to GER Div 6. 3+ plates pack as a 2×2 / column, fit-radius + clamp to the sea polygon. Cluster AABB + ~9 screen-px pad picks the nearest plate and never nearest-own-land spill. Labels include the nation tag; SOV is not truncated to `SOV king_g.`.
+
+**FIX #2 (Play FAIL `d742c583`):** FIX #1 centred/clamped on raw `get_province_geometry` (unscaled). Live `world_accurate` renderer centroids are ×THEATER_SCALE (~1.728): Channel `(7134.5, 1622.3)` / North Sea `(7195.9, 1336.9)`. The 2×2 parked over arctic Canada. `_sea_province_poly_world` now transforms + aligns to `province_centroids`; cluster >~2 plate spacings from chip base falls back to a chip-base 2×2. Drawn chrome matches the hit disk. Labels are `TAG Fleet N` including POL/USA/SOV. Guard (j) asserts cluster near **both** the live renderer centroid and the chip base, and fails if the cluster sits on unscaled geo. (g) uses live East Kent / old ENG chip / Channel centroid. Live-scale check: `tools/eoa_fleet2_live_scale_check.sh` (xvfb 1280×740, GER Europe Home, zoom ~1.5). Evidence `docs/evidence/fleet2_fix2/`.
+
+Live-scale xvfb (GER Home, zoom 1.524, RSS **2033.9**, RESULT=PASS):
+
+| sea | cluster (renderer) | Play centroid | d | plates (r=14.50, step=41) |
+|---|---|---|---|---|
+| Channel `950001` | `(7134.523, 1622.313)` | `(7134.5, 1622.3)` | 0.0 | ENG `(7114.0, 1601.8)` `ENG Fleet 2` · ITA `(7155.0, 1601.8)` `ITA Fleet 2` · POL `(7114.0, 1642.8)` `POL Fleet 3` · USA `(7155.0, 1642.8)` `USA Fleet 4` |
+| North Sea `950000` | `(7195.852, 1336.935)` | `(7195.9, 1336.9)` | 0.1 | GER `(7175.4, 1316.4)` `GER Fleet 2` · FRA `(7216.4, 1316.4)` `FRA Fleet 2` · JAP `(7175.4, 1357.4)` `JAP Fleet 2` · SOV `(7216.4, 1357.4)` `SOV Fleet 4` |
+
+East Kent `711453` / old ENG chip / Channel centroid → `ENG_formation_2` / ENG / fleet (not GER Div 6).
+
+**FIX #2b (screenshots on `c9fd1c00` did not show plates):** North Sea Home was empty water at the centroid; Channel frames were the choke-diamond trio (Danish + Channel sea centroids), not a labelled 2×2; Channel camera sat over England. Plates now draw on `SeaNationFleetLayer` (`z=40`) above sea fill and overlay chokes. Inverse-zoom floor **0.66** keeps plates ~36–46 screen px; Home (`z<0.65`) spreads the 2×2 by drawn-body radius; compact 0.8 / 1.5 / 2.3 step is **45**. Click area = drawn NationPlate body (`max(half_w, half_h)+2`). Labels are two-line `TAG` / `Fleet N`. Pixel assert samples each logged plate screen centre and requires nation/NATO/label chrome (not sea / choke). Live-scale: `tools/eoa_fleet2_live_scale_check.sh` xvfb **exactly 1280×740**, GER Europe Home, Home + ~1.5 for Channel and North Sea. Evidence `docs/evidence/fleet2_fix2b/`.
+
+Live-scale xvfb FIX #2b (GER Home, RSS **2145.6**, RESULT=PASS, uncropped 1280×740):
+
+| sea / band | zoom | camera | cluster vs Play | r / hit / scale | plates world → screen |
+|---|---|---|---|---|---|
+| Channel Home | 0.318 | `(7134.5, 1645.9)` | `(7134.5, 1645.9)` vs `(7134.5, 1622.3)` d=23.6 | 14.50 / 64.67 / 2.712 | ENG `(7067.9, 1579.2)` `619,349` `ENG Fleet 2` · ITA `(7201.2, 1579.2)` `661,349` · POL `(7067.9, 1712.5)` `619,391` · USA `(7201.2, 1712.5)` `661,391` |
+| Channel ~1.5 | 1.500 | `(7134.5, 1622.3)` | `(7134.5, 1622.3)` d=0.0 | 14.50 / 19.52 / 0.660 | ENG `(7112.0, 1599.8)` `606,336` `ENG Fleet 2` · ITA `(7157.0, 1599.8)` `674,336` · POL `(7112.0, 1644.8)` `606,404` · USA `(7157.0, 1644.8)` `674,404` |
+| North Sea Home | 0.318 | `(7195.8, 1360.5)` | `(7195.8, 1360.5)` vs `(7195.9, 1336.9)` d=23.6 | 14.50 / 64.67 / 2.712 | GER `(7129.2, 1293.8)` `619,349` `GER Fleet 2` · FRA `(7262.5, 1293.8)` `661,349` · JAP `(7129.2, 1427.2)` `619,391` · SOV `(7262.5, 1427.2)` `661,391` |
+| North Sea ~1.5 | 1.500 | `(7195.9, 1336.9)` | `(7195.9, 1336.9)` d=0.1 | 14.50 / 19.52 / 0.660 | GER `(7173.4, 1314.4)` `606,336` `GER Fleet 2` · FRA `(7218.4, 1314.4)` `674,336` · JAP `(7173.4, 1359.4)` `606,404` · SOV `(7218.4, 1359.4)` `674,404` |
+
+Pixel samples: nation/NATO/label chrome present; choke=0 at all 16 plate centres. Live clicks 10/10: CH ENG/ITA/POL/USA opened read-only; NS GER own full card (`fight=true` `assign=true`); NS FRA/JAP/SOV read-only; East Kent `711453` `(7119.1, 1620.9)` + old ENG chip `(7134.5, 1610.3)` → `ENG_formation_2` (Channel fleet, not GER Div 6).
+
+Guard: `HeadlessFleet2SharedSeaMarkerTest` + `tools/eoa_fleet2_guard.sh` (hd + xvfb 1280×740). Seeds are real `world_accurate` label_anchors (production stationing):
+
+| seed | pid | world |
+|---|---|---|
+| Maginot GER land / GER Div 6 | `710173` | `(4283.279411, 1010.266854)` |
+| Köln (GER land; FRA fleet) | `710417` | `(4254.322147, 944.095861)` |
+| East Kent (ENG coastal land) | `711453` | `(4119.875715, 938.028287)` |
+| North Sea (GER/FRA/JAP/SOV) | `950000` | `(4164.266667, 773.688889)` |
+| English Channel (ENG/ITA/POL/USA) | `950001` | `(4128.701206, 938.217996)` |
+| old ENG Channel chip (pre-FIX #1) | `950001` | `(4128.701, 926.218)` |
+
+Cases: (a) GER North Sea disk → GER fleet own card; (b) FRA North Sea disk → FRA fleet read-only card; (c) North Sea hit areas do not overlap and each centre picks its own fleet; (d) production Channel four plates, each centre picks its fleet (read-only for GER); (e) Köln FRA land-fleet still not selected; (f) Channel 4 plate centres each pick their fleet and lie over sea / clamp tolerance; (g) live East Kent `711453` / old ENG chip / Channel centroid pick a Channel fleet, **not** GER Div 6; (h) cluster-pad click between plates picks the nearest plate, not land spill; (i) labels are `TAG Fleet N` (POL/USA/SOV included; SOV not truncated); (j) cluster centres sit in renderer world near **both** the live centroid and the chip base — not unscaled geo / Canada; (k) all 8 plates at z0.318 and z0.40 open their fleet (GER own / others read-only); GER-nearest gap binds the fleet; East Kent / old ENG stay Channel; (l) a land/air drawn body inside the old FIX #3 pad opens **that unit**, and own GER cannot steal a neighbour body at z0.318. Headless + xvfb **NOT live Play**.
+
+Guard FIX #2 (hd = xvfb, live-space fixtures): NS GER `(7175.352, 1316.435)` hit-r=17.5 · FRA `(7216.352, 1316.435)` · JAP `(7175.352, 1357.435)` · SOV `(7216.352, 1357.435)` · Channel ENG `(7114.0, 1601.8)` · ITA `(7155.0, 1601.8)` · POL `(7114.0, 1642.8)` · USA `(7155.0, 1642.8)` · dist=41.0 > r_sum=35.0 · CH cluster `(7134.5, 1622.3)` · NS cluster `(7195.852, 1336.935)`.
+
+Isolated keep-green (FIX #2b tip; wrapper `rss_mb` preferred; MV-1/MV-1b **unedited**):
+
+| gate | kind | result | peak RSS MB |
+|---|---|---|---|
+| FLEET-2 hd / xvfb | both | PASS (a–j) | **1200.7 / 1342.1** |
+| FLEET-1 hd / xvfb | both | PASS (a–h, unedited) | **1200.7 / 1335.9** |
+| hd_mv1 | headless | PASS (unedited) | **1209.0** |
+| hd_mv1b | headless | PASS (unedited) | **1208.9** |
+| hd_rh1 | headless | PASS | **1209.1** |
+| hd_ix1 (6) | headless | PASS (MandateGate PASS) | **1208.7–1209.2** |
+| hd_rx1 (4) | headless | PASS | **1208.6–1209.2** |
+| hd_rt1 (3) | headless | PASS | **1208.8** |
+| xvfb_mv1 | xvfb | PASS | **2042.6** |
+| xvfb_mv1_card | xvfb | PASS `fra=true` `edge_panel`/`edge_card`/`cap_commit` | **2042.4** |
+| xvfb_rh1 | xvfb | PASS | **2034.4** |
+| py_fac1a | py | PASS 7/7 | **0.082s** |
+| hd_fac1a | headless | PASS | **1208.9** |
+| xvfb_fac1a | xvfb | PASS stale_lag=true 15/15 lone+cluster rx1 0.843/0.843 | **2037.4** |
+| CRASH-1 10× hd + 10× xvfb | both | PASS | wrapper 10×+10× |
+| MV-1e 15/15 @ 4× | hd+xvfb | PASS | **1200.5 / 1337.2** |
+| Seeded RX-1 mid_river ON/OFF | xvfb | PASS units-off **0.749** / close 0.775 / spine 1.000 (FAC-1a 0.843/0.843) | wrapper exec (sibling xvfb ~2040) |
+| UI-1 guard hd+xvfb | both | PASS | **1205.0 / 1348.6** |
+| FLEET-2 live-scale xvfb | xvfb | PASS Home+1.5 plates visible; pixel chrome; 10/10 clicks | **2145.6** |
+
+**FIX #3 (Play MIXED `b66c7724`):** Home-band own-land hit disk (up to ~320 world) stole spread plates below z0.65. Drawn sea-plate body wins first; cluster AABB binds the nearest sea plate (East Kent / old ENG / own-GER gap). Labels use the unit's per-nation ordinal, not stack `index+1`. Guard (k) clicks all 8 plates at z0.318 and z0.40 at live renderer coords. FLEET-1 / MV-1b **unedited**.
+
+Live-scale xvfb FIX #3 (GER Home, RSS **2031.6**, RESULT=PASS, uncropped 1280×740):
+
+| plate | fid | label |
+|---|---|---|
+| NS GER | `GER_formation_2` | GER Fleet 2 |
+| NS FRA | `FRA_formation_2` | FRA Fleet 2 |
+| NS JAP | `JAP_formation_2` | JAP Fleet 2 |
+| NS SOV | `fielded_sov_21559591` | SOV Fleet 1 |
+| CH ENG | `ENG_formation_2` | ENG Fleet 2 |
+| CH ITA | `ITA_formation_2` | ITA Fleet 2 |
+| CH POL | `fielded_pol_21560167` | POL Fleet 1 |
+| CH USA | `fielded_usa_21558889` | USA Fleet 1 |
+
+Clicks: all 8 plates at 0.318 / 0.40 / 0.80 / 1.50 opened their own fleet (GER own card; others read-only). East Kent + old ENG → `ENG_formation_2`. GER-nearest gap → `GER_formation_2` own card. Evidence `docs/evidence/fleet2_fix3/`. Cases (a)–(k).
+
+Isolated keep-green (FIX #3 tip; wrapper `rss_mb` preferred; MV-1/MV-1b **unedited**):
+
+| gate | kind | result | peak RSS MB |
+|---|---|---|---|
+| FLEET-2 hd / xvfb | both | PASS (a–k) | **1206.8 / 1341.4** |
+| FLEET-1 hd / xvfb | both | PASS (a–h, unedited) | **1201.2 / 1340.5** |
+| hd_mv1 | headless | PASS (unedited) | **1201.0** |
+| hd_mv1b | headless | PASS (unedited) | **1201.1** |
+| hd_rh1 | headless | PASS | **1200.8** |
+| hd_ix1 (6) | headless | PASS (MandateGate PASS) | **1200.8–1205.4** |
+| hd_rx1 (4) | headless | PASS | **1200.9–1202.5** |
+| hd_rt1 (3) | headless | PASS | **1200.9** |
+| xvfb_mv1 | xvfb | PASS | **2035.0** |
+| xvfb_mv1_card | xvfb | PASS `fra=true` `edge_panel`/`edge_card`/`cap_commit` | **2036.5** |
+| xvfb_rh1 | xvfb | PASS | **2038.7** |
+| py_fac1a | py | PASS 7/7 | **0.092s** |
+| hd_fac1a | headless | PASS | **1201.2** |
+| xvfb_fac1a | xvfb | PASS stale_lag=true 15/15 lone+cluster rx1 0.843/0.843 | **2041.4** |
+| CRASH-1 10× hd + 10× xvfb | both | PASS | wrapper 10×+10× |
+| MV-1e 15/15 @ 4× | hd+xvfb | PASS | **1201.1 / 1340.4** |
+| Seeded RX-1 mid_river ON/OFF | xvfb | PASS units-off **0.749** / close 0.775 / spine 1.000 (FAC-1a 0.843/0.843) | sibling xvfb ~2040 |
+| UI-1 guard hd+xvfb | both | PASS | **1205.6 / 1349.0** |
+| FLEET-2 live-scale xvfb | xvfb | PASS 8 plates × 4 zooms; East Kent; old ENG; GER-nearest gap | **2031.6** |
+
+**FIX #4 (Play MIXED `9c9c5f20`):** FIX #3 cluster AABB (centres ± hit_r + 9/z) stole land counters at z≤0.40; Home-band own GER stole neighbours just outside the box. **Option (a):** nearest drawn body (plate or land/air) wins — not shrink-to-drawn+4px. Gap bind is plate-centres AABB + 1u and only when no body is under the click; a land chip whose centre sits outside that hole cannot spill into East Kent / the old ENG chip. Below z0.65, own land/air hit is capped at **40 screen px**. Guard (k)+(l). FLEET-1 / MV-1b **unedited**.
+
+Live-scale xvfb FIX #4 (GER Home, RSS **2030.0**, RESULT=PASS, uncropped 1280×740):
+
+| click | z0.318 | z0.400 |
+|---|---|---|
+| ENG Div 0 / 1 | `ENG_formation_0` / `_1` | same |
+| BEL Div 0 / 1 / 2 | `BEL_formation_0` / `_1` / `_2` | same |
+| NLD Div 0 / 2 / AW3 | `NLD_formation_0` / `_2` / `_3` | same |
+| FRA Garrison 4 | `FRA_formation_4` | same |
+| Emden NLD / BEL AW3 / DNK AW3 | `NLD_formation_1` / `BEL_formation_3` / `DNK_formation_3` | same |
+| coast `710374` / `710380` | `NLD_formation_1` (not GER AW3) | same |
+| own GER Div 6 / 7 / Garr 4 / AW3 | own cards at 0.318 | — |
+
+All 8 plates at 0.318 / 0.40 / 0.80 / 1.50 opened their own fleet. East Kent + old ENG → `ENG_formation_2`. GER-nearest gap → `GER_formation_2` own card. Evidence `docs/evidence/fleet2_fix4/`. Cases (a)–(l).
+
+Isolated keep-green (FIX #4 tip; wrapper `rss_mb` preferred; MV-1/MV-1b **unedited**):
+
+| gate | kind | result | peak RSS MB |
+|---|---|---|---|
+| FLEET-2 hd / xvfb | both | PASS (a–l) | **1203.2 / 1337.4** |
+| FLEET-1 hd / xvfb | both | PASS (a–h, unedited) | **1203.5 / 1337.2** |
+| hd_mv1 | headless | PASS (unedited) | **1202.2** |
+| hd_mv1b | headless | PASS (unedited) | **1201.8** |
+| hd_rh1 | headless | PASS | **1201.6** |
+| hd_ix1 (6) | headless | PASS (MandateGate PASS) | **1201.6–1206.3** |
+| hd_rx1 (4) | headless | PASS | **1202.1–1203.4** |
+| hd_rt1 (3) | headless | PASS | **1202.0–1202.8** |
+| xvfb_mv1 | xvfb | PASS | **2042.0** |
+| xvfb_mv1_card | xvfb | PASS `fra=true` `edge_panel`/`edge_card`/`cap_commit` | **2043.9** |
+| xvfb_rh1 | xvfb | PASS | **2039.5** |
+| py_fac1a | py | PASS 7/7 | **0.080s** |
+| hd_fac1a | headless | PASS | **1202.3** |
+| xvfb_fac1a | xvfb | PASS stale_lag=true 15/15 lone+cluster rx1 0.843/0.843 | **2042.3** |
+| CRASH-1 10× hd + 10× xvfb | both | PASS | wrapper 10×+10× |
+| MV-1e 15/15 @ 4× | hd+xvfb | PASS | **1201.9 / 1337.0** |
+| Seeded RX-1 mid_river ON/OFF | xvfb | PASS units-off **0.749** / close 0.775 / spine 1.000 (FAC-1a 0.843/0.843) | isolated |
+| UI-1 guard hd+xvfb | both | PASS | **1207.3 / 1347.0** |
+| FLEET-2 live-scale xvfb | xvfb | PASS 8 plates × 4 zooms; East Kent; GER gap; Play land/air own units | **2030.0** |
+
+**FIX #5 (Play MIXED `7f9e3ad0`):** 40 px own circle missed AW3 bars +46 / corner (→ CZE). Coasts `710374`/`710380` → NLD was a **regression**, not intended. Below z0.65, land/air hit is the painted rect (NationPlate 44×40 + StatBars 44×14 + Designation/TypeLetter/StrNum). Player-owned GIS land never opens a foreign chip stationed elsewhere. Own StatBars hit beats a nearer foreign plate. Guard (k)+(l)+(m). FLEET-1 / MV-1b **unedited**.
+
+Live-scale xvfb FIX #5 (GER Home, RSS **2045.6**, RESULT=PASS, uncropped 1280×740):
+
+| click | z0.318 | z0.400 |
+|---|---|---|
+| ENG Div 0 / 1 | `ENG_formation_0` / `_1` | same |
+| BEL Div 0 / 1 / 2 | `BEL_formation_0` / `_1` / `_2` | same |
+| NLD Div 0 / 2 / AW3 | `NLD_formation_0` / `_2` / `_3` | same |
+| FRA Garrison 4 | `FRA_formation_4` | same |
+| Emden NLD / BEL AW3 / DNK AW3 | `NLD_formation_1` / `BEL_formation_3` / `DNK_formation_3` | same |
+| coast `710374` / `710380` | own GER spill (never NLD) | same |
+| GER AW3 bars +46 / corner | `GER_formation_3` own | same |
+| own GER Div 6 / 7 / Garr 4 / AW3 | own cards | own cards |
+
+All 8 plates at 0.318 / 0.40 / 0.80 / 1.50 opened their own fleet. East Kent + old ENG → `ENG_formation_2`. GER-nearest gap → `GER_formation_2` own card. Evidence `docs/evidence/fleet2_fix5/`. Cases (a)–(m).
+
+Isolated keep-green (FIX #5 tip `a50cdeed`; wrapper `rss_mb` preferred; MV-1/MV-1b **unedited**):
+
+| gate | kind | result | peak RSS MB |
+|---|---|---|---|
+| FLEET-2 hd / xvfb | both | PASS (a–m) | **1208.6 / 1344.1** |
+| FLEET-1 hd / xvfb | both | PASS (a–h, unedited) | **1202.8 / 1341.4** |
+| hd_mv1 | headless | PASS (unedited) | **1203.0** |
+| hd_mv1b | headless | PASS (unedited) | **1203.0** |
+| hd_rh1 | headless | PASS | **1202.5** |
+| hd_ix1 (6) | headless | PASS (MandateGate PASS) | **1202.4–1207.1** |
+| hd_rx1 (4) | headless | PASS | **1202.4–1202.6** |
+| hd_rt1 (3) | headless | PASS | **1202.4–1202.6** |
+| xvfb_mv1 | xvfb | PASS | **2040.0** |
+| xvfb_mv1_card | xvfb | PASS | **2044.6** |
+| xvfb_rh1 | xvfb | PASS | **2033.2** |
+| py_fac1a | py | PASS 7/7 | — |
+| hd_fac1a | headless | PASS | **1202.8** |
+| xvfb_fac1a | xvfb | PASS stale_lag=true 15/15 lone+cluster rx1 0.843/0.843 | **2047.8** |
+| CRASH-1 10× hd + 10× xvfb | both | PASS | wrapper 10×+10× |
+| MV-1e 15/15 @ 4× | hd+xvfb | PASS | **1202.6 / 1337.9** |
+| Seeded RX-1 mid_river ON/OFF | xvfb | PASS units-off **0.749** / close 0.775 / spine 1.000 (FAC-1a 0.843/0.843) | isolated |
+| UI-1 guard hd+xvfb | both | PASS | **1207.4 / 1354.3** |
+| FLEET-2 live-scale xvfb | xvfb | PASS 8 plates × 4 zooms; East Kent; GER gap; coasts never NLD; AW3 bars/corner own | **2045.6** |
+
+**FIX #6 (Play MIXED `97d6ea45`):** ownership block too broad. Emden NLD east +20 / DNK AW3 bars +44 opened GER Garrison 4. Topmost painted body wins (plate, bars, or label). Ownership only in the halo (no painted body). Same-z: NationPlate interior > StatBars > plate rim > label, then nearest centre. Guard (n): Emden east +20 → `NLD_formation_1`; DNK bars +44 → `DNK_formation_3`. Keep coasts 710374/710380 halo/covered-by-paint and GER AW3 bars +46 / corner. FLEET-1 / MV-1b **unedited**.
+
+Live-scale xvfb FIX #6 (GER Home, RSS **2031.4**, RESULT=PASS, uncropped 1280×740):
+
+| click | z0.318 | z0.400 |
+|---|---|---|
+| ENG Div 0 / 1 | `ENG_formation_0` / `_1` | same |
+| BEL Div 0 / 1 / 2 | `BEL_formation_0` / `_1` / `_2` | same |
+| NLD Div 0 / 2 / AW3 | `NLD_formation_0` / `_2` / `_3` | same |
+| FRA Garrison 4 | `FRA_formation_4` | same |
+| Emden NLD / BEL AW3 / DNK AW3 | `NLD_formation_1` / `BEL_formation_3` / `DNK_formation_3` | same |
+| Emden NLD east +20 | `NLD_formation_1` | `NLD_formation_1` |
+| DNK AW3 bars +44 | `DNK_formation_3` | `DNK_formation_3` |
+| coast `710374` / `710380` | covered_by_paint (hex under a painted body) | same |
+| GER AW3 bars +46 / corner | `GER_formation_3` own | same |
+| own GER Div 6 / 7 / Garr 4 / AW3 | own cards | own cards |
+| Emden grid | 28 cells: 6 NLD_1 + 22 named topmost | 15 cells: 4 NLD_1 + 11 named topmost |
+
+All 8 plates at 0.318 / 0.40 / 0.80 / 1.50 opened their own fleet. East Kent + old ENG → `ENG_formation_2`. GER-nearest gap → `GER_formation_2` own card. Evidence `docs/evidence/fleet2_fix6/`. Cases (a)–(n).
+
+Isolated keep-green (FIX #6 tip `d15ac739`; wrapper `rss_mb` preferred; MV-1/MV-1b **unedited**):
+
+| gate | kind | result | peak RSS MB |
+|---|---|---|---|
+| FLEET-2 hd / xvfb | both | PASS (a–n) | **1209.0 / 1340.7** |
+| FLEET-1 hd / xvfb | both | PASS (a–h, unedited) | **1203.5 / 1344.5** |
+| hd_mv1 | headless | PASS (unedited) | **1203.3** |
+| hd_mv1b | headless | PASS (unedited) | **1203.3** |
+| hd_rh1 | headless | PASS | **1203.1** |
+| hd_ix1 (6) | headless | PASS (MandateGate PASS) | **1203.2–1207.7** |
+| hd_rx1 (4) | headless | PASS | **1203.1–1203.3** |
+| hd_rt1 (3) | headless | PASS | **1203.1–1203.3** |
+| xvfb_mv1 | xvfb | PASS | **2040.8** |
+| xvfb_mv1_card | xvfb | PASS | **2045.2** |
+| xvfb_rh1 | xvfb | PASS | **2041.1** |
+| py_fac1a | py | PASS 7/7 | — |
+| hd_fac1a | headless | PASS | **1203.5** |
+| xvfb_fac1a | xvfb | PASS stale_lag=true 15/15 lone+cluster rx1 0.843/0.843 | **2043.8** |
+| CRASH-1 10× hd + 10× xvfb | both | PASS | wrapper 10×+10× |
+| MV-1e 15/15 @ 4× | hd+xvfb | PASS | **1203.3 / 1343.4** |
+| Seeded RX-1 mid_river ON/OFF | xvfb | PASS units-off **0.749** / close 0.775 / spine 1.000 | isolated |
+| UI-1 guard hd+xvfb | both | PASS | **1207.9 / 1353.7** |
+| FLEET-2 live-scale xvfb | xvfb | PASS 8 plates × 4 zooms; East Kent; GER gap; Emden east +20 NLD; DNK bars +44 DNK; AW3 bars/corner own | **2031.4** |
 
 ### CRASH-1 halt-march popup (draft HOLD)
 
