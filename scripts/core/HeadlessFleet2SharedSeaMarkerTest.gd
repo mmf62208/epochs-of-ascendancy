@@ -494,9 +494,9 @@ func _setup_formations() -> bool:
 		return false
 	if not _register_formation(FID_FRA_FLEET_KOLN, FRA_TAG, "fleet", DESIGN_FLEET, KOLN, "FRA Köln Fleet"):
 		return false
-	if not _register_formation(FID_NLD_LAND, NLD_TAG, "division", DESIGN_LAND, EAST_KENT, "NLD Div 1"):
+	if not _register_formation(FID_NLD_LAND, NLD_TAG, "division", DESIGN_LAND, -1, "NLD Div 1"):
 		return false
-	if not _register_formation(FID_DNK_AIR, DNK_TAG, "air_wing", DESIGN_LAND, EAST_KENT, "DNK AW3"):
+	if not _register_formation(FID_DNK_AIR, DNK_TAG, "air_wing", DESIGN_LAND, -1, "DNK AW3"):
 		return false
 	_isolate_fixture_formations()
 	_pass("seeded production NS (GER/FRA/JAP/SOV) + Channel (ENG/ITA/POL/USA)")
