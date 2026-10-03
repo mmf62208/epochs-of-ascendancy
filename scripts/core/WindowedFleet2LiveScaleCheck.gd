@@ -871,7 +871,7 @@ func _province_world(pid: int) -> Vector2:
 
 func _write_clicks_md() -> void:
 	DirAccess.make_dir_recursive_absolute(REPO_DIR)
-	var path := "%s/CLICKS.md" % REPO_DIR
+	var path := "%s/CLICKS_DUMP.md" % REPO_DIR
 	var f := FileAccess.open(path, FileAccess.WRITE)
 	if f == null:
 		return
