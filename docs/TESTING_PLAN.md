@@ -732,6 +732,47 @@ Isolated keep-green (FIX #4 tip; wrapper `rss_mb` preferred; MV-1/MV-1b **unedit
 | UI-1 guard hd+xvfb | both | PASS | **1207.3 / 1347.0** |
 | FLEET-2 live-scale xvfb | xvfb | PASS 8 plates × 4 zooms; East Kent; GER gap; Play land/air own units | **2030.0** |
 
+**FIX #5 (Play MIXED `7f9e3ad0`):** 40 px own circle missed AW3 bars +46 / corner (→ CZE). Coasts `710374`/`710380` → NLD was a **regression**, not intended. Below z0.65, land/air hit is the painted rect (NationPlate 44×40 + StatBars 44×14 + Designation/TypeLetter/StrNum). Player-owned GIS land never opens a foreign chip stationed elsewhere. Own StatBars hit beats a nearer foreign plate. Guard (k)+(l)+(m). FLEET-1 / MV-1b **unedited**.
+
+Live-scale xvfb FIX #5 (GER Home, RSS **2045.6**, RESULT=PASS, uncropped 1280×740):
+
+| click | z0.318 | z0.400 |
+|---|---|---|
+| ENG Div 0 / 1 | `ENG_formation_0` / `_1` | same |
+| BEL Div 0 / 1 / 2 | `BEL_formation_0` / `_1` / `_2` | same |
+| NLD Div 0 / 2 / AW3 | `NLD_formation_0` / `_2` / `_3` | same |
+| FRA Garrison 4 | `FRA_formation_4` | same |
+| Emden NLD / BEL AW3 / DNK AW3 | `NLD_formation_1` / `BEL_formation_3` / `DNK_formation_3` | same |
+| coast `710374` / `710380` | own GER spill (never NLD) | same |
+| GER AW3 bars +46 / corner | `GER_formation_3` own | same |
+| own GER Div 6 / 7 / Garr 4 / AW3 | own cards | own cards |
+
+All 8 plates at 0.318 / 0.40 / 0.80 / 1.50 opened their own fleet. East Kent + old ENG → `ENG_formation_2`. GER-nearest gap → `GER_formation_2` own card. Evidence `docs/evidence/fleet2_fix5/`. Cases (a)–(m).
+
+Isolated keep-green (FIX #5 tip `a50cdeed`; wrapper `rss_mb` preferred; MV-1/MV-1b **unedited**):
+
+| gate | kind | result | peak RSS MB |
+|---|---|---|---|
+| FLEET-2 hd / xvfb | both | PASS (a–m) | **1208.6 / 1344.1** |
+| FLEET-1 hd / xvfb | both | PASS (a–h, unedited) | **1202.8 / 1341.4** |
+| hd_mv1 | headless | PASS (unedited) | **1203.0** |
+| hd_mv1b | headless | PASS (unedited) | **1203.0** |
+| hd_rh1 | headless | PASS | **1202.5** |
+| hd_ix1 (6) | headless | PASS (MandateGate PASS) | **1202.4–1207.1** |
+| hd_rx1 (4) | headless | PASS | **1202.4–1202.6** |
+| hd_rt1 (3) | headless | PASS | **1202.4–1202.6** |
+| xvfb_mv1 | xvfb | PASS | **2040.0** |
+| xvfb_mv1_card | xvfb | PASS | **2044.6** |
+| xvfb_rh1 | xvfb | PASS | **2033.2** |
+| py_fac1a | py | PASS 7/7 | — |
+| hd_fac1a | headless | PASS | **1202.8** |
+| xvfb_fac1a | xvfb | PASS stale_lag=true 15/15 lone+cluster rx1 0.843/0.843 | **2047.8** |
+| CRASH-1 10× hd + 10× xvfb | both | PASS | wrapper 10×+10× |
+| MV-1e 15/15 @ 4× | hd+xvfb | PASS | **1202.6 / 1337.9** |
+| Seeded RX-1 mid_river ON/OFF | xvfb | PASS units-off **0.749** / close 0.775 / spine 1.000 (FAC-1a 0.843/0.843) | isolated |
+| UI-1 guard hd+xvfb | both | PASS | **1207.4 / 1354.3** |
+| FLEET-2 live-scale xvfb | xvfb | PASS 8 plates × 4 zooms; East Kent; GER gap; coasts never NLD; AW3 bars/corner own | **2045.6** |
+
 ### CRASH-1 halt-march popup (draft HOLD)
 
 Halt / Press / Hold / Withdraw / Assign must not `free()` `UnitDetailPopup` while `pressed` is emitting. Detach + rename `UnitDetailPopup_dying` + `queue_free()`. Same-dest still click is a no-op re-issue. **FIX #1 (Play live MIXED `80b0b542`):** press-mode rebuild dropped the card so the mouse-up still-clicked the map (inspector + camera jump; twice switched/cleared selection). Latch `_unit_card_consumed_press` on those five buttons; `_input` / `_unhandled_input` / `_left_release_must_skip_pick` / land-chip still-click swallow the matching release. Open card refreshes Halt on march start / re-target / arrival. **CRASH-1b (CH-1):** that latch must eat **one** matching left release then clear (new left press anywhere, 1 frame after the eaten release, 0.5s safety) so later top-bar / UI clicks register. Guard: Halt still no click-through; ≥4 UI press+release after swallow; following map still-click commits. Headless `HeadlessCrash1HaltMarchPopupTest` + `tools/eoa_crash1_halt_march_guard.sh` 10× hd + 10× xvfb — **NOT live Play**. MV-1 / MV-1b gates **unedited**.
