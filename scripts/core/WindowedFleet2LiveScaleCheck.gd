@@ -1,12 +1,13 @@
 extends SceneTree
 
-## FLEET-2 FIX #5 live-scale check on the real world_accurate board.
+## FLEET-2 FIX #6 live-scale check on the real world_accurate board.
 ## xvfb exactly 1280x740 · GER · Europe Home · Channel + North Sea at Home zoom
 ## and ~1.5. Pixel-assert each plate centre. Click all 8 plates at 0.318 / 0.40
 ## / 0.8 / 1.5 plus East Kent, old ENG chip, and a GER-nearest gap.
 ## Also click Play-listed land/air counters at 0.318 / 0.40, coasts 710374 /
-## 710380 (own GER or province, never foreign), own AW3 bars +46 / corner,
-## and own GER bodies. xvfb is NOT live Play. Never EOA_SKIP_TITLE.
+## 710380 (own GER or province in the halo), Emden NLD east +20, DNK AW3
+## bars +44, own AW3 bars +46 / corner, Emden painted-rect grid, and own
+## GER bodies. xvfb is NOT live Play. Never EOA_SKIP_TITLE.
 ##
 ##   tools/eoa_fleet2_live_scale_check.sh
 
@@ -23,7 +24,7 @@ const VIEW_H := 740
 const WAIT_MAP_SECS := 420
 const SETTLE_FRAMES := 36
 const GER_TAG := "GER"
-const REPO_DIR := "docs/evidence/fleet2_fix5"
+const REPO_DIR := "docs/evidence/fleet2_fix6"
 const COAST_A := 710374
 const COAST_B := 710380
 
@@ -74,7 +75,7 @@ func _start() -> void:
 		_out_dir = "/tmp/eoa-fleet2-live"
 	DirAccess.make_dir_recursive_absolute(_out_dir)
 	if DirAccess.dir_exists_absolute("/opt/cursor/artifacts"):
-		DirAccess.make_dir_recursive_absolute("/opt/cursor/artifacts/fleet2-fix5")
+		DirAccess.make_dir_recursive_absolute("/opt/cursor/artifacts/fleet2-fix6")
 	if OS.get_environment("EOA_SMOKE_AUTO_BEGIN").strip_edges() != "1":
 		OS.set_environment("EOA_SMOKE_AUTO_BEGIN", "1")
 	_log("EOA_FLEET2_LIVE who=guard.boot out=%s view=%dx%d (NOT product Play)" % [_out_dir, VIEW_W, VIEW_H])
@@ -366,6 +367,9 @@ func _click_land_air_guard(z: float) -> void:
 	_click_coast_hex(z, COAST_A)
 	_click_coast_hex(z, COAST_B)
 	_click_own_aw3_painted(z)
+	_click_emden_east(z)
+	_click_dnk_aw3_bars(z)
+	_click_emden_grid(z)
 
 
 func _click_own_ger_bodies(z: float) -> void:
@@ -398,13 +402,194 @@ func _click_coast_hex(z: float, pid: int) -> void:
 	if pos == Vector2.ZERO:
 		_fail_reasons.append("coast_%d_no_centroid" % pid)
 		return
+	# Halo probe: if the centroid sits on a painted foreign plate (Emden
+	# NLD overhangs Cuxhaven), walk to a point that still GIS-resolves to
+	# this hex but misses every painted body — that is the FIX #5 coast fix.
+	var halo: Vector2 = _halo_point_in_province(pid, pos, z)
+	if halo.distance_to(pos) > 0.5:
+		_log("EOA_FLEET2_LIVE who=coast_halo pid=%d centroid=%.1f,%.1f halo=%.1f,%.1f z=%.3f" % [
+			pid, pos.x, pos.y, halo.x, halo.y, z
+		])
 	_click_one({
 		"who": "z%.3f_coast_%d" % [z, pid],
-		"pos": pos,
+		"pos": halo,
 		"own": false,
 		"kind": "hex_own_or_province",
 		"want_tags": ["GER"],
 	})
+
+
+func _click_emden_east(z: float) -> void:
+	var counters: Array = _collect_land_air_counters()
+	var hit: Dictionary = _match_land_air(counters, "NLD", "division", 1)
+	if hit.is_empty():
+		_fail_reasons.append("missing_Emden_NLD_east_z%.3f" % z)
+		return
+	var base: Vector2 = hit.get("pos", Vector2.ZERO) as Vector2
+	var east: Vector2 = base + Vector2(20.0 / maxf(z, 0.05), 0.0)
+	_click_one({
+		"who": "z%.3f_Emden_NLD_east20" % z,
+		"pos": east,
+		"own": false,
+		"kind": "land",
+		"want_tags": ["NLD"],
+		"want_type": "division",
+		"want_fid": str(hit.get("fid", "")),
+	})
+
+
+func _click_dnk_aw3_bars(z: float) -> void:
+	var counters: Array = _collect_land_air_counters()
+	var hit: Dictionary = _match_land_air(counters, "DNK", "air_wing", 3)
+	if hit.is_empty():
+		_fail_reasons.append("missing_DNK_AW3_bars_z%.3f" % z)
+		return
+	var icon: Node2D = hit.get("icon", null) as Node2D
+	var base: Vector2 = hit.get("pos", Vector2.ZERO) as Vector2
+	var bars: Vector2 = base + Vector2(0.0, 44.0 / maxf(z, 0.05))
+	if icon != null and is_instance_valid(icon):
+		var xf: Transform2D = icon.get_global_transform()
+		var local_bars: Vector2 = xf * Vector2(0.0, 27.0)
+		if _world_in_icon_painted(icon, bars):
+			pass
+		else:
+			bars = local_bars
+	_click_one({
+		"who": "z%.3f_DNK_AW3_bars44" % z,
+		"pos": bars,
+		"own": false,
+		"kind": "land",
+		"want_tags": ["DNK"],
+		"want_type": "air_wing",
+		"want_fid": str(hit.get("fid", "")),
+	})
+
+
+func _click_emden_grid(z: float) -> void:
+	var counters: Array = _collect_land_air_counters()
+	var hit: Dictionary = _match_land_air(counters, "NLD", "division", 1)
+	if hit.is_empty():
+		_fail_reasons.append("missing_Emden_NLD_grid_z%.3f" % z)
+		return
+	var icon: Node2D = hit.get("icon", null) as Node2D
+	var base: Vector2 = hit.get("pos", Vector2.ZERO) as Vector2
+	var want_fid := str(hit.get("fid", ""))
+	var dxs: Array = [-30, -20, -10, 0, 10, 20, 30]
+	var dys: Array = [-24, 0, 24, 46]
+	if z >= 0.36:
+		dxs = [-30, -15, 0, 15, 30]
+		dys = [-20, 5, 35]
+	var nld1_n: int = 0
+	var other_n: int = 0
+	var outside_n: int = 0
+	var zz: float = maxf(z, 0.05)
+	for dx_v in dxs:
+		for dy_v in dys:
+			var dx: float = float(dx_v)
+			var dy: float = float(dy_v)
+			var world: Vector2 = base + Vector2(dx / zz, dy / zz)
+			var in_nld: bool = _world_in_icon_painted(icon, world)
+			var fo: Object = null
+			var mr := _map_renderer()
+			if mr != null and mr.has_method("_pick_unit_formation_at_world"):
+				fo = mr.call("_pick_unit_formation_at_world", world)
+			var fid := str(fo.formation_id) if fo != null and "formation_id" in fo else "null"
+			var tag := str(fo.country_tag).strip_edges().to_upper() if fo != null and "country_tag" in fo else "?"
+			var top_name := _name_topmost_painted(world)
+			if in_nld:
+				if fid == want_fid:
+					nld1_n += 1
+				else:
+					other_n += 1
+					# Inside NLD paint: only OK when a different counter is
+					# drawn on top of this cell.
+					if top_name.is_empty() or top_name == want_fid or top_name == "null":
+						_fail_reasons.append(
+							"emden_grid_z%.3f_%d_%d_got_%s_no_topmost" % [z, int(dx), int(dy), fid]
+						)
+			else:
+				outside_n += 1
+			_log(
+				"EOA_FLEET2_LIVE who=emden_grid z=%.3f dx=%d dy=%d world=%.1f,%.1f in_nld=%s fid=%s tag=%s topmost=%s"
+				% [z, int(dx), int(dy), world.x, world.y, str(in_nld), fid, tag, top_name]
+			)
+			_click_log.append(
+				"grid z=%.3f dx=%d dy=%d in_nld=%s fid=%s topmost=%s" % [
+					z, int(dx), int(dy), str(in_nld), fid, top_name
+				]
+			)
+	_log(
+		"EOA_FLEET2_LIVE who=emden_grid_sum z=%.3f nld1=%d other=%d outside=%d cells=%d"
+		% [z, nld1_n, other_n, outside_n, nld1_n + other_n + outside_n]
+	)
+
+
+func _halo_point_in_province(pid: int, start: Vector2, z: float) -> Vector2:
+	if not _any_painted_at(start):
+		return start
+	var mr := _map_renderer()
+	var zz: float = maxf(z, 0.05)
+	var radii: Array = [12, 24, 36, 48, 64, 80, 100, 128]
+	for r_v in radii:
+		var r: float = float(r_v) / zz
+		for i in 16:
+			var p: Vector2 = start + Vector2(r, 0.0).rotated(TAU * float(i) / 16.0)
+			var hid: int = -1
+			if mr != null and mr.has_method("_resolve_hex_pick_pid"):
+				hid = int(mr.call("_resolve_hex_pick_pid", p))
+			if hid == pid and not _any_painted_at(p):
+				return p
+	return start
+
+
+func _any_painted_at(world: Vector2) -> bool:
+	return not _name_topmost_painted(world).is_empty()
+
+
+func _name_topmost_painted(world: Vector2) -> String:
+	var mr := _map_renderer()
+	if mr == null or not ("_demo_unit_icon_pids" in mr):
+		return ""
+	var best: Node2D = null
+	var best_fid := ""
+	for id_v in mr._demo_unit_icon_pids:
+		var id: int = int(id_v)
+		if not mr.has_method("_iter_demo_unit_icons_at_pid"):
+			continue
+		for c_v in mr.call("_iter_demo_unit_icons_at_pid", id) as Array:
+			var icon: Node2D = c_v as Node2D
+			if icon == null or not is_instance_valid(icon) or not icon.visible:
+				continue
+			var painted: bool = false
+			if bool(icon.get_meta("sea_nation_disk", false)):
+				var chip_pos: Vector2 = icon.global_position
+				if mr.has_method("_demo_unit_icon_world_pos"):
+					chip_pos = mr.call("_demo_unit_icon_world_pos", icon, id) as Vector2
+				var hit_r: float = 14.5
+				if mr.has_method("_demo_unit_icon_hit_radius_world"):
+					hit_r = float(mr.call("_demo_unit_icon_hit_radius_world", 1.0, icon))
+				painted = world.distance_to(chip_pos) <= hit_r
+			else:
+				painted = _world_in_icon_painted(icon, world)
+			if not painted:
+				continue
+			var fo: Object = null
+			if mr.has_method("_formation_from_demo_icon"):
+				fo = mr.call("_formation_from_demo_icon", icon)
+			var fid := str(fo.formation_id) if fo != null and "formation_id" in fo else str(icon.get_meta("formation_id", ""))
+			if best == null:
+				best = icon
+				best_fid = fid
+				continue
+			var above: bool = false
+			if mr.has_method("_unit_counter_is_drawn_above"):
+				above = bool(mr.call("_unit_counter_is_drawn_above", icon, best))
+			else:
+				above = icon.is_greater_than(best)
+			if above:
+				best = icon
+				best_fid = fid
+	return best_fid
 
 
 func _click_own_aw3_painted(z: float) -> void:
@@ -545,8 +730,9 @@ func _write_clicks_md() -> void:
 	var f := FileAccess.open(path, FileAccess.WRITE)
 	if f == null:
 		return
-	f.store_string("# FLEET-2 FIX #5 live-scale clicks\n\n")
+	f.store_string("# FLEET-2 FIX #6 live-scale clicks\n\n")
 	f.store_string("xvfb 1280x740 · GER · Europe Home · world_accurate. NOT live Play.\n\n")
+	f.store_string("Topmost painted counter (z_index, then scene-tree / CanvasItem order) wins. Ownership only in the halo.\n\n")
 	f.store_string("| click | result |\n|---|---|\n")
 	for line_v in _click_log:
 		var line := str(line_v)
@@ -743,8 +929,8 @@ func _capture(name: String, zoom: float, cam_world: Vector2) -> bool:
 	var path := "%s/%s.png" % [_out_dir, name]
 	img.save_png(path)
 	_captures.append(path)
-	if DirAccess.dir_exists_absolute("/opt/cursor/artifacts/fleet2-fix4"):
-		img.save_png("/opt/cursor/artifacts/fleet2-fix4/%s.png" % name)
+	if DirAccess.dir_exists_absolute("/opt/cursor/artifacts/fleet2-fix6"):
+		img.save_png("/opt/cursor/artifacts/fleet2-fix6/%s.png" % name)
 	DirAccess.make_dir_recursive_absolute(REPO_DIR)
 	img.save_png("%s/%s.png" % [REPO_DIR, name])
 	var z := 0.0

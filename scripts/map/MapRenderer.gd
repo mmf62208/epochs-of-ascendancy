@@ -19544,8 +19544,9 @@ func _try_open_land_unit_at_world(
 	# cursor wins. Cluster/gap bind is only for a no-body click BETWEEN
 	# plates (East Kent / own-GER gap) — not an outer AABB over Kent.
 	# Köln FRA stays land-stationed / not a sea_nation_disk (MV-1b).
-	# FIX #5: land/air body below z0.65 is the painted rect; a player-owned
-	# land hex never opens a foreign land/air chip stationed elsewhere.
+	# FIX #5: land/air body below z0.65 is the painted rect.
+	# FIX #6: the topmost painted counter (plate / bars / label) wins;
+	# player-land ownership only applies in the halo (no painted body).
 	var cam_sea := get_viewport().get_camera_2d() if get_viewport() else null
 	var z_sea: float = 1.0
 	if cam_sea:
@@ -20464,7 +20465,10 @@ func _pick_unit_formation_at_world(world_pos: Vector2, land_only: bool = false, 
 	var best_any: Object = null
 	var best_any_d := INF
 	var best_bar_player: Object = null
-	var best_bar_player_d: float = INF
+	var painted_fo: Object = null
+	var painted_counter: Node2D = null
+	var own_bars_fo: Object = null
+	var own_bars_counter: Node2D = null
 	var p_tag := _player_tag()
 	for id_v in _demo_unit_icon_pids:
 		var id := int(id_v)
@@ -20481,6 +20485,8 @@ func _pick_unit_formation_at_world(world_pos: Vector2, land_only: bool = false, 
 			var is_sea_disk: bool = bool(counter.get_meta("sea_nation_disk", false))
 			# FIX #5: below z0.65 land/air hit is the painted rect (plate+bars+
 			# label), own and foreign — not the 40 px circle.
+			# FIX #6: painted body is accepted without the ownership block;
+			# topmost draw order wins (not nearest centre).
 			if z < 0.65 and not is_sea_disk:
 				if not _world_in_unit_painted_rect(world_pos, counter):
 					continue
@@ -20501,8 +20507,9 @@ func _pick_unit_formation_at_world(world_pos: Vector2, land_only: bool = false, 
 						fo = f2 as Object
 			if fo == null:
 				continue
-			if z < 0.65 and not is_sea_disk and _foreign_land_air_blocked_on_player_hex(world_pos, fo):
-				continue
+			# FIX #6: painted plate / bars / label under the cursor are never
+			# ownership-blocked. Halo (no painted body) never reaches here at
+			# z<0.65 — those clicks fall through to pad / own-land spill.
 			if land_only and _formation_type_blocks_land_open(fo):
 				continue
 			if player_only:
@@ -20510,6 +20517,15 @@ func _pick_unit_formation_at_world(world_pos: Vector2, land_only: bool = false, 
 					continue
 				if str(fo.country_tag).strip_edges().to_upper() != p_tag:
 					continue
+			if z < 0.65 and not is_sea_disk:
+				if painted_counter == null or _unit_counter_is_drawn_above(counter, painted_counter):
+					painted_counter = counter
+					painted_fo = fo
+				if _formation_is_player_tag(fo) and _world_in_unit_stat_bars(world_pos, counter):
+					if own_bars_counter == null or _unit_counter_is_drawn_above(counter, own_bars_counter):
+						own_bars_counter = counter
+						own_bars_fo = fo
+				continue
 			# Inclusive disk: accept boundary (d == hit_r2) as a valid best.
 			if d <= best_any_d:
 				best_any_d = d
@@ -20519,20 +20535,23 @@ func _pick_unit_formation_at_world(world_pos: Vector2, land_only: bool = false, 
 				if str(fo.country_tag).strip_edges().to_upper() == p_tag and d <= best_player_d:
 					best_player_d = d
 					best_player = fo
-			# Own strength-bar strip beats a nearer foreign plate that only
-			# overlaps the bars (Berlin AW3 +46 → CZE). Foreign StatBars
-			# must not steal a neighbour chip centre.
-			if z < 0.65 and not is_sea_disk and _formation_is_player_tag(fo):
-				if _world_in_unit_stat_bars(world_pos, counter) and d <= best_bar_player_d:
-					best_bar_player_d = d
-					best_bar_player = fo
 	# FIX #4 (a): nearest DRAWN body wins (plate or land/air). A land/air
 	# chip whose centre sits *outside* a between-plates hole must not
 	# spill into that hole (East Kent / old ENG stay Channel).
 	# player_only still skips foreign plates (MV-1b). land_only skips fleets.
+	# FIX #6: below z0.65 the painted land/air winner is topmost-drawn.
+	# Own StatBars still beat a foreign plate that draws on top of them.
 	var sea_drawn: Object = _pick_sea_nation_plate_drawn_at_world(world_pos, z)
 	var land_body: Object = best_any
-	if best_bar_player != null:
+	if painted_fo != null:
+		land_body = painted_fo
+		if _formation_is_player_tag(painted_fo):
+			best_player = painted_fo
+	if own_bars_fo != null and (land_body == null or not _formation_is_player_tag(land_body)):
+		land_body = own_bars_fo
+		best_player = own_bars_fo
+		best_bar_player = own_bars_fo
+	if best_bar_player != null and land_body == null:
 		land_body = best_bar_player
 		best_player = best_bar_player
 	if land_body != null and _land_air_body_blocked_by_cluster_hole(world_pos, land_body, z):
@@ -26254,7 +26273,9 @@ func _unit_counter_drawn_body_radius_world(z: float, counter: Node2D = null) -> 
 
 
 func _pick_drawn_land_air_body_at_world(world_pos: Vector2, z: float = -1.0) -> Object:
-	# Nearest visible land/air counter whose drawn body contains the click.
+	# Visible land/air counter whose drawn body contains the click.
+	# FIX #6: below z0.65 the topmost painted body wins (draw order, not
+	# nearest centre). Ownership is not applied on a painted hit.
 	var zz: float = z
 	if zz < 0.05:
 		var cam := get_viewport().get_camera_2d() if get_viewport() else null
@@ -26262,9 +26283,10 @@ func _pick_drawn_land_air_body_at_world(world_pos: Vector2, z: float = -1.0) -> 
 		if cam:
 			zz = maxf(cam.zoom.x, cam.zoom.y)
 	var best: Object = null
+	var best_counter: Node2D = null
 	var best_d: float = INF
 	var best_bar: Object = null
-	var best_bar_d: float = INF
+	var best_bar_counter: Node2D = null
 	for id_v in _demo_unit_icon_pids:
 		var id: int = int(id_v)
 		for c_v in _iter_demo_unit_icons_at_pid(id):
@@ -26284,22 +26306,58 @@ func _pick_drawn_land_air_body_at_world(world_pos: Vector2, z: float = -1.0) -> 
 			if zz < 0.65:
 				if not _world_in_unit_painted_rect(world_pos, icon):
 					continue
-				if _foreign_land_air_blocked_on_player_hex(world_pos, fo):
-					continue
 			else:
 				var hit_r: float = _demo_unit_icon_hit_radius_world(zz, icon)
 				if d > hit_r:
 					continue
-			if zz < 0.65 and _formation_is_player_tag(fo) and _world_in_unit_stat_bars(world_pos, icon):
-				if d <= best_bar_d:
-					best_bar_d = d
-					best_bar = fo
+			if zz < 0.65:
+				if best_counter == null or _unit_counter_is_drawn_above(icon, best_counter):
+					best_counter = icon
+					best = fo
+				if _formation_is_player_tag(fo) and _world_in_unit_stat_bars(world_pos, icon):
+					if best_bar_counter == null or _unit_counter_is_drawn_above(icon, best_bar_counter):
+						best_bar_counter = icon
+						best_bar = fo
+				continue
 			if d <= best_d:
 				best_d = d
 				best = fo
-	if best_bar != null:
+	if best_bar != null and (best == null or not _formation_is_player_tag(best)):
 		return best_bar
 	return best
+
+
+func _unit_counter_effective_z_index(counter: Node2D) -> int:
+	# CanvasItem draw order: absolute z_index, then tree order.
+	if counter == null or not is_instance_valid(counter):
+		return -2147483648
+	var z: int = counter.z_index
+	if not counter.z_as_relative:
+		return z
+	var acc: int = z
+	var walk: Node = counter.get_parent()
+	while walk != null:
+		if walk is CanvasItem:
+			var ci: CanvasItem = walk as CanvasItem
+			acc += ci.z_index
+			if not ci.z_as_relative:
+				break
+		walk = walk.get_parent()
+	return acc
+
+
+func _unit_counter_is_drawn_above(a: Node2D, b: Node2D) -> bool:
+	# True when `a` is painted on top of `b` (same rule Godot uses: higher
+	# z_index, then later in the scene tree). Not nearest-centre.
+	if a == null or not is_instance_valid(a):
+		return false
+	if b == null or not is_instance_valid(b):
+		return true
+	var za: int = _unit_counter_effective_z_index(a)
+	var zb: int = _unit_counter_effective_z_index(b)
+	if za != zb:
+		return za > zb
+	return a.is_greater_than(b)
 
 
 func _unit_counter_painted_local_rect(counter: Node2D) -> Rect2:
@@ -26419,8 +26477,10 @@ func _province_owner_tag(pid: int) -> String:
 
 
 func _foreign_land_air_blocked_on_player_hex(world_pos: Vector2, fo: Object) -> bool:
-	# Player-owned GIS land must not open a foreign land/air chip that is
-	# stationed on another province (Cuxhaven / Heidekreis → Emden NLD).
+	# Halo / fallback only (FIX #6). Do not apply when a painted plate,
+	# strength-bar strip or label is under the click — that painted body
+	# wins (Emden east / DNK bars). Cuxhaven / Heidekreis stay GER when
+	# the click misses every painted body and spills to own land.
 	if fo == null or _formation_is_player_tag(fo):
 		return false
 	if _formation_is_fleet_counter(fo):

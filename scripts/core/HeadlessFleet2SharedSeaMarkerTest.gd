@@ -50,7 +50,9 @@ const FID_POL_FLEET := "fleet2_pol_channel"
 const FID_USA_FLEET := "fleet2_usa_channel"
 const FID_FRA_FLEET_KOLN := "fleet2_fra_koln"
 const FID_NLD_LAND := "fleet2_nld_div0"
+const FID_DNK_AIR := "fleet2_dnk_aw3"
 const NLD_TAG := "NLD"
+const DNK_TAG := "DNK"
 const DESIGN_LAND := "infantry_1936"
 const DESIGN_FLEET := "king_george_v_class_bb"
 const WORLD_MAGINOT := Vector2(4283.279410731325, 1010.2668539708038)
@@ -195,6 +197,7 @@ func _run() -> void:
 	_test_k_spread_band_live_clicks()
 	_test_l_land_counters_keep_own_body()
 	_test_m_painted_rect_and_player_land()
+	_test_n_topmost_painted_over_player_land()
 	_cleanup()
 
 
@@ -322,6 +325,23 @@ func _test_source_needles() -> void:
 		return
 	if "40.0 / maxf(z, 0.05)" in ren:
 		_fail("FIX #5 must not keep the 40 px own-only circle cap")
+		return
+	if "func _unit_counter_is_drawn_above" not in ren:
+		_fail("FIX #6 topmost-drawn helper missing")
+		return
+	if "func _unit_counter_effective_z_index" not in ren:
+		_fail("FIX #6 CanvasItem z_index helper missing")
+		return
+	var drawn_fn := _slice_func(ren, "_pick_drawn_land_air_body_at_world")
+	if "_foreign_land_air_blocked_on_player_hex" in drawn_fn:
+		_fail("FIX #6 painted-body pick must not apply the ownership block")
+		return
+	if "_unit_counter_is_drawn_above" not in drawn_fn:
+		_fail("FIX #6 painted-body pick must use draw order, not only nearest centre")
+		return
+	var pick6 := _slice_func(ren, "_pick_unit_formation_at_world")
+	if "_unit_counter_is_drawn_above" not in pick6:
+		_fail("FIX #6 unit pick must use topmost draw order on painted bodies")
 		return
 	var pad_fn := _slice_func(ren, "_world_in_sea_nation_cluster_pad")
 	if "p.x - rr" in pad_fn or "hit_r + pad" in pad_fn:
@@ -474,7 +494,9 @@ func _setup_formations() -> bool:
 		return false
 	if not _register_formation(FID_FRA_FLEET_KOLN, FRA_TAG, "fleet", DESIGN_FLEET, KOLN, "FRA Köln Fleet"):
 		return false
-	if not _register_formation(FID_NLD_LAND, NLD_TAG, "division", DESIGN_LAND, -1, "NLD Div 0"):
+	if not _register_formation(FID_NLD_LAND, NLD_TAG, "division", DESIGN_LAND, EAST_KENT, "NLD Div 1"):
+		return false
+	if not _register_formation(FID_DNK_AIR, DNK_TAG, "air_wing", DESIGN_LAND, EAST_KENT, "DNK AW3"):
 		return false
 	_isolate_fixture_formations()
 	_pass("seeded production NS (GER/FRA/JAP/SOV) + Channel (ENG/ITA/POL/USA)")
@@ -496,6 +518,7 @@ func _isolate_fixture_formations() -> void:
 		FID_USA_FLEET: true,
 		FID_FRA_FLEET_KOLN: true,
 		FID_NLD_LAND: true,
+		FID_DNK_AIR: true,
 	}
 	var pids: Dictionary = {MAGINOT: true, KOLN: true, EAST_KENT: true, NORTH_SEA: true, CHANNEL: true}
 	if _lm == null or not ("formations" in _lm) or not (_lm.formations is Dictionary):
@@ -1276,6 +1299,8 @@ func _place_land_chip_at(pid: int, fid: String, world: Vector2) -> Node2D:
 	icon.visible = true
 	host.add_child(icon)
 	icon.global_position = world
+	icon.z_index = 28
+	icon.z_as_relative = false
 	var fo: Object = _formation(fid)
 	if fo != null:
 		icon.set_meta("formation", fo)
@@ -1409,14 +1434,16 @@ func _test_l_land_counters_keep_own_body() -> void:
 
 
 func _test_m_painted_rect_and_player_land() -> void:
-	# FIX #5 (m): player-owned land must not open a foreign chip stationed
-	# elsewhere (Cuxhaven / Heidekreis → Emden NLD). Own AW3 bars / corner
-	# inside the painted rect must still pick the own unit.
+	# FIX #5 / #6 (m): player-owned land in the HALO (no painted body) must
+	# not open a foreign chip stationed elsewhere (Cuxhaven / Heidekreis).
+	# Own AW3 bars / corner inside the painted rect must still pick the own unit.
 	var z: float = 0.318
 	_apply_zoom(z)
 	if not _resolve_marker_coords():
 		return
-	var nld_pos: Vector2 = WORLD_MAGINOT + Vector2(72.0, 0.0)
+	# Far enough that Maginot centroid sits outside the painted plate
+	# (half-width ≈ 22 × scale; scale ~5 → ~110 world).
+	var nld_pos: Vector2 = WORLD_MAGINOT + Vector2(280.0, 0.0)
 	var nld_icon: Node2D = _place_land_chip_at(EAST_KENT, FID_NLD_LAND, nld_pos)
 	if nld_icon == null:
 		_fail("(m) NLD land chip missing")
@@ -1485,7 +1512,80 @@ func _test_m_painted_rect_and_player_land() -> void:
 		return
 	_free_icon(ger_icon)
 	_apply_zoom(1.0)
-	_pass("(m) player-owned land never opens foreign NLD; own painted bars/corner pick GER")
+	_pass("(m) player-owned halo never opens foreign NLD; own painted bars/corner pick GER")
+
+
+func _test_n_topmost_painted_over_player_land() -> void:
+	# FIX #6 (n): a painted foreign body on player-owned land still wins.
+	# Emden NLD east +20 px → NLD; DNK AW3 bars +44 px → DNK.
+	var z: float = 0.318
+	_apply_zoom(z)
+	if not _resolve_marker_coords():
+		return
+	var nld_icon: Node2D = _place_land_chip_at(EAST_KENT, FID_NLD_LAND, WORLD_MAGINOT)
+	if nld_icon == null:
+		_fail("(n) NLD land chip missing")
+		return
+	var nld_s: float = 5.0
+	if _mr.has_method("_unit_counter_scale_for_zoom"):
+		nld_s = maxf(4.0, float(_mr.call("_unit_counter_scale_for_zoom", z)))
+	nld_icon.scale = Vector2(nld_s, nld_s)
+	nld_icon.visible = true
+	nld_icon.z_index = 28
+	nld_icon.z_as_relative = false
+	if _mr.has_method("_attach_unit_counter_chrome"):
+		_mr.call("_attach_unit_counter_chrome", nld_icon, _formation(FID_NLD_LAND), Color(0.2, 0.4, 0.7, 1.0))
+	var east: Vector2 = WORLD_MAGINOT + Vector2(20.0 / z, 0.0)
+	if not bool(_mr.call("_world_in_unit_painted_rect", east, nld_icon)):
+		_fail("(n) Emden-east +20 px must sit in the NLD painted rect")
+		_free_icon(nld_icon)
+		return
+	_reset_pick()
+	var east_fo: Object = _mr.call("_pick_unit_formation_at_world", east)
+	var east_fid := str(east_fo.formation_id) if east_fo != null and "formation_id" in east_fo else "?"
+	if east_fid != FID_NLD_LAND:
+		_fail("(n) Emden-east +20 px pick=%s want NLD" % east_fid)
+		_free_icon(nld_icon)
+		return
+	_reset_pick()
+	if not _click_chip_path(east) or _selected_fid() != FID_NLD_LAND:
+		_fail("(n) Emden-east +20 px selected=%s" % _selected_fid())
+		_free_icon(nld_icon)
+		return
+	_free_icon(nld_icon)
+	var dnk_icon: Node2D = _place_land_chip_at(EAST_KENT, FID_DNK_AIR, WORLD_MAGINOT)
+	if dnk_icon == null:
+		_fail("(n) DNK air chip missing")
+		return
+	dnk_icon.scale = Vector2(nld_s, nld_s)
+	dnk_icon.visible = true
+	dnk_icon.z_index = 28
+	dnk_icon.z_as_relative = false
+	if _mr.has_method("_attach_unit_counter_chrome"):
+		_mr.call("_attach_unit_counter_chrome", dnk_icon, _formation(FID_DNK_AIR), Color(0.75, 0.15, 0.18, 1.0))
+	var bars: Vector2 = dnk_icon.get_global_transform() * Vector2(0.0, 27.0)
+	var bars_px: Vector2 = WORLD_MAGINOT + Vector2(0.0, 44.0 / z)
+	if bool(_mr.call("_world_in_unit_painted_rect", bars_px, dnk_icon)):
+		bars = bars_px
+	if not bool(_mr.call("_world_in_unit_painted_rect", bars, dnk_icon)):
+		_fail("(n) DNK bars +44 px must sit in the DNK painted rect")
+		_free_icon(dnk_icon)
+		return
+	_reset_pick()
+	var bars_fo: Object = _mr.call("_pick_unit_formation_at_world", bars)
+	var bars_fid := str(bars_fo.formation_id) if bars_fo != null and "formation_id" in bars_fo else "?"
+	if bars_fid != FID_DNK_AIR:
+		_fail("(n) DNK bars +44 px pick=%s want DNK" % bars_fid)
+		_free_icon(dnk_icon)
+		return
+	_reset_pick()
+	if not _click_chip_path(bars) or _selected_fid() != FID_DNK_AIR:
+		_fail("(n) DNK bars +44 px selected=%s" % _selected_fid())
+		_free_icon(dnk_icon)
+		return
+	_free_icon(dnk_icon)
+	_apply_zoom(1.0)
+	_pass("(n) painted Emden-east +20 opens NLD; DNK bars +44 open DNK (ownership halo-only)")
 
 
 func _sea_nation_cluster_icons(pid: int) -> Array:
@@ -1507,6 +1607,7 @@ func _cleanup() -> void:
 		_lm.formations.erase(FID_USA_FLEET)
 		_lm.formations.erase(FID_FRA_FLEET_KOLN)
 		_lm.formations.erase(FID_NLD_LAND)
+		_lm.formations.erase(FID_DNK_AIR)
 	if _mr != null and is_instance_valid(_mr):
 		_mr.queue_free()
 		_mr = null
