@@ -1,6 +1,6 @@
 # FLEET-2 FIX #6 live-scale clicks (xvfb 1280×740, GER, Europe Home, world_accurate)
 
-Live-scale tip `d15ac739`. Home zoom **0.318**. RSS peak **2031.4 MB**. RESULT=**PASS**. xvfb ≠ live Play.
+Live-scale tip `d15ac739` (docs follow-up on the same pick rule). Home zoom **0.318**. RSS peak **2031.4 MB**. RESULT=**PASS**. xvfb ≠ live Play.
 
 ## Topmost-painted rule
 
