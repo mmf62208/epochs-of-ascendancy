@@ -19544,6 +19544,8 @@ func _try_open_land_unit_at_world(
 	# cursor wins. Cluster/gap bind is only for a no-body click BETWEEN
 	# plates (East Kent / own-GER gap) — not an outer AABB over Kent.
 	# Köln FRA stays land-stationed / not a sea_nation_disk (MV-1b).
+	# FIX #5: land/air body below z0.65 is the painted rect; a player-owned
+	# land hex never opens a foreign land/air chip stationed elsewhere.
 	var cam_sea := get_viewport().get_camera_2d() if get_viewport() else null
 	var z_sea: float = 1.0
 	if cam_sea:
@@ -20473,12 +20475,17 @@ func _pick_unit_formation_at_world(world_pos: Vector2, land_only: bool = false, 
 				continue
 			# Live painted plate after Home/fit. Prefer chrome world pos (not AABB-floor widen).
 			var chip_pos: Vector2 = _demo_unit_icon_world_pos(counter, id)
-			# Home-band chips paint plate+label; stacked sea-nation disks use the plate.
-			var hit_r := _demo_unit_icon_hit_radius_world(z, counter)
-			var hit_r2 := hit_r * hit_r
-			var d := world_pos.distance_squared_to(chip_pos)
-			if d > hit_r2:
-				continue
+			var d: float = world_pos.distance_squared_to(chip_pos)
+			var is_sea_disk: bool = bool(counter.get_meta("sea_nation_disk", false))
+			# FIX #5: below z0.65 land/air hit is the painted rect (plate+bars+
+			# label), own and foreign — not the 40 px circle.
+			if z < 0.65 and not is_sea_disk:
+				if not _world_in_unit_painted_rect(world_pos, counter):
+					continue
+			else:
+				var hit_r: float = _demo_unit_icon_hit_radius_world(z, counter)
+				if d > hit_r * hit_r:
+					continue
 			var fo: Object = null
 			if counter.has_meta("formation"):
 				var fmeta: Variant = counter.get_meta("formation")
@@ -20491,6 +20498,8 @@ func _pick_unit_formation_at_world(world_pos: Vector2, land_only: bool = false, 
 					if f2 is Object:
 						fo = f2 as Object
 			if fo == null:
+				continue
+			if z < 0.65 and not is_sea_disk and _foreign_land_air_blocked_on_player_hex(world_pos, fo):
 				continue
 			if land_only and _formation_type_blocks_land_open(fo):
 				continue
@@ -26256,14 +26265,125 @@ func _pick_drawn_land_air_body_at_world(world_pos: Vector2, z: float = -1.0) -> 
 			if _formation_is_fleet_counter(fo):
 				continue
 			var chip_pos: Vector2 = _demo_unit_icon_world_pos(icon, id)
-			var hit_r: float = _demo_unit_icon_hit_radius_world(zz, icon)
 			var d: float = world_pos.distance_to(chip_pos)
-			if d > hit_r:
-				continue
+			# FIX #5: painted rect (plate + strength bars + label) below z0.65.
+			if zz < 0.65:
+				if not _world_in_unit_painted_rect(world_pos, icon):
+					continue
+				if _foreign_land_air_blocked_on_player_hex(world_pos, fo):
+					continue
+			else:
+				var hit_r: float = _demo_unit_icon_hit_radius_world(zz, icon)
+				if d > hit_r:
+					continue
 			if d <= best_d:
 				best_d = d
 				best = fo
 	return best
+
+
+func _unit_counter_painted_local_rect(counter: Node2D) -> Rect2:
+	# NationPlate 44×40 at (−22,−20), StatBars 44×14 at (−22,20) → y=34,
+	# plus Designation / TypeLetter / StrNum. Fallback is that union.
+	var fallback: Rect2 = Rect2(Vector2(-22.0, -20.0), Vector2(44.0, 54.0))
+	if counter == null or not is_instance_valid(counter):
+		return fallback
+	var acc: Rect2 = Rect2()
+	var has_any: bool = false
+	var names: PackedStringArray = PackedStringArray([
+		"NationPlate", "StatBars", "Designation", "TypeLetter", "StrNum"
+	])
+	for nm in names:
+		var n: Node = counter.get_node_or_null(nm)
+		if n == null:
+			continue
+		var piece: Rect2 = _canvas_item_rect_in_counter_local(counter, n)
+		if piece.size.x > 0.0 or piece.size.y > 0.0:
+			if not has_any:
+				acc = piece
+				has_any = true
+			else:
+				acc = acc.merge(piece)
+		for sub_v in n.get_children():
+			var sub: Node = sub_v as Node
+			var sp: Rect2 = _canvas_item_rect_in_counter_local(counter, sub)
+			if sp.size.x <= 0.0 and sp.size.y <= 0.0:
+				continue
+			if not has_any:
+				acc = sp
+				has_any = true
+			else:
+				acc = acc.merge(sp)
+	if has_any:
+		return acc
+	return fallback
+
+
+func _canvas_item_rect_in_counter_local(counter: Node2D, n: Node) -> Rect2:
+	if n == null or not (n is CanvasItem):
+		return Rect2()
+	var own: Rect2 = _unit_counter_child_own_rect(n as CanvasItem)
+	if own.size.x <= 0.0 and own.size.y <= 0.0:
+		return Rect2()
+	var origin: Vector2 = Vector2.ZERO
+	var walk: Node = n
+	while walk != null and walk != counter:
+		if walk is Node2D:
+			origin += (walk as Node2D).position
+		walk = walk.get_parent()
+	return Rect2(origin + own.position, own.size)
+
+
+func _world_in_unit_painted_rect(world_pos: Vector2, counter: Node2D) -> bool:
+	if counter == null or not is_instance_valid(counter):
+		return false
+	var xf: Transform2D = counter.get_global_transform()
+	var local: Vector2 = xf.affine_inverse() * world_pos
+	var r: Rect2 = _unit_counter_painted_local_rect(counter).grow(0.5)
+	return (
+		local.x >= r.position.x
+		and local.y >= r.position.y
+		and local.x <= r.position.x + r.size.x
+		and local.y <= r.position.y + r.size.y
+	)
+
+
+func _province_owner_tag(pid: int) -> String:
+	if pid < 0:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_owner"):
+		var from_mm: String = str(MapManager.get_province_owner(pid)).strip_edges().to_upper()
+		if not from_mm.is_empty():
+			return from_mm
+	if provinces.has(pid):
+		var p: Province = provinces[pid] as Province
+		if p != null:
+			if "owner_tag" in p:
+				var ot: String = str(p.owner_tag).strip_edges().to_upper()
+				if not ot.is_empty():
+					return ot
+			if "controller_tag" in p:
+				var ct: String = str(p.controller_tag).strip_edges().to_upper()
+				if not ct.is_empty():
+					return ct
+	return ""
+
+
+func _foreign_land_air_blocked_on_player_hex(world_pos: Vector2, fo: Object) -> bool:
+	# Player-owned GIS land must not open a foreign land/air chip that is
+	# stationed on another province (Cuxhaven / Heidekreis → Emden NLD).
+	if fo == null or _formation_is_player_tag(fo):
+		return false
+	if _formation_is_fleet_counter(fo):
+		return false
+	if not _hex_pick_is_land_province(world_pos):
+		return false
+	var pid: int = _resolve_hex_pick_pid(world_pos)
+	var owner: String = _province_owner_tag(pid)
+	var p_tag: String = _player_tag()
+	if owner.is_empty() or p_tag.is_empty() or owner != p_tag:
+		return false
+	return _formation_stationed_province_id(fo) != pid
 
 
 func _demo_unit_icon_hit_radius_world(z: float, counter: Node2D = null) -> float:
@@ -26271,16 +26391,7 @@ func _demo_unit_icon_hit_radius_world(z: float, counter: Node2D = null) -> float
 		var disk_r: float = _sea_nation_fleet_disk_radius_world(z, counter)
 		# Small pad so the "TAG Fleet N" under the disk stays clickable.
 		return disk_r + 3.0
-	var r: float = _unit_counter_drawn_body_radius_world(z, counter)
-	# FIX #4 (c): below z0.65, own land/air hit is capped at 40 screen px
-	# so it cannot reach a neighbour (Emden NLD / BEL AW3 / DNK AW3).
-	# Clicks on the own counter's drawn plate still sit inside 40 px.
-	if z < 0.65 and counter != null and is_instance_valid(counter):
-		var fo_own: Object = _formation_from_demo_icon(counter)
-		if _formation_is_player_tag(fo_own):
-			var cap_world: float = 40.0 / maxf(z, 0.05)
-			r = minf(r, cap_world)
-	return r
+	return _unit_counter_drawn_body_radius_world(z, counter)
 
 
 func _sync_sea_nation_fleet_offsets(z: float) -> void:

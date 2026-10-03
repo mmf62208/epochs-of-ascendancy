@@ -4,6 +4,8 @@ Live-scale tip `c080e435` (docs/keep-green follow on the same branch). Home zoom
 
 Option (a): **drawn body first** (not shrink-to-drawn+4px). (c) own land/air cap **40 screen px** below z0.65.
 
+**Correction:** the coast rows that listed `710374` / `710380` → `NLD_formation_1` as intended were **wrong**. Those hexes are German-owned land (Cuxhaven / Heidekreis). Opening the Emden NLD unit is a regression; FIX #5 requires own GER or the province.
+
 ## 8 labels + unit ids
 
 | sea | tag | fid | label |
@@ -46,8 +48,8 @@ Each opened **its own unit** (foreign read-only). Never a fleet. Never a neighbo
 | Emden NLD | `NLD_formation_1` | `NLD_formation_1` |
 | BEL AW3 | `BEL_formation_3` | `BEL_formation_3` |
 | DNK AW3 | `DNK_formation_3` | `DNK_formation_3` |
-| coast `710374` | `NLD_formation_1` (not GER AW3) | `NLD_formation_1` |
-| coast `710380` | `NLD_formation_1` (not GER AW3) | `NLD_formation_1` |
+| coast `710374` | **REGRESSION — not intended.** Opened `NLD_formation_1` (Emden, stationed at Oost-Groningen). A German-owned land click must never open a foreign unit. Corrected in FIX #5. | same NLD steal |
+| coast `710380` | **REGRESSION — not intended.** Opened `NLD_formation_1`. Same as Cuxhaven; FIX #5 requires own GER or the province. | same NLD steal |
 
 ## Own GER drawn bodies at z0.318 (radius-cap check)
 

@@ -1,11 +1,12 @@
 extends SceneTree
 
-## FLEET-2 FIX #4 live-scale check on the real world_accurate board.
+## FLEET-2 FIX #5 live-scale check on the real world_accurate board.
 ## xvfb exactly 1280x740 · GER · Europe Home · Channel + North Sea at Home zoom
 ## and ~1.5. Pixel-assert each plate centre. Click all 8 plates at 0.318 / 0.40
 ## / 0.8 / 1.5 plus East Kent, old ENG chip, and a GER-nearest gap.
-## Also click Play-listed land/air counters at 0.318 / 0.40 and own GER bodies
-## at 0.318. xvfb is NOT live Play. Never EOA_SKIP_TITLE.
+## Also click Play-listed land/air counters at 0.318 / 0.40, coasts 710374 /
+## 710380 (own GER or province, never foreign), own AW3 bars +46 / corner,
+## and own GER bodies. xvfb is NOT live Play. Never EOA_SKIP_TITLE.
 ##
 ##   tools/eoa_fleet2_live_scale_check.sh
 
@@ -22,7 +23,7 @@ const VIEW_H := 740
 const WAIT_MAP_SECS := 420
 const SETTLE_FRAMES := 36
 const GER_TAG := "GER"
-const REPO_DIR := "docs/evidence/fleet2_fix4"
+const REPO_DIR := "docs/evidence/fleet2_fix5"
 const COAST_A := 710374
 const COAST_B := 710380
 
@@ -73,7 +74,7 @@ func _start() -> void:
 		_out_dir = "/tmp/eoa-fleet2-live"
 	DirAccess.make_dir_recursive_absolute(_out_dir)
 	if DirAccess.dir_exists_absolute("/opt/cursor/artifacts"):
-		DirAccess.make_dir_recursive_absolute("/opt/cursor/artifacts/fleet2-fix4")
+		DirAccess.make_dir_recursive_absolute("/opt/cursor/artifacts/fleet2-fix5")
 	if OS.get_environment("EOA_SMOKE_AUTO_BEGIN").strip_edges() != "1":
 		OS.set_environment("EOA_SMOKE_AUTO_BEGIN", "1")
 	_log("EOA_FLEET2_LIVE who=guard.boot out=%s view=%dx%d (NOT product Play)" % [_out_dir, VIEW_W, VIEW_H])
@@ -262,7 +263,6 @@ func _do_clicks() -> void:
 			})
 		if z == 0.318 or z == 0.40:
 			_click_land_air_guard(z)
-		if z == 0.318:
 			_click_own_ger_bodies(z)
 	_write_clicks_md()
 	_finish(_fail_reasons.is_empty())
@@ -300,24 +300,25 @@ func _click_one(row: Dictionary) -> void:
 			ok = ok and tag != GER_TAG and fid.find("Div") < 0 and fid.find("Garrison") < 0
 		if who.find("GER_nearest_gap") >= 0:
 			ok = ok and tag == GER_TAG and ftype == "fleet"
-	elif kind == "hex_not_ger_air":
-		var air_ok := ftype != "air_wing" or tag != GER_TAG
-		if fo != null and "stationed_province_id" in fo:
-			var sid: int = int(fo.stationed_province_id)
-			if sid == COAST_A or sid == COAST_B:
-				air_ok = true
-		ok = air_ok and ftype != "fleet"
+	elif kind == "hex_own_or_province":
+		# German land: own GER (not fleet) or no unit. Never a foreign chip.
+		if fo == null:
+			ok = true
+		else:
+			ok = tag == GER_TAG and ftype != "fleet"
 	else:
 		ok = fo != null and opened and tag in want and ftype != "fleet"
 		if not want_type.is_empty():
 			ok = ok and ftype == want_type
 		if not want_fid.is_empty():
 			ok = ok and fid == want_fid
-	if kind != "hex_not_ger_air":
+	if kind != "hex_own_or_province":
 		if own:
 			ok = ok and card["open_fight"] and card["assign"]
 		else:
 			ok = ok and not card["open_fight"] and not card["assign"]
+	elif fo != null and tag == GER_TAG:
+		ok = ok and card["open_fight"] and card["assign"]
 	var line := (
 		"EOA_FLEET2_LIVE who=click name=%s world=%.1f,%.1f fid=%s tag=%s type=%s opened=%s own_card=%s fight=%s assign=%s ok=%s"
 		% [who, pos.x, pos.y, fid, tag, ftype, str(opened), str(own), str(card["open_fight"]), str(card["assign"]), str(ok)]
@@ -364,6 +365,7 @@ func _click_land_air_guard(z: float) -> void:
 		})
 	_click_coast_hex(z, COAST_A)
 	_click_coast_hex(z, COAST_B)
+	_click_own_aw3_painted(z)
 
 
 func _click_own_ger_bodies(z: float) -> void:
@@ -400,9 +402,55 @@ func _click_coast_hex(z: float, pid: int) -> void:
 		"who": "z%.3f_coast_%d" % [z, pid],
 		"pos": pos,
 		"own": false,
-		"kind": "hex_not_ger_air",
-		"want_tags": ["GER", "DNK", "NLD"],
+		"kind": "hex_own_or_province",
+		"want_tags": ["GER"],
 	})
+
+
+func _click_own_aw3_painted(z: float) -> void:
+	var counters: Array = _collect_land_air_counters()
+	var hit: Dictionary = _match_land_air(counters, "GER", "air_wing", 3)
+	if hit.is_empty():
+		_fail_reasons.append("missing_GER_AW3_painted_z%.3f" % z)
+		return
+	var icon: Node2D = hit.get("icon", null) as Node2D
+	var base: Vector2 = hit.get("pos", Vector2.ZERO) as Vector2
+	var bars: Vector2 = base + Vector2(0.0, 46.0 / maxf(z, 0.05))
+	var corner: Vector2 = base + Vector2(32.0 / maxf(z, 0.05), 28.0 / maxf(z, 0.05))
+	if icon != null and is_instance_valid(icon):
+		var xf: Transform2D = icon.get_global_transform()
+		bars = xf * Vector2(0.0, 27.0)
+		# Play +46 screen px along +Y; keep that as the bars probe when it
+		# still lands in the painted rect (it does at Home-band scale).
+		var bars_px: Vector2 = base + Vector2(0.0, 46.0 / maxf(z, 0.05))
+		if _world_in_icon_painted(icon, bars_px):
+			bars = bars_px
+		corner = xf * Vector2(21.0, 20.0)
+	_click_one({
+		"who": "z%.3f_GER_AW3_bars" % z,
+		"pos": bars,
+		"own": true,
+		"kind": "land",
+		"want_tags": ["GER"],
+		"want_type": "air_wing",
+		"want_fid": str(hit.get("fid", "")),
+	})
+	_click_one({
+		"who": "z%.3f_GER_AW3_corner" % z,
+		"pos": corner,
+		"own": true,
+		"kind": "land",
+		"want_tags": ["GER"],
+		"want_type": "air_wing",
+		"want_fid": str(hit.get("fid", "")),
+	})
+
+
+func _world_in_icon_painted(icon: Node2D, world: Vector2) -> bool:
+	var mr := _map_renderer()
+	if mr != null and mr.has_method("_world_in_unit_painted_rect"):
+		return bool(mr.call("_world_in_unit_painted_rect", world, icon))
+	return true
 
 
 func _collect_land_air_counters() -> Array:
@@ -442,6 +490,7 @@ func _collect_land_air_counters() -> Array:
 				"pos": pos,
 				"pid": int(fo.stationed_province_id) if "stationed_province_id" in fo else id,
 				"ord": _counter_ordinal(fname, fid),
+				"icon": icon,
 			})
 	return out
 
@@ -496,7 +545,7 @@ func _write_clicks_md() -> void:
 	var f := FileAccess.open(path, FileAccess.WRITE)
 	if f == null:
 		return
-	f.store_string("# FLEET-2 FIX #4 live-scale clicks\n\n")
+	f.store_string("# FLEET-2 FIX #5 live-scale clicks\n\n")
 	f.store_string("xvfb 1280x740 · GER · Europe Home · world_accurate. NOT live Play.\n\n")
 	f.store_string("| click | result |\n|---|---|\n")
 	for line_v in _click_log:

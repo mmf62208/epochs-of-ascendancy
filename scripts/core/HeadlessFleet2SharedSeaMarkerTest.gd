@@ -194,6 +194,7 @@ func _run() -> void:
 	_test_j_renderer_space_anchor()
 	_test_k_spread_band_live_clicks()
 	_test_l_land_counters_keep_own_body()
+	_test_m_painted_rect_and_player_land()
 	_cleanup()
 
 
@@ -307,8 +308,17 @@ func _test_source_needles() -> void:
 	if "func _land_air_body_blocked_by_cluster_hole" not in ren:
 		_fail("FIX #4 cluster-hole land-spill guard missing")
 		return
-	if "40.0 / maxf(z, 0.05)" not in ren:
-		_fail("FIX #4 own land/air screen-px cap (40) missing")
+	if "func _unit_counter_painted_local_rect" not in ren:
+		_fail("FIX #5 painted-rect helper missing")
+		return
+	if "func _world_in_unit_painted_rect" not in ren:
+		_fail("FIX #5 painted-rect world test missing")
+		return
+	if "func _foreign_land_air_blocked_on_player_hex" not in ren:
+		_fail("FIX #5 player-land foreign land/air guard missing")
+		return
+	if "40.0 / maxf(z, 0.05)" in ren:
+		_fail("FIX #5 must not keep the 40 px own-only circle cap")
 		return
 	var pad_fn := _slice_func(ren, "_world_in_sea_nation_cluster_pad")
 	if "p.x - rr" in pad_fn or "hit_r + pad" in pad_fn:
@@ -1393,6 +1403,86 @@ func _test_l_land_counters_keep_own_body() -> void:
 	_free_icon(ger_icon)
 	_apply_zoom(1.0)
 	_pass("(l) land counter in old pad keeps its own body; own-GER cap does not steal the neighbour")
+
+
+func _test_m_painted_rect_and_player_land() -> void:
+	# FIX #5 (m): player-owned land must not open a foreign chip stationed
+	# elsewhere (Cuxhaven / Heidekreis → Emden NLD). Own AW3 bars / corner
+	# inside the painted rect must still pick the own unit.
+	var z: float = 0.318
+	_apply_zoom(z)
+	if not _resolve_marker_coords():
+		return
+	var nld_pos: Vector2 = WORLD_MAGINOT + Vector2(72.0, 0.0)
+	var nld_icon: Node2D = _place_land_chip_at(EAST_KENT, FID_NLD_LAND, nld_pos)
+	if nld_icon == null:
+		_fail("(m) NLD land chip missing")
+		return
+	var nld_s: float = 5.0
+	if _mr.has_method("_unit_counter_scale_for_zoom"):
+		nld_s = maxf(4.0, float(_mr.call("_unit_counter_scale_for_zoom", z)))
+	nld_icon.scale = Vector2(nld_s, nld_s)
+	nld_icon.visible = true
+	if _mr.has_method("_attach_unit_counter_chrome"):
+		_mr.call("_attach_unit_counter_chrome", nld_icon, _formation(FID_NLD_LAND), Color(0.2, 0.4, 0.7, 1.0))
+	_reset_pick()
+	var coast: Object = _mr.call("_pick_unit_formation_at_world", WORLD_MAGINOT)
+	var cfid := str(coast.formation_id) if coast != null and "formation_id" in coast else "null"
+	if cfid == FID_NLD_LAND:
+		_fail("(m) GER land centroid opened foreign NLD (Cuxhaven-style steal)")
+		_free_icon(nld_icon)
+		return
+	var opened_nld: bool = _click_chip_path(WORLD_MAGINOT)
+	if opened_nld and _selected_fid() == FID_NLD_LAND:
+		_fail("(m) GER land click selected NLD")
+		_free_icon(nld_icon)
+		return
+	_free_icon(nld_icon)
+	var ger_icon: Node2D = _place_land_chip_at(MAGINOT, FID_GER_LAND, WORLD_MAGINOT)
+	if ger_icon == null:
+		_fail("(m) GER land chip missing")
+		return
+	var ger_s: float = nld_s
+	ger_icon.scale = Vector2(ger_s, ger_s)
+	ger_icon.visible = true
+	if _mr.has_method("_attach_unit_counter_chrome"):
+		_mr.call("_attach_unit_counter_chrome", ger_icon, _formation(FID_GER_LAND), Color(0.4, 0.4, 0.42, 1.0))
+	var bars: Vector2 = ger_icon.get_global_transform() * Vector2(0.0, 27.0)
+	var corner: Vector2 = ger_icon.get_global_transform() * Vector2(21.0, 20.0)
+	var bars_px: Vector2 = WORLD_MAGINOT + Vector2(0.0, 46.0 / z)
+	_reset_pick()
+	var bars_fo: Object = _mr.call("_pick_unit_formation_at_world", bars)
+	var bars_fid := str(bars_fo.formation_id) if bars_fo != null and "formation_id" in bars_fo else "?"
+	if bars_fid != FID_GER_LAND:
+		_fail("(m) own bars local(0,27) pick=%s want GER" % bars_fid)
+		_free_icon(ger_icon)
+		return
+	_reset_pick()
+	var px_fo: Object = _mr.call("_pick_unit_formation_at_world", bars_px)
+	var px_fid := str(px_fo.formation_id) if px_fo != null and "formation_id" in px_fo else "?"
+	if px_fid != FID_GER_LAND:
+		_fail("(m) own bars +46 px pick=%s want GER" % px_fid)
+		_free_icon(ger_icon)
+		return
+	_reset_pick()
+	var cor_fo: Object = _mr.call("_pick_unit_formation_at_world", corner)
+	var cor_fid := str(cor_fo.formation_id) if cor_fo != null and "formation_id" in cor_fo else "?"
+	if cor_fid != FID_GER_LAND:
+		_fail("(m) own corner pick=%s want GER" % cor_fid)
+		_free_icon(ger_icon)
+		return
+	_reset_pick()
+	if not _click_chip_path(bars_px) or _selected_fid() != FID_GER_LAND:
+		_fail("(m) own bars +46 px selected=%s" % _selected_fid())
+		_free_icon(ger_icon)
+		return
+	if not _popup_has_btn("BtnOpenFight"):
+		_fail("(m) own GER bars card must still show Open fight")
+		_free_icon(ger_icon)
+		return
+	_free_icon(ger_icon)
+	_apply_zoom(1.0)
+	_pass("(m) player-owned land never opens foreign NLD; own painted bars/corner pick GER")
 
 
 func _sea_nation_cluster_icons(pid: int) -> Array:
