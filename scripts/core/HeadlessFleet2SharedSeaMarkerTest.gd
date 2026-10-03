@@ -314,6 +314,9 @@ func _test_source_needles() -> void:
 	if "func _world_in_unit_painted_rect" not in ren:
 		_fail("FIX #5 painted-rect world test missing")
 		return
+	if "func _world_in_unit_stat_bars" not in ren:
+		_fail("FIX #5 StatBars hit helper missing")
+		return
 	if "func _foreign_land_air_blocked_on_player_hex" not in ren:
 		_fail("FIX #5 player-land foreign land/air guard missing")
 		return

@@ -20463,6 +20463,10 @@ func _pick_unit_formation_at_world(world_pos: Vector2, land_only: bool = false, 
 	var best_player_d := INF
 	var best_any: Object = null
 	var best_any_d := INF
+	var best_bar: Object = null
+	var best_bar_d: float = INF
+	var best_bar_player: Object = null
+	var best_bar_player_d: float = INF
 	var p_tag := _player_tag()
 	for id_v in _demo_unit_icon_pids:
 		var id := int(id_v)
@@ -20517,12 +20521,26 @@ func _pick_unit_formation_at_world(world_pos: Vector2, land_only: bool = false, 
 				if str(fo.country_tag).strip_edges().to_upper() == p_tag and d <= best_player_d:
 					best_player_d = d
 					best_player = fo
+			# Strength-bar / label strip wins over a nearer foreign plate
+			# that only overlaps the bars (Berlin AW3 +46 → CZE).
+			if z < 0.65 and not is_sea_disk and _world_in_unit_stat_bars(world_pos, counter):
+				if d <= best_bar_d:
+					best_bar_d = d
+					best_bar = fo
+				if not p_tag.is_empty() and "country_tag" in fo:
+					if str(fo.country_tag).strip_edges().to_upper() == p_tag and d <= best_bar_player_d:
+						best_bar_player_d = d
+						best_bar_player = fo
 	# FIX #4 (a): nearest DRAWN body wins (plate or land/air). A land/air
 	# chip whose centre sits *outside* a between-plates hole must not
 	# spill into that hole (East Kent / old ENG stay Channel).
 	# player_only still skips foreign plates (MV-1b). land_only skips fleets.
 	var sea_drawn: Object = _pick_sea_nation_plate_drawn_at_world(world_pos, z)
 	var land_body: Object = best_any
+	if best_bar != null:
+		land_body = best_bar
+		if best_bar_player != null:
+			best_player = best_bar_player
 	if land_body != null and _land_air_body_blocked_by_cluster_hole(world_pos, land_body, z):
 		land_body = null
 		best_player = null
@@ -26251,6 +26269,8 @@ func _pick_drawn_land_air_body_at_world(world_pos: Vector2, z: float = -1.0) -> 
 			zz = maxf(cam.zoom.x, cam.zoom.y)
 	var best: Object = null
 	var best_d: float = INF
+	var best_bar: Object = null
+	var best_bar_d: float = INF
 	for id_v in _demo_unit_icon_pids:
 		var id: int = int(id_v)
 		for c_v in _iter_demo_unit_icons_at_pid(id):
@@ -26276,9 +26296,15 @@ func _pick_drawn_land_air_body_at_world(world_pos: Vector2, z: float = -1.0) -> 
 				var hit_r: float = _demo_unit_icon_hit_radius_world(zz, icon)
 				if d > hit_r:
 					continue
+			if zz < 0.65 and _world_in_unit_stat_bars(world_pos, icon):
+				if d <= best_bar_d:
+					best_bar_d = d
+					best_bar = fo
 			if d <= best_d:
 				best_d = d
 				best = fo
+	if best_bar != null:
+		return best_bar
 	return best
 
 
@@ -26332,6 +26358,35 @@ func _canvas_item_rect_in_counter_local(counter: Node2D, n: Node) -> Rect2:
 			origin += (walk as Node2D).position
 		walk = walk.get_parent()
 	return Rect2(origin + own.position, own.size)
+
+
+func _world_in_unit_stat_bars(world_pos: Vector2, counter: Node2D) -> bool:
+	# Strength-bar strip under the plate (and live StatBars children).
+	if counter == null or not is_instance_valid(counter):
+		return false
+	var xf: Transform2D = counter.get_global_transform()
+	var local: Vector2 = xf.affine_inverse() * world_pos
+	var r: Rect2 = Rect2(Vector2(-22.0, 20.0), Vector2(44.0, 14.0))
+	var bars: Node = counter.get_node_or_null("StatBars")
+	if bars != null:
+		var live: Rect2 = _canvas_item_rect_in_counter_local(counter, bars)
+		for sub_v in bars.get_children():
+			var sp: Rect2 = _canvas_item_rect_in_counter_local(counter, sub_v as Node)
+			if sp.size.x <= 0.0 and sp.size.y <= 0.0:
+				continue
+			if live.size.x <= 0.0 and live.size.y <= 0.0:
+				live = sp
+			else:
+				live = live.merge(sp)
+		if live.size.x > 0.0 or live.size.y > 0.0:
+			r = live
+	r = r.grow(0.5)
+	return (
+		local.x >= r.position.x
+		and local.y >= r.position.y
+		and local.x <= r.position.x + r.size.x
+		and local.y <= r.position.y + r.size.y
+	)
 
 
 func _world_in_unit_painted_rect(world_pos: Vector2, counter: Node2D) -> bool:
