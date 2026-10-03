@@ -1,10 +1,11 @@
 extends SceneTree
 
-## FLEET-2 FIX #3 live-scale check on the real world_accurate board.
+## FLEET-2 FIX #4 live-scale check on the real world_accurate board.
 ## xvfb exactly 1280x740 · GER · Europe Home · Channel + North Sea at Home zoom
 ## and ~1.5. Pixel-assert each plate centre. Click all 8 plates at 0.318 / 0.40
 ## / 0.8 / 1.5 plus East Kent, old ENG chip, and a GER-nearest gap.
-## xvfb is NOT live Play. Never EOA_SKIP_TITLE.
+## Also click Play-listed land/air counters at 0.318 / 0.40 and own GER bodies
+## at 0.318. xvfb is NOT live Play. Never EOA_SKIP_TITLE.
 ##
 ##   tools/eoa_fleet2_live_scale_check.sh
 
@@ -21,7 +22,9 @@ const VIEW_H := 740
 const WAIT_MAP_SECS := 420
 const SETTLE_FRAMES := 36
 const GER_TAG := "GER"
-const REPO_DIR := "docs/evidence/fleet2_fix3"
+const REPO_DIR := "docs/evidence/fleet2_fix4"
+const COAST_A := 710374
+const COAST_B := 710380
 
 enum Phase {
 	WAIT_MAP,
@@ -70,7 +73,7 @@ func _start() -> void:
 		_out_dir = "/tmp/eoa-fleet2-live"
 	DirAccess.make_dir_recursive_absolute(_out_dir)
 	if DirAccess.dir_exists_absolute("/opt/cursor/artifacts"):
-		DirAccess.make_dir_recursive_absolute("/opt/cursor/artifacts/fleet2-fix3")
+		DirAccess.make_dir_recursive_absolute("/opt/cursor/artifacts/fleet2-fix4")
 	if OS.get_environment("EOA_SMOKE_AUTO_BEGIN").strip_edges() != "1":
 		OS.set_environment("EOA_SMOKE_AUTO_BEGIN", "1")
 	_log("EOA_FLEET2_LIVE who=guard.boot out=%s view=%dx%d (NOT product Play)" % [_out_dir, VIEW_W, VIEW_H])
@@ -216,6 +219,7 @@ func _do_clicks() -> void:
 				"who": "z%.3f_CH_%s" % [z, str(k)],
 				"pos": rec.get("pos", Vector2.ZERO) as Vector2,
 				"own": false,
+				"kind": "fleet",
 				"want_tags": ["ENG", "ITA", "POL", "USA"],
 			})
 		for k2 in _ns_plates.keys():
@@ -225,34 +229,42 @@ func _do_clicks() -> void:
 				"who": "z%.3f_NS_%s" % [z, tag],
 				"pos": rec2.get("pos", Vector2.ZERO) as Vector2,
 				"own": tag == GER_TAG,
+				"kind": "fleet",
 				"want_tags": ["GER", "FRA", "JAP", "SOV"],
 			})
-		if z == 0.318 or z == 1.50:
+		_click_one({
+			"who": "z%.3f_east_kent_711453" % z,
+			"pos": LIVE_RENDER_EAST_KENT,
+			"own": false,
+			"kind": "fleet",
+			"want_tags": ["ENG", "ITA", "POL", "USA"],
+		})
+		_click_one({
+			"who": "z%.3f_old_eng_chip" % z,
+			"pos": LIVE_OLD_ENG_CHIP,
+			"own": false,
+			"kind": "fleet",
+			"want_tags": ["ENG", "ITA", "POL", "USA"],
+		})
+		var ger_p: Vector2 = Vector2.ZERO
+		var fra_p: Vector2 = Vector2.ZERO
+		if _ns_plates.has("GER"):
+			ger_p = (_ns_plates["GER"] as Dictionary).get("pos", Vector2.ZERO) as Vector2
+		if _ns_plates.has("FRA"):
+			fra_p = (_ns_plates["FRA"] as Dictionary).get("pos", Vector2.ZERO) as Vector2
+		if ger_p != Vector2.ZERO and fra_p != Vector2.ZERO:
 			_click_one({
-				"who": "z%.3f_east_kent_711453" % z,
-				"pos": LIVE_RENDER_EAST_KENT,
-				"own": false,
-				"want_tags": ["ENG", "ITA", "POL", "USA"],
+				"who": "z%.3f_GER_nearest_gap" % z,
+				"pos": ger_p.lerp(fra_p, 0.38),
+				"own": true,
+				"kind": "fleet",
+				"want_tags": ["GER"],
 			})
-			_click_one({
-				"who": "z%.3f_old_eng_chip" % z,
-				"pos": LIVE_OLD_ENG_CHIP,
-				"own": false,
-				"want_tags": ["ENG", "ITA", "POL", "USA"],
-			})
-			var ger_p: Vector2 = Vector2.ZERO
-			var fra_p: Vector2 = Vector2.ZERO
-			if _ns_plates.has("GER"):
-				ger_p = (_ns_plates["GER"] as Dictionary).get("pos", Vector2.ZERO) as Vector2
-			if _ns_plates.has("FRA"):
-				fra_p = (_ns_plates["FRA"] as Dictionary).get("pos", Vector2.ZERO) as Vector2
-			if ger_p != Vector2.ZERO and fra_p != Vector2.ZERO:
-				_click_one({
-					"who": "z%.3f_GER_nearest_gap" % z,
-					"pos": ger_p.lerp(fra_p, 0.38),
-					"own": true,
-					"want_tags": ["GER"],
-				})
+		if z == 0.318 or z == 0.40:
+			_click_land_air_guard(z)
+		if z == 0.318:
+			_click_own_ger_bodies(z)
+	_write_clicks_md()
 	_finish(_fail_reasons.is_empty())
 
 
@@ -262,6 +274,9 @@ func _click_one(row: Dictionary) -> void:
 	var pos: Vector2 = row.get("pos", Vector2.ZERO) as Vector2
 	var own: bool = bool(row.get("own", false))
 	var want: Array = row.get("want_tags", []) as Array
+	var kind := str(row.get("kind", "fleet"))
+	var want_type := str(row.get("want_type", ""))
+	var want_fid := str(row.get("want_fid", ""))
 	if mr == null:
 		_fail_reasons.append("click_%s_no_mr" % who)
 		return
@@ -278,15 +293,31 @@ func _click_one(row: Dictionary) -> void:
 	var tag := str(fo.country_tag).strip_edges().to_upper() if fo != null and "country_tag" in fo else "?"
 	var ftype := str(fo.formation_type) if fo != null and "formation_type" in fo else "?"
 	var card := _popup_state()
-	var ok := fo != null and ftype == "fleet" and tag in want and opened
-	if who.ends_with("east_kent_711453") or who.ends_with("old_eng_chip"):
-		ok = ok and tag != GER_TAG and fid.find("Div") < 0 and fid.find("Garrison") < 0
-	if who.find("GER_nearest_gap") >= 0:
-		ok = ok and tag == GER_TAG and ftype == "fleet"
-	if own:
-		ok = ok and card["open_fight"] and card["assign"]
+	var ok := false
+	if kind == "fleet":
+		ok = fo != null and ftype == "fleet" and tag in want and opened
+		if who.ends_with("east_kent_711453") or who.ends_with("old_eng_chip"):
+			ok = ok and tag != GER_TAG and fid.find("Div") < 0 and fid.find("Garrison") < 0
+		if who.find("GER_nearest_gap") >= 0:
+			ok = ok and tag == GER_TAG and ftype == "fleet"
+	elif kind == "hex_not_ger_air":
+		var air_ok := ftype != "air_wing" or tag != GER_TAG
+		if fo != null and "stationed_province_id" in fo:
+			var sid: int = int(fo.stationed_province_id)
+			if sid == COAST_A or sid == COAST_B:
+				air_ok = true
+		ok = air_ok and ftype != "fleet"
 	else:
-		ok = ok and not card["open_fight"] and not card["assign"]
+		ok = fo != null and opened and tag in want and ftype != "fleet"
+		if not want_type.is_empty():
+			ok = ok and ftype == want_type
+		if not want_fid.is_empty():
+			ok = ok and fid == want_fid
+	if kind != "hex_not_ger_air":
+		if own:
+			ok = ok and card["open_fight"] and card["assign"]
+		else:
+			ok = ok and not card["open_fight"] and not card["assign"]
 	var line := (
 		"EOA_FLEET2_LIVE who=click name=%s world=%.1f,%.1f fid=%s tag=%s type=%s opened=%s own_card=%s fight=%s assign=%s ok=%s"
 		% [who, pos.x, pos.y, fid, tag, ftype, str(opened), str(own), str(card["open_fight"]), str(card["assign"]), str(ok)]
@@ -297,6 +328,182 @@ func _click_one(row: Dictionary) -> void:
 		_kent_pick = "%s/%s/%s" % [fid, tag, ftype]
 	if not ok:
 		_fail_reasons.append("click_%s_got_%s_%s" % [who, tag, ftype])
+
+
+func _click_land_air_guard(z: float) -> void:
+	var counters: Array = _collect_land_air_counters()
+	var rows: Array = [
+		{"who": "ENG_Div_0", "tag": "ENG", "type": "division", "ord": 0},
+		{"who": "ENG_Div_1", "tag": "ENG", "type": "division", "ord": 1},
+		{"who": "BEL_Div_0", "tag": "BEL", "type": "division", "ord": 0},
+		{"who": "BEL_Div_1", "tag": "BEL", "type": "division", "ord": 1},
+		{"who": "BEL_Div_2", "tag": "BEL", "type": "division", "ord": 2},
+		{"who": "NLD_Div_0", "tag": "NLD", "type": "division", "ord": 0},
+		{"who": "NLD_Div_2", "tag": "NLD", "type": "division", "ord": 2},
+		{"who": "NLD_AW3", "tag": "NLD", "type": "air_wing", "ord": 3},
+		{"who": "FRA_Garrison_4", "tag": "FRA", "type": "garrison", "ord": 4},
+		{"who": "Emden_NLD", "tag": "NLD", "type": "division", "ord": 1},
+		{"who": "BEL_AW3", "tag": "BEL", "type": "air_wing", "ord": 3},
+		{"who": "DNK_AW3", "tag": "DNK", "type": "air_wing", "ord": 3},
+	]
+	for rec_v in rows:
+		var rec: Dictionary = rec_v as Dictionary
+		var hit: Dictionary = _match_land_air(counters, str(rec["tag"]), str(rec["type"]), int(rec["ord"]))
+		if hit.is_empty():
+			_fail_reasons.append("missing_%s_z%.3f" % [str(rec["who"]), z])
+			_log("EOA_FLEET2_LIVE who=missing name=%s z=%.3f" % [str(rec["who"]), z])
+			continue
+		_click_one({
+			"who": "z%.3f_%s" % [z, str(rec["who"])],
+			"pos": hit.get("pos", Vector2.ZERO) as Vector2,
+			"own": false,
+			"kind": "land",
+			"want_tags": [str(rec["tag"])],
+			"want_type": str(rec["type"]),
+			"want_fid": str(hit.get("fid", "")),
+		})
+	_click_coast_hex(z, COAST_A)
+	_click_coast_hex(z, COAST_B)
+
+
+func _click_own_ger_bodies(z: float) -> void:
+	var counters: Array = _collect_land_air_counters()
+	var rows: Array = [
+		{"who": "GER_Div_6", "tag": "GER", "type": "division", "ord": 6},
+		{"who": "GER_Div_7", "tag": "GER", "type": "division", "ord": 7},
+		{"who": "GER_Garrison_4", "tag": "GER", "type": "garrison", "ord": 4},
+		{"who": "GER_AW3", "tag": "GER", "type": "air_wing", "ord": 3},
+	]
+	for rec_v in rows:
+		var rec: Dictionary = rec_v as Dictionary
+		var hit: Dictionary = _match_land_air(counters, str(rec["tag"]), str(rec["type"]), int(rec["ord"]))
+		if hit.is_empty():
+			_fail_reasons.append("missing_%s_z%.3f" % [str(rec["who"]), z])
+			continue
+		_click_one({
+			"who": "z%.3f_%s_body" % [z, str(rec["who"])],
+			"pos": hit.get("pos", Vector2.ZERO) as Vector2,
+			"own": true,
+			"kind": "land",
+			"want_tags": ["GER"],
+			"want_type": str(rec["type"]),
+			"want_fid": str(hit.get("fid", "")),
+		})
+
+
+func _click_coast_hex(z: float, pid: int) -> void:
+	var pos: Vector2 = _province_world(pid)
+	if pos == Vector2.ZERO:
+		_fail_reasons.append("coast_%d_no_centroid" % pid)
+		return
+	_click_one({
+		"who": "z%.3f_coast_%d" % [z, pid],
+		"pos": pos,
+		"own": false,
+		"kind": "hex_not_ger_air",
+		"want_tags": ["GER", "DNK", "NLD"],
+	})
+
+
+func _collect_land_air_counters() -> Array:
+	var out: Array = []
+	var mr := _map_renderer()
+	if mr == null or not ("_demo_unit_icon_pids" in mr):
+		return out
+	for id_v in mr._demo_unit_icon_pids:
+		var id: int = int(id_v)
+		if not mr.has_method("_iter_demo_unit_icons_at_pid"):
+			continue
+		for c_v in mr.call("_iter_demo_unit_icons_at_pid", id) as Array:
+			var icon: Node2D = c_v as Node2D
+			if icon == null or not is_instance_valid(icon) or not icon.visible:
+				continue
+			if bool(icon.get_meta("sea_nation_disk", false)):
+				continue
+			var fo: Object = null
+			if mr.has_method("_formation_from_demo_icon"):
+				fo = mr.call("_formation_from_demo_icon", icon)
+			if fo == null:
+				continue
+			var tag := str(fo.country_tag).strip_edges().to_upper() if "country_tag" in fo else ""
+			var ftype := str(fo.formation_type) if "formation_type" in fo else ""
+			if ftype == "fleet" or ftype == "task_force" or ftype == "ship":
+				continue
+			var fname := str(fo.name) if "name" in fo else ""
+			var fid := str(fo.formation_id) if "formation_id" in fo else ""
+			var pos: Vector2 = icon.global_position
+			if mr.has_method("_demo_unit_icon_world_pos"):
+				pos = mr.call("_demo_unit_icon_world_pos", icon, id) as Vector2
+			out.append({
+				"tag": tag,
+				"type": ftype,
+				"name": fname,
+				"fid": fid,
+				"pos": pos,
+				"pid": int(fo.stationed_province_id) if "stationed_province_id" in fo else id,
+				"ord": _counter_ordinal(fname, fid),
+			})
+	return out
+
+
+func _counter_ordinal(n: String, fid: String) -> int:
+	var from_name: int = _trailing_int_token(n)
+	if from_name >= 0:
+		return from_name
+	return _trailing_int_token(fid)
+
+
+func _trailing_int_token(s: String) -> int:
+	var n: String = s.strip_edges()
+	if n.is_empty():
+		return -1
+	var i: int = n.length() - 1
+	while i >= 0 and n.unicode_at(i) >= 48 and n.unicode_at(i) <= 57:
+		i -= 1
+	if i == n.length() - 1:
+		return -1
+	return int(n.substr(i + 1))
+
+
+func _match_land_air(counters: Array, tag: String, ftype: String, ord: int) -> Dictionary:
+	var best: Dictionary = {}
+	for c_v in counters:
+		var c: Dictionary = c_v as Dictionary
+		if str(c.get("tag", "")) != tag:
+			continue
+		if str(c.get("type", "")) != ftype:
+			continue
+		if int(c.get("ord", -99)) != ord:
+			continue
+		best = c
+		break
+	return best
+
+
+func _province_world(pid: int) -> Vector2:
+	var mr := _map_renderer()
+	if mr != null and "province_centroids" in mr and mr.province_centroids.has(pid):
+		return mr.province_centroids[pid] as Vector2
+	var mm := _map_manager()
+	if mm != null and mm.has_method("get_province_centroid"):
+		return mm.call("get_province_centroid", pid) as Vector2
+	return Vector2.ZERO
+
+
+func _write_clicks_md() -> void:
+	DirAccess.make_dir_recursive_absolute(REPO_DIR)
+	var path := "%s/CLICKS.md" % REPO_DIR
+	var f := FileAccess.open(path, FileAccess.WRITE)
+	if f == null:
+		return
+	f.store_string("# FLEET-2 FIX #4 live-scale clicks\n\n")
+	f.store_string("xvfb 1280x740 · GER · Europe Home · world_accurate. NOT live Play.\n\n")
+	f.store_string("| click | result |\n|---|---|\n")
+	for line_v in _click_log:
+		var line := str(line_v)
+		f.store_string("| `%s` | logged |\n" % line.replace("|", "/"))
+	f.close()
+	_log("EOA_FLEET2_LIVE who=clicks_md path=%s n=%d" % [path, _click_log.size()])
 
 
 func _go_settle(next_phase: int) -> void:
@@ -487,8 +694,8 @@ func _capture(name: String, zoom: float, cam_world: Vector2) -> bool:
 	var path := "%s/%s.png" % [_out_dir, name]
 	img.save_png(path)
 	_captures.append(path)
-	if DirAccess.dir_exists_absolute("/opt/cursor/artifacts/fleet2-fix3"):
-		img.save_png("/opt/cursor/artifacts/fleet2-fix3/%s.png" % name)
+	if DirAccess.dir_exists_absolute("/opt/cursor/artifacts/fleet2-fix4"):
+		img.save_png("/opt/cursor/artifacts/fleet2-fix4/%s.png" % name)
 	DirAccess.make_dir_recursive_absolute(REPO_DIR)
 	img.save_png("%s/%s.png" % [REPO_DIR, name])
 	var z := 0.0

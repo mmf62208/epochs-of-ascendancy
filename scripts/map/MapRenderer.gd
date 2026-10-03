@@ -19540,16 +19540,30 @@ func _try_open_land_unit_at_world(
 	ctrl_click: bool = false,
 	chip_disk_only: bool = false
 ) -> bool:
-	# FIX #3 (a): drawn sea-plate body beats Home-band own-land disks.
-	# FIX #3 (b): cluster-pad nearest sea fleet (incl. own GER) binds the
-	# card — do not fall through to the sea-zone inspector.
+	# FIX #4 (a): whichever plate or land/air body is drawn under the
+	# cursor wins. Cluster/gap bind is only for a no-body click BETWEEN
+	# plates (East Kent / own-GER gap) — not an outer AABB over Kent.
 	# Köln FRA stays land-stationed / not a sea_nation_disk (MV-1b).
 	var cam_sea := get_viewport().get_camera_2d() if get_viewport() else null
 	var z_sea: float = 1.0
 	if cam_sea:
 		z_sea = maxf(cam_sea.zoom.x, cam_sea.zoom.y)
 	var sea_bind: Object = _pick_sea_nation_plate_drawn_at_world(world_pos, z_sea)
-	if sea_bind == null and not chip_disk_only:
+	if sea_bind != null and _formation_is_stationed_on_sea(sea_bind):
+		_select_map_unit(sea_bind)
+		_show_unit_detail_popup(sea_bind)
+		return true
+	var land_air_body: Object = _pick_drawn_land_air_body_at_world(world_pos, z_sea)
+	if land_air_body != null and not _formation_is_fleet_counter(land_air_body):
+		_select_map_unit(land_air_body)
+		_show_unit_detail_popup(land_air_body)
+		if _formation_is_player_tag(land_air_body):
+			var pid_la: int = int(land_air_body.stationed_province_id) if "stationed_province_id" in land_air_body else -1
+			if pid_la >= 0:
+				attack_staging_province_id = pid_la
+				debug_combat_attacker_province_id = pid_la
+		return true
+	if not chip_disk_only:
 		sea_bind = _pick_nearest_sea_nation_in_cluster_pad(world_pos, z_sea, false, false)
 	if sea_bind != null and _formation_is_stationed_on_sea(sea_bind):
 		_select_map_unit(sea_bind)
@@ -20478,11 +20492,9 @@ func _pick_unit_formation_at_world(world_pos: Vector2, land_only: bool = false, 
 				if str(fo.country_tag).strip_edges().to_upper() == p_tag and d <= best_player_d:
 					best_player_d = d
 					best_player = fo
-	# FIX #3: a click inside a sea plate's drawn body wins before the
-	# Home-band own-land disk (up to ~320u). A cluster-pad gap binds the
-	# nearest sea plate when that plate is closer than any land hit
-	# (East Kent / old ENG chip / own-GER gap). player_only still skips
-	# foreign plates (MV-1b). land_only still skips fleets.
+	# FIX #4 (a): drawn body under the cursor (sea plate or land/air)
+	# wins. Gap bind is only when no body is under the click.
+	# player_only still skips foreign plates (MV-1b). land_only skips fleets.
 	var sea_drawn: Object = _pick_sea_nation_plate_drawn_at_world(world_pos, z)
 	if sea_drawn != null:
 		if land_only and _formation_type_blocks_land_open(sea_drawn):
@@ -20492,11 +20504,14 @@ func _pick_unit_formation_at_world(world_pos: Vector2, land_only: bool = false, 
 			return null
 		else:
 			return sea_drawn
+	if best_any != null:
+		# Nearest drawn land/air body — not player-prefer over a neighbour.
+		if player_only:
+			return best_player
+		return best_any
 	var sea_pad: Object = _pick_nearest_sea_nation_in_cluster_pad(world_pos, z, land_only, false)
 	if sea_pad != null:
-		# FIX #1 contract: cluster AABB + pad binds the nearest sea plate and
-		# never nearest-own-land spill — even when a Home-band land disk is
-		# closer than the spread plate (East Kent / old ENG at z0.318).
+		# BETWEEN plates only (East Kent / own-GER gap). No outer margin.
 		if player_only and not _formation_is_player_tag(sea_pad):
 			return null
 		return sea_pad
@@ -25886,25 +25901,37 @@ func _sea_nation_cluster_icons_at_pid(id: int) -> Array:
 
 
 func _world_in_sea_nation_cluster_pad(world_pos: Vector2, icons: Array, z: float) -> bool:
+	# FIX #4 (b): BETWEEN plate centres only. Do not expand by hit_r + 9/z —
+	# that outer margin stole Kent / Low Countries land counters.
+	var _zoom_keep: float = z
 	if icons.size() < 2:
 		return false
-	var pad: float = _sea_nation_cluster_pad_world(z)
 	var minx: float = INF
 	var maxx: float = -INF
 	var miny: float = INF
 	var maxy: float = -INF
+	var n: int = 0
 	for c_v in icons:
 		var icon: Node2D = c_v as Node2D
 		if icon == null:
 			continue
 		var pid: int = int(icon.get_meta("province_id", -1))
 		var p: Vector2 = _demo_unit_icon_world_pos(icon, pid)
-		var rr: float = _sea_nation_fleet_disk_radius_world(z, icon) + pad
-		minx = minf(minx, p.x - rr)
-		maxx = maxf(maxx, p.x + rr)
-		miny = minf(miny, p.y - rr)
-		maxy = maxf(maxy, p.y + rr)
-	return world_pos.x >= minx and world_pos.x <= maxx and world_pos.y >= miny and world_pos.y <= maxy
+		minx = minf(minx, p.x)
+		maxx = maxf(maxx, p.x)
+		miny = minf(miny, p.y)
+		maxy = maxf(maxy, p.y)
+		n += 1
+	if n < 2:
+		return false
+	# 1 world-unit slack so a lerp-on-edge gap (GER|FRA 0.38) still binds.
+	var slack: float = 1.0
+	return (
+		world_pos.x >= minx - slack
+		and world_pos.x <= maxx + slack
+		and world_pos.y >= miny - slack
+		and world_pos.y <= maxy + slack
+	)
 
 
 func _pick_sea_nation_plate_drawn_at_world(world_pos: Vector2, z: float = -1.0) -> Object:
@@ -25959,8 +25986,8 @@ func _formation_from_demo_icon(counter: Node2D) -> Object:
 func _pick_nearest_sea_nation_in_cluster_pad(
 	world_pos: Vector2, z: float, land_only: bool, player_only: bool
 ) -> Object:
-	# Click in the cluster AABB + pad binds the nearest plate and never falls
-	# through to nearest-own-land spill (East Kent / Channel gap).
+	# Click BETWEEN plate centres binds the nearest plate (East Kent / GER gap).
+	# Outer margin around the cluster is not a fleet bind.
 	var p_tag: String = _player_tag()
 	var best: Object = null
 	var best_d: float = INF
@@ -26108,12 +26135,74 @@ func _sea_nation_counter_scale(radius_world: float, z_override: float = -1.0) ->
 	return clampf(maxf(target, packed), 0.66, 8.0)
 
 
+func _unit_counter_drawn_body_radius_world(z: float, counter: Node2D = null) -> float:
+	# Painted NATO plate (+ short nameplate) in world — not the old
+	# hit_screen/z double-divide that made Home-band disks ~320–390u.
+	var zz: float = maxf(z, 0.05)
+	var cscale: float = 0.0
+	if counter != null and is_instance_valid(counter):
+		cscale = maxf(counter.scale.x, counter.scale.y)
+	if cscale < 0.05:
+		cscale = _unit_counter_scale_for_zoom(z)
+	var plate_world: float = maxf(0.5 * 32.0 * cscale * sqrt(2.0), 20.0)
+	var label_world: float = 16.0 / zz if cscale >= 2.0 else 0.0
+	var r: float = plate_world + label_world
+	if counter != null and is_instance_valid(counter) and counter.is_inside_tree():
+		var live_s: float = _unit_counter_aabb_hit_screen(counter)
+		if live_s > 1.0:
+			r = minf(r, maxf(live_s / zz, plate_world))
+	return maxf(r, 20.0)
+
+
+func _pick_drawn_land_air_body_at_world(world_pos: Vector2, z: float = -1.0) -> Object:
+	# Nearest visible land/air counter whose drawn body contains the click.
+	var zz: float = z
+	if zz < 0.05:
+		var cam := get_viewport().get_camera_2d() if get_viewport() else null
+		zz = 1.0
+		if cam:
+			zz = maxf(cam.zoom.x, cam.zoom.y)
+	var best: Object = null
+	var best_d: float = INF
+	for id_v in _demo_unit_icon_pids:
+		var id: int = int(id_v)
+		for c_v in _iter_demo_unit_icons_at_pid(id):
+			var icon: Node2D = c_v as Node2D
+			if icon == null or not is_instance_valid(icon) or not icon.visible:
+				continue
+			if bool(icon.get_meta("sea_nation_disk", false)):
+				continue
+			var fo: Object = _formation_from_demo_icon(icon)
+			if fo == null:
+				continue
+			if _formation_is_fleet_counter(fo):
+				continue
+			var chip_pos: Vector2 = _demo_unit_icon_world_pos(icon, id)
+			var hit_r: float = _demo_unit_icon_hit_radius_world(zz, icon)
+			var d: float = world_pos.distance_to(chip_pos)
+			if d > hit_r:
+				continue
+			if d <= best_d:
+				best_d = d
+				best = fo
+	return best
+
+
 func _demo_unit_icon_hit_radius_world(z: float, counter: Node2D = null) -> float:
 	if counter != null and is_instance_valid(counter) and bool(counter.get_meta("sea_nation_disk", false)):
 		var disk_r: float = _sea_nation_fleet_disk_radius_world(z, counter)
 		# Small pad so the "TAG Fleet N" under the disk stays clickable.
 		return disk_r + 3.0
-	return _unit_counter_hit_radius_world(z, counter)
+	var r: float = _unit_counter_drawn_body_radius_world(z, counter)
+	# FIX #4 (c): below z0.65, own land/air hit is capped at 40 screen px
+	# so it cannot reach a neighbour (Emden NLD / BEL AW3 / DNK AW3).
+	# Clicks on the own counter's drawn plate still sit inside 40 px.
+	if z < 0.65 and counter != null and is_instance_valid(counter):
+		var fo_own: Object = _formation_from_demo_icon(counter)
+		if _formation_is_player_tag(fo_own):
+			var cap_world: float = 40.0 / maxf(z, 0.05)
+			r = minf(r, cap_world)
+	return r
 
 
 func _sync_sea_nation_fleet_offsets(z: float) -> void:

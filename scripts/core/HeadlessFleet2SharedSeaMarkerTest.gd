@@ -49,6 +49,8 @@ const FID_ITA_FLEET := "fleet2_ita_channel"
 const FID_POL_FLEET := "fleet2_pol_channel"
 const FID_USA_FLEET := "fleet2_usa_channel"
 const FID_FRA_FLEET_KOLN := "fleet2_fra_koln"
+const FID_NLD_LAND := "fleet2_nld_div0"
+const NLD_TAG := "NLD"
 const DESIGN_LAND := "infantry_1936"
 const DESIGN_FLEET := "king_george_v_class_bb"
 const WORLD_MAGINOT := Vector2(4283.279410731325, 1010.2668539708038)
@@ -191,6 +193,7 @@ func _run() -> void:
 	_test_i_labels_have_nation_tag()
 	_test_j_renderer_space_anchor()
 	_test_k_spread_band_live_clicks()
+	_test_l_land_counters_keep_own_body()
 	_cleanup()
 
 
@@ -225,7 +228,10 @@ func _test_source_needles() -> void:
 		_fail("pick hit radius must match the drawn disk")
 		return
 	if "_pick_nearest_sea_nation_in_cluster_pad" not in pick_fn:
-		_fail("FIX #3 pick must bind cluster-pad before Home-band land")
+		_fail("FIX #4 pick must still gap-bind BETWEEN plates when no body is under the click")
+		return
+	if "if best_any != null" not in pick_fn:
+		_fail("FIX #4 pick must return a drawn land/air body before the cluster pad")
 		return
 	var land_fn := _slice_func(ren, "_try_open_land_unit_at_world")
 	if "fo_any == null" not in land_fn:
@@ -292,6 +298,19 @@ func _test_source_needles() -> void:
 	if "_pick_nearest_sea_nation_in_cluster_pad" not in land3:
 		_fail("land open must bind own-GER cluster-pad (not sea-zone inspector)")
 		return
+	if "_pick_drawn_land_air_body_at_world" not in land3:
+		_fail("FIX #4 land open must bind a land/air drawn body before the cluster pad")
+		return
+	if "func _unit_counter_drawn_body_radius_world" not in ren:
+		_fail("FIX #4 drawn land/air body radius helper missing")
+		return
+	if "40.0 / maxf(z, 0.05)" not in ren:
+		_fail("FIX #4 own land/air screen-px cap (40) missing")
+		return
+	var pad_fn := _slice_func(ren, "_world_in_sea_nation_cluster_pad")
+	if "p.x - rr" in pad_fn or "hit_r + pad" in pad_fn:
+		_fail("FIX #4 cluster pad must use plate centres, not centres ± (hit_r+pad)")
+		return
 	_pass("FLEET-2 source needles (FLEET-1 / MV-1b unedited)")
 
 
@@ -317,6 +336,7 @@ func _setup_fixture() -> bool:
 		USA_TAG: {"tag": USA_TAG, "name": "United States"},
 		JAP_TAG: {"tag": JAP_TAG, "name": "Japan"},
 		SOV_TAG: {"tag": SOV_TAG, "name": "Soviet Union"},
+		NLD_TAG: {"tag": NLD_TAG, "name": "Netherlands"},
 	}
 	for row in rows:
 		var pid := int(row["id"])
@@ -438,6 +458,8 @@ func _setup_formations() -> bool:
 		return false
 	if not _register_formation(FID_FRA_FLEET_KOLN, FRA_TAG, "fleet", DESIGN_FLEET, KOLN, "FRA Köln Fleet"):
 		return false
+	if not _register_formation(FID_NLD_LAND, NLD_TAG, "division", DESIGN_LAND, EAST_KENT, "NLD Div 0"):
+		return false
 	_isolate_fixture_formations()
 	_pass("seeded production NS (GER/FRA/JAP/SOV) + Channel (ENG/ITA/POL/USA)")
 	return true
@@ -457,6 +479,7 @@ func _isolate_fixture_formations() -> void:
 		FID_POL_FLEET: true,
 		FID_USA_FLEET: true,
 		FID_FRA_FLEET_KOLN: true,
+		FID_NLD_LAND: true,
 	}
 	var pids: Dictionary = {MAGINOT: true, KOLN: true, EAST_KENT: true, NORTH_SEA: true, CHANNEL: true}
 	if _lm == null or not ("formations" in _lm) or not (_lm.formations is Dictionary):
@@ -1293,6 +1316,88 @@ func _test_e_koln_fra_land_fleet() -> void:
 	_pass("(e) Köln FRA land-province fleet at %s still not selected" % str(WORLD_KOLN))
 
 
+func _free_icon(icon: Node2D) -> void:
+	if icon == null or not is_instance_valid(icon):
+		return
+	icon.visible = false
+	if icon.get_parent() != null:
+		icon.get_parent().remove_child(icon)
+	icon.free()
+
+
+func _test_l_land_counters_keep_own_body() -> void:
+	# FIX #4: a land counter inside the old padded AABB but outside the
+	# between-plates box must open itself, not the nearest fleet. A nearby
+	# own-GER chip must not steal the neighbour at z0.318.
+	var z: float = 0.318
+	_apply_zoom(z)
+	if not _resolve_marker_coords():
+		return
+	var pad_w: float = 9.0 / z
+	var land_pos: Vector2 = Vector2(_usa_ch.x + _ch_r + pad_w - 10.0, (_pol_ch.y + _usa_ch.y) * 0.5)
+	if bool(_mr.call("_world_in_sea_nation_cluster_pad", land_pos, _sea_nation_cluster_icons(CHANNEL), z)):
+		land_pos = Vector2(_usa_ch.x + _ch_r + pad_w + 8.0, (_pol_ch.y + _usa_ch.y) * 0.5)
+	if land_pos.distance_to(_usa_ch) <= _ch_r + 2.0:
+		land_pos = Vector2(_usa_ch.x + _ch_r + 16.0, _usa_ch.y + _ch_r + 16.0)
+	var nld_icon: Node2D = _place_land_chip_at(EAST_KENT, FID_NLD_LAND, land_pos)
+	if nld_icon == null:
+		_fail("(l) NLD land chip missing")
+		return
+	nld_icon.scale = Vector2(2.0, 2.0)
+	nld_icon.visible = true
+	_reset_pick()
+	var disk: Object = _mr.call("_pick_unit_formation_at_world", land_pos)
+	var got := str(disk.formation_id) if disk != null and "formation_id" in disk else "?"
+	var gtype := str(disk.formation_type) if disk != null and "formation_type" in disk else "?"
+	if got != FID_NLD_LAND or gtype == "fleet":
+		_fail("(l) land body inside old pad pick=%s/%s want NLD land (not a fleet)" % [got, gtype])
+		_free_icon(nld_icon)
+		return
+	var opened: bool = _click_chip_path(land_pos)
+	if not opened or _selected_fid() != FID_NLD_LAND:
+		_fail("(l) land body selected=%s want NLD land" % _selected_fid())
+		_free_icon(nld_icon)
+		return
+	if not _popup_up() or not _assert_no_command_buttons("(l) NLD land"):
+		_free_icon(nld_icon)
+		return
+	var ger_pos: Vector2 = land_pos + Vector2(90.0, 0.0)
+	var ger_icon: Node2D = _place_land_chip_at(MAGINOT, FID_GER_LAND, ger_pos)
+	if ger_icon != null:
+		ger_icon.scale = Vector2(8.0, 8.0)
+		ger_icon.visible = true
+	_reset_pick()
+	var neigh: Object = _mr.call("_pick_unit_formation_at_world", land_pos)
+	var nfid := str(neigh.formation_id) if neigh != null and "formation_id" in neigh else "?"
+	if nfid != FID_NLD_LAND:
+		_fail("(l) neighbour body stolen by own GER (got %s)" % nfid)
+		_free_icon(nld_icon)
+		_free_icon(ger_icon)
+		return
+	_reset_pick()
+	var own_open: bool = _click_chip_path(ger_pos)
+	if not own_open or _selected_fid() != FID_GER_LAND:
+		_fail("(l) own GER drawn body selected=%s — radius cap broke Home-band own pick" % _selected_fid())
+		_free_icon(nld_icon)
+		_free_icon(ger_icon)
+		return
+	if not _popup_has_btn("BtnOpenFight"):
+		_fail("(l) own GER card must still show Open fight")
+		_free_icon(nld_icon)
+		_free_icon(ger_icon)
+		return
+	_free_icon(nld_icon)
+	_free_icon(ger_icon)
+	_apply_zoom(1.0)
+	_pass("(l) land counter in old pad keeps its own body; own-GER cap does not steal the neighbour")
+
+
+func _sea_nation_cluster_icons(pid: int) -> Array:
+	if _mr != null and _mr.has_method("_sea_nation_cluster_icons_at_pid"):
+		return _mr.call("_sea_nation_cluster_icons_at_pid", pid) as Array
+	return []
+
+
 func _cleanup() -> void:
 	if _lm != null and "formations" in _lm and _lm.formations is Dictionary:
 		_lm.formations.erase(FID_GER_LAND)
@@ -1305,6 +1410,7 @@ func _cleanup() -> void:
 		_lm.formations.erase(FID_POL_FLEET)
 		_lm.formations.erase(FID_USA_FLEET)
 		_lm.formations.erase(FID_FRA_FLEET_KOLN)
+		_lm.formations.erase(FID_NLD_LAND)
 	if _mr != null and is_instance_valid(_mr):
 		_mr.queue_free()
 		_mr = null
