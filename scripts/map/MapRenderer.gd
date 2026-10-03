@@ -26392,13 +26392,15 @@ func _world_in_unit_nation_plate(world_pos: Vector2, counter: Node2D) -> bool:
 
 
 func _world_in_unit_plate_interior(world_pos: Vector2, counter: Node2D) -> bool:
-	# Interior of the 44×40 NationPlate. The outer ~28% is rim — overlapping
-	# StatBars there still win (DNK AW3 +44 on the Emden plate edge).
+	# Inner face of the 44×40 NationPlate. FLEET-2b shrinks this from 72%
+	# to ~60% so StatBars over the outer face / rim win across the visible
+	# strip (Play: DNK AW3 +44 only ±4 at 72%). Emden east +20 is ~13.1
+	# local at Home (20/z/scale) and must stay interior — 13.4 keeps that.
 	if not _world_in_unit_nation_plate(world_pos, counter):
 		return false
 	var xf: Transform2D = counter.get_global_transform()
 	var local: Vector2 = xf.affine_inverse() * world_pos
-	return absf(local.x) <= 22.0 * 0.72 and absf(local.y) <= 20.0 * 0.72
+	return absf(local.x) <= 13.4 and absf(local.y) <= 12.2
 
 
 func _unit_counter_painted_wins(
@@ -26410,11 +26412,12 @@ func _unit_counter_painted_wins(
 	#    Emden centre is NLD plate interior (beats DNK bars that cover it).
 	#    DNK +44 is DNK bars on the NLD rim (bars win). East +20 is still
 	#    NLD interior. Neighbour chip centres stay their own interiors.
-	#    FLEET-2b: StatBars over another chip's plate win across the
-	#    full visible strip (not only ±4 px around the bar centre).
-	#    Emden centre / east +20 stay NLD because they are not on the strip.
+	#    FLEET-2b: inner face is ~60% (not 72%) so StatBars over the
+	#    outer face / rim win across the visible strip. Emden centre
+	#    and east +20 stay NLD inner interior. Same-nation piles are
+	#    unchanged (Play +8 → DNK Div 2 by nearer bar centre).
 	# 3) same class → nearest painted *piece* centre (bars use the strip
-	#    centre, not the chip origin — DNK AW3 ±8 / ends stay DNK).
+	#    centre, not the chip origin).
 	# 4) true distance tie → scene-tree / CanvasItem order
 	# Tree order is not a visual stack at Home-band inverse-zoom (all
 	# DemoUnitIcon_* share z=28), so it is only the last resort.
@@ -26429,12 +26432,6 @@ func _unit_counter_painted_wins(
 	var ca: int = _unit_counter_painted_class(world_pos, a)
 	var cb: int = _unit_counter_painted_class(world_pos, b)
 	if ca != cb:
-		if ca == 2 and cb == 3:
-			if _stat_bars_beat_other_plate_interior(world_pos, a, b):
-				return true
-		elif cb == 2 and ca == 3:
-			if _stat_bars_beat_other_plate_interior(world_pos, b, a):
-				return false
 		return ca > cb
 	var pa: Vector2 = _unit_counter_painted_piece_world(world_pos, a)
 	var pb: Vector2 = _unit_counter_painted_piece_world(world_pos, b)
@@ -26449,16 +26446,6 @@ func _unit_counter_painted_wins(
 	if a_d > b_d:
 		return false
 	return a.is_greater_than(b)
-
-
-func _stat_bars_beat_other_plate_interior(world_pos: Vector2, bars_c: Node2D, plate_c: Node2D) -> bool:
-	# Click is on `bars_c` StatBars and on `plate_c` interior. The visible
-	# strip is the painted pixel — it wins across its full width (DNK AW3
-	# ±4 / ±8 / ends). Emden centre and east +20 stay NLD because those
-	# points are not on the DNK strip. `plate_c` is the overlapped face.
-	if plate_c == null or not is_instance_valid(plate_c):
-		return false
-	return _world_in_unit_stat_bars(world_pos, bars_c)
 
 
 func _unit_counter_painted_piece_world(world_pos: Vector2, counter: Node2D) -> Vector2:

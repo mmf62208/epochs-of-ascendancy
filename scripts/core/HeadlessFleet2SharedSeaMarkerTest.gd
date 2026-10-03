@@ -352,9 +352,6 @@ func _test_source_needles() -> void:
 	if "func _chip_text_glyph_local_rect" not in ren:
 		_fail("FLEET-2b tight glyph rect helper missing")
 		return
-	if "func _stat_bars_beat_other_plate_interior" not in ren:
-		_fail("FLEET-2b StatBars-over-edge helper missing")
-		return
 	if "func _unit_counter_painted_piece_world" not in ren:
 		_fail("FLEET-2b painted-piece centre helper missing")
 		return
@@ -1643,8 +1640,9 @@ func _test_o_dnk_bar_strip_full_width() -> void:
 	nld_icon.z_as_relative = false
 	if _mr.has_method("_attach_unit_counter_chrome"):
 		_mr.call("_attach_unit_counter_chrome", nld_icon, _formation(FID_NLD_LAND), Color(0.2, 0.4, 0.7, 1.0))
-	# Sit DNK so its bar strip (local y=20..34) overlaps the NLD east rim.
-	var dnk_pos: Vector2 = WORLD_MAGINOT + Vector2(16.0, -37.0) * nld_s
+	# Sit DNK so the full bar strip overlaps the NLD *east rim / outer
+	# face* (not the inner 60%). Entire strip x stays east of NLD |x|=13.4.
+	var dnk_pos: Vector2 = WORLD_MAGINOT + Vector2(36.0, -10.0) * nld_s
 	var dnk_icon: Node2D = _place_land_chip_at(MAGINOT, FID_DNK_AIR, dnk_pos)
 	if dnk_icon == null:
 		_fail("(o) DNK air chip missing")

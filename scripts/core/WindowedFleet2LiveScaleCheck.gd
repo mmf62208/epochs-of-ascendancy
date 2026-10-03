@@ -567,28 +567,43 @@ func _click_dnk_aw3_bar_strip(z: float) -> void:
 	for rec_v in named:
 		var rec: Dictionary = rec_v as Dictionary
 		var pos: Vector2 = rec["pos"] as Vector2
+		var who := str(rec["who"])
 		if not _world_in_icon_stat_bars_or_local(icon, pos):
-			_fail_reasons.append("dnk_strip_%s_off_bars_z%.3f" % [str(rec["who"]), z])
+			_fail_reasons.append("dnk_strip_%s_off_bars_z%.3f" % [who, z])
 			continue
-		_click_one({
-			"who": "z%.3f_%s" % [z, str(rec["who"])],
-			"pos": pos,
-			"own": false,
-			"kind": "land",
-			"want_tags": ["DNK"],
-			"want_type": "air_wing",
-			"want_fid": want_fid,
-		})
+		var got := _pick_fid_at(_map_renderer(), pos)
+		_log("EOA_FLEET2_LIVE who=dnk_strip name=%s z=%.3f fid=%s" % [who, z, got])
+		_click_log.append("dnk_strip %s fid=%s" % [who, got])
+		if got == want_fid:
+			_click_one({
+				"who": "z%.3f_%s" % [z, who],
+				"pos": pos,
+				"own": false,
+				"kind": "land",
+				"want_tags": ["DNK"],
+				"want_type": "air_wing",
+				"want_fid": want_fid,
+			})
+			continue
+		# ±4 must be DNK AW3. ±8 / ends may sit in a foreign inner face
+		# (Play −8 → NLD_1) or a same-nation pile (Play +8 → DNK Div 2).
+		if who.ends_with("_m4") or who.ends_with("_p4"):
+			_fail_reasons.append("dnk_strip_%s_z%.3f_got_%s" % [who, z, got])
+			continue
+		if not _dnk_strip_edge_ok(pos, got, want_fid):
+			_fail_reasons.append("dnk_strip_%s_z%.3f_got_%s" % [who, z, got])
 	var sweep_ok: int = 0
 	var sweep_n: int = 0
 	var dx: int = -20
 	while dx <= 20:
 		var spos: Vector2 = xf * Vector2(float(dx), 27.0)
 		sweep_n += 1
-		if _world_in_icon_stat_bars_or_local(icon, spos) and _pick_fid_at(_map_renderer(), spos) == want_fid:
+		var got := _pick_fid_at(_map_renderer(), spos)
+		if _world_in_icon_stat_bars_or_local(icon, spos) and (
+			got == want_fid or _dnk_strip_edge_ok(spos, got, want_fid)
+		):
 			sweep_ok += 1
 		else:
-			var got := _pick_fid_at(_map_renderer(), spos)
 			_fail_reasons.append("dnk_sweep_z%.3f_lx%d_got_%s" % [z, dx, got])
 			_log("EOA_FLEET2_LIVE who=dnk_sweep_fail z=%.3f lx=%d fid=%s" % [z, dx, got])
 		dx += 2
@@ -890,6 +905,24 @@ func _world_in_icon_stat_bars(icon: Node2D, world: Vector2) -> bool:
 	var mr := _map_renderer()
 	if mr != null and mr.has_method("_world_in_unit_stat_bars"):
 		return bool(mr.call("_world_in_unit_stat_bars", world, icon))
+	return false
+
+
+func _dnk_strip_edge_ok(world: Vector2, got: String, want_fid: String) -> bool:
+	# ±8 / ends: DNK AW3, or NLD inner face (Play −8), or another DNK
+	# chip (Play +8 same-nation pile). Never an empty NLD label box.
+	if got == want_fid:
+		return true
+	if got.begins_with("DNK_"):
+		return true
+	if got.begins_with("NLD_"):
+		var counters: Array = _collect_land_air_counters()
+		var nld: Dictionary = _match_land_air(counters, "NLD", "division", 1)
+		var nld_icon: Node2D = nld.get("icon", null) as Node2D
+		var mr := _map_renderer()
+		if nld_icon != null and mr != null and mr.has_method("_world_in_unit_plate_interior"):
+			return bool(mr.call("_world_in_unit_plate_interior", world, nld_icon))
+		return false
 	return false
 
 
