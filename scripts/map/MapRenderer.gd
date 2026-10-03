@@ -26569,11 +26569,28 @@ func _world_in_unit_stat_bars(world_pos: Vector2, counter: Node2D) -> bool:
 
 func _world_in_unit_painted_rect(world_pos: Vector2, counter: Node2D) -> bool:
 	# FLEET-2b: only actually painted pixels. Plate + StatBars via
-	# `_world_in_unit_plate_or_bars`; designation / type / str use glyph
-	# ink (and outline), not a fat AABB. Empty label box cannot win.
+	# `_world_in_unit_plate_or_bars`. Glyph ink counts only on/near the
+	# face (plate grown 3 local) so a designation estimate cannot steal
+	# Heidekreis 40 px east of Emden NLD.
 	if _world_in_unit_plate_or_bars(world_pos, counter):
 		return true
-	return _world_in_unit_painted_glyphs(world_pos, counter)
+	if not _world_in_unit_painted_glyphs(world_pos, counter):
+		return false
+	return _world_in_unit_plate_grown(world_pos, counter, 2.0)
+
+
+func _world_in_unit_plate_grown(world_pos: Vector2, counter: Node2D, grow_local: float) -> bool:
+	if counter == null or not is_instance_valid(counter):
+		return false
+	var xf: Transform2D = counter.get_global_transform()
+	var local: Vector2 = xf.affine_inverse() * world_pos
+	var plate: Rect2 = Rect2(Vector2(-22.0, -20.0), Vector2(44.0, 40.0)).grow(grow_local)
+	return (
+		local.x >= plate.position.x
+		and local.y >= plate.position.y
+		and local.x <= plate.position.x + plate.size.x
+		and local.y <= plate.position.y + plate.size.y
+	)
 
 
 func _world_in_unit_painted_glyphs(world_pos: Vector2, counter: Node2D) -> bool:
@@ -26615,7 +26632,8 @@ func _chip_text_glyph_local_rect(item: CanvasItem) -> Rect2:
 		fs = int(item.get("font_size"))
 	var outline: float = 0.0
 	if "outline_size" in item:
-		outline = float(item.get("outline_size"))
+		# Ink halo only — full outline_size 4 at font 9 was a fat box.
+		outline = minf(float(item.get("outline_size")), 1.5)
 	var font: Font = ThemeDB.fallback_font
 	var align_right: bool = "align_right" in item and bool(item.get("align_right"))
 	var align_center: bool = "align_center" in item and bool(item.get("align_center"))
