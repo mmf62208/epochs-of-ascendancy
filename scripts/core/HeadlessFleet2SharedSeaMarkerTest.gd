@@ -198,6 +198,8 @@ func _run() -> void:
 	_test_l_land_counters_keep_own_body()
 	_test_m_painted_rect_and_player_land()
 	_test_n_topmost_painted_over_player_land()
+	_test_o_dnk_bar_strip_full_width()
+	_test_p_empty_label_box_cannot_win()
 	_cleanup()
 
 
@@ -320,8 +322,11 @@ func _test_source_needles() -> void:
 	if "func _world_in_unit_stat_bars" not in ren:
 		_fail("FIX #5 StatBars hit helper missing")
 		return
-	if "func _foreign_land_air_blocked_on_player_hex" not in ren:
-		_fail("FIX #5 player-land foreign land/air guard missing")
+	if "func _foreign_land_air_blocked_on_player_hex" in ren:
+		_fail("FLEET-2b must remove unused _foreign_land_air_blocked_on_player_hex")
+		return
+	if "func _province_owner_tag" in ren:
+		_fail("FLEET-2b must remove unused _province_owner_tag with the dead halo helper")
 		return
 	if "40.0 / maxf(z, 0.05)" in ren:
 		_fail("FIX #5 must not keep the 40 px own-only circle cap")
@@ -341,6 +346,25 @@ func _test_source_needles() -> void:
 	if "func _world_in_unit_plate_or_bars" not in ren:
 		_fail("FIX #6 tight plate+bars halo helper missing")
 		return
+	if "func _world_in_unit_painted_glyphs" not in ren:
+		_fail("FLEET-2b glyph-ink helper missing")
+		return
+	if "func _chip_text_glyph_local_rect" not in ren:
+		_fail("FLEET-2b tight glyph rect helper missing")
+		return
+	if "func _stat_bars_beat_other_plate_interior" not in ren:
+		_fail("FLEET-2b StatBars-over-edge helper missing")
+		return
+	if "func _unit_counter_painted_piece_world" not in ren:
+		_fail("FLEET-2b painted-piece centre helper missing")
+		return
+	var painted_fn := _slice_func(ren, "_world_in_unit_painted_rect")
+	if "_world_in_unit_plate_or_bars" not in painted_fn:
+		_fail("FLEET-2b painted hit must wire _world_in_unit_plate_or_bars")
+		return
+	if "_world_in_unit_painted_glyphs" not in painted_fn:
+		_fail("FLEET-2b painted hit must count glyph ink, not a fat label AABB")
+		return
 	var drawn_fn := _slice_func(ren, "_pick_drawn_land_air_body_at_world")
 	if "_foreign_land_air_blocked_on_player_hex" in drawn_fn:
 		_fail("FIX #6 painted-body pick must not apply the ownership block")
@@ -351,6 +375,9 @@ func _test_source_needles() -> void:
 	var pick6 := _slice_func(ren, "_pick_unit_formation_at_world")
 	if "_unit_counter_painted_wins" not in pick6:
 		_fail("FIX #6 unit pick must use z_index-then-nearest on painted bodies")
+		return
+	if "_world_in_unit_painted_rect" not in pick6:
+		_fail("FLEET-2b unit pick must still use the painted-pixel test")
 		return
 	var pad_fn := _slice_func(ren, "_world_in_sea_nation_cluster_pad")
 	if "p.x - rr" in pad_fn or "hit_r + pad" in pad_fn:
@@ -1595,6 +1622,147 @@ func _test_n_topmost_painted_over_player_land() -> void:
 	_free_icon(dnk_icon)
 	_apply_zoom(1.0)
 	_pass("(n) painted Emden-east +20 opens NLD; DNK bars +44 open DNK (ownership halo-only)")
+
+
+func _test_o_dnk_bar_strip_full_width() -> void:
+	# FLEET-2b (o): DNK AW3 StatBars win across the full visible strip
+	# (±4, ±8, ends) where they overlap the NLD plate edge. NLD centre
+	# and east +20 stay NLD_1.
+	var z: float = 0.318
+	_apply_zoom(z)
+	var nld_s: float = 5.0
+	if _mr.has_method("_unit_counter_scale_for_zoom"):
+		nld_s = maxf(4.0, float(_mr.call("_unit_counter_scale_for_zoom", z)))
+	var nld_icon: Node2D = _place_land_chip_at(EAST_KENT, FID_NLD_LAND, WORLD_MAGINOT)
+	if nld_icon == null:
+		_fail("(o) NLD land chip missing")
+		return
+	nld_icon.scale = Vector2(nld_s, nld_s)
+	nld_icon.visible = true
+	nld_icon.z_index = 28
+	nld_icon.z_as_relative = false
+	if _mr.has_method("_attach_unit_counter_chrome"):
+		_mr.call("_attach_unit_counter_chrome", nld_icon, _formation(FID_NLD_LAND), Color(0.2, 0.4, 0.7, 1.0))
+	# Sit DNK so its bar strip (local y=20..34) overlaps the NLD east rim.
+	var dnk_pos: Vector2 = WORLD_MAGINOT + Vector2(16.0, -37.0) * nld_s
+	var dnk_icon: Node2D = _place_land_chip_at(MAGINOT, FID_DNK_AIR, dnk_pos)
+	if dnk_icon == null:
+		_fail("(o) DNK air chip missing")
+		_free_icon(nld_icon)
+		return
+	dnk_icon.scale = Vector2(nld_s, nld_s)
+	dnk_icon.visible = true
+	dnk_icon.z_index = 28
+	dnk_icon.z_as_relative = false
+	if _mr.has_method("_attach_unit_counter_chrome"):
+		_mr.call("_attach_unit_counter_chrome", dnk_icon, _formation(FID_DNK_AIR), Color(0.75, 0.15, 0.18, 1.0))
+	var xf: Transform2D = dnk_icon.get_global_transform()
+	var nld_xf: Transform2D = nld_icon.get_global_transform()
+	_reset_pick()
+	var centre_fo: Object = _mr.call("_pick_unit_formation_at_world", WORLD_MAGINOT)
+	var centre_fid := str(centre_fo.formation_id) if centre_fo != null and "formation_id" in centre_fo else "?"
+	if centre_fid != FID_NLD_LAND:
+		_fail("(o) Emden centre pick=%s want NLD" % centre_fid)
+		_free_icon(nld_icon)
+		_free_icon(dnk_icon)
+		return
+	var east: Vector2 = WORLD_MAGINOT + Vector2(20.0 / z, 0.0)
+	_reset_pick()
+	var east_fo: Object = _mr.call("_pick_unit_formation_at_world", east)
+	var east_fid := str(east_fo.formation_id) if east_fo != null and "formation_id" in east_fo else "?"
+	if east_fid != FID_NLD_LAND:
+		_fail("(o) Emden-east +20 pick=%s want NLD" % east_fid)
+		_free_icon(nld_icon)
+		_free_icon(dnk_icon)
+		return
+	var probes: Array = [
+		{"name": "bars0", "pos": xf * Vector2(0.0, 27.0)},
+		{"name": "bars+4", "pos": xf * Vector2(0.0, 27.0) + Vector2(4.0 / z, 0.0)},
+		{"name": "bars-4", "pos": xf * Vector2(0.0, 27.0) + Vector2(-4.0 / z, 0.0)},
+		{"name": "bars+8", "pos": xf * Vector2(0.0, 27.0) + Vector2(8.0 / z, 0.0)},
+		{"name": "bars-8", "pos": xf * Vector2(0.0, 27.0) + Vector2(-8.0 / z, 0.0)},
+		{"name": "end+", "pos": xf * Vector2(20.0, 27.0)},
+		{"name": "end-", "pos": xf * Vector2(-20.0, 27.0)},
+	]
+	for rec_v in probes:
+		var rec: Dictionary = rec_v as Dictionary
+		var pos: Vector2 = rec["pos"] as Vector2
+		var name := str(rec["name"])
+		if not bool(_mr.call("_world_in_unit_stat_bars", pos, dnk_icon)):
+			_fail("(o) %s must sit in the DNK StatBars strip" % name)
+			_free_icon(nld_icon)
+			_free_icon(dnk_icon)
+			return
+		_reset_pick()
+		var fo: Object = _mr.call("_pick_unit_formation_at_world", pos)
+		var fid := str(fo.formation_id) if fo != null and "formation_id" in fo else "?"
+		if fid != FID_DNK_AIR:
+			var nld_local: Vector2 = nld_xf.affine_inverse() * pos
+			_fail("(o) %s pick=%s want DNK (nld_local=%.1f,%.1f)" % [name, fid, nld_local.x, nld_local.y])
+			_free_icon(nld_icon)
+			_free_icon(dnk_icon)
+			return
+	_free_icon(nld_icon)
+	_free_icon(dnk_icon)
+	_apply_zoom(1.0)
+	_pass("(o) DNK AW3 bars ±4/±8/ends open DNK; Emden centre and east +20 stay NLD")
+
+
+func _test_p_empty_label_box_cannot_win() -> void:
+	# FLEET-2b (p): a designation AABB with no glyph ink cannot open the
+	# chip (Heidekreis 710380 at z0.40, ~40 px east of Emden NLD).
+	var z: float = 0.40
+	_apply_zoom(z)
+	var nld_s: float = 5.0
+	if _mr.has_method("_unit_counter_scale_for_zoom"):
+		nld_s = maxf(4.0, float(_mr.call("_unit_counter_scale_for_zoom", z)))
+	var nld_icon: Node2D = _place_land_chip_at(EAST_KENT, FID_NLD_LAND, WORLD_MAGINOT)
+	if nld_icon == null:
+		_fail("(p) NLD land chip missing")
+		return
+	nld_icon.scale = Vector2(nld_s, nld_s)
+	nld_icon.visible = true
+	nld_icon.z_index = 28
+	nld_icon.z_as_relative = false
+	if _mr.has_method("_attach_unit_counter_chrome"):
+		_mr.call("_attach_unit_counter_chrome", nld_icon, _formation(FID_NLD_LAND), Color(0.2, 0.4, 0.7, 1.0))
+	# East of the plate, through the old fat label box, no ink.
+	var empty_label: Vector2 = nld_icon.get_global_transform() * Vector2(30.0, 12.0)
+	if bool(_mr.call("_world_in_unit_plate_or_bars", empty_label, nld_icon)):
+		_fail("(p) empty-label probe must sit outside plate+bars")
+		_free_icon(nld_icon)
+		return
+	if _mr.has_method("_world_in_unit_painted_glyphs"):
+		if bool(_mr.call("_world_in_unit_painted_glyphs", empty_label, nld_icon)):
+			_fail("(p) empty-label probe must sit outside glyph ink")
+			_free_icon(nld_icon)
+			return
+	if bool(_mr.call("_world_in_unit_painted_rect", empty_label, nld_icon)):
+		_fail("(p) painted-pixel test must reject the empty designation box")
+		_free_icon(nld_icon)
+		return
+	_reset_pick()
+	var fo: Object = _mr.call("_pick_unit_formation_at_world", empty_label)
+	var fid := str(fo.formation_id) if fo != null and "formation_id" in fo else "null"
+	if fid == FID_NLD_LAND:
+		_fail("(p) empty label box opened NLD (Heidekreis-style steal)")
+		_free_icon(nld_icon)
+		return
+	var far_east: Vector2 = WORLD_MAGINOT + Vector2(40.0 / z, 0.0)
+	if bool(_mr.call("_world_in_unit_painted_rect", far_east, nld_icon)):
+		_fail("(p) 40 px east of NLD centre must not be painted pixels")
+		_free_icon(nld_icon)
+		return
+	_reset_pick()
+	var far_fo: Object = _mr.call("_pick_unit_formation_at_world", far_east)
+	var far_fid := str(far_fo.formation_id) if far_fo != null and "formation_id" in far_fo else "null"
+	if far_fid == FID_NLD_LAND:
+		_fail("(p) 40 px east opened NLD through an empty label box")
+		_free_icon(nld_icon)
+		return
+	_free_icon(nld_icon)
+	_apply_zoom(1.0)
+	_pass("(p) empty designation box / 40 px east of NLD never opens NLD")
 
 
 func _sea_nation_cluster_icons(pid: int) -> Array:

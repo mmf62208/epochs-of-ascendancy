@@ -5,9 +5,11 @@ extends SceneTree
 ## and ~1.5. Pixel-assert each plate centre. Click all 8 plates at 0.318 / 0.40
 ## / 0.8 / 1.5 plus East Kent, old ENG chip, and a GER-nearest gap.
 ## Also click Play-listed land/air counters at 0.318 / 0.40, coasts 710374 /
-## 710380 (own GER or province in the halo), Emden NLD east +20, DNK AW3
-## bars +44, own AW3 bars +46 / corner, Emden painted-rect grid, and own
-## GER bodies. xvfb is NOT live Play. Never EOA_SKIP_TITLE.
+## 710380 (topmost PAINTED chip or own GER/province — never NLD through an
+## empty label box), Emden NLD east +20, DNK AW3 bars +44 / ±4 / ±8 / ends /
+## 2 px sweep, own AW3 bars +46 / corner, Emden painted-rect grid, own GER
+## bodies, and bare-land points east of the NLD label. xvfb is NOT live Play.
+## Never EOA_SKIP_TITLE.
 ##
 ##   tools/eoa_fleet2_live_scale_check.sh
 
@@ -24,7 +26,7 @@ const VIEW_H := 740
 const WAIT_MAP_SECS := 420
 const SETTLE_FRAMES := 36
 const GER_TAG := "GER"
-const REPO_DIR := "docs/evidence/fleet2_fix6"
+const REPO_DIR := "docs/evidence/fleet2b"
 const COAST_A := 710374
 const COAST_B := 710380
 
@@ -75,7 +77,7 @@ func _start() -> void:
 		_out_dir = "/tmp/eoa-fleet2-live"
 	DirAccess.make_dir_recursive_absolute(_out_dir)
 	if DirAccess.dir_exists_absolute("/opt/cursor/artifacts"):
-		DirAccess.make_dir_recursive_absolute("/opt/cursor/artifacts/fleet2-fix6")
+		DirAccess.make_dir_recursive_absolute("/opt/cursor/artifacts/fleet2b")
 	if OS.get_environment("EOA_SMOKE_AUTO_BEGIN").strip_edges() != "1":
 		OS.set_environment("EOA_SMOKE_AUTO_BEGIN", "1")
 	_log("EOA_FLEET2_LIVE who=guard.boot out=%s view=%dx%d (NOT product Play)" % [_out_dir, VIEW_W, VIEW_H])
@@ -369,7 +371,11 @@ func _click_land_air_guard(z: float) -> void:
 	_click_own_aw3_painted(z)
 	_click_emden_east(z)
 	_click_dnk_aw3_bars(z)
+	_click_dnk_aw3_bar_strip(z)
+	_click_nld_label_east_bare(z)
 	_click_emden_grid(z)
+	if is_equal_approx(z, 0.40):
+		_click_heidekreis_painted_or_own(z)
 
 
 func _click_own_ger_bodies(z: float) -> void:
@@ -535,6 +541,145 @@ func _dnk_bars_pick_point(icon: Node2D, start: Vector2, want_fid: String, z: flo
 	return start
 
 
+func _click_dnk_aw3_bar_strip(z: float) -> void:
+	# FLEET-2b: full visible StatBars width — ±4, ±8, ends, every 2 px.
+	var counters: Array = _collect_land_air_counters()
+	var hit: Dictionary = _match_land_air(counters, "DNK", "air_wing", 3)
+	if hit.is_empty():
+		_fail_reasons.append("missing_DNK_AW3_strip_z%.3f" % z)
+		return
+	var icon: Node2D = hit.get("icon", null) as Node2D
+	var want_fid: String = str(hit.get("fid", ""))
+	if icon == null or not is_instance_valid(icon):
+		_fail_reasons.append("missing_DNK_AW3_strip_icon_z%.3f" % z)
+		return
+	var xf: Transform2D = icon.get_global_transform()
+	var mid: Vector2 = xf * Vector2(0.0, 27.0)
+	var zz: float = maxf(z, 0.05)
+	var named: Array = [
+		{"who": "DNK_AW3_bars_m4", "pos": mid + Vector2(-4.0 / zz, 0.0)},
+		{"who": "DNK_AW3_bars_p4", "pos": mid + Vector2(4.0 / zz, 0.0)},
+		{"who": "DNK_AW3_bars_m8", "pos": mid + Vector2(-8.0 / zz, 0.0)},
+		{"who": "DNK_AW3_bars_p8", "pos": mid + Vector2(8.0 / zz, 0.0)},
+		{"who": "DNK_AW3_bars_end_m", "pos": xf * Vector2(-20.0, 27.0)},
+		{"who": "DNK_AW3_bars_end_p", "pos": xf * Vector2(20.0, 27.0)},
+	]
+	for rec_v in named:
+		var rec: Dictionary = rec_v as Dictionary
+		var pos: Vector2 = rec["pos"] as Vector2
+		if not _world_in_icon_stat_bars_or_local(icon, pos):
+			_fail_reasons.append("dnk_strip_%s_off_bars_z%.3f" % [str(rec["who"]), z])
+			continue
+		_click_one({
+			"who": "z%.3f_%s" % [z, str(rec["who"])],
+			"pos": pos,
+			"own": false,
+			"kind": "land",
+			"want_tags": ["DNK"],
+			"want_type": "air_wing",
+			"want_fid": want_fid,
+		})
+	var sweep_ok: int = 0
+	var sweep_n: int = 0
+	var dx: int = -20
+	while dx <= 20:
+		var spos: Vector2 = xf * Vector2(float(dx), 27.0)
+		sweep_n += 1
+		if _world_in_icon_stat_bars_or_local(icon, spos) and _pick_fid_at(_map_renderer(), spos) == want_fid:
+			sweep_ok += 1
+		else:
+			var got := _pick_fid_at(_map_renderer(), spos)
+			_fail_reasons.append("dnk_sweep_z%.3f_lx%d_got_%s" % [z, dx, got])
+			_log("EOA_FLEET2_LIVE who=dnk_sweep_fail z=%.3f lx=%d fid=%s" % [z, dx, got])
+		dx += 2
+	_log("EOA_FLEET2_LIVE who=dnk_sweep_sum z=%.3f ok=%d n=%d" % [z, sweep_ok, sweep_n])
+	_click_log.append("dnk_sweep z=%.3f ok=%d/%d" % [z, sweep_ok, sweep_n])
+
+
+func _click_nld_label_east_bare(z: float) -> void:
+	# Bare land east of the Emden NLD label — must not open NLD_1.
+	var counters: Array = _collect_land_air_counters()
+	var hit: Dictionary = _match_land_air(counters, "NLD", "division", 1)
+	if hit.is_empty():
+		_fail_reasons.append("missing_NLD_label_east_z%.3f" % z)
+		return
+	var icon: Node2D = hit.get("icon", null) as Node2D
+	var base: Vector2 = hit.get("pos", Vector2.ZERO) as Vector2
+	var nld_fid := str(hit.get("fid", ""))
+	if icon == null or not is_instance_valid(icon):
+		_fail_reasons.append("missing_NLD_label_east_icon_z%.3f" % z)
+		return
+	var xf: Transform2D = icon.get_global_transform()
+	var pts: Array = [
+		{"who": "NLD_label_east_local28", "pos": xf * Vector2(28.0, 12.0)},
+		{"who": "NLD_label_east_local32", "pos": xf * Vector2(32.0, 10.0)},
+		{"who": "NLD_label_east_40px", "pos": base + Vector2(40.0 / maxf(z, 0.05), 0.0)},
+	]
+	for rec_v in pts:
+		var rec: Dictionary = rec_v as Dictionary
+		var pos: Vector2 = rec["pos"] as Vector2
+		var who := str(rec["who"])
+		var nld_paint: bool = _world_in_icon_painted(icon, pos)
+		var any_paint: bool = _any_painted_at(pos)
+		var fid := _pick_fid_at(_map_renderer(), pos)
+		_log(
+			"EOA_FLEET2_LIVE who=nld_label_east name=%s z=%.3f world=%.1f,%.1f nld_paint=%s any_paint=%s fid=%s"
+			% [who, z, pos.x, pos.y, str(nld_paint), str(any_paint), fid]
+		)
+		_click_log.append("label_east %s nld_paint=%s any_paint=%s fid=%s" % [who, str(nld_paint), str(any_paint), fid])
+		if nld_paint:
+			continue
+		if fid == nld_fid:
+			_fail_reasons.append("label_east_%s_z%.3f_nld_empty_box" % [who, z])
+			continue
+		if any_paint:
+			_click_log.append("label_east %s covered_by_paint topmost=%s" % [who, _name_topmost_painted(pos)])
+			continue
+		_click_one({
+			"who": "z%.3f_%s" % [z, who],
+			"pos": pos,
+			"own": false,
+			"kind": "hex_own_or_province",
+			"want_tags": ["GER"],
+		})
+
+
+func _click_heidekreis_painted_or_own(z: float) -> void:
+	# z0.40 Heidekreis: topmost PAINTED chip or own GER/province — never
+	# NLD_1 through an empty label box.
+	var pos: Vector2 = _province_world(COAST_B)
+	if pos == Vector2.ZERO:
+		_fail_reasons.append("heidekreis_no_centroid")
+		return
+	var nld_hit: Dictionary = _match_land_air(_collect_land_air_counters(), "NLD", "division", 1)
+	var nld_fid := str(nld_hit.get("fid", "NLD_formation_1"))
+	var nld_icon: Node2D = nld_hit.get("icon", null) as Node2D
+	var painted: bool = _any_painted_at(pos)
+	var in_nld_paint: bool = nld_icon != null and _world_in_icon_painted(nld_icon, pos)
+	var fid := _pick_fid_at(_map_renderer(), pos)
+	_log(
+		"EOA_FLEET2_LIVE who=heidekreis_z40 world=%.1f,%.1f painted=%s in_nld_paint=%s fid=%s"
+		% [pos.x, pos.y, str(painted), str(in_nld_paint), fid]
+	)
+	_click_log.append("heidekreis z=%.3f painted=%s in_nld_paint=%s fid=%s" % [z, str(painted), str(in_nld_paint), fid])
+	if fid == nld_fid and not in_nld_paint:
+		_fail_reasons.append("heidekreis_z%.3f_nld_empty_label" % z)
+		return
+	if painted:
+		var top := _name_topmost_painted(pos)
+		if top == nld_fid and not in_nld_paint:
+			_fail_reasons.append("heidekreis_z%.3f_topmost_nld_empty_label" % z)
+		_click_log.append("heidekreis covered_by_paint topmost=%s" % top)
+		return
+	_click_one({
+		"who": "z%.3f_Heidekreis_halo" % z,
+		"pos": pos,
+		"own": false,
+		"kind": "hex_own_or_province",
+		"want_tags": ["GER"],
+	})
+
+
 func _pick_fid_at(mr: Node, world: Vector2) -> String:
 	if mr == null or not mr.has_method("_pick_unit_formation_at_world"):
 		return ""
@@ -604,8 +749,8 @@ func _click_emden_grid(z: float) -> void:
 
 
 func _halo_point_in_province(pid: int, start: Vector2, z: float) -> Vector2:
-	# Match the picker's painted-body test so a designation-only overhang
-	# is treated as painted (Heidekreis) and we walk off it.
+	# FLEET-2b: walk off actually painted pixels only. An empty label box
+	# is already a halo (Heidekreis).
 	if not _any_painted_at(start):
 		return start
 	var mr := _map_renderer()
@@ -624,9 +769,9 @@ func _halo_point_in_province(pid: int, start: Vector2, z: float) -> Vector2:
 
 
 func _any_painted_at(world: Vector2) -> bool:
-	# Full painted body (plate + bars + label). A designation overhang
-	# still counts as painted — Heidekreis centroid at z0.40 sits just
-	# outside the tight plate but inside NLD's label AABB.
+	# FLEET-2b painted pixels only (plate + bars + glyph ink). An empty
+	# designation AABB is not painted — Heidekreis 710380 at z0.40 must
+	# not count as covered_by_paint just because the label box reaches it.
 	var mr := _map_renderer()
 	if mr == null or not ("_demo_unit_icon_pids" in mr):
 		return false
@@ -642,9 +787,6 @@ func _any_painted_at(world: Vector2) -> bool:
 				continue
 			if _world_in_icon_painted(icon, world):
 				return true
-			if mr.has_method("_world_in_unit_plate_or_bars"):
-				if bool(mr.call("_world_in_unit_plate_or_bars", world, icon)):
-					return true
 	return false
 
 
@@ -875,9 +1017,9 @@ func _write_clicks_md() -> void:
 	var f := FileAccess.open(path, FileAccess.WRITE)
 	if f == null:
 		return
-	f.store_string("# FLEET-2 FIX #6 live-scale clicks\n\n")
+	f.store_string("# FLEET-2b live-scale clicks\n\n")
 	f.store_string("xvfb 1280x740 · GER · Europe Home · world_accurate. NOT live Play.\n\n")
-	f.store_string("Topmost painted: higher CanvasItem z_index; then plate interior > StatBars > plate rim > label; then nearest painted centre. Tree/CanvasItem order only on a true distance tie. Ownership block is halo-only (no painted body under the click).\n\n")
+	f.store_string("Topmost painted *pixels*: plate, bars, or glyph ink (not a fat empty label AABB). Higher CanvasItem z_index; then plate interior > StatBars > plate rim > label; StatBars over another plate edge win across the strip; then nearest painted piece centre. Ownership block is halo-only (no painted pixels under the click).\n\n")
 	f.store_string("| click | result |\n|---|---|\n")
 	for line_v in _click_log:
 		var line := str(line_v)
@@ -1074,8 +1216,8 @@ func _capture(name: String, zoom: float, cam_world: Vector2) -> bool:
 	var path := "%s/%s.png" % [_out_dir, name]
 	img.save_png(path)
 	_captures.append(path)
-	if DirAccess.dir_exists_absolute("/opt/cursor/artifacts/fleet2-fix6"):
-		img.save_png("/opt/cursor/artifacts/fleet2-fix6/%s.png" % name)
+	if DirAccess.dir_exists_absolute("/opt/cursor/artifacts/fleet2b"):
+		img.save_png("/opt/cursor/artifacts/fleet2b/%s.png" % name)
 	DirAccess.make_dir_recursive_absolute(REPO_DIR)
 	img.save_png("%s/%s.png" % [REPO_DIR, name])
 	var z := 0.0
