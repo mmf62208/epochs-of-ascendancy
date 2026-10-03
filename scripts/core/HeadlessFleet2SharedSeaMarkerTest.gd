@@ -335,6 +335,9 @@ func _test_source_needles() -> void:
 	if "func _unit_counter_painted_wins" not in ren:
 		_fail("FIX #6 painted-win (z_index then nearest) helper missing")
 		return
+	if "func _unit_counter_painted_class" not in ren:
+		_fail("FIX #6 painted class (interior/bars/rim/label) helper missing")
+		return
 	if "func _world_in_unit_plate_or_bars" not in ren:
 		_fail("FIX #6 tight plate+bars halo helper missing")
 		return

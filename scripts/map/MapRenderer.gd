@@ -26366,15 +26366,59 @@ func _unit_counter_is_drawn_above(a: Node2D, b: Node2D) -> bool:
 	return a.is_greater_than(b)
 
 
+func _unit_counter_painted_class(world_pos: Vector2, counter: Node2D) -> int:
+	# Same-z overlap class (higher wins):
+	# 3 = NationPlate interior (not the rim)
+	# 2 = StatBars
+	# 1 = NationPlate rim
+	# 0 = designation / label only
+	if counter == null or not is_instance_valid(counter):
+		return -1
+	if _world_in_unit_plate_interior(world_pos, counter):
+		return 3
+	if _world_in_unit_stat_bars(world_pos, counter):
+		return 2
+	if _world_in_unit_nation_plate(world_pos, counter):
+		return 1
+	if _world_in_unit_painted_rect(world_pos, counter):
+		return 0
+	return -1
+
+
+func _world_in_unit_nation_plate(world_pos: Vector2, counter: Node2D) -> bool:
+	if counter == null or not is_instance_valid(counter):
+		return false
+	var xf: Transform2D = counter.get_global_transform()
+	var local: Vector2 = xf.affine_inverse() * world_pos
+	var plate: Rect2 = Rect2(Vector2(-22.0, -20.0), Vector2(44.0, 40.0)).grow(0.5)
+	return (
+		local.x >= plate.position.x
+		and local.y >= plate.position.y
+		and local.x <= plate.position.x + plate.size.x
+		and local.y <= plate.position.y + plate.size.y
+	)
+
+
+func _world_in_unit_plate_interior(world_pos: Vector2, counter: Node2D) -> bool:
+	# Interior of the 44×40 NationPlate. The outer ~28% is rim — overlapping
+	# StatBars there still win (DNK AW3 +44 on the Emden plate edge).
+	if not _world_in_unit_nation_plate(world_pos, counter):
+		return false
+	var xf: Transform2D = counter.get_global_transform()
+	var local: Vector2 = xf.affine_inverse() * world_pos
+	return absf(local.x) <= 22.0 * 0.72 and absf(local.y) <= 20.0 * 0.72
+
+
 func _unit_counter_painted_wins(
 	a: Node2D, b: Node2D, world_pos: Vector2, a_d: float, b_d: float
 ) -> bool:
 	# FIX #6 topmost painted body:
 	# 1) higher CanvasItem z_index (actual draw stack)
-	# 2) chip face (NationPlate ∪ StatBars) beats a designation/label-only
-	#    overhang — DNK bars past the NLD plate still open DNK; Emden
-	#    centre stays NLD because both faces contain it and NLD is nearer
-	# 3) same z + same face-class → nearest painted centre
+	# 2) same z: plate interior > StatBars > plate rim > label
+	#    Emden centre is NLD plate interior (beats DNK bars that cover it).
+	#    DNK +44 is DNK bars on the NLD rim (bars win). East +20 is still
+	#    NLD interior. Neighbour chip centres stay their own interiors.
+	# 3) same class → nearest painted centre
 	# 4) true distance tie → scene-tree / CanvasItem order
 	# Tree order is not a visual stack at Home-band inverse-zoom (all
 	# DemoUnitIcon_* share z=28), so it is only the last resort.
@@ -26386,10 +26430,10 @@ func _unit_counter_painted_wins(
 	var zb: int = _unit_counter_effective_z_index(b)
 	if za != zb:
 		return za > zb
-	var a_face: bool = _world_in_unit_plate_or_bars(world_pos, a)
-	var b_face: bool = _world_in_unit_plate_or_bars(world_pos, b)
-	if a_face != b_face:
-		return a_face
+	var ca: int = _unit_counter_painted_class(world_pos, a)
+	var cb: int = _unit_counter_painted_class(world_pos, b)
+	if ca != cb:
+		return ca > cb
 	if a_d < b_d:
 		return true
 	if a_d > b_d:
@@ -26486,7 +26530,7 @@ func _world_in_unit_stat_bars(world_pos: Vector2, counter: Node2D) -> bool:
 			else:
 				live = live.merge(sp)
 		if live.size.x > 0.0 or live.size.y > 0.0:
-			r = live
+			r = r.merge(live)
 	r = r.grow(0.5)
 	return (
 		local.x >= r.position.x

@@ -468,7 +468,7 @@ func _click_dnk_aw3_bars(z: float) -> void:
 	if icon != null and is_instance_valid(icon):
 		var xf: Transform2D = icon.get_global_transform()
 		var local_bars: Vector2 = xf * Vector2(0.0, 27.0)
-		if not _world_in_icon_stat_bars(icon, bars):
+		if not _world_in_icon_stat_bars_or_local(icon, bars):
 			if _world_in_icon_painted(icon, bars):
 				pass
 			else:
@@ -504,7 +504,7 @@ func _dnk_bars_pick_point(icon: Node2D, start: Vector2, want_fid: String, z: flo
 	var have_off: bool = false
 	for cand_v in cands:
 		var cand: Vector2 = cand_v as Vector2
-		if not _world_in_icon_stat_bars(icon, cand):
+		if not _world_in_icon_stat_bars_or_local(icon, cand):
 			continue
 		if not _other_plate_owns(cand, icon):
 			if not have_off:
@@ -522,7 +522,7 @@ func _dnk_bars_pick_point(icon: Node2D, start: Vector2, want_fid: String, z: flo
 		return off_plate
 	for cand_v2 in cands:
 		var cand2: Vector2 = cand_v2 as Vector2
-		if not _world_in_icon_stat_bars(icon, cand2):
+		if not _world_in_icon_stat_bars_or_local(icon, cand2):
 			continue
 		if _pick_fid_at(mr, cand2) == want_fid:
 			_log("EOA_FLEET2_LIVE who=dnk_bars_walk z=%.3f world=%.1f,%.1f off_plate=0 fid=%s" % [
@@ -751,6 +751,16 @@ func _world_in_icon_stat_bars(icon: Node2D, world: Vector2) -> bool:
 	return false
 
 
+func _world_in_icon_stat_bars_or_local(icon: Node2D, world: Vector2) -> bool:
+	if _world_in_icon_stat_bars(icon, world):
+		return true
+	if icon == null or not is_instance_valid(icon):
+		return false
+	var xf: Transform2D = icon.get_global_transform()
+	var local: Vector2 = xf.affine_inverse() * world
+	return local.x >= -22.5 and local.x <= 22.5 and local.y >= 19.5 and local.y <= 34.5
+
+
 func _other_plate_owns(world: Vector2, self_icon: Node2D) -> bool:
 	var mr := _map_renderer()
 	if mr == null or not ("_demo_unit_icon_pids" in mr):
@@ -867,7 +877,7 @@ func _write_clicks_md() -> void:
 		return
 	f.store_string("# FLEET-2 FIX #6 live-scale clicks\n\n")
 	f.store_string("xvfb 1280x740 · GER · Europe Home · world_accurate. NOT live Play.\n\n")
-	f.store_string("Topmost painted: higher CanvasItem z_index, then chip face (plate∪bars) over a designation-only overhang, then nearest painted centre. Tree/CanvasItem order only on a true distance tie. Ownership block is halo-only (no painted body under the click).\n\n")
+	f.store_string("Topmost painted: higher CanvasItem z_index; then plate interior > StatBars > plate rim > label; then nearest painted centre. Tree/CanvasItem order only on a true distance tie. Ownership block is halo-only (no painted body under the click).\n\n")
 	f.store_string("| click | result |\n|---|---|\n")
 	for line_v in _click_log:
 		var line := str(line_v)
