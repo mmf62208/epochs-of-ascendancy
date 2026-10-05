@@ -35,6 +35,23 @@ Fix: card body **Withdrawing · bounce tomorrow**, button **Withdraw ●**,
 toast `Withdrawing · bounce tomorrow` / `Withdrew · fight ended`, bubble
 label ` WD` (Hold paints ` HOLD`).
 
+## FIX #1 live MIXED `138a1f8a` (1280×740)
+
+Halt **PASS** live at screen (85, 744). Hold ● / Withdraw **FAIL**.
+
+Proven layout (not hunches):
+1. Dock `vp.y - 252` + stance row *below* cmd left Press/Hold off-screen
+   at 1280×740 (Play needed ~800 height to see them).
+2. Fighting+marching put **Withdraw** on the same row as **Halt**. Clicks
+   aimed at Withdraw hit Halt (`March halted`) or nothing.
+3. Hold toast used `next_hook` (`Unpause to fight · Press or Hold`) — same
+   string as Press — so stance API toasts ×3 did not prove Hold ●.
+
+Fix: `UNIT_CARD_DOCK_RESERVE` 348 + `_dock_unit_card_in_viewport` after
+layout; stance row **above** cmd with Press | Hold | Withdraw; Halt stays
+left on the lower row; toast **`Stance: Hold`**. Harness asserts card text
++ `att_stance` after click and that buttons sit inside 1280×740.
+
 ## Fence
 
 Did **not** edit first-session tip strip, `TipDismiss`, or map release-fallthrough.

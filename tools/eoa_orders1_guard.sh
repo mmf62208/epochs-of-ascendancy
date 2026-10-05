@@ -26,9 +26,9 @@ run_one() {
       return 0
     fi
     xvfb-run -a -s "-screen 0 1280x740x24" \
-      "${ROOT}/tools/run_godot.sh" --path . -s "$SCRIPT" >"$log" 2>&1 || code=$?
+      "${ROOT}/tools/run_godot.sh" --path . --resolution 1280x740 -s "$SCRIPT" >"$log" 2>&1 || code=$?
   else
-    "${ROOT}/tools/run_godot.sh" --headless --path . -s "$SCRIPT" >"$log" 2>&1 || code=$?
+    "${ROOT}/tools/run_godot.sh" --headless --path . --resolution 1280x740 -s "$SCRIPT" >"$log" 2>&1 || code=$?
   fi
   if ! grep -q "HeadlessOrders1HaltHoldWithdrawTest: RESULT=PASS" "$log"; then
     echo "ORDERS-1 ${mode} #${idx}: RESULT=FAIL (no RESULT=PASS) code=$code log=$log"

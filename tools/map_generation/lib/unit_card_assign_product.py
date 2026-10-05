@@ -58,6 +58,23 @@ def build_unit_card_assign_product(*, check_wiring: bool = True) -> Dict[str, An
     wiring["press_hold"] = stance_ok
     (passes if stance_ok else fails).append("press_hold")
 
+    # Hold click must toast Stance: Hold, not the shared next_hook (Play MIXED 138a1f8a).
+    hold_toast = "Stance: Hold" in popup
+    wiring["hold_distinct_toast"] = hold_toast
+    (passes if hold_toast else fails).append("hold_distinct_toast")
+
+    dock_raised = (
+        "UNIT_CARD_DOCK_RESERVE" in ren
+        and "_dock_unit_card_in_viewport" in popup
+        and "vp.y - 252" not in popup
+    )
+    wiring["dock_fits_1280x740"] = dock_raised
+    (passes if dock_raised else fails).append("dock_fits_1280x740")
+
+    wd_sep = "stance_row.add_child(wd_btn)" in popup
+    wiring["withdraw_not_beside_halt"] = wd_sep
+    (passes if wd_sep else fails).append("withdraw_not_beside_halt")
+
     no_insp = "show_info_panel" not in execute
     wiring["execute_no_info_panel"] = no_insp
     (passes if no_insp else fails).append("execute_no_info_panel")

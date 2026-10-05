@@ -862,7 +862,7 @@ Isolated keep-green (FLEET-2b tip `c62d85b6`; wrapper `rss_mb` preferred; MV-1/M
 
 ### ORDERS-1 Halt / Hold / Withdraw play-loop (draft HOLD)
 
-From Begin GER 1936: land chip → March → **Halt march** (left command button, not Assign at ≈(97,731)); open fight → **Hold** paints **Hold ●**; **Withdraw** paints **Withdrawing · bounce tomorrow** / **Withdraw ●**. Halt already worked on `b9425e33`. Hold API forced Press (Array `in`). Same-day withdraw had no visible card state. Guard: `HeadlessOrders1HaltHoldWithdrawTest` + `tools/eoa_orders1_guard.sh`. Tip strip / TipDismiss / CLOSE-1 / CRASH-1 / PR #73 hit-disk **unedited**. Headless + xvfb **NOT live Play**.
+From Begin GER 1936: land chip → March → **Halt march** (lower-left command button, not Assign); open fight → **Hold** on the **upper** row paints **Hold ●** + toast `Stance: Hold`; **Withdraw** (upper row, not Halt) paints **Withdrawing · bounce tomorrow** / **Withdraw ●**. Halt already worked on `b9425e33`. Hold API forced Press (Array `in`). Same-day withdraw had no visible card state. **FIX #1:** Play MIXED `138a1f8a` at 1280×740 — stance clipped (`vp.y-252`); Withdraw beside Halt. Raise dock; Press\|Hold\|Withdraw above Halt. Recipe `docs/evidence/orders1/CLICKS.md`. Guard: `HeadlessOrders1HaltHoldWithdrawTest` + `tools/eoa_orders1_guard.sh` (card text + stance after click, 1280×740 visibility). Tip strip / TipDismiss / CLOSE-1 / CRASH-1 / PR #73 hit-disk **unedited**. Headless + xvfb **NOT live Play**.
 
 ### CLOSE-1 card Close stale drag (draft HOLD)
 

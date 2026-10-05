@@ -124,6 +124,7 @@ func _run() -> void:
 	await _test_halt_loop()
 	await _test_hold_loop()
 	await _test_withdraw_loop()
+	await _test_fight_and_march_layout()
 	_cleanup()
 
 
@@ -153,10 +154,25 @@ func _test_source_needles() -> void:
 	if "Withdraw ●" not in show_pop and "Withdrawing" not in show_pop:
 		_fail("card must show Withdraw ● or Withdrawing after same-day withdraw")
 		return
+	if "Stance: Hold" not in show_pop:
+		_fail("Hold toast must say Stance: Hold (not the shared next_hook)")
+		return
+	if "UNIT_CARD_DOCK_RESERVE" not in ren or "_dock_unit_card_in_viewport" not in show_pop:
+		_fail("card must raise/re-dock so stance+cmd fit 1280x740")
+		return
+	if "vp.y - 252" in show_pop:
+		_fail("old vp.y-252 dock clips Press/Hold at 1280x740")
+		return
+	if "stance_row.add_child(wd_btn)" not in show_pop:
+		_fail("Withdraw must sit on stance_row, not beside Halt")
+		return
+	if show_pop.find("vbox.add_child(stance_row)") > show_pop.find("vbox.add_child(cmd_row)"):
+		_fail("stance_row must be added above cmd_row so Hold is not clipped")
+		return
 	if "show_first_session_action_tip" in show_pop or "TipDismiss" in show_pop:
 		_fail("unit-card popup must not own the first-session tip strip")
 		return
-	_pass("source needles: Halt/Hold/Withdraw + visible withdraw state; tip strip fenced")
+	_pass("source needles: Halt/Hold/Withdraw + 1280x740 dock + Stance: Hold toast; tip strip fenced")
 
 
 func _setup_nuts3_fixture() -> bool:
@@ -275,6 +291,7 @@ func _setup_formations() -> bool:
 
 
 func _setup_map_renderer() -> bool:
+	_force_play_viewport()
 	var mr_script: Script = load("res://scripts/map/MapRenderer.gd") as Script
 	if mr_script == null:
 		_fail("MapRenderer.gd missing")
@@ -411,6 +428,34 @@ func _card_text() -> String:
 	return " | ".join(bits)
 
 
+func _force_play_viewport() -> void:
+	var win: Window = root as Window
+	if win != null:
+		win.size = Vector2i(1280, 740)
+	DisplayServer.window_set_size(Vector2i(1280, 740))
+	var vs := root.get_visible_rect().size if root != null else Vector2.ZERO
+	_info_line("play viewport request=1280x740 visible=%.0fx%.0f" % [vs.x, vs.y])
+
+
+func _assert_btn_on_play_card(label: String, btn: Button) -> bool:
+	if btn == null:
+		_fail("%s missing for 1280x740 visibility" % label)
+		return false
+	var r: Rect2 = btn.get_global_rect()
+	_log_button_rect(label, btn)
+	if r.size.x < 8.0 or r.size.y < 8.0:
+		_fail("%s rect too small (%.1fx%.1f) — not clickable" % [label, r.size.x, r.size.y])
+		return false
+	# Client coords must stay inside Play 1280×740 (window chrome is +29 y on live).
+	if r.position.y < 0.0 or r.position.y + r.size.y > 740.5:
+		_fail("%s clipped vertically at 1280x740 (y=%.1f h=%.1f)" % [label, r.position.y, r.size.y])
+		return false
+	if r.position.x < 0.0 or r.position.x + r.size.x > 1280.5:
+		_fail("%s clipped horizontally at 1280x740 (x=%.1f w=%.1f)" % [label, r.position.x, r.size.x])
+		return false
+	return true
+
+
 func _button_screen_pos(btn: Button) -> Vector2:
 	if btn == null:
 		return Vector2(97, 731)
@@ -535,6 +580,10 @@ func _test_halt_loop() -> void:
 	if halt_btn == null:
 		_fail("Halt march missing on marching card")
 		return
+	if not _assert_btn_on_play_card("Halt", halt_btn):
+		return
+	if assign_btn != null and not _assert_btn_on_play_card("Assign", assign_btn):
+		return
 	if assign_btn != null:
 		var hr: Rect2 = halt_btn.get_global_rect()
 		var ar: Rect2 = assign_btn.get_global_rect()
@@ -593,6 +642,10 @@ func _test_hold_loop() -> void:
 		return
 	_log_button_rect("Hold", hold_btn)
 	_log_button_rect("Press", press_btn)
+	if not _assert_btn_on_play_card("Hold", hold_btn):
+		return
+	if press_btn != null and not _assert_btn_on_play_card("Press", press_btn):
+		return
 	hold_btn.pressed.emit()
 	await _flush_frames()
 	var bat: Dictionary = _battle_for_fid()
@@ -611,8 +664,9 @@ func _test_hold_loop() -> void:
 	if txt.find("Hold ●") < 0:
 		_fail("card text missing Hold ●")
 		return
-	_info_line("after Hold card=%s" % txt)
-	_pass("Hold: att_stance=hold and card shows Hold ●")
+	if str(bat.get("att_stance", "")) == "hold" and txt.find("Hold ●") >= 0:
+		_info_line("after Hold card=%s stance=%s" % [txt, str(bat.get("att_stance", ""))])
+	_pass("Hold: att_stance=hold and card shows Hold ● (not toast-only)")
 
 
 func _test_withdraw_loop() -> void:
@@ -625,6 +679,8 @@ func _test_withdraw_loop() -> void:
 		_fail("Withdraw missing on fighting card")
 		return
 	_log_button_rect("Withdraw", wd_btn)
+	if not _assert_btn_on_play_card("Withdraw", wd_btn):
+		return
 	var before_txt := _card_text()
 	_info_line("before Withdraw card=%s" % before_txt)
 	wd_btn.pressed.emit()
@@ -654,7 +710,105 @@ func _test_withdraw_loop() -> void:
 	if after_txt == before_txt:
 		_fail("Withdraw left card text unchanged")
 		return
-	_pass("Withdraw: pending bounce + visible card state")
+	_pass("Withdraw: pending bounce + visible card state (not toast-only)")
+
+
+func _test_fight_and_march_layout() -> void:
+	# Play MIXED 138a1f8a: fighting+marching put Withdraw beside Halt;
+	# stance row sat below cmd and clipped at 1280×740.
+	_fm("clear_march", FID)
+	_inject_open_battle(0)
+	var fo: Object = _formation()
+	if fo == null:
+		_fail("formation missing for fight+march layout")
+		return
+	fo.set("stationed_province_id", BONN)
+	var marched: Dictionary = _fm("enqueue_own_land_march", FID, KOELN, GER_TAG)
+	if not bool(marched.get("ok", false)):
+		_fail("fight+march enqueue failed: %s" % str(marched.get("reason", marched)))
+		return
+	_show_selected_card()
+	await _flush_frames()
+	var halt_btn: Button = _find_card_btn("BtnHaltMarch", "Halt march")
+	var hold_btn: Button = _find_card_btn("BtnHoldStance", "Hold")
+	var press_btn: Button = _find_card_btn("BtnPressStance", "Press")
+	var wd_btn: Button = _find_card_btn("BtnWithdraw", "Withdraw")
+	var assign_btn: Button = _find_card_btn("BtnAssignLeader", "Assign")
+	if halt_btn == null or hold_btn == null or wd_btn == null:
+		_fail("fight+march card missing Halt/Hold/Withdraw")
+		return
+	if not _assert_btn_on_play_card("Halt(fight+march)", halt_btn):
+		return
+	if not _assert_btn_on_play_card("Hold(fight+march)", hold_btn):
+		return
+	if not _assert_btn_on_play_card("Withdraw(fight+march)", wd_btn):
+		return
+	if press_btn != null and not _assert_btn_on_play_card("Press(fight+march)", press_btn):
+		return
+	var hr: Rect2 = halt_btn.get_global_rect()
+	var wr: Rect2 = wd_btn.get_global_rect()
+	var hor: Rect2 = hold_btn.get_global_rect()
+	if hr.intersects(wr):
+		_fail("Halt and Withdraw overlap — Play clicks Withdraw and hits Halt")
+		return
+	if absf(hr.position.y - wr.position.y) < 8.0:
+		_fail("Halt and Withdraw share a row — Play will misclick")
+		return
+	if hor.position.y > hr.position.y + 4.0:
+		_fail("Hold sits below Halt — stance will clip at 1280x740")
+		return
+	var pop: Node = _popup()
+	if pop is Control:
+		var pc: Control = pop as Control
+		var bottom := pc.position.y + maxf(pc.size.y, 220.0)
+		_info_line("card dock y=%.1f size=%.1fx%.1f bottom=%.1f" % [pc.position.y, pc.size.x, pc.size.y, bottom])
+		if bottom > 740.5:
+			_fail("unit card bottom %.1f exceeds Play 1280x740" % bottom)
+			return
+	_info_line(
+		"PLAY_CLICKS 1280x740 Halt=(%.0f,%.0f) Hold=(%.0f,%.0f) Withdraw=(%.0f,%.0f) Assign=%s"
+		% [
+			hr.position.x + hr.size.x * 0.5, hr.position.y + hr.size.y * 0.5,
+			hor.position.x + hor.size.x * 0.5, hor.position.y + hor.size.y * 0.5,
+			wr.position.x + wr.size.x * 0.5, wr.position.y + wr.size.y * 0.5,
+			("n/a" if assign_btn == null else "%.0f,%.0f" % [
+				assign_btn.get_global_rect().position.x + assign_btn.get_global_rect().size.x * 0.5,
+				assign_btn.get_global_rect().position.y + assign_btn.get_global_rect().size.y * 0.5,
+			]),
+		]
+	)
+	# Click Hold while Halt is also visible — must bank Hold ●, not Halt.
+	hold_btn.pressed.emit()
+	await _flush_frames()
+	var bat: Dictionary = _battle_for_fid()
+	if str(bat.get("att_stance", "")) != "hold":
+		_fail("Hold click on fight+march card did not bank att_stance=hold")
+		return
+	var hold_after: Button = _find_card_btn("BtnHoldStance", "Hold")
+	if hold_after == null or hold_after.text != "Hold ●":
+		_fail("fight+march Hold click did not paint Hold ●")
+		return
+	if bool(_fm("has_march", FID)) == false:
+		_fail("Hold click cleared the march (hit Halt)")
+		return
+	# Click Withdraw — must bank pending, not Halt.
+	var wd2: Button = _find_card_btn("BtnWithdraw", "Withdraw")
+	if wd2 == null:
+		_fail("Withdraw missing after Hold on fight+march card")
+		return
+	wd2.pressed.emit()
+	await _flush_frames()
+	var wr_bat: Dictionary = _battle_for_fid()
+	var after_txt := _card_text()
+	var pending := bool(wr_bat.get("withdraw_pending", false))
+	var marked := after_txt.find("Withdraw ●") >= 0 or after_txt.findn("Withdrawing") >= 0
+	if not pending and not marked:
+		_fail("Withdraw click on fight+march card did not bank pending/visible state")
+		return
+	if bool(_fm("has_march", FID)) == false:
+		_fail("Withdraw click cleared the march (hit Halt)")
+		return
+	_pass("fight+march layout: stance above cmd, no Halt/Withdraw overlap, Hold● + Withdrawing bank")
 
 
 func _cleanup() -> void:

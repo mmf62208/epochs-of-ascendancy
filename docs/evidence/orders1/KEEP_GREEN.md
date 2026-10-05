@@ -14,7 +14,7 @@ misses. ORDERS-1 did not edit pick / tip / hit-disk / Close / release paths.
 | `test_unit_card_assign_product` | py | PASS | halt + withdraw visible + assign |
 | `test_land_battle_stance_product` | py | PASS | explicit Hold assign |
 | `test_land_battle_bubble_product` | py | PASS | HOLD / WD labels |
-| `HeadlessOrders1HaltHoldWithdrawTest` | hd+xvfb | PASS | Halt / Hold API+card ● / Withdrawing |
+| `HeadlessOrders1HaltHoldWithdrawTest` | hd+xvfb | pending FIX #1 | Halt / Hold ● / Withdrawing + 1280×740 visibility + fight+march layout |
 | `tools/eoa_orders1_guard.sh` | hd+xvfb | PASS | wrapper 1×+1× |
 | `HeadlessCrash1HaltMarchPopupTest` | hd | PASS | CRASH-1 unedited |
 | `HeadlessClose1StaleDragGuardTest` | hd | PASS | CLOSE-1/1b leftover 11/11 |
