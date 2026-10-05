@@ -860,6 +860,10 @@ Isolated keep-green (FLEET-2b tip `c62d85b6`; wrapper `rss_mb` preferred; MV-1/M
 | UI-1 guard hd+xvfb | both | PASS | **1208.1 / 1347.4** |
 | FLEET-2 live-scale xvfb | xvfb | PASS 8 plates × 4 zooms; East Kent; GER gap; Emden east +20 NLD; DNK ±4 DNK_3; Heidekreis z0.40 never NLD empty label | **2037.5** |
 
+### ORDERS-1 Halt / Hold / Withdraw play-loop (draft HOLD)
+
+From Begin GER 1936: land chip → March → **Halt march** (left command button, not Assign at ≈(97,731)); open fight → **Hold** paints **Hold ●**; **Withdraw** paints **Withdrawing · bounce tomorrow** / **Withdraw ●**. Halt already worked on `b9425e33`. Hold API forced Press (Array `in`). Same-day withdraw had no visible card state. Guard: `HeadlessOrders1HaltHoldWithdrawTest` + `tools/eoa_orders1_guard.sh`. Tip strip / TipDismiss / CLOSE-1 / CRASH-1 / PR #73 hit-disk **unedited**. Headless + xvfb **NOT live Play**.
+
 ### CLOSE-1 card Close stale drag (draft HOLD)
 
 Unit-card Close (`BtnClose` `ACTION_MODE_BUTTON_PRESS`) must not leave a live left-press / drag. Play `9c9c5f20` 19:35:44 / 20:04:17: after Close at (304,551) the next move to the top bar jumped the camera by −1.2× the mouse delta (`middle_mouse_pan_speed`); `97d6ea45` check 5: first top-edge pan after Close was 0 until one empty drag. **FIX #1 (Play MIXED `ce5d3304`):** first top-edge after Close must pan north **and** stay in theater clamp (z0.32 must not fly to cy≈−12384; z0.80 first try must not be `edgepan=0`). `_clamp_camera_to_theater` skips only while `_close_camera_locked`. `_consume_close_press_left_gesture` still clears leftover press/drag. UI-1 click-through skip-pick and CRASH-1 Halt latches stay. Guard: `HeadlessClose1StaleDragGuardTest` + `tools/eoa_close1_guard.sh` (clamp-while-guard + first-edge clamp). Windowed xvfb `tools/eoa_close1_windowed_check.sh` 1280×740 GER Europe Home: ≥20 Close→top-bar trials at zoom 0.32–1.5 including 0.32 and 0.80; first-move delta 0; first edge pans and `|dy|` / cam_y stay in `_apply_camera_bounds`. FLEET-1 / FLEET-2 / MV-1 / MV-1b **unedited**. Headless + xvfb **NOT live Play**.

@@ -21127,6 +21127,7 @@ func _show_unit_detail_popup(formation: Object) -> void:
 		if bat.is_empty() and BattleManager.has_method("get_land_battle_at"):
 			bat = BattleManager.get_land_battle_at(pid)
 	var in_battle := not bat.is_empty()
+	var wd_pending := bool(bat.get("withdraw_pending", false))
 	if in_battle:
 		var att_tag := str(bat.get("att_tag", tag))
 		var def_tag := str(bat.get("def_tag", "?"))
@@ -21137,6 +21138,9 @@ func _show_unit_detail_popup(formation: Object) -> void:
 			hook = str(BattleManager.land_battle_next_hook(bat))
 		if not hook.is_empty():
 			lines.append(hook)
+			body.text = "\n".join(lines)
+		if wd_pending:
+			lines.append("Withdrawing · bounce tomorrow")
 			body.text = "\n".join(lines)
 		var stance_row := HBoxContainer.new()
 		stance_row.add_theme_constant_override("separation", 6)
@@ -21153,6 +21157,7 @@ func _show_unit_detail_popup(formation: Object) -> void:
 			press_btn.pressed.connect(func() -> void:
 				_arm_unit_card_press_consume()
 				var r: Dictionary = BattleManager.set_land_battle_stance(fid, "press")
+				_sync_land_battle_bubbles()
 				_show_inspector_toast(str(r.get("next_hook", "Stance: Press")), 3.5)
 				_show_unit_detail_popup(formation)
 			)
@@ -21167,6 +21172,7 @@ func _show_unit_detail_popup(formation: Object) -> void:
 			hold_btn.pressed.connect(func() -> void:
 				_arm_unit_card_press_consume()
 				var r2: Dictionary = BattleManager.set_land_battle_stance(fid, "hold")
+				_sync_land_battle_bubbles()
 				_show_inspector_toast(str(r2.get("next_hook", "Stance: Hold")), 3.5)
 				_show_unit_detail_popup(formation)
 			)
@@ -21174,7 +21180,7 @@ func _show_unit_detail_popup(formation: Object) -> void:
 	if in_battle and typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("withdraw_from_land_battle"):
 		var wd_btn := Button.new()
 		wd_btn.name = "BtnWithdraw"
-		wd_btn.text = "Withdraw"
+		wd_btn.text = "Withdraw ●" if wd_pending else "Withdraw"
 		wd_btn.focus_mode = Control.FOCUS_NONE
 		wd_btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
 		wd_btn.tooltip_text = "Disengage this unit from the open land battle."
@@ -21184,10 +21190,12 @@ func _show_unit_detail_popup(formation: Object) -> void:
 			var wr: Dictionary = BattleManager.withdraw_from_land_battle(fid)
 			_sync_land_battle_bubbles()
 			_play_map_sfx("error")
-			_show_inspector_toast(
-				"Withdraw · %s" % str(wr.get("reason", wr.get("ok", "done"))),
-				3.5
-			)
+			var wd_msg := "Withdrawing · bounce tomorrow"
+			if bool(wr.get("resolved", false)):
+				wd_msg = "Withdrew · fight ended"
+			elif not bool(wr.get("ok", false)):
+				wd_msg = "Withdraw · %s" % str(wr.get("reason", "failed"))
+			_show_inspector_toast(wd_msg, 3.5)
 			_show_unit_detail_popup(formation)
 		)
 		cmd_row.add_child(wd_btn)

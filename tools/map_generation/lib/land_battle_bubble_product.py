@@ -115,6 +115,14 @@ def build_land_battle_bubble_product(*, check_wiring: bool = True) -> Dict[str, 
     else:
         fails.append("centroid_int_keys")
 
+    labels = _gd_func_slice(src, "_sync_day_labels")
+    stance_chip = " WD" in labels and " HOLD" in labels
+    wiring["hold_withdraw_label"] = stance_chip
+    if stance_chip:
+        passes.append("hold_withdraw_label")
+    else:
+        fails.append("hold_withdraw_label")
+
     if check_wiring:
         sfx_keys_ok = bool(sfx) and all(
             token in sfx

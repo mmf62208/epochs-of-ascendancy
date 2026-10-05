@@ -195,5 +195,9 @@ func _sync_day_labels() -> void:
 		if bool(entry.get("enc_att", false)) or bool(entry.get("enc_def", false)) \
 				or bool(entry.get("pocket_att", false)) or bool(entry.get("pocket_def", false)):
 			lb.text += " ENC"
+		if bool(entry.get("withdraw_pending", false)):
+			lb.text += " WD"
+		elif str(entry.get("att_stance", "")).to_lower() == "hold":
+			lb.text += " HOLD"
 		lb.position = pos + Vector2(-22.0, -22.0)
 		lb.visible = true

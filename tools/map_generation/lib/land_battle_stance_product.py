@@ -97,6 +97,11 @@ def build_land_battle_stance_product() -> Dict[str, Any]:
         passes.append("bm_stance_api")
     else:
         fails.append("bm_stance_api")
+    hold_assign = 'raw_st == "hold"' in bm and "st not in" not in bm
+    if hold_assign:
+        passes.append("hold_explicit_assign")
+    else:
+        fails.append("hold_explicit_assign")
     if "func land_battle_next_hook" in bm or "func _land_battle_next_hook" in bm:
         passes.append("bm_next_hook")
     else:
