@@ -1571,7 +1571,9 @@ func _lock_close_camera() -> void:
 		_close_camera_locked = true
 	_close_click_guard = true
 	_close_release_seen = false
-	_close_suppress_edge = true
+	# HUD Close sits in the 6px north strip. Unit-card Close at ~y=551 must
+	# not suppress first top-edge pan (Play MIXED ce5d3304 EDGE080_try1).
+	_close_suppress_edge = _close_click_is_north_edge_strip()
 	var vp: Viewport = get_viewport()
 	_close_click_screen = vp.get_mouse_position() if vp != null else Vector2.ZERO
 
@@ -1601,13 +1603,21 @@ func _restore_pre_dismiss_camera(snap: Dictionary) -> void:
 	elif cam != null:
 		_lock_close_camera()
 	_close_click_guard = true
-	_close_suppress_edge = true
+	_close_suppress_edge = _close_click_is_north_edge_strip()
 	_close_release_seen = true
 	_hold_camera_now()
 
 
 func _unlock_close_camera() -> void:
 	_close_camera_locked = false
+
+
+func _clear_camera_hold_timers_for_nav() -> void:
+	# WASD / first-edge after Close: drop hold + pick-block so theater clamp
+	# can run. Skip-pick stays on `_close_click_guard` / `_left_skip_next_pick`.
+	_hold_camera_until_msec = 0
+	_inspector_held_closed = false
+	_map_pick_block_until_msec = 0
 
 
 func _reassert_locked_close_camera() -> void:
@@ -1839,6 +1849,16 @@ func _camera_is_held() -> bool:
 		return true
 	var now: int = Time.get_ticks_msec()
 	return now < _hold_camera_until_msec or now < _map_pick_block_until_msec
+
+
+func _dismiss_close_control_from_input() -> void:
+	# Unit-card BtnClose matches `_mouse_over_close_control`. Routing that
+	# through inspector dismiss locked GIS + hold timers and forced edge
+	# suppress (Play MIXED ce5d3304 check #2).
+	if _unit_detail_popup_is_visible():
+		_dismiss_unit_card_restore_province()
+		return
+	_dismiss_inspector_and_restore_input()
 
 
 func _mouse_over_close_control() -> bool:
@@ -2787,7 +2807,7 @@ func _input(event: InputEvent) -> void:
 			elif event.pressed:
 				# Close on press so the release cannot pick the hex under the button.
 				if _mouse_over_close_control() and _inspector_stack_blocking_input():
-					_dismiss_inspector_and_restore_input()
+					_dismiss_close_control_from_input()
 					get_viewport().set_input_as_handled()
 					return
 				if _top_bar_owns_click() or _mouse_over_search_control() or _search_ui_owns_click() or _road_spine_btn_owns_click():
@@ -3142,7 +3162,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 		if _mouse_over_close_control():
 			if _inspector_stack_blocking_input():
-				_dismiss_inspector_and_restore_input()
+				_dismiss_close_control_from_input()
 			get_viewport().set_input_as_handled()
 			return
 		if _top_bar_owns_click() or _mouse_over_search_control() or _search_ui_owns_click() or _living_title_owns_click() or _road_spine_btn_owns_click():
@@ -3662,16 +3682,15 @@ func _handle_camera_input(delta: float) -> void:
 			_unlock_close_camera()
 			_close_click_guard = false
 			_close_suppress_edge = false
-			if _camera_is_held():
-				_hold_camera_until_msec = 0
-				_inspector_held_closed = false
-				_map_pick_block_until_msec = 0
+			_clear_camera_hold_timers_for_nav()
 		elif _close_suppress_edge:
 			move_dir = Vector2.ZERO
 		else:
-			# First edge after Close must stick (Play: 0 edgepan until empty drag).
+			# First edge after Close must stick and clamp (Play MIXED ce5d3304:
+			# EDGE032b unclamped runaway; EDGE080_try1 edge_dir=0 / dy=0).
 			# Keep `_close_click_guard` so the Close release still cannot pick.
 			_unlock_close_camera()
+			_clear_camera_hold_timers_for_nav()
 		if move_dir != Vector2.ZERO:
 			move_dir = move_dir.normalized()
 			# edge_scroll_speed for edge/WASD feel; pan_speed kept as alias baseline
@@ -15784,7 +15803,10 @@ func auto_update_theater_from_camera() -> void:
 
 ## Clamp or wrap camera within current theater bounds (wrap enables seamless toroidal pan for tactical refinement).
 func _clamp_camera_to_theater() -> void:
-	if _camera_is_held():
+	# GIS lock reassert owns the pose. `_close_click_guard` / hold timers must
+	# not skip clamp — Play MIXED ce5d3304 EDGE032b flew to cy≈−12384 because
+	# first-edge unlocked GIS but `_camera_is_held()` still returned true.
+	if _close_camera_locked:
 		return
 	var cam := get_viewport().get_camera_2d() if get_viewport() else null
 	if cam == null:

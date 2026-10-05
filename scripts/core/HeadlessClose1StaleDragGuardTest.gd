@@ -125,6 +125,8 @@ func _run() -> void:
 	await _test_close_swallowed_release_stale_mask()
 	await _test_close_click_through_and_edge_ready()
 	await _test_first_edge_after_close_pans()
+	await _test_first_edge_after_close_clamps()
+	await _test_clamp_ignores_click_guard()
 	await _test_normal_map_drag_still_pans()
 	_cleanup()
 
@@ -163,6 +165,24 @@ func _test_source_needles() -> void:
 		return
 	if "First edge after Close must stick" not in cam_fn:
 		_fail("first edge after Close must unlock the GIS lock")
+		return
+	if "_clear_camera_hold_timers_for_nav()" not in cam_fn:
+		_fail("first edge / WASD must clear hold timers so clamp can run")
+		return
+	var clamp_fn := _slice_func(ren, "_clamp_camera_to_theater")
+	if "_camera_is_held()" in clamp_fn:
+		_fail("_clamp_camera_to_theater must not early-return on _camera_is_held")
+		return
+	if "if _close_camera_locked:" not in clamp_fn:
+		_fail("_clamp_camera_to_theater may skip only while GIS-locked")
+		return
+	var input_slice := _slice_func(ren, "_input")
+	if "_dismiss_close_control_from_input()" not in input_slice:
+		_fail("_input Close must route unit-card vs inspector")
+		return
+	var inp := _read("res://scripts/map/MapViewInput.gd")
+	if "_dead_or_hidden_unit_card_in_ancestry" not in inp:
+		_fail("MapViewInput must ignore a just-Closed unit card hover")
 		return
 	var show_pop := _slice_func(ren, "_show_unit_detail_popup")
 	if show_pop.count("_arm_unit_card_press_consume()") < 5:
@@ -296,12 +316,16 @@ func _setup_map_renderer() -> bool:
 		si += 1
 	_cam = Camera2D.new()
 	_cam.name = "MapCamera"
-	_cam.position = Vector2(400, 300)
+	_cam.position = Vector2(4000, 2000)
 	_cam.zoom = Vector2(0.32, 0.32)
 	_cam.enabled = true
 	_mr.add_child(_cam)
 	root.add_child(_mr)
 	_cam.make_current()
+	if "_current_theater_bounds" in _mr:
+		_mr.set("_current_theater_bounds", MapCanvasConfig.WORLD_CANONICAL_BOUNDS)
+	if "enable_map_wrap" in _mr:
+		_mr.set("enable_map_wrap", false)
 	for pid_v in [BONN, KOELN]:
 		var pid := int(pid_v)
 		var gp: Variant = _mm.call("get_province", pid) if _mm.has_method("get_province") else null
@@ -526,9 +550,11 @@ func _test_first_edge_after_close_pans() -> void:
 	if bool(_mr.get("_close_suppress_edge")):
 		_fail("first edge: suppress still on after unit-card Close")
 		return
+	# Play leftover: skip-pick guard stays; do not paper over by clearing it.
 	_mr.set("_close_camera_locked", false)
-	_mr.set("_close_click_guard", false)
-	_mr.set("_hold_camera_until_msec", 0)
+	_mr.set("_close_click_guard", true)
+	_mr.set("_hold_camera_until_msec", Time.get_ticks_msec() + 900)
+	_mr.set("_map_pick_block_until_msec", Time.get_ticks_msec() + 800)
 	var helper: Vector2 = MapViewInput.edge_pan_direction_at(
 		TOP_BAR, Vector2(1280, 740), false, true, true, false
 	)
@@ -549,6 +575,70 @@ func _test_first_edge_after_close_pans() -> void:
 	# xvfb SceneTree window is often unfocused; helper + suppress-off is the gate
 	# (same class as HeadlessUi1 rim). Windowed TestScenario proves the camera.
 	_pass("first edge after Close allowed (helper north, suppress off, dy=%.1f)" % dy)
+
+
+func _test_first_edge_after_close_clamps() -> void:
+	# Play EDGE032b: first edge after Close flew to cy≈−12384 because clamp
+	# early-returned while `_close_click_guard` / hold timers were set.
+	if _cam == null or _mr == null:
+		_fail("clamp edge: no camera")
+		return
+	_mr.set("_current_theater_bounds", MapCanvasConfig.WORLD_CANONICAL_BOUNDS)
+	_mr.set("enable_map_wrap", false)
+	_cam.zoom = Vector2(0.32, 0.32)
+	_cam.global_position = Vector2(4000.0, 1300.0)
+	var origin: Vector2 = _close_via_real_button(true)
+	await _flush()
+	if origin == Vector2.ZERO:
+		return
+	_mr.set("_close_suppress_edge", false)
+	_mr.set("_close_camera_locked", false)
+	_mr.set("_close_click_guard", true)
+	_mr.set("_hold_camera_until_msec", Time.get_ticks_msec() + 900)
+	_mr.set("_map_pick_block_until_msec", Time.get_ticks_msec() + 800)
+	_cam.global_position = Vector2(4000.0, 1300.0)
+	_warp(TOP_BAR)
+	var before: Vector2 = _camera_pos()
+	var i := 0
+	while i < 40:
+		_tick_camera()
+		i += 1
+	var after: Vector2 = _camera_pos()
+	var dy: float = after.y - before.y
+	var want: Vector2 = after
+	if _mr.has_method("_apply_camera_bounds"):
+		want = _mr.call("_apply_camera_bounds", after)
+	if after.y < -500.0:
+		_fail("first edge runaway cy=%.1f (Play EDGE032b class)" % after.y)
+		return
+	if after.distance_to(want) > 2.5:
+		_fail("first edge skipped theater clamp after=%.1f want=%.1f" % [after.y, want.y])
+		return
+	if dy > -1.0 and after.y > want.y + 2.5:
+		_fail("first edge after Close did not pan or clamp dy=%.1f cy=%.1f" % [dy, after.y])
+		return
+	_pass("first edge after Close clamps (dy=%.1f cy=%.1f bound=%.1f)" % [dy, after.y, want.y])
+
+
+func _test_clamp_ignores_click_guard() -> void:
+	if _cam == null or _mr == null or not _mr.has_method("_clamp_camera_to_theater"):
+		_fail("clamp guard: missing method")
+		return
+	_mr.set("_current_theater_bounds", MapCanvasConfig.WORLD_CANONICAL_BOUNDS)
+	_mr.set("enable_map_wrap", false)
+	_mr.set("_close_camera_locked", false)
+	_mr.set("_close_click_guard", true)
+	_mr.set("_close_suppress_edge", false)
+	_mr.set("_hold_camera_until_msec", Time.get_ticks_msec() + 5000)
+	_mr.set("_map_pick_block_until_msec", Time.get_ticks_msec() + 5000)
+	_cam.zoom = Vector2(0.32, 0.32)
+	_cam.global_position = Vector2(4000.0, -20000.0)
+	_mr.call("_clamp_camera_to_theater")
+	var after: Vector2 = _camera_pos()
+	if after.y < -500.0:
+		_fail("clamp skipped while _close_click_guard (cy=%.1f)" % after.y)
+		return
+	_pass("clamp runs while _close_click_guard (cy=%.1f)" % after.y)
 
 
 func _test_normal_map_drag_still_pans() -> void:

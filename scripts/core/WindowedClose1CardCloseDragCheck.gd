@@ -14,7 +14,9 @@ const WAIT_MAP_SECS := 420
 const SETTLE_FRAMES := 24
 const GER_TAG := "GER"
 const CAM_EPS := 1.5
-const EDGE_FRAMES := 18
+const EDGE_FRAMES := 60
+const EDGE_ABSURD_Y := -2000.0
+const EDGE_UNCLAMPED_MAX := 4000.0
 const ZOOMS: Array[float] = [0.32, 0.50, 0.80, 1.20, 1.50]
 const TRIALS_PER_ZOOM := 4
 const TOP_BAR := Vector2(640.0, 0.0)
@@ -211,13 +213,26 @@ func _do_one_trial() -> void:
 	var edge_after: Vector2 = cam.global_position
 	var edge_d: Vector2 = edge_after - edge_before
 	_edge_n += 1
+	var clamped: Vector2 = edge_after
+	if mr.has_method("_apply_camera_bounds"):
+		clamped = mr.call("_apply_camera_bounds", edge_after)
 	var edge_ok: bool = edge_d.y < -4.0
+	if absf(edge_d.y) > EDGE_UNCLAMPED_MAX:
+		edge_ok = false
+	if edge_after.y < EDGE_ABSURD_Y:
+		edge_ok = false
+	if edge_after.distance_to(clamped) > 2.5:
+		edge_ok = false
 	if edge_ok:
 		_edge_ok += 1
 	else:
-		_fail_reasons.append("edge0_z%.2f_t%d_dy=%.1f" % [z, local_i, edge_d.y])
+		_fail_reasons.append(
+			"edge_z%.2f_t%d_dy=%.1f cy=%.1f bound=%.1f" % [
+				z, local_i, edge_d.y, edge_after.y, clamped.y
+			]
+		)
 	_rows.append(
-		"| %d | %.2f | %.0f,%.0f | %d | %.2f | %s | %.1f | %s |" % [
+		"| %d | %.2f | %.0f,%.0f | %d | %.2f | %s | %.1f | %.1f | %s |" % [
 			_trial_i + 1,
 			z,
 			close_pos.x,
@@ -226,6 +241,7 @@ func _do_one_trial() -> void:
 			move_d,
 			"PASS" if move_ok else "FAIL",
 			edge_d.y,
+			edge_after.y,
 			"PASS" if edge_ok else "FAIL",
 		]
 	)
@@ -424,8 +440,8 @@ func _write_clicks() -> void:
 	var md := "# CLOSE-1 windowed xvfb 1280x740\n\n"
 	md += "GER · Europe Home · world_accurate. NOT live Play.\n\n"
 	md += "first_move %d/%d · first_edge %d/%d\n\n" % [_first_move_ok, _first_move_n, _edge_ok, _edge_n]
-	md += "| # | zoom | close | steps | move_d | first_move | edge_dy | first_edge |\n"
-	md += "|---|---|---|---|---|---|---|---|\n"
+	md += "| # | zoom | close | steps | move_d | first_move | edge_dy | cam_y | first_edge |\n"
+	md += "|---|---|---|---|---|---|---|---|---|\n"
 	for row in _rows:
 		md += "%s\n" % row
 	var path := "%s/CLICKS.md" % _out_dir
