@@ -2781,6 +2781,10 @@ func _input(event: InputEvent) -> void:
 			else:
 				_is_middle_dragging = false
 		elif event.button_index == MOUSE_BUTTON_LEFT:
+			# TipDismiss arms this on press. Clear after the release frame so
+			# the same click cannot open the unit under the ×, and the next click can.
+			if not event.pressed and has_meta("eoa_tip_dismiss_swallow_release"):
+				call_deferred("_clear_first_session_tip_dismiss_swallow")
 			if event.pressed:
 				_skip_inspector_after_march = false
 				_clear_unit_card_press_consume_on_new_left_press()
@@ -3198,6 +3202,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	# even when create_area_nodes_for_fallback=false (pure MapPickGrid mode, zero Area2D nodes).
 	if use_spatial_picking and event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if not event.pressed and _consume_unit_card_press_release_if_armed():
+			return
+		if not event.pressed and _first_session_tip_dismiss_blocks_map_pick():
+			call_deferred("_clear_first_session_tip_dismiss_swallow")
+			get_viewport().set_input_as_handled()
 			return
 		if _living_title_boot_is_up():
 			if event.pressed:
@@ -19488,6 +19496,10 @@ func _try_open_land_chip_from_input(ctrl_click: bool = false, event: InputEvent 
 	# `_input` still-click path: beat GUI so a follow-mouse glance card cannot
 	# swallow GER Division. Search / Close / unit-card / modal stay theirs.
 	# Esc helpers + Dig2 / Drag2+3 pan helpers untouched.
+	# TipDismiss ×: this release must not open the counter under the button.
+	# Body clicks do not arm the swallow (the label ignores the mouse).
+	if _first_session_tip_dismiss_blocks_map_pick():
+		return false
 	if _top_bar_owns_click() or _mouse_over_search_control() or _search_ui_owns_click() or _mouse_over_close_control() or _road_spine_btn_owns_click():
 		return false
 	if _unit_card_consumed_press or _unit_card_release_eaten:
@@ -24528,14 +24540,40 @@ func show_first_session_action_tip() -> void:
 	btn.focus_mode = Control.FOCUS_NONE
 	btn.mouse_filter = Control.MOUSE_FILTER_STOP
 	btn.custom_minimum_size = Vector2(28, 28)
+	# Press arms the swallow before `_input` sees the release. `pressed` is the release.
+	btn.button_down.connect(_arm_first_session_tip_dismiss_swallow)
 	btn.pressed.connect(dismiss_first_session_action_tip)
 	row.add_child(btn)
 	print("EOA_FIRST_SESSION_TIP shown=1 pass_through=1 text=%s" % FIRST_SESSION_TIP_TEXT)
 
 
+func _arm_first_session_tip_dismiss_swallow() -> void:
+	set_meta("eoa_tip_dismiss_swallow_release", true)
+
+
+func _first_session_tip_dismiss_blocks_map_pick() -> bool:
+	return has_meta("eoa_tip_dismiss_swallow_release")
+
+
+func _clear_first_session_tip_dismiss_swallow() -> void:
+	if has_meta("eoa_tip_dismiss_swallow_release"):
+		remove_meta("eoa_tip_dismiss_swallow_release")
+
+
 func dismiss_first_session_action_tip() -> void:
 	# Must not take the inspector Close path (that locks the camera).
+	# Button.pressed runs on release. Freeing the strip inside that signal
+	# drops the Control before the viewport finishes the click, and the map
+	# opens whatever counter is under the × (EST Air Wing 3).
 	set_meta("eoa_first_session_tip_dismissed", true)
+	var vp := get_viewport()
+	if vp != null:
+		vp.set_input_as_handled()
+	call_deferred("_free_first_session_tip_strip")
+
+
+func _free_first_session_tip_strip() -> void:
+	_clear_first_session_tip_dismiss_swallow()
 	var ui := get_node_or_null("UI") as CanvasLayer
 	if ui == null:
 		return
