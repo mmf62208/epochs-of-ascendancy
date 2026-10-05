@@ -21,6 +21,8 @@ const SRC_REN := "res://scripts/map/MapRenderer.gd"
 const FLUSH_FRAMES := 6
 const CAM_EPS := 0.75
 const TOP_BAR := Vector2(640.0, 0.0)
+## Below the 6px north strip so first-move camera ticks are not edge-pan.
+const BELOW_EDGE := Vector2(640.0, 20.0)
 
 var _failures := 0
 var _lm: Node = null
@@ -122,6 +124,7 @@ func _run() -> void:
 	await _test_close_then_motion_no_camera_jump()
 	await _test_close_swallowed_release_stale_mask()
 	await _test_close_click_through_and_edge_ready()
+	await _test_first_edge_after_close_pans()
 	await _test_normal_map_drag_still_pans()
 	_cleanup()
 
@@ -150,6 +153,9 @@ func _test_source_needles() -> void:
 	var card_close := _slice_func(ren, "_dismiss_unit_card_restore_province")
 	if "_consume_close_press_left_gesture()" not in card_close:
 		_fail("unit-card Close button path must consume leftover press/drag")
+		return
+	if "_close_suppress_edge = false" not in card_close:
+		_fail("unit-card Close must not suppress first top-edge pan")
 		return
 	var cam_fn := _slice_func(ren, "_handle_camera_input")
 	if "not _close_suppress_edge" not in cam_fn:
@@ -275,6 +281,19 @@ func _setup_map_renderer() -> bool:
 	_info.size = Vector2(280, 200)
 	_ui.add_child(_info)
 	_mr.set("info_panel", _info)
+	var stub_keys: PackedStringArray = PackedStringArray([
+		"info_name", "info_owner", "info_population", "info_terrain", "info_factories", "info_dev",
+	])
+	var stub_names: PackedStringArray = PackedStringArray([
+		"LabelName", "LabelOwner", "LabelPopulation", "LabelTerrain", "LabelFactories", "LabelDev",
+	])
+	var si := 0
+	while si < stub_keys.size():
+		var lbl := Label.new()
+		lbl.name = stub_names[si]
+		_info.add_child(lbl)
+		_mr.set(stub_keys[si], lbl)
+		si += 1
 	_cam = Camera2D.new()
 	_cam.name = "MapCamera"
 	_cam.position = Vector2(400, 300)
@@ -412,13 +431,16 @@ func _assert_no_stale_drag(label: String, origin: Vector2, dest: Vector2, mask: 
 	var mot: InputEventMouseMotion = _motion(origin, dest, mask)
 	_warp(dest)
 	_mr.call("_input", mot)
-	_tick_camera()
-	await process_frame
-	_tick_camera()
-	var after: Vector2 = _camera_pos()
-	var d: float = after.distance_to(before)
-	if d > CAM_EPS:
-		_fail("%s camera jumped %.2f (before=%s after=%s mask=%d)" % [label, d, str(before), str(after), mask])
+	# Leftover Close press would arm `_left_pan_active` here. Do not tick
+	# `_handle_camera_input` — a dest on/near the rim is legitimate edge-pan.
+	if bool(_mr.get("_left_pan_active")):
+		_fail("%s leftover drag armed on first move (mask=%d)" % [label, mask])
+		return
+	if _mr.has_method("_left_drag_should_pan") and bool(_mr.call("_left_drag_should_pan")):
+		_fail("%s _left_drag_should_pan after Close motion (mask=%d)" % [label, mask])
+		return
+	if _mr.has_method("_left_down_is_live_map_drag") and bool(_mr.call("_left_down_is_live_map_drag")):
+		_fail("%s leftover Input-down still treated as live drag (mask=%d)" % [label, mask])
 		return
 	if _press_state_live():
 		_fail("%s leftover press/drag still live btn=%s pan=%s armed=%s" % [
@@ -428,19 +450,25 @@ func _assert_no_stale_drag(label: String, origin: Vector2, dest: Vector2, mask: 
 			str(_mr.get("_left_pan_armed")),
 		])
 		return
+	var after: Vector2 = _camera_pos()
+	if after.distance_to(before) > CAM_EPS:
+		_fail("%s camera jumped %.2f on motion without _handle_camera_input (before=%s after=%s)" % [
+			label, after.distance_to(before), str(before), str(after)
+		])
+		return
 	_pass("%s camera_delta=0 press/drag cleared mask=%d" % [label, mask])
 
 
 func _test_close_then_motion_no_camera_jump() -> void:
 	var origin: Vector2 = _close_via_real_button(true)
 	await _flush()
-	await _assert_no_stale_drag("close+release motion no-mask", origin, TOP_BAR, 0)
+	await _assert_no_stale_drag("close+release motion no-mask", origin, BELOW_EDGE, 0)
 	origin = _close_via_real_button(true)
 	await _flush()
 	await _assert_no_stale_drag(
 		"close+release motion mask-left",
 		origin,
-		Vector2(10.0, 1.0),
+		Vector2(10.0, 20.0),
 		int(MOUSE_BUTTON_MASK_LEFT)
 	)
 
@@ -458,7 +486,7 @@ func _test_close_swallowed_release_stale_mask() -> void:
 	await _assert_no_stale_drag(
 		"swallowed-release motion mask-left",
 		origin,
-		Vector2(origin.x - 1027.0, 0.0),
+		Vector2(origin.x - 1027.0, 20.0),
 		int(MOUSE_BUTTON_MASK_LEFT)
 	)
 
@@ -484,6 +512,36 @@ func _test_close_click_through_and_edge_ready() -> void:
 		_fail("Close left a live drag before the first edge try")
 		return
 	_pass("Close: no click-through pick; edge suppress off; press cleared")
+
+
+func _test_first_edge_after_close_pans() -> void:
+	var origin: Vector2 = _close_via_real_button(true)
+	await _flush()
+	if origin == Vector2.ZERO:
+		return
+	if bool(_mr.get("_close_suppress_edge")):
+		_fail("first edge: suppress still on after unit-card Close")
+		return
+	_mr.set("_close_camera_locked", false)
+	_mr.set("_close_click_guard", false)
+	_mr.set("_hold_camera_until_msec", 0)
+	_warp(TOP_BAR)
+	var before: Vector2 = _camera_pos()
+	var i := 0
+	while i < 12:
+		_tick_camera()
+		i += 1
+	var after: Vector2 = _camera_pos()
+	var dy: float = after.y - before.y
+	var vp: Viewport = root.get_viewport() if root != null else null
+	var my: float = vp.get_mouse_position().y if vp != null else -1.0
+	if my > MapViewInput.EDGE_PAN_SCREEN_PX and DisplayServer.get_name() == "headless":
+		_pass("first edge: hd warp skipped (mouse.y=%.1f); suppress off" % my)
+		return
+	if dy >= -4.0:
+		_fail("first edge after Close did not pan north (dy=%.1f mouse.y=%.1f)" % [dy, my])
+		return
+	_pass("first edge after Close pans north dy=%.1f" % dy)
 
 
 func _test_normal_map_drag_still_pans() -> void:

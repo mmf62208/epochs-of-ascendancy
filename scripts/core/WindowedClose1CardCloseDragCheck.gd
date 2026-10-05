@@ -19,6 +19,9 @@ const ZOOMS: Array[float] = [0.32, 0.50, 0.80, 1.20, 1.50]
 const TRIALS_PER_ZOOM := 4
 const TOP_BAR := Vector2(640.0, 0.0)
 const TOP_BAR_ALT := Vector2(10.0, 1.0)
+## First-move dest stays below the 6px rim so edge-pan is not scored as a stale drag.
+const FIRST_MOVE := Vector2(640.0, 20.0)
+const FIRST_MOVE_ALT := Vector2(10.0, 20.0)
 
 enum Phase {
 	WAIT_MAP,
@@ -181,7 +184,8 @@ func _do_one_trial() -> void:
 		_trial_i += 1
 		_phase = Phase.OPEN_CARD
 		return
-	var dest: Vector2 = TOP_BAR if (local_i % 2) == 0 else TOP_BAR_ALT
+	var dest: Vector2 = FIRST_MOVE if (local_i % 2) == 0 else FIRST_MOVE_ALT
+	var edge_pos: Vector2 = TOP_BAR if (local_i % 2) == 0 else TOP_BAR_ALT
 	var steps: int = 1
 	if local_i == 1:
 		steps = 4
@@ -193,17 +197,17 @@ func _do_one_trial() -> void:
 	var after_move: Vector2 = cam.global_position
 	var move_d: float = after_move.distance_to(before)
 	_first_move_n += 1
-	var move_ok: bool = move_d <= CAM_EPS
+	var live: bool = bool(mr.get("_left_btn_down")) or bool(mr.get("_left_pan_active"))
+	var drag_should: bool = false
+	if mr.has_method("_left_drag_should_pan"):
+		drag_should = bool(mr.call("_left_drag_should_pan"))
+	var move_ok: bool = move_d <= CAM_EPS and not live and not drag_should
 	if move_ok:
 		_first_move_ok += 1
 	else:
-		_fail_reasons.append("stale_drag_z%.2f_t%d_d=%.1f" % [z, local_i, move_d])
-	var live: bool = bool(mr.get("_left_btn_down")) or bool(mr.get("_left_pan_active"))
-	if live:
-		_fail_reasons.append("press_live_z%.2f_t%d" % [z, local_i])
-		move_ok = false
+		_fail_reasons.append("stale_drag_z%.2f_t%d_d=%.1f live=%s" % [z, local_i, move_d, str(live)])
 	var edge_before: Vector2 = cam.global_position
-	_hold_top_edge(dest)
+	_hold_top_edge(edge_pos)
 	var edge_after: Vector2 = cam.global_position
 	var edge_d: Vector2 = edge_after - edge_before
 	_edge_n += 1

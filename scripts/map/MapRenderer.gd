@@ -1622,12 +1622,35 @@ func _reassert_locked_close_camera() -> void:
 		cam.zoom = _close_camera_lock_zoom
 
 
+func _unit_card_close_screen_pos() -> Vector2:
+	# Prefer the live BtnClose centre. Headless warp often leaves the
+	# viewport mouse at y=0, which is the 6px north strip.
+	var ui: CanvasLayer = get_node_or_null("UI") as CanvasLayer
+	if ui == null:
+		return Vector2.INF
+	var pop: Node = ui.get_node_or_null("UnitDetailPopup")
+	if pop == null or not is_instance_valid(pop) or pop.is_queued_for_deletion():
+		return Vector2.INF
+	if pop is CanvasItem and not (pop as CanvasItem).visible:
+		return Vector2.INF
+	var btn: Button = pop.find_child("BtnClose", true, false) as Button
+	if btn == null or not btn.visible:
+		return Vector2.INF
+	var r: Rect2 = btn.get_global_rect()
+	if r.size.x < 1.0 or r.size.y < 1.0:
+		return Vector2.INF
+	return r.get_center()
+
+
 func _close_click_is_north_edge_strip() -> bool:
 	# Only the true 6px window rim — unit-card Close at ~y=551 must not
-	# suppress top-edge pan (Play: first edge after Close did nothing).
-	var vp: Viewport = get_viewport()
-	var mouse: Vector2 = vp.get_mouse_position() if vp != null else Vector2.ZERO
-	return mouse.y <= MapViewInput.EDGE_PAN_SCREEN_PX
+	# suppress top-edge pan (Play 97d6ea45 check 5: first edge after Close
+	# did nothing until one empty drag).
+	var pos: Vector2 = _unit_card_close_screen_pos()
+	if pos == Vector2.INF:
+		var vp: Viewport = get_viewport()
+		pos = vp.get_mouse_position() if vp != null else Vector2.ZERO
+	return pos.y <= MapViewInput.EDGE_PAN_SCREEN_PX
 
 
 func _consume_close_press_left_gesture() -> void:
@@ -1636,7 +1659,9 @@ func _consume_close_press_left_gesture() -> void:
 	# Re-arming that leftover (old dismiss path) plus a swallowed release
 	# made the next mouse move a 1.2× drag (Play 9c9c5f20 19:35:44 / 20:04:17).
 	var vp: Viewport = get_viewport()
-	var mouse: Vector2 = vp.get_mouse_position() if vp != null else Vector2.ZERO
+	var mouse: Vector2 = _unit_card_close_screen_pos()
+	if mouse == Vector2.INF:
+		mouse = vp.get_mouse_position() if vp != null else Vector2.ZERO
 	_reset_left_gesture_state(mouse)
 	_left_skip_next_pick = true
 	_left_btn_down = false
@@ -21178,7 +21203,10 @@ func _hide_unit_card_keep_map_focus() -> void:
 func _dismiss_unit_card_restore_province() -> void:
 	# Button path (hover can miss `_mouse_over_close_control` in `_input`).
 	# Must still drop leftover press/drag so the next move is not a stale pan.
+	# Docked unit-card Close (~y=551) is never the 6px north HUD Close —
+	# do not suppress first top-edge pan (Play 97d6ea45 check 5).
 	_consume_close_press_left_gesture()
+	_close_suppress_edge = false
 	_hide_unit_card_keep_map_focus()
 	if selected_province_id < 0 or not provinces.has(selected_province_id):
 		return
