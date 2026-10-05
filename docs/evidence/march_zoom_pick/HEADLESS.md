@@ -1,6 +1,6 @@
-# March zoom dest pick (headless)
+# March zoom dest pick (headless / xvfb)
 
-NOT live Play. Tip after first PASS run. `tools/run_godot.sh` Godot 4.7.1-rc2.
+NOT live Play. `tools/run_godot.sh` Godot 4.7.1-rc2. xvfb 1280×740 numbers below.
 
 GIS interiors: Heidekreis `710380` world=`7461.096,1530.885` · Köln `710417` world=`7350.861,1631.095`.
 d(Heidekreis, Harz)=**73.2** · d(Heidekreis, Börde)=**72.0** (not adjacent).
@@ -9,12 +9,12 @@ d(Heidekreis, Harz)=**73.2** · d(Heidekreis, Börde)=**72.0** (not adjacent).
 
 | kind | zoom | target | screen | dest |
 |---|---|---|---|---|
-| fresh | z=0.32 | Heidekreis 710380 | 1060.8,489.9 | **710380** Heidekreis |
-| fresh | z=0.80 | Heidekreis 710380 | 753.0,483.0 | **710380** Heidekreis |
-| fresh | z=1.50 | Heidekreis 710380 | 726.7,456.7 | **710380** Heidekreis |
-| fresh | z=0.32 | Köln 710417 | 970.5,492.5 | **710417** Köln |
-| fresh | z=0.80 | Köln 710417 | 740.4,470.4 | **710417** Köln |
-| fresh | z=1.50 | Köln 710417 | 728.2,458.2 | **710417** Köln |
+| fresh | z=0.32 | Heidekreis 710380 | 902.8,370.0 | **710380** Heidekreis |
+| fresh | z=0.80 | Heidekreis 710380 | 640.0,370.0 | **710380** Heidekreis |
+| fresh | z=1.50 | Heidekreis 710380 | 640.0,370.0 | **710380** Heidekreis |
+| fresh | z=0.32 | Köln 710417 | 867.5,370.0 | **710417** Köln |
+| fresh | z=0.80 | Köln 710417 | 640.0,370.0 | **710417** Köln |
+| fresh | z=1.50 | Köln 710417 | 640.0,370.0 | **710417** Köln |
 
 `mm_screen` matched dest on every row. `_screen_to_world` round-trip world unchanged.
 
@@ -22,11 +22,11 @@ d(Heidekreis, Harz)=**73.2** · d(Heidekreis, Börde)=**72.0** (not adjacent).
 
 | src zoom | reuse zoom | stale dest | fresh dest |
 |---|---|---|---|
-| 1.50 | 0.80 | **710318 Uckermark** | 710380 Heidekreis |
+| 1.50 | 0.80 | Vest- og Sydsjælland | 710380 Heidekreis |
 | 1.50 | 0.32 | miss `-1` | 710380 Heidekreis |
-| 0.32 | 0.80 | **711075 Jeleniogórski** | 710380 Heidekreis |
-| 0.32 | 1.50 | **710549 Sömmerda** | 710380 Heidekreis |
+| 0.32 | 0.80 | Zielonogórski | 710380 Heidekreis |
+| 0.32 | 1.50 | **Mansfeld-Südharz** (Harz neighbor) | 710380 Heidekreis |
 
-Stale screens miss by whole provinces. Fresh recompute never misses. Harz/Börde are that miss class (south of Heidekreis toward Home), not a 1-hex product offset.
+Stale screens miss by whole provinces (including the Harz-adjacent cell). Fresh recompute never misses.
 
-RESULT=**PASS** (failures=0).
+RESULT=**PASS** (failures=0) hd+xvfb.

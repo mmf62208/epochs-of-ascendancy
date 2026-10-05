@@ -27,7 +27,7 @@ Shared chip / spill / title / Fill% pick code is **untouched**.
 
 Fresh interior screen → dest **710380** at z 0.32 / 0.80 / 1.50 (Köln sanity **710417** all three). See `HEADLESS.md`.
 
-Stale screen (Köln camera) misses by whole provinces: z=1.50 screen @ 0.80 → Uckermark; z=0.32 screen @ 0.80 → Jeleniogórski; z=0.32 screen @ 1.50 → Sömmerda. Fresh recompute stays Heidekreis.
+Stale screen (Köln camera, xvfb 1280×740) misses by whole provinces: z=1.50 screen @ 0.80 → Vest- og Sydsjælland; z=0.32 screen @ 0.80 → Zielonogórski; z=0.32 screen @ 1.50 → **Mansfeld-Südharz** (Harz neighbor). Fresh recompute stays Heidekreis. Windowed Home: z=1.50 Heidekreis screen is off the top (`752,-67`); reuse at 0.80/0.32 misses (`dest=-1`).
 
 **Harness-only verdict.** No product change.
 
