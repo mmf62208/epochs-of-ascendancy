@@ -3704,6 +3704,7 @@ func _handle_camera_input(delta: float) -> void:
 
 	# UI-1: true outer 6px of the *window* (screen pixels). The old 64px strip
 	# under the HUD (y≈200–264) and last-64px floor (y>676 @ 740) were wrong.
+	# EDGE-1: far-right ≈x=1270 on 1280×740 uses EDGE_PAN_RIGHT_SCREEN_PX (10).
 	# Hovered UI / unfocused / mouse-outside skip. Close-held still suppresses.
 	var edge_dir: Vector2 = Vector2.ZERO
 	var mouse_pos: Vector2 = get_viewport().get_mouse_position()
