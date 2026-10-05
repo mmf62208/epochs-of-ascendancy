@@ -136,8 +136,14 @@ func _test_source_needles() -> void:
 		_fail("_process must not rebuild the icon list")
 	else:
 		_pass("_process does not rebuild icon list")
-	var draw_fn := _slice_func(src, "_draw")
-	if "_last_markers.clear()" in draw_fn:
+	var draw_i := src.find("func _draw() -> void:")
+	var draw_fn := ""
+	if draw_i >= 0:
+		var nxt := src.find("\nfunc ", draw_i + 10)
+		draw_fn = src.substr(draw_i, nxt - draw_i) if nxt >= 0 else src.substr(draw_i)
+	if draw_fn.is_empty():
+		_fail("_draw function missing")
+	elif "_last_markers.clear()" in draw_fn:
 		_fail("_draw must not clear the marker cache")
 	else:
 		_pass("_draw keeps the marker cache")
