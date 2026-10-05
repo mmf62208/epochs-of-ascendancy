@@ -319,8 +319,8 @@ func _test_hover_reuses_markers() -> void:
 		return
 	var near_w: Vector2 = _layer.call("get_draw_world", NEAR_PID) as Vector2
 	var far_w: Vector2 = _far_world()
-	if near_w == Vector2.ZERO or far_w == Vector2.ZERO:
-		_fail("hover-cache worlds missing")
+	if not near_w.is_finite() or not far_w.is_finite() or far_w == Vector2.ZERO:
+		_fail("hover-cache FAR world missing")
 		return
 	var pid_near0: int = int(_layer.call("hit_test_at_zoom", near_w, HOME_ZOOM))
 	var pid_far0: int = int(_layer.call("hit_test_at_zoom", far_w, HOME_ZOOM))
