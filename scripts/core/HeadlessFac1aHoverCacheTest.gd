@@ -249,10 +249,26 @@ func _hover_pid(world: Vector2, zoom: float) -> int:
 	return int(_layer.call("hit_test_at_zoom", world, zoom))
 
 
-func _hover_many(worlds: Array[Vector2], zoom: float, n: int) -> void:
+func _layout_centers(zoom: float) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var layouts: Array = _layer.call("get_hit_rects_at_zoom", zoom)
+	for lay_v in layouts:
+		if typeof(lay_v) != TYPE_DICTIONARY:
+			continue
+		var lay: Dictionary = lay_v
+		var world: Vector2 = lay.get("world", Vector2.ZERO) as Vector2
+		out.append({
+			"pid": int(lay.get("pid", -1)),
+			"world": world,
+			"cluster": bool(lay.get("cluster", false)),
+		})
+	return out
+
+
+func _hover_many(pts: Array[Vector2], zoom: float, n: int) -> void:
 	var i := 0
 	while i < n:
-		for w in worlds:
+		for w in pts:
 			_hover_pid(w, zoom)
 		i += 1
 
@@ -267,23 +283,39 @@ func _test_hover_reuses_cache() -> void:
 	var b_w: Vector2 = worlds[NEAR_B] as Vector2
 	var c_w: Vector2 = worlds[FAR_C] as Vector2
 	var miss_w := Vector2(-80.0, 80.0)
-	var hover_pts: Array[Vector2] = [a_w, b_w, miss_w]
-	var pid_a0: int = _hover_pid(a_w, HOME_ZOOM)
+	var icons: Array = _layer.call("get_icon_list")
+	if icons.size() != 2:
+		_fail("pair fixture icons=%d want 2" % icons.size())
+		return
+	var home_layouts: Array[Dictionary] = _layout_centers(HOME_ZOOM)
+	if home_layouts.is_empty():
+		_fail("Home get_hit_rects_at_zoom returned 0 layouts")
+		return
+	var clustered := false
+	var host_w := Vector2.ZERO
+	var host_pid := -1
+	for rec in home_layouts:
+		if bool(rec.get("cluster", false)):
+			clustered = true
+			host_w = rec.get("world", Vector2.ZERO) as Vector2
+			host_pid = int(rec.get("pid", -1))
+	if not clustered or host_pid <= 0:
+		_fail("Home z0.776 pair should produce a cluster layout")
+		return
+	var pid_host0: int = _hover_pid(host_w, HOME_ZOOM)
 	var pid_b0: int = _hover_pid(b_w, HOME_ZOOM)
 	var pid_miss0: int = _hover_pid(miss_w, HOME_ZOOM)
-	if pid_a0 <= 0:
-		_fail("Home hover at NEAR_A missed (pid=%d)" % pid_a0)
+	if pid_host0 != host_pid:
+		_fail("Home hover at cluster centre pid=%d want %d" % [pid_host0, host_pid])
 		return
-	if pid_b0 <= 0:
-		_fail("Home hover at NEAR_B missed (pid=%d)" % pid_b0)
+	if pid_b0 != host_pid:
+		_fail("Home hover at NEAR_B (L2 host) pid=%d want %d" % [pid_b0, host_pid])
 		return
 	if pid_miss0 > 0:
 		_fail("empty hover point owned pid=%d" % pid_miss0)
 		return
-	if pid_a0 != pid_b0:
-		_fail("Home z0.776 pair should cluster (A=%d B=%d)" % [pid_a0, pid_b0])
-		return
-	_pass("Home hover cluster host pid=%d (A and B same)" % pid_a0)
+	_pass("Home hover cluster host pid=%d at world %s" % [host_pid, str(host_w)])
+	var hover_pts: Array[Vector2] = [host_w, b_w, miss_w]
 	var builds0: int = int(_layer.call("get_build_markers_count"))
 	if builds0 <= 0:
 		_fail("first Home hover/draw never called _build_markers")
@@ -294,7 +326,7 @@ func _test_hover_reuses_cache() -> void:
 		_fail("fixed-zoom hover rebuilt markers %d → %d" % [builds0, builds1])
 		return
 	_pass("fixed-zoom %d hovers caused 0 extra builds (%d)" % [HOVER_N, builds1])
-	if _hover_pid(a_w, HOME_ZOOM) != pid_a0 or _hover_pid(b_w, HOME_ZOOM) != pid_b0:
+	if _hover_pid(host_w, HOME_ZOOM) != pid_host0 or _hover_pid(b_w, HOME_ZOOM) != pid_b0:
 		_fail("Home hover pid changed after cached hovers")
 		return
 	if _hover_pid(miss_w, HOME_ZOOM) != pid_miss0:
@@ -318,7 +350,7 @@ func _test_hover_reuses_cache() -> void:
 	if builds2 <= builds1:
 		_fail("zoom change must rebuild clusters (%d → %d)" % [builds1, builds2])
 		return
-	_hover_many(hover_pts, CLOSE_ZOOM, HOVER_N)
+	_hover_many([a_w, b_w, miss_w], CLOSE_ZOOM, HOVER_N)
 	var builds3: int = int(_layer.call("get_build_markers_count"))
 	if builds3 != builds2:
 		_fail("close-zoom hover rebuilt markers %d → %d" % [builds2, builds3])
@@ -341,7 +373,7 @@ func _test_hover_reuses_cache() -> void:
 	if builds4 <= builds3:
 		_fail("data change must rebuild clusters (%d → %d)" % [builds3, builds4])
 		return
-	_hover_many([a_w, b_w, c_w, miss_w], HOME_ZOOM, HOVER_N)
+	_hover_many([host_w, b_w, c_w, miss_w], HOME_ZOOM, HOVER_N)
 	var builds5: int = int(_layer.call("get_build_markers_count"))
 	if builds5 != builds4:
 		_fail("post-data hover rebuilt markers %d → %d" % [builds4, builds5])
