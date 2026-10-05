@@ -3,7 +3,7 @@
 **Branch:** `cursor/orders1-halt-hold-withdraw-89c5`
 **PR:** https://github.com/mmf62208/epochs-of-ascendancy/pull/76 (draft, HOLD)
 **Base:** main `f4282acdd4f911259636253303730d8467595ab4` (PR #75 TipDismiss squash; parent of first ORDERS-1 commit)
-**Merge:** HOLD for Play + Scott. ONE draft PR. Do not merge. No rebase needed.
+**Merge:** Play **PASS → KEEP** tip `333a1285`. Draft until Ship squash-merges onto main `f4282acd`. Do not merge from this tip. No rebase needed.
 
 **Rebase:** replayed 4 ORDERS-1 commits onto `f4282acd`. **0 conflicts.** TipDismiss swallow / deferred free / release-block kept from main; unit-card dock + Press|Hold|Withdraw upper row + Halt|Assign lower + `Stance: Hold` kept from ORDERS-1. `git diff origin/main -- MapRenderer.gd` has no TipDismiss hunks.
 
@@ -35,6 +35,10 @@ visible card/bubble state change.
    `start_land_battle` **opened**; prefer adjacent enemy (Maginot fallback
    kept). **Recipe:** Close @(670, 85) then Open fight → Start (no Ctrl).
    Harness `_test_open_fight_start_no_ctrl` banks Hold ● / Withdraw ●.
+6. **Play PASS `333a1285`:** Halt / Hold ● + `Stance: Hold` / Withdraw ● /
+   Open fight → Start (`opened=true` Maginot) all live. Recipe coords below
+   are the live hits (Start y≈548, Hold/Withdraw y≈621). Soft OK: first Open
+   fight hit empty Haut-Rhin — prefer defended neighbor later (not COMBAT-1).
 
 ## Fence STOP
 
@@ -53,12 +57,13 @@ on trusted main.
 ## Play recipe (1280×740 — do not raise the window)
 
 `docs/evidence/orders1/CLICKS.md` — Absolute @(0, 29). No Ctrl.
+Live-proven Play PASS `333a1285` (harness fixture centers are not this table).
 
 | Button | Client | Screen |
 |---|---|---|
 | Inspector Close | ~(670, 56) | **~(670, 85)** |
 | Open fight | **(90, 535)** | **(90, 564)** |
-| Start battle | **(205, 496)** | **(205, 525)** |
-| Hold | **(159, 633)** | **(159, 662)** |
-| Withdraw | **(246, 633)** | **(246, 662)** |
-| Halt fight+march | **(92, 675)** | **(92, 704)** |
+| Start battle | **≈(205, 519)** | **≈(205, 548)** |
+| Hold | **≈(157, 592)** | **≈(157, 621)** |
+| Withdraw | **≈(241, 592)** | **≈(241, 621)** |
+| Halt march-only | **(90–93, 633)** | **(90–93, 662)** |

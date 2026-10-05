@@ -52,7 +52,14 @@ layout; stance row **above** cmd with Press | Hold | Withdraw; Halt stays
 left on the lower row; toast **`Stance: Hold`**. Harness asserts card text
 + `att_stance` after click and that buttons sit inside 1280×740.
 
+## Play PASS `333a1285` (recipe coords)
+
+Live 1280×740 @(0,29) Open fight **(90, 564)** · Start **≈(205, 548)** ·
+Hold **≈(157, 621)** · Withdraw **≈(241, 621)** · Halt march-only **(90–93, 662)**.
+Harness fixture y=525/662 are not the live fighting-card hits (525 = Power
+line; 662 = Assign). Soft OK: first adjacent can be empty Haut-Rhin.
+
 ## Fence
 
 Did **not** edit first-session tip strip, `TipDismiss`, or map release-fallthrough.
-Those stay Mike's Grok Build lane.
+Those stay Mike's Grok Build lane. COMBAT-1 not started.

@@ -23172,6 +23172,8 @@ func _open_fight_from_formation_id(fid: String) -> void:
 	# Prefer the selected unit's current hex + an adjacent enemy so Play can
 	# Open fight → Start without Ctrl (xdotool Ctrl is intermittent).
 	# First-session fallback stays GER Maginot 710173 → FRA 710739.
+	# Soft OK Play 333a1285: first adjacent can be empty (Haut-Rhin instant
+	# capture). Prefer a defended neighbor later — not COMBAT-1 / not here.
 	const GER_FRONT := 710173
 	const FRA_FRONT := 710739
 	if typeof(LeaderManager) == TYPE_NIL or not LeaderManager.has_method("get_formation"):

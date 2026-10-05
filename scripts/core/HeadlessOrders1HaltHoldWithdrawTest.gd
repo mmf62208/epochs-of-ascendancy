@@ -5,6 +5,12 @@ extends SceneTree
 ## Does not load WorldMap.tscn / 3520 polygons.
 ## Does not touch first-session tip / TipDismiss / release-fallthrough.
 ##
+## Live Play recipe (PASS 333a1285, 1280x740 Absolute @(0,29)) is in
+## docs/evidence/orders1/CLICKS.md — NOT the nuts3 fixture centers printed
+## below. Live: Open fight (90,564) · Start ≈(205,548) · Hold ≈(157,621) ·
+## Withdraw ≈(241,621) · Halt march-only (90-93,662). y=662 on the fighting
+## card is Assign. Start y=525 hits the Power line.
+##
 ##   tools/run_godot.sh --headless --path . -s res://scripts/core/HeadlessOrders1HaltHoldWithdrawTest.gd
 ##   tools/eoa_orders1_guard.sh
 
@@ -776,6 +782,8 @@ func _test_fight_and_march_layout() -> void:
 		if bottom > 740.5:
 			_fail("unit card bottom %.1f exceeds Play 1280x740" % bottom)
 			return
+	# Fixture client centers only. Live Play: Hold/Withdraw ≈(157,621)/(241,621)
+	# screen; y=662 on the fighting card is Assign (CLICKS.md).
 	_info_line(
 		"PLAY_CLICKS 1280x740 Halt=(%.0f,%.0f) Hold=(%.0f,%.0f) Withdraw=(%.0f,%.0f) Assign=%s"
 		% [
@@ -859,6 +867,9 @@ func _set_koeln_fra() -> void:
 func _test_open_fight_start_no_ctrl() -> void:
 	# Play FAIL aa6a08d4: Ctrl+xdotool never opened a fight. Card Open fight →
 	# Start battle must bank Hold ● / Withdraw ● with no Ctrl.
+	# Live Play PASS 333a1285 screen: Open fight (90,564) · Start ≈(205,548)
+	# · Hold ≈(157,621) · Withdraw ≈(241,621). Printed PLAY_CLICKS_OPENFIGHT
+	# values are nuts3 fixture client centers, not the live recipe.
 	_fm("clear_march", FID)
 	_clear_injected_battle()
 	var fo: Object = _formation()

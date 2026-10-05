@@ -1,6 +1,8 @@
 # ORDERS-1 isolated keep-green
 
-Tip after rebase onto main `f4282acd` (PR #75 TipDismiss). xvfb / headless ≠ live Play.
+Tip after rebase onto main `f4282acd` (PR #75 TipDismiss). Play **PASS KEEP**
+`333a1285`. Live recipe coords are in `CLICKS.md` (Start ≈548 / Hold·Withdraw
+≈621). xvfb / headless ≠ live Play.
 Never `EOA_SKIP_TITLE`. `tools/run_godot.sh` only (Godot 4.7.1-rc2).
 
 Official `tools/eoa_full_test_gates.sh --quick` is **already red on trusted
