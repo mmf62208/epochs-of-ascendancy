@@ -1059,14 +1059,18 @@ func _process(_delta: float) -> void:
 	var z := _canvas_zoom()
 	var pos := cam.global_position if cam != null else Vector2.ZERO
 	var zoom_changed := absf(z - _last_zoom) > 0.008
-	var pan_changed := _last_cam_pos != Vector2.INF and pos.distance_to(_last_cam_pos) > 8.0
-	if zoom_changed or pan_changed:
+	# World-space _draw is transformed by Camera2D. Reclustering on every 8px
+	# pan is O(n²) and hitchy at Home/operational zoom (screen icons overlap).
+	# Zoom still rebuilds clusters; pan keeps the last draw commands.
+	if zoom_changed:
 		_last_zoom = z
 		_last_cam_pos = pos
 		queue_redraw()
 	elif _last_cam_pos == Vector2.INF:
 		_last_cam_pos = pos
 		_last_zoom = z
+	elif cam != null:
+		_last_cam_pos = pos
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -1456,8 +1460,11 @@ func _draw() -> void:
 	if not _should_draw():
 		return
 	var z := _canvas_zoom()
-	var markers := _build_markers()
-	_last_markers = markers
+	var markers: Array[Dictionary] = _last_markers
+	if markers.is_empty() or absf(z - _last_zoom) > 0.008:
+		markers = _build_markers()
+		_last_markers = markers
+		_last_zoom = z
 	for rec in markers:
 		var world: Vector2 = rec.get("world", Vector2.ZERO) as Vector2
 		if not world.is_finite():
