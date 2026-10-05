@@ -2,7 +2,9 @@
 
 **Base:** trusted main `b89a1679ee90eba9e496c8a9f62ef1b10612d589` (ORDERS-1 #76)
 **Branch:** `cursor/combat1-fight-resolve-13b5`
-**Merge:** HOLD (draft PR, do not merge)
+**PR:** https://github.com/mmf62208/epochs-of-ascendancy/pull/77 (draft, HOLD)
+**Merge:** HOLD (do not merge)
+**Keep-green:** isolated **PASS** (ORDERS-1 / TipDismiss / CLOSE-1 leftover 11/11 / COMBAT-1 hd). Official `--quick` fill-toe hit-disk greps remain pre-existing red on main — not this slice.
 
 ## What changed
 

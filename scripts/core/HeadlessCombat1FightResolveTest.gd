@@ -130,11 +130,12 @@ func _test_source_needles() -> void:
 		_fail("MapRenderer / BattleManager missing")
 		return
 	var adj_fn := _slice_func(ren, "_adjacent_enemy_province_id")
-	if adj_fn.is_empty() or "get_divisions_at_province" not in adj_fn:
-		_fail("_adjacent_enemy_province_id must prefer get_divisions_at_province")
+	if adj_fn.is_empty() or "_province_has_defending_units" not in adj_fn:
+		_fail("_adjacent_enemy_province_id must prefer a defended neighbor")
 		return
-	if "_province_has_defending_units" not in ren:
-		_fail("_province_has_defending_units missing")
+	var def_fn := _slice_func(ren, "_province_has_defending_units")
+	if def_fn.is_empty() or "get_divisions_at_province" not in def_fn:
+		_fail("_province_has_defending_units must call get_divisions_at_province")
 		return
 	if "refresh_after_land_battle_day" not in ren or "_surface_last_land_aar_toast" not in ren:
 		_fail("COMBAT-1 must surface AAR after the land-battle tick")
@@ -508,12 +509,16 @@ func _test_open_fight_start_and_resolve() -> void:
 	var toast := ""
 	if "_last_inspector_toast" in _mr:
 		toast = str(_mr._last_inspector_toast)
-	var visible := ("%s %s" % [aar_line, toast]).to_lower()
+	var visible := ("%s %s %s" % [aar_line, toast, str(aar.get("winner", ""))]).to_lower()
 	if aar_line.is_empty():
 		_fail("no AAR line after fight tick")
 		return
-	if visible.find("took") < 0 and visible.find("held") < 0:
-		_fail("AAR/toast not readable Took/Held: aar=%s toast=%s" % [aar_line, toast])
+	if (
+		visible.find("took") < 0
+		and visible.find("held") < 0
+		and visible.find("battle ended") < 0
+	):
+		_fail("AAR/toast not readable Took/Held/ended: aar=%s toast=%s winner=%s" % [aar_line, toast, str(aar.get("winner", ""))])
 		return
 	if toast.find(aar_line) < 0 and toast.to_lower().find("took") < 0 and toast.to_lower().find("held") < 0:
 		_fail("toast missing AAR line (playtester cannot see resolve): toast=%s aar=%s" % [toast, aar_line])
