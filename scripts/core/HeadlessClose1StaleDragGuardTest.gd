@@ -170,7 +170,7 @@ func _test_source_needles() -> void:
 		_fail("first edge / WASD must clear hold timers so clamp can run")
 		return
 	var clamp_fn := _slice_func(ren, "_clamp_camera_to_theater")
-	if "_camera_is_held()" in clamp_fn:
+	if "if _camera_is_held()" in clamp_fn:
 		_fail("_clamp_camera_to_theater must not early-return on _camera_is_held")
 		return
 	if "if _close_camera_locked:" not in clamp_fn:
@@ -601,7 +601,9 @@ func _test_first_edge_after_close_clamps() -> void:
 	var before: Vector2 = _camera_pos()
 	var i := 0
 	while i < 40:
-		_tick_camera()
+		# Camera-only — do not `_process` (that auto-loads world theater).
+		if _mr.has_method("_handle_camera_input"):
+			_mr.call("_handle_camera_input", 0.016)
 		i += 1
 	var after: Vector2 = _camera_pos()
 	var dy: float = after.y - before.y
