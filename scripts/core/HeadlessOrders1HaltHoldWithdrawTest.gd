@@ -125,6 +125,7 @@ func _run() -> void:
 	await _test_hold_loop()
 	await _test_withdraw_loop()
 	await _test_fight_and_march_layout()
+	await _test_open_fight_start_no_ctrl()
 	_cleanup()
 
 
@@ -172,7 +173,17 @@ func _test_source_needles() -> void:
 	if "show_first_session_action_tip" in show_pop or "TipDismiss" in show_pop:
 		_fail("unit-card popup must not own the first-session tip strip")
 		return
-	_pass("source needles: Halt/Hold/Withdraw + 1280x740 dock + Stance: Hold toast; tip strip fenced")
+	if show_pop.count("_arm_unit_card_press_consume()") < 6:
+		_fail("Open fight must latch press-consume like Halt/Hold/Withdraw")
+		return
+	var sheet_fn := _slice_func(ren, "_show_open_fight_sheet")
+	if "BtnStartBattle" not in sheet_fn or "start_land_battle" not in sheet_fn:
+		_fail("Open fight sheet must name BtnStartBattle and call start_land_battle")
+		return
+	if 'assault.get("opened"' not in sheet_fn:
+		_fail("Start battle must bank only when start_land_battle opened a fight")
+		return
+	_pass("source needles: Halt/Hold/Withdraw + Open fight Start + 1280x740 dock; tip strip fenced")
 
 
 func _setup_nuts3_fixture() -> bool:
@@ -809,6 +820,130 @@ func _test_fight_and_march_layout() -> void:
 		_fail("Withdraw click cleared the march (hit Halt)")
 		return
 	_pass("fight+march layout: stance above cmd, no Halt/Withdraw overlap, Hold● + Withdrawing bank")
+
+
+func _find_sheet_btn(node_name: String, text_prefix: String) -> Button:
+	if _ui == null:
+		return null
+	var sheet: Node = _ui.get_node_or_null("OpenFightSheet")
+	if sheet == null:
+		return null
+	var named: Button = sheet.find_child(node_name, true, false) as Button
+	if named != null:
+		return named
+	for n in sheet.find_children("*", "Button", true, false):
+		if n is Button and str((n as Button).text).begins_with(text_prefix):
+			return n as Button
+	return null
+
+
+func _set_koeln_fra() -> void:
+	var koel: Object = _mm.call("get_province", KOELN) if _mm != null and _mm.has_method("get_province") else null
+	if koel != null:
+		koel.set("owner_tag", "FRA")
+		koel.set("controller_tag", "FRA")
+	if _mr != null and "provinces" in _mr and _mr.provinces.has(KOELN):
+		var mp: Object = _mr.provinces[KOELN] as Object
+		if mp != null:
+			mp.set("owner_tag", "FRA")
+			mp.set("controller_tag", "FRA")
+	var d: Object = null
+	if _lm != null and _lm.has_method("get_formation"):
+		d = _lm.call("get_formation", FID_DEF)
+	if d != null:
+		d.set("stationed_province_id", KOELN)
+		d.set("country_tag", "FRA")
+		d.set("is_in_combat", false)
+
+
+func _test_open_fight_start_no_ctrl() -> void:
+	# Play FAIL aa6a08d4: Ctrl+xdotool never opened a fight. Card Open fight →
+	# Start battle must bank Hold ● / Withdraw ● with no Ctrl.
+	_fm("clear_march", FID)
+	_clear_injected_battle()
+	var fo: Object = _formation()
+	if fo == null:
+		_fail("formation missing for Open fight")
+		return
+	fo.set("stationed_province_id", BONN)
+	fo.set("is_in_combat", false)
+	_set_koeln_fra()
+	if "selected_formation_id" in _mr:
+		_mr.selected_formation_id = FID
+	_show_selected_card()
+	await _flush_frames()
+	var open_btn: Button = _find_card_btn("BtnOpenFight", "Open fight")
+	if open_btn == null:
+		_fail("Open fight missing on own land card")
+		return
+	if not _assert_btn_on_play_card("Open fight", open_btn):
+		return
+	_log_button_rect("Open fight", open_btn)
+	open_btn.pressed.emit()
+	await _flush_frames()
+	var start_btn: Button = _find_sheet_btn("BtnStartBattle", "Start battle")
+	if start_btn == null:
+		_fail("Open fight did not show Start battle (no Ctrl)")
+		return
+	_log_button_rect("Start battle", start_btn)
+	if not _assert_btn_on_play_card("Start battle", start_btn):
+		return
+	var orr: Rect2 = open_btn.get_global_rect()
+	var srr: Rect2 = start_btn.get_global_rect()
+	var open_cx := orr.position.x + orr.size.x * 0.5
+	var open_cy := orr.position.y + orr.size.y * 0.5
+	var start_cx := srr.position.x + srr.size.x * 0.5
+	var start_cy := srr.position.y + srr.size.y * 0.5
+	start_btn.pressed.emit()
+	await _flush_frames()
+	var bat: Dictionary = _battle_for_fid()
+	if bat.is_empty() or str(bat.get("att_fid", "")) != FID:
+		_fail("Start battle did not open a land fight for the card unit")
+		return
+	var hold_btn: Button = _find_card_btn("BtnHoldStance", "Hold")
+	var wd_btn: Button = _find_card_btn("BtnWithdraw", "Withdraw")
+	if hold_btn == null or wd_btn == null:
+		_fail("fighting card after Start missing Hold/Withdraw")
+		return
+	if not _assert_btn_on_play_card("Hold(after Start)", hold_btn):
+		return
+	if not _assert_btn_on_play_card("Withdraw(after Start)", wd_btn):
+		return
+	var hr: Rect2 = hold_btn.get_global_rect()
+	var wr: Rect2 = wd_btn.get_global_rect()
+	_info_line(
+		"PLAY_CLICKS_OPENFIGHT 1280x740 OpenFight=(%.0f,%.0f) Start=(%.0f,%.0f) Hold=(%.0f,%.0f) Withdraw=(%.0f,%.0f)"
+		% [
+			open_cx, open_cy, start_cx, start_cy,
+			hr.position.x + hr.size.x * 0.5, hr.position.y + hr.size.y * 0.5,
+			wr.position.x + wr.size.x * 0.5, wr.position.y + wr.size.y * 0.5,
+		]
+	)
+	hold_btn.pressed.emit()
+	await _flush_frames()
+	var after_hold: Dictionary = _battle_for_fid()
+	var hold_after: Button = _find_card_btn("BtnHoldStance", "Hold")
+	var txt := _card_text()
+	if str(after_hold.get("att_stance", "")) != "hold" or hold_after == null or hold_after.text != "Hold ●":
+		_fail("Open fight Start → Hold did not bank Hold ● / att_stance=hold")
+		return
+	if txt.find("Hold ●") < 0:
+		_fail("card text missing Hold ● after Open fight Start")
+		return
+	var wd2: Button = _find_card_btn("BtnWithdraw", "Withdraw")
+	if wd2 == null:
+		_fail("Withdraw missing after Hold on Open-fight card")
+		return
+	wd2.pressed.emit()
+	await _flush_frames()
+	var wr_bat: Dictionary = _battle_for_fid()
+	var after_wd := _card_text()
+	var pending := bool(wr_bat.get("withdraw_pending", false))
+	var marked := after_wd.find("Withdraw ●") >= 0 or after_wd.findn("Withdrawing") >= 0
+	if not pending and not marked:
+		_fail("Open fight Start → Withdraw did not bank Withdraw ● / Withdrawing")
+		return
+	_pass("Open fight → Start (no Ctrl) banks Hold ● and Withdraw ●")
 
 
 func _cleanup() -> void:

@@ -75,6 +75,15 @@ def build_unit_card_assign_product(*, check_wiring: bool = True) -> Dict[str, An
     wiring["withdraw_not_beside_halt"] = wd_sep
     (passes if wd_sep else fails).append("withdraw_not_beside_halt")
 
+    open_latch = popup.count("_arm_unit_card_press_consume()") >= 6
+    wiring["open_fight_press_latch"] = open_latch
+    (passes if open_latch else fails).append("open_fight_press_latch")
+
+    sheet = _gd_func_slice(ren, "_show_open_fight_sheet")
+    start_opened = "BtnStartBattle" in sheet and 'assault.get("opened"' in sheet
+    wiring["start_battle_opened_only"] = start_opened
+    (passes if start_opened else fails).append("start_battle_opened_only")
+
     no_insp = "show_info_panel" not in execute
     wiring["execute_no_info_panel"] = no_insp
     (passes if no_insp else fails).append("execute_no_info_panel")

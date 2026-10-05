@@ -20921,6 +20921,10 @@ func _show_unit_detail_popup(formation: Object) -> void:
 	# on-screen at Play 1280×740 (old 252px reserve clipped the stance row).
 	panel.set_meta("unit_card_dock", true)
 	_dock_unit_card_in_viewport(panel)
+	# Play MIXED/FAIL: National Spirits inspector covered the left dock so
+	# Open fight / Hold / Withdraw were not clickable. Hide it while the card is up.
+	if info_panel != null and info_panel is CanvasItem:
+		(info_panel as CanvasItem).visible = false
 	ui.add_child(panel)
 
 	var margin := MarginContainer.new()
@@ -21014,6 +21018,7 @@ func _show_unit_detail_popup(formation: Object) -> void:
 		RetrowaveTheme.style_primary_button(fight_btn)
 		var fight_fid := fid
 		fight_btn.pressed.connect(func() -> void:
+			_arm_unit_card_press_consume()
 			_open_fight_from_formation_id(fight_fid)
 		)
 		fight_row.add_child(fight_btn)
@@ -23164,9 +23169,9 @@ var _unit_pick_strategic_hint_shown: bool = false
 
 
 func _open_fight_from_formation_id(fid: String) -> void:
-	# First-session sheet: stage GER Maginot 710173 → FRA 710739 and open the combat card.
-	# Do not require the clicked unit (DNK etc.) to already sit on a live border.
-	# Cheap Maginot pair only — no world OOB rebuild (that hung input).
+	# Prefer the selected unit's current hex + an adjacent enemy so Play can
+	# Open fight → Start without Ctrl (xdotool Ctrl is intermittent).
+	# First-session fallback stays GER Maginot 710173 → FRA 710739.
 	const GER_FRONT := 710173
 	const FRA_FRONT := 710739
 	if typeof(LeaderManager) == TYPE_NIL or not LeaderManager.has_method("get_formation"):
@@ -23181,10 +23186,21 @@ func _open_fight_from_formation_id(fid: String) -> void:
 			LeaderManager.field_designed_unit("GER", "panzer_iii_j_medium", GER_FRONT, "land")
 	var att_fid := ""
 	var fo: Object = LeaderManager.get_formation(fid) if not fid.is_empty() else null
-	if fo != null and "country_tag" in fo and str(fo.country_tag).strip_edges().to_upper() == "GER":
-		if "stationed_province_id" in fo:
-			fo.stationed_province_id = GER_FRONT
+	var from_pid := GER_FRONT
+	var enemy_pid := FRA_FRONT
+	if fo != null and "country_tag" in fo:
 		att_fid = fid
+		var tag_here := str(fo.country_tag).strip_edges().to_upper()
+		var here := int(fo.stationed_province_id) if "stationed_province_id" in fo else -1
+		var local_enemy := _adjacent_enemy_province_id(here, tag_here)
+		if local_enemy > 0 and here > 0:
+			from_pid = here
+			enemy_pid = local_enemy
+		elif tag_here == "GER":
+			if "stationed_province_id" in fo:
+				fo.stationed_province_id = GER_FRONT
+			from_pid = GER_FRONT
+			enemy_pid = FRA_FRONT
 	if att_fid.is_empty() and LeaderManager.has_method("get_formations_for_country"):
 		for f in LeaderManager.get_formations_for_country("GER"):
 			if f == null:
@@ -23196,17 +23212,16 @@ func _open_fight_from_formation_id(fid: String) -> void:
 				f.stationed_province_id = GER_FRONT
 			att_fid = str(f.formation_id) if "formation_id" in f else ""
 			fo = f
+			from_pid = GER_FRONT
+			enemy_pid = FRA_FRONT
 			break
 	if att_fid.is_empty() or fo == null:
 		# Still open the Maginot sheet — Play: button was tooltip-only / no-op.
 		_show_open_fight_sheet("", null, GER_FRONT, FRA_FRONT, "GER")
 		return
 	selected_formation_id = att_fid
-	attack_staging_province_id = GER_FRONT
-	if typeof(BattleManager) == TYPE_NIL or not BattleManager.has_method("start_land_battle"):
-		_show_open_fight_sheet(att_fid, fo, GER_FRONT, FRA_FRONT, "GER")
-		return
-	_show_open_fight_sheet(att_fid, fo, GER_FRONT, FRA_FRONT, "GER")
+	attack_staging_province_id = from_pid
+	_show_open_fight_sheet(att_fid, fo, from_pid, enemy_pid, str(fo.country_tag) if "country_tag" in fo else "GER")
 
 
 func _adjacent_enemy_province_id(from_pid: int, owner_tag: String = "") -> int:
@@ -23366,8 +23381,10 @@ func _show_open_fight_sheet(
 	vbox.add_child(body)
 	if enemy_pid > 0 and typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("start_land_battle"):
 		var start_btn := Button.new()
+		start_btn.name = "BtnStartBattle"
 		start_btn.text = "Start battle"
 		start_btn.focus_mode = Control.FOCUS_NONE
+		start_btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
 		if typeof(RetrowaveTheme) != TYPE_NIL:
 			RetrowaveTheme.style_primary_button(start_btn)
 		var start_fid := fid
@@ -23375,16 +23392,21 @@ func _show_open_fight_sheet(
 		var start_from := from_pid
 		var start_tag := attacker_tag
 		start_btn.pressed.connect(func() -> void:
+			_arm_unit_card_press_consume()
 			var assault: Dictionary = BattleManager.start_land_battle(start_tag, start_to, start_from, start_fid)
-			if bool(assault.get("opened", false)) or bool(assault.get("success", false)):
+			# Instant empty-hex capture is success but not a fight — no Hold/Withdraw.
+			if bool(assault.get("opened", false)):
 				_sync_land_battle_bubbles()
+				if is_instance_valid(panel):
+					panel.queue_free()
 				if formation != null:
 					_show_unit_detail_popup(formation)
 				_show_inspector_toast("Open fight · battle opened · Press/Hold/Withdraw on the unit card", 4.0)
-				if is_instance_valid(panel):
-					panel.queue_free()
 			else:
-				_show_inspector_toast(str(assault.get("reason", "Attack failed")), 3.2, true)
+				var why := str(assault.get("reason", "no multi-day fight"))
+				if bool(assault.get("success", false)) and bool(assault.get("instant", false)):
+					why = "empty hex · no Hold/Withdraw"
+				_show_inspector_toast("Start battle · %s" % why, 3.2, true)
 		)
 		vbox.add_child(start_btn)
 
