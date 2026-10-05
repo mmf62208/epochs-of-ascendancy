@@ -180,6 +180,7 @@ func _do_one_trial() -> void:
 		return
 	var z: float = ZOOMS[int(_trial_i / TRIALS_PER_ZOOM)]
 	var local_i: int = _trial_i % TRIALS_PER_ZOOM
+	_nudge_south_of_north_clamp()
 	var close_pos: Vector2 = _card_close_pos()
 	if close_pos == Vector2.ZERO:
 		_fail_reasons.append("close_pos_z%.2f_t%d" % [z, local_i])
@@ -338,18 +339,35 @@ func _hold_top_edge(pos: Vector2) -> void:
 
 func _recenter_home(z: float) -> void:
 	var mr := _map_renderer()
-	if mr != null and mr.has_method("player_path_europe_home"):
-		mr.call("player_path_europe_home")
-	_set_zoom(z)
+	# Unlock BEFORE Home — `_camera_is_held()` otherwise keeps the camera on
+	# the north clamp from the previous first-edge (z0.32/0.50/0.80 dy=0).
 	if mr != null:
 		mr.set("_close_camera_locked", false)
 		mr.set("_close_click_guard", false)
 		mr.set("_close_suppress_edge", false)
 		mr.set("_hold_camera_until_msec", 0)
 		mr.set("_map_pick_block_until_msec", 0)
+		mr.set("_inspector_held_closed", false)
 		if mr.has_method("_reset_left_gesture_state"):
 			mr.call("_reset_left_gesture_state", Vector2(400, 400))
 		mr.set("_close_ignore_stale_left_down", false)
+	if mr != null and mr.has_method("player_path_europe_home"):
+		mr.call("player_path_europe_home")
+	_set_zoom(z)
+	_nudge_south_of_north_clamp()
+
+
+func _nudge_south_of_north_clamp() -> void:
+	var cam := _camera()
+	var mr := _map_renderer()
+	if cam == null or mr == null or not mr.has_method("_apply_camera_bounds"):
+		return
+	var here: Vector2 = cam.global_position
+	var north: Vector2 = mr.call("_apply_camera_bounds", Vector2(here.x, here.y - 20000.0))
+	if here.y <= north.y + 80.0:
+		cam.global_position = Vector2(here.x, north.y + 420.0)
+		if mr.has_method("_clamp_camera_to_theater"):
+			mr.call("_clamp_camera_to_theater")
 
 
 func _set_zoom(z: float) -> void:
