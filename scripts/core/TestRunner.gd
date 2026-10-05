@@ -1536,14 +1536,19 @@ func _rx1_live_progress_status() -> Dictionary:
 	return out
 
 
-## One-shot first-session onboarding for graphical F5 (meta-guarded at call site).
+## One-shot first-session tip after Begin (meta-guarded at the call site).
+## Pass-through strip on the map. A blocking debug toast is not the Begin path.
 func _toast_first_session_onboarding() -> void:
-	# Godot 4.7: has_method() is instance-only — cannot call on class_name DebugOverlay.
-	# toast_map_debug is a static func on DebugOverlay.
-	if typeof(DebugOverlay) == TYPE_NIL:
+	if map_renderer != null and is_instance_valid(map_renderer) and map_renderer.has_method("show_first_session_action_tip"):
+		map_renderer.call("show_first_session_action_tip")
+		if map_renderer.has_meta("eoa_first_session_tip_shown"):
+			return
+	if not has_meta("eoa_first_session_tip_retry"):
+		set_meta("eoa_first_session_tip_retry", true)
+		call_deferred("_toast_first_session_onboarding")
 		return
-	DebugOverlay.toast_map_debug(
-		"Play as GER · click a chip (str %) · click own land to MARCH · Ctrl+click France to ASSAULT"
+	print(
+		"EOA_FIRST_SESSION_TIP shown=0 pass_through=0 reason=no_ui text=Select a unit, then March or Open card."
 	)
 
 

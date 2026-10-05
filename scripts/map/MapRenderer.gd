@@ -19770,7 +19770,12 @@ func _try_open_land_unit_at_world(
 		if fo_any == null and _hex_pick_is_land_province(world_pos):
 			# Home chrome over Neustadt / Schwäbisch Hall / FRA / Berlin-Home:
 			# nearest painted player-land icon (station 710173 / ger_nbr).
-			fo = _nearest_player_land_formation_at_world(world_pos)
+			# Empty land shares this handler (Karlsruhe Garrison when it is the
+			# nearest GER chip inside 340). Open only on that chip's hit disk.
+			# OOB strip focus is a separate explicit click, not this path.
+			var spill_fo: Object = _nearest_player_land_formation_at_world(world_pos)
+			if _empty_land_spill_is_on_chip(world_pos, spill_fo):
+				fo = spill_fo
 	if fo == null:
 		# FLEET-1 FIX #1: disk hit on a foreign fleet stationed in a SEA
 		# province inspects that fleet even if GIS under the cursor is
@@ -19803,6 +19808,20 @@ func _try_open_land_unit_at_world(
 		return true
 	_show_unit_detail_popup(fo)
 	return true
+
+
+func _empty_land_spill_is_on_chip(world_pos: Vector2, fo: Object) -> bool:
+	# CHROME_SPILL_WORLD (340) stays inside _nearest_player_land_formation_at_world.
+	# Binding that result on empty land opened a distant card (Karlsruhe Garrison).
+	# Same-hex station and painted-chip clicks are resolved before this helper.
+	if fo == null:
+		return false
+	var cam := get_viewport().get_camera_2d() if get_viewport() else null
+	var z: float = 1.0
+	if cam != null:
+		z = maxf(cam.zoom.x, cam.zoom.y)
+	var hit_r: float = _unit_counter_hit_radius_world(z, null)
+	return _formation_icon_distance(world_pos, fo) <= hit_r
 
 
 func _mv1_preview_shows_hops() -> bool:
@@ -19972,8 +19991,9 @@ func _refresh_selected_unit_chip() -> void:
 	var gold := Color(1.0, 0.85, 0.25, 1.0)
 	# Resolve selected formation's station province (stack cycle: fid changes, pin stays).
 	var sel_pid := -1
+	var sel_f: Formation = null
 	if not selected_formation_id.is_empty() and typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_formation"):
-		var sel_f: Formation = LeaderManager.get_formation(selected_formation_id)
+		sel_f = LeaderManager.get_formation(selected_formation_id)
 		if sel_f != null and "stationed_province_id" in sel_f:
 			sel_pid = int(sel_f.stationed_province_id)
 	for id_v in _demo_unit_icon_pids:
@@ -19987,6 +20007,10 @@ func _refresh_selected_unit_chip() -> void:
 			if old_sel != null:
 				counter.remove_child(old_sel)
 				old_sel.free()
+			var old_read: Node = counter.get_node_or_null("FillToeReadout")
+			if old_read != null:
+				counter.remove_child(old_read)
+				old_read.free()
 			if selected_formation_id.is_empty() or sel_pid < 0:
 				continue
 			# Province pin or exact formation (FLEET-2: one disk per sea nation).
@@ -20000,6 +20024,56 @@ func _refresh_selected_unit_chip() -> void:
 			frame.name = "SelectedFrame"
 			frame.z_index = 20
 			counter.add_child(frame)
+			if sel_f != null and _formation_is_player_tag(sel_f) and not _formation_type_blocks_land_open(sel_f):
+				_attach_fill_toe_readout(counter, sel_f)
+
+
+func _fill_toe_chip_text(formation: Object) -> String:
+	var fold := "Fill —%\nTOE —"
+	if formation != null and _unit_card_combat_strip_ready():
+		var lines: PackedStringArray = _safe_unit_card_strip_lines(formation)
+		if not lines.is_empty():
+			var first := str(lines[0]).strip_edges()
+			if not first.is_empty() and not first.begins_with("Strength"):
+				fold = first
+		if fold.is_empty() or fold.begins_with("Strength"):
+			fold = "Fill —% · TOE —"
+		elif not ("TOE" in fold):
+			fold = "%s · TOE —" % fold
+		var sep := fold.find(" · TOE")
+		if sep >= 0:
+			var fill_line := fold.substr(0, sep).strip_edges()
+			var toe_line := fold.substr(sep + 3).strip_edges()
+			if fill_line.is_empty():
+				fill_line = "Fill —%"
+			if toe_line.is_empty():
+				toe_line = "TOE —"
+			fold = "%s\n%s" % [_short_chip_line(fill_line), _short_chip_line(toe_line)]
+		else:
+			fold = _short_chip_line(fold)
+	return fold
+
+
+func _short_chip_line(s: String, n: int = 22) -> String:
+	if s.length() <= n:
+		return s
+	return s.substr(0, n - 1) + "."
+
+
+func _attach_fill_toe_readout(counter: Node2D, formation: Object) -> void:
+	# Selected player-land only. Not a painted-glyph name, so fleet plate
+	# ranking does not treat this readout as chip ink.
+	if counter == null or formation == null:
+		return
+	var lab: Node2D = _UnitChipTextScr.new() as Node2D
+	lab.name = "FillToeReadout"
+	lab.set("text", _fill_toe_chip_text(formation))
+	lab.set("font_size", 14)
+	lab.set("font_color", Color(0.55, 0.95, 1.0, 1.0))
+	lab.set("outline_size", 4)
+	lab.position = Vector2(-22, -58)
+	lab.z_index = 21
+	counter.add_child(lab)
 
 
 ## Cycle stack at selected unit's province ([ ] keys / unit card buttons). One pin per province.
@@ -20849,7 +20923,11 @@ func _show_unit_detail_popup(formation: Object) -> void:
 	var title := Label.new()
 	title.text = name_s
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	title.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	# One line so a long garrison name cannot run under Close.
+	title.autowrap_mode = TextServer.AUTOWRAP_OFF
+	title.clip_text = true
+	title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	RetrowaveTheme.style_title(title, RetrowaveTheme.CYAN)
 	title.add_theme_font_size_override("font_size", 16)
 	title_row.add_child(title)
@@ -20859,6 +20937,8 @@ func _show_unit_detail_popup(formation: Object) -> void:
 	close_btn.focus_mode = Control.FOCUS_NONE
 	close_btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
 	RetrowaveTheme.style_secondary_button(close_btn)
+	close_btn.custom_minimum_size = Vector2(76, 28)
+	close_btn.size_flags_horizontal = Control.SIZE_SHRINK_END
 	close_btn.process_mode = Node.PROCESS_MODE_ALWAYS
 	close_btn.pressed.connect(_dismiss_unit_card_restore_province)
 	title_row.add_child(close_btn)
@@ -20881,7 +20961,19 @@ func _show_unit_detail_popup(formation: Object) -> void:
 		fill_col = RetrowaveTheme.SUCCESS
 	fill_lbl.add_theme_color_override("font_color", fill_col)
 	fill_lbl.add_theme_font_size_override("font_size", 16)
+	fill_lbl.custom_minimum_size = Vector2(290, 22)
 	vbox.add_child(fill_lbl)
+	var toe_lbl := Label.new()
+	toe_lbl.name = "ToeLabel"
+	toe_lbl.text = "TOE —"
+	toe_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	toe_lbl.custom_minimum_size = Vector2(290, 22)
+	toe_lbl.clip_text = false
+	RetrowaveTheme.style_body_label(toe_lbl)
+	toe_lbl.add_theme_color_override("font_color", RetrowaveTheme.CYAN)
+	toe_lbl.add_theme_font_size_override("font_size", 16)
+	vbox.add_child(toe_lbl)
+	_apply_fill_toe_card_lines(fill_lbl, toe_lbl, fill_txt)
 	var fill_bar := ProgressBar.new()
 	fill_bar.name = "FillToeBar"
 	fill_bar.custom_minimum_size = Vector2(0, 4)
@@ -20951,13 +21043,14 @@ func _show_unit_detail_popup(formation: Object) -> void:
 			fill_txt = "Fill —% · TOE —"
 		elif not ("TOE" in fill_txt):
 			fill_txt = "%s · TOE —" % fill_txt
-		fill_lbl.text = fill_txt
+		_apply_fill_toe_card_lines(fill_lbl, toe_lbl, fill_txt)
 		fill_ratio = _safe_unit_card_fill_ratio(formation)
 		if fill_ratio >= 0.0 and fill_ratio < 0.5:
 			fill_col = RetrowaveTheme.WARNING
 		elif fill_ratio >= 0.5:
 			fill_col = RetrowaveTheme.SUCCESS
 		fill_lbl.add_theme_color_override("font_color", fill_col)
+		toe_lbl.add_theme_color_override("font_color", fill_col)
 		fill_bar.value = clampf(fill_ratio, 0.0, 1.0) * 100.0
 		if strip0.size() > 1:
 			for si in range(1, strip0.size()):
@@ -21233,6 +21326,28 @@ func _safe_unit_card_tooltip_lines(formation: Object) -> PackedStringArray:
 		for item in (raw as Array):
 			out.append(str(item))
 	return out
+
+
+func _apply_fill_toe_card_lines(fill_lbl: Label, toe_lbl: Label, fill_txt: String) -> void:
+	# Split "Fill NN% · TOE …" so each line is full width under the title.
+	# Close stays on the title row and cannot share a line with the fold.
+	var fill_line := fill_txt
+	var toe_line := "TOE —"
+	var sep := fill_txt.find(" · TOE")
+	if sep >= 0:
+		fill_line = fill_txt.substr(0, sep).strip_edges()
+		toe_line = fill_txt.substr(sep + 3).strip_edges()
+		if fill_line.is_empty():
+			fill_line = "Fill —%"
+		if toe_line.is_empty():
+			toe_line = "TOE —"
+	elif fill_txt.begins_with("TOE"):
+		fill_line = "Fill —%"
+		toe_line = fill_txt
+	if fill_lbl != null:
+		fill_lbl.text = fill_line
+	if toe_lbl != null:
+		toe_lbl.text = toe_line
 
 
 func _apply_unit_detail_popup_min_size(panel: Control) -> void:
@@ -24353,6 +24468,84 @@ func ensure_equipment_flow_glyphs_on() -> Dictionary:
 	return get_equipment_flow_glyph_query()
 
 
+const FIRST_SESSION_TIP_TEXT := "Select a unit, then March or Open card."
+
+
+## One-shot pass-through strip after Begin. Body ignores the mouse so map
+## clicks land on the board. TipDismiss is not a Close control.
+func show_first_session_action_tip() -> void:
+	if has_meta("eoa_first_session_tip_shown"):
+		return
+	var ui := get_node_or_null("UI") as CanvasLayer
+	if ui == null:
+		print(
+			"EOA_FIRST_SESSION_TIP shown=0 pass_through=0 reason=no_ui text=%s"
+			% FIRST_SESSION_TIP_TEXT
+		)
+		return
+	set_meta("eoa_first_session_tip_shown", true)
+	var old := ui.get_node_or_null("FirstSessionTipStrip")
+	if old != null:
+		ui.remove_child(old)
+		old.queue_free()
+	var panel := PanelContainer.new()
+	panel.name = "FirstSessionTipStrip"
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.z_index = 80
+	panel.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	panel.offset_left = 220.0
+	panel.offset_right = -220.0
+	panel.offset_top = 58.0
+	panel.offset_bottom = 96.0
+	RetrowaveTheme.style_detail_panel_flat(panel)
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ui.add_child(panel)
+	var margin := MarginContainer.new()
+	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	margin.add_theme_constant_override("margin_left", 10)
+	margin.add_theme_constant_override("margin_right", 6)
+	margin.add_theme_constant_override("margin_top", 4)
+	margin.add_theme_constant_override("margin_bottom", 4)
+	panel.add_child(margin)
+	var row := HBoxContainer.new()
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_theme_constant_override("separation", 8)
+	margin.add_child(row)
+	var lab := Label.new()
+	lab.name = "TipText"
+	lab.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	lab.text = FIRST_SESSION_TIP_TEXT
+	lab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	lab.autowrap_mode = TextServer.AUTOWRAP_OFF
+	lab.clip_text = true
+	RetrowaveTheme.style_body_label(lab)
+	lab.add_theme_font_size_override("font_size", 16)
+	lab.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(lab)
+	var btn := Button.new()
+	btn.name = "TipDismiss"
+	btn.text = "×"
+	btn.focus_mode = Control.FOCUS_NONE
+	btn.mouse_filter = Control.MOUSE_FILTER_STOP
+	btn.custom_minimum_size = Vector2(28, 28)
+	btn.pressed.connect(dismiss_first_session_action_tip)
+	row.add_child(btn)
+	print("EOA_FIRST_SESSION_TIP shown=1 pass_through=1 text=%s" % FIRST_SESSION_TIP_TEXT)
+
+
+func dismiss_first_session_action_tip() -> void:
+	# Must not take the inspector Close path (that locks the camera).
+	set_meta("eoa_first_session_tip_dismissed", true)
+	var ui := get_node_or_null("UI") as CanvasLayer
+	if ui == null:
+		return
+	var strip := ui.get_node_or_null("FirstSessionTipStrip")
+	if strip == null:
+		return
+	ui.remove_child(strip)
+	strip.queue_free()
+
+
 ## Cheap G / first-session order toast — never pathfinds.
 func _toast_easy_unit_orders() -> void:
 	var toast := (
@@ -25583,9 +25776,15 @@ func _unit_counter_aabb_hit_screen(counter: Node2D) -> float:
 	var origin_s: Vector2 = counter.get_global_transform_with_canvas() * Vector2.ZERO
 	var farthest: float = 0.0
 	for ch in counter.get_children():
+		# Selected Fill%/TOE sits above the plate. Counting it would grow the
+		# hit disk and steal a neighbor click (fleet plate rules stay put).
+		if str(ch.name) == "FillToeReadout":
+			continue
 		farthest = maxf(farthest, _unit_counter_item_farthest_screen(ch, origin_s))
 		if ch is Node:
 			for sub in (ch as Node).get_children():
+				if str(sub.name) == "FillToeReadout":
+					continue
 				farthest = maxf(farthest, _unit_counter_item_farthest_screen(sub, origin_s))
 	return farthest
 
