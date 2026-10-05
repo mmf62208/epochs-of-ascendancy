@@ -1698,7 +1698,7 @@ func _close_click_is_north_edge_strip() -> bool:
 	# suppress top-edge pan (Play 97d6ea45 check 5: first edge after Close
 	# did nothing until one empty drag).
 	# CLOSE-1b: if the Close button is already gone, do *not* fall back to
-	# get_mouse_position() — that is often y=0 (headless warp / first push).
+	# the viewport mouse — that is often y=0 (headless warp / first push).
 	var pos: Vector2 = _hud_or_card_close_screen_pos()
 	if pos == Vector2.INF:
 		return false

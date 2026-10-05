@@ -200,7 +200,7 @@ func _test_source_needles() -> void:
 	if "return false" not in strip_fn:
 		_fail("_close_click_is_north_edge_strip must not fall back to mouse y=0")
 		return
-	if "get_mouse_position()" in strip_fn:
+	if "pos = vp.get_mouse_position()" in strip_fn or "get_viewport().get_mouse_position()" in strip_fn:
 		_fail("_close_click_is_north_edge_strip must not use viewport mouse fallback")
 		return
 	if "mouse.y <= EDGE_PAN_SCREEN_PX" not in inp or "return false" not in _slice_func(inp, "_mouse_over_map_chrome_blocks_edge_pan"):
@@ -674,12 +674,17 @@ func _arm_close1b_leftover_soft_state(origin: Vector2) -> void:
 
 
 func _tick_process_camera(frames: int) -> void:
-	# Full `_process` (handle + possible GIS reassert). Do not also call
-	# `_handle_camera_input` — that papers over same-frame snap-back.
+	# Pre-fix `_process` camera tail: handle then GIS reassert. First-edge
+	# must unlock so reassert cannot snap (Play SOFT dy=0). Do not call full
+	# `_process` — that auto-loads world theater on this fixture.
 	var i := 0
 	while i < frames:
-		if _mr != null and _mr.has_method("_process"):
-			_mr.call("_process", 0.016)
+		if _mr == null:
+			return
+		if _mr.has_method("_handle_camera_input"):
+			_mr.call("_handle_camera_input", 0.016)
+		if not bool(_mr.get("_left_pan_active")) and _mr.has_method("_reassert_locked_close_camera"):
+			_mr.call("_reassert_locked_close_camera")
 		i += 1
 
 
