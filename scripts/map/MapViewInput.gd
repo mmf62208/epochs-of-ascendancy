@@ -12,6 +12,11 @@ const _PAUSE_DELTA_MAX := 0.05
 ## True outer-window edge-pan strip, in screen pixels (not viewport / content-scale).
 ## Play 1280x740: a 64px HUD-offset band at y≈200 and y>676 was the wrong strip.
 const EDGE_PAN_SCREEN_PX := 6.0
+## Far-right Play hover is ≈x=1270 on a 1280 window (10px inset). The 6px strip
+## starts at 1274, so that hover — and the top-right corner (1270, 1) east
+## component — missed. Left / top / bottom stay 6px so UI-1 rest (97,731)
+## still does not pan.
+const EDGE_PAN_RIGHT_SCREEN_PX := 10.0
 
 ## Known autoload singletons that appear as direct children of the viewport root.
 ## These are plain Nodes (with scripts like GameData.gd) and MUST NEVER have .visible (or other CanvasItem-only props) accessed.
@@ -56,6 +61,7 @@ static func edge_pan_direction_at(
 	if mouse_window.x > window_size.x or mouse_window.y > window_size.y:
 		return Vector2.ZERO
 	var strip: float = EDGE_PAN_SCREEN_PX
+	var right_strip: float = maxf(strip, EDGE_PAN_RIGHT_SCREEN_PX)
 	var in_north_strip: bool = mouse_window.y <= strip
 	var blocks: bool = hovered_blocks
 	if blocks and top_bar_only and in_north_strip:
@@ -65,7 +71,7 @@ static func edge_pan_direction_at(
 	var dir := Vector2.ZERO
 	if mouse_window.x <= strip:
 		dir.x -= 1.0
-	elif mouse_window.x >= window_size.x - strip:
+	elif mouse_window.x >= window_size.x - right_strip:
 		dir.x += 1.0
 	if in_north_strip:
 		dir.y -= 1.0

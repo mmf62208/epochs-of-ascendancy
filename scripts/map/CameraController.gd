@@ -128,6 +128,7 @@ func _apply_edge_pan(delta: float) -> void:
 		return
 	var nav_delta := MapViewInput.motion_delta(delta)
 	# UI-1: true outer 6px window strip (not HUD-offset / 56px viewport band).
+	# EDGE-1: far-right uses EDGE_PAN_RIGHT_SCREEN_PX so x≈1270 pans.
 	var dir: Vector2 = MapViewInput.edge_pan_direction_screen(vp)
 	if dir.length_squared() < 0.0001:
 		return
