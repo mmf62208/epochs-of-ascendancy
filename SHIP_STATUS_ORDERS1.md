@@ -5,7 +5,7 @@
 **Base:** main `f4282acdd4f911259636253303730d8467595ab4` (PR #75 TipDismiss squash; parent of first ORDERS-1 commit)
 **Merge:** HOLD for Play + Scott. ONE draft PR. Do not merge.
 
-**Rebase:** replayed 4 ORDERS-1 commits onto `f4282acd`. **0 conflicts.** TipDismiss swallow / deferred free / release-block kept from main; unit-card dock + Press|Hold|Withdraw upper row + Halt|Assign lower + `Stance: Hold` kept from ORDERS-1. `git diff origin/main -- MapRenderer.gd` has no TipDismiss hunks.
+**Rebase:** replayed 4 ORDERS-1 commits onto `f4282acd`. **0 conflicts.** TipDismiss swallow / deferred free / release-block kept from main; unit-card dock + Press|Hold|Withdraw upper row + Halt|Assign lower + `Stance: Hold` kept from ORDERS-1. `git diff origin/main -- MapRenderer.gd` has no TipDismiss hunks. Play recipe coords **unchanged** after rebase.
 
 ## Product
 
@@ -40,10 +40,11 @@ release-fallthrough. After rebase we **inherit** PR #75 TipDismiss from main
 
 ## Keep-green
 
-See `docs/evidence/orders1/KEEP_GREEN.md`. Official `--quick` is pre-existing
-red on trusted main (pick/chrome/living-loop greps). PR #73 readability,
-unit-card assign, stance, bubble products **PASS**. ORDERS-1 hd+xvfb **PASS**.
-CLOSE-1 leftover 11/11 **PASS**. CRASH-1 **PASS**. First-session readability hd **PASS**.
+See `docs/evidence/orders1/KEEP_GREEN.md`. After rebase onto `f4282acd`:
+ORDERS-1 hd **PASS** (Hold ● / Withdraw ●; PLAY_CLICKS **unchanged**).
+FSR/TipDismiss hd **PASS** (× did not open air wing; map pick after release).
+CLOSE-1 leftover **11/11 PASS**. Official `--quick` still pre-existing red
+on trusted main.
 
 ## Play recipe (1280×740 — do not raise the window)
 

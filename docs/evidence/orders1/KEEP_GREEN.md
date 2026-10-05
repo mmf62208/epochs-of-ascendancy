@@ -14,11 +14,11 @@ misses. ORDERS-1 did not edit pick / tip / hit-disk / Close / release paths.
 | `test_unit_card_assign_product` | py | PASS | halt + withdraw visible + 1280×740 dock + Stance: Hold |
 | `test_land_battle_stance_product` | py | PASS | explicit Hold assign |
 | `test_land_battle_bubble_product` | py | PASS | HOLD / WD labels |
-| `HeadlessOrders1HaltHoldWithdrawTest` | hd+xvfb | PASS | Halt / Hold ● / Withdrawing + 1280×740 visibility + fight+march layout |
-| `tools/eoa_orders1_guard.sh` | hd+xvfb | PASS | wrapper 1×+1× `--resolution 1280x740` |
-| `HeadlessCrash1HaltMarchPopupTest` | hd+xvfb | PASS | CRASH-1 unedited (repeats=1) |
-| `HeadlessClose1StaleDragGuardTest` | hd+xvfb | PASS | CLOSE-1/1b leftover 11/11 · rss 1209.1 / 1344.1 |
-| `HeadlessFirstSessionReadabilityTest` | hd | PASS | PR #73 unedited |
+| `HeadlessOrders1HaltHoldWithdrawTest` | hd after rebase | PASS | Hold ● / Withdraw ● · PLAY_CLICKS Halt=(92,675) Hold=(159,633) Withdraw=(246,633) **unchanged** |
+| `tools/eoa_orders1_guard.sh` | hd+xvfb (pre-rebase) | PASS | wrapper 1×+1× `--resolution 1280x740` |
+| `HeadlessCrash1HaltMarchPopupTest` | hd+xvfb (pre-rebase) | PASS | CRASH-1 unedited (repeats=1) |
+| `HeadlessClose1StaleDragGuardTest` | hd after rebase | PASS | CLOSE-1/1b leftover **11/11** |
+| `HeadlessFirstSessionReadabilityTest` | hd after rebase | PASS | TipDismiss × did not open air wing; map pick works after × release |
 
 Fences kept: first-session tip / TipDismiss / release-fallthrough **unedited**.
 No new dual package. No Godot bump. No `world_full` ID renumber. PR #7 stays draft.
