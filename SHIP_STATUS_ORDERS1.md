@@ -2,8 +2,10 @@
 
 **Branch:** `cursor/orders1-halt-hold-withdraw-89c5`
 **PR:** https://github.com/mmf62208/epochs-of-ascendancy/pull/76 (draft, HOLD)
-**Base:** trusted main `b9425e338d0bedd2cdbe69453f4fea26396ce8a0`
+**Base:** main `f4282acdd4f911259636253303730d8467595ab4` (PR #75 TipDismiss squash; parent of first ORDERS-1 commit)
 **Merge:** HOLD for Play + Scott. ONE draft PR. Do not merge.
+
+**Rebase:** replayed 4 ORDERS-1 commits onto `f4282acd`. **0 conflicts.** TipDismiss swallow / deferred free / release-block kept from main; unit-card dock + Press|Hold|Withdraw upper row + Halt|Assign lower + `Stance: Hold` kept from ORDERS-1. `git diff origin/main -- MapRenderer.gd` has no TipDismiss hunks.
 
 ## Product
 
@@ -31,9 +33,10 @@ do what the card says, with a visible card/bubble state change.
 
 ## Fence STOP
 
-Did **not** need the first-session tip / TipDismiss / map release-fallthrough
-path. Those files/handlers were not edited. No Grok Build rebase required
-for this slice.
+ORDERS-1 commits did **not** edit first-session tip / TipDismiss / map
+release-fallthrough. After rebase we **inherit** PR #75 TipDismiss from main
+(`_arm_first_session_tip_dismiss_swallow`, deferred `_free_first_session_tip_strip`,
+`_input` / `_unhandled_input` / land-chip release-block). Both products kept.
 
 ## Keep-green
 

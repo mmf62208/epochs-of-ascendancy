@@ -1,7 +1,7 @@
 # ORDERS-1 isolated keep-green
 
-Tip after FIX #1. xvfb / headless ≠ live Play. Never `EOA_SKIP_TITLE`.
-`tools/run_godot.sh` only (Godot 4.7.1-rc2).
+Tip after rebase onto main `f4282acd` (PR #75 TipDismiss). xvfb / headless ≠ live Play.
+Never `EOA_SKIP_TITLE`. `tools/run_godot.sh` only (Godot 4.7.1-rc2).
 
 Official `tools/eoa_full_test_gates.sh --quick` is **already red on trusted
 main `b9425e33`** (unit_pick / unit_chrome / fill-toe slice greps + living-loop
