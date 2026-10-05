@@ -322,6 +322,12 @@ static func _mouse_over_map_chrome_blocks_edge_pan(viewport: Viewport) -> bool:
 	if viewport == null or viewport.get_tree() == null:
 		return false
 	var mouse: Vector2 = viewport.get_mouse_position()
+	# CLOSE-1b: an unsettled left-dock InfoPanel rect must not swallow the
+	# true north 6px rim (Play SOFT_EDGEPAN_NO_CAM after restore-province).
+	# TopInfoBar hover is still exempt via north_strip_top_bar_exempt; other
+	# overlays on that strip still block through hover.
+	if mouse.y >= 0.0 and mouse.y <= EDGE_PAN_SCREEN_PX:
+		return false
 	var mrs: Array = viewport.get_tree().get_nodes_in_group("map_renderer")
 	for mr_v in mrs:
 		if mr_v == null or not (mr_v is Node):

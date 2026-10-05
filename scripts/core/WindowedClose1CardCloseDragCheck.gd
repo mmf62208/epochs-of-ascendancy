@@ -19,6 +19,9 @@ const EDGE_ABSURD_Y := -2000.0
 const EDGE_UNCLAMPED_MAX := 4000.0
 const ZOOMS: Array[float] = [0.32, 0.50, 0.80, 1.20, 1.50]
 const TRIALS_PER_ZOOM := 4
+## CLOSE-1b: Close → immediate y=0 (no y=20 first_move). Play SOFT was 3/11.
+const DIRECT_ZOOMS: Array[float] = [0.32, 0.80]
+const DIRECT_TRIALS_PER_ZOOM := 8
 const TOP_BAR := Vector2(640.0, 0.0)
 const TOP_BAR_ALT := Vector2(10.0, 1.0)
 ## First-move dest stays below the 6px rim so edge-pan is not scored as a stale drag.
@@ -49,8 +52,12 @@ var _first_move_ok: int = 0
 var _first_move_n: int = 0
 var _edge_ok: int = 0
 var _edge_n: int = 0
+var _direct_ok: int = 0
+var _direct_n: int = 0
 var _trial_i: int = 0
+var _direct_i: int = 0
 var _last_mouse: Vector2 = Vector2.ZERO
+var _doing_direct: bool = false
 
 
 func _init() -> void:
@@ -152,19 +159,31 @@ func _do_home() -> void:
 
 func _do_open_card() -> void:
 	var total: int = ZOOMS.size() * TRIALS_PER_ZOOM
-	if _trial_i >= total:
+	var direct_total: int = DIRECT_ZOOMS.size() * DIRECT_TRIALS_PER_ZOOM
+	if _trial_i >= total and _direct_i >= direct_total:
 		_write_clicks()
 		if _first_move_ok != _first_move_n or _first_move_n < 20:
 			_fail_reasons.append("first_move %d/%d" % [_first_move_ok, _first_move_n])
 		if _edge_ok != _edge_n or _edge_n < 20:
 			_fail_reasons.append("first_edge %d/%d" % [_edge_ok, _edge_n])
+		if _direct_ok != _direct_n or _direct_n < 16:
+			_fail_reasons.append("first_edge_direct %d/%d" % [_direct_ok, _direct_n])
 		_finish(_fail_reasons.is_empty())
 		return
-	var z: float = ZOOMS[int(_trial_i / TRIALS_PER_ZOOM)]
+	_doing_direct = _trial_i >= total
+	var z: float
+	if _doing_direct:
+		z = DIRECT_ZOOMS[int(_direct_i / DIRECT_TRIALS_PER_ZOOM)]
+	else:
+		z = ZOOMS[int(_trial_i / TRIALS_PER_ZOOM)]
 	_set_zoom(z)
 	if not _open_card():
-		_fail_reasons.append("card_open_z%.2f_t%d" % [z, _trial_i % TRIALS_PER_ZOOM])
-		_trial_i += 1
+		if _doing_direct:
+			_fail_reasons.append("card_open_direct_z%.2f_t%d" % [z, _direct_i])
+			_direct_i += 1
+		else:
+			_fail_reasons.append("card_open_z%.2f_t%d" % [z, _trial_i % TRIALS_PER_ZOOM])
+			_trial_i += 1
 		_phase = Phase.OPEN_CARD
 		return
 	_settle_left = 4
@@ -178,13 +197,23 @@ func _do_one_trial() -> void:
 		_fail_reasons.append("no_map_or_cam")
 		_finish(false)
 		return
-	var z: float = ZOOMS[int(_trial_i / TRIALS_PER_ZOOM)]
-	var local_i: int = _trial_i % TRIALS_PER_ZOOM
+	var z: float
+	var local_i: int
+	if _doing_direct:
+		z = DIRECT_ZOOMS[int(_direct_i / DIRECT_TRIALS_PER_ZOOM)]
+		local_i = _direct_i % DIRECT_TRIALS_PER_ZOOM
+	else:
+		z = ZOOMS[int(_trial_i / TRIALS_PER_ZOOM)]
+		local_i = _trial_i % TRIALS_PER_ZOOM
 	_nudge_south_of_north_clamp()
 	var close_pos: Vector2 = _card_close_pos()
 	if close_pos == Vector2.ZERO:
-		_fail_reasons.append("close_pos_z%.2f_t%d" % [z, local_i])
-		_trial_i += 1
+		if _doing_direct:
+			_fail_reasons.append("close_pos_direct_z%.2f_t%d" % [z, local_i])
+			_direct_i += 1
+		else:
+			_fail_reasons.append("close_pos_z%.2f_t%d" % [z, local_i])
+			_trial_i += 1
 		_phase = Phase.OPEN_CARD
 		return
 	var dest: Vector2 = FIRST_MOVE if (local_i % 2) == 0 else FIRST_MOVE_ALT
@@ -195,25 +224,33 @@ func _do_one_trial() -> void:
 	elif local_i == 3:
 		steps = 8
 	_press_close_real(close_pos)
-	var before: Vector2 = cam.global_position
-	_move_to(close_pos, dest, steps, local_i >= 2)
-	var after_move: Vector2 = cam.global_position
-	var move_d: float = after_move.distance_to(before)
-	_first_move_n += 1
+	var move_d: float = 0.0
+	var move_ok: bool = true
 	var live: bool = bool(mr.get("_left_btn_down")) or bool(mr.get("_left_pan_active"))
-	var drag_should: bool = false
-	if mr.has_method("_left_drag_should_pan"):
-		drag_should = bool(mr.call("_left_drag_should_pan"))
-	var move_ok: bool = move_d <= CAM_EPS and not live and not drag_should
-	if move_ok:
-		_first_move_ok += 1
+	if _doing_direct:
+		# CLOSE-1b: no y=20 first_move — Play SOFT went Close → top rim.
+		# Half the directs inject the leftover suppress+GIS lock (008e5c30).
+		if (local_i % 2) == 0:
+			_inject_close1b_leftover(mr, cam, close_pos)
 	else:
-		_fail_reasons.append("stale_drag_z%.2f_t%d_d=%.1f live=%s" % [z, local_i, move_d, str(live)])
+		var before: Vector2 = cam.global_position
+		_move_to(close_pos, dest, steps, local_i >= 2)
+		var after_move: Vector2 = cam.global_position
+		move_d = after_move.distance_to(before)
+		_first_move_n += 1
+		var drag_should: bool = false
+		if mr.has_method("_left_drag_should_pan"):
+			drag_should = bool(mr.call("_left_drag_should_pan"))
+		live = bool(mr.get("_left_btn_down")) or bool(mr.get("_left_pan_active"))
+		move_ok = move_d <= CAM_EPS and not live and not drag_should
+		if move_ok:
+			_first_move_ok += 1
+		else:
+			_fail_reasons.append("stale_drag_z%.2f_t%d_d=%.1f live=%s" % [z, local_i, move_d, str(live)])
 	var edge_before: Vector2 = cam.global_position
 	_hold_top_edge(edge_pos)
 	var edge_after: Vector2 = cam.global_position
 	var edge_d: Vector2 = edge_after - edge_before
-	_edge_n += 1
 	var clamped: Vector2 = edge_after
 	if mr.has_method("_apply_camera_bounds"):
 		clamped = mr.call("_apply_camera_bounds", edge_after)
@@ -224,36 +261,89 @@ func _do_one_trial() -> void:
 		edge_ok = false
 	if edge_after.distance_to(clamped) > 2.5:
 		edge_ok = false
-	if edge_ok:
-		_edge_ok += 1
-	else:
-		_fail_reasons.append(
-			"edge_z%.2f_t%d_dy=%.1f cy=%.1f bound=%.1f" % [
-				z, local_i, edge_d.y, edge_after.y, clamped.y
+	if _doing_direct:
+		_direct_n += 1
+		if edge_ok:
+			_direct_ok += 1
+		else:
+			_fail_reasons.append(
+				"direct_z%.2f_t%d_dy=%.1f cy=%.1f bound=%.1f" % [
+					z, local_i, edge_d.y, edge_after.y, clamped.y
+				]
+			)
+		_rows.append(
+			"| D%d | %.2f | %.0f,%.0f | 0 | — | skip | %.1f | %.1f | %s |" % [
+				_direct_i + 1,
+				z,
+				close_pos.x,
+				close_pos.y,
+				edge_d.y,
+				edge_after.y,
+				"PASS" if edge_ok else "FAIL",
 			]
 		)
-	_rows.append(
-		"| %d | %.2f | %.0f,%.0f | %d | %.2f | %s | %.1f | %.1f | %s |" % [
-			_trial_i + 1,
-			z,
-			close_pos.x,
-			close_pos.y,
-			steps,
-			move_d,
-			"PASS" if move_ok else "FAIL",
-			edge_d.y,
-			edge_after.y,
-			"PASS" if edge_ok else "FAIL",
-		]
-	)
-	_log(
-		"EOA_CLOSE1_LIVE who=trial i=%d z=%.2f close=%.0f,%.0f steps=%d move_d=%.2f edge_dy=%.1f live=%s" % [
-			_trial_i + 1, z, close_pos.x, close_pos.y, steps, move_d, edge_d.y, str(live)
-		]
-	)
-	_recenter_home(z)
-	_trial_i += 1
+		_log(
+			"EOA_CLOSE1B_LIVE who=direct i=%d z=%.2f close=%.0f,%.0f edge_dy=%.1f cy=%.1f" % [
+				_direct_i + 1, z, close_pos.x, close_pos.y, edge_d.y, edge_after.y
+			]
+		)
+		_recenter_home(z)
+		_direct_i += 1
+	else:
+		_edge_n += 1
+		if edge_ok:
+			_edge_ok += 1
+		else:
+			_fail_reasons.append(
+				"edge_z%.2f_t%d_dy=%.1f cy=%.1f bound=%.1f" % [
+					z, local_i, edge_d.y, edge_after.y, clamped.y
+				]
+			)
+		_rows.append(
+			"| %d | %.2f | %.0f,%.0f | %d | %.2f | %s | %.1f | %.1f | %s |" % [
+				_trial_i + 1,
+				z,
+				close_pos.x,
+				close_pos.y,
+				steps,
+				move_d,
+				"PASS" if move_ok else "FAIL",
+				edge_d.y,
+				edge_after.y,
+				"PASS" if edge_ok else "FAIL",
+			]
+		)
+		_log(
+			"EOA_CLOSE1_LIVE who=trial i=%d z=%.2f close=%.0f,%.0f steps=%d move_d=%.2f edge_dy=%.1f live=%s" % [
+				_trial_i + 1, z, close_pos.x, close_pos.y, steps, move_d, edge_d.y, str(live)
+			]
+		)
+		_recenter_home(z)
+		_trial_i += 1
 	_phase = Phase.OPEN_CARD
+
+
+func _inject_close1b_leftover(mr: Node, cam: Camera2D, origin: Vector2) -> void:
+	if mr == null or cam == null:
+		return
+	if "_close_suppress_edge" in mr:
+		mr.set("_close_suppress_edge", true)
+	if "_close_click_was_north_strip" in mr:
+		mr.set("_close_click_was_north_strip", false)
+	if "_close_click_screen" in mr:
+		mr.set("_close_click_screen", origin)
+	if "_close_camera_locked" in mr:
+		mr.set("_close_camera_locked", true)
+	if "_close_click_guard" in mr:
+		mr.set("_close_click_guard", true)
+	if "_close_camera_lock_pos" in mr:
+		mr.set("_close_camera_lock_pos", cam.global_position)
+	if "_close_camera_lock_zoom" in mr:
+		mr.set("_close_camera_lock_zoom", cam.zoom)
+	if "_hold_camera_until_msec" in mr:
+		mr.set("_hold_camera_until_msec", Time.get_ticks_msec() + 900)
+	if "_map_pick_block_until_msec" in mr:
+		mr.set("_map_pick_block_until_msec", Time.get_ticks_msec() + 800)
 
 
 func _open_card() -> bool:
@@ -334,6 +424,13 @@ func _hold_top_edge(pos: Vector2) -> void:
 		var mr := _map_renderer()
 		if mr != null and mr.has_method("_handle_camera_input"):
 			mr.call("_handle_camera_input", 0.016)
+		# Match `_process`: GIS reassert after camera apply (CLOSE-1b snap-back).
+		if mr != null and not bool(mr.get("_left_pan_active")):
+			var skip_reassert: bool = false
+			if mr.has_method("_first_edge_after_mid_close_wants_pan"):
+				skip_reassert = bool(mr.call("_first_edge_after_mid_close_wants_pan"))
+			if not skip_reassert and mr.has_method("_reassert_locked_close_camera"):
+				mr.call("_reassert_locked_close_camera")
 		i += 1
 
 
@@ -345,6 +442,8 @@ func _recenter_home(z: float) -> void:
 		mr.set("_close_camera_locked", false)
 		mr.set("_close_click_guard", false)
 		mr.set("_close_suppress_edge", false)
+		if "_close_click_was_north_strip" in mr:
+			mr.set("_close_click_was_north_strip", false)
 		mr.set("_hold_camera_until_msec", 0)
 		mr.set("_map_pick_block_until_msec", 0)
 		mr.set("_inspector_held_closed", false)
@@ -455,9 +554,11 @@ func _warp(pos: Vector2) -> void:
 
 
 func _write_clicks() -> void:
-	var md := "# CLOSE-1 windowed xvfb 1280x740\n\n"
+	var md := "# CLOSE-1 / CLOSE-1b windowed xvfb 1280x740\n\n"
 	md += "GER · Europe Home · world_accurate. NOT live Play.\n\n"
-	md += "first_move %d/%d · first_edge %d/%d\n\n" % [_first_move_ok, _first_move_n, _edge_ok, _edge_n]
+	md += "first_move %d/%d · first_edge %d/%d · first_edge_direct %d/%d (CLOSE-1b, no y=20 first)\n\n" % [
+		_first_move_ok, _first_move_n, _edge_ok, _edge_n, _direct_ok, _direct_n
+	]
 	md += "| # | zoom | close | steps | move_d | first_move | edge_dy | cam_y | first_edge |\n"
 	md += "|---|---|---|---|---|---|---|---|---|\n"
 	for row in _rows:
@@ -467,13 +568,17 @@ func _write_clicks() -> void:
 	if f != null:
 		f.store_string(md)
 		f.close()
-	var ev_dir := "docs/evidence/close1"
-	DirAccess.make_dir_recursive_absolute(ev_dir)
-	var ev := FileAccess.open("%s/CLICKS.md" % ev_dir, FileAccess.WRITE)
-	if ev != null:
-		ev.store_string(md)
-		ev.close()
-	_log("EOA_CLOSE1_LIVE who=clicks first_move=%d/%d first_edge=%d/%d" % [_first_move_ok, _first_move_n, _edge_ok, _edge_n])
+	for ev_dir in ["docs/evidence/close1", "docs/evidence/close1b"]:
+		DirAccess.make_dir_recursive_absolute(ev_dir)
+		var ev := FileAccess.open("%s/CLICKS.md" % ev_dir, FileAccess.WRITE)
+		if ev != null:
+			ev.store_string(md)
+			ev.close()
+	_log(
+		"EOA_CLOSE1_LIVE who=clicks first_move=%d/%d first_edge=%d/%d first_edge_direct=%d/%d" % [
+			_first_move_ok, _first_move_n, _edge_ok, _edge_n, _direct_ok, _direct_n
+		]
+	)
 
 
 func _go_settle(next_phase: int) -> void:
@@ -630,8 +735,8 @@ func _finish(ok: bool) -> void:
 		for r in _fail_reasons:
 			print("  [FAIL] WindowedClose1CardCloseDragCheck: ", r)
 	print(
-		"WindowedClose1CardCloseDragCheck: first_move=%d/%d first_edge=%d/%d" % [
-			_first_move_ok, _first_move_n, _edge_ok, _edge_n
+		"WindowedClose1CardCloseDragCheck: first_move=%d/%d first_edge=%d/%d first_edge_direct=%d/%d" % [
+			_first_move_ok, _first_move_n, _edge_ok, _edge_n, _direct_ok, _direct_n
 		]
 	)
 	print("WindowedClose1CardCloseDragCheck: ", "PASS" if ok else "FAIL", " (failures=", _fail_reasons.size(), ")")

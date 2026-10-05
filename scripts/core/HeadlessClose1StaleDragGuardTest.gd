@@ -126,6 +126,9 @@ func _run() -> void:
 	await _test_close_click_through_and_edge_ready()
 	await _test_first_edge_after_close_pans()
 	await _test_first_edge_after_close_clamps()
+	await _test_close_strip_ignores_stale_mouse_y0()
+	await _test_first_edge_close1b_leftover_soft_dy0()
+	await _test_north_strip_hud_close_still_suppresses()
 	await _test_clamp_ignores_click_guard()
 	await _test_normal_map_drag_still_pans()
 	_cleanup()
@@ -183,6 +186,25 @@ func _test_source_needles() -> void:
 	var inp := _read("res://scripts/map/MapViewInput.gd")
 	if "_dead_or_hidden_unit_card_in_ancestry" not in inp:
 		_fail("MapViewInput must ignore a just-Closed unit card hover")
+		return
+	if "_close_click_was_north_strip" not in ren:
+		_fail("CLOSE-1b must record whether Close was on the 6px rim")
+		return
+	if "func _note_close_click_strip_from_button" not in ren:
+		_fail("_note_close_click_strip_from_button missing")
+		return
+	if "func _first_edge_after_mid_close_wants_pan" not in ren:
+		_fail("_first_edge_after_mid_close_wants_pan missing")
+		return
+	var strip_fn := _slice_func(ren, "_close_click_is_north_edge_strip")
+	if "return false" not in strip_fn:
+		_fail("_close_click_is_north_edge_strip must not fall back to mouse y=0")
+		return
+	if "pos = vp.get_mouse_position()" in strip_fn or "get_viewport().get_mouse_position()" in strip_fn:
+		_fail("_close_click_is_north_edge_strip must not use viewport mouse fallback")
+		return
+	if "mouse.y <= EDGE_PAN_SCREEN_PX" not in inp or "return false" not in _slice_func(inp, "_mouse_over_map_chrome_blocks_edge_pan"):
+		_fail("MapViewInput north-strip chrome fallback must not swallow y=0")
 		return
 	var show_pop := _slice_func(ren, "_show_unit_detail_popup")
 	if show_pop.count("_arm_unit_card_press_consume()") < 5:
@@ -620,6 +642,122 @@ func _test_first_edge_after_close_clamps() -> void:
 		_fail("first edge after Close did not pan or clamp dy=%.1f cy=%.1f" % [dy, after.y])
 		return
 	_pass("first edge after Close clamps (dy=%.1f cy=%.1f bound=%.1f)" % [dy, after.y, want.y])
+
+
+func _test_close_strip_ignores_stale_mouse_y0() -> void:
+	if _mr == null or not _mr.has_method("_close_click_is_north_edge_strip"):
+		_fail("strip helper missing")
+		return
+	_warp(TOP_BAR)
+	if _mr.has_method("_hide_unit_card_keep_map_focus"):
+		_mr.call("_hide_unit_card_keep_map_focus")
+	if bool(_mr.call("_close_click_is_north_edge_strip")):
+		_fail("hidden card + mouse y=0 must not count as north-strip Close")
+		return
+	_pass("Close strip ignores stale/warped mouse at y=0")
+
+
+func _arm_close1b_leftover_soft_state(origin: Vector2) -> void:
+	# Play 008e5c30 SOFT writers: suppress latched as if consume saw y=0,
+	# GIS lock still on, hold timers set, Close itself was mid-panel.
+	_mr.set("_close_suppress_edge", true)
+	_mr.set("_close_click_was_north_strip", false)
+	_mr.set("_close_click_screen", origin)
+	_mr.set("_close_camera_locked", true)
+	_mr.set("_close_click_guard", true)
+	_mr.set("_hold_camera_until_msec", Time.get_ticks_msec() + 900)
+	_mr.set("_map_pick_block_until_msec", Time.get_ticks_msec() + 800)
+	_mr.set("_inspector_held_closed", false)
+	if _cam != null:
+		_mr.set("_close_camera_lock_pos", _cam.global_position)
+		_mr.set("_close_camera_lock_zoom", _cam.zoom)
+
+
+func _tick_process_camera(frames: int) -> void:
+	# Pre-fix `_process` camera tail: handle then GIS reassert. First-edge
+	# must unlock so reassert cannot snap (Play SOFT dy=0). Do not call full
+	# `_process` — that auto-loads world theater on this fixture.
+	var i := 0
+	while i < frames:
+		if _mr == null:
+			return
+		if _mr.has_method("_handle_camera_input"):
+			_mr.call("_handle_camera_input", 0.016)
+		if not bool(_mr.get("_left_pan_active")) and _mr.has_method("_reassert_locked_close_camera"):
+			_mr.call("_reassert_locked_close_camera")
+		i += 1
+
+
+func _test_first_edge_close1b_leftover_soft_dy0() -> void:
+	# Stronger automated repro of Play SOFT_EDGEPAN_NO_CAM (3/11 cycles):
+	# Close → leftover suppress + GIS lock → immediate y=0 (no y=20 first).
+	# Old path: edge_dir logged / skipped, `_reassert` snaps, dy=0.
+	if _cam == null or _mr == null:
+		_fail("close1b leftover: no camera")
+		return
+	_mr.set("_current_theater_bounds", MapCanvasConfig.WORLD_CANONICAL_BOUNDS)
+	_mr.set("enable_map_wrap", false)
+	var soft_fails := 0
+	var trial := 0
+	while trial < 11:
+		var z: float = 0.32 if (trial % 2) == 0 else 0.80
+		_cam.zoom = Vector2(z, z)
+		_cam.global_position = Vector2(4000.0, 2000.0)
+		var origin: Vector2 = _close_via_real_button(true)
+		if origin == Vector2.ZERO:
+			_fail("close1b leftover: Close failed trial=%d" % trial)
+			return
+		_arm_close1b_leftover_soft_state(origin)
+		_cam.global_position = Vector2(4000.0, 2000.0)
+		_mr.set("_close_camera_lock_pos", _cam.global_position)
+		_mr.set("_close_camera_lock_zoom", _cam.zoom)
+		_warp(TOP_BAR)
+		var before: Vector2 = _camera_pos()
+		_tick_process_camera(20)
+		var after: Vector2 = _camera_pos()
+		var dy: float = after.y - before.y
+		var want: Vector2 = after
+		if _mr.has_method("_apply_camera_bounds"):
+			want = _mr.call("_apply_camera_bounds", after)
+		if dy > -4.0 or after.distance_to(before) < CAM_EPS:
+			soft_fails += 1
+			_fail(
+				"CLOSE-1b leftover trial %d z=%.2f SOFT_EDGEPAN_NO_CAM dy=%.1f cam0=%.1f cam1=%.1f"
+				% [trial + 1, z, dy, before.y, after.y]
+			)
+		elif after.y < -500.0:
+			_fail("CLOSE-1b leftover trial %d runaway cy=%.1f" % [trial + 1, after.y])
+			return
+		elif after.distance_to(want) > 2.5:
+			_fail("CLOSE-1b leftover trial %d skipped clamp cy=%.1f want=%.1f" % [trial + 1, after.y, want.y])
+			return
+		trial += 1
+	if soft_fails == 0:
+		_pass("CLOSE-1b leftover first_edge 11/11 pans+clamps (z0.32/0.80, no y=20 first)")
+
+
+func _test_north_strip_hud_close_still_suppresses() -> void:
+	# Greenland leftover: a Close that *was* on the 6px rim must still hold
+	# until the cursor leaves that strip.
+	if _cam == null or _mr == null:
+		_fail("hud-strip suppress: no camera")
+		return
+	_cam.zoom = Vector2(0.32, 0.32)
+	_cam.global_position = Vector2(4000.0, 2000.0)
+	_mr.set("_close_suppress_edge", true)
+	_mr.set("_close_click_was_north_strip", true)
+	_mr.set("_close_camera_locked", true)
+	_mr.set("_close_click_guard", true)
+	_mr.set("_close_camera_lock_pos", _cam.global_position)
+	_mr.set("_close_camera_lock_zoom", _cam.zoom)
+	_warp(TOP_BAR)
+	var before: Vector2 = _camera_pos()
+	_tick_process_camera(12)
+	var after: Vector2 = _camera_pos()
+	if after.distance_to(before) > CAM_EPS:
+		_fail("HUD north-strip Close must keep suppress (dy=%.1f)" % (after.y - before.y))
+		return
+	_pass("HUD north-strip Close still suppresses first edge (Greenland leftover)")
 
 
 func _test_clamp_ignores_click_guard() -> void:
