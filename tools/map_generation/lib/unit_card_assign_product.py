@@ -38,6 +38,10 @@ def build_unit_card_assign_product(*, check_wiring: bool = True) -> Dict[str, An
     wiring["withdraw_battle"] = wd_ok
     (passes if wd_ok else fails).append("withdraw_battle")
 
+    wd_vis = "Withdraw ●" in popup and "Withdrawing" in popup
+    wiring["withdraw_visible_state"] = wd_vis
+    (passes if wd_vis else fails).append("withdraw_visible_state")
+
     as_ok = "Assign" in popup and "get_available_leaders" in popup
     wiring["assign_leader"] = as_ok
     (passes if as_ok else fails).append("assign_leader")
@@ -53,6 +57,32 @@ def build_unit_card_assign_product(*, check_wiring: bool = True) -> Dict[str, An
     stance_ok = "Press" in popup and "Hold" in popup and "set_land_battle_stance" in popup
     wiring["press_hold"] = stance_ok
     (passes if stance_ok else fails).append("press_hold")
+
+    # Hold click must toast Stance: Hold, not the shared next_hook (Play MIXED 138a1f8a).
+    hold_toast = "Stance: Hold" in popup
+    wiring["hold_distinct_toast"] = hold_toast
+    (passes if hold_toast else fails).append("hold_distinct_toast")
+
+    dock_raised = (
+        "UNIT_CARD_DOCK_RESERVE" in ren
+        and "_dock_unit_card_in_viewport" in popup
+        and "vp.y - 252" not in popup
+    )
+    wiring["dock_fits_1280x740"] = dock_raised
+    (passes if dock_raised else fails).append("dock_fits_1280x740")
+
+    wd_sep = "stance_row.add_child(wd_btn)" in popup
+    wiring["withdraw_not_beside_halt"] = wd_sep
+    (passes if wd_sep else fails).append("withdraw_not_beside_halt")
+
+    open_latch = popup.count("_arm_unit_card_press_consume()") >= 6
+    wiring["open_fight_press_latch"] = open_latch
+    (passes if open_latch else fails).append("open_fight_press_latch")
+
+    sheet = _gd_func_slice(ren, "_show_open_fight_sheet")
+    start_opened = "BtnStartBattle" in sheet and 'assault.get("opened"' in sheet
+    wiring["start_battle_opened_only"] = start_opened
+    (passes if start_opened else fails).append("start_battle_opened_only")
 
     no_insp = "show_info_panel" not in execute
     wiring["execute_no_info_panel"] = no_insp

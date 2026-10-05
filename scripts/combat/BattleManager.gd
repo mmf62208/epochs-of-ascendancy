@@ -937,8 +937,14 @@ func get_land_battle_for_formation(formation_id: String) -> Dictionary:
 
 func set_land_battle_stance(formation_id: String, stance: String) -> Dictionary:
 	var fid := formation_id.strip_edges()
-	var st := str(stance or "press").strip_edges().to_lower()
-	if st not in ["press", "hold", "withdraw"]:
+	# Explicit equals only. Array membership on the stance token forced Press.
+	var raw_st := str(stance).strip_edges().to_lower()
+	var st := "press"
+	if raw_st == "hold":
+		st = "hold"
+	elif raw_st == "withdraw":
+		st = "withdraw"
+	elif raw_st == "press":
 		st = "press"
 	if st == "withdraw":
 		return withdraw_from_land_battle(fid)

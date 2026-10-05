@@ -261,6 +261,10 @@ var _close_ignore_stale_left_down := false
 ## clear after that one release, on any new left press (UI or map), and after
 ## a short safety timeout (Play: leftover eaten swallowed later top-bar ups).
 const UNIT_CARD_LATCH_SAFETY_SEC := 0.5
+## Fighting card (stance + cmd) must stay on-screen at Play 1280×740.
+## Old reserve 252 clipped Press/Hold below Halt/Assign (card grows past 220).
+const UNIT_CARD_DOCK_RESERVE := 348.0
+const UNIT_CARD_DOCK_MARGIN := 8.0
 var _unit_card_consumed_press := false
 var _unit_card_release_eaten := false
 var _unit_card_latch_arm_sec := 0.0
@@ -20913,10 +20917,14 @@ func _show_unit_detail_popup(formation: Object) -> void:
 	panel.custom_minimum_size = Vector2(320, 220)
 	RetrowaveTheme.style_detail_panel_flat(panel)
 	# Docked HOI-style unit card (bottom-left). UNIT_CARD_DOCK / unit_card_dock — not a mouse popup.
-	var vp := get_viewport().get_visible_rect().size if get_viewport() else Vector2(1280, 720)
-	var dock := Vector2(18.0, maxf(64.0, vp.y - 252.0))
-	panel.position = dock
+	# FIX #1: reserve 348px + post-layout clamp so Press/Hold/Withdraw stay
+	# on-screen at Play 1280×740 (old 252px reserve clipped the stance row).
 	panel.set_meta("unit_card_dock", true)
+	_dock_unit_card_in_viewport(panel)
+	# Play MIXED/FAIL: National Spirits inspector covered the left dock so
+	# Open fight / Hold / Withdraw were not clickable. Hide it while the card is up.
+	if info_panel != null and info_panel is CanvasItem:
+		(info_panel as CanvasItem).visible = false
 	ui.add_child(panel)
 
 	var margin := MarginContainer.new()
@@ -21010,6 +21018,7 @@ func _show_unit_detail_popup(formation: Object) -> void:
 		RetrowaveTheme.style_primary_button(fight_btn)
 		var fight_fid := fid
 		fight_btn.pressed.connect(func() -> void:
+			_arm_unit_card_press_consume()
 			_open_fight_from_formation_id(fight_fid)
 		)
 		fight_row.add_child(fight_btn)
@@ -21096,11 +21105,102 @@ func _show_unit_detail_popup(formation: Object) -> void:
 		lines.append("Stack %d/%d · [ ] or buttons to cycle" % [stack_idx + 1, stack_divs.size()])
 		body.text = "\n".join(lines)
 
-	var cmd_row := HBoxContainer.new()
-	cmd_row.add_theme_constant_override("separation", 6)
-	vbox.add_child(cmd_row)
 	var marching := typeof(FormationMovement) != TYPE_NIL \
 		and bool(FormationMovement.has_march(fid))
+	var bat: Dictionary = {}
+	if typeof(BattleManager) != TYPE_NIL:
+		if BattleManager.has_method("get_land_battle_for_formation"):
+			bat = BattleManager.get_land_battle_for_formation(fid)
+		if bat.is_empty() and BattleManager.has_method("get_land_battle_at"):
+			bat = BattleManager.get_land_battle_at(pid)
+	var in_battle := not bat.is_empty()
+	var wd_pending := bool(bat.get("withdraw_pending", false))
+	# Stance row ABOVE cmd so Press/Hold/Withdraw stay unclipped at 1280×740
+	# and Withdraw is never adjacent to Halt (Play MIXED 138a1f8a hit Halt).
+	var stance_row := HBoxContainer.new()
+	stance_row.name = "UnitCardStanceRow"
+	stance_row.add_theme_constant_override("separation", 6)
+	var cmd_row := HBoxContainer.new()
+	cmd_row.name = "UnitCardCmdRow"
+	cmd_row.add_theme_constant_override("separation", 6)
+	if in_battle:
+		var att_tag := str(bat.get("att_tag", tag))
+		var def_tag := str(bat.get("def_tag", "?"))
+		lines.append("Fight · %s vs %s" % [att_tag, def_tag])
+		body.text = "\n".join(lines)
+		var hook := str(bat.get("next_hook", ""))
+		if hook.is_empty() and BattleManager.has_method("land_battle_next_hook"):
+			hook = str(BattleManager.land_battle_next_hook(bat))
+		if not hook.is_empty():
+			lines.append(hook)
+			body.text = "\n".join(lines)
+		if wd_pending:
+			lines.append("Withdrawing · bounce tomorrow")
+			body.text = "\n".join(lines)
+		vbox.add_child(stance_row)
+		var cur_st := str(bat.get("att_stance", "press"))
+		if BattleManager.has_method("set_land_battle_stance"):
+			var press_btn := Button.new()
+			press_btn.name = "BtnPressStance"
+			press_btn.text = "Press" if cur_st != "press" else "Press ●"
+			press_btn.focus_mode = Control.FOCUS_NONE
+			press_btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
+			press_btn.tooltip_text = "Hit harder, spend more org and equipment. Use to finish a breaking front."
+			RetrowaveTheme.style_secondary_button(press_btn)
+			press_btn.pressed.connect(func() -> void:
+				_arm_unit_card_press_consume()
+				var r: Dictionary = BattleManager.set_land_battle_stance(fid, "press")
+				_sync_land_battle_bubbles()
+				var press_toast := "Stance: Press"
+				if not bool(r.get("ok", false)):
+					press_toast = "Stance · %s" % str(r.get("reason", "failed"))
+				_show_inspector_toast(press_toast, 3.5)
+				_show_unit_detail_popup(formation)
+			)
+			stance_row.add_child(press_btn)
+			var hold_btn := Button.new()
+			hold_btn.name = "BtnHoldStance"
+			hold_btn.text = "Hold" if cur_st != "hold" else "Hold ●"
+			hold_btn.focus_mode = Control.FOCUS_NONE
+			hold_btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
+			hold_btn.tooltip_text = "Ease off. Less loss, slower fight. Wait for a reinforcing march."
+			RetrowaveTheme.style_secondary_button(hold_btn)
+			hold_btn.pressed.connect(func() -> void:
+				_arm_unit_card_press_consume()
+				var r2: Dictionary = BattleManager.set_land_battle_stance(fid, "hold")
+				_sync_land_battle_bubbles()
+				var hold_toast := "Stance: Hold"
+				if not bool(r2.get("ok", false)):
+					hold_toast = "Stance · %s" % str(r2.get("reason", "failed"))
+				elif str(r2.get("stance", "")) != "hold":
+					hold_toast = "Stance: %s" % str(r2.get("stance", "Hold"))
+				_show_inspector_toast(hold_toast, 3.5)
+				_show_unit_detail_popup(formation)
+			)
+			stance_row.add_child(hold_btn)
+		if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("withdraw_from_land_battle"):
+			var wd_btn := Button.new()
+			wd_btn.name = "BtnWithdraw"
+			wd_btn.text = "Withdraw ●" if wd_pending else "Withdraw"
+			wd_btn.focus_mode = Control.FOCUS_NONE
+			wd_btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
+			wd_btn.tooltip_text = "Disengage this unit from the open land battle."
+			RetrowaveTheme.style_secondary_button(wd_btn)
+			wd_btn.pressed.connect(func() -> void:
+				_arm_unit_card_press_consume()
+				var wr: Dictionary = BattleManager.withdraw_from_land_battle(fid)
+				_sync_land_battle_bubbles()
+				_play_map_sfx("error")
+				var wd_msg := "Withdrawing · bounce tomorrow"
+				if bool(wr.get("resolved", false)):
+					wd_msg = "Withdrew · fight ended"
+				elif not bool(wr.get("ok", false)):
+					wd_msg = "Withdraw · %s" % str(wr.get("reason", "failed"))
+				_show_inspector_toast(wd_msg, 3.5)
+				_show_unit_detail_popup(formation)
+			)
+			stance_row.add_child(wd_btn)
+	vbox.add_child(cmd_row)
 	if marching:
 		var halt_btn := Button.new()
 		halt_btn.name = "BtnHaltMarch"
@@ -21120,77 +21220,6 @@ func _show_unit_detail_popup(formation: Object) -> void:
 			_show_unit_detail_popup(formation)
 		)
 		cmd_row.add_child(halt_btn)
-	var bat: Dictionary = {}
-	if typeof(BattleManager) != TYPE_NIL:
-		if BattleManager.has_method("get_land_battle_for_formation"):
-			bat = BattleManager.get_land_battle_for_formation(fid)
-		if bat.is_empty() and BattleManager.has_method("get_land_battle_at"):
-			bat = BattleManager.get_land_battle_at(pid)
-	var in_battle := not bat.is_empty()
-	if in_battle:
-		var att_tag := str(bat.get("att_tag", tag))
-		var def_tag := str(bat.get("def_tag", "?"))
-		lines.append("Fight · %s vs %s" % [att_tag, def_tag])
-		body.text = "\n".join(lines)
-		var hook := str(bat.get("next_hook", ""))
-		if hook.is_empty() and BattleManager.has_method("land_battle_next_hook"):
-			hook = str(BattleManager.land_battle_next_hook(bat))
-		if not hook.is_empty():
-			lines.append(hook)
-			body.text = "\n".join(lines)
-		var stance_row := HBoxContainer.new()
-		stance_row.add_theme_constant_override("separation", 6)
-		vbox.add_child(stance_row)
-		var cur_st := str(bat.get("att_stance", "press"))
-		if BattleManager.has_method("set_land_battle_stance"):
-			var press_btn := Button.new()
-			press_btn.name = "BtnPressStance"
-			press_btn.text = "Press" if cur_st != "press" else "Press ●"
-			press_btn.focus_mode = Control.FOCUS_NONE
-			press_btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
-			press_btn.tooltip_text = "Hit harder, spend more org and equipment. Use to finish a breaking front."
-			RetrowaveTheme.style_secondary_button(press_btn)
-			press_btn.pressed.connect(func() -> void:
-				_arm_unit_card_press_consume()
-				var r: Dictionary = BattleManager.set_land_battle_stance(fid, "press")
-				_show_inspector_toast(str(r.get("next_hook", "Stance: Press")), 3.5)
-				_show_unit_detail_popup(formation)
-			)
-			stance_row.add_child(press_btn)
-			var hold_btn := Button.new()
-			hold_btn.name = "BtnHoldStance"
-			hold_btn.text = "Hold" if cur_st != "hold" else "Hold ●"
-			hold_btn.focus_mode = Control.FOCUS_NONE
-			hold_btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
-			hold_btn.tooltip_text = "Ease off. Less loss, slower fight. Wait for a reinforcing march."
-			RetrowaveTheme.style_secondary_button(hold_btn)
-			hold_btn.pressed.connect(func() -> void:
-				_arm_unit_card_press_consume()
-				var r2: Dictionary = BattleManager.set_land_battle_stance(fid, "hold")
-				_show_inspector_toast(str(r2.get("next_hook", "Stance: Hold")), 3.5)
-				_show_unit_detail_popup(formation)
-			)
-			stance_row.add_child(hold_btn)
-	if in_battle and typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("withdraw_from_land_battle"):
-		var wd_btn := Button.new()
-		wd_btn.name = "BtnWithdraw"
-		wd_btn.text = "Withdraw"
-		wd_btn.focus_mode = Control.FOCUS_NONE
-		wd_btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
-		wd_btn.tooltip_text = "Disengage this unit from the open land battle."
-		RetrowaveTheme.style_secondary_button(wd_btn)
-		wd_btn.pressed.connect(func() -> void:
-			_arm_unit_card_press_consume()
-			var wr: Dictionary = BattleManager.withdraw_from_land_battle(fid)
-			_sync_land_battle_bubbles()
-			_play_map_sfx("error")
-			_show_inspector_toast(
-				"Withdraw · %s" % str(wr.get("reason", wr.get("ok", "done"))),
-				3.5
-			)
-			_show_unit_detail_popup(formation)
-		)
-		cmd_row.add_child(wd_btn)
 	if own_card and typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_available_leaders"):
 		var avail: Array = LeaderManager.get_available_leaders(tag)
 		if avail.size() > 0:
@@ -21282,6 +21311,8 @@ func _show_unit_detail_popup(formation: Object) -> void:
 			ui.move_child(panel, ui.get_child_count() - 1)
 	)
 	_apply_unit_detail_popup_min_size(panel)
+	_dock_unit_card_in_viewport(panel)
+	ui.move_child(panel, ui.get_child_count() - 1)
 	_hide_hover_tooltip()
 
 
@@ -21373,6 +21404,25 @@ func _apply_unit_detail_popup_min_size(panel: Control) -> void:
 		panel.reset_size()
 	if panel.size.x < min_sz.x or panel.size.y < min_sz.y:
 		panel.size = min_sz
+
+
+func _dock_unit_card_in_viewport(panel: Control) -> void:
+	# Keep the whole card (stance + cmd) inside the Play viewport.
+	# 1280×740: old 252px reserve put Press/Hold below the fold.
+	if panel == null:
+		return
+	var vp := Vector2(1280.0, 740.0)
+	if get_viewport() != null:
+		var vs := get_viewport().get_visible_rect().size
+		if vs.x > 1.0 and vs.y > 1.0:
+			vp = vs
+	var h := maxf(panel.size.y, panel.custom_minimum_size.y)
+	if h < 8.0:
+		h = UNIT_CARD_DOCK_RESERVE - UNIT_CARD_DOCK_MARGIN
+	var y := maxf(64.0, vp.y - maxf(UNIT_CARD_DOCK_RESERVE, h + UNIT_CARD_DOCK_MARGIN))
+	if y + h > vp.y - UNIT_CARD_DOCK_MARGIN:
+		y = maxf(64.0, vp.y - h - UNIT_CARD_DOCK_MARGIN)
+	panel.position = Vector2(18.0, y)
 
 
 func _unit_detail_popup_is_visible() -> bool:
@@ -23119,9 +23169,11 @@ var _unit_pick_strategic_hint_shown: bool = false
 
 
 func _open_fight_from_formation_id(fid: String) -> void:
-	# First-session sheet: stage GER Maginot 710173 → FRA 710739 and open the combat card.
-	# Do not require the clicked unit (DNK etc.) to already sit on a live border.
-	# Cheap Maginot pair only — no world OOB rebuild (that hung input).
+	# Prefer the selected unit's current hex + an adjacent enemy so Play can
+	# Open fight → Start without Ctrl (xdotool Ctrl is intermittent).
+	# First-session fallback stays GER Maginot 710173 → FRA 710739.
+	# Soft OK Play 333a1285: first adjacent can be empty (Haut-Rhin instant
+	# capture). Prefer a defended neighbor later — not COMBAT-1 / not here.
 	const GER_FRONT := 710173
 	const FRA_FRONT := 710739
 	if typeof(LeaderManager) == TYPE_NIL or not LeaderManager.has_method("get_formation"):
@@ -23136,10 +23188,21 @@ func _open_fight_from_formation_id(fid: String) -> void:
 			LeaderManager.field_designed_unit("GER", "panzer_iii_j_medium", GER_FRONT, "land")
 	var att_fid := ""
 	var fo: Object = LeaderManager.get_formation(fid) if not fid.is_empty() else null
-	if fo != null and "country_tag" in fo and str(fo.country_tag).strip_edges().to_upper() == "GER":
-		if "stationed_province_id" in fo:
-			fo.stationed_province_id = GER_FRONT
+	var from_pid := GER_FRONT
+	var enemy_pid := FRA_FRONT
+	if fo != null and "country_tag" in fo:
 		att_fid = fid
+		var tag_here := str(fo.country_tag).strip_edges().to_upper()
+		var here := int(fo.stationed_province_id) if "stationed_province_id" in fo else -1
+		var local_enemy := _adjacent_enemy_province_id(here, tag_here)
+		if local_enemy > 0 and here > 0:
+			from_pid = here
+			enemy_pid = local_enemy
+		elif tag_here == "GER":
+			if "stationed_province_id" in fo:
+				fo.stationed_province_id = GER_FRONT
+			from_pid = GER_FRONT
+			enemy_pid = FRA_FRONT
 	if att_fid.is_empty() and LeaderManager.has_method("get_formations_for_country"):
 		for f in LeaderManager.get_formations_for_country("GER"):
 			if f == null:
@@ -23151,17 +23214,16 @@ func _open_fight_from_formation_id(fid: String) -> void:
 				f.stationed_province_id = GER_FRONT
 			att_fid = str(f.formation_id) if "formation_id" in f else ""
 			fo = f
+			from_pid = GER_FRONT
+			enemy_pid = FRA_FRONT
 			break
 	if att_fid.is_empty() or fo == null:
 		# Still open the Maginot sheet — Play: button was tooltip-only / no-op.
 		_show_open_fight_sheet("", null, GER_FRONT, FRA_FRONT, "GER")
 		return
 	selected_formation_id = att_fid
-	attack_staging_province_id = GER_FRONT
-	if typeof(BattleManager) == TYPE_NIL or not BattleManager.has_method("start_land_battle"):
-		_show_open_fight_sheet(att_fid, fo, GER_FRONT, FRA_FRONT, "GER")
-		return
-	_show_open_fight_sheet(att_fid, fo, GER_FRONT, FRA_FRONT, "GER")
+	attack_staging_province_id = from_pid
+	_show_open_fight_sheet(att_fid, fo, from_pid, enemy_pid, str(fo.country_tag) if "country_tag" in fo else "GER")
 
 
 func _adjacent_enemy_province_id(from_pid: int, owner_tag: String = "") -> int:
@@ -23321,8 +23383,10 @@ func _show_open_fight_sheet(
 	vbox.add_child(body)
 	if enemy_pid > 0 and typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("start_land_battle"):
 		var start_btn := Button.new()
+		start_btn.name = "BtnStartBattle"
 		start_btn.text = "Start battle"
 		start_btn.focus_mode = Control.FOCUS_NONE
+		start_btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
 		if typeof(RetrowaveTheme) != TYPE_NIL:
 			RetrowaveTheme.style_primary_button(start_btn)
 		var start_fid := fid
@@ -23330,16 +23394,21 @@ func _show_open_fight_sheet(
 		var start_from := from_pid
 		var start_tag := attacker_tag
 		start_btn.pressed.connect(func() -> void:
+			_arm_unit_card_press_consume()
 			var assault: Dictionary = BattleManager.start_land_battle(start_tag, start_to, start_from, start_fid)
-			if bool(assault.get("opened", false)) or bool(assault.get("success", false)):
+			# Instant empty-hex capture is success but not a fight — no Hold/Withdraw.
+			if bool(assault.get("opened", false)):
 				_sync_land_battle_bubbles()
+				if is_instance_valid(panel):
+					panel.queue_free()
 				if formation != null:
 					_show_unit_detail_popup(formation)
 				_show_inspector_toast("Open fight · battle opened · Press/Hold/Withdraw on the unit card", 4.0)
-				if is_instance_valid(panel):
-					panel.queue_free()
 			else:
-				_show_inspector_toast(str(assault.get("reason", "Attack failed")), 3.2, true)
+				var why := str(assault.get("reason", "no multi-day fight"))
+				if bool(assault.get("success", false)) and bool(assault.get("instant", false)):
+					why = "empty hex · no Hold/Withdraw"
+				_show_inspector_toast("Start battle · %s" % why, 3.2, true)
 		)
 		vbox.add_child(start_btn)
 
