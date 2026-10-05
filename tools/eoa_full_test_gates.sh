@@ -229,6 +229,9 @@ else
   run_step launch_fac1a_airfield_icons \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessFac1aAirfieldIconTest.gd || fail
 
+  run_step launch_fac1a_pan_icons \
+    tools/run_godot.sh --headless --resolution 1280x740 -s res://scripts/core/HeadlessFac1aPanIconsTest.gd || fail
+
   run_step launch_mv1b_input_gate \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessMv1bInputGateTest.gd || fail
 
