@@ -108,6 +108,7 @@ func _run() -> void:
 	if not _setup_layer():
 		return
 	await _test_pan_reuses_markers()
+	_test_hover_reuses_markers()
 	if _layer != null and is_instance_valid(_layer):
 		_layer.queue_free()
 	if _cam != null and is_instance_valid(_cam):
@@ -163,6 +164,16 @@ func _test_source_needles() -> void:
 		_fail("compute_markers_at_zoom must stay")
 	else:
 		_pass("compute_markers_at_zoom unchanged")
+	var hit_rects := _slice_func(src, "get_hit_rects_at_zoom")
+	if "_markers_for_hit_test" not in hit_rects:
+		_fail("get_hit_rects_at_zoom must reuse the draw-side marker cache")
+	else:
+		_pass("get_hit_rects_at_zoom uses hover cache helper")
+	var compute := _slice_func(src, "compute_markers_at_zoom")
+	if "_last_markers" in compute or "_markers_for_hit_test" in compute:
+		_fail("compute_markers_at_zoom must stay the explicit uncached path")
+	else:
+		_pass("compute_markers_at_zoom does not read the draw cache")
 
 
 func _dummy_site(pid: int, tier: int) -> DummySite:
@@ -300,3 +311,40 @@ func _test_pan_reuses_markers() -> void:
 	_info("home_z=%.3f cam_delta=%.1f builds=%d drawn=%d" % [
 		HOME_ZOOM, screen_w_world, builds_after, drawn
 	])
+
+
+func _test_hover_reuses_markers() -> void:
+	if _layer == null:
+		_fail("fixture missing for hover-cache")
+		return
+	var near_w: Vector2 = _layer.call("get_draw_world", NEAR_PID) as Vector2
+	var far_w: Vector2 = _far_world()
+	if near_w == Vector2.ZERO or far_w == Vector2.ZERO:
+		_fail("hover-cache worlds missing")
+		return
+	var pid_near0: int = int(_layer.call("hit_test_at_zoom", near_w, HOME_ZOOM))
+	var pid_far0: int = int(_layer.call("hit_test_at_zoom", far_w, HOME_ZOOM))
+	if pid_near0 != NEAR_PID:
+		_fail("NEAR hover pid=%d want %d" % [pid_near0, NEAR_PID])
+		return
+	if pid_far0 != FAR_PID:
+		_fail("FAR hover pid=%d want %d" % [pid_far0, FAR_PID])
+		return
+	var builds_before: int = int(_layer.call("get_build_markers_count"))
+	var i := 0
+	while i < 8:
+		_layer.call("hit_test_at_zoom", near_w, HOME_ZOOM)
+		_layer.call("hit_test_world", far_w)
+		i += 1
+	var builds_after: int = int(_layer.call("get_build_markers_count"))
+	if builds_after != builds_before:
+		_fail("fixed-zoom hover rebuilt markers %d → %d" % [builds_before, builds_after])
+		return
+	_pass("fixed-zoom hover caused 0 extra builds (%d)" % builds_after)
+	if int(_layer.call("hit_test_at_zoom", near_w, HOME_ZOOM)) != pid_near0:
+		_fail("NEAR hover pid changed after cached hovers")
+		return
+	if int(_layer.call("hit_test_at_zoom", far_w, HOME_ZOOM)) != pid_far0:
+		_fail("FAR hover pid changed after cached hovers")
+		return
+	_pass("same facility pids after cached hovers")

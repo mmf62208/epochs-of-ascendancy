@@ -491,12 +491,33 @@ func get_hit_rects_at_zoom(zoom: float) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	if not _should_draw_at(zoom):
 		return out
-	var markers := compute_markers_at_zoom(zoom)
+	var markers := _markers_for_hit_test(zoom)
 	for rec_v in markers:
 		if typeof(rec_v) != TYPE_DICTIONARY:
 			continue
 		out.append(_layout_drawn_marker(rec_v as Dictionary, zoom))
 	return out
+
+
+## Hover/click hit-test reuses the draw-side cluster cache when the requested
+## zoom matches `_markers_zoom` within the same 0.008 band `_draw` uses and
+## the cache is clean. Otherwise build once and populate `_last_markers`.
+## `compute_markers_at_zoom` stays the explicit uncached path for tests.
+func _markers_for_hit_test(zoom: float) -> Array[Dictionary]:
+	if (
+		not _markers_dirty
+		and not _last_markers.is_empty()
+		and absf(zoom - _markers_zoom) <= 0.008
+	):
+		return _last_markers
+	var prev := _test_zoom
+	_test_zoom = zoom
+	var markers := _build_markers()
+	_test_zoom = prev
+	_last_markers = markers
+	_markers_zoom = zoom
+	_markers_dirty = false
+	return markers
 
 
 func badge_inside_footprint_at(zoom: float) -> bool:
@@ -582,6 +603,8 @@ func get_draw_world(pid: int) -> Vector2:
 
 
 func compute_markers_at_zoom(zoom: float) -> Array[Dictionary]:
+	## Explicit / test-zoom path: always rebuild at the requested zoom.
+	## Hover hit-test does not call this.
 	var prev := _test_zoom
 	_test_zoom = zoom
 	var markers := _build_markers()
