@@ -8,7 +8,9 @@ From: Ship / CA
 |---|---|
 | **Base** | TRUSTED main `251d26280bdc186c9db7cedf74ef98b6c051c5f5` (COMBAT-1) |
 | **Branch** | `cursor/edge1-camera-feel-3a71` |
-| Verdict | machine slice (headless). xvfb ≠ live Play. |
+| **Tip** | see git after keep-green commit |
+| **PR** | https://github.com/mmf62208/epochs-of-ascendancy/pull/79 |
+| Verdict | isolated keep-green **PASS**. xvfb ≠ live Play. Merge **HOLD**. |
 
 ## Proven cause
 
