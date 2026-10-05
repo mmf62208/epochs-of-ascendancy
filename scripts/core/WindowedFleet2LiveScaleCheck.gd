@@ -1052,7 +1052,7 @@ func _write_clicks_md() -> void:
 		return
 	f.store_string("# FLEET-2b live-scale clicks\n\n")
 	f.store_string("xvfb 1280x740 · GER · Europe Home · world_accurate. NOT live Play.\n\n")
-	f.store_string("Topmost painted *pixels*: plate, bars, or glyph ink (not a fat empty label AABB). Higher CanvasItem z_index; then plate interior > StatBars > plate rim > label; StatBars over another plate edge win across the strip; then nearest painted piece centre. Ownership block is halo-only (no painted pixels under the click).\n\n")
+	f.store_string("Topmost painted *pixels*: plate, bars, or glyph ink (not a fat empty label AABB). Rank is the hit piece's CanvasItem z (child z included, so StatBars and text at z=3 beat any NationPlate at z=-1), then scene-tree order. Ownership block is halo-only (no painted pixels under the click).\n\n")
 	f.store_string("| click | result |\n|---|---|\n")
 	for line_v in _click_log:
 		var line := str(line_v)

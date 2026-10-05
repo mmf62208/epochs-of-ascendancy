@@ -20716,11 +20716,8 @@ func _pick_unit_formation_at_world(world_pos: Vector2, land_only: bool = false, 
 	var best_player_d := INF
 	var best_any: Object = null
 	var best_any_d := INF
-	var best_bar_player: Object = null
 	var painted_fo: Object = null
 	var painted_counter: Node2D = null
-	var own_bars_fo: Object = null
-	var own_bars_counter: Node2D = null
 	var p_tag := _player_tag()
 	for id_v in _demo_unit_icon_pids:
 		var id := int(id_v)
@@ -20737,8 +20734,9 @@ func _pick_unit_formation_at_world(world_pos: Vector2, land_only: bool = false, 
 			var is_sea_disk: bool = bool(counter.get_meta("sea_nation_disk", false))
 			# FIX #5: below z0.65 land/air hit is the painted body (plate+bars+
 			# label), own and foreign — not the 40 px circle.
-			# FIX #6: painted body is accepted without the ownership block;
-			# topmost draw order wins (not nearest centre).
+			# FIX #6: painted body is accepted without the ownership block.
+			# Below z0.65 the drawn piece on top wins (child CanvasItem z,
+			# then tree order). Plate-interior class does not beat bars.
 			# FLEET-2b: only actually painted pixels (plate, bars, glyph ink).
 			# A fat designation AABB with no ink cannot win.
 			if z < 0.65 and not is_sea_disk:
@@ -20779,10 +20777,6 @@ func _pick_unit_formation_at_world(world_pos: Vector2, land_only: bool = false, 
 					painted_counter = counter
 					painted_fo = fo
 					best_any_d = d
-				if _formation_is_player_tag(fo) and _world_in_unit_stat_bars(world_pos, counter):
-					if own_bars_counter == null or _unit_counter_is_drawn_above(counter, own_bars_counter):
-						own_bars_counter = counter
-						own_bars_fo = fo
 				continue
 			# Inclusive disk: accept boundary (d == hit_r2) as a valid best.
 			if d <= best_any_d:
@@ -20797,21 +20791,14 @@ func _pick_unit_formation_at_world(world_pos: Vector2, land_only: bool = false, 
 	# chip whose centre sits *outside* a between-plates hole must not
 	# spill into that hole (East Kent / old ENG stay Channel).
 	# player_only still skips foreign plates (MV-1b). land_only skips fleets.
-	# FIX #6: below z0.65 the painted land/air winner is topmost-drawn.
-	# Own StatBars still beat a foreign plate that draws on top of them.
+	# FIX #6: below z0.65 the painted land/air winner is the piece drawn
+	# on top (StatBars / text z=3 beat any NationPlate z=-1).
 	var sea_drawn: Object = _pick_sea_nation_plate_drawn_at_world(world_pos, z)
 	var land_body: Object = best_any
 	if painted_fo != null:
 		land_body = painted_fo
 		if _formation_is_player_tag(painted_fo):
 			best_player = painted_fo
-	if own_bars_fo != null and (land_body == null or not _formation_is_player_tag(land_body)):
-		land_body = own_bars_fo
-		best_player = own_bars_fo
-		best_bar_player = own_bars_fo
-	if best_bar_player != null and land_body == null:
-		land_body = best_bar_player
-		best_player = best_bar_player
 	if land_body != null and _land_air_body_blocked_by_cluster_hole(world_pos, land_body, z):
 		land_body = null
 		best_player = null
@@ -26833,8 +26820,9 @@ func _unit_counter_drawn_body_radius_world(z: float, counter: Node2D = null) -> 
 
 func _pick_drawn_land_air_body_at_world(world_pos: Vector2, z: float = -1.0) -> Object:
 	# Visible land/air counter whose drawn body contains the click.
-	# FIX #6: below z0.65 the topmost painted body wins (draw order, not
-	# nearest centre). Ownership is not applied on a painted hit.
+	# Below z0.65 the piece Godot paints on top wins (CanvasItem z,
+	# including child z, then tree order). Ownership is not applied on
+	# a painted hit. Plate-interior class does not beat bars or text.
 	var zz: float = z
 	if zz < 0.05:
 		var cam := get_viewport().get_camera_2d() if get_viewport() else null
@@ -26844,8 +26832,6 @@ func _pick_drawn_land_air_body_at_world(world_pos: Vector2, z: float = -1.0) -> 
 	var best: Object = null
 	var best_counter: Node2D = null
 	var best_d: float = INF
-	var best_bar: Object = null
-	var best_bar_counter: Node2D = null
 	for id_v in _demo_unit_icon_pids:
 		var id: int = int(id_v)
 		for c_v in _iter_demo_unit_icons_at_pid(id):
@@ -26876,16 +26862,10 @@ func _pick_drawn_land_air_body_at_world(world_pos: Vector2, z: float = -1.0) -> 
 					best_counter = icon
 					best = fo
 					best_d = d
-				if _formation_is_player_tag(fo) and _world_in_unit_stat_bars(world_pos, icon):
-					if best_bar_counter == null or _unit_counter_is_drawn_above(icon, best_bar_counter):
-						best_bar_counter = icon
-						best_bar = fo
 				continue
 			if d <= best_d:
 				best_d = d
 				best = fo
-	if best_bar != null and (best == null or not _formation_is_player_tag(best)):
-		return best_bar
 	return best
 
 
@@ -26923,7 +26903,8 @@ func _unit_counter_is_drawn_above(a: Node2D, b: Node2D) -> bool:
 
 
 func _unit_counter_painted_class(world_pos: Vector2, counter: Node2D) -> int:
-	# Same-z overlap class (higher wins):
+	# Piece-centre bucket for `_unit_counter_painted_piece_world` only.
+	# Click rank is `_unit_counter_painted_wins` (drawn z, then tree order).
 	# 3 = NationPlate interior (not the rim)
 	# 2 = StatBars
 	# 1 = NationPlate rim
@@ -26967,49 +26948,106 @@ func _world_in_unit_plate_interior(world_pos: Vector2, counter: Node2D) -> bool:
 	return absf(local.x) <= 13.4 and absf(local.y) <= 12.2
 
 
-func _unit_counter_painted_wins(
-	a: Node2D, b: Node2D, world_pos: Vector2, a_d: float, b_d: float
-) -> bool:
-	# FIX #6 topmost painted body:
-	# 1) higher CanvasItem z_index (actual draw stack)
-	# 2) same z: plate interior > StatBars > plate rim > label
-	#    Emden centre is NLD plate interior (beats DNK bars that cover it).
-	#    DNK +44 is DNK bars on the NLD rim (bars win). East +20 is still
-	#    NLD interior. Neighbour chip centres stay their own interiors.
-	#    FLEET-2b: inner face is ~60% (not 72%) so StatBars over the
-	#    outer face / rim win across the visible strip. Emden centre
-	#    and east +20 stay NLD inner interior. Same-nation piles are
-	#    unchanged (Play +8 → DNK Div 2 by nearer bar centre).
-	# 3) same class → nearest painted *piece* centre (bars use the strip
-	#    centre, not the chip origin).
-	# 4) true distance tie → scene-tree / CanvasItem order
-	# Tree order is not a visual stack at Home-band inverse-zoom (all
-	# DemoUnitIcon_* share z=28), so it is only the last resort.
+func _canvas_item_effective_z(item: CanvasItem) -> int:
+	# Same parent walk as `_unit_counter_effective_z_index`, starting at
+	# the hit piece so NationPlate z=-1 and StatBars/text z=3 both count.
+	if item == null or not is_instance_valid(item):
+		return -2147483648
+	var z: int = item.z_index
+	if not item.z_as_relative:
+		return z
+	var acc: int = z
+	var walk: Node = item.get_parent()
+	while walk != null:
+		if walk is CanvasItem:
+			var ci: CanvasItem = walk as CanvasItem
+			acc += ci.z_index
+			if not ci.z_as_relative:
+				break
+		walk = walk.get_parent()
+	return acc
+
+
+func _drawn_piece_is_above(a: CanvasItem, b: CanvasItem) -> bool:
+	# Godot paint order for one drawn piece: higher effective z, then
+	# later in the scene tree. A missing piece loses.
 	if a == null or not is_instance_valid(a):
 		return false
 	if b == null or not is_instance_valid(b):
 		return true
-	var za: int = _unit_counter_effective_z_index(a)
-	var zb: int = _unit_counter_effective_z_index(b)
+	var za: int = _canvas_item_effective_z(a)
+	var zb: int = _canvas_item_effective_z(b)
 	if za != zb:
 		return za > zb
-	var ca: int = _unit_counter_painted_class(world_pos, a)
-	var cb: int = _unit_counter_painted_class(world_pos, b)
-	if ca != cb:
-		return ca > cb
-	var pa: Vector2 = _unit_counter_painted_piece_world(world_pos, a)
-	var pb: Vector2 = _unit_counter_painted_piece_world(world_pos, b)
-	var da: float = world_pos.distance_squared_to(pa)
-	var db: float = world_pos.distance_squared_to(pb)
-	if da < db:
-		return true
-	if da > db:
-		return false
-	if a_d < b_d:
-		return true
-	if a_d > b_d:
-		return false
 	return a.is_greater_than(b)
+
+
+func _world_in_chip_text_node(world_pos: Vector2, node: CanvasItem) -> bool:
+	# Glyph ink only. An empty designation AABB must not win.
+	if node == null or not is_instance_valid(node) or not (node is Node2D):
+		return false
+	var r: Rect2 = _chip_text_glyph_local_rect(node).grow(0.75)
+	if r.size.x <= 0.0 and r.size.y <= 0.0:
+		return false
+	var local: Vector2 = (node as Node2D).get_global_transform().affine_inverse() * world_pos
+	return (
+		local.x >= r.position.x
+		and local.y >= r.position.y
+		and local.x <= r.position.x + r.size.x
+		and local.y <= r.position.y + r.size.y
+	)
+
+
+func _unit_counter_top_drawn_piece(world_pos: Vector2, counter: Node2D) -> CanvasItem:
+	# The chip piece under this world point that Godot paints last.
+	# FillToeReadout and NationFrame stay out (selected-only / outside
+	# the painted rect). CombatPulse is selected-combat chrome, not a hit.
+	if counter == null or not is_instance_valid(counter):
+		return null
+	var best: CanvasItem = null
+	var plate: Node = counter.get_node_or_null("NationPlate")
+	if plate is CanvasItem and _world_in_unit_nation_plate(world_pos, counter):
+		best = plate as CanvasItem
+	var bars: Node = counter.get_node_or_null("StatBars")
+	if bars is CanvasItem and _world_in_unit_stat_bars(world_pos, counter):
+		var bars_ci: CanvasItem = bars as CanvasItem
+		if best == null or _drawn_piece_is_above(bars_ci, best):
+			best = bars_ci
+	var names: PackedStringArray = PackedStringArray([
+		"Designation", "TypeLetter", "StrNum", "LeaderMark"
+	])
+	for nm in names:
+		var n: Node = counter.get_node_or_null(String(nm))
+		if n == null or not (n is CanvasItem):
+			continue
+		var ci: CanvasItem = n as CanvasItem
+		if not _world_in_chip_text_node(world_pos, ci):
+			continue
+		if best == null or _drawn_piece_is_above(ci, best):
+			best = ci
+	return best
+
+
+func _unit_counter_painted_wins(
+	a: Node2D, b: Node2D, world_pos: Vector2, _a_d: float, _b_d: float
+) -> bool:
+	# The piece Godot paints on top wins.
+	# 1) CanvasItem z of that piece, child z included. StatBars and
+	#    designation/type/strength text are z=3; NationPlate is z=-1.
+	#    Every chip root shares z=28, so bars and text beat any plate
+	#    face under them (Low Countries: DNK AW3 bars on NLD Div 1).
+	# 2) Equal z → scene-tree order (`is_greater_than`).
+	# Plate-interior class and nearest piece centre do not outrank ink
+	# that is already drawn above the plate.
+	if a == null or not is_instance_valid(a):
+		return false
+	if b == null or not is_instance_valid(b):
+		return true
+	var pa: CanvasItem = _unit_counter_top_drawn_piece(world_pos, a)
+	var pb: CanvasItem = _unit_counter_top_drawn_piece(world_pos, b)
+	if pa == null and pb == null:
+		return _unit_counter_is_drawn_above(a, b)
+	return _drawn_piece_is_above(pa, pb)
 
 
 func _unit_counter_painted_piece_world(world_pos: Vector2, counter: Node2D) -> Vector2:

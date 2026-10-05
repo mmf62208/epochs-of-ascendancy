@@ -127,6 +127,7 @@ run_step unit_board_play_path \
     tools.map_generation.tests.test_order_panel_play_strip_product \
     tools.map_generation.tests.test_unit_centric_pick_product \
     tools.map_generation.tests.test_unit_counter_chrome_product \
+    tools.map_generation.tests.test_chip_draw_order_pick_product \
     tools.map_generation.tests.test_unit_own_land_march_product \
     tools.map_generation.tests.test_unit_multi_day_battle_product \
     tools.map_generation.tests.test_land_battle_bubble_product \
