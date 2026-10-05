@@ -1,6 +1,7 @@
 # EDGE-1 isolated keep-green
 
 Off trusted main `251d26280bdc186c9db7cedf74ef98b6c051c5f5` (COMBAT-1 squash #77).
+Tip `8522ffa7e423ec16fc7e36fdb6cb8ddebd147ba4`.
 xvfb / headless ≠ live Play. Never `EOA_SKIP_TITLE`. `tools/run_godot.sh` only
 (Godot 4.7.1-rc2).
 
