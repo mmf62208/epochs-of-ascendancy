@@ -862,12 +862,12 @@ Isolated keep-green (FLEET-2b tip `c62d85b6`; wrapper `rss_mb` preferred; MV-1/M
 
 ### CLOSE-1 card Close stale drag (draft HOLD)
 
-Unit-card Close (`BtnClose` `ACTION_MODE_BUTTON_PRESS`) must not leave a live left-press / drag. Play `9c9c5f20` 19:35:44 / 20:04:17: after Close at (304,551) the next move to the top bar jumped the camera by −1.2× the mouse delta (`middle_mouse_pan_speed`); `97d6ea45` check 5: first top-edge pan after Close was 0 until one empty drag. `_consume_close_press_left_gesture` clears `_left_btn_down` / pan-active and ignores leftover Input-down; `_close_suppress_edge` only when Close is in the 6px north strip. UI-1 click-through skip-pick and CRASH-1 Halt latches stay. Guard: `HeadlessClose1StaleDragGuardTest` + `tools/eoa_close1_guard.sh` (Close press/release via the real button, large motion with and without `button_mask`, camera delta 0, press/drag cleared). Windowed xvfb `tools/eoa_close1_windowed_check.sh` 1280×740 GER Europe Home: ≥20 Close→top-bar trials at zoom 0.32–1.5, first-move delta 0, first edge pans. FLEET-1 / FLEET-2 / MV-1 / MV-1b **unedited**. Headless + xvfb **NOT live Play**.
+Unit-card Close (`BtnClose` `ACTION_MODE_BUTTON_PRESS`) must not leave a live left-press / drag. Play `9c9c5f20` 19:35:44 / 20:04:17: after Close at (304,551) the next move to the top bar jumped the camera by −1.2× the mouse delta (`middle_mouse_pan_speed`); `97d6ea45` check 5: first top-edge pan after Close was 0 until one empty drag. **FIX #1 (Play MIXED `ce5d3304`):** first top-edge after Close must pan north **and** stay in theater clamp (z0.32 must not fly to cy≈−12384; z0.80 first try must not be `edgepan=0`). `_clamp_camera_to_theater` skips only while `_close_camera_locked`. `_consume_close_press_left_gesture` still clears leftover press/drag. UI-1 click-through skip-pick and CRASH-1 Halt latches stay. Guard: `HeadlessClose1StaleDragGuardTest` + `tools/eoa_close1_guard.sh` (clamp-while-guard + first-edge clamp). Windowed xvfb `tools/eoa_close1_windowed_check.sh` 1280×740 GER Europe Home: ≥20 Close→top-bar trials at zoom 0.32–1.5 including 0.32 and 0.80; first-move delta 0; first edge pans and `|dy|` / cam_y stay in `_apply_camera_bounds`. FLEET-1 / FLEET-2 / MV-1 / MV-1b **unedited**. Headless + xvfb **NOT live Play**.
 
 | gate | kind | result | peak RSS MB |
 |---|---|---|---|
-| CLOSE-1 hd / xvfb | both | PASS | **1207.6 / 1339.0** |
-| CLOSE-1 windowed 1280×740 | xvfb | PASS first_move 20/20 · first_edge 20/20 Close (304,523) | **2129.0** |
+| CLOSE-1 hd / xvfb | both | PASS | **1204.3 / 1339.1** |
+| CLOSE-1 windowed 1280×740 | xvfb | PASS first_move 20/20 · first_edge 20/20 clamped (z0.32 cam_y=1076 / z0.80=382) Close (304,523) | **2031.6** |
 | Isolated keep-green (listed gates) | mixed | PASS FAILS=0 | see `docs/evidence/close1/KEEP_GREEN.md` |
 
 ### CRASH-1 halt-march popup (draft HOLD)
