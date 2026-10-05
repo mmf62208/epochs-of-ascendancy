@@ -112,6 +112,7 @@ func _run() -> void:
 	if not _setup_layer():
 		return
 	await _test_hover_reuses_cache()
+	await _test_budget_hover_cost()
 	if _layer != null and is_instance_valid(_layer):
 		_layer.queue_free()
 	if _cam != null and is_instance_valid(_cam):
@@ -390,3 +391,61 @@ func _test_hover_reuses_cache() -> void:
 	_info("home_z=%.3f close_z=%.3f builds=%d→%d→%d→%d→%d" % [
 		HOME_ZOOM, CLOSE_ZOOM, builds0, builds1, builds2, builds3, builds5
 	])
+
+
+func _test_budget_hover_cost() -> void:
+	## Default-board icon budget is 180. Time the old uncached hover path
+	## (compute_markers_at_zoom) vs cached hit_test at Home z0.776.
+	if _layer == null:
+		_fail("fixture missing for budget hover cost")
+		return
+	var n := 180
+	var provs := {}
+	var cents := {}
+	var polys := {}
+	var i := 0
+	while i < n:
+		var pid: int = 710000 + i
+		var w := Vector2(float(i % 18) * 80.0, float(i / 18) * 80.0)
+		provs[pid] = _dummy_prov(pid, w, 1 + (i % 4))
+		cents[pid] = w
+		polys[pid] = _square_poly(w)
+		i += 1
+	_cam.zoom = Vector2(HOME_ZOOM, HOME_ZOOM)
+	_cam.force_update_scroll()
+	_layer.call("setup_for_test", provs, cents, 3520, polys)
+	_layer.call("set_test_map_mode", "political")
+	_layer.call("set_show_facilities", true)
+	_layer.call("set_test_zoom", HOME_ZOOM)
+	await _flush()
+	var icons: Array = _layer.call("get_icon_list")
+	if icons.size() < 100:
+		_fail("budget fixture icons=%d want ~180" % icons.size())
+		return
+	var sample := Vector2(40.0, 40.0)
+	var t0 := Time.get_ticks_usec()
+	var k := 0
+	while k < 8:
+		_layer.call("compute_markers_at_zoom", HOME_ZOOM)
+		k += 1
+	var uncached_ms := float(Time.get_ticks_usec() - t0) / 1000.0
+	_layer.call("hit_test_at_zoom", sample, HOME_ZOOM)
+	var builds_warm: int = int(_layer.call("get_build_markers_count"))
+	t0 = Time.get_ticks_usec()
+	k = 0
+	while k < 8:
+		_layer.call("hit_test_at_zoom", sample, HOME_ZOOM)
+		k += 1
+	var cached_ms := float(Time.get_ticks_usec() - t0) / 1000.0
+	var builds_after: int = int(_layer.call("get_build_markers_count"))
+	if builds_after != builds_warm:
+		_fail("budget cached hover rebuilt %d → %d" % [builds_warm, builds_after])
+		return
+	_pass("budget 180-icon hover cache 0 extra builds")
+	_info("budget z0.776 n=%d uncached_8=%.1fms cached_8=%.1fms" % [
+		icons.size(), uncached_ms, cached_ms
+	])
+	if cached_ms > uncached_ms and cached_ms > 20.0:
+		_fail("cached hover slower than uncached (%.1f vs %.1f ms)" % [cached_ms, uncached_ms])
+		return
+	_pass("cached hover cheaper than uncached compute path")
