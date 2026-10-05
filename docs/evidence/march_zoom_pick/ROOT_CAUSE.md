@@ -23,6 +23,14 @@ A known GIS-interior screen point, recomputed at the current zoom, must pick tha
 
 Shared chip / spill / title / Fill% pick code is **untouched**.
 
+## Headless numbers (product already correct)
+
+Fresh interior screen → dest **710380** at z 0.32 / 0.80 / 1.50 (Köln sanity **710417** all three). See `HEADLESS.md`.
+
+Stale screen (Köln camera) misses by whole provinces: z=1.50 screen @ 0.80 → Uckermark; z=0.32 screen @ 0.80 → Jeleniogórski; z=0.32 screen @ 1.50 → Sömmerda. Fresh recompute stays Heidekreis.
+
+**Harness-only verdict.** No product change.
+
 ## Guards
 
 - `HeadlessMarchZoomDestPickTest` + `tools/eoa_march_zoom_pick_guard.sh`

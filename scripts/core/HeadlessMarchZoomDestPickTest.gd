@@ -373,9 +373,6 @@ func _test_fresh_interior_picks() -> void:
 			if not _screen_in_view(screen):
 				_fail("fresh z=%.2f %s screen off-viewport %s" % [z, _pname(pid), str(screen)])
 				continue
-			if pid == HEIDE:
-				if not _try_commit_march(dest):
-					continue
 			_pass("fresh z=%.2f %s dest=%d screen=%.1f,%.1f" % [z, _pname(pid), dest, screen.x, screen.y])
 
 
@@ -412,38 +409,38 @@ func _test_stale_screen_hypothesis() -> void:
 		if fresh_dest != HEIDE:
 			_fail("stale-experiment fresh recompute z=%.2f want Heidekreis got %d %s" % [z, fresh_dest, _pname(fresh_dest)])
 		if stale_dest == HEIDE:
-			print("  [INFO] stale z=1.50 screen @ z=%.2f still Heidekreis (Home camera still covers it)" % z)
+			print("  [INFO] stale z=1.50 screen @ z=%.2f still Heidekreis" % z)
 		else:
 			print(
 				"  [INFO] STALE_HARNESS z=1.50 screen @ z=%.2f dest=%d %s (Harz=%d Börde=%d)"
 				% [z, stale_dest, _pname(stale_dest), HARZ, BORDE]
 			)
-
-
-func _try_commit_march(dest: int) -> bool:
-	if _mv == null:
-		return true
-	var inst: Object = _mv.new()
-	if inst == null:
-		_fail("FormationMovement instance failed")
-		return false
-	if inst.has_method("clear_march"):
-		inst.call("clear_march", FID)
-	var fo: Object = _formation()
-	if fo != null:
-		fo.set("stationed_province_id", BONN)
-	var preview: Dictionary = inst.call("preview_own_land_march", FID, dest, GER_TAG)
-	var commit: Dictionary = inst.call("enqueue_own_land_march", FID, dest, GER_TAG)
-	if not bool(commit.get("ok", false)):
-		_fail("move_commit dest=%d not ok %s" % [dest, str(commit)])
-		return false
-	var hops := int(commit.get("hops", 0))
-	var days := int(commit.get("calendar_days", 0))
-	print(
-		"  [INFO] move_commit dest=%s hops=%d days=%d preview_ok=%s"
-		% [_pname(dest), hops, days, str(bool(preview.get("ok", false)))]
+	# Home-fit screen reused at mid zoom: world slides toward the camera
+	# (south of Heidekreis → Harz / Börde class).
+	_set_cam(home_w, 0.32)
+	await _flush()
+	var home_screen: Vector2 = _world_to_screen(heide_w)
+	var home_fresh: int = _pick_screen(home_screen)
+	_stale_rows.append(
+		"| stale_src | z=0.32 cam=Köln | Heidekreis screen=%.1f,%.1f | dest=%d %s |"
+		% [home_screen.x, home_screen.y, home_fresh, _pname(home_fresh)]
 	)
-	return true
+	for z2 in [0.80, 1.50]:
+		_set_cam(home_w, z2)
+		await _flush()
+		var stale2: int = _pick_screen(home_screen)
+		var fresh2_screen: Vector2 = _world_to_screen(heide_w)
+		var fresh2: int = _pick_screen(fresh2_screen)
+		_stale_rows.append(
+			"| stale_reuse | z=0.32 screen @ z=%.2f | stale_dest=%d %s | fresh_dest=%d %s |"
+			% [z2, stale2, _pname(stale2), fresh2, _pname(fresh2)]
+		)
+		print(
+			"  [INFO] STALE_HARNESS z=0.32 screen @ z=%.2f dest=%d %s fresh=%d %s (Harz=%d Börde=%d)"
+			% [z2, stale2, _pname(stale2), fresh2, _pname(fresh2), HARZ, BORDE]
+		)
+		if fresh2 != HEIDE:
+			_fail("stale-experiment fresh recompute z=%.2f want Heidekreis got %d %s" % [z2, fresh2, _pname(fresh2)])
 
 
 func _pick_screen(screen: Vector2) -> int:

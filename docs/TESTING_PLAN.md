@@ -876,7 +876,8 @@ Live smoke soft: selected own unit (GER Garrison 4) → click aimed at Heidekrei
 
 | gate | kind | result | note |
 |---|---|---|---|
-| March zoom dest hd / xvfb | both | pending this tip | fresh interior → dest |
+| March zoom dest hd | headless | PASS dest=710380 at 0.32/0.80/1.50 | stale screens miss (Uckermark / Jeleniogórski / Sömmerda) |
+| March zoom dest xvfb | xvfb | pending this tip | same script |
 | March zoom dest windowed 1280×740 | xvfb | pending this tip | GER Home + centered interior |
 
 ### CLOSE-1b first top-edge after Close dy=0 (draft HOLD)
