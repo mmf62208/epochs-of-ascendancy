@@ -879,6 +879,9 @@ func _test_open_fight_start_no_ctrl() -> void:
 	if not _assert_btn_on_play_card("Open fight", open_btn):
 		return
 	_log_button_rect("Open fight", open_btn)
+	var orr: Rect2 = open_btn.get_global_rect()
+	var open_cx := orr.position.x + orr.size.x * 0.5
+	var open_cy := orr.position.y + orr.size.y * 0.5
 	open_btn.pressed.emit()
 	await _flush_frames()
 	var start_btn: Button = _find_sheet_btn("BtnStartBattle", "Start battle")
@@ -888,10 +891,7 @@ func _test_open_fight_start_no_ctrl() -> void:
 	_log_button_rect("Start battle", start_btn)
 	if not _assert_btn_on_play_card("Start battle", start_btn):
 		return
-	var orr: Rect2 = open_btn.get_global_rect()
 	var srr: Rect2 = start_btn.get_global_rect()
-	var open_cx := orr.position.x + orr.size.x * 0.5
-	var open_cy := orr.position.y + orr.size.y * 0.5
 	var start_cx := srr.position.x + srr.size.x * 0.5
 	var start_cy := srr.position.y + srr.size.y * 0.5
 	start_btn.pressed.emit()
