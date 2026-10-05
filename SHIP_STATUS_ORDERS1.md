@@ -44,8 +44,11 @@ CLOSE-1 leftover 11/11 **PASS**. CRASH-1 **PASS**. First-session readability hd 
 
 ## Play recipe (1280×740 — do not raise the window)
 
-`docs/evidence/orders1/CLICKS.md`
+`docs/evidence/orders1/CLICKS.md` — harness `PLAY_CLICKS` at viewport 1280×740
+(card dock y=392, 340×338, bottom=730). Screen = client + (0, 29).
 
-- **Hold** upper row ~(134, 649) screen — expect **Hold ●** + `Stance: Hold`
-- **Withdraw** upper row ~(210, 649) screen — not Halt
-- **Halt** lower-left ~(73, 681) screen — not Assign
+- **Hold** upper row client **(159, 633)** / screen **(159, 662)** — **Hold ●** + `Stance: Hold`
+- **Withdraw** upper row client **(246, 633)** / screen **(246, 662)** — not Halt
+- **Halt** lower-left client **(93, 675)** / screen **(93, 704)** when also fighting
+  (march-only Halt **(93, 633)** / **(93, 662)**) — not Assign
+- **Assign** sits under Withdraw at the same X — aim y=662 for Withdraw, y=704 for Halt
