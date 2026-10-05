@@ -899,7 +899,19 @@ func tick_open_land_battles(days: float = 1.0) -> Array:
 		_open_land_battles = still
 		if _open_land_battles.is_empty():
 			break
+	# COMBAT-1: F5 day_emit toasts before this tick, so resolve never painted
+	# the card / Took-Held line. Notify after the existing tick only.
+	_notify_land_battle_day_surface()
 	return out
+
+
+func _notify_land_battle_day_surface() -> void:
+	var tree := get_tree()
+	if tree == null:
+		return
+	for mr in tree.get_nodes_in_group("map_renderer"):
+		if mr.has_method("refresh_after_land_battle_day"):
+			mr.call_deferred("refresh_after_land_battle_day")
 
 
 func get_open_land_battles() -> Array:
@@ -1458,8 +1470,23 @@ func _record_land_aar(battle: Dictionary, winner: String, to_id: int) -> void:
 			if np != null:
 				next_place = np.name
 	var line := "Battle ended at %s" % place
+	var win_key := str(winner).strip_edges().to_lower()
+	if win_key.is_empty():
+		win_key = "draw"
 	if typeof(LandBattleAar) != TYPE_NIL:
-		line = LandBattleAar.format_line(winner, place, int(battle.get("days_elapsed", 0)), loss, next_place)
+		line = LandBattleAar.format_line(win_key, place, int(battle.get("days_elapsed", 0)), loss, next_place)
+	else:
+		# -s harness may not register class_name; same formatter, load by path.
+		var aar_scr: Script = load("res://scripts/combat/LandBattleAar.gd") as Script
+		if aar_scr != null and aar_scr.has_method("format_line"):
+			line = str(aar_scr.call(
+				"format_line",
+				win_key,
+				place,
+				int(battle.get("days_elapsed", 0)),
+				loss,
+				next_place,
+			))
 	var economy := ""
 	if winner == "attacker" and not res.is_empty() and typeof(LandBattleAar) != TYPE_NIL:
 		var year := 1936
