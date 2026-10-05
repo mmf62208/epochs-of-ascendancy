@@ -1,6 +1,7 @@
 # SHIP_STATUS — ORDERS-1 Halt / Hold / Withdraw
 
 **Branch:** `cursor/orders1-halt-hold-withdraw-89c5`
+**PR:** https://github.com/mmf62208/epochs-of-ascendancy/pull/76 (draft, HOLD)
 **Base:** trusted main `b9425e338d0bedd2cdbe69453f4fea26396ce8a0`
 **Merge:** HOLD for Play + Scott. ONE draft PR. Do not merge.
 
@@ -26,7 +27,8 @@ for this slice.
 
 See `docs/evidence/orders1/KEEP_GREEN.md`. Official `--quick` is pre-existing
 red on trusted main (pick/chrome/living-loop greps). PR #73 readability,
-unit-card assign, and stance products stay green. CLOSE-1 / CRASH-1 unedited.
+unit-card assign, stance, bubble products **PASS**. ORDERS-1 hd+xvfb **PASS**.
+CLOSE-1 leftover 11/11 **PASS**. CRASH-1 **PASS**. First-session readability hd **PASS**.
 
 ## Play recipe
 
