@@ -4,6 +4,7 @@ extends SceneTree
 ## Tip is pass-through and one-shot. Selected GER land shows Fill%/TOE.
 ## Empty land outside the hit disk does not count as on-chip.
 ## Tip dismiss and unit-card Close must not lock or jump the camera.
+## TipDismiss × must not open the counter under that screen point.
 ## Headless is NOT live Play. Never set EOA_SKIP_TITLE.
 ##
 ##   tools/run_godot.sh --headless --path . -s res://scripts/core/HeadlessFirstSessionReadabilityTest.gd
@@ -25,6 +26,8 @@ func _pass(msg: String) -> void:
 
 
 func _run() -> void:
+	DisplayServer.window_set_size(Vector2i(1280, 720))
+	root.size = Vector2i(1280, 720)
 	var mr_script: Script = load("res://scripts/map/MapRenderer.gd") as Script
 	if mr_script == null:
 		_fail("MapRenderer.gd missing")
@@ -78,13 +81,21 @@ func _run() -> void:
 		_pass("dismiss is TipDismiss")
 	if cam.position.distance_to(cam0) > 0.01 or bool(mr.get("_close_camera_locked")) != locked0:
 		_fail("showing the tip moved the camera")
-	mr.call("dismiss_first_session_action_tip")
+	await process_frame
+	cam.position = cam0
+	cam.zoom = Vector2(0.78, 0.78)
+	await _assert_tip_dismiss_does_not_open_unit(mr, ui, cam, dismiss)
 	if ui.get_node_or_null("FirstSessionTipStrip") != null:
 		_fail("tip still up after dismiss")
 	elif cam.position.distance_to(cam0) > 0.01 or bool(mr.get("_close_camera_locked")):
 		_fail("tip dismiss locked or jumped the camera")
 	else:
 		_pass("tip dismiss leaves the camera")
+	mr.call("show_first_session_action_tip")
+	if ui.get_node_or_null("FirstSessionTipStrip") != null:
+		_fail("tip showed again after dismiss")
+	else:
+		_pass("tip stays dismissed")
 
 	var fscr: Script = load("res://scripts/formations/Formation.gd") as Script
 	var fo: Object = fscr.new() if fscr != null else null
@@ -199,6 +210,113 @@ func _run() -> void:
 	else:
 		_pass("empty land outside the hit disk does not open")
 	_finish()
+
+
+func _release_at(screen_pt: Vector2) -> InputEventMouseButton:
+	var ev := InputEventMouseButton.new()
+	ev.button_index = MOUSE_BUTTON_LEFT
+	ev.pressed = false
+	ev.position = screen_pt
+	ev.global_position = screen_pt
+	return ev
+
+
+func _clear_open_card(mr: Node, ui: Node) -> void:
+	mr.set("selected_formation_id", "")
+	var pop: Node = ui.get_node_or_null("UnitDetailPopup")
+	if pop != null:
+		ui.remove_child(pop)
+		pop.free()
+
+
+func _air_under_button(mr: Node, container: Node, world_pt: Vector2) -> void:
+	var fscr: Script = load("res://scripts/formations/Formation.gd") as Script
+	var fo: Object = fscr.new() if fscr != null else null
+	if fo == null:
+		_fail("EST air Formation missing")
+		return
+	fo.set("formation_id", "fs_est_air")
+	fo.set("country_tag", "EST")
+	fo.set("formation_type", "air_wing")
+	fo.set("name", "EST Air Wing 3")
+	fo.set("stationed_province_id", 710199)
+	fo.set("strength", 0.9)
+	fo.set("organization", 1.0)
+	var host := Node2D.new()
+	host.name = "Province_710199"
+	host.position = world_pt
+	container.add_child(host)
+	var icon := Node2D.new()
+	icon.name = "DemoUnitIcon_710199"
+	host.add_child(icon)
+	icon.global_position = world_pt
+	icon.set_meta("formation", fo)
+	icon.set_meta("formation_id", "fs_est_air")
+	icon.set_meta("province_id", 710199)
+	if "province_nodes" in mr:
+		mr.province_nodes[710199] = host
+	if "_demo_unit_icon_pids" in mr:
+		mr._demo_unit_icon_pids = [710199]
+
+
+func _assert_tip_dismiss_does_not_open_unit(mr: Node, ui: Node, cam: Camera2D, dismiss: Button) -> void:
+	var cam_enter: Vector2 = cam.position
+	var container: Node = mr.get_node_or_null("ProvinceContainers")
+	if container == null or dismiss == null:
+		_fail("tip dismiss fixture missing container or ×")
+		return
+	var rect: Rect2 = dismiss.get_global_rect()
+	if rect.size.x < 8.0 or rect.size.y < 8.0:
+		_fail("TipDismiss rect too small %s" % str(rect))
+		return
+	var screen_pt: Vector2 = rect.get_center()
+	var world_pt: Vector2 = cam.get_canvas_transform().affine_inverse() * screen_pt
+	_air_under_button(mr, container, world_pt)
+	mr.set("selected_formation_id", "")
+	var proof: bool = bool(mr.call("_try_open_land_unit_at_world", world_pt, false, false))
+	if not proof or str(mr.get("selected_formation_id")) != "fs_est_air":
+		_fail("air wing under × was not a real hit (opened=%s fid=%s)" % [str(proof), str(mr.get("selected_formation_id"))])
+		return
+	if ui.get_node_or_null("UnitDetailPopup") == null:
+		_fail("air wing hit did not open a card")
+		return
+	_pass("air wing under × opens when the click is not TipDismiss")
+	_clear_open_card(mr, ui)
+	cam.position = cam_enter
+	cam.zoom = Vector2(0.78, 0.78)
+	dismiss.button_down.emit()
+	var ev: InputEventMouseButton = _release_at(screen_pt)
+	if bool(mr.call("_try_open_land_chip_from_input", false, ev)):
+		_fail("TipDismiss release opened a unit from _input")
+		return
+	if str(mr.get("selected_formation_id")) == "fs_est_air" or ui.get_node_or_null("UnitDetailPopup") != null:
+		_fail("TipDismiss _input path selected EST Air Wing 3")
+		return
+	dismiss.pressed.emit()
+	if cam.position.distance_to(cam_enter) > 0.01 or bool(mr.get("_close_camera_locked")):
+		_fail("TipDismiss moved or locked the camera")
+		return
+	mr.call("_unhandled_input", ev)
+	if str(mr.get("selected_formation_id")) == "fs_est_air" or ui.get_node_or_null("UnitDetailPopup") != null:
+		_fail("TipDismiss release opened EST Air Wing 3 after the strip hid")
+		return
+	_pass("TipDismiss × did not open the air wing under it")
+	await process_frame
+	cam.position = cam_enter
+	cam.zoom = Vector2(0.78, 0.78)
+	if mr.has_meta("eoa_tip_dismiss_swallow_release"):
+		_fail("tip dismiss swallow stayed armed")
+		return
+	var later: bool = bool(mr.call("_try_open_land_unit_at_world", world_pt, false, false))
+	if not later or str(mr.get("selected_formation_id")) != "fs_est_air":
+		_fail("map pick stayed suppressed after TipDismiss")
+		return
+	_pass("map pick works again after the × release")
+	_clear_open_card(mr, ui)
+	if "_demo_unit_icon_pids" in mr:
+		mr._demo_unit_icon_pids = []
+	cam.position = cam_enter
+	cam.zoom = Vector2(0.78, 0.78)
 
 
 func _finish() -> void:

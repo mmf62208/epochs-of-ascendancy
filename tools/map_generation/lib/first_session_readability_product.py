@@ -49,6 +49,12 @@ def build_first_session_readability_product() -> Dict[str, Any]:
 
     show_fn = _gd_func_slice(ren, "show_first_session_action_tip")
     dismiss_fn = _gd_func_slice(ren, "dismiss_first_session_action_tip")
+    arm_fn = _gd_func_slice(ren, "_arm_first_session_tip_dismiss_swallow")
+    block_fn = _gd_func_slice(ren, "_first_session_tip_dismiss_blocks_map_pick")
+    free_fn = _gd_func_slice(ren, "_free_first_session_tip_strip")
+    chip_fn = _gd_func_slice(ren, "_try_open_land_chip_from_input")
+    unhandled_fn = _gd_func_slice(ren, "_unhandled_input")
+    input_fn = _gd_func_slice(ren, "_input")
     toast_fn = _gd_func_slice(runner, "_toast_first_session_onboarding")
     tip_ok = (
         TIP_TEXT in ren
@@ -59,9 +65,20 @@ def build_first_session_readability_product() -> Dict[str, Any]:
         and "BtnClose" not in show_fn
         and "EOA_FIRST_SESSION_TIP shown=1 pass_through=1" in show_fn
         and "eoa_first_session_tip_shown" in show_fn
+        and "button_down.connect(_arm_first_session_tip_dismiss_swallow)" in show_fn
         and "_dismiss_inspector_and_restore_input" not in dismiss_fn
         and "_lock_close_camera" not in dismiss_fn
         and "_consume_close_press_left_gesture" not in dismiss_fn
+        and "set_input_as_handled" in dismiss_fn
+        and 'call_deferred("_free_first_session_tip_strip")' in dismiss_fn
+        and "queue_free" not in dismiss_fn
+        and "eoa_tip_dismiss_swallow_release" in arm_fn
+        and "eoa_tip_dismiss_swallow_release" in block_fn
+        and "queue_free" in free_fn
+        and "_lock_close_camera" not in free_fn
+        and "_first_session_tip_dismiss_blocks_map_pick" in chip_fn
+        and "_first_session_tip_dismiss_blocks_map_pick" in unhandled_fn
+        and "_clear_first_session_tip_dismiss_swallow" in input_fn
         and "show_first_session_action_tip" in toast_fn
         and "eoa_first_session_toast" in runner
     )
