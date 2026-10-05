@@ -21,3 +21,8 @@ CRASH-1 `card_press_armed` / `card_release_eaten` is a different latch (Halt / P
 `_consume_close_press_left_gesture` on inspector Close and unit-card Close: reset press/drag, skip-pick the matching release, set `_close_ignore_stale_left_down`, set `_close_suppress_edge` only if Close is in the 6px north strip. First edge after Close unlocks the GIS lock without dropping the click-through skip-pick.
 
 UI-1 no-click-through, CRASH-1 latches, Halt-march, and normal map drags unchanged.
+
+## Guard / check (not live Play)
+
+- Headless+xvfb `tools/eoa_close1_guard.sh` **PASS** RSS **1207.6 / 1339.0**. First edge after Close pans (hd dy=−174.8 / xvfb dy=−1192.7).
+- Windowed xvfb 1280×740 **PASS** RSS **2129.0**. first_move **20/20** (all move_d=0.00) · first_edge **20/20**. Close at (304, 523). See `CLICKS.md` / `GUARD.md`.
