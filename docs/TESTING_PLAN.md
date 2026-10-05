@@ -860,6 +860,16 @@ Isolated keep-green (FLEET-2b tip `c62d85b6`; wrapper `rss_mb` preferred; MV-1/M
 | UI-1 guard hd+xvfb | both | PASS | **1208.1 / 1347.4** |
 | FLEET-2 live-scale xvfb | xvfb | PASS 8 plates × 4 zooms; East Kent; GER gap; Emden east +20 NLD; DNK ±4 DNK_3; Heidekreis z0.40 never NLD empty label | **2037.5** |
 
+### CLOSE-1 card Close stale drag (draft HOLD)
+
+Unit-card Close (`BtnClose` `ACTION_MODE_BUTTON_PRESS`) must not leave a live left-press / drag. Play `9c9c5f20` 19:35:44 / 20:04:17: after Close at (304,551) the next move to the top bar jumped the camera by −1.2× the mouse delta (`middle_mouse_pan_speed`); `97d6ea45` check 5: first top-edge pan after Close was 0 until one empty drag. **FIX #1 (Play MIXED `ce5d3304`):** first top-edge after Close must pan north **and** stay in theater clamp (z0.32 must not fly to cy≈−12384; z0.80 first try must not be `edgepan=0`). `_clamp_camera_to_theater` skips only while `_close_camera_locked`. `_consume_close_press_left_gesture` still clears leftover press/drag. UI-1 click-through skip-pick and CRASH-1 Halt latches stay. Guard: `HeadlessClose1StaleDragGuardTest` + `tools/eoa_close1_guard.sh` (clamp-while-guard + first-edge clamp). Windowed xvfb `tools/eoa_close1_windowed_check.sh` 1280×740 GER Europe Home: ≥20 Close→top-bar trials at zoom 0.32–1.5 including 0.32 and 0.80; first-move delta 0; first edge pans and `|dy|` / cam_y stay in `_apply_camera_bounds`. FLEET-1 / FLEET-2 / MV-1 / MV-1b **unedited**. Headless + xvfb **NOT live Play**.
+
+| gate | kind | result | peak RSS MB |
+|---|---|---|---|
+| CLOSE-1 hd / xvfb | both | PASS | **1204.3 / 1339.1** |
+| CLOSE-1 windowed 1280×740 | xvfb | PASS first_move 20/20 · first_edge 20/20 clamped (z0.32 cam_y=1076 / z0.80=382) Close (304,523) | **2031.6** |
+| Isolated keep-green (listed gates) | mixed | PASS FAILS=0 | see `docs/evidence/close1/KEEP_GREEN.md` |
+
 ### CRASH-1 halt-march popup (draft HOLD)
 
 Halt / Press / Hold / Withdraw / Assign must not `free()` `UnitDetailPopup` while `pressed` is emitting. Detach + rename `UnitDetailPopup_dying` + `queue_free()`. Same-dest still click is a no-op re-issue. **FIX #1 (Play live MIXED `80b0b542`):** press-mode rebuild dropped the card so the mouse-up still-clicked the map (inspector + camera jump; twice switched/cleared selection). Latch `_unit_card_consumed_press` on those five buttons; `_input` / `_unhandled_input` / `_left_release_must_skip_pick` / land-chip still-click swallow the matching release. Open card refreshes Halt on march start / re-target / arrival. **CRASH-1b (CH-1):** that latch must eat **one** matching left release then clear (new left press anywhere, 1 frame after the eaten release, 0.5s safety) so later top-bar / UI clicks register. Guard: Halt still no click-through; ≥4 UI press+release after swallow; following map still-click commits. Headless `HeadlessCrash1HaltMarchPopupTest` + `tools/eoa_crash1_halt_march_guard.sh` 10× hd + 10× xvfb — **NOT live Play**. MV-1 / MV-1b gates **unedited**.

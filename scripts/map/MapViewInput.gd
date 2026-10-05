@@ -107,6 +107,8 @@ static func hovered_ui_blocks_edge_pan(viewport: Viewport) -> bool:
 		return false
 	if hovered.mouse_filter == Control.MOUSE_FILTER_IGNORE:
 		return false
+	if _dead_or_hidden_unit_card_in_ancestry(hovered):
+		return false
 	var nn := str(hovered.name)
 	if nn == "WorldMap" or nn == "MapRenderer" or nn.begins_with("Province"):
 		return false
@@ -163,6 +165,8 @@ static func non_topbar_overlay_contains_mouse(viewport: Viewport) -> bool:
 	if hovered_is_top_info_bar_only(hovered):
 		return false
 	if hovered.mouse_filter == Control.MOUSE_FILTER_IGNORE:
+		return false
+	if _dead_or_hidden_unit_card_in_ancestry(hovered):
 		return false
 	var hname := str(hovered.name)
 	if hname == "WorldMap" or hname == "MapRenderer" or hname.begins_with("Province"):
@@ -238,14 +242,18 @@ static func control_or_ancestor_blocks_edge_pan(node: Node) -> bool:
 		if walk.has_meta("blocks_edge_pan") and bool(walk.get_meta("blocks_edge_pan")):
 			return true
 		if walk.has_meta("unit_card_dock") and bool(walk.get_meta("unit_card_dock")):
+			if _unit_card_node_is_dead_or_hidden(walk):
+				return false
 			return true
 		var nname := str(walk.name)
 		# Province inspector + docked unit card / UnitDetailPopup (name, not Panel-only).
-		if (
-			nname == "InfoPanel"
-			or nname == "UnitDetailPopup"
-			or nname.begins_with("UnitDetailPopup")
-		):
+		# A just-Closed card (hidden / IGNORE / queued) must not sticky-block
+		# first top-edge pan (Play MIXED ce5d3304 EDGE080_try1 edgepan=0).
+		if nname == "UnitDetailPopup" or nname.begins_with("UnitDetailPopup"):
+			if _unit_card_node_is_dead_or_hidden(walk):
+				return false
+			return true
+		if nname == "InfoPanel":
 			return true
 		# Top bar MUST block edge-pan — otherwise mouse over 1x/Prod continuously
 		# pans the camera and thrash-redraws world_full (no hover flash, no wheel scroll).
@@ -279,6 +287,26 @@ static func control_or_ancestor_blocks_edge_pan(node: Node) -> bool:
 	return false
 
 
+static func _unit_card_node_is_dead_or_hidden(n: Node) -> bool:
+	if n == null or not is_instance_valid(n) or n.is_queued_for_deletion():
+		return true
+	if n is CanvasItem and not (n as CanvasItem).visible:
+		return true
+	if n is Control and (n as Control).mouse_filter == Control.MOUSE_FILTER_IGNORE:
+		return true
+	return false
+
+
+static func _dead_or_hidden_unit_card_in_ancestry(node: Node) -> bool:
+	var walk: Node = node
+	while walk != null:
+		var nn := str(walk.name)
+		if nn == "UnitDetailPopup" or nn.begins_with("UnitDetailPopup"):
+			return _unit_card_node_is_dead_or_hidden(walk)
+		walk = walk.get_parent()
+	return false
+
+
 static func _visible_control_contains_mouse(ctrl: Node, mouse: Vector2) -> bool:
 	if ctrl == null or not (ctrl is Control):
 		return false
@@ -308,8 +336,8 @@ static func _mouse_over_map_chrome_blocks_edge_pan(viewport: Viewport) -> bool:
 				ip.set_meta("blocks_edge_pan", true)
 			return true
 		var card: Node = ui.get_node_or_null("UnitDetailPopup")
-		if _visible_control_contains_mouse(card, mouse):
-			if card is Node and not card.has_meta("blocks_edge_pan"):
+		if card != null and not _unit_card_node_is_dead_or_hidden(card) and _visible_control_contains_mouse(card, mouse):
+			if not card.has_meta("blocks_edge_pan"):
 				card.set_meta("blocks_edge_pan", true)
 			return true
 		for ch in ui.get_children():
@@ -320,6 +348,8 @@ static func _mouse_over_map_chrome_blocks_edge_pan(viewport: Viewport) -> bool:
 				continue
 			var docked: bool = ch_c.has_meta("unit_card_dock") and bool(ch_c.get_meta("unit_card_dock"))
 			var flagged: bool = ch_c.has_meta("blocks_edge_pan") and bool(ch_c.get_meta("blocks_edge_pan"))
+			if docked and _unit_card_node_is_dead_or_hidden(ch_c):
+				continue
 			if (docked or flagged) and ch_c.get_global_rect().has_point(mouse):
 				return true
 	return false

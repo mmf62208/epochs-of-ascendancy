@@ -251,6 +251,10 @@ var _close_camera_lock_pos := Vector2.ZERO
 var _close_camera_lock_zoom := Vector2.ONE
 var _close_click_guard := false
 var _close_release_seen := false
+## CLOSE-1: leftover Input-down / `_left_btn_down` after a card Close press
+## must not start a map drag. The Close button fires on press and frees the
+## card, so the matching release (and the Input singleton) can stay stale.
+var _close_ignore_stale_left_down := false
 ## CRASH-1 FIX #1 / CRASH-1b: unit-card Halt / Press / Hold / Withdraw / Assign
 ## fire on button-down and rebuild the card. Swallow only the matching left
 ## release so it cannot still-click the map. The latch must not linger —
@@ -1317,6 +1321,7 @@ func _begin_left_map_gesture(new_press: bool = false) -> void:
 	_left_button_was_up = false
 	if new_press:
 		_clear_unit_card_press_consume_latch()
+		_close_ignore_stale_left_down = false
 	var cam: Camera2D = get_viewport().get_camera_2d() if get_viewport() else null
 	if cam != null:
 		_left_press_cam_pos = cam.global_position
@@ -1324,6 +1329,8 @@ func _begin_left_map_gesture(new_press: bool = false) -> void:
 
 
 func _note_left_gesture_motion() -> void:
+	if _close_ignore_stale_left_down:
+		return
 	_note_sticky_slop()
 	if not _left_btn_down:
 		# Never `_begin` here after a pan — that reset dragged and the release hex picked.
@@ -1527,7 +1534,16 @@ func _left_release_must_skip_pick() -> bool:
 	return false
 
 
+func _left_down_is_live_map_drag() -> bool:
+	# CLOSE-1: after card Close, leftover Input-down is not a map drag.
+	if _close_ignore_stale_left_down:
+		return false
+	return _left_pan_armed or _left_btn_down or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
+
+
 func _left_drag_should_pan() -> bool:
+	if _close_ignore_stale_left_down:
+		return false
 	if _left_pan_active:
 		return true
 	if not (_left_pan_armed or _left_btn_down or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)):
@@ -1555,7 +1571,9 @@ func _lock_close_camera() -> void:
 		_close_camera_locked = true
 	_close_click_guard = true
 	_close_release_seen = false
-	_close_suppress_edge = true
+	# HUD Close sits in the 6px north strip. Unit-card Close at ~y=551 must
+	# not suppress first top-edge pan (Play MIXED ce5d3304 EDGE080_try1).
+	_close_suppress_edge = _close_click_is_north_edge_strip()
 	var vp: Viewport = get_viewport()
 	_close_click_screen = vp.get_mouse_position() if vp != null else Vector2.ZERO
 
@@ -1585,13 +1603,21 @@ func _restore_pre_dismiss_camera(snap: Dictionary) -> void:
 	elif cam != null:
 		_lock_close_camera()
 	_close_click_guard = true
-	_close_suppress_edge = true
+	_close_suppress_edge = _close_click_is_north_edge_strip()
 	_close_release_seen = true
 	_hold_camera_now()
 
 
 func _unlock_close_camera() -> void:
 	_close_camera_locked = false
+
+
+func _clear_camera_hold_timers_for_nav() -> void:
+	# WASD / first-edge after Close: drop hold + pick-block so theater clamp
+	# can run. Skip-pick stays on `_close_click_guard` / `_left_skip_next_pick`.
+	_hold_camera_until_msec = 0
+	_inspector_held_closed = false
+	_map_pick_block_until_msec = 0
 
 
 func _reassert_locked_close_camera() -> void:
@@ -1606,9 +1632,65 @@ func _reassert_locked_close_camera() -> void:
 		cam.zoom = _close_camera_lock_zoom
 
 
+func _unit_card_close_screen_pos() -> Vector2:
+	# Prefer the live BtnClose centre. Headless warp often leaves the
+	# viewport mouse at y=0, which is the 6px north strip.
+	var ui: CanvasLayer = get_node_or_null("UI") as CanvasLayer
+	if ui == null:
+		return Vector2.INF
+	var pop: Node = ui.get_node_or_null("UnitDetailPopup")
+	if pop == null or not is_instance_valid(pop) or pop.is_queued_for_deletion():
+		return Vector2.INF
+	if pop is CanvasItem and not (pop as CanvasItem).visible:
+		return Vector2.INF
+	var btn: Button = pop.find_child("BtnClose", true, false) as Button
+	if btn == null or not btn.visible:
+		return Vector2.INF
+	var r: Rect2 = btn.get_global_rect()
+	if r.size.x < 1.0 or r.size.y < 1.0:
+		return Vector2.INF
+	return r.get_center()
+
+
+func _close_click_is_north_edge_strip() -> bool:
+	# Only the true 6px window rim — unit-card Close at ~y=551 must not
+	# suppress top-edge pan (Play 97d6ea45 check 5: first edge after Close
+	# did nothing until one empty drag).
+	var pos: Vector2 = _unit_card_close_screen_pos()
+	if pos == Vector2.INF:
+		var vp: Viewport = get_viewport()
+		pos = vp.get_mouse_position() if vp != null else Vector2.ZERO
+	return pos.y <= MapViewInput.EDGE_PAN_SCREEN_PX
+
+
+func _consume_close_press_left_gesture() -> void:
+	# Close fires on press (ACTION_MODE_BUTTON_PRESS) and frees the card.
+	# `_input` already armed `_left_btn_down` via `_begin_left_map_gesture`.
+	# Re-arming that leftover (old dismiss path) plus a swallowed release
+	# made the next mouse move a 1.2× drag (Play 9c9c5f20 19:35:44 / 20:04:17).
+	var vp: Viewport = get_viewport()
+	var mouse: Vector2 = _unit_card_close_screen_pos()
+	if mouse == Vector2.INF:
+		mouse = vp.get_mouse_position() if vp != null else Vector2.ZERO
+	_reset_left_gesture_state(mouse)
+	_left_skip_next_pick = true
+	_left_btn_down = false
+	_left_pan_armed = false
+	_left_pan_active = false
+	_left_button_was_up = true
+	_close_ignore_stale_left_down = true
+	_close_suppress_edge = _close_click_is_north_edge_strip()
+	if vp != null:
+		vp.set_input_as_handled()
+
+
 func _note_close_button_release() -> void:
 	if _close_click_guard:
 		_close_release_seen = true
+	_left_btn_down = false
+	_left_pan_active = false
+	_left_pan_armed = false
+	_left_button_was_up = true
 
 
 func _clear_unit_card_press_consume_latch() -> void:
@@ -1767,6 +1849,16 @@ func _camera_is_held() -> bool:
 		return true
 	var now: int = Time.get_ticks_msec()
 	return now < _hold_camera_until_msec or now < _map_pick_block_until_msec
+
+
+func _dismiss_close_control_from_input() -> void:
+	# Unit-card BtnClose matches `_mouse_over_close_control`. Routing that
+	# through inspector dismiss locked GIS + hold timers and forced edge
+	# suppress (Play MIXED ce5d3304 check #2).
+	if _unit_detail_popup_is_visible():
+		_dismiss_unit_card_restore_province()
+		return
+	_dismiss_inspector_and_restore_input()
 
 
 func _mouse_over_close_control() -> bool:
@@ -2715,7 +2807,7 @@ func _input(event: InputEvent) -> void:
 			elif event.pressed:
 				# Close on press so the release cannot pick the hex under the button.
 				if _mouse_over_close_control() and _inspector_stack_blocking_input():
-					_dismiss_inspector_and_restore_input()
+					_dismiss_close_control_from_input()
 					get_viewport().set_input_as_handled()
 					return
 				if _top_bar_owns_click() or _mouse_over_search_control() or _search_ui_owns_click() or _road_spine_btn_owns_click():
@@ -2763,7 +2855,7 @@ func _input(event: InputEvent) -> void:
 						return
 	if event is InputEventMouseMotion:
 		_note_mouse_up_arms_still_click()
-		if _left_btn_down or _left_pan_armed or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+		if _left_down_is_live_map_drag():
 			_latch_left_skip_pick_from_live_slop()
 			_note_left_gesture_motion()
 		if not _left_pan_active and _left_drag_should_pan():
@@ -3070,7 +3162,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 		if _mouse_over_close_control():
 			if _inspector_stack_blocking_input():
-				_dismiss_inspector_and_restore_input()
+				_dismiss_close_control_from_input()
 			get_viewport().set_input_as_handled()
 			return
 		if _top_bar_owns_click() or _mouse_over_search_control() or _search_ui_owns_click() or _living_title_owns_click() or _road_spine_btn_owns_click():
@@ -3400,7 +3492,7 @@ func _process(delta: float) -> void:
 	# Empty-area left-drag: physical left-down + slop → `_left_pan_active` even with
 	# no Area2D / leftover Close swallow. `_left_drag_should_pan` lives here so a
 	# missed `_input` arm still moves the camera after 8px.
-	if _left_pan_armed or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) or _left_btn_down:
+	if _left_down_is_live_map_drag():
 		_latch_left_skip_pick_from_live_slop()
 		_accumulate_left_drag_slop()
 	if not _left_pan_active and _left_drag_should_pan():
@@ -3512,7 +3604,7 @@ func _handle_camera_input(delta: float) -> void:
 
 	# Accumulate slop before the modal early-return so a leftover false-positive
 	# popup cannot wipe skip-pick; sea release then jump-zoomed Rio Grande Rise.
-	if _left_pan_armed or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) or _left_btn_down:
+	if _left_down_is_live_map_drag():
 		_accumulate_left_drag_slop()
 	if not _left_pan_active and _left_drag_should_pan():
 		_activate_left_drag_pan_from_slop()
@@ -3542,14 +3634,11 @@ func _handle_camera_input(delta: float) -> void:
 	var edge_dir: Vector2 = Vector2.ZERO
 	var mouse_pos: Vector2 = get_viewport().get_mouse_position()
 	if _close_suppress_edge:
-		var top_safe_hold: float = _map_nav_top_clearance()
-		var still_in_north_band: bool = mouse_pos.y < top_safe_hold + edge_margin + 24.0
-		if not still_in_north_band:
+		var still_in_north_strip: bool = mouse_pos.y <= MapViewInput.EDGE_PAN_SCREEN_PX
+		if not still_in_north_strip:
 			_close_suppress_edge = false
 	if (
-		not _close_camera_locked
-		and not _close_click_guard
-		and not _close_suppress_edge
+		not _close_suppress_edge
 		and not MapViewInput.edge_pan_blocked_by_gui(get_viewport())
 	):
 		edge_dir = MapViewInput.edge_pan_direction_screen(get_viewport())
@@ -3557,7 +3646,7 @@ func _handle_camera_input(delta: float) -> void:
 
 	# Left-drag pan after slop (click still picks). Middle / right drag too.
 	# Slop + physical left-down starts pan even if `_left_pan_armed` was cleared.
-	if _left_pan_armed or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) or _left_btn_down:
+	if _left_down_is_live_map_drag():
 		_accumulate_left_drag_slop()
 	if not _left_pan_active and _left_drag_should_pan():
 		_activate_left_drag_pan_from_slop()
@@ -3593,12 +3682,15 @@ func _handle_camera_input(delta: float) -> void:
 			_unlock_close_camera()
 			_close_click_guard = false
 			_close_suppress_edge = false
-			if _camera_is_held():
-				_hold_camera_until_msec = 0
-				_inspector_held_closed = false
-				_map_pick_block_until_msec = 0
-		elif _close_camera_locked or _close_click_guard or _close_suppress_edge:
+			_clear_camera_hold_timers_for_nav()
+		elif _close_suppress_edge:
 			move_dir = Vector2.ZERO
+		else:
+			# First edge after Close must stick and clamp (Play MIXED ce5d3304:
+			# EDGE032b unclamped runaway; EDGE080_try1 edge_dir=0 / dy=0).
+			# Keep `_close_click_guard` so the Close release still cannot pick.
+			_unlock_close_camera()
+			_clear_camera_hold_timers_for_nav()
 		if move_dir != Vector2.ZERO:
 			move_dir = move_dir.normalized()
 			# edge_scroll_speed for edge/WASD feel; pan_speed kept as alias baseline
@@ -3620,7 +3712,7 @@ func _handle_camera_input(delta: float) -> void:
 		# leftover `_begin` then wiped sticky slop. Latch the camera move as
 		# THIS drag — leftover `_begin` must not reset it (see KEEP above).
 		# WASD with button up must not mark (Alicante after key-pan).
-		if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) or _left_btn_down or _left_pan_armed:
+		if _left_down_is_live_map_drag():
 			_left_cam_moved_this_down = true
 			_mark_left_pan_blocked_pick()
 
@@ -14546,13 +14638,9 @@ func _dismiss_inspector_and_restore_input() -> void:
 	_map_pick_block_until_msec = Time.get_ticks_msec() + 800
 	# FIX #2: Close must not leave dragged/not-ready so the next map press
 	# can still-click (Play: "inspector Close restored input" then 22 dead clicks).
-	_reset_left_gesture_state()
-	# Same Close button-down: the release must not pick the hex / counter
-	# under the button. Next fresh press resets skip via `_begin`.
-	if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
-		_left_skip_next_pick = true
-		_left_btn_down = true
-		_left_button_was_up = false
+	# CLOSE-1: do not re-arm `_left_btn_down` for the still-held Close press —
+	# the card is about to free and the release is often swallowed.
+	_consume_close_press_left_gesture()
 	var ui := get_node_or_null("UI") as CanvasLayer
 	if ui != null:
 		var fight_sheet := ui.get_node_or_null("OpenFightSheet")
@@ -15715,7 +15803,10 @@ func auto_update_theater_from_camera() -> void:
 
 ## Clamp or wrap camera within current theater bounds (wrap enables seamless toroidal pan for tactical refinement).
 func _clamp_camera_to_theater() -> void:
-	if _camera_is_held():
+	# GIS lock reassert owns the pose. `_close_click_guard` / hold timers must
+	# not skip clamp — Play MIXED ce5d3304 EDGE032b flew to cy≈−12384 because
+	# first-edge unlocked GIS but `_camera_is_held()` still returned true.
+	if _close_camera_locked:
 		return
 	var cam := get_viewport().get_camera_2d() if get_viewport() else null
 	if cam == null:
@@ -21132,6 +21223,12 @@ func _hide_unit_card_keep_map_focus() -> void:
 
 
 func _dismiss_unit_card_restore_province() -> void:
+	# Button path (hover can miss `_mouse_over_close_control` in `_input`).
+	# Must still drop leftover press/drag so the next move is not a stale pan.
+	# Docked unit-card Close (~y=551) is never the 6px north HUD Close —
+	# do not suppress first top-edge pan (Play 97d6ea45 check 5).
+	_consume_close_press_left_gesture()
+	_close_suppress_edge = false
 	_hide_unit_card_keep_map_focus()
 	if selected_province_id < 0 or not provinces.has(selected_province_id):
 		return
