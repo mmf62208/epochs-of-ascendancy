@@ -357,14 +357,23 @@ func _click_land_air_guard(z: float) -> void:
 			_fail_reasons.append("missing_%s_z%.3f" % [str(rec["who"]), z])
 			_log("EOA_FLEET2_LIVE who=missing name=%s z=%.3f" % [str(rec["who"]), z])
 			continue
+		var want_fid := str(hit.get("fid", ""))
+		var icon: Node2D = hit.get("icon", null) as Node2D
+		var pos: Vector2 = _point_where_chip_is_drawn(icon, want_fid)
+		if pos.x > 1.0e8:
+			# Nothing of this chip is the piece drawn on top. A covered
+			# plate must not be required to open.
+			_log("EOA_FLEET2_LIVE who=buried name=%s z=%.3f fid=%s" % [str(rec["who"]), z, want_fid])
+			_click_log.append("buried %s fid=%s" % [str(rec["who"]), want_fid])
+			continue
 		_click_one({
 			"who": "z%.3f_%s" % [z, str(rec["who"])],
-			"pos": hit.get("pos", Vector2.ZERO) as Vector2,
+			"pos": pos,
 			"own": false,
 			"kind": "land",
 			"want_tags": [str(rec["tag"])],
 			"want_type": str(rec["type"]),
-			"want_fid": str(hit.get("fid", "")),
+			"want_fid": want_fid,
 		})
 	_click_coast_hex(z, COAST_A)
 	_click_coast_hex(z, COAST_B)
@@ -572,8 +581,12 @@ func _click_dnk_aw3_bar_strip(z: float) -> void:
 			_fail_reasons.append("dnk_strip_%s_off_bars_z%.3f" % [who, z])
 			continue
 		var got := _pick_fid_at(_map_renderer(), pos)
-		_log("EOA_FLEET2_LIVE who=dnk_strip name=%s z=%.3f fid=%s" % [who, z, got])
-		_click_log.append("dnk_strip %s fid=%s" % [who, got])
+		var winner := _painted_piece_winner_fid(pos)
+		_log("EOA_FLEET2_LIVE who=dnk_strip name=%s z=%.3f fid=%s winner=%s" % [who, z, got, winner])
+		_click_log.append("dnk_strip %s fid=%s winner=%s" % [who, got, winner])
+		if got != winner or winner.is_empty():
+			_fail_reasons.append("dnk_strip_%s_z%.3f_got_%s_winner_%s" % [who, z, got, winner])
+			continue
 		if got == want_fid:
 			_click_one({
 				"who": "z%.3f_%s" % [z, who],
@@ -584,31 +597,35 @@ func _click_dnk_aw3_bar_strip(z: float) -> void:
 				"want_type": "air_wing",
 				"want_fid": want_fid,
 			})
-			continue
-		# ±4 must be DNK AW3. ±8 / ends may sit in a foreign inner face
-		# (Play −8 → NLD_1) or a same-nation pile (Play +8 → DNK Div 2).
-		if who.ends_with("_m4") or who.ends_with("_p4"):
-			_fail_reasons.append("dnk_strip_%s_z%.3f_got_%s" % [who, z, got])
-			continue
-		if not _dnk_strip_edge_ok(pos, got, want_fid):
-			_fail_reasons.append("dnk_strip_%s_z%.3f_got_%s" % [who, z, got])
 	var sweep_ok: int = 0
 	var sweep_n: int = 0
+	var own_n: int = 0
+	var other_n: int = 0
 	var dx: int = -20
 	while dx <= 20:
 		var spos: Vector2 = xf * Vector2(float(dx), 27.0)
 		sweep_n += 1
-		var got := _pick_fid_at(_map_renderer(), spos)
-		if _world_in_icon_stat_bars_or_local(icon, spos) and (
-			got == want_fid or _dnk_strip_edge_ok(spos, got, want_fid)
-		):
+		var got_s := _pick_fid_at(_map_renderer(), spos)
+		var winner_s := _painted_piece_winner_fid(spos)
+		if _world_in_icon_stat_bars_or_local(icon, spos) and not winner_s.is_empty() and got_s == winner_s:
 			sweep_ok += 1
+			if got_s == want_fid:
+				own_n += 1
+			else:
+				other_n += 1
 		else:
-			_fail_reasons.append("dnk_sweep_z%.3f_lx%d_got_%s" % [z, dx, got])
-			_log("EOA_FLEET2_LIVE who=dnk_sweep_fail z=%.3f lx=%d fid=%s" % [z, dx, got])
+			_fail_reasons.append("dnk_sweep_z%.3f_lx%d_got_%s_winner_%s" % [z, dx, got_s, winner_s])
+			_log("EOA_FLEET2_LIVE who=dnk_sweep_fail z=%.3f lx=%d fid=%s winner=%s" % [z, dx, got_s, winner_s])
 		dx += 2
-	_log("EOA_FLEET2_LIVE who=dnk_sweep_sum z=%.3f ok=%d n=%d" % [z, sweep_ok, sweep_n])
-	_click_log.append("dnk_sweep z=%.3f ok=%d/%d" % [z, sweep_ok, sweep_n])
+	if own_n == 0:
+		_fail_reasons.append("dnk_strip_no_own_bars_z%.3f" % z)
+	# Home pile: some of this strip is another chip's ink. That pixel must
+	# be the drawn piece, not NLD Div 1's plate just because the point
+	# sits in that plate.
+	if is_equal_approx(z, 0.318) and other_n == 0:
+		_fail_reasons.append("dnk_strip_no_overlap_z%.3f" % z)
+	_log("EOA_FLEET2_LIVE who=dnk_sweep_sum z=%.3f ok=%d n=%d own=%d other=%d" % [z, sweep_ok, sweep_n, own_n, other_n])
+	_click_log.append("dnk_sweep z=%.3f ok=%d/%d own=%d other=%d" % [z, sweep_ok, sweep_n, own_n, other_n])
 
 
 func _click_nld_label_east_bare(z: float) -> void:
@@ -908,22 +925,82 @@ func _world_in_icon_stat_bars(icon: Node2D, world: Vector2) -> bool:
 	return false
 
 
-func _dnk_strip_edge_ok(world: Vector2, got: String, want_fid: String) -> bool:
-	# ±8 / ends: DNK AW3, or NLD inner face (Play −8), or another DNK
-	# chip (Play +8 same-nation pile). Never an empty NLD label box.
-	if got == want_fid:
-		return true
-	if got.begins_with("DNK_"):
-		return true
-	if got.begins_with("NLD_"):
-		var counters: Array = _collect_land_air_counters()
-		var nld: Dictionary = _match_land_air(counters, "NLD", "division", 1)
-		var nld_icon: Node2D = nld.get("icon", null) as Node2D
-		var mr := _map_renderer()
-		if nld_icon != null and mr != null and mr.has_method("_world_in_unit_plate_interior"):
-			return bool(mr.call("_world_in_unit_plate_interior", world, nld_icon))
+func _painted_piece_winner_fid(world: Vector2) -> String:
+	# Independent of `_pick_unit_formation_at_world` and of
+	# `_unit_counter_painted_wins`: the formation whose top drawn piece
+	# has the higher CanvasItem z, then later tree order.
+	var mr := _map_renderer()
+	if mr == null or not ("_demo_unit_icon_pids" in mr):
+		return ""
+	if not mr.has_method("_canvas_item_effective_z") or not mr.has_method("_unit_counter_top_drawn_piece"):
+		return ""
+	var best_piece: CanvasItem = null
+	var best_fid := ""
+	for id_v in mr._demo_unit_icon_pids:
+		var id: int = int(id_v)
+		if not mr.has_method("_iter_demo_unit_icons_at_pid"):
+			continue
+		for c_v in mr.call("_iter_demo_unit_icons_at_pid", id) as Array:
+			var icon: Node2D = c_v as Node2D
+			if icon == null or not is_instance_valid(icon) or not icon.visible:
+				continue
+			if bool(icon.get_meta("sea_nation_disk", false)):
+				continue
+			var fo: Object = null
+			if mr.has_method("_formation_from_demo_icon"):
+				fo = mr.call("_formation_from_demo_icon", icon)
+			if fo == null:
+				continue
+			if mr.has_method("_formation_is_fleet_counter") and bool(mr.call("_formation_is_fleet_counter", fo)):
+				continue
+			if not _world_in_icon_painted(icon, world):
+				continue
+			var piece: CanvasItem = mr.call("_unit_counter_top_drawn_piece", world, icon) as CanvasItem
+			if piece == null:
+				continue
+			if best_piece != null and not _piece_is_drawn_above(mr, piece, best_piece):
+				continue
+			best_piece = piece
+			best_fid = str(fo.formation_id) if "formation_id" in fo else ""
+	return best_fid
+
+
+func _piece_is_drawn_above(mr: Node, a: CanvasItem, b: CanvasItem) -> bool:
+	if a == null:
 		return false
-	return false
+	if b == null:
+		return true
+	var za: int = int(mr.call("_canvas_item_effective_z", a))
+	var zb: int = int(mr.call("_canvas_item_effective_z", b))
+	if za != zb:
+		return za > zb
+	return a.is_greater_than(b)
+
+
+func _point_where_chip_is_drawn(icon: Node2D, want_fid: String) -> Vector2:
+	if icon == null or not is_instance_valid(icon) or want_fid.is_empty():
+		return Vector2(INF, INF)
+	var xf: Transform2D = icon.get_global_transform()
+	var worlds: Array = []
+	var ly: int = -16
+	while ly <= 16:
+		var lx: int = -16
+		while lx <= 16:
+			worlds.append(xf * Vector2(float(lx), float(ly)))
+			lx += 8
+		ly += 8
+	var bx: int = -20
+	while bx <= 20:
+		worlds.append(xf * Vector2(float(bx), 27.0))
+		bx += 4
+	var desig: Node = icon.get_node_or_null("Designation")
+	if desig is Node2D:
+		worlds.append((desig as Node2D).global_position)
+	for world_v in worlds:
+		var world: Vector2 = world_v as Vector2
+		if _painted_piece_winner_fid(world) == want_fid:
+			return world
+	return Vector2(INF, INF)
 
 
 func _world_in_icon_stat_bars_or_local(icon: Node2D, world: Vector2) -> bool:
