@@ -1,8 +1,10 @@
 extends SceneTree
 
 ## FLEET-1: nearest-own-land chrome spill (CHROME_SPILL_WORLD 340) must not
-## steal a foreign fleet disk or an open-sea hex. Land-near-own-unit and
-## own-fleet first-select stay as today. Does not load WorldMap.tscn / 3520.
+## steal a foreign fleet disk or an open-sea hex. The ungated spill function
+## still names Maginot inside 340. Empty land outside the chip hit disk
+## (Emden → Maginot, Karlsruhe-style) must not open that card.
+## Own-fleet first-select stays. Does not load WorldMap.tscn / 3520.
 ## Headless / xvfb are NOT live Play.
 ##
 ## Real world_accurate label_anchor centroids (provinces_geometry.json):
@@ -716,17 +718,18 @@ func _test_c_near_own_land() -> void:
 		var lfid: String = str(disk.formation_id) if "formation_id" in disk else "?"
 		_fail("(c) Emden must be outside the Maginot land disk (got %s)" % lfid)
 		return
+	var spill: Object = _mr.call("_nearest_player_land_formation_at_world", WORLD_EMDEN)
+	if spill == null or str(spill.formation_id) != FID_GER_LAND:
+		_fail("(c) ungated spill at Emden must still name Maginot GER")
+		return
+	if bool(_mr.call("_empty_land_spill_is_on_chip", WORLD_EMDEN, spill)):
+		_fail("(c) Emden must sit outside the Maginot hit disk")
+		return
 	var opened: bool = _click_chip_path(WORLD_EMDEN)
-	if not opened:
-		_fail("(c) land-near-own-unit spill must still open Maginot GER")
+	if opened or _selected_fid() == FID_GER_LAND or _popup_up():
+		_fail("(c) empty land at Emden opened distant Maginot GER (selected=%s)" % _selected_fid())
 		return
-	if _selected_fid() != FID_GER_LAND:
-		_fail("(c) selected=%s want Maginot GER %s" % [_selected_fid(), FID_GER_LAND])
-		return
-	if not _popup_up():
-		_fail("(c) GER land card missing")
-		return
-	_pass("(c) Emden land at %s still picked Maginot GER (spill on land)" % str(WORLD_EMDEN))
+	_pass("(c) Emden land at %s did not open distant Maginot GER" % str(WORLD_EMDEN))
 
 
 func _test_d_own_fleet() -> void:
