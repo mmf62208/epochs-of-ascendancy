@@ -5,8 +5,8 @@
 | | |
 |---|---|
 | Branch | `cursor/close1b-first-edge-dy0-017a` |
-| Tip | `d293f5daf3549eb3da90e7622a5054ed109066b9` |
-| Parent | `32b5c17f` / main `3276be5d` (CLOSE-1 KEEP == PASS tip `008e5c30`) |
+| Tip | `46a160f07816114fffaf6862270ad2a2409edfc8` |
+| Code | `d293f5da` (needle + leftover ticks) on `32b5c17f` / main `3276be5d` (CLOSE-1 KEEP == PASS tip `008e5c30`) |
 | PR | https://github.com/mmf62208/epochs-of-ascendancy/pull/72 (draft) |
 
 ## Symptom (Play soft on `008e5c30`)

@@ -1,6 +1,6 @@
 # CLOSE-1b isolated keep-green
 
-Tip `d293f5daf3549eb3da90e7622a5054ed109066b9`. FAILS=0. KEEP_GREEN_RESULT=PASS. xvfb / headless ≠ live Play. Never EOA_SKIP_TITLE. `tools/run_godot.sh` only (Godot 4.7.1-rc2).
+Tip `46a160f07816114fffaf6862270ad2a2409edfc8`. FAILS=0. KEEP_GREEN_RESULT=PASS. xvfb / headless ≠ live Play. Never EOA_SKIP_TITLE. `tools/run_godot.sh` only (Godot 4.7.1-rc2).
 
 `hd_ix1_mandate` prints `PASS (failures=0)`, not `RESULT=PASS`. Scored PASS.
 

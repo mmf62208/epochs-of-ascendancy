@@ -1,6 +1,6 @@
 # CLOSE-1b guard
 
-Tip `d293f5daf3549eb3da90e7622a5054ed109066b9` (parent `32b5c17f`). `tools/eoa_close1_guard.sh`. xvfb / headless ≠ live Play. Never `EOA_SKIP_TITLE`. `tools/run_godot.sh` only (Godot 4.7.1-rc2).
+Tip `46a160f07816114fffaf6862270ad2a2409edfc8` (code `d293f5da` / parent `32b5c17f`). `tools/eoa_close1_guard.sh`. xvfb / headless ≠ live Play. Never `EOA_SKIP_TITLE`. `tools/run_godot.sh` only (Godot 4.7.1-rc2).
 
 | mode | result | peak RSS MB |
 |---|---|---|
