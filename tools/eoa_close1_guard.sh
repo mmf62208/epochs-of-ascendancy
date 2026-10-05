@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# CLOSE-1 stale-drag-after-Close guard. Headless + xvfb.
+# CLOSE-1 / CLOSE-1b stale-drag-after-Close + first-edge leftover guard.
+# Headless + xvfb. CLOSE-1b: leftover suppress+GIS + immediate y=0.
 # xvfb / llvmpipe is NOT live Play. Never EOA_SKIP_TITLE.
 #
 #   tools/eoa_close1_guard.sh

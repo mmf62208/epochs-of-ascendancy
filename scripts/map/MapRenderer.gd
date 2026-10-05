@@ -269,6 +269,10 @@ var _unit_card_eaten_frame: int = -1
 var _esc_stack_frame: int = -1
 ## Close button sits in the north edge-pan strip — suppress edge until the mouse leaves that click.
 var _close_suppress_edge := false
+## CLOSE-1b: true only when the Close *button* was in the 6px north strip.
+## A unit-card Close at ~y=551 must not keep suppress after the cursor reaches
+## y=0 (Play 008e5c30 SOFT_EDGEPAN_NO_CAM: edgepan≥2, dy=0, cam0==cam1).
+var _close_click_was_north_strip := false
 ## UI-1: a march commit must not open the destination inspector this click.
 var _skip_inspector_after_march := false
 var _close_click_screen := Vector2.ZERO
@@ -1573,9 +1577,14 @@ func _lock_close_camera() -> void:
 	_close_release_seen = false
 	# HUD Close sits in the 6px north strip. Unit-card Close at ~y=551 must
 	# not suppress first top-edge pan (Play MIXED ce5d3304 EDGE080_try1).
-	_close_suppress_edge = _close_click_is_north_edge_strip()
+	# Record the Close *button* (not a stale/warped mouse at y=0).
+	_note_close_click_strip_from_button()
+	_close_suppress_edge = _close_click_was_north_strip
 	var vp: Viewport = get_viewport()
-	_close_click_screen = vp.get_mouse_position() if vp != null else Vector2.ZERO
+	var btn_pos: Vector2 = _hud_or_card_close_screen_pos()
+	_close_click_screen = btn_pos if btn_pos != Vector2.INF else (
+		vp.get_mouse_position() if vp != null else Vector2.ZERO
+	)
 
 
 func _snapshot_pre_dismiss_camera() -> Dictionary:
@@ -1603,7 +1612,8 @@ func _restore_pre_dismiss_camera(snap: Dictionary) -> void:
 	elif cam != null:
 		_lock_close_camera()
 	_close_click_guard = true
-	_close_suppress_edge = _close_click_is_north_edge_strip()
+	_note_close_click_strip_from_button()
+	_close_suppress_edge = _close_click_was_north_strip
 	_close_release_seen = true
 	_hold_camera_now()
 
@@ -1652,15 +1662,58 @@ func _unit_card_close_screen_pos() -> Vector2:
 	return r.get_center()
 
 
+func _inspector_close_screen_pos() -> Vector2:
+	if info_panel == null or not (info_panel is Control):
+		return Vector2.INF
+	var ip: Control = info_panel as Control
+	if not ip.visible:
+		return Vector2.INF
+	var btn: Button = ip.find_child("BtnClose", true, false) as Button
+	if btn == null or not btn.visible:
+		return Vector2.INF
+	var r: Rect2 = btn.get_global_rect()
+	if r.size.x < 1.0 or r.size.y < 1.0:
+		return Vector2.INF
+	return r.get_center()
+
+
+func _hud_or_card_close_screen_pos() -> Vector2:
+	var card: Vector2 = _unit_card_close_screen_pos()
+	if card != Vector2.INF:
+		return card
+	return _inspector_close_screen_pos()
+
+
+func _note_close_click_strip_from_button() -> void:
+	# Button centre only. Never infer the 6px rim from a stale/warped mouse
+	# (Play CLOSE-1b: viewport mouse already at y=0 after unit-card Close).
+	var pos: Vector2 = _hud_or_card_close_screen_pos()
+	_close_click_was_north_strip = pos != Vector2.INF and pos.y <= MapViewInput.EDGE_PAN_SCREEN_PX
+	if pos != Vector2.INF:
+		_close_click_screen = pos
+
+
 func _close_click_is_north_edge_strip() -> bool:
 	# Only the true 6px window rim — unit-card Close at ~y=551 must not
 	# suppress top-edge pan (Play 97d6ea45 check 5: first edge after Close
 	# did nothing until one empty drag).
-	var pos: Vector2 = _unit_card_close_screen_pos()
+	# CLOSE-1b: if the Close button is already gone, do *not* fall back to
+	# get_mouse_position() — that is often y=0 (headless warp / first push).
+	var pos: Vector2 = _hud_or_card_close_screen_pos()
 	if pos == Vector2.INF:
-		var vp: Viewport = get_viewport()
-		pos = vp.get_mouse_position() if vp != null else Vector2.ZERO
+		return false
 	return pos.y <= MapViewInput.EDGE_PAN_SCREEN_PX
+
+
+func _first_edge_after_mid_close_wants_pan() -> bool:
+	# Same-frame GIS reassert after `_handle_camera_input` must not snap back
+	# a first top-edge delta from a mid-panel Close (Play SOFT dy=0).
+	if _close_click_was_north_strip:
+		return false
+	var vp: Viewport = get_viewport()
+	if vp == null:
+		return false
+	return vp.get_mouse_position().y <= MapViewInput.EDGE_PAN_SCREEN_PX
 
 
 func _consume_close_press_left_gesture() -> void:
@@ -1679,7 +1732,8 @@ func _consume_close_press_left_gesture() -> void:
 	_left_pan_active = false
 	_left_button_was_up = true
 	_close_ignore_stale_left_down = true
-	_close_suppress_edge = _close_click_is_north_edge_strip()
+	_note_close_click_strip_from_button()
+	_close_suppress_edge = _close_click_was_north_strip
 	if vp != null:
 		vp.set_input_as_handled()
 
@@ -1770,6 +1824,7 @@ func _finish_close_click_guard_on_new_press() -> void:
 	if _close_click_guard or _close_suppress_edge or _close_camera_locked:
 		_close_click_guard = false
 		_close_suppress_edge = false
+		_close_click_was_north_strip = false
 		_unlock_close_camera()
 		_hold_camera_until_msec = 0
 		_map_pick_block_until_msec = 0
@@ -2468,6 +2523,7 @@ func _apply_home_key(shift_pressed: bool) -> void:
 	_close_click_guard = false
 	_close_release_seen = false
 	_close_suppress_edge = false
+	_close_click_was_north_strip = false
 	_hold_camera_until_msec = 0
 	_inspector_held_closed = false
 	_map_pick_block_until_msec = 0
@@ -2707,6 +2763,7 @@ func _input(event: InputEvent) -> void:
 				_unlock_close_camera()
 				_close_click_guard = false
 				_close_suppress_edge = false
+				_close_click_was_north_strip = false
 				var factor := (1.0 + zoom_speed * 1.35) if event.button_index == MOUSE_BUTTON_WHEEL_UP else (1.0 - zoom_speed * 1.35)
 				_zoom_toward_mouse(factor)
 				# NEVER call full _refresh_terrain_zoom_aware() / 3520 fill rebuild per notch.
@@ -3499,7 +3556,10 @@ func _process(delta: float) -> void:
 		_activate_left_drag_pan_from_slop()
 	_handle_camera_input(delta)
 	# Active empty-area drag must apply; Close lock cannot snap the camera back.
-	if not _left_pan_active:
+	# CLOSE-1b: first top-edge after a mid-panel Close must also stick — do not
+	# reassert GIS lock on the same frame edge-pan applied a delta (Play
+	# SOFT_EDGEPAN_NO_CAM: edgepan≥2, dy=0, cam0==cam1).
+	if not _left_pan_active and not _first_edge_after_mid_close_wants_pan():
 		_reassert_locked_close_camera()
 	_allow_left_pan_skip_to_die()
 	# GIS dual-map watchdog: re-lock canvas identity + equirect underlay every ~0.5s while playing.
@@ -3635,7 +3695,10 @@ func _handle_camera_input(delta: float) -> void:
 	var mouse_pos: Vector2 = get_viewport().get_mouse_position()
 	if _close_suppress_edge:
 		var still_in_north_strip: bool = mouse_pos.y <= MapViewInput.EDGE_PAN_SCREEN_PX
-		if not still_in_north_strip:
+		# CLOSE-1b: suppress sticks only for a Close that *was* on the 6px rim.
+		# Unit-card Close (~y=551) then a first top-edge push must pan even if
+		# a later lock/consume saw the cursor already at y=0 (SOFT dy=0).
+		if not still_in_north_strip or not _close_click_was_north_strip:
 			_close_suppress_edge = false
 	if (
 		not _close_suppress_edge
@@ -3682,6 +3745,7 @@ func _handle_camera_input(delta: float) -> void:
 			_unlock_close_camera()
 			_close_click_guard = false
 			_close_suppress_edge = false
+			_close_click_was_north_strip = false
 			_clear_camera_hold_timers_for_nav()
 		elif _close_suppress_edge:
 			move_dir = Vector2.ZERO
@@ -16728,6 +16792,7 @@ func _focus_asia_view() -> void:
 	_close_click_guard = false
 	_close_release_seen = false
 	_close_suppress_edge = false
+	_close_click_was_north_strip = false
 	_hold_camera_until_msec = 0
 	# Keep skip so leftover mouse after the jump cannot open RUS West.
 	# Do not zero _map_pick_block_until_msec (that re-armed the leftover pick).
@@ -18472,6 +18537,7 @@ func focus_province_by_id(province_id: int, zoom_mode: String = "soft") -> bool:
 	_unlock_close_camera()
 	_close_click_guard = false
 	_close_suppress_edge = false
+	_close_click_was_north_strip = false
 	_hold_camera_until_msec = 0
 	_map_pick_block_until_msec = 0
 	_select_province(province, node)
@@ -18515,6 +18581,7 @@ func open_province_inspector_from_search(province_id: int) -> bool:
 	_unlock_close_camera()
 	_close_click_guard = false
 	_close_suppress_edge = false
+	_close_click_was_north_strip = false
 	_hold_camera_until_msec = 0
 	_map_pick_block_until_msec = 0
 	var node := _province_node(province_id)
@@ -18562,6 +18629,7 @@ func _open_hex_province_inspector(province: Province) -> void:
 	_unlock_close_camera()
 	_close_click_guard = false
 	_close_suppress_edge = false
+	_close_click_was_north_strip = false
 	_hold_camera_until_msec = 0
 	_map_pick_block_until_msec = 0
 	_raise_province_inspector_over_unit_card()
@@ -21229,6 +21297,7 @@ func _dismiss_unit_card_restore_province() -> void:
 	# do not suppress first top-edge pan (Play 97d6ea45 check 5).
 	_consume_close_press_left_gesture()
 	_close_suppress_edge = false
+	_close_click_was_north_strip = false
 	_hide_unit_card_keep_map_focus()
 	if selected_province_id < 0 or not provinces.has(selected_province_id):
 		return
