@@ -870,6 +870,15 @@ Unit-card Close (`BtnClose` `ACTION_MODE_BUTTON_PRESS`) must not leave a live le
 | CLOSE-1 windowed 1280×740 | xvfb | PASS first_move 20/20 · first_edge 20/20 clamped (z0.32 cam_y=1076 / z0.80=382) Close (304,523) | **2031.6** |
 | Isolated keep-green (listed gates) | mixed | PASS FAILS=0 | see `docs/evidence/close1/KEEP_GREEN.md` |
 
+### March dest pick at z 0.32 / 0.80 / 1.50 (draft HOLD)
+
+Live smoke soft: selected own unit (GER Garrison 4) → click aimed at Heidekreis `710380` sometimes committed Harz / Börde at z~0.80 and the correct dest at z~1.50. Those dests are **not adjacent** to Heidekreis. A few-pixel product offset would land on a Lower Saxony neighbor. Guard: recompute a known GIS-interior screen at the current zoom and require dest=`710380` (plus Köln sanity). Stale z=1.50 screen reused at 0.80/0.32 is logged (harness hypothesis), not a product fail. MapRenderer pick / chip / spill / title / Fill% **unedited** unless a fresh interior misses. Headless `HeadlessMarchZoomDestPickTest` + `tools/eoa_march_zoom_pick_guard.sh`. Windowed xvfb `tools/eoa_march_zoom_pick_windowed_check.sh` 1280×740. Halt / CLOSE-1/1b / UI-1 / CRASH-1 / FLEET-1/2 **unedited**. Headless + xvfb **NOT live Play**.
+
+| gate | kind | result | note |
+|---|---|---|---|
+| March zoom dest hd / xvfb | both | pending this tip | fresh interior → dest |
+| March zoom dest windowed 1280×740 | xvfb | pending this tip | GER Home + centered interior |
+
 ### CLOSE-1b first top-edge after Close dy=0 (draft HOLD)
 
 Play soft on CLOSE-1 tip `008e5c30`: after some unit-card Closes the first top-edge push logged `edgepan≥2` but camera stayed (`dy=0`, cam0==cam1) at z≈0.32 and z≈0.80 (3/11). Retry later panned without an empty drag. Root: `_close_click_is_north_edge_strip` fell back to a stale/warped mouse at y=0 after the card hid; suppress stuck while the cursor stayed on the 6px rim; `_process` `_reassert_locked_close_camera` after `_handle_camera_input` snapped any delta. CLOSE-1 windowed first_move to y=20 had cleared suppress and hid it. Fix: button-only strip; `_close_click_was_north_strip`; first edge after a mid-panel Close must pan and not snap back. HUD Close that *was* on the rim still suppresses (Greenland leftover). Guard: `HeadlessClose1StaleDragGuardTest` leftover 11× z0.32/0.80 + `tools/eoa_close1_guard.sh`; windowed `tools/eoa_close1_windowed_check.sh` first_move 20/20 · first_edge 20/20 · **first_edge_direct 16/16** (Close→y=0, no y=20; half inject leftover suppress+GIS). FLEET-1 / FLEET-2 / MV-1 / MV-1b **unedited**. Headless + xvfb **NOT live Play**.
