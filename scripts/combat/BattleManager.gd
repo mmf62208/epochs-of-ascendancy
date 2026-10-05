@@ -899,7 +899,19 @@ func tick_open_land_battles(days: float = 1.0) -> Array:
 		_open_land_battles = still
 		if _open_land_battles.is_empty():
 			break
+	# COMBAT-1: F5 day_emit toasts before this tick, so resolve never painted
+	# the card / Took-Held line. Notify after the existing tick only.
+	_notify_land_battle_day_surface()
 	return out
+
+
+func _notify_land_battle_day_surface() -> void:
+	var tree := get_tree()
+	if tree == null:
+		return
+	for mr in tree.get_nodes_in_group("map_renderer"):
+		if mr.has_method("refresh_after_land_battle_day"):
+			mr.call_deferred("refresh_after_land_battle_day")
 
 
 func get_open_land_battles() -> Array:

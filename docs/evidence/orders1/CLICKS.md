@@ -42,10 +42,10 @@ Harness nuts3 `PLAY_CLICKS` / `PLAY_CLICKS_OPENFIGHT` still print fixture
 client centers (OpenFight=90,535 Start=205,496 Hold=159,633 Withdraw=246,633).
 Those are **not** the live Play recipe — use this table.
 
-## Soft OK (not COMBAT-1)
+## Soft OK (COMBAT-1)
 
-Open fight can pick an **empty** adjacent enemy (Play: Div7 → Haut-Rhin,
-`opened=false` instant capture). Prefer a **defended** neighbor later.
-Do not implement that here.
+Open fight used to pick an **empty** adjacent enemy (Play: Div7 → Haut-Rhin,
+`opened=false` instant capture). COMBAT-1 prefers a **defended** neighbor
+when one exists. Empty remains the fallback.
 
 Headless + xvfb ≠ live Play. Draft until Ship squash-merges.

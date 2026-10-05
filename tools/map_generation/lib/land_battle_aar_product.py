@@ -8,6 +8,7 @@ ROOT = Path(__file__).resolve().parents[3]
 AAR_GD = ROOT / "scripts" / "combat" / "LandBattleAar.gd"
 BM_GD = ROOT / "scripts" / "combat" / "BattleManager.gd"
 HOOK_GD = ROOT / "scripts" / "ui" / "PlayNextHook.gd"
+REN_GD = ROOT / "scripts" / "map" / "MapRenderer.gd"
 
 
 def format_line(
@@ -54,6 +55,7 @@ def build_land_battle_aar_product() -> Dict[str, Any]:
     aar = AAR_GD.read_text(encoding="utf-8") if AAR_GD.is_file() else ""
     bm = BM_GD.read_text(encoding="utf-8") if BM_GD.is_file() else ""
     hook = HOOK_GD.read_text(encoding="utf-8") if HOOK_GD.is_file() else ""
+    ren = REN_GD.read_text(encoding="utf-8") if REN_GD.is_file() else ""
     if "func format_line" in aar and "func pick_next_enemy_hex" in aar:
         passes.append("aar_api")
     else:
@@ -66,6 +68,20 @@ def build_land_battle_aar_product() -> Dict[str, Any]:
         passes.append("hook_reads_aar")
     else:
         fails.append("hook_reads_aar")
+    # COMBAT-1: toast/card after the existing tick, not only while a fight
+    # is still open (day_emit used to skip Took/Held when open_n==0).
+    if (
+        "refresh_after_land_battle_day" in ren
+        and "_surface_last_land_aar_toast" in ren
+        and "_notify_land_battle_day_surface" in bm
+    ):
+        passes.append("aar_toast_after_tick")
+    else:
+        fails.append("aar_toast_after_tick")
+    if "get_divisions_at_province" in ren and "_province_has_defending_units" in ren:
+        passes.append("prefer_defended_neighbor")
+    else:
+        fails.append("prefer_defended_neighbor")
     ok = len(fails) == 0
     return {
         "ok": ok,

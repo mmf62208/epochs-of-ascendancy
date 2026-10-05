@@ -414,6 +414,10 @@ var attack_staging_province_id: int = -1
 
 ## Phase 4: last combat outcome details (settlement_def_bonus used, winner, capture) for inspector append + richer toasts/logs after real assaults (map/F10).
 var _last_combat_outcome_text: String = ""
+## COMBAT-1: last inspector toast body (headless skip-UI still records this).
+var _last_inspector_toast: String = ""
+## COMBAT-1: last AAR line already shown so day_emit + post-tick do not double-toast.
+var _last_surfaced_aar_line: String = ""
 
 var _btn_attack: Button = null
 var _btn_open_fight: Button = null
@@ -923,12 +927,10 @@ func _on_game_day_advanced_legend(year: int, month: int, day: int) -> void:
 				if "tomorrow" in hook_s.to_lower():
 					_show_inspector_toast(hook_s, 4.5)
 					break
-		if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("peek_last_land_aar"):
-			var aar: Dictionary = BattleManager.peek_last_land_aar()
-			var aar_line := str(aar.get("line", ""))
-			if not aar_line.is_empty():
-				_show_inspector_toast(aar_line, 5.5)
-				_play_map_sfx("achievement" if str(aar.get("winner", "")) == "attacker" else "map")
+	# COMBAT-1: AAR used to live inside `if open_n > 0`. On F5/headless the
+	# battle tick is *after* this emit, so resolve day had open_n=0 and the
+	# Took/Held line never toasted. Surface leftover AAR even with 0 open.
+	_surface_last_land_aar_toast()
 	# Pass 17: live-update airfield repair rings without full province rebuild.
 	# Live F5 / softpipe: walking 3520 province_nodes on every day_emit wedges the clock.
 	if not live_or_light:
@@ -23038,6 +23040,7 @@ func _on_infra_cancelled_for_inspector(pid: int, reason: String) -> void:
 
 func _show_inspector_toast(message: String, duration: float = 2.5, is_error: bool = false) -> void:
 	eoa_log_flush("EOA_SMOKE_SPINE_BISECT who=MapRenderer._show_inspector_toast.enter")
+	_last_inspector_toast = str(message)
 	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
 		LeaderEventUI.show_toast(message, duration, is_error)
 		eoa_log_flush("EOA_SMOKE_SPINE_BISECT who=MapRenderer._show_inspector_toast.after_show_toast")
@@ -23172,8 +23175,8 @@ func _open_fight_from_formation_id(fid: String) -> void:
 	# Prefer the selected unit's current hex + an adjacent enemy so Play can
 	# Open fight → Start without Ctrl (xdotool Ctrl is intermittent).
 	# First-session fallback stays GER Maginot 710173 → FRA 710739.
-	# Soft OK Play 333a1285: first adjacent can be empty (Haut-Rhin instant
-	# capture). Prefer a defended neighbor later — not COMBAT-1 / not here.
+	# COMBAT-1: `_adjacent_enemy_province_id` prefers a neighbor with
+	# defending units (Play soft: empty Haut-Rhin was first, instant capture).
 	const GER_FRONT := 710173
 	const FRA_FRONT := 710739
 	if typeof(LeaderManager) == TYPE_NIL or not LeaderManager.has_method("get_formation"):
@@ -23227,6 +23230,9 @@ func _open_fight_from_formation_id(fid: String) -> void:
 
 
 func _adjacent_enemy_province_id(from_pid: int, owner_tag: String = "") -> int:
+	# COMBAT-1: prefer a neighbor that already has defending units so Open
+	# fight → Start opens a real fight (empty Haut-Rhin was first-adjacent
+	# instant capture). Empty enemy is fallback only. Not a chip pick rule.
 	var tag := owner_tag.strip_edges().to_upper()
 	if tag.is_empty():
 		tag = _player_tag()
@@ -23234,6 +23240,7 @@ func _adjacent_enemy_province_id(from_pid: int, owner_tag: String = "") -> int:
 		return -1
 	var adj: Array = MapManager.get_adjacent_provinces(from_pid, true)
 	var hop2: Array = []
+	var empty_adj := -1
 	for pid_v in adj:
 		var pid := int(pid_v)
 		if not provinces.has(pid):
@@ -23243,9 +23250,13 @@ func _adjacent_enemy_province_id(from_pid: int, owner_tag: String = "") -> int:
 			continue
 		var ot := str(p.owner_tag).strip_edges().to_upper()
 		if not ot.is_empty() and ot != tag:
-			return pid
+			if _province_has_defending_units(pid, ot):
+				return pid
+			if empty_adj < 0:
+				empty_adj = pid
 		hop2.append(pid)
 	# One extra hop (Milano → Swiss hinterland) — still not a 3520 scan.
+	var empty_hop2 := -1
 	for mid in hop2:
 		var adj2: Array = MapManager.get_adjacent_provinces(int(mid), true)
 		for pid2_v in adj2:
@@ -23256,9 +23267,32 @@ func _adjacent_enemy_province_id(from_pid: int, owner_tag: String = "") -> int:
 			if p2 == null:
 				continue
 			var ot2 := str(p2.owner_tag).strip_edges().to_upper()
-			if not ot2.is_empty() and ot2 != tag:
+			if ot2.is_empty() or ot2 == tag:
+				continue
+			if _province_has_defending_units(pid2, ot2):
 				return pid2
-	return -1
+			if empty_hop2 < 0:
+				empty_hop2 = pid2
+	if empty_adj > 0:
+		return empty_adj
+	return empty_hop2
+
+
+func _province_has_defending_units(pid: int, owner_tag: String) -> bool:
+	if typeof(BattleManager) == TYPE_NIL or not BattleManager.has_method("get_divisions_at_province"):
+		return false
+	var tag := owner_tag.strip_edges().to_upper()
+	if tag.is_empty() and provinces.has(pid):
+		var p: Province = provinces[pid] as Province
+		if p != null:
+			if "controller_tag" in p:
+				tag = str(p.controller_tag).strip_edges().to_upper()
+			if tag.is_empty():
+				tag = str(p.owner_tag).strip_edges().to_upper()
+	if tag.is_empty() or pid <= 0:
+		return false
+	var divs: Array = BattleManager.get_divisions_at_province(pid, tag)
+	return not divs.is_empty()
 
 
 func _show_open_fight_sheet(
@@ -24920,6 +24954,60 @@ func _sync_land_battle_bubbles() -> int:
 	_land_battle_bubble_layer.call("set_battles", battles)
 	_refresh_next_hook_chip()
 	return battles.size()
+
+
+## COMBAT-1: after an existing land-battle day tick, refresh the open card /
+## selected chip and toast the shipped AAR line (Took / Held). Not a new combat.
+func refresh_after_land_battle_day() -> void:
+	_sync_land_battle_bubbles()
+	_refresh_open_fight_card_after_tick()
+	_surface_last_land_aar_toast()
+
+
+func _surface_last_land_aar_toast() -> void:
+	if typeof(BattleManager) == TYPE_NIL or not BattleManager.has_method("peek_last_land_aar"):
+		return
+	var aar: Dictionary = BattleManager.peek_last_land_aar()
+	var aar_line := str(aar.get("line", "")).strip_edges()
+	if aar_line.is_empty() or aar_line == _last_surfaced_aar_line:
+		return
+	_last_surfaced_aar_line = aar_line
+	# Headless LeaderEventUI skips toast CanvasLayer; print so a playtester log
+	# still has a readable resolve line.
+	print("Fight resolved · %s" % aar_line)
+	_show_inspector_toast(aar_line, 5.5)
+	_play_map_sfx("achievement" if str(aar.get("winner", "")) == "attacker" else "map")
+
+
+func _refresh_open_fight_card_after_tick() -> void:
+	if selected_formation_id.is_empty() or typeof(LeaderManager) == TYPE_NIL:
+		return
+	if not LeaderManager.has_method("get_formation"):
+		return
+	var fo: Object = LeaderManager.get_formation(selected_formation_id)
+	if fo == null:
+		return
+	var ui := get_node_or_null("UI") as CanvasLayer
+	var pop: Node = ui.get_node_or_null("UnitDetailPopup") if ui != null else null
+	if pop != null and is_instance_valid(pop):
+		_show_unit_detail_popup(fo)
+	_refresh_selected_unit_chip()
+	var pids: Array = []
+	if "stationed_province_id" in fo:
+		var sid := int(fo.stationed_province_id)
+		if sid >= 0:
+			pids.append(sid)
+	if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("get_land_battle_for_formation"):
+		var bat: Dictionary = BattleManager.get_land_battle_for_formation(selected_formation_id)
+		if not bat.is_empty():
+			var from_id := int(bat.get("from_id", -1))
+			var to_id := int(bat.get("to_id", -1))
+			if from_id >= 0 and not pids.has(from_id):
+				pids.append(from_id)
+			if to_id >= 0 and not pids.has(to_id):
+				pids.append(to_id)
+	if not pids.is_empty():
+		_update_unit_icons_for_pids(pids)
 
 
 func _setup_battle_indicator_layer() -> void:
