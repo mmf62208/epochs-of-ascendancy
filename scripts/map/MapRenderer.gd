@@ -13,6 +13,7 @@ const _DomainOpsOverlayLayerScr = preload("res://scripts/map/DomainOpsOverlayLay
 const _LeaderStationOverlayLayerScr = preload("res://scripts/map/LeaderStationOverlayLayer.gd")
 const _UnitChipTextScr = preload("res://scripts/map/UnitChipText.gd")
 const _ConstructionProgressOverlayLayerScr = preload("res://scripts/map/ConstructionProgressOverlayLayer.gd")
+const _SupplyOutlineBatchLayerScr = preload("res://scripts/map/SupplyOutlineBatchLayer.gd")
 ## Loaded in _ready — missing scripts must not fail MapRenderer parse (grey TestScenario).
 var _FactoryStatusLayerScr: Script = null
 var _AgentPresenceLayerScr: Script = null
@@ -396,6 +397,10 @@ const _CONFLICT_FILL_TINT := ProvinceMapVisuals.FILL_CONFLICT
 const _AGENT_FILL_TINT := ProvinceMapVisuals.FILL_AGENT
 
 var _supply_role_by_province: Dictionary[int, String] = {}
+var _supply_roles_cache: Dictionary[int, String] = {}
+var _supply_poly_cache: Dictionary[int, PackedVector2Array] = {}
+var _supply_outline_batch: Node2D = null
+var _supply_outline_rebuild_count: int = 0
 var _compare_candidate_ids: Array[int] = []
 var _supply_legend_panel: PanelContainer = null
 var _compare_hint_label: Label = null
@@ -24331,7 +24336,7 @@ func get_active_overlay_layers() -> Array[String]:
 	var names: Array[String] = []
 	if container == null:
 		return names
-	var excluded: Array[String] = ["SupplyMapLayer", "ProvinceContainers"]
+	var excluded: Array[String] = ["SupplyMapLayer", "ProvinceContainers", "SupplyOutlineBatch"]
 	for child in container.get_children():
 		if child is Node2D:
 			var n := child.name
@@ -28992,7 +28997,7 @@ func _supply_highlight_roles() -> Dictionary[int, String]:
 
 
 func _apply_infra_pressure_overlay_roles(roles: Dictionary[int, String]) -> void:
-	if not supply_mode or typeof(MapManager) == TYPE_NIL:
+	if not supply_mode:
 		return
 	for pid_var in province_nodes.keys():
 		var pid := int(pid_var)
@@ -29004,12 +29009,34 @@ func _apply_infra_pressure_overlay_roles(roles: Dictionary[int, String]) -> void
 		var p: Province = provinces[pid] as Province
 		if p == null:
 			continue
+		var focus := ProvinceInsight.agent_pressure_focus_kind(p)
+		# Mass 1936 path: infra < 45 + owned land → engineers_recommended.
+		# Must not call get_engineer_assignment_snapshot / breakdown per pid
+		# (that was the L-on hang: 3k snapshots + 6k Line2Ds).
+		if focus != "sabotage":
+			var tag := str(p.controller_tag).strip_edges().to_upper()
+			if tag.is_empty():
+				tag = str(p.owner_tag).strip_edges().to_upper()
+			if not tag.is_empty() and ProvinceInsight.province_benefits_country(p, tag):
+				if int(p.infrastructure) < 45:
+					roles[pid] = "engineers_recommended"
+					continue
+				if focus == "disrupt":
+					roles[pid] = "supply_pressure"
+					continue
+				continue
+			if focus == "disrupt":
+				roles[pid] = "supply_pressure"
+				continue
+			continue
+		if typeof(MapManager) == TYPE_NIL:
+			continue
 		var bd: Dictionary = MapManager.get_infrastructure_repair_breakdown(pid)
 		var eng_role := ProvinceInsight.get_engineer_supply_overlay_role(p, bd)
 		if not eng_role.is_empty():
 			roles[pid] = eng_role
 			continue
-		if ProvinceInsight.agent_pressure_focus_kind(p) == "disrupt":
+		if focus == "disrupt":
 			roles[pid] = "supply_pressure"
 			continue
 		var depot_sab := float(bd.get("depot_sabotage_level", 0.0))
@@ -29019,6 +29046,17 @@ func _apply_infra_pressure_overlay_roles(roles: Dictionary[int, String]) -> void
 
 
 func _pulse_supply_outlines() -> void:
+	if _supply_outline_batch != null and is_instance_valid(_supply_outline_batch) and _supply_outline_batch.visible:
+		var skip: Dictionary = {}
+		for flash_pid in _engineer_assign_flash_by_province.keys():
+			skip[int(flash_pid)] = true
+		if _hover_outline_province_id >= 0:
+			skip[_hover_outline_province_id] = true
+		if _supply_outline_batch.has_method("set_skip_pids"):
+			_supply_outline_batch.call("set_skip_pids", skip)
+		if _supply_outline_batch.has_method("set_pulse_phase"):
+			_supply_outline_batch.call("set_pulse_phase", _outline_pulse_phase)
+		return
 	for pid in _supply_role_by_province.keys():
 		if _engineer_assign_flash_by_province.has(pid):
 			continue  # `_apply_engineer_assignment_flash_pulses` owns NODE_SUPPLY for this province.
@@ -29086,32 +29124,119 @@ func _pulse_amount_for_supply_role(role: String) -> float:
 
 
 func _refresh_supply_highlights() -> void:
-	# Hang-class: province pick must not walk 3520 outlines when supply overlay is off.
-	if not supply_mode and _supply_role_by_province.is_empty():
+	# Hang-class: L off is hide-only. Never walk 3520 nodes or rebuild Line2Ds.
+	if not supply_mode:
+		_set_supply_outline_batch_visible(false)
+		_supply_role_by_province.clear()
 		return
 	var roles := _supply_highlight_roles()
 	_supply_role_by_province = roles
-	if roles.is_empty() and not supply_mode:
+	if _supply_roles_cache_matches(roles) and _supply_outline_batch_is_ready():
+		_set_supply_outline_batch_visible(true)
 		return
-	for pid in province_nodes.keys():
+	_supply_roles_cache = roles.duplicate()
+	_apply_supply_roles_to_batch(roles)
+
+
+func get_supply_overlay_outline_visible_count() -> int:
+	if not supply_mode:
+		return 0
+	if _supply_outline_batch_is_ready() and _supply_outline_batch.visible:
+		if _supply_outline_batch.has_method("visible_item_count"):
+			return int(_supply_outline_batch.call("visible_item_count"))
+	var n := 0
+	for pid in _supply_role_by_province.keys():
 		var node := _province_node(int(pid))
 		if node == null:
 			continue
-		var role: String = str(roles.get(int(pid), ""))
+		var line := node.get_node_or_null(ProvinceMapVisuals.NODE_SUPPLY) as Line2D
+		if line != null and line.visible:
+			n += 1
+	return n
+
+
+func get_supply_outline_rebuild_count() -> int:
+	return _supply_outline_rebuild_count
+
+
+func _supply_outline_batch_is_ready() -> bool:
+	return _supply_outline_batch != null and is_instance_valid(_supply_outline_batch)
+
+
+func _supply_roles_cache_matches(roles: Dictionary[int, String]) -> bool:
+	if roles.size() != _supply_roles_cache.size():
+		return false
+	for pid in roles.keys():
+		if str(_supply_roles_cache.get(int(pid), "")) != str(roles[pid]):
+			return false
+	return true
+
+
+func _set_supply_outline_batch_visible(on: bool) -> void:
+	if not _supply_outline_batch_is_ready():
+		return
+	_supply_outline_batch.visible = on
+
+
+func _cached_supply_polygon(node: Node2D, pid: int) -> PackedVector2Array:
+	if _supply_poly_cache.has(pid):
+		return _supply_poly_cache[pid]
+	var pts := _province_polygon(node)
+	_supply_poly_cache[pid] = pts
+	return pts
+
+
+func _ensure_supply_outline_batch() -> Node2D:
+	if _supply_outline_batch_is_ready():
+		return _supply_outline_batch
+	if container == null:
+		return null
+	var existing := container.get_node_or_null("SupplyOutlineBatch") as Node2D
+	if existing != null:
+		_supply_outline_batch = existing
+		return _supply_outline_batch
+	var batch: Node2D = _SupplyOutlineBatchLayerScr.new() as Node2D
+	if batch == null:
+		return null
+	batch.name = "SupplyOutlineBatch"
+	container.add_child(batch)
+	_supply_outline_batch = batch
+	return _supply_outline_batch
+
+
+func _apply_supply_roles_to_batch(roles: Dictionary[int, String]) -> void:
+	var batch := _ensure_supply_outline_batch()
+	if batch == null:
+		return
+	var items: Array[Dictionary] = []
+	for pid_var in roles.keys():
+		var pid := int(pid_var)
+		var role := str(roles[pid_var])
 		if role.is_empty():
-			ProvinceMapVisuals.hide_polished_outline(node, ProvinceMapVisuals.NODE_SUPPLY)
+			continue
+		if _engineer_assign_flash_by_province.has(pid):
+			continue
+		var node := _province_node(pid)
+		if node == null:
+			continue
+		var pts := _cached_supply_polygon(node, pid)
+		if pts.size() < 3:
 			continue
 		var style: Dictionary = ProvinceMapVisuals.get_supply_outline_style(role)
-		ProvinceMapVisuals.ensure_polished_outline(
-			node,
-			_province_polygon(node),
-			ProvinceMapVisuals.NODE_SUPPLY,
-			style["color"],
-			style["width"],
-			style["glow"],
-			style["glow_extra"],
-			style["z_index"],
-		)
+		items.append({
+			"pid": pid,
+			"points": pts,
+			"color": style["color"],
+			"glow": style["glow"],
+			"width": style["width"],
+			"glow_extra": style["glow_extra"],
+			"z_index": style["z_index"],
+			"role": role,
+		})
+	if batch.has_method("set_items"):
+		batch.call("set_items", items)
+	batch.visible = true
+	_supply_outline_rebuild_count += 1
 
 
 func _update_supply_overlay_legend() -> void:
