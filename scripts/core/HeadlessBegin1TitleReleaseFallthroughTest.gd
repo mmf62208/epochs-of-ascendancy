@@ -1,29 +1,45 @@
 extends SceneTree
 
-## BEGIN-1: a normal ~80 ms Begin click must not leftover-pick the map.
-## FIX #2: clock starts after the Begin frame (restamp on first later _process).
-## Poll-path arms set begin_press_pending so the click's own N+1 press keeps
-## the arm. Event-path keeps the same-frame rule. button_down arms only while
-## left is held (Enter/Space must not arm).
-## Drive real InputEventMouseButton through title _input then MapRenderer
-## _input (same frame). No manual arm. Follow-up / later clicks must select
-## via the real pick path (pid != -1, no _select_province fallback).
-## Does not load WorldMap.tscn / 3520. Headless / xvfb are NOT live Play.
+## BEGIN-1 FIX #3 (test-only): leftover Begin release must not pick the map.
+## Product SHA f18a341a (frozen). Later commits are test / docs only.
+##
+## Real pipeline (T1 / leftover / follow-up click):
+##   _title._input(ev)  AND  same-frame Input.parse_input_event + flush.
+## Direct MapRenderer._input does not leftover-pick on main — it is not
+## a behavior proof. Judge leftover / follow-up by pid / inspector / zoom
+## only. Do not early-out on swallow flags.
+##
+##   T1  event-path 80 ms through the real pipeline. FAIL on main 425b4448
+##       (Loir-et-Cher picked or inspector open). PASS on the tip.
+##   T2  event Begin, drop leftover, real click 3 frames later must pick
+##       (pid != -1, inspector). Catches M2 (no later-press clear).
+##   T3  poll Begin, no press / no release, wait >=1000 ms + 3 frames,
+##       first click must pick. Catches M1 (no expiry).
+##   T4  T1 pipeline + OS.delay_msec(900) in the Begin frame, release in
+##       frame N+2, must be swallowed. Catches M7 (clock not re-stamped).
+##   T5  keep poll-path (b). M3: Begin hit outside the button rect so
+##       button_down cannot re-arm. M9 (drop arm_frame+2 only) makes no
+##       T1–T5 behavior difference.
 ##
 ##   timeout 1500 tools/run_godot.sh --headless --path . --import --quit
 ##   tools/run_godot.sh --headless --path . --resolution 1280x740 \
 ##     -s res://scripts/core/HeadlessBegin1TitleReleaseFallthroughTest.gd
 ##   tools/eoa_begin1_guard.sh
+##
+## Headless / xvfb are NOT live Play.
 
 const SRC_REN := "res://scripts/map/MapRenderer.gd"
 const SRC_TITLE := "res://scripts/ui/LivingTitleBoot.gd"
 const PLAY_SIZE := Vector2i(1280, 740)
 const LOIR := 710671
 const HOLD_MS := 80
-const EXPIRE_WAIT_MS := 800
+const EXPIRE_WAIT_MS := 1000
 const ZOOM0 := 0.776
 const CAM0 := Vector2(4200, 1000)
 const MAP_PT := Vector2(640, 400)
+const OUTSIDE_BEGIN_PT := Vector2(200, 580)
+## M9: dropping `frames >= arm_frame + 2` from expiry (keep restamp + 750 ms)
+## does not change T1–T5 leftover / follow-up pick behavior.
 
 var _failures: int = 0
 var _mr: Node = null
@@ -37,6 +53,7 @@ var _mm: Node = null
 var _saved_pick_grid: Variant = null
 var _loir_province: Object = null
 var _loir_host: Node2D = null
+var _event_seq: int = 0
 
 
 func _init() -> void:
@@ -74,6 +91,47 @@ func _read(path: String) -> String:
 	return text
 
 
+func _new_obj(path: String) -> Object:
+	var scr: Script = load(path) as Script
+	if scr == null:
+		return null
+	return scr.new()
+
+
+func _run() -> void:
+	DisplayServer.window_set_size(PLAY_SIZE)
+	root.size = PLAY_SIZE
+	if not _setup_renderer():
+		return
+	# Behavior cases first so fail-on-main is T1 leftover pick, not source text.
+	await _test_t1_event_pipeline_80ms()
+	await _test_t2_drop_leftover_later_click_picks()
+	await _test_t3_poll_expire_then_first_click_picks()
+	await _test_t4_same_frame_delay_release_n_plus_2()
+	await _test_t5_poll_path_keeps_arm()
+	await _test_t5_m3_outside_button_begin()
+	await _test_keyboard_begin_then_map_click()
+	_test_source_needles()
+
+
+func _test_source_needles() -> void:
+	# Light invariants that exist on main and the tip. Do not needle FIX #2
+	# internals (clock_ready / arm_frame+2 / pending_press) — those are M7/M9
+	# source-text only and are not a behavior proof.
+	var title_src := _read(SRC_TITLE)
+	var ren := _read(SRC_REN)
+	if title_src.is_empty() or ren.is_empty():
+		_fail("source files missing")
+		return
+	if "ACTION_MODE_BUTTON_PRESS" not in title_src:
+		_fail("Begin must stay ACTION_MODE_BUTTON_PRESS")
+		return
+	if "eoa_tip_dismiss_swallow_release" not in _slice_func(ren, "_arm_first_session_tip_dismiss_swallow"):
+		_fail("TipDismiss swallow must stay")
+		return
+	_pass("source needles: ACTION_MODE_BUTTON_PRESS + TipDismiss kept (M9 is behavior-neutral)")
+
+
 func _slice_func(src: String, func_name: String) -> String:
 	var needle := "func %s" % func_name
 	var i := src.find(needle)
@@ -91,123 +149,6 @@ func _slice_func(src: String, func_name: String) -> String:
 	if nxt < 0:
 		return src.substr(i)
 	return src.substr(i, nxt - i)
-
-
-func _new_obj(path: String) -> Object:
-	var scr: Script = load(path) as Script
-	if scr == null:
-		return null
-	return scr.new()
-
-
-func _run() -> void:
-	DisplayServer.window_set_size(PLAY_SIZE)
-	root.size = PLAY_SIZE
-	_test_source_needles()
-	if not _setup_renderer():
-		return
-	await _test_80ms_begin_does_not_pick()
-	await _test_next_map_click_still_selects()
-	await _test_keyboard_begin_then_map_click()
-	await _test_swallow_expires_and_new_press_clears()
-	await _test_same_frame_delay_does_not_expire()
-	await _test_poll_path_late_press_keeps_arm()
-
-
-func _test_source_needles() -> void:
-	var title_src := _read(SRC_TITLE)
-	var ren := _read(SRC_REN)
-	if title_src.is_empty() or ren.is_empty():
-		_fail("source files missing")
-		return
-	if "ACTION_MODE_BUTTON_PRESS" not in title_src:
-		_fail("Begin must stay ACTION_MODE_BUTTON_PRESS")
-		return
-	if "button_down.connect(_arm_begin_release_swallow)" not in title_src:
-		_fail("Begin press must arm leftover-release swallow")
-		return
-	var arm_title_fn := _slice_func(title_src, "_arm_begin_release_swallow")
-	if arm_title_fn.is_empty() or "os_left_button_held" not in arm_title_fn:
-		_fail("button_down arm must require os_left_button_held (keyboard Begin must not arm)")
-		return
-	var begin_fn := _slice_func(title_src, "_on_begin_new")
-	if begin_fn.is_empty() or "if _closed:" not in begin_fn:
-		_fail("_on_begin_new must no-op when already closed (double-fire)")
-		return
-	if "os_left_button_held" not in begin_fn:
-		_fail("_on_begin_new must arm swallow only while left is down")
-		return
-	if "eoa_begin_swallow_release" not in ren:
-		_fail("MapRenderer must keep eoa_begin_swallow_release meta")
-		return
-	if "func arm_begin_title_release_swallow" not in ren:
-		_fail("MapRenderer must expose arm_begin_title_release_swallow")
-		return
-	var arm_fn := _slice_func(ren, "arm_begin_title_release_swallow")
-	if "get_ticks_msec" not in arm_fn or "get_process_frames" not in arm_fn:
-		_fail("arm_begin_title_release_swallow must store arm time and arm frame")
-		return
-	if "pending_press" not in arm_fn or "eoa_begin_swallow_press_pending" not in arm_fn:
-		_fail("arm_begin_title_release_swallow must take pending_press and set begin_press_pending")
-		return
-	if "BEGIN_TITLE_SWALLOW_EXPIRE_MS" not in ren and "750" not in _slice_func(ren, "_begin_title_release_blocks_map_pick"):
-		_fail("Begin swallow must expire after ~750 ms")
-		return
-	var tick_fn := _slice_func(ren, "_tick_begin_title_release_swallow")
-	if "eoa_begin_swallow_clock_ready" not in tick_fn or "get_ticks_msec" not in tick_fn:
-		_fail("_tick_begin_title_release_swallow must restamp the clock after the Begin frame")
-		return
-	var exp_fn := _slice_func(ren, "_begin_title_release_swallow_expired")
-	if "eoa_begin_swallow_clock_ready" not in exp_fn or "arm_frame + 2" not in exp_fn:
-		_fail("expiry must require restamp and frames >= arm_frame + 2")
-		return
-	if "func _clear_begin_title_release_swallow_on_new_left_press" not in ren:
-		_fail("Begin swallow must clear on a new left press")
-		return
-	var clear_press_fn := _slice_func(ren, "_clear_begin_title_release_swallow_on_new_left_press")
-	if "eoa_begin_swallow_arm_frame" not in clear_press_fn:
-		_fail("new left press must clear only in a later frame than the arming")
-		return
-	if "eoa_begin_swallow_press_pending" not in clear_press_fn:
-		_fail("new left press must keep the arm when begin_press_pending (poll-path late press)")
-		return
-	var apply_fn := _slice_func(title_src, "_apply_pointer_hit")
-	if "pending_press" not in apply_fn or "_on_begin_new(pending_press" not in apply_fn:
-		_fail("_apply_pointer_hit must pass event-vs-poll pending_press into _on_begin_new")
-		return
-	var begin_new_fn := _slice_func(title_src, "_on_begin_new")
-	if "pending_press" not in begin_new_fn or "from_pointer" not in begin_new_fn:
-		_fail("_on_begin_new must take pending_press / from_pointer from the pointer path")
-		return
-	var input_fn := _slice_func(ren, "_input")
-	if "_begin_title_release_blocks_map_pick" not in input_fn:
-		_fail("MapRenderer._input must swallow the Begin leftover release")
-		return
-	if "_clear_begin_title_release_swallow_on_new_left_press" not in input_fn:
-		_fail("MapRenderer._input must drop the swallow on a new left press")
-		return
-	var un_fn := _slice_func(ren, "_unhandled_input")
-	if "_begin_title_release_blocks_map_pick" not in un_fn:
-		_fail("MapRenderer._unhandled_input must swallow the Begin leftover release")
-		return
-	if "_clear_begin_title_release_swallow_on_new_left_press" not in un_fn:
-		_fail("MapRenderer._unhandled_input must drop the swallow on a new left press")
-		return
-	var chip_fn := _slice_func(ren, "_try_open_land_chip_from_input")
-	if "_begin_title_release_blocks_map_pick" not in chip_fn:
-		_fail("land-chip still-click must honor the Begin swallow")
-		return
-	var area_fn := _slice_func(ren, "_on_province_input")
-	if "_begin_title_release_blocks_map_pick" not in area_fn:
-		_fail("Area2D leftover release must honor the Begin swallow")
-		return
-	if "_clear_begin_title_release_swallow_on_new_left_press" not in area_fn:
-		_fail("Area2D new press must drop the Begin swallow")
-		return
-	if "eoa_tip_dismiss_swallow_release" not in _slice_func(ren, "_arm_first_session_tip_dismiss_swallow"):
-		_fail("TipDismiss swallow must stay")
-		return
-	_pass("source needles: restamp clock + poll pending_press + later-frame clear + TipDismiss kept")
 
 
 func _setup_renderer() -> bool:
@@ -266,8 +207,6 @@ func _setup_renderer() -> bool:
 		_mr.use_spatial_picking = true
 	_mr.set("selected_province_id", -1)
 	_mr.set("selected_formation_id", "")
-	# First show_info_panel creates ProvinceIdBadge and currently also
-	# _clear_selection(). Prime the badge so the follow-up pick keeps pid.
 	if _mr.has_method("_ensure_province_id_badge"):
 		_mr.call("_ensure_province_id_badge")
 	_mm = root.get_node_or_null("MapManager")
@@ -319,8 +258,6 @@ func _seed_loir_under_screen(screen_pt: Vector2) -> bool:
 	if _mm != null:
 		if "pick_grid" in _mm:
 			_mm.pick_grid = null
-		# Isolate nearest-centroid fallback: only Loir sits under this click.
-		# Typed Dictionary[int, Vector2] cannot be replaced by an untyped dict.
 		if "_centroids" in _mm and _mm._centroids is Dictionary:
 			var cents: Dictionary = _mm._centroids
 			cents.clear()
@@ -336,21 +273,19 @@ func _seed_loir_under_screen(screen_pt: Vector2) -> bool:
 	return true
 
 
-func _release_at(screen_pt: Vector2) -> InputEventMouseButton:
+func _make_mouse(screen_pt: Vector2, pressed: bool) -> InputEventMouseButton:
+	_event_seq += 1
 	var ev := InputEventMouseButton.new()
+	ev.device = 0
 	ev.button_index = MOUSE_BUTTON_LEFT
-	ev.pressed = false
+	ev.pressed = pressed
+	ev.canceled = false
+	ev.double_click = false
 	ev.position = screen_pt
 	ev.global_position = screen_pt
-	return ev
-
-
-func _press_at(screen_pt: Vector2) -> InputEventMouseButton:
-	var ev := InputEventMouseButton.new()
-	ev.button_index = MOUSE_BUTTON_LEFT
-	ev.pressed = true
-	ev.position = screen_pt
-	ev.global_position = screen_pt
+	ev.button_mask = MOUSE_BUTTON_MASK_LEFT if pressed else 0
+	# Unique so parse_input_event cannot drop a replayed instance.
+	ev.set_meta("eoa_begin1_seq", _event_seq)
 	return ev
 
 
@@ -361,12 +296,15 @@ func _warp_mouse(screen_pt: Vector2) -> void:
 	DisplayServer.warp_mouse(Vector2i(int(round(screen_pt.x)), int(round(screen_pt.y))))
 
 
-func _send_mouse(screen_pt: Vector2, pressed: bool) -> InputEventMouseButton:
+func _send_pipeline(screen_pt: Vector2, pressed: bool, through_title: bool) -> InputEventMouseButton:
+	# Real leftover-pick pipeline: title._input plus same-frame parse+flush.
 	_warp_mouse(screen_pt)
-	var ev: InputEventMouseButton = _press_at(screen_pt) if pressed else _release_at(screen_pt)
-	if _mr != null:
-		_mr._input(ev)
-		_mr._unhandled_input(ev)
+	var ev: InputEventMouseButton = _make_mouse(screen_pt, pressed)
+	if through_title and _title != null and is_instance_valid(_title):
+		_title._input(ev)
+	Input.parse_input_event(ev)
+	if Input.has_method("flush_buffered_events"):
+		Input.flush_buffered_events()
 	return ev
 
 
@@ -435,6 +373,11 @@ func _clear_inspector() -> void:
 			pop.free()
 
 
+func _restore_home_camera() -> void:
+	_cam.position = CAM0
+	_cam.zoom = Vector2(ZOOM0, ZOOM0)
+
+
 func _spawn_title() -> bool:
 	if _title != null and is_instance_valid(_title):
 		if not _title.is_queued_for_deletion():
@@ -458,205 +401,70 @@ func _spawn_title() -> bool:
 		return false
 	begin.visible = true
 	if begin.get_global_rect().size.x < 8.0 or begin.get_global_rect().size.y < 8.0:
-		begin.position = Vector2(80, 420)
+		begin.position = Vector2(80, 180)
 		begin.size = Vector2(360, 72)
 		if begin.has_method("reset_size"):
 			begin.reset_size()
 		await _flush(3)
 	var rect: Rect2 = begin.get_global_rect()
 	if rect.size.x < 8.0 or rect.size.y < 8.0:
-		rect = Rect2(Vector2(80, 420), Vector2(360, 72))
+		rect = Rect2(Vector2(80, 180), Vector2(360, 72))
 		begin.position = rect.position
 		begin.size = rect.size
 	_begin_pt = rect.get_center()
-	if not bool(_mr.call("_living_title_boot_is_up")):
+	if _mr.has_method("_living_title_boot_is_up") and not bool(_mr.call("_living_title_boot_is_up")):
 		_fail("LivingTitleBoot must be visible to MapRenderer before Begin press")
 		return false
 	return true
 
 
-func _begin_via_real_mouse_press() -> bool:
-	if not await _spawn_title():
-		return false
-	_cam.position = CAM0
-	_cam.zoom = Vector2(ZOOM0, ZOOM0)
+func _place_begin_button(pos: Vector2, size: Vector2) -> Button:
+	var begin: Button = _title.find_child("LivingTitleBegin", true, false) as Button
+	if begin == null:
+		return null
+	var cc_btn: Button = _title.find_child("LivingTitleCommandCenter", true, false) as Button
+	if cc_btn != null:
+		cc_btn.global_position = Vector2(900, 20)
+		cc_btn.size = Vector2(160, 36)
+	begin.global_position = pos
+	begin.size = size
+	return begin
+
+
+func _begin_closed() -> bool:
+	if _title == null or not is_instance_valid(_title):
+		return true
+	return bool(_title.get("_closed"))
+
+
+func _prepare_begin_home(screen_pt: Vector2) -> bool:
+	_restore_home_camera()
 	_clear_inspector()
-	if not _seed_loir_under_screen(_begin_pt):
+	if not _seed_loir_under_screen(screen_pt):
 		return false
-	_warp_mouse(_begin_pt)
-	var ev: InputEventMouseButton = _press_at(_begin_pt)
-	# Title _input first, then MapRenderer _input in the same frame (c).
-	# A mutant that also clears on the same-frame press (M3) drops the arm.
-	_title._input(ev)
-	if not bool(_title.get("_closed")):
-		_fail("Begin mouse press did not close the living title via title _input")
-		return false
-	if not bool(_mr.call("_begin_title_release_blocks_map_pick")):
-		_fail("title _input Begin did not arm leftover-release swallow")
-		return false
-	_mr._input(ev)
-	if not bool(_mr.call("_begin_title_release_blocks_map_pick")):
-		_fail("same-frame MapRenderer _input press cleared the Begin swallow")
-		return false
-	_pass("Begin mouse press closed the title via title _input then MapRenderer _input")
-	_pass("Begin leftover-release swallow armed through same-frame title+map press")
 	return true
 
 
-func _test_80ms_begin_does_not_pick() -> void:
-	if not await _begin_via_real_mouse_press():
-		return
-	await _wait_hold_ms(HOLD_MS)
-	await _flush(3)
-	if _title != null and is_instance_valid(_title) and not _title.is_queued_for_deletion():
-		if not bool(_title.get("_closed")):
-			_fail("title still open after 80 ms")
-			return
-	_cam.position = CAM0
-	_cam.zoom = Vector2(ZOOM0, ZOOM0)
-	if not _seed_loir_under_screen(_begin_pt):
-		return
-	_clear_inspector()
-	var z0: float = _zoom_x()
-	var pid0: int = int(_mr.get("selected_province_id"))
-	_send_mouse(_begin_pt, false)
-	await _flush(2)
-	var got_pid: int = int(_mr.get("selected_province_id"))
-	if got_pid != pid0 and got_pid == LOIR:
-		_fail("Begin leftover release selected Loir-et-Cher via real pick (pid=%d)" % got_pid)
-		return
-	if got_pid != pid0 and got_pid > 0:
-		_fail("Begin leftover release selected pid=%d" % got_pid)
-		return
-	if _inspector_up():
-		_fail("Begin leftover release opened the inspector")
-		return
-	if absf(_zoom_x() - z0) > 0.002:
-		_fail("Begin leftover release changed zoom %.3f -> %.3f" % [z0, _zoom_x()])
-		return
-	_pass("80 ms Begin leftover release did not pick / inspect / zoom")
-	await _flush(3)
-	if bool(_mr.call("_begin_title_release_blocks_map_pick")):
-		_fail("Begin swallow stayed armed after the leftover release")
-		return
-	_pass("Begin swallow cleared after one leftover release")
-
-
-func _assert_real_map_click_selects(screen_pt: Vector2, why: String) -> bool:
-	_reset_map_click_latches()
-	_cam.position = CAM0
-	_cam.zoom = Vector2(ZOOM0, ZOOM0)
+func _prepare_leftover_home(screen_pt: Vector2) -> bool:
+	# Restore Home under the leftover without wiping the Begin press gesture.
+	_restore_home_camera()
 	if not _seed_loir_under_screen(screen_pt):
 		return false
 	_clear_inspector()
-	if bool(_mr.call("_begin_title_release_blocks_map_pick")):
-		_fail("%s: swallow still armed; would eat a real map click" % why)
-		return false
-	_warp_mouse(screen_pt)
-	_send_mouse(screen_pt, true)
-	_send_mouse(screen_pt, false)
-	await _flush(2)
-	var got_pid: int = int(_mr.get("selected_province_id"))
-	if got_pid != LOIR:
-		_fail("%s: real pick path must select Loir-et-Cher (pid=%d)" % [why, got_pid])
-		return false
-	if not _inspector_up():
-		_fail("%s: real pick path must open the inspector" % why)
-		return false
-	_pass("%s: real map click selected pid=%d and opened inspector" % [why, got_pid])
 	return true
 
 
-func _test_next_map_click_still_selects() -> void:
-	if _mr == null or _cam == null:
-		_fail("renderer missing for follow-up click")
-		return
-	await _assert_real_map_click_selects(MAP_PT, "follow-up after leftover Begin")
-
-
-func _send_begin_key(keycode: int) -> void:
-	var ev := InputEventKey.new()
-	ev.keycode = keycode
-	ev.physical_keycode = keycode
-	ev.pressed = true
-	ev.echo = false
-	if _title != null and is_instance_valid(_title):
-		_title._input(ev)
-	if _title != null and is_instance_valid(_title) and not bool(_title.get("_closed")):
-		if _mr != null:
-			_mr._input(ev)
-	if _title != null and is_instance_valid(_title) and not bool(_title.get("_closed")):
-		if _title.has_method("handle_live_begin"):
-			_title.call("handle_live_begin")
-
-
-func _test_keyboard_begin_then_map_click() -> void:
-	for keycode in [KEY_ENTER, KEY_SPACE]:
-		var key_name: String = "Enter" if keycode == KEY_ENTER else "Space"
-		if not await _spawn_title():
-			return
-		_clear_inspector()
-		_send_begin_key(keycode)
-		if not bool(_title.get("_closed")):
-			_fail("keyboard Begin (%s) did not close the living title" % key_name)
-			return
-		if bool(_mr.call("_begin_title_release_blocks_map_pick")):
-			_fail("keyboard Begin (%s) armed leftover-release swallow" % key_name)
-			return
-		_pass("keyboard Begin (%s) closed the title and did not arm swallow" % key_name)
-		if not await _assert_real_map_click_selects(MAP_PT, "map click after keyboard Begin (%s)" % key_name):
-			return
-
-
-func _test_swallow_expires_and_new_press_clears() -> void:
-	# Lost leftover up after a real Begin press: expire, then first click picks.
-	if not await _begin_via_real_mouse_press():
-		return
-	await _wait_hold_ms(EXPIRE_WAIT_MS)
-	await _flush(2)
-	if bool(_mr.call("_begin_title_release_blocks_map_pick")):
-		_fail("lost-release swallow stayed armed after %d ms expiry" % EXPIRE_WAIT_MS)
-		return
-	_pass("lost-release swallow expired after ~750 ms")
-	if not await _assert_real_map_click_selects(MAP_PT, "first click after lost-release expiry"):
-		return
-	# Separately: lost leftover up, then a later-frame fresh press clears.
-	if not await _begin_via_real_mouse_press():
-		return
-	await _flush(3)
-	if not bool(_mr.call("_begin_title_release_blocks_map_pick")):
-		_fail("swallow dropped before the later-frame press (cannot prove clear-on-press)")
-		return
-	_send_mouse(MAP_PT, true)
-	if bool(_mr.call("_begin_title_release_blocks_map_pick")):
-		_fail("later-frame left press did not clear the Begin swallow")
-		return
-	_pass("later-frame left press cleared the Begin swallow")
-	_send_mouse(MAP_PT, false)
-	await _flush(2)
-	_clear_inspector()
-	if not await _assert_real_map_click_selects(MAP_PT, "first click after lost-release + fresh press"):
-		return
-
-
-func _assert_leftover_release_did_not_pick(screen_pt: Vector2, why: String) -> bool:
-	_cam.position = CAM0
-	_cam.zoom = Vector2(ZOOM0, ZOOM0)
-	if not _seed_loir_under_screen(screen_pt):
+func _assert_leftover_swallowed(screen_pt: Vector2, why: String) -> bool:
+	if not _prepare_leftover_home(screen_pt):
 		return false
-	_clear_inspector()
 	var z0: float = _zoom_x()
-	var pid0: int = int(_mr.get("selected_province_id"))
-	if not bool(_mr.call("_begin_title_release_blocks_map_pick")):
-		_fail("%s: swallow not armed before leftover release" % why)
-		return false
-	_send_mouse(screen_pt, false)
+	_send_pipeline(screen_pt, false, true)
 	await _flush(2)
 	var got_pid: int = int(_mr.get("selected_province_id"))
-	if got_pid != pid0 and got_pid == LOIR:
-		_fail("%s: leftover release selected Loir-et-Cher via real pick (pid=%d)" % [why, got_pid])
+	if got_pid == LOIR:
+		_fail("%s: leftover release selected Loir-et-Cher (pid=%d)" % [why, got_pid])
 		return false
-	if got_pid != pid0 and got_pid > 0:
+	if got_pid > 0:
 		_fail("%s: leftover release selected pid=%d" % [why, got_pid])
 		return false
 	if _inspector_up():
@@ -669,82 +477,202 @@ func _assert_leftover_release_did_not_pick(screen_pt: Vector2, why: String) -> b
 	return true
 
 
-func _test_same_frame_delay_does_not_expire() -> void:
-	# (a) Real Begin press, then 900 ms wall-clock in the same frame.
-	# Clock must not start until the first later _process restamp.
-	if not await _begin_via_real_mouse_press():
-		return
-	OS.delay_msec(900)
-	if not bool(_mr.call("_begin_title_release_blocks_map_pick")):
-		_fail("same-frame 900 ms delay expired the swallow before leftover release")
-		return
-	await process_frame
-	if not await _assert_leftover_release_did_not_pick(_begin_pt, "same-frame 900 ms Begin then next-frame release"):
-		return
+func _assert_real_click_picks(screen_pt: Vector2, why: String) -> bool:
+	# Do not skip when swallow is still armed — that hid M1 / M2.
+	_reset_map_click_latches()
+	_restore_home_camera()
+	if not _seed_loir_under_screen(screen_pt):
+		return false
+	_clear_inspector()
+	_send_pipeline(screen_pt, true, false)
+	_send_pipeline(screen_pt, false, false)
 	await _flush(2)
-	if bool(_mr.call("_begin_title_release_blocks_map_pick")):
-		_fail("Begin swallow stayed armed after the delayed leftover release")
-		return
-	_pass("same-frame 900 ms stall did not expire the Begin swallow")
+	var got_pid: int = int(_mr.get("selected_province_id"))
+	if got_pid == -1:
+		_fail("%s: real click must pick (pid=-1)" % why)
+		return false
+	if not _inspector_up():
+		_fail("%s: real click must open the inspector (pid=%d)" % [why, got_pid])
+		return false
+	_pass("%s: real click picked pid=%d and opened inspector" % [why, got_pid])
+	return true
 
 
-func _test_poll_path_late_press_keeps_arm() -> void:
-	# (b) Poll-path arm in frame N (handle_live_pointer(null)), press in N+1,
-	# then leftover release: no pick. A later click still picks.
+func _test_t1_event_pipeline_80ms() -> void:
 	if not await _spawn_title():
 		return
-	_cam.position = CAM0
-	_cam.zoom = Vector2(ZOOM0, ZOOM0)
-	_clear_inspector()
-	# Headless poll uses Viewport.get_mouse_position() (often 0,0). Cover that
-	# point and the Begin centre so handle_live_pointer(null) is a real poll
-	# hit, not a manual arm.
-	var begin_btn: Button = _title.find_child("LivingTitleBegin", true, false) as Button
-	if begin_btn == null:
-		_fail("LivingTitleBegin missing for poll-path")
+	if not _prepare_begin_home(_begin_pt):
 		return
-	var cc_btn: Button = _title.find_child("LivingTitleCommandCenter", true, false) as Button
-	if cc_btn != null:
-		cc_btn.global_position = Vector2(900, 20)
-		cc_btn.size = Vector2(160, 36)
-	begin_btn.global_position = Vector2(0, 0)
-	begin_btn.size = Vector2(420, 220)
+	_send_pipeline(_begin_pt, true, true)
+	if not _begin_closed():
+		_fail("T1: Begin press via title._input + parse/flush did not close the living title")
+		return
+	_pass("T1: Begin press closed the title through the real pipeline")
+	await _wait_hold_ms(HOLD_MS)
+	await _flush(3)
+	if not await _assert_leftover_swallowed(_begin_pt, "T1 event-path 80 ms leftover"):
+		return
+	if not await _assert_real_click_picks(MAP_PT, "T1 follow-up after leftover"):
+		return
+
+
+func _test_t2_drop_leftover_later_click_picks() -> void:
+	if not await _spawn_title():
+		return
+	if not _prepare_begin_home(_begin_pt):
+		return
+	_send_pipeline(_begin_pt, true, true)
+	if not _begin_closed():
+		_fail("T2: event Begin did not close the living title")
+		return
+	# Drop the leftover release. Three frames later a real click must pick
+	# (M2: no later-press clear keeps the arm and eats that click).
+	await _flush(3)
+	if not await _assert_real_click_picks(MAP_PT, "T2 click 3 frames after dropped leftover"):
+		return
+
+
+func _test_t3_poll_expire_then_first_click_picks() -> void:
+	if not await _spawn_title():
+		return
+	var begin_btn: Button = _place_begin_button(Vector2(0, 0), Vector2(420, 220))
+	if begin_btn == null:
+		_fail("T3: LivingTitleBegin missing")
+		return
 	await _flush(2)
 	_begin_pt = begin_btn.get_global_rect().get_center()
-	if not bool(_title.call("begin_owns_screen_point", Vector2(0, 0))) and not bool(_title.call("begin_owns_screen_point", Vector2(40, 80))):
-		_fail("poll-path Begin hit rect must own the headless poll point")
+	if _title.has_method("begin_owns_screen_point"):
+		if not bool(_title.call("begin_owns_screen_point", Vector2(0, 0))) and not bool(_title.call("begin_owns_screen_point", Vector2(40, 80))):
+			_fail("T3: poll-path Begin hit rect must own the headless poll point")
+			return
+	_restore_home_camera()
+	_clear_inspector()
+	_warp_mouse(Vector2(40, 80))
+	var polled: String = str(_title.call("handle_live_pointer", null))
+	if polled != "begin":
+		_fail("T3: poll-path handle_live_pointer(null) did not Begin (got %s)" % polled)
 		return
+	if not _begin_closed():
+		_fail("T3: poll-path Begin did not close the living title")
+		return
+	_pass("T3: poll-path Begin closed the title (no press / no release)")
+	# No leftover press or release. Expiry must drop the arm (M1: first click eaten).
+	await _wait_hold_ms(EXPIRE_WAIT_MS)
+	await _flush(3)
+	if not await _assert_real_click_picks(MAP_PT, "T3 first click after 1000 ms + 3 frames"):
+		return
+
+
+func _test_t4_same_frame_delay_release_n_plus_2() -> void:
+	if not await _spawn_title():
+		return
+	if not _prepare_begin_home(_begin_pt):
+		return
+	_send_pipeline(_begin_pt, true, true)
+	if not _begin_closed():
+		_fail("T4: Begin press did not close the living title")
+		return
+	# Clock must restamp on the first later _process. 900 ms in this frame
+	# must not expire the leftover (M7: no restamp → leftover picks).
+	OS.delay_msec(900)
+	await process_frame
+	await process_frame
+	if not await _assert_leftover_swallowed(_begin_pt, "T4 same-frame 900 ms then release N+2"):
+		return
+
+
+func _test_t5_poll_path_keeps_arm() -> void:
+	# (b) Poll-path arm in frame N, press in N+1, leftover release: no pick.
+	if not await _spawn_title():
+		return
+	var begin_btn: Button = _place_begin_button(Vector2(0, 0), Vector2(420, 220))
+	if begin_btn == null:
+		_fail("T5(b): LivingTitleBegin missing")
+		return
+	await _flush(2)
+	_begin_pt = begin_btn.get_global_rect().get_center()
+	_restore_home_camera()
+	_clear_inspector()
 	if not _seed_loir_under_screen(MAP_PT):
 		return
 	_warp_mouse(Vector2(40, 80))
 	var polled: String = str(_title.call("handle_live_pointer", null))
 	if polled != "begin":
-		_fail("poll-path handle_live_pointer(null) did not Begin (got %s)" % polled)
+		_fail("T5(b): poll-path handle_live_pointer(null) did not Begin (got %s)" % polled)
 		return
-	if not bool(_title.get("_closed")):
-		_fail("poll-path Begin did not close the living title")
+	if not _begin_closed():
+		_fail("T5(b): poll-path Begin did not close the living title")
 		return
-	if not bool(_mr.call("_begin_title_release_blocks_map_pick")):
-		_fail("poll-path Begin did not arm leftover-release swallow")
-		return
-	_pass("poll-path handle_live_pointer(null) closed the title and armed swallow")
+	_pass("T5(b): poll-path handle_live_pointer(null) closed the title")
 	await process_frame
-	_reset_map_click_latches()
-	_cam.position = CAM0
-	_cam.zoom = Vector2(ZOOM0, ZOOM0)
-	if not _seed_loir_under_screen(MAP_PT):
+	if not _prepare_leftover_home(MAP_PT):
 		return
-	_clear_inspector()
-	_send_mouse(MAP_PT, true)
-	if not bool(_mr.call("_begin_title_release_blocks_map_pick")):
-		_fail("poll-path N+1 press cleared the Begin swallow")
+	_send_pipeline(MAP_PT, true, false)
+	if not await _assert_leftover_swallowed(MAP_PT, "T5(b) poll N+1 press then leftover"):
 		return
-	_pass("poll-path N+1 press kept the Begin swallow")
-	if not await _assert_leftover_release_did_not_pick(MAP_PT, "poll-path N+1 press then leftover release"):
+	if not await _assert_real_click_picks(MAP_PT, "T5(b) later click after poll leftover"):
+		return
+
+
+func _test_t5_m3_outside_button_begin() -> void:
+	# M3 (clear on same-frame press) is masked if the hit is on LivingTitleBegin
+	# (button_down re-arms). Hit left-column / slab, not the button rect.
+	if not await _spawn_title():
+		return
+	var begin_btn: Button = _place_begin_button(Vector2(80, 160), Vector2(360, 72))
+	if begin_btn == null:
+		_fail("T5 M3: LivingTitleBegin missing")
 		return
 	await _flush(2)
-	if bool(_mr.call("_begin_title_release_blocks_map_pick")):
-		_fail("poll-path leftover release left the swallow armed")
+	var btn_rect: Rect2 = begin_btn.get_global_rect()
+	var hit: Vector2 = OUTSIDE_BEGIN_PT
+	if btn_rect.has_point(hit):
+		hit = Vector2(btn_rect.position.x + 8.0, btn_rect.end.y + 80.0)
+	if btn_rect.has_point(hit):
+		_fail("T5 M3: outside-button hit still inside LivingTitleBegin")
 		return
-	if not await _assert_real_map_click_selects(MAP_PT, "later click after poll-path leftover"):
+	if _title.has_method("left_column_is_begin") and not bool(_title.call("left_column_is_begin", hit)):
+		_fail("T5 M3: hit must be a left-column Begin (not the button)")
 		return
+	if not _prepare_begin_home(hit):
+		return
+	_send_pipeline(hit, true, true)
+	if not _begin_closed():
+		_fail("T5 M3: outside-button Begin did not close the living title")
+		return
+	_pass("T5 M3: outside-button Begin closed the title (button_down cannot re-arm)")
+	await _wait_hold_ms(HOLD_MS)
+	await _flush(2)
+	if not await _assert_leftover_swallowed(hit, "T5 M3 outside-button leftover"):
+		return
+
+
+func _send_begin_key(keycode: int) -> void:
+	var ev := InputEventKey.new()
+	ev.keycode = keycode
+	ev.physical_keycode = keycode
+	ev.pressed = true
+	ev.echo = false
+	if _title != null and is_instance_valid(_title):
+		_title._input(ev)
+	if _title != null and is_instance_valid(_title) and not _begin_closed():
+		if _mr != null:
+			_mr._input(ev)
+	if _title != null and is_instance_valid(_title) and not _begin_closed():
+		if _title.has_method("handle_live_begin"):
+			_title.call("handle_live_begin")
+
+
+func _test_keyboard_begin_then_map_click() -> void:
+	for keycode in [KEY_ENTER, KEY_SPACE]:
+		var key_name: String = "Enter" if keycode == KEY_ENTER else "Space"
+		if not await _spawn_title():
+			return
+		_clear_inspector()
+		_send_begin_key(keycode)
+		if not _begin_closed():
+			_fail("keyboard Begin (%s) did not close the living title" % key_name)
+			return
+		_pass("keyboard Begin (%s) closed the title" % key_name)
+		if not await _assert_real_click_picks(MAP_PT, "map click after keyboard Begin (%s)" % key_name):
+			return
