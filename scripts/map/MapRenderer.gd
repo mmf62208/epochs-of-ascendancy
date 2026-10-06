@@ -261,9 +261,11 @@ var _close_ignore_stale_left_down := false
 ## clear after that one release, on any new left press (UI or map), and after
 ## a short safety timeout (Play: leftover eaten swallowed later top-bar ups).
 const UNIT_CARD_LATCH_SAFETY_SEC := 0.5
-## BEGIN-1 FIX #1: leftover Begin release swallow is one orphan up only.
-## A later-frame left press clears it. Expires after ~750 ms so a lost
-## release (unfocused window) cannot eat the player's first map click.
+## BEGIN-1 FIX #2: leftover Begin release swallow is one orphan up only.
+## Clock starts on the first _process after the Begin frame (restamp), then
+## expires after ~750 ms and frames >= arm_frame + 2. A later-frame left
+## press clears it unless that press is the poll-path Begin click itself
+## (begin_press_pending). Lost leftover up cannot eat the first map click.
 const BEGIN_TITLE_SWALLOW_EXPIRE_MS: int = 750
 ## Fighting card (stance + cmd) must stay on-screen at Play 1280×740.
 ## Old reserve 252 clipped Press/Hold below Halt/Assign (card grows past 220).
@@ -24693,17 +24695,31 @@ func _clear_first_session_tip_dismiss_swallow() -> void:
 		remove_meta("eoa_tip_dismiss_swallow_release")
 
 
-func arm_begin_title_release_swallow() -> void:
+func arm_begin_title_release_swallow(pending_press: bool = false) -> void:
 	# LivingTitleBoot Begin press (button_down / handle_live_pointer / _input).
-	# One leftover left-release is eaten. A later-frame left press or ~750 ms
-	# expiry drops it so a lost up cannot eat the next click.
+	# One leftover left-release is eaten. Clock is restamped on the first
+	# _process after this frame so a slow apply_living_title_boot cannot
+	# age the leftover up past 750 ms. A later-frame left press or expiry
+	# drops it so a lost up cannot eat the next click. Poll-path arms set
+	# begin_press_pending so the click's own N+1 press keeps the arm.
 	set_meta("eoa_begin_swallow_release", true)
 	set_meta("eoa_begin_swallow_arm_msec", Time.get_ticks_msec())
 	set_meta("eoa_begin_swallow_arm_frame", Engine.get_process_frames())
+	if has_meta("eoa_begin_swallow_clock_ready"):
+		remove_meta("eoa_begin_swallow_clock_ready")
+	if pending_press:
+		set_meta("eoa_begin_swallow_press_pending", true)
+	elif has_meta("eoa_begin_swallow_press_pending"):
+		remove_meta("eoa_begin_swallow_press_pending")
 
 
 func _begin_title_release_swallow_expired() -> bool:
 	if not has_meta("eoa_begin_swallow_release"):
+		return false
+	if not has_meta("eoa_begin_swallow_clock_ready"):
+		return false
+	var arm_frame: int = int(get_meta("eoa_begin_swallow_arm_frame", -1))
+	if Engine.get_process_frames() < arm_frame + 2:
 		return false
 	var arm_ms: int = int(get_meta("eoa_begin_swallow_arm_msec", 0))
 	if arm_ms > 0 and Time.get_ticks_msec() - arm_ms >= BEGIN_TITLE_SWALLOW_EXPIRE_MS:
@@ -24722,7 +24738,11 @@ func _begin_title_release_blocks_map_pick() -> bool:
 
 func _clear_begin_title_release_swallow_on_new_left_press() -> void:
 	# Same-frame Begin press must keep the arm so the matching ~80 ms up is eaten.
+	# Poll-path: the Begin click's own press arrives in N+1 — eat that one only.
 	if not has_meta("eoa_begin_swallow_release"):
+		return
+	if has_meta("eoa_begin_swallow_press_pending"):
+		remove_meta("eoa_begin_swallow_press_pending")
 		return
 	var arm_frame: int = int(get_meta("eoa_begin_swallow_arm_frame", -1))
 	if Engine.get_process_frames() > arm_frame:
@@ -24730,7 +24750,15 @@ func _clear_begin_title_release_swallow_on_new_left_press() -> void:
 
 
 func _tick_begin_title_release_swallow() -> void:
-	if has_meta("eoa_begin_swallow_release") and _begin_title_release_swallow_expired():
+	if not has_meta("eoa_begin_swallow_release"):
+		return
+	if not has_meta("eoa_begin_swallow_clock_ready"):
+		var arm_frame: int = int(get_meta("eoa_begin_swallow_arm_frame", -1))
+		if Engine.get_process_frames() > arm_frame:
+			set_meta("eoa_begin_swallow_arm_msec", Time.get_ticks_msec())
+			set_meta("eoa_begin_swallow_clock_ready", true)
+		return
+	if _begin_title_release_swallow_expired():
 		_clear_begin_title_release_swallow()
 
 
@@ -24741,6 +24769,10 @@ func _clear_begin_title_release_swallow() -> void:
 		remove_meta("eoa_begin_swallow_arm_msec")
 	if has_meta("eoa_begin_swallow_arm_frame"):
 		remove_meta("eoa_begin_swallow_arm_frame")
+	if has_meta("eoa_begin_swallow_clock_ready"):
+		remove_meta("eoa_begin_swallow_clock_ready")
+	if has_meta("eoa_begin_swallow_press_pending"):
+		remove_meta("eoa_begin_swallow_press_pending")
 
 
 func dismiss_first_session_action_tip() -> void:

@@ -1,14 +1,16 @@
 extends SceneTree
 
 ## BEGIN-1: a normal ~80 ms Begin click must not leftover-pick the map.
-## FIX #1: swallow expires after ~750 ms; a later-frame left press clears it.
-## button_down arms only while left is held (Enter/Space must not arm).
-## Drive real InputEventMouseButton press/release through MapRenderer _input /
-## _unhandled_input. Follow-up and lost-release clicks must select via the real
-## pick path (pid != -1, no _select_province fallback).
+## FIX #2: clock starts after the Begin frame (restamp on first later _process).
+## Poll-path arms set begin_press_pending so the click's own N+1 press keeps
+## the arm. Event-path keeps the same-frame rule. button_down arms only while
+## left is held (Enter/Space must not arm).
+## Drive real InputEventMouseButton through title _input then MapRenderer
+## _input (same frame). No manual arm. Follow-up / later clicks must select
+## via the real pick path (pid != -1, no _select_province fallback).
 ## Does not load WorldMap.tscn / 3520. Headless / xvfb are NOT live Play.
 ##
-##   tools/run_godot.sh --headless --import --quit
+##   timeout 1500 tools/run_godot.sh --headless --path . --import --quit
 ##   tools/run_godot.sh --headless --path . --resolution 1280x740 \
 ##     -s res://scripts/core/HeadlessBegin1TitleReleaseFallthroughTest.gd
 ##   tools/eoa_begin1_guard.sh
@@ -108,6 +110,8 @@ func _run() -> void:
 	await _test_next_map_click_still_selects()
 	await _test_keyboard_begin_then_map_click()
 	await _test_swallow_expires_and_new_press_clears()
+	await _test_same_frame_delay_does_not_expire()
+	await _test_poll_path_late_press_keeps_arm()
 
 
 func _test_source_needles() -> void:
@@ -143,8 +147,19 @@ func _test_source_needles() -> void:
 	if "get_ticks_msec" not in arm_fn or "get_process_frames" not in arm_fn:
 		_fail("arm_begin_title_release_swallow must store arm time and arm frame")
 		return
+	if "pending_press" not in arm_fn or "eoa_begin_swallow_press_pending" not in arm_fn:
+		_fail("arm_begin_title_release_swallow must take pending_press and set begin_press_pending")
+		return
 	if "BEGIN_TITLE_SWALLOW_EXPIRE_MS" not in ren and "750" not in _slice_func(ren, "_begin_title_release_blocks_map_pick"):
 		_fail("Begin swallow must expire after ~750 ms")
+		return
+	var tick_fn := _slice_func(ren, "_tick_begin_title_release_swallow")
+	if "eoa_begin_swallow_clock_ready" not in tick_fn or "get_ticks_msec" not in tick_fn:
+		_fail("_tick_begin_title_release_swallow must restamp the clock after the Begin frame")
+		return
+	var exp_fn := _slice_func(ren, "_begin_title_release_swallow_expired")
+	if "eoa_begin_swallow_clock_ready" not in exp_fn or "arm_frame + 2" not in exp_fn:
+		_fail("expiry must require restamp and frames >= arm_frame + 2")
 		return
 	if "func _clear_begin_title_release_swallow_on_new_left_press" not in ren:
 		_fail("Begin swallow must clear on a new left press")
@@ -152,6 +167,17 @@ func _test_source_needles() -> void:
 	var clear_press_fn := _slice_func(ren, "_clear_begin_title_release_swallow_on_new_left_press")
 	if "eoa_begin_swallow_arm_frame" not in clear_press_fn:
 		_fail("new left press must clear only in a later frame than the arming")
+		return
+	if "eoa_begin_swallow_press_pending" not in clear_press_fn:
+		_fail("new left press must keep the arm when begin_press_pending (poll-path late press)")
+		return
+	var apply_fn := _slice_func(title_src, "_apply_pointer_hit")
+	if "pending_press" not in apply_fn or "_on_begin_new(pending_press" not in apply_fn:
+		_fail("_apply_pointer_hit must pass event-vs-poll pending_press into _on_begin_new")
+		return
+	var begin_new_fn := _slice_func(title_src, "_on_begin_new")
+	if "pending_press" not in begin_new_fn or "from_pointer" not in begin_new_fn:
+		_fail("_on_begin_new must take pending_press / from_pointer from the pointer path")
 		return
 	var input_fn := _slice_func(ren, "_input")
 	if "_begin_title_release_blocks_map_pick" not in input_fn:
@@ -181,7 +207,7 @@ func _test_source_needles() -> void:
 	if "eoa_tip_dismiss_swallow_release" not in _slice_func(ren, "_arm_first_session_tip_dismiss_swallow"):
 		_fail("TipDismiss swallow must stay")
 		return
-	_pass("source needles: 750 ms expire + later-frame clear + left-held arm + TipDismiss kept")
+	_pass("source needles: restamp clock + poll pending_press + later-frame clear + TipDismiss kept")
 
 
 func _setup_renderer() -> bool:
@@ -457,18 +483,23 @@ func _begin_via_real_mouse_press() -> bool:
 	_clear_inspector()
 	if not _seed_loir_under_screen(_begin_pt):
 		return false
+	_warp_mouse(_begin_pt)
 	var ev: InputEventMouseButton = _press_at(_begin_pt)
-	_mr._input(ev)
+	# Title _input first, then MapRenderer _input in the same frame (c).
+	# A mutant that also clears on the same-frame press (M3) drops the arm.
+	_title._input(ev)
 	if not bool(_title.get("_closed")):
-		_title._input(ev)
-	if not bool(_title.get("_closed")):
-		_fail("Begin mouse press did not close the living title via _input")
+		_fail("Begin mouse press did not close the living title via title _input")
 		return false
-	_pass("Begin mouse press closed the title via real InputEventMouseButton")
 	if not bool(_mr.call("_begin_title_release_blocks_map_pick")):
-		_fail("Begin mouse press did not arm leftover-release swallow")
+		_fail("title _input Begin did not arm leftover-release swallow")
 		return false
-	_pass("Begin leftover-release swallow armed")
+	_mr._input(ev)
+	if not bool(_mr.call("_begin_title_release_blocks_map_pick")):
+		_fail("same-frame MapRenderer _input press cleared the Begin swallow")
+		return false
+	_pass("Begin mouse press closed the title via title _input then MapRenderer _input")
+	_pass("Begin leftover-release swallow armed through same-frame title+map press")
 	return true
 
 
@@ -605,4 +636,97 @@ func _test_swallow_expires_and_new_press_clears() -> void:
 	await _flush(2)
 	_clear_inspector()
 	if not await _assert_real_map_click_selects(MAP_PT, "first click after lost-release + fresh press"):
+		return
+
+
+func _assert_leftover_release_did_not_pick(screen_pt: Vector2, why: String) -> bool:
+	_cam.position = CAM0
+	_cam.zoom = Vector2(ZOOM0, ZOOM0)
+	if not _seed_loir_under_screen(screen_pt):
+		return false
+	_clear_inspector()
+	var z0: float = _zoom_x()
+	var pid0: int = int(_mr.get("selected_province_id"))
+	if not bool(_mr.call("_begin_title_release_blocks_map_pick")):
+		_fail("%s: swallow not armed before leftover release" % why)
+		return false
+	_send_mouse(screen_pt, false)
+	await _flush(2)
+	var got_pid: int = int(_mr.get("selected_province_id"))
+	if got_pid != pid0 and got_pid == LOIR:
+		_fail("%s: leftover release selected Loir-et-Cher via real pick (pid=%d)" % [why, got_pid])
+		return false
+	if got_pid != pid0 and got_pid > 0:
+		_fail("%s: leftover release selected pid=%d" % [why, got_pid])
+		return false
+	if _inspector_up():
+		_fail("%s: leftover release opened the inspector" % why)
+		return false
+	if absf(_zoom_x() - z0) > 0.002:
+		_fail("%s: leftover release changed zoom %.3f -> %.3f" % [why, z0, _zoom_x()])
+		return false
+	_pass("%s: leftover release did not pick / inspect / zoom" % why)
+	return true
+
+
+func _test_same_frame_delay_does_not_expire() -> void:
+	# (a) Real Begin press, then 900 ms wall-clock in the same frame.
+	# Clock must not start until the first later _process restamp.
+	if not await _begin_via_real_mouse_press():
+		return
+	OS.delay_msec(900)
+	if not bool(_mr.call("_begin_title_release_blocks_map_pick")):
+		_fail("same-frame 900 ms delay expired the swallow before leftover release")
+		return
+	await process_frame
+	if not await _assert_leftover_release_did_not_pick(_begin_pt, "same-frame 900 ms Begin then next-frame release"):
+		return
+	await _flush(2)
+	if bool(_mr.call("_begin_title_release_blocks_map_pick")):
+		_fail("Begin swallow stayed armed after the delayed leftover release")
+		return
+	_pass("same-frame 900 ms stall did not expire the Begin swallow")
+
+
+func _test_poll_path_late_press_keeps_arm() -> void:
+	# (b) Poll-path arm in frame N (handle_live_pointer(null)), press in N+1,
+	# then leftover release: no pick. A later click still picks.
+	if not await _spawn_title():
+		return
+	_cam.position = CAM0
+	_cam.zoom = Vector2(ZOOM0, ZOOM0)
+	_clear_inspector()
+	if not _seed_loir_under_screen(_begin_pt):
+		return
+	_warp_mouse(_begin_pt)
+	var polled: String = str(_title.call("handle_live_pointer", null))
+	if polled != "begin":
+		_fail("poll-path handle_live_pointer(null) did not Begin (got %s)" % polled)
+		return
+	if not bool(_title.get("_closed")):
+		_fail("poll-path Begin did not close the living title")
+		return
+	if not bool(_mr.call("_begin_title_release_blocks_map_pick")):
+		_fail("poll-path Begin did not arm leftover-release swallow")
+		return
+	_pass("poll-path handle_live_pointer(null) closed the title and armed swallow")
+	await process_frame
+	_reset_map_click_latches()
+	_cam.position = CAM0
+	_cam.zoom = Vector2(ZOOM0, ZOOM0)
+	if not _seed_loir_under_screen(_begin_pt):
+		return
+	_clear_inspector()
+	_send_mouse(_begin_pt, true)
+	if not bool(_mr.call("_begin_title_release_blocks_map_pick")):
+		_fail("poll-path N+1 press cleared the Begin swallow")
+		return
+	_pass("poll-path N+1 press kept the Begin swallow")
+	if not await _assert_leftover_release_did_not_pick(_begin_pt, "poll-path N+1 press then leftover release"):
+		return
+	await _flush(2)
+	if bool(_mr.call("_begin_title_release_blocks_map_pick")):
+		_fail("poll-path leftover release left the swallow armed")
+		return
+	if not await _assert_real_map_click_selects(MAP_PT, "later click after poll-path leftover"):
 		return
