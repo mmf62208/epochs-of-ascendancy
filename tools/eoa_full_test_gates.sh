@@ -236,6 +236,9 @@ else
   run_step launch_fac1a_hover_cache \
     tools/run_godot.sh --headless --resolution 1280x740 -s res://scripts/core/HeadlessFac1aHoverCacheTest.gd || fail
 
+  run_step launch_perf2_fleet_refresh_budget \
+    tools/run_godot.sh --headless -s res://scripts/core/HeadlessPerf2FleetRefreshBudgetTest.gd || fail
+
   run_step launch_perf3_supply_toggle \
     tools/run_godot.sh --headless --resolution 1280x740 -s res://scripts/core/HeadlessPerf3SupplyToggleTest.gd || fail
 
@@ -257,6 +260,9 @@ else
   run_step launch_ix1_title_esc_begin \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessIx1LivingTitleEscBeginTest.gd || fail
 
+  run_step launch_begin1_title_release \
+    tools/run_godot.sh --headless --resolution 1280x740 -s res://scripts/core/HeadlessBegin1TitleReleaseFallthroughTest.gd || fail
+
   run_step launch_ix1_spine_complete \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessIx1RoadSpineCompleteTest.gd || fail
 
@@ -265,6 +271,12 @@ else
 
   run_step launch_rx1_visibility \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessRx1RhineVisibilityTest.gd || fail
+
+  run_step launch_vis1_map_readability tools/run_godot.sh --headless --path . --resolution 1280x720 -s res://scripts/core/HeadlessVis1MapReadabilityTest.gd || fail
+
+  run_step launch_vis2_capital_stars_after_l \
+    tools/run_godot.sh --headless --path . --resolution 1280x720 \
+    -s res://scripts/core/HeadlessVis2CapitalStarsAfterLTest.gd || fail
 
   run_step launch_rt1_road_tier \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessRt1RoadTierForEdgeTest.gd || fail
