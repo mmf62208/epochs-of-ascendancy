@@ -112,6 +112,7 @@ run_step unit_board_play_path \
     tools.map_generation.tests.test_map_states_mapmode_product \
     tools.map_generation.tests.test_map_mode_toolbar_active_product \
     tools.map_generation.tests.test_map_state_labels_surface_product \
+    tools.map_generation.tests.test_map_nation_label_landmass_product \
     tools.map_generation.tests.test_map_live_border_fronts_surface_product \
     tools.map_generation.tests.test_map_supply_corridor_product \
     tools.map_generation.tests.test_map_supply_hub_brief_product \
@@ -228,6 +229,12 @@ else
 
   run_step launch_fac1a_airfield_icons \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessFac1aAirfieldIconTest.gd || fail
+
+  run_step launch_fac1a_pan_icons \
+    tools/run_godot.sh --headless --resolution 1280x740 -s res://scripts/core/HeadlessFac1aPanIconsTest.gd || fail
+
+  run_step launch_fac1a_hover_cache \
+    tools/run_godot.sh --headless --resolution 1280x740 -s res://scripts/core/HeadlessFac1aHoverCacheTest.gd || fail
 
   run_step launch_mv1b_input_gate \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessMv1bInputGateTest.gd || fail

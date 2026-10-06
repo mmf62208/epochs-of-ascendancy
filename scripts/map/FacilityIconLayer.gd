@@ -67,6 +67,9 @@ var _test_counter_rects: Array[Rect2] = []
 var _json_anchors: Dictionary = {}
 var _clustered: bool = false
 var _last_markers: Array[Dictionary] = []
+var _markers_zoom: float = -1.0
+var _markers_dirty: bool = true
+var _build_markers_count: int = 0
 var _debug_hit_overlay: bool = false
 
 
@@ -86,6 +89,7 @@ func _ready() -> void:
 		if not ssm.special_site_created.is_connected(_on_special_site_created):
 			ssm.special_site_created.connect(_on_special_site_created)
 	rebuild_icon_list()
+	_mark_markers_dirty()
 	queue_redraw()
 
 
@@ -95,6 +99,7 @@ func _on_special_site_created(_site: Object, _province_id: int) -> void:
 
 func notify_sites_changed() -> void:
 	rebuild_icon_list()
+	_mark_markers_dirty()
 	queue_redraw()
 
 
@@ -102,6 +107,7 @@ func set_show_facilities(enabled: bool) -> void:
 	if show_facilities == enabled:
 		return
 	show_facilities = enabled
+	_mark_markers_dirty()
 	queue_redraw()
 
 
@@ -123,6 +129,14 @@ func get_last_drawn_count() -> int:
 
 func get_last_markers() -> Array[Dictionary]:
 	return _last_markers
+
+
+func get_build_markers_count() -> int:
+	return _build_markers_count
+
+
+func _mark_markers_dirty() -> void:
+	_markers_dirty = true
 
 
 func is_clustered() -> bool:
@@ -202,6 +216,7 @@ func _halo_grow_world(zoom: float) -> float:
 
 func set_debug_hit_overlay(enabled: bool) -> void:
 	_debug_hit_overlay = enabled
+	_mark_markers_dirty()
 	queue_redraw()
 
 
@@ -476,12 +491,33 @@ func get_hit_rects_at_zoom(zoom: float) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	if not _should_draw_at(zoom):
 		return out
-	var markers := compute_markers_at_zoom(zoom)
+	var markers := _markers_for_hit_test(zoom)
 	for rec_v in markers:
 		if typeof(rec_v) != TYPE_DICTIONARY:
 			continue
 		out.append(_layout_drawn_marker(rec_v as Dictionary, zoom))
 	return out
+
+
+## Hover/click hit-test reuses the draw-side cluster cache when the requested
+## zoom matches `_markers_zoom` within the same 0.008 band `_draw` uses and
+## the cache is clean. Otherwise build once and populate `_last_markers`.
+## `compute_markers_at_zoom` stays the explicit uncached path for tests.
+func _markers_for_hit_test(zoom: float) -> Array[Dictionary]:
+	if (
+		not _markers_dirty
+		and not _last_markers.is_empty()
+		and absf(zoom - _markers_zoom) <= 0.008
+	):
+		return _last_markers
+	var prev := _test_zoom
+	_test_zoom = zoom
+	var markers := _build_markers()
+	_test_zoom = prev
+	_last_markers = markers
+	_markers_zoom = zoom
+	_markers_dirty = false
+	return markers
 
 
 func badge_inside_footprint_at(zoom: float) -> bool:
@@ -567,6 +603,8 @@ func get_draw_world(pid: int) -> Vector2:
 
 
 func compute_markers_at_zoom(zoom: float) -> Array[Dictionary]:
+	## Explicit / test-zoom path: always rebuild at the requested zoom.
+	## Hover hit-test does not call this.
 	var prev := _test_zoom
 	_test_zoom = zoom
 	var markers := _build_markers()
@@ -584,11 +622,13 @@ func setup_for_test(provinces: Dictionary, centroids: Dictionary, board_n: int =
 
 func set_test_zoom(zoom: float) -> void:
 	_test_zoom = zoom
+	_mark_markers_dirty()
 	queue_redraw()
 
 
 func set_test_map_mode(mode: String) -> void:
 	_test_map_mode = mode.strip_edges().to_lower()
+	_mark_markers_dirty()
 	queue_redraw()
 
 
@@ -628,6 +668,7 @@ static func texture_key_for_level(level: int, state: String) -> String:
 
 func rebuild_icon_list() -> void:
 	_rebuild_count += 1
+	_mark_markers_dirty()
 	_icons.clear()
 	_load_json_anchors()
 	var provinces: Dictionary = _provinces_for_scan()
@@ -1060,7 +1101,13 @@ func _process(_delta: float) -> void:
 	var pos := cam.global_position if cam != null else Vector2.ZERO
 	var zoom_changed := absf(z - _last_zoom) > 0.008
 	var pan_changed := _last_cam_pos != Vector2.INF and pos.distance_to(_last_cam_pos) > 8.0
+	# Clustering is translation-invariant (gaps depend on world×zoom only).
+	# Pan ≥8px still queue_redraws so viewport-culled icons appear, but the
+	# marker cache stays valid. Zoom dirties the cache (_last_zoom is owned
+	# here — _draw compares _markers_zoom, not this field).
 	if zoom_changed or pan_changed:
+		if zoom_changed:
+			_mark_markers_dirty()
 		_last_zoom = z
 		_last_cam_pos = pos
 		queue_redraw()
@@ -1148,6 +1195,7 @@ func _screen_of(world: Vector2) -> Vector2:
 
 
 func _build_markers() -> Array[Dictionary]:
+	_build_markers_count += 1
 	var z := _canvas_zoom()
 	var icon_px := _icon_screen_px(z)
 	var items: Array[Dictionary] = []
@@ -1452,12 +1500,15 @@ func _mm_centroid(pid: int) -> Vector2:
 
 func _draw() -> void:
 	_drawn_count = 0
-	_last_markers.clear()
 	if not _should_draw():
 		return
 	var z := _canvas_zoom()
-	var markers := _build_markers()
-	_last_markers = markers
+	var markers: Array[Dictionary] = _last_markers
+	if _markers_dirty or markers.is_empty() or absf(z - _markers_zoom) > 0.008:
+		markers = _build_markers()
+		_last_markers = markers
+		_markers_zoom = z
+		_markers_dirty = false
 	for rec in markers:
 		var world: Vector2 = rec.get("world", Vector2.ZERO) as Vector2
 		if not world.is_finite():

@@ -25876,7 +25876,10 @@ func _refresh_province_fill_colors(refresh_all: bool = false) -> void:
 			col = col.lerp(Color(0.85, 0.25, 0.25, 0.55), 0.40)  # riot red tint
 		poly.color = col
 	_refresh_supply_highlights()
-	_fill_zoom_at_last_paint = _zoom_fill_characterization_scale
+	# Drift compares camera zoom. GIS locks container.scale at 1.0 — recording
+	# that scale here made every unpaused Home/operational frame look like a
+	# zoom drift and recolored all ~3520 fills.
+	_fill_zoom_at_last_paint = _get_camera_zoom()
 
 
 ## Perf/scale helper for lazy culling in fills/overlays: return set of "active" pids worth processing (events/riots/pending research, player/majors owned, high pop/econ proxies, borders).

@@ -9,8 +9,23 @@ from typing import Any, Dict, List, Set, Tuple
 
 ROOT = Path(__file__).resolve().parents[3]
 LABELS_GD = ROOT / "scripts" / "map" / "MapPoliticalLabelsLayer.gd"
+ZOOM_LOD_GD = ROOT / "scripts" / "map" / "MapZoomLOD.gd"
+ROAD_TIER_GD = ROOT / "scripts" / "map" / "RoadTierVisual.gd"
 MENU_GD = ROOT / "scripts" / "ui" / "MainMenu.gd"
 MENU_TSCN = ROOT / "scenes" / "ui" / "MainMenu.tscn"
+
+# Mirror MapZoomLOD nation-label camera policy (LABEL-1).
+NATION_LABEL_EUROPE_ZOOM = 0.40
+NATION_LABEL_MID_ZOOM = 0.776
+NATION_LABEL_CLOSE_ZOOM = 1.80
+NATION_LABEL_FADE_START_ZOOM = 0.82
+NATION_LABEL_HIDE_ZOOM = 0.98
+NATION_LABEL_CITY_LABEL_ZOOM = 1.50
+NATION_LABEL_EUROPE_HEIGHT_FRAC = 0.032
+NATION_LABEL_MID_HEIGHT_FRAC = 0.026
+NATION_LABEL_EUROPE_RATIO_BAND = (0.018, 0.045)
+NATION_LABEL_MID_RATIO_BAND = (0.016, 0.038)
+NATION_LABEL_CLOSE_RATIO_MAX = 0.012
 
 
 def capital_landmass_centroid(
@@ -52,6 +67,119 @@ def capital_landmass_centroid(
     if wsum <= 0:
         return None
     return (sx / wsum, sy / wsum)
+
+
+def nation_label_target_frac_of_height(zoom: float) -> float:
+    zz = max(float(zoom), 0.01)
+    if zz <= NATION_LABEL_EUROPE_ZOOM:
+        return NATION_LABEL_EUROPE_HEIGHT_FRAC
+    if zz >= NATION_LABEL_HIDE_ZOOM:
+        return 0.0
+    if zz <= NATION_LABEL_MID_ZOOM:
+        span = max(NATION_LABEL_MID_ZOOM - NATION_LABEL_EUROPE_ZOOM, 0.01)
+        t = max(0.0, min(1.0, (zz - NATION_LABEL_EUROPE_ZOOM) / span))
+        return NATION_LABEL_EUROPE_HEIGHT_FRAC + (
+            NATION_LABEL_MID_HEIGHT_FRAC - NATION_LABEL_EUROPE_HEIGHT_FRAC
+        ) * t
+    # Fade band (0.82–0.98): hold mid on-screen size. Alpha fades separately.
+    return NATION_LABEL_MID_HEIGHT_FRAC
+
+
+def nation_label_font_px_for_camera(zoom: float, viewport_h: float) -> int:
+    frac = nation_label_target_frac_of_height(zoom)
+    target = frac * max(float(viewport_h), 1.0)
+    if target <= 0.5 or zoom >= NATION_LABEL_HIDE_ZOOM or zoom >= NATION_LABEL_CITY_LABEL_ZOOM:
+        return 0
+    font_px = int(round(target / max(float(zoom), 0.08)))
+    return max(10, min(96, font_px))
+
+
+def nation_label_effective_screen_px(font_px: int, zoom: float, node_scale: float) -> float:
+    return float(max(int(font_px), 0)) * max(float(zoom), 0.0) * max(float(node_scale), 0.0)
+
+
+def nation_label_height_ratio(
+    font_px: int, zoom: float, node_scale: float, viewport_h: float
+) -> float:
+    return nation_label_effective_screen_px(font_px, zoom, node_scale) / max(float(viewport_h), 1.0)
+
+
+def nation_label_is_texture_magnified(font_px: int, zoom: float, node_scale: float) -> bool:
+    if int(font_px) <= 0:
+        return False
+    effective = nation_label_effective_screen_px(font_px, zoom, node_scale)
+    if effective <= 0.5:
+        return False
+    return effective > float(font_px) + 0.75 or float(node_scale) > 1.02
+
+
+def _label1_bands_ok(viewport_h: float = 720.0) -> Tuple[bool, List[str], List[str]]:
+    passes: List[str] = []
+    fails: List[str] = []
+    cases = (
+        ("europe", NATION_LABEL_EUROPE_ZOOM, NATION_LABEL_EUROPE_RATIO_BAND, False),
+        ("mid", NATION_LABEL_MID_ZOOM, NATION_LABEL_MID_RATIO_BAND, False),
+        ("close", NATION_LABEL_CLOSE_ZOOM, (0.0, NATION_LABEL_CLOSE_RATIO_MAX), True),
+    )
+    for name, zoom, band, must_hide in cases:
+        font_px = nation_label_font_px_for_camera(zoom, viewport_h)
+        ratio = nation_label_height_ratio(font_px, zoom, 1.0, viewport_h)
+        magnified = nation_label_is_texture_magnified(font_px, zoom, 1.0)
+        lo, hi = band
+        if must_hide and font_px != 0:
+            fails.append("%s_font_not_hidden=%d" % (name, font_px))
+        elif (not must_hide) and font_px <= 0:
+            fails.append("%s_font_hidden" % name)
+        else:
+            passes.append("%s_font=%d" % (name, font_px))
+        if magnified:
+            fails.append("%s_texture_magnified" % name)
+        else:
+            passes.append("%s_not_magnified" % name)
+        if lo <= ratio <= hi:
+            passes.append("%s_ratio=%.4f" % (name, ratio))
+        else:
+            fails.append("%s_ratio=%.4f_want_%.3f..%.3f" % (name, ratio, lo, hi))
+    mid_r = nation_label_height_ratio(
+        nation_label_font_px_for_camera(NATION_LABEL_MID_ZOOM, viewport_h),
+        NATION_LABEL_MID_ZOOM,
+        1.0,
+        viewport_h,
+    )
+    eu_r = nation_label_height_ratio(
+        nation_label_font_px_for_camera(NATION_LABEL_EUROPE_ZOOM, viewport_h),
+        NATION_LABEL_EUROPE_ZOOM,
+        1.0,
+        viewport_h,
+    )
+    if mid_r <= eu_r + 0.002:
+        passes.append("mid_le_europe")
+    else:
+        fails.append("mid_larger_than_europe")
+    fade_z = 0.90
+    fade_px = nation_label_font_px_for_camera(fade_z, viewport_h)
+    fade_r = nation_label_height_ratio(fade_px, fade_z, 1.0, viewport_h)
+    fade_eff = nation_label_effective_screen_px(fade_px, fade_z, 1.0)
+    mid_eff = nation_label_effective_screen_px(
+        nation_label_font_px_for_camera(NATION_LABEL_MID_ZOOM, viewport_h),
+        NATION_LABEL_MID_ZOOM,
+        1.0,
+    )
+    if fade_px <= 0:
+        fails.append("fade_font_hidden")
+    elif fade_eff + 0.51 < mid_eff:
+        fails.append("fade_smaller_than_mid")
+    else:
+        passes.append("fade_holds_mid_size=%.1f" % fade_eff)
+    if 0.016 <= fade_r <= 0.038:
+        passes.append("fade_ratio=%.4f" % fade_r)
+    else:
+        fails.append("fade_ratio=%.4f" % fade_r)
+    if nation_label_is_texture_magnified(20, NATION_LABEL_MID_ZOOM, 2.5):
+        passes.append("scale_2_5_detected")
+    else:
+        fails.append("scale_2_5_not_flagged")
+    return (len(fails) == 0, passes, fails)
 
 
 def build_map_nation_label_landmass_product() -> Dict[str, Any]:
@@ -100,6 +228,8 @@ def build_map_nation_label_landmass_product() -> Dict[str, Any]:
         fails.append("included_disconnected_colony")
 
     gd = LABELS_GD.read_text(encoding="utf-8") if LABELS_GD.is_file() else ""
+    lod = ZOOM_LOD_GD.read_text(encoding="utf-8") if ZOOM_LOD_GD.is_file() else ""
+    road = ROAD_TIER_GD.read_text(encoding="utf-8") if ROAD_TIER_GD.is_file() else ""
     menu = MENU_GD.read_text(encoding="utf-8") if MENU_GD.is_file() else ""
     tscn = MENU_TSCN.read_text(encoding="utf-8") if MENU_TSCN.is_file() else ""
     if "func _capital_landmass_centroid" in gd and "_capital_landmass_centroid(" in gd:
@@ -114,6 +244,42 @@ def build_map_nation_label_landmass_product() -> Dict[str, Any]:
         passes.append("menu_save_path")
     else:
         fails.append("menu_no_save")
+
+    label1_needles = (
+        "nation_label_font_px_for_camera",
+        "nation_label_is_texture_magnified",
+        "NATION_LABEL_MID_ZOOM",
+        "PROCESS_MODE_ALWAYS",
+        "seed_debug_nation_label",
+        "lbl.scale = Vector2.ONE",
+        "_sync_live_viewport_box",
+        "_apply_nation_fade_modulate",
+        "_apply_nation_visibility_only",
+        "_apply_state_visibility_only",
+        "VIEWPORT_BOX_POS_DEAD_FRAC",
+    )
+    for needle in label1_needles:
+        src = lod if needle.startswith("nation_label_") or needle.startswith("NATION_LABEL_") else gd
+        if needle == "nation_label_font_px_for_camera" or needle == "nation_label_is_texture_magnified" or needle == "NATION_LABEL_MID_ZOOM":
+            src = lod
+        if needle in src:
+            passes.append("label1_%s" % needle)
+        else:
+            fails.append("missing_%s" % needle)
+    if "END_LABEL_ZOOM_MIN := 1.50" in road and "Köln" in road:
+        passes.append("city_labels_mid_close")
+    else:
+        fails.append("city_label_lod_regressed")
+    if "FacilityIconLayer" not in gd and "TipDismiss" not in gd:
+        passes.append("label_layer_keeps_fences")
+    else:
+        fails.append("label_layer_touched_fences")
+
+    bands_ok, band_pass, band_fail = _label1_bands_ok(720.0)
+    passes.extend(band_pass)
+    fails.extend(band_fail)
+    if not bands_ok:
+        fails.append("label1_bands")
 
     ok = len(fails) == 0
     return {
