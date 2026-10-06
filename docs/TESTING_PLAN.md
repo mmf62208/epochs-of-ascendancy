@@ -612,6 +612,8 @@ Live-scale xvfb FIX #2b (GER Home, RSS **2145.6**, RESULT=PASS, uncropped 1280×
 
 Pixel samples: nation/NATO/label chrome present; choke=0 at all 16 plate centres. Live clicks 10/10: CH ENG/ITA/POL/USA opened read-only; NS GER own full card (`fight=true` `assign=true`); NS FRA/JAP/SOV read-only; East Kent `711453` `(7119.1, 1620.9)` + old ENG chip `(7134.5, 1610.3)` → `ENG_formation_2` (Channel fleet, not GER Div 6).
 
+**PERF-2 (idle 6th-frame + wheel-notch, HOLD merge):** Shared-sea stack offsets cache by `(pid, count, radius)` so `_refresh_province_detail_visibility` does not rebuild Channel / North Sea layouts every 6 unpaused frames. Wheel schedule no longer double-calls `_refresh_terrain_zoom_light`. Capital-star theme px skipped when unchanged. `plate_label` logs on change only. Guard `HeadlessPerf2FleetRefreshBudgetTest` (offsets identical with/without cache; detail refresh < 80 ms; wheel notch < 100 ms). Live recipe `docs/evidence/perf2/CLICKS.md`. FacilityIconLayer / MapZoomLOD / pick / TipDismiss / ORDERS / camera **unedited**.
+
 Guard: `HeadlessFleet2SharedSeaMarkerTest` + `tools/eoa_fleet2_guard.sh` (hd + xvfb 1280×740). Seeds are real `world_accurate` label_anchors (production stationing):
 
 | seed | pid | world |
