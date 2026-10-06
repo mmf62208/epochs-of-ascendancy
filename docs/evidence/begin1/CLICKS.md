@@ -4,9 +4,9 @@ Window **1280×740** Absolute **@(0, 29)** · GER 1936 · `world_accurate`.
 Do **not** raise the window. Do **not** use Ctrl.
 Headless / xvfb ≠ live Play.
 
-**Tip:** `1868dced592c4ee5c347dec0271a9ea14283564c` (product `f18a341a`) BEGIN-1 FIX #2
-(restamp clock after the Begin frame + poll-path `begin_press_pending`).
-Update SHA after the push.
+**Code SHA:** `f18a341a02fc823c35e037cc8e8e61f951eac41b` (product frozen).
+Later commits are **test / docs only**. BEGIN-1 FIX #3 is the real-pipeline
+leftover test (T1–T5). Do not treat a later docs SHA as the product.
 
 ## Pre-step
 

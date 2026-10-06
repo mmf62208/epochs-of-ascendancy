@@ -2,48 +2,41 @@
 
 Updated: 2026-10-06
 From: Cloud Agent
-**Status:** draft PR · **merge HOLD** · **FIX #2** (restamp clock + poll pending press)
+**Status:** draft PR · **merge HOLD** · **FIX #3** (test-only real pipeline)
 
 | | |
 |---|---|
 | **Base** | main `425b4448c7bec8b7f8d5602193b8e8466d1e5ec2` (LABEL-1) |
 | **Branch** | `cursor/begin1-title-release-swallow-d55e` |
-| **Product** | `f18a341a02fc823c35e037cc8e8e61f951eac41b` |
-| **Tip** | `1868dced592c4ee5c347dec0271a9ea14283564c` |
+| **Code SHA** | `f18a341a02fc823c35e037cc8e8e61f951eac41b` (product frozen) |
+| **Later commits** | **test / docs only** — MapRenderer / LivingTitleBoot unedited after `f18a341a` |
 | **PR** | https://github.com/mmf62208/epochs-of-ascendancy/pull/84 |
 | Verdict | isolated keep-green **PASS**. xvfb ≠ live Play. Merge **HOLD**. |
 
-## Proven cause (FIX #2 re-gate of `8a32fa6f`: NOT READY)
+## Proven cause (FIX #3 re-gate of `bef7fef2`: test NOT READY)
 
-Two real gaps, both missed by the FIX #1 test:
+Product at `f18a341a` is READY. The FIX #2 test was not a behavior proof:
 
-1. The 750 ms clock started **before** the slow Begin frame. Arming happens
-   before `apply_living_title_boot` (~0.7–1.1 s), so the leftover release
-   arrived 671–757 ms old. 8 cores: swallowed 7/8 (one expired at exactly
-   750 ms). 2 cores (`taskset`): a 100 ms Begin click opened Loir-et-Cher
-   and zoomed to 0.900 in 2/2 runs. `e5e3e338` swallowed there.
-2. The later-frame clear broke the poll path. When Begin fires from a
-   `_process` poll (TestRunner, title poll, `handle_live_pointer(null)`),
-   the click's own press arrives in frame N+1, clears the arm, and the
-   release picks.
+- Event-path 80 ms / (a) / (c) also **PASS on main** `425b4448` (no swallow). Direct `_mr._input` leftover does not pick.
+- Only (b) poll caught the bug by behavior.
+- M1 / M2 / M3 were caught only by internal-flag checks.
+- M7 / M9 were caught only by source-text needles.
+- A real-pipeline probe does catch it: main picks Loir-et-Cher; the tip does not.
 
-## Diff
+## Diff (FIX #3, test-only)
 
-- `MapRenderer._tick_begin_title_release_swallow`: first `_process` with
-  frames > arm_frame restamps the clock to now. Expiry only after that
-  restamp **and** frames >= arm_frame + 2.
-- Poll-path arms (`handle_live_pointer(null)`) set `begin_press_pending`.
-  The first left press (including `_input` + `_unhandled_input` in that
-  same frame) clears pending and keeps the arm. Later presses clear as
-  before. Event-path keeps the same-frame rule.
-- `LivingTitleBoot._apply_pointer_hit` → `_on_begin_new(pending_press,
-  from_pointer)` → `arm_begin_title_release_swallow(pending_press)`.
-- Guard: (a) same-frame `OS.delay_msec(900)` then next-frame release;
-  (b) poll-path N+1 press keeps arm, later click picks; (c) title `_input`
-  then MapRenderer `_input` same frame (M3); (d) lost-release + keyboard.
+`HeadlessBegin1TitleReleaseFallthroughTest` leftover / follow-up uses the real pipeline: `_title._input` **and** same-frame `Input.parse_input_event` + `Input.flush_buffered_events`. Leftover / follow-up judged by pid / inspector / zoom only (no swallow-flag early-out).
+
+| case | what it proves |
+|---|---|
+| **T1** | Event-path 80 ms through the real pipeline. **FAIL** on main (Loir picked). **PASS** on the tip. |
+| **T2** | Event Begin, drop leftover, real click 3 frames later must pick. Catches **M2**. |
+| **T3** | Poll Begin, no press / no release, wait ≥1000 ms + 3 frames, first click must pick. Catches **M1**. |
+| **T4** | T1 pipeline + `OS.delay_msec(900)` in the Begin frame, release in N+2, must be swallowed. Catches **M7**. |
+| **T5** | Keep poll-path **(b)**. M3: Begin hit **outside** the button rect. **M9** makes no T1–T5 behavior difference. |
 
 Camera / edge-pan / TipDismiss / FacilityIconLayer / labels / fleet stack /
-unit pick ranking **unedited**. TestRunner poll wiring **unedited**.
+unit pick ranking **unedited**. Product `f18a341a` **unedited**.
 
 ## Play recipe (human)
 
@@ -60,12 +53,12 @@ Pre-step: `timeout 1500 tools/run_godot.sh --headless --path . --import --quit`
    or after a later fresh press (not the poll-path Begin click itself),
    the first map click must pick.
 
-## Gates (tip `1868dced592c4ee5c347dec0271a9ea14283564c`, product `f18a341a`)
+## Gates (code SHA `f18a341a`; later commits test/docs only)
 
 | gate | kind | result |
 |---|---|---|
-| `HeadlessBegin1TitleReleaseFallthroughTest` | hd | **PASS** (`eoa_begin1_guard.sh` 1212.7 MB) |
-| `HeadlessBegin1TitleReleaseFallthroughTest` | xvfb | **PASS** (`eoa_begin1_guard.sh` 1376.4 MB) |
+| `HeadlessBegin1TitleReleaseFallthroughTest` | hd | **PASS** (`eoa_begin1_guard.sh` 1212.8 MB) |
+| `HeadlessBegin1TitleReleaseFallthroughTest` | xvfb | **PASS** (`eoa_begin1_guard.sh` 1343.4 MB) |
 | `HeadlessFirstSessionReadabilityTest` (TipDismiss) | hd | **PASS** |
 | `HeadlessIx1LivingTitleEscBeginTest` | hd | **PASS** |
 | `HeadlessFleet1LandSpillGateTest` | hd | **PASS** |
@@ -76,20 +69,26 @@ Pre-step: `timeout 1500 tools/run_godot.sh --headless --path . --import --quit`
 | `tools/eoa_full_test_gates.sh --quick` | pure | same **14** `unit_board_play_path` reds as main; no new red. `map_qc` env skip (no Pillow). HOI open_p0=0. |
 | `tools/live2_ts.sh` | live 2-core | **not present** in tree |
 
-## Mutants (each FAIL)
+## Fail-on-main / pass-on-tip (T1–T4, xvfb)
 
-| mutant | fail |
-|---|---|
-| M1 no expiry | lost-release swallow stayed armed after 800 ms |
-| M2 no later-press clear | later-frame left press did not clear |
-| M3 clear on same-frame press | title `_input` then MapRenderer `_input` dropped the arm |
-
-## Fail-before `8a32fa6f` / pass-after tip
-
-| case | `8a32fa6f` | tip |
+| case | main `425b4448` | tip |
 |---|---|---|
-| (a) same-frame 900 ms stall, release next frame | **FAIL** (clock expired) | **PASS** |
-| (b) poll-path N+1 press then leftover release | **FAIL** (N+1 press cleared arm) | **PASS** |
+| T1 event-path 80 ms leftover | **FAIL** (Loir-et-Cher `710671`) | **PASS** |
+| T2 drop leftover, click 3 frames later | PASS (no swallow to eat the click) | **PASS** |
+| T3 poll, 1000 ms + 3 frames, first click | PASS (no swallow to eat the click) | **PASS** |
+| T4 same-frame 900 ms, release N+2 | **FAIL** (Loir-et-Cher `710671`) | **PASS** |
+
+T2 / T3 are mutant catchers (M2 / M1), not fail-on-main leftover proofs. T1 and T4 leftover-pick on main.
+
+## Behavior-only mutants (flag + source-text assertions removed)
+
+| mutant | behavior | caught by |
+|---|---|---|
+| M1 no expiry | **FAIL** | T3 first click `pid=-1` |
+| M2 no later-press clear | **FAIL** | T2 click `pid=-1` |
+| M3 clear on same-frame press | **FAIL** | T5 outside-button leftover picked Loir (T1 on-button still PASSes — `button_down` re-arms) |
+| M7 clock not re-stamped | **FAIL** | T4 leftover picked Loir |
+| M9 drop `arm_frame+2` only | **PASS** | no T1–T5 behavior difference |
 
 ## Test-merge (local only)
 
