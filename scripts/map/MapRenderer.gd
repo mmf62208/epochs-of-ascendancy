@@ -2550,6 +2550,8 @@ func _apply_home_key(shift_pressed: bool) -> void:
 	if shift_pressed:
 		fit_camera_to_full_world()
 		_sync_unit_counter_paint()
+		# Same star LOD as a wheel notch to this zoom (paused Home skips _process LOD).
+		_sync_capital_star_scales()
 	else:
 		center_europe_in_world_view()
 		if typeof(DebugOverlay) != TYPE_NIL:
@@ -16567,6 +16569,9 @@ func center_europe_in_world_view() -> void:
 	# Home zoom is often still strategic-tier (~0.33–0.49). Re-paint chips here —
 	# paused first-session never reaches _refresh_province_detail_visibility.
 	_sync_unit_counter_paint()
+	# Stars use the same STRATEGIC_MAX_ZOOM hide rule as a wheel notch. Home is a
+	# camera jump, so _refresh_terrain_zoom_light never runs while paused.
+	_sync_capital_star_scales()
 	print("MapRenderer: centered on Europe (Berlin+Paris+Rome frame) inside world view")
 
 
@@ -29286,10 +29291,21 @@ func _refresh_supply_highlights() -> void:
 	# Hang-class: province pick must not walk 3520 outlines when supply overlay is off.
 	if not supply_mode and _supply_role_by_province.is_empty():
 		return
+	var prev_pids: Array[int] = []
+	if not supply_mode:
+		for pid_v in _supply_role_by_province.keys():
+			prev_pids.append(int(pid_v))
 	var roles := _supply_highlight_roles()
-	_supply_role_by_province = roles
 	if roles.is_empty() and not supply_mode:
+		# L off used to assign the empty dict then return, leaving yellow
+		# SupplyOutline Line2Ds in the tree until the next map-mode switch.
+		for pid in prev_pids:
+			var hide_node := _province_node(pid)
+			if hide_node != null:
+				ProvinceMapVisuals.hide_polished_outline(hide_node, ProvinceMapVisuals.NODE_SUPPLY)
+		_supply_role_by_province = roles
 		return
+	_supply_role_by_province = roles
 	for pid in province_nodes.keys():
 		var node := _province_node(int(pid))
 		if node == null:
