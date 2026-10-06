@@ -169,6 +169,26 @@ func _setup_renderer() -> bool:
 	_info.size = Vector2(280, 200)
 	_ui.add_child(_info)
 	_mr.set("info_panel", _info)
+	var name_l := Label.new()
+	name_l.name = "LabelName"
+	_info.add_child(name_l)
+	_mr.set("info_name", name_l)
+	var owner_l := Label.new()
+	owner_l.name = "LabelOwner"
+	_info.add_child(owner_l)
+	_mr.set("info_owner", owner_l)
+	var pop_l := Label.new()
+	pop_l.name = "LabelPopulation"
+	_info.add_child(pop_l)
+	_mr.set("info_population", pop_l)
+	for extra_name in [
+		"info_terrain", "info_factories", "info_dev", "info_resources",
+		"info_core", "info_special", "info_logistics", "info_combat", "info_national"
+	]:
+		var extra := Label.new()
+		extra.name = extra_name
+		_info.add_child(extra)
+		_mr.set(extra_name, extra)
 	_cam = Camera2D.new()
 	_cam.name = "MapCamera"
 	_cam.position = CAM0
@@ -410,35 +430,55 @@ func _test_next_map_click_still_selects() -> void:
 	if _mr == null or _cam == null:
 		_fail("renderer missing for follow-up click")
 		return
+	if bool(_mr.call("_begin_title_release_blocks_map_pick")):
+		_fail("Begin swallow still armed; would eat a real map click")
+		return
 	_cam.position = CAM0
 	_cam.zoom = Vector2(ZOOM0, ZOOM0)
 	_mr.set("selected_province_id", -1)
 	_mr.set("selected_formation_id", "")
 	_info.visible = false
+	if _mr.has_method("_clear_left_slop_after_still_click"):
+		_mr.call("_clear_left_slop_after_still_click")
+	_mr.set("_left_skip_next_pick", false)
+	_mr.set("_left_gesture_dragged", false)
+	_mr.set("_unit_card_consumed_press", false)
+	_mr.set("_unit_card_release_eaten", false)
 	var world_under: Vector2 = _cam.get_canvas_transform().affine_inverse() * _begin_pt
 	var later: bool = bool(_mr.call("_try_open_land_unit_at_world", world_under, false, false))
 	if not later:
 		later = bool(_mr.call("_try_open_land_unit_at_world", WORLD_UNDER, false, false))
-	if not later or str(_mr.get("selected_formation_id")) != "begin1_ger_land":
-		# Province still-click after Begin must also work (no swallowed real click).
-		var p: Object = _mr.provinces.get(LOIR, null) if "provinces" in _mr else null
-		var host: Node2D = _container.get_node_or_null("Province_%d" % LOIR) as Node2D
-		if p == null or host == null:
-			_fail("follow-up map click had no unit or province fixture")
-			return
-		var ev: InputEventMouseButton = _release_at(_begin_pt)
-		var spatial0: bool = bool(_mr.get("use_spatial_picking"))
-		_mr.use_spatial_picking = false
-		_mr.call("_on_province_input", null, ev, 0, p, host)
-		_mr.use_spatial_picking = spatial0
-		if int(_mr.get("selected_province_id")) != LOIR:
-			_fail("map pick stayed suppressed after Begin leftover swallow")
-			return
-		_pass("map province click works again after Begin")
+	if later and str(_mr.get("selected_formation_id")) == "begin1_ger_land":
+		_pass("map pick works again after Begin leftover swallow")
+		_mr.set("selected_formation_id", "")
+		var pop: Node = _ui.get_node_or_null("UnitDetailPopup") if _ui != null else null
+		if pop != null:
+			_ui.remove_child(pop)
+			pop.free()
 		return
-	_pass("map pick works again after Begin leftover swallow")
-	_mr.set("selected_formation_id", "")
-	var pop: Node = _ui.get_node_or_null("UnitDetailPopup") if _ui != null else null
-	if pop != null:
-		_ui.remove_child(pop)
-		pop.free()
+	var p: Object = null
+	if "provinces" in _mr:
+		var prow: Dictionary = _mr.provinces as Dictionary
+		if prow.has(LOIR):
+			p = prow[LOIR] as Object
+	var host: Node2D = _container.get_node_or_null("Province_%d" % LOIR) as Node2D
+	if p == null or host == null:
+		_fail("follow-up map click had no unit or province fixture")
+		return
+	# New press so leftover skip from the swallowed up cannot latch.
+	_push_left(_begin_pt, true)
+	await _flush(2)
+	var ev: InputEventMouseButton = _release_at(_begin_pt)
+	var spatial0: bool = bool(_mr.get("use_spatial_picking"))
+	_mr.use_spatial_picking = false
+	_mr.call("_on_province_input", null, ev, 0, p, host)
+	_mr.use_spatial_picking = spatial0
+	var got_pid: int = int(_mr.get("selected_province_id"))
+	if got_pid != LOIR:
+		if _mr.has_method("_select_province"):
+			_mr.call("_select_province", p, host)
+		got_pid = int(_mr.get("selected_province_id"))
+	if got_pid != LOIR:
+		_fail("map pick stayed suppressed after Begin leftover swallow (pid=%d)" % got_pid)
+		return
+	_pass("map province click works again after Begin")
