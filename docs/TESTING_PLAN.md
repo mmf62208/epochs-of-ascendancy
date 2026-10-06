@@ -365,8 +365,11 @@ Default F5 board is **`world_accurate`**. Four Rhineland airfields seed through 
 ```bash
 python3 -m unittest tools.map_generation.tests.test_fac1a_airfield_icons -v
 tools/run_godot.sh --headless --path . -s res://scripts/core/HeadlessFac1aAirfieldIconTest.gd
+tools/run_godot.sh --headless --path . --resolution 1280x740 -s res://scripts/core/HeadlessFac1aPanIconsTest.gd
 tools/eoa_fac1a_pixel_guard.sh
 ```
+
+**PERF-1 FIX #1 (pan icons):** `_process` still `queue_redraw`s on ≥8px pan so previously culled airfields appear. Clusters cache per `_markers_zoom`; `_build_markers` must not increment on pan. Headless `HeadlessFac1aPanIconsTest` **RESULT=PASS** (Home z=0.33, ≥1 screen-width pan, drawn>0, build count unchanged). MapRenderer fill-zoom fix kept. Camera / edge-pan / chip pick **unedited**.
 
 xvfb screenshots go to `/opt/cursor/artifacts/fac1a/`, `/opt/cursor/artifacts/fac1a_fix2/`, `/opt/cursor/artifacts/fac1a_fix2b/`, `/opt/cursor/artifacts/fac1a_fix2c/`, `/opt/cursor/artifacts/fac1a_fix3/`, and `/opt/cursor/artifacts/fac1a_fix4/` and are **NOT live Play**. Peak RSS must stay under 3 GB (isolated process tree — do not sum leftover Godot). Merge **HOLD**.
 
