@@ -173,7 +173,7 @@ func _test_source_needles() -> void:
 		_fail("sea-disk clear must invalidate the fleet offset cache")
 		return
 	var sched := _slice_func(ren, "_schedule_light_terrain_zoom_refresh")
-	if "_refresh_terrain_zoom_light" in sched:
+	if "_refresh_terrain_zoom_light()" in sched:
 		_fail("_schedule_light_terrain_zoom_refresh must not refresh immediately (wheel already did)")
 		return
 	if "_pending_terrain_zoom_refresh" not in sched:

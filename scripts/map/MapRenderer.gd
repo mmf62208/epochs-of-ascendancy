@@ -2932,7 +2932,7 @@ func _input(event: InputEvent) -> void:
 
 
 func _schedule_light_terrain_zoom_refresh() -> void:
-	# Wheel already ran _refresh_terrain_zoom_light via _zoom_toward_mouse.
+	# Wheel already ran the light LOD pass via _zoom_toward_mouse.
 	# Only queue the post-burst flush — never refresh again this frame.
 	_pending_terrain_zoom_refresh = true
 	_wheel_zoom_terrain_at_msec = Time.get_ticks_msec()
