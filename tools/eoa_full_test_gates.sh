@@ -112,6 +112,7 @@ run_step unit_board_play_path \
     tools.map_generation.tests.test_map_states_mapmode_product \
     tools.map_generation.tests.test_map_mode_toolbar_active_product \
     tools.map_generation.tests.test_map_state_labels_surface_product \
+    tools.map_generation.tests.test_map_nation_label_landmass_product \
     tools.map_generation.tests.test_map_live_border_fronts_surface_product \
     tools.map_generation.tests.test_map_supply_corridor_product \
     tools.map_generation.tests.test_map_supply_hub_brief_product \
