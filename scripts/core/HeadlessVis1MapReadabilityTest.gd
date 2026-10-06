@@ -1,9 +1,11 @@
 extends SceneTree
 
-## VIS-1: first-session map readability — paused Home hides capital stars;
-## L on then L off leaves no supply-outline residue.
-## Drives the real Home key and L toggle. Does not load WorldMap.tscn / 3520.
-## Headless is NOT live Play. Never set EOA_SKIP_TITLE.
+## VIS-1: first-session map readability — paused Home / Shift+Home hide capital
+## stars; L on then L off leaves no supply-outline residue.
+## Drives real keys through the viewport (not _input / _unhandled_input).
+## Does not load WorldMap.tscn / 3520. Headless is NOT live Play.
+## Never set EOA_SKIP_TITLE.
+## EOA_VIS1_BEHAVIOR_ONLY=1 skips source-text needles (mutation table).
 ##
 ##   tools/run_godot.sh --headless --path . --resolution 1280x720 \
 ##     -s res://scripts/core/HeadlessVis1MapReadabilityTest.gd
@@ -28,6 +30,7 @@ var _mr: Node = null
 var _cam: Camera2D = null
 var _container: Node2D = null
 var _home_ms: float = 0.0
+var _shift_home_ms: float = 0.0
 var _l_on_ms: float = 0.0
 var _l_off_ms: float = 0.0
 
@@ -99,15 +102,22 @@ func _flush() -> void:
 func _run() -> void:
 	DisplayServer.window_set_size(PLAY_SIZE)
 	root.size = PLAY_SIZE
-	_assert_source_needles()
+	if OS.get_environment("EOA_VIS1_BEHAVIOR_ONLY") != "1":
+		_assert_source_needles()
+	else:
+		_info("EOA_VIS1_BEHAVIOR_ONLY=1 — source-text needles skipped")
 	if not _setup_map_renderer():
 		return
 	_pause_sim()
 	_seed_capitals_and_polys()
 	await _flush()
 	await _assert_paused_home_hides_stars()
+	await _assert_paused_shift_home_hides_stars()
 	await _assert_l_toggle_clears_outlines()
-	_info("home_ms=%.2f l_on_ms=%.2f l_off_ms=%.2f (fixture, not 3520 GL)" % [_home_ms, _l_on_ms, _l_off_ms])
+	_info(
+		"home_ms=%.2f shift_home_ms=%.2f l_on_ms=%.2f l_off_ms=%.2f (fixture, not 3520 GL)"
+		% [_home_ms, _shift_home_ms, _l_on_ms, _l_off_ms]
+	)
 	_cleanup()
 
 
@@ -162,6 +172,8 @@ func _setup_map_renderer() -> bool:
 	_mr.add_child(_cam)
 	root.add_child(_mr)
 	_cam.make_current()
+	_mr.set_process_input(true)
+	_mr.set_process_unhandled_input(true)
 	if "_close_camera_locked" in _mr:
 		_mr.set("_close_camera_locked", false)
 	_pass("MapRenderer fixture ready")
@@ -270,19 +282,27 @@ func _visible_supply_outline_count() -> int:
 	return n
 
 
-func _press_key(key: Key, shift_pressed: bool = false) -> void:
+func _make_key(key: Key, pressed: bool, shift_pressed: bool) -> InputEventKey:
 	var ev := InputEventKey.new()
-	ev.pressed = true
+	ev.pressed = pressed
 	ev.echo = false
 	ev.keycode = key
 	ev.physical_keycode = key
 	ev.shift_pressed = shift_pressed
-	# Product paths: Home is handled in _input (beats GUI focus); L is in _unhandled_input.
-	if key == KEY_HOME and _mr.has_method("_input"):
-		_mr._input(ev)
-		return
-	if _mr.has_method("_unhandled_input"):
-		_mr._unhandled_input(ev)
+	return ev
+
+
+func _deliver_key_event(ev: InputEventKey) -> void:
+	# Viewport / Input pipeline. Do not call _input or _unhandled_input —
+	# a direct call would hide a Shift+Home path that never receives real events.
+	Input.parse_input_event(ev)
+	if Input.has_method("flush_buffered_events"):
+		Input.flush_buffered_events()
+
+
+func _press_key(key: Key, shift_pressed: bool = false) -> void:
+	_deliver_key_event(_make_key(key, true, shift_pressed))
+	_deliver_key_event(_make_key(key, false, shift_pressed))
 
 
 func _cam_zoom() -> float:
@@ -322,6 +342,42 @@ func _assert_paused_home_hides_stars() -> void:
 		_fail("Home fixture frame %.2fms looks like a 3520 rebuild" % _home_ms)
 	else:
 		_pass("Home stay-cheap %.2fms" % _home_ms)
+
+
+func _assert_paused_shift_home_hides_stars() -> void:
+	# Close zoom + 8 visible stars, then a real Home with Shift held.
+	# Must fail if _apply_home_key skips _sync_capital_star_scales (even when
+	# the source-text needle is hidden).
+	_cam.zoom = Vector2(CLOSE_Z, CLOSE_Z)
+	_cam.position = Vector2(4200.0, 1800.0)
+	if _mr.has_method("_refresh_terrain_zoom_light"):
+		_mr.call("_refresh_terrain_zoom_light")
+	await _flush()
+	var n_close := _visible_star_count()
+	_info("paused close-before-Shift+Home z=%.3f visible_stars=%d" % [_cam_zoom(), n_close])
+	if n_close < CAPITAL_PIDS.size():
+		_fail("close zoom before Shift+Home must show capital stars (got %d want %d)" % [n_close, CAPITAL_PIDS.size()])
+	else:
+		_pass("paused close zoom before Shift+Home shows %d capital stars" % n_close)
+	var t0 := Time.get_ticks_usec()
+	_press_key(KEY_HOME, true)
+	_shift_home_ms = float(Time.get_ticks_usec() - t0) / 1000.0
+	await _flush()
+	var z_shift := _cam_zoom()
+	var n_shift := _visible_star_count()
+	_info("paused Shift+Home z=%.3f visible_stars=%d shift_home_ms=%.2f" % [z_shift, n_shift, _shift_home_ms])
+	if z_shift > HOME_STRATEGIC_MAX:
+		_fail("Shift+Home camera z=%.3f must be <= STRATEGIC_MAX_ZOOM %.2f" % [z_shift, HOME_STRATEGIC_MAX])
+	else:
+		_pass("Shift+Home camera z=%.3f is strategic" % z_shift)
+	if n_shift != 0:
+		_fail("paused Shift+Home left %d capital stars visible (want 0)" % n_shift)
+	else:
+		_pass("paused Shift+Home hides capital stars")
+	if _shift_home_ms > 250.0:
+		_fail("Shift+Home fixture frame %.2fms looks like a 3520 rebuild" % _shift_home_ms)
+	else:
+		_pass("Shift+Home stay-cheap %.2fms" % _shift_home_ms)
 
 
 func _assert_l_toggle_clears_outlines() -> void:

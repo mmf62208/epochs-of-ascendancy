@@ -263,6 +263,8 @@ else
   run_step launch_rx1_visibility \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessRx1RhineVisibilityTest.gd || fail
 
+  run_step launch_vis1_map_readability tools/run_godot.sh --headless --path . --resolution 1280x720 -s res://scripts/core/HeadlessVis1MapReadabilityTest.gd || fail
+
   run_step launch_rt1_road_tier \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessRt1RoadTierForEdgeTest.gd || fail
 
