@@ -83,6 +83,7 @@ func _run() -> void:
 	await _assert_fade_band_holds_mid_size()
 	await _measure_and_snapshot("close", CLOSE_Z, 0.0, CLOSE_RATIO_HI, true)
 	await _assert_paused_viewport_after_home()
+	await _assert_pan_frame_cost()
 	_assert_no_node_scale()
 	_assert_layer_fences()
 
@@ -382,6 +383,118 @@ func _assert_paused_viewport_after_home() -> void:
 	await process_frame
 
 
+func _seed_perf_nation_grid(n: int) -> void:
+	if _layer == null or not _layer.has_method("seed_debug_nation_label"):
+		return
+	var cols := 13
+	var rows := int(ceili(float(n) / float(cols)))
+	var i := 0
+	for gy in range(rows):
+		for gx in range(cols):
+			if i >= n:
+				return
+			i += 1
+			var tag := "P%02d" % i
+			var pos := Vector2(3600.0 + float(gx) * 140.0, 1280.0 + float(gy) * 120.0)
+			_layer.call("seed_debug_nation_label", tag, "Perf%d" % i, pos, 20)
+
+
+func _seed_perf_state_grid(n: int) -> void:
+	if _layer == null or not _layer.has_method("seed_debug_state_label"):
+		return
+	var cols := 12
+	var rows := int(ceili(float(n) / float(cols)))
+	var i := 0
+	for gy in range(rows):
+		for gx in range(cols):
+			if i >= n:
+				return
+			i += 1
+			var pos := Vector2(3600.0 + float(gx) * 150.0, 1280.0 + float(gy) * 110.0)
+			_layer.call("seed_debug_state_label", 90000 + i, "State%d" % i, pos)
+
+
+func _median_usec(samples: Array[int]) -> int:
+	if samples.is_empty():
+		return 0
+	var copy: Array[int] = []
+	for s in samples:
+		copy.append(int(s))
+	copy.sort()
+	return copy[int(copy.size() / 2)]
+
+
+func _assert_pan_frame_cost() -> void:
+	_cam.position = HOME_POS
+	_cam.zoom = Vector2(EUROPE_Z, EUROPE_Z)
+	if _layer != null and _layer.has_method("sync_camera_zoom"):
+		_layer.call("sync_camera_zoom", EUROPE_Z)
+	_seed_perf_nation_grid(65)
+	if _layer != null and _layer.has_method("sync_viewport"):
+		var live: Rect2 = Rect2(Vector2(2150.0, 250.0), Vector2(4100.0, 2700.0))
+		_layer.call("sync_viewport", live, true)
+	await process_frame
+	await process_frame
+	var vis_n := _visible_nation_count()
+	_info("perf political visible=%d" % vis_n)
+	if vis_n < 65:
+		_fail("perf political visible=%d want 65 in view" % vis_n)
+	var pol_samples: Array[int] = []
+	if _layer != null and _layer.has_method("debug_measure_forced_pan_frame_usec"):
+		for _i in 10:
+			pol_samples.append(int(_layer.call("debug_measure_forced_pan_frame_usec")))
+	var pol_med := _median_usec(pol_samples)
+	var pol_ms := float(pol_med) / 1000.0
+	_info("political pan-frame median=%.3fms samples=%s" % [pol_ms, str(pol_samples)])
+	if pol_med <= 0:
+		_fail("political pan-frame measure missing")
+	elif pol_ms > 0.30:
+		_fail("political pan-frame %.3fms > 0.30ms (65 labels)" % pol_ms)
+	else:
+		_pass("political pan-frame %.3fms (65 labels)" % pol_ms)
+	var idle_samples: Array[int] = []
+	if _layer != null and _layer.has_method("debug_measure_idle_sync_usec"):
+		if _layer.has_method("debug_measure_forced_pan_frame_usec"):
+			_layer.call("debug_measure_forced_pan_frame_usec")
+		for _j in 12:
+			idle_samples.append(int(_layer.call("debug_measure_idle_sync_usec")))
+	var idle_med := _median_usec(idle_samples)
+	var idle_ms := float(idle_med) / 1000.0
+	_info("idle sync median=%.3fms samples=%s" % [idle_ms, str(idle_samples)])
+	if idle_ms > 0.20:
+		_fail("idle sync %.3fms (want ~0.10ms baseline, <0.20)" % idle_ms)
+	else:
+		_pass("idle sync %.3fms (near 0.10ms baseline)" % idle_ms)
+	_cam.zoom = Vector2(MID_Z, MID_Z)
+	if _layer != null and _layer.has_method("sync_camera_zoom"):
+		_layer.call("sync_camera_zoom", MID_Z)
+	if _layer != null and _layer.has_method("sync_tier"):
+		_layer.call("sync_tier", 1)
+	_seed_perf_state_grid(80)
+	if _layer != null and _layer.has_method("set_map_mode_context"):
+		_layer.call("set_map_mode_context", "states")
+	await process_frame
+	var st_samples: Array[int] = []
+	if _layer != null and _layer.has_method("debug_measure_position_pan_usec"):
+		for _k in 10:
+			st_samples.append(int(_layer.call("debug_measure_position_pan_usec", true)))
+	var st_med := _median_usec(st_samples)
+	var st_ms := float(st_med) / 1000.0
+	_info("states pan-frame median=%.3fms samples=%s" % [st_ms, str(st_samples)])
+	if st_med <= 0:
+		_fail("states pan-frame measure missing")
+	elif st_ms > 0.60:
+		_fail("states pan-frame %.3fms > 0.60ms" % st_ms)
+	else:
+		_pass("states pan-frame %.3fms" % st_ms)
+	if _layer != null and _layer.has_method("set_map_mode_context"):
+		_layer.call("set_map_mode_context", "political")
+	_cam.zoom = Vector2(EUROPE_Z, EUROPE_Z)
+	if _layer != null and _layer.has_method("sync_camera_zoom"):
+		_layer.call("sync_camera_zoom", EUROPE_Z)
+	await process_frame
+
+
 func _assert_no_node_scale() -> void:
 	if _ger_label == null or not is_instance_valid(_ger_label):
 		_fail("NationLabel_GER missing")
@@ -419,3 +532,11 @@ func _assert_layer_fences() -> void:
 		_fail("fade modulate.a path missing")
 	else:
 		_pass("fade band uses modulate.a")
+	if "_apply_nation_visibility_only" not in src or "_apply_state_visibility_only" not in src:
+		_fail("position-only visibility pass missing")
+	else:
+		_pass("position-only visibility pass")
+	if "VIEWPORT_BOX_POS_DEAD_FRAC" not in src:
+		_fail("5% view dead zone missing")
+	else:
+		_pass("5% view position dead zone")

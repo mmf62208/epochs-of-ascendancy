@@ -254,6 +254,9 @@ def build_map_nation_label_landmass_product() -> Dict[str, Any]:
         "lbl.scale = Vector2.ONE",
         "_sync_live_viewport_box",
         "_apply_nation_fade_modulate",
+        "_apply_nation_visibility_only",
+        "_apply_state_visibility_only",
+        "VIEWPORT_BOX_POS_DEAD_FRAC",
     )
     for needle in label1_needles:
         src = lod if needle.startswith("nation_label_") or needle.startswith("NATION_LABEL_") else gd

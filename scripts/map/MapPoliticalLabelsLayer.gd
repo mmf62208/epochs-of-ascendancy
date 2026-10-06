@@ -12,7 +12,8 @@ const NATION_LABEL_Z := 18
 const CLOSE_FADE_START_ZOOM := MapZoomLODScript.NATION_LABEL_FADE_START_ZOOM
 const CLOSE_HIDE_ZOOM := MapZoomLODScript.NATION_LABEL_HIDE_ZOOM
 const VIEWPORT_BOX_MARGIN_RATIO := 0.14
-const VIEWPORT_BOX_POS_DEAD_SQ := 256.0
+const VIEWPORT_BOX_POS_DEAD_FRAC := 0.05
+const VIEWPORT_BOX_POS_DEAD_MIN := 32.0
 const VIEWPORT_BOX_ZOOM_DEAD := 0.012
 const VIEWPORT_BOX_VP_DEAD_SQ := 16.0
 
@@ -102,6 +103,12 @@ func set_hovered_region(region_id: int, tier: int = -1) -> void:
 
 
 func sync_viewport(world_rect: Rect2, active: bool) -> void:
+	var box_changed := (
+		active != _viewport_culling_active
+		or not _viewport_boxes_match(_viewport_rect, world_rect)
+	)
+	if not box_changed:
+		return
 	_viewport_rect = world_rect
 	_viewport_culling_active = active
 	if active and world_rect.size != Vector2.ZERO:
@@ -129,6 +136,19 @@ func _compute_live_camera_world_rect(margin_ratio: float = VIEWPORT_BOX_MARGIN_R
 	return rect.grow(margin)
 
 
+func _viewport_boxes_match(a: Rect2, b: Rect2) -> bool:
+	return (
+		a.position.distance_squared_to(b.position) < 0.25
+		and a.size.distance_squared_to(b.size) < 0.25
+	)
+
+
+func _position_dead_sq_for_view(view_size_world: Vector2) -> float:
+	var span := maxf(view_size_world.x, view_size_world.y)
+	var dead := maxf(span * VIEWPORT_BOX_POS_DEAD_FRAC, VIEWPORT_BOX_POS_DEAD_MIN)
+	return dead * dead
+
+
 func _sync_live_viewport_box() -> void:
 	var vp := get_viewport()
 	if vp == null:
@@ -142,12 +162,19 @@ func _sync_live_viewport_box() -> void:
 	var pos := cam.global_position
 	var z := maxf(absf(cam.zoom.x), absf(cam.zoom.y))
 	var vp_sz: Vector2 = vp.get_visible_rect().size
+	if vp_sz.x < 8.0 or vp_sz.y < 8.0:
+		vp_sz = Vector2(1280.0, 720.0)
+	var view_world := vp_sz / maxf(z, 0.01)
+	var pos_dead_sq := _position_dead_sq_for_view(view_world)
+	var zoom_changed := _last_box_cam_zoom < 0.0 or absf(z - _last_box_cam_zoom) >= VIEWPORT_BOX_ZOOM_DEAD
+	var vp_changed := _last_box_vp_size == Vector2.ZERO or vp_sz.distance_squared_to(_last_box_vp_size) >= VIEWPORT_BOX_VP_DEAD_SQ
+	var pos_changed := _last_box_cam_pos.x < -90000.0 or pos.distance_squared_to(_last_box_cam_pos) >= pos_dead_sq
 	if (
 		_viewport_culling_active
 		and _viewport_rect.size != Vector2.ZERO
-		and pos.distance_squared_to(_last_box_cam_pos) < VIEWPORT_BOX_POS_DEAD_SQ
-		and absf(z - _last_box_cam_zoom) < VIEWPORT_BOX_ZOOM_DEAD
-		and vp_sz.distance_squared_to(_last_box_vp_size) < VIEWPORT_BOX_VP_DEAD_SQ
+		and not zoom_changed
+		and not pos_changed
+		and not vp_changed
 	):
 		return
 	_last_box_cam_pos = pos
@@ -155,9 +182,15 @@ func _sync_live_viewport_box() -> void:
 	_last_box_vp_size = vp_sz
 	_viewport_rect = live
 	_viewport_culling_active = true
-	if _built:
+	if not _built:
+		return
+	if zoom_changed or vp_changed:
 		_apply_nation_close_zoom()
 		_apply_state_label_visibility()
+		return
+	_apply_nation_visibility_only()
+	if _current_map_mode == "states":
+		_apply_state_visibility_only()
 
 
 func count_visible_nation_labels() -> int:
@@ -860,7 +893,9 @@ func force_nation_label_at(tag: String, world_pos: Vector2, display_name: String
 	if force_px <= 0:
 		force_px = 22
 	lbl.add_theme_font_size_override("font_size", force_px)
-	lbl.modulate = Color(1.0, 1.0, 1.0, 1.0)
+	_apply_nation_fade_modulate(lbl, _nation_alpha_for_zoom())
+	lbl.set_meta("cached_font_px", force_px)
+	lbl.set_meta("cached_alpha", _nation_alpha_for_zoom())
 	lbl.visible = true
 	_fit_and_center_label(lbl)
 
@@ -906,6 +941,8 @@ func _apply_tier_visibility(tier: int) -> void:
 				l.scale = Vector2.ONE
 				l.add_theme_font_size_override("font_size", zoom_px)
 				_apply_nation_fade_modulate(l, _nation_alpha_for_zoom())
+				l.set_meta("cached_font_px", zoom_px)
+				l.set_meta("cached_alpha", _nation_alpha_for_zoom())
 				_fit_and_center_label(l)
 	for rid_var in _region_labels.keys():
 		var lbl_r: Variant = _region_labels[rid_var]
@@ -955,6 +992,35 @@ func _apply_state_label_visibility() -> void:
 			c3.a = MapZoomLODScript.label_alpha_for_tier(_current_tier, "region")
 			l.add_theme_color_override("font_color", c3)
 			_fit_and_center_label(l)
+
+
+func _apply_state_visibility_only() -> void:
+	var show_s: bool = MapZoomLODScript.show_state_labels(_current_tier, _current_map_mode)
+	for sid_var in _state_labels.keys():
+		var lbl: Variant = _state_labels[sid_var]
+		if not (lbl is Label):
+			continue
+		var l := lbl as Label
+		var in_view := (
+			not _viewport_culling_active
+			or _viewport_rect.size == Vector2.ZERO
+			or _viewport_rect.has_point(l.position)
+		)
+		l.visible = show_s and in_view
+
+
+func seed_debug_state_label(sid: int, text: String, world_pos: Vector2) -> Label:
+	var existing: Label = _state_labels.get(sid) as Label if _state_labels.has(sid) else null
+	if existing != null and is_instance_valid(existing):
+		existing.queue_free()
+	var lbl := _make_label(text, world_pos, 15, Color(0.92, 0.88, 0.72, 0.92))
+	lbl.name = "StateLabel_%d" % sid
+	lbl.visible = false
+	add_child(lbl)
+	_state_labels[sid] = lbl
+	_built = true
+	_fit_and_center_label(lbl)
+	return lbl
 
 
 func seed_debug_nation_label(tag: String, text: String, world_pos: Vector2, rank_px: int = 28) -> Label:
@@ -1076,9 +1142,78 @@ func _apply_nation_close_zoom() -> void:
 		l.scale = Vector2.ONE
 		l.add_theme_font_size_override("font_size", px)
 		_apply_nation_fade_modulate(l, alpha)
+		l.set_meta("cached_font_px", px)
+		l.set_meta("cached_alpha", alpha)
 		l.visible = (show_n or force) and in_view and px > 0
 		if l.visible:
 			_fit_and_center_label(l)
+
+
+func _apply_nation_visibility_only() -> void:
+	if not _built:
+		return
+	var nation_px: int = MapZoomLODScript.nation_label_font_px(_current_tier)
+	var hide := _nation_labels_hidden_by_close_zoom()
+	var alpha := _nation_alpha_for_zoom()
+	var show_n: bool = MapZoomLODScript.show_nation_labels(_current_tier)
+	if _current_map_mode == "states":
+		show_n = false
+	for lbl in _nation_labels.values():
+		if not (lbl is Label):
+			continue
+		var l := lbl as Label
+		var force := l.has_meta("force_visible") and bool(l.get_meta("force_visible"))
+		var px := _nation_font_px_for_zoom(_nation_rank_px(l, nation_px))
+		if px <= 0 and force:
+			px = maxi(12, int(round(18.0 / maxf(_camera_zoom, 0.20))))
+		var base_visible := (show_n or force) and px > 0 and (not hide or force)
+		var want := base_visible and _nation_label_in_view(l, force)
+		var was := l.visible
+		var cached_px := int(l.get_meta("cached_font_px")) if l.has_meta("cached_font_px") else -1
+		var cached_a := float(l.get_meta("cached_alpha")) if l.has_meta("cached_alpha") else -1.0
+		var style_stale := cached_px != px or absf(cached_a - alpha) > 0.01
+		l.visible = want
+		if want and ((not was) or style_stale):
+			l.scale = Vector2.ONE
+			l.add_theme_font_size_override("font_size", px)
+			_apply_nation_fade_modulate(l, alpha)
+			l.set_meta("cached_font_px", px)
+			l.set_meta("cached_alpha", alpha)
+			_fit_and_center_label(l)
+
+
+func debug_measure_position_pan_usec(include_states: bool = false) -> int:
+	var t0 := Time.get_ticks_usec()
+	_apply_nation_visibility_only()
+	if include_states:
+		_apply_state_visibility_only()
+	return int(Time.get_ticks_usec() - t0)
+
+
+func debug_measure_forced_pan_frame_usec() -> int:
+	var vp := get_viewport()
+	if vp == null:
+		return 0
+	var cam := vp.get_camera_2d()
+	if cam == null:
+		return 0
+	var z := maxf(absf(cam.zoom.x), absf(cam.zoom.y))
+	var vp_sz: Vector2 = vp.get_visible_rect().size
+	if vp_sz.x < 8.0 or vp_sz.y < 8.0:
+		vp_sz = Vector2(1280.0, 720.0)
+	var dead := sqrt(_position_dead_sq_for_view(vp_sz / maxf(z, 0.01)))
+	_last_box_cam_pos = cam.global_position + Vector2(dead + 8.0, 0.0)
+	_last_box_cam_zoom = z
+	_last_box_vp_size = vp_sz
+	var t0 := Time.get_ticks_usec()
+	_sync_live_viewport_box()
+	return int(Time.get_ticks_usec() - t0)
+
+
+func debug_measure_idle_sync_usec() -> int:
+	var t0 := Time.get_ticks_usec()
+	_sync_live_viewport_box()
+	return int(Time.get_ticks_usec() - t0)
 
 
 func _apply_nation_fade_modulate(l: Label, alpha: float) -> void:
