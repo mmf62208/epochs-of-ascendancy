@@ -10,24 +10,28 @@ edge-pan **unedited**. MapRenderer fill-line (PR #80) **unedited**. MapRenderer
 pause / detail-refresh skip **unedited**. PR #7 stays draft. `world_full` IDs
 **untouched**.
 
-Paused first-session: `PoliticalLabelsLayer` recomputes its visible box from the
-live MapCamera in `_process` (Home ≥43 names; Far-East pan 6). Fade 0.82–0.98
-holds mid on-screen size (18.9 ≥ 18.6) and fades `modulate.a=0.48` (outline
-included).
+FIX #2 pan cost (all in `MapPoliticalLabelsLayer.gd`): visibility-only on
+position moves; 5% view dead zone; `sync_viewport` does not reset idle;
+`force_nation_label_at` fades via modulate.
+
+| metric | before (e1d4f8b5) | after hd | after xvfb |
+|---|---|---|---|
+| political pan-frame | 2.5–2.7 ms | **0.114 ms** | **0.170 ms** |
+| states pan-frame | 5.4–7.2 ms | **0.093 ms** | **0.089 ms** |
+| idle `_process` box | 0.57 ms | **0.002 ms** | **0.002 ms** |
 
 | gate | kind | result | note |
 |---|---|---|---|
-| `HeadlessLabel1NationZoomTest` | hd | PASS | Europe 0.0322 · mid 0.0259 · fade 0.0263 / modulate.a=0.48 · close hidden; paused Home 43 · Far East 6 |
-| `HeadlessLabel1NationZoomTest` | xvfb | PASS | same bands; shots under `/tmp/eoa-label1/` |
-| `tools/eoa_label1_guard.sh` | hd+xvfb | PASS | rss 1210.4 / 1374.2 |
-| `test_map_nation_label_landmass_product` | py | PASS | landmass + LABEL-1 bands + fade holds mid |
+| `HeadlessLabel1NationZoomTest` | hd | PASS | fade holds mid; paused Home 43 · Far East 6; pan 0.101 / idle 0.002 / states 0.123 |
+| `HeadlessLabel1NationZoomTest` | xvfb | PASS | `tools/eoa_label1_guard.sh` |
+| `tools/eoa_label1_guard.sh` | hd+xvfb | PASS | rss 1210.8 / 1341.3 |
+| `test_map_nation_label_landmass_product` | py | PASS | landmass + LABEL-1 needles |
 | `HeadlessRt1RoadTierForEdgeTest` | hd | PASS | Köln/Bonn/Leverkusen still at 1.50 / 1.80 |
 | `HeadlessFirstSessionReadabilityTest` | hd | PASS | TipDismiss / Fill% / hit-disk |
-| `test_rx1_rhine_crossing_product` | py | PASS | `CLOSE_HIDE_ZOOM` still present |
-| `map_accuracy_qc` | py | PASS | NE hit 0.9853 (Pillow installed) |
+| `map_accuracy_qc` | py | PASS | NE hit 0.9853 |
 
 Official `--quick` `unit_board_play_path` still reports **14 pre-existing FAIL**
-on this host (same class as main `d008ca42` / EDGE-1 KEEP_GREEN “stay red”):
+on this host (same class as main `d008ca42`):
 
 - `living_unit_order_loop` 4
 - `unit_card_fill_toe` 3
@@ -36,7 +40,6 @@ on this host (same class as main `d008ca42` / EDGE-1 KEEP_GREEN “stay red”):
 - `se_england_shire` 1
 - `first_session_play_surface` 1
 
-**No new FAIL** in the nation-label tests. `unit_save_path` / `map_qc` /
-`hoi_matrix_product` **OK**.
+**No new FAIL.** `unit_save_path` / `map_qc` / `hoi_matrix_product` **OK**.
 
 Recipe: `docs/evidence/label1/CLICKS.md`.
