@@ -900,6 +900,7 @@ func seed_debug_nation_label(tag: String, text: String, world_pos: Vector2, rank
 	add_child(lbl)
 	_nation_labels[t] = lbl
 	_built = true
+	_camera_zoom = MapZoomLODScript.read_camera_zoom(get_viewport())
 	_fit_and_center_label(lbl)
 	_apply_nation_close_zoom()
 	return lbl
@@ -948,9 +949,10 @@ func nation_label_debug_metrics(tag: String = "GER") -> Dictionary:
 	var node_scale := 1.0
 	var visible := false
 	if lbl != null and is_instance_valid(lbl):
-		font_px = int(lbl.get_theme_font_size("font_size"))
-		node_scale = maxf(lbl.scale.x, lbl.scale.y)
 		visible = lbl.visible
+		node_scale = maxf(lbl.scale.x, lbl.scale.y)
+		if visible:
+			font_px = int(lbl.get_theme_font_size("font_size"))
 	var vh := _viewport_height_px()
 	var effective := MapZoomLODScript.nation_label_effective_screen_px(font_px, _camera_zoom, node_scale)
 	return {
@@ -967,12 +969,24 @@ func nation_label_debug_metrics(tag: String = "GER") -> Dictionary:
 	}
 
 
+func _nation_label_in_view(l: Label, force: bool) -> bool:
+	if force or not _viewport_culling_active or _viewport_rect.size == Vector2.ZERO:
+		return true
+	var anchor: Vector2 = l.position
+	if l.has_meta("label_anchor"):
+		anchor = l.get_meta("label_anchor") as Vector2
+	return _viewport_rect.has_point(anchor) or _viewport_rect.has_point(l.position)
+
+
 func _apply_nation_close_zoom() -> void:
 	if not _built:
 		return
 	var nation_px: int = MapZoomLODScript.nation_label_font_px(_current_tier)
 	var hide := _nation_labels_hidden_by_close_zoom()
 	var alpha := _nation_alpha_for_zoom()
+	var show_n: bool = MapZoomLODScript.show_nation_labels(_current_tier)
+	if _current_map_mode == "states":
+		show_n = false
 	for lbl in _nation_labels.values():
 		if not (lbl is Label):
 			continue
@@ -982,14 +996,14 @@ func _apply_nation_close_zoom() -> void:
 		if (hide or px <= 0) and not force:
 			l.visible = false
 			continue
-		if not l.visible and hide and not force:
-			continue
 		if px <= 0 and force:
 			px = maxi(12, int(round(18.0 / maxf(_camera_zoom, 0.20))))
+		var in_view := _nation_label_in_view(l, force)
 		l.scale = Vector2.ONE
 		l.add_theme_font_size_override("font_size", px)
 		var c := l.get_theme_color("font_color")
 		c.a = alpha
 		l.add_theme_color_override("font_color", c)
+		l.visible = (show_n or force) and in_view and px > 0
 		if l.visible:
 			_fit_and_center_label(l)

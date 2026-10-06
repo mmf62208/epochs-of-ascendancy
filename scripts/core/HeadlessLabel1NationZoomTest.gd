@@ -9,7 +9,6 @@ extends SceneTree
 ##     -s res://scripts/core/HeadlessLabel1NationZoomTest.gd
 
 const MapZoomLODScript = preload("res://scripts/map/MapZoomLOD.gd")
-const MapPoliticalLabelsLayerScript = preload("res://scripts/map/MapPoliticalLabelsLayer.gd")
 const RoadTierVisualScript = preload("res://scripts/map/RoadTierVisual.gd")
 
 const PLAY_SIZE := Vector2i(1280, 720)
@@ -23,9 +22,10 @@ const MID_RATIO_HI := 0.038
 const CLOSE_RATIO_HI := 0.012
 
 var _failures: int = 0
-var _layer: Node2D = null
+var _layer: Node = null
 var _cam: Camera2D = null
 var _shot_dir: String = "user://label1"
+var _ger_label: Label = null
 
 
 func _init() -> void:
@@ -67,16 +67,9 @@ func _run() -> void:
 	_cam.zoom = Vector2(EUROPE_Z, EUROPE_Z)
 	root.add_child(_cam)
 	_cam.make_current()
-	_layer = MapPoliticalLabelsLayerScript.new()
-	_layer.name = "PoliticalLabelsLayer"
-	root.add_child(_layer)
 	await process_frame
-	if _layer.has_method("seed_debug_nation_label"):
-		_layer.call("seed_debug_nation_label", "GER", "Germany", Vector2(4200, 1580), 28)
-		_layer.call("seed_debug_nation_label", "FRA", "France", Vector2(4000, 1720), 24)
-		_layer.call("seed_debug_nation_label", "NLD", "Netherlands", Vector2(4280, 1500), 17)
-	else:
-		_fail("seed_debug_nation_label missing")
+	var booted: bool = await _boot_label_layer()
+	if not booted:
 		return
 	_assert_policy_tables()
 	_assert_city_label_lod()
@@ -85,6 +78,33 @@ func _run() -> void:
 	await _measure_and_snapshot("close", CLOSE_Z, 0.0, CLOSE_RATIO_HI, true)
 	_assert_no_node_scale()
 	_assert_layer_fences()
+
+
+func _boot_label_layer() -> bool:
+	var scr: Script = load("res://scripts/map/MapPoliticalLabelsLayer.gd") as Script
+	if scr == null:
+		_fail("MapPoliticalLabelsLayer.gd failed to load")
+		return false
+	var inst: Object = scr.new()
+	if inst == null or not (inst is Node2D):
+		_fail("MapPoliticalLabelsLayer.new() failed (autoload parse?)")
+		return false
+	_layer = inst as Node2D
+	_layer.name = "PoliticalLabelsLayer"
+	root.add_child(_layer)
+	await process_frame
+	if _layer.has_method("seed_debug_nation_label"):
+		_ger_label = _layer.call("seed_debug_nation_label", "GER", "Germany", Vector2(4200, 1580), 28) as Label
+		_layer.call("seed_debug_nation_label", "FRA", "France", Vector2(4000, 1720), 24)
+		_layer.call("seed_debug_nation_label", "NLD", "Netherlands", Vector2(4280, 1500), 17)
+	else:
+		_fail("seed_debug_nation_label missing")
+		return false
+	if _ger_label == null or not is_instance_valid(_ger_label):
+		_fail("GER nation label was not created")
+		return false
+	_pass("seeded GER/FRA/NLD nation labels")
+	return true
 
 
 func _add_backdrop() -> void:
@@ -139,15 +159,22 @@ func _assert_policy_tables() -> void:
 		_fail("policy missed scale=2.5 magnification")
 	else:
 		_pass("policy flags node.scale magnification")
+	var mid_eff: float = MapZoomLODScript.nation_label_effective_screen_px(mid_px, MID_Z, 1.0)
+	if mid_eff > float(mid_px) + 0.75:
+		_fail("mid effective %.1f > font %d" % [mid_eff, mid_px])
+	else:
+		_pass("mid effective %.1fpx from font %d (not a blown-up texture)" % [mid_eff, mid_px])
 
 
 func _assert_city_label_lod() -> void:
-	if not RoadTierVisualScript.end_labels_visible_at_zoom(MID_Z) and not RoadTierVisualScript.end_labels_visible_at_zoom(1.80):
-		_fail("city labels hidden at mid 1.80")
-	elif not RoadTierVisualScript.end_labels_visible_at_zoom(1.80):
+	if not RoadTierVisualScript.end_labels_visible_at_zoom(1.80):
 		_fail("city labels hidden at close/mid 1.80")
 	else:
 		_pass("city labels visible at 1.80 (Köln/Bonn/Leverkusen)")
+	if not RoadTierVisualScript.end_labels_visible_at_zoom(1.50):
+		_fail("city labels must show at zoom 1.50")
+	else:
+		_pass("city labels show at 1.50")
 	if RoadTierVisualScript.end_labels_visible_at_zoom(EUROPE_Z):
 		_fail("city labels must stay off at Europe Home")
 	else:
@@ -156,21 +183,41 @@ func _assert_city_label_lod() -> void:
 		_fail("END_LABEL_ZOOM_MIN=%.2f" % RoadTierVisualScript.END_LABEL_ZOOM_MIN)
 	else:
 		_pass("city label floor 1.50 kept")
-	if not RoadTierVisualScript.end_labels_visible_at_zoom(1.50):
-		_fail("city labels must show at zoom 1.50")
-	else:
-		_pass("city labels show at 1.50")
+
+
+func _metrics_for(z: float) -> Dictionary:
+	if _layer != null and _layer.has_method("nation_label_debug_metrics"):
+		var live: Dictionary = _layer.call("nation_label_debug_metrics", "GER") as Dictionary
+		if not live.is_empty():
+			return live
+	var font_px: int = 0
+	var node_scale := 1.0
+	var visible := false
+	if _ger_label != null and is_instance_valid(_ger_label):
+		visible = _ger_label.visible
+		node_scale = maxf(_ger_label.scale.x, _ger_label.scale.y)
+		if visible:
+			font_px = int(_ger_label.get_theme_font_size("font_size"))
+	var vh := 720.0
+	return {
+		"zoom": z,
+		"viewport_h": vh,
+		"font_px": font_px,
+		"node_scale": node_scale,
+		"effective_screen_px": MapZoomLODScript.nation_label_effective_screen_px(font_px, z, node_scale),
+		"height_ratio": MapZoomLODScript.nation_label_height_ratio(font_px, z, node_scale, vh),
+		"texture_magnified": MapZoomLODScript.nation_label_is_texture_magnified(font_px, z, node_scale),
+		"visible": visible,
+	}
 
 
 func _measure_and_snapshot(name_s: String, z: float, lo: float, hi: float, must_hide: bool) -> void:
 	_cam.zoom = Vector2(z, z)
-	if _layer.has_method("sync_camera_zoom"):
+	if _layer != null and _layer.has_method("sync_camera_zoom"):
 		_layer.call("sync_camera_zoom", z)
 	await process_frame
 	await process_frame
-	var m: Dictionary = {}
-	if _layer.has_method("nation_label_debug_metrics"):
-		m = _layer.call("nation_label_debug_metrics", "GER") as Dictionary
+	var m: Dictionary = _metrics_for(z)
 	var font_px := int(m.get("font_px", -1))
 	var node_scale := float(m.get("node_scale", 0.0))
 	var ratio := float(m.get("height_ratio", -1.0))
@@ -197,7 +244,7 @@ func _measure_and_snapshot(name_s: String, z: float, lo: float, hi: float, must_
 		else:
 			_pass("%s nation labels hidden (city names own this band)" % name_s)
 	else:
-		if not visible or font_px <= 0:
+		if (not visible) or font_px <= 0:
 			_fail("%s nation label missing font=%d vis=%s" % [name_s, font_px, str(visible)])
 		elif ratio < lo or ratio > hi:
 			_fail("%s height_ratio=%.4f want %.3f..%.3f" % [name_s, ratio, lo, hi])
@@ -209,15 +256,20 @@ func _measure_and_snapshot(name_s: String, z: float, lo: float, hi: float, must_
 
 
 func _capture_shot(name_s: String, z: float) -> void:
+	if str(DisplayServer.get_name()).to_lower().contains("headless"):
+		_info("shot skip (headless) %s z=%.3f" % [name_s, z])
+		return
 	var vp := root.get_viewport()
 	if vp == null:
 		return
 	await process_frame
 	var tex: ViewportTexture = vp.get_texture()
 	if tex == null:
+		_info("shot skip (headless dummy viewport) %s" % name_s)
 		return
 	var img: Image = tex.get_image()
 	if img == null or img.get_width() < 8:
+		_info("shot skip (no image) %s" % name_s)
 		return
 	var path := "%s/label1_%s_z%.3f.png" % [_shot_dir, name_s, z]
 	var err := img.save_png(path)
@@ -228,16 +280,15 @@ func _capture_shot(name_s: String, z: float) -> void:
 
 
 func _assert_no_node_scale() -> void:
-	var ger: Label = _layer.get_node_or_null("NationLabel_GER") as Label
-	if ger == null:
+	if _ger_label == null or not is_instance_valid(_ger_label):
 		_fail("NationLabel_GER missing")
 		return
-	if ger.scale != Vector2.ONE:
-		_fail("GER scale=%s" % str(ger.scale))
+	if _ger_label.scale != Vector2.ONE:
+		_fail("GER scale=%s" % str(_ger_label.scale))
 	else:
 		_pass("GER Label.scale is identity")
-	if _layer.scale != Vector2.ONE:
-		_fail("layer scale=%s" % str(_layer.scale))
+	if _layer != null and _layer is Node2D and (_layer as Node2D).scale != Vector2.ONE:
+		_fail("layer scale=%s" % str((_layer as Node2D).scale))
 	else:
 		_pass("PoliticalLabelsLayer scale is identity")
 
