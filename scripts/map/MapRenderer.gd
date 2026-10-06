@@ -401,6 +401,12 @@ var _supply_roles_cache: Dictionary[int, String] = {}
 var _supply_poly_cache: Dictionary[int, PackedVector2Array] = {}
 var _supply_outline_batch: Node2D = null
 var _supply_outline_rebuild_count: int = 0
+## PERF-3 FIX #1: count live-slow work that used to run on every L (roles / setup /
+## 3k glyph reset_size). Headless asserts cache-hit toggles do not increment these.
+var _supply_toggle_in_progress: bool = false
+var _supply_toggle_role_computes: int = 0
+var _supply_toggle_setups: int = 0
+var _supply_toggle_glyph_layouts: int = 0
 var _compare_candidate_ids: Array[int] = []
 var _supply_legend_panel: PanelContainer = null
 var _compare_hint_label: Label = null
@@ -14957,6 +14963,8 @@ func _apply_static_map_glyph_outline(lbl: Label) -> void:
 
 
 func _layout_zoomed_map_glyphs_for_province_node(pid: int, zoom_metric: float, show_glyphs: bool) -> void:
+	if _supply_toggle_in_progress:
+		_supply_toggle_glyph_layouts += 1
 	var node: Variant = province_nodes.get(pid)
 	if node == null or not (node is Node2D):
 		return
@@ -25405,6 +25413,16 @@ func _sync_map_label_glyph_stack(zoom_metric: float = -1.0) -> void:
 		_layout_zoomed_map_glyphs_for_province_node(int(pid), zz, show_glyphs)
 
 
+func _sync_supply_name_label_z_only() -> void:
+	## L toggle only needs name Label z so they stay above rings. Do not walk
+	## province_nodes / reset_size glyphs here — that was the live 1.6–4.8 s pause.
+	var z := _map_province_name_label_z_index()
+	for id in _province_name_labels:
+		var lbl: Variant = _province_name_labels[id]
+		if lbl is Label and is_instance_valid(lbl):
+			(lbl as Label).z_index = z
+
+
 func _sync_supply_route_canvas_stack() -> void:
 	if supply_map_layer == null or not is_instance_valid(supply_map_layer):
 		return
@@ -25417,11 +25435,13 @@ func _sync_supply_route_canvas_stack() -> void:
 	else:
 		supply_map_layer.self_modulate = Color.WHITE
 		supply_map_layer.trade_corridor_supply_dim = 1.0
-	_sync_map_label_glyph_stack()
+	_sync_supply_name_label_z_only()
 	supply_map_layer.queue_redraw()
 
 
 func _setup_supply_layer() -> void:
+	if _supply_toggle_in_progress:
+		_supply_toggle_setups += 1
 	if container == null:
 		return
 	if supply_map_layer == null or not is_instance_valid(supply_map_layer):
@@ -25645,6 +25665,7 @@ func _toggle_supply_overlay() -> void:
 	var sm := _supply_manager()
 	if sm == null:
 		return
+	_supply_toggle_in_progress = true
 	sm.toggle_overlay()
 	supply_mode = sm.overlay_visible
 	if supply_map_layer:
@@ -25663,16 +25684,18 @@ func _toggle_supply_overlay() -> void:
 		if ol_infra.has_method("queue_redraw"):
 			ol_infra.queue_redraw()
 	if supply_mode:
-		_setup_supply_layer()
+		# Boot already called `_setup_supply_layer`. Re-entering it on every L-on
+		# restacked 3k glyph Labels + recomputed roles (live ~4.5 s after batch cache).
+		if supply_map_layer == null or not is_instance_valid(supply_map_layer):
+			_setup_supply_layer()
 		# Hang-class: do not BFS a 3520-board corridor on the L/G frame.
 		_show_inspector_toast("Supply legend ON · click a unit chip to order (march / Ctrl+click assault)", 4.0)
-		_update_supply_overlay_legend()
+		_refresh_supply_highlights(true)
 	else:
 		_end_supply_reroute()
 		if supply_map_layer != null and supply_map_layer.has_method("clear_route_highlight"):
 			supply_map_layer.call("clear_route_highlight")
-	# Skip full fill recolor on toggle — was expensive; tint handles on next mapmode.
-	_refresh_supply_highlights()
+		_refresh_supply_highlights()
 	_update_supply_overlay_legend()
 	if _hover_province != null:
 		_refresh_hover_tooltip(_hover_province)
@@ -25680,6 +25703,7 @@ func _toggle_supply_overlay() -> void:
 		if not supply_mode:
 			supply_overlay_panel.hide_panel()
 	_sync_supply_route_canvas_stack()
+	_supply_toggle_in_progress = false
 
 
 func _refresh_supply_routes() -> void:
@@ -28942,12 +28966,15 @@ func _set_compare_preview_outline(province_id: int, visible: bool) -> void:
 
 
 func _supply_highlight_roles() -> Dictionary[int, String]:
+	if _supply_toggle_in_progress:
+		_supply_toggle_role_computes += 1
 	var roles: Dictionary[int, String] = {}
 	if not supply_mode:
 		return roles
 	var sm := _supply_manager()
 	for pid in province_nodes.keys():
-		if ProvinceInsight.depot_fill_ratio(int(pid)) >= 0.0:
+		var depot: Variant = sm.get_depot_state(int(pid)) if sm != null else null
+		if depot != null and float(depot.fill_ratio()) >= 0.0:
 			roles[int(pid)] = "hub"  # overwritten below if on route / preview / selected
 	if sm == null:
 		return roles
@@ -29123,11 +29150,15 @@ func _pulse_amount_for_supply_role(role: String) -> float:
 			return 0.28
 
 
-func _refresh_supply_highlights() -> void:
+func _refresh_supply_highlights(reuse_cached_roles: bool = false) -> void:
 	# Hang-class: L off is hide-only. Never walk 3520 nodes or rebuild Line2Ds.
 	if not supply_mode:
 		_set_supply_outline_batch_visible(false)
-		_supply_role_by_province.clear()
+		_supply_role_by_province = {}
+		return
+	if reuse_cached_roles and _supply_outline_batch_is_ready() and not _supply_roles_cache.is_empty():
+		_supply_role_by_province = _supply_roles_cache.duplicate()
+		_set_supply_outline_batch_visible(true)
 		return
 	var roles := _supply_highlight_roles()
 	_supply_role_by_province = roles
@@ -29157,6 +29188,18 @@ func get_supply_overlay_outline_visible_count() -> int:
 
 func get_supply_outline_rebuild_count() -> int:
 	return _supply_outline_rebuild_count
+
+
+func get_supply_toggle_role_computes() -> int:
+	return _supply_toggle_role_computes
+
+
+func get_supply_toggle_setups() -> int:
+	return _supply_toggle_setups
+
+
+func get_supply_toggle_glyph_layouts() -> int:
+	return _supply_toggle_glyph_layouts
 
 
 func _supply_outline_batch_is_ready() -> bool:
