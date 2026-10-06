@@ -4,7 +4,7 @@ Window **1280×740** Absolute **@(0, 29)** · GER 1936 · `world_accurate`.
 Do **not** raise the window. Do **not** use Ctrl.
 Headless / xvfb ≠ live Play.
 
-**Tip:** `2f15698dec1f456b6ee339137873a83bc05b4ffb` (product `f18a341a`) BEGIN-1 FIX #2
+**Tip:** `1868dced592c4ee5c347dec0271a9ea14283564c` (product `f18a341a`) BEGIN-1 FIX #2
 (restamp clock after the Begin frame + poll-path `begin_press_pending`).
 Update SHA after the push.
 

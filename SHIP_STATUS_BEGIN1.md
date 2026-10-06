@@ -9,7 +9,7 @@ From: Cloud Agent
 | **Base** | main `425b4448c7bec8b7f8d5602193b8e8466d1e5ec2` (LABEL-1) |
 | **Branch** | `cursor/begin1-title-release-swallow-d55e` |
 | **Product** | `f18a341a02fc823c35e037cc8e8e61f951eac41b` |
-| **Tip** | `2f15698dec1f456b6ee339137873a83bc05b4ffb` |
+| **Tip** | `1868dced592c4ee5c347dec0271a9ea14283564c` |
 | **PR** | https://github.com/mmf62208/epochs-of-ascendancy/pull/84 |
 | Verdict | isolated keep-green **PASS**. xvfb ≠ live Play. Merge **HOLD**. |
 
@@ -60,7 +60,7 @@ Pre-step: `timeout 1500 tools/run_godot.sh --headless --path . --import --quit`
    or after a later fresh press (not the poll-path Begin click itself),
    the first map click must pick.
 
-## Gates (tip `2f15698dec1f456b6ee339137873a83bc05b4ffb`, product `f18a341a`)
+## Gates (tip `1868dced592c4ee5c347dec0271a9ea14283564c`, product `f18a341a`)
 
 | gate | kind | result |
 |---|---|---|
