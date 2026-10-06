@@ -1,9 +1,10 @@
 extends SceneTree
 
 ## BEGIN-1: a normal ~80 ms Begin click must not leftover-pick the map.
-## Press starts the game (ACTION_MODE_BUTTON_PRESS) and queue_free()s the
-## title; the matching release must not select a province, open the
-## inspector, or soft click-zoom. The next real map click still selects.
+## FIX #1: swallow clears on a new left press and expires (400 ms / 24 frames).
+## Drive real InputEventMouseButton press/release through MapRenderer _input /
+## _unhandled_input. Follow-up and no-release clicks must select via the real
+## pick path (pid != -1, no _select_province fallback).
 ## Does not load WorldMap.tscn / 3520. Headless / xvfb are NOT live Play.
 ##
 ##   tools/run_godot.sh --headless --path . --resolution 1280x740 \
@@ -17,7 +18,7 @@ const LOIR := 710671
 const HOLD_MS := 80
 const ZOOM0 := 0.776
 const CAM0 := Vector2(4200, 1000)
-const WORLD_UNDER := Vector2(1000, 1000)
+const MAP_PT := Vector2(640, 400)
 
 var _failures: int = 0
 var _mr: Node = null
@@ -27,6 +28,10 @@ var _info: Panel = null
 var _title: CanvasLayer = null
 var _container: Node2D = null
 var _begin_pt: Vector2 = Vector2.ZERO
+var _mm: Node = null
+var _saved_pick_grid: Variant = null
+var _loir_province: Object = null
+var _loir_host: Node2D = null
 
 
 func _init() -> void:
@@ -35,6 +40,7 @@ func _init() -> void:
 
 func _start() -> void:
 	await _run()
+	_restore_pick_grid()
 	var ok := _failures == 0
 	print("HeadlessBegin1TitleReleaseFallthroughTest: ", "PASS" if ok else "FAIL", " (failures=", _failures, ")")
 	print("HeadlessBegin1TitleReleaseFallthroughTest: RESULT=", "PASS" if ok else "FAIL")
@@ -97,6 +103,8 @@ func _run() -> void:
 		return
 	await _test_80ms_begin_does_not_pick()
 	await _test_next_map_click_still_selects()
+	await _test_keyboard_begin_then_map_click()
+	await _test_swallow_expires_and_new_press_clears()
 
 
 func _test_source_needles() -> void:
@@ -124,13 +132,25 @@ func _test_source_needles() -> void:
 	if "func arm_begin_title_release_swallow" not in ren:
 		_fail("MapRenderer must expose arm_begin_title_release_swallow")
 		return
+	if "BEGIN_SWALLOW_CAP_MSEC" not in ren or "BEGIN_SWALLOW_CAP_FRAMES" not in ren:
+		_fail("Begin swallow must expire on a short msec/frame cap")
+		return
+	if "func _clear_begin_title_release_swallow_on_new_left_press" not in ren:
+		_fail("Begin swallow must clear on a new left press")
+		return
 	var input_fn := _slice_func(ren, "_input")
 	if "_begin_title_release_blocks_map_pick" not in input_fn:
 		_fail("MapRenderer._input must swallow the Begin leftover release")
 		return
+	if "_clear_begin_title_release_swallow_on_new_left_press" not in input_fn:
+		_fail("MapRenderer._input must drop the swallow on a new left press")
+		return
 	var un_fn := _slice_func(ren, "_unhandled_input")
 	if "_begin_title_release_blocks_map_pick" not in un_fn:
 		_fail("MapRenderer._unhandled_input must swallow the Begin leftover release")
+		return
+	if "_clear_begin_title_release_swallow_on_new_left_press" not in un_fn:
+		_fail("MapRenderer._unhandled_input must drop the swallow on a new left press")
 		return
 	var chip_fn := _slice_func(ren, "_try_open_land_chip_from_input")
 	if "_begin_title_release_blocks_map_pick" not in chip_fn:
@@ -140,10 +160,13 @@ func _test_source_needles() -> void:
 	if "_begin_title_release_blocks_map_pick" not in area_fn:
 		_fail("Area2D leftover release must honor the Begin swallow")
 		return
+	if "_clear_begin_title_release_swallow_on_new_left_press" not in area_fn:
+		_fail("Area2D new press must drop the Begin swallow")
+		return
 	if "eoa_tip_dismiss_swallow_release" not in _slice_func(ren, "_arm_first_session_tip_dismiss_swallow"):
 		_fail("TipDismiss swallow must stay")
 		return
-	_pass("source needles: Begin press-arm swallow + TipDismiss kept")
+	_pass("source needles: Begin press-arm + expiry + clear-on-press + TipDismiss kept")
 
 
 func _setup_renderer() -> bool:
@@ -155,6 +178,7 @@ func _setup_renderer() -> bool:
 	if _mr == null:
 		_fail("MapRenderer create failed")
 		return false
+	_mr.name = "MapRenderer"
 	_container = Node2D.new()
 	_container.name = "ProvinceContainers"
 	_mr.add_child(_container)
@@ -201,7 +225,16 @@ func _setup_renderer() -> bool:
 		_mr.use_spatial_picking = true
 	_mr.set("selected_province_id", -1)
 	_mr.set("selected_formation_id", "")
+	_mm = root.get_node_or_null("MapManager")
+	if _mm != null and "pick_grid" in _mm:
+		_saved_pick_grid = _mm.pick_grid
+		_mm.pick_grid = null
 	return true
+
+
+func _restore_pick_grid() -> void:
+	if _mm != null and "pick_grid" in _mm and _saved_pick_grid != null:
+		_mm.pick_grid = _saved_pick_grid
 
 
 func _make_province() -> Object:
@@ -217,49 +250,42 @@ func _make_province() -> Object:
 	return p
 
 
-func _seed_pick_target() -> Object:
-	var p: Object = _make_province()
-	if p == null:
-		_fail("Province create failed")
-		return null
+func _seed_loir_under_screen(screen_pt: Vector2) -> bool:
+	if _cam == null or _mr == null:
+		_fail("renderer missing for Loir seed")
+		return false
+	var world_under: Vector2 = _cam.get_canvas_transform().affine_inverse() * screen_pt
+	if _loir_province == null:
+		_loir_province = _make_province()
+		if _loir_province == null:
+			_fail("Province create failed")
+			return false
 	if "provinces" in _mr:
-		_mr.provinces[LOIR] = p
+		_mr.provinces[LOIR] = _loir_province
 	if "province_centroids" in _mr:
-		_mr.province_centroids[LOIR] = WORLD_UNDER
-	var host := Node2D.new()
-	host.name = "Province_%d" % LOIR
-	host.position = WORLD_UNDER
-	_container.add_child(host)
+		_mr.province_centroids[LOIR] = world_under
+	if _loir_host == null:
+		_loir_host = Node2D.new()
+		_loir_host.name = "Province_%d" % LOIR
+		_container.add_child(_loir_host)
+	_loir_host.global_position = world_under
 	if "province_nodes" in _mr:
-		_mr.province_nodes[LOIR] = host
-	var fscr: Script = load("res://scripts/formations/Formation.gd") as Script
-	var fo: Object = fscr.new() if fscr != null else null
-	if fo == null:
-		_fail("Formation create failed")
-		return null
-	fo.set("formation_id", "begin1_ger_land")
-	fo.set("country_tag", "GER")
-	fo.set("formation_type", "division")
-	fo.set("name", "BEGIN-1 Div")
-	fo.set("stationed_province_id", LOIR)
-	fo.set("strength", 0.9)
-	fo.set("organization", 1.0)
-	var icon := Node2D.new()
-	icon.name = "DemoUnitIcon_%d" % LOIR
-	host.add_child(icon)
-	icon.global_position = WORLD_UNDER
-	icon.set_meta("formation", fo)
-	icon.set_meta("formation_id", "begin1_ger_land")
-	icon.set_meta("province_id", LOIR)
+		_mr.province_nodes[LOIR] = _loir_host
+	if _mm != null:
+		if "pick_grid" in _mm:
+			_mm.pick_grid = null
+		# Isolate nearest-centroid fallback: only Loir sits under this click.
+		if "_centroids" in _mm:
+			_mm._centroids = {LOIR: world_under}
+		elif _mm.has_method("sync_render_centroids"):
+			_mm.call("sync_render_centroids", {LOIR: world_under})
 	if "_demo_unit_icon_pids" in _mr:
-		_mr._demo_unit_icon_pids = [LOIR]
-	var plate := Polygon2D.new()
-	plate.name = "NationPlate"
-	plate.polygon = PackedVector2Array([
-		Vector2(-22, -20), Vector2(22, -20), Vector2(22, 20), Vector2(-22, 20)
-	])
-	icon.add_child(plate)
-	return p
+		_mr._demo_unit_icon_pids = []
+	var got: int = int(_mr.call("_still_click_province_pid", world_under, false))
+	if got != LOIR:
+		_fail("real pick path must resolve Loir-et-Cher under the click (pid=%d)" % got)
+		return false
+	return true
 
 
 func _release_at(screen_pt: Vector2) -> InputEventMouseButton:
@@ -280,19 +306,30 @@ func _press_at(screen_pt: Vector2) -> InputEventMouseButton:
 	return ev
 
 
-func _push_left(screen_pt: Vector2, pressed: bool) -> void:
+func _send_mouse(screen_pt: Vector2, pressed: bool) -> InputEventMouseButton:
 	if DisplayServer.get_name() != "headless":
 		DisplayServer.warp_mouse(Vector2i(int(round(screen_pt.x)), int(round(screen_pt.y))))
 	var ev: InputEventMouseButton = _press_at(screen_pt) if pressed else _release_at(screen_pt)
-	var vp: Viewport = root.get_viewport()
-	if vp != null:
-		vp.push_input(ev, true)
-	else:
-		Input.parse_input_event(ev)
 	if _mr != null:
 		_mr._input(ev)
-		if not pressed:
-			_mr._unhandled_input(ev)
+		_mr._unhandled_input(ev)
+	return ev
+
+
+func _reset_map_click_latches() -> void:
+	if _mr == null:
+		return
+	if _mr.has_method("_clear_left_slop_after_still_click"):
+		_mr.call("_clear_left_slop_after_still_click")
+	_mr.set("_left_skip_next_pick", false)
+	_mr.set("_left_gesture_dragged", false)
+	_mr.set("_left_btn_down", false)
+	_mr.set("_left_button_was_up", true)
+	_mr.set("_left_ready_for_still_click", true)
+	_mr.set("_unit_card_consumed_press", false)
+	_mr.set("_unit_card_release_eaten", false)
+	_mr.set("_skip_inspector_after_march", false)
+	_mr.set("selected_formation_id", "")
 
 
 func _wait_hold_ms(ms: int) -> void:
@@ -322,92 +359,105 @@ func _inspector_up() -> bool:
 	return false
 
 
-func _test_80ms_begin_does_not_pick() -> void:
+func _clear_inspector() -> void:
+	_mr.set("selected_province_id", -1)
+	_mr.set("selected_formation_id", "")
+	if _info != null:
+		_info.visible = false
+	if _ui != null:
+		var pop: Node = _ui.get_node_or_null("UnitDetailPopup")
+		if pop != null:
+			_ui.remove_child(pop)
+			pop.free()
+
+
+func _spawn_title() -> bool:
+	if _title != null and is_instance_valid(_title):
+		if not _title.is_queued_for_deletion():
+			_title.free()
+		_title = null
 	var title_scr: GDScript = load(SRC_TITLE) as GDScript
 	if title_scr == null:
 		_fail("LivingTitleBoot missing")
-		return
+		return false
 	_title = title_scr.new() as CanvasLayer
 	if _title == null:
 		_fail("LivingTitleBoot create failed")
-		return
+		return false
 	_title.name = "LivingTitleBoot"
+	_title.visible = true
 	root.add_child(_title)
 	await _flush(6)
 	var begin: Button = _title.find_child("LivingTitleBegin", true, false) as Button
 	if begin == null:
 		_fail("LivingTitleBegin missing")
-		return
-	begin.position = Vector2(80, 420)
-	begin.size = Vector2(360, 72)
-	if begin.has_method("reset_size"):
-		begin.reset_size()
-	await _flush(3)
+		return false
+	begin.visible = true
+	if begin.get_global_rect().size.x < 8.0 or begin.get_global_rect().size.y < 8.0:
+		begin.position = Vector2(80, 420)
+		begin.size = Vector2(360, 72)
+		if begin.has_method("reset_size"):
+			begin.reset_size()
+		await _flush(3)
 	var rect: Rect2 = begin.get_global_rect()
 	if rect.size.x < 8.0 or rect.size.y < 8.0:
 		rect = Rect2(Vector2(80, 420), Vector2(360, 72))
+		begin.position = rect.position
+		begin.size = rect.size
 	_begin_pt = rect.get_center()
-	var world_under: Vector2 = _cam.get_canvas_transform().affine_inverse() * _begin_pt
-	if world_under != Vector2.ZERO:
-		# Keep the leftover-release target under the Begin pixel (Home/Loir class).
-		pass
-	var p: Object = _seed_pick_target()
-	if p == null:
-		return
-	# Re-home the chip to the world point under Begin so leftover still-click
-	# would open it if the swallow is missing (TipDismiss proof shape).
-	var host: Node2D = _container.get_node_or_null("Province_%d" % LOIR) as Node2D
-	if host != null:
-		host.global_position = world_under
-	var icon: Node2D = host.find_child("DemoUnitIcon_%d" % LOIR, true, false) as Node2D if host != null else null
-	if icon != null:
-		icon.global_position = world_under
-	if "province_centroids" in _mr:
-		_mr.province_centroids[LOIR] = world_under
+	if not bool(_mr.call("_living_title_boot_is_up")):
+		_fail("LivingTitleBoot must be visible to MapRenderer before Begin press")
+		return false
+	return true
+
+
+func _begin_via_real_mouse_press() -> bool:
+	if not await _spawn_title():
+		return false
 	_cam.position = CAM0
 	_cam.zoom = Vector2(ZOOM0, ZOOM0)
-	_mr.set("selected_province_id", -1)
-	_mr.set("selected_formation_id", "")
-	_info.visible = false
-	_push_left(_begin_pt, true)
+	_clear_inspector()
+	if not _seed_loir_under_screen(_begin_pt):
+		return false
+	var ev: InputEventMouseButton = _press_at(_begin_pt)
+	_mr._input(ev)
 	if not bool(_title.get("_closed")):
-		if begin.has_signal("button_down"):
-			begin.button_down.emit()
-		begin.pressed.emit()
+		_title._input(ev)
 	if not bool(_title.get("_closed")):
-		_fail("Begin press did not close the living title")
-		return
-	_pass("Begin press closed the title")
-	if _mr != null and not bool(_mr.call("_begin_title_release_blocks_map_pick")):
-		if _mr.has_method("arm_begin_title_release_swallow"):
-			_mr.call("arm_begin_title_release_swallow")
-		if not bool(_mr.call("_begin_title_release_blocks_map_pick")):
-			_fail("Begin press did not arm leftover-release swallow")
-			return
+		_fail("Begin mouse press did not close the living title via _input")
+		return false
+	_pass("Begin mouse press closed the title via real InputEventMouseButton")
+	if not bool(_mr.call("_begin_title_release_blocks_map_pick")):
+		_fail("Begin mouse press did not arm leftover-release swallow")
+		return false
 	_pass("Begin leftover-release swallow armed")
+	return true
+
+
+func _test_80ms_begin_does_not_pick() -> void:
+	if not await _begin_via_real_mouse_press():
+		return
 	await _wait_hold_ms(HOLD_MS)
 	await _flush(3)
 	if _title != null and is_instance_valid(_title) and not _title.is_queued_for_deletion():
-		# queue_free should have run; force the title-up guard down.
 		if not bool(_title.get("_closed")):
 			_fail("title still open after 80 ms")
 			return
 	_cam.position = CAM0
 	_cam.zoom = Vector2(ZOOM0, ZOOM0)
+	if not _seed_loir_under_screen(_begin_pt):
+		return
+	_clear_inspector()
 	var z0: float = _zoom_x()
 	var pid0: int = int(_mr.get("selected_province_id"))
-	var ev: InputEventMouseButton = _release_at(_begin_pt)
-	_push_left(_begin_pt, false)
-	# Area2D leftover path (spatial picking off) — Loir-et-Cher inspector + soft zoom.
-	var spatial0: bool = bool(_mr.get("use_spatial_picking"))
-	_mr.use_spatial_picking = false
-	_mr.call("_on_province_input", null, ev, 0, p, host)
-	_mr.use_spatial_picking = spatial0
-	if bool(_mr.call("_try_open_land_chip_from_input", false, ev)):
-		_fail("Begin leftover release opened a land chip")
+	_send_mouse(_begin_pt, false)
+	await _flush(2)
+	var got_pid: int = int(_mr.get("selected_province_id"))
+	if got_pid != pid0 and got_pid == LOIR:
+		_fail("Begin leftover release selected Loir-et-Cher via real pick (pid=%d)" % got_pid)
 		return
-	if int(_mr.get("selected_province_id")) != pid0 and int(_mr.get("selected_province_id")) == LOIR:
-		_fail("Begin leftover release selected Loir-et-Cher")
+	if got_pid != pid0 and got_pid > 0:
+		_fail("Begin leftover release selected pid=%d" % got_pid)
 		return
 	if _inspector_up():
 		_fail("Begin leftover release opened the inspector")
@@ -415,70 +465,94 @@ func _test_80ms_begin_does_not_pick() -> void:
 	if absf(_zoom_x() - z0) > 0.002:
 		_fail("Begin leftover release changed zoom %.3f -> %.3f" % [z0, _zoom_x()])
 		return
-	if str(_mr.get("selected_formation_id")) == "begin1_ger_land":
-		_fail("Begin leftover release selected the unit under Begin")
-		return
 	_pass("80 ms Begin leftover release did not pick / inspect / zoom")
 	await _flush(3)
-	if _mr.has_meta("eoa_begin_swallow_release"):
+	if bool(_mr.call("_begin_title_release_blocks_map_pick")):
 		_fail("Begin swallow stayed armed after the leftover release")
 		return
 	_pass("Begin swallow cleared after one leftover release")
+
+
+func _assert_real_map_click_selects(screen_pt: Vector2, why: String) -> bool:
+	_reset_map_click_latches()
+	_cam.position = CAM0
+	_cam.zoom = Vector2(ZOOM0, ZOOM0)
+	if not _seed_loir_under_screen(screen_pt):
+		return false
+	_clear_inspector()
+	if bool(_mr.call("_begin_title_release_blocks_map_pick")):
+		_fail("%s: swallow still armed; would eat a real map click" % why)
+		return false
+	_send_mouse(screen_pt, true)
+	await _flush(2)
+	_send_mouse(screen_pt, false)
+	await _flush(3)
+	var got_pid: int = int(_mr.get("selected_province_id"))
+	if got_pid != LOIR:
+		_fail("%s: real pick path must select Loir-et-Cher (pid=%d)" % [why, got_pid])
+		return false
+	if not _inspector_up():
+		_fail("%s: real pick path must open the inspector" % why)
+		return false
+	_pass("%s: real map click selected pid=%d and opened inspector" % [why, got_pid])
+	return true
 
 
 func _test_next_map_click_still_selects() -> void:
 	if _mr == null or _cam == null:
 		_fail("renderer missing for follow-up click")
 		return
+	await _assert_real_map_click_selects(MAP_PT, "follow-up after leftover Begin")
+
+
+func _test_keyboard_begin_then_map_click() -> void:
+	if not await _spawn_title():
+		return
+	_clear_inspector()
+	var enter := InputEventKey.new()
+	enter.keycode = KEY_ENTER
+	enter.physical_keycode = KEY_ENTER
+	enter.pressed = true
+	_title._input(enter)
+	if not bool(_title.get("_closed")):
+		_fail("keyboard Enter did not close the living title via _input")
+		return
 	if bool(_mr.call("_begin_title_release_blocks_map_pick")):
-		_fail("Begin swallow still armed; would eat a real map click")
+		_fail("keyboard Begin must not arm leftover-release swallow")
 		return
-	_cam.position = CAM0
-	_cam.zoom = Vector2(ZOOM0, ZOOM0)
-	_mr.set("selected_province_id", -1)
-	_mr.set("selected_formation_id", "")
-	_info.visible = false
-	if _mr.has_method("_clear_left_slop_after_still_click"):
-		_mr.call("_clear_left_slop_after_still_click")
-	_mr.set("_left_skip_next_pick", false)
-	_mr.set("_left_gesture_dragged", false)
-	_mr.set("_unit_card_consumed_press", false)
-	_mr.set("_unit_card_release_eaten", false)
-	var world_under: Vector2 = _cam.get_canvas_transform().affine_inverse() * _begin_pt
-	var later: bool = bool(_mr.call("_try_open_land_unit_at_world", world_under, false, false))
-	if not later:
-		later = bool(_mr.call("_try_open_land_unit_at_world", WORLD_UNDER, false, false))
-	if later and str(_mr.get("selected_formation_id")) == "begin1_ger_land":
-		_pass("map pick works again after Begin leftover swallow")
-		_mr.set("selected_formation_id", "")
-		var pop: Node = _ui.get_node_or_null("UnitDetailPopup") if _ui != null else null
-		if pop != null:
-			_ui.remove_child(pop)
-			pop.free()
+	_pass("keyboard Begin closed the title and did not arm swallow")
+	await _assert_real_map_click_selects(MAP_PT, "map click after keyboard Begin")
+
+
+func _test_swallow_expires_and_new_press_clears() -> void:
+	if _mr == null:
+		_fail("renderer missing for swallow expiry")
 		return
-	var p: Object = null
-	if "provinces" in _mr:
-		var prow: Dictionary = _mr.provinces as Dictionary
-		if prow.has(LOIR):
-			p = prow[LOIR] as Object
-	var host: Node2D = _container.get_node_or_null("Province_%d" % LOIR) as Node2D
-	if p == null or host == null:
-		_fail("follow-up map click had no unit or province fixture")
+	_mr.call("arm_begin_title_release_swallow")
+	if not bool(_mr.call("_begin_title_release_blocks_map_pick")):
+		_fail("arm_begin_title_release_swallow did not arm")
 		return
-	# New press so leftover skip from the swallowed up cannot latch.
-	_push_left(_begin_pt, true)
+	var t0: int = Time.get_ticks_msec()
+	var f0: int = Engine.get_process_frames()
+	while (
+		Time.get_ticks_msec() - t0 < 450
+		and Engine.get_process_frames() - f0 < 30
+	):
+		await process_frame
+	if bool(_mr.call("_begin_title_release_blocks_map_pick")):
+		_fail("Begin swallow still armed after 400 ms / 24 frames")
+		return
+	_pass("Begin swallow expired on its own (400 ms / 24 frames)")
+	_mr.call("arm_begin_title_release_swallow")
+	if not bool(_mr.call("_begin_title_release_blocks_map_pick")):
+		_fail("re-arm before new-press clear failed")
+		return
+	_send_mouse(MAP_PT, true)
+	if bool(_mr.call("_begin_title_release_blocks_map_pick")):
+		_fail("new left press did not clear the Begin swallow")
+		return
+	_pass("new left press cleared the Begin swallow")
+	_send_mouse(MAP_PT, false)
 	await _flush(2)
-	var ev: InputEventMouseButton = _release_at(_begin_pt)
-	var spatial0: bool = bool(_mr.get("use_spatial_picking"))
-	_mr.use_spatial_picking = false
-	_mr.call("_on_province_input", null, ev, 0, p, host)
-	_mr.use_spatial_picking = spatial0
-	var got_pid: int = int(_mr.get("selected_province_id"))
-	if got_pid != LOIR:
-		if _mr.has_method("_select_province"):
-			_mr.call("_select_province", p, host)
-		got_pid = int(_mr.get("selected_province_id"))
-	if got_pid != LOIR:
-		_fail("map pick stayed suppressed after Begin leftover swallow (pid=%d)" % got_pid)
-		return
-	_pass("map province click works again after Begin")
+	_clear_inspector()
+	await _assert_real_map_click_selects(MAP_PT, "map click after armed-no-release")

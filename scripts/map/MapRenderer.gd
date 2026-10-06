@@ -261,6 +261,11 @@ var _close_ignore_stale_left_down := false
 ## clear after that one release, on any new left press (UI or map), and after
 ## a short safety timeout (Play: leftover eaten swallowed later top-bar ups).
 const UNIT_CARD_LATCH_SAFETY_SEC := 0.5
+## BEGIN-1 FIX #1: leftover Begin release swallow is one orphan up only.
+## A new left press must clear it, and it expires well under a second so a
+## lost release / keyboard Begin cannot eat the player's first map click.
+const BEGIN_SWALLOW_CAP_MSEC := 400
+const BEGIN_SWALLOW_CAP_FRAMES := 24
 ## Fighting card (stance + cmd) must stay on-screen at Play 1280×740.
 ## Old reserve 252 clipped Press/Hold below Halt/Assign (card grows past 220).
 const UNIT_CARD_DOCK_RESERVE := 348.0
@@ -2801,6 +2806,7 @@ func _input(event: InputEvent) -> void:
 			if event.pressed:
 				_skip_inspector_after_march = false
 				_clear_unit_card_press_consume_on_new_left_press()
+				_clear_begin_title_release_swallow_on_new_left_press()
 			if _living_title_boot_is_up():
 				# Play 5adb38e: never swallow title-up presses. Route by event
 				# coords (computerUse may not update get_mouse_position first).
@@ -3216,6 +3222,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	# Spatial picking click handling — this path makes the system fully functional
 	# even when create_area_nodes_for_fallback=false (pure MapPickGrid mode, zero Area2D nodes).
 	if use_spatial_picking and event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if event.pressed:
+			_clear_begin_title_release_swallow_on_new_left_press()
 		if not event.pressed and _consume_unit_card_press_release_if_armed():
 			return
 		if not event.pressed and _first_session_tip_dismiss_blocks_map_pick():
@@ -3566,6 +3574,7 @@ func _process(delta: float) -> void:
 		_perf.begin("process_total")
 	_expire_map_time_pulse_if_needed()
 	_tick_unit_card_press_consume_latch(delta)
+	_tick_begin_title_release_swallow()
 
 	# When sim is paused, skip heavy LOD/fill/theater work — pan/zoom/UI stay responsive for playtest.
 	var sim_paused := false
@@ -18483,6 +18492,7 @@ func _on_province_input(_viewport: Node, event: InputEvent, _shape_idx: int, pro
 	# Press return is first so skip-pick does not have to latch before this fires.
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed:
+			_clear_begin_title_release_swallow_on_new_left_press()
 			return
 		if _begin_title_release_blocks_map_pick():
 			call_deferred("_clear_begin_title_release_swallow")
@@ -24686,17 +24696,51 @@ func _clear_first_session_tip_dismiss_swallow() -> void:
 
 func arm_begin_title_release_swallow() -> void:
 	# LivingTitleBoot Begin press (button_down / handle_live_pointer / _input).
-	# One leftover left-release is eaten; the next map click is not.
+	# One leftover left-release is eaten. A new left press or a short cap
+	# (400 ms / 24 frames) drops it so a lost up cannot eat the next click.
 	set_meta("eoa_begin_swallow_release", true)
+	set_meta("eoa_begin_swallow_arm_msec", Time.get_ticks_msec())
+	set_meta("eoa_begin_swallow_arm_frame", Engine.get_process_frames())
+
+
+func _begin_title_release_swallow_expired() -> bool:
+	if not has_meta("eoa_begin_swallow_release"):
+		return false
+	var arm_ms: int = int(get_meta("eoa_begin_swallow_arm_msec", 0))
+	if arm_ms > 0 and Time.get_ticks_msec() - arm_ms >= BEGIN_SWALLOW_CAP_MSEC:
+		return true
+	var arm_fr: int = int(get_meta("eoa_begin_swallow_arm_frame", -1))
+	if arm_fr >= 0 and Engine.get_process_frames() - arm_fr >= BEGIN_SWALLOW_CAP_FRAMES:
+		return true
+	return false
 
 
 func _begin_title_release_blocks_map_pick() -> bool:
-	return has_meta("eoa_begin_swallow_release")
+	if not has_meta("eoa_begin_swallow_release"):
+		return false
+	if _begin_title_release_swallow_expired():
+		_clear_begin_title_release_swallow()
+		return false
+	return true
+
+
+func _clear_begin_title_release_swallow_on_new_left_press() -> void:
+	if has_meta("eoa_begin_swallow_release"):
+		_clear_begin_title_release_swallow()
+
+
+func _tick_begin_title_release_swallow() -> void:
+	if has_meta("eoa_begin_swallow_release") and _begin_title_release_swallow_expired():
+		_clear_begin_title_release_swallow()
 
 
 func _clear_begin_title_release_swallow() -> void:
 	if has_meta("eoa_begin_swallow_release"):
 		remove_meta("eoa_begin_swallow_release")
+	if has_meta("eoa_begin_swallow_arm_msec"):
+		remove_meta("eoa_begin_swallow_arm_msec")
+	if has_meta("eoa_begin_swallow_arm_frame"):
+		remove_meta("eoa_begin_swallow_arm_frame")
 
 
 func dismiss_first_session_action_tip() -> void:

@@ -18,7 +18,8 @@ Screen x = client x + **0**.
    - **no** click-zoom (Home zoom must stay; leftover used to jump ~0.776 → 0.900)
    - Loir-et-Cher (under Begin at ~**(284, 580)** after Home) must **not** be selected
 4. Then a **new** still-click on a GER land chip / hex must select normally
-   (the leftover swallow is one-shot).
+   (the leftover swallow is one-shot; a new left press or 400 ms / 24 frames
+   drops it so a lost release / keyboard Begin cannot eat that click).
 
 ## 1280×740 Begin point
 
