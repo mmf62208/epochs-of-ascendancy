@@ -355,6 +355,9 @@ func _build_ui() -> void:
 	# (Play d18cbae: cursor on Begin, no transition, then window-exit).
 	_begin_btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
 	_begin_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	# Press arms a one-shot leftover-release swallow (TipDismiss pattern).
+	# Begin queue_free()s on press; a real ~80 ms mouse-up must not pick the map.
+	_begin_btn.button_down.connect(_arm_begin_release_swallow)
 	_begin_btn.pressed.connect(_on_begin_new)
 	_begin_btn.gui_input.connect(_on_begin_gui_input)
 	RetrowaveTheme.style_primary_button(_begin_btn)
@@ -1363,7 +1366,26 @@ func _shortcut_input(event: InputEvent) -> void:
 			vp_sb.set_input_as_handled()
 
 
+func _arm_begin_release_swallow() -> void:
+	# TipDismiss-style: press arms swallow of the next left release so the
+	# orphan mouse-up cannot select/inspect/click-zoom after the title dies.
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
+	if tree == null:
+		return
+	var mr: Node = tree.get_first_node_in_group("map_renderer")
+	if mr == null and tree.current_scene != null:
+		mr = tree.current_scene.find_child("MapRenderer", true, false)
+	if mr != null and mr.has_method("arm_begin_title_release_swallow"):
+		mr.call("arm_begin_title_release_swallow")
+
+
 func _on_begin_new() -> void:
+	if _closed:
+		return
+	# Pointer Begin (left still down). Keyboard Enter/Space/B must not eat
+	# the next real map click.
+	if os_left_button_held():
+		_arm_begin_release_swallow()
 	print("LivingTitleBoot: live Begin · %s · %d" % [_tag, _year])
 	var out: Dictionary = apply_living_title_boot(_tag, _year, "")
 	_finish(out)

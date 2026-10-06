@@ -2791,6 +2791,13 @@ func _input(event: InputEvent) -> void:
 			# the same click cannot open the unit under the ×, and the next click can.
 			if not event.pressed and has_meta("eoa_tip_dismiss_swallow_release"):
 				call_deferred("_clear_first_session_tip_dismiss_swallow")
+			# Begin fires on press and queue_free()s the title. The matching
+			# ~80 ms leftover release must not still-click the map (Loir-et-Cher
+			# inspector + soft click-zoom 0.776→0.900). One-shot like TipDismiss.
+			if not event.pressed and _begin_title_release_blocks_map_pick():
+				call_deferred("_clear_begin_title_release_swallow")
+				get_viewport().set_input_as_handled()
+				return
 			if event.pressed:
 				_skip_inspector_after_march = false
 				_clear_unit_card_press_consume_on_new_left_press()
@@ -2806,6 +2813,8 @@ func _input(event: InputEvent) -> void:
 					var title_act: String = _route_living_title_pointer(event)
 					print("EOA_LIVE_PTR who=MapRenderer._input action=%s" % title_act)
 					if title_act == "begin" or title_act == "cc" or title_act == "panel":
+						if title_act == "begin":
+							arm_begin_title_release_swallow()
 						get_viewport().set_input_as_handled()
 						return
 					if _living_title_owns_event(event) or _top_bar_owns_click():
@@ -3213,10 +3222,16 @@ func _unhandled_input(event: InputEvent) -> void:
 			call_deferred("_clear_first_session_tip_dismiss_swallow")
 			get_viewport().set_input_as_handled()
 			return
+		if not event.pressed and _begin_title_release_blocks_map_pick():
+			call_deferred("_clear_begin_title_release_swallow")
+			get_viewport().set_input_as_handled()
+			return
 		if _living_title_boot_is_up():
 			if event.pressed:
 				var un_act: String = _route_living_title_pointer(event)
 				if un_act == "begin" or un_act == "cc" or un_act == "panel":
+					if un_act == "begin":
+						arm_begin_title_release_swallow()
 					get_viewport().set_input_as_handled()
 					return
 				if _living_title_owns_event(event) or _top_bar_owns_click():
@@ -18469,6 +18484,9 @@ func _on_province_input(_viewport: Node, event: InputEvent, _shape_idx: int, pro
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed:
 			return
+		if _begin_title_release_blocks_map_pick():
+			call_deferred("_clear_begin_title_release_swallow")
+			return
 	# Hold + committed slop/skip: abort before inspector (Tropical Atlantic Waters).
 	# Read-only live slop — do not `_note`/`_begin` here. Click-without-slop still picks.
 	var left_still_down: bool = (
@@ -19506,6 +19524,8 @@ func _try_open_land_chip_from_input(ctrl_click: bool = false, event: InputEvent 
 	# TipDismiss ×: this release must not open the counter under the button.
 	# Body clicks do not arm the swallow (the label ignores the mouse).
 	if _first_session_tip_dismiss_blocks_map_pick():
+		return false
+	if _begin_title_release_blocks_map_pick():
 		return false
 	if _top_bar_owns_click() or _mouse_over_search_control() or _search_ui_owns_click() or _mouse_over_close_control() or _road_spine_btn_owns_click():
 		return false
@@ -24662,6 +24682,21 @@ func _first_session_tip_dismiss_blocks_map_pick() -> bool:
 func _clear_first_session_tip_dismiss_swallow() -> void:
 	if has_meta("eoa_tip_dismiss_swallow_release"):
 		remove_meta("eoa_tip_dismiss_swallow_release")
+
+
+func arm_begin_title_release_swallow() -> void:
+	# LivingTitleBoot Begin press (button_down / handle_live_pointer / _input).
+	# One leftover left-release is eaten; the next map click is not.
+	set_meta("eoa_begin_swallow_release", true)
+
+
+func _begin_title_release_blocks_map_pick() -> bool:
+	return has_meta("eoa_begin_swallow_release")
+
+
+func _clear_begin_title_release_swallow() -> void:
+	if has_meta("eoa_begin_swallow_release"):
+		remove_meta("eoa_begin_swallow_release")
 
 
 func dismiss_first_session_action_tip() -> void:
