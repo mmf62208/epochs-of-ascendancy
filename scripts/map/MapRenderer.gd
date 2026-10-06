@@ -15009,6 +15009,31 @@ func _apply_static_map_glyph_outline(lbl: Label) -> void:
 	lbl.add_theme_constant_override("shadow_offset_y", 1)
 
 
+func _restore_idle_capital_star_draw_state(star: Label, pid: int, ctr: Vector2) -> void:
+	## After L off, `_layout_zoomed_map_glyphs_for_province_node` used to leave
+	## capitals at `Z_MAP_GLYPH + 2` (10, absolute). Europe land nodes sit at
+	## `_province_draw_z_index` 4 and other canvas layers sit above 10, so the
+	## glyphs stayed in the tree but did not draw until a map-mode switch
+	## re-asserted z=40 via `_restore_land_poly_visibility`.
+	var force := _asia_end_force_star_pids.has(pid)
+	var px := 32 if force else _capital_star_font_px()
+	star.z_as_relative = false
+	star.z_index = 80 if force else 40
+	star.modulate = Color(1.0, 1.0, 1.0, 1.0)
+	star.visible = px > 0
+	if px <= 0:
+		return
+	star.add_theme_font_size_override("font_size", px)
+	star.set_meta(META_MAP_GLYPH_PX, px)
+	star.add_theme_color_override("font_color", Color(1.0, 0.92, 0.15, 1.0))
+	star.add_theme_color_override("font_outline_color", Color(0.02, 0.02, 0.05, 1.0))
+	star.add_theme_constant_override("outline_size", 6)
+	star.reset_size()
+	if ctr != Vector2.ZERO:
+		var sms := star.get_minimum_size()
+		star.position = ctr - sms * 0.5
+
+
 func _layout_zoomed_map_glyphs_for_province_node(pid: int, zoom_metric: float, show_glyphs: bool) -> void:
 	var node: Variant = province_nodes.get(pid)
 	if node == null or not (node is Node2D):
@@ -15020,6 +15045,9 @@ func _layout_zoomed_map_glyphs_for_province_node(pid: int, zoom_metric: float, s
 			var lbl := child as Label
 			var base_px := int(lbl.get_meta(META_MAP_GLYPH_PX))
 			var is_capital := lbl.has_meta(META_MAP_GLYPH_CAPITAL)
+			if is_capital and not supply_mode:
+				_restore_idle_capital_star_draw_state(lbl, int(pid), ctr)
+				continue
 			# Capital gold stars stay visible at all zoom levels (Washington/Tokyo were
 			# hidden when detail glyphs culled at strategic zoom).
 			if is_capital:
