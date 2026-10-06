@@ -2,8 +2,13 @@
 
 StatBars and chip text stay at z=3. NationPlate stays at z=-1.
 `_unit_counter_painted_wins` ranks the hit piece by CanvasItem z
-(child z included) then tree order. Plate-interior class must not
-beat bars or text that are drawn above the plate.
+(child z included) then tree order. Land chrome and sea plates share
+that rank. Land roots stay at 28. A player land chip whose origin
+loses to foreign ink is moved later in the tree than that foreign
+chip. A land chip that still has no drawn pixel is slid until one
+of its pixels is on top, without stealing a player origin or the
+NLD Div 1 bar rim. Sea roots stay at 40. Plate-interior class must
+not beat bars or text.
 """
 from __future__ import annotations
 
@@ -38,6 +43,10 @@ def build_chip_draw_order_pick_product() -> Dict[str, Any]:
     wins = _gd_func_slice(ren, "_unit_counter_painted_wins")
     drawn = _gd_func_slice(ren, "_pick_drawn_land_air_body_at_world")
     pick = _gd_func_slice(ren, "_pick_unit_formation_at_world")
+    land_open = _gd_func_slice(ren, "_try_open_land_unit_at_world")
+    sea_pick = _gd_func_slice(ren, "_pick_sea_nation_plate_drawn_at_world")
+    beats = _gd_func_slice(ren, "_drawn_land_beats_sea_plate")
+    piece = _gd_func_slice(ren, "_unit_counter_top_drawn_piece")
     plate = _gd_func_slice(ren, "_make_unit_nation_plate")
     bars = _gd_func_slice(ren, "_make_unit_stat_bars")
     checks = {
@@ -53,6 +62,18 @@ def build_chip_draw_order_pick_product() -> Dict[str, Any]:
         "no_player_bar_override": "own_bars_fo" not in pick and "best_bar" not in drawn,
         "plate_stays_under_bars": "z_index = -1" in plate and "z_index = 3" in bars,
         "class_helper_kept": "func _unit_counter_painted_class" in ren,
+        "sea_land_same_piece": "_unit_counter_top_drawn_piece" in sea_pick
+        and "_unit_counter_painted_wins" in sea_pick
+        and "_drawn_land_beats_sea_plate" in pick
+        and "_drawn_land_beats_sea_plate" in land_open
+        and "_unit_counter_painted_wins" in beats
+        and "SeaNationDisk" in piece,
+        "own_chip_above_foreign_land": (
+            "func _raise_player_land_above_covering_foreign" in ren
+            and "_raise_player_land_above_covering_foreign(zz)" in ren
+            and "eoa_raise_above_foreign" in ren
+            and "chip_z = 34" not in ren
+        ),
         "headless_overlap": False,
     }
     if HEADLESS.is_file():

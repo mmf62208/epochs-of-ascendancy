@@ -462,6 +462,14 @@ var _occupation_layer = null  # OccupationOverlayLayer
 ## FLEET-2 FIX #2b: sea-nation plates live on this layer (z=40) so they paint
 ## above sea fill (province polys) and choke diamonds (infra overlay z=8).
 var _sea_nation_layer: Node2D = null
+## Scale at which player land chips were last moved after the foreign
+## chip covering their origin. -1 = not yet. Not a second plate layer.
+var _player_draw_raise_scale: float = -1.0
+## Visible land icons used by the buried-pixel scan. Empty outside that scan.
+var _land_draw_pick_pool: Array = []
+## Player land icons moved onto the foreign chip's parent. Restored
+## before a rebuild so the home province still owns the node.
+var _player_draw_raised: Array = []
 #endregion
 #region Phase 2/3 gap-closure overlays
 @export var show_strategic_flow_overlay: bool = false
@@ -19737,7 +19745,7 @@ func _try_open_land_unit_at_world(
 		sea_bind != null
 		and land_air_body != null
 		and not _formation_is_fleet_counter(land_air_body)
-		and _formation_icon_distance(world_pos, land_air_body) <= _formation_icon_distance(world_pos, sea_bind)
+		and _drawn_land_beats_sea_plate(land_air_body, sea_bind, world_pos, z_sea)
 	):
 		_select_map_unit(land_air_body)
 		_show_unit_detail_popup(land_air_body)
@@ -20803,9 +20811,10 @@ func _pick_unit_formation_at_world(world_pos: Vector2, land_only: bool = false, 
 		land_body = null
 		best_player = null
 	if sea_drawn != null and land_body != null:
-		var sea_d: float = _formation_icon_distance(world_pos, sea_drawn)
-		var land_d: float = _formation_icon_distance(world_pos, land_body)
-		if land_d <= sea_d:
+		# Same rank as land chrome: the drawn piece on top wins. A sea
+		# plate wins only when its pixels cover the point and sit above
+		# the land piece. Nearest centre does not.
+		if _drawn_land_beats_sea_plate(land_body, sea_drawn, world_pos, z):
 			if player_only:
 				return best_player
 			if not (land_only and _formation_type_blocks_land_open(land_body)):
@@ -26598,8 +26607,41 @@ func _land_air_body_blocked_by_cluster_hole(world_pos: Vector2, fo: Object, z: f
 	return _click_in_cluster_hole_outside_chip(world_pos, _formation_chip_world(fo), z)
 
 
+func _demo_icon_node_for_formation(fo: Object) -> Node2D:
+	if fo == null:
+		return null
+	var want := ""
+	if "formation_id" in fo:
+		want = str(fo.formation_id)
+	for id_v in _demo_unit_icon_pids:
+		var id: int = int(id_v)
+		for c_v in _iter_demo_unit_icons_at_pid(id):
+			var icon: Node2D = c_v as Node2D
+			if icon == null or not is_instance_valid(icon):
+				continue
+			if icon.has_meta("formation") and icon.get_meta("formation") == fo:
+				return icon
+			if not want.is_empty() and str(icon.get_meta("formation_id", "")) == want:
+				return icon
+	return null
+
+
+func _drawn_land_beats_sea_plate(land_body: Object, sea_body: Object, world_pos: Vector2, z: float) -> bool:
+	# Below z0.65, land chrome and sea plates share one rank: the drawn
+	# piece on top (CanvasItem z, child z included, then tree order).
+	# At z>=0.65 the operational path keeps nearest centre.
+	if z >= 0.65:
+		return _formation_icon_distance(world_pos, land_body) <= _formation_icon_distance(world_pos, sea_body)
+	var land_icon: Node2D = _demo_icon_node_for_formation(land_body)
+	var sea_icon: Node2D = _demo_icon_node_for_formation(sea_body)
+	return _unit_counter_painted_wins(land_icon, sea_icon, world_pos, 0.0, 0.0)
+
+
 func _pick_sea_nation_plate_drawn_at_world(world_pos: Vector2, z: float = -1.0) -> Object:
-	# Strict drawn NationPlate body (not Home-band land AABB / 340 spill).
+	# Strict drawn sea plate (not Home-band land AABB / 340 spill).
+	# Below z0.65 only pixels Godot paints (plate, disk, glyph, ship)
+	# count, ranked by the same piece z as land chrome. The disk-radius
+	# circle is the z>=0.65 hit, not a steal over land ink.
 	var zz: float = z
 	if zz < 0.05:
 		var cam := get_viewport().get_camera_2d() if get_viewport() else null
@@ -26607,7 +26649,9 @@ func _pick_sea_nation_plate_drawn_at_world(world_pos: Vector2, z: float = -1.0) 
 		if cam:
 			zz = maxf(cam.zoom.x, cam.zoom.y)
 	var best: Object = null
+	var best_icon: Node2D = null
 	var best_d: float = INF
+	var painted_band: bool = zz < 0.65
 	for id_v in _demo_unit_icon_pids:
 		var id: int = int(id_v)
 		for c_v in _iter_demo_unit_icons_at_pid(id):
@@ -26622,8 +26666,16 @@ func _pick_sea_nation_plate_drawn_at_world(world_pos: Vector2, z: float = -1.0) 
 			if not _formation_is_stationed_on_sea(fo):
 				continue
 			var chip_pos: Vector2 = _demo_unit_icon_world_pos(icon, id)
-			var hit_r: float = _sea_nation_fleet_disk_radius_world(zz, icon)
 			var d: float = world_pos.distance_to(chip_pos)
+			if painted_band:
+				if _unit_counter_top_drawn_piece(world_pos, icon) == null:
+					continue
+				if best_icon == null or _unit_counter_painted_wins(icon, best_icon, world_pos, d, best_d):
+					best_icon = icon
+					best = fo
+					best_d = d
+				continue
+			var hit_r: float = _sea_nation_fleet_disk_radius_world(zz, icon)
 			if d > hit_r:
 				continue
 			if d <= best_d:
@@ -26998,18 +27050,63 @@ func _world_in_chip_text_node(world_pos: Vector2, node: CanvasItem) -> bool:
 	)
 
 
+func _world_in_sea_nation_disk(world_pos: Vector2, counter: Node2D) -> bool:
+	# Opaque SeaNationDisk (48×44 local). The radius circle is larger
+	# than this polygon on the short axis and is not a painted hit.
+	if counter == null or not is_instance_valid(counter):
+		return false
+	var disk: Node = counter.get_node_or_null("SeaNationDisk")
+	if disk == null or not (disk is Polygon2D):
+		return false
+	if not (disk as CanvasItem).visible:
+		return false
+	var poly: PackedVector2Array = (disk as Polygon2D).polygon
+	if poly.size() < 3:
+		return false
+	return Geometry2D.is_point_in_polygon((disk as Polygon2D).to_local(world_pos), poly)
+
+
+func _unit_counter_top_sprite(world_pos: Vector2, counter: Node2D) -> CanvasItem:
+	# NATO / ship glyph. Direct Sprite2D children only — stack-badge
+	# art sits under StackBadge and is not a hit.
+	if counter == null or not is_instance_valid(counter):
+		return null
+	var best: CanvasItem = null
+	for c_v in counter.get_children():
+		if not (c_v is Sprite2D):
+			continue
+		var spr: Sprite2D = c_v as Sprite2D
+		if not spr.visible or spr.texture == null:
+			continue
+		var sz: Vector2 = spr.texture.get_size()
+		if sz.x <= 0.0 or sz.y <= 0.0:
+			continue
+		var rect := Rect2(-sz * 0.5, sz) if spr.centered else Rect2(Vector2.ZERO, sz)
+		if not rect.grow(0.5).has_point(spr.to_local(world_pos)):
+			continue
+		if best == null or _drawn_piece_is_above(spr, best):
+			best = spr
+	return best
+
+
 func _unit_counter_top_drawn_piece(world_pos: Vector2, counter: Node2D) -> CanvasItem:
 	# The chip piece under this world point that Godot paints last.
-	# FillToeReadout and NationFrame stay out (selected-only / outside
-	# the painted rect). CombatPulse is selected-combat chrome, not a hit.
+	# Land chrome and sea plates share this walk. FillToeReadout and
+	# NationFrame stay out. CombatPulse is selected-combat chrome, not a hit.
+	# Hidden sea bars/type/strength are not ink.
 	if counter == null or not is_instance_valid(counter):
 		return null
 	var best: CanvasItem = null
 	var plate: Node = counter.get_node_or_null("NationPlate")
-	if plate is CanvasItem and _world_in_unit_nation_plate(world_pos, counter):
+	if plate is CanvasItem and (plate as CanvasItem).visible and _world_in_unit_nation_plate(world_pos, counter):
 		best = plate as CanvasItem
+	var disk: Node = counter.get_node_or_null("SeaNationDisk")
+	if disk is CanvasItem and (disk as CanvasItem).visible and _world_in_sea_nation_disk(world_pos, counter):
+		var disk_ci: CanvasItem = disk as CanvasItem
+		if best == null or _drawn_piece_is_above(disk_ci, best):
+			best = disk_ci
 	var bars: Node = counter.get_node_or_null("StatBars")
-	if bars is CanvasItem and _world_in_unit_stat_bars(world_pos, counter):
+	if bars is CanvasItem and (bars as CanvasItem).visible and _world_in_unit_stat_bars(world_pos, counter):
 		var bars_ci: CanvasItem = bars as CanvasItem
 		if best == null or _drawn_piece_is_above(bars_ci, best):
 			best = bars_ci
@@ -27021,24 +27118,34 @@ func _unit_counter_top_drawn_piece(world_pos: Vector2, counter: Node2D) -> Canva
 		if n == null or not (n is CanvasItem):
 			continue
 		var ci: CanvasItem = n as CanvasItem
+		if not ci.visible:
+			continue
 		if not _world_in_chip_text_node(world_pos, ci):
 			continue
 		if best == null or _drawn_piece_is_above(ci, best):
 			best = ci
+	var spr_ci: CanvasItem = _unit_counter_top_sprite(world_pos, counter)
+	if spr_ci != null and (best == null or _drawn_piece_is_above(spr_ci, best)):
+		best = spr_ci
 	return best
 
 
 func _unit_counter_painted_wins(
 	a: Node2D, b: Node2D, world_pos: Vector2, _a_d: float, _b_d: float
 ) -> bool:
-	# The piece Godot paints on top wins.
+	# The piece Godot paints on top wins. Land chrome and sea plates
+	# use this same rank.
 	# 1) CanvasItem z of that piece, child z included. StatBars and
 	#    designation/type/strength text are z=3; NationPlate is z=-1.
-	#    Every chip root shares z=28, so bars and text beat any plate
-	#    face under them (Low Countries: DNK AW3 bars on NLD Div 1).
+	#    Land roots stay at 28, so bars and text beat any plate
+	#    (Low Countries: DNK AW3 bars on NLD Div 1).
+	#    Player chips are moved later in the tree than the foreign
+	#    chip covering their origin, so that tie opens the player chip.
+	#    Sea roots stay at 40, so a sea plate or disk beats land bars.
 	# 2) Equal z → scene-tree order (`is_greater_than`).
 	# Plate-interior class and nearest piece centre do not outrank ink
-	# that is already drawn above the plate.
+	# that is already drawn above the plate. A missing piece loses,
+	# so a disk-radius hit with no painted sea pixel does not win.
 	if a == null or not is_instance_valid(a):
 		return false
 	if b == null or not is_instance_valid(b):
@@ -27343,6 +27450,8 @@ func _sync_unit_counter_scales(z: float = -1.0) -> void:
 	if zz < 0.0:
 		zz = _get_camera_zoom() if has_method("_get_camera_zoom") else 1.0
 	_sync_sea_nation_fleet_offsets(zz)
+	if zz < 0.65:
+		_raise_player_land_above_covering_foreign(zz)
 
 
 func _unit_counters_want_visible(z: float = -1.0) -> bool:
@@ -30626,7 +30735,463 @@ func _update_unit_icons_for_pids(pids: Array) -> void:
 	_rebuild_demo_unit_icons(only)
 
 
+func _restore_player_land_draw_parents() -> void:
+	for icon_v in _player_draw_raised:
+		var icon: Node2D = icon_v as Node2D
+		if icon == null or not is_instance_valid(icon):
+			continue
+		var pid := int(icon.get_meta("province_id", -1))
+		if pid < 0 or not province_nodes.has(pid):
+			continue
+		var home: Node2D = province_nodes[pid] as Node2D
+		if home == null:
+			continue
+		var gp := icon.global_position
+		if icon.has_meta("eoa_draw_home_pos"):
+			gp = icon.get_meta("eoa_draw_home_pos") as Vector2
+			icon.remove_meta("eoa_draw_home_pos")
+		# A slide that never reparented still has to return to the
+		# province point. Skipping "already home" left that offset on.
+		if icon.get_parent() != home:
+			icon.reparent(home, true)
+		icon.global_position = gp
+		icon.z_index = 28
+		icon.z_as_relative = false
+	_player_draw_raised.clear()
+
+
+func _raise_player_land_above_covering_foreign(z: float) -> void:
+	# Land roots stay at 28. A higher root paints player strength text
+	# over the NLD Div 1 bar pixel. Move each player land icon to just
+	# after the foreign icon whose ink wins its origin. Nearby land
+	# icons with no pixel move the same way. If that covers a GER
+	# origin, the player icon is moved back above that ink. Sea disks
+	# stay at z 40. NLD bars beat a GER plate on the same pixel.
+	if z >= 0.65 or _demo_unit_icon_pids.is_empty():
+		return
+	if _player_draw_raise_scale >= 0.0 and is_equal_approx(_player_draw_raise_scale, z):
+		return
+	_player_draw_raise_scale = z
+	_restore_player_land_draw_parents()
+	var icons: Array = []
+	for id_v in _demo_unit_icon_pids:
+		for c_v in _iter_demo_unit_icons_at_pid(int(id_v)):
+			var icon: Node2D = c_v as Node2D
+			if icon == null or not is_instance_valid(icon) or not icon.visible:
+				continue
+			if bool(icon.get_meta("sea_nation_disk", false)):
+				continue
+			if bool(icon.get_meta("eoa_raise_above_foreign", false)):
+				icons.append(icon)
+	# Hidden chips (scale sync before the visibility pass) are not a
+	# finished raise. Leave the flag clear so the next paint retries.
+	if icons.is_empty():
+		_player_draw_raise_scale = -1.0
+		return
+	print("MapRenderer: player land draw raise begin z=%.3f players=%d" % [z, icons.size()])
+	# Players first, so a GER origin beats the foreign chip on that point.
+	# Chips with no pixel move the same way. If their bars cover a GER
+	# origin, slide them clear. A chip that is still covered, including
+	# one under a sea plate, is slid in world space until one of its
+	# pixels is the drawn top. Do not move GER a second time: that put
+	# GER strength text on the NLD Div 1 bars.
+	var moved_fids: PackedStringArray = PackedStringArray()
+	moved_fids.append_array(_move_land_icons_after_covers(icons, true))
+	_land_draw_pick_pool = _visible_land_draw_icons()
+	var buried: Array = _buried_land_icons_near(icons)
+	moved_fids.append_array(_move_land_icons_after_covers(buried, false))
+	var uncovered: Array = _buried_land_icons_near(icons)
+	moved_fids.append_array(_move_land_icons_after_covers(uncovered, false))
+	_land_draw_pick_pool = []
+	for buried_v in buried:
+		_nudge_land_icon_off_player_origins(buried_v as Node2D, icons)
+	for uncovered_v in uncovered:
+		_nudge_land_icon_off_player_origins(uncovered_v as Node2D, icons)
+	moved_fids.append_array(_slide_buried_land_icons_until_pixel(icons))
+	print("MapRenderer: player land draw raise z=%.3f candidates=%d moved=%d fids=%s" % [z, icons.size() + buried.size() + uncovered.size(), moved_fids.size(), ",".join(moved_fids)])
+
+
+func _move_land_icons_after_covers(icons: Array, skip_player_winner: bool) -> PackedStringArray:
+	var moves: Array = []
+	for icon_v in icons:
+		var icon: Node2D = icon_v as Node2D
+		if icon == null or not is_instance_valid(icon):
+			continue
+		var winner: Object = _pick_unit_formation_at_world(icon.global_position)
+		if winner == null:
+			continue
+		var self_fo: Object = _formation_from_demo_icon(icon)
+		if winner == self_fo:
+			continue
+		if skip_player_winner and _formation_is_player_tag(winner):
+			continue
+		var foreign: Node2D = _demo_icon_node_for_formation(winner)
+		if foreign == null or foreign == icon or not is_instance_valid(foreign):
+			continue
+		if bool(foreign.get_meta("sea_nation_disk", false)):
+			continue
+		if foreign.get_parent() == null:
+			continue
+		moves.append({"icon": icon, "foreign": foreign})
+	var ordered: Array = []
+	for move_v in moves:
+		var move: Dictionary = move_v as Dictionary
+		var cur: Node2D = move.get("icon") as Node2D
+		var placed := false
+		for i in ordered.size():
+			var prev: Node2D = (ordered[i] as Dictionary).get("icon") as Node2D
+			if cur != null and prev != null and cur.is_greater_than(prev):
+				ordered.insert(i, move)
+				placed = true
+				break
+		if not placed:
+			ordered.append(move)
+	var moved_fids: PackedStringArray = PackedStringArray()
+	for ord_v in ordered:
+		var ord: Dictionary = ord_v as Dictionary
+		var icon: Node2D = ord.get("icon") as Node2D
+		var foreign: Node2D = ord.get("foreign") as Node2D
+		if icon == null or foreign == null or not is_instance_valid(icon) or not is_instance_valid(foreign):
+			continue
+		var parent: Node = foreign.get_parent()
+		if parent == null:
+			continue
+		var gp := icon.global_position
+		if icon.get_parent() != parent:
+			icon.reparent(parent, true)
+		else:
+			parent.move_child(icon, parent.get_child_count() - 1)
+		icon.global_position = gp
+		icon.z_index = 28
+		icon.z_as_relative = false
+		var dest := foreign.get_index() + 1
+		if dest >= parent.get_child_count():
+			dest = parent.get_child_count() - 1
+		if dest < 0:
+			dest = 0
+		if icon.get_index() != dest:
+			parent.move_child(icon, dest)
+		_player_draw_raised.append(icon)
+		moved_fids.append(str(icon.get_meta("formation_id", icon.name)))
+	return moved_fids
+
+
+func _buried_land_icons_near(anchors: Array) -> Array:
+	# A land chip with no face pixel of its own, sitting on the player
+	# pile. Chips that already draw a pixel stay where they are, so the
+	# NLD Div 1 bar corner is not jumped.
+	var out: Array = []
+	if anchors.is_empty():
+		return out
+	var seen: Dictionary = {}
+	for anchor_v in anchors:
+		seen[anchor_v] = true
+	for id_v in _demo_unit_icon_pids:
+		for c_v in _iter_demo_unit_icons_at_pid(int(id_v)):
+			var icon: Node2D = c_v as Node2D
+			if icon == null or not is_instance_valid(icon) or not icon.visible:
+				continue
+			if seen.has(icon) or bool(icon.get_meta("sea_nation_disk", false)):
+				continue
+			if bool(icon.get_meta("eoa_raise_above_foreign", false)):
+				continue
+			var close := false
+			for anchor_v in anchors:
+				var anchor: Node2D = anchor_v as Node2D
+				if anchor == null:
+					continue
+				if icon.global_position.distance_squared_to(anchor.global_position) <= 500.0 * 500.0:
+					close = true
+					break
+			if not close:
+				continue
+			seen[icon] = true
+			if _land_chip_has_own_pixel(icon):
+				continue
+			out.append(icon)
+	return out
+
+
+func _land_chip_has_own_pixel(icon: Node2D) -> bool:
+	var self_fo: Object = _formation_from_demo_icon(icon)
+	if self_fo == null or not ("formation_id" in self_fo):
+		return false
+	var want := str(self_fo.formation_id)
+	var xf := icon.get_global_transform()
+	var quick: Array = [
+		Vector2(0, 0), Vector2(-16, -4), Vector2(-18, -22), Vector2(14, -22),
+		Vector2(10, -22), Vector2(21.2, 33.8), Vector2(0, 27), Vector2(24, 0),
+		Vector2(-22, 0), Vector2(22, 0), Vector2(18, -18), Vector2(-18, -18),
+		Vector2(18, 18), Vector2(-18, 18), Vector2(0, -20), Vector2(0, 34),
+		Vector2(-22, 34), Vector2(-20, -20), Vector2(20, -20),
+	]
+	for p_v in quick:
+		if _pick_world_is_fid(xf * (p_v as Vector2), want):
+			return true
+	var step := 4
+	while step >= 2:
+		var ly := -22
+		while ly <= 34:
+			var lx := -24
+			while lx <= 26:
+				if _pick_world_is_fid(xf * Vector2(float(lx), float(ly)), want):
+					return true
+				lx += step
+			ly += step
+		if step == 2:
+			break
+		step = 2
+	return false
+
+
+func _nudge_land_icon_off_player_origins(icon: Node2D, anchors: Array) -> void:
+	# Tree order cannot put this chip above the pile and also keep it
+	# under GER: GER strength text reaches the NLD Div 1 bars. Slide the
+	# chip until a player origin is outside its bars and text. The plate
+	# may still cover that point; plate z loses to GER bars.
+	if icon == null or not is_instance_valid(icon) or anchors.is_empty():
+		return
+	var guard := 0
+	while guard < 24:
+		var blocker: Node2D = null
+		for anchor_v in anchors:
+			var anchor: Node2D = anchor_v as Node2D
+			if anchor == null or not is_instance_valid(anchor):
+				continue
+			if _land_high_ink_covers(icon, anchor.global_position):
+				blocker = anchor
+				break
+		if blocker == null:
+			return
+		if not icon.has_meta("eoa_draw_home_pos"):
+			icon.set_meta("eoa_draw_home_pos", icon.global_position)
+		var away: Vector2 = icon.global_position - blocker.global_position
+		if away.length_squared() < 1.0:
+			away = Vector2(-1.0, -1.0)
+		icon.global_position += away.normalized() * maxf(icon.scale.x, 1.0) * 2.0
+		guard += 1
+
+
+func _land_high_ink_covers(icon: Node2D, world: Vector2) -> bool:
+	var piece: CanvasItem = _unit_counter_top_drawn_piece(world, icon)
+	if piece == null:
+		return false
+	return _canvas_item_effective_z(piece) >= icon.z_index + 3
+
+
+func _visible_land_draw_icons() -> Array:
+	var out: Array = []
+	for id_v in _demo_unit_icon_pids:
+		for c_v in _iter_demo_unit_icons_at_pid(int(id_v)):
+			var icon: Node2D = c_v as Node2D
+			if icon == null or not is_instance_valid(icon) or not icon.visible:
+				continue
+			out.append(icon)
+	return out
+
+
+func _pick_world_is_fid(world: Vector2, want: String) -> bool:
+	# The buried scan asks this hundreds of times. Rank only land icons
+	# close to the point. Sea plates stay on the real click path.
+	if _land_draw_pick_pool.is_empty():
+		var hit: Object = _pick_unit_formation_at_world(world)
+		return hit != null and "formation_id" in hit and str(hit.formation_id) == want
+	var best_counter: Node2D = null
+	var best_fo: Object = null
+	var best_d := INF
+	for icon_v in _land_draw_pick_pool:
+		var icon: Node2D = icon_v as Node2D
+		if icon == null or not is_instance_valid(icon) or not icon.visible:
+			continue
+		var reach := maxf(icon.scale.x, 1.0) * 80.0
+		var d := world.distance_squared_to(icon.global_position)
+		if d > reach * reach:
+			continue
+		if not _world_in_unit_painted_rect(world, icon):
+			continue
+		var fo: Object = _formation_from_demo_icon(icon)
+		if fo == null:
+			continue
+		if best_counter == null or _unit_counter_painted_wins(icon, best_counter, world, d, best_d):
+			best_counter = icon
+			best_fo = fo
+			best_d = d
+	if best_fo == null or not ("formation_id" in best_fo) or str(best_fo.formation_id) != want:
+		return false
+	# The pool can miss a sea plate. Confirm with the click path.
+	var hit: Object = _pick_unit_formation_at_world(world)
+	return hit != null and "formation_id" in hit and str(hit.formation_id) == want
+
+
+func _slide_buried_land_icons_until_pixel(anchors: Array) -> PackedStringArray:
+	# Tree order cannot paint a land chip through a sea plate (z 40).
+	# Move the chip in world space until a face sample is the drawn top
+	# and player origins plus the NLD Div 1 bar rim still open the same
+	# formation. The pick pool stays empty here so the probe is the click.
+	var moved := PackedStringArray()
+	if anchors.is_empty():
+		return moved
+	_land_draw_pick_pool = _visible_land_draw_icons()
+	var still: Array = _buried_land_icons_near(anchors)
+	_land_draw_pick_pool = []
+	if still.is_empty():
+		print("MapRenderer: buried land slide none")
+		return moved
+	var guards: Array = _buried_slide_guard_points(anchors)
+	var seas: Array = _visible_sea_disk_icons()
+	for icon_v in still:
+		var fid := _slide_one_buried_land_icon(icon_v as Node2D, guards, seas)
+		if not fid.is_empty():
+			moved.append(fid)
+	print("MapRenderer: buried land slide candidates=%d moved=%d fids=%s" % [still.size(), moved.size(), ",".join(moved)])
+	return moved
+
+
+func _buried_slide_guard_points(anchors: Array) -> Array:
+	var out: Array = []
+	for anchor_v in anchors:
+		var anchor: Node2D = anchor_v as Node2D
+		if anchor == null or not is_instance_valid(anchor):
+			continue
+		var fid := _demo_icon_formation_id(anchor)
+		if fid.is_empty():
+			continue
+		out.append({"world": anchor.global_position, "fid": fid})
+	for id_v in _demo_unit_icon_pids:
+		for c_v in _iter_demo_unit_icons_at_pid(int(id_v)):
+			var icon: Node2D = c_v as Node2D
+			if icon == null or not is_instance_valid(icon) or not icon.visible:
+				continue
+			if bool(icon.get_meta("sea_nation_disk", false)):
+				continue
+			if _demo_icon_formation_id(icon) != "NLD_formation_1":
+				continue
+			out.append({
+				"world": icon.get_global_transform() * Vector2(21.2, 33.8),
+				"fid": "NLD_formation_1",
+			})
+	return out
+
+
+func _demo_icon_formation_id(icon: Node2D) -> String:
+	if icon == null or not is_instance_valid(icon):
+		return ""
+	var fo: Object = _formation_from_demo_icon(icon)
+	if fo != null and "formation_id" in fo:
+		return str(fo.formation_id)
+	return str(icon.get_meta("formation_id", ""))
+
+
+func _visible_sea_disk_icons() -> Array:
+	var out: Array = []
+	for id_v in _demo_unit_icon_pids:
+		for c_v in _iter_demo_unit_icons_at_pid(int(id_v)):
+			var icon: Node2D = c_v as Node2D
+			if icon == null or not is_instance_valid(icon) or not icon.visible:
+				continue
+			if bool(icon.get_meta("sea_nation_disk", false)):
+				out.append(icon)
+	return out
+
+
+func _world_under_sea_disk(world: Vector2, seas: Array) -> bool:
+	for sea_v in seas:
+		var sea: Node2D = sea_v as Node2D
+		if sea == null or not is_instance_valid(sea):
+			continue
+		if _world_in_unit_painted_rect(world, sea):
+			return true
+	return false
+
+
+func _slide_one_buried_land_icon(icon: Node2D, guards: Array, seas: Array) -> String:
+	if icon == null or not is_instance_valid(icon):
+		return ""
+	if _buried_slide_pose_ok(icon, guards, seas):
+		return ""
+	var origin := icon.global_position
+	var headings: Array = _buried_slide_headings(icon)
+	var step_len := maxf(icon.scale.x, 1.0) * 4.0
+	var had_home := icon.has_meta("eoa_draw_home_pos")
+	if not had_home:
+		icon.set_meta("eoa_draw_home_pos", origin)
+	var step := 1
+	while step <= 12:
+		for heading_v in headings:
+			var heading: Vector2 = heading_v as Vector2
+			icon.global_position = origin + heading * step_len * float(step)
+			if _buried_slide_pose_ok(icon, guards, seas):
+				if not _player_draw_raised.has(icon):
+					_player_draw_raised.append(icon)
+				var fid := _demo_icon_formation_id(icon)
+				print("MapRenderer: buried land slide fid=%s step=%d to=%.1f,%.1f" % [fid, step, icon.global_position.x, icon.global_position.y])
+				return fid
+		step += 1
+	icon.global_position = origin
+	if not had_home:
+		icon.remove_meta("eoa_draw_home_pos")
+	print("MapRenderer: buried land slide miss fid=%s" % _demo_icon_formation_id(icon))
+	return ""
+
+
+func _buried_slide_headings(icon: Node2D) -> Array:
+	var away := Vector2(1.0, 0.0)
+	var winner: Object = _pick_unit_formation_at_world(icon.global_position)
+	if winner != null:
+		var cover: Node2D = _demo_icon_node_for_formation(winner)
+		if cover != null and cover != icon:
+			var delta: Vector2 = icon.global_position - cover.global_position
+			if delta.length_squared() > 1.0:
+				away = delta.normalized()
+	var out: Array = []
+	var i := 0
+	while i < 16:
+		out.append(away.rotated(float(i) * PI * 2.0 / 16.0))
+		i += 1
+	return out
+
+
+func _buried_slide_pose_ok(icon: Node2D, guards: Array, seas: Array) -> bool:
+	if not _buried_slide_has_quick_pixel(icon, seas):
+		return false
+	for guard_v in guards:
+		var guard: Dictionary = guard_v as Dictionary
+		var world: Vector2 = guard.get("world", Vector2.ZERO) as Vector2
+		var want := str(guard.get("fid", ""))
+		if want.is_empty():
+			continue
+		if not _world_in_unit_painted_rect(world, icon):
+			continue
+		var hit: Object = _pick_unit_formation_at_world(world)
+		if hit == null or not ("formation_id" in hit) or str(hit.formation_id) != want:
+			return false
+	return true
+
+
+func _buried_slide_has_quick_pixel(icon: Node2D, seas: Array) -> bool:
+	var want := _demo_icon_formation_id(icon)
+	if want.is_empty():
+		return false
+	var xf := icon.get_global_transform()
+	# Corners first. These locals are on the harness step-2 face scan.
+	var locals: Array = [
+		Vector2(-22, -22), Vector2(22, -22), Vector2(-22, 34), Vector2(22, 34),
+		Vector2(0, -22), Vector2(0, 34), Vector2(-22, 0), Vector2(24, 0),
+		Vector2(21.2, 33.8), Vector2(-18, -22), Vector2(14, -22), Vector2(10, -22),
+		Vector2(0, 27), Vector2(-22, 34), Vector2(20, -20), Vector2(-20, -20),
+		Vector2(0, 0),
+	]
+	for local_v in locals:
+		var world: Vector2 = xf * (local_v as Vector2)
+		if _world_under_sea_disk(world, seas):
+			continue
+		if _pick_world_is_fid(world, want):
+			return true
+	return false
+
+
 func _rebuild_demo_unit_icons(only_pids: Dictionary) -> void:
+	_restore_player_land_draw_parents()
 	var scoped := not only_pids.is_empty()
 	# Clear previous demo icons only where we placed them (or only listed pids).
 	var kept: Array = []
@@ -30651,6 +31216,7 @@ func _rebuild_demo_unit_icons(only_pids: Dictionary) -> void:
 	if not scoped:
 		_clear_sea_nation_layer_icons(-1)
 	_demo_unit_icon_pids.clear()
+	_player_draw_raise_scale = -1.0
 	for k in kept:
 		_demo_unit_icon_pids.append(int(k))
 	if not scoped:
@@ -30722,8 +31288,15 @@ func _rebuild_demo_unit_icons(only_pids: Dictionary) -> void:
 		if province_centroids.has(id):
 			chip_pos = (province_centroids[id] as Vector2) + _unit_chip_offset_for_pid(id)
 		counter.position = chip_pos
+		# Land/air root stays 28 (plate 27, bars/text 31). A higher root
+		# paints player text over the NLD Div 1 bar pixel. Player chips
+		# that lose their origin to foreign text are moved later in the
+		# tree instead (`_raise_player_land_above_covering_foreign`).
+		# Sea roots stay at 40. Child plate z stays -1.
 		counter.z_index = 28
 		counter.z_as_relative = false
+		if _formation_is_player_tag(ff):
+			counter.set_meta("eoa_raise_above_foreign", true)
 		# Inverse-zoom: readable at Europe view, not 15px specks.
 		counter.scale = Vector2.ONE * _unit_counter_scale_for_zoom()
 		# LOD: hidden at strategic so hex picks (capitals/fronts) win; visible operational+.

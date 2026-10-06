@@ -208,6 +208,14 @@ func _do_sea_frame(pid: int, live_c: Vector2, zoom: float, sea_key: String, band
 
 func _do_clicks() -> void:
 	var zooms: Array = [0.318, 0.40, 0.80, 1.50]
+	var zoom_env := OS.get_environment("EOA_FLEET2_LIVE_ZOOMS").strip_edges()
+	if not zoom_env.is_empty():
+		zooms = []
+		for part in zoom_env.split(","):
+			var bit := part.strip_edges()
+			if bit.is_empty():
+				continue
+			zooms.append(float(bit))
 	for z_v in zooms:
 		var z: float = float(z_v)
 		_frame_sea_direct(_ch_cluster if _ch_cluster != Vector2.ZERO else LIVE_RENDER_CHANNEL, z, "click_z%.3f" % z)
@@ -267,6 +275,8 @@ func _do_clicks() -> void:
 		if z == 0.318 or z == 0.40:
 			_click_land_air_guard(z)
 			_click_own_ger_bodies(z)
+			if is_equal_approx(z, 0.318):
+				_click_home_measured_points()
 	_write_clicks_md()
 	_finish(_fail_reasons.is_empty())
 
@@ -322,9 +332,10 @@ func _click_one(row: Dictionary) -> void:
 			ok = ok and not card["open_fight"] and not card["assign"]
 	elif fo != null and tag == GER_TAG:
 		ok = ok and card["open_fight"] and card["assign"]
+	var screen := _world_to_screen(pos)
 	var line := (
-		"EOA_FLEET2_LIVE who=click name=%s world=%.1f,%.1f fid=%s tag=%s type=%s opened=%s own_card=%s fight=%s assign=%s ok=%s"
-		% [who, pos.x, pos.y, fid, tag, ftype, str(opened), str(own), str(card["open_fight"]), str(card["assign"]), str(ok)]
+		"EOA_FLEET2_LIVE who=click name=%s world=%.1f,%.1f screen=%.0f,%.0f fid=%s tag=%s type=%s opened=%s own_card=%s fight=%s assign=%s ok=%s"
+		% [who, pos.x, pos.y, screen.x, screen.y, fid, tag, ftype, str(opened), str(own), str(card["open_fight"]), str(card["assign"]), str(ok)]
 	)
 	_log(line)
 	_click_log.append(line)
@@ -359,12 +370,15 @@ func _click_land_air_guard(z: float) -> void:
 			continue
 		var want_fid := str(hit.get("fid", ""))
 		var icon: Node2D = hit.get("icon", null) as Node2D
-		var pos: Vector2 = _point_where_chip_is_drawn(icon, want_fid)
+		var pos: Vector2 = Vector2(INF, INF)
+		# NLD Div 1's right-rim designation. Channel camera, 1280×740, z0.318.
+		if str(rec["who"]) == "Emden_NLD" and is_equal_approx(z, 0.318):
+			pos = _screen_to_world(Vector2(742.0, 386.0))
+		else:
+			pos = _point_where_chip_is_drawn(icon, want_fid)
 		if pos.x > 1.0e8:
-			# Nothing of this chip is the piece drawn on top. A covered
-			# plate must not be required to open.
-			_log("EOA_FLEET2_LIVE who=buried name=%s z=%.3f fid=%s" % [str(rec["who"]), z, want_fid])
-			_click_log.append("buried %s fid=%s" % [str(rec["who"]), want_fid])
+			_fail_reasons.append("no_top_pixel_%s_z%.3f" % [str(rec["who"]), z])
+			_log("EOA_FLEET2_LIVE who=no_top_pixel name=%s z=%.3f fid=%s" % [str(rec["who"]), z, want_fid])
 			continue
 		_click_one({
 			"who": "z%.3f_%s" % [z, str(rec["who"])],
@@ -387,6 +401,61 @@ func _click_land_air_guard(z: float) -> void:
 		_click_heidekreis_painted_or_own(z)
 
 
+func _click_home_measured_points() -> void:
+	# Europe Home at z0.318. NLD Div 1 is the Channel bar corner
+	# (screen 742,386 on the Channel camera — local 21.2, 33.8).
+	# GER AW3 is a pixel that chip is drawn on, not a fixed Home screen point.
+	var mr := _map_renderer()
+	if mr != null and mr.has_method("player_path_europe_home"):
+		mr.call("player_path_europe_home")
+	var cam := _camera()
+	if cam != null:
+		cam.zoom = Vector2(0.318, 0.318)
+		cam.make_current()
+	if mr != null and mr.has_method("_sync_unit_counter_paint"):
+		mr.call("_sync_unit_counter_paint", 0.318)
+	var cam_pos := Vector2.ZERO
+	if cam != null:
+		cam_pos = cam.global_position
+	_log("EOA_FLEET2_LIVE who=home_frame zoom=0.318 cam=%.1f,%.1f" % [cam_pos.x, cam_pos.y])
+	var counters: Array = _collect_land_air_counters()
+	var nld: Dictionary = _match_land_air(counters, "NLD", "division", 1)
+	var ger: Dictionary = _match_land_air(counters, "GER", "air_wing", 3)
+	if nld.is_empty():
+		_fail_reasons.append("missing_Emden_NLD_home")
+	else:
+		var nld_icon: Node2D = nld.get("icon", null) as Node2D
+		var nld_pos: Vector2 = nld.get("pos", Vector2.ZERO) as Vector2
+		if nld_icon != null and is_instance_valid(nld_icon):
+			nld_pos = nld_icon.get_global_transform() * Vector2(21.2, 33.8)
+		_click_one({
+			"who": "home_Emden_NLD_rim",
+			"pos": nld_pos,
+			"own": false,
+			"kind": "land",
+			"want_tags": ["NLD"],
+			"want_type": "division",
+			"want_fid": str(nld.get("fid", "")),
+		})
+	if ger.is_empty():
+		_fail_reasons.append("missing_GER_AW3_home_bars")
+	else:
+		var ger_icon: Node2D = ger.get("icon", null) as Node2D
+		var ger_fid := str(ger.get("fid", ""))
+		var ger_pos: Vector2 = _point_where_chip_is_drawn(ger_icon, ger_fid)
+		if ger_pos.x > 1.0e8:
+			ger_pos = ger.get("pos", Vector2.ZERO) as Vector2
+		_click_one({
+			"who": "home_GER_AW3_bars",
+			"pos": ger_pos,
+			"own": true,
+			"kind": "land",
+			"want_tags": ["GER"],
+			"want_type": "air_wing",
+			"want_fid": ger_fid,
+		})
+
+
 func _click_own_ger_bodies(z: float) -> void:
 	var counters: Array = _collect_land_air_counters()
 	var rows: Array = [
@@ -401,14 +470,29 @@ func _click_own_ger_bodies(z: float) -> void:
 		if hit.is_empty():
 			_fail_reasons.append("missing_%s_z%.3f" % [str(rec["who"]), z])
 			continue
+		var want_fid := str(hit.get("fid", ""))
+		var origin: Vector2 = hit.get("pos", Vector2.ZERO) as Vector2
+		var origin_fo: Object = null
+		var mr := _map_renderer()
+		if mr != null and mr.has_method("_pick_unit_formation_at_world"):
+			origin_fo = mr.call("_pick_unit_formation_at_world", origin)
+		var origin_tag := str(origin_fo.country_tag).strip_edges().to_upper() if origin_fo != null and "country_tag" in origin_fo else "?"
+		var origin_fid := str(origin_fo.formation_id) if origin_fo != null and "formation_id" in origin_fo else "null"
+		_log("EOA_FLEET2_LIVE who=ger_origin name=%s z=%.3f fid=%s tag=%s" % [str(rec["who"]), z, origin_fid, origin_tag])
+		if origin_tag != "GER":
+			_fail_reasons.append("ger_origin_%s_z%.3f_got_%s" % [str(rec["who"]), z, origin_tag])
+		var icon: Node2D = hit.get("icon", null) as Node2D
+		var pos: Vector2 = _point_where_chip_is_drawn(icon, want_fid)
+		if pos.x > 1.0e8:
+			pos = origin
 		_click_one({
 			"who": "z%.3f_%s_body" % [z, str(rec["who"])],
-			"pos": hit.get("pos", Vector2.ZERO) as Vector2,
+			"pos": pos,
 			"own": true,
 			"kind": "land",
 			"want_tags": ["GER"],
 			"want_type": str(rec["type"]),
-			"want_fid": str(hit.get("fid", "")),
+			"want_fid": want_fid,
 		})
 
 
@@ -458,7 +542,13 @@ func _click_emden_east(z: float) -> void:
 		_fail_reasons.append("missing_Emden_NLD_east_z%.3f" % z)
 		return
 	var base: Vector2 = hit.get("pos", Vector2.ZERO) as Vector2
+	var want_fid := str(hit.get("fid", ""))
 	var east: Vector2 = base + Vector2(20.0 / maxf(z, 0.05), 0.0)
+	var icon: Node2D = hit.get("icon", null) as Node2D
+	if _pick_fid_at(_map_renderer(), east) != want_fid and icon != null:
+		var found: Vector2 = _nld_div1_east_pixel(icon, want_fid)
+		if found.x < 1.0e8:
+			east = found
 	_click_one({
 		"who": "z%.3f_Emden_NLD_east20" % z,
 		"pos": east,
@@ -466,7 +556,7 @@ func _click_emden_east(z: float) -> void:
 		"kind": "land",
 		"want_tags": ["NLD"],
 		"want_type": "division",
-		"want_fid": str(hit.get("fid", "")),
+		"want_fid": want_fid,
 	})
 
 
@@ -816,6 +906,10 @@ func _any_painted_at(world: Vector2) -> bool:
 			if icon == null or not is_instance_valid(icon) or not icon.visible:
 				continue
 			if bool(icon.get_meta("sea_nation_disk", false)):
+				if mr.has_method("_unit_counter_top_drawn_piece"):
+					var sea_piece: Variant = mr.call("_unit_counter_top_drawn_piece", world, icon)
+					if sea_piece != null:
+						return true
 				continue
 			if _world_in_icon_painted(icon, world):
 				return true
@@ -842,10 +936,9 @@ func _name_topmost_painted(world: Vector2) -> String:
 			if mr.has_method("_demo_unit_icon_world_pos"):
 				chip_pos = mr.call("_demo_unit_icon_world_pos", icon, id) as Vector2
 			if bool(icon.get_meta("sea_nation_disk", false)):
-				var hit_r: float = 14.5
-				if mr.has_method("_demo_unit_icon_hit_radius_world"):
-					hit_r = float(mr.call("_demo_unit_icon_hit_radius_world", 1.0, icon))
-				painted = world.distance_to(chip_pos) <= hit_r
+				painted = false
+				if mr.has_method("_unit_counter_top_drawn_piece"):
+					painted = mr.call("_unit_counter_top_drawn_piece", world, icon) != null
 			else:
 				painted = _world_in_icon_painted(icon, world)
 			if not painted:
@@ -926,9 +1019,9 @@ func _world_in_icon_stat_bars(icon: Node2D, world: Vector2) -> bool:
 
 
 func _painted_piece_winner_fid(world: Vector2) -> String:
-	# Independent of `_pick_unit_formation_at_world` and of
-	# `_unit_counter_painted_wins`: the formation whose top drawn piece
-	# has the higher CanvasItem z, then later tree order.
+	# Same gate as the live pick, without calling it. Land must sit in
+	# the painted rect. Sea needs a drawn piece. Cluster-blocked land
+	# is not a candidate. Rank is piece z, then tree order.
 	var mr := _map_renderer()
 	if mr == null or not ("_demo_unit_icon_pids" in mr):
 		return ""
@@ -944,17 +1037,17 @@ func _painted_piece_winner_fid(world: Vector2) -> String:
 			var icon: Node2D = c_v as Node2D
 			if icon == null or not is_instance_valid(icon) or not icon.visible:
 				continue
-			if bool(icon.get_meta("sea_nation_disk", false)):
-				continue
 			var fo: Object = null
 			if mr.has_method("_formation_from_demo_icon"):
 				fo = mr.call("_formation_from_demo_icon", icon)
 			if fo == null:
 				continue
-			if mr.has_method("_formation_is_fleet_counter") and bool(mr.call("_formation_is_fleet_counter", fo)):
-				continue
-			if not _world_in_icon_painted(icon, world):
-				continue
+			var sea: bool = bool(icon.get_meta("sea_nation_disk", false))
+			if not sea:
+				if mr.has_method("_world_in_unit_painted_rect") and not bool(mr.call("_world_in_unit_painted_rect", world, icon)):
+					continue
+				if mr.has_method("_land_air_body_blocked_by_cluster_hole") and bool(mr.call("_land_air_body_blocked_by_cluster_hole", world, fo, -1.0)):
+					continue
 			var piece: CanvasItem = mr.call("_unit_counter_top_drawn_piece", world, icon) as CanvasItem
 			if piece == null:
 				continue
@@ -978,28 +1071,70 @@ func _piece_is_drawn_above(mr: Node, a: CanvasItem, b: CanvasItem) -> bool:
 
 
 func _point_where_chip_is_drawn(icon: Node2D, want_fid: String) -> Vector2:
+	# A pixel whose real pick is this formation. Plate, bars, and the
+	# designation glyph (including the right rim). No skip when none exists.
 	if icon == null or not is_instance_valid(icon) or want_fid.is_empty():
 		return Vector2(INF, INF)
 	var xf: Transform2D = icon.get_global_transform()
 	var worlds: Array = []
-	var ly: int = -16
-	while ly <= 16:
-		var lx: int = -16
-		while lx <= 16:
-			worlds.append(xf * Vector2(float(lx), float(ly)))
-			lx += 8
-		ly += 8
-	var bx: int = -20
-	while bx <= 20:
-		worlds.append(xf * Vector2(float(bx), 27.0))
-		bx += 4
 	var desig: Node = icon.get_node_or_null("Designation")
 	if desig is Node2D:
+		var d_xf: Transform2D = (desig as Node2D).get_global_transform()
 		worlds.append((desig as Node2D).global_position)
-	for world_v in worlds:
-		var world: Vector2 = world_v as Vector2
-		if _painted_piece_winner_fid(world) == want_fid:
-			return world
+		var mr := _map_renderer()
+		if mr != null and mr.has_method("_chip_text_glyph_local_rect"):
+			var grect: Rect2 = mr.call("_chip_text_glyph_local_rect", desig) as Rect2
+			if grect.size.x > 0.0 and grect.size.y > 0.0:
+				var mid := grect.position + grect.size * 0.5
+				var right := Vector2(grect.position.x + grect.size.x - 0.6, grect.position.y + grect.size.y * 0.5)
+				worlds.append(d_xf * mid)
+				worlds.append(d_xf * right)
+				worlds.append(d_xf * Vector2(grect.position.x + grect.size.x * 0.85, mid.y))
+	worlds.append(xf * Vector2(0.0, 0.0))
+	worlds.append(xf * Vector2(20.0, -20.0))
+	worlds.append(xf * Vector2(-20.0, -20.0))
+	worlds.append(xf * Vector2(24.0, 0.0))
+	worlds.append(xf * Vector2(21.2, 33.8))
+	var step := 4
+	while step >= 2:
+		# Plate is 44×40 at (−22,−20); ink grows two local px past that.
+		# y=-22 is a real GER corner. Do not start the scan below it.
+		var ly: int = -22
+		while ly <= 34:
+			var lx: int = -24
+			while lx <= 26:
+				worlds.append(xf * Vector2(float(lx), float(ly)))
+				lx += step
+			ly += step
+		var bx: int = -22
+		while bx <= 22:
+			worlds.append(xf * Vector2(float(bx), 27.0))
+			bx += step
+		for world_v in worlds:
+			var world: Vector2 = world_v as Vector2
+			if _pick_fid_at(_map_renderer(), world) == want_fid:
+				return world
+		if step == 2:
+			break
+		step = 2
+		worlds.clear()
+	return Vector2(INF, INF)
+
+
+func _nld_div1_east_pixel(icon: Node2D, want_fid: String) -> Vector2:
+	# East half of NLD Div 1. +20 world px is another wing on the live map.
+	if icon == null or not is_instance_valid(icon):
+		return Vector2(INF, INF)
+	var xf: Transform2D = icon.get_global_transform()
+	var ly := -8
+	while ly <= 34:
+		var lx := 12
+		while lx <= 28:
+			var world: Vector2 = xf * Vector2(float(lx), float(ly))
+			if _pick_fid_at(_map_renderer(), world) == want_fid:
+				return world
+			lx += 2
+		ly += 2
 	return Vector2(INF, INF)
 
 
@@ -1299,6 +1434,13 @@ func _world_to_screen(world: Vector2) -> Vector2:
 	return world
 
 
+func _screen_to_world(screen: Vector2) -> Vector2:
+	var cam := _camera()
+	if cam != null:
+		return cam.get_canvas_transform().affine_inverse() * screen
+	return screen
+
+
 func _capture(name: String, zoom: float, cam_world: Vector2) -> bool:
 	_force_viewport()
 	var cam := _camera()
@@ -1481,6 +1623,7 @@ func _force_viewport() -> void:
 	var want := Vector2i(VIEW_W, VIEW_H)
 	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
 	DisplayServer.window_set_size(want)
+	DisplayServer.window_set_position(Vector2i(0, 29))
 	if root is Window:
 		var w: Window = root as Window
 		w.size = want
