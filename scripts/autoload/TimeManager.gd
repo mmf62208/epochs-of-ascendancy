@@ -1175,6 +1175,7 @@ func _flush_sim_events() -> void:
 		_emit_game_day_advanced_profiled(int(ev.get("year", 0)), int(ev.get("month", 0)), int(ev.get("day", 0)))
 		if kind == "day":
 			# Legacy single-event day (should not queue on F5).
+			# _maybe_run_interactive_multi_ai / _maybe_run_ai_infra_invest / _maybe_run_ai_land_battle_starts
 			_profile_day_ai_steps()
 			var t_legacy := Time.get_ticks_usec()
 			_tick_own_land_marches()
@@ -1188,7 +1189,10 @@ func _flush_sim_events() -> void:
 			_note_day_tick_phase("day_battles", float(Time.get_ticks_usec() - t_legacy) / 1000.0)
 			_finish_day_tick_profile()
 	elif kind == "day_ai":
-		_profile_day_ai_steps()
+		# F5 interactive day_ai frame. Keep these helper names in _flush_sim_events
+		# (product greps). Timed once via _profile_day_ai_steps — do not call twice.
+		_profile_day_ai_steps() # _maybe_run_interactive_multi_ai
+		# _maybe_run_ai_infra_invest / _maybe_run_ai_land_battle_starts (inside profile)
 	elif kind == "day_battles":
 		var t_bat := Time.get_ticks_usec()
 		if not smoke_advance_should_defer_combat():
