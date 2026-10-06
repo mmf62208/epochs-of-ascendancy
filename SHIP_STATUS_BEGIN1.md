@@ -80,7 +80,7 @@ Pre-step: `timeout 1500 tools/run_godot.sh --headless --path . --import --quit`
 | `HeadlessFac1aPanIconsTest` (PERF-1) | hd | **PASS** |
 | `HeadlessFac1aHoverCacheTest` (PERF-1b) | hd | **PASS** |
 | `HeadlessLabel1NationZoomTest` (LABEL-1) | hd | **PASS** |
-| `launch_begin1_title_release` in `eoa_full_test_gates.sh` | hd | wired after `launch_ix1_title_esc_begin` (FIX #4) |
+| `launch_begin1_title_release` in `eoa_full_test_gates.sh` | hd | **PASS** (extracted `run_step` line on tip) |
 | `tools/eoa_full_test_gates.sh --quick` | pure | same **14** `unit_board_play_path` reds as main; no new red. `map_qc` env skip (no Pillow). HOI open_p0=0. |
 | `tools/live2_ts.sh` | live 2-core | **not present** in tree |
 
