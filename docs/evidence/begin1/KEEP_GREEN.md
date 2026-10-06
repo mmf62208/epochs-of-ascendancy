@@ -4,7 +4,7 @@ Headless / xvfb ≠ live Play. Never `EOA_SKIP_TITLE`.
 
 | gate | kind | expected |
 |---|---|---|
-| `HeadlessBegin1TitleReleaseFallthroughTest` | hd+xvfb | PASS — 80 ms leftover no pick / inspect / zoom; follow-up via real `_input` pick; lost-release expiry (~750 ms) + later-frame press; keyboard Enter/Space not armed |
+| `HeadlessBegin1TitleReleaseFallthroughTest` | hd+xvfb | PASS — 80 ms leftover no pick / inspect / zoom; follow-up via real `_input` pick (pid != -1); lost-release expiry (~750 ms) + later-frame press; keyboard Enter/Space not armed |
 | `HeadlessFirstSessionReadabilityTest` | hd | PASS — TipDismiss × still swallows |
 | `HeadlessIx1LivingTitleEscBeginTest` | hd | PASS — Begin PRESS + Esc/CC routing |
 | `tools/eoa_full_test_gates.sh --quick` | pure | same known `unit_board_play_path` reds as main; no new red |

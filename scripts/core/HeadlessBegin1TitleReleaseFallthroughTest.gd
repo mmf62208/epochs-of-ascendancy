@@ -240,6 +240,10 @@ func _setup_renderer() -> bool:
 		_mr.use_spatial_picking = true
 	_mr.set("selected_province_id", -1)
 	_mr.set("selected_formation_id", "")
+	# First show_info_panel creates ProvinceIdBadge and currently also
+	# _clear_selection(). Prime the badge so the follow-up pick keeps pid.
+	if _mr.has_method("_ensure_province_id_badge"):
+		_mr.call("_ensure_province_id_badge")
 	_mm = root.get_node_or_null("MapManager")
 	if _mm != null and "pick_grid" in _mm:
 		_saved_pick_grid = _mm.pick_grid
@@ -290,8 +294,11 @@ func _seed_loir_under_screen(screen_pt: Vector2) -> bool:
 		if "pick_grid" in _mm:
 			_mm.pick_grid = null
 		# Isolate nearest-centroid fallback: only Loir sits under this click.
-		if "_centroids" in _mm:
-			_mm._centroids = {LOIR: world_under}
+		# Typed Dictionary[int, Vector2] cannot be replaced by an untyped dict.
+		if "_centroids" in _mm and _mm._centroids is Dictionary:
+			var cents: Dictionary = _mm._centroids
+			cents.clear()
+			cents[LOIR] = world_under
 		elif _mm.has_method("sync_render_centroids"):
 			_mm.call("sync_render_centroids", {LOIR: world_under})
 	if "_demo_unit_icon_pids" in _mr:
@@ -321,9 +328,15 @@ func _press_at(screen_pt: Vector2) -> InputEventMouseButton:
 	return ev
 
 
+func _warp_mouse(screen_pt: Vector2) -> void:
+	var vp: Viewport = root.get_viewport()
+	if vp != null:
+		vp.warp_mouse(screen_pt)
+	DisplayServer.warp_mouse(Vector2i(int(round(screen_pt.x)), int(round(screen_pt.y))))
+
+
 func _send_mouse(screen_pt: Vector2, pressed: bool) -> InputEventMouseButton:
-	if DisplayServer.get_name() != "headless":
-		DisplayServer.warp_mouse(Vector2i(int(round(screen_pt.x)), int(round(screen_pt.y))))
+	_warp_mouse(screen_pt)
 	var ev: InputEventMouseButton = _press_at(screen_pt) if pressed else _release_at(screen_pt)
 	if _mr != null:
 		_mr._input(ev)
@@ -334,16 +347,26 @@ func _send_mouse(screen_pt: Vector2, pressed: bool) -> InputEventMouseButton:
 func _reset_map_click_latches() -> void:
 	if _mr == null:
 		return
-	if _mr.has_method("_clear_left_slop_after_still_click"):
+	if _mr.has_method("_reset_left_gesture_state"):
+		_mr.call("_reset_left_gesture_state", MAP_PT)
+	elif _mr.has_method("_clear_left_slop_after_still_click"):
 		_mr.call("_clear_left_slop_after_still_click")
 	_mr.set("_left_skip_next_pick", false)
 	_mr.set("_left_gesture_dragged", false)
 	_mr.set("_left_btn_down", false)
 	_mr.set("_left_button_was_up", true)
 	_mr.set("_left_ready_for_still_click", true)
+	_mr.set("_left_cam_moved_this_down", false)
+	_mr.set("_left_pan_active", false)
+	_mr.set("_left_pan_armed", false)
+	_mr.set("_left_slop_latched", false)
+	_mr.set("_left_release_frame", -1)
+	_mr.set("_close_click_guard", false)
+	_mr.set("_map_pick_block_until_msec", 0)
 	_mr.set("_unit_card_consumed_press", false)
 	_mr.set("_unit_card_release_eaten", false)
 	_mr.set("_skip_inspector_after_march", false)
+	_mr.set("_mv1_last_release_was_drag", false)
 	_mr.set("selected_formation_id", "")
 
 
@@ -498,10 +521,10 @@ func _assert_real_map_click_selects(screen_pt: Vector2, why: String) -> bool:
 	if bool(_mr.call("_begin_title_release_blocks_map_pick")):
 		_fail("%s: swallow still armed; would eat a real map click" % why)
 		return false
+	_warp_mouse(screen_pt)
 	_send_mouse(screen_pt, true)
-	await _flush(2)
 	_send_mouse(screen_pt, false)
-	await _flush(3)
+	await _flush(2)
 	var got_pid: int = int(_mr.get("selected_province_id"))
 	if got_pid != LOIR:
 		_fail("%s: real pick path must select Loir-et-Cher (pid=%d)" % [why, got_pid])
