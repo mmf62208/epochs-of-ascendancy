@@ -17,6 +17,7 @@ const OPS_Z := 0.760
 const FLUSH_FRAMES := 4
 
 var _failures: int = 0
+var _measured: int = 0
 var _mr: Node = null
 var _cam: Camera2D = null
 var _container: Node2D = null
@@ -102,6 +103,8 @@ func _run() -> void:
 	await _flush()
 	await _measure_at_zoom("Home", HOME_Z)
 	await _measure_at_zoom("z0.760", OPS_Z)
+	if _measured < 2:
+		_fail("did not measure both zooms (setup aborted)")
 	if _mr != null and is_instance_valid(_mr):
 		_mr.queue_free()
 
@@ -128,11 +131,10 @@ func _setup_renderer() -> bool:
 	_cam.make_current()
 	var pscr: Script = load("res://scripts/data/Province.gd") as Script
 	var sm: Node = root.get_node_or_null("SupplyManager")
+	var mm: Node = root.get_node_or_null("MapManager")
 	if sm == null:
 		_fail("SupplyManager autoload missing")
 		return false
-	var nodes: Dictionary = {}
-	var provs: Dictionary = {}
 	var depot_scr: Script = load("res://scripts/supply/ProvinceDepotState.gd") as Script
 	var i := 0
 	while i < LAND_N:
@@ -144,7 +146,7 @@ func _setup_renderer() -> bool:
 		poly.polygon = _make_ring(24.0, POLY_SIDES)
 		host.add_child(poly)
 		_container.add_child(host)
-		nodes[pid] = host
+		_mr.province_nodes[pid] = host
 		if pscr != null:
 			var p: Object = pscr.new()
 			p.set("id", pid)
@@ -153,12 +155,15 @@ func _setup_renderer() -> bool:
 			p.set("controller_tag", "GER")
 			p.set("infrastructure", 1)
 			p.set("is_sea", false)
-			provs[pid] = p
+			_mr.provinces[pid] = p
+			if mm != null and "_provinces" in mm:
+				mm._provinces[pid] = p
 		if depot_scr != null and "depot_states" in sm:
 			sm.depot_states[pid] = depot_scr.new(pid, 100.0)
 		i += 1
-	_mr.province_nodes = nodes
-	_mr.provinces = provs
+	if int(_mr.province_nodes.size()) < LAND_N:
+		_fail("province_nodes seeded %d want %d" % [int(_mr.province_nodes.size()), LAND_N])
+		return false
 	if "overlay_visible" in sm:
 		sm.overlay_visible = false
 	_mr.supply_mode = false
@@ -184,6 +189,7 @@ func _measure_at_zoom(label: String, zoom: float) -> void:
 	if _mr == null:
 		_fail("renderer missing for %s" % label)
 		return
+	_measured += 1
 	if bool(_mr.get("supply_mode")):
 		_mr.call("_toggle_supply_overlay")
 		await process_frame
