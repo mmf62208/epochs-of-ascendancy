@@ -431,6 +431,42 @@ func _place_begin_button(pos: Vector2, size: Vector2) -> Button:
 	return begin
 
 
+func _poll_mouse() -> Vector2:
+	var vp: Viewport = root.get_viewport()
+	if vp != null:
+		return vp.get_mouse_position()
+	return Vector2.ZERO
+
+
+func _prepare_poll_begin_hit() -> bool:
+	# Headless warp often leaves get_mouse_position() at the last leftover /
+	# follow-up point. Cover (0,0) and the live poll point so
+	# handle_live_pointer(null) is a real Begin, not panel/map.
+	var poll_pt: Vector2 = _poll_mouse()
+	var cover := Vector2(
+		maxf(700.0, maxf(poll_pt.x, 40.0) + 80.0),
+		maxf(740.0, maxf(poll_pt.y, 80.0) + 80.0)
+	)
+	var begin_btn: Button = _place_begin_button(Vector2(0, 0), cover)
+	if begin_btn == null:
+		_fail("poll-path LivingTitleBegin missing")
+		return false
+	await _flush(2)
+	_begin_pt = begin_btn.get_global_rect().get_center()
+	var owns_hit := true
+	if _title.has_method("begin_owns_screen_point"):
+		owns_hit = (
+			bool(_title.call("begin_owns_screen_point", Vector2(0, 0)))
+			or bool(_title.call("begin_owns_screen_point", poll_pt))
+			or bool(_title.call("begin_owns_screen_point", Vector2(40, 80)))
+		)
+	if not owns_hit:
+		_fail("poll-path Begin hit rect must own (0,0) or the live poll point %s" % str(poll_pt))
+		return false
+	_warp_mouse(Vector2(40, 80))
+	return true
+
+
 func _begin_closed() -> bool:
 	if _title == null or not is_instance_valid(_title):
 		return true
@@ -535,19 +571,10 @@ func _test_t2_drop_leftover_later_click_picks() -> void:
 func _test_t3_poll_expire_then_first_click_picks() -> void:
 	if not await _spawn_title():
 		return
-	var begin_btn: Button = _place_begin_button(Vector2(0, 0), Vector2(420, 220))
-	if begin_btn == null:
-		_fail("T3: LivingTitleBegin missing")
+	if not await _prepare_poll_begin_hit():
 		return
-	await _flush(2)
-	_begin_pt = begin_btn.get_global_rect().get_center()
-	if _title.has_method("begin_owns_screen_point"):
-		if not bool(_title.call("begin_owns_screen_point", Vector2(0, 0))) and not bool(_title.call("begin_owns_screen_point", Vector2(40, 80))):
-			_fail("T3: poll-path Begin hit rect must own the headless poll point")
-			return
 	_restore_home_camera()
 	_clear_inspector()
-	_warp_mouse(Vector2(40, 80))
 	var polled: String = str(_title.call("handle_live_pointer", null))
 	if polled != "begin":
 		_fail("T3: poll-path handle_live_pointer(null) did not Begin (got %s)" % polled)
@@ -585,17 +612,12 @@ func _test_t5_poll_path_keeps_arm() -> void:
 	# (b) Poll-path arm in frame N, press in N+1, leftover release: no pick.
 	if not await _spawn_title():
 		return
-	var begin_btn: Button = _place_begin_button(Vector2(0, 0), Vector2(420, 220))
-	if begin_btn == null:
-		_fail("T5(b): LivingTitleBegin missing")
+	if not await _prepare_poll_begin_hit():
 		return
-	await _flush(2)
-	_begin_pt = begin_btn.get_global_rect().get_center()
 	_restore_home_camera()
 	_clear_inspector()
 	if not _seed_loir_under_screen(MAP_PT):
 		return
-	_warp_mouse(Vector2(40, 80))
 	var polled: String = str(_title.call("handle_live_pointer", null))
 	if polled != "begin":
 		_fail("T5(b): poll-path handle_live_pointer(null) did not Begin (got %s)" % polled)
