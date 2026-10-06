@@ -2,73 +2,70 @@
 
 Updated: 2026-10-06
 From: Cloud Agent
-**Status:** draft PR · **merge HOLD** · **FIX #1** (lost-release expiry)
+**Status:** draft PR · **merge HOLD** · **FIX #2** (restamp clock + poll pending press)
 
 | | |
 |---|---|
 | **Base** | main `425b4448c7bec8b7f8d5602193b8e8466d1e5ec2` (LABEL-1) |
 | **Branch** | `cursor/begin1-title-release-swallow-d55e` |
-| **Tip** | `1a29087f3f4eb06201191bcd94d015b7d82c9a95` |
+| **Product** | `f18a341a02fc823c35e037cc8e8e61f951eac41b` |
+| **Tip** | `HEAD_SHA_PENDING` |
 | **PR** | https://github.com/mmf62208/epochs-of-ascendancy/pull/84 |
 | Verdict | isolated keep-green **PASS**. xvfb ≠ live Play. Merge **HOLD**. |
 
-## Proven cause
+## Proven cause (FIX #2 re-gate of `8a32fa6f`: NOT READY)
 
-Begin is `ACTION_MODE_BUTTON_PRESS`. `_on_begin_new` → `_finish` sets `_closed`
-and `queue_free()`. `_living_title_boot_is_up()` is then false (closed **or**
-queued). MapRenderer leftover left-release does not require a matching map
-press, so a real ~80–150 ms mouse-up still-clicks the hex under the cursor
-after Home (Loir-et-Cher at ~284,580 / 1280×740): inspector +
-`_center_camera_on_province(..., "soft")` 0.776→0.900.
+Two real gaps, both missed by the FIX #1 test:
 
-Instant 0 ms press+release stays on the still-alive Begin Control for that
-frame, so GUI eats the up and the race stays hidden.
-
-**FIX #1:** the swallow could stay armed forever if the leftover up never
-reached Godot (unfocused window / keyboard Begin). A same-frame clear-on-press
-also dropped a `button_down` arm before the leftover up. Product now expires
-after **~750 ms** (time, not frames — uncapped headless can burn 24 frames in
-well under 80 ms), and a **later-frame** left press clears it. `button_down`
-arms only while the left mouse button is actually held (Enter/Space must not
-eat the first map click).
+1. The 750 ms clock started **before** the slow Begin frame. Arming happens
+   before `apply_living_title_boot` (~0.7–1.1 s), so the leftover release
+   arrived 671–757 ms old. 8 cores: swallowed 7/8 (one expired at exactly
+   750 ms). 2 cores (`taskset`): a 100 ms Begin click opened Loir-et-Cher
+   and zoomed to 0.900 in 2/2 runs. `e5e3e338` swallowed there.
+2. The later-frame clear broke the poll path. When Begin fires from a
+   `_process` poll (TestRunner, title poll, `handle_live_pointer(null)`),
+   the click's own press arrives in frame N+1, clears the arm, and the
+   release picks.
 
 ## Diff
 
-- `LivingTitleBoot`: `button_down` + pointer `_on_begin_new` arm the swallow
-  only while `os_left_button_held()`; `_on_begin_new` no-ops if already
-  `_closed`.
-- `MapRenderer`: TipDismiss-style `eoa_begin_swallow_release` on leftover
-  `_input` / `_unhandled_input` / land-chip still-click / Area2D release.
-  Stores arm time (`Time.get_ticks_msec`) + arm frame. Expires after 750 ms.
-  A new left press in a later frame than the arming clears the flag.
-- Guard `HeadlessBegin1TitleReleaseFallthroughTest` + `tools/eoa_begin1_guard.sh`
-  drives real `InputEventMouseButton` through `_input` / `_unhandled_input`
-  (no emit / `_select_province` fallback). 80 ms leftover; follow-up pid != -1
-  + inspector; lost-release expiry; later-frame press; keyboard Enter/Space.
+- `MapRenderer._tick_begin_title_release_swallow`: first `_process` with
+  frames > arm_frame restamps the clock to now. Expiry only after that
+  restamp **and** frames >= arm_frame + 2.
+- Poll-path arms (`handle_live_pointer(null)`) set `begin_press_pending`.
+  The first left press (including `_input` + `_unhandled_input` in that
+  same frame) clears pending and keeps the arm. Later presses clear as
+  before. Event-path keeps the same-frame rule.
+- `LivingTitleBoot._apply_pointer_hit` → `_on_begin_new(pending_press,
+  from_pointer)` → `arm_begin_title_release_swallow(pending_press)`.
+- Guard: (a) same-frame `OS.delay_msec(900)` then next-frame release;
+  (b) poll-path N+1 press keeps arm, later click picks; (c) title `_input`
+  then MapRenderer `_input` same frame (M3); (d) lost-release + keyboard.
 
 Camera / edge-pan / TipDismiss / FacilityIconLayer / labels / fleet stack /
-unit pick ranking **unedited**.
+unit pick ranking **unedited**. TestRunner poll wiring **unedited**.
 
 ## Play recipe (human)
 
 `docs/evidence/begin1/CLICKS.md` — 1280×740 Absolute @(0,29) no Ctrl.
 
-Pre-step: `tools/run_godot.sh --headless --import --quit`
+Pre-step: `timeout 1500 tools/run_godot.sh --headless --path . --import --quit`
 
 1. Title. Germany · 1936. Cursor on **Begin**.
 2. Normal click: press, hold **~80–150 ms**, release (not a 0 ms tap).
 3. Home must have **no** inspector, **no** unit card, **no** click-zoom.
    Loir-et-Cher under ~**(284, 580)** must stay unselected.
 4. A **new** still-click on a GER land chip must still open Fill%/TOE.
-5. If the leftover up never arrives (unfocused window): after ~750 ms, or
-   after a fresh press, the first map click must pick.
+5. Lost leftover up: after ~750 ms **from the first frame after Begin**,
+   or after a later fresh press (not the poll-path Begin click itself),
+   the first map click must pick.
 
-## Gates (tip `1a29087f`)
+## Gates (tip `HEAD_SHA_PENDING`, product `f18a341a`)
 
 | gate | kind | result |
 |---|---|---|
-| `HeadlessBegin1TitleReleaseFallthroughTest` | hd | **PASS** (`eoa_begin1_guard.sh` 1212.6 MB) |
-| `HeadlessBegin1TitleReleaseFallthroughTest` | xvfb | **PASS** (`eoa_begin1_guard.sh` 1355.6 MB) |
+| `HeadlessBegin1TitleReleaseFallthroughTest` | hd | **PASS** (`eoa_begin1_guard.sh` 1212.7 MB) |
+| `HeadlessBegin1TitleReleaseFallthroughTest` | xvfb | **PASS** (`eoa_begin1_guard.sh` 1376.4 MB) |
 | `HeadlessFirstSessionReadabilityTest` (TipDismiss) | hd | **PASS** |
 | `HeadlessIx1LivingTitleEscBeginTest` | hd | **PASS** |
 | `HeadlessFleet1LandSpillGateTest` | hd | **PASS** |
@@ -77,16 +74,27 @@ Pre-step: `tools/run_godot.sh --headless --import --quit`
 | `HeadlessFac1aHoverCacheTest` (PERF-1b) | hd | **PASS** |
 | `HeadlessLabel1NationZoomTest` (LABEL-1) | hd | **PASS** |
 | `tools/eoa_full_test_gates.sh --quick` | pure | same **14** `unit_board_play_path` reds as main; no new red. `map_qc` env skip (no Pillow). HOI open_p0=0. |
+| `tools/live2_ts.sh` | live 2-core | **not present** in tree |
 
-## Test-merge onto draft PR #83
+## Mutants (each FAIL)
 
-`origin/cursor/perf2-idle-wheel-refresh-f611` @ `5f459614e00a24919959ccb3673e1274098912da`.
+| mutant | fail |
+|---|---|
+| M1 no expiry | lost-release swallow stayed armed after 800 ms |
+| M2 no later-press clear | later-frame left press did not clear |
+| M3 clear on same-frame press | title `_input` then MapRenderer `_input` dropped the arm |
 
-- **`docs/CURRENT_STATE.md`**: content conflict (both prepend a HOLD changelog paragraph).
-- `scripts/map/MapRenderer.gd`: **auto-merged**.
-- `docs/TESTING_PLAN.md`: **auto-merged**.
+## Fail-before `8a32fa6f` / pass-after tip
 
-Product input path does not conflict with PERF-2 fleet-offset / wheel-refresh.
+| case | `8a32fa6f` | tip |
+|---|---|---|
+| (a) same-frame 900 ms stall, release next frame | **FAIL** (clock expired) | **PASS** |
+| (b) poll-path N+1 press then leftover release | **FAIL** (N+1 press cleared arm) | **PASS** |
+
+## Test-merge (local only)
+
+- PR #83 `5f459614` (`cursor/perf2-idle-wheel-refresh-f611`): `docs/CURRENT_STATE.md` content conflict only. `MapRenderer.gd` + `TESTING_PLAN.md` auto-merged.
+- PR #85 `2df6d4ba` (`cursor/vis-1-map-readability-bf03`): `docs/CURRENT_STATE.md` content conflict only. `MapRenderer.gd` + `TESTING_PLAN.md` auto-merged.
 
 ## Out of scope (follow-up)
 

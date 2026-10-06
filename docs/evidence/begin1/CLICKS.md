@@ -4,13 +4,14 @@ Window **1280×740** Absolute **@(0, 29)** · GER 1936 · `world_accurate`.
 Do **not** raise the window. Do **not** use Ctrl.
 Headless / xvfb ≠ live Play.
 
-**Tip:** this BEGIN-1 FIX #1 revision (750 ms expiry + later-frame clear +
-keyboard Begin does not arm). Update SHA after the push.
+**Tip:** `HEAD_SHA_PENDING` (product `f18a341a`) BEGIN-1 FIX #2
+(restamp clock after the Begin frame + poll-path `begin_press_pending`).
+Update SHA after the push.
 
 ## Pre-step
 
 ```
-tools/run_godot.sh --headless --import --quit
+timeout 1500 tools/run_godot.sh --headless --path . --import --quit
 ```
 
 Client = screen − window origin. Screen y = client y + **29**.
@@ -29,9 +30,9 @@ Screen x = client x + **0**.
 4. Then a **new** still-click on a GER land chip / hex must select normally
    (the leftover swallow is one-shot).
 5. Lost leftover up (unfocused window / release never reaches Godot): after
-   **~750 ms**, or after a **fresh** left press in a later frame, the first
-   map click must pick. Keyboard Enter/Space Begin must **not** arm the
-   swallow.
+   **~750 ms from the first frame after Begin**, or after a **fresh** left
+   press that is not the poll-path Begin click itself, the first map click
+   must pick. Keyboard Enter/Space Begin must **not** arm the swallow.
 
 ## 1280×740 Begin point
 
