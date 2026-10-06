@@ -963,8 +963,12 @@ func try_start_infrastructure_investment(province_id: int, investor_tag: String)
 	# Real Political Power / Mandate spend (high-value wiring for player investment loop)
 	var pp_cost := int(preview.get("cost_pp", 0))
 	if typeof(GameData) != TYPE_NIL:
-		# Validate Mandate (primary for infra)
-		var ps: Dictionary = GameData.get_peace_state() if GameData.has_method("get_peace_state") else {}
+		# Validate Mandate (primary for infra). PERF-4: peek, never deep-copy peace_state.
+		var ps: Dictionary = {}
+		if GameData.has_method("peek_peace_state"):
+			ps = GameData.peek_peace_state()
+		elif GameData.has_method("get_peace_state"):
+			ps = GameData.get_peace_state()
 		var current_mand := int(ps.get("mandate", {}).get(investor_tag, 0))
 		if current_mand < pp_cost:
 			return {"success": false, "reason": "Insufficient Mandate (%d < %d)" % [current_mand, pp_cost], "preview": preview}
@@ -1146,8 +1150,12 @@ func get_ix1_road_spine_mandate_cost() -> int:
 func get_ix1_displayed_mandate(tag: String = "GER") -> int:
 	## Live HUD / Invest gate read the raw peace_state map (empty → 0), not get_pillar's 50 baseline.
 	var t := tag.strip_edges().to_upper()
-	if typeof(GameData) != TYPE_NIL and GameData.has_method("get_peace_state"):
-		var ps: Dictionary = GameData.get_peace_state()
+	if typeof(GameData) != TYPE_NIL:
+		var ps: Dictionary = {}
+		if GameData.has_method("peek_peace_state"):
+			ps = GameData.peek_peace_state()
+		elif GameData.has_method("get_peace_state"):
+			ps = GameData.get_peace_state()
 		return int(ps.get("mandate", {}).get(t, 0))
 	return 0
 

@@ -170,6 +170,7 @@ run_step unit_save_path \
     tools.map_generation.tests.test_long_session_save_product \
     tools.map_generation.tests.test_infra_ai_invest_product \
     tools.map_generation.tests.test_calendar_autosave_product \
+    tools.map_generation.tests.test_perf4_daily_sim_tick_product \
     -v || fail
 
 run_step map_qc \
@@ -244,6 +245,9 @@ else
 
   run_step launch_ix1_day_tick \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessIx1RoadSpineDayTickTest.gd || fail
+
+  run_step launch_perf4_daily_sim_tick \
+    tools/run_godot.sh --headless -s res://scripts/core/HeadlessPerf4DailySimTickTest.gd || fail
 
   run_step launch_ix1_live_stay_alive_tick \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessIx1RoadSpineLiveStayAliveTickTest.gd || fail

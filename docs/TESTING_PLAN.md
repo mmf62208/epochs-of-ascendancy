@@ -370,6 +370,14 @@ tools/run_godot.sh --headless --path . --resolution 1280x740 -s res://scripts/co
 tools/eoa_fac1a_pixel_guard.sh
 ```
 
+**PERF-4 daily sim-tick hitch:** TimeManager profiles each `game_day_advanced` listener and day_ai / day_battles steps. `GameData.get_peace_state` must not `duplicate(true)` (use `peek_peace_state`; snapshot via `get_peace_state_copy`). Owner lists use `_ensure_owner_index`. Headless `HeadlessPerf4DailySimTickTest` **RESULT=PASS**: source gates FAIL on main deepcopy; live-F5-equiv 7d worst phase < 500ms; same AI infra decisions for seed 193601. Product `test_perf4_daily_sim_tick_product` on `--quick`. Title / Begin / sea-fleet / Home star / supply overlay / chips **unedited**.
+
+```bash
+python3 -m unittest tools.map_generation.tests.test_perf4_daily_sim_tick_product -v
+EOA_DAY_TICK_PROFILE=1 tools/run_godot.sh --headless --path . \
+  -s res://scripts/core/HeadlessPerf4DailySimTickTest.gd
+```
+
 **PERF-1 FIX #1 (pan icons):** `_process` still `queue_redraw`s on ≥8px pan so previously culled airfields appear. Clusters cache per `_markers_zoom`; `_build_markers` must not increment on pan. Headless `HeadlessFac1aPanIconsTest` **RESULT=PASS** (Home z=0.33, ≥1 screen-width pan, drawn>0, build count unchanged). MapRenderer fill-zoom fix kept. Camera / edge-pan / chip pick **unedited**.
 
 **PERF-1b (hover cache):** `get_hit_rects_at_zoom` reuses `_last_markers` when zoom matches within 0.008 and the cache is clean; otherwise builds once and stores. `compute_markers_at_zoom` stays uncached. Headless `HeadlessFac1aHoverCacheTest` **RESULT=PASS**: N hovers at fixed zoom add 0 builds; zoom / data change updates clusters. Isolated keep-green **FAILS=0**. Camera / edge-pan / chip pick **unedited**. Evidence `docs/evidence/perf1b/`.

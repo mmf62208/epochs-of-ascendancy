@@ -360,9 +360,23 @@ func _init_peace_state_if_needed() -> void:
 		update_manpower_from_population(t)
 
 
-func get_peace_state() -> Dictionary:
+## Live peace_state map (no copy). Daily tick / AI invest / battle preview must
+## use this — `duplicate(true)` of the blob was a ~1.7s hitch once per game day.
+func peek_peace_state() -> Dictionary:
+	_init_peace_state_if_needed()
+	return peace_state
+
+
+## Explicit deep snapshot for save/export callers that must detach from live state.
+func get_peace_state_copy() -> Dictionary:
 	_init_peace_state_if_needed()
 	return peace_state.duplicate(true)
+
+
+func get_peace_state() -> Dictionary:
+	# PERF-4: same live map as peek_peace_state. Callers that need a detached
+	# snapshot use get_peace_state_copy(). Outcomes unchanged for reads.
+	return peek_peace_state()
 
 
 ## Helpers for map visuals / overlays (riots, pending research ethics) + culling: cheap queries so overlays only process "active" provinces (player owned + events + border/high pop via caller).

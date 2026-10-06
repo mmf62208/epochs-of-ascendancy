@@ -3799,7 +3799,11 @@ func advance_production(days: float) -> void:
 		# Pop labor (new leap forward): countries with larger population provide more labor, boosting factory output (ties pop policies/growth to production).
 		var pop_labor := 1.0
 		if typeof(GameData) != TYPE_NIL and GameData.has_method("get_peace_state"):
-			var ps: Dictionary = GameData.get_peace_state()
+			var ps: Dictionary = {}
+			if GameData.has_method("peek_peace_state"):
+				ps = GameData.peek_peace_state()
+			elif GameData.has_method("get_peace_state"):
+				ps = GameData.get_peace_state()
 			var p := float(ps.get("population", {}).get(factory.owner_tag, 0.0))
 			if p > 0:
 				pop_labor = clampf(1.0 + (p / 100000000.0) * 0.2, 1.0, 1.5)
