@@ -1764,6 +1764,9 @@ func _should_run_heavy_daily_theater() -> bool:
 	# Compact Maginot playtest clock uses the same light daily path as graphical F5.
 	if typeof(TimeManager) != TYPE_NIL and bool(TimeManager.get("_living_playtest_clock")):
 		return false
+	# Headless live-F5-equiv must match Play 1x (heavy duals stay off; DisplayServer is headless).
+	if typeof(TimeManager) != TYPE_NIL and bool(TimeManager.get("_live_f5_equiv_clock")):
+		return false
 	# UI smoke must stay light even under headless (otherwise 1x freezes the smoke harness).
 	if OS.get_environment("EOA_UI_SMOKE").strip_edges() == "1":
 		return false
