@@ -190,7 +190,8 @@ class TestFac1aAirfieldIcons(unittest.TestCase):
         land_end = ren.find("\nfunc ", land_start + 10)
         land_body = ren[land_start:land_end]
         self.assertNotIn("FacilityIcon", land_body)
-        self.assertNotIn("_facility_icon", land_body)
+        self.assertNotIn("FacilityIconLayer", land_body)
+        self.assertIn("and _facility_icon_pid_at(world_pos) <= 0", land_body)
         guard = ROOT / "scripts" / "core" / "WindowedFac1aAirfieldPixelGuard.gd"
         gsrc = guard.read_text(encoding="utf-8")
         self.assertIn("const SPLIT_ZOOM := 1.53", gsrc)

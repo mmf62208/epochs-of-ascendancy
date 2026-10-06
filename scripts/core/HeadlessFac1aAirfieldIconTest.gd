@@ -218,10 +218,12 @@ func _test_source_needles() -> void:
 	else:
 		_pass("_resolve_hex_pick_pid GIS-only")
 	var land_fn := _slice_func(ren, "_try_open_land_unit_at_world")
-	if "FacilityIcon" in land_fn or "_facility_icon" in land_fn:
-		_fail("_try_open_land_unit_at_world must not mention FacilityIcon")
+	if "FacilityIcon" in land_fn or "FacilityIconLayer" in land_fn:
+		_fail("_try_open_land_unit_at_world must not name FacilityIconLayer")
+	elif "and _facility_icon_pid_at(world_pos) <= 0" not in land_fn:
+		_fail("land spill must skip a facility icon pid")
 	else:
-		_pass("_try_open_land_unit_at_world untouched by facility")
+		_pass("land spill skips a facility icon pid")
 	if "_setup_facility_icon_layer" not in ren:
 		_fail("MapRenderer missing _setup_facility_icon_layer")
 	else:

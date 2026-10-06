@@ -2,13 +2,14 @@
 
 StatBars and chip text stay at z=3. NationPlate stays at z=-1.
 `_unit_counter_painted_wins` ranks the hit piece by CanvasItem z
-(child z included) then tree order. Land chrome and sea plates share
-that rank. Land roots stay at 28. A player land chip whose origin
-loses to foreign ink is moved later in the tree than that foreign
-chip. A land chip that still has no drawn pixel is slid until one
-of its pixels is on top, without stealing a player origin or the
-NLD Div 1 bar rim. Sea roots stay at 40. Plate-interior class must
-not beat bars or text.
+(child z included) then tree order. A face, bar, or glyph counts
+only where it has ink. Land chrome and sea plates share that rank.
+Land roots stay at 28. Once, at rebuild, foreign NATO sprites start
+at z=4 (above bars and glyphs at z=3). A chip with no top pixel at
+Home scale steps its sprite up to at most z=8. Player symbols are
+z=9 and the player chip is moved to the end of its own province
+node. Zoom does not reparent or slide them. Sea roots stay at 40.
+Plate-interior class must not beat bars or text.
 """
 from __future__ import annotations
 
@@ -68,11 +69,26 @@ def build_chip_draw_order_pick_product() -> Dict[str, Any]:
         and "_drawn_land_beats_sea_plate" in land_open
         and "_unit_counter_painted_wins" in beats
         and "SeaNationDisk" in piece,
-        "own_chip_above_foreign_land": (
-            "func _raise_player_land_above_covering_foreign" in ren
-            and "_raise_player_land_above_covering_foreign(zz)" in ren
-            and "eoa_raise_above_foreign" in ren
+        "player_order_once_at_rebuild": (
+            "func _order_player_land_chips_last" in ren
+            and "_order_player_land_chips_last()" in _gd_func_slice(ren, "_rebuild_demo_unit_icons")
+            and "z_index = 9 if player_land else 4" in _gd_func_slice(ren, "_order_player_land_chips_last")
+            and "_bury_covered_land_sprites(foreign)" in _gd_func_slice(ren, "_order_player_land_chips_last")
+            and "spr_z >= 8" in _gd_func_slice(ren, "_bury_covered_land_sprites")
+            and "func _raise_player_land_above_covering_foreign" not in ren
+            and "_raise_player_land_above_covering_foreign(zz)" not in ren
+            and "eoa_raise_above_foreign" not in ren
+            and "NLD_formation_1" not in ren
             and "chip_z = 34" not in ren
+        ),
+        "opaque_piece_ink": (
+            "func _sprite_pixel_opaque" in ren
+            and "_sprite_pixel_opaque" in _gd_func_slice(ren, "_unit_counter_top_sprite")
+            and "func _world_in_unit_stat_bar_ink" in ren
+            and "_world_in_unit_stat_bar_ink" in piece
+            and "func _world_in_chip_text_glyphs" in ren
+            and "_world_in_chip_text_glyphs" in _gd_func_slice(ren, "_world_in_unit_painted_glyphs")
+            and "func _world_in_unit_stat_bars" in ren
         ),
         "headless_overlap": False,
     }
