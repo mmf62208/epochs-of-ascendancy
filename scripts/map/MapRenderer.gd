@@ -24707,6 +24707,8 @@ func arm_begin_title_release_swallow(pending_press: bool = false) -> void:
 	set_meta("eoa_begin_swallow_arm_frame", Engine.get_process_frames())
 	if has_meta("eoa_begin_swallow_clock_ready"):
 		remove_meta("eoa_begin_swallow_clock_ready")
+	if has_meta("eoa_begin_swallow_press_seen_frame"):
+		remove_meta("eoa_begin_swallow_press_seen_frame")
 	if pending_press:
 		set_meta("eoa_begin_swallow_press_pending", true)
 	elif has_meta("eoa_begin_swallow_press_pending"):
@@ -24739,13 +24741,19 @@ func _begin_title_release_blocks_map_pick() -> bool:
 func _clear_begin_title_release_swallow_on_new_left_press() -> void:
 	# Same-frame Begin press must keep the arm so the matching ~80 ms up is eaten.
 	# Poll-path: the Begin click's own press arrives in N+1 — eat that one only.
+	# One physical press can hit _input and _unhandled_input; treat same-frame
+	# deliveries as that first press, not a later click.
 	if not has_meta("eoa_begin_swallow_release"):
 		return
+	var now_frame: int = Engine.get_process_frames()
 	if has_meta("eoa_begin_swallow_press_pending"):
 		remove_meta("eoa_begin_swallow_press_pending")
+		set_meta("eoa_begin_swallow_press_seen_frame", now_frame)
+		return
+	if int(get_meta("eoa_begin_swallow_press_seen_frame", -1)) == now_frame:
 		return
 	var arm_frame: int = int(get_meta("eoa_begin_swallow_arm_frame", -1))
-	if Engine.get_process_frames() > arm_frame:
+	if now_frame > arm_frame:
 		_clear_begin_title_release_swallow()
 
 
@@ -24773,6 +24781,8 @@ func _clear_begin_title_release_swallow() -> void:
 		remove_meta("eoa_begin_swallow_clock_ready")
 	if has_meta("eoa_begin_swallow_press_pending"):
 		remove_meta("eoa_begin_swallow_press_pending")
+	if has_meta("eoa_begin_swallow_press_seen_frame"):
+		remove_meta("eoa_begin_swallow_press_seen_frame")
 
 
 func dismiss_first_session_action_tip() -> void:

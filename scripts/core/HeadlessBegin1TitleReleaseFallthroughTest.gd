@@ -696,9 +696,27 @@ func _test_poll_path_late_press_keeps_arm() -> void:
 	_cam.position = CAM0
 	_cam.zoom = Vector2(ZOOM0, ZOOM0)
 	_clear_inspector()
-	if not _seed_loir_under_screen(_begin_pt):
+	# Headless poll uses Viewport.get_mouse_position() (often 0,0). Cover that
+	# point and the Begin centre so handle_live_pointer(null) is a real poll
+	# hit, not a manual arm.
+	var begin_btn: Button = _title.find_child("LivingTitleBegin", true, false) as Button
+	if begin_btn == null:
+		_fail("LivingTitleBegin missing for poll-path")
 		return
-	_warp_mouse(_begin_pt)
+	var cc_btn: Button = _title.find_child("LivingTitleCommandCenter", true, false) as Button
+	if cc_btn != null:
+		cc_btn.global_position = Vector2(900, 20)
+		cc_btn.size = Vector2(160, 36)
+	begin_btn.global_position = Vector2(0, 0)
+	begin_btn.size = Vector2(420, 220)
+	await _flush(2)
+	_begin_pt = begin_btn.get_global_rect().get_center()
+	if not bool(_title.call("begin_owns_screen_point", Vector2(0, 0))) and not bool(_title.call("begin_owns_screen_point", Vector2(40, 80))):
+		_fail("poll-path Begin hit rect must own the headless poll point")
+		return
+	if not _seed_loir_under_screen(MAP_PT):
+		return
+	_warp_mouse(Vector2(40, 80))
 	var polled: String = str(_title.call("handle_live_pointer", null))
 	if polled != "begin":
 		_fail("poll-path handle_live_pointer(null) did not Begin (got %s)" % polled)
@@ -714,15 +732,15 @@ func _test_poll_path_late_press_keeps_arm() -> void:
 	_reset_map_click_latches()
 	_cam.position = CAM0
 	_cam.zoom = Vector2(ZOOM0, ZOOM0)
-	if not _seed_loir_under_screen(_begin_pt):
+	if not _seed_loir_under_screen(MAP_PT):
 		return
 	_clear_inspector()
-	_send_mouse(_begin_pt, true)
+	_send_mouse(MAP_PT, true)
 	if not bool(_mr.call("_begin_title_release_blocks_map_pick")):
 		_fail("poll-path N+1 press cleared the Begin swallow")
 		return
 	_pass("poll-path N+1 press kept the Begin swallow")
-	if not await _assert_leftover_release_did_not_pick(_begin_pt, "poll-path N+1 press then leftover release"):
+	if not await _assert_leftover_release_did_not_pick(MAP_PT, "poll-path N+1 press then leftover release"):
 		return
 	await _flush(2)
 	if bool(_mr.call("_begin_title_release_blocks_map_pick")):
