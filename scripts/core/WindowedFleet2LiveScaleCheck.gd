@@ -207,7 +207,16 @@ func _do_sea_frame(pid: int, live_c: Vector2, zoom: float, sea_key: String, band
 
 
 func _do_clicks() -> void:
+	_assert_zoom_reorder_ms()
 	var zooms: Array = [0.318, 0.40, 0.80, 1.50]
+	var zoom_env := OS.get_environment("EOA_FLEET2_LIVE_ZOOMS").strip_edges()
+	if not zoom_env.is_empty():
+		zooms = []
+		for part in zoom_env.split(","):
+			var bit := part.strip_edges()
+			if bit.is_empty():
+				continue
+			zooms.append(float(bit))
 	for z_v in zooms:
 		var z: float = float(z_v)
 		_frame_sea_direct(_ch_cluster if _ch_cluster != Vector2.ZERO else LIVE_RENDER_CHANNEL, z, "click_z%.3f" % z)
@@ -267,6 +276,10 @@ func _do_clicks() -> void:
 		if z == 0.318 or z == 0.40:
 			_click_land_air_guard(z)
 			_click_own_ger_bodies(z)
+			if is_equal_approx(z, 0.318):
+				_click_home_measured_points()
+	_click_ger_face_pixels()
+	_click_airfield_l4()
 	_write_clicks_md()
 	_finish(_fail_reasons.is_empty())
 
@@ -309,22 +322,26 @@ func _click_one(row: Dictionary) -> void:
 			ok = true
 		else:
 			ok = tag == GER_TAG and ftype != "fleet"
+	elif kind == "not_fid":
+		# Airfield cluster: fail only when this click opens the forbidden formation.
+		ok = not (opened and fid == want_fid)
 	else:
 		ok = fo != null and opened and tag in want and ftype != "fleet"
 		if not want_type.is_empty():
 			ok = ok and ftype == want_type
 		if not want_fid.is_empty():
 			ok = ok and fid == want_fid
-	if kind != "hex_own_or_province":
+	if kind != "hex_own_or_province" and kind != "not_fid":
 		if own:
 			ok = ok and card["open_fight"] and card["assign"]
 		else:
 			ok = ok and not card["open_fight"] and not card["assign"]
-	elif fo != null and tag == GER_TAG:
+	elif kind == "hex_own_or_province" and fo != null and tag == GER_TAG:
 		ok = ok and card["open_fight"] and card["assign"]
+	var screen := _world_to_screen(pos)
 	var line := (
-		"EOA_FLEET2_LIVE who=click name=%s world=%.1f,%.1f fid=%s tag=%s type=%s opened=%s own_card=%s fight=%s assign=%s ok=%s"
-		% [who, pos.x, pos.y, fid, tag, ftype, str(opened), str(own), str(card["open_fight"]), str(card["assign"]), str(ok)]
+		"EOA_FLEET2_LIVE who=click name=%s world=%.1f,%.1f screen=%.0f,%.0f fid=%s tag=%s type=%s opened=%s own_card=%s fight=%s assign=%s ok=%s"
+		% [who, pos.x, pos.y, screen.x, screen.y, fid, tag, ftype, str(opened), str(own), str(card["open_fight"]), str(card["assign"]), str(ok)]
 	)
 	_log(line)
 	_click_log.append(line)
@@ -357,14 +374,36 @@ func _click_land_air_guard(z: float) -> void:
 			_fail_reasons.append("missing_%s_z%.3f" % [str(rec["who"]), z])
 			_log("EOA_FLEET2_LIVE who=missing name=%s z=%.3f" % [str(rec["who"]), z])
 			continue
+		var want_fid := str(hit.get("fid", ""))
+		var icon: Node2D = hit.get("icon", null) as Node2D
+		var pos: Vector2 = _point_where_chip_is_drawn(icon, want_fid)
+		if pos.x > 1.0e8:
+			var cover := ""
+			var origin := Vector2.ZERO
+			if icon != null and is_instance_valid(icon):
+				origin = icon.global_position
+				cover = _painted_piece_winner_fid(origin)
+				var xf_b: Transform2D = icon.get_global_transform()
+				var bits: PackedStringArray = PackedStringArray()
+				for off_v in [Vector2(0, -18), Vector2(0, 27), Vector2(24, 10), Vector2(-24, 10), Vector2(36, 8)]:
+					var off: Vector2 = off_v as Vector2
+					bits.append("%s=%s" % [str(off), _painted_piece_winner_fid(xf_b * off)])
+				_log("EOA_FLEET2_LIVE who=buried_samples name=%s origin=%.1f,%.1f scale=%.2f %s" % [
+					str(rec["who"]), origin.x, origin.y, icon.scale.x, " ".join(bits)
+				])
+			_fail_reasons.append("no_top_pixel_%s_z%.3f" % [str(rec["who"]), z])
+			_log("EOA_FLEET2_LIVE who=no_top_pixel name=%s z=%.3f fid=%s cover_at_origin=%s" % [
+				str(rec["who"]), z, want_fid, cover
+			])
+			continue
 		_click_one({
 			"who": "z%.3f_%s" % [z, str(rec["who"])],
-			"pos": hit.get("pos", Vector2.ZERO) as Vector2,
+			"pos": pos,
 			"own": false,
 			"kind": "land",
 			"want_tags": [str(rec["tag"])],
 			"want_type": str(rec["type"]),
-			"want_fid": str(hit.get("fid", "")),
+			"want_fid": want_fid,
 		})
 	_click_coast_hex(z, COAST_A)
 	_click_coast_hex(z, COAST_B)
@@ -376,6 +415,67 @@ func _click_land_air_guard(z: float) -> void:
 	_click_emden_grid(z)
 	if is_equal_approx(z, 0.40):
 		_click_heidekreis_painted_or_own(z)
+
+
+func _click_home_measured_points() -> void:
+	# Europe Home at z0.318. NLD Div 1 is the Channel bar corner
+	# (screen 742,386 on the Channel camera — local 21.2, 33.8).
+	# GER AW3 is a pixel that chip is drawn on, not a fixed Home screen point.
+	var mr := _map_renderer()
+	if mr != null and mr.has_method("player_path_europe_home"):
+		mr.call("player_path_europe_home")
+	var cam := _camera()
+	if cam != null:
+		cam.zoom = Vector2(0.318, 0.318)
+		cam.make_current()
+	if mr != null and mr.has_method("_sync_unit_counter_paint"):
+		mr.call("_sync_unit_counter_paint", 0.318)
+	var cam_pos := Vector2.ZERO
+	if cam != null:
+		cam_pos = cam.global_position
+	_log("EOA_FLEET2_LIVE who=home_frame zoom=0.318 cam=%.1f,%.1f" % [cam_pos.x, cam_pos.y])
+	var counters: Array = _collect_land_air_counters()
+	var nld: Dictionary = _match_land_air(counters, "NLD", "division", 1)
+	var ger: Dictionary = _match_land_air(counters, "GER", "air_wing", 3)
+	if nld.is_empty():
+		_fail_reasons.append("missing_Emden_NLD_home")
+	else:
+		var nld_icon: Node2D = nld.get("icon", null) as Node2D
+		var nld_fid := str(nld.get("fid", ""))
+		# The old local (21.2, 33.8) rim is under a player symbol once
+		# those sprites paint above foreign bars. Click a pixel this
+		# chip still owns.
+		var nld_pos: Vector2 = _point_where_chip_is_drawn(nld_icon, nld_fid)
+		if nld_pos.x > 1.0e8:
+			_fail_reasons.append("no_top_pixel_Emden_NLD_home")
+			_log("EOA_FLEET2_LIVE who=no_top_pixel name=Emden_NLD_home fid=%s" % nld_fid)
+		else:
+			_click_one({
+				"who": "home_Emden_NLD_rim",
+				"pos": nld_pos,
+				"own": false,
+				"kind": "land",
+				"want_tags": ["NLD"],
+				"want_type": "division",
+				"want_fid": nld_fid,
+			})
+	if ger.is_empty():
+		_fail_reasons.append("missing_GER_AW3_home_bars")
+	else:
+		var ger_icon: Node2D = ger.get("icon", null) as Node2D
+		var ger_fid := str(ger.get("fid", ""))
+		var ger_pos: Vector2 = _point_where_chip_is_drawn(ger_icon, ger_fid)
+		if ger_pos.x > 1.0e8:
+			ger_pos = ger.get("pos", Vector2.ZERO) as Vector2
+		_click_one({
+			"who": "home_GER_AW3_bars",
+			"pos": ger_pos,
+			"own": true,
+			"kind": "land",
+			"want_tags": ["GER"],
+			"want_type": "air_wing",
+			"want_fid": ger_fid,
+		})
 
 
 func _click_own_ger_bodies(z: float) -> void:
@@ -392,14 +492,26 @@ func _click_own_ger_bodies(z: float) -> void:
 		if hit.is_empty():
 			_fail_reasons.append("missing_%s_z%.3f" % [str(rec["who"]), z])
 			continue
+		var want_fid := str(hit.get("fid", ""))
+		var icon: Node2D = hit.get("icon", null) as Node2D
+		var pos: Vector2 = _point_where_chip_is_drawn(icon, want_fid)
+		if pos.x > 1.0e8:
+			var cover := ""
+			if icon != null and is_instance_valid(icon):
+				cover = _painted_piece_winner_fid(icon.global_position)
+			_fail_reasons.append("no_top_pixel_%s_z%.3f" % [str(rec["who"]), z])
+			_log("EOA_FLEET2_LIVE who=no_top_pixel name=%s z=%.3f fid=%s cover_at_origin=%s" % [
+				str(rec["who"]), z, want_fid, cover
+			])
+			continue
 		_click_one({
 			"who": "z%.3f_%s_body" % [z, str(rec["who"])],
-			"pos": hit.get("pos", Vector2.ZERO) as Vector2,
+			"pos": pos,
 			"own": true,
 			"kind": "land",
 			"want_tags": ["GER"],
 			"want_type": str(rec["type"]),
-			"want_fid": str(hit.get("fid", "")),
+			"want_fid": want_fid,
 		})
 
 
@@ -449,7 +561,16 @@ func _click_emden_east(z: float) -> void:
 		_fail_reasons.append("missing_Emden_NLD_east_z%.3f" % z)
 		return
 	var base: Vector2 = hit.get("pos", Vector2.ZERO) as Vector2
+	var want_fid := str(hit.get("fid", ""))
 	var east: Vector2 = base + Vector2(20.0 / maxf(z, 0.05), 0.0)
+	var icon: Node2D = hit.get("icon", null) as Node2D
+	if _painted_piece_winner_fid(east) != want_fid:
+		var found: Vector2 = _nld_div1_east_pixel(icon, want_fid)
+		if found.x > 1.0e8:
+			_fail_reasons.append("no_top_pixel_Emden_NLD_east_z%.3f" % z)
+			_log("EOA_FLEET2_LIVE who=no_top_pixel name=Emden_NLD_east z=%.3f fid=%s" % [z, want_fid])
+			return
+		east = found
 	_click_one({
 		"who": "z%.3f_Emden_NLD_east20" % z,
 		"pos": east,
@@ -457,7 +578,7 @@ func _click_emden_east(z: float) -> void:
 		"kind": "land",
 		"want_tags": ["NLD"],
 		"want_type": "division",
-		"want_fid": str(hit.get("fid", "")),
+		"want_fid": want_fid,
 	})
 
 
@@ -572,8 +693,12 @@ func _click_dnk_aw3_bar_strip(z: float) -> void:
 			_fail_reasons.append("dnk_strip_%s_off_bars_z%.3f" % [who, z])
 			continue
 		var got := _pick_fid_at(_map_renderer(), pos)
-		_log("EOA_FLEET2_LIVE who=dnk_strip name=%s z=%.3f fid=%s" % [who, z, got])
-		_click_log.append("dnk_strip %s fid=%s" % [who, got])
+		var winner := _painted_piece_winner_fid(pos)
+		_log("EOA_FLEET2_LIVE who=dnk_strip name=%s z=%.3f fid=%s winner=%s" % [who, z, got, winner])
+		_click_log.append("dnk_strip %s fid=%s winner=%s" % [who, got, winner])
+		if got != winner or winner.is_empty():
+			_fail_reasons.append("dnk_strip_%s_z%.3f_got_%s_winner_%s" % [who, z, got, winner])
+			continue
 		if got == want_fid:
 			_click_one({
 				"who": "z%.3f_%s" % [z, who],
@@ -584,31 +709,35 @@ func _click_dnk_aw3_bar_strip(z: float) -> void:
 				"want_type": "air_wing",
 				"want_fid": want_fid,
 			})
-			continue
-		# ±4 must be DNK AW3. ±8 / ends may sit in a foreign inner face
-		# (Play −8 → NLD_1) or a same-nation pile (Play +8 → DNK Div 2).
-		if who.ends_with("_m4") or who.ends_with("_p4"):
-			_fail_reasons.append("dnk_strip_%s_z%.3f_got_%s" % [who, z, got])
-			continue
-		if not _dnk_strip_edge_ok(pos, got, want_fid):
-			_fail_reasons.append("dnk_strip_%s_z%.3f_got_%s" % [who, z, got])
 	var sweep_ok: int = 0
 	var sweep_n: int = 0
+	var own_n: int = 0
+	var other_n: int = 0
 	var dx: int = -20
 	while dx <= 20:
 		var spos: Vector2 = xf * Vector2(float(dx), 27.0)
 		sweep_n += 1
-		var got := _pick_fid_at(_map_renderer(), spos)
-		if _world_in_icon_stat_bars_or_local(icon, spos) and (
-			got == want_fid or _dnk_strip_edge_ok(spos, got, want_fid)
-		):
+		var got_s := _pick_fid_at(_map_renderer(), spos)
+		var winner_s := _painted_piece_winner_fid(spos)
+		if _world_in_icon_stat_bars_or_local(icon, spos) and not winner_s.is_empty() and got_s == winner_s:
 			sweep_ok += 1
+			if got_s == want_fid:
+				own_n += 1
+			else:
+				other_n += 1
 		else:
-			_fail_reasons.append("dnk_sweep_z%.3f_lx%d_got_%s" % [z, dx, got])
-			_log("EOA_FLEET2_LIVE who=dnk_sweep_fail z=%.3f lx=%d fid=%s" % [z, dx, got])
+			_fail_reasons.append("dnk_sweep_z%.3f_lx%d_got_%s_winner_%s" % [z, dx, got_s, winner_s])
+			_log("EOA_FLEET2_LIVE who=dnk_sweep_fail z=%.3f lx=%d fid=%s winner=%s" % [z, dx, got_s, winner_s])
 		dx += 2
-	_log("EOA_FLEET2_LIVE who=dnk_sweep_sum z=%.3f ok=%d n=%d" % [z, sweep_ok, sweep_n])
-	_click_log.append("dnk_sweep z=%.3f ok=%d/%d" % [z, sweep_ok, sweep_n])
+	if own_n == 0:
+		_fail_reasons.append("dnk_strip_no_own_bars_z%.3f" % z)
+	# Home pile: some of this strip is another chip's ink. That pixel must
+	# be the drawn piece, not NLD Div 1's plate just because the point
+	# sits in that plate.
+	if is_equal_approx(z, 0.318) and other_n == 0:
+		_fail_reasons.append("dnk_strip_no_overlap_z%.3f" % z)
+	_log("EOA_FLEET2_LIVE who=dnk_sweep_sum z=%.3f ok=%d n=%d own=%d other=%d" % [z, sweep_ok, sweep_n, own_n, other_n])
+	_click_log.append("dnk_sweep z=%.3f ok=%d/%d own=%d other=%d" % [z, sweep_ok, sweep_n, own_n, other_n])
 
 
 func _click_nld_label_east_bare(z: float) -> void:
@@ -695,13 +824,224 @@ func _click_heidekreis_painted_or_own(z: float) -> void:
 	})
 
 
-func _pick_fid_at(mr: Node, world: Vector2) -> String:
-	if mr == null or not mr.has_method("_pick_unit_formation_at_world"):
-		return ""
-	var fo: Object = mr.call("_pick_unit_formation_at_world", world)
-	if fo != null and "formation_id" in fo:
-		return str(fo.formation_id)
-	return ""
+func _assert_zoom_reorder_ms() -> void:
+	# The deleted per-zoom raise spent 30–70 s below z0.65. This step is
+	# one scale sync from 0.40 to 0.318 after a warmup sync.
+	var mr := _map_renderer()
+	if mr == null or not mr.has_method("_sync_unit_counter_paint"):
+		_fail_reasons.append("zoom_step_no_sync")
+		return
+	var n := 0
+	if "_demo_unit_icon_pids" in mr:
+		n = (mr._demo_unit_icon_pids as Array).size()
+	if n < 10:
+		_fail_reasons.append("zoom_step_few_icons_%d" % n)
+		return
+	mr.call("_sync_unit_counter_paint", 0.40)
+	mr.call("_sync_unit_counter_paint", 0.40)
+	mr.set_meta("eoa_trace_counter_sync", true)
+	var t0 := Time.get_ticks_usec()
+	mr.call("_sync_unit_counter_paint", 0.318)
+	var ms := float(Time.get_ticks_usec() - t0) / 1000.0
+	_log("EOA_FLEET2_LIVE who=zoom_step from=0.400 to=0.318 ms=%.2f icons=%d" % [ms, n])
+	if ms > 50.0:
+		_fail_reasons.append("zoom_step_ms_%.1f" % ms)
+
+
+func _click_ger_face_pixels() -> void:
+	# Province 710977 at z0.318. Each face pixel is chosen where this
+	# chip's sprite is the top painted piece, then the live open must
+	# be that formation. A miss is no_top_pixel, not a substitute point.
+	var z := 0.318
+	var pid := 710977
+	var anchor := _province_world(pid)
+	if anchor == Vector2.ZERO:
+		_fail_reasons.append("ger_face_no_centroid")
+		return
+	_frame_sea_direct(anchor, z, "ger_faces_710977")
+	var counters: Array = _collect_land_air_counters()
+	var rows: Array = [
+		{"who": "GER_Div_6", "type": "division", "ord": 6},
+		{"who": "GER_Garrison_4", "type": "garrison", "ord": 4},
+		{"who": "GER_Div_7", "type": "division", "ord": 7},
+	]
+	for rec_v in rows:
+		var rec: Dictionary = rec_v as Dictionary
+		var who := str(rec["who"])
+		var hit: Dictionary = _match_land_air(counters, "GER", str(rec["type"]), int(rec["ord"]))
+		if hit.is_empty():
+			_fail_reasons.append("missing_%s_face" % who)
+			_log("EOA_FLEET2_LIVE who=missing_face name=%s frame_pid=%d" % [who, pid])
+			_log_ger_face_candidates(counters)
+			continue
+		_log("EOA_FLEET2_LIVE who=ger_face_unit name=%s fid=%s stationed=%d frame=%d" % [
+			who, str(hit.get("fid", "")), int(hit.get("pid", -1)), pid
+		])
+		var want_fid := str(hit.get("fid", ""))
+		var icon: Node2D = hit.get("icon", null) as Node2D
+		var pos: Vector2 = _ger_face_world(icon, want_fid)
+		if pos.x > 1.0e8:
+			_fail_reasons.append("no_top_pixel_%s_z%.3f" % [who, z])
+			_log("EOA_FLEET2_LIVE who=no_top_pixel name=%s z=%.3f fid=%s" % [who, z, want_fid])
+			continue
+		_click_one({
+			"who": "z%.3f_%s_face" % [z, who],
+			"pos": pos,
+			"own": true,
+			"kind": "land",
+			"want_tags": ["GER"],
+			"want_type": str(rec["type"]),
+			"want_fid": want_fid,
+		})
+
+
+func _log_ger_face_candidates(counters: Array) -> void:
+	var n := 0
+	for c_v in counters:
+		var c: Dictionary = c_v as Dictionary
+		if str(c.get("tag", "")) != "GER":
+			continue
+		var ord := int(c.get("ord", -99))
+		if ord != 4 and ord != 6 and ord != 7:
+			continue
+		_log("EOA_FLEET2_LIVE who=ger_face_candidate type=%s ord=%d pid=%d fid=%s" % [
+			str(c.get("type", "")), ord, int(c.get("pid", -1)), str(c.get("fid", ""))
+		])
+		n += 1
+		if n >= 12:
+			return
+
+
+func _match_land_air_at(counters: Array, tag: String, ftype: String, ord: int, pid: int) -> Dictionary:
+	for c_v in counters:
+		var c: Dictionary = c_v as Dictionary
+		if str(c.get("tag", "")) != tag:
+			continue
+		if str(c.get("type", "")) != ftype:
+			continue
+		if int(c.get("ord", -99)) != ord:
+			continue
+		if int(c.get("pid", -1)) != pid:
+			continue
+		return c
+	return {}
+
+
+func _ger_face_world(icon: Node2D, want_fid: String) -> Vector2:
+	if icon == null or not is_instance_valid(icon) or want_fid.is_empty():
+		return Vector2(INF, INF)
+	var spr: Sprite2D = null
+	for c_v in icon.get_children():
+		if c_v is Sprite2D and (c_v as Sprite2D).visible and (c_v as Sprite2D).texture != null:
+			spr = c_v as Sprite2D
+			break
+	if spr == null:
+		return Vector2(INF, INF)
+	var mr := _map_renderer()
+	if mr == null or not mr.has_method("_sprite_pixel_opaque") or not mr.has_method("_unit_counter_top_drawn_piece"):
+		return Vector2(INF, INF)
+	var sz: Vector2 = spr.texture.get_size()
+	if spr.region_enabled:
+		sz = spr.region_rect.size
+	var locals: Array = [Vector2.ZERO]
+	var step := 2.0
+	var y := -sz.y * 0.5 + 1.0
+	while y < sz.y * 0.5:
+		var x := -sz.x * 0.5 + 1.0
+		while x < sz.x * 0.5:
+			locals.append(Vector2(x, y))
+			x += step
+		y += step
+	var opaque_n := 0
+	var sprite_top_n := 0
+	var center_piece := "null"
+	var center_fid := ""
+	var center_opaque := false
+	for local_v in locals:
+		var local: Vector2 = local_v as Vector2
+		var world: Vector2 = spr.to_global(local)
+		var opaque := bool(mr.call("_sprite_pixel_opaque", spr, world))
+		if local == Vector2.ZERO:
+			center_opaque = opaque
+			var piece0: Variant = mr.call("_unit_counter_top_drawn_piece", world, icon)
+			if piece0 is Node:
+				center_piece = str((piece0 as Node).name)
+			center_fid = _painted_piece_winner_fid(world)
+		if not opaque:
+			continue
+		opaque_n += 1
+		var piece: Variant = mr.call("_unit_counter_top_drawn_piece", world, icon)
+		if not (piece is Sprite2D):
+			continue
+		sprite_top_n += 1
+		if _painted_piece_winner_fid(world) == want_fid:
+			_log("EOA_FLEET2_LIVE who=ger_face_hit fid=%s opaque=%d sprite_top=%d tex=%.0fx%.0f" % [
+				want_fid, opaque_n, sprite_top_n, sz.x, sz.y
+			])
+			return world
+	var spr_z := -999
+	var spr_eff := -999
+	if mr.has_method("_canvas_item_effective_z"):
+		spr_z = spr.z_index
+		spr_eff = int(mr.call("_canvas_item_effective_z", spr))
+	_log(
+		"EOA_FLEET2_LIVE who=ger_face_miss fid=%s opaque=%d sprite_top=%d samples=%d tex=%.0fx%.0f center_opaque=%s center_piece=%s center_fid=%s spr_z=%d spr_eff=%d"
+		% [want_fid, opaque_n, sprite_top_n, locals.size(), sz.x, sz.y, str(center_opaque), center_piece, center_fid, spr_z, spr_eff]
+	)
+	return Vector2(INF, INF)
+
+
+func _click_airfield_l4() -> void:
+	# L4 cluster on Neuwied. The nearest-own spill must not open GER_formation_4.
+	var z := 0.760
+	var pid := 710451
+	var anchor := _province_world(pid)
+	if anchor == Vector2.ZERO:
+		_fail_reasons.append("airfield_710451_no_centroid")
+		return
+	_frame_sea_direct(anchor, z, "airfield_710451")
+	var mr := _map_renderer()
+	var ol: Node = null
+	if mr != null and mr.has_method("get_overlay_layer"):
+		ol = mr.call("get_overlay_layer", "FacilityIconLayer") as Node
+	if ol == null or not ol.has_method("get_hit_rects_at_zoom"):
+		_fail_reasons.append("airfield_no_layer")
+		return
+	var layouts: Array = ol.call("get_hit_rects_at_zoom", z) as Array
+	var hit := Vector2(INF, INF)
+	for layout_v in layouts:
+		if typeof(layout_v) != TYPE_DICTIONARY:
+			continue
+		var layout: Dictionary = layout_v as Dictionary
+		if int(layout.get("pid", -1)) != pid or not bool(layout.get("cluster", false)):
+			continue
+		var rect: Rect2 = layout.get("hit_icon", Rect2()) as Rect2
+		if rect.size.x <= 0.0:
+			continue
+		var center: Vector2 = rect.get_center()
+		var fac := -1
+		if mr.has_method("_facility_icon_pid_at"):
+			fac = int(mr.call("_facility_icon_pid_at", center))
+		if fac == pid:
+			hit = center
+			break
+	if hit.x > 1.0e8:
+		_fail_reasons.append("airfield_710451_no_hit")
+		_log("EOA_FLEET2_LIVE who=airfield_miss pid=%d z=%.3f" % [pid, z])
+		return
+	_click_one({
+		"who": "z%.3f_L4_%d" % [z, pid],
+		"pos": hit,
+		"own": false,
+		"kind": "not_fid",
+		"want_fid": "GER_formation_4",
+	})
+
+
+func _pick_fid_at(_mr: Node, world: Vector2) -> String:
+	# Point choice is the painted-piece walk. The live pick is only the
+	# click result, so a search cannot lock onto its own answer.
+	return _painted_piece_winner_fid(world)
 
 
 func _click_emden_grid(z: float) -> void:
@@ -799,6 +1139,10 @@ func _any_painted_at(world: Vector2) -> bool:
 			if icon == null or not is_instance_valid(icon) or not icon.visible:
 				continue
 			if bool(icon.get_meta("sea_nation_disk", false)):
+				if mr.has_method("_unit_counter_top_drawn_piece"):
+					var sea_piece: Variant = mr.call("_unit_counter_top_drawn_piece", world, icon)
+					if sea_piece != null:
+						return true
 				continue
 			if _world_in_icon_painted(icon, world):
 				return true
@@ -825,10 +1169,9 @@ func _name_topmost_painted(world: Vector2) -> String:
 			if mr.has_method("_demo_unit_icon_world_pos"):
 				chip_pos = mr.call("_demo_unit_icon_world_pos", icon, id) as Vector2
 			if bool(icon.get_meta("sea_nation_disk", false)):
-				var hit_r: float = 14.5
-				if mr.has_method("_demo_unit_icon_hit_radius_world"):
-					hit_r = float(mr.call("_demo_unit_icon_hit_radius_world", 1.0, icon))
-				painted = world.distance_to(chip_pos) <= hit_r
+				painted = false
+				if mr.has_method("_unit_counter_top_drawn_piece"):
+					painted = mr.call("_unit_counter_top_drawn_piece", world, icon) != null
 			else:
 				painted = _world_in_icon_painted(icon, world)
 			if not painted:
@@ -863,35 +1206,65 @@ func _click_own_aw3_painted(z: float) -> void:
 		return
 	var icon: Node2D = hit.get("icon", null) as Node2D
 	var base: Vector2 = hit.get("pos", Vector2.ZERO) as Vector2
-	var bars: Vector2 = base + Vector2(0.0, 46.0 / maxf(z, 0.05))
-	var corner: Vector2 = base + Vector2(32.0 / maxf(z, 0.05), 28.0 / maxf(z, 0.05))
+	var want_fid := str(hit.get("fid", ""))
+	var bars := Vector2(INF, INF)
+	var corner := Vector2(INF, INF)
 	if icon != null and is_instance_valid(icon):
 		var xf: Transform2D = icon.get_global_transform()
-		bars = xf * Vector2(0.0, 27.0)
-		# Play +46 screen px along +Y; keep that as the bars probe when it
-		# still lands in the painted rect (it does at Home-band scale).
+		var bar_pts: Array = []
 		var bars_px: Vector2 = base + Vector2(0.0, 46.0 / maxf(z, 0.05))
-		if _world_in_icon_painted(icon, bars_px):
-			bars = bars_px
-		corner = xf * Vector2(21.0, 20.0)
-	_click_one({
-		"who": "z%.3f_GER_AW3_bars" % z,
-		"pos": bars,
-		"own": true,
-		"kind": "land",
-		"want_tags": ["GER"],
-		"want_type": "air_wing",
-		"want_fid": str(hit.get("fid", "")),
-	})
-	_click_one({
-		"who": "z%.3f_GER_AW3_corner" % z,
-		"pos": corner,
-		"own": true,
-		"kind": "land",
-		"want_tags": ["GER"],
-		"want_type": "air_wing",
-		"want_fid": str(hit.get("fid", "")),
-	})
+		if _world_in_icon_stat_bars(icon, bars_px):
+			bar_pts.append(bars_px)
+		bar_pts.append(xf * Vector2(0.0, 27.0))
+		var bx := -20
+		while bx <= 20:
+			bar_pts.append(xf * Vector2(float(bx), 27.0))
+			bar_pts.append(xf * Vector2(float(bx), 22.0))
+			bar_pts.append(xf * Vector2(float(bx), 32.0))
+			bx += 2
+		bars = _first_owned_point(bar_pts, want_fid)
+		var corner_pts: Array = [
+			xf * Vector2(21.0, 20.0),
+			xf * Vector2(18.0, 16.0),
+			xf * Vector2(21.0, 12.0),
+			xf * Vector2(16.0, 20.0),
+			xf * Vector2(21.0, 8.0),
+			xf * Vector2(12.0, 18.0),
+		]
+		var cx := 10
+		while cx <= 22:
+			var cy := 8
+			while cy <= 22:
+				corner_pts.append(xf * Vector2(float(cx), float(cy)))
+				cy += 2
+			cx += 2
+		corner = _first_owned_point(corner_pts, want_fid)
+	if bars.x > 1.0e8:
+		_fail_reasons.append("no_top_pixel_GER_AW3_bars_z%.3f" % z)
+		_log("EOA_FLEET2_LIVE who=no_top_pixel name=GER_AW3_bars z=%.3f fid=%s" % [z, want_fid])
+	else:
+		_click_one({
+			"who": "z%.3f_GER_AW3_bars" % z,
+			"pos": bars,
+			"own": true,
+			"kind": "land",
+			"want_tags": ["GER"],
+			"want_type": "air_wing",
+			"want_fid": want_fid,
+		})
+	if corner.x > 1.0e8:
+		_fail_reasons.append("no_top_pixel_GER_AW3_corner_z%.3f" % z)
+		_log("EOA_FLEET2_LIVE who=no_top_pixel name=GER_AW3_corner z=%.3f fid=%s" % [z, want_fid])
+	else:
+		_click_one({
+			"who": "z%.3f_GER_AW3_corner" % z,
+			"pos": corner,
+			"own": true,
+			"kind": "land",
+			"want_tags": ["GER"],
+			"want_type": "air_wing",
+			"want_fid": want_fid,
+		})
 
 
 func _world_in_icon_painted(icon: Node2D, world: Vector2) -> bool:
@@ -908,22 +1281,134 @@ func _world_in_icon_stat_bars(icon: Node2D, world: Vector2) -> bool:
 	return false
 
 
-func _dnk_strip_edge_ok(world: Vector2, got: String, want_fid: String) -> bool:
-	# ±8 / ends: DNK AW3, or NLD inner face (Play −8), or another DNK
-	# chip (Play +8 same-nation pile). Never an empty NLD label box.
-	if got == want_fid:
-		return true
-	if got.begins_with("DNK_"):
-		return true
-	if got.begins_with("NLD_"):
-		var counters: Array = _collect_land_air_counters()
-		var nld: Dictionary = _match_land_air(counters, "NLD", "division", 1)
-		var nld_icon: Node2D = nld.get("icon", null) as Node2D
-		var mr := _map_renderer()
-		if nld_icon != null and mr != null and mr.has_method("_world_in_unit_plate_interior"):
-			return bool(mr.call("_world_in_unit_plate_interior", world, nld_icon))
+func _painted_piece_winner_fid(world: Vector2) -> String:
+	# Same gate as the live pick, without calling it. Land must sit in
+	# the painted rect. Sea needs a drawn piece. Cluster-blocked land
+	# is not a candidate. Rank is piece z, then tree order.
+	var mr := _map_renderer()
+	if mr == null or not ("_demo_unit_icon_pids" in mr):
+		return ""
+	if not mr.has_method("_canvas_item_effective_z") or not mr.has_method("_unit_counter_top_drawn_piece"):
+		return ""
+	var best_piece: CanvasItem = null
+	var best_fid := ""
+	for id_v in mr._demo_unit_icon_pids:
+		var id: int = int(id_v)
+		if not mr.has_method("_iter_demo_unit_icons_at_pid"):
+			continue
+		for c_v in mr.call("_iter_demo_unit_icons_at_pid", id) as Array:
+			var icon: Node2D = c_v as Node2D
+			if icon == null or not is_instance_valid(icon) or not icon.visible:
+				continue
+			var fo: Object = null
+			if mr.has_method("_formation_from_demo_icon"):
+				fo = mr.call("_formation_from_demo_icon", icon)
+			if fo == null:
+				continue
+			var sea: bool = bool(icon.get_meta("sea_nation_disk", false))
+			if not sea:
+				if mr.has_method("_world_in_unit_painted_rect") and not bool(mr.call("_world_in_unit_painted_rect", world, icon)):
+					continue
+				if mr.has_method("_land_air_body_blocked_by_cluster_hole") and bool(mr.call("_land_air_body_blocked_by_cluster_hole", world, fo, -1.0)):
+					continue
+			var piece: CanvasItem = mr.call("_unit_counter_top_drawn_piece", world, icon) as CanvasItem
+			if piece == null:
+				continue
+			if best_piece != null and not _piece_is_drawn_above(mr, piece, best_piece):
+				continue
+			best_piece = piece
+			best_fid = str(fo.formation_id) if "formation_id" in fo else ""
+	return best_fid
+
+
+func _piece_is_drawn_above(mr: Node, a: CanvasItem, b: CanvasItem) -> bool:
+	if a == null:
 		return false
-	return false
+	if b == null:
+		return true
+	var za: int = int(mr.call("_canvas_item_effective_z", a))
+	var zb: int = int(mr.call("_canvas_item_effective_z", b))
+	if za != zb:
+		return za > zb
+	return a.is_greater_than(b)
+
+
+func _point_where_chip_is_drawn(icon: Node2D, want_fid: String) -> Vector2:
+	# A pixel whose real pick is this formation. Plate, bars, and the
+	# designation glyph (including the right rim). No skip when none exists.
+	if icon == null or not is_instance_valid(icon) or want_fid.is_empty():
+		return Vector2(INF, INF)
+	var xf: Transform2D = icon.get_global_transform()
+	var worlds: Array = []
+	var desig: Node = icon.get_node_or_null("Designation")
+	if desig is Node2D:
+		var d_xf: Transform2D = (desig as Node2D).get_global_transform()
+		worlds.append((desig as Node2D).global_position)
+		var mr := _map_renderer()
+		if mr != null and mr.has_method("_chip_text_glyph_local_rect"):
+			var grect: Rect2 = mr.call("_chip_text_glyph_local_rect", desig) as Rect2
+			if grect.size.x > 0.0 and grect.size.y > 0.0:
+				var mid := grect.position + grect.size * 0.5
+				var right := Vector2(grect.position.x + grect.size.x - 0.6, grect.position.y + grect.size.y * 0.5)
+				worlds.append(d_xf * mid)
+				worlds.append(d_xf * right)
+				worlds.append(d_xf * Vector2(grect.position.x + grect.size.x * 0.85, mid.y))
+	worlds.append(xf * Vector2(0.0, 0.0))
+	worlds.append(xf * Vector2(20.0, -20.0))
+	worlds.append(xf * Vector2(-20.0, -20.0))
+	worlds.append(xf * Vector2(24.0, 0.0))
+	worlds.append(xf * Vector2(21.2, 33.8))
+	var step := 4
+	while step >= 1:
+		# Plate is 44×40 at (−22,−20); ink grows two local px past that.
+		# y=-22 is a real GER corner. Do not start the scan below it.
+		var ly: int = -22
+		while ly <= 34:
+			var lx: int = -24
+			while lx <= 26:
+				worlds.append(xf * Vector2(float(lx), float(ly)))
+				lx += step
+			ly += step
+		var bx: int = -22
+		while bx <= 22:
+			worlds.append(xf * Vector2(float(bx), 27.0))
+			bx += step
+		for world_v in worlds:
+			var world: Vector2 = world_v as Vector2
+			if _pick_fid_at(_map_renderer(), world) == want_fid:
+				return world
+		if step == 1:
+			break
+		step = int(step / 2)
+		worlds.clear()
+	return Vector2(INF, INF)
+
+
+func _first_owned_point(points: Array, want_fid: String) -> Vector2:
+	if want_fid.is_empty():
+		return Vector2(INF, INF)
+	for world_v in points:
+		var world: Vector2 = world_v as Vector2
+		if _pick_fid_at(_map_renderer(), world) == want_fid:
+			return world
+	return Vector2(INF, INF)
+
+
+func _nld_div1_east_pixel(icon: Node2D, want_fid: String) -> Vector2:
+	# East half of NLD Div 1. +20 world px is another wing on the live map.
+	if icon == null or not is_instance_valid(icon):
+		return Vector2(INF, INF)
+	var xf: Transform2D = icon.get_global_transform()
+	var ly := -8
+	while ly <= 34:
+		var lx := 12
+		while lx <= 28:
+			var world: Vector2 = xf * Vector2(float(lx), float(ly))
+			if _pick_fid_at(_map_renderer(), world) == want_fid:
+				return world
+			lx += 2
+		ly += 2
+	return Vector2(INF, INF)
 
 
 func _world_in_icon_stat_bars_or_local(icon: Node2D, world: Vector2) -> bool:
@@ -1052,7 +1537,7 @@ func _write_clicks_md() -> void:
 		return
 	f.store_string("# FLEET-2b live-scale clicks\n\n")
 	f.store_string("xvfb 1280x740 · GER · Europe Home · world_accurate. NOT live Play.\n\n")
-	f.store_string("Topmost painted *pixels*: plate, bars, or glyph ink (not a fat empty label AABB). Higher CanvasItem z_index; then plate interior > StatBars > plate rim > label; StatBars over another plate edge win across the strip; then nearest painted piece centre. Ownership block is halo-only (no painted pixels under the click).\n\n")
+	f.store_string("Topmost painted *pixels*: plate, bars, or glyph ink (not a fat empty label AABB). Rank is the hit piece's CanvasItem z (child z included, so StatBars and text at z=3 beat any NationPlate at z=-1), then scene-tree order. Ownership block is halo-only (no painted pixels under the click).\n\n")
 	f.store_string("| click | result |\n|---|---|\n")
 	for line_v in _click_log:
 		var line := str(line_v)
@@ -1220,6 +1705,13 @@ func _world_to_screen(world: Vector2) -> Vector2:
 	if cam != null:
 		return cam.get_canvas_transform() * world
 	return world
+
+
+func _screen_to_world(screen: Vector2) -> Vector2:
+	var cam := _camera()
+	if cam != null:
+		return cam.get_canvas_transform().affine_inverse() * screen
+	return screen
 
 
 func _capture(name: String, zoom: float, cam_world: Vector2) -> bool:
@@ -1404,6 +1896,7 @@ func _force_viewport() -> void:
 	var want := Vector2i(VIEW_W, VIEW_H)
 	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
 	DisplayServer.window_set_size(want)
+	DisplayServer.window_set_position(Vector2i(0, 29))
 	if root is Window:
 		var w: Window = root as Window
 		w.size = want
