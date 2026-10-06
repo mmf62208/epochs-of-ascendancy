@@ -146,6 +146,8 @@ func _run() -> void:
 	_attach_fat_sea_rings()
 	_plant_capital_stars(37)
 	_test_b_detail_and_wheel_budgets()
+	_test_c_map_mode_keeps_stars_hidden_at_home()
+	_test_d_supply_glyph_pass_restores_20px()
 	_cleanup()
 
 
@@ -180,11 +182,20 @@ func _test_source_needles() -> void:
 		_fail("_schedule_light_terrain_zoom_refresh must still queue the post-burst flush")
 		return
 	var stars := _slice_func(ren, "_sync_capital_star_scales")
-	if "META_MAP_GLYPH_PX" not in stars:
-		_fail("_sync_capital_star_scales must skip theme override when px is unchanged")
+	if "get_theme_font_size" not in stars:
+		_fail("_sync_capital_star_scales must skip from the actual font-size override, not only the stored px tag")
 		return
 	if "_capital_star_last_sync_px" not in stars:
 		_fail("_sync_capital_star_scales must early-out when last px still matches")
+		return
+	var restore := _slice_func(ren, "_restore_land_poly_visibility")
+	var ensure := _slice_func(ren, "_ensure_capital_stars_visible")
+	if "_invalidate_capital_star_scale_cache" not in restore and "_invalidate_capital_star_scale_cache" not in ensure:
+		_fail("map-mode restore/ensure must invalidate the capital-star scale cache")
+		return
+	var layout := _slice_func(ren, "_layout_zoomed_map_glyphs_for_province_node")
+	if "_invalidate_capital_star_scale_cache" not in layout:
+		_fail("glyph layout must invalidate the capital-star scale cache when it touches a star")
 		return
 	var lab := _slice_func(ren, "_sea_nation_plate_label")
 	if "_fleet2_plate_label_log" not in lab:
@@ -636,6 +647,11 @@ func _plant_capital_stars(n: int) -> void:
 		node.name = "Perf2StarHost_%d" % pid
 		host.add_child(node)
 		_mr.province_nodes[pid] = node
+		var poly := Polygon2D.new()
+		poly.name = "LandFill"
+		poly.polygon = PackedVector2Array([Vector2(0, 0), Vector2(6, 0), Vector2(0, 6)])
+		poly.color = Color(0.40, 0.42, 0.46, 0.96)
+		node.add_child(poly)
 		var star := Label.new()
 		star.text = "★"
 		star.set_meta(meta_px, -1)
@@ -706,6 +722,164 @@ func _test_b_detail_and_wheel_budgets() -> void:
 		"(b) detail %d usec / wheel %d usec / cache-hit %d usec (raw %d)"
 		% [detail_usec, wheel_usec, hit_usec, raw_usec]
 	)
+
+
+func _iter_capital_stars() -> Array:
+	var out: Array = []
+	if _mr == null or not ("province_nodes" in _mr):
+		return out
+	var meta_cap: StringName = &"_map_glyph_capital"
+	for pid_v in _mr.province_nodes.keys():
+		var node: Node2D = _mr.province_nodes[pid_v] as Node2D
+		if node == null:
+			continue
+		for child in node.get_children():
+			if child is Label and (child as Label).has_meta(meta_cap):
+				out.append(child)
+	return out
+
+
+func _star_override_px(star: Label) -> int:
+	if star.has_theme_font_size_override("font_size"):
+		return int(star.get_theme_font_size("font_size"))
+	return -1
+
+
+func _count_visible_stars() -> int:
+	var n := 0
+	for star_v in _iter_capital_stars():
+		var star: Label = star_v as Label
+		if star != null and star.visible:
+			n += 1
+	return n
+
+
+func _count_stars_at_px(px: int) -> int:
+	var n := 0
+	for star_v in _iter_capital_stars():
+		var star: Label = star_v as Label
+		if star != null and _star_override_px(star) == px:
+			n += 1
+	return n
+
+
+func _layout_all_capital_stars(zoom_metric: float) -> void:
+	if _mr == null or not _mr.has_method("_layout_zoomed_map_glyphs_for_province_node"):
+		return
+	if not ("province_nodes" in _mr):
+		return
+	var meta_cap: StringName = &"_map_glyph_capital"
+	for pid_v in _mr.province_nodes.keys():
+		var node: Node2D = _mr.province_nodes[pid_v] as Node2D
+		if node == null:
+			continue
+		var has_star := false
+		for child in node.get_children():
+			if child is Label and (child as Label).has_meta(meta_cap):
+				has_star = true
+				break
+		if has_star:
+			_mr.call("_layout_zoomed_map_glyphs_for_province_node", int(pid_v), zoom_metric, true)
+
+
+func _same_px_notch() -> void:
+	if _mr.has_method("_refresh_terrain_zoom_light"):
+		_mr.call("_refresh_terrain_zoom_light")
+	elif _mr.has_method("_sync_capital_star_scales"):
+		_mr.call("_sync_capital_star_scales")
+
+
+func _test_c_map_mode_keeps_stars_hidden_at_home() -> void:
+	# Home / world zoom hides stars (nation labels own z <= 0.55).
+	_force_play_zoom(0.32)
+	if _mr.has_method("_invalidate_capital_star_scale_cache"):
+		_mr.call("_invalidate_capital_star_scale_cache")
+	if _mr.has_method("_sync_capital_star_scales"):
+		_mr.call("_sync_capital_star_scales")
+	var planted: int = _iter_capital_stars().size()
+	if planted < 37:
+		_fail("(c) expected ≥37 planted capital stars, got %d" % planted)
+		return
+	if _count_visible_stars() != 0:
+		_fail("(c) pre-map-mode Home stars should be hidden, visible=%d" % _count_visible_stars())
+		return
+	# Map-mode switch (F1/F2 path) restores land fills and re-asserts stars.
+	if _mr.has_method("_ensure_capital_stars_visible"):
+		_mr.call("_ensure_capital_stars_visible")
+	else:
+		_fail("(c) _ensure_capital_stars_visible missing")
+		return
+	var after_mode: int = _count_visible_stars()
+	if after_mode != 0:
+		_fail("(c) map-mode at z=0.32 left %d stars visible (want 0)" % after_mode)
+		return
+	_same_px_notch()
+	_same_px_notch()
+	var after_notches: int = _count_visible_stars()
+	if after_notches != 0:
+		_fail("(c) same-px notches after map-mode left %d stars visible (want 0)" % after_notches)
+		return
+	# Back at Home — still strategic, stars stay hidden.
+	_force_play_zoom(0.32)
+	_same_px_notch()
+	var after_home: int = _count_visible_stars()
+	if after_home != 0:
+		_fail("(c) back at Home left %d stars visible (want 0)" % after_home)
+		return
+	_pass("(c) map-mode at Home keeps %d stars hidden through 2 notches + Home" % planted)
+
+
+func _force_capital_star_px_band(want_px: int) -> float:
+	var candidates: Array = [0.80, 0.70, 0.60, 0.75, 0.65, 0.56]
+	for z_v in candidates:
+		var z: float = float(z_v)
+		_force_play_zoom(z)
+		if not _mr.has_method("_capital_star_font_px"):
+			return z
+		var got: int = int(_mr.call("_capital_star_font_px"))
+		if got == want_px:
+			return z
+	return -1.0
+
+
+func _test_d_supply_glyph_pass_restores_20px() -> void:
+	# Operational band: _capital_star_font_px() clamps to 20 for z in (0.55, 0.80].
+	var z20: float = _force_capital_star_px_band(20)
+	var live_px: int = int(_mr.call("_capital_star_font_px")) if _mr.has_method("_capital_star_font_px") else -1
+	print("  [INFO] PERF-2 (d) zoom_for_20=%s live_px=%d cam=%s" % [str(z20), live_px, str(_cam.zoom if _cam != null else Vector2.ZERO)])
+	if z20 < 0.0 or live_px != 20:
+		_fail("(d) could not park camera in the 20 px star band (live_px=%d)" % live_px)
+		return
+	if _mr.has_method("_invalidate_capital_star_scale_cache"):
+		_mr.call("_invalidate_capital_star_scale_cache")
+	if _mr.has_method("_sync_capital_star_scales"):
+		_mr.call("_sync_capital_star_scales")
+	var planted: int = _iter_capital_stars().size()
+	if planted < 37:
+		_fail("(d) expected ≥37 planted capital stars, got %d" % planted)
+		return
+	if _count_stars_at_px(20) != planted:
+		var sample: Label = _iter_capital_stars()[0] as Label if planted > 0 else null
+		var sample_px: int = _star_override_px(sample) if sample != null else -1
+		_fail("(d) pre-supply stars should be 20 px (n=%d at 20, planted=%d sample=%d)" % [_count_stars_at_px(20), planted, sample_px])
+		return
+	# Supply / zoom glyph pass writes 18–36 px without updating the stored tag.
+	# Use a high zoom_metric so the capital formula clamps to 36, matching Play.
+	_layout_all_capital_stars(2.0)
+	var at_36: int = _count_stars_at_px(36)
+	if at_36 < 1:
+		_fail("(d) supply glyph pass should enlarge stars (36 px count=%d)" % at_36)
+		return
+	print("  [INFO] PERF-2 (d) after supply glyph pass 36px=%d 20px=%d" % [at_36, _count_stars_at_px(20)])
+	_same_px_notch()
+	var restored: int = _count_stars_at_px(20)
+	if restored != planted:
+		_fail(
+			"(d) same-px notch after supply left 20px=%d 36px=%d (want 20px=%d)"
+			% [restored, _count_stars_at_px(36), planted]
+		)
+		return
+	_pass("(d) supply glyph pass + same-px notch restores %d stars to 20 px" % planted)
 
 
 func _cleanup() -> void:

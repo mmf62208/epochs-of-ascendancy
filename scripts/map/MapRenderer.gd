@@ -14480,6 +14480,8 @@ func _force_all_province_nodes_visible() -> void:
 
 ## After mapmode / mesh toggles: land polys must be opaque; sea below land z.
 func _restore_land_poly_visibility() -> void:
+	# Restore forces capital-star visibility; do not trust the last-px skip.
+	_invalidate_capital_star_scale_cache()
 	for pid in province_nodes.keys():
 		var node: Node2D = province_nodes[pid] as Node2D
 		if node == null or not is_instance_valid(node):
@@ -14530,6 +14532,7 @@ func _restore_land_poly_visibility() -> void:
 
 
 func _ensure_capital_stars_visible() -> void:
+	_invalidate_capital_star_scale_cache()
 	_restore_land_poly_visibility()
 	# Re-stamp stars if missing (mapmode / mesh paths must never drop capitals).
 	var n_stars := 0
@@ -14591,12 +14594,16 @@ func _sync_capital_star_scales(_z: float = -1.0) -> void:
 				continue
 			var star := child as Label
 			var want_vis: bool = use_px > 0
+			var actual_px: int = 0
+			if star.has_theme_font_size_override("font_size"):
+				actual_px = int(star.get_theme_font_size("font_size"))
 			if star.visible != want_vis:
 				star.visible = want_vis
 			if use_px <= 0:
 				continue
-			var prev_px: int = int(star.get_meta(META_MAP_GLYPH_PX, -1))
-			if prev_px == use_px:
+			# Skip the theme write only when the live override already matches.
+			# Layout / restore can change font_size without updating META_MAP_GLYPH_PX.
+			if actual_px == use_px:
 				if force:
 					star.z_as_relative = false
 					star.z_index = 80
@@ -14988,6 +14995,8 @@ func _layout_zoomed_map_glyphs_for_province_node(pid: int, zoom_metric: float, s
 			var is_capital := lbl.has_meta(META_MAP_GLYPH_CAPITAL)
 			# Capital gold stars stay visible at all zoom levels (Washington/Tokyo were
 			# hidden when detail glyphs culled at strategic zoom).
+			if is_capital:
+				_invalidate_capital_star_scale_cache()
 			lbl.visible = true if is_capital else show_glyphs
 			if show_glyphs or is_capital:
 				var zsc := _zoom_detail_scale_smooth(zoom_metric, 1.8)

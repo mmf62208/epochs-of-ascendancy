@@ -27,6 +27,16 @@ and wheel-notch cost; plate positions and capital stars must look unchanged.
 5. After a short burst, one extra light refresh may land ~180 ms later
    (debounced post-burst). That is intended.
 
+## Capital stars after map-mode / supply (FIX #1)
+
+1. **Home** (or world, z ≤ 0.55). Switch map mode (F1 / F2 / toolbar).
+   Expect: capital stars **stay hidden** (nation labels own that band). They
+   stay hidden through two more same-px wheel notches and after Home again.
+   Prior tip `b2674c6c` showed all 37 stars and they stuck.
+2. At operational zoom (star px = 20), toggle the **supply overlay**, then
+   one same-px wheel notch.
+   Expect: stars return to **20 px** (not stuck at the glyph-pass 36 px).
+
 ## Must keep (visible)
 
 - Channel 4-plate and North Sea 4-plate **positions** (Home spread + compact
@@ -34,6 +44,8 @@ and wheel-notch cost; plate positions and capital stars must look unchanged.
 - Land counter scales and capital stars look the same.
 - `EOA_FLEET2 who=plate_label` prints **only when a label changes**, not 8
   lines every refresh.
+- Map-mode switch at Home means stars stay hidden; supply overlay toggle
+  plus one notch means stars are back to 20 px.
 
 ## Must not change
 

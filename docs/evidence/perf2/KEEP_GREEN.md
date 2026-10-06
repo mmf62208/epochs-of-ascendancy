@@ -1,9 +1,21 @@
 # PERF-2 isolated keep-green
 
 Off trusted main `d008ca42094bcb6df58872d0bd421f08a87c76b0` (EDGE-1 #79).
-Tip `1421609c3cba82b35c36ab9b2d0230632bb0369b`.
-xvfb / headless ≠ live Play. Never `EOA_SKIP_TITLE`. `tools/run_godot.sh` only
-(Godot 4.7.1-rc2). HOLD merge.
+Tip `1421609c3cba82b35c36ab9b2d0230632bb0369b` (pre-FIX #1). FIX #1 parent
+`b2674c6c` (main `425b4448` merged). xvfb / headless ≠ live Play. Never
+`EOA_SKIP_TITLE`. `tools/run_godot.sh` only (Godot 4.7.1-rc2). HOLD merge.
+
+## FIX #1 capital-star stale skip (before / after)
+
+`HeadlessPerf2FleetRefreshBudgetTest` (c)(d) on product `b2674c6c` vs this tip.
+Import first: `tools/run_godot.sh --headless --import --quit`.
+
+| repro | `b2674c6c` | after FIX #1 |
+|---|---|---|
+| (c) map-mode at Home z=0.32, then 2 same-px notches + Home | **FAIL** `37 stars visible (want 0)` | **PASS** 37 hidden |
+| (d) supply glyph pass (36 px) + same-px notch | **FAIL** `20px=0 36px=37 (want 20px=37)` | **PASS** 37 restored to 20 px |
+| source needle (live font-size + invalidate) | **FAIL** | **PASS** |
+| (a)(b) fleet cache + wheel budget | PASS (wheel 694 µs) | PASS (wheel 646 µs; plates identical) |
 
 Fences kept: FacilityIconLayer **unedited**. MapZoomLOD / country labels
 **unedited**. Pick / draw-order / hit-test / spill **unedited**. TipDismiss /
