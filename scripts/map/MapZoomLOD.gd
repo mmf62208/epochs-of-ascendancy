@@ -307,6 +307,81 @@ static func nation_label_font_px(t: Tier) -> int:
 			return 16
 
 
+## First-session country-name screen size. Labels stay world-space Controls
+## (Camera2D multiplies the raster). Size via font_size / zoom — never node.scale.
+## Mid ~0.776 is the Play Home-adjacent wheel-in that used to smear "Germany".
+const NATION_LABEL_EUROPE_ZOOM: float = 0.40
+const NATION_LABEL_MID_ZOOM: float = 0.776
+const NATION_LABEL_CLOSE_ZOOM: float = 1.80
+const NATION_LABEL_FADE_START_ZOOM: float = 0.82
+const NATION_LABEL_HIDE_ZOOM: float = 0.98
+## City end-labels (Köln/Bonn/Leverkusen) appear at 1.50 — nation names must be gone.
+const NATION_LABEL_CITY_LABEL_ZOOM: float = 1.50
+const NATION_LABEL_EUROPE_HEIGHT_FRAC: float = 0.032
+const NATION_LABEL_MID_HEIGHT_FRAC: float = 0.026
+const NATION_LABEL_FONT_PX_MIN: int = 10
+const NATION_LABEL_FONT_PX_MAX: int = 96
+
+
+static func nation_label_target_frac_of_height(z: float) -> float:
+	var zz := maxf(z, 0.01)
+	if zz <= NATION_LABEL_EUROPE_ZOOM:
+		return NATION_LABEL_EUROPE_HEIGHT_FRAC
+	if zz >= NATION_LABEL_HIDE_ZOOM:
+		return 0.0
+	if zz <= NATION_LABEL_MID_ZOOM:
+		var span_mid := maxf(NATION_LABEL_MID_ZOOM - NATION_LABEL_EUROPE_ZOOM, 0.01)
+		var t_mid := clampf((zz - NATION_LABEL_EUROPE_ZOOM) / span_mid, 0.0, 1.0)
+		return lerpf(NATION_LABEL_EUROPE_HEIGHT_FRAC, NATION_LABEL_MID_HEIGHT_FRAC, t_mid)
+	var span_hide := maxf(NATION_LABEL_HIDE_ZOOM - NATION_LABEL_MID_ZOOM, 0.01)
+	var t_hide := clampf((zz - NATION_LABEL_MID_ZOOM) / span_hide, 0.0, 1.0)
+	return lerpf(NATION_LABEL_MID_HEIGHT_FRAC, 0.0, t_hide)
+
+
+static func nation_label_hidden_for_camera(z: float) -> bool:
+	return z >= NATION_LABEL_HIDE_ZOOM or z >= NATION_LABEL_CITY_LABEL_ZOOM
+
+
+static func nation_label_alpha_for_camera(z: float) -> float:
+	if nation_label_hidden_for_camera(z):
+		return 0.0
+	if z < NATION_LABEL_FADE_START_ZOOM:
+		return 0.96
+	var span := maxf(NATION_LABEL_HIDE_ZOOM - NATION_LABEL_FADE_START_ZOOM, 0.01)
+	var t := clampf((z - NATION_LABEL_FADE_START_ZOOM) / span, 0.0, 1.0)
+	return clampf(0.96 * (1.0 - t), 0.0, 0.96)
+
+
+## Font px such that font_px * camera.zoom == target screen px (node.scale stays 1).
+## Oversamples when zoomed out so the camera shrinks a larger raster — not a magnified one.
+static func nation_label_font_px_for_camera(z: float, viewport_h: float) -> int:
+	var frac := nation_label_target_frac_of_height(z)
+	var target := frac * maxf(viewport_h, 1.0)
+	if target <= 0.5 or nation_label_hidden_for_camera(z):
+		return 0
+	var font_px := int(round(target / maxf(z, 0.08)))
+	return clampi(font_px, NATION_LABEL_FONT_PX_MIN, NATION_LABEL_FONT_PX_MAX)
+
+
+static func nation_label_effective_screen_px(font_px: int, z: float, node_scale: float) -> float:
+	return float(maxi(font_px, 0)) * maxf(z, 0.0) * maxf(node_scale, 0.0)
+
+
+static func nation_label_height_ratio(font_px: int, z: float, node_scale: float, viewport_h: float) -> float:
+	var h := maxf(viewport_h, 1.0)
+	return nation_label_effective_screen_px(font_px, z, node_scale) / h
+
+
+## Magnifying a texture: camera.zoom * node.scale > 1 blows up a smaller raster.
+static func nation_label_is_texture_magnified(font_px: int, z: float, node_scale: float) -> bool:
+	if font_px <= 0:
+		return false
+	var effective := nation_label_effective_screen_px(font_px, z, node_scale)
+	if effective <= 0.5:
+		return false
+	return effective > float(font_px) + 0.75 or node_scale > 1.02
+
+
 static func region_label_font_px(t: Tier) -> int:
 	match t:
 		Tier.OPERATIONAL:

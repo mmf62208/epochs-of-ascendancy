@@ -18,15 +18,26 @@ var _camera_zoom: float = 1.0
 
 ## Play MIXED 816cdc9: nation Labels (z=40 absolute) buried the Rhine at close
 ## zoom over Köln. Keep them under river/road overlays and hide/fade when close.
+## Size with font_size / Camera2D.zoom (never node.scale) so mid ~0.776 stays crisp.
 const NATION_LABEL_Z := 18
-const CLOSE_FADE_START_ZOOM := 0.62
-const CLOSE_HIDE_ZOOM := 0.88
+const CLOSE_FADE_START_ZOOM := MapZoomLODScript.NATION_LABEL_FADE_START_ZOOM
+const CLOSE_HIDE_ZOOM := MapZoomLODScript.NATION_LABEL_HIDE_ZOOM
 
 
 func _ready() -> void:
 	z_index = 12
 	z_as_relative = false
-	set_process(false)
+	# First-session is often paused; MapRenderer skips detail refresh then.
+	# Track live MapCamera zoom here so wheel-in cannot magnify a stale raster.
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	set_process(true)
+
+
+func _process(_delta: float) -> void:
+	if not _built:
+		return
+	var live_z: float = MapZoomLODScript.read_camera_zoom(get_viewport())
+	sync_camera_zoom(live_z)
 
 
 func rebuild_from_map_data(province_centroids: Dictionary, provinces: Dictionary) -> void:
@@ -37,6 +48,7 @@ func rebuild_from_map_data(province_centroids: Dictionary, provinces: Dictionary
 	_build_region_labels(province_centroids)
 	_build_state_labels(province_centroids, provinces)
 	_built = true
+	_camera_zoom = MapZoomLODScript.read_camera_zoom(get_viewport())
 	_apply_tier_visibility(_current_tier)
 
 
@@ -743,10 +755,12 @@ func _make_label(text: String, pos: Vector2, font_px: int, col: Color) -> Label:
 	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	lbl.z_as_relative = false
 	lbl.z_index = NATION_LABEL_Z
+	lbl.scale = Vector2.ONE
 	lbl.clip_text = false
 	lbl.text_overrun_behavior = TextServer.OVERRUN_NO_TRIMMING
 	lbl.autowrap_mode = TextServer.AUTOWRAP_OFF
 	lbl.set_meta("label_anchor", pos)
+	lbl.set_meta("nation_rank_px", maxi(font_px, 14))
 	return lbl
 
 
@@ -766,22 +780,29 @@ func force_nation_label_at(tag: String, world_pos: Vector2, display_name: String
 		lbl.name = "NationLabel_%s" % t
 		add_child(lbl)
 		_nation_labels[t] = lbl
+		lbl.set_meta("nation_rank_px", 24)
 	else:
 		lbl.text = name_s
 	lbl.set_meta("label_anchor", world_pos)
 	lbl.set_meta("force_visible", true)
-	lbl.visible = true
 	lbl.z_index = NATION_LABEL_Z
-	lbl.add_theme_font_size_override("font_size", 26)
+	lbl.scale = Vector2.ONE
+	var force_px: int = _nation_font_px_for_zoom(26)
+	if force_px <= 0:
+		force_px = 22
+	lbl.add_theme_font_size_override("font_size", force_px)
 	lbl.modulate = Color(1.0, 1.0, 1.0, 1.0)
+	lbl.visible = true
 	_fit_and_center_label(lbl)
 
 
 func _fit_and_center_label(lbl: Label) -> void:
+	lbl.scale = Vector2.ONE
 	lbl.reset_size()
 	var ms := lbl.get_minimum_size()
 	lbl.custom_minimum_size = Vector2(ms.x + 16.0, ms.y + 10.0)
 	lbl.reset_size()
+	lbl.scale = Vector2.ONE
 	if lbl.has_meta("label_anchor"):
 		lbl.position = (lbl.get_meta("label_anchor") as Vector2) - lbl.size * 0.5
 	else:
@@ -810,9 +831,11 @@ func _apply_tier_visibility(tier: int) -> void:
 				or _viewport_rect.has_point(anchor)
 				or _viewport_rect.has_point(l.position)
 			)
-			l.visible = (show_n or force) and in_view and not _nation_labels_hidden_by_close_zoom()
+			var zoom_px: int = _nation_font_px_for_zoom(_nation_rank_px(l, nation_px))
+			l.visible = (show_n or force) and in_view and zoom_px > 0 and not _nation_labels_hidden_by_close_zoom()
 			if l.visible:
-				l.add_theme_font_size_override("font_size", _nation_font_px_for_zoom(nation_px))
+				l.scale = Vector2.ONE
+				l.add_theme_font_size_override("font_size", zoom_px)
 				var c := l.get_theme_color("font_color")
 				c.a = _nation_alpha_for_zoom()
 				l.add_theme_color_override("font_color", c)
@@ -867,25 +890,81 @@ func _apply_state_label_visibility() -> void:
 			_fit_and_center_label(l)
 
 
+func seed_debug_nation_label(tag: String, text: String, world_pos: Vector2, rank_px: int = 28) -> Label:
+	var t := tag.strip_edges().to_upper()
+	var existing: Label = _nation_labels.get(t) as Label if _nation_labels.has(t) else null
+	if existing != null and is_instance_valid(existing):
+		existing.queue_free()
+	var lbl := _make_label(text, world_pos, rank_px, Color(0.85, 0.88, 0.95, 0.95))
+	lbl.name = "NationLabel_%s" % t
+	add_child(lbl)
+	_nation_labels[t] = lbl
+	_built = true
+	_fit_and_center_label(lbl)
+	_apply_nation_close_zoom()
+	return lbl
+
+
+func _viewport_height_px() -> float:
+	var vp := get_viewport()
+	if vp != null:
+		var sz: Vector2 = vp.get_visible_rect().size
+		if sz.y >= 64.0:
+			return sz.y
+	return 720.0
+
+
 func _nation_labels_hidden_by_close_zoom() -> bool:
-	return _camera_zoom >= CLOSE_HIDE_ZOOM
+	return MapZoomLODScript.nation_label_hidden_for_camera(_camera_zoom)
 
 
 func _nation_alpha_for_zoom() -> float:
-	if _camera_zoom < CLOSE_FADE_START_ZOOM:
-		return 0.96
-	if _camera_zoom >= CLOSE_HIDE_ZOOM:
-		return 0.0
-	var t := (_camera_zoom - CLOSE_FADE_START_ZOOM) / maxf(CLOSE_HIDE_ZOOM - CLOSE_FADE_START_ZOOM, 0.01)
-	return clampf(0.96 * (1.0 - t), 0.0, 0.96)
+	return MapZoomLODScript.nation_label_alpha_for_camera(_camera_zoom)
 
 
 func _nation_font_px_for_zoom(base_px: int) -> int:
-	# Labels live in world space — shrink as Camera2D.zoom grows so "Netherlands"
-	# does not cover Köln at close zoom.
-	if _camera_zoom <= 0.55:
-		return base_px
-	return maxi(12, int(round(float(base_px) * 0.55 / _camera_zoom)))
+	# Rasterize at target_screen / zoom so Camera2D shrinks a larger glyph.
+	# Never compensate with Label.scale — that magnifies a low-res texture.
+	var px: int = MapZoomLODScript.nation_label_font_px_for_camera(_camera_zoom, _viewport_height_px())
+	if px <= 0:
+		return 0
+	if base_px >= 24:
+		return px
+	if base_px >= 17:
+		return maxi(MapZoomLODScript.NATION_LABEL_FONT_PX_MIN, int(round(float(px) * 0.88)))
+	return maxi(MapZoomLODScript.NATION_LABEL_FONT_PX_MIN, int(round(float(px) * 0.78)))
+
+
+func _nation_rank_px(lbl: Label, fallback_px: int) -> int:
+	if lbl != null and lbl.has_meta("nation_rank_px"):
+		return int(lbl.get_meta("nation_rank_px"))
+	return fallback_px
+
+
+func nation_label_debug_metrics(tag: String = "GER") -> Dictionary:
+	var t := tag.strip_edges().to_upper()
+	var lbl: Label = _nation_labels.get(t) as Label if _nation_labels.has(t) else null
+	var font_px := 0
+	var node_scale := 1.0
+	var visible := false
+	if lbl != null and is_instance_valid(lbl):
+		font_px = int(lbl.get_theme_font_size("font_size"))
+		node_scale = maxf(lbl.scale.x, lbl.scale.y)
+		visible = lbl.visible
+	var vh := _viewport_height_px()
+	var effective := MapZoomLODScript.nation_label_effective_screen_px(font_px, _camera_zoom, node_scale)
+	return {
+		"tag": t,
+		"zoom": _camera_zoom,
+		"viewport_h": vh,
+		"font_px": font_px,
+		"node_scale": node_scale,
+		"effective_screen_px": effective,
+		"height_ratio": MapZoomLODScript.nation_label_height_ratio(font_px, _camera_zoom, node_scale, vh),
+		"texture_magnified": MapZoomLODScript.nation_label_is_texture_magnified(font_px, _camera_zoom, node_scale),
+		"visible": visible,
+		"alpha": _nation_alpha_for_zoom(),
+	}
 
 
 func _apply_nation_close_zoom() -> void:
@@ -894,17 +973,20 @@ func _apply_nation_close_zoom() -> void:
 	var nation_px: int = MapZoomLODScript.nation_label_font_px(_current_tier)
 	var hide := _nation_labels_hidden_by_close_zoom()
 	var alpha := _nation_alpha_for_zoom()
-	var px := _nation_font_px_for_zoom(nation_px)
 	for lbl in _nation_labels.values():
 		if not (lbl is Label):
 			continue
 		var l := lbl as Label
 		var force := l.has_meta("force_visible") and bool(l.get_meta("force_visible"))
-		if hide and not force:
+		var px := _nation_font_px_for_zoom(_nation_rank_px(l, nation_px))
+		if (hide or px <= 0) and not force:
 			l.visible = false
 			continue
-		if not l.visible and hide:
+		if not l.visible and hide and not force:
 			continue
+		if px <= 0 and force:
+			px = maxi(12, int(round(18.0 / maxf(_camera_zoom, 0.20))))
+		l.scale = Vector2.ONE
 		l.add_theme_font_size_override("font_size", px)
 		var c := l.get_theme_color("font_color")
 		c.a = alpha
