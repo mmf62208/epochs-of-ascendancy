@@ -355,6 +355,9 @@ func _build_ui() -> void:
 	# (Play d18cbae: cursor on Begin, no transition, then window-exit).
 	_begin_btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
 	_begin_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	# Press arms a one-shot leftover-release swallow (TipDismiss pattern).
+	# Begin queue_free()s on press; a real ~80 ms mouse-up must not pick the map.
+	_begin_btn.button_down.connect(_arm_begin_release_swallow)
 	_begin_btn.pressed.connect(_on_begin_new)
 	_begin_btn.gui_input.connect(_on_begin_gui_input)
 	RetrowaveTheme.style_primary_button(_begin_btn)
@@ -793,10 +796,11 @@ func handle_live_pointer(event: InputEvent) -> String:
 		var st: InputEventScreenTouch = event
 		ev_pts.append(st.position)
 	var ev_hit: String = _classify_points(ev_pts)
+	var pending_press: bool = event == null
 	if ev_hit != "map":
-		return _apply_pointer_hit(ev_hit)
+		return _apply_pointer_hit(ev_hit, pending_press)
 	var fb_hit: String = _classify_points(collect_pointer_points(null))
-	return _apply_pointer_hit(fb_hit)
+	return _apply_pointer_hit(fb_hit, pending_press)
 
 
 func _classify_points(pts: Array[Vector2]) -> String:
@@ -813,10 +817,10 @@ func _classify_points(pts: Array[Vector2]) -> String:
 	return "map"
 
 
-func _apply_pointer_hit(hit: String) -> String:
+func _apply_pointer_hit(hit: String, pending_press: bool = false) -> String:
 	if hit == "begin":
 		print("EOA_LIVE_PTR who=title.handle_live_pointer action=begin")
-		_on_begin_new()
+		_on_begin_new(pending_press, true)
 		return "begin"
 	if hit == "cc":
 		print("EOA_LIVE_PTR who=title.handle_live_pointer action=cc")
@@ -1363,7 +1367,34 @@ func _shortcut_input(event: InputEvent) -> void:
 			vp_sb.set_input_as_handled()
 
 
-func _on_begin_new() -> void:
+func _arm_begin_release_swallow(pending_press: bool = false, skip_held_check: bool = false) -> void:
+	# TipDismiss-style: press arms swallow of the next left release so the
+	# orphan mouse-up cannot select/inspect/click-zoom after the title dies.
+	# Keyboard Enter/Space/B can fire button_down on a focused Begin — do not
+	# arm unless the left mouse button is actually held. Pointer event /
+	# poll paths already decided this is a mouse Begin (skip_held_check).
+	if not skip_held_check and not os_left_button_held():
+		return
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
+	if tree == null:
+		return
+	var mr: Node = tree.get_first_node_in_group("map_renderer")
+	if mr == null and tree.current_scene != null:
+		mr = tree.current_scene.find_child("MapRenderer", true, false)
+	if mr != null and mr.has_method("arm_begin_title_release_swallow"):
+		mr.call("arm_begin_title_release_swallow", pending_press)
+
+
+func _on_begin_new(pending_press: bool = false, from_pointer: bool = false) -> void:
+	if _closed:
+		return
+	# Pointer Begin (event or poll). Keyboard Enter/Space/B must not eat
+	# the next real map click. Poll-path sets begin_press_pending so the
+	# click's own N+1 press keeps the arm.
+	if from_pointer:
+		_arm_begin_release_swallow(pending_press, true)
+	elif os_left_button_held():
+		_arm_begin_release_swallow(false, false)
 	print("LivingTitleBoot: live Begin · %s · %d" % [_tag, _year])
 	var out: Dictionary = apply_living_title_boot(_tag, _year, "")
 	_finish(out)

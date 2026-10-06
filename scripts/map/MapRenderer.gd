@@ -261,6 +261,12 @@ var _close_ignore_stale_left_down := false
 ## clear after that one release, on any new left press (UI or map), and after
 ## a short safety timeout (Play: leftover eaten swallowed later top-bar ups).
 const UNIT_CARD_LATCH_SAFETY_SEC := 0.5
+## BEGIN-1 FIX #2: leftover Begin release swallow is one orphan up only.
+## Clock starts on the first _process after the Begin frame (restamp), then
+## expires after ~750 ms and frames >= arm_frame + 2. A later-frame left
+## press clears it unless that press is the poll-path Begin click itself
+## (begin_press_pending). Lost leftover up cannot eat the first map click.
+const BEGIN_TITLE_SWALLOW_EXPIRE_MS: int = 750
 ## Fighting card (stance + cmd) must stay on-screen at Play 1280×740.
 ## Old reserve 252 clipped Press/Hold below Halt/Assign (card grows past 220).
 const UNIT_CARD_DOCK_RESERVE := 348.0
@@ -2792,9 +2798,17 @@ func _input(event: InputEvent) -> void:
 			# the same click cannot open the unit under the ×, and the next click can.
 			if not event.pressed and has_meta("eoa_tip_dismiss_swallow_release"):
 				call_deferred("_clear_first_session_tip_dismiss_swallow")
+			# Begin fires on press and queue_free()s the title. The matching
+			# ~80 ms leftover release must not still-click the map (Loir-et-Cher
+			# inspector + soft click-zoom 0.776→0.900). One-shot like TipDismiss.
+			if not event.pressed and _begin_title_release_blocks_map_pick():
+				call_deferred("_clear_begin_title_release_swallow")
+				get_viewport().set_input_as_handled()
+				return
 			if event.pressed:
 				_skip_inspector_after_march = false
 				_clear_unit_card_press_consume_on_new_left_press()
+				_clear_begin_title_release_swallow_on_new_left_press()
 			if _living_title_boot_is_up():
 				# Play 5adb38e: never swallow title-up presses. Route by event
 				# coords (computerUse may not update get_mouse_position first).
@@ -2807,6 +2821,8 @@ func _input(event: InputEvent) -> void:
 					var title_act: String = _route_living_title_pointer(event)
 					print("EOA_LIVE_PTR who=MapRenderer._input action=%s" % title_act)
 					if title_act == "begin" or title_act == "cc" or title_act == "panel":
+						if title_act == "begin":
+							arm_begin_title_release_swallow()
 						get_viewport().set_input_as_handled()
 						return
 					if _living_title_owns_event(event) or _top_bar_owns_click():
@@ -3205,16 +3221,24 @@ func _unhandled_input(event: InputEvent) -> void:
 	# Spatial picking click handling — this path makes the system fully functional
 	# even when create_area_nodes_for_fallback=false (pure MapPickGrid mode, zero Area2D nodes).
 	if use_spatial_picking and event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if event.pressed:
+			_clear_begin_title_release_swallow_on_new_left_press()
 		if not event.pressed and _consume_unit_card_press_release_if_armed():
 			return
 		if not event.pressed and _first_session_tip_dismiss_blocks_map_pick():
 			call_deferred("_clear_first_session_tip_dismiss_swallow")
 			get_viewport().set_input_as_handled()
 			return
+		if not event.pressed and _begin_title_release_blocks_map_pick():
+			call_deferred("_clear_begin_title_release_swallow")
+			get_viewport().set_input_as_handled()
+			return
 		if _living_title_boot_is_up():
 			if event.pressed:
 				var un_act: String = _route_living_title_pointer(event)
 				if un_act == "begin" or un_act == "cc" or un_act == "panel":
+					if un_act == "begin":
+						arm_begin_title_release_swallow()
 					get_viewport().set_input_as_handled()
 					return
 				if _living_title_owns_event(event) or _top_bar_owns_click():
@@ -3549,6 +3573,7 @@ func _process(delta: float) -> void:
 		_perf.begin("process_total")
 	_expire_map_time_pulse_if_needed()
 	_tick_unit_card_press_consume_latch(delta)
+	_tick_begin_title_release_swallow()
 
 	# When sim is paused, skip heavy LOD/fill/theater work — pan/zoom/UI stay responsive for playtest.
 	var sim_paused := false
@@ -18502,6 +18527,10 @@ func _on_province_input(_viewport: Node, event: InputEvent, _shape_idx: int, pro
 	# Press return is first so skip-pick does not have to latch before this fires.
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed:
+			_clear_begin_title_release_swallow_on_new_left_press()
+			return
+		if _begin_title_release_blocks_map_pick():
+			call_deferred("_clear_begin_title_release_swallow")
 			return
 	# Hold + committed slop/skip: abort before inspector (Tropical Atlantic Waters).
 	# Read-only live slop — do not `_note`/`_begin` here. Click-without-slop still picks.
@@ -19540,6 +19569,8 @@ func _try_open_land_chip_from_input(ctrl_click: bool = false, event: InputEvent 
 	# TipDismiss ×: this release must not open the counter under the button.
 	# Body clicks do not arm the swallow (the label ignores the mouse).
 	if _first_session_tip_dismiss_blocks_map_pick():
+		return false
+	if _begin_title_release_blocks_map_pick():
 		return false
 	if _top_bar_owns_click() or _mouse_over_search_control() or _search_ui_owns_click() or _mouse_over_close_control() or _road_spine_btn_owns_click():
 		return false
@@ -24696,6 +24727,96 @@ func _first_session_tip_dismiss_blocks_map_pick() -> bool:
 func _clear_first_session_tip_dismiss_swallow() -> void:
 	if has_meta("eoa_tip_dismiss_swallow_release"):
 		remove_meta("eoa_tip_dismiss_swallow_release")
+
+
+func arm_begin_title_release_swallow(pending_press: bool = false) -> void:
+	# LivingTitleBoot Begin press (button_down / handle_live_pointer / _input).
+	# One leftover left-release is eaten. Clock is restamped on the first
+	# _process after this frame so a slow apply_living_title_boot cannot
+	# age the leftover up past 750 ms. A later-frame left press or expiry
+	# drops it so a lost up cannot eat the next click. Poll-path arms set
+	# begin_press_pending so the click's own N+1 press keeps the arm.
+	set_meta("eoa_begin_swallow_release", true)
+	set_meta("eoa_begin_swallow_arm_msec", Time.get_ticks_msec())
+	set_meta("eoa_begin_swallow_arm_frame", Engine.get_process_frames())
+	if has_meta("eoa_begin_swallow_clock_ready"):
+		remove_meta("eoa_begin_swallow_clock_ready")
+	if has_meta("eoa_begin_swallow_press_seen_frame"):
+		remove_meta("eoa_begin_swallow_press_seen_frame")
+	if pending_press:
+		set_meta("eoa_begin_swallow_press_pending", true)
+	elif has_meta("eoa_begin_swallow_press_pending"):
+		remove_meta("eoa_begin_swallow_press_pending")
+
+
+func _begin_title_release_swallow_expired() -> bool:
+	if not has_meta("eoa_begin_swallow_release"):
+		return false
+	if not has_meta("eoa_begin_swallow_clock_ready"):
+		return false
+	var arm_frame: int = int(get_meta("eoa_begin_swallow_arm_frame", -1))
+	if Engine.get_process_frames() < arm_frame + 2:
+		return false
+	var arm_ms: int = int(get_meta("eoa_begin_swallow_arm_msec", 0))
+	if arm_ms > 0 and Time.get_ticks_msec() - arm_ms >= BEGIN_TITLE_SWALLOW_EXPIRE_MS:
+		return true
+	return false
+
+
+func _begin_title_release_blocks_map_pick() -> bool:
+	if not has_meta("eoa_begin_swallow_release"):
+		return false
+	if _begin_title_release_swallow_expired():
+		_clear_begin_title_release_swallow()
+		return false
+	return true
+
+
+func _clear_begin_title_release_swallow_on_new_left_press() -> void:
+	# Same-frame Begin press must keep the arm so the matching ~80 ms up is eaten.
+	# Poll-path: the Begin click's own press arrives in N+1 — eat that one only.
+	# One physical press can hit _input and _unhandled_input; treat same-frame
+	# deliveries as that first press, not a later click.
+	if not has_meta("eoa_begin_swallow_release"):
+		return
+	var now_frame: int = Engine.get_process_frames()
+	if has_meta("eoa_begin_swallow_press_pending"):
+		remove_meta("eoa_begin_swallow_press_pending")
+		set_meta("eoa_begin_swallow_press_seen_frame", now_frame)
+		return
+	if int(get_meta("eoa_begin_swallow_press_seen_frame", -1)) == now_frame:
+		return
+	var arm_frame: int = int(get_meta("eoa_begin_swallow_arm_frame", -1))
+	if now_frame > arm_frame:
+		_clear_begin_title_release_swallow()
+
+
+func _tick_begin_title_release_swallow() -> void:
+	if not has_meta("eoa_begin_swallow_release"):
+		return
+	if not has_meta("eoa_begin_swallow_clock_ready"):
+		var arm_frame: int = int(get_meta("eoa_begin_swallow_arm_frame", -1))
+		if Engine.get_process_frames() > arm_frame:
+			set_meta("eoa_begin_swallow_arm_msec", Time.get_ticks_msec())
+			set_meta("eoa_begin_swallow_clock_ready", true)
+		return
+	if _begin_title_release_swallow_expired():
+		_clear_begin_title_release_swallow()
+
+
+func _clear_begin_title_release_swallow() -> void:
+	if has_meta("eoa_begin_swallow_release"):
+		remove_meta("eoa_begin_swallow_release")
+	if has_meta("eoa_begin_swallow_arm_msec"):
+		remove_meta("eoa_begin_swallow_arm_msec")
+	if has_meta("eoa_begin_swallow_arm_frame"):
+		remove_meta("eoa_begin_swallow_arm_frame")
+	if has_meta("eoa_begin_swallow_clock_ready"):
+		remove_meta("eoa_begin_swallow_clock_ready")
+	if has_meta("eoa_begin_swallow_press_pending"):
+		remove_meta("eoa_begin_swallow_press_pending")
+	if has_meta("eoa_begin_swallow_press_seen_frame"):
+		remove_meta("eoa_begin_swallow_press_seen_frame")
 
 
 func dismiss_first_session_action_tip() -> void:
