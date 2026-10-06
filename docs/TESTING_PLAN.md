@@ -376,7 +376,7 @@ tools/eoa_fac1a_pixel_guard.sh
 
 ### PERF-3 supply overlay L toggle (draft HOLD)
 
-L-on / L-off must not rebuild 3196 `SupplyOutline` + `SupplyOutlineGlow` Line2Ds. Rings are built once on `SupplyOutlineBatchLayer` (same `ProvinceMapVisuals.get_supply_outline_style` colors / widths / glow) and shown/hidden. Headless measures the real `_toggle_supply_overlay` path (3196 dummy land, 48-pt rings) at Home z0.318 and z0.760. Fails on main (multi-second create; L-off leaves rings up). Limit **1000 ms** each way (target <500 ms).
+L-on / L-off must not rebuild 3196 `SupplyOutline` + `SupplyOutlineGlow` Line2Ds. Rings are built once on `SupplyOutlineBatchLayer` (same `ProvinceMapVisuals.get_supply_outline_style` colors / widths / glow) and shown/hidden. Headless measures the real `_toggle_supply_overlay` path (3196 dummy land, 48-pt rings) at Home z0.318 and z0.760. Fails on main (L-off leaves rings up; create path). Limit **1000 ms** each way (target <500 ms). Branch evidence: Home **178.2 / 9.6 ms**, z0.760 **104.6 / 9.5 ms**, rebuilds stay 1, line2d=0.
 
 ```bash
 tools/run_godot.sh --headless --path . --resolution 1280x740 \
