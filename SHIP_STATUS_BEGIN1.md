@@ -2,14 +2,14 @@
 
 Updated: 2026-10-06
 From: Cloud Agent
-**Status:** draft PR · **merge HOLD** · **FIX #3** (test-only real pipeline)
+**Status:** draft PR · **merge HOLD** · **FIX #4** (gate wiring only)
 
 | | |
 |---|---|
 | **Base** | main `425b4448c7bec8b7f8d5602193b8e8466d1e5ec2` (LABEL-1) |
 | **Branch** | `cursor/begin1-title-release-swallow-d55e` |
 | **Code SHA** | `f18a341a02fc823c35e037cc8e8e61f951eac41b` (product frozen) |
-| **Later commits** | **test / docs only** — MapRenderer / LivingTitleBoot unedited after `f18a341a` |
+| **Later commits** | **test / docs / gates only** — MapRenderer / LivingTitleBoot unedited after `f18a341a` |
 | **PR** | https://github.com/mmf62208/epochs-of-ascendancy/pull/84 |
 | Verdict | isolated keep-green **PASS**. xvfb ≠ live Play. Merge **HOLD**. |
 
@@ -38,6 +38,20 @@ Product at `f18a341a` is READY. The FIX #2 test was not a behavior proof:
 Camera / edge-pan / TipDismiss / FacilityIconLayer / labels / fleet stack /
 unit pick ranking **unedited**. Product `f18a341a` **unedited**.
 
+## FIX #4 (gate wiring only)
+
+Re-gate of tip `f5bb5d6d`: (A)–(E) pass. (F) the full gate never ran BEGIN-1 —
+`tools/eoa_full_test_gates.sh` had no `HeadlessBegin1TitleReleaseFallthroughTest`
+or `eoa_begin1_guard.sh` reference. FIX #4 adds, after `launch_ix1_title_esc_begin`:
+
+```
+run_step launch_begin1_title_release \
+  tools/run_godot.sh --headless --resolution 1280x740 -s res://scripts/core/HeadlessBegin1TitleReleaseFallthroughTest.gd || fail
+```
+
+No product change. No test-logic rewrite. Code SHA stays `f18a341a`.
+Later commits are test / docs / gates only.
+
 ## Play recipe (human)
 
 `docs/evidence/begin1/CLICKS.md` — 1280×740 Absolute @(0,29) no Ctrl.
@@ -53,7 +67,7 @@ Pre-step: `timeout 1500 tools/run_godot.sh --headless --path . --import --quit`
    or after a later fresh press (not the poll-path Begin click itself),
    the first map click must pick.
 
-## Gates (code SHA `f18a341a`; later commits test/docs only)
+## Gates (code SHA `f18a341a`; later commits test/docs/gates only)
 
 | gate | kind | result |
 |---|---|---|
@@ -66,6 +80,7 @@ Pre-step: `timeout 1500 tools/run_godot.sh --headless --path . --import --quit`
 | `HeadlessFac1aPanIconsTest` (PERF-1) | hd | **PASS** |
 | `HeadlessFac1aHoverCacheTest` (PERF-1b) | hd | **PASS** |
 | `HeadlessLabel1NationZoomTest` (LABEL-1) | hd | **PASS** |
+| `launch_begin1_title_release` in `eoa_full_test_gates.sh` | hd | wired after `launch_ix1_title_esc_begin` (FIX #4) |
 | `tools/eoa_full_test_gates.sh --quick` | pure | same **14** `unit_board_play_path` reds as main; no new red. `map_qc` env skip (no Pillow). HOI open_p0=0. |
 | `tools/live2_ts.sh` | live 2-core | **not present** in tree |
 

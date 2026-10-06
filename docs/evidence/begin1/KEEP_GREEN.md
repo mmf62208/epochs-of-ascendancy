@@ -1,7 +1,8 @@
 # BEGIN-1 keep-green (isolated)
 
 Headless / xvfb ≠ live Play. Never `EOA_SKIP_TITLE`.
-Code SHA `f18a341a`. Later commits are test / docs only.
+Code SHA `f18a341a`. Later commits are test / docs / gates only.
+FIX #4 wires `launch_begin1_title_release` into `tools/eoa_full_test_gates.sh`.
 
 | gate | kind | expected |
 |---|---|---|
@@ -13,6 +14,7 @@ Code SHA `f18a341a`. Later commits are test / docs only.
 | `HeadlessFac1aPanIconsTest` | hd | PASS |
 | `HeadlessFac1aHoverCacheTest` | hd | PASS |
 | `HeadlessLabel1NationZoomTest` | hd | PASS |
+| `launch_begin1_title_release` (`eoa_full_test_gates.sh`) | hd | PASS — same script as BEGIN-1 hd |
 | `tools/eoa_full_test_gates.sh --quick` | pure | same known 14 `unit_board_play_path` reds as main; no new red |
 
 Pre-step: `timeout 1500 tools/run_godot.sh --headless --path . --import --quit`

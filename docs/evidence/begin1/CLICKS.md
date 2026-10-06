@@ -5,8 +5,9 @@ Do **not** raise the window. Do **not** use Ctrl.
 Headless / xvfb ≠ live Play.
 
 **Code SHA:** `f18a341a02fc823c35e037cc8e8e61f951eac41b` (product frozen).
-Later commits are **test / docs only**. BEGIN-1 FIX #3 is the real-pipeline
-leftover test (T1–T5). Do not treat a later docs SHA as the product.
+Later commits are **test / docs / gates only**. FIX #4 is gate wiring only
+(`launch_begin1_title_release` in `tools/eoa_full_test_gates.sh`). Do not
+treat a later docs SHA as the product.
 
 ## Pre-step
 
