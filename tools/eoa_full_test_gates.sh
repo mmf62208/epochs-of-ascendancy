@@ -236,6 +236,9 @@ else
   run_step launch_fac1a_hover_cache \
     tools/run_godot.sh --headless --resolution 1280x740 -s res://scripts/core/HeadlessFac1aHoverCacheTest.gd || fail
 
+  run_step launch_perf2_fleet_refresh_budget \
+    tools/run_godot.sh --headless -s res://scripts/core/HeadlessPerf2FleetRefreshBudgetTest.gd || fail
+
   run_step launch_mv1b_input_gate \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessMv1bInputGateTest.gd || fail
 
@@ -253,6 +256,9 @@ else
 
   run_step launch_ix1_title_esc_begin \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessIx1LivingTitleEscBeginTest.gd || fail
+
+  run_step launch_begin1_title_release \
+    tools/run_godot.sh --headless --resolution 1280x740 -s res://scripts/core/HeadlessBegin1TitleReleaseFallthroughTest.gd || fail
 
   run_step launch_ix1_spine_complete \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessIx1RoadSpineCompleteTest.gd || fail

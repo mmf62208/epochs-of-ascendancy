@@ -261,6 +261,12 @@ var _close_ignore_stale_left_down := false
 ## clear after that one release, on any new left press (UI or map), and after
 ## a short safety timeout (Play: leftover eaten swallowed later top-bar ups).
 const UNIT_CARD_LATCH_SAFETY_SEC := 0.5
+## BEGIN-1 FIX #2: leftover Begin release swallow is one orphan up only.
+## Clock starts on the first _process after the Begin frame (restamp), then
+## expires after ~750 ms and frames >= arm_frame + 2. A later-frame left
+## press clears it unless that press is the poll-path Begin click itself
+## (begin_press_pending). Lost leftover up cannot eat the first map click.
+const BEGIN_TITLE_SWALLOW_EXPIRE_MS: int = 750
 ## Fighting card (stance + cmd) must stay on-screen at Play 1280×740.
 ## Old reserve 252 clipped Press/Hold below Halt/Assign (card grows past 220).
 const UNIT_CARD_DOCK_RESERVE := 348.0
@@ -2534,6 +2540,7 @@ func _apply_home_key(shift_pressed: bool) -> void:
 	_inspector_held_closed = false
 	_map_pick_block_until_msec = 0
 	_asia_end_force_star_pids.clear()
+	_invalidate_capital_star_scale_cache()
 	_asia_end_china_anchor = Vector2.ZERO
 	_restore_asia_end_row_fills()
 	var end_overlay: Node = (container if container != null else self).get_node_or_null("AsiaEndStarOverlay")
@@ -2793,9 +2800,17 @@ func _input(event: InputEvent) -> void:
 			# the same click cannot open the unit under the ×, and the next click can.
 			if not event.pressed and has_meta("eoa_tip_dismiss_swallow_release"):
 				call_deferred("_clear_first_session_tip_dismiss_swallow")
+			# Begin fires on press and queue_free()s the title. The matching
+			# ~80 ms leftover release must not still-click the map (Loir-et-Cher
+			# inspector + soft click-zoom 0.776→0.900). One-shot like TipDismiss.
+			if not event.pressed and _begin_title_release_blocks_map_pick():
+				call_deferred("_clear_begin_title_release_swallow")
+				get_viewport().set_input_as_handled()
+				return
 			if event.pressed:
 				_skip_inspector_after_march = false
 				_clear_unit_card_press_consume_on_new_left_press()
+				_clear_begin_title_release_swallow_on_new_left_press()
 			if _living_title_boot_is_up():
 				# Play 5adb38e: never swallow title-up presses. Route by event
 				# coords (computerUse may not update get_mouse_position first).
@@ -2808,6 +2823,8 @@ func _input(event: InputEvent) -> void:
 					var title_act: String = _route_living_title_pointer(event)
 					print("EOA_LIVE_PTR who=MapRenderer._input action=%s" % title_act)
 					if title_act == "begin" or title_act == "cc" or title_act == "panel":
+						if title_act == "begin":
+							arm_begin_title_release_swallow()
 						get_viewport().set_input_as_handled()
 						return
 					if _living_title_owns_event(event) or _top_bar_owns_click():
@@ -2933,13 +2950,10 @@ func _input(event: InputEvent) -> void:
 
 
 func _schedule_light_terrain_zoom_refresh() -> void:
+	# Wheel already ran the light LOD pass via _zoom_toward_mouse.
+	# Only queue the post-burst flush — never refresh again this frame.
 	_pending_terrain_zoom_refresh = true
-	var now := Time.get_ticks_msec()
-	if now - _wheel_zoom_terrain_at_msec < WHEEL_TERRAIN_REFRESH_MS:
-		return
-	_wheel_zoom_terrain_at_msec = now
-	_pending_terrain_zoom_refresh = false
-	_refresh_terrain_zoom_light()
+	_wheel_zoom_terrain_at_msec = Time.get_ticks_msec()
 
 
 func _refresh_terrain_zoom_light() -> void:
@@ -3209,16 +3223,24 @@ func _unhandled_input(event: InputEvent) -> void:
 	# Spatial picking click handling — this path makes the system fully functional
 	# even when create_area_nodes_for_fallback=false (pure MapPickGrid mode, zero Area2D nodes).
 	if use_spatial_picking and event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if event.pressed:
+			_clear_begin_title_release_swallow_on_new_left_press()
 		if not event.pressed and _consume_unit_card_press_release_if_armed():
 			return
 		if not event.pressed and _first_session_tip_dismiss_blocks_map_pick():
 			call_deferred("_clear_first_session_tip_dismiss_swallow")
 			get_viewport().set_input_as_handled()
 			return
+		if not event.pressed and _begin_title_release_blocks_map_pick():
+			call_deferred("_clear_begin_title_release_swallow")
+			get_viewport().set_input_as_handled()
+			return
 		if _living_title_boot_is_up():
 			if event.pressed:
 				var un_act: String = _route_living_title_pointer(event)
 				if un_act == "begin" or un_act == "cc" or un_act == "panel":
+					if un_act == "begin":
+						arm_begin_title_release_swallow()
 					get_viewport().set_input_as_handled()
 					return
 				if _living_title_owns_event(event) or _top_bar_owns_click():
@@ -3553,6 +3575,7 @@ func _process(delta: float) -> void:
 		_perf.begin("process_total")
 	_expire_map_time_pulse_if_needed()
 	_tick_unit_card_press_consume_latch(delta)
+	_tick_begin_title_release_swallow()
 
 	# When sim is paused, skip heavy LOD/fill/theater work — pan/zoom/UI stay responsive for playtest.
 	var sim_paused := false
@@ -14484,6 +14507,8 @@ func _force_all_province_nodes_visible() -> void:
 
 ## After mapmode / mesh toggles: land polys must be opaque; sea below land z.
 func _restore_land_poly_visibility() -> void:
+	# Restore forces capital-star visibility; do not trust the last-px skip.
+	_invalidate_capital_star_scale_cache()
 	for pid in province_nodes.keys():
 		var node: Node2D = province_nodes[pid] as Node2D
 		if node == null or not is_instance_valid(node):
@@ -14534,6 +14559,7 @@ func _restore_land_poly_visibility() -> void:
 
 
 func _ensure_capital_stars_visible() -> void:
+	_invalidate_capital_star_scale_cache()
 	_restore_land_poly_visibility()
 	# Re-stamp stars if missing (mapmode / mesh paths must never drop capitals).
 	var n_stars := 0
@@ -14566,8 +14592,24 @@ func _capital_star_font_px() -> int:
 	return int(clampf(16.0 / maxf(z, 0.35), 11.0, 20.0))
 
 
+var _capital_star_last_sync_px: int = -999
+var _capital_star_last_sync_force_n: int = -1
+
+
+func _invalidate_capital_star_scale_cache() -> void:
+	_capital_star_last_sync_px = -999
+	_capital_star_last_sync_force_n = -1
+
+
 func _sync_capital_star_scales(_z: float = -1.0) -> void:
 	var px := _capital_star_font_px()
+	var force_n: int = _asia_end_force_star_pids.size()
+	# Theme font overrides on ~37 stars cost ~200 ms/notch even when px is
+	# unchanged. Skip the walk when the last apply already matches.
+	if px == _capital_star_last_sync_px and force_n == _capital_star_last_sync_force_n:
+		return
+	_capital_star_last_sync_px = px
+	_capital_star_last_sync_force_n = force_n
 	for pid in province_nodes.keys():
 		var node: Node2D = province_nodes[pid] as Node2D
 		if node == null:
@@ -14578,16 +14620,30 @@ func _sync_capital_star_scales(_z: float = -1.0) -> void:
 			if not (child is Label) or not (child as Label).has_meta(META_MAP_GLYPH_CAPITAL):
 				continue
 			var star := child as Label
-			star.visible = use_px > 0
-			if use_px > 0:
-				star.add_theme_font_size_override("font_size", use_px)
-				star.set_meta(META_MAP_GLYPH_PX, use_px)
+			var want_vis: bool = use_px > 0
+			var actual_px: int = 0
+			if star.has_theme_font_size_override("font_size"):
+				actual_px = int(star.get_theme_font_size("font_size"))
+			if star.visible != want_vis:
+				star.visible = want_vis
+			if use_px <= 0:
+				continue
+			# Skip the theme write only when the live override already matches.
+			# Layout / restore can change font_size without updating META_MAP_GLYPH_PX.
+			if actual_px == use_px:
 				if force:
 					star.z_as_relative = false
 					star.z_index = 80
+				continue
+			star.add_theme_font_size_override("font_size", use_px)
+			star.set_meta(META_MAP_GLYPH_PX, use_px)
+			if force:
+				star.z_as_relative = false
+				star.z_index = 80
 
 
 func _add_capital_star_to_node(node: Node2D, pid: int, force_px: int = 0) -> void:
+	_invalidate_capital_star_scale_cache()
 	var center: Vector2 = _centroid_for_pid(pid)
 	if center == Vector2.ZERO:
 		center = province_centroids.get(pid, Vector2.ZERO) as Vector2
@@ -14966,6 +15022,8 @@ func _layout_zoomed_map_glyphs_for_province_node(pid: int, zoom_metric: float, s
 			var is_capital := lbl.has_meta(META_MAP_GLYPH_CAPITAL)
 			# Capital gold stars stay visible at all zoom levels (Washington/Tokyo were
 			# hidden when detail glyphs culled at strategic zoom).
+			if is_capital:
+				_invalidate_capital_star_scale_cache()
 			lbl.visible = true if is_capital else show_glyphs
 			if show_glyphs or is_capital:
 				var zsc := _zoom_detail_scale_smooth(zoom_metric, 1.8)
@@ -16615,6 +16673,7 @@ func _resolve_chi_capital_centroid() -> Vector2:
 
 
 func _force_asia_end_capital_stars(tokyo_pid: int, chi_pid: int) -> void:
+	_invalidate_capital_star_scale_cache()
 	_asia_end_force_star_pids.clear()
 	var chi_names := {902487: "Beiping", 902496: "Nanjing", 902505: "Chongqing"}
 	# Always stamp Tokyo + Beiping (Play: CHI star missing when only the resolved pid was used).
@@ -18473,6 +18532,10 @@ func _on_province_input(_viewport: Node, event: InputEvent, _shape_idx: int, pro
 	# Press return is first so skip-pick does not have to latch before this fires.
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed:
+			_clear_begin_title_release_swallow_on_new_left_press()
+			return
+		if _begin_title_release_blocks_map_pick():
+			call_deferred("_clear_begin_title_release_swallow")
 			return
 	# Hold + committed slop/skip: abort before inspector (Tropical Atlantic Waters).
 	# Read-only live slop — do not `_note`/`_begin` here. Click-without-slop still picks.
@@ -19511,6 +19574,8 @@ func _try_open_land_chip_from_input(ctrl_click: bool = false, event: InputEvent 
 	# TipDismiss ×: this release must not open the counter under the button.
 	# Body clicks do not arm the swallow (the label ignores the mouse).
 	if _first_session_tip_dismiss_blocks_map_pick():
+		return false
+	if _begin_title_release_blocks_map_pick():
 		return false
 	if _top_bar_owns_click() or _mouse_over_search_control() or _search_ui_owns_click() or _mouse_over_close_control() or _road_spine_btn_owns_click():
 		return false
@@ -24669,6 +24734,96 @@ func _clear_first_session_tip_dismiss_swallow() -> void:
 		remove_meta("eoa_tip_dismiss_swallow_release")
 
 
+func arm_begin_title_release_swallow(pending_press: bool = false) -> void:
+	# LivingTitleBoot Begin press (button_down / handle_live_pointer / _input).
+	# One leftover left-release is eaten. Clock is restamped on the first
+	# _process after this frame so a slow apply_living_title_boot cannot
+	# age the leftover up past 750 ms. A later-frame left press or expiry
+	# drops it so a lost up cannot eat the next click. Poll-path arms set
+	# begin_press_pending so the click's own N+1 press keeps the arm.
+	set_meta("eoa_begin_swallow_release", true)
+	set_meta("eoa_begin_swallow_arm_msec", Time.get_ticks_msec())
+	set_meta("eoa_begin_swallow_arm_frame", Engine.get_process_frames())
+	if has_meta("eoa_begin_swallow_clock_ready"):
+		remove_meta("eoa_begin_swallow_clock_ready")
+	if has_meta("eoa_begin_swallow_press_seen_frame"):
+		remove_meta("eoa_begin_swallow_press_seen_frame")
+	if pending_press:
+		set_meta("eoa_begin_swallow_press_pending", true)
+	elif has_meta("eoa_begin_swallow_press_pending"):
+		remove_meta("eoa_begin_swallow_press_pending")
+
+
+func _begin_title_release_swallow_expired() -> bool:
+	if not has_meta("eoa_begin_swallow_release"):
+		return false
+	if not has_meta("eoa_begin_swallow_clock_ready"):
+		return false
+	var arm_frame: int = int(get_meta("eoa_begin_swallow_arm_frame", -1))
+	if Engine.get_process_frames() < arm_frame + 2:
+		return false
+	var arm_ms: int = int(get_meta("eoa_begin_swallow_arm_msec", 0))
+	if arm_ms > 0 and Time.get_ticks_msec() - arm_ms >= BEGIN_TITLE_SWALLOW_EXPIRE_MS:
+		return true
+	return false
+
+
+func _begin_title_release_blocks_map_pick() -> bool:
+	if not has_meta("eoa_begin_swallow_release"):
+		return false
+	if _begin_title_release_swallow_expired():
+		_clear_begin_title_release_swallow()
+		return false
+	return true
+
+
+func _clear_begin_title_release_swallow_on_new_left_press() -> void:
+	# Same-frame Begin press must keep the arm so the matching ~80 ms up is eaten.
+	# Poll-path: the Begin click's own press arrives in N+1 — eat that one only.
+	# One physical press can hit _input and _unhandled_input; treat same-frame
+	# deliveries as that first press, not a later click.
+	if not has_meta("eoa_begin_swallow_release"):
+		return
+	var now_frame: int = Engine.get_process_frames()
+	if has_meta("eoa_begin_swallow_press_pending"):
+		remove_meta("eoa_begin_swallow_press_pending")
+		set_meta("eoa_begin_swallow_press_seen_frame", now_frame)
+		return
+	if int(get_meta("eoa_begin_swallow_press_seen_frame", -1)) == now_frame:
+		return
+	var arm_frame: int = int(get_meta("eoa_begin_swallow_arm_frame", -1))
+	if now_frame > arm_frame:
+		_clear_begin_title_release_swallow()
+
+
+func _tick_begin_title_release_swallow() -> void:
+	if not has_meta("eoa_begin_swallow_release"):
+		return
+	if not has_meta("eoa_begin_swallow_clock_ready"):
+		var arm_frame: int = int(get_meta("eoa_begin_swallow_arm_frame", -1))
+		if Engine.get_process_frames() > arm_frame:
+			set_meta("eoa_begin_swallow_arm_msec", Time.get_ticks_msec())
+			set_meta("eoa_begin_swallow_clock_ready", true)
+		return
+	if _begin_title_release_swallow_expired():
+		_clear_begin_title_release_swallow()
+
+
+func _clear_begin_title_release_swallow() -> void:
+	if has_meta("eoa_begin_swallow_release"):
+		remove_meta("eoa_begin_swallow_release")
+	if has_meta("eoa_begin_swallow_arm_msec"):
+		remove_meta("eoa_begin_swallow_arm_msec")
+	if has_meta("eoa_begin_swallow_arm_frame"):
+		remove_meta("eoa_begin_swallow_arm_frame")
+	if has_meta("eoa_begin_swallow_clock_ready"):
+		remove_meta("eoa_begin_swallow_clock_ready")
+	if has_meta("eoa_begin_swallow_press_pending"):
+		remove_meta("eoa_begin_swallow_press_pending")
+	if has_meta("eoa_begin_swallow_press_seen_frame"):
+		remove_meta("eoa_begin_swallow_press_seen_frame")
+
+
 func dismiss_first_session_action_tip() -> void:
 	# Must not take the inspector Close path (that locks the camera).
 	# Button.pressed runs on release. Freeing the strip inside that signal
@@ -26116,6 +26271,7 @@ func _ensure_sea_nation_layer() -> Node2D:
 
 
 func _clear_sea_nation_layer_icons(only_pid: int = -1) -> void:
+	_invalidate_sea_fleet_offset_cache()
 	var layer: Node2D = _ensure_sea_nation_layer()
 	if layer == null:
 		return
@@ -26211,18 +26367,49 @@ func _sea_nation_anchor_shift(pid: int) -> Vector2:
 	return _sea_poly_centroid(poly) - _unit_chip_base_world(pid)
 
 
+## Shared-sea stack layout is zoom-invariant (pid + plate count + radius).
+## Rebuilding it every 6th unpaused frame was the idle ~150–230 ms hitch.
+var _sea_fleet_offset_cache: Dictionary = {}
+var _sea_fleet_offset_cache_enabled: bool = true
+var _fleet2_plate_label_log: Dictionary = {}
+
+
+func _invalidate_sea_fleet_offset_cache() -> void:
+	_sea_fleet_offset_cache.clear()
+
+
+func _sea_fleet_offset_cache_key(pid: int, count: int, radius: float) -> String:
+	return "%d|%d|%.3f" % [pid, count, radius]
+
+
+func _copy_sea_fleet_offset_array(src: Array) -> Array:
+	var out: Array = []
+	for v in src:
+		out.append(v as Vector2)
+	return out
+
+
 func _sea_nation_fleet_stack_offsets(count: int, radius: float, pid: int = -1) -> Array:
 	# 1 plate: chip base. 2: side-by-side if that stays over sea, else a column.
 	# 3+: 2x2 / column / row — pick the layout that stays inside (or closest
 	# to) the sea polygon so the Channel cannot fan across Kent / Belgium.
+	var key: String = _sea_fleet_offset_cache_key(pid, count, radius)
+	if _sea_fleet_offset_cache_enabled and _sea_fleet_offset_cache.has(key):
+		return _copy_sea_fleet_offset_array(_sea_fleet_offset_cache[key] as Array)
 	var r: float = maxf(radius, 12.0)
 	if count >= 3 and pid >= 0:
 		r = _sea_nation_fit_radius(pid, count, r)
 	if count <= 1:
-		return [Vector2.ZERO]
+		var single: Array = [Vector2.ZERO]
+		if _sea_fleet_offset_cache_enabled:
+			_sea_fleet_offset_cache[key] = _copy_sea_fleet_offset_array(single)
+		return single
 	var cands: Array = _sea_nation_layout_candidates(count, r)
 	if cands.is_empty():
-		return [Vector2.ZERO]
+		var empty_c: Array = [Vector2.ZERO]
+		if _sea_fleet_offset_cache_enabled:
+			_sea_fleet_offset_cache[key] = _copy_sea_fleet_offset_array(empty_c)
+		return empty_c
 	if pid >= 0 and count >= 3:
 		var shift: Vector2 = _sea_nation_anchor_shift(pid)
 		if shift.length_squared() > 0.01:
@@ -26235,9 +26422,15 @@ func _sea_nation_fleet_stack_offsets(count: int, radius: float, pid: int = -1) -
 				shifted.append(one)
 			cands = shifted
 	if pid < 0:
-		return cands[0] as Array
+		var raw0: Array = cands[0] as Array
+		if _sea_fleet_offset_cache_enabled:
+			_sea_fleet_offset_cache[key] = _copy_sea_fleet_offset_array(raw0)
+		return raw0
 	var chosen: Array = _sea_nation_choose_clamped_offsets(pid, cands, r)
-	return _sea_nation_maybe_fallback_chip_base(pid, chosen, r, count)
+	var result: Array = _sea_nation_maybe_fallback_chip_base(pid, chosen, r, count)
+	if _sea_fleet_offset_cache_enabled:
+		_sea_fleet_offset_cache[key] = _copy_sea_fleet_offset_array(result)
+	return result
 
 
 func _sea_nation_layout_candidates(count: int, radius: float) -> Array:
@@ -26714,9 +26907,13 @@ func _sea_nation_plate_label(fo: Object, tag: String, _index: int = 0) -> String
 	if fo != null and "formation_id" in fo:
 		fid = str(fo.formation_id)
 	var label: String = "%s\nFleet %d" % [t, num]
-	print("EOA_FLEET2 who=plate_label fid=%s tag=%s ordinal=%d label='%s'" % [
-		fid, t, num, label.replace("\n", "|")
-	])
+	var log_key: String = fid if not fid.is_empty() else "%s|%d" % [t, num]
+	var prev_label: String = str(_fleet2_plate_label_log.get(log_key, ""))
+	if prev_label != label:
+		_fleet2_plate_label_log[log_key] = label
+		print("EOA_FLEET2 who=plate_label fid=%s tag=%s ordinal=%d label='%s'" % [
+			fid, t, num, label.replace("\n", "|")
+		])
 	return label
 
 
@@ -30605,6 +30802,7 @@ func _update_unit_icons_for_pids(pids: Array) -> void:
 
 
 func _rebuild_demo_unit_icons(only_pids: Dictionary) -> void:
+	_invalidate_sea_fleet_offset_cache()
 	var scoped := not only_pids.is_empty()
 	# Clear previous demo icons only where we placed them (or only listed pids).
 	var kept: Array = []
