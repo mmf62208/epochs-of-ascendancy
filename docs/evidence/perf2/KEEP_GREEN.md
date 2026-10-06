@@ -17,9 +17,9 @@ Import first: `tools/run_godot.sh --headless --import --quit`.
 | source needle (live font-size + invalidate) | **FAIL** | **PASS** |
 | (a)(b) fleet cache + wheel budget | PASS (wheel 694 µs) | PASS (wheel 646 µs; plates identical) |
 
-Fences kept: FacilityIconLayer **unedited**. MapZoomLOD / country labels
-**unedited**. Pick / draw-order / hit-test / spill **unedited**. TipDismiss /
-ORDERS / camera / edge-pan **unedited**.
+FIX #1 tip `7fe129f8`. Fences kept: FacilityIconLayer **unedited**. MapZoomLOD /
+country labels **unedited**. Pick / draw-order / hit-test / spill **unedited**.
+TipDismiss / ORDERS / camera / edge-pan **unedited**.
 
 Official `--quick` `unit_board_play_path` still has the **14 known reds** on
 main (unit_pick / unit_chrome / fill-toe / living_unit greps:
@@ -34,12 +34,13 @@ reds.** `map_qc` / `hoi_matrix_product` / `unit_save_path` OK.
 
 | gate | kind | result | note |
 |---|---|---|---|
-| `HeadlessPerf2FleetRefreshBudgetTest` | hd | PASS | (a) Channel/NS offsets + plate worlds identical; (b) detail 554 µs / wheel 640 µs / cache-hit 3 µs (raw 3153 µs) |
-| `HeadlessFleet2SharedSeaMarkerTest` | hd | PASS (a–p) | plate positions unchanged |
-| `HeadlessFleet2SharedSeaMarkerTest` | xvfb | PASS (a–p) | 1280×740 |
-| `HeadlessFleet1LandSpillGateTest` | hd | PASS (a–h) | unedited |
-| `WindowedFleet2LiveScaleCheck` | xvfb | PASS | RSS **2041.2** · 1280×740 GER Home |
-| `--quick` `unit_board_play_path` | py | FAIL 14 | same known reds as main; no new |
+| `HeadlessPerf2FleetRefreshBudgetTest` | hd | PASS | (a)(b) kept; (c)(d) FAIL on `b2674c6c` / PASS on `7fe129f8`; detail 707 µs / wheel 646 µs / cache-hit 4 µs |
+| `HeadlessFleet2SharedSeaMarkerTest` | hd | PASS (a–p) | plate positions unchanged · RSS **1213.2** |
+| `HeadlessFleet2SharedSeaMarkerTest` | xvfb | PASS (a–p) | 1280×740 · RSS **1350.9** |
+| `HeadlessFleet1LandSpillGateTest` | hd | PASS (a–h) | unedited · RSS **1207.5** |
+| `HeadlessFleet1LandSpillGateTest` | xvfb | PASS (a–h) | unedited · RSS **1382.5** |
+| `WindowedFleet2LiveScaleCheck` | xvfb | PASS | RSS **2040.1** · 1280×740 GER Home |
+| `--quick` `unit_board_play_path` | py | FAIL 14 | same known reds: living_unit_order_loop 4, unit_card_fill_toe 3, unit_centric_pick 3, unit_counter_chrome 2, se_england_shire 1, first_session_play_surface 1; **no new** |
 | `--quick` `map_qc` / HOI / save | py | OK | NE hit 0.9853 |
 
 ## Test-merge
