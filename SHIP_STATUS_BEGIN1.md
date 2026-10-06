@@ -8,9 +8,9 @@ From: Cloud Agent
 |---|---|
 | **Base** | main `425b4448c7bec8b7f8d5602193b8e8466d1e5ec2` (LABEL-1) |
 | **Branch** | `cursor/begin1-title-release-swallow-d55e` |
-| **Tip** | *(this revision — SHA after push)* |
+| **Tip** | `1a29087f3f4eb06201191bcd94d015b7d82c9a95` |
 | **PR** | https://github.com/mmf62208/epochs-of-ascendancy/pull/84 |
-| Verdict | isolated keep-green pending this revision. xvfb ≠ live Play. Merge **HOLD**. |
+| Verdict | isolated keep-green **PASS**. xvfb ≠ live Play. Merge **HOLD**. |
 
 ## Proven cause
 
@@ -25,11 +25,12 @@ Instant 0 ms press+release stays on the still-alive Begin Control for that
 frame, so GUI eats the up and the race stays hidden.
 
 **FIX #1:** the swallow could stay armed forever if the leftover up never
-reached Godot (unfocused window). A same-frame clear-on-press also dropped
-a `button_down` arm before the leftover up. Product now expires after
-**~750 ms**, and a **later-frame** left press clears it. `button_down` arms
-only while the left mouse button is actually held (Enter/Space must not eat
-the first map click).
+reached Godot (unfocused window / keyboard Begin). A same-frame clear-on-press
+also dropped a `button_down` arm before the leftover up. Product now expires
+after **~750 ms** (time, not frames — uncapped headless can burn 24 frames in
+well under 80 ms), and a **later-frame** left press clears it. `button_down`
+arms only while the left mouse button is actually held (Enter/Space must not
+eat the first map click).
 
 ## Diff
 
@@ -41,8 +42,9 @@ the first map click).
   Stores arm time (`Time.get_ticks_msec`) + arm frame. Expires after 750 ms.
   A new left press in a later frame than the arming clears the flag.
 - Guard `HeadlessBegin1TitleReleaseFallthroughTest` + `tools/eoa_begin1_guard.sh`
-  (80 ms leftover; next click via real `_input` pick; lost-release expiry;
-  lost-release + fresh press; keyboard Enter/Space).
+  drives real `InputEventMouseButton` through `_input` / `_unhandled_input`
+  (no emit / `_select_province` fallback). 80 ms leftover; follow-up pid != -1
+  + inspector; lost-release expiry; later-frame press; keyboard Enter/Space.
 
 Camera / edge-pan / TipDismiss / FacilityIconLayer / labels / fleet stack /
 unit pick ranking **unedited**.
@@ -61,30 +63,30 @@ Pre-step: `tools/run_godot.sh --headless --import --quit`
 5. If the leftover up never arrives (unfocused window): after ~750 ms, or
    after a fresh press, the first map click must pick.
 
-## Gates
+## Gates (tip `1a29087f`)
 
 | gate | kind | result |
 |---|---|---|
-| `HeadlessBegin1TitleReleaseFallthroughTest` | hd | pending this revision |
-| `HeadlessBegin1TitleReleaseFallthroughTest` | xvfb | pending this revision |
-| `HeadlessFirstSessionReadabilityTest` (TipDismiss) | hd | pending this revision |
-| `HeadlessIx1LivingTitleEscBeginTest` | hd | pending this revision |
-| `HeadlessFleet1LandSpillGateTest` | hd | pending this revision |
-| `HeadlessFleet2SharedSeaMarkerTest` | hd | pending this revision |
-| `HeadlessFac1aPanIconsTest` (PERF-1) | hd | pending this revision |
-| `HeadlessFac1aHoverCacheTest` (PERF-1b) | hd | pending this revision |
-| `HeadlessLabel1NationZoomTest` (LABEL-1) | hd | pending this revision |
-| `tools/eoa_full_test_gates.sh --quick` | pure | pending this revision |
+| `HeadlessBegin1TitleReleaseFallthroughTest` | hd | **PASS** (`eoa_begin1_guard.sh` 1212.6 MB) |
+| `HeadlessBegin1TitleReleaseFallthroughTest` | xvfb | **PASS** (`eoa_begin1_guard.sh` 1355.6 MB) |
+| `HeadlessFirstSessionReadabilityTest` (TipDismiss) | hd | **PASS** |
+| `HeadlessIx1LivingTitleEscBeginTest` | hd | **PASS** |
+| `HeadlessFleet1LandSpillGateTest` | hd | **PASS** |
+| `HeadlessFleet2SharedSeaMarkerTest` | hd | **PASS** |
+| `HeadlessFac1aPanIconsTest` (PERF-1) | hd | **PASS** |
+| `HeadlessFac1aHoverCacheTest` (PERF-1b) | hd | **PASS** |
+| `HeadlessLabel1NationZoomTest` (LABEL-1) | hd | **PASS** |
+| `tools/eoa_full_test_gates.sh --quick` | pure | same **14** `unit_board_play_path` reds as main; no new red. `map_qc` env skip (no Pillow). HOI open_p0=0. |
 
 ## Test-merge onto draft PR #83
 
-`origin/cursor/perf2-idle-wheel-refresh-f611` @ `b2674c6c` (already includes main `425b4448`).
+`origin/cursor/perf2-idle-wheel-refresh-f611` @ `5f459614e00a24919959ccb3673e1274098912da`.
 
 - **`docs/CURRENT_STATE.md`**: content conflict (both prepend a HOLD changelog paragraph).
 - `scripts/map/MapRenderer.gd`: **auto-merged**.
 - `docs/TESTING_PLAN.md`: **auto-merged**.
 
-Reverse (BEGIN-1 ← #83): same docs-only `CURRENT_STATE.md` conflict. Product input path does not conflict with PERF-2 fleet-offset / wheel-refresh.
+Product input path does not conflict with PERF-2 fleet-offset / wheel-refresh.
 
 ## Out of scope (follow-up)
 
