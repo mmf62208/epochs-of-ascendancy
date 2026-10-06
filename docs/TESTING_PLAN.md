@@ -374,6 +374,17 @@ tools/eoa_fac1a_pixel_guard.sh
 
 **PERF-1b (hover cache):** `get_hit_rects_at_zoom` reuses `_last_markers` when zoom matches within 0.008 and the cache is clean; otherwise builds once and stores. `compute_markers_at_zoom` stays uncached. Headless `HeadlessFac1aHoverCacheTest` **RESULT=PASS**: N hovers at fixed zoom add 0 builds; zoom / data change updates clusters. Isolated keep-green **FAILS=0**. Camera / edge-pan / chip pick **unedited**. Evidence `docs/evidence/perf1b/`.
 
+### PERF-3 supply overlay L toggle (draft HOLD)
+
+L-on / L-off must not rebuild 3196 `SupplyOutline` + `SupplyOutlineGlow` Line2Ds. Rings are built once on `SupplyOutlineBatchLayer` (same `ProvinceMapVisuals.get_supply_outline_style` colors / widths / glow) and shown/hidden. Headless measures the **full** `_toggle_supply_overlay` path Play timed (3196 dummy land, 48-pt rings, **seeded glyph Labels + boot SupplyMapLayer**) at Home z0.318 and z0.760. Fails on main (L-off leaves rings up). Fails if L still restacks glyphs / re-enters `_setup_supply_layer` / recomputes roles after the first cache fill (the live ~4.5 s / ~1.6 s leftover on `936ee472`). Limit **1000 ms** each way (target <500 ms). FIX #1 evidence: Home **156.9 / 8.2 / 374.2 ms**, z0.760 **52.7 / 8.1 / 52.5 ms**, rebuilds stay 1, line2d=0, glyphs=0, setups=0, roles=1.
+
+```bash
+tools/run_godot.sh --headless --path . --resolution 1280x740 \
+  -s res://scripts/core/HeadlessPerf3SupplyToggleTest.gd
+```
+
+Wired as `launch_perf3_supply_toggle` in `tools/eoa_full_test_gates.sh` (full path only). `--quick` is unchanged pure-python. Not live Play. Merge **HOLD**.
+
 xvfb screenshots go to `/opt/cursor/artifacts/fac1a/`, `/opt/cursor/artifacts/fac1a_fix2/`, `/opt/cursor/artifacts/fac1a_fix2b/`, `/opt/cursor/artifacts/fac1a_fix2c/`, `/opt/cursor/artifacts/fac1a_fix3/`, and `/opt/cursor/artifacts/fac1a_fix4/` and are **NOT live Play**. Peak RSS must stay under 3 GB (isolated process tree — do not sum leftover Godot). Merge **HOLD**.
 
 **FIX #4 (Play MIXED `76fb4808`):** click ownership + badge-in-footprint + cluster digit + lone min size + split guard 1.53. Seeds unchanged. Isolated keep-green:
