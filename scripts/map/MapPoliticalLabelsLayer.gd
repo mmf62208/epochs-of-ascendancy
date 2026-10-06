@@ -1163,14 +1163,16 @@ func _apply_nation_visibility_only() -> void:
 			continue
 		var l := lbl as Label
 		var force := l.has_meta("force_visible") and bool(l.get_meta("force_visible"))
-		var px := _nation_font_px_for_zoom(_nation_rank_px(l, nation_px))
-		if px <= 0 and force:
-			px = maxi(12, int(round(18.0 / maxf(_camera_zoom, 0.20))))
+		var cached_px := int(l.get_meta("cached_font_px")) if l.has_meta("cached_font_px") else -1
+		var cached_a := float(l.get_meta("cached_alpha")) if l.has_meta("cached_alpha") else -1.0
+		var px := cached_px
+		if px < 0:
+			px = _nation_font_px_for_zoom(_nation_rank_px(l, nation_px))
+			if px <= 0 and force:
+				px = maxi(12, int(round(18.0 / maxf(_camera_zoom, 0.20))))
 		var base_visible := (show_n or force) and px > 0 and (not hide or force)
 		var want := base_visible and _nation_label_in_view(l, force)
 		var was := l.visible
-		var cached_px := int(l.get_meta("cached_font_px")) if l.has_meta("cached_font_px") else -1
-		var cached_a := float(l.get_meta("cached_alpha")) if l.has_meta("cached_alpha") else -1.0
 		var style_stale := cached_px != px or absf(cached_a - alpha) > 0.01
 		l.visible = want
 		if want and ((not was) or style_stale):
