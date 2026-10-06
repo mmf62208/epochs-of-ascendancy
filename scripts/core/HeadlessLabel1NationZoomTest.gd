@@ -15,11 +15,15 @@ const PLAY_SIZE := Vector2i(1280, 720)
 const EUROPE_Z := 0.40
 const MID_Z := 0.776
 const CLOSE_Z := 1.80
+const FADE_Z := 0.90
 const EUROPE_RATIO_LO := 0.018
 const EUROPE_RATIO_HI := 0.045
 const MID_RATIO_LO := 0.016
 const MID_RATIO_HI := 0.038
 const CLOSE_RATIO_HI := 0.012
+const HOME_POS := Vector2(4200, 1600)
+const FAR_EAST_POS := Vector2(12000, 1800)
+const PAUSED_EUROPE_MIN := 30
 
 var _failures: int = 0
 var _layer: Node = null
@@ -75,7 +79,10 @@ func _run() -> void:
 	_assert_city_label_lod()
 	await _measure_and_snapshot("europe", EUROPE_Z, EUROPE_RATIO_LO, EUROPE_RATIO_HI, false)
 	await _measure_and_snapshot("mid", MID_Z, MID_RATIO_LO, MID_RATIO_HI, false)
+	await _measure_and_snapshot("fade", FADE_Z, MID_RATIO_LO, MID_RATIO_HI, false)
+	await _assert_fade_band_holds_mid_size()
 	await _measure_and_snapshot("close", CLOSE_Z, 0.0, CLOSE_RATIO_HI, true)
+	await _assert_paused_viewport_after_home()
 	_assert_no_node_scale()
 	_assert_layer_fences()
 
@@ -164,6 +171,14 @@ func _assert_policy_tables() -> void:
 		_fail("mid effective %.1f > font %d" % [mid_eff, mid_px])
 	else:
 		_pass("mid effective %.1fpx from font %d (not a blown-up texture)" % [mid_eff, mid_px])
+	var fade_px: int = MapZoomLODScript.nation_label_font_px_for_camera(FADE_Z, vh)
+	var fade_eff: float = MapZoomLODScript.nation_label_effective_screen_px(fade_px, FADE_Z, 1.0)
+	if fade_px <= 0:
+		_fail("fade-band policy font=%d" % fade_px)
+	elif fade_eff + 0.51 < mid_eff:
+		_fail("fade-band screen %.1f < mid %.1f" % [fade_eff, mid_eff])
+	else:
+		_pass("fade-band holds mid size (screen %.1f >= mid %.1f)" % [fade_eff, mid_eff])
 
 
 func _assert_city_label_lod() -> void:
@@ -279,6 +294,94 @@ func _capture_shot(name_s: String, z: float) -> void:
 		_info("shot skip err=%d path=%s" % [err, path])
 
 
+func _visible_nation_count() -> int:
+	if _layer != null and _layer.has_method("count_visible_nation_labels"):
+		return int(_layer.call("count_visible_nation_labels"))
+	var n := 0
+	if _layer == null:
+		return 0
+	for child in _layer.get_children():
+		if child is Label and (child as Label).visible and str(child.name).begins_with("NationLabel_"):
+			n += 1
+	return n
+
+
+func _seed_paused_theater_labels() -> void:
+	if _layer == null or not _layer.has_method("seed_debug_nation_label"):
+		return
+	var i := 0
+	for gx in range(8):
+		for gy in range(5):
+			i += 1
+			var tag := "E%02d" % i
+			var pos := Vector2(3600.0 + float(gx) * 160.0, 1300.0 + float(gy) * 140.0)
+			_layer.call("seed_debug_nation_label", tag, "Nation%d" % i, pos, 20)
+	for j in range(6):
+		var fe_tag := "FE%d" % j
+		var fe_pos := Vector2(11800.0 + float(j) * 80.0, 1700.0)
+		_layer.call("seed_debug_nation_label", fe_tag, "East%d" % j, fe_pos, 20)
+
+
+func _assert_fade_band_holds_mid_size() -> void:
+	var vh := 720.0
+	var mid_px: int = MapZoomLODScript.nation_label_font_px_for_camera(MID_Z, vh)
+	var mid_eff: float = MapZoomLODScript.nation_label_effective_screen_px(mid_px, MID_Z, 1.0)
+	var m: Dictionary = _metrics_for(FADE_Z)
+	var fade_eff := float(m.get("effective_screen_px", -1.0))
+	var modulate_a := float(m.get("modulate_a", 1.0))
+	var alpha := float(m.get("alpha", 1.0))
+	if fade_eff + 0.51 < mid_eff:
+		_fail("fade live screen %.1f < mid %.1f" % [fade_eff, mid_eff])
+	else:
+		_pass("fade live screen %.1f >= mid %.1f" % [fade_eff, mid_eff])
+	if modulate_a > 0.85:
+		_fail("fade modulate.a=%.2f (outline should fade, not stay dark)" % modulate_a)
+	elif modulate_a < 0.15:
+		_fail("fade modulate.a=%.2f too faint" % modulate_a)
+	else:
+		_pass("fade modulate.a=%.2f (fill+outline)" % modulate_a)
+	if absf(modulate_a - alpha) > 0.08:
+		_fail("fade modulate.a=%.2f != policy alpha=%.2f" % [modulate_a, alpha])
+	else:
+		_pass("fade modulate matches policy alpha")
+
+
+func _assert_paused_viewport_after_home() -> void:
+	# First sessions are often paused. Home then pause used to keep a stale
+	# MapRenderer cull box (5/65 over Europe; none after a Far-East pan).
+	_cam.position = HOME_POS
+	_cam.zoom = Vector2(EUROPE_Z, EUROPE_Z)
+	if _layer != null and _layer.has_method("sync_camera_zoom"):
+		_layer.call("sync_camera_zoom", EUROPE_Z)
+	_seed_paused_theater_labels()
+	# Stale box = last unpaused refresh, not the live Home camera.
+	if _layer != null and _layer.has_method("sync_viewport"):
+		_layer.call("sync_viewport", Rect2(Vector2(-4000.0, -4000.0), Vector2(180.0, 180.0)), true)
+	paused = true
+	await process_frame
+	await process_frame
+	var n_eu := _visible_nation_count()
+	_info("paused Home Europe visible=%d" % n_eu)
+	if n_eu < PAUSED_EUROPE_MIN:
+		_fail("paused Home Europe visible=%d want >= %d" % [n_eu, PAUSED_EUROPE_MIN])
+	else:
+		_pass("paused Home Europe visible=%d" % n_eu)
+	_cam.position = FAR_EAST_POS
+	await process_frame
+	await process_frame
+	var n_fe := _visible_nation_count()
+	_info("paused Far East visible=%d" % n_fe)
+	if n_fe <= 0:
+		_fail("paused Far East visible=%d (stale Europe box?)" % n_fe)
+	else:
+		_pass("paused Far East visible=%d" % n_fe)
+	paused = false
+	_cam.position = HOME_POS
+	if _layer != null and _layer.has_method("sync_camera_zoom"):
+		_layer.call("sync_camera_zoom", EUROPE_Z)
+	await process_frame
+
+
 func _assert_no_node_scale() -> void:
 	if _ger_label == null or not is_instance_valid(_ger_label):
 		_fail("NationLabel_GER missing")
@@ -308,3 +411,11 @@ func _assert_layer_fences() -> void:
 		_fail("live zoom / identity-scale wiring missing")
 	else:
 		_pass("paused-session zoom tracking + identity scale")
+	if "_sync_live_viewport_box" not in src or "_compute_live_camera_world_rect" not in src:
+		_fail("live viewport box refresh missing")
+	else:
+		_pass("paused-session live viewport box")
+	if "_apply_nation_fade_modulate" not in src:
+		_fail("fade modulate.a path missing")
+	else:
+		_pass("fade band uses modulate.a")

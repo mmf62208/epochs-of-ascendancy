@@ -60,6 +60,10 @@ class TestNationLabelLandmass(unittest.TestCase):
         # Effective screen px is font * zoom * 1, not a blown-up 20px texture.
         mid_eff = nation_label_effective_screen_px(mid, NATION_LABEL_MID_ZOOM, 1.0)
         self.assertLessEqual(mid_eff, float(mid) + 0.75)
+        fade = nation_label_font_px_for_camera(0.90, h)
+        fade_eff = nation_label_effective_screen_px(fade, 0.90, 1.0)
+        self.assertGreater(fade, 0)
+        self.assertGreaterEqual(fade_eff + 0.51, mid_eff)
 
 
 if __name__ == "__main__":

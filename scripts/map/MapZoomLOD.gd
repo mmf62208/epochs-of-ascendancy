@@ -333,9 +333,8 @@ static func nation_label_target_frac_of_height(z: float) -> float:
 		var span_mid := maxf(NATION_LABEL_MID_ZOOM - NATION_LABEL_EUROPE_ZOOM, 0.01)
 		var t_mid := clampf((zz - NATION_LABEL_EUROPE_ZOOM) / span_mid, 0.0, 1.0)
 		return lerpf(NATION_LABEL_EUROPE_HEIGHT_FRAC, NATION_LABEL_MID_HEIGHT_FRAC, t_mid)
-	var span_hide := maxf(NATION_LABEL_HIDE_ZOOM - NATION_LABEL_MID_ZOOM, 0.01)
-	var t_hide := clampf((zz - NATION_LABEL_MID_ZOOM) / span_hide, 0.0, 1.0)
-	return lerpf(NATION_LABEL_MID_HEIGHT_FRAC, 0.0, t_hide)
+	# Fade band (0.82–0.98): hold mid on-screen size. Alpha fades separately.
+	return NATION_LABEL_MID_HEIGHT_FRAC
 
 
 static func nation_label_hidden_for_camera(z: float) -> bool:

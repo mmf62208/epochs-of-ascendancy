@@ -81,9 +81,8 @@ def nation_label_target_frac_of_height(zoom: float) -> float:
         return NATION_LABEL_EUROPE_HEIGHT_FRAC + (
             NATION_LABEL_MID_HEIGHT_FRAC - NATION_LABEL_EUROPE_HEIGHT_FRAC
         ) * t
-    span = max(NATION_LABEL_HIDE_ZOOM - NATION_LABEL_MID_ZOOM, 0.01)
-    t = max(0.0, min(1.0, (zz - NATION_LABEL_MID_ZOOM) / span))
-    return NATION_LABEL_MID_HEIGHT_FRAC * (1.0 - t)
+    # Fade band (0.82–0.98): hold mid on-screen size. Alpha fades separately.
+    return NATION_LABEL_MID_HEIGHT_FRAC
 
 
 def nation_label_font_px_for_camera(zoom: float, viewport_h: float) -> int:
@@ -157,6 +156,25 @@ def _label1_bands_ok(viewport_h: float = 720.0) -> Tuple[bool, List[str], List[s
         passes.append("mid_le_europe")
     else:
         fails.append("mid_larger_than_europe")
+    fade_z = 0.90
+    fade_px = nation_label_font_px_for_camera(fade_z, viewport_h)
+    fade_r = nation_label_height_ratio(fade_px, fade_z, 1.0, viewport_h)
+    fade_eff = nation_label_effective_screen_px(fade_px, fade_z, 1.0)
+    mid_eff = nation_label_effective_screen_px(
+        nation_label_font_px_for_camera(NATION_LABEL_MID_ZOOM, viewport_h),
+        NATION_LABEL_MID_ZOOM,
+        1.0,
+    )
+    if fade_px <= 0:
+        fails.append("fade_font_hidden")
+    elif fade_eff + 0.51 < mid_eff:
+        fails.append("fade_smaller_than_mid")
+    else:
+        passes.append("fade_holds_mid_size=%.1f" % fade_eff)
+    if 0.016 <= fade_r <= 0.038:
+        passes.append("fade_ratio=%.4f" % fade_r)
+    else:
+        fails.append("fade_ratio=%.4f" % fade_r)
     if nation_label_is_texture_magnified(20, NATION_LABEL_MID_ZOOM, 2.5):
         passes.append("scale_2_5_detected")
     else:
@@ -234,6 +252,8 @@ def build_map_nation_label_landmass_product() -> Dict[str, Any]:
         "PROCESS_MODE_ALWAYS",
         "seed_debug_nation_label",
         "lbl.scale = Vector2.ONE",
+        "_sync_live_viewport_box",
+        "_apply_nation_fade_modulate",
     )
     for needle in label1_needles:
         src = lod if needle.startswith("nation_label_") or needle.startswith("NATION_LABEL_") else gd

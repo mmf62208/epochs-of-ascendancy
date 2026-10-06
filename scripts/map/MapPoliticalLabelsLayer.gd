@@ -5,6 +5,17 @@ extends Node2D
 
 const MapZoomLODScript = preload("res://scripts/map/MapZoomLOD.gd")
 
+## Play MIXED 816cdc9: nation Labels (z=40 absolute) buried the Rhine at close
+## zoom over Köln. Keep them under river/road overlays and hide/fade when close.
+## Size with font_size / Camera2D.zoom (never node.scale) so mid ~0.776 stays crisp.
+const NATION_LABEL_Z := 18
+const CLOSE_FADE_START_ZOOM := MapZoomLODScript.NATION_LABEL_FADE_START_ZOOM
+const CLOSE_HIDE_ZOOM := MapZoomLODScript.NATION_LABEL_HIDE_ZOOM
+const VIEWPORT_BOX_MARGIN_RATIO := 0.14
+const VIEWPORT_BOX_POS_DEAD_SQ := 256.0
+const VIEWPORT_BOX_ZOOM_DEAD := 0.012
+const VIEWPORT_BOX_VP_DEAD_SQ := 16.0
+
 var _nation_labels: Dictionary = {}  # tag -> Label
 var _region_labels: Dictionary = {}  # region_id -> Label
 var _state_labels: Dictionary = {}  # state_id -> Label
@@ -15,13 +26,9 @@ var _hover_region_id: int = -1
 var _viewport_rect: Rect2 = Rect2()
 var _viewport_culling_active: bool = false
 var _camera_zoom: float = 1.0
-
-## Play MIXED 816cdc9: nation Labels (z=40 absolute) buried the Rhine at close
-## zoom over Köln. Keep them under river/road overlays and hide/fade when close.
-## Size with font_size / Camera2D.zoom (never node.scale) so mid ~0.776 stays crisp.
-const NATION_LABEL_Z := 18
-const CLOSE_FADE_START_ZOOM := MapZoomLODScript.NATION_LABEL_FADE_START_ZOOM
-const CLOSE_HIDE_ZOOM := MapZoomLODScript.NATION_LABEL_HIDE_ZOOM
+var _last_box_cam_pos: Vector2 = Vector2(-99999.0, -99999.0)
+var _last_box_cam_zoom: float = -1.0
+var _last_box_vp_size: Vector2 = Vector2.ZERO
 
 
 func _ready() -> void:
@@ -38,6 +45,9 @@ func _process(_delta: float) -> void:
 		return
 	var live_z: float = MapZoomLODScript.read_camera_zoom(get_viewport())
 	sync_camera_zoom(live_z)
+	# Own the visible box from the live MapCamera. MapRenderer's detail refresh
+	# skips while paused, which left Home / Far-East pans on a stale cull rect.
+	_sync_live_viewport_box()
 
 
 func rebuild_from_map_data(province_centroids: Dictionary, provinces: Dictionary) -> void:
@@ -94,9 +104,68 @@ func set_hovered_region(region_id: int, tier: int = -1) -> void:
 func sync_viewport(world_rect: Rect2, active: bool) -> void:
 	_viewport_rect = world_rect
 	_viewport_culling_active = active
+	if active and world_rect.size != Vector2.ZERO:
+		_last_box_cam_pos = Vector2(-99999.0, -99999.0)
 	if not _built:
 		return
 	_apply_tier_visibility(_current_tier)
+
+
+func _compute_live_camera_world_rect(margin_ratio: float = VIEWPORT_BOX_MARGIN_RATIO) -> Rect2:
+	var vp := get_viewport()
+	if vp == null:
+		return Rect2()
+	var cam := vp.get_camera_2d()
+	if cam == null:
+		return Rect2()
+	var vp_size: Vector2 = vp.get_visible_rect().size
+	if vp_size.x < 8.0 or vp_size.y < 8.0:
+		vp_size = Vector2(1280.0, 720.0)
+	var zoom := maxf(absf(cam.zoom.x), absf(cam.zoom.y))
+	var half := vp_size * 0.5 / maxf(zoom, 0.01)
+	var center := cam.global_position
+	var rect := Rect2(center - half, half * 2.0)
+	var margin := margin_ratio * maxf(rect.size.x, rect.size.y)
+	return rect.grow(margin)
+
+
+func _sync_live_viewport_box() -> void:
+	var vp := get_viewport()
+	if vp == null:
+		return
+	var cam := vp.get_camera_2d()
+	if cam == null:
+		return
+	var live := _compute_live_camera_world_rect(VIEWPORT_BOX_MARGIN_RATIO)
+	if live.size == Vector2.ZERO:
+		return
+	var pos := cam.global_position
+	var z := maxf(absf(cam.zoom.x), absf(cam.zoom.y))
+	var vp_sz: Vector2 = vp.get_visible_rect().size
+	if (
+		_viewport_culling_active
+		and _viewport_rect.size != Vector2.ZERO
+		and pos.distance_squared_to(_last_box_cam_pos) < VIEWPORT_BOX_POS_DEAD_SQ
+		and absf(z - _last_box_cam_zoom) < VIEWPORT_BOX_ZOOM_DEAD
+		and vp_sz.distance_squared_to(_last_box_vp_size) < VIEWPORT_BOX_VP_DEAD_SQ
+	):
+		return
+	_last_box_cam_pos = pos
+	_last_box_cam_zoom = z
+	_last_box_vp_size = vp_sz
+	_viewport_rect = live
+	_viewport_culling_active = true
+	if _built:
+		_apply_nation_close_zoom()
+		_apply_state_label_visibility()
+
+
+func count_visible_nation_labels() -> int:
+	var n := 0
+	for lbl in _nation_labels.values():
+		if lbl is Label and (lbl as Label).visible:
+			n += 1
+	return n
 
 
 func _clear_labels() -> void:
@@ -836,9 +905,7 @@ func _apply_tier_visibility(tier: int) -> void:
 			if l.visible:
 				l.scale = Vector2.ONE
 				l.add_theme_font_size_override("font_size", zoom_px)
-				var c := l.get_theme_color("font_color")
-				c.a = _nation_alpha_for_zoom()
-				l.add_theme_color_override("font_color", c)
+				_apply_nation_fade_modulate(l, _nation_alpha_for_zoom())
 				_fit_and_center_label(l)
 	for rid_var in _region_labels.keys():
 		var lbl_r: Variant = _region_labels[rid_var]
@@ -948,9 +1015,13 @@ func nation_label_debug_metrics(tag: String = "GER") -> Dictionary:
 	var font_px := 0
 	var node_scale := 1.0
 	var visible := false
+	var modulate_a := 1.0
+	var outline_a := 0.95
 	if lbl != null and is_instance_valid(lbl):
 		visible = lbl.visible
 		node_scale = maxf(lbl.scale.x, lbl.scale.y)
+		modulate_a = lbl.modulate.a
+		outline_a = lbl.get_theme_color("font_outline_color").a
 		if visible:
 			font_px = int(lbl.get_theme_font_size("font_size"))
 	var vh := _viewport_height_px()
@@ -966,6 +1037,9 @@ func nation_label_debug_metrics(tag: String = "GER") -> Dictionary:
 		"texture_magnified": MapZoomLODScript.nation_label_is_texture_magnified(font_px, _camera_zoom, node_scale),
 		"visible": visible,
 		"alpha": _nation_alpha_for_zoom(),
+		"modulate_a": modulate_a,
+		"outline_a": outline_a,
+		"visible_count": count_visible_nation_labels(),
 	}
 
 
@@ -1001,9 +1075,20 @@ func _apply_nation_close_zoom() -> void:
 		var in_view := _nation_label_in_view(l, force)
 		l.scale = Vector2.ONE
 		l.add_theme_font_size_override("font_size", px)
-		var c := l.get_theme_color("font_color")
-		c.a = alpha
-		l.add_theme_color_override("font_color", c)
+		_apply_nation_fade_modulate(l, alpha)
 		l.visible = (show_n or force) and in_view and px > 0
 		if l.visible:
 			_fit_and_center_label(l)
+
+
+func _apply_nation_fade_modulate(l: Label, alpha: float) -> void:
+	# Fade fill + outline together. Do not shrink font in the 0.82–0.98 band.
+	l.modulate = Color(1.0, 1.0, 1.0, clampf(alpha, 0.0, 1.0))
+	if l.has_theme_color_override("font_color"):
+		var c := l.get_theme_color("font_color")
+		c.a = 0.96
+		l.add_theme_color_override("font_color", c)
+	if l.has_theme_color_override("font_outline_color"):
+		var oc := l.get_theme_color("font_outline_color")
+		oc.a = 0.95
+		l.add_theme_color_override("font_outline_color", oc)
