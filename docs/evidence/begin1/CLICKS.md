@@ -4,6 +4,15 @@ Window **1280×740** Absolute **@(0, 29)** · GER 1936 · `world_accurate`.
 Do **not** raise the window. Do **not** use Ctrl.
 Headless / xvfb ≠ live Play.
 
+**Tip:** this BEGIN-1 FIX #1 revision (750 ms expiry + later-frame clear +
+keyboard Begin does not arm). Update SHA after the push.
+
+## Pre-step
+
+```
+tools/run_godot.sh --headless --import --quit
+```
+
 Client = screen − window origin. Screen y = client y + **29**.
 Screen x = client x + **0**.
 
@@ -18,8 +27,11 @@ Screen x = client x + **0**.
    - **no** click-zoom (Home zoom must stay; leftover used to jump ~0.776 → 0.900)
    - Loir-et-Cher (under Begin at ~**(284, 580)** after Home) must **not** be selected
 4. Then a **new** still-click on a GER land chip / hex must select normally
-   (the leftover swallow is one-shot; a new left press or 400 ms / 24 frames
-   drops it so a lost release / keyboard Begin cannot eat that click).
+   (the leftover swallow is one-shot).
+5. Lost leftover up (unfocused window / release never reaches Godot): after
+   **~750 ms**, or after a **fresh** left press in a later frame, the first
+   map click must pick. Keyboard Enter/Space Begin must **not** arm the
+   swallow.
 
 ## 1280×740 Begin point
 

@@ -1369,6 +1369,10 @@ func _shortcut_input(event: InputEvent) -> void:
 func _arm_begin_release_swallow() -> void:
 	# TipDismiss-style: press arms swallow of the next left release so the
 	# orphan mouse-up cannot select/inspect/click-zoom after the title dies.
+	# Keyboard Enter/Space/B can fire button_down on a focused Begin — do not
+	# arm unless the left mouse button is actually held.
+	if not os_left_button_held():
+		return
 	var tree: SceneTree = Engine.get_main_loop() as SceneTree
 	if tree == null:
 		return

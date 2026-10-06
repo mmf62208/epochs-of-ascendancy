@@ -262,10 +262,9 @@ var _close_ignore_stale_left_down := false
 ## a short safety timeout (Play: leftover eaten swallowed later top-bar ups).
 const UNIT_CARD_LATCH_SAFETY_SEC := 0.5
 ## BEGIN-1 FIX #1: leftover Begin release swallow is one orphan up only.
-## A new left press must clear it, and it expires well under a second so a
-## lost release / keyboard Begin cannot eat the player's first map click.
-const BEGIN_SWALLOW_CAP_MSEC := 400
-const BEGIN_SWALLOW_CAP_FRAMES := 24
+## A later-frame left press clears it. Expires after ~750 ms so a lost
+## release (unfocused window) cannot eat the player's first map click.
+const BEGIN_TITLE_SWALLOW_EXPIRE_MS: int = 750
 ## Fighting card (stance + cmd) must stay on-screen at Play 1280×740.
 ## Old reserve 252 clipped Press/Hold below Halt/Assign (card grows past 220).
 const UNIT_CARD_DOCK_RESERVE := 348.0
@@ -24696,8 +24695,8 @@ func _clear_first_session_tip_dismiss_swallow() -> void:
 
 func arm_begin_title_release_swallow() -> void:
 	# LivingTitleBoot Begin press (button_down / handle_live_pointer / _input).
-	# One leftover left-release is eaten. A new left press or a short cap
-	# (400 ms / 24 frames) drops it so a lost up cannot eat the next click.
+	# One leftover left-release is eaten. A later-frame left press or ~750 ms
+	# expiry drops it so a lost up cannot eat the next click.
 	set_meta("eoa_begin_swallow_release", true)
 	set_meta("eoa_begin_swallow_arm_msec", Time.get_ticks_msec())
 	set_meta("eoa_begin_swallow_arm_frame", Engine.get_process_frames())
@@ -24707,10 +24706,7 @@ func _begin_title_release_swallow_expired() -> bool:
 	if not has_meta("eoa_begin_swallow_release"):
 		return false
 	var arm_ms: int = int(get_meta("eoa_begin_swallow_arm_msec", 0))
-	if arm_ms > 0 and Time.get_ticks_msec() - arm_ms >= BEGIN_SWALLOW_CAP_MSEC:
-		return true
-	var arm_fr: int = int(get_meta("eoa_begin_swallow_arm_frame", -1))
-	if arm_fr >= 0 and Engine.get_process_frames() - arm_fr >= BEGIN_SWALLOW_CAP_FRAMES:
+	if arm_ms > 0 and Time.get_ticks_msec() - arm_ms >= BEGIN_TITLE_SWALLOW_EXPIRE_MS:
 		return true
 	return false
 
@@ -24725,7 +24721,11 @@ func _begin_title_release_blocks_map_pick() -> bool:
 
 
 func _clear_begin_title_release_swallow_on_new_left_press() -> void:
-	if has_meta("eoa_begin_swallow_release"):
+	# Same-frame Begin press must keep the arm so the matching ~80 ms up is eaten.
+	if not has_meta("eoa_begin_swallow_release"):
+		return
+	var arm_frame: int = int(get_meta("eoa_begin_swallow_arm_frame", -1))
+	if Engine.get_process_frames() > arm_frame:
 		_clear_begin_title_release_swallow()
 
 

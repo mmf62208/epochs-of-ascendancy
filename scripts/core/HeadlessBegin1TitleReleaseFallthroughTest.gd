@@ -1,12 +1,14 @@
 extends SceneTree
 
 ## BEGIN-1: a normal ~80 ms Begin click must not leftover-pick the map.
-## FIX #1: swallow clears on a new left press and expires (400 ms / 24 frames).
+## FIX #1: swallow expires after ~750 ms; a later-frame left press clears it.
+## button_down arms only while left is held (Enter/Space must not arm).
 ## Drive real InputEventMouseButton press/release through MapRenderer _input /
-## _unhandled_input. Follow-up and no-release clicks must select via the real
+## _unhandled_input. Follow-up and lost-release clicks must select via the real
 ## pick path (pid != -1, no _select_province fallback).
 ## Does not load WorldMap.tscn / 3520. Headless / xvfb are NOT live Play.
 ##
+##   tools/run_godot.sh --headless --import --quit
 ##   tools/run_godot.sh --headless --path . --resolution 1280x740 \
 ##     -s res://scripts/core/HeadlessBegin1TitleReleaseFallthroughTest.gd
 ##   tools/eoa_begin1_guard.sh
@@ -16,6 +18,7 @@ const SRC_TITLE := "res://scripts/ui/LivingTitleBoot.gd"
 const PLAY_SIZE := Vector2i(1280, 740)
 const LOIR := 710671
 const HOLD_MS := 80
+const EXPIRE_WAIT_MS := 800
 const ZOOM0 := 0.776
 const CAM0 := Vector2(4200, 1000)
 const MAP_PT := Vector2(640, 400)
@@ -119,6 +122,10 @@ func _test_source_needles() -> void:
 	if "button_down.connect(_arm_begin_release_swallow)" not in title_src:
 		_fail("Begin press must arm leftover-release swallow")
 		return
+	var arm_title_fn := _slice_func(title_src, "_arm_begin_release_swallow")
+	if arm_title_fn.is_empty() or "os_left_button_held" not in arm_title_fn:
+		_fail("button_down arm must require os_left_button_held (keyboard Begin must not arm)")
+		return
 	var begin_fn := _slice_func(title_src, "_on_begin_new")
 	if begin_fn.is_empty() or "if _closed:" not in begin_fn:
 		_fail("_on_begin_new must no-op when already closed (double-fire)")
@@ -132,11 +139,19 @@ func _test_source_needles() -> void:
 	if "func arm_begin_title_release_swallow" not in ren:
 		_fail("MapRenderer must expose arm_begin_title_release_swallow")
 		return
-	if "BEGIN_SWALLOW_CAP_MSEC" not in ren or "BEGIN_SWALLOW_CAP_FRAMES" not in ren:
-		_fail("Begin swallow must expire on a short msec/frame cap")
+	var arm_fn := _slice_func(ren, "arm_begin_title_release_swallow")
+	if "get_ticks_msec" not in arm_fn or "get_process_frames" not in arm_fn:
+		_fail("arm_begin_title_release_swallow must store arm time and arm frame")
+		return
+	if "BEGIN_TITLE_SWALLOW_EXPIRE_MS" not in ren and "750" not in _slice_func(ren, "_begin_title_release_blocks_map_pick"):
+		_fail("Begin swallow must expire after ~750 ms")
 		return
 	if "func _clear_begin_title_release_swallow_on_new_left_press" not in ren:
 		_fail("Begin swallow must clear on a new left press")
+		return
+	var clear_press_fn := _slice_func(ren, "_clear_begin_title_release_swallow_on_new_left_press")
+	if "eoa_begin_swallow_arm_frame" not in clear_press_fn:
+		_fail("new left press must clear only in a later frame than the arming")
 		return
 	var input_fn := _slice_func(ren, "_input")
 	if "_begin_title_release_blocks_map_pick" not in input_fn:
@@ -166,7 +181,7 @@ func _test_source_needles() -> void:
 	if "eoa_tip_dismiss_swallow_release" not in _slice_func(ren, "_arm_first_session_tip_dismiss_swallow"):
 		_fail("TipDismiss swallow must stay")
 		return
-	_pass("source needles: Begin press-arm + expiry + clear-on-press + TipDismiss kept")
+	_pass("source needles: 750 ms expire + later-frame clear + left-held arm + TipDismiss kept")
 
 
 func _setup_renderer() -> bool:
@@ -505,54 +520,66 @@ func _test_next_map_click_still_selects() -> void:
 	await _assert_real_map_click_selects(MAP_PT, "follow-up after leftover Begin")
 
 
+func _send_begin_key(keycode: int) -> void:
+	var ev := InputEventKey.new()
+	ev.keycode = keycode
+	ev.physical_keycode = keycode
+	ev.pressed = true
+	ev.echo = false
+	if _title != null and is_instance_valid(_title):
+		_title._input(ev)
+	if _title != null and is_instance_valid(_title) and not bool(_title.get("_closed")):
+		if _mr != null:
+			_mr._input(ev)
+	if _title != null and is_instance_valid(_title) and not bool(_title.get("_closed")):
+		if _title.has_method("handle_live_begin"):
+			_title.call("handle_live_begin")
+
+
 func _test_keyboard_begin_then_map_click() -> void:
-	if not await _spawn_title():
-		return
-	_clear_inspector()
-	var enter := InputEventKey.new()
-	enter.keycode = KEY_ENTER
-	enter.physical_keycode = KEY_ENTER
-	enter.pressed = true
-	_title._input(enter)
-	if not bool(_title.get("_closed")):
-		_fail("keyboard Enter did not close the living title via _input")
-		return
-	if bool(_mr.call("_begin_title_release_blocks_map_pick")):
-		_fail("keyboard Begin must not arm leftover-release swallow")
-		return
-	_pass("keyboard Begin closed the title and did not arm swallow")
-	await _assert_real_map_click_selects(MAP_PT, "map click after keyboard Begin")
+	for keycode in [KEY_ENTER, KEY_SPACE]:
+		var key_name: String = "Enter" if keycode == KEY_ENTER else "Space"
+		if not await _spawn_title():
+			return
+		_clear_inspector()
+		_send_begin_key(keycode)
+		if not bool(_title.get("_closed")):
+			_fail("keyboard Begin (%s) did not close the living title" % key_name)
+			return
+		if bool(_mr.call("_begin_title_release_blocks_map_pick")):
+			_fail("keyboard Begin (%s) armed leftover-release swallow" % key_name)
+			return
+		_pass("keyboard Begin (%s) closed the title and did not arm swallow" % key_name)
+		if not await _assert_real_map_click_selects(MAP_PT, "map click after keyboard Begin (%s)" % key_name):
+			return
 
 
 func _test_swallow_expires_and_new_press_clears() -> void:
-	if _mr == null:
-		_fail("renderer missing for swallow expiry")
+	# Lost leftover up after a real Begin press: expire, then first click picks.
+	if not await _begin_via_real_mouse_press():
 		return
-	_mr.call("arm_begin_title_release_swallow")
-	if not bool(_mr.call("_begin_title_release_blocks_map_pick")):
-		_fail("arm_begin_title_release_swallow did not arm")
-		return
-	var t0: int = Time.get_ticks_msec()
-	var f0: int = Engine.get_process_frames()
-	while (
-		Time.get_ticks_msec() - t0 < 450
-		and Engine.get_process_frames() - f0 < 30
-	):
-		await process_frame
+	await _wait_hold_ms(EXPIRE_WAIT_MS)
+	await _flush(2)
 	if bool(_mr.call("_begin_title_release_blocks_map_pick")):
-		_fail("Begin swallow still armed after 400 ms / 24 frames")
+		_fail("lost-release swallow stayed armed after %d ms expiry" % EXPIRE_WAIT_MS)
 		return
-	_pass("Begin swallow expired on its own (400 ms / 24 frames)")
-	_mr.call("arm_begin_title_release_swallow")
+	_pass("lost-release swallow expired after ~750 ms")
+	if not await _assert_real_map_click_selects(MAP_PT, "first click after lost-release expiry"):
+		return
+	# Separately: lost leftover up, then a later-frame fresh press clears.
+	if not await _begin_via_real_mouse_press():
+		return
+	await _flush(3)
 	if not bool(_mr.call("_begin_title_release_blocks_map_pick")):
-		_fail("re-arm before new-press clear failed")
+		_fail("swallow dropped before the later-frame press (cannot prove clear-on-press)")
 		return
 	_send_mouse(MAP_PT, true)
 	if bool(_mr.call("_begin_title_release_blocks_map_pick")):
-		_fail("new left press did not clear the Begin swallow")
+		_fail("later-frame left press did not clear the Begin swallow")
 		return
-	_pass("new left press cleared the Begin swallow")
+	_pass("later-frame left press cleared the Begin swallow")
 	_send_mouse(MAP_PT, false)
 	await _flush(2)
 	_clear_inspector()
-	await _assert_real_map_click_selects(MAP_PT, "map click after armed-no-release")
+	if not await _assert_real_map_click_selects(MAP_PT, "first click after lost-release + fresh press"):
+		return
