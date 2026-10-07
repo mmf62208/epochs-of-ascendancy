@@ -484,8 +484,9 @@ func _poll_mouse() -> Vector2:
 
 func _prepare_poll_close_hit(btn: Button) -> Vector2:
 	# Headless warp often leaves get_mouse_position() at the last leftover
-	# (BEGIN-1 poll class). Cover (0,0) and the live poll point so
-	# handle_live_close_pointer(null) is a real × hit, then seed Köln under it.
+	# (BEGIN-1 poll class). Toast × sits in a BOTTOM_RIGHT VBox that clips
+	# and ignores set_global_position — reparent onto the news layer so the
+	# × can cover (0,0) and the live poll point.
 	if btn == null:
 		return Vector2.ZERO
 	var poll_pt: Vector2 = _poll_mouse()
@@ -493,9 +494,22 @@ func _prepare_poll_close_hit(btn: Button) -> Vector2:
 		maxf(96.0, maxf(poll_pt.x, 24.0) + 48.0),
 		maxf(96.0, maxf(poll_pt.y, 24.0) + 48.0)
 	)
+	var host: Node = root
+	if _cc != null and is_instance_valid(_cc) and _cc.is_ancestor_of(btn):
+		host = _cc
+	elif _leui != null:
+		var layer: Node = _leui.get_node_or_null("LeaderNewsLayer")
+		if layer != null:
+			host = layer
+	var parent: Node = btn.get_parent()
+	if parent != host:
+		if parent != null:
+			parent.remove_child(btn)
+		host.add_child(btn)
+	btn.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	btn.position = Vector2.ZERO
 	btn.custom_minimum_size = cover
 	btn.size = cover
-	btn.set_global_position(Vector2.ZERO)
 	if btn.has_method("reset_size"):
 		btn.reset_size()
 	await _flush(2)
@@ -505,7 +519,7 @@ func _prepare_poll_close_hit(btn: Button) -> Vector2:
 		_fail("poll-path × hit rect must own (0,0) or the live poll point %s (rect=%s)" % [str(poll_pt), str(rect)])
 		return Vector2.ZERO
 	if not rect.has_point(hit):
-		hit = rect.get_center()
+		hit = Vector2.ZERO if rect.has_point(Vector2.ZERO) else rect.get_center()
 	_restore_home_camera()
 	_clear_inspector()
 	if not _seed_known_under_screen(hit):

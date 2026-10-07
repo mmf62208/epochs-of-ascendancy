@@ -773,6 +773,16 @@ func _free_notice_toast_node(node: Node) -> void:
 
 
 func notice_close_button() -> Button:
+	var tree: SceneTree = get_tree()
+	if tree != null:
+		for n in tree.get_nodes_in_group(NOTICE_CLOSE_GROUP):
+			if n == null or not is_instance_valid(n) or not (n is Button):
+				continue
+			var grouped: Button = n as Button
+			if grouped.name != "NoticeClose":
+				continue
+			if grouped.visible and grouped.is_visible_in_tree():
+				return grouped
 	if _toast_container == null:
 		return null
 	return _toast_container.find_child("NoticeClose", true, false) as Button
