@@ -404,6 +404,10 @@ const _AGENT_FILL_TINT := ProvinceMapVisuals.FILL_AGENT
 
 var _supply_role_by_province: Dictionary[int, String] = {}
 var _supply_roles_cache: Dictionary[int, String] = {}
+var _supply_roles_cache_fingerprint: String = ""
+var _supply_cache_route_pids: Dictionary = {}
+var _supply_cache_depot_pids: Dictionary = {}
+var _supply_overlay_dirty_pids: Dictionary = {}
 var _supply_poly_cache: Dictionary[int, PackedVector2Array] = {}
 var _supply_outline_batch: Node2D = null
 var _supply_outline_rebuild_count: int = 0
@@ -413,12 +417,32 @@ var _supply_toggle_in_progress: bool = false
 var _supply_toggle_role_computes: int = 0
 var _supply_toggle_setups: int = 0
 var _supply_toggle_glyph_layouts: int = 0
+var _supply_full_role_recomputes: int = 0
+var _supply_batch_patches: int = 0
+var _supply_last_reconcile_ms: float = 0.0
 var _compare_candidate_ids: Array[int] = []
 var _supply_legend_panel: PanelContainer = null
+var _supply_legend_pulse_border: Control = null
+var _legend_pulse_last_active: bool = false
+var _legend_pulse_last_kind: String = ""
 var _compare_hint_label: Label = null
+var _compare_hint_last_color: Color = Color(1.0, 0.75, 0.45)
 var _legend_tracked_year: int = -1
 var _legend_tracked_month: int = -1
 var _legend_tracked_day: int = -1
+var _legend_stat_cache_year: int = -1
+var _legend_stat_cache_month: int = -1
+var _legend_stat_cache_day: int = -1
+var _legend_stat_cache_dirty: bool = true
+var _legend_cached_contested: int = 0
+var _legend_cached_agent: int = 0
+var _legend_cached_dual: int = 0
+var _legend_board_walks: int = 0
+var _legend_text_writes: int = 0
+var _legend_style_writes: int = 0
+var _legend_hover_flushed: int = 0
+var _hover_tooltip_coalesce_pending: bool = false
+var _hover_tooltip_coalesce_key: String = ""
 var _map_time_pulse_bbcode: String = ""
 var _map_time_pulse_kind: String = ""
 var _map_time_pulse_until_msec: int = 0
@@ -766,12 +790,40 @@ func _connect_map_manager_signals() -> void:
 		return
 	if not MapManager.province_data_changed.is_connected(_on_map_province_data_changed):
 		MapManager.province_data_changed.connect(_on_map_province_data_changed)
+	_connect_supply_manager_signals()
+
+
+func _connect_supply_manager_signals() -> void:
+	var sm := _supply_manager()
+	if sm == null:
+		return
+	if sm.has_signal("network_rebuilt") and not sm.network_rebuilt.is_connected(_on_supply_network_rebuilt_overlay):
+		sm.network_rebuilt.connect(_on_supply_network_rebuilt_overlay)
+	if sm.has_signal("route_updated") and not sm.route_updated.is_connected(_on_supply_route_updated_overlay):
+		sm.route_updated.connect(_on_supply_route_updated_overlay)
+
+
+func _on_supply_network_rebuilt_overlay(_hub_count: int = 0) -> void:
+	## Accelerator only — #88 mutation paths emit nothing, so the per-frame fingerprint poll is required.
+	_supply_overlay_dirty_pids[-1] = true
+
+
+func _on_supply_route_updated_overlay(_route_id: String = "", _plan: Variant = null) -> void:
+	_supply_overlay_dirty_pids[-1] = true
+
+
+func _mark_supply_overlay_pid_dirty(province_id: int) -> void:
+	_supply_overlay_dirty_pids[province_id] = true
 
 
 func _on_map_province_data_changed(province_id: int, what: String) -> void:
 	if what not in ["effects", "development", "infrastructure", "owner", "controller", "all", "infrastructure_project", "settlement", "welfare", "policy", "burden"]:
 		return
 	var owner_flip := what in ["owner", "controller", "all"]
+	if what in ["owner", "controller", "infrastructure", "development", "effects", "all"]:
+		_mark_supply_overlay_pid_dirty(province_id)
+		if owner_flip:
+			_invalidate_legend_board_stats()
 	if provinces.has(province_id):
 		_refresh_single_province_fill(province_id)
 		# Inspector rebuild is heavy; skip on capture/resolve owner flips.
@@ -907,6 +959,12 @@ func _connect_time_manager_signals() -> void:
 
 
 func _on_game_day_advanced_legend(year: int, month: int, day: int) -> void:
+	var _legend_prof := OS.get_environment("EOA_LEGEND_PROFILE").strip_edges() == "1"
+	var _legend_t0 := Time.get_ticks_usec() if _legend_prof else 0
+	var _walks0 := _legend_board_walks
+	var _style0 := _legend_style_writes
+	var _text0 := _legend_text_writes
+	var _hover0 := _legend_hover_flushed
 	if _legend_tracked_day < 0:
 		_legend_tracked_day = day
 		_legend_tracked_month = month
@@ -970,6 +1028,13 @@ func _on_game_day_advanced_legend(year: int, month: int, day: int) -> void:
 	# Live F5 / softpipe: skip path-risk walks on the hour/day emit (clock at 00:00).
 	if not live_or_light:
 		_sample_route_risk_day_history()
+	if _legend_prof:
+		var ms := float(Time.get_ticks_usec() - _legend_t0) / 1000.0
+		var hover_n := 1 if _legend_hover_flushed > _hover0 else 0
+		print(
+			"EOA_LEGEND_DAY ms=%.3f style_writes=%d walks=%d text_writes=%d hover=%d"
+			% [ms, _legend_style_writes - _style0, _legend_board_walks - _walks0, _legend_text_writes - _text0, hover_n]
+		)
 
 
 func _on_time_advanced_refresh_legend(_a: Variant = null, _b: Variant = null) -> void:
@@ -1034,7 +1099,35 @@ func _refresh_map_time_ui() -> void:
 	if supply_mode:
 		_update_supply_legend_text()
 	if _hover_province != null and hover_tooltip != null and hover_tooltip.visible:
-		_refresh_hover_tooltip(_hover_province)
+		_queue_day_hover_tooltip_refresh()
+
+
+func _queue_day_hover_tooltip_refresh() -> void:
+	if _hover_province == null or hover_tooltip == null or not hover_tooltip.visible:
+		return
+	var key := "%d:%d:%d:%d" % [
+		_hover_province.id, _legend_tracked_year, _legend_tracked_month, _legend_tracked_day,
+	]
+	if key == _hover_tooltip_coalesce_key:
+		return
+	if _hover_tooltip_coalesce_pending:
+		return
+	_hover_tooltip_coalesce_pending = true
+	call_deferred("_flush_day_hover_tooltip_refresh")
+
+
+func _flush_day_hover_tooltip_refresh() -> void:
+	_hover_tooltip_coalesce_pending = false
+	if _hover_province == null or hover_tooltip == null or not hover_tooltip.visible:
+		return
+	var key := "%d:%d:%d:%d" % [
+		_hover_province.id, _legend_tracked_year, _legend_tracked_month, _legend_tracked_day,
+	]
+	if key == _hover_tooltip_coalesce_key:
+		return
+	_hover_tooltip_coalesce_key = key
+	_legend_hover_flushed += 1
+	_refresh_hover_tooltip(_hover_province)
 
 
 func _get_active_map_time_pulse_bbcode() -> String:
@@ -1053,7 +1146,8 @@ func _expire_map_time_pulse_if_needed() -> void:
 	_map_time_pulse_bbcode = ""
 	_map_time_pulse_kind = ""
 	if supply_mode:
-		_update_supply_legend_text()
+		_apply_supply_legend_time_pulse_style(false, "")
+		_update_supply_legend_text(false)
 
 
 func _is_info_panel_visible() -> bool:
@@ -29195,61 +29289,86 @@ func _set_compare_preview_outline(province_id: int, visible: bool) -> void:
 		ProvinceMapVisuals.hide_polished_outline(node, ProvinceMapVisuals.NODE_COMPARE)
 
 
+func _supply_role_context() -> Dictionary:
+	var ctx: Dictionary = {
+		"has_depot": {},
+		"selected": -1,
+		"preview_pids": {},
+		"route_pids": {},
+		"trade_pids": {},
+	}
+	var sm := _supply_manager()
+	if sm != null and "depot_states" in sm:
+		for pid_var in sm.depot_states.keys():
+			var depot: Variant = sm.get_depot_state(int(pid_var)) if sm.has_method("get_depot_state") else sm.depot_states[pid_var]
+			if depot != null and depot.has_method("fill_ratio") and float(depot.fill_ratio()) >= 0.0:
+				(ctx["has_depot"] as Dictionary)[int(pid_var)] = true
+	if sm != null and sm.has_method("get_selected_province_id"):
+		ctx["selected"] = int(sm.get_selected_province_id())
+	if int(ctx["selected"]) < 0:
+		ctx["selected"] = selected_province_id
+	if sm == null:
+		return ctx
+	if _supply_reroute_active and sm.has_method("preview_player_route"):
+		var preview: SupplyRoutePlan = sm.preview_player_route()
+		if preview != null and preview.path_length() > 0:
+			for pid_var in preview.province_path:
+				(ctx["preview_pids"] as Dictionary)[int(pid_var)] = true
+	if sm.has_method("get_all_routes"):
+		for plan_var in sm.get_all_routes():
+			if not (plan_var is SupplyRoutePlan):
+				continue
+			var plan := plan_var as SupplyRoutePlan
+			if plan.represents_trade_flow:
+				if plan.province_path.size() >= 2:
+					for pid_var in plan.province_path:
+						(ctx["trade_pids"] as Dictionary)[int(pid_var)] = true
+				continue
+			for pid_var in plan.province_path:
+				(ctx["route_pids"] as Dictionary)[int(pid_var)] = true
+	return ctx
+
+
+func _supply_role_for_pid(pid: int, ctx: Dictionary = {}) -> String:
+	if ctx.is_empty():
+		ctx = _supply_role_context()
+	var role := ""
+	var has_depot: Dictionary = ctx.get("has_depot", {})
+	if bool(has_depot.get(pid, false)):
+		role = "hub"
+	var selected := int(ctx.get("selected", -1))
+	if selected >= 0 and pid == selected:
+		return "active"
+	var preview_pids: Dictionary = ctx.get("preview_pids", {})
+	var route_pids: Dictionary = ctx.get("route_pids", {})
+	if preview_pids.has(pid):
+		role = "preview"
+	elif route_pids.has(pid):
+		role = "route"
+	if role in ["active", "preview", "route"]:
+		return role
+	var trade_pids: Dictionary = ctx.get("trade_pids", {})
+	if role != "hub" and trade_pids.has(pid):
+		role = "trade_transit"
+	var roles: Dictionary[int, String] = {}
+	if not role.is_empty():
+		roles[pid] = role
+	_apply_infra_pressure_role_for_pid(pid, roles)
+	return str(roles.get(pid, ""))
+
+
 func _supply_highlight_roles() -> Dictionary[int, String]:
 	if _supply_toggle_in_progress:
 		_supply_toggle_role_computes += 1
 	var roles: Dictionary[int, String] = {}
 	if not supply_mode:
 		return roles
-	var sm := _supply_manager()
+	_supply_full_role_recomputes += 1
+	var ctx := _supply_role_context()
 	for pid in province_nodes.keys():
-		var depot: Variant = sm.get_depot_state(int(pid)) if sm != null else null
-		if depot != null and float(depot.fill_ratio()) >= 0.0:
-			roles[int(pid)] = "hub"  # overwritten below if on route / preview / selected
-	if sm == null:
-		return roles
-	var selected: int = SupplyManager.get_selected_province_id()
-	if selected < 0:
-		selected = selected_province_id
-	if selected >= 0:
-		roles[selected] = "active"
-	var preview_pids: Dictionary[int, bool] = {}
-	if _supply_reroute_active:
-		var preview: SupplyRoutePlan = sm.preview_player_route()
-		if preview != null and preview.path_length() > 0:
-			for pid_var in preview.province_path:
-				preview_pids[int(pid_var)] = true
-	for plan_var in sm.get_all_routes():
-		if not (plan_var is SupplyRoutePlan):
-			continue
-		var plan := plan_var as SupplyRoutePlan
-		if plan.represents_trade_flow:
-			continue
-		for pid_var in plan.province_path:
-			var pid := int(pid_var)
-			if str(roles.get(pid, "")) == "active":
-				continue
-			if preview_pids.has(pid):
-				roles[pid] = "preview"
-			else:
-				roles[pid] = "route"
-	for pid in preview_pids.keys():
-		if str(roles.get(pid, "")) != "active":
-			roles[pid] = "preview"
-	# Trade corridors: soft ring on path provinces that are not already primary logistics / depots.
-	for plan_var in sm.get_all_routes():
-		if not (plan_var is SupplyRoutePlan):
-			continue
-		var tplan := plan_var as SupplyRoutePlan
-		if not tplan.represents_trade_flow or tplan.province_path.size() < 2:
-			continue
-		for pid_var in tplan.province_path:
-			var pid2 := int(pid_var)
-			var cur := str(roles.get(pid2, ""))
-			if cur in ["active", "preview", "route", "hub"]:
-				continue
-			roles[pid2] = "trade_transit"
-	_apply_infra_pressure_overlay_roles(roles)
+		var role := _supply_role_for_pid(int(pid), ctx)
+		if not role.is_empty():
+			roles[int(pid)] = role
 	return roles
 
 
@@ -29257,52 +29376,59 @@ func _apply_infra_pressure_overlay_roles(roles: Dictionary[int, String]) -> void
 	if not supply_mode:
 		return
 	for pid_var in province_nodes.keys():
-		var pid := int(pid_var)
-		var existing: String = str(roles.get(pid, ""))
-		if existing in ["active", "preview", "route"]:
-			continue
-		if not provinces.has(pid):
-			continue
-		var p: Province = provinces[pid] as Province
-		if p == null:
-			continue
-		var focus := ProvinceInsight.agent_pressure_focus_kind(p)
-		# Mass 1936 path: infra < 45 + owned land → engineers_recommended.
-		# Must not call get_engineer_assignment_snapshot / breakdown per pid
-		# (that was the L-on hang: 3k snapshots + 6k Line2Ds).
-		if focus != "sabotage":
-			var tag := str(p.controller_tag).strip_edges().to_upper()
-			if tag.is_empty():
-				tag = str(p.owner_tag).strip_edges().to_upper()
-			if not tag.is_empty() and ProvinceInsight.province_benefits_country(p, tag):
-				if int(p.infrastructure) < 45:
-					roles[pid] = "engineers_recommended"
-					continue
-				if focus == "disrupt":
-					roles[pid] = "supply_pressure"
-					continue
-				continue
+		_apply_infra_pressure_role_for_pid(int(pid_var), roles)
+
+
+func _apply_infra_pressure_role_for_pid(pid: int, roles: Dictionary[int, String]) -> void:
+	if not supply_mode:
+		return
+	var existing: String = str(roles.get(pid, ""))
+	if existing in ["active", "preview", "route"]:
+		return
+	if not provinces.has(pid):
+		return
+	var p: Province = provinces[pid] as Province
+	if p == null:
+		return
+	var focus := ProvinceInsight.agent_pressure_focus_kind(p)
+	# Mass 1936 path: infra < 45 + owned land → engineers_recommended.
+	# Must not call get_engineer_assignment_snapshot / breakdown per pid
+	# (that was the L-on hang: 3k snapshots + 6k Line2Ds).
+	if focus != "sabotage":
+		var tag := str(p.controller_tag).strip_edges().to_upper()
+		if tag.is_empty():
+			tag = str(p.owner_tag).strip_edges().to_upper()
+		if not tag.is_empty() and ProvinceInsight.province_benefits_country(p, tag):
+			if int(p.infrastructure) < 45:
+				roles[pid] = "engineers_recommended"
+				return
 			if focus == "disrupt":
 				roles[pid] = "supply_pressure"
-				continue
-			continue
-		if typeof(MapManager) == TYPE_NIL:
-			continue
-		var bd: Dictionary = MapManager.get_infrastructure_repair_breakdown(pid)
-		var eng_role := ProvinceInsight.get_engineer_supply_overlay_role(p, bd)
-		if not eng_role.is_empty():
-			roles[pid] = eng_role
-			continue
+				return
+			return
 		if focus == "disrupt":
 			roles[pid] = "supply_pressure"
-			continue
-		var depot_sab := float(bd.get("depot_sabotage_level", 0.0))
-		if depot_sab > 0.12:
-			roles[pid] = "depot_sabotage"
-			continue
+			return
+		return
+	if typeof(MapManager) == TYPE_NIL:
+		return
+	var bd: Dictionary = MapManager.get_infrastructure_repair_breakdown(pid)
+	var eng_role := ProvinceInsight.get_engineer_supply_overlay_role(p, bd)
+	if not eng_role.is_empty():
+		roles[pid] = eng_role
+		return
+	if focus == "disrupt":
+		roles[pid] = "supply_pressure"
+		return
+	var depot_sab := float(bd.get("depot_sabotage_level", 0.0))
+	if depot_sab > 0.12:
+		roles[pid] = "depot_sabotage"
+		return
 
 
 func _pulse_supply_outlines() -> void:
+	if supply_mode:
+		_reconcile_supply_overlay_if_needed(false)
 	if _supply_outline_batch != null and is_instance_valid(_supply_outline_batch) and _supply_outline_batch.visible:
 		var skip: Dictionary = {}
 		for flash_pid in _engineer_assign_flash_by_province.keys():
@@ -29386,7 +29512,17 @@ func _refresh_supply_highlights(reuse_cached_roles: bool = false) -> void:
 		_set_supply_outline_batch_visible(false)
 		_supply_role_by_province = {}
 		return
-	if reuse_cached_roles and _supply_outline_batch_is_ready() and not _supply_roles_cache.is_empty():
+	_reconcile_supply_overlay_if_needed(reuse_cached_roles)
+	if (
+		reuse_cached_roles
+		and _supply_outline_batch_is_ready()
+		and not _supply_roles_cache.is_empty()
+		and _supply_roles_cache_is_fresh()
+	):
+		_supply_role_by_province = _supply_roles_cache.duplicate()
+		_set_supply_outline_batch_visible(true)
+		return
+	if not _supply_roles_cache.is_empty() and _supply_outline_batch_is_ready():
 		_supply_role_by_province = _supply_roles_cache.duplicate()
 		_set_supply_outline_batch_visible(true)
 		return
@@ -29396,6 +29532,7 @@ func _refresh_supply_highlights(reuse_cached_roles: bool = false) -> void:
 		_set_supply_outline_batch_visible(true)
 		return
 	_supply_roles_cache = roles.duplicate()
+	_store_supply_roles_cache_fingerprint()
 	_apply_supply_roles_to_batch(roles)
 
 
@@ -29432,6 +29569,36 @@ func get_supply_toggle_glyph_layouts() -> int:
 	return _supply_toggle_glyph_layouts
 
 
+func get_supply_full_role_recomputes() -> int:
+	return _supply_full_role_recomputes
+
+
+func get_supply_batch_patches() -> int:
+	return _supply_batch_patches
+
+
+func get_last_supply_reconcile_ms() -> float:
+	return _supply_last_reconcile_ms
+
+
+func get_legend_board_walks() -> int:
+	return _legend_board_walks
+
+
+func get_legend_text_writes() -> int:
+	return _legend_text_writes
+
+
+func get_legend_style_writes() -> int:
+	return _legend_style_writes
+
+
+func get_supply_legend_pulse_modulate() -> Color:
+	if _supply_legend_pulse_border != null and is_instance_valid(_supply_legend_pulse_border):
+		return _supply_legend_pulse_border.self_modulate
+	return Color(0, 0, 0, 0)
+
+
 func _supply_outline_batch_is_ready() -> bool:
 	return _supply_outline_batch != null and is_instance_valid(_supply_outline_batch)
 
@@ -29443,6 +29610,204 @@ func _supply_roles_cache_matches(roles: Dictionary[int, String]) -> bool:
 		if str(_supply_roles_cache.get(int(pid), "")) != str(roles[pid]):
 			return false
 	return true
+
+
+func _supply_topology_fingerprint() -> String:
+	var sm := _supply_manager()
+	if sm == null:
+		return "null"
+	var parts: PackedStringArray = PackedStringArray()
+	var routes_dict: Dictionary = {}
+	if "_routes" in sm:
+		routes_dict = sm._routes as Dictionary
+	var keys: Array = routes_dict.keys()
+	keys.sort()
+	for k in keys:
+		var plan: Variant = routes_dict[k]
+		var iid := 0
+		if plan != null and plan is Object:
+			iid = int((plan as Object).get_instance_id())
+		parts.append("%s:%d" % [str(k), iid])
+	var depot_n := 0
+	if "depot_states" in sm:
+		depot_n = int((sm.depot_states as Dictionary).size())
+	var depot_hash := 0
+	if "player_depot_province_ids" in sm:
+		var ids: Array = (sm.player_depot_province_ids as Array).duplicate()
+		ids.sort()
+		depot_hash = hash(ids)
+	var selected := -1
+	if sm.has_method("get_selected_province_id"):
+		selected = int(sm.get_selected_province_id())
+	if selected < 0:
+		selected = selected_province_id
+	var preview_key := "0"
+	if _supply_reroute_active and sm.has_method("preview_player_route"):
+		var prev: Variant = sm.preview_player_route()
+		if prev != null and prev is Object:
+			preview_key = str((prev as Object).get_instance_id())
+	return "%s|d%d|h%d|s%d|p%s" % ["+".join(parts), depot_n, depot_hash, selected, preview_key]
+
+
+func _collect_supply_route_pids() -> Dictionary:
+	var out := {}
+	var sm := _supply_manager()
+	if sm == null or not sm.has_method("get_all_routes"):
+		return out
+	for plan_var in sm.get_all_routes():
+		if not (plan_var is SupplyRoutePlan):
+			continue
+		var plan := plan_var as SupplyRoutePlan
+		if plan.represents_trade_flow:
+			continue
+		for pid_var in plan.province_path:
+			out[int(pid_var)] = true
+	return out
+
+
+func _collect_supply_depot_pids() -> Dictionary:
+	var out := {}
+	var sm := _supply_manager()
+	if sm == null or not ("depot_states" in sm):
+		return out
+	for pid_var in sm.depot_states.keys():
+		out[int(pid_var)] = true
+	return out
+
+
+func _store_supply_roles_cache_fingerprint() -> void:
+	_supply_roles_cache_fingerprint = _supply_topology_fingerprint()
+	_supply_cache_route_pids = _collect_supply_route_pids()
+	_supply_cache_depot_pids = _collect_supply_depot_pids()
+
+
+func _supply_roles_cache_is_fresh() -> bool:
+	if _supply_roles_cache.is_empty():
+		return false
+	if not _supply_overlay_dirty_pids.is_empty():
+		return false
+	return _supply_roles_cache_fingerprint == _supply_topology_fingerprint()
+
+
+func _pid_set_symmetric_diff(a: Dictionary, b: Dictionary) -> Dictionary:
+	var out := {}
+	for k in a.keys():
+		if not b.has(k):
+			out[int(k)] = true
+	for k in b.keys():
+		if not a.has(k):
+			out[int(k)] = true
+	return out
+
+
+func _reconcile_supply_overlay_if_needed(from_toggle: bool = false) -> void:
+	if not supply_mode:
+		return
+	var t0 := Time.get_ticks_usec()
+	var fp := _supply_topology_fingerprint()
+	var fp_changed := fp != _supply_roles_cache_fingerprint
+	var dirty: Dictionary = _supply_overlay_dirty_pids.duplicate()
+	if not fp_changed and dirty.is_empty() and not _supply_roles_cache.is_empty() and _supply_outline_batch_is_ready():
+		_supply_last_reconcile_ms = float(Time.get_ticks_usec() - t0) / 1000.0
+		return
+	var force_full := (
+		_supply_roles_cache.is_empty()
+		or not _supply_outline_batch_is_ready()
+		or (from_toggle and dirty.size() > 256)
+	)
+	if force_full:
+		var roles := _supply_highlight_roles()
+		_supply_role_by_province = roles
+		_supply_roles_cache = roles.duplicate()
+		_store_supply_roles_cache_fingerprint()
+		_supply_overlay_dirty_pids.clear()
+		var sm_full := _supply_manager()
+		if supply_map_layer != null and sm_full != null and sm_full.has_method("get_all_routes"):
+			supply_map_layer.set_routes(sm_full.get_all_routes())
+		_apply_supply_roles_to_batch(roles)
+		_supply_last_reconcile_ms = float(Time.get_ticks_usec() - t0) / 1000.0
+		return
+	var sm := _supply_manager()
+	if fp_changed and supply_map_layer != null and sm != null and sm.has_method("get_all_routes"):
+		supply_map_layer.set_routes(sm.get_all_routes())
+	var new_route_pids := _collect_supply_route_pids()
+	var new_depot_pids := _collect_supply_depot_pids()
+	var patch_pids := _pid_set_symmetric_diff(_supply_cache_route_pids, new_route_pids)
+	var depot_diff := _pid_set_symmetric_diff(_supply_cache_depot_pids, new_depot_pids)
+	for k in depot_diff.keys():
+		patch_pids[int(k)] = true
+	for k in dirty.keys():
+		var dpid := int(k)
+		if dpid >= 0:
+			patch_pids[dpid] = true
+	if patch_pids.is_empty():
+		_store_supply_roles_cache_fingerprint()
+		_supply_overlay_dirty_pids.clear()
+		_supply_last_reconcile_ms = float(Time.get_ticks_usec() - t0) / 1000.0
+		return
+	var ctx := _supply_role_context()
+	var upserts: Dictionary = {}
+	var removed: Array[int] = []
+	for pid_var in patch_pids.keys():
+		var pid := int(pid_var)
+		var new_role := _supply_role_for_pid(pid, ctx)
+		var old_role := str(_supply_roles_cache.get(pid, ""))
+		if new_role.is_empty():
+			if _supply_roles_cache.has(pid):
+				_supply_roles_cache.erase(pid)
+				_supply_role_by_province.erase(pid)
+				removed.append(pid)
+		elif new_role != old_role or not _supply_roles_cache.has(pid):
+			_supply_roles_cache[pid] = new_role
+			_supply_role_by_province[pid] = new_role
+			upserts[pid] = new_role
+	_store_supply_roles_cache_fingerprint()
+	_supply_overlay_dirty_pids.clear()
+	if not upserts.is_empty() or not removed.is_empty():
+		_patch_supply_roles_on_batch(upserts, removed)
+	_supply_last_reconcile_ms = float(Time.get_ticks_usec() - t0) / 1000.0
+
+
+func _patch_supply_roles_on_batch(upsert_roles: Dictionary, removed_pids: Array[int]) -> void:
+	var batch := _ensure_supply_outline_batch()
+	if batch == null:
+		return
+	var upserts: Array[Dictionary] = []
+	for pid_var in upsert_roles.keys():
+		var item := _supply_role_batch_item(int(pid_var), str(upsert_roles[pid_var]))
+		if not item.is_empty():
+			upserts.append(item)
+	if batch.has_method("patch_items"):
+		batch.call("patch_items", upserts, removed_pids)
+	else:
+		_apply_supply_roles_to_batch(_supply_roles_cache)
+		return
+	batch.visible = true
+	_supply_batch_patches += 1
+
+
+func _supply_role_batch_item(pid: int, role: String) -> Dictionary:
+	if role.is_empty():
+		return {}
+	if _engineer_assign_flash_by_province.has(pid):
+		return {}
+	var node := _province_node(pid)
+	if node == null:
+		return {}
+	var pts := _cached_supply_polygon(node, pid)
+	if pts.size() < 3:
+		return {}
+	var style: Dictionary = ProvinceMapVisuals.get_supply_outline_style(role)
+	return {
+		"pid": pid,
+		"points": pts,
+		"color": style["color"],
+		"glow": style["glow"],
+		"width": style["width"],
+		"glow_extra": style["glow_extra"],
+		"z_index": style["z_index"],
+		"role": role,
+	}
 
 
 func _set_supply_outline_batch_visible(on: bool) -> void:
@@ -29537,6 +29902,31 @@ func _update_supply_overlay_legend() -> void:
 		style.content_margin_top = 6
 		style.content_margin_bottom = 6
 		panel.add_theme_stylebox_override("panel", style)
+		var host := Control.new()
+		host.name = "SupplyOverlayLegendHost"
+		host.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		host.set_anchors_preset(Control.PRESET_TOP_LEFT)
+		host.offset_left = 10.0
+		host.offset_top = 56.0
+		host.custom_minimum_size = Vector2(480, 0)
+		host.z_index = 40
+		var pulse := Panel.new()
+		_supply_legend_pulse_border = pulse
+		pulse.name = "SupplyLegendPulseBorder"
+		pulse.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		pulse.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		var pulse_style := StyleBoxFlat.new()
+		pulse_style.bg_color = Color(0, 0, 0, 0)
+		pulse_style.draw_center = false
+		pulse_style.border_color = Color(1, 1, 1, 1)
+		pulse_style.set_border_width_all(2)
+		pulse_style.set_corner_radius_all(5)
+		pulse.add_theme_stylebox_override("panel", pulse_style)
+		pulse.self_modulate = Color(0.35, 0.55, 0.85, 0.75)
+		host.add_child(pulse)
+		panel.set_anchors_preset(Control.PRESET_TOP_LEFT)
+		panel.offset_left = 0.0
+		panel.offset_top = 0.0
 		var vbox := VBoxContainer.new()
 		vbox.add_theme_constant_override("separation", 4)
 		panel.add_child(vbox)
@@ -29580,7 +29970,10 @@ func _update_supply_overlay_legend() -> void:
 		_supply_overlay_legend.mouse_filter = Control.MOUSE_FILTER_STOP  # allow text scroll; Close still above
 		_supply_overlay_legend.add_theme_font_size_override("normal_font_size", 11)
 		margin.add_child(_supply_overlay_legend)
-		ui.add_child(panel)
+		host.add_child(panel)
+		ui.add_child(host)
+		if not panel.resized.is_connected(_sync_supply_legend_pulse_host):
+			panel.resized.connect(_sync_supply_legend_pulse_host)
 	_update_supply_legend_text()
 
 
@@ -29594,18 +29987,48 @@ func _on_close_supply_legend_pressed() -> void:
 	print("MapRenderer: SupplyOverlayLegend closed by user")
 
 
-func _update_supply_legend_text() -> void:
+func _invalidate_legend_board_stats() -> void:
+	_legend_stat_cache_dirty = true
+
+
+func _legend_board_stats() -> Dictionary:
+	var y := _legend_tracked_year
+	var m := _legend_tracked_month
+	var d := _legend_tracked_day
+	if (
+		_legend_stat_cache_dirty
+		or y != _legend_stat_cache_year
+		or m != _legend_stat_cache_month
+		or d != _legend_stat_cache_day
+	):
+		_legend_board_walks += 1
+		_legend_cached_contested = ProvinceInsight.count_contested_provinces(provinces)
+		_legend_cached_agent = ProvinceInsight.count_agent_networks(provinces, _player_tag())
+		_legend_cached_dual = ProvinceInsight.count_dual_situation_provinces(provinces)
+		_legend_stat_cache_year = y
+		_legend_stat_cache_month = m
+		_legend_stat_cache_day = d
+		_legend_stat_cache_dirty = false
+	return {
+		"contested": _legend_cached_contested,
+		"agent": _legend_cached_agent,
+		"dual": _legend_cached_dual,
+	}
+
+
+func _update_supply_legend_text(update_hint: bool = true) -> void:
 	_set_supply_legend_visible(supply_mode)
 	if _supply_overlay_legend != null and supply_mode:
 		var hover_role := ""
 		if _hover_province != null:
 			hover_role = str(_supply_role_by_province.get(_hover_province.id, ""))
 		var hid := _hover_province.id if _hover_province != null else -1
-		var contested_n := ProvinceInsight.count_contested_provinces(provinces)
-		var agent_n := ProvinceInsight.count_agent_networks(provinces, _player_tag())
-		var dual_n := ProvinceInsight.count_dual_situation_provinces(provinces)
+		var stats := _legend_board_stats()
+		var contested_n := int(stats.get("contested", 0))
+		var agent_n := int(stats.get("agent", 0))
+		var dual_n := int(stats.get("dual", 0))
 		var pulse := _get_active_map_time_pulse_bbcode()
-		_supply_overlay_legend.text = ProvinceInsight.build_supply_legend_bbcode(
+		var new_text := ProvinceInsight.build_supply_legend_bbcode(
 			selected_province_id,
 			_compare_candidate_ids.size(),
 			hid,
@@ -29617,26 +30040,59 @@ func _update_supply_legend_text() -> void:
 			pulse,
 			_map_time_pulse_kind,
 		)
+		if _supply_overlay_legend.text != new_text:
+			_supply_overlay_legend.text = new_text
+			_legend_text_writes += 1
 		_apply_supply_legend_time_pulse_style(not pulse.is_empty(), _map_time_pulse_kind)
-	_update_compare_hint_label()
+	if update_hint:
+		_update_compare_hint_label()
+
+
+func _sync_supply_legend_pulse_host() -> void:
+	if _supply_legend_panel == null or not is_instance_valid(_supply_legend_panel):
+		return
+	var host := _supply_legend_panel.get_parent() as Control
+	if host == null:
+		return
+	var sz: Vector2 = _supply_legend_panel.size
+	host.custom_minimum_size = sz
+	host.size = sz
+	if _supply_legend_pulse_border != null and is_instance_valid(_supply_legend_pulse_border):
+		_supply_legend_pulse_border.size = sz
+
+
+func _legend_pulse_modulate_for(pulse_active: bool, pulse_kind: String) -> Color:
+	if not pulse_active:
+		return Color(0.35, 0.55, 0.85, 0.75)
+	if pulse_kind == "year":
+		return Color(0.45, 0.82, 1.0, 0.95)
+	if pulse_kind == "month":
+		return Color(0.55, 0.72, 0.92, 0.9)
+	if pulse_kind == "day":
+		return Color(0.42, 0.52, 0.68, 0.82)
+	return Color(0.55, 0.72, 0.92, 0.9)
 
 
 func _apply_supply_legend_time_pulse_style(pulse_active: bool, pulse_kind: String = "") -> void:
-	if _supply_legend_panel == null:
+	if _legend_pulse_last_active == pulse_active and _legend_pulse_last_kind == pulse_kind:
 		return
-	var style := _supply_legend_panel.get_theme_stylebox("panel") as StyleBoxFlat
-	if style == null:
+	_legend_pulse_last_active = pulse_active
+	_legend_pulse_last_kind = pulse_kind
+	if _supply_legend_pulse_border == null or not is_instance_valid(_supply_legend_pulse_border):
 		return
-	if not pulse_active:
-		style.border_color = Color(0.35, 0.55, 0.85, 0.75)
-	elif pulse_kind == "year":
-		style.border_color = Color(0.45, 0.82, 1.0, 0.95)
-	elif pulse_kind == "month":
-		style.border_color = Color(0.55, 0.72, 0.92, 0.9)
-	elif pulse_kind == "day":
-		style.border_color = Color(0.42, 0.52, 0.68, 0.82)
-	else:
-		style.border_color = Color(0.55, 0.72, 0.92, 0.9)
+	_sync_supply_legend_pulse_host()
+	_supply_legend_pulse_border.self_modulate = _legend_pulse_modulate_for(pulse_active, pulse_kind)
+	_legend_style_writes += 1
+
+
+func _set_compare_hint_style(new_text: String, new_color: Color) -> void:
+	if _compare_hint_label == null:
+		return
+	if _compare_hint_label.text != new_text:
+		_compare_hint_label.text = new_text
+	if _compare_hint_last_color != new_color:
+		_compare_hint_label.add_theme_color_override("font_color", new_color)
+		_compare_hint_last_color = new_color
 
 
 func _update_compare_hint_label() -> void:
@@ -29649,14 +30105,16 @@ func _update_compare_hint_label() -> void:
 		_compare_hint_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_compare_hint_label.add_theme_font_size_override("font_size", 11)
 		_compare_hint_label.add_theme_color_override("font_color", Color(1.0, 0.75, 0.45))
+		_compare_hint_last_color = Color(1.0, 0.75, 0.45)
 		_compare_hint_label.set_anchors_preset(Control.PRESET_TOP_LEFT)
 		_compare_hint_label.offset_left = 12.0
 		_compare_hint_label.offset_top = 52.0
 		_compare_hint_label.custom_minimum_size = Vector2(480, 0)
 		ui.add_child(_compare_hint_label)
-	var contested_n := ProvinceInsight.count_contested_provinces(provinces)
-	var agent_n := ProvinceInsight.count_agent_networks(provinces, _player_tag())
-	var dual_n := ProvinceInsight.count_dual_situation_provinces(provinces)
+	var stats := _legend_board_stats()
+	var contested_n := int(stats.get("contested", 0))
+	var agent_n := int(stats.get("agent", 0))
+	var dual_n := int(stats.get("dual", 0))
 	var show_compare := selected_province_id >= 0 and not supply_mode
 	var show_conflict := contested_n > 0 and not supply_mode and not show_compare
 	var show_agent := agent_n > 0 and not supply_mode and not show_compare and not show_conflict
@@ -29680,30 +30138,39 @@ func _update_compare_hint_label() -> void:
 		var overlay := ProvinceInsight.build_map_supply_mode_hint_plain(
 			contested_n, agent_n, dual_n, selected_province_id, p_tag,
 		)
-		_compare_hint_label.text = base + "  |  " + overlay if not overlay.is_empty() else base
-		_compare_hint_label.add_theme_color_override("font_color", Color(1.0, 0.75, 0.45))
-	elif show_supply_overlays:
-		_compare_hint_label.text = ProvinceInsight.build_map_supply_mode_hint_plain(
-			contested_n, agent_n, dual_n, -1, p_tag,
+		_set_compare_hint_style(
+			base + "  |  " + overlay if not overlay.is_empty() else base,
+			Color(1.0, 0.75, 0.45),
 		)
-		_compare_hint_label.add_theme_color_override("font_color", Color(0.55, 0.92, 0.78))
+	elif show_supply_overlays:
+		_set_compare_hint_style(
+			ProvinceInsight.build_map_supply_mode_hint_plain(
+				contested_n, agent_n, dual_n, -1, p_tag,
+			),
+			Color(0.55, 0.92, 0.78),
+		)
 	elif show_compare:
-		var hid := _hover_province.id if _hover_province != null else -1
-		var hover_cand := _is_compare_candidate(hid)
-		_compare_hint_label.text = ProvinceInsight.build_map_compare_hint_plain(
-			selected_province_id, _compare_candidate_ids.size(), hid, hover_cand,
+		var hid2 := _hover_province.id if _hover_province != null else -1
+		var hover_cand2 := _is_compare_candidate(hid2)
+		_set_compare_hint_style(
+			ProvinceInsight.build_map_compare_hint_plain(
+				selected_province_id, _compare_candidate_ids.size(), hid2, hover_cand2,
+			),
+			Color(1.0, 0.75, 0.45),
 		)
 	elif show_conflict:
-		_compare_hint_label.text = ProvinceInsight.build_conflict_map_hint_plain(contested_n)
-		_compare_hint_label.add_theme_color_override("font_color", Color(1.0, 0.55, 0.55))
-	elif show_agent:
-		_compare_hint_label.text = (
-			"◎ %d agent network%s — rings pulse daily · hover for strength & today's activity"
-			% [agent_n, "s" if agent_n != 1 else ""]
+		_set_compare_hint_style(
+			ProvinceInsight.build_conflict_map_hint_plain(contested_n),
+			Color(1.0, 0.55, 0.55),
 		)
-		_compare_hint_label.add_theme_color_override("font_color", Color(0.72, 0.55, 1.0))
+	elif show_agent:
+		_set_compare_hint_style(
+			"◎ %d agent network%s — rings pulse daily · hover for strength & today's activity"
+			% [agent_n, "s" if agent_n != 1 else ""],
+			Color(0.72, 0.55, 1.0),
+		)
 	else:
-		_compare_hint_label.add_theme_color_override("font_color", Color(1.0, 0.75, 0.45))
+		_set_compare_hint_style(_compare_hint_label.text, Color(1.0, 0.75, 0.45))
 
 
 func _set_supply_legend_visible(visible: bool) -> void:
@@ -29714,7 +30181,11 @@ func _set_supply_legend_visible(visible: bool) -> void:
 		var margin := _supply_overlay_legend.get_parent()
 		panel = margin.get_parent() if margin else null
 	if panel is CanvasItem:
-		panel.visible = visible
+		var host := (panel as Node).get_parent() as CanvasItem
+		if host != null and host.name == "SupplyOverlayLegendHost":
+			host.visible = visible
+		else:
+			panel.visible = visible
 
 
 func _supply_depot_tint_color(fill_ratio: float) -> Color:

@@ -385,6 +385,17 @@ tools/run_godot.sh --headless --path . --resolution 1280x740 \
 
 Wired as `launch_perf3_supply_toggle` in `tools/eoa_full_test_gates.sh` (full path only). `--quick` is unchanged pure-python. Not live Play. Merge **HOLD**.
 
+### PERF-5 legend day tick + supply overlay freshness (draft HOLD)
+
+Off main `61a80433`. Two MapRenderer-only bugs: (a) L-on `_on_game_day_advanced_legend` mutated the legend StyleBox every day (theme + fit_content relayout); (b) PERF-3 cache reuse left stale rings after depot/capture because nothing called `set_routes` and `_supply_roles_cache` had no fingerprint. Fix: pulse via a sibling modulate overlay, per-day count cache, hint write-on-change, expiry restyle-only; overlay fingerprint poll + dirty pids + incremental `patch_items` (signals are accelerators only — #88 mutation paths emit nothing). Guards `HeadlessPerf5LegendDayTickTest` + `HeadlessPerf5SupplyOverlayFreshTest`. Wired after `launch_perf3_supply_toggle`. `--quick` still the same 14 known `unit_board_play_path` reds. `HeadlessPerf3SupplyToggleTest` unedited. Not live Play. Merge **HOLD**.
+
+```bash
+tools/run_godot.sh --headless --path . --resolution 1280x740 \
+  -s res://scripts/core/HeadlessPerf5LegendDayTickTest.gd
+tools/run_godot.sh --headless --path . --resolution 1280x740 \
+  -s res://scripts/core/HeadlessPerf5SupplyOverlayFreshTest.gd
+```
+
 xvfb screenshots go to `/opt/cursor/artifacts/fac1a/`, `/opt/cursor/artifacts/fac1a_fix2/`, `/opt/cursor/artifacts/fac1a_fix2b/`, `/opt/cursor/artifacts/fac1a_fix2c/`, `/opt/cursor/artifacts/fac1a_fix3/`, and `/opt/cursor/artifacts/fac1a_fix4/` and are **NOT live Play**. Peak RSS must stay under 3 GB (isolated process tree — do not sum leftover Godot). Merge **HOLD**.
 
 **FIX #4 (Play MIXED `76fb4808`):** click ownership + badge-in-footprint + cluster digit + lone min size + split guard 1.53. Seeds unchanged. Isolated keep-green:
