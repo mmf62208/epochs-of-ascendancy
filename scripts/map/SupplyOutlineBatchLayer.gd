@@ -40,6 +40,46 @@ func set_items(items: Array[Dictionary]) -> void:
 	queue_redraw()
 
 
+func patch_items(upserts: Array, removed_pids: Array) -> void:
+	var remove_set: Dictionary = {}
+	for pid_var in removed_pids:
+		remove_set[int(pid_var)] = true
+	var upsert_by_pid: Dictionary = {}
+	for item_var in upserts:
+		if typeof(item_var) != TYPE_DICTIONARY:
+			continue
+		var item: Dictionary = item_var
+		var pid := int(item.get("pid", -1))
+		if pid < 0:
+			continue
+		upsert_by_pid[pid] = item
+		remove_set.erase(pid)
+	var kept: Array[Dictionary] = []
+	for old_item in _items:
+		var pid := int(old_item.get("pid", -1))
+		if remove_set.has(pid):
+			_closed_points.erase(pid)
+			continue
+		if upsert_by_pid.has(pid):
+			continue
+		kept.append(old_item)
+	for pid_var in upsert_by_pid.keys():
+		var item: Dictionary = upsert_by_pid[pid_var]
+		var pid := int(pid_var)
+		var pts: PackedVector2Array = item.get("points", PackedVector2Array()) as PackedVector2Array
+		if pts.size() < 3:
+			continue
+		_closed_points[pid] = ProvinceMapVisuals.close_outline_points(pts)
+		kept.append(item)
+	_items = kept
+	_item_count = 0
+	for item2 in _items:
+		var pid2 := int(item2.get("pid", -1))
+		if pid2 >= 0 and _closed_points.has(pid2):
+			_item_count += 1
+	queue_redraw()
+
+
 func item_count() -> int:
 	return _item_count
 
