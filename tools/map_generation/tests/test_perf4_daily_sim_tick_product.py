@@ -66,6 +66,15 @@ class TestPerf4DailySimTickProduct(unittest.TestCase):
             "headless_capture_frame_budget",
             "headless_peace_annex_supply",
             "headless_one_full_supply_day",
+            "headless_replanned_off_must_fail",
+            "headless_ten_capture_path_identity",
+            "headless_annex_path_identity",
+            "headless_hub_capacity_day40",
+            "route_refresh_covers_all_dests_in_one_day",
+            "supply_hub_stats_refresh",
+            "infra_dev_notifies_hub_stats",
+            "supply_day_spike_profile",
+            "pathfinder_binary_heap",
             "depot_one_hub_patch",
             "supply_capture_no_full_route_rebuild",
             "daily_listener_light_split",
@@ -109,6 +118,31 @@ class TestPerf4DailySimTickProduct(unittest.TestCase):
         self.assertTrue(
             "update_province_owner" in peace or "notify_province_control_changed" in peace
         )
+
+    def test_fix4_same_day_refill_and_hub_stats(self) -> None:
+        sm = (ROOT / "scripts" / "supply" / "SupplyManager.gd").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("DEFAULT_ROUTE_DEST_CAP: int = 24", sm)
+        self.assertIn("ROUTE_REFRESH_BUDGET_PER_FLUSH: int = DEFAULT_ROUTE_DEST_CAP", sm)
+        self.assertNotIn("ROUTE_REFRESH_BUDGET_PER_FLUSH: int = 2", sm)
+        self.assertIn("func notify_hub_stats_changed", sm)
+        self.assertIn("last_supply_day_profile", sm)
+        mm = (ROOT / "scripts" / "map" / "MapManager.gd").read_text(encoding="utf-8")
+        self.assertIn("notify_hub_stats_changed", extract_gd_func_body(mm, "update_province_infrastructure"))
+        self.assertIn("notify_hub_stats_changed", extract_gd_func_body(mm, "update_province_development"))
+        pf = (ROOT / "scripts" / "supply" / "SupplyPathfinder.gd").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("_heap_push", pf)
+        self.assertNotIn("open.sort_custom", pf)
+        hd = (ROOT / "scripts" / "core" / "HeadlessPerf4LiveMultiAiDayTest.gd").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("_test_replanned_off_must_fail", hd)
+        self.assertIn("_test_ten_capture_path_identity_within_one_day", hd)
+        self.assertIn("_test_annex_path_identity", hd)
+        self.assertIn("_test_hub_capacity_matches_rebuild_at_day_40", hd)
 
     def test_live_multi_ai_harness_exists(self) -> None:
         hd = ROOT / "scripts" / "core" / "HeadlessPerf4LiveMultiAiDayTest.gd"

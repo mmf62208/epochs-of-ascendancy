@@ -13,9 +13,12 @@ boot GER + a live-weight supply network and time the Play multi-AI step.
 Soft theater tick does not rebuild the network for dummy pid 1. Live Play
 still runs the full advance_supply_day steps (air / naval / shipping).
 A depot/hub owner flip retags the hub and drops touching routes (no
-24-route rebuild). Depot add/remove patches one hub. Daily listener
-stays on main's light path so apply_supply is the one full day.
-Production shares a per-day line-owner cache; owner index is counted + timed.
+24-route rebuild). Dropped dests refill on the next full supply day
+(budget = dest cap 24) with the same Dijkstra tie-breaks as a rebuild.
+Infra/dev complete recalculates that hub's capacity. Depot add/remove
+patches one hub. Daily listener stays on main's light path so
+apply_supply is the one full day. Production shares a per-day
+line-owner cache; owner index is counted + timed.
 """
 from __future__ import annotations
 
@@ -247,6 +250,51 @@ def build_perf4_daily_sim_tick_product() -> Dict[str, Any]:
         passes.append("headless_one_full_supply_day")
     else:
         fails.append("headless_one_full_supply_day")
+    if HD_LIVE_GD.is_file() and "_test_replanned_off_must_fail" in hd_live:
+        passes.append("headless_replanned_off_must_fail")
+    else:
+        fails.append("headless_replanned_off_must_fail")
+    if HD_LIVE_GD.is_file() and "_test_ten_capture_path_identity_within_one_day" in hd_live:
+        passes.append("headless_ten_capture_path_identity")
+    else:
+        fails.append("headless_ten_capture_path_identity")
+    if HD_LIVE_GD.is_file() and "_test_annex_path_identity" in hd_live:
+        passes.append("headless_annex_path_identity")
+    else:
+        fails.append("headless_annex_path_identity")
+    if HD_LIVE_GD.is_file() and "_test_hub_capacity_matches_rebuild_at_day_40" in hd_live:
+        passes.append("headless_hub_capacity_day40")
+    else:
+        fails.append("headless_hub_capacity_day40")
+    if "DEFAULT_ROUTE_DEST_CAP" in sm and "ROUTE_REFRESH_BUDGET_PER_FLUSH: int = DEFAULT_ROUTE_DEST_CAP" in sm:
+        passes.append("route_refresh_covers_all_dests_in_one_day")
+    else:
+        fails.append("route_refresh_covers_all_dests_in_one_day")
+    if "func notify_hub_stats_changed" in sm:
+        passes.append("supply_hub_stats_refresh")
+    else:
+        fails.append("supply_hub_stats_refresh")
+    infra_upd = extract_gd_func_body(mm, "update_province_infrastructure")
+    dev_upd = extract_gd_func_body(mm, "update_province_development")
+    if (
+        infra_upd
+        and "notify_hub_stats_changed" in infra_upd
+        and dev_upd
+        and "notify_hub_stats_changed" in dev_upd
+    ):
+        passes.append("infra_dev_notifies_hub_stats")
+    else:
+        fails.append("infra_dev_notifies_hub_stats")
+    if "last_supply_day_profile" in sm and "[SUPPLY-DAY-SPIKE]" in sm:
+        passes.append("supply_day_spike_profile")
+    else:
+        fails.append("supply_day_spike_profile")
+    if "_heap_push" in (ROOT / "scripts" / "supply" / "SupplyPathfinder.gd").read_text(
+        encoding="utf-8"
+    ):
+        passes.append("pathfinder_binary_heap")
+    else:
+        fails.append("pathfinder_binary_heap")
     if "launch_perf4_daily_sim_tick" in gates:
         passes.append("wired_into_gates")
     else:

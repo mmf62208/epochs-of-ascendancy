@@ -59,13 +59,23 @@ var network_ownership_refresh_count: int = 0
 var network_route_rebuild_count: int = 0
 ## FIX #3: one-hub depot add/remove (not a full build_network).
 var network_hub_patch_count: int = 0
-## FIX #3: amortized dest refill after a control change (not 24 plans).
+## FIX #3/#4: dest refill after a control change (same dest cap as a full rebuild).
 var network_route_refill_count: int = 0
+## FIX #4: hub capacity refresh when infra / development completes.
+var network_hub_stats_refresh_count: int = 0
 ## FIX #3: increment only on the full air/naval/shipping path.
 var full_supply_day_count: int = 0
 ## Control-change pids waiting for a cheap route drop / dest refill.
 var _control_dirty_pids: Dictionary = {}
-const ROUTE_REFRESH_BUDGET_PER_FLUSH: int = 2
+## Same dest cap as `_rebuild_default_routes`. One full supply day must recover
+## every dropped dest (ten captures drop ≤ this many). Capture stays drop-only.
+const DEFAULT_ROUTE_DEST_CAP: int = 24
+const ROUTE_REFRESH_BUDGET_PER_FLUSH: int = DEFAULT_ROUTE_DEST_CAP
+## Last full-day section timings (spike diagnosis: heap vs rebuild vs generate).
+var last_supply_day_profile: Dictionary = {}
+var last_flush_plan_count: int = 0
+var last_flush_plan_ms: float = 0.0
+var last_flush_plan_ms_max: float = 0.0
 
 
 func _ready() -> void:
@@ -225,8 +235,37 @@ func _patch_player_depot_hub(province_id: int, enabled: bool) -> void:
 	_control_dirty_pids[province_id] = true
 
 
+## PERF-4 FIX #4: infra / development complete recalculates this hub's
+## capacity. FIX #1 left capitals stale from ~day 28 (17900 vs 18600).
+func notify_hub_stats_changed(province_id: int) -> void:
+	if province_id <= 0:
+		return
+	if not hubs.has(province_id):
+		return
+	var province: Province = null
+	if provinces.has(province_id):
+		province = provinces[province_id] as Province
+	if province == null and typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province"):
+		province = MapManager.get_province(province_id) as Province
+	if province == null:
+		return
+	if rules == null:
+		rules = SupplyRules.load_from_path()
+	var capitals: Dictionary = SupplyNetworkBuilder._capital_by_tag(_countries)
+	var hub: ProvinceSupplyHub = SupplyNetworkBuilder._hub_from_province(
+		province, _city_layer, capitals, player_depot_province_ids, rules
+	)
+	if hub == null:
+		return
+	hubs[province_id] = hub
+	_init_one_depot_state(hub, false)
+	network_hub_patch_count += 1
+	network_hub_stats_refresh_count += 1
+
+
 ## PERF-4 FIX #3: capture / occupation retags the hub and drops only the
-## routes that touch this pid. Route dests refill later, amortized.
+## routes that touch this pid. Route dests refill on the next full supply
+## day (budget = DEFAULT_ROUTE_DEST_CAP so every dropped dest recovers in 1 day).
 ## FIX #2 rebuilt all 24 routes on every hub notify (~1.4–2.7s).
 func notify_province_control_changed(province_id: int) -> void:
 	if province_id <= 0:
@@ -276,13 +315,40 @@ func _drop_routes_touching_pid(province_id: int) -> int:
 
 
 func flush_pending_control_route_refresh(max_plans: int = ROUTE_REFRESH_BUDGET_PER_FLUSH) -> int:
-	if not _control_dirty_pids.is_empty():
+	last_flush_plan_count = 0
+	last_flush_plan_ms = 0.0
+	last_flush_plan_ms_max = 0.0
+	var had_dirty: bool = not _control_dirty_pids.is_empty()
+	if had_dirty:
 		for pid_v in _control_dirty_pids.keys():
 			_drop_routes_touching_pid(int(pid_v))
-	var planned := _refill_missing_default_routes(max_plans)
+		# Drop remaining defaults so refill walks the same sorted dests and
+		# tie-breaks as `_rebuild_default_routes` (annex / ten-capture identity).
+		_drop_all_default_routes()
+	var planned: int = _refill_missing_default_routes(max_plans)
 	if _missing_default_dest_count() == 0:
 		_control_dirty_pids.clear()
 	return planned
+
+
+func _drop_all_default_routes() -> void:
+	for key_v in _default_routes.keys():
+		_routes.erase(str(key_v))
+	_default_routes.clear()
+
+
+func count_missing_default_dests() -> int:
+	return _missing_default_dest_count()
+
+
+func get_hub_capacity_snapshot() -> Dictionary:
+	var out: Dictionary = {}
+	for pid_v in hubs.keys():
+		var hub: ProvinceSupplyHub = hubs[pid_v]
+		if hub == null:
+			continue
+		out[int(pid_v)] = float(hub.storage_capacity)
+	return out
 
 
 func _player_route_targets() -> Array[int]:
@@ -302,7 +368,7 @@ func _missing_default_dest_count() -> int:
 	if source < 0:
 		return 0
 	var targets: Array[int] = _player_route_targets()
-	var max_routes := mini(targets.size(), 24)
+	var max_routes := mini(targets.size(), DEFAULT_ROUTE_DEST_CAP)
 	var missing := 0
 	for i in range(max_routes):
 		var key := "%d_%d" % [source, targets[i]]
@@ -318,8 +384,10 @@ func _refill_missing_default_routes(max_plans: int) -> int:
 	if source < 0:
 		return 0
 	var targets: Array[int] = _player_route_targets()
-	var max_routes := mini(targets.size(), 24)
+	var max_routes := mini(targets.size(), DEFAULT_ROUTE_DEST_CAP)
 	var planned := 0
+	var plan_ms_sum: float = 0.0
+	var plan_ms_max: float = 0.0
 	for i in range(max_routes):
 		if planned >= max_plans:
 			break
@@ -327,12 +395,20 @@ func _refill_missing_default_routes(max_plans: int) -> int:
 		var key := "%d_%d" % [source, target]
 		if _routes.has(key):
 			continue
+		var t_plan: int = Time.get_ticks_usec()
 		var plan := _plan_route(source, target, [], false)
+		var one_ms: float = float(Time.get_ticks_usec() - t_plan) / 1000.0
+		plan_ms_sum += one_ms
+		if one_ms > plan_ms_max:
+			plan_ms_max = one_ms
 		plan.route_id = key
 		plan.baseline_days = plan.total_days
 		_default_routes[key] = plan
 		_routes[key] = plan
 		planned += 1
+	last_flush_plan_count = planned
+	last_flush_plan_ms = plan_ms_sum
+	last_flush_plan_ms_max = plan_ms_max
 	if planned > 0:
 		network_route_refill_count += planned
 	return planned
@@ -382,9 +458,11 @@ func get_network_topology_snapshot() -> Dictionary:
 		"build_count": network_build_count,
 		"ownership_refresh_count": network_ownership_refresh_count,
 		"hub_patch_count": network_hub_patch_count,
+		"hub_stats_refresh_count": network_hub_stats_refresh_count,
 		"route_refill_count": network_route_refill_count,
 		"full_supply_day_count": full_supply_day_count,
 		"dirty_n": _control_dirty_pids.size(),
+		"missing_dests": _missing_default_dest_count(),
 	}
 
 
@@ -853,21 +931,34 @@ func advance_supply_day(days: float = 1.0) -> void:
 		return
 
 	full_supply_day_count += 1
-	# FIX #3: refill at most a few dests so a capture day stays under 500 ms.
+	var t_day: int = Time.get_ticks_usec()
+	var builds0: int = network_build_count
+	var t_sec: int = Time.get_ticks_usec()
+	# FIX #4: refill every missing dest in this one full day (N = dest cap 24).
 	flush_pending_control_route_refresh(ROUTE_REFRESH_BUDGET_PER_FLUSH)
+	var flush_ms: float = float(Time.get_ticks_usec() - t_sec) / 1000.0
 
 	# === Province Infrastructure & Development: Local Supply Generation ===
+	t_sec = Time.get_ticks_usec()
 	_generate_local_supply_from_development(days)
+	var generate_ms: float = float(Time.get_ticks_usec() - t_sec) / 1000.0
 
 	# Naval recon from fleets in sea zones (1 chance per day per seazone presence)
+	t_sec = Time.get_ticks_usec()
 	_process_naval_recon(days)
+	var naval_ms: float = float(Time.get_ticks_usec() - t_sec) / 1000.0
 
 	# Naval fuel consumption + endurance for fleets at sea (long deployments burn fuel/supply; low = vuln/return forced; resupply at ports)
+	t_sec = Time.get_ticks_usec()
 	_process_naval_fuel_endurance_and_repair(days)
+	var fuel_ms: float = float(Time.get_ticks_usec() - t_sec) / 1000.0
 
+	t_sec = Time.get_ticks_usec()
 	_process_air_missions(days)
+	var air_ms: float = float(Time.get_ticks_usec() - t_sec) / 1000.0
 	if force_registry and force_registry.has_method("decay_all_recon"):
 		force_registry.decay_all_recon(days)  # air recon intel decays (persistent but not permanent)
+	t_sec = Time.get_ticks_usec()
 	var attrition := get_attrition_cargo_summary()
 	var attrition_tons := float(attrition.get("total_tons", 0.0)) * days
 	for key in _routes:
@@ -959,6 +1050,36 @@ func advance_supply_day(days: float = 1.0) -> void:
 		if overflow > 0.0 and src != null:
 			src.apply_inflow(overflow * 0.5)
 		depot_stock_changed.emit(dst.province_id, dst.stockpile)
+	var shipping_ms: float = float(Time.get_ticks_usec() - t_sec) / 1000.0
+	var total_ms: float = float(Time.get_ticks_usec() - t_day) / 1000.0
+	last_supply_day_profile = {
+		"total_ms": total_ms,
+		"flush_ms": flush_ms,
+		"generate_ms": generate_ms,
+		"naval_ms": naval_ms,
+		"fuel_ms": fuel_ms,
+		"air_ms": air_ms,
+		"shipping_ms": shipping_ms,
+		"plans": last_flush_plan_count,
+		"plan_ms": last_flush_plan_ms,
+		"plan_ms_max": last_flush_plan_ms_max,
+		"rebuilds": network_build_count - builds0,
+		"dijkstra_pops": SupplyPathfinder.last_search_pops,
+		"dijkstra_open_peak": SupplyPathfinder.last_search_open_peak,
+		"dijkstra_ms": SupplyPathfinder.last_search_ms,
+	}
+	if total_ms >= 200.0:
+		print(
+			"[SUPPLY-DAY-SPIKE] total=%.1fms flush=%.1fms gen=%.1fms naval=%.1fms fuel=%.1fms air=%.1fms ship=%.1fms plans=%d plan_ms=%.1f max=%.1f rebuilds=%d pops=%d open_peak=%d dijkstra=%.1fms"
+			% [
+				total_ms, flush_ms, generate_ms, naval_ms, fuel_ms, air_ms, shipping_ms,
+				last_flush_plan_count, last_flush_plan_ms, last_flush_plan_ms_max,
+				network_build_count - builds0,
+				SupplyPathfinder.last_search_pops,
+				SupplyPathfinder.last_search_open_peak,
+				SupplyPathfinder.last_search_ms,
+			]
+		)
 
 
 func begin_player_reroute(source_province_id: int, target_province_id: int) -> void:
@@ -2035,7 +2156,7 @@ func _rebuild_default_routes() -> void:
 		if hub.owner_tag == player_tag and hub.province_id != source:
 			targets.append(hub.province_id)
 	targets.sort()
-	var max_routes := mini(targets.size(), 24)
+	var max_routes := mini(targets.size(), DEFAULT_ROUTE_DEST_CAP)
 	for i in range(max_routes):
 		var target := targets[i]
 		var key := "%d_%d" % [source, target]

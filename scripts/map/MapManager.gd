@@ -1577,6 +1577,8 @@ func update_province_development(province_id: int, new_dev: int) -> bool:
 		return false
 	if p.development_level != new_dev:
 		p.development_level = max(0, new_dev)
+		if typeof(SupplyManager) != TYPE_NIL and SupplyManager.has_method("notify_hub_stats_changed"):
+			SupplyManager.notify_hub_stats_changed(province_id)
 		province_data_changed.emit(province_id, "development")
 		return true
 	return false
@@ -1587,6 +1589,8 @@ func update_province_infrastructure(province_id: int, new_infra: int) -> bool:
 		return false
 	if p.infrastructure != new_infra:
 		p.infrastructure = max(0, new_infra)
+		if typeof(SupplyManager) != TYPE_NIL and SupplyManager.has_method("notify_hub_stats_changed"):
+			SupplyManager.notify_hub_stats_changed(province_id)
 		province_data_changed.emit(province_id, "infrastructure")
 		return true
 	return false

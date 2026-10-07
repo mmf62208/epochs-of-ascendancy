@@ -28,6 +28,10 @@ const EQUIV_DAYS := 5
 const EQUIV_SEED := 193601
 const PLAYER_TAG := "GER"
 const DAY_BUDGET_MS := 500.0
+const QUIET_DAY_BUDGET_MS := 200.0
+const CAPTURE_FRAME_BUDGET_MS := 5.0
+const RECOVERY_DAY_BUDGET_MS := 200.0
+const HUB_CAPACITY_DAY := 40
 const CAPTURE_HUB_PID := 710160
 const CAPTURE_DEPOT_PID := 710161
 const REAL_DEPOT_PID := 710300
@@ -124,12 +128,16 @@ func _run() -> void:
 	_test_repeated_real_depot_guard(sm)
 	_test_capture_frame_budgets(mm, sm)
 	_test_peace_annexation_updates_supply(gd, mm, sm)
+	_test_ten_capture_path_identity_within_one_day(mm, sm)
+	_test_annex_path_identity(gd, mm, sm)
 	_test_capture_matches_full_rebuild(mm, sm)
 	_test_one_full_supply_day_per_game_day(tm, gd, sm)
 	_test_production_cache_measured(gd)
 	_test_owner_index_measured(mm)
 	_test_multi_ai_decisions_stable(gd, tm)
 	_test_live_day_ai_budget(tm, gd)
+	_test_hub_capacity_on_infra_complete(mm, sm)
+	_test_hub_capacity_matches_rebuild_at_day_40(tm, mm, sm)
 
 
 func _test_source_gates_fail_on_pre_fix() -> void:
@@ -170,6 +178,7 @@ func _test_source_gates_fail_on_pre_fix() -> void:
 		_fail("advance_supply_day still gates live Play onto the light path")
 	else:
 		_pass("advance_supply_day does not light-gate live Play")
+	_test_replanned_off_must_fail(sm_src, adv)
 	var gd_src := _read(SRC_GD)
 	var mut := _slice_func(gd_src, "apply_supply_route_mutation")
 	if "get_province" not in mut:
@@ -192,6 +201,45 @@ func _test_source_gates_fail_on_pre_fix() -> void:
 		_fail("interactive multi-AI live body lost production / apply_supply")
 	else:
 		_pass("interactive multi-AI still applies production + apply_supply")
+
+
+func _test_replanned_off_must_fail(sm_src: String, adv: String) -> void:
+	# 5ca1d0b5: budget=2 and turning refill off still passed the whole gate.
+	if "ROUTE_REFRESH_BUDGET_PER_FLUSH: int = 2" in sm_src:
+		_fail("re-plan budget still 2/day (5ca1d0b5 FAIL class — dests stay dark)")
+	elif "ROUTE_REFRESH_BUDGET_PER_FLUSH: int = DEFAULT_ROUTE_DEST_CAP" not in sm_src:
+		_fail("re-plan budget is not the dest cap (turning re-plan off must FAIL)")
+	else:
+		_pass("re-plan budget equals DEFAULT_ROUTE_DEST_CAP (24 dests / 1 day)")
+	if "DEFAULT_ROUTE_DEST_CAP: int = 24" not in sm_src:
+		_fail("DEFAULT_ROUTE_DEST_CAP missing (cap N undocumented)")
+	else:
+		_pass("DEFAULT_ROUTE_DEST_CAP=24 documented as full-rebuild dest cap")
+	if "flush_pending_control_route_refresh" not in adv:
+		_fail("advance_supply_day no longer flushes dropped dests")
+	else:
+		_pass("advance_supply_day flushes dropped dests on the full day")
+	var refill := _slice_func(sm_src, "_refill_missing_default_routes")
+	if refill.is_empty() or "_plan_route" not in refill:
+		_fail("re-plan turned off (_refill_missing_default_routes stub)")
+	else:
+		_pass("re-plan still plans missing dests")
+	var flush := _slice_func(sm_src, "flush_pending_control_route_refresh")
+	if flush.is_empty() or "_refill_missing_default_routes" not in flush:
+		_fail("re-plan turned off (flush does not refill)")
+	else:
+		_pass("flush calls _refill_missing_default_routes")
+	if "notify_hub_stats_changed" not in sm_src:
+		_fail("notify_hub_stats_changed missing (5ca1d0b5 hub capacity stale)")
+	else:
+		_pass("notify_hub_stats_changed present")
+	var mm_src := _read("res://scripts/map/MapManager.gd")
+	var infra_fn := _slice_func(mm_src, "update_province_infrastructure")
+	var dev_fn := _slice_func(mm_src, "update_province_development")
+	if "notify_hub_stats_changed" not in infra_fn or "notify_hub_stats_changed" not in dev_fn:
+		_fail("infra/dev complete does not notify hub stats (5ca1d0b5 stale from ~d28)")
+	else:
+		_pass("infra/dev complete notifies hub stats")
 
 
 func _boot_live_supply_network(mm: Node, sm: Node) -> bool:
@@ -407,8 +455,10 @@ func _test_live_day_ai_budget(tm: Node, gd: Node) -> void:
 		_pass("worst daily-tick phase %.1fms < %.0f (%s)" % [worst, DAY_BUDGET_MS, worst_kind])
 	if worst_ai >= DAY_BUDGET_MS:
 		_fail("worst day_ai %.1fms >= %.0f (live hitch class)" % [worst_ai, DAY_BUDGET_MS])
+	elif worst_ai >= QUIET_DAY_BUDGET_MS:
+		_fail("worst quiet day_ai %.1fms >= %.0f (FIX #4 live-day bar)" % [worst_ai, QUIET_DAY_BUDGET_MS])
 	else:
-		_pass("worst day_ai %.1fms < %.0f" % [worst_ai, DAY_BUDGET_MS])
+		_pass("worst day_ai %.1fms < %.0f quiet-bar" % [worst_ai, QUIET_DAY_BUDGET_MS])
 
 
 func _test_repeated_real_depot_guard(sm: Node) -> void:
@@ -638,10 +688,10 @@ func _test_capture_frame_budgets(mm: Node, sm: Node) -> void:
 	print("HeadlessPerf4LiveMultiAiDayTest: capture_frame_single pid=%d %.1fms" % [CAPTURE_HUB_PID, one_ms])
 	if _hub_owner_tag(sm, CAPTURE_HUB_PID) != "FRA":
 		_fail("single capture left hub owner %s" % _hub_owner_tag(sm, CAPTURE_HUB_PID))
-	elif one_ms >= DAY_BUDGET_MS:
-		_fail("single capture %.1fms >= %.0f (2d930483 rebuild-every-route class)" % [one_ms, DAY_BUDGET_MS])
+	elif one_ms >= CAPTURE_FRAME_BUDGET_MS:
+		_fail("single capture %.1fms >= %.0f (FIX #4 capture-frame bar)" % [one_ms, CAPTURE_FRAME_BUDGET_MS])
 	else:
-		_pass("single capture frame %.1fms < %.0f" % [one_ms, DAY_BUDGET_MS])
+		_pass("single capture frame %.1fms < %.0f" % [one_ms, CAPTURE_FRAME_BUDGET_MS])
 	_restore_owner(mm, CAPTURE_HUB_PID, "GER")
 	var ten: Array[int] = _collect_ger_hub_pids(sm, 10, [])
 	if ten.size() < 10:
@@ -658,10 +708,10 @@ func _test_capture_frame_budgets(mm: Node, sm: Node) -> void:
 			tagged += 1
 	if tagged != ten.size():
 		_fail("ten-capture retagged %d/%d hubs" % [tagged, ten.size()])
-	elif ten_ms >= DAY_BUDGET_MS:
-		_fail("ten captures %.1fms >= %.0f (2d930483 21s class)" % [ten_ms, DAY_BUDGET_MS])
+	elif ten_ms >= CAPTURE_FRAME_BUDGET_MS:
+		_fail("ten captures %.1fms >= %.0f (FIX #4 capture-frame bar)" % [ten_ms, CAPTURE_FRAME_BUDGET_MS])
 	else:
-		_pass("ten-capture tick %.1fms < %.0f" % [ten_ms, DAY_BUDGET_MS])
+		_pass("ten-capture tick %.1fms < %.0f" % [ten_ms, CAPTURE_FRAME_BUDGET_MS])
 	for pid3 in ten:
 		_restore_owner(mm, pid3, "GER")
 
@@ -693,6 +743,254 @@ func _test_peace_annexation_updates_supply(gd: Node, mm: Node, sm: Node) -> void
 	else:
 		_pass("peace annexation retagged hub %d and notified supply" % pid)
 	_restore_owner(mm, pid, "GER")
+
+
+func _route_paths_identical(a: Array, b: Array) -> bool:
+	var paths_a: Dictionary = {}
+	var paths_b: Dictionary = {}
+	for raw in a:
+		if typeof(raw) != TYPE_DICTIONARY:
+			continue
+		var row: Dictionary = raw
+		paths_a[str(row.get("key", ""))] = str(row.get("path", []))
+	for raw_b in b:
+		if typeof(raw_b) != TYPE_DICTIONARY:
+			continue
+		var row_b: Dictionary = raw_b
+		paths_b[str(row_b.get("key", ""))] = str(row_b.get("path", []))
+	if paths_a.size() != paths_b.size():
+		return false
+	for key_v in paths_a.keys():
+		if not paths_b.has(key_v):
+			return false
+		if str(paths_a[key_v]) != str(paths_b[key_v]):
+			return false
+	return true
+
+
+func _path_mismatch_count(a: Array, b: Array) -> int:
+	var paths_a: Dictionary = {}
+	var paths_b: Dictionary = {}
+	for raw in a:
+		if typeof(raw) != TYPE_DICTIONARY:
+			continue
+		var row: Dictionary = raw
+		paths_a[str(row.get("key", ""))] = str(row.get("path", []))
+	for raw_b in b:
+		if typeof(raw_b) != TYPE_DICTIONARY:
+			continue
+		var row_b: Dictionary = raw_b
+		paths_b[str(row_b.get("key", ""))] = str(row_b.get("path", []))
+	var n: int = 0
+	var keys: Dictionary = {}
+	for k in paths_a.keys():
+		keys[k] = true
+	for k2 in paths_b.keys():
+		keys[k2] = true
+	for key_v in keys.keys():
+		if str(paths_a.get(key_v, "")) != str(paths_b.get(key_v, "")):
+			n += 1
+	return n
+
+
+func _test_ten_capture_path_identity_within_one_day(mm: Node, sm: Node) -> void:
+	if sm == null or not sm.has_method("get_network_topology_snapshot"):
+		_fail("ten-capture path identity helpers missing")
+		return
+	if not _boot_live_supply_network(mm, sm):
+		_fail("ten-capture identity boot failed")
+		return
+	var ten: Array[int] = _collect_ger_hub_pids(sm, 10, [])
+	if ten.size() < 10:
+		_fail("ten-capture identity needs 10 GER hubs got=%d" % ten.size())
+		return
+	var refill0: int = int(sm.get("network_route_refill_count"))
+	var missing0: int = int(sm.call("count_missing_default_dests")) if sm.has_method("count_missing_default_dests") else -1
+	for pid in ten:
+		mm.call("update_province_owner", pid, "FRA", "FRA")
+	var missing_cap: int = int(sm.call("count_missing_default_dests")) if sm.has_method("count_missing_default_dests") else -1
+	print(
+		"HeadlessPerf4LiveMultiAiDayTest: ten_capture_drop missing=%d→%d pids=%s"
+		% [missing0, missing_cap, str(ten)]
+	)
+	if missing_cap <= 0:
+		_fail("ten captures dropped no dests (re-plan-off mutant unguarded)")
+		for pid_r in ten:
+			_restore_owner(mm, pid_r, "GER")
+		return
+	var t_day: int = Time.get_ticks_usec()
+	sm.call("advance_supply_day", 1.0)
+	var day_ms: float = float(Time.get_ticks_usec() - t_day) / 1000.0
+	var missing1: int = int(sm.call("count_missing_default_dests"))
+	var refill1: int = int(sm.get("network_route_refill_count"))
+	var prof: Dictionary = sm.get("last_supply_day_profile") if "last_supply_day_profile" in sm else {}
+	print(
+		"HeadlessPerf4LiveMultiAiDayTest: ten_capture_recovery day=%.1fms missing=%d refill=%d→%d profile=%s"
+		% [day_ms, missing1, refill0, refill1, str(prof)]
+	)
+	if missing1 != 0:
+		_fail("ten-capture dests still missing after 1 day n=%d (5ca1d0b5 budget=2 class)" % missing1)
+	elif refill1 <= refill0:
+		_fail("ten-capture 1-day refill_count unchanged %d→%d (re-plan turned off)" % [refill0, refill1])
+	else:
+		_pass("ten-capture recovered all dests in 1 day missing=0 refill+%d" % (refill1 - refill0))
+	if day_ms >= RECOVERY_DAY_BUDGET_MS:
+		_fail("ten-capture recovery day %.1fms >= %.0f" % [day_ms, RECOVERY_DAY_BUDGET_MS])
+	else:
+		_pass("ten-capture recovery day %.1fms < %.0f" % [day_ms, RECOVERY_DAY_BUDGET_MS])
+	var live: Dictionary = sm.call("get_network_topology_snapshot")
+	if not _boot_live_supply_network(mm, sm):
+		_fail("ten-capture forced rebuild failed")
+		for pid_r2 in ten:
+			_restore_owner(mm, pid_r2, "GER")
+		return
+	var full: Dictionary = sm.call("get_network_topology_snapshot")
+	var live_routes: Array = live.get("routes", []) as Array
+	var full_routes: Array = full.get("routes", []) as Array
+	var mismatch: int = _path_mismatch_count(live_routes, full_routes)
+	print(
+		"HeadlessPerf4LiveMultiAiDayTest: ten_capture_paths live_n=%d full_n=%d mismatch=%d"
+		% [live_routes.size(), full_routes.size(), mismatch]
+	)
+	if not _route_paths_identical(live_routes, full_routes):
+		_fail("ten-capture paths != forced rebuild mismatch=%d (5ca1d0b5 equal-length drift)" % mismatch)
+	else:
+		_pass("ten-capture paths match forced rebuild n=%d" % live_routes.size())
+	for pid_r3 in ten:
+		_restore_owner(mm, pid_r3, "GER")
+	_boot_live_supply_network(mm, sm)
+
+
+func _test_annex_path_identity(gd: Node, mm: Node, sm: Node) -> void:
+	if gd == null or not gd.has_method("apply_peace_conference_settlement_live"):
+		_fail("annex path identity helpers missing")
+		return
+	if not _boot_live_supply_network(mm, sm):
+		_fail("annex path identity boot failed")
+		return
+	var pids: Array[int] = _collect_ger_hub_pids(sm, 1, [CAPTURE_HUB_PID, CAPTURE_DEPOT_PID, int(CAPITALS.get("GER", 0))])
+	if pids.is_empty():
+		_fail("annex path identity needs a GER hub")
+		return
+	var pid: int = pids[0]
+	var res: Dictionary = gd.call("apply_peace_conference_settlement_live", "FRA", "GER", pid, true, false, 0.0, false)
+	if not bool(res.get("ok", false)) and _hub_owner_tag(sm, pid) != "FRA":
+		_fail("annex path identity settlement failed pid=%d" % pid)
+		return
+	sm.call("advance_supply_day", 1.0)
+	var missing: int = int(sm.call("count_missing_default_dests")) if sm.has_method("count_missing_default_dests") else -1
+	if missing != 0:
+		_fail("annex dests still missing after 1 day n=%d" % missing)
+	else:
+		_pass("annex recovered dests in 1 day")
+	var live: Dictionary = sm.call("get_network_topology_snapshot")
+	if not _boot_live_supply_network(mm, sm):
+		_fail("annex forced rebuild failed")
+		_restore_owner(mm, pid, "GER")
+		return
+	var full: Dictionary = sm.call("get_network_topology_snapshot")
+	var live_routes: Array = live.get("routes", []) as Array
+	var full_routes: Array = full.get("routes", []) as Array
+	var mismatch: int = _path_mismatch_count(live_routes, full_routes)
+	print(
+		"HeadlessPerf4LiveMultiAiDayTest: annex_paths pid=%d live_n=%d full_n=%d mismatch=%d"
+		% [pid, live_routes.size(), full_routes.size(), mismatch]
+	)
+	if not _route_paths_identical(live_routes, full_routes):
+		_fail("annex paths != forced rebuild mismatch=%d (5ca1d0b5 equal-length drift)" % mismatch)
+	else:
+		_pass("annex paths match forced rebuild n=%d" % live_routes.size())
+	_restore_owner(mm, pid, "GER")
+	_boot_live_supply_network(mm, sm)
+
+
+func _test_hub_capacity_on_infra_complete(mm: Node, sm: Node) -> void:
+	if mm == null or sm == null or not mm.has_method("update_province_infrastructure"):
+		_fail("hub capacity infra helpers missing")
+		return
+	if not sm.has_method("notify_hub_stats_changed") and not ("network_hub_stats_refresh_count" in sm):
+		_fail("notify_hub_stats_changed missing (5ca1d0b5 FAIL class)")
+		return
+	var ger_cap: int = int(CAPITALS.get("GER", 0))
+	var hubs: Dictionary = sm.hubs if "hubs" in sm else {}
+	if not hubs.has(ger_cap):
+		_fail("GER capital %d is not a hub" % ger_cap)
+		return
+	var hub0: Variant = hubs[ger_cap]
+	var cap0: float = float(hub0.storage_capacity) if hub0 != null else 0.0
+	var p: Variant = mm.call("get_province", ger_cap)
+	if p == null:
+		_fail("GER capital province missing")
+		return
+	var infra0: int = int(p.infrastructure)
+	var stats0: int = int(sm.get("network_hub_stats_refresh_count"))
+	mm.call("update_province_infrastructure", ger_cap, infra0 + 1)
+	var hub1: Variant = (sm.hubs as Dictionary).get(ger_cap)
+	var cap1: float = float(hub1.storage_capacity) if hub1 != null else 0.0
+	var stats1: int = int(sm.get("network_hub_stats_refresh_count"))
+	print(
+		"HeadlessPerf4LiveMultiAiDayTest: hub_infra_complete pid=%d infra=%d→%d cap=%.0f→%.0f stats=%d→%d"
+		% [ger_cap, infra0, infra0 + 1, cap0, cap1, stats0, stats1]
+	)
+	if stats1 <= stats0:
+		_fail("infra complete did not refresh hub stats (5ca1d0b5 stale capacity)")
+	elif cap1 <= cap0:
+		_fail("infra complete left hub capacity %.0f (expected increase)" % cap1)
+	else:
+		_pass("infra complete recalculated hub capacity %.0f→%.0f" % [cap0, cap1])
+	if not _boot_live_supply_network(mm, sm):
+		_fail("hub capacity rebuild after infra failed")
+		return
+	var hub_full: Variant = (sm.hubs as Dictionary).get(ger_cap)
+	var cap_full: float = float(hub_full.storage_capacity) if hub_full != null else -1.0
+	if not is_equal_approx(cap1, cap_full):
+		_fail("infra hub capacity %.0f != rebuild %.0f" % [cap1, cap_full])
+	else:
+		_pass("infra hub capacity matches rebuild %.0f" % cap_full)
+
+
+func _test_hub_capacity_matches_rebuild_at_day_40(tm: Node, mm: Node, sm: Node) -> void:
+	if tm == null or sm == null or not tm.has_method("advance_live_f5_equivalent_days"):
+		_fail("day-40 hub capacity helpers missing")
+		return
+	if not _boot_live_supply_network(mm, sm):
+		_fail("day-40 hub capacity boot failed")
+		return
+	_reset_clock(tm, 0)
+	var clock: Dictionary = tm.call("advance_live_f5_equivalent_days", HUB_CAPACITY_DAY)
+	var live_caps: Dictionary = sm.call("get_hub_capacity_snapshot") if sm.has_method("get_hub_capacity_snapshot") else {}
+	if live_caps.is_empty() and "hubs" in sm:
+		for pid_v in (sm.hubs as Dictionary).keys():
+			var h: Variant = (sm.hubs as Dictionary).get(pid_v)
+			if h != null:
+				live_caps[int(pid_v)] = float(h.storage_capacity)
+	if not _boot_live_supply_network(mm, sm):
+		_fail("day-40 forced rebuild failed")
+		return
+	var full_caps: Dictionary = sm.call("get_hub_capacity_snapshot") if sm.has_method("get_hub_capacity_snapshot") else {}
+	var mismatch: int = 0
+	var checked: int = 0
+	var sample: PackedStringArray = PackedStringArray()
+	for tag_v in CAPITALS.keys():
+		var pid: int = int(CAPITALS[tag_v])
+		if not live_caps.has(pid) and not live_caps.has(str(pid)):
+			continue
+		var live_c: float = float(live_caps.get(pid, live_caps.get(str(pid), 0.0)))
+		var full_c: float = float(full_caps.get(pid, full_caps.get(str(pid), 0.0)))
+		checked += 1
+		if not is_equal_approx(live_c, full_c):
+			mismatch += 1
+			sample.append("%s %d live=%.0f full=%.0f" % [str(tag_v), pid, live_c, full_c])
+	print(
+		"HeadlessPerf4LiveMultiAiDayTest: hub_capacity_day40 clock=%s checked=%d mismatch=%d sample=%s"
+		% [str(clock), checked, mismatch, ", ".join(sample)]
+	)
+	if checked == 0:
+		_fail("day-40 hub capacity found no capital hubs")
+	elif mismatch > 0:
+		_fail("day-40 hub capacity != rebuild mismatch=%d %s (5ca1d0b5 stale from ~d28)" % [mismatch, ", ".join(sample)])
+	else:
+		_pass("day-40 hub capacity matches full rebuild capitals=%d" % checked)
 
 
 func _test_one_full_supply_day_per_game_day(tm: Node, gd: Node, sm: Node) -> void:
