@@ -370,7 +370,7 @@ tools/run_godot.sh --headless --path . --resolution 1280x740 -s res://scripts/co
 tools/eoa_fac1a_pixel_guard.sh
 ```
 
-**PERF-4 daily sim-tick hitch:** TimeManager profiles each `game_day_advanced` listener and day_ai / day_battles steps. `GameData.get_peace_state` must not `duplicate(true)` (use `peek_peace_state`; snapshot via `get_peace_state_copy`). Owner lists use `_ensure_owner_index`. Headless `HeadlessPerf4DailySimTickTest`: **FAIL on main** `425b4448` (deepcopy / no timers / no profile history, 7d wall 1396.7ms) · **PASS on tip** (worst phase 25.7ms day_ai, 7d wall 82.7ms, seed 193601 infra decisions identical). Product `test_perf4_daily_sim_tick_product` on `--quick`. Refreshed onto main `61a80433` (#83–#87 KEEP). Title / Begin / sea-fleet / Home star / supply overlay / chips **unedited**.
+**PERF-4 daily sim-tick hitch:** TimeManager profiles each `game_day_advanced` listener and day_ai / day_battles steps. `GameData.get_peace_state` must not `duplicate(true)` (use `peek_peace_state`; snapshot via `get_peace_state_copy`). Owner lists use `_ensure_owner_index`. Headless `HeadlessPerf4DailySimTickTest`: **FAIL on main** `425b4448` (deepcopy / no timers / no profile history, 7d wall 1396.7ms) · **PASS after merge onto `61a80433`** (worst phase 20.5ms day_ai, 7d wall 72.6ms, seed 193601 infra decisions identical). Product `test_perf4_daily_sim_tick_product` on `--quick`. Title / Begin / sea-fleet / Home star / supply overlay / chips **unedited**.
 
 ```bash
 python3 -m unittest tools.map_generation.tests.test_perf4_daily_sim_tick_product -v
