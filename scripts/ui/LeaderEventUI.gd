@@ -549,9 +549,14 @@ func _dismiss_toast(panel: Variant = null) -> void:
 	if vp != null:
 		vp.set_input_as_handled()
 	if toast is Node:
-		# Deferred free: dropping the Control inside `pressed` lets the same
-		# release fall through to MapRenderer after the × is gone.
-		call_deferred("_free_notice_toast_node", toast as Node)
+		var node: Node = toast as Node
+		var parent: Node = node.get_parent()
+		if parent != null:
+			# IX-1: child count must drop this frame (queue_free alone spun).
+			parent.remove_child(node)
+		# Deferred free so the same leftover release cannot pick while the
+		# Control is mid-pressed teardown (TipDismiss / BEGIN-1 leftover class).
+		call_deferred("_free_notice_toast_node", node)
 
 
 func _toast_object_from_ref(panel: Variant) -> Object:

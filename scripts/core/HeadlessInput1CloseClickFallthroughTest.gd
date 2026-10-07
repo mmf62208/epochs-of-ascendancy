@@ -193,8 +193,14 @@ func _setup_renderer() -> bool:
 		_saved_pick_grid = _mm.pick_grid
 		_mm.pick_grid = null
 	_leui = root.get_node_or_null("LeaderEventUI")
-	if _leui == null and typeof(LeaderEventUI) != TYPE_NIL:
-		_leui = LeaderEventUI as Node
+	if _leui == null:
+		# -s harness: do not reference the autoload class_name (parse fail).
+		var leui_scr: Script = load("res://scripts/ui/LeaderEventUI.gd") as Script
+		if leui_scr != null:
+			_leui = leui_scr.new() as Node
+			if _leui != null:
+				_leui.name = "LeaderEventUI"
+				root.add_child(_leui)
 	return true
 
 
