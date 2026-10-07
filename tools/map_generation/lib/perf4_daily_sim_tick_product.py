@@ -127,6 +127,10 @@ def build_perf4_daily_sim_tick_product() -> Dict[str, Any]:
         passes.append("depot_rebuild_on_change_only")
     else:
         fails.append("depot_rebuild_on_change_only")
+    if depot_fn and "provinces.has" in depot_fn:
+        passes.append("depot_skips_missing_pid")
+    else:
+        fails.append("depot_skips_missing_pid")
     adv_fn = extract_gd_func_body(sm, "advance_supply_day")
     if adv_fn and "_should_use_interactive_light_supply" in adv_fn:
         passes.append("supply_day_f5_light_gate")

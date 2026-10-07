@@ -157,6 +157,9 @@ func set_player_depot(province_id: int, enabled: bool) -> void:
 	# PERF-4 FIX #1: rebuild only when membership changes. The interactive
 	# multi-AI soft tick used to call this every game day (dummy pid 1) and
 	# re-ran build_network + 24 route plans on the live 3520 board (~1.5s).
+	# Dummy / missing pids are never added as depots.
+	if enabled and not provinces.is_empty() and not provinces.has(province_id):
+		return
 	var changed := false
 	if enabled:
 		if province_id not in player_depot_province_ids:

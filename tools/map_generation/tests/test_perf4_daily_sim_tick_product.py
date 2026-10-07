@@ -51,6 +51,7 @@ class TestPerf4DailySimTickProduct(unittest.TestCase):
             "headless_multi_ai_budget_test",
             "multi_ai_wired_into_gates",
             "depot_rebuild_on_change_only",
+            "depot_skips_missing_pid",
             "headless_live_multi_ai_test",
             "live_multi_ai_wired_into_gates",
         ):
@@ -63,6 +64,7 @@ class TestPerf4DailySimTickProduct(unittest.TestCase):
         body = extract_gd_func_body(src, "set_player_depot")
         self.assertIn("changed", body)
         self.assertIn("build_network", body)
+        self.assertIn("provinces.has", body)
 
     def test_live_multi_ai_harness_exists(self) -> None:
         hd = ROOT / "scripts" / "core" / "HeadlessPerf4LiveMultiAiDayTest.gd"

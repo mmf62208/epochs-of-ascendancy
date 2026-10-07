@@ -128,6 +128,10 @@ func _test_source_gates_fail_on_pre_fix() -> void:
 		_fail("set_player_depot still rebuilds every call (pre-fix / main FAIL class)")
 	else:
 		_pass("set_player_depot rebuilds only on membership change")
+	if "provinces.has" not in depot:
+		_fail("set_player_depot still accepts dummy/missing pids (pre-fix FAIL class)")
+	else:
+		_pass("set_player_depot skips pids missing from the board")
 	var adv := _slice_func(sm_src, "advance_supply_day")
 	if "_should_use_interactive_light_supply" not in adv and "_advance_supply_day_light" not in adv:
 		_fail("advance_supply_day missing F5 light gate (pre-fix FAIL class)")
@@ -198,21 +202,29 @@ func _test_step_costs(gd: Node, sm: Node, tm: Node) -> void:
 	t0 = Time.get_ticks_usec()
 	var supply: Dictionary = gd.call("apply_order_panel_action", "apply_supply", 1)
 	var supply_ms := float(Time.get_ticks_usec() - t0) / 1000.0
+	# Dummy pid 1 is the live soft-tick argument. First enable must skip
+	# missing pids; a second call must stay a membership no-op. Do not treat
+	# a first-time add of a *real* depot as the daily hitch.
 	t0 = Time.get_ticks_usec()
 	if sm.has_method("set_player_depot"):
 		sm.call("set_player_depot", 1, true)
-	var depot_ms := float(Time.get_ticks_usec() - t0) / 1000.0
+	var depot_first_ms := float(Time.get_ticks_usec() - t0) / 1000.0
+	t0 = Time.get_ticks_usec()
+	if sm.has_method("set_player_depot"):
+		sm.call("set_player_depot", 1, true)
+	var depot_second_ms := float(Time.get_ticks_usec() - t0) / 1000.0
 	t0 = Time.get_ticks_usec()
 	var live: Dictionary = gd.call("apply_interactive_multi_ai_day_live", 1)
 	var live_ms := float(Time.get_ticks_usec() - t0) / 1000.0
 	if "_live_f5_equiv_clock" in tm:
 		tm.set("_live_f5_equiv_clock", false)
 	print(
-		"HeadlessPerf4LiveMultiAiDayTest: steps prod=%.1fms supply=%.1fms depot=%.1fms multi_ai=%.1fms prod_ok=%s supply_ok=%s live_ok=%s tags=%s"
+		"HeadlessPerf4LiveMultiAiDayTest: steps prod=%.1fms supply=%.1fms depot_first=%.1fms depot_second=%.1fms multi_ai=%.1fms prod_ok=%s supply_ok=%s live_ok=%s tags=%s"
 		% [
 			prod_ms,
 			supply_ms,
-			depot_ms,
+			depot_first_ms,
+			depot_second_ms,
 			live_ms,
 			str(bool(prod.get("ok", false))),
 			str(bool(supply.get("ok", false))),
@@ -220,14 +232,22 @@ func _test_step_costs(gd: Node, sm: Node, tm: Node) -> void:
 			str(live.get("prod_tags", [])),
 		]
 	)
+	if supply_ms >= DAY_BUDGET_MS:
+		_fail("apply_supply %.1fms >= %.0f (live daily hitch class)" % [supply_ms, DAY_BUDGET_MS])
+	else:
+		_pass("apply_supply %.1fms < %.0f" % [supply_ms, DAY_BUDGET_MS])
 	if live_ms >= DAY_BUDGET_MS:
 		_fail("apply_interactive_multi_ai_day_live %.1fms >= %.0f (still rebuilding?)" % [live_ms, DAY_BUDGET_MS])
 	else:
 		_pass("apply_interactive_multi_ai_day_live %.1fms < %.0f" % [live_ms, DAY_BUDGET_MS])
-	if depot_ms >= DAY_BUDGET_MS:
-		_fail("set_player_depot(1) %.1fms >= %.0f (dummy pid still rebuilds)" % [depot_ms, DAY_BUDGET_MS])
+	if depot_first_ms >= DAY_BUDGET_MS:
+		_fail("set_player_depot(1) first %.1fms >= %.0f (dummy pid still rebuilds)" % [depot_first_ms, DAY_BUDGET_MS])
 	else:
-		_pass("set_player_depot(1) no-op/cheap %.1fms" % depot_ms)
+		_pass("set_player_depot(1) first skip/cheap %.1fms" % depot_first_ms)
+	if depot_second_ms >= DAY_BUDGET_MS:
+		_fail("set_player_depot(1) second %.1fms >= %.0f (membership no-op missed)" % [depot_second_ms, DAY_BUDGET_MS])
+	else:
+		_pass("set_player_depot(1) second no-op %.1fms" % depot_second_ms)
 
 
 func _collect_multi_ai_days(gd: Node, tm: Node, days: int) -> Array:
