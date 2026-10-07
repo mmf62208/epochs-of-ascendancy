@@ -2821,13 +2821,10 @@ func _input(event: InputEvent) -> void:
 				call_deferred("_clear_begin_title_release_swallow")
 				get_viewport().set_input_as_handled()
 				return
-			# INPUT-1: leftover release after notice × / Command Center × must
-			# not still-click the hex or unit. Do not consume press or the
-			# close release — GUI must see both so `pressed` fires. Swallow
-			# leftover in `_unhandled_input` after the Control closes.
-			if not event.pressed and _ui_close_click_blocks_map_pick(event):
-				_unstick_ui_close_map_latches()
-				return
+			# INPUT-1: do not swallow leftover in `_input` (GUI must see the
+			# close release so `pressed` fires). `_unhandled_input` eats the
+			# leftover after the Control closes. `_input` skip-still-click
+			# survived mutants — it is not a consume point.
 			if event.pressed:
 				_skip_inspector_after_march = false
 				_clear_unit_card_press_consume_on_new_left_press()
