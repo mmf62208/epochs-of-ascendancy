@@ -289,6 +289,10 @@ def build_perf4_daily_sim_tick_product() -> Dict[str, Any]:
         passes.append("supply_day_spike_profile")
     else:
         fails.append("supply_day_spike_profile")
+    if "ROUTE_REFRESH_MS_BUDGET" in sm and "func drain_pending_route_refresh" in sm:
+        passes.append("same_day_dest_drain")
+    else:
+        fails.append("same_day_dest_drain")
     if "_heap_push" in (ROOT / "scripts" / "supply" / "SupplyPathfinder.gd").read_text(
         encoding="utf-8"
     ):

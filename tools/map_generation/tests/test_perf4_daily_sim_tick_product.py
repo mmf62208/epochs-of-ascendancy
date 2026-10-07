@@ -74,6 +74,7 @@ class TestPerf4DailySimTickProduct(unittest.TestCase):
             "supply_hub_stats_refresh",
             "infra_dev_notifies_hub_stats",
             "supply_day_spike_profile",
+            "same_day_dest_drain",
             "pathfinder_binary_heap",
             "depot_one_hub_patch",
             "supply_capture_no_full_route_rebuild",
@@ -126,6 +127,8 @@ class TestPerf4DailySimTickProduct(unittest.TestCase):
         self.assertIn("DEFAULT_ROUTE_DEST_CAP: int = 24", sm)
         self.assertIn("ROUTE_REFRESH_BUDGET_PER_FLUSH: int = DEFAULT_ROUTE_DEST_CAP", sm)
         self.assertNotIn("ROUTE_REFRESH_BUDGET_PER_FLUSH: int = 2", sm)
+        self.assertIn("ROUTE_REFRESH_MS_BUDGET", sm)
+        self.assertIn("func drain_pending_route_refresh", sm)
         self.assertIn("func notify_hub_stats_changed", sm)
         self.assertIn("last_supply_day_profile", sm)
         mm = (ROOT / "scripts" / "map" / "MapManager.gd").read_text(encoding="utf-8")

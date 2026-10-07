@@ -67,10 +67,15 @@ var network_hub_stats_refresh_count: int = 0
 var full_supply_day_count: int = 0
 ## Control-change pids waiting for a cheap route drop / dest refill.
 var _control_dirty_pids: Dictionary = {}
+## One-shot: next flush replans every default dest (same order as a full rebuild).
+var _must_replan_all_defaults: bool = false
 ## Same dest cap as `_rebuild_default_routes`. One full supply day must recover
 ## every dropped dest (ten captures drop ≤ this many). Capture stays drop-only.
 const DEFAULT_ROUTE_DEST_CAP: int = 24
 const ROUTE_REFRESH_BUDGET_PER_FLUSH: int = DEFAULT_ROUTE_DEST_CAP
+## Per-frame plan slice so a 24-dest refill cannot hitch the live day over ~200 ms.
+## Remaining dests drain on the same calendar day via `_process`.
+const ROUTE_REFRESH_MS_BUDGET: float = 80.0
 ## Last full-day section timings (spike diagnosis: heap vs rebuild vs generate).
 var last_supply_day_profile: Dictionary = {}
 var last_flush_plan_count: int = 0
@@ -103,11 +108,13 @@ func build_network(
 	if not tag.is_empty():
 		player_tag = tag
 	network_build_count += 1
+	SupplyPathfinder.clear_neighbor_cache()
 	hubs = SupplyNetworkBuilder.build(
 		provinces, p_countries, city_layer, player_depot_province_ids, rules,
 	)
 	_init_depot_states()
 	_control_dirty_pids.clear()
+	_must_replan_all_defaults = false
 	refresh_intel_from_forces()
 	_rebuild_default_routes()
 	network_rebuilt.emit(hubs.size())
@@ -233,6 +240,7 @@ func _patch_player_depot_hub(province_id: int, enabled: bool) -> void:
 	if not enabled:
 		_drop_routes_touching_pid(province_id)
 	_control_dirty_pids[province_id] = true
+	_must_replan_all_defaults = true
 
 
 ## PERF-4 FIX #4: infra / development complete recalculates this hub's
@@ -281,11 +289,13 @@ func notify_province_control_changed(province_id: int) -> void:
 		if hub != null and hub.owner_tag != live_tag:
 			hub.owner_tag = live_tag
 			hub_changed = true
+	SupplyPathfinder.clear_neighbor_cache()
 	var dropped := _drop_routes_touching_pid(province_id)
 	var is_depot := province_id in player_depot_province_ids
 	if not hub_changed and not is_depot and dropped == 0:
 		return
 	_control_dirty_pids[province_id] = true
+	_must_replan_all_defaults = true
 	network_ownership_refresh_count += 1
 
 
@@ -322,9 +332,10 @@ func flush_pending_control_route_refresh(max_plans: int = ROUTE_REFRESH_BUDGET_P
 	if had_dirty:
 		for pid_v in _control_dirty_pids.keys():
 			_drop_routes_touching_pid(int(pid_v))
-		# Drop remaining defaults so refill walks the same sorted dests and
-		# tie-breaks as `_rebuild_default_routes` (annex / ten-capture identity).
+	if _must_replan_all_defaults:
+		# Once per control change: remaining defaults replan in rebuild order.
 		_drop_all_default_routes()
+		_must_replan_all_defaults = false
 	var planned: int = _refill_missing_default_routes(max_plans)
 	if _missing_default_dest_count() == 0:
 		_control_dirty_pids.clear()
@@ -388,9 +399,14 @@ func _refill_missing_default_routes(max_plans: int) -> int:
 	var planned := 0
 	var plan_ms_sum: float = 0.0
 	var plan_ms_max: float = 0.0
+	var t_budget: int = Time.get_ticks_usec()
 	for i in range(max_routes):
 		if planned >= max_plans:
 			break
+		if planned > 0:
+			var used_ms: float = float(Time.get_ticks_usec() - t_budget) / 1000.0
+			if used_ms >= ROUTE_REFRESH_MS_BUDGET:
+				break
 		var target := targets[i]
 		var key := "%d_%d" % [source, target]
 		if _routes.has(key):
@@ -412,6 +428,26 @@ func _refill_missing_default_routes(max_plans: int) -> int:
 	if planned > 0:
 		network_route_refill_count += planned
 	return planned
+
+
+func drain_pending_route_refresh() -> int:
+	var total: int = 0
+	var guard: int = 0
+	while _missing_default_dest_count() > 0 and guard < DEFAULT_ROUTE_DEST_CAP:
+		var got: int = flush_pending_control_route_refresh(ROUTE_REFRESH_BUDGET_PER_FLUSH)
+		if got <= 0:
+			break
+		total += got
+		guard += 1
+	return total
+
+
+func _process(_delta: float) -> void:
+	if _control_dirty_pids.is_empty():
+		return
+	if _should_use_interactive_light_supply():
+		return
+	flush_pending_control_route_refresh(ROUTE_REFRESH_BUDGET_PER_FLUSH)
 
 
 func _live_control_tag_for_pid(province_id: int) -> String:

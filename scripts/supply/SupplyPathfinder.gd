@@ -11,6 +11,16 @@ extends RefCounted
 static var last_search_pops: int = 0
 static var last_search_open_peak: int = 0
 static var last_search_ms: float = 0.0
+## Friendly-neighbor lists are stable until a control / infra change.
+static var _land_nbr_cache: Dictionary = {}
+static var _friendly_cache: Dictionary = {}
+static var _cache_owner_tag: String = ""
+
+
+static func clear_neighbor_cache() -> void:
+	_land_nbr_cache.clear()
+	_friendly_cache.clear()
+	_cache_owner_tag = ""
 
 
 static func find_route(
@@ -246,6 +256,11 @@ static func _supply_neighbors(
 				if nh != null and nh.airport_level >= min_air:
 					out.append(nid)
 		_:
+			if _cache_owner_tag != owner_tag:
+				clear_neighbor_cache()
+				_cache_owner_tag = owner_tag
+			if _land_nbr_cache.has(pid):
+				return _land_nbr_cache[pid]
 			for nid in adjacency.get_land_neighbors(pid):
 				if _is_friendly(nid, owner_tag, provinces):
 					out.append(nid)
@@ -254,6 +269,12 @@ static func _supply_neighbors(
 					var np: Province = provinces.get(nid)
 					if np != null and not np.is_sea and _is_friendly(nid, owner_tag, provinces):
 						out.append(nid)
+			out.sort()
+			var stored: Array[int] = []
+			for stored_id in out:
+				stored.append(int(stored_id))
+			_land_nbr_cache[pid] = stored
+			return out
 	out.sort()
 	return out
 
@@ -354,29 +375,41 @@ static func _segment_mode(
 ## Own land, open sea, unowned land, OR transit rights (alliance / military access / basing / docking).
 ## Neutral foreign land without agreement blocks overland supply (East Prussia → Baltic sea path).
 static func _is_friendly(province_id: int, owner_tag: String, provinces: Dictionary) -> bool:
+	if _cache_owner_tag != owner_tag:
+		clear_neighbor_cache()
+		_cache_owner_tag = owner_tag
+	if _friendly_cache.has(province_id):
+		return bool(_friendly_cache[province_id])
 	var p: Province = provinces.get(province_id)
 	if p == null:
+		_friendly_cache[province_id] = false
 		return false
 	# Open water is always usable for sealift (enemy fleets handled via interdiction, not block).
 	if p.is_sea:
+		_friendly_cache[province_id] = true
 		return true
 	var ctrl := str(p.controller_tag).strip_edges().to_upper() if not str(p.controller_tag).is_empty() else str(p.owner_tag).strip_edges().to_upper()
 	if ctrl.is_empty():
+		_friendly_cache[province_id] = true
 		return true  # unowned land
 	var tag := owner_tag.strip_edges().to_upper()
 	if tag.is_empty():
+		_friendly_cache[province_id] = true
 		return true
 	if ctrl == tag:
+		_friendly_cache[province_id] = true
 		return true
 	# Diplomatic transit: alliance or explicit basing / military access / docking rights.
+	var ok: bool = false
 	if typeof(RelationsManager) != TYPE_NIL:
 		if RelationsManager.has_method("is_allied") and RelationsManager.is_allied(tag, ctrl):
-			return true
-		if RelationsManager.has_method("get_policy"):
+			ok = true
+		elif RelationsManager.has_method("get_policy"):
 			var pol: Dictionary = RelationsManager.get_policy(tag, ctrl)
 			if bool(pol.get("military_access", false)) \
 				or bool(pol.get("docking_rights", false)) \
 				or bool(pol.get("basing_rights", false)) \
 				or bool(pol.get("supply_transit", false)):
-				return true
-	return false
+				ok = true
+	_friendly_cache[province_id] = ok
+	return ok

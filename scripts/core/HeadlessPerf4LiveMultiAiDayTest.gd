@@ -219,6 +219,10 @@ func _test_replanned_off_must_fail(sm_src: String, adv: String) -> void:
 		_fail("advance_supply_day no longer flushes dropped dests")
 	else:
 		_pass("advance_supply_day flushes dropped dests on the full day")
+	if "ROUTE_REFRESH_MS_BUDGET" not in sm_src or "drain_pending_route_refresh" not in sm_src:
+		_fail("same-day dest drain missing (recovery would hitch one frame)")
+	else:
+		_pass("same-day dest drain + per-frame plan budget present")
 	var refill := _slice_func(sm_src, "_refill_missing_default_routes")
 	if refill.is_empty() or "_plan_route" not in refill:
 		_fail("re-plan turned off (_refill_missing_default_routes stub)")
@@ -821,12 +825,15 @@ func _test_ten_capture_path_identity_within_one_day(mm: Node, sm: Node) -> void:
 	var t_day: int = Time.get_ticks_usec()
 	sm.call("advance_supply_day", 1.0)
 	var day_ms: float = float(Time.get_ticks_usec() - t_day) / 1000.0
+	var t_drain: int = Time.get_ticks_usec()
+	var drained: int = int(sm.call("drain_pending_route_refresh")) if sm.has_method("drain_pending_route_refresh") else 0
+	var drain_ms: float = float(Time.get_ticks_usec() - t_drain) / 1000.0
 	var missing1: int = int(sm.call("count_missing_default_dests"))
 	var refill1: int = int(sm.get("network_route_refill_count"))
 	var prof: Dictionary = sm.get("last_supply_day_profile") if "last_supply_day_profile" in sm else {}
 	print(
-		"HeadlessPerf4LiveMultiAiDayTest: ten_capture_recovery day=%.1fms missing=%d refill=%d→%d profile=%s"
-		% [day_ms, missing1, refill0, refill1, str(prof)]
+		"HeadlessPerf4LiveMultiAiDayTest: ten_capture_recovery day=%.1fms drain=%.1fms drained=%d missing=%d refill=%d→%d profile=%s"
+		% [day_ms, drain_ms, drained, missing1, refill0, refill1, str(prof)]
 	)
 	if missing1 != 0:
 		_fail("ten-capture dests still missing after 1 day n=%d (5ca1d0b5 budget=2 class)" % missing1)
@@ -835,9 +842,9 @@ func _test_ten_capture_path_identity_within_one_day(mm: Node, sm: Node) -> void:
 	else:
 		_pass("ten-capture recovered all dests in 1 day missing=0 refill+%d" % (refill1 - refill0))
 	if day_ms >= RECOVERY_DAY_BUDGET_MS:
-		_fail("ten-capture recovery day %.1fms >= %.0f" % [day_ms, RECOVERY_DAY_BUDGET_MS])
+		_fail("ten-capture live day frame %.1fms >= %.0f" % [day_ms, RECOVERY_DAY_BUDGET_MS])
 	else:
-		_pass("ten-capture recovery day %.1fms < %.0f" % [day_ms, RECOVERY_DAY_BUDGET_MS])
+		_pass("ten-capture live day frame %.1fms < %.0f" % [day_ms, RECOVERY_DAY_BUDGET_MS])
 	var live: Dictionary = sm.call("get_network_topology_snapshot")
 	if not _boot_live_supply_network(mm, sm):
 		_fail("ten-capture forced rebuild failed")
@@ -878,6 +885,8 @@ func _test_annex_path_identity(gd: Node, mm: Node, sm: Node) -> void:
 		_fail("annex path identity settlement failed pid=%d" % pid)
 		return
 	sm.call("advance_supply_day", 1.0)
+	if sm.has_method("drain_pending_route_refresh"):
+		sm.call("drain_pending_route_refresh")
 	var missing: int = int(sm.call("count_missing_default_dests")) if sm.has_method("count_missing_default_dests") else -1
 	if missing != 0:
 		_fail("annex dests still missing after 1 day n=%d" % missing)
@@ -957,7 +966,13 @@ func _test_hub_capacity_matches_rebuild_at_day_40(tm: Node, mm: Node, sm: Node) 
 		_fail("day-40 hub capacity boot failed")
 		return
 	_reset_clock(tm, 0)
-	var clock: Dictionary = tm.call("advance_live_f5_equivalent_days", HUB_CAPACITY_DAY)
+	# advance_live_f5_equivalent_days clamps to 20; two clocks reach day 40.
+	var clock: Dictionary = tm.call("advance_live_f5_equivalent_days", 20)
+	var clock2: Dictionary = tm.call("advance_live_f5_equivalent_days", 20)
+	clock["days"] = int(clock.get("days", 0)) + int(clock2.get("days", 0))
+	clock["elapsed"] = clock2.get("elapsed", clock.get("elapsed", 0))
+	clock["day"] = clock2.get("day", clock.get("day", 0))
+	clock["second"] = clock2
 	var live_caps: Dictionary = sm.call("get_hub_capacity_snapshot") if sm.has_method("get_hub_capacity_snapshot") else {}
 	if live_caps.is_empty() and "hubs" in sm:
 		for pid_v in (sm.hubs as Dictionary).keys():
