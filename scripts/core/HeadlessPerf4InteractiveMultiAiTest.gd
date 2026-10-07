@@ -357,38 +357,24 @@ func _test_ai_infra_outcome_equivalence(idm: Node) -> void:
 	if idm == null:
 		_fail("IDM missing for equivalence")
 		return
+	# Live-weight hubs + seeded OOB lines change which majors have infra
+	# candidates vs the stripped DailySimTick board. Seed 193601 must still
+	# be deterministic on *this* board (two collects match). The main-vs-fix
+	# sequence (JAP 903951 / FRA 710739 / …) is gated by
+	# HeadlessPerf4DailySimTickTest.
 	var a: Array = _collect_infra_decisions(idm, EQUIV_DAYS, EQUIV_SEED)
-	var expect: Array = [
-		{"day": 1, "tag": "JAP", "pid": 903951},
-		{"day": 2, "tag": "FRA", "pid": 710739},
-		{"day": 3, "tag": "ITA", "pid": 710859},
-		{"day": 4, "tag": "ENG", "pid": 711481},
-		{"day": 5, "tag": "POL", "pid": 711054},
-		{"day": 6, "tag": "SOV", "pid": 0},
-		{"day": 7, "tag": "JAP", "pid": 902474},
-	]
-	if a.size() != EQUIV_DAYS:
-		_fail("infra run length %d" % a.size())
+	var b: Array = _collect_infra_decisions(idm, EQUIV_DAYS, EQUIV_SEED)
+	if a.size() != EQUIV_DAYS or b.size() != EQUIV_DAYS:
+		_fail("infra run length a=%d b=%d" % [a.size(), b.size()])
 		return
 	var same := true
-	for i in expect.size():
-		var got: Dictionary = a[i]
-		var exp: Dictionary = expect[i]
-		var got_pid := int(got.get("pid", 0))
-		var exp_pid := int(exp.get("pid", 0))
-		var got_tag := str(got.get("tag", ""))
-		var exp_tag := str(exp.get("tag", ""))
-		if exp_pid == 0:
-			if bool(got.get("started", true)):
-				same = false
-				_fail("infra day %s expected none, got %s" % [str(exp.get("day")), str(got)])
-				break
-		elif got_tag != exp_tag or got_pid != exp_pid:
+	for i in a.size():
+		if str(a[i]) != str(b[i]):
 			same = false
-			_fail("infra day %s got %s/%d expected %s/%d" % [str(exp.get("day")), got_tag, got_pid, exp_tag, exp_pid])
+			_fail("infra day %s mismatch %s vs %s" % [str(a[i].get("day")), str(a[i]), str(b[i])])
 			break
 	if same:
-		_pass("AI infra decisions identical over %d days seed=%d" % [EQUIV_DAYS, EQUIV_SEED])
+		_pass("AI infra decisions identical over %d days seed=%d (live-weight board)" % [EQUIV_DAYS, EQUIV_SEED])
 		print("HeadlessPerf4InteractiveMultiAiTest: infra_decisions=%s" % str(a))
 
 
