@@ -11,20 +11,25 @@ extends SceneTree
 ##   T1  notice × event-path press+release through parse+flush. FAIL on
 ##       main 61a80433 (province under × selected). PASS on the tip.
 ##       Same-spot follow-up at 0 / 1 / 3 frames (no latch reset).
+##       Also runs T1/T3/T5 on a `post_news` / `_show_toast` News × so
+##       disconnecting that button_down fails by leftover Köln / unit.
 ##   T2  Command Center CloseX same pipeline + leftover up after overlay
 ##       free. FAIL on main (Köln) / PASS on tip. Same-spot 0 / 1 / 3.
 ##   T3  leftover release after notice dismiss (overlay gone) via real
 ##       InputEvents at the real ×. Catches missing `_input` swallow.
 ##   T4  leftover release after CC dismiss via real InputEvents.
 ##   T5  leftover `_input` chip path after notice × with a unit under ×.
-##   T6  poll-path notice close (no button_down), leftover press+release
-##       one frame later. Catches poll arm + pending_press.
-##   T7  poll-path CC close, leftover press+release one frame later.
+##   T6  poll-path notice close through real `_process` (press away, warp
+##       over ×, frames tick). Leftover press+release one frame later.
+##   T7  poll-path CC close through MainMenu `_process`, leftover one
+##       frame later.
 ##   T8  later still-click at a different spot must pick (one-shot).
 ##   T9  G89 same-spot at 0/1/3/240 frames (notice + CC) and CC other-spot.
 ##       No latch reset. Realistic hold close, then still-click at the real ×.
-##   T10 CC fast double-click: two press+release pairs same frame and next
-##       frame at the real ✕ (main T2/T4 only fail this way).
+##   T10 CC leftover after overlay free (CC closed/freed before the
+##       second click, like T2/T4). Main fails by leftover Köln.
+##   T11 poll-pending swallow must expire: after 750 ms + 2 frames a
+##       same-spot click must select. Stuck tick leaves pid=-1.
 ##
 ##   tools/run_godot.sh --headless --path . --resolution 1280x740 \
 ##     -s res://scripts/core/HeadlessInput1CloseClickFallthroughTest.gd
@@ -107,15 +112,19 @@ func _run() -> void:
 		return
 	# Behavior first so fail-on-main is leftover pick, not source text.
 	await _test_t1_notice_event_pipeline()
+	await _test_t1_news_event_pipeline()
 	await _test_t2_cc_event_pipeline()
 	await _test_t3_notice_leftover_after_free()
+	await _test_t3_news_leftover_after_free()
 	await _test_t4_cc_leftover_after_free()
 	await _test_t5_notice_chip_leftover()
+	await _test_t5_news_chip_leftover()
 	await _test_t6_notice_poll_leftover()
 	await _test_t7_cc_poll_leftover()
 	await _test_t8_later_click_picks()
 	await _test_g_same_spot()
 	await _test_cc_fast_double_click()
+	await _test_t11_swallow_expiry_must_select()
 	_test_source_needles()
 
 
@@ -472,6 +481,20 @@ func _fixture_notice_close() -> Button:
 	return btn
 
 
+func _find_notice_close() -> Button:
+	var btn: Button = null
+	if _leui != null and _leui.has_method("notice_close_button"):
+		btn = _leui.call("notice_close_button") as Button
+	if btn == null and _leui != null:
+		btn = _leui.find_child("NoticeClose", true, false) as Button
+	return btn
+
+
+func _is_news_toast_close(btn: Button) -> bool:
+	# `_show_toast` (post_news) sets this tooltip; `show_toast` does not.
+	return btn != null and is_instance_valid(btn) and btn.tooltip_text == "Dismiss notification"
+
+
 func _show_notice() -> Button:
 	_enable_toast_ui()
 	if _leui == null:
@@ -479,11 +502,34 @@ func _show_notice() -> Button:
 	if _leui.has_method("show_toast"):
 		_leui.call("show_toast", "INPUT-1 notice close test", 30.0)
 	await _flush(3)
-	var btn: Button = null
-	if _leui.has_method("notice_close_button"):
-		btn = _leui.call("notice_close_button") as Button
+	var btn: Button = _find_notice_close()
 	if btn == null:
-		btn = _leui.find_child("NoticeClose", true, false) as Button
+		btn = _fixture_notice_close()
+		await _flush(1)
+	return btn
+
+
+func _show_news_notice() -> Button:
+	# post_news → `_show_toast` NoticeClose (button_down ~L523). Fixture only
+	# when headless main skips toast UI, so leftover still fails by Köln.
+	_enable_toast_ui()
+	if _leui == null:
+		return _fixture_notice_close()
+	if _leui.has_method("post_news"):
+		_leui.call(
+			"post_news",
+			"INPUT-1 news close test",
+			"News toast × must not pick Köln",
+			"general"
+		)
+	await _flush(3)
+	var btn: Button = _find_notice_close()
+	if btn != null and _is_news_toast_close(btn):
+		return btn
+	var forced: bool = _leui != null and "force_toast_ui" in _leui and bool(_leui.get("force_toast_ui"))
+	if forced and btn == null:
+		_fail("T-news: post_news did not build NoticeClose with force_toast_ui")
+		return _fixture_notice_close()
 	if btn == null:
 		btn = _fixture_notice_close()
 		await _flush(1)
@@ -632,6 +678,21 @@ func _test_t1_notice_event_pipeline() -> void:
 	await _same_spot_gaps("notice")
 
 
+func _test_t1_news_event_pipeline() -> void:
+	_hide_notices()
+	var btn: Button = await _show_news_notice()
+	if btn == null:
+		return
+	var pt: Vector2 = _prepare_under(btn)
+	if pt == Vector2.ZERO:
+		return
+	await _click_close(pt)
+	await _flush(1)
+	if not _assert_no_selection("T1 news post_news event-path leftover"):
+		return
+	_hide_notices()
+
+
 func _test_t2_cc_event_pipeline() -> void:
 	var btn: Button = await _spawn_cc()
 	if btn == null:
@@ -666,6 +727,22 @@ func _test_t3_notice_leftover_after_free() -> void:
 	_leftover_up_after_free(pt)
 	await _flush(2)
 	if not _assert_no_selection("T3 notice leftover after overlay free"):
+		return
+	_hide_notices()
+
+
+func _test_t3_news_leftover_after_free() -> void:
+	_hide_notices()
+	var btn: Button = await _show_news_notice()
+	if btn == null:
+		return
+	var pt: Vector2 = _prepare_under(btn)
+	if pt == Vector2.ZERO:
+		return
+	await _click_close_same_frame(pt)
+	_leftover_up_after_free(pt)
+	await _flush(2)
+	if not _assert_no_selection("T3 news leftover after overlay free"):
 		return
 	_hide_notices()
 
@@ -754,25 +831,85 @@ func _test_t5_notice_chip_leftover() -> void:
 	_hide_notices()
 
 
-func _poll_close_or_dismiss(kind: String, _btn: Button, pt: Vector2) -> bool:
+func _test_t5_news_chip_leftover() -> void:
+	_hide_notices()
+	var btn: Button = await _show_news_notice()
+	if btn == null:
+		return
+	var pt: Vector2 = _prepare_under(btn)
+	if pt == Vector2.ZERO:
+		return
+	var world_pt: Vector2 = _cam.get_canvas_transform().affine_inverse() * pt
+	_air_under_point(pt)
+	_mr.set("selected_formation_id", "")
+	var proof: bool = false
+	if _mr.has_method("_try_open_land_unit_at_world"):
+		proof = bool(_mr.call("_try_open_land_unit_at_world", world_pt, false, false))
+	if not proof or _fid() != "input1_est_air":
+		_fail("T5 news air wing under × was not a real hit (opened=%s fid=%s)" % [str(proof), _fid()])
+		return
+	_pass("T5 news air wing under × opens when the click is not NoticeClose")
+	_clear_inspector()
+	await _click_close_same_frame(pt)
+	_leftover_up_after_free(pt)
+	await _flush(2)
+	if _fid() == "input1_est_air":
+		_fail("T5 news leftover chip path selected the unit under ×")
+		return
+	if not _assert_no_selection("T5 news leftover _input / chip"):
+		return
+	if "_demo_unit_icon_pids" in _mr:
+		_mr._demo_unit_icon_pids = []
+	_hide_notices()
+
+
+func _poll_away_pt(btn: Button) -> Vector2:
+	var away: Vector2 = MAP_PT
+	if btn != null and is_instance_valid(btn):
+		var rect: Rect2 = btn.get_global_rect().grow(12.0)
+		if rect.has_point(away):
+			away = Vector2(80, 600)
+			if rect.has_point(away):
+				away = Vector2(48, 48)
+	return away
+
+
+func _idle_poll_latches() -> void:
+	# Button-up + one frame so `_poll_*_just_pressed` drops its hold latch.
+	_send_pipeline(MAP_PT, false)
+	if _leui != null and "_notice_ptr_poll_held" in _leui:
+		_leui.set("_notice_ptr_poll_held", false)
+	if _cc != null and is_instance_valid(_cc) and "_close_ptr_poll_held" in _cc:
+		_cc.set("_close_ptr_poll_held", false)
+
+
+func _drive_real_process_poll(kind: String, btn: Button, pt: Vector2) -> void:
+	# Press away from × so GUI button_down does not fire, warp over × in
+	# the same frame, then let `_process` poll `handle_live_close_pointer(null)`.
+	_idle_poll_latches()
+	await process_frame
+	var away: Vector2 = _poll_away_pt(btn)
+	_aim_mouse(away)
+	var ev: InputEventMouseButton = _make_mouse(away, true)
+	Input.parse_input_event(ev)
+	if Input.has_method("flush_buffered_events"):
+		Input.flush_buffered_events()
 	_aim_mouse(pt)
-	await _flush(1)
+	var i: int = 0
+	while i < 3:
+		await process_frame
+		i += 1
+	# Matching leftover up of this hold. Poll-arm swallows it on the tip.
+	_send_pipeline(pt, false)
+	# Poll miss (main / disabled `_process`) must not hide leftover Köln:
+	# drop the overlay so the next click is judged by selection.
 	if kind == "notice":
-		if _leui != null and _leui.has_method("handle_live_close_pointer"):
-			var polled: String = str(_leui.call("handle_live_close_pointer", null))
-			if polled == "close":
-				return true
-		_hide_notices()
-		return true
-	if _cc != null and _cc.has_method("handle_live_close_pointer"):
-		var cc_polled: String = str(_cc.call("handle_live_close_pointer", null))
-		if cc_polled == "close":
-			return true
-	if _cc != null and _cc.has_method("_force_close"):
-		_cc.call("_force_close")
-		return true
-	_free_cc()
-	return true
+		var still: Button = _find_notice_close()
+		if still != null and is_instance_valid(still) and still.is_visible_in_tree():
+			_hide_notices()
+	elif _cc != null and is_instance_valid(_cc) and not _cc_closed():
+		_cc.free()
+		_cc = null
 
 
 func _test_t6_notice_poll_leftover() -> void:
@@ -783,8 +920,7 @@ func _test_t6_notice_poll_leftover() -> void:
 	var pt: Vector2 = _prepare_under(btn)
 	if pt == Vector2.ZERO:
 		return
-	if not await _poll_close_or_dismiss("notice", btn, pt):
-		return
+	await _drive_real_process_poll("notice", btn, pt)
 	await process_frame
 	_clear_inspector()
 	# Poll leftover press arrives N+1. pending_press must keep the arm.
@@ -804,8 +940,7 @@ func _test_t7_cc_poll_leftover() -> void:
 	var pt: Vector2 = _prepare_under(btn)
 	if pt == Vector2.ZERO:
 		return
-	if not await _poll_close_or_dismiss("cc", btn, pt):
-		return
+	await _drive_real_process_poll("cc", btn, pt)
 	await process_frame
 	_clear_inspector()
 	_send_pipeline(pt, true)
@@ -922,45 +1057,58 @@ func _g_case(kind: String, gap_frames: int, other_spot: bool) -> void:
 
 
 func _test_cc_fast_double_click() -> void:
-	# Two presses at the real ✕ in the same frame and the next frame.
-	# Main T2/T4 only fail by leftover Köln with this second click.
-	for gap_frames in [0, 1]:
-		var btn: Button = await _spawn_cc()
-		if btn == null:
-			return
-		var pt: Vector2 = _prepare_under(btn)
-		if pt == Vector2.ZERO:
-			return
-		_aim_mouse(pt)
-		await _flush(1)
-		_send_pipeline(pt, true)
-		_send_pipeline(pt, false)
-		var i: int = 0
-		while i < gap_frames:
-			await process_frame
-			i += 1
-		_send_pipeline(pt, true)
-		_send_pipeline(pt, false)
-		await _flush(1)
-		if not _cc_closed():
-			_fail("T10 CC double-click gap=%d: CloseX did not close" % gap_frames)
-			_free_cc()
-			return
-		if gap_frames == 0:
-			# Same-frame second click is leftover. Main T2/T4 fail only this way.
-			if not _assert_no_selection("T10 CC double-click gap=0 leftover"):
-				_free_cc()
-				return
-			await _flush(2)
-			if not await _assert_same_spot_picks(pt, "T10 CC double-click gap=0 same-spot"):
-				_free_cc()
-				return
-		else:
-			# Next-frame second press clears the one-shot; must select.
-			var got: int = _pid()
-			if got != KNOWN_PID and not _inspector_up():
-				_fail("T10 CC double-click gap=1: next-frame click did not select (pid=%d)" % got)
-				_free_cc()
-				return
-			_pass("T10 CC double-click gap=1: next-frame click selected pid=%d" % got)
+	# Close through the real ✕, then leftover after the overlay is gone
+	# (same as T2/T4). A still-open Command Center blocked the second
+	# same-frame click on main, so T10 used to PASS on 61a80433.
+	var btn: Button = await _spawn_cc()
+	if btn == null:
+		return
+	var pt: Vector2 = _prepare_under(btn)
+	if pt == Vector2.ZERO:
+		return
+	await _click_close_same_frame(pt)
+	_leftover_up_after_free(pt)
+	await _flush(1)
+	if not _cc_closed():
+		_fail("T10: CloseX press+release did not close Command Center")
 		_free_cc()
+		return
+	if not _assert_no_selection("T10 CC leftover after overlay free"):
+		_free_cc()
+		return
+	_free_cc()
+
+
+func _test_t11_swallow_expiry_must_select() -> void:
+	# Phase 1: event-path leftover after free. FAIL on main by Köln.
+	_hide_notices()
+	var btn: Button = await _show_notice()
+	if btn == null:
+		return
+	var pt: Vector2 = _prepare_under(btn)
+	if pt == Vector2.ZERO:
+		return
+	await _click_close_same_frame(pt)
+	_leftover_up_after_free(pt)
+	await _flush(2)
+	if not _assert_no_selection("T11 main-fail leftover before expiry"):
+		_hide_notices()
+		return
+	_hide_notices()
+	_clear_inspector()
+	# Phase 2: poll-pending arm. After 750 ms + 2 frames the same spot
+	# must select. A no-op `_tick_ui_close_release_swallow` keeps pending
+	# and leftover pid stays -1.
+	if not _mr.has_method("arm_ui_close_release_swallow"):
+		_fail("T11: arm_ui_close_release_swallow missing after leftover passed")
+		return
+	_restore_home_camera()
+	if not _seed_known_under_screen(pt):
+		return
+	_hide_harness_map_chrome()
+	_mr.call("arm_ui_close_release_swallow", true)
+	await _wait_hold_ms(830)
+	await _flush(4)
+	if not await _assert_same_spot_picks(pt, "T11 swallow expiry must select"):
+		return
+	_hide_notices()
