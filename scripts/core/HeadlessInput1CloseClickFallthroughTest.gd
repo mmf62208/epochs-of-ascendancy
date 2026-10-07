@@ -591,6 +591,7 @@ func _test_t3_notice_unhandled_leftover() -> void:
 	_hide_notices()
 	if not _seed_known_under_screen(pt):
 		return
+	_reset_map_click_latches()
 	_clear_inspector()
 	var ev: InputEventMouseButton = _make_mouse(pt, false)
 	_warp_mouse(pt)
@@ -615,6 +616,7 @@ func _test_t4_cc_unhandled_leftover() -> void:
 	_free_cc()
 	if not _seed_known_under_screen(pt):
 		return
+	_reset_map_click_latches()
 	_clear_inspector()
 	var ev: InputEventMouseButton = _make_mouse(pt, false)
 	_warp_mouse(pt)
@@ -681,6 +683,7 @@ func _test_t5_notice_chip_leftover() -> void:
 		btn.pressed.emit()
 	await _flush(2)
 	_hide_notices()
+	_reset_map_click_latches()
 	_mr.set("selected_formation_id", "")
 	var ev: InputEventMouseButton = _make_mouse(pt, false)
 	_warp_mouse(pt)
@@ -719,6 +722,7 @@ func _test_t6_notice_poll_leftover() -> void:
 	_hide_notices()
 	if not _seed_known_under_screen(pt):
 		return
+	_reset_map_click_latches()
 	_clear_inspector()
 	var ev: InputEventMouseButton = _make_mouse(pt, false)
 	_warp_mouse(pt)
@@ -747,6 +751,7 @@ func _test_t7_cc_poll_leftover() -> void:
 	_free_cc()
 	if not _seed_known_under_screen(pt):
 		return
+	_reset_map_click_latches()
 	_clear_inspector()
 	var ev: InputEventMouseButton = _make_mouse(pt, false)
 	_warp_mouse(pt)
