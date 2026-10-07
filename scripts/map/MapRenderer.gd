@@ -2822,12 +2822,11 @@ func _input(event: InputEvent) -> void:
 				get_viewport().set_input_as_handled()
 				return
 			# INPUT-1: leftover release after notice × / Command Center × must
-			# not still-click the hex or unit. Do not consume the press — GUI
-			# must see it so close fires on button `pressed` (release).
+			# not still-click the hex or unit. Do not consume press or the
+			# close release — GUI must see both so `pressed` fires. Swallow
+			# leftover in `_unhandled_input` after the Control closes.
 			if not event.pressed and _ui_close_click_blocks_map_pick(event):
 				_unstick_ui_close_map_latches()
-				call_deferred("_clear_ui_close_release_swallow")
-				get_viewport().set_input_as_handled()
 				return
 			if event.pressed:
 				_skip_inspector_after_march = false
@@ -18943,10 +18942,16 @@ func _is_mouse_over_blocking_ui() -> bool:
 		if n is DraggablePanel and (n as CanvasItem).visible:
 			return true
 		var nn := str(n.name)
+		if nn == "MainMenu":
+			# queue_free / `_closing` leftover must not block the next hex pick
+			# on the same ✕ spot (INPUT-1 same-spot after Command Center).
+			if n.is_queued_for_deletion() or ("_closing" in n and bool(n.get("_closing"))):
+				n = n.get_parent()
+				continue
+			return true
 		if nn in [
 			"TechnologyScreen",
 			"InfoPanel",
-			"MainMenu",
 			"DebugOverlay",
 			"OrderCommandPanel",
 			"DiplomacyView",
@@ -24955,6 +24960,19 @@ func _live_ui_close_mouse_pos() -> Vector2:
 	return Vector2.ZERO
 
 
+func _ui_close_button_is_dying(btn: Button) -> bool:
+	# queue_free CloseX stays in-tree until the frame ends. Must not steal the
+	# next same-spot map click (CC ✕ leftover `_left_skip` / no `_begin`).
+	var walk: Node = btn
+	while walk != null:
+		if walk.is_queued_for_deletion():
+			return true
+		if "_closing" in walk and bool(walk.get("_closing")):
+			return true
+		walk = walk.get_parent()
+	return false
+
+
 func _notice_or_cc_close_owns_screen_point(pt: Vector2) -> bool:
 	var tree: SceneTree = get_tree()
 	if tree == null:
@@ -24964,6 +24982,8 @@ func _notice_or_cc_close_owns_screen_point(pt: Vector2) -> bool:
 			continue
 		var btn: Button = n as Button
 		if not btn.visible or not btn.is_visible_in_tree():
+			continue
+		if _ui_close_button_is_dying(btn):
 			continue
 		if btn.get_global_rect().has_point(pt):
 			return true

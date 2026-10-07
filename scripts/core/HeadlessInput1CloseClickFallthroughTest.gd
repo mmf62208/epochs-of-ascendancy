@@ -204,7 +204,27 @@ func _setup_renderer() -> bool:
 				_leui.name = "LeaderEventUI"
 				root.add_child(_leui)
 	_enable_toast_ui()
+	_hide_harness_map_chrome()
 	return true
+
+
+func _hide_harness_map_chrome() -> void:
+	# MapRenderer builds MapModeToolbar / search over the real CloseX slot
+	# (~1063,152), often on CC unpause. Hide harness chrome so same-spot is
+	# judged by province pick. Do not move or enlarge ×.
+	if _mr == null:
+		return
+	for chrome_name in [
+		"MapModeToolbar", "TopInfoBar", "SearchBox", "SearchLineEdit",
+		"MapModeBar", "Minimap", "StrategicMinimap"
+	]:
+		var chrome: Node = _mr.find_child(chrome_name, true, false)
+		if chrome is CanvasItem:
+			(chrome as CanvasItem).visible = false
+	if _ui != null:
+		var tb: Node = _ui.find_child("MapModeToolbar", true, false)
+		if tb is CanvasItem:
+			(tb as CanvasItem).visible = false
 
 
 func _enable_toast_ui() -> void:
@@ -374,8 +394,15 @@ func _assert_no_selection(why: String) -> bool:
 
 func _assert_same_spot_picks(screen_pt: Vector2, why: String) -> bool:
 	_clear_inspector()
+	# CC close can retarget map-mode / camera. Re-seed Köln under the same
+	# screen point. Do not reset input latches.
+	_restore_home_camera()
+	if not _seed_known_under_screen(screen_pt):
+		return false
+	_hide_harness_map_chrome()
+	_aim_mouse(screen_pt)
+	await _flush(1)
 	_send_pipeline(screen_pt, true)
-	await _wait_hold_ms(HOLD_MS)
 	_send_pipeline(screen_pt, false)
 	await _flush(2)
 	var got_pid: int = _pid()
@@ -525,8 +552,12 @@ func _prepare_under(btn: Button) -> Vector2:
 
 
 func _click_close(screen_pt: Vector2) -> void:
+	_aim_mouse(screen_pt)
+	await _flush(1)
 	_send_pipeline(screen_pt, true)
 	await _wait_hold_ms(HOLD_MS)
+	_aim_mouse(screen_pt)
+	await _flush(1)
 	_send_pipeline(screen_pt, false)
 
 
