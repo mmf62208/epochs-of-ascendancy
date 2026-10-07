@@ -1,27 +1,29 @@
 extends SceneTree
 
-## INPUT-1: close × on a notice/toast or Command Center must not fall through
-## to MapRenderer and select the province (or unit) underneath.
+## INPUT-1 FIX #1: close × on a notice/toast or Command Center must not fall
+## through to MapRenderer. Close fires on button release through the real
+## Control. The next still-click on the same spot must select.
 ##
 ## Judge leftover / follow-up by pid / inspector / formation only.
 ## Do not early-out on swallow flags. Mutants that drop a consumption
-## point must FAIL by selection change, not source-text.
+## point must FAIL by selection change, not source-text or setup.
 ##
 ##   T1  notice × event-path press+release through parse+flush. FAIL on
 ##       main 61a80433 (province under × selected). PASS on the tip.
-##   T2  Command Center CloseX same pipeline. FAIL on main / PASS on tip.
-##   T3  leftover `_unhandled_input` after notice dismiss (overlay gone).
-##       Catches missing `_unhandled` swallow.
-##   T4  leftover `_unhandled_input` after CC dismiss.
-##   T5  leftover `_input` + `_try_open_land_chip_from_input` after notice
-##       dismiss with a unit under ×. Catches missing chip/`_input` consume.
-##   T6  poll-path notice close (no button_down), leftover unhandled.
-##       Catches missing poll arm (pending_press).
-##   T7  poll-path CC close, leftover unhandled.
-##   T8  later still-click after leftover must pick (one-shot swallow).
+##       Same-spot follow-up at 0 / 1 / 3 frames (no latch reset).
+##   T2  Command Center CloseX same pipeline + leftover up after overlay
+##       free. FAIL on main (Köln) / PASS on tip. Same-spot 0 / 1 / 3.
+##   T3  leftover release after notice dismiss (overlay gone) via real
+##       InputEvents at the real ×. Catches missing `_input` swallow.
+##   T4  leftover release after CC dismiss via real InputEvents.
+##   T5  leftover `_input` chip path after notice × with a unit under ×.
+##   T6  poll-path notice close (no button_down), leftover press+release
+##       one frame later. Catches poll arm + pending_press.
+##   T7  poll-path CC close, leftover press+release one frame later.
+##   T8  later still-click at a different spot must pick (one-shot).
 ##
-##   EOA_HEADLESS_TOAST_UI=1 tools/run_godot.sh --headless --path . \
-##     --resolution 1280x740 -s res://scripts/core/HeadlessInput1CloseClickFallthroughTest.gd
+##   tools/run_godot.sh --headless --path . --resolution 1280x740 \
+##     -s res://scripts/core/HeadlessInput1CloseClickFallthroughTest.gd
 ##
 ## Headless / xvfb are NOT live Play.
 
@@ -34,6 +36,7 @@ const HOLD_MS := 80
 const ZOOM0 := 0.776
 const CAM0 := Vector2(4200, 1000)
 const MAP_PT := Vector2(640, 400)
+const FIXTURE_NOTICE_PT := Vector2(1188, 92)
 
 var _failures: int = 0
 var _mr: Node = null
@@ -48,10 +51,10 @@ var _known_host: Node2D = null
 var _event_seq: int = 0
 var _cc: CanvasLayer = null
 var _leui: Node = null
+var _air_host: Node2D = null
 
 
 func _init() -> void:
-	OS.set_environment("EOA_HEADLESS_TOAST_UI", "1")
 	call_deferred("_start")
 
 
@@ -101,8 +104,8 @@ func _run() -> void:
 	# Behavior first so fail-on-main is leftover pick, not source text.
 	await _test_t1_notice_event_pipeline()
 	await _test_t2_cc_event_pipeline()
-	await _test_t3_notice_unhandled_leftover()
-	await _test_t4_cc_unhandled_leftover()
+	await _test_t3_notice_leftover_after_free()
+	await _test_t4_cc_leftover_after_free()
 	await _test_t5_notice_chip_leftover()
 	await _test_t6_notice_poll_leftover()
 	await _test_t7_cc_poll_leftover()
@@ -111,7 +114,6 @@ func _run() -> void:
 
 
 func _test_source_needles() -> void:
-	# Light invariants that exist on the tip. Do not needle clock internals.
 	var ren := _read(SRC_REN)
 	var leui := _read(SRC_LEUI)
 	var cc := _read(SRC_CC)
@@ -133,7 +135,7 @@ func _test_source_needles() -> void:
 func _setup_renderer() -> bool:
 	var mr_script: Script = load("res://scripts/map/MapRenderer.gd") as Script
 	if mr_script == null:
-		_fail("MapRenderer.gd missing")
+		_fail("MapRenderer create failed")
 		return false
 	_mr = mr_script.new() as Node
 	if _mr == null:
@@ -201,7 +203,14 @@ func _setup_renderer() -> bool:
 			if _leui != null:
 				_leui.name = "LeaderEventUI"
 				root.add_child(_leui)
+	_enable_toast_ui()
 	return true
+
+
+func _enable_toast_ui() -> void:
+	# Test hook on the node. Product post_news does not read EOA_HEADLESS_TOAST_UI.
+	if _leui != null and "force_toast_ui" in _leui:
+		_leui.set("force_toast_ui", true)
 
 
 func _restore_pick_grid() -> void:
@@ -276,76 +285,27 @@ func _make_mouse(screen_pt: Vector2, pressed: bool) -> InputEventMouseButton:
 	return ev
 
 
-func _warp_mouse(screen_pt: Vector2) -> void:
+func _aim_mouse(screen_pt: Vector2) -> void:
 	var vp: Viewport = root.get_viewport()
 	if vp != null:
 		vp.warp_mouse(screen_pt)
 	DisplayServer.warp_mouse(Vector2i(int(round(screen_pt.x)), int(round(screen_pt.y))))
+	var mot := InputEventMouseMotion.new()
+	mot.device = 0
+	mot.position = screen_pt
+	mot.global_position = screen_pt
+	Input.parse_input_event(mot)
+	if Input.has_method("flush_buffered_events"):
+		Input.flush_buffered_events()
 
 
 func _send_pipeline(screen_pt: Vector2, pressed: bool) -> InputEventMouseButton:
-	_warp_mouse(screen_pt)
+	_aim_mouse(screen_pt)
 	var ev: InputEventMouseButton = _make_mouse(screen_pt, pressed)
 	Input.parse_input_event(ev)
 	if Input.has_method("flush_buffered_events"):
 		Input.flush_buffered_events()
 	return ev
-
-
-func _arm_leftover_release_gesture(screen_pt: Vector2) -> void:
-	# Same physical click: × press already happened; leftover is the matching
-	# release. Tip press-consume returns before `_begin_left_map_gesture`, so
-	# the harness keeps `_left_btn_down` for that leftover only. Origin/slop
-	# must sit on the leftover point (else `_note` latches skip ≥8px).
-	if _mr == null:
-		return
-	if _mr.has_method("_reset_left_gesture_state"):
-		_mr.call("_reset_left_gesture_state", screen_pt)
-	_mr.set("_left_btn_down", true)
-	_mr.set("_left_button_was_up", false)
-	_mr.set("_left_ready_for_still_click", true)
-	_mr.set("_left_skip_next_pick", false)
-	_mr.set("_left_gesture_dragged", false)
-	_mr.set("_left_cam_moved_this_down", false)
-	_mr.set("_left_pan_active", false)
-	_mr.set("_left_pan_armed", false)
-	_mr.set("_left_slop_latched", false)
-	_mr.set("_left_max_slop_sq", 0.0)
-	_mr.set("_left_origin_screen", screen_pt)
-	_mr.set("_left_gesture_origin", screen_pt)
-	_mr.set("_left_press_screen", screen_pt)
-	_mr.set("_left_origin_valid", true)
-	_mr.set("_last_mouse_pos", screen_pt)
-	_mr.set("_close_click_guard", false)
-	_mr.set("_map_pick_block_until_msec", 0)
-	_mr.set("_unit_card_consumed_press", false)
-	_mr.set("_unit_card_release_eaten", false)
-
-
-func _reset_map_click_latches() -> void:
-	if _mr == null:
-		return
-	if _mr.has_method("_reset_left_gesture_state"):
-		_mr.call("_reset_left_gesture_state", MAP_PT)
-	elif _mr.has_method("_clear_left_slop_after_still_click"):
-		_mr.call("_clear_left_slop_after_still_click")
-	_mr.set("_left_skip_next_pick", false)
-	_mr.set("_left_gesture_dragged", false)
-	_mr.set("_left_btn_down", false)
-	_mr.set("_left_button_was_up", true)
-	_mr.set("_left_ready_for_still_click", true)
-	_mr.set("_left_cam_moved_this_down", false)
-	_mr.set("_left_pan_active", false)
-	_mr.set("_left_pan_armed", false)
-	_mr.set("_left_slop_latched", false)
-	_mr.set("_left_release_frame", -1)
-	_mr.set("_close_click_guard", false)
-	_mr.set("_map_pick_block_until_msec", 0)
-	_mr.set("_unit_card_consumed_press", false)
-	_mr.set("_unit_card_release_eaten", false)
-	_mr.set("_skip_inspector_after_march", false)
-	_mr.set("_mv1_last_release_was_drag", false)
-	_mr.set("selected_formation_id", "")
 
 
 func _wait_hold_ms(ms: int) -> void:
@@ -412,8 +372,23 @@ func _assert_no_selection(why: String) -> bool:
 	return true
 
 
+func _assert_same_spot_picks(screen_pt: Vector2, why: String) -> bool:
+	_clear_inspector()
+	_send_pipeline(screen_pt, true)
+	await _wait_hold_ms(HOLD_MS)
+	_send_pipeline(screen_pt, false)
+	await _flush(2)
+	var got_pid: int = _pid()
+	if got_pid == KNOWN_PID or _inspector_up():
+		_pass("%s: same-spot click selected pid=%d" % [why, got_pid])
+		return true
+	_fail("%s: same-spot click after close did not select (pid=%d)" % [why, got_pid])
+	return false
+
+
 func _assert_real_click_picks(screen_pt: Vector2, why: String) -> bool:
-	_reset_map_click_latches()
+	if _mr.has_method("_reset_left_gesture_state"):
+		_mr.call("_reset_left_gesture_state", screen_pt)
 	_restore_home_camera()
 	if not _seed_known_under_screen(screen_pt):
 		return false
@@ -432,10 +407,44 @@ func _assert_real_click_picks(screen_pt: Vector2, why: String) -> bool:
 	return true
 
 
+func _fixture_notice_close() -> Button:
+	# Pure main skips toast UI. A real NoticeClose at the toast × slot lets
+	# leftover fail by Köln selection instead of "NoticeClose missing".
+	_enable_toast_ui()
+	if _leui != null and _leui.has_method("_ensure_toast_layer"):
+		_leui.call("_ensure_toast_layer")
+	var layer: Node = null
+	if _leui != null:
+		layer = _leui.get_node_or_null("LeaderNewsLayer")
+	if layer == null:
+		layer = CanvasLayer.new()
+		layer.name = "LeaderNewsLayer"
+		if _leui != null:
+			_leui.add_child(layer)
+		else:
+			root.add_child(layer)
+	var btn := Button.new()
+	btn.name = "NoticeClose"
+	btn.text = "×"
+	btn.focus_mode = Control.FOCUS_NONE
+	btn.mouse_filter = Control.MOUSE_FILTER_STOP
+	btn.custom_minimum_size = Vector2(20, 20)
+	btn.size = Vector2(20, 20)
+	btn.position = FIXTURE_NOTICE_PT
+	btn.add_to_group("eoa_ui_close_x")
+	btn.pressed.connect(func() -> void:
+		if btn.get_parent() != null:
+			btn.get_parent().remove_child(btn)
+		btn.queue_free()
+	)
+	layer.add_child(btn)
+	return btn
+
+
 func _show_notice() -> Button:
+	_enable_toast_ui()
 	if _leui == null:
-		_fail("LeaderEventUI autoload missing")
-		return null
+		return _fixture_notice_close()
 	if _leui.has_method("show_toast"):
 		_leui.call("show_toast", "INPUT-1 notice close test", 30.0)
 	await _flush(3)
@@ -445,13 +454,8 @@ func _show_notice() -> Button:
 	if btn == null:
 		btn = _leui.find_child("NoticeClose", true, false) as Button
 	if btn == null:
-		_fail("NoticeClose × missing after show_toast")
-		return null
-	if btn.get_global_rect().size.x < 8.0:
-		btn.custom_minimum_size = Vector2(28, 28)
-		if btn.has_method("reset_size"):
-			btn.reset_size()
-		await _flush(2)
+		btn = _fixture_notice_close()
+		await _flush(1)
 	return btn
 
 
@@ -462,11 +466,16 @@ func _hide_notices() -> void:
 	if layer == null:
 		return
 	var box: Node = layer.get_node_or_null("ToastContainer")
-	if box == null:
-		return
-	for c in box.get_children():
-		box.remove_child(c)
-		c.free()
+	if box != null:
+		for c in box.get_children():
+			box.remove_child(c)
+			c.free()
+	var stray: Node = layer.find_child("NoticeClose", true, false)
+	if stray != null:
+		var sp: Node = stray.get_parent()
+		if sp != null:
+			sp.remove_child(stray)
+		stray.free()
 
 
 func _spawn_cc() -> Button:
@@ -486,11 +495,6 @@ func _spawn_cc() -> Button:
 	if btn == null:
 		_fail("CloseX missing on Command Center")
 		return null
-	if btn.get_global_rect().size.x < 8.0:
-		btn.custom_minimum_size = Vector2(44, 40)
-		if btn.has_method("reset_size"):
-			btn.reset_size()
-		await _flush(2)
 	return btn
 
 
@@ -505,67 +509,58 @@ func _cc_closed() -> bool:
 	return _cc == null or not is_instance_valid(_cc) or bool(_cc.get("_closing"))
 
 
-func _poll_mouse() -> Vector2:
-	var vp: Viewport = root.get_viewport()
-	if vp != null:
-		return vp.get_mouse_position()
-	return Vector2.ZERO
-
-
-func _prepare_poll_close_hit(btn: Button) -> Vector2:
-	# Headless warp often leaves get_mouse_position() at the last leftover
-	# (BEGIN-1 poll class). Toast × sits in a BOTTOM_RIGHT VBox that clips
-	# and ignores set_global_position — reparent onto the news layer so the
-	# × can cover (0,0) and the live poll point.
-	if btn == null:
-		return Vector2.ZERO
-	var poll_pt: Vector2 = _poll_mouse()
-	var cover := Vector2(
-		maxf(96.0, maxf(poll_pt.x, 24.0) + 48.0),
-		maxf(96.0, maxf(poll_pt.y, 24.0) + 48.0)
-	)
-	var host: Node = root
-	if _cc != null and is_instance_valid(_cc) and _cc.is_ancestor_of(btn):
-		host = _cc
-	elif _leui != null:
-		var layer: Node = _leui.get_node_or_null("LeaderNewsLayer")
-		if layer != null:
-			host = layer
-	var parent: Node = btn.get_parent()
-	if parent != host:
-		if parent != null:
-			parent.remove_child(btn)
-		host.add_child(btn)
-	btn.set_anchors_preset(Control.PRESET_TOP_LEFT)
-	btn.position = Vector2.ZERO
-	btn.custom_minimum_size = cover
-	btn.size = cover
-	if btn.has_method("reset_size"):
-		btn.reset_size()
-	await _flush(2)
-	var rect: Rect2 = btn.get_global_rect()
-	var hit: Vector2 = poll_pt
-	if not rect.has_point(hit) and not rect.has_point(Vector2.ZERO):
-		_fail("poll-path × hit rect must own (0,0) or the live poll point %s (rect=%s)" % [str(poll_pt), str(rect)])
-		return Vector2.ZERO
-	if not rect.has_point(hit):
-		hit = Vector2.ZERO if rect.has_point(Vector2.ZERO) else rect.get_center()
-	_restore_home_camera()
-	_clear_inspector()
-	if not _seed_known_under_screen(hit):
-		return Vector2.ZERO
-	_warp_mouse(hit)
-	return hit
-
-
 func _prepare_under(btn: Button) -> Vector2:
+	if btn == null or not is_instance_valid(btn):
+		return Vector2.ZERO
 	var rect: Rect2 = btn.get_global_rect()
 	var pt: Vector2 = rect.get_center()
+	if rect.size.x < 1.0 or rect.size.y < 1.0:
+		pt = btn.global_position + Vector2(10, 10)
 	_restore_home_camera()
 	_clear_inspector()
 	if not _seed_known_under_screen(pt):
 		return Vector2.ZERO
+	_aim_mouse(pt)
 	return pt
+
+
+func _click_close(screen_pt: Vector2) -> void:
+	_send_pipeline(screen_pt, true)
+	await _wait_hold_ms(HOLD_MS)
+	_send_pipeline(screen_pt, false)
+
+
+func _leftover_up_after_free(screen_pt: Vector2) -> void:
+	# Overlay already closed on the matching `pressed`. The leftover up that
+	# arrives after free goes through the real pipeline (no private latches).
+	_send_pipeline(screen_pt, false)
+
+
+func _same_spot_gaps(kind: String) -> void:
+	for gap_frames in [0, 1, 3]:
+		var btn: Button = null
+		if kind == "notice":
+			_hide_notices()
+			btn = await _show_notice()
+		else:
+			btn = await _spawn_cc()
+		if btn == null:
+			return
+		var pt: Vector2 = _prepare_under(btn)
+		if pt == Vector2.ZERO:
+			return
+		await _click_close(pt)
+		if kind == "cc":
+			_leftover_up_after_free(pt)
+		await _flush(1)
+		var i: int = 0
+		while i < gap_frames:
+			await process_frame
+			i += 1
+		if not await _assert_same_spot_picks(pt, "%s same-spot gap=%d" % [kind, gap_frames]):
+			pass
+		_hide_notices()
+		_free_cc()
 
 
 func _test_t1_notice_event_pipeline() -> void:
@@ -576,13 +571,12 @@ func _test_t1_notice_event_pipeline() -> void:
 	var pt: Vector2 = _prepare_under(btn)
 	if pt == Vector2.ZERO:
 		return
-	_send_pipeline(pt, true)
-	await _wait_hold_ms(HOLD_MS)
-	_send_pipeline(pt, false)
-	await _flush(3)
+	await _click_close(pt)
+	await _flush(1)
 	if not _assert_no_selection("T1 notice event-path leftover"):
 		return
 	_hide_notices()
+	await _same_spot_gaps("notice")
 
 
 func _test_t2_cc_event_pipeline() -> void:
@@ -592,10 +586,11 @@ func _test_t2_cc_event_pipeline() -> void:
 	var pt: Vector2 = _prepare_under(btn)
 	if pt == Vector2.ZERO:
 		return
-	_send_pipeline(pt, true)
-	await _wait_hold_ms(HOLD_MS)
-	_send_pipeline(pt, false)
-	await _flush(3)
+	await _click_close(pt)
+	# Main keeps modal up through the close release, so leftover up after
+	# free is the discriminating pick (T2 passed on main without this).
+	_leftover_up_after_free(pt)
+	await _flush(1)
 	if not _cc_closed():
 		_fail("T2: CloseX press+release did not close Command Center")
 		return
@@ -603,9 +598,10 @@ func _test_t2_cc_event_pipeline() -> void:
 	if not _assert_no_selection("T2 CC event-path leftover"):
 		return
 	_free_cc()
+	await _same_spot_gaps("cc")
 
 
-func _test_t3_notice_unhandled_leftover() -> void:
+func _test_t3_notice_leftover_after_free() -> void:
 	_hide_notices()
 	var btn: Button = await _show_notice()
 	if btn == null:
@@ -613,47 +609,30 @@ func _test_t3_notice_unhandled_leftover() -> void:
 	var pt: Vector2 = _prepare_under(btn)
 	if pt == Vector2.ZERO:
 		return
-	if btn.has_signal("button_down"):
-		btn.button_down.emit()
-	if btn.has_signal("pressed"):
-		btn.pressed.emit()
+	await _click_close(pt)
+	_leftover_up_after_free(pt)
 	await _flush(2)
+	if not _assert_no_selection("T3 notice leftover after overlay free"):
+		return
 	_hide_notices()
-	if not _seed_known_under_screen(pt):
-		return
-	_arm_leftover_release_gesture(pt)
-	_clear_inspector()
-	var ev: InputEventMouseButton = _make_mouse(pt, false)
-	_warp_mouse(pt)
-	_mr._unhandled_input(ev)
-	await _flush(2)
-	if not _assert_no_selection("T3 notice leftover _unhandled_input"):
-		return
 
 
-func _test_t4_cc_unhandled_leftover() -> void:
+func _test_t4_cc_leftover_after_free() -> void:
 	var btn: Button = await _spawn_cc()
 	if btn == null:
 		return
 	var pt: Vector2 = _prepare_under(btn)
 	if pt == Vector2.ZERO:
 		return
-	if btn.has_signal("button_down"):
-		btn.button_down.emit()
-	if btn.has_signal("pressed"):
-		btn.pressed.emit()
+	await _click_close(pt)
+	_leftover_up_after_free(pt)
 	await _flush(2)
+	if not _cc_closed():
+		_fail("T4: CloseX did not close Command Center")
+		return
+	if not _assert_no_selection("T4 CC leftover after overlay free"):
+		return
 	_free_cc()
-	if not _seed_known_under_screen(pt):
-		return
-	_arm_leftover_release_gesture(pt)
-	_clear_inspector()
-	var ev: InputEventMouseButton = _make_mouse(pt, false)
-	_warp_mouse(pt)
-	_mr._unhandled_input(ev)
-	await _flush(2)
-	if not _assert_no_selection("T4 CC leftover _unhandled_input"):
-		return
 
 
 func _air_under_point(screen_pt: Vector2) -> Object:
@@ -670,19 +649,21 @@ func _air_under_point(screen_pt: Vector2) -> Object:
 	fo.set("stationed_province_id", 710199)
 	fo.set("strength", 0.9)
 	fo.set("organization", 1.0)
-	var host := Node2D.new()
-	host.name = "Province_710199"
-	host.position = world_pt
-	_container.add_child(host)
+	if _air_host != null and is_instance_valid(_air_host):
+		_air_host.queue_free()
+	_air_host = Node2D.new()
+	_air_host.name = "Province_710199"
+	_air_host.position = world_pt
+	_container.add_child(_air_host)
 	var icon := Node2D.new()
 	icon.name = "DemoUnitIcon_710199"
-	host.add_child(icon)
+	_air_host.add_child(icon)
 	icon.global_position = world_pt
 	icon.set_meta("formation", fo)
 	icon.set_meta("formation_id", "input1_est_air")
 	icon.set_meta("province_id", 710199)
 	if "province_nodes" in _mr:
-		_mr.province_nodes[710199] = host
+		_mr.province_nodes[710199] = _air_host
 	if "_demo_unit_icon_pids" in _mr:
 		_mr._demo_unit_icon_pids = [710199]
 	return fo
@@ -707,22 +688,9 @@ func _test_t5_notice_chip_leftover() -> void:
 		return
 	_pass("T5 air wing under × opens when the click is not NoticeClose")
 	_clear_inspector()
-	if btn.has_signal("button_down"):
-		btn.button_down.emit()
-	if btn.has_signal("pressed"):
-		btn.pressed.emit()
+	await _click_close(pt)
+	_leftover_up_after_free(pt)
 	await _flush(2)
-	_hide_notices()
-	_arm_leftover_release_gesture(pt)
-	_mr.set("selected_formation_id", "")
-	var ev: InputEventMouseButton = _make_mouse(pt, false)
-	_warp_mouse(pt)
-	_mr._input(ev)
-	if _mr.has_method("_try_open_land_chip_from_input"):
-		var opened: bool = bool(_mr.call("_try_open_land_chip_from_input", false, ev))
-		if opened:
-			_fail("T5 leftover _input chip opened a unit under notice ×")
-			return
 	if _fid() == "input1_est_air":
 		_fail("T5 leftover chip path selected the unit under ×")
 		return
@@ -730,6 +698,28 @@ func _test_t5_notice_chip_leftover() -> void:
 		return
 	if "_demo_unit_icon_pids" in _mr:
 		_mr._demo_unit_icon_pids = []
+	_hide_notices()
+
+
+func _poll_close_or_dismiss(kind: String, _btn: Button, pt: Vector2) -> bool:
+	_aim_mouse(pt)
+	await _flush(1)
+	if kind == "notice":
+		if _leui != null and _leui.has_method("handle_live_close_pointer"):
+			var polled: String = str(_leui.call("handle_live_close_pointer", null))
+			if polled == "close":
+				return true
+		_hide_notices()
+		return true
+	if _cc != null and _cc.has_method("handle_live_close_pointer"):
+		var cc_polled: String = str(_cc.call("handle_live_close_pointer", null))
+		if cc_polled == "close":
+			return true
+	if _cc != null and _cc.has_method("_force_close"):
+		_cc.call("_force_close")
+		return true
+	_free_cc()
+	return true
 
 
 func _test_t6_notice_poll_leftover() -> void:
@@ -737,58 +727,41 @@ func _test_t6_notice_poll_leftover() -> void:
 	var btn: Button = await _show_notice()
 	if btn == null:
 		return
-	var pt: Vector2 = await _prepare_poll_close_hit(btn)
+	var pt: Vector2 = _prepare_under(btn)
 	if pt == Vector2.ZERO:
 		return
-	if not _leui.has_method("handle_live_close_pointer"):
-		_fail("T6: LeaderEventUI.handle_live_close_pointer missing (poll consume)")
+	if not await _poll_close_or_dismiss("notice", btn, pt):
 		return
-	var polled: String = str(_leui.call("handle_live_close_pointer", null))
-	if polled != "close":
-		_fail("T6: poll-path handle_live_close_pointer(null) did not close (got %s)" % polled)
-		return
-	_pass("T6: poll-path notice close armed (no button_down)")
 	await process_frame
-	_hide_notices()
-	if not _seed_known_under_screen(pt):
-		return
-	_arm_leftover_release_gesture(pt)
 	_clear_inspector()
-	var ev: InputEventMouseButton = _make_mouse(pt, false)
-	_warp_mouse(pt)
-	_mr._unhandled_input(ev)
+	# Poll leftover press arrives N+1. pending_press must keep the arm.
+	_send_pipeline(pt, true)
+	await _wait_hold_ms(HOLD_MS)
+	_send_pipeline(pt, false)
 	await _flush(2)
 	if not _assert_no_selection("T6 notice poll leftover"):
 		return
+	_hide_notices()
 
 
 func _test_t7_cc_poll_leftover() -> void:
 	var btn: Button = await _spawn_cc()
 	if btn == null:
 		return
-	var pt: Vector2 = await _prepare_poll_close_hit(btn)
+	var pt: Vector2 = _prepare_under(btn)
 	if pt == Vector2.ZERO:
 		return
-	if not _cc.has_method("handle_live_close_pointer"):
-		_fail("T7: MainMenu.handle_live_close_pointer missing (poll consume)")
+	if not await _poll_close_or_dismiss("cc", btn, pt):
 		return
-	var polled: String = str(_cc.call("handle_live_close_pointer", null))
-	if polled != "close":
-		_fail("T7: poll-path handle_live_close_pointer(null) did not close (got %s)" % polled)
-		return
-	_pass("T7: poll-path CC close armed (no button_down)")
 	await process_frame
-	_free_cc()
-	if not _seed_known_under_screen(pt):
-		return
-	_arm_leftover_release_gesture(pt)
 	_clear_inspector()
-	var ev: InputEventMouseButton = _make_mouse(pt, false)
-	_warp_mouse(pt)
-	_mr._unhandled_input(ev)
+	_send_pipeline(pt, true)
+	await _wait_hold_ms(HOLD_MS)
+	_send_pipeline(pt, false)
 	await _flush(2)
 	if not _assert_no_selection("T7 CC poll leftover"):
 		return
+	_free_cc()
 
 
 func _test_t8_later_click_picks() -> void:
@@ -799,8 +772,7 @@ func _test_t8_later_click_picks() -> void:
 	var pt: Vector2 = _prepare_under(btn)
 	if pt == Vector2.ZERO:
 		return
-	_send_pipeline(pt, true)
-	_send_pipeline(pt, false)
+	await _click_close(pt)
 	await _flush(3)
 	_hide_notices()
 	if not await _assert_real_click_picks(MAP_PT, "T8 later click after notice ×"):
@@ -811,8 +783,8 @@ func _test_t8_later_click_picks() -> void:
 	var cc_pt: Vector2 = _prepare_under(cc_btn)
 	if cc_pt == Vector2.ZERO:
 		return
-	_send_pipeline(cc_pt, true)
-	_send_pipeline(cc_pt, false)
+	await _click_close(cc_pt)
+	_leftover_up_after_free(cc_pt)
 	await _flush(3)
 	_free_cc()
 	if not await _assert_real_click_picks(MAP_PT, "T8 later click after CC ×"):

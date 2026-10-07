@@ -263,7 +263,7 @@ else
   run_step launch_begin1_title_release \
     tools/run_godot.sh --headless --resolution 1280x740 -s res://scripts/core/HeadlessBegin1TitleReleaseFallthroughTest.gd || fail
 
-  EOA_HEADLESS_TOAST_UI=1 run_step launch_input1_close_click \
+  run_step launch_input1_close_click \
     tools/run_godot.sh --headless --path . --resolution 1280x740 \
     -s res://scripts/core/HeadlessInput1CloseClickFallthroughTest.gd || fail
 

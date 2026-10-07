@@ -935,6 +935,8 @@ func arm_cc_close_release_swallow(pending_press: bool = false) -> void:
 
 
 func _on_close_x_button_down() -> void:
+	# Real press reached CloseX — do not also poll-close on this hold.
+	_close_ptr_poll_held = true
 	arm_cc_close_release_swallow()
 
 
@@ -955,6 +957,8 @@ func handle_live_close_pointer(event: InputEvent = null) -> String:
 	var vp: Viewport = get_viewport()
 	if vp != null:
 		pts.append(vp.get_mouse_position())
+	var ds_mouse: Vector2i = DisplayServer.mouse_get_position()
+	pts.append(Vector2(float(ds_mouse.x), float(ds_mouse.y)))
 	var rect: Rect2 = btn.get_global_rect()
 	var over: bool = false
 	for p in pts:
@@ -995,9 +999,8 @@ func _process(_delta: float) -> void:
 
 
 func _force_close() -> void:
-	# Arm before queue_free so leftover `_unhandled_input` cannot pick the map
-	# under ✕ (TipDismiss / BEGIN-1 leftover class).
-	arm_cc_close_release_swallow()
+	# Swallow is armed on CloseX button_down / poll handle, not here.
+	# `_force_close` re-arm cleared poll `pending_press` (same-spot stayed dead).
 	if _closing:
 		_pause_game(false)
 		menu_closed.emit()

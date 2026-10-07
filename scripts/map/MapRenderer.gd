@@ -2821,9 +2821,11 @@ func _input(event: InputEvent) -> void:
 				call_deferred("_clear_begin_title_release_swallow")
 				get_viewport().set_input_as_handled()
 				return
-			# INPUT-1: notice × / Command Center × leftover must not still-click
-			# the hex or unit under the button (press AND release).
+			# INPUT-1: leftover release after notice × / Command Center × must
+			# not still-click the hex or unit. Do not consume the press — GUI
+			# must see it so close fires on button `pressed` (release).
 			if not event.pressed and _ui_close_click_blocks_map_pick(event):
+				_unstick_ui_close_map_latches()
 				call_deferred("_clear_ui_close_release_swallow")
 				get_viewport().set_input_as_handled()
 				return
@@ -2833,8 +2835,8 @@ func _input(event: InputEvent) -> void:
 				_clear_begin_title_release_swallow_on_new_left_press()
 				_clear_ui_close_release_swallow_on_new_left_press()
 				if _notice_or_cc_close_owns_event(event):
-					arm_ui_close_release_swallow()
-					get_viewport().set_input_as_handled()
+					# Let the Control take the press (button_down / pressed).
+					# Do not begin a map gesture under ×.
 					return
 			if _living_title_boot_is_up():
 				# Play 5adb38e: never swallow title-up presses. Route by event
@@ -3252,8 +3254,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			_clear_begin_title_release_swallow_on_new_left_press()
 			_clear_ui_close_release_swallow_on_new_left_press()
 			if _notice_or_cc_close_owns_event(event):
-				arm_ui_close_release_swallow()
-				get_viewport().set_input_as_handled()
+				# No press consume — GUI CloseX / NoticeClose must see the down.
 				return
 		if not event.pressed and _consume_unit_card_press_release_if_armed():
 			return
@@ -3266,6 +3267,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 			return
 		if not event.pressed and _ui_close_click_blocks_map_pick(event):
+			_unstick_ui_close_map_latches()
 			call_deferred("_clear_ui_close_release_swallow")
 			get_viewport().set_input_as_handled()
 			return
@@ -19642,8 +19644,6 @@ func _try_open_land_chip_from_input(ctrl_click: bool = false, event: InputEvent 
 		return false
 	if _begin_title_release_blocks_map_pick():
 		return false
-	if _ui_close_click_blocks_map_pick(event):
-		return false
 	if _top_bar_owns_click() or _mouse_over_search_control() or _search_ui_owns_click() or _mouse_over_close_control() or _road_spine_btn_owns_click():
 		return false
 	if _unit_card_consumed_press or _unit_card_release_eaten:
@@ -24892,10 +24892,10 @@ func _clear_begin_title_release_swallow() -> void:
 
 
 func arm_ui_close_release_swallow(pending_press: bool = false) -> void:
-	# Notice × / Command Center CloseX press (button_down / handle_live_close /
-	# _input). One leftover left-release is eaten. Clock restamps on the first
-	# _process after this frame. A later-frame left press or expiry drops it.
-	# Poll-path arms set press_pending so the click's own N+1 press keeps the arm.
+	# Notice × / Command Center CloseX (button_down / poll handle_live_close).
+	# One leftover left-release is eaten. Clock restamps on the first _process
+	# after this frame. A later-frame left press or expiry drops it. Poll-path
+	# arms set press_pending so the click's own N+1 press keeps the arm.
 	set_meta("eoa_ui_close_swallow_release", true)
 	set_meta("eoa_ui_close_swallow_arm_msec", Time.get_ticks_msec())
 	set_meta("eoa_ui_close_swallow_arm_frame", Engine.get_process_frames())
@@ -24932,10 +24932,10 @@ func _ui_close_release_blocks_map_pick() -> bool:
 	return true
 
 
-func _ui_close_click_blocks_map_pick(event: InputEvent = null) -> bool:
-	if _ui_close_release_blocks_map_pick():
-		return true
-	return _notice_or_cc_close_owns_event(event)
+func _ui_close_click_blocks_map_pick(_event: InputEvent = null) -> bool:
+	# Armed swallow only. Geometric × ownership must not hide a missing arm
+	# (poll / button_down mutants survived while the × rect was still up).
+	return _ui_close_release_blocks_map_pick()
 
 
 func _notice_or_cc_close_owns_event(event: InputEvent = null) -> bool:
@@ -24973,6 +24973,8 @@ func _notice_or_cc_close_owns_screen_point(pt: Vector2) -> bool:
 func _clear_ui_close_release_swallow_on_new_left_press() -> void:
 	# Same-frame close press must keep the arm so the matching leftover up is eaten.
 	# Poll-path: the close click's own press arrives in N+1 — eat that one only.
+	# A later real press clears the one-shot and unsticks leftover skip so the
+	# same spot can select again (CC ✕ used to leave `_left_skip_next_pick`).
 	if not has_meta("eoa_ui_close_swallow_release"):
 		return
 	var now_frame: int = Engine.get_process_frames()
@@ -25000,6 +25002,29 @@ func _tick_ui_close_release_swallow() -> void:
 		_clear_ui_close_release_swallow()
 
 
+func _unstick_ui_close_map_latches() -> void:
+	# Leftover swallow / close must not leave skip/slop latched. Play: after
+	# Command Center ✕ the same spot stayed pid=-1 (`_left_skip_next_pick`).
+	_left_skip_next_pick = false
+	_left_btn_down = false
+	_left_button_was_up = true
+	_left_ready_for_still_click = true
+	_left_gesture_dragged = false
+	_left_slop_latched = false
+	_left_gesture_panned = false
+	_left_pan_committed = false
+	_left_pan_active = false
+	_left_pan_armed = false
+	_left_cam_moved_this_down = false
+	_left_max_slop_sq = 0.0
+	_left_sticky_valid = false
+	_left_sticky_slop_sq = 0.0
+	_left_origin_valid = false
+	_left_release_frame = -1
+	_left_release_screen_valid = false
+	_close_click_guard = false
+
+
 func _clear_ui_close_release_swallow() -> void:
 	if has_meta("eoa_ui_close_swallow_release"):
 		remove_meta("eoa_ui_close_swallow_release")
@@ -25013,6 +25038,7 @@ func _clear_ui_close_release_swallow() -> void:
 		remove_meta("eoa_ui_close_swallow_press_pending")
 	if has_meta("eoa_ui_close_swallow_press_seen_frame"):
 		remove_meta("eoa_ui_close_swallow_press_seen_frame")
+	_unstick_ui_close_map_latches()
 
 
 func dismiss_first_session_action_tip() -> void:

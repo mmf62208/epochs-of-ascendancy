@@ -28,6 +28,9 @@ var _mech_icon: Texture2D = null
 var _versailles_icon: Texture2D = null
 ## Edge-trigger for `_process` pointer poll (computerUse / DisplayServer leftover).
 var _notice_ptr_poll_held: bool = false
+## Headless INPUT-1 / toast-click guards opt in. Product `post_news` / `show_toast`
+## stay skipped in headless so Maginot / CompleteTest quit after RESULT=PASS.
+var force_toast_ui: bool = false
 
 
 func _ready() -> void:
@@ -299,8 +302,9 @@ func post_news(title: String, body: String, category: String = "general") -> voi
 func _should_skip_toast_ui() -> bool:
 	# Headless Maginot / -s harness: toast timers + CanvasLayer hung quit after RESULT=PASS.
 	# Graphical F5 1x still shows capture toasts (PLAYTEST item 14).
-	# INPUT-1 guard opts in so notice × can be clicked in headless.
-	if OS.get_environment("EOA_HEADLESS_TOAST_UI") == "1":
+	# Guards set `force_toast_ui` on this node — do not read EOA_HEADLESS_TOAST_UI
+	# here (that env is a test/gate hook, not product news-path policy).
+	if force_toast_ui:
 		return false
 	if DisplayServer.get_name() == "headless" or OS.has_feature("dedicated_server"):
 		return true
@@ -542,9 +546,8 @@ func _dismiss_toast(panel: Variant = null) -> void:
 	if toast.has_meta(TOAST_DISMISSING_META) and bool(toast.get_meta(TOAST_DISMISSING_META)):
 		return
 	toast.set_meta(TOAST_DISMISSING_META, true)
-	# Arm before the panel dies so leftover `_unhandled_input` cannot pick
-	# the province under × (TipDismiss / BEGIN-1 leftover class).
-	arm_notice_close_release_swallow()
+	# Swallow is armed on NoticeClose button_down / poll handle, not here.
+	# Dismiss-arm mutants survived: timer / Respond close has no leftover click.
 	var vp: Viewport = get_viewport()
 	if vp != null:
 		vp.set_input_as_handled()
@@ -760,6 +763,8 @@ func arm_notice_close_release_swallow(pending_press: bool = false) -> void:
 
 
 func _on_notice_close_button_down() -> void:
+	# Real press reached the Control — do not also poll-close on this hold.
+	_notice_ptr_poll_held = true
 	arm_notice_close_release_swallow()
 
 
@@ -801,6 +806,8 @@ func handle_live_close_pointer(event: InputEvent = null) -> String:
 	var vp: Viewport = get_viewport()
 	if vp != null:
 		pts.append(vp.get_mouse_position())
+	var ds_mouse: Vector2i = DisplayServer.mouse_get_position()
+	pts.append(Vector2(float(ds_mouse.x), float(ds_mouse.y)))
 	var rect: Rect2 = btn.get_global_rect()
 	var over: bool = false
 	for p in pts:
