@@ -4,7 +4,7 @@ Window **1280×740** Absolute **@(0, 29)** · GER 1936 · `world_accurate`.
 Do **not** raise the window. Do **not** use Ctrl.
 Headless / xvfb ≠ live Play.
 
-**Code SHA:** `4d50ef799b63ee457207ec2742f6627830244124` (guard + product). See `docs/CURRENT_STATE.md` INPUT-1.
+**Code SHA:** `d24c44bc9b63ee457207ec2742f6627830244124` (guard + product). See `docs/CURRENT_STATE.md` INPUT-1.
 
 ## Pre-step
 
