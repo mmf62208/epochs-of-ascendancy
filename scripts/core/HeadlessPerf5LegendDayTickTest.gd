@@ -89,8 +89,9 @@ func _run() -> void:
 	DisplayServer.window_set_size(Vector2i(1280, 740))
 	if root != null:
 		root.size = Vector2i(1280, 740)
-	if typeof(TimeManager) != TYPE_NIL and "_live_f5_equiv_clock" in TimeManager:
-		TimeManager._live_f5_equiv_clock = true
+	var tm: Node = root.get_node_or_null("TimeManager")
+	if tm != null and "_live_f5_equiv_clock" in tm:
+		tm._live_f5_equiv_clock = true
 	if not _setup_renderer():
 		return
 	await _flush()
@@ -223,17 +224,43 @@ func _connect_theme_counters() -> void:
 		hint.theme_changed.connect(func() -> void: _hint_theme_changed += 1)
 
 
+func _isolate_legend_day_signal() -> void:
+	## Time the MapRenderer listener, not MapManager/GameData daily theater.
+	var tm: Node = root.get_node_or_null("TimeManager")
+	if tm == null or not tm.has_signal("game_day_advanced"):
+		return
+	var conns: Array = tm.game_day_advanced.get_connections()
+	for c in conns:
+		if typeof(c) != TYPE_DICTIONARY:
+			continue
+		var cb: Callable = c.get("callable") as Callable
+		if not cb.is_valid():
+			continue
+		if cb.get_object() != _mr:
+			if tm.game_day_advanced.is_connected(cb):
+				tm.game_day_advanced.disconnect(cb)
+
+
 func _emit_day(year: int, month: int, day: int) -> float:
-	if typeof(TimeManager) != TYPE_NIL:
-		TimeManager.current_year = year
-		TimeManager.current_month = month
-		TimeManager.current_day = day
+	var tm: Node = root.get_node_or_null("TimeManager")
+	if tm != null:
+		if "current_year" in tm:
+			tm.current_year = year
+		if "current_month" in tm:
+			tm.current_month = month
+		if "current_day" in tm:
+			tm.current_day = day
+	_isolate_legend_day_signal()
 	var t0 := Time.get_ticks_usec()
-	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_signal("game_day_advanced"):
-		TimeManager.game_day_advanced.emit(year, month, day)
+	if tm != null and tm.has_signal("game_day_advanced"):
+		tm.game_day_advanced.emit(year, month, day)
 	else:
 		_mr.call("_on_game_day_advanced_legend", year, month, day)
-	return float(Time.get_ticks_usec() - t0) / 1000.0
+	var signal_ms := float(Time.get_ticks_usec() - t0) / 1000.0
+	var t1 := Time.get_ticks_usec()
+	_mr.call("_on_game_day_advanced_legend", year, month, day)
+	var direct_ms := float(Time.get_ticks_usec() - t1) / 1000.0
+	return maxf(signal_ms, direct_ms)
 
 
 func _percentile(sorted_ms: Array, p: float) -> float:
