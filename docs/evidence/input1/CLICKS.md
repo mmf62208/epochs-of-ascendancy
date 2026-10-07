@@ -4,7 +4,7 @@ Window **1280×740** Absolute **@(0, 29)** · GER 1936 · `world_accurate`.
 Do **not** raise the window. Do **not** use Ctrl.
 Headless / xvfb ≠ live Play.
 
-**Code SHA:** `977c9a841524c7e1a41f16722a00dc414b0a7533` (FIX #2 tip). Guard **PASS** failures=0. Pure main `61a80433` **FAIL** by leftover Köln / unit (T1–T7). See `docs/CURRENT_STATE.md` INPUT-1 FIX #2.
+**Code SHA:** product `977c9a841524c7e1a41f16722a00dc414b0a7533` (FIX #2, unedited). FIX #3 is **tests / docs only**. Guard **PASS** failures=0. Pure main `61a80433` **FAIL** by leftover Köln / unit (T1–T7, news T1/T3/T5, T10, T11). See `docs/CURRENT_STATE.md` INPUT-1 FIX #3.
 
 ## Pre-step
 
