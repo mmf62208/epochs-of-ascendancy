@@ -366,6 +366,10 @@ func enqueue_player_dests_for_refresh() -> int:
 	return _refill_queue.size() - before
 
 
+func is_player_friendly_province(province_id: int) -> bool:
+	return not _pid_blocks_player_supply(province_id)
+
+
 func get_hub_capacity_snapshot() -> Dictionary:
 	var out: Dictionary = {}
 	for pid_v in hubs.keys():

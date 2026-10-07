@@ -1241,14 +1241,13 @@ func _test_relations_access_clears_friendly_cache(sm: Node) -> void:
 	if rm == null or sm == null:
 		_fail("relations cache helpers missing")
 		return
-	var provs: Dictionary = sm.provinces if "provinces" in sm else {}
-	if provs.is_empty():
-		_fail("relations cache needs supply provinces")
+	if not sm.has_method("is_player_friendly_province"):
+		_fail("is_player_friendly_province missing")
 		return
-	var before: bool = bool(SupplyPathfinder._is_friendly(SWI_PID, PLAYER_TAG, provs))
+	var before: bool = bool(sm.call("is_player_friendly_province", SWI_PID))
 	if rm.has_method("set_policy"):
 		rm.call("set_policy", PLAYER_TAG, "SWI", {"military_access": true})
-	var after: bool = bool(SupplyPathfinder._is_friendly(SWI_PID, PLAYER_TAG, provs))
+	var after: bool = bool(sm.call("is_player_friendly_province", SWI_PID))
 	print(
 		"HeadlessPerf4LiveMultiAiDayTest: ger_swi_access before=%s after=%s"
 		% [str(before), str(after)]
