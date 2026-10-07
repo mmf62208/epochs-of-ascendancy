@@ -3,9 +3,9 @@ extends SceneTree
 ## PERF-4 FIX #1: interactive multi-AI is the live Play 1x hitch.
 ## Drives `_maybe_run_interactive_multi_ai` / `apply_interactive_multi_ai_day_live`
 ## with the live nation set (GER player, majors AI) and a live-weight supply
-## network. FAILS on main 61a80433 and on tip 289268ed (full advance_supply_day
-## + no per-day line/region cache). PASSES after the light supply tick + shared
-## per-day caches. Mutants that undo those must fail.
+## network. FAILS on main 61a80433 and on tip 289268ed (rebuild every day).
+## PASSES when the soft tick does not rebuild the network and still runs the
+## full advance_supply_day steps (air / naval / shipping).
 ##
 ##   tools/run_godot.sh --headless --path . \
 ##     -s res://scripts/core/HeadlessPerf4InteractiveMultiAiTest.gd
@@ -112,17 +112,20 @@ func _run() -> void:
 		_pass("live-weight supply hubs=%d" % hubs)
 	_seed_major_oob_lines(pm)
 	_test_interactive_multi_ai_entry(tm, gd, sm)
+	_test_production_cache_measured(pm)
+	_test_ai_infra_outcome_equivalence(idm, mm)
 	_test_live_day_path_includes_multi_ai(tm, idm)
-	_test_ai_infra_outcome_equivalence(idm)
 
 
 func _test_source_gates_fail_on_old_tips() -> void:
 	var gd_src := _read(SRC_GD)
 	var supply_fn := _slice_func(gd_src, "apply_supply_route_mutation")
-	if "advance_supply_day_interactive_light" not in supply_fn:
-		_fail("apply_supply still calls full advance_supply_day on F5 (289268ed FAIL class)")
+	if "advance_supply_day_interactive_light" in supply_fn:
+		_fail("apply_supply still drops live Play onto the light path")
+	elif "advance_supply_day" in supply_fn:
+		_pass("apply_supply uses full advance_supply_day")
 	else:
-		_pass("apply_supply uses interactive light on F5")
+		_fail("apply_supply lost advance_supply_day")
 	var live_fn := _slice_func(gd_src, "apply_interactive_multi_ai_day_live")
 	if "country_profile" not in live_fn or "begin_interactive_multi_ai_day_cache" not in live_fn:
 		_fail("apply_interactive_multi_ai_day_live missing per-country profile/cache (289268ed FAIL class)")
@@ -277,7 +280,7 @@ func _test_interactive_multi_ai_entry(tm: Node, gd: Node, sm: Node) -> void:
 		_fail("_maybe_run_interactive_multi_ai %.1fms >= %.0f" % [maybe_ms, FRAME_BUDGET_MS])
 	else:
 		_pass("_maybe_run_interactive_multi_ai %.1fms < %.0f" % [maybe_ms, FRAME_BUDGET_MS])
-	# Behaviour mutant: light path must have been used (detail recorded on peace_state).
+	# Behaviour mutant: live Play must keep the full supply day.
 	var supply_last: Dictionary = {}
 	if "peace_state" in gd:
 		var ps: Dictionary = gd.peace_state
@@ -285,10 +288,10 @@ func _test_interactive_multi_ai_entry(tm: Node, gd: Node, sm: Node) -> void:
 		if raw is Dictionary:
 			supply_last = raw as Dictionary
 	var detail := str(supply_last.get("detail", ""))
-	if detail != "advance_supply_day_light":
-		_fail("soft supply did not use light path (detail=%s) — undo-fix mutant" % detail)
+	if detail != "advance_supply_day":
+		_fail("soft supply skipped full day (detail=%s)" % detail)
 	else:
-		_pass("soft supply light path detail=%s" % detail)
+		_pass("soft supply full-day detail=%s" % detail)
 	var depots := 0
 	if sm != null and "depot_states" in sm:
 		depots = int((sm.depot_states as Dictionary).size())
@@ -326,10 +329,12 @@ func _print_country_profile(label: String, prof: Dictionary, wall_ms: float) -> 
 		)
 
 
-func _collect_infra_decisions(idm: Node, days: int, seed: int) -> Array:
+func _collect_infra_decisions(idm: Node, days: int, seed: int, mm: Node = null) -> Array:
 	var out: Array = []
 	if idm == null or not idm.has_method("try_ai_start_infra_project"):
 		return out
+	if mm != null and "_live_fronts_precompute" in mm:
+		mm.set("_live_fronts_precompute", {})
 	if "active_projects" in idm:
 		(idm.active_projects as Dictionary).clear()
 	if "_ai_infra_budget_day" in idm:
@@ -353,7 +358,52 @@ func _collect_infra_decisions(idm: Node, days: int, seed: int) -> Array:
 	return out
 
 
-func _test_ai_infra_outcome_equivalence(idm: Node) -> void:
+func _test_production_cache_measured(pm: Node) -> void:
+	if pm == null or not pm.has_method("advance_days_for_country"):
+		_fail("advance_days_for_country missing")
+		return
+	if not pm.has_method("begin_interactive_multi_ai_day_cache"):
+		_fail("production day cache missing")
+		return
+	if pm.has_method("end_interactive_multi_ai_day_cache"):
+		pm.call("end_interactive_multi_ai_day_cache")
+	var scan0 := int(pm.get("interactive_ai_line_scan_count")) if "interactive_ai_line_scan_count" in pm else -1
+	if scan0 < 0:
+		_fail("interactive_ai_line_scan_count missing")
+		return
+	var t0 := Time.get_ticks_usec()
+	for _i in 6:
+		pm.call("advance_days_for_country", "JAP", 1.0)
+		pm.call("advance_days_for_country", "FRA", 1.0)
+		pm.call("advance_days_for_country", "ENG", 1.0)
+	var uncached_ms := float(Time.get_ticks_usec() - t0) / 1000.0
+	var scan_unc := int(pm.get("interactive_ai_line_scan_count")) - scan0
+	pm.call("begin_interactive_multi_ai_day_cache")
+	var scan1 := int(pm.get("interactive_ai_line_scan_count"))
+	t0 = Time.get_ticks_usec()
+	for _j in 6:
+		pm.call("advance_days_for_country", "JAP", 1.0)
+		pm.call("advance_days_for_country", "FRA", 1.0)
+		pm.call("advance_days_for_country", "ENG", 1.0)
+	var cached_ms := float(Time.get_ticks_usec() - t0) / 1000.0
+	var scan_c := int(pm.get("interactive_ai_line_scan_count")) - scan1
+	if pm.has_method("end_interactive_multi_ai_day_cache"):
+		pm.call("end_interactive_multi_ai_day_cache")
+	print(
+		"HeadlessPerf4InteractiveMultiAiTest: prod_cache uncached=%.2fms scans=%d cached=%.2fms scans=%d"
+		% [uncached_ms, scan_unc, cached_ms, scan_c]
+	)
+	if scan_c != 0:
+		_fail("cached production still scanned lines scans=%d" % scan_c)
+	elif scan_unc < 6:
+		_fail("uncached production walks too few scans=%d" % scan_unc)
+	elif cached_ms <= 0.0 or uncached_ms <= cached_ms:
+		_fail("production cache no timing benefit cached=%.2fms uncached=%.2fms" % [cached_ms, uncached_ms])
+	else:
+		_pass("production cache cached=%.2fms < uncached=%.2fms scans %d→0" % [cached_ms, uncached_ms, scan_unc])
+
+
+func _test_ai_infra_outcome_equivalence(idm: Node, mm: Node = null) -> void:
 	if idm == null:
 		_fail("IDM missing for equivalence")
 		return
@@ -362,8 +412,8 @@ func _test_ai_infra_outcome_equivalence(idm: Node) -> void:
 	# be deterministic on *this* board (two collects match). The main-vs-fix
 	# sequence (JAP 903951 / FRA 710739 / …) is gated by
 	# HeadlessPerf4DailySimTickTest.
-	var a: Array = _collect_infra_decisions(idm, EQUIV_DAYS, EQUIV_SEED)
-	var b: Array = _collect_infra_decisions(idm, EQUIV_DAYS, EQUIV_SEED)
+	var a: Array = _collect_infra_decisions(idm, EQUIV_DAYS, EQUIV_SEED, mm)
+	var b: Array = _collect_infra_decisions(idm, EQUIV_DAYS, EQUIV_SEED, mm)
 	if a.size() != EQUIV_DAYS or b.size() != EQUIV_DAYS:
 		_fail("infra run length a=%d b=%d" % [a.size(), b.size()])
 		return

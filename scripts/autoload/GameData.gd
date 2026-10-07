@@ -4445,15 +4445,11 @@ func apply_supply_route_mutation(route_id: String = "main", priority: String = "
 		if depot_ok and SupplyManager.has_method("set_player_depot"):
 			SupplyManager.set_player_depot(province_id, true)
 		if SupplyManager.has_method("advance_supply_day"):
-			var used_light := false
-			if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("is_interactive_light_sim"):
-				if bool(TimeManager.is_interactive_light_sim()) and SupplyManager.has_method("advance_supply_day_interactive_light"):
-					SupplyManager.call("advance_supply_day_interactive_light", 1.0)
-					used_light = true
-			if not used_light:
-				SupplyManager.advance_supply_day(1.0)
+			# PERF-4 FIX #2: live Play / multi-AI soft tick keep the full day
+			# (air, naval, route shipping). Do not drop steps for speed.
+			SupplyManager.advance_supply_day(1.0)
 			supply_live = true
-			supply_detail = "advance_supply_day_light" if used_light else "advance_supply_day"
+			supply_detail = "advance_supply_day"
 	peace_state["supply_last_live_apply"] = {
 		"route_id": route_id,
 		"priority": priority,

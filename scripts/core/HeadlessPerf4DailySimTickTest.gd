@@ -23,6 +23,15 @@ const SRC_IDM := "res://scripts/map/InfrastructureDevelopmentManager.gd"
 const EQUIV_DAYS := 7
 const EQUIV_SEED := 193601
 const PEACE_COPY_LOOPS := 24
+const EXPECTED_INFRA := [
+	{"day": 1, "tag": "JAP", "pid": 903951},
+	{"day": 2, "tag": "FRA", "pid": 710739},
+	{"day": 3, "tag": "ITA", "pid": 710859},
+	{"day": 4, "tag": "ENG", "pid": 711481},
+	{"day": 5, "tag": "POL", "pid": 711054},
+	{"day": 6, "tag": "SOV", "pid": 0},
+	{"day": 7, "tag": "JAP", "pid": 902474},
+]
 
 var _failures := 0
 
@@ -97,8 +106,11 @@ func _run() -> void:
 		idm.call("initialize_with_time")
 	_test_peace_state_read_is_cheap(gd)
 	_test_owner_index_is_cached(mm)
+	# Infra equivalence on the pristine board — the live day path starts
+	# projects and can precompute fronts. Running it first was the
+	# day-2 FRA no_candidate flake class.
+	_test_ai_infra_outcome_equivalence(idm, mm)
 	_test_live_day_path_budget(tm, idm)
-	_test_ai_infra_outcome_equivalence(idm)
 
 
 func _test_source_gates_fail_on_main() -> void:
@@ -156,34 +168,75 @@ func _test_owner_index_is_cached(mm: Node) -> void:
 		_fail("get_provinces_by_owner missing")
 		return
 	var tags: Array = ["GER", "FRA", "ENG", "USA", "SOV", "ITA", "JAP", "POL"]
+	var all_p: Dictionary = mm.call("get_all_provinces") if mm.has_method("get_all_provinces") else {}
+	var brute_n := 0
+	var brute_ger: Array = []
+	for pid_v in all_p.keys():
+		var p = all_p[pid_v]
+		if p == null:
+			continue
+		var ot := str(p.owner_tag).strip_edges().to_upper()
+		if ot in tags:
+			brute_n += 1
+		if ot == "GER":
+			brute_ger.append(int(pid_v))
+	if mm.has_method("_invalidate_owner_index"):
+		mm.call("_invalidate_owner_index")
+	var builds0 := int(mm.get("owner_index_build_count")) if "owner_index_build_count" in mm else -1
 	var t0 := Time.get_ticks_usec()
 	var n0 := 0
 	for tag_v in tags:
 		var owned: Array = mm.call("get_provinces_by_owner", str(tag_v))
 		n0 += owned.size()
 	var first_ms := float(Time.get_ticks_usec() - t0) / 1000.0
+	var builds1 := int(mm.get("owner_index_build_count")) if "owner_index_build_count" in mm else -1
 	t0 = Time.get_ticks_usec()
 	var n1 := 0
 	for tag_v2 in tags:
 		var owned2: Array = mm.call("get_provinces_by_owner", str(tag_v2))
 		n1 += owned2.size()
 	var second_ms := float(Time.get_ticks_usec() - t0) / 1000.0
+	var builds2 := int(mm.get("owner_index_build_count")) if "owner_index_build_count" in mm else -1
+	t0 = Time.get_ticks_usec()
+	var brute_walk_n := 0
+	for _i in 32:
+		for pid_v2 in all_p.keys():
+			var p2 = all_p[pid_v2]
+			if p2 != null and str(p2.owner_tag).to_upper() == "GER":
+				brute_walk_n += 1
+	var brute_ms := float(Time.get_ticks_usec() - t0) / 1000.0
+	t0 = Time.get_ticks_usec()
+	for _j in 32:
+		mm.call("get_provinces_by_owner", "GER")
+	var cached_ms := float(Time.get_ticks_usec() - t0) / 1000.0
+	var ger_idx: Array = mm.call("get_provinces_by_owner", "GER")
+	ger_idx.sort()
+	brute_ger.sort()
 	print(
-		"HeadlessPerf4DailySimTickTest: owner_index first=%.2fms second=%.2fms n=%d/%d"
-		% [first_ms, second_ms, n0, n1]
+		"HeadlessPerf4DailySimTickTest: owner_index first=%.2fms second=%.2fms cached32=%.2fms brute32=%.2fms n=%d/%d brute=%d builds=%d→%d→%d"
+		% [first_ms, second_ms, cached_ms, brute_ms, n0, n1, brute_n, builds0, builds1, builds2]
 	)
-	if n0 < 100 or n0 != n1:
-		_fail("owner_index membership mismatch n0=%d n1=%d" % [n0, n1])
-	elif second_ms > 50.0:
-		_fail("owner_index cache miss? second=%.1fms" % second_ms)
+	if n0 < 100 or n0 != n1 or n0 != brute_n:
+		_fail("owner_index membership mismatch n0=%d n1=%d brute=%d" % [n0, n1, brute_n])
+	elif str(ger_idx) != str(brute_ger):
+		_fail("owner_index GER list != brute walk idx=%d brute=%d" % [ger_idx.size(), brute_ger.size()])
+	elif builds0 >= 0 and (builds1 != builds0 + 1 or builds2 != builds1):
+		_fail("owner_index build count %d→%d→%d (revert walks every call?)" % [builds0, builds1, builds2])
+	elif cached_ms <= 0.0 or brute_ms <= cached_ms:
+		_fail("owner_index no timing benefit cached32=%.2fms brute32=%.2fms" % [cached_ms, brute_ms])
 	else:
-		_pass("owner_index cached second=%.2fms n=%d" % [second_ms, n1])
+		_pass(
+			"owner_index cached second=%.2fms cached32=%.2fms < brute32=%.2fms n=%d"
+			% [second_ms, cached_ms, brute_ms, n1]
+		)
 
 
-func _collect_infra_decisions(idm: Node, days: int, seed: int) -> Array:
+func _collect_infra_decisions(idm: Node, days: int, seed: int, mm: Node = null) -> Array:
 	var out: Array = []
 	if idm == null or not idm.has_method("try_ai_start_infra_project"):
 		return out
+	if mm != null and "_live_fronts_precompute" in mm:
+		mm.set("_live_fronts_precompute", {})
 	if "active_projects" in idm:
 		(idm.active_projects as Dictionary).clear()
 	if "_ai_infra_budget_day" in idm:
@@ -207,12 +260,12 @@ func _collect_infra_decisions(idm: Node, days: int, seed: int) -> Array:
 	return out
 
 
-func _test_ai_infra_outcome_equivalence(idm: Node) -> void:
+func _test_ai_infra_outcome_equivalence(idm: Node, mm: Node = null) -> void:
 	if idm == null:
 		_fail("IDM missing for equivalence")
 		return
-	var a: Array = _collect_infra_decisions(idm, EQUIV_DAYS, EQUIV_SEED)
-	var b: Array = _collect_infra_decisions(idm, EQUIV_DAYS, EQUIV_SEED)
+	var a: Array = _collect_infra_decisions(idm, EQUIV_DAYS, EQUIV_SEED, mm)
+	var b: Array = _collect_infra_decisions(idm, EQUIV_DAYS, EQUIV_SEED, mm)
 	if a.size() != EQUIV_DAYS or b.size() != EQUIV_DAYS:
 		_fail("equivalence run length a=%d b=%d" % [a.size(), b.size()])
 		return
@@ -224,6 +277,25 @@ func _test_ai_infra_outcome_equivalence(idm: Node) -> void:
 			same = false
 			_fail("infra decision day %s mismatch %s vs %s" % [str(da.get("day")), str(da), str(db)])
 			break
+		if str(da.get("tag", "")) == "FRA" and str(da.get("reason", "")) == "no_candidate":
+			same = false
+			_fail("day %s FRA no_candidate (flake class)" % str(da.get("day")))
+			break
+		if i < EXPECTED_INFRA.size() and str(da.get("tag", "")) == str((EXPECTED_INFRA[i] as Dictionary).get("tag", "")):
+			var exp: Dictionary = EXPECTED_INFRA[i]
+			if int(exp.get("pid", 0)) > 0 and int(da.get("pid", -1)) != int(exp.get("pid", -2)):
+				same = false
+				_fail(
+					"infra day %s %s expected pid=%s got pid=%s reason=%s"
+					% [
+						str(da.get("day")),
+						str(da.get("tag")),
+						str(exp.get("pid")),
+						str(da.get("pid")),
+						str(da.get("reason", "")),
+					]
+				)
+				break
 	if same:
 		_pass("AI infra decisions identical over %d days seed=%d" % [EQUIV_DAYS, EQUIV_SEED])
 		print("HeadlessPerf4DailySimTickTest: infra_decisions=%s" % str(a))

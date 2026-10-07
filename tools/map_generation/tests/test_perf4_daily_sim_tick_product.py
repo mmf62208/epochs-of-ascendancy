@@ -43,16 +43,26 @@ class TestPerf4DailySimTickProduct(unittest.TestCase):
         p = build_perf4_daily_sim_tick_product()
         for key in (
             "multi_ai_country_profile",
-            "soft_supply_uses_light",
+            "soft_supply_uses_full_day",
             "production_day_cache",
+            "production_line_scan_count",
             "line_owner_index_hot_path",
             "supply_interactive_light",
+            "supply_day_full_steps_in_live",
+            "supply_capture_owner_refresh",
+            "map_owner_notifies_supply",
+            "supply_network_build_count",
             "regional_control_owner_index",
+            "owner_index_build_count",
             "headless_multi_ai_budget_test",
             "multi_ai_wired_into_gates",
             "depot_rebuild_on_change_only",
             "depot_skips_missing_pid",
             "headless_live_multi_ai_test",
+            "headless_capture_rebuild_case",
+            "headless_repeated_real_depot",
+            "headless_production_cache_timing",
+            "headless_owner_index_timing",
             "live_multi_ai_wired_into_gates",
         ):
             self.assertIn(key, p.get("passes") or [], msg=p)
@@ -65,6 +75,21 @@ class TestPerf4DailySimTickProduct(unittest.TestCase):
         self.assertIn("changed", body)
         self.assertIn("build_network", body)
         self.assertIn("provinces.has", body)
+
+    def test_supply_capture_refresh_and_full_day(self) -> None:
+        src = (ROOT / "scripts" / "supply" / "SupplyManager.gd").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("func notify_province_control_changed", src)
+        self.assertIn("network_build_count", src)
+        adv = extract_gd_func_body(src, "advance_supply_day")
+        self.assertIn("_process_air_missions", adv)
+        self.assertIn("_process_naval_recon", adv)
+        self.assertNotIn("is_live_f5_play_path", adv)
+        gd = (ROOT / "scripts" / "autoload" / "GameData.gd").read_text(encoding="utf-8")
+        mut = extract_gd_func_body(gd, "apply_supply_route_mutation")
+        self.assertIn("advance_supply_day", mut)
+        self.assertNotIn("advance_supply_day_interactive_light", mut)
 
     def test_live_multi_ai_harness_exists(self) -> None:
         hd = ROOT / "scripts" / "core" / "HeadlessPerf4LiveMultiAiDayTest.gd"

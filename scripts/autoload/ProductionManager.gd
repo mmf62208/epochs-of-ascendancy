@@ -81,6 +81,8 @@ var _interactive_ai_day_cache_ready: bool = false
 var _interactive_ai_line_ids_by_owner: Dictionary = {}
 var _interactive_ai_national_mod_cache: Dictionary = {}
 var _interactive_ai_family_count_cache: Dictionary = {}
+## PERF-4 FIX #2: full-line walks. Reverting the cache increments this.
+var interactive_ai_line_scan_count: int = 0
 
 
 func _ready() -> void:
@@ -394,6 +396,7 @@ func advance_days_for_country(country_tag: String, days: float = 1.0) -> Diction
 	if _interactive_ai_day_cache_ready and _interactive_ai_line_ids_by_owner.has(tag):
 		line_ids = _interactive_ai_line_ids_by_owner[tag] as Array
 	else:
+		interactive_ai_line_scan_count += 1
 		for line_id_v in _lines.keys():
 			line_ids.append(str(line_id_v))
 	for line_id_v2 in line_ids:

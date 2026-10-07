@@ -47,6 +47,7 @@ var _owner_index: Dictionary = {}
 var _controller_index: Dictionary = {}
 var _owner_index_dirty: bool = true
 var _regional_bonus_cache: Dictionary = {}
+var owner_index_build_count: int = 0
 
 # Optional high-performance picker (created on demand or by MapRenderer)
 var pick_grid: MapPickGrid = null
@@ -438,6 +439,7 @@ func _invalidate_owner_index() -> void:
 func _ensure_owner_index() -> void:
 	if not _owner_index_dirty:
 		return
+	owner_index_build_count += 1
 	_owner_index.clear()
 	_controller_index.clear()
 	for pid_v in _provinces.keys():
@@ -1558,6 +1560,8 @@ func update_province_owner(
 		changed = true
 	if changed:
 		_invalidate_owner_index()
+		if typeof(SupplyManager) != TYPE_NIL and SupplyManager.has_method("notify_province_control_changed"):
+			SupplyManager.notify_province_control_changed(province_id)
 		if not skip_emit:
 			province_data_changed.emit(province_id, "owner")
 
@@ -1605,6 +1609,8 @@ func update_province_settlement(province_id: int, new_level: float) -> bool:
 func notify_province_changed(province_id: int, what: String) -> void:
 	if what in ["owner", "controller", "all"]:
 		_invalidate_owner_index()
+		if typeof(SupplyManager) != TYPE_NIL and SupplyManager.has_method("notify_province_control_changed"):
+			SupplyManager.notify_province_control_changed(province_id)
 	if _provinces.has(province_id):
 		province_data_changed.emit(province_id, what)
 

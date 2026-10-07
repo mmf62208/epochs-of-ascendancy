@@ -52,6 +52,11 @@ var _pending_waypoints: Array[int] = []
 var _reroute_source_id: int = -1
 var _reroute_target_id: int = -1
 var _selected_province_id: int = -1
+## PERF-4 FIX #2: count rebuilds so a reverted depot-membership guard fails
+## by count (repeated add of a real depot) rather than source-string checks.
+var network_build_count: int = 0
+var network_ownership_refresh_count: int = 0
+var network_route_rebuild_count: int = 0
 
 
 func _ready() -> void:
@@ -78,6 +83,7 @@ func build_network(
 	adjacency = p_adjacency
 	if not tag.is_empty():
 		player_tag = tag
+	network_build_count += 1
 	hubs = SupplyNetworkBuilder.build(
 		provinces, p_countries, city_layer, player_depot_province_ids, rules,
 	)
@@ -172,6 +178,79 @@ func set_player_depot(province_id: int, enabled: bool) -> void:
 		return
 	if not provinces.is_empty():
 		build_network(provinces, _countries, _city_layer, adjacency, player_tag)
+
+
+## PERF-4 FIX #2: capture / occupation must retag hubs and rebuild routes.
+## Main only looked correct because it rebuilt the network every day.
+func notify_province_control_changed(province_id: int) -> void:
+	if province_id <= 0:
+		return
+	if hubs.is_empty() and player_depot_province_ids.is_empty():
+		return
+	var is_hub := hubs.has(province_id)
+	var is_depot := province_id in player_depot_province_ids
+	if not is_hub and not is_depot:
+		return
+	var live_tag := _live_control_tag_for_pid(province_id)
+	if live_tag.is_empty():
+		return
+	var hub_changed := false
+	if is_hub:
+		var hub: ProvinceSupplyHub = hubs[province_id]
+		if hub != null and hub.owner_tag != live_tag:
+			hub.owner_tag = live_tag
+			hub_changed = true
+	if not hub_changed and not is_depot:
+		return
+	network_ownership_refresh_count += 1
+	if not provinces.is_empty():
+		_rebuild_default_routes()
+
+
+func _live_control_tag_for_pid(province_id: int) -> String:
+	var p: Province = null
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province"):
+		p = MapManager.get_province(province_id) as Province
+	if p == null and provinces.has(province_id):
+		p = provinces[province_id] as Province
+	if p == null:
+		return ""
+	return _ctrl(p).strip_edges().to_upper()
+
+
+func get_network_topology_snapshot() -> Dictionary:
+	var hub_owners: Dictionary = {}
+	for pid_v in hubs.keys():
+		var hub: ProvinceSupplyHub = hubs[pid_v]
+		if hub == null:
+			continue
+		hub_owners[int(pid_v)] = str(hub.owner_tag).strip_edges().to_upper()
+	var route_rows: Array = []
+	for key_v in _routes.keys():
+		var plan: SupplyRoutePlan = _routes[key_v]
+		if plan == null:
+			continue
+		var path_copy: Array = []
+		for step_v in plan.province_path:
+			path_copy.append(int(step_v))
+		route_rows.append({
+			"key": str(key_v),
+			"src": int(plan.source_province_id),
+			"dst": int(plan.target_province_id),
+			"owner": str(plan.owner_tag).strip_edges().to_upper(),
+			"path": path_copy,
+		})
+	route_rows.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return str(a.get("key", "")) < str(b.get("key", ""))
+	)
+	return {
+		"hub_owners": hub_owners,
+		"routes": route_rows,
+		"hub_n": hub_owners.size(),
+		"route_n": route_rows.size(),
+		"build_count": network_build_count,
+		"ownership_refresh_count": network_ownership_refresh_count,
+	}
 
 
 func set_selected_province(province_id: int) -> void:
@@ -561,18 +640,16 @@ func get_attrition_cargo_summary(_leader_id: String = "") -> Dictionary:
 
 
 func _should_use_interactive_light_supply() -> bool:
+	# PERF-4 FIX #2: live F5 / Play must run the full day (air, naval, shipping).
+	# Compact Maginot playtest clock is the only remaining light caller.
 	if typeof(TimeManager) == TYPE_NIL:
 		return false
-	if TimeManager.has_method("is_interactive_light_sim") and bool(TimeManager.is_interactive_light_sim()):
-		return true
-	if TimeManager.has_method("is_live_f5_play_path") and bool(TimeManager.is_live_f5_play_path()):
-		return true
-	return false
+	return bool(TimeManager.get("_living_playtest_clock"))
 
 
 func _on_game_day_advanced(_year: int, _month: int, _day: int) -> void:
 	# Daily supply simulation driven by central TimeManager.
-	# Interactive F5 / live Play: light path (same gate as apply_supply soft tick).
+	# Live Play uses the full advance (rebuild is skipped, steps are not).
 	advance_supply_day(1.0)
 
 
@@ -624,8 +701,7 @@ func _generate_local_supply_from_development_light(days: float) -> void:
 				daily_gen *= (1.0 - clampf(disruption * 0.25, 0.0, 0.6))
 		state.apply_inflow(daily_gen)
 
-## Interactive F5 / multi-AI soft theater tick: same depot inflow as the daily
-## light listener. Must not re-enter the full air/naval/weather cascade.
+## Compact Maginot playtest clock only. Live Play uses advance_supply_day.
 func advance_supply_day_interactive_light(days: float = 1.0) -> void:
 	_advance_supply_day_light(days)
 
@@ -633,9 +709,9 @@ func advance_supply_day_interactive_light(days: float = 1.0) -> void:
 func advance_supply_day(days: float = 1.0) -> void:
 	if days <= 0.0:
 		return
-	# PERF-4 FIX #1: F5 / live Play already ran the light listener; the
-	# interactive multi-AI soft tick must not re-enter air/naval recon +
-	# full route shipping (that path is the year-sim / heavy-daily board).
+	# PERF-4 FIX #2: live Play keeps air / naval / route-shipping. Compact
+	# Maginot playtest clock is the only light skip. Speed comes from not
+	# rebuilding the network, not from dropping steps.
 	if _should_use_interactive_light_supply():
 		_advance_supply_day_light(days)
 		return
@@ -1808,6 +1884,7 @@ func _calculate_route_reinforcement_modifier(path: Array, player_tag: String) ->
 
 
 func _rebuild_default_routes() -> void:
+	network_route_rebuild_count += 1
 	_default_routes.clear()
 	_routes.clear()
 	var source := get_capital_hub_id()

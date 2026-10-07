@@ -10,8 +10,10 @@ This product greps the shipped path. Headless
 `HeadlessPerf4DailySimTickTest` times the cheap day flush.
 `HeadlessPerf4LiveMultiAiDayTest` and `HeadlessPerf4InteractiveMultiAiTest`
 boot GER + a live-weight supply network and time the Play multi-AI step.
-Soft theater tick uses the F5 light supply path and does not rebuild the
-network for dummy pid 1. Production shares a per-day line-owner cache.
+Soft theater tick does not rebuild the network for dummy pid 1. Live Play
+still runs the full advance_supply_day steps (air / naval / shipping).
+A depot/hub owner flip patches routes. Production shares a per-day
+line-owner cache; owner index is counted + timed.
 """
 from __future__ import annotations
 
@@ -111,10 +113,14 @@ def build_perf4_daily_sim_tick_product() -> Dict[str, Any]:
         passes.append("owner_index_hot_path")
     else:
         fails.append("owner_index_hot_path")
-    if ensure_fn and "_owner_index" in ensure_fn:
+    if ensure_fn and "_owner_index" in ensure_fn and "owner_index_build_count" in ensure_fn:
         passes.append("owner_index_builder")
     else:
         fails.append("owner_index_builder")
+    if "var owner_index_build_count" in mm:
+        passes.append("owner_index_build_count")
+    else:
+        fails.append("owner_index_build_count")
 
     try_fn = extract_gd_func_body(idm, "try_start_infrastructure_investment")
     if try_fn and "peek_peace_state" in try_fn:
@@ -132,10 +138,29 @@ def build_perf4_daily_sim_tick_product() -> Dict[str, Any]:
     else:
         fails.append("depot_skips_missing_pid")
     adv_fn = extract_gd_func_body(sm, "advance_supply_day")
-    if adv_fn and "_should_use_interactive_light_supply" in adv_fn:
-        passes.append("supply_day_f5_light_gate")
+    if (
+        adv_fn
+        and "_process_air_missions" in adv_fn
+        and "_process_naval_recon" in adv_fn
+        and "is_live_f5_play_path" not in adv_fn
+        and "is_interactive_light_sim" not in adv_fn
+    ):
+        passes.append("supply_day_full_steps_in_live")
     else:
-        fails.append("supply_day_f5_light_gate")
+        fails.append("supply_day_full_steps_in_live")
+    if "func notify_province_control_changed" in sm and "network_ownership_refresh_count" in sm:
+        passes.append("supply_capture_owner_refresh")
+    else:
+        fails.append("supply_capture_owner_refresh")
+    owner_upd = extract_gd_func_body(mm, "update_province_owner")
+    if owner_upd and "notify_province_control_changed" in owner_upd:
+        passes.append("map_owner_notifies_supply")
+    else:
+        fails.append("map_owner_notifies_supply")
+    if "network_build_count" in sm:
+        passes.append("supply_network_build_count")
+    else:
+        fails.append("supply_network_build_count")
     supply_fn = extract_gd_func_body(gd, "apply_supply_route_mutation")
     if supply_fn and "get_province" in supply_fn and "set_player_depot" in supply_fn:
         passes.append("apply_supply_requires_real_province")
@@ -147,14 +172,36 @@ def build_perf4_daily_sim_tick_product() -> Dict[str, Any]:
     else:
         fails.append("multi_ai_still_runs_prod_and_supply")
 
-    if HD_GD.is_file() and "DAY_TICK_FRAME_BUDGET_MS" in hd and "RESULT=" in hd:
+    if HD_GD.is_file() and "DAY_TICK_FRAME_BUDGET_MS" in hd and "RESULT=" in hd and "FRA no_candidate" in hd:
         passes.append("headless_budget_test")
     else:
         fails.append("headless_budget_test")
-    if HD_LIVE_GD.is_file() and "apply_interactive_multi_ai_day_live" in hd_live and "RESULT=" in hd_live:
+    if (
+        HD_LIVE_GD.is_file()
+        and "apply_interactive_multi_ai_day_live" in hd_live
+        and "RESULT=" in hd_live
+        and "CAPTURE_HUB_PID" in hd_live
+        and "REPEAT_DEPOT_ADDS" in hd_live
+    ):
         passes.append("headless_live_multi_ai_test")
     else:
         fails.append("headless_live_multi_ai_test")
+    if HD_LIVE_GD.is_file() and "_test_capture_matches_full_rebuild" in hd_live:
+        passes.append("headless_capture_rebuild_case")
+    else:
+        fails.append("headless_capture_rebuild_case")
+    if HD_LIVE_GD.is_file() and "_test_repeated_real_depot_guard" in hd_live:
+        passes.append("headless_repeated_real_depot")
+    else:
+        fails.append("headless_repeated_real_depot")
+    if HD_LIVE_GD.is_file() and "_test_production_cache_measured" in hd_live:
+        passes.append("headless_production_cache_timing")
+    else:
+        fails.append("headless_production_cache_timing")
+    if HD_LIVE_GD.is_file() and "_test_owner_index_measured" in hd_live:
+        passes.append("headless_owner_index_timing")
+    else:
+        fails.append("headless_owner_index_timing")
     if "launch_perf4_daily_sim_tick" in gates:
         passes.append("wired_into_gates")
     else:
@@ -174,16 +221,24 @@ def build_perf4_daily_sim_tick_product() -> Dict[str, Any]:
     else:
         fails.append("multi_ai_country_profile")
     supply_fn = extract_gd_func_body(gd, "apply_supply_route_mutation")
-    if supply_fn and "advance_supply_day_interactive_light" in supply_fn:
-        passes.append("soft_supply_uses_light")
+    if (
+        supply_fn
+        and "advance_supply_day" in supply_fn
+        and "advance_supply_day_interactive_light" not in supply_fn
+    ):
+        passes.append("soft_supply_uses_full_day")
     else:
-        fails.append("soft_supply_uses_light")
+        fails.append("soft_supply_uses_full_day")
     if "func begin_interactive_multi_ai_day_cache" in pm:
         passes.append("production_day_cache")
     else:
         fails.append("production_day_cache")
+    if "interactive_ai_line_scan_count" in pm:
+        passes.append("production_line_scan_count")
+    else:
+        fails.append("production_line_scan_count")
     adv_fn = extract_gd_func_body(pm, "advance_days_for_country")
-    if adv_fn and "_interactive_ai_line_ids_by_owner" in adv_fn:
+    if adv_fn and "_interactive_ai_line_ids_by_owner" in adv_fn and "interactive_ai_line_scan_count" in adv_fn:
         passes.append("line_owner_index_hot_path")
     else:
         fails.append("line_owner_index_hot_path")
