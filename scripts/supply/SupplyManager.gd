@@ -154,10 +154,19 @@ func get_capital_hub_id() -> int:
 
 
 func set_player_depot(province_id: int, enabled: bool) -> void:
-	if enabled and province_id not in player_depot_province_ids:
-		player_depot_province_ids.append(province_id)
-	elif not enabled and province_id in player_depot_province_ids:
+	# PERF-4 FIX #1: rebuild only when membership changes. The interactive
+	# multi-AI soft tick used to call this every game day (dummy pid 1) and
+	# re-ran build_network + 24 route plans on the live 3520 board (~1.5s).
+	var changed := false
+	if enabled:
+		if province_id not in player_depot_province_ids:
+			player_depot_province_ids.append(province_id)
+			changed = true
+	elif province_id in player_depot_province_ids:
 		player_depot_province_ids.erase(province_id)
+		changed = true
+	if not changed:
+		return
 	if not provinces.is_empty():
 		build_network(provinces, _countries, _city_layer, adjacency, player_tag)
 
@@ -548,12 +557,19 @@ func get_attrition_cargo_summary(_leader_id: String = "") -> Dictionary:
 	)
 
 
+func _should_use_interactive_light_supply() -> bool:
+	if typeof(TimeManager) == TYPE_NIL:
+		return false
+	if TimeManager.has_method("is_interactive_light_sim") and bool(TimeManager.is_interactive_light_sim()):
+		return true
+	if TimeManager.has_method("is_live_f5_play_path") and bool(TimeManager.is_live_f5_play_path()):
+		return true
+	return false
+
+
 func _on_game_day_advanced(_year: int, _month: int, _day: int) -> void:
 	# Daily supply simulation driven by central TimeManager.
-	# Interactive F5: always light path (no air/naval recon spam — that made 1x + wheel unusable).
-	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("is_interactive_light_sim") and bool(TimeManager.is_interactive_light_sim()):
-		_advance_supply_day_light(1.0)
-		return
+	# Interactive F5 / live Play: light path (same gate as apply_supply soft tick).
 	advance_supply_day(1.0)
 
 
@@ -613,6 +629,12 @@ func advance_supply_day_interactive_light(days: float = 1.0) -> void:
 
 func advance_supply_day(days: float = 1.0) -> void:
 	if days <= 0.0:
+		return
+	# PERF-4 FIX #1: F5 / live Play already ran the light listener; the
+	# interactive multi-AI soft tick must not re-enter air/naval recon +
+	# full route shipping (that path is the year-sim / heavy-daily board).
+	if _should_use_interactive_light_supply():
+		_advance_supply_day_light(days)
 		return
 
 	# === Province Infrastructure & Development: Local Supply Generation ===

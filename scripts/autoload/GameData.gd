@@ -4436,7 +4436,13 @@ func apply_supply_route_mutation(route_id: String = "main", priority: String = "
 			SupplyManager.set_selected_province(province_id)
 		if SupplyManager.has_method("set_routing_mode"):
 			SupplyManager.set_routing_mode(str(priority).to_lower())
-		if province_id > 0 and SupplyManager.has_method("set_player_depot"):
+		# PERF-4 FIX #1: interactive multi-AI passes dummy pid 1. Marking that
+		# as a player depot rebuilt the live 3520 supply network every day.
+		# Only stamp a depot when the province actually exists on the board.
+		var depot_ok := false
+		if province_id > 0 and typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province"):
+			depot_ok = MapManager.get_province(province_id) != null
+		if depot_ok and SupplyManager.has_method("set_player_depot"):
 			SupplyManager.set_player_depot(province_id, true)
 		if SupplyManager.has_method("advance_supply_day"):
 			var used_light := false

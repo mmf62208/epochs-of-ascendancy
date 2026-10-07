@@ -50,8 +50,26 @@ class TestPerf4DailySimTickProduct(unittest.TestCase):
             "regional_control_owner_index",
             "headless_multi_ai_budget_test",
             "multi_ai_wired_into_gates",
+            "depot_rebuild_on_change_only",
+            "headless_live_multi_ai_test",
+            "live_multi_ai_wired_into_gates",
         ):
             self.assertIn(key, p.get("passes") or [], msg=p)
+
+    def test_set_player_depot_rebuilds_only_on_change(self) -> None:
+        src = (ROOT / "scripts" / "supply" / "SupplyManager.gd").read_text(
+            encoding="utf-8"
+        )
+        body = extract_gd_func_body(src, "set_player_depot")
+        self.assertIn("changed", body)
+        self.assertIn("build_network", body)
+
+    def test_live_multi_ai_harness_exists(self) -> None:
+        hd = ROOT / "scripts" / "core" / "HeadlessPerf4LiveMultiAiDayTest.gd"
+        self.assertTrue(hd.is_file())
+        text = hd.read_text(encoding="utf-8")
+        self.assertIn("apply_interactive_multi_ai_day_live", text)
+        self.assertIn("boot_living_player", text)
 
 
 if __name__ == "__main__":

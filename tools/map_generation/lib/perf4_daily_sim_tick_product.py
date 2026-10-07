@@ -1,20 +1,17 @@
 """PERF-4 daily sim-tick hitch — instrument + cheap peace_state + owner index.
 
-Live 1x Play (Begin GER 1936) hitch ~1.7–1.9s once per in-game day, aligned
-with AI infra start / land-battle attrition. Dominant cost: GameData.get_peace_state
-deep-copied the peace blob on every read (invest, battle preview, production).
-Secondary: MapManager.get_provinces_by_owner walked ~3520 hexes per call.
+Live 1x Play (Begin GER 1936) hitch ~1.7–1.9s once per in-game day. First
+slice: GameData.get_peace_state deepcopy + 3520 owner walk. FIX #1: the
+remaining live hitch was `_maybe_run_interactive_multi_ai` → apply_supply
+→ SupplyManager.set_player_depot(1) rebuilding the F5 supply network every
+day. The stripped HeadlessPerf4DailySimTickTest never built that network.
 
 This product greps the shipped path. Headless
-`HeadlessPerf4DailySimTickTest` times the live-F5 day flush and checks
-outcome equivalence (same AI infra decisions, same seed).
-
-FIX #1: live Play hitch was `_maybe_run_interactive_multi_ai` (1.5–1.7s).
-The old headless clock never built a live-weight supply network, so the
-soft `apply_supply` tick looked cheap. Soft theater tick now uses
-`advance_supply_day_interactive_light` (same depot formula as the daily
-F5 listener). Production shares a per-day line-owner / modifier cache.
-`HeadlessPerf4InteractiveMultiAiTest` drives that Play entry point.
+`HeadlessPerf4DailySimTickTest` times the cheap day flush.
+`HeadlessPerf4LiveMultiAiDayTest` and `HeadlessPerf4InteractiveMultiAiTest`
+boot GER + a live-weight supply network and time the Play multi-AI step.
+Soft theater tick uses the F5 light supply path and does not rebuild the
+network for dummy pid 1. Production shares a per-day line-owner cache.
 """
 from __future__ import annotations
 
@@ -28,6 +25,7 @@ MM_GD = ROOT / "scripts" / "map" / "MapManager.gd"
 IDM_GD = ROOT / "scripts" / "map" / "InfrastructureDevelopmentManager.gd"
 HD_GD = ROOT / "scripts" / "core" / "HeadlessPerf4DailySimTickTest.gd"
 HD_MULTI_GD = ROOT / "scripts" / "core" / "HeadlessPerf4InteractiveMultiAiTest.gd"
+HD_LIVE_GD = ROOT / "scripts" / "core" / "HeadlessPerf4LiveMultiAiDayTest.gd"
 PM_GD = ROOT / "scripts" / "autoload" / "ProductionManager.gd"
 SM_GD = ROOT / "scripts" / "supply" / "SupplyManager.gd"
 GATES_SH = ROOT / "tools" / "eoa_full_test_gates.sh"
@@ -68,6 +66,7 @@ def build_perf4_daily_sim_tick_product() -> Dict[str, Any]:
     idm = _read(IDM_GD)
     hd = _read(HD_GD)
     hd_multi = _read(HD_MULTI_GD)
+    hd_live = _read(HD_LIVE_GD)
     pm = _read(PM_GD)
     sm = _read(SM_GD)
     gates = _read(GATES_SH)
@@ -123,14 +122,43 @@ def build_perf4_daily_sim_tick_product() -> Dict[str, Any]:
     else:
         fails.append("infra_start_peeks_peace")
 
+    depot_fn = extract_gd_func_body(sm, "set_player_depot")
+    if depot_fn and "changed" in depot_fn and "build_network" in depot_fn:
+        passes.append("depot_rebuild_on_change_only")
+    else:
+        fails.append("depot_rebuild_on_change_only")
+    adv_fn = extract_gd_func_body(sm, "advance_supply_day")
+    if adv_fn and "_should_use_interactive_light_supply" in adv_fn:
+        passes.append("supply_day_f5_light_gate")
+    else:
+        fails.append("supply_day_f5_light_gate")
+    supply_fn = extract_gd_func_body(gd, "apply_supply_route_mutation")
+    if supply_fn and "get_province" in supply_fn and "set_player_depot" in supply_fn:
+        passes.append("apply_supply_requires_real_province")
+    else:
+        fails.append("apply_supply_requires_real_province")
+    live_fn = extract_gd_func_body(gd, "apply_interactive_multi_ai_day_live")
+    if live_fn and "apply_production_for_tag" in live_fn and "apply_order_panel_action" in live_fn:
+        passes.append("multi_ai_still_runs_prod_and_supply")
+    else:
+        fails.append("multi_ai_still_runs_prod_and_supply")
+
     if HD_GD.is_file() and "DAY_TICK_FRAME_BUDGET_MS" in hd and "RESULT=" in hd:
         passes.append("headless_budget_test")
     else:
         fails.append("headless_budget_test")
+    if HD_LIVE_GD.is_file() and "apply_interactive_multi_ai_day_live" in hd_live and "RESULT=" in hd_live:
+        passes.append("headless_live_multi_ai_test")
+    else:
+        fails.append("headless_live_multi_ai_test")
     if "launch_perf4_daily_sim_tick" in gates:
         passes.append("wired_into_gates")
     else:
         fails.append("wired_into_gates")
+    if "launch_perf4_live_multi_ai_day" in gates:
+        passes.append("live_multi_ai_wired_into_gates")
+    else:
+        fails.append("live_multi_ai_wired_into_gates")
     if "test_perf4_daily_sim_tick_product" in gates:
         passes.append("wired_into_quick")
     else:
@@ -184,6 +212,8 @@ def build_perf4_daily_sim_tick_product() -> Dict[str, Any]:
         "profile_env": PROFILE_ENV,
         "live_api": "TimeManager.advance_live_f5_equivalent_days",
         "headless": "scripts/core/HeadlessPerf4DailySimTickTest.gd",
+        "headless_live_multi_ai": "scripts/core/HeadlessPerf4LiveMultiAiDayTest.gd",
+        "headless_interactive_multi_ai": "scripts/core/HeadlessPerf4InteractiveMultiAiTest.gd",
     }
 
 

@@ -4,6 +4,8 @@ extends SceneTree
 ## (day_emit / day_ai / day_battles) on world_accurate. FAILS on main
 ## (get_peace_state still deep-copies; no per-listener timers / owner index).
 ## PASSES on this branch: worst phase < 500ms + same AI infra decisions.
+## Does NOT boot the F5 supply network — see HeadlessPerf4LiveMultiAiDayTest
+## for the live Begin-GER interactive multi-AI cost.
 ##
 ##   tools/run_godot.sh --headless --path . \
 ##     -s res://scripts/core/HeadlessPerf4DailySimTickTest.gd

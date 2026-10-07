@@ -258,6 +258,9 @@ else
   run_step launch_perf4_interactive_multi_ai \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessPerf4InteractiveMultiAiTest.gd || fail
 
+  run_step launch_perf4_live_multi_ai_day \
+    tools/run_godot.sh --headless -s res://scripts/core/HeadlessPerf4LiveMultiAiDayTest.gd || fail
+
   run_step launch_ix1_live_stay_alive_tick \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessIx1RoadSpineLiveStayAliveTickTest.gd || fail
 
