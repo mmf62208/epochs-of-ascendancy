@@ -1088,6 +1088,8 @@ func _test_recapture_ger_converges(mm: Node, sm: Node) -> void:
 	if mm == null or sm == null:
 		_fail("recapture helpers missing")
 		return
+	_restore_owner(mm, CAPTURE_HUB_PID, "GER")
+	_restore_owner(mm, CAPTURE_DEPOT_PID, "GER")
 	if not _boot_live_supply_network(mm, sm):
 		_fail("recapture boot failed")
 		return

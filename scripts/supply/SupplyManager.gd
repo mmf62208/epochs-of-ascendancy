@@ -87,6 +87,9 @@ var last_flush_redrop_count: int = 0
 var last_plan_ms: float = 0.0
 ## Flush re-drops (must stay 0). Notify hostile drops do not increment this.
 var network_route_redrop_count: int = 0
+## Sorted player dest hubs (excludes capital). Updated incrementally so a
+## capture frame does not walk all 3k hubs.
+var _player_hub_ids: Array[int] = []
 
 
 func _ready() -> void:
@@ -124,6 +127,7 @@ func build_network(
 	_init_depot_states()
 	_control_dirty_pids.clear()
 	_clear_refill_queue()
+	_rebuild_player_hub_ids()
 	refresh_intel_from_forces()
 	_rebuild_default_routes()
 	network_rebuilt.emit(hubs.size())
@@ -241,12 +245,14 @@ func _patch_player_depot_hub(province_id: int, enabled: bool) -> void:
 	if hub == null:
 		hubs.erase(province_id)
 		depot_states.erase(province_id)
+		_rebuild_player_hub_ids()
 		_drop_obsolete_dest_routes()
 		_enqueue_missing_and_affected_dests(province_id)
 		_control_dirty_pids.erase(province_id)
 		return
 	hubs[province_id] = hub
 	_init_one_depot_state(hub, false)
+	_rebuild_player_hub_ids()
 	# Keep old routes serving until flush swaps their replacement. Only a
 	# dest that is no longer in the player dest set is dropped now.
 	_drop_obsolete_dest_routes()
@@ -295,11 +301,15 @@ func notify_province_control_changed(province_id: int) -> void:
 	if live_tag.is_empty():
 		return
 	var hub_changed := false
+	var old_hub_tag := ""
 	if hubs.has(province_id):
 		var hub: ProvinceSupplyHub = hubs[province_id]
-		if hub != null and hub.owner_tag != live_tag:
-			hub.owner_tag = live_tag
-			hub_changed = true
+		if hub != null:
+			old_hub_tag = str(hub.owner_tag).strip_edges().to_upper()
+			if hub.owner_tag != live_tag:
+				hub.owner_tag = live_tag
+				hub_changed = true
+				_note_player_hub_owner(province_id, old_hub_tag, live_tag)
 	SupplyPathfinder.clear_neighbor_cache()
 	var dropped := 0
 	if _pid_blocks_player_supply(province_id):
@@ -381,15 +391,30 @@ func get_hub_capacity_snapshot() -> Dictionary:
 
 
 func _player_route_targets() -> Array[int]:
+	return _player_hub_ids
+
+
+func _rebuild_player_hub_ids() -> void:
+	_player_hub_ids.clear()
 	var source := get_capital_hub_id()
-	var targets: Array[int] = []
 	if source < 0:
-		return targets
+		return
 	for hub: ProvinceSupplyHub in hubs.values():
 		if hub != null and hub.owner_tag == player_tag and hub.province_id != source:
-			targets.append(hub.province_id)
-	targets.sort()
-	return targets
+			_player_hub_ids.append(hub.province_id)
+	_player_hub_ids.sort()
+
+
+func _note_player_hub_owner(province_id: int, old_tag: String, new_tag: String) -> void:
+	var source := get_capital_hub_id()
+	var old_ok := old_tag == player_tag and province_id != source
+	var new_ok := new_tag == player_tag and province_id != source
+	if old_ok and not new_ok:
+		_player_hub_ids.erase(province_id)
+	elif new_ok and not old_ok:
+		if province_id not in _player_hub_ids:
+			_player_hub_ids.append(province_id)
+			_player_hub_ids.sort()
 
 
 func _missing_default_dest_count() -> int:
@@ -2315,11 +2340,7 @@ func _rebuild_default_routes() -> void:
 	var source := get_capital_hub_id()
 	if source < 0:
 		return
-	var targets: Array[int] = []
-	for hub: ProvinceSupplyHub in hubs.values():
-		if hub.owner_tag == player_tag and hub.province_id != source:
-			targets.append(hub.province_id)
-	targets.sort()
+	var targets: Array[int] = _player_route_targets()
 	var max_routes := mini(targets.size(), DEFAULT_ROUTE_DEST_CAP)
 	for i in range(max_routes):
 		var target := targets[i]
