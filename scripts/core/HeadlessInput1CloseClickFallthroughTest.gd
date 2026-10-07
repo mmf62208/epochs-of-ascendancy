@@ -292,13 +292,15 @@ func _send_pipeline(screen_pt: Vector2, pressed: bool) -> InputEventMouseButton:
 	return ev
 
 
-func _arm_leftover_release_gesture() -> void:
+func _arm_leftover_release_gesture(screen_pt: Vector2) -> void:
 	# Same physical click: × press already happened; leftover is the matching
 	# release. Tip press-consume returns before `_begin_left_map_gesture`, so
-	# the harness keeps `_left_btn_down` for that leftover only. Swallow must
-	# be the thing that blocks pick (mutants that drop it select Köln).
+	# the harness keeps `_left_btn_down` for that leftover only. Origin/slop
+	# must sit on the leftover point (else `_note` latches skip ≥8px).
 	if _mr == null:
 		return
+	if _mr.has_method("_reset_left_gesture_state"):
+		_mr.call("_reset_left_gesture_state", screen_pt)
 	_mr.set("_left_btn_down", true)
 	_mr.set("_left_button_was_up", false)
 	_mr.set("_left_ready_for_still_click", true)
@@ -308,6 +310,12 @@ func _arm_leftover_release_gesture() -> void:
 	_mr.set("_left_pan_active", false)
 	_mr.set("_left_pan_armed", false)
 	_mr.set("_left_slop_latched", false)
+	_mr.set("_left_max_slop_sq", 0.0)
+	_mr.set("_left_origin_screen", screen_pt)
+	_mr.set("_left_gesture_origin", screen_pt)
+	_mr.set("_left_press_screen", screen_pt)
+	_mr.set("_left_origin_valid", true)
+	_mr.set("_last_mouse_pos", screen_pt)
 	_mr.set("_close_click_guard", false)
 	_mr.set("_map_pick_block_until_msec", 0)
 	_mr.set("_unit_card_consumed_press", false)
@@ -613,7 +621,7 @@ func _test_t3_notice_unhandled_leftover() -> void:
 	_hide_notices()
 	if not _seed_known_under_screen(pt):
 		return
-	_arm_leftover_release_gesture()
+	_arm_leftover_release_gesture(pt)
 	_clear_inspector()
 	var ev: InputEventMouseButton = _make_mouse(pt, false)
 	_warp_mouse(pt)
@@ -638,7 +646,7 @@ func _test_t4_cc_unhandled_leftover() -> void:
 	_free_cc()
 	if not _seed_known_under_screen(pt):
 		return
-	_arm_leftover_release_gesture()
+	_arm_leftover_release_gesture(pt)
 	_clear_inspector()
 	var ev: InputEventMouseButton = _make_mouse(pt, false)
 	_warp_mouse(pt)
@@ -705,7 +713,7 @@ func _test_t5_notice_chip_leftover() -> void:
 		btn.pressed.emit()
 	await _flush(2)
 	_hide_notices()
-	_arm_leftover_release_gesture()
+	_arm_leftover_release_gesture(pt)
 	_mr.set("selected_formation_id", "")
 	var ev: InputEventMouseButton = _make_mouse(pt, false)
 	_warp_mouse(pt)
@@ -744,7 +752,7 @@ func _test_t6_notice_poll_leftover() -> void:
 	_hide_notices()
 	if not _seed_known_under_screen(pt):
 		return
-	_arm_leftover_release_gesture()
+	_arm_leftover_release_gesture(pt)
 	_clear_inspector()
 	var ev: InputEventMouseButton = _make_mouse(pt, false)
 	_warp_mouse(pt)
@@ -773,7 +781,7 @@ func _test_t7_cc_poll_leftover() -> void:
 	_free_cc()
 	if not _seed_known_under_screen(pt):
 		return
-	_arm_leftover_release_gesture()
+	_arm_leftover_release_gesture(pt)
 	_clear_inspector()
 	var ev: InputEventMouseButton = _make_mouse(pt, false)
 	_warp_mouse(pt)
