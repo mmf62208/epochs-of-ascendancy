@@ -451,19 +451,22 @@ func _b1_real_api() -> void:
 	await _after_change_frame()
 	_assert_overlay("B1 L-on depot add", _off_route_pid, "hub")
 
-	# L off → change → L on
+	# L off → change → L on. Drop the captured path so topology changes even
+	# without #88 notify. Assert immediately — a process_frame would let the
+	# pulse poll hide a missing L-on fingerprint check (mutant B1).
 	_ensure_l_off()
 	await process_frame
 	var mm: Node = root.get_node_or_null("MapManager")
 	if mm != null:
 		mm.call("update_province_owner", _mid_route_pid, "GER", "FRA", true, false)
-	await process_frame
-	var on2 := await _toggle_ms()
+	_drop_routes_touching(_mid_route_pid)
+	var t_on2 := Time.get_ticks_usec()
+	_mr.call("_toggle_supply_overlay")
+	var on2 := float(Time.get_ticks_usec() - t_on2) / 1000.0
 	if on2 >= L_ON_MS_LIMIT:
 		_fail("B1 L-off→capture→L-on %.1f ms" % on2)
 	else:
 		_pass("B1 L-off→capture→L-on %.1f ms" % on2)
-	await _after_change_frame()
 	_assert_overlay("B1 L-off→capture→on", _mid_route_pid, "no_route")
 
 	# Ten-pid capture batch while L on
