@@ -292,6 +292,28 @@ func _send_pipeline(screen_pt: Vector2, pressed: bool) -> InputEventMouseButton:
 	return ev
 
 
+func _arm_leftover_release_gesture() -> void:
+	# Same physical click: × press already happened; leftover is the matching
+	# release. Tip press-consume returns before `_begin_left_map_gesture`, so
+	# the harness keeps `_left_btn_down` for that leftover only. Swallow must
+	# be the thing that blocks pick (mutants that drop it select Köln).
+	if _mr == null:
+		return
+	_mr.set("_left_btn_down", true)
+	_mr.set("_left_button_was_up", false)
+	_mr.set("_left_ready_for_still_click", true)
+	_mr.set("_left_skip_next_pick", false)
+	_mr.set("_left_gesture_dragged", false)
+	_mr.set("_left_cam_moved_this_down", false)
+	_mr.set("_left_pan_active", false)
+	_mr.set("_left_pan_armed", false)
+	_mr.set("_left_slop_latched", false)
+	_mr.set("_close_click_guard", false)
+	_mr.set("_map_pick_block_until_msec", 0)
+	_mr.set("_unit_card_consumed_press", false)
+	_mr.set("_unit_card_release_eaten", false)
+
+
 func _reset_map_click_latches() -> void:
 	if _mr == null:
 		return
@@ -591,7 +613,7 @@ func _test_t3_notice_unhandled_leftover() -> void:
 	_hide_notices()
 	if not _seed_known_under_screen(pt):
 		return
-	_reset_map_click_latches()
+	_arm_leftover_release_gesture()
 	_clear_inspector()
 	var ev: InputEventMouseButton = _make_mouse(pt, false)
 	_warp_mouse(pt)
@@ -616,7 +638,7 @@ func _test_t4_cc_unhandled_leftover() -> void:
 	_free_cc()
 	if not _seed_known_under_screen(pt):
 		return
-	_reset_map_click_latches()
+	_arm_leftover_release_gesture()
 	_clear_inspector()
 	var ev: InputEventMouseButton = _make_mouse(pt, false)
 	_warp_mouse(pt)
@@ -683,7 +705,7 @@ func _test_t5_notice_chip_leftover() -> void:
 		btn.pressed.emit()
 	await _flush(2)
 	_hide_notices()
-	_reset_map_click_latches()
+	_arm_leftover_release_gesture()
 	_mr.set("selected_formation_id", "")
 	var ev: InputEventMouseButton = _make_mouse(pt, false)
 	_warp_mouse(pt)
@@ -722,7 +744,7 @@ func _test_t6_notice_poll_leftover() -> void:
 	_hide_notices()
 	if not _seed_known_under_screen(pt):
 		return
-	_reset_map_click_latches()
+	_arm_leftover_release_gesture()
 	_clear_inspector()
 	var ev: InputEventMouseButton = _make_mouse(pt, false)
 	_warp_mouse(pt)
@@ -751,7 +773,7 @@ func _test_t7_cc_poll_leftover() -> void:
 	_free_cc()
 	if not _seed_known_under_screen(pt):
 		return
-	_reset_map_click_latches()
+	_arm_leftover_release_gesture()
 	_clear_inspector()
 	var ev: InputEventMouseButton = _make_mouse(pt, false)
 	_warp_mouse(pt)
