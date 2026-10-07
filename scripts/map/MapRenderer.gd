@@ -2830,10 +2830,6 @@ func _input(event: InputEvent) -> void:
 				_clear_unit_card_press_consume_on_new_left_press()
 				_clear_begin_title_release_swallow_on_new_left_press()
 				_clear_ui_close_release_swallow_on_new_left_press()
-				if _notice_or_cc_close_owns_event(event):
-					# Let the Control take the press (button_down / pressed).
-					# Do not begin a map gesture under ×.
-					return
 			if _living_title_boot_is_up():
 				# Play 5adb38e: never swallow title-up presses. Route by event
 				# coords (computerUse may not update get_mouse_position first).
@@ -3249,9 +3245,6 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event.pressed:
 			_clear_begin_title_release_swallow_on_new_left_press()
 			_clear_ui_close_release_swallow_on_new_left_press()
-			if _notice_or_cc_close_owns_event(event):
-				# No press consume — GUI CloseX / NoticeClose must see the down.
-				return
 		if not event.pressed and _consume_unit_card_press_release_if_armed():
 			return
 		if not event.pressed and _first_session_tip_dismiss_blocks_map_pick():
@@ -3263,7 +3256,6 @@ func _unhandled_input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 			return
 		if not event.pressed and _ui_close_click_blocks_map_pick(event):
-			_unstick_ui_close_map_latches()
 			call_deferred("_clear_ui_close_release_swallow")
 			get_viewport().set_input_as_handled()
 			return
@@ -18940,11 +18932,6 @@ func _is_mouse_over_blocking_ui() -> bool:
 			return true
 		var nn := str(n.name)
 		if nn == "MainMenu":
-			# queue_free / `_closing` leftover must not block the next hex pick
-			# on the same ✕ spot (INPUT-1 same-spot after Command Center).
-			if n.is_queued_for_deletion() or ("_closing" in n and bool(n.get("_closing"))):
-				n = n.get_parent()
-				continue
 			return true
 		if nn in [
 			"TechnologyScreen",
@@ -24940,58 +24927,10 @@ func _ui_close_click_blocks_map_pick(_event: InputEvent = null) -> bool:
 	return _ui_close_release_blocks_map_pick()
 
 
-func _notice_or_cc_close_owns_event(event: InputEvent = null) -> bool:
-	if event is InputEventMouse:
-		var em: InputEventMouse = event as InputEventMouse
-		if _notice_or_cc_close_owns_screen_point(em.position):
-			return true
-		if _notice_or_cc_close_owns_screen_point(em.global_position):
-			return true
-	return _notice_or_cc_close_owns_screen_point(_live_ui_close_mouse_pos())
-
-
-func _live_ui_close_mouse_pos() -> Vector2:
-	var vp: Viewport = get_viewport()
-	if vp != null:
-		return vp.get_mouse_position()
-	return Vector2.ZERO
-
-
-func _ui_close_button_is_dying(btn: Button) -> bool:
-	# queue_free CloseX stays in-tree until the frame ends. Must not steal the
-	# next same-spot map click (CC ✕ leftover `_left_skip` / no `_begin`).
-	var walk: Node = btn
-	while walk != null:
-		if walk.is_queued_for_deletion():
-			return true
-		if "_closing" in walk and bool(walk.get("_closing")):
-			return true
-		walk = walk.get_parent()
-	return false
-
-
-func _notice_or_cc_close_owns_screen_point(pt: Vector2) -> bool:
-	var tree: SceneTree = get_tree()
-	if tree == null:
-		return false
-	for n in tree.get_nodes_in_group("eoa_ui_close_x"):
-		if n == null or not is_instance_valid(n) or not (n is Button):
-			continue
-		var btn: Button = n as Button
-		if not btn.visible or not btn.is_visible_in_tree():
-			continue
-		if _ui_close_button_is_dying(btn):
-			continue
-		if btn.get_global_rect().has_point(pt):
-			return true
-	return false
-
-
 func _clear_ui_close_release_swallow_on_new_left_press() -> void:
 	# Same-frame close press must keep the arm so the matching leftover up is eaten.
 	# Poll-path: the close click's own press arrives in N+1 — eat that one only.
-	# A later real press clears the one-shot and unsticks leftover skip so the
-	# same spot can select again (CC ✕ used to leave `_left_skip_next_pick`).
+	# A later-frame left press drops the one-shot so the same spot can select.
 	if not has_meta("eoa_ui_close_swallow_release"):
 		return
 	var now_frame: int = Engine.get_process_frames()
@@ -25019,29 +24958,6 @@ func _tick_ui_close_release_swallow() -> void:
 		_clear_ui_close_release_swallow()
 
 
-func _unstick_ui_close_map_latches() -> void:
-	# Leftover swallow / close must not leave skip/slop latched. Play: after
-	# Command Center ✕ the same spot stayed pid=-1 (`_left_skip_next_pick`).
-	_left_skip_next_pick = false
-	_left_btn_down = false
-	_left_button_was_up = true
-	_left_ready_for_still_click = true
-	_left_gesture_dragged = false
-	_left_slop_latched = false
-	_left_gesture_panned = false
-	_left_pan_committed = false
-	_left_pan_active = false
-	_left_pan_armed = false
-	_left_cam_moved_this_down = false
-	_left_max_slop_sq = 0.0
-	_left_sticky_valid = false
-	_left_sticky_slop_sq = 0.0
-	_left_origin_valid = false
-	_left_release_frame = -1
-	_left_release_screen_valid = false
-	_close_click_guard = false
-
-
 func _clear_ui_close_release_swallow() -> void:
 	if has_meta("eoa_ui_close_swallow_release"):
 		remove_meta("eoa_ui_close_swallow_release")
@@ -25055,7 +24971,6 @@ func _clear_ui_close_release_swallow() -> void:
 		remove_meta("eoa_ui_close_swallow_press_pending")
 	if has_meta("eoa_ui_close_swallow_press_seen_frame"):
 		remove_meta("eoa_ui_close_swallow_press_seen_frame")
-	_unstick_ui_close_map_latches()
 
 
 func dismiss_first_session_action_tip() -> void:

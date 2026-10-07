@@ -21,6 +21,10 @@ extends SceneTree
 ##       one frame later. Catches poll arm + pending_press.
 ##   T7  poll-path CC close, leftover press+release one frame later.
 ##   T8  later still-click at a different spot must pick (one-shot).
+##   T9  G89 same-spot at 0/1/3/240 frames (notice + CC) and CC other-spot.
+##       No latch reset. Realistic hold close, then still-click at the real ×.
+##   T10 CC fast double-click: two press+release pairs same frame and next
+##       frame at the real ✕ (main T2/T4 only fail this way).
 ##
 ##   tools/run_godot.sh --headless --path . --resolution 1280x740 \
 ##     -s res://scripts/core/HeadlessInput1CloseClickFallthroughTest.gd
@@ -110,6 +114,8 @@ func _run() -> void:
 	await _test_t6_notice_poll_leftover()
 	await _test_t7_cc_poll_leftover()
 	await _test_t8_later_click_picks()
+	await _test_g_same_spot()
+	await _test_cc_fast_double_click()
 	_test_source_needles()
 
 
@@ -455,6 +461,8 @@ func _fixture_notice_close() -> Button:
 	btn.size = Vector2(20, 20)
 	btn.position = FIXTURE_NOTICE_PT
 	btn.add_to_group("eoa_ui_close_x")
+	if _leui != null and _leui.has_method("_on_notice_close_button_down"):
+		btn.button_down.connect(_leui._on_notice_close_button_down)
 	btn.pressed.connect(func() -> void:
 		if btn.get_parent() != null:
 			btn.get_parent().remove_child(btn)
@@ -584,7 +592,7 @@ func _leftover_up_after_free(screen_pt: Vector2) -> void:
 
 
 func _same_spot_gaps(kind: String) -> void:
-	for gap_frames in [0, 1, 3]:
+	for gap_frames in [0, 1, 3, 240]:
 		var btn: Button = null
 		if kind == "notice":
 			_hide_notices()
@@ -834,3 +842,115 @@ func _test_t8_later_click_picks() -> void:
 	_free_cc()
 	if not await _assert_real_click_picks(MAP_PT, "T8 later click after CC ×"):
 		return
+
+
+func _test_g_same_spot() -> void:
+	# Fold G89f1SameSpotTest: realistic hold close, then same-spot still-click
+	# at 0/1/3/240 frames with no latch reset. CC other-spot at gap=3.
+	for kind in ["notice", "cc"]:
+		for gap in [0, 1, 3, 240]:
+			await _g_case(kind, gap, false)
+	await _g_case("cc", 3, true)
+
+
+func _g_case(kind: String, gap_frames: int, other_spot: bool) -> void:
+	var btn: Button = null
+	if kind == "notice":
+		_hide_notices()
+		btn = await _show_notice()
+	else:
+		btn = await _spawn_cc()
+	if btn == null:
+		_fail("G %s: no ×" % kind)
+		return
+	var pt: Vector2 = _prepare_under(btn)
+	if pt == Vector2.ZERO:
+		return
+	var closes: Array[int] = [0]
+	btn.pressed.connect(func() -> void: closes[0] += 1)
+	_aim_mouse(pt)
+	await _flush(1)
+	_send_pipeline(pt, true)
+	await _wait_hold_ms(HOLD_MS)
+	var closed_on_press: bool = (kind == "cc" and _cc_closed()) or (
+		kind == "notice" and not is_instance_valid(btn)
+	)
+	_aim_mouse(pt)
+	_send_pipeline(pt, false)
+	await _flush(1)
+	var closed: bool = (kind == "cc" and _cc_closed()) or (
+		kind == "notice"
+		and (
+			not is_instance_valid(btn)
+			or btn.get_parent() == null
+			or not btn.is_visible_in_tree()
+		)
+	)
+	var leftover_pid: int = _pid()
+	if not closed:
+		_fail("G %s gap=%d: overlay did not close" % [kind, gap_frames])
+	if leftover_pid > 0 or _inspector_up():
+		_fail("G %s gap=%d: close leftover selected pid=%d" % [kind, gap_frames, leftover_pid])
+	var i: int = 0
+	while i < gap_frames:
+		await process_frame
+		i += 1
+	_clear_inspector()
+	if kind == "cc":
+		_free_cc()
+	_restore_home_camera()
+	if other_spot:
+		pt = MAP_PT
+	_seed_known_under_screen(pt)
+	_hide_harness_map_chrome()
+	_aim_mouse(pt)
+	await _flush(1)
+	_send_pipeline(pt, true)
+	await _wait_hold_ms(HOLD_MS)
+	_send_pipeline(pt, false)
+	await _flush(2)
+	var got: int = _pid()
+	var tag := "G %s gap=%d%s closed_on_press=%s pressed_sig=%d" % [
+		kind, gap_frames, " other" if other_spot else " same", str(closed_on_press), closes[0]
+	]
+	if got != KNOWN_PID and not _inspector_up():
+		_fail("%s: click after close did not select (pid=%d)" % [tag, got])
+	else:
+		_pass("%s: leftover_pid=%d; click selected pid=%d" % [tag, leftover_pid, got])
+	_hide_notices()
+	_free_cc()
+
+
+func _test_cc_fast_double_click() -> void:
+	# Two presses at the real ✕ in the same frame and the next frame.
+	# Main T2/T4 only fail by leftover Köln with this second click.
+	for gap_frames in [0, 1]:
+		var btn: Button = await _spawn_cc()
+		if btn == null:
+			return
+		var pt: Vector2 = _prepare_under(btn)
+		if pt == Vector2.ZERO:
+			return
+		_aim_mouse(pt)
+		await _flush(1)
+		_send_pipeline(pt, true)
+		_send_pipeline(pt, false)
+		var i: int = 0
+		while i < gap_frames:
+			await process_frame
+			i += 1
+		_send_pipeline(pt, true)
+		_send_pipeline(pt, false)
+		await _flush(1)
+		if not _cc_closed():
+			_fail("T10 CC double-click gap=%d: CloseX did not close" % gap_frames)
+			_free_cc()
+			return
+		if not _assert_no_selection("T10 CC double-click gap=%d leftover" % gap_frames):
+			_free_cc()
+			return
+		await _flush(2)
+		if not await _assert_same_spot_picks(pt, "T10 CC double-click gap=%d same-spot" % gap_frames):
+			_free_cc()
+			return
+		_free_cc()

@@ -764,8 +764,10 @@ func arm_notice_close_release_swallow(pending_press: bool = false) -> void:
 
 func _on_notice_close_button_down() -> void:
 	# Real press reached the Control — do not also poll-close on this hold.
+	# Swallow is armed by poll `handle_live_close_pointer` (pending_press) or
+	# by the leftover `_unhandled` path after overlay free. A button_down arm
+	# survived every leftover / same-spot mutant (M7b) — dead.
 	_notice_ptr_poll_held = true
-	arm_notice_close_release_swallow()
 
 
 func _free_notice_toast_node(node: Node) -> void:
