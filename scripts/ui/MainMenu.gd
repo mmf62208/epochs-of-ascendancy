@@ -76,6 +76,8 @@ var _save_as_dialog: AcceptDialog
 var _save_as_field: LineEdit
 var _nation_btns: Dictionary = {}
 var _era_btns: Dictionary = {}
+## Edge-trigger for `_process` pointer poll (computerUse leftover on CloseX).
+var _close_ptr_poll_held: bool = false
 
 
 func _ready() -> void:
@@ -263,6 +265,9 @@ func _build_ui() -> void:
 	close_x.focus_mode = Control.FOCUS_ALL
 	close_x.mouse_filter = Control.MOUSE_FILTER_STOP
 	close_x.process_mode = Node.PROCESS_MODE_ALWAYS
+	close_x.add_to_group("eoa_ui_close_x")
+	# Press arms leftover-release swallow before MapRenderer `_input` sees the up.
+	close_x.button_down.connect(_on_close_x_button_down)
 	close_x.pressed.connect(_force_close)
 	RetrowaveTheme.style_secondary_button(close_x)
 	# Slightly stronger “window chrome” read for the X.
@@ -405,9 +410,12 @@ func _build_ui() -> void:
 	outer.add_child(_status_label)
 
 	var close_btn := Button.new()
+	close_btn.name = "ReturnToGame"
 	close_btn.text = "Return to Game (ESC)"
 	close_btn.custom_minimum_size = Vector2(0, 40)
 	close_btn.mouse_filter = Control.MOUSE_FILTER_STOP
+	close_btn.add_to_group("eoa_ui_close_x")
+	close_btn.button_down.connect(_on_close_x_button_down)
 	close_btn.pressed.connect(_force_close)
 	RetrowaveTheme.style_primary_button(close_btn)
 	outer.add_child(close_btn)
@@ -908,7 +916,88 @@ func _return_to_title() -> void:
 	get_tree().change_scene_to_file("res://scenes/TestScenario.tscn")
 
 
+func _map_renderer_for_close() -> Node:
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
+	if tree == null:
+		return null
+	var mr: Node = tree.get_first_node_in_group("map_renderer")
+	if mr != null:
+		return mr
+	if tree.root != null:
+		return tree.root.find_child("MapRenderer", true, false)
+	return null
+
+
+func arm_cc_close_release_swallow(pending_press: bool = false) -> void:
+	var mr: Node = _map_renderer_for_close()
+	if mr != null and mr.has_method("arm_ui_close_release_swallow"):
+		mr.call("arm_ui_close_release_swallow", pending_press)
+
+
+func _on_close_x_button_down() -> void:
+	arm_cc_close_release_swallow()
+
+
+func close_x_button() -> Button:
+	return find_child("CloseX", true, false) as Button
+
+
+func handle_live_close_pointer(event: InputEvent = null) -> String:
+	# Poll / event backup when computerUse never delivers button_down on ✕.
+	var btn: Button = close_x_button()
+	if btn == null or not is_instance_valid(btn):
+		return "none"
+	var pts: Array[Vector2] = []
+	if event is InputEventMouse:
+		var em: InputEventMouse = event as InputEventMouse
+		pts.append(em.position)
+		pts.append(em.global_position)
+	var vp: Viewport = get_viewport()
+	if vp != null:
+		pts.append(vp.get_mouse_position())
+	var rect: Rect2 = btn.get_global_rect()
+	var over: bool = false
+	for p in pts:
+		if rect.has_point(p):
+			over = true
+			break
+	if not over:
+		return "miss"
+	arm_cc_close_release_swallow(event == null)
+	_force_close()
+	return "close"
+
+
+func _os_left_button_held() -> bool:
+	if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+		return true
+	if DisplayServer.get_name() == "headless" or OS.has_feature("dedicated_server"):
+		return false
+	return (int(DisplayServer.mouse_get_button_state()) & int(MOUSE_BUTTON_MASK_LEFT)) != 0
+
+
+func _poll_close_x_just_pressed() -> bool:
+	var held: bool = _os_left_button_held()
+	if held:
+		if _close_ptr_poll_held:
+			return false
+		_close_ptr_poll_held = true
+		return true
+	_close_ptr_poll_held = false
+	return false
+
+
+func _process(_delta: float) -> void:
+	if _closing:
+		return
+	if _poll_close_x_just_pressed():
+		handle_live_close_pointer(null)
+
+
 func _force_close() -> void:
+	# Arm before queue_free so leftover `_unhandled_input` cannot pick the map
+	# under ✕ (TipDismiss / BEGIN-1 leftover class).
+	arm_cc_close_release_swallow()
 	if _closing:
 		_pause_game(false)
 		menu_closed.emit()

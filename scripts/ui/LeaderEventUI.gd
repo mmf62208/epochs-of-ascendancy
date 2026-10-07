@@ -8,6 +8,7 @@ signal news_posted(entry: Dictionary)
 const MAX_NEWS_ITEMS := 40
 const TOAST_DURATION_SEC := 6.0
 const TOAST_DISMISSING_META := "eoa_toast_dismissing"
+const NOTICE_CLOSE_GROUP := "eoa_ui_close_x"
 
 var news_history: Array[Dictionary] = []
 var _retirement_queue: Array[String] = []
@@ -25,6 +26,8 @@ var _space_icon: Texture2D = null
 var _secret_space_icon: Texture2D = null
 var _mech_icon: Texture2D = null
 var _versailles_icon: Texture2D = null
+## Edge-trigger for `_process` pointer poll (computerUse / DisplayServer leftover).
+var _notice_ptr_poll_held: bool = false
 
 
 func _ready() -> void:
@@ -207,8 +210,14 @@ func show_toast(message: String, duration_sec: float = 3.0, is_error: bool = fal
 
 	# Close/dismiss X for all toasts (user request for important messages).
 	var close_btn := Button.new()
+	close_btn.name = "NoticeClose"
 	close_btn.text = "×"
 	close_btn.custom_minimum_size = Vector2(20, 20)
+	close_btn.focus_mode = Control.FOCUS_NONE
+	close_btn.mouse_filter = Control.MOUSE_FILTER_STOP
+	close_btn.add_to_group(NOTICE_CLOSE_GROUP)
+	# Press arms leftover-release swallow before MapRenderer `_input` sees the up.
+	close_btn.button_down.connect(_on_notice_close_button_down)
 	close_btn.pressed.connect(_dismiss_toast.bind(panel))
 	title_row.add_child(close_btn)
 	vbox.add_child(title_row)
@@ -290,6 +299,9 @@ func post_news(title: String, body: String, category: String = "general") -> voi
 func _should_skip_toast_ui() -> bool:
 	# Headless Maginot / -s harness: toast timers + CanvasLayer hung quit after RESULT=PASS.
 	# Graphical F5 1x still shows capture toasts (PLAYTEST item 14).
+	# INPUT-1 guard opts in so notice × can be clicked in headless.
+	if OS.get_environment("EOA_HEADLESS_TOAST_UI") == "1":
+		return false
 	if DisplayServer.get_name() == "headless" or OS.has_feature("dedicated_server"):
 		return true
 	if typeof(TimeManager) != TYPE_NIL and bool(TimeManager.get("_living_playtest_clock")):
@@ -478,9 +490,13 @@ func _show_toast(entry: Dictionary) -> void:
 	header.add_child(title_label)
 
 	var dismiss_button := Button.new()
+	dismiss_button.name = "NoticeClose"
 	dismiss_button.text = "×"
 	dismiss_button.tooltip_text = "Dismiss notification"
 	dismiss_button.custom_minimum_size = Vector2(32, 28)
+	dismiss_button.focus_mode = Control.FOCUS_NONE
+	dismiss_button.mouse_filter = Control.MOUSE_FILTER_STOP
+	dismiss_button.add_to_group(NOTICE_CLOSE_GROUP)
 	RetrowaveTheme.style_secondary_button(dismiss_button)
 	header.add_child(dismiss_button)
 
@@ -500,6 +516,7 @@ func _show_toast(entry: Dictionary) -> void:
 	_trim_toast_stack_to(4)
 
 	_arm_toast_timeout(panel, TOAST_DURATION_SEC)
+	dismiss_button.button_down.connect(_on_notice_close_button_down)
 	dismiss_button.pressed.connect(_dismiss_toast.bind(weakref(panel)))
 
 
@@ -525,13 +542,16 @@ func _dismiss_toast(panel: Variant = null) -> void:
 	if toast.has_meta(TOAST_DISMISSING_META) and bool(toast.get_meta(TOAST_DISMISSING_META)):
 		return
 	toast.set_meta(TOAST_DISMISSING_META, true)
+	# Arm before the panel dies so leftover `_unhandled_input` cannot pick
+	# the province under × (TipDismiss / BEGIN-1 leftover class).
+	arm_notice_close_release_swallow()
+	var vp: Viewport = get_viewport()
+	if vp != null:
+		vp.set_input_as_handled()
 	if toast is Node:
-		var node: Node = toast as Node
-		var parent: Node = node.get_parent()
-		if parent != null:
-			parent.remove_child(node)
-		# One-shot free. Never start a second tween/timer on a dismissing panel.
-		node.queue_free()
+		# Deferred free: dropping the Control inside `pressed` lets the same
+		# release fall through to MapRenderer after the × is gone.
+		call_deferred("_free_notice_toast_node", toast as Node)
 
 
 func _toast_object_from_ref(panel: Variant) -> Object:
@@ -714,3 +734,96 @@ func _leader_display_name(leader_id: String) -> String:
 	if summary.is_empty():
 		return leader_id
 	return str(summary.get("name", leader_id))
+
+
+func _map_renderer_for_close() -> Node:
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
+	if tree == null:
+		return null
+	var mr: Node = tree.get_first_node_in_group("map_renderer")
+	if mr != null:
+		return mr
+	if tree.root != null:
+		return tree.root.find_child("MapRenderer", true, false)
+	return null
+
+
+func arm_notice_close_release_swallow(pending_press: bool = false) -> void:
+	var mr: Node = _map_renderer_for_close()
+	if mr != null and mr.has_method("arm_ui_close_release_swallow"):
+		mr.call("arm_ui_close_release_swallow", pending_press)
+
+
+func _on_notice_close_button_down() -> void:
+	arm_notice_close_release_swallow()
+
+
+func _free_notice_toast_node(node: Node) -> void:
+	if node == null or not is_instance_valid(node):
+		return
+	var parent: Node = node.get_parent()
+	if parent != null:
+		parent.remove_child(node)
+	node.queue_free()
+
+
+func notice_close_button() -> Button:
+	if _toast_container == null:
+		return null
+	return _toast_container.find_child("NoticeClose", true, false) as Button
+
+
+func handle_live_close_pointer(event: InputEvent = null) -> String:
+	# Poll / event backup when computerUse never delivers button_down.
+	var btn: Button = notice_close_button()
+	if btn == null or not is_instance_valid(btn):
+		return "none"
+	var pts: Array[Vector2] = []
+	if event is InputEventMouse:
+		var em: InputEventMouse = event as InputEventMouse
+		pts.append(em.position)
+		pts.append(em.global_position)
+	var vp: Viewport = get_viewport()
+	if vp != null:
+		pts.append(vp.get_mouse_position())
+	var rect: Rect2 = btn.get_global_rect()
+	var over: bool = false
+	for p in pts:
+		if rect.has_point(p):
+			over = true
+			break
+	if event != null and not over:
+		return "miss"
+	if event == null and not over:
+		return "miss"
+	arm_notice_close_release_swallow(event == null)
+	var panel: Node = btn
+	while panel != null and not (panel is PanelContainer):
+		panel = panel.get_parent()
+	if panel != null:
+		_dismiss_toast(panel)
+	return "close"
+
+
+func _os_left_button_held() -> bool:
+	if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+		return true
+	if DisplayServer.get_name() == "headless" or OS.has_feature("dedicated_server"):
+		return false
+	return (int(DisplayServer.mouse_get_button_state()) & int(MOUSE_BUTTON_MASK_LEFT)) != 0
+
+
+func _poll_notice_close_just_pressed() -> bool:
+	var held: bool = _os_left_button_held()
+	if held:
+		if _notice_ptr_poll_held:
+			return false
+		_notice_ptr_poll_held = true
+		return true
+	_notice_ptr_poll_held = false
+	return false
+
+
+func _process(_delta: float) -> void:
+	if _poll_notice_close_just_pressed():
+		handle_live_close_pointer(null)

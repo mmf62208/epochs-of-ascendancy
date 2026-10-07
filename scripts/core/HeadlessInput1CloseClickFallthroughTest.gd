@@ -1,0 +1,729 @@
+extends SceneTree
+
+## INPUT-1: close × on a notice/toast or Command Center must not fall through
+## to MapRenderer and select the province (or unit) underneath.
+##
+## Judge leftover / follow-up by pid / inspector / formation only.
+## Do not early-out on swallow flags. Mutants that drop a consumption
+## point must FAIL by selection change, not source-text.
+##
+##   T1  notice × event-path press+release through parse+flush. FAIL on
+##       main 61a80433 (province under × selected). PASS on the tip.
+##   T2  Command Center CloseX same pipeline. FAIL on main / PASS on tip.
+##   T3  leftover `_unhandled_input` after notice dismiss (overlay gone).
+##       Catches missing `_unhandled` swallow.
+##   T4  leftover `_unhandled_input` after CC dismiss.
+##   T5  leftover `_input` + `_try_open_land_chip_from_input` after notice
+##       dismiss with a unit under ×. Catches missing chip/`_input` consume.
+##   T6  poll-path notice close (no button_down), leftover unhandled.
+##       Catches missing poll arm (pending_press).
+##   T7  poll-path CC close, leftover unhandled.
+##   T8  later still-click after leftover must pick (one-shot swallow).
+##
+##   EOA_HEADLESS_TOAST_UI=1 tools/run_godot.sh --headless --path . \
+##     --resolution 1280x740 -s res://scripts/core/HeadlessInput1CloseClickFallthroughTest.gd
+##
+## Headless / xvfb are NOT live Play.
+
+const SRC_REN := "res://scripts/map/MapRenderer.gd"
+const SRC_LEUI := "res://scripts/ui/LeaderEventUI.gd"
+const SRC_CC := "res://scripts/ui/MainMenu.gd"
+const PLAY_SIZE := Vector2i(1280, 740)
+const KNOWN_PID := 710417
+const HOLD_MS := 80
+const ZOOM0 := 0.776
+const CAM0 := Vector2(4200, 1000)
+const MAP_PT := Vector2(640, 400)
+
+var _failures: int = 0
+var _mr: Node = null
+var _cam: Camera2D = null
+var _ui: CanvasLayer = null
+var _info: Panel = null
+var _container: Node2D = null
+var _mm: Node = null
+var _saved_pick_grid: Variant = null
+var _known_province: Object = null
+var _known_host: Node2D = null
+var _event_seq: int = 0
+var _cc: CanvasLayer = null
+var _leui: Node = null
+
+
+func _init() -> void:
+	OS.set_environment("EOA_HEADLESS_TOAST_UI", "1")
+	call_deferred("_start")
+
+
+func _start() -> void:
+	await _run()
+	_restore_pick_grid()
+	var ok := _failures == 0
+	print("HeadlessInput1CloseClickFallthroughTest: ", "PASS" if ok else "FAIL", " (failures=", _failures, ")")
+	print("HeadlessInput1CloseClickFallthroughTest: RESULT=", "PASS" if ok else "FAIL")
+	if OS.has_method("flush_stdout"):
+		OS.call("flush_stdout")
+	quit(0 if ok else 1)
+
+
+func _fail(msg: String) -> void:
+	_failures += 1
+	print("  [FAIL] HeadlessInput1CloseClickFallthroughTest: ", msg)
+
+
+func _pass(msg: String) -> void:
+	print("  [PASS] HeadlessInput1CloseClickFallthroughTest: ", msg)
+
+
+func _read(path: String) -> String:
+	if not FileAccess.file_exists(path):
+		return ""
+	var f := FileAccess.open(path, FileAccess.READ)
+	if f == null:
+		return ""
+	var text := f.get_as_text()
+	f.close()
+	return text
+
+
+func _new_obj(path: String) -> Object:
+	var scr: Script = load(path) as Script
+	if scr == null:
+		return null
+	return scr.new()
+
+
+func _run() -> void:
+	DisplayServer.window_set_size(PLAY_SIZE)
+	root.size = PLAY_SIZE
+	if not _setup_renderer():
+		return
+	# Behavior first so fail-on-main is leftover pick, not source text.
+	await _test_t1_notice_event_pipeline()
+	await _test_t2_cc_event_pipeline()
+	await _test_t3_notice_unhandled_leftover()
+	await _test_t4_cc_unhandled_leftover()
+	await _test_t5_notice_chip_leftover()
+	await _test_t6_notice_poll_leftover()
+	await _test_t7_cc_poll_leftover()
+	await _test_t8_later_click_picks()
+	_test_source_needles()
+
+
+func _test_source_needles() -> void:
+	# Light invariants that exist on the tip. Do not needle clock internals.
+	var ren := _read(SRC_REN)
+	var leui := _read(SRC_LEUI)
+	var cc := _read(SRC_CC)
+	if ren.is_empty() or leui.is_empty() or cc.is_empty():
+		_fail("source files missing")
+		return
+	if "arm_ui_close_release_swallow" not in ren:
+		_fail("MapRenderer must expose arm_ui_close_release_swallow")
+		return
+	if "NoticeClose" not in leui:
+		_fail("notice × must be named NoticeClose")
+		return
+	if "CloseX" not in cc:
+		_fail("Command Center × must stay CloseX")
+		return
+	_pass("source needles: swallow API + NoticeClose + CloseX (behavior is the proof)")
+
+
+func _setup_renderer() -> bool:
+	var mr_script: Script = load("res://scripts/map/MapRenderer.gd") as Script
+	if mr_script == null:
+		_fail("MapRenderer.gd missing")
+		return false
+	_mr = mr_script.new() as Node
+	if _mr == null:
+		_fail("MapRenderer create failed")
+		return false
+	_mr.name = "MapRenderer"
+	_container = Node2D.new()
+	_container.name = "ProvinceContainers"
+	_mr.add_child(_container)
+	if "container" in _mr:
+		_mr.container = _container
+	_ui = CanvasLayer.new()
+	_ui.name = "UI"
+	_mr.add_child(_ui)
+	_info = Panel.new()
+	_info.name = "InfoPanel"
+	_info.visible = false
+	_info.size = Vector2(280, 200)
+	_ui.add_child(_info)
+	_mr.set("info_panel", _info)
+	var name_l := Label.new()
+	name_l.name = "LabelName"
+	_info.add_child(name_l)
+	_mr.set("info_name", name_l)
+	var owner_l := Label.new()
+	owner_l.name = "LabelOwner"
+	_info.add_child(owner_l)
+	_mr.set("info_owner", owner_l)
+	var pop_l := Label.new()
+	pop_l.name = "LabelPopulation"
+	_info.add_child(pop_l)
+	_mr.set("info_population", pop_l)
+	for extra_name in [
+		"info_terrain", "info_factories", "info_dev", "info_resources",
+		"info_core", "info_special", "info_logistics", "info_combat", "info_national"
+	]:
+		var extra := Label.new()
+		extra.name = extra_name
+		_info.add_child(extra)
+		_mr.set(extra_name, extra)
+	_cam = Camera2D.new()
+	_cam.name = "MapCamera"
+	_cam.position = CAM0
+	_cam.zoom = Vector2(ZOOM0, ZOOM0)
+	_cam.enabled = true
+	_mr.add_child(_cam)
+	root.add_child(_mr)
+	_cam.make_current()
+	if "use_spatial_picking" in _mr:
+		_mr.use_spatial_picking = true
+	_mr.set("selected_province_id", -1)
+	_mr.set("selected_formation_id", "")
+	if _mr.has_method("_ensure_province_id_badge"):
+		_mr.call("_ensure_province_id_badge")
+	_mm = root.get_node_or_null("MapManager")
+	if _mm != null and "pick_grid" in _mm:
+		_saved_pick_grid = _mm.pick_grid
+		_mm.pick_grid = null
+	_leui = root.get_node_or_null("LeaderEventUI")
+	if _leui == null and typeof(LeaderEventUI) != TYPE_NIL:
+		_leui = LeaderEventUI as Node
+	return true
+
+
+func _restore_pick_grid() -> void:
+	if _mm != null and "pick_grid" in _mm and _saved_pick_grid != null:
+		_mm.pick_grid = _saved_pick_grid
+
+
+func _make_province() -> Object:
+	var p: Object = _new_obj("res://scripts/data/Province.gd")
+	if p == null:
+		return null
+	p.set("id", KNOWN_PID)
+	p.set("owner_tag", "GER")
+	p.set("controller_tag", "GER")
+	p.set("terrain", "plains")
+	p.set("name", "Köln")
+	p.set("is_sea", false)
+	return p
+
+
+func _seed_known_under_screen(screen_pt: Vector2) -> bool:
+	if _cam == null or _mr == null:
+		_fail("renderer missing for known-pid seed")
+		return false
+	var world_under: Vector2 = _cam.get_canvas_transform().affine_inverse() * screen_pt
+	if _known_province == null:
+		_known_province = _make_province()
+		if _known_province == null:
+			_fail("Province create failed")
+			return false
+	if "provinces" in _mr:
+		_mr.provinces[KNOWN_PID] = _known_province
+	if "province_centroids" in _mr:
+		_mr.province_centroids[KNOWN_PID] = world_under
+	if _known_host == null:
+		_known_host = Node2D.new()
+		_known_host.name = "Province_%d" % KNOWN_PID
+		_container.add_child(_known_host)
+	_known_host.global_position = world_under
+	if "province_nodes" in _mr:
+		_mr.province_nodes[KNOWN_PID] = _known_host
+	if _mm != null:
+		if "pick_grid" in _mm:
+			_mm.pick_grid = null
+		if "_centroids" in _mm and _mm._centroids is Dictionary:
+			var cents: Dictionary = _mm._centroids
+			cents.clear()
+			cents[KNOWN_PID] = world_under
+		elif _mm.has_method("sync_render_centroids"):
+			_mm.call("sync_render_centroids", {KNOWN_PID: world_under})
+	if "_demo_unit_icon_pids" in _mr:
+		_mr._demo_unit_icon_pids = []
+	var got: int = int(_mr.call("_still_click_province_pid", world_under, false))
+	if got != KNOWN_PID:
+		_fail("real pick path must resolve Köln under the click (pid=%d)" % got)
+		return false
+	return true
+
+
+func _make_mouse(screen_pt: Vector2, pressed: bool) -> InputEventMouseButton:
+	_event_seq += 1
+	var ev := InputEventMouseButton.new()
+	ev.device = 0
+	ev.button_index = MOUSE_BUTTON_LEFT
+	ev.pressed = pressed
+	ev.canceled = false
+	ev.double_click = false
+	ev.position = screen_pt
+	ev.global_position = screen_pt
+	ev.button_mask = MOUSE_BUTTON_MASK_LEFT if pressed else 0
+	ev.set_meta("eoa_input1_seq", _event_seq)
+	return ev
+
+
+func _warp_mouse(screen_pt: Vector2) -> void:
+	var vp: Viewport = root.get_viewport()
+	if vp != null:
+		vp.warp_mouse(screen_pt)
+	DisplayServer.warp_mouse(Vector2i(int(round(screen_pt.x)), int(round(screen_pt.y))))
+
+
+func _send_pipeline(screen_pt: Vector2, pressed: bool) -> InputEventMouseButton:
+	_warp_mouse(screen_pt)
+	var ev: InputEventMouseButton = _make_mouse(screen_pt, pressed)
+	Input.parse_input_event(ev)
+	if Input.has_method("flush_buffered_events"):
+		Input.flush_buffered_events()
+	return ev
+
+
+func _reset_map_click_latches() -> void:
+	if _mr == null:
+		return
+	if _mr.has_method("_reset_left_gesture_state"):
+		_mr.call("_reset_left_gesture_state", MAP_PT)
+	elif _mr.has_method("_clear_left_slop_after_still_click"):
+		_mr.call("_clear_left_slop_after_still_click")
+	_mr.set("_left_skip_next_pick", false)
+	_mr.set("_left_gesture_dragged", false)
+	_mr.set("_left_btn_down", false)
+	_mr.set("_left_button_was_up", true)
+	_mr.set("_left_ready_for_still_click", true)
+	_mr.set("_left_cam_moved_this_down", false)
+	_mr.set("_left_pan_active", false)
+	_mr.set("_left_pan_armed", false)
+	_mr.set("_left_slop_latched", false)
+	_mr.set("_left_release_frame", -1)
+	_mr.set("_close_click_guard", false)
+	_mr.set("_map_pick_block_until_msec", 0)
+	_mr.set("_unit_card_consumed_press", false)
+	_mr.set("_unit_card_release_eaten", false)
+	_mr.set("_skip_inspector_after_march", false)
+	_mr.set("_mv1_last_release_was_drag", false)
+	_mr.set("selected_formation_id", "")
+
+
+func _wait_hold_ms(ms: int) -> void:
+	var t0: int = Time.get_ticks_msec()
+	while Time.get_ticks_msec() - t0 < ms:
+		await process_frame
+
+
+func _flush(n: int = 4) -> void:
+	var i: int = 0
+	while i < n:
+		await process_frame
+		i += 1
+
+
+func _inspector_up() -> bool:
+	if _info != null and _info.visible:
+		return true
+	if _ui != null and _ui.get_node_or_null("UnitDetailPopup") != null:
+		return true
+	return false
+
+
+func _clear_inspector() -> void:
+	_mr.set("selected_province_id", -1)
+	_mr.set("selected_formation_id", "")
+	if _info != null:
+		_info.visible = false
+	if _ui != null:
+		var pop: Node = _ui.get_node_or_null("UnitDetailPopup")
+		if pop != null:
+			_ui.remove_child(pop)
+			pop.free()
+
+
+func _restore_home_camera() -> void:
+	_cam.position = CAM0
+	_cam.zoom = Vector2(ZOOM0, ZOOM0)
+
+
+func _pid() -> int:
+	return int(_mr.get("selected_province_id"))
+
+
+func _fid() -> String:
+	return str(_mr.get("selected_formation_id"))
+
+
+func _assert_no_selection(why: String) -> bool:
+	var got_pid: int = _pid()
+	if got_pid == KNOWN_PID:
+		_fail("%s: leftover selected Köln (pid=%d)" % [why, got_pid])
+		return false
+	if got_pid > 0:
+		_fail("%s: leftover selected pid=%d" % [why, got_pid])
+		return false
+	if not _fid().is_empty():
+		_fail("%s: leftover selected unit %s" % [why, _fid()])
+		return false
+	if _inspector_up():
+		_fail("%s: leftover opened the inspector" % why)
+		return false
+	_pass("%s: leftover did not pick / inspect" % why)
+	return true
+
+
+func _assert_real_click_picks(screen_pt: Vector2, why: String) -> bool:
+	_reset_map_click_latches()
+	_restore_home_camera()
+	if not _seed_known_under_screen(screen_pt):
+		return false
+	_clear_inspector()
+	_send_pipeline(screen_pt, true)
+	_send_pipeline(screen_pt, false)
+	await _flush(2)
+	var got_pid: int = _pid()
+	if got_pid == -1:
+		_fail("%s: real click must pick (pid=-1)" % why)
+		return false
+	if not _inspector_up() and got_pid != KNOWN_PID:
+		_fail("%s: real click must open inspector or pick Köln (pid=%d)" % [why, got_pid])
+		return false
+	_pass("%s: real click picked pid=%d" % [why, got_pid])
+	return true
+
+
+func _show_notice() -> Button:
+	if _leui == null:
+		_fail("LeaderEventUI autoload missing")
+		return null
+	if _leui.has_method("show_toast"):
+		_leui.call("show_toast", "INPUT-1 notice close test", 30.0)
+	await _flush(3)
+	var btn: Button = null
+	if _leui.has_method("notice_close_button"):
+		btn = _leui.call("notice_close_button") as Button
+	if btn == null:
+		btn = _leui.find_child("NoticeClose", true, false) as Button
+	if btn == null:
+		_fail("NoticeClose × missing after show_toast")
+		return null
+	if btn.get_global_rect().size.x < 8.0:
+		btn.custom_minimum_size = Vector2(28, 28)
+		if btn.has_method("reset_size"):
+			btn.reset_size()
+		await _flush(2)
+	return btn
+
+
+func _hide_notices() -> void:
+	if _leui == null:
+		return
+	var layer: Node = _leui.get_node_or_null("LeaderNewsLayer")
+	if layer == null:
+		return
+	var box: Node = layer.get_node_or_null("ToastContainer")
+	if box == null:
+		return
+	for c in box.get_children():
+		box.remove_child(c)
+		c.free()
+
+
+func _spawn_cc() -> Button:
+	_free_cc()
+	var scr: GDScript = load(SRC_CC) as GDScript
+	if scr == null:
+		_fail("MainMenu.gd missing")
+		return null
+	_cc = scr.new() as CanvasLayer
+	if _cc == null:
+		_fail("Command Center create failed")
+		return null
+	_cc.name = "MainMenu"
+	root.add_child(_cc)
+	await _flush(6)
+	var btn: Button = _cc.find_child("CloseX", true, false) as Button
+	if btn == null:
+		_fail("CloseX missing on Command Center")
+		return null
+	if btn.get_global_rect().size.x < 8.0:
+		btn.custom_minimum_size = Vector2(44, 40)
+		if btn.has_method("reset_size"):
+			btn.reset_size()
+		await _flush(2)
+	return btn
+
+
+func _free_cc() -> void:
+	if _cc != null and is_instance_valid(_cc):
+		if not _cc.is_queued_for_deletion():
+			_cc.free()
+	_cc = null
+
+
+func _cc_closed() -> bool:
+	return _cc == null or not is_instance_valid(_cc) or bool(_cc.get("_closing"))
+
+
+func _prepare_under(btn: Button) -> Vector2:
+	var rect: Rect2 = btn.get_global_rect()
+	var pt: Vector2 = rect.get_center()
+	_restore_home_camera()
+	_clear_inspector()
+	if not _seed_known_under_screen(pt):
+		return Vector2.ZERO
+	return pt
+
+
+func _test_t1_notice_event_pipeline() -> void:
+	_hide_notices()
+	var btn: Button = await _show_notice()
+	if btn == null:
+		return
+	var pt: Vector2 = _prepare_under(btn)
+	if pt == Vector2.ZERO:
+		return
+	_send_pipeline(pt, true)
+	await _wait_hold_ms(HOLD_MS)
+	_send_pipeline(pt, false)
+	await _flush(3)
+	if not _assert_no_selection("T1 notice event-path leftover"):
+		return
+	_hide_notices()
+
+
+func _test_t2_cc_event_pipeline() -> void:
+	var btn: Button = await _spawn_cc()
+	if btn == null:
+		return
+	var pt: Vector2 = _prepare_under(btn)
+	if pt == Vector2.ZERO:
+		return
+	_send_pipeline(pt, true)
+	await _wait_hold_ms(HOLD_MS)
+	_send_pipeline(pt, false)
+	await _flush(3)
+	if not _cc_closed():
+		_fail("T2: CloseX press+release did not close Command Center")
+		return
+	_pass("T2: CloseX closed Command Center through the real pipeline")
+	if not _assert_no_selection("T2 CC event-path leftover"):
+		return
+	_free_cc()
+
+
+func _test_t3_notice_unhandled_leftover() -> void:
+	_hide_notices()
+	var btn: Button = await _show_notice()
+	if btn == null:
+		return
+	var pt: Vector2 = _prepare_under(btn)
+	if pt == Vector2.ZERO:
+		return
+	if btn.has_signal("button_down"):
+		btn.button_down.emit()
+	if btn.has_signal("pressed"):
+		btn.pressed.emit()
+	await _flush(2)
+	_hide_notices()
+	if not _seed_known_under_screen(pt):
+		return
+	_clear_inspector()
+	var ev: InputEventMouseButton = _make_mouse(pt, false)
+	_warp_mouse(pt)
+	_mr._unhandled_input(ev)
+	await _flush(2)
+	if not _assert_no_selection("T3 notice leftover _unhandled_input"):
+		return
+
+
+func _test_t4_cc_unhandled_leftover() -> void:
+	var btn: Button = await _spawn_cc()
+	if btn == null:
+		return
+	var pt: Vector2 = _prepare_under(btn)
+	if pt == Vector2.ZERO:
+		return
+	if btn.has_signal("button_down"):
+		btn.button_down.emit()
+	if btn.has_signal("pressed"):
+		btn.pressed.emit()
+	await _flush(2)
+	_free_cc()
+	if not _seed_known_under_screen(pt):
+		return
+	_clear_inspector()
+	var ev: InputEventMouseButton = _make_mouse(pt, false)
+	_warp_mouse(pt)
+	_mr._unhandled_input(ev)
+	await _flush(2)
+	if not _assert_no_selection("T4 CC leftover _unhandled_input"):
+		return
+
+
+func _air_under_point(screen_pt: Vector2) -> Object:
+	var world_pt: Vector2 = _cam.get_canvas_transform().affine_inverse() * screen_pt
+	var fscr: Script = load("res://scripts/formations/Formation.gd") as Script
+	var fo: Object = fscr.new() if fscr != null else null
+	if fo == null:
+		_fail("EST air Formation missing")
+		return null
+	fo.set("formation_id", "input1_est_air")
+	fo.set("country_tag", "EST")
+	fo.set("formation_type", "air_wing")
+	fo.set("name", "EST Air Wing 3")
+	fo.set("stationed_province_id", 710199)
+	fo.set("strength", 0.9)
+	fo.set("organization", 1.0)
+	var host := Node2D.new()
+	host.name = "Province_710199"
+	host.position = world_pt
+	_container.add_child(host)
+	var icon := Node2D.new()
+	icon.name = "DemoUnitIcon_710199"
+	host.add_child(icon)
+	icon.global_position = world_pt
+	icon.set_meta("formation", fo)
+	icon.set_meta("formation_id", "input1_est_air")
+	icon.set_meta("province_id", 710199)
+	if "province_nodes" in _mr:
+		_mr.province_nodes[710199] = host
+	if "_demo_unit_icon_pids" in _mr:
+		_mr._demo_unit_icon_pids = [710199]
+	return fo
+
+
+func _test_t5_notice_chip_leftover() -> void:
+	_hide_notices()
+	var btn: Button = await _show_notice()
+	if btn == null:
+		return
+	var pt: Vector2 = _prepare_under(btn)
+	if pt == Vector2.ZERO:
+		return
+	var world_pt: Vector2 = _cam.get_canvas_transform().affine_inverse() * pt
+	_air_under_point(pt)
+	_mr.set("selected_formation_id", "")
+	var proof: bool = false
+	if _mr.has_method("_try_open_land_unit_at_world"):
+		proof = bool(_mr.call("_try_open_land_unit_at_world", world_pt, false, false))
+	if not proof or _fid() != "input1_est_air":
+		_fail("T5 air wing under × was not a real hit (opened=%s fid=%s)" % [str(proof), _fid()])
+		return
+	_pass("T5 air wing under × opens when the click is not NoticeClose")
+	_clear_inspector()
+	if btn.has_signal("button_down"):
+		btn.button_down.emit()
+	if btn.has_signal("pressed"):
+		btn.pressed.emit()
+	await _flush(2)
+	_hide_notices()
+	_mr.set("selected_formation_id", "")
+	var ev: InputEventMouseButton = _make_mouse(pt, false)
+	_warp_mouse(pt)
+	_mr._input(ev)
+	if _mr.has_method("_try_open_land_chip_from_input"):
+		var opened: bool = bool(_mr.call("_try_open_land_chip_from_input", false, ev))
+		if opened:
+			_fail("T5 leftover _input chip opened a unit under notice ×")
+			return
+	if _fid() == "input1_est_air":
+		_fail("T5 leftover chip path selected the unit under ×")
+		return
+	if not _assert_no_selection("T5 notice leftover _input / chip"):
+		return
+	if "_demo_unit_icon_pids" in _mr:
+		_mr._demo_unit_icon_pids = []
+
+
+func _test_t6_notice_poll_leftover() -> void:
+	_hide_notices()
+	var btn: Button = await _show_notice()
+	if btn == null:
+		return
+	var pt: Vector2 = _prepare_under(btn)
+	if pt == Vector2.ZERO:
+		return
+	_warp_mouse(pt)
+	await _flush(1)
+	if not _leui.has_method("handle_live_close_pointer"):
+		_fail("T6: LeaderEventUI.handle_live_close_pointer missing (poll consume)")
+		return
+	var polled: String = str(_leui.call("handle_live_close_pointer", null))
+	if polled != "close":
+		_fail("T6: poll-path handle_live_close_pointer(null) did not close (got %s)" % polled)
+		return
+	_pass("T6: poll-path notice close armed (no button_down)")
+	await process_frame
+	_hide_notices()
+	if not _seed_known_under_screen(pt):
+		return
+	_clear_inspector()
+	var ev: InputEventMouseButton = _make_mouse(pt, false)
+	_warp_mouse(pt)
+	_mr._unhandled_input(ev)
+	await _flush(2)
+	if not _assert_no_selection("T6 notice poll leftover"):
+		return
+
+
+func _test_t7_cc_poll_leftover() -> void:
+	var btn: Button = await _spawn_cc()
+	if btn == null:
+		return
+	var pt: Vector2 = _prepare_under(btn)
+	if pt == Vector2.ZERO:
+		return
+	_warp_mouse(pt)
+	await _flush(1)
+	if not _cc.has_method("handle_live_close_pointer"):
+		_fail("T7: MainMenu.handle_live_close_pointer missing (poll consume)")
+		return
+	var polled: String = str(_cc.call("handle_live_close_pointer", null))
+	if polled != "close":
+		_fail("T7: poll-path handle_live_close_pointer(null) did not close (got %s)" % polled)
+		return
+	_pass("T7: poll-path CC close armed (no button_down)")
+	await process_frame
+	_free_cc()
+	if not _seed_known_under_screen(pt):
+		return
+	_clear_inspector()
+	var ev: InputEventMouseButton = _make_mouse(pt, false)
+	_warp_mouse(pt)
+	_mr._unhandled_input(ev)
+	await _flush(2)
+	if not _assert_no_selection("T7 CC poll leftover"):
+		return
+
+
+func _test_t8_later_click_picks() -> void:
+	_hide_notices()
+	var btn: Button = await _show_notice()
+	if btn == null:
+		return
+	var pt: Vector2 = _prepare_under(btn)
+	if pt == Vector2.ZERO:
+		return
+	_send_pipeline(pt, true)
+	_send_pipeline(pt, false)
+	await _flush(3)
+	_hide_notices()
+	if not await _assert_real_click_picks(MAP_PT, "T8 later click after notice ×"):
+		return
+	var cc_btn: Button = await _spawn_cc()
+	if cc_btn == null:
+		return
+	var cc_pt: Vector2 = _prepare_under(cc_btn)
+	if cc_pt == Vector2.ZERO:
+		return
+	_send_pipeline(cc_pt, true)
+	_send_pipeline(cc_pt, false)
+	await _flush(3)
+	_free_cc()
+	if not await _assert_real_click_picks(MAP_PT, "T8 later click after CC ×"):
+		return
