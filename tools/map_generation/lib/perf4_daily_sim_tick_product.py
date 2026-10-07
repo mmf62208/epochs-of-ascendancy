@@ -12,9 +12,10 @@ This product greps the shipped path. Headless
 boot GER + a live-weight supply network and time the Play multi-AI step.
 Soft theater tick does not rebuild the network for dummy pid 1. Live Play
 still runs the full advance_supply_day steps (air / naval / shipping).
-A depot/hub owner flip retags the hub and drops touching routes (no
-24-route rebuild). Dropped dests refill on the next full supply day
-(budget = dest cap 24) with the same Dijkstra tie-breaks as a rebuild.
+A depot/hub owner flip retags the hub and enqueues affected dests once
+(no re-drop). Flush pops a deduped FIFO; old routes keep serving until
+swap. Dropped dests refill the same day (dest cap 24, predictive 40 ms
+slice) with the same Dijkstra tie-breaks as a rebuild.
 Infra/dev complete recalculates that hub's capacity. Depot add/remove
 patches one hub. Daily listener stays on main's light path so
 apply_supply is the one full day. Production shares a per-day
@@ -266,6 +267,34 @@ def build_perf4_daily_sim_tick_product() -> Dict[str, Any]:
         passes.append("headless_hub_capacity_day40")
     else:
         fails.append("headless_hub_capacity_day40")
+    if HD_LIVE_GD.is_file() and "_test_depot_add_710314_converges" in hd_live:
+        passes.append("headless_depot_add_converges")
+    else:
+        fails.append("headless_depot_add_converges")
+    if HD_LIVE_GD.is_file() and "_test_recapture_ger_converges" in hd_live:
+        passes.append("headless_recapture_converges")
+    else:
+        fails.append("headless_recapture_converges")
+    if HD_LIVE_GD.is_file() and "_test_multi_round_capture_round3_converges" in hd_live:
+        passes.append("headless_multi_round_capture_converges")
+    else:
+        fails.append("headless_multi_round_capture_converges")
+    if HD_LIVE_GD.is_file() and "_test_keep_old_routes_until_swap" in hd_live:
+        passes.append("headless_keep_old_routes")
+    else:
+        fails.append("headless_keep_old_routes")
+    if HD_LIVE_GD.is_file() and "_test_ten_capture_drains_one_day_1x_and_4x" in hd_live:
+        passes.append("headless_ten_capture_1x_4x_drain")
+    else:
+        fails.append("headless_ten_capture_1x_4x_drain")
+    if HD_LIVE_GD.is_file() and "_test_slice_caps_plans_per_frame" in hd_live:
+        passes.append("headless_slice_plan_cap")
+    else:
+        fails.append("headless_slice_plan_cap")
+    if HD_LIVE_GD.is_file() and "QUIET_DAY_BUDGET_MS" not in hd_live:
+        passes.append("headless_no_200ms_wall")
+    else:
+        fails.append("headless_no_200ms_wall")
     if "DEFAULT_ROUTE_DEST_CAP" in sm and "ROUTE_REFRESH_BUDGET_PER_FLUSH: int = DEFAULT_ROUTE_DEST_CAP" in sm:
         passes.append("route_refresh_covers_all_dests_in_one_day")
     else:
@@ -293,6 +322,34 @@ def build_perf4_daily_sim_tick_product() -> Dict[str, Any]:
         passes.append("same_day_dest_drain")
     else:
         fails.append("same_day_dest_drain")
+    flush = extract_gd_func_body(sm, "flush_pending_control_route_refresh")
+    if (
+        "_refill_queue" in sm
+        and "_refill_queued" in sm
+        and flush
+        and "_refill_queued_dests" in flush
+        and "_drop_routes_touching_pid(" not in flush
+    ):
+        passes.append("fifo_refill_no_redrop")
+    else:
+        fails.append("fifo_refill_no_redrop")
+    if "ROUTE_REFRESH_MS_BUDGET: float = 40.0" in sm and "used_ms + next_est" in sm:
+        passes.append("predictive_40ms_slice")
+    else:
+        fails.append("predictive_40ms_slice")
+    notify = extract_gd_func_body(sm, "notify_province_control_changed")
+    if notify and "_pid_blocks_player_supply" in notify:
+        passes.append("keep_old_routes_until_swap")
+    else:
+        fails.append("keep_old_routes_until_swap")
+    if "_on_relations_or_access_changed" in sm:
+        passes.append("relations_clears_friendly_cache")
+    else:
+        fails.append("relations_clears_friendly_cache")
+    if "notify_hub_stats_changed" in gd:
+        passes.append("gamedata_direct_infra_notifies_hub")
+    else:
+        fails.append("gamedata_direct_infra_notifies_hub")
     if "_heap_push" in (ROOT / "scripts" / "supply" / "SupplyPathfinder.gd").read_text(
         encoding="utf-8"
     ):

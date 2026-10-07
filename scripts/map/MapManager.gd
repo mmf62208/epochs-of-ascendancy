@@ -1615,6 +1615,9 @@ func notify_province_changed(province_id: int, what: String) -> void:
 		_invalidate_owner_index()
 		if typeof(SupplyManager) != TYPE_NIL and SupplyManager.has_method("notify_province_control_changed"):
 			SupplyManager.notify_province_control_changed(province_id)
+	if what in ["infrastructure", "development"]:
+		if typeof(SupplyManager) != TYPE_NIL and SupplyManager.has_method("notify_hub_stats_changed"):
+			SupplyManager.notify_hub_stats_changed(province_id)
 	if _provinces.has(province_id):
 		province_data_changed.emit(province_id, what)
 

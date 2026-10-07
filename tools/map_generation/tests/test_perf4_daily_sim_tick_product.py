@@ -76,6 +76,18 @@ class TestPerf4DailySimTickProduct(unittest.TestCase):
             "supply_day_spike_profile",
             "same_day_dest_drain",
             "pathfinder_binary_heap",
+            "headless_depot_add_converges",
+            "headless_recapture_converges",
+            "headless_multi_round_capture_converges",
+            "headless_keep_old_routes",
+            "headless_ten_capture_1x_4x_drain",
+            "headless_slice_plan_cap",
+            "headless_no_200ms_wall",
+            "fifo_refill_no_redrop",
+            "predictive_40ms_slice",
+            "keep_old_routes_until_swap",
+            "relations_clears_friendly_cache",
+            "gamedata_direct_infra_notifies_hub",
             "depot_one_hub_patch",
             "supply_capture_no_full_route_rebuild",
             "daily_listener_light_split",
@@ -128,8 +140,13 @@ class TestPerf4DailySimTickProduct(unittest.TestCase):
         self.assertIn("ROUTE_REFRESH_BUDGET_PER_FLUSH: int = DEFAULT_ROUTE_DEST_CAP", sm)
         self.assertNotIn("ROUTE_REFRESH_BUDGET_PER_FLUSH: int = 2", sm)
         self.assertIn("ROUTE_REFRESH_MS_BUDGET", sm)
+        self.assertIn("ROUTE_REFRESH_MS_BUDGET: float = 40.0", sm)
+        self.assertIn("_refill_queue", sm)
         self.assertIn("func drain_pending_route_refresh", sm)
         self.assertIn("func notify_hub_stats_changed", sm)
+        flush = extract_gd_func_body(sm, "flush_pending_control_route_refresh")
+        self.assertNotIn("_drop_routes_touching_pid(", flush)
+        self.assertIn("_refill_queued_dests", flush)
         self.assertIn("last_supply_day_profile", sm)
         mm = (ROOT / "scripts" / "map" / "MapManager.gd").read_text(encoding="utf-8")
         self.assertIn("notify_hub_stats_changed", extract_gd_func_body(mm, "update_province_infrastructure"))
@@ -146,6 +163,10 @@ class TestPerf4DailySimTickProduct(unittest.TestCase):
         self.assertIn("_test_ten_capture_path_identity_within_one_day", hd)
         self.assertIn("_test_annex_path_identity", hd)
         self.assertIn("_test_hub_capacity_matches_rebuild_at_day_40", hd)
+        self.assertIn("_test_depot_add_710314_converges", hd)
+        self.assertIn("_test_recapture_ger_converges", hd)
+        self.assertIn("_test_keep_old_routes_until_swap", hd)
+        self.assertNotIn("QUIET_DAY_BUDGET_MS", hd)
 
     def test_live_multi_ai_harness_exists(self) -> None:
         hd = ROOT / "scripts" / "core" / "HeadlessPerf4LiveMultiAiDayTest.gd"

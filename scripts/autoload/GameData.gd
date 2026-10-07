@@ -2268,6 +2268,8 @@ func apply_ascendancy_initiative_player_province_choice(tag: String, branch: Str
 	# Notify for map visuals (vitality, overlays), combat recalc, supply
 	MapManager.notify_province_changed(chosen_pid, "settlement")
 	MapManager.notify_province_changed(chosen_pid, "infrastructure")
+	if typeof(SupplyManager) != TYPE_NIL and SupplyManager.has_method("notify_hub_stats_changed"):
+		SupplyManager.notify_hub_stats_changed(chosen_pid)
 	# Pillar nudge based on geo (e.g. coastal/river give Mandate for trade)
 	var mandate_gain : Variant = 6
 	if is_river or is_coastal:
@@ -3125,6 +3127,8 @@ func apply_encourage_relocation(tag: String, target_culture_or_area: String, sca
 			# Dev has no dedicated updater in all builds; direct + optional notify.
 			if MapManager.has_method("notify_province_changed"):
 				MapManager.notify_province_changed(pid, "development")
+			if typeof(SupplyManager) != TYPE_NIL and SupplyManager.has_method("notify_hub_stats_changed"):
+				SupplyManager.notify_hub_stats_changed(pid)
 			# Explicit emit so MapRenderer tints (settlement cyan-green vitality + welfare strain) and inspector refresh live for playtest.
 			if typeof(MapManager) != TYPE_NIL and MapManager.has_signal("province_data_changed"):
 				MapManager.province_data_changed.emit(pid, "settlement")

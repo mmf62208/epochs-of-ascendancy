@@ -65,22 +65,28 @@ var network_route_refill_count: int = 0
 var network_hub_stats_refresh_count: int = 0
 ## FIX #3: increment only on the full air/naval/shipping path.
 var full_supply_day_count: int = 0
-## Control-change pids waiting for a cheap route drop / dest refill.
+## Leftover dirty set (FIX #4 livelock). Control changes enqueue dests once
+## and clear the pid immediately. Flush never re-scans this.
 var _control_dirty_pids: Dictionary = {}
-## One-shot: next flush replans every default dest (same order as a full rebuild).
-var _must_replan_all_defaults: bool = false
+## FIX #5: dests waiting for a one-shot replan/swap. Deduped FIFO.
+var _refill_queue: Array[int] = []
+var _refill_queued: Dictionary = {}
 ## Same dest cap as `_rebuild_default_routes`. One full supply day must recover
 ## every dropped dest (ten captures drop ≤ this many). Capture stays drop-only.
 const DEFAULT_ROUTE_DEST_CAP: int = 24
 const ROUTE_REFRESH_BUDGET_PER_FLUSH: int = DEFAULT_ROUTE_DEST_CAP
-## Per-frame plan slice so a 24-dest refill cannot hitch the live day over ~200 ms.
-## Remaining dests drain on the same calendar day via `_process`.
-const ROUTE_REFRESH_MS_BUDGET: float = 80.0
+## Predictive per-frame plan slice. Stop before the next plan would cross 40 ms
+## so refill frames stay under ~200 ms. First plan is always allowed.
+const ROUTE_REFRESH_MS_BUDGET: float = 40.0
 ## Last full-day section timings (spike diagnosis: heap vs rebuild vs generate).
 var last_supply_day_profile: Dictionary = {}
 var last_flush_plan_count: int = 0
 var last_flush_plan_ms: float = 0.0
 var last_flush_plan_ms_max: float = 0.0
+var last_flush_redrop_count: int = 0
+var last_plan_ms: float = 0.0
+## Flush re-drops (must stay 0). Notify hostile drops do not increment this.
+var network_route_redrop_count: int = 0
 
 
 func _ready() -> void:
@@ -92,6 +98,9 @@ func _ready() -> void:
 	if typeof(TimeManager) != TYPE_NIL:
 		if not TimeManager.game_day_advanced.is_connected(_on_game_day_advanced):
 			TimeManager.game_day_advanced.connect(_on_game_day_advanced)
+	if typeof(RelationsManager) != TYPE_NIL and RelationsManager.has_signal("relations_changed"):
+		if not RelationsManager.relations_changed.is_connected(_on_relations_or_access_changed):
+			RelationsManager.relations_changed.connect(_on_relations_or_access_changed)
 
 
 func build_network(
@@ -114,7 +123,7 @@ func build_network(
 	)
 	_init_depot_states()
 	_control_dirty_pids.clear()
-	_must_replan_all_defaults = false
+	_clear_refill_queue()
 	refresh_intel_from_forces()
 	_rebuild_default_routes()
 	network_rebuilt.emit(hubs.size())
@@ -232,15 +241,17 @@ func _patch_player_depot_hub(province_id: int, enabled: bool) -> void:
 	if hub == null:
 		hubs.erase(province_id)
 		depot_states.erase(province_id)
-		_drop_routes_touching_pid(province_id)
-		_control_dirty_pids[province_id] = true
+		_drop_obsolete_dest_routes()
+		_enqueue_missing_and_affected_dests(province_id)
+		_control_dirty_pids.erase(province_id)
 		return
 	hubs[province_id] = hub
 	_init_one_depot_state(hub, false)
-	if not enabled:
-		_drop_routes_touching_pid(province_id)
-	_control_dirty_pids[province_id] = true
-	_must_replan_all_defaults = true
+	# Keep old routes serving until flush swaps their replacement. Only a
+	# dest that is no longer in the player dest set is dropped now.
+	_drop_obsolete_dest_routes()
+	_enqueue_missing_and_affected_dests(province_id)
+	_control_dirty_pids.erase(province_id)
 
 
 ## PERF-4 FIX #4: infra / development complete recalculates this hub's
@@ -271,10 +282,10 @@ func notify_hub_stats_changed(province_id: int) -> void:
 	network_hub_stats_refresh_count += 1
 
 
-## PERF-4 FIX #3: capture / occupation retags the hub and drops only the
-## routes that touch this pid. Route dests refill on the next full supply
-## day (budget = DEFAULT_ROUTE_DEST_CAP so every dropped dest recovers in 1 day).
-## FIX #2 rebuilt all 24 routes on every hub notify (~1.4–2.7s).
+## PERF-4 FIX #5: capture / occupation retags the hub, drops only routes
+## that now pass through a hostile or impassable pid, and enqueues affected
+## dests ONCE. The pid leaves the dirty set immediately. Flush never
+## re-scans or re-drops. Old friendly routes keep serving until swap.
 func notify_province_control_changed(province_id: int) -> void:
 	if province_id <= 0:
 		return
@@ -290,12 +301,15 @@ func notify_province_control_changed(province_id: int) -> void:
 			hub.owner_tag = live_tag
 			hub_changed = true
 	SupplyPathfinder.clear_neighbor_cache()
-	var dropped := _drop_routes_touching_pid(province_id)
+	var dropped := 0
+	if _pid_blocks_player_supply(province_id):
+		dropped = _drop_routes_touching_pid(province_id)
+	_drop_obsolete_dest_routes()
 	var is_depot := province_id in player_depot_province_ids
-	if not hub_changed and not is_depot and dropped == 0:
+	_enqueue_missing_and_affected_dests(province_id)
+	_control_dirty_pids.erase(province_id)
+	if not hub_changed and not is_depot and dropped == 0 and _refill_queue.is_empty():
 		return
-	_control_dirty_pids[province_id] = true
-	_must_replan_all_defaults = true
 	network_ownership_refresh_count += 1
 
 
@@ -328,28 +342,28 @@ func flush_pending_control_route_refresh(max_plans: int = ROUTE_REFRESH_BUDGET_P
 	last_flush_plan_count = 0
 	last_flush_plan_ms = 0.0
 	last_flush_plan_ms_max = 0.0
-	var had_dirty: bool = not _control_dirty_pids.is_empty()
-	if had_dirty:
-		for pid_v in _control_dirty_pids.keys():
-			_drop_routes_touching_pid(int(pid_v))
-	if _must_replan_all_defaults:
-		# Once per control change: remaining defaults replan in rebuild order.
-		_drop_all_default_routes()
-		_must_replan_all_defaults = false
-	var planned: int = _refill_missing_default_routes(max_plans)
-	if _missing_default_dest_count() == 0:
-		_control_dirty_pids.clear()
-	return planned
-
-
-func _drop_all_default_routes() -> void:
-	for key_v in _default_routes.keys():
-		_routes.erase(str(key_v))
-	_default_routes.clear()
+	last_flush_redrop_count = 0
+	# FIX #5: flush only pops the dest FIFO. Restoring a dirty-pid re-drop
+	# here re-plans the first sorted dests forever (depot add / recapture livelock).
+	return _refill_queued_dests(max_plans)
 
 
 func count_missing_default_dests() -> int:
 	return _missing_default_dest_count()
+
+
+func count_refill_queue() -> int:
+	return _refill_queue.size()
+
+
+func count_control_dirty() -> int:
+	return _control_dirty_pids.size()
+
+
+func enqueue_player_dests_for_refresh() -> int:
+	var before: int = _refill_queue.size()
+	_enqueue_all_current_dests()
+	return _refill_queue.size() - before
 
 
 func get_hub_capacity_snapshot() -> Dictionary:
@@ -389,36 +403,50 @@ func _missing_default_dest_count() -> int:
 
 
 func _refill_missing_default_routes(max_plans: int) -> int:
+	return _refill_queued_dests(max_plans)
+
+
+func _refill_queued_dests(max_plans: int) -> int:
 	if max_plans <= 0:
 		return 0
 	var source := get_capital_hub_id()
 	if source < 0:
+		_clear_refill_queue()
 		return 0
+	var allowed: Dictionary = {}
 	var targets: Array[int] = _player_route_targets()
 	var max_routes := mini(targets.size(), DEFAULT_ROUTE_DEST_CAP)
+	for i in range(max_routes):
+		allowed[targets[i]] = true
 	var planned := 0
 	var plan_ms_sum: float = 0.0
 	var plan_ms_max: float = 0.0
 	var t_budget: int = Time.get_ticks_usec()
-	for i in range(max_routes):
-		if planned >= max_plans:
-			break
+	while planned < max_plans and not _refill_queue.is_empty():
 		if planned > 0:
 			var used_ms: float = float(Time.get_ticks_usec() - t_budget) / 1000.0
-			if used_ms >= ROUTE_REFRESH_MS_BUDGET:
+			var next_est: float = last_plan_ms
+			if next_est <= 0.0:
+				next_est = ROUTE_REFRESH_MS_BUDGET
+			# Predictive: stop before the next plan would cross the 40 ms budget.
+			# Removing this check fails the per-frame plan-cap mutant.
+			if used_ms + next_est >= ROUTE_REFRESH_MS_BUDGET:
 				break
-		var target := targets[i]
-		var key := "%d_%d" % [source, target]
-		if _routes.has(key):
+		var dest: int = int(_refill_queue.pop_front())
+		_refill_queued.erase(dest)
+		if dest == source or not allowed.has(dest):
 			continue
+		var key := "%d_%d" % [source, dest]
 		var t_plan: int = Time.get_ticks_usec()
-		var plan := _plan_route(source, target, [], false)
+		var plan := _plan_route(source, dest, [], false)
 		var one_ms: float = float(Time.get_ticks_usec() - t_plan) / 1000.0
+		last_plan_ms = one_ms
 		plan_ms_sum += one_ms
 		if one_ms > plan_ms_max:
 			plan_ms_max = one_ms
 		plan.route_id = key
 		plan.baseline_days = plan.total_days
+		# Swap in place: the previous route served until this assignment.
 		_default_routes[key] = plan
 		_routes[key] = plan
 		planned += 1
@@ -433,9 +461,12 @@ func _refill_missing_default_routes(max_plans: int) -> int:
 func drain_pending_route_refresh() -> int:
 	var total: int = 0
 	var guard: int = 0
-	while _missing_default_dest_count() > 0 and guard < DEFAULT_ROUTE_DEST_CAP:
+	while (not _refill_queue.is_empty() or _missing_default_dest_count() > 0) and guard < DEFAULT_ROUTE_DEST_CAP:
 		var got: int = flush_pending_control_route_refresh(ROUTE_REFRESH_BUDGET_PER_FLUSH)
 		if got <= 0:
+			if _missing_default_dest_count() > 0 and _refill_queue.is_empty():
+				_enqueue_all_current_dests()
+				continue
 			break
 		total += got
 		guard += 1
@@ -443,11 +474,101 @@ func drain_pending_route_refresh() -> int:
 
 
 func _process(_delta: float) -> void:
-	if _control_dirty_pids.is_empty():
+	if _refill_queue.is_empty():
 		return
 	if _should_use_interactive_light_supply():
 		return
 	flush_pending_control_route_refresh(ROUTE_REFRESH_BUDGET_PER_FLUSH)
+
+
+func _on_relations_or_access_changed(_a: String = "", _b: String = "", _snap: Dictionary = {}) -> void:
+	SupplyPathfinder.clear_neighbor_cache()
+
+
+func _clear_refill_queue() -> void:
+	_refill_queue.clear()
+	_refill_queued.clear()
+
+
+func _enqueue_refill_dest(dest: int) -> void:
+	if dest <= 0:
+		return
+	if _refill_queued.has(dest):
+		return
+	_refill_queued[dest] = true
+	_refill_queue.append(dest)
+
+
+func _enqueue_all_current_dests() -> void:
+	var targets: Array[int] = _player_route_targets()
+	var max_n := mini(targets.size(), DEFAULT_ROUTE_DEST_CAP)
+	for i in range(max_n):
+		_enqueue_refill_dest(targets[i])
+
+
+func _enqueue_missing_and_affected_dests(touched_pid: int) -> void:
+	var source := get_capital_hub_id()
+	if source < 0:
+		return
+	var targets: Array[int] = _player_route_targets()
+	var max_n := mini(targets.size(), DEFAULT_ROUTE_DEST_CAP)
+	for i in range(max_n):
+		var dest: int = targets[i]
+		var key := "%d_%d" % [source, dest]
+		var needs := false
+		if not _routes.has(key):
+			needs = true
+		elif touched_pid > 0 and _route_plan_touches_pid(_routes[key], touched_pid):
+			needs = true
+		if needs:
+			_enqueue_refill_dest(dest)
+
+
+func _pid_blocks_player_supply(province_id: int) -> bool:
+	var p: Province = null
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province"):
+		p = MapManager.get_province(province_id) as Province
+	if p == null and provinces.has(province_id):
+		p = provinces[province_id] as Province
+	if p == null:
+		return true
+	if p.is_sea:
+		return false
+	return not SupplyPathfinder._is_friendly(province_id, player_tag, provinces)
+
+
+func _route_plan_touches_pid(plan: SupplyRoutePlan, province_id: int) -> bool:
+	if plan == null:
+		return false
+	if int(plan.source_province_id) == province_id or int(plan.target_province_id) == province_id:
+		return true
+	for step_v in plan.province_path:
+		if int(step_v) == province_id:
+			return true
+	return false
+
+
+func _drop_obsolete_dest_routes() -> int:
+	var source := get_capital_hub_id()
+	if source < 0:
+		return 0
+	var allowed: Dictionary = {}
+	var targets: Array[int] = _player_route_targets()
+	var max_n := mini(targets.size(), DEFAULT_ROUTE_DEST_CAP)
+	for i in range(max_n):
+		allowed[targets[i]] = true
+	var drop_keys: Array[String] = []
+	for key_v in _default_routes.keys():
+		var plan: SupplyRoutePlan = _default_routes[key_v]
+		if plan == null:
+			drop_keys.append(str(key_v))
+			continue
+		if int(plan.source_province_id) != source or not allowed.has(int(plan.target_province_id)):
+			drop_keys.append(str(key_v))
+	for key in drop_keys:
+		_routes.erase(key)
+		_default_routes.erase(key)
+	return drop_keys.size()
 
 
 func _live_control_tag_for_pid(province_id: int) -> String:
@@ -498,6 +619,8 @@ func get_network_topology_snapshot() -> Dictionary:
 		"route_refill_count": network_route_refill_count,
 		"full_supply_day_count": full_supply_day_count,
 		"dirty_n": _control_dirty_pids.size(),
+		"refill_queue_n": _refill_queue.size(),
+		"redrop_count": network_route_redrop_count,
 		"missing_dests": _missing_default_dest_count(),
 	}
 
@@ -1091,6 +1214,7 @@ func advance_supply_day(days: float = 1.0) -> void:
 	last_supply_day_profile = {
 		"total_ms": total_ms,
 		"flush_ms": flush_ms,
+		"refill_ms": flush_ms,
 		"generate_ms": generate_ms,
 		"naval_ms": naval_ms,
 		"fuel_ms": fuel_ms,
