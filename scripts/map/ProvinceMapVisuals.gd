@@ -175,6 +175,34 @@ static func hide_polished_outline(parent: Node2D, base_name: String) -> void:
 	hide_outline(parent, base_name + SUFFIX_GLOW)
 
 
+## Closed ring for the batched L overlay (same width/glow/AA as Line2D rings).
+static func close_outline_points(points: PackedVector2Array) -> PackedVector2Array:
+	if points.size() < 2:
+		return points
+	if points[0] == points[points.size() - 1]:
+		return points
+	var closed := PackedVector2Array()
+	closed.resize(points.size() + 1)
+	for i in range(points.size()):
+		closed[i] = points[i]
+	closed[points.size()] = points[0]
+	return closed
+
+
+static func draw_polished_ring(
+	ci: CanvasItem,
+	points: PackedVector2Array,
+	color: Color,
+	width: float,
+	glow_color: Color,
+	glow_extra_width: float,
+) -> void:
+	if ci == null or points.size() < 3:
+		return
+	ci.draw_polyline(points, glow_color, width + glow_extra_width, true)
+	ci.draw_polyline(points, color, width, true)
+
+
 static func get_outline_line(parent: Node2D, node_name: String) -> Line2D:
 	return parent.get_node_or_null(node_name) as Line2D
 

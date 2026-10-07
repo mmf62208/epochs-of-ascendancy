@@ -13,6 +13,7 @@ const _DomainOpsOverlayLayerScr = preload("res://scripts/map/DomainOpsOverlayLay
 const _LeaderStationOverlayLayerScr = preload("res://scripts/map/LeaderStationOverlayLayer.gd")
 const _UnitChipTextScr = preload("res://scripts/map/UnitChipText.gd")
 const _ConstructionProgressOverlayLayerScr = preload("res://scripts/map/ConstructionProgressOverlayLayer.gd")
+const _SupplyOutlineBatchLayerScr = preload("res://scripts/map/SupplyOutlineBatchLayer.gd")
 ## Loaded in _ready — missing scripts must not fail MapRenderer parse (grey TestScenario).
 var _FactoryStatusLayerScr: Script = null
 var _AgentPresenceLayerScr: Script = null
@@ -261,6 +262,12 @@ var _close_ignore_stale_left_down := false
 ## clear after that one release, on any new left press (UI or map), and after
 ## a short safety timeout (Play: leftover eaten swallowed later top-bar ups).
 const UNIT_CARD_LATCH_SAFETY_SEC := 0.5
+## BEGIN-1 FIX #2: leftover Begin release swallow is one orphan up only.
+## Clock starts on the first _process after the Begin frame (restamp), then
+## expires after ~750 ms and frames >= arm_frame + 2. A later-frame left
+## press clears it unless that press is the poll-path Begin click itself
+## (begin_press_pending). Lost leftover up cannot eat the first map click.
+const BEGIN_TITLE_SWALLOW_EXPIRE_MS: int = 750
 ## Fighting card (stance + cmd) must stay on-screen at Play 1280×740.
 ## Old reserve 252 clipped Press/Hold below Halt/Assign (card grows past 220).
 const UNIT_CARD_DOCK_RESERVE := 348.0
@@ -396,6 +403,16 @@ const _CONFLICT_FILL_TINT := ProvinceMapVisuals.FILL_CONFLICT
 const _AGENT_FILL_TINT := ProvinceMapVisuals.FILL_AGENT
 
 var _supply_role_by_province: Dictionary[int, String] = {}
+var _supply_roles_cache: Dictionary[int, String] = {}
+var _supply_poly_cache: Dictionary[int, PackedVector2Array] = {}
+var _supply_outline_batch: Node2D = null
+var _supply_outline_rebuild_count: int = 0
+## PERF-3 FIX #1: count live-slow work that used to run on every L (roles / setup /
+## 3k glyph reset_size). Headless asserts cache-hit toggles do not increment these.
+var _supply_toggle_in_progress: bool = false
+var _supply_toggle_role_computes: int = 0
+var _supply_toggle_setups: int = 0
+var _supply_toggle_glyph_layouts: int = 0
 var _compare_candidate_ids: Array[int] = []
 var _supply_legend_panel: PanelContainer = null
 var _compare_hint_label: Label = null
@@ -2534,6 +2551,7 @@ func _apply_home_key(shift_pressed: bool) -> void:
 	_inspector_held_closed = false
 	_map_pick_block_until_msec = 0
 	_asia_end_force_star_pids.clear()
+	_invalidate_capital_star_scale_cache()
 	_asia_end_china_anchor = Vector2.ZERO
 	_restore_asia_end_row_fills()
 	var end_overlay: Node = (container if container != null else self).get_node_or_null("AsiaEndStarOverlay")
@@ -2543,6 +2561,8 @@ func _apply_home_key(shift_pressed: bool) -> void:
 	if shift_pressed:
 		fit_camera_to_full_world()
 		_sync_unit_counter_paint()
+		# Same star LOD as a wheel notch to this zoom (paused Home skips _process LOD).
+		_sync_capital_star_scales()
 	else:
 		center_europe_in_world_view()
 		if typeof(DebugOverlay) != TYPE_NIL:
@@ -2791,9 +2811,17 @@ func _input(event: InputEvent) -> void:
 			# the same click cannot open the unit under the ×, and the next click can.
 			if not event.pressed and has_meta("eoa_tip_dismiss_swallow_release"):
 				call_deferred("_clear_first_session_tip_dismiss_swallow")
+			# Begin fires on press and queue_free()s the title. The matching
+			# ~80 ms leftover release must not still-click the map (Loir-et-Cher
+			# inspector + soft click-zoom 0.776→0.900). One-shot like TipDismiss.
+			if not event.pressed and _begin_title_release_blocks_map_pick():
+				call_deferred("_clear_begin_title_release_swallow")
+				get_viewport().set_input_as_handled()
+				return
 			if event.pressed:
 				_skip_inspector_after_march = false
 				_clear_unit_card_press_consume_on_new_left_press()
+				_clear_begin_title_release_swallow_on_new_left_press()
 			if _living_title_boot_is_up():
 				# Play 5adb38e: never swallow title-up presses. Route by event
 				# coords (computerUse may not update get_mouse_position first).
@@ -2806,6 +2834,8 @@ func _input(event: InputEvent) -> void:
 					var title_act: String = _route_living_title_pointer(event)
 					print("EOA_LIVE_PTR who=MapRenderer._input action=%s" % title_act)
 					if title_act == "begin" or title_act == "cc" or title_act == "panel":
+						if title_act == "begin":
+							arm_begin_title_release_swallow()
 						get_viewport().set_input_as_handled()
 						return
 					if _living_title_owns_event(event) or _top_bar_owns_click():
@@ -2931,13 +2961,10 @@ func _input(event: InputEvent) -> void:
 
 
 func _schedule_light_terrain_zoom_refresh() -> void:
+	# Wheel already ran the light LOD pass via _zoom_toward_mouse.
+	# Only queue the post-burst flush — never refresh again this frame.
 	_pending_terrain_zoom_refresh = true
-	var now := Time.get_ticks_msec()
-	if now - _wheel_zoom_terrain_at_msec < WHEEL_TERRAIN_REFRESH_MS:
-		return
-	_wheel_zoom_terrain_at_msec = now
-	_pending_terrain_zoom_refresh = false
-	_refresh_terrain_zoom_light()
+	_wheel_zoom_terrain_at_msec = Time.get_ticks_msec()
 
 
 func _refresh_terrain_zoom_light() -> void:
@@ -3207,16 +3234,24 @@ func _unhandled_input(event: InputEvent) -> void:
 	# Spatial picking click handling — this path makes the system fully functional
 	# even when create_area_nodes_for_fallback=false (pure MapPickGrid mode, zero Area2D nodes).
 	if use_spatial_picking and event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if event.pressed:
+			_clear_begin_title_release_swallow_on_new_left_press()
 		if not event.pressed and _consume_unit_card_press_release_if_armed():
 			return
 		if not event.pressed and _first_session_tip_dismiss_blocks_map_pick():
 			call_deferred("_clear_first_session_tip_dismiss_swallow")
 			get_viewport().set_input_as_handled()
 			return
+		if not event.pressed and _begin_title_release_blocks_map_pick():
+			call_deferred("_clear_begin_title_release_swallow")
+			get_viewport().set_input_as_handled()
+			return
 		if _living_title_boot_is_up():
 			if event.pressed:
 				var un_act: String = _route_living_title_pointer(event)
 				if un_act == "begin" or un_act == "cc" or un_act == "panel":
+					if un_act == "begin":
+						arm_begin_title_release_swallow()
 					get_viewport().set_input_as_handled()
 					return
 				if _living_title_owns_event(event) or _top_bar_owns_click():
@@ -3551,6 +3586,7 @@ func _process(delta: float) -> void:
 		_perf.begin("process_total")
 	_expire_map_time_pulse_if_needed()
 	_tick_unit_card_press_consume_latch(delta)
+	_tick_begin_title_release_swallow()
 
 	# When sim is paused, skip heavy LOD/fill/theater work — pan/zoom/UI stay responsive for playtest.
 	var sim_paused := false
@@ -14482,6 +14518,8 @@ func _force_all_province_nodes_visible() -> void:
 
 ## After mapmode / mesh toggles: land polys must be opaque; sea below land z.
 func _restore_land_poly_visibility() -> void:
+	# Restore forces capital-star visibility; do not trust the last-px skip.
+	_invalidate_capital_star_scale_cache()
 	for pid in province_nodes.keys():
 		var node: Node2D = province_nodes[pid] as Node2D
 		if node == null or not is_instance_valid(node):
@@ -14532,6 +14570,7 @@ func _restore_land_poly_visibility() -> void:
 
 
 func _ensure_capital_stars_visible() -> void:
+	_invalidate_capital_star_scale_cache()
 	_restore_land_poly_visibility()
 	# Re-stamp stars if missing (mapmode / mesh paths must never drop capitals).
 	var n_stars := 0
@@ -14564,8 +14603,24 @@ func _capital_star_font_px() -> int:
 	return int(clampf(16.0 / maxf(z, 0.35), 11.0, 20.0))
 
 
+var _capital_star_last_sync_px: int = -999
+var _capital_star_last_sync_force_n: int = -1
+
+
+func _invalidate_capital_star_scale_cache() -> void:
+	_capital_star_last_sync_px = -999
+	_capital_star_last_sync_force_n = -1
+
+
 func _sync_capital_star_scales(_z: float = -1.0) -> void:
 	var px := _capital_star_font_px()
+	var force_n: int = _asia_end_force_star_pids.size()
+	# Theme font overrides on ~37 stars cost ~200 ms/notch even when px is
+	# unchanged. Skip the walk when the last apply already matches.
+	if px == _capital_star_last_sync_px and force_n == _capital_star_last_sync_force_n:
+		return
+	_capital_star_last_sync_px = px
+	_capital_star_last_sync_force_n = force_n
 	for pid in province_nodes.keys():
 		var node: Node2D = province_nodes[pid] as Node2D
 		if node == null:
@@ -14576,16 +14631,30 @@ func _sync_capital_star_scales(_z: float = -1.0) -> void:
 			if not (child is Label) or not (child as Label).has_meta(META_MAP_GLYPH_CAPITAL):
 				continue
 			var star := child as Label
-			star.visible = use_px > 0
-			if use_px > 0:
-				star.add_theme_font_size_override("font_size", use_px)
-				star.set_meta(META_MAP_GLYPH_PX, use_px)
+			var want_vis: bool = use_px > 0
+			var actual_px: int = 0
+			if star.has_theme_font_size_override("font_size"):
+				actual_px = int(star.get_theme_font_size("font_size"))
+			if star.visible != want_vis:
+				star.visible = want_vis
+			if use_px <= 0:
+				continue
+			# Skip the theme write only when the live override already matches.
+			# Layout / restore can change font_size without updating META_MAP_GLYPH_PX.
+			if actual_px == use_px:
 				if force:
 					star.z_as_relative = false
 					star.z_index = 80
+				continue
+			star.add_theme_font_size_override("font_size", use_px)
+			star.set_meta(META_MAP_GLYPH_PX, use_px)
+			if force:
+				star.z_as_relative = false
+				star.z_index = 80
 
 
 func _add_capital_star_to_node(node: Node2D, pid: int, force_px: int = 0) -> void:
+	_invalidate_capital_star_scale_cache()
 	var center: Vector2 = _centroid_for_pid(pid)
 	if center == Vector2.ZERO:
 		center = province_centroids.get(pid, Vector2.ZERO) as Vector2
@@ -14951,7 +15020,34 @@ func _apply_static_map_glyph_outline(lbl: Label) -> void:
 	lbl.add_theme_constant_override("shadow_offset_y", 1)
 
 
+func _restore_idle_capital_star_draw_state(star: Label, pid: int, ctr: Vector2) -> void:
+	## After L off, `_layout_zoomed_map_glyphs_for_province_node` used to leave
+	## capitals at `Z_MAP_GLYPH + 2` (10, absolute). Europe land nodes sit at
+	## `_province_draw_z_index` 4 and other canvas layers sit above 10, so the
+	## glyphs stayed in the tree but did not draw until a map-mode switch
+	## re-asserted z=40 via `_restore_land_poly_visibility`.
+	var force := _asia_end_force_star_pids.has(pid)
+	var px := 32 if force else _capital_star_font_px()
+	star.z_as_relative = false
+	star.z_index = 80 if force else 40
+	star.modulate = Color(1.0, 1.0, 1.0, 1.0)
+	star.visible = px > 0
+	if px <= 0:
+		return
+	star.add_theme_font_size_override("font_size", px)
+	star.set_meta(META_MAP_GLYPH_PX, px)
+	star.add_theme_color_override("font_color", Color(1.0, 0.92, 0.15, 1.0))
+	star.add_theme_color_override("font_outline_color", Color(0.02, 0.02, 0.05, 1.0))
+	star.add_theme_constant_override("outline_size", 6)
+	star.reset_size()
+	if ctr != Vector2.ZERO:
+		var sms := star.get_minimum_size()
+		star.position = ctr - sms * 0.5
+
+
 func _layout_zoomed_map_glyphs_for_province_node(pid: int, zoom_metric: float, show_glyphs: bool) -> void:
+	if _supply_toggle_in_progress:
+		_supply_toggle_glyph_layouts += 1
 	var node: Variant = province_nodes.get(pid)
 	if node == null or not (node is Node2D):
 		return
@@ -14962,8 +15058,13 @@ func _layout_zoomed_map_glyphs_for_province_node(pid: int, zoom_metric: float, s
 			var lbl := child as Label
 			var base_px := int(lbl.get_meta(META_MAP_GLYPH_PX))
 			var is_capital := lbl.has_meta(META_MAP_GLYPH_CAPITAL)
+			if is_capital and not supply_mode:
+				_restore_idle_capital_star_draw_state(lbl, int(pid), ctr)
+				continue
 			# Capital gold stars stay visible at all zoom levels (Washington/Tokyo were
 			# hidden when detail glyphs culled at strategic zoom).
+			if is_capital:
+				_invalidate_capital_star_scale_cache()
 			lbl.visible = true if is_capital else show_glyphs
 			if show_glyphs or is_capital:
 				var zsc := _zoom_detail_scale_smooth(zoom_metric, 1.8)
@@ -16509,6 +16610,9 @@ func center_europe_in_world_view() -> void:
 	# Home zoom is often still strategic-tier (~0.33–0.49). Re-paint chips here —
 	# paused first-session never reaches _refresh_province_detail_visibility.
 	_sync_unit_counter_paint()
+	# Stars use the same STRATEGIC_MAX_ZOOM hide rule as a wheel notch. Home is a
+	# camera jump, so _refresh_terrain_zoom_light never runs while paused.
+	_sync_capital_star_scales()
 	print("MapRenderer: centered on Europe (Berlin+Paris+Rome frame) inside world view")
 
 
@@ -16610,6 +16714,7 @@ func _resolve_chi_capital_centroid() -> Vector2:
 
 
 func _force_asia_end_capital_stars(tokyo_pid: int, chi_pid: int) -> void:
+	_invalidate_capital_star_scale_cache()
 	_asia_end_force_star_pids.clear()
 	var chi_names := {902487: "Beiping", 902496: "Nanjing", 902505: "Chongqing"}
 	# Always stamp Tokyo + Beiping (Play: CHI star missing when only the resolved pid was used).
@@ -18468,6 +18573,10 @@ func _on_province_input(_viewport: Node, event: InputEvent, _shape_idx: int, pro
 	# Press return is first so skip-pick does not have to latch before this fires.
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed:
+			_clear_begin_title_release_swallow_on_new_left_press()
+			return
+		if _begin_title_release_blocks_map_pick():
+			call_deferred("_clear_begin_title_release_swallow")
 			return
 	# Hold + committed slop/skip: abort before inspector (Tropical Atlantic Waters).
 	# Read-only live slop — do not `_note`/`_begin` here. Click-without-slop still picks.
@@ -19506,6 +19615,8 @@ func _try_open_land_chip_from_input(ctrl_click: bool = false, event: InputEvent 
 	# TipDismiss ×: this release must not open the counter under the button.
 	# Body clicks do not arm the swallow (the label ignores the mouse).
 	if _first_session_tip_dismiss_blocks_map_pick():
+		return false
+	if _begin_title_release_blocks_map_pick():
 		return false
 	if _top_bar_owns_click() or _mouse_over_search_control() or _search_ui_owns_click() or _mouse_over_close_control() or _road_spine_btn_owns_click():
 		return false
@@ -24331,7 +24442,7 @@ func get_active_overlay_layers() -> Array[String]:
 	var names: Array[String] = []
 	if container == null:
 		return names
-	var excluded: Array[String] = ["SupplyMapLayer", "ProvinceContainers"]
+	var excluded: Array[String] = ["SupplyMapLayer", "ProvinceContainers", "SupplyOutlineBatch"]
 	for child in container.get_children():
 		if child is Node2D:
 			var n := child.name
@@ -24662,6 +24773,96 @@ func _first_session_tip_dismiss_blocks_map_pick() -> bool:
 func _clear_first_session_tip_dismiss_swallow() -> void:
 	if has_meta("eoa_tip_dismiss_swallow_release"):
 		remove_meta("eoa_tip_dismiss_swallow_release")
+
+
+func arm_begin_title_release_swallow(pending_press: bool = false) -> void:
+	# LivingTitleBoot Begin press (button_down / handle_live_pointer / _input).
+	# One leftover left-release is eaten. Clock is restamped on the first
+	# _process after this frame so a slow apply_living_title_boot cannot
+	# age the leftover up past 750 ms. A later-frame left press or expiry
+	# drops it so a lost up cannot eat the next click. Poll-path arms set
+	# begin_press_pending so the click's own N+1 press keeps the arm.
+	set_meta("eoa_begin_swallow_release", true)
+	set_meta("eoa_begin_swallow_arm_msec", Time.get_ticks_msec())
+	set_meta("eoa_begin_swallow_arm_frame", Engine.get_process_frames())
+	if has_meta("eoa_begin_swallow_clock_ready"):
+		remove_meta("eoa_begin_swallow_clock_ready")
+	if has_meta("eoa_begin_swallow_press_seen_frame"):
+		remove_meta("eoa_begin_swallow_press_seen_frame")
+	if pending_press:
+		set_meta("eoa_begin_swallow_press_pending", true)
+	elif has_meta("eoa_begin_swallow_press_pending"):
+		remove_meta("eoa_begin_swallow_press_pending")
+
+
+func _begin_title_release_swallow_expired() -> bool:
+	if not has_meta("eoa_begin_swallow_release"):
+		return false
+	if not has_meta("eoa_begin_swallow_clock_ready"):
+		return false
+	var arm_frame: int = int(get_meta("eoa_begin_swallow_arm_frame", -1))
+	if Engine.get_process_frames() < arm_frame + 2:
+		return false
+	var arm_ms: int = int(get_meta("eoa_begin_swallow_arm_msec", 0))
+	if arm_ms > 0 and Time.get_ticks_msec() - arm_ms >= BEGIN_TITLE_SWALLOW_EXPIRE_MS:
+		return true
+	return false
+
+
+func _begin_title_release_blocks_map_pick() -> bool:
+	if not has_meta("eoa_begin_swallow_release"):
+		return false
+	if _begin_title_release_swallow_expired():
+		_clear_begin_title_release_swallow()
+		return false
+	return true
+
+
+func _clear_begin_title_release_swallow_on_new_left_press() -> void:
+	# Same-frame Begin press must keep the arm so the matching ~80 ms up is eaten.
+	# Poll-path: the Begin click's own press arrives in N+1 — eat that one only.
+	# One physical press can hit _input and _unhandled_input; treat same-frame
+	# deliveries as that first press, not a later click.
+	if not has_meta("eoa_begin_swallow_release"):
+		return
+	var now_frame: int = Engine.get_process_frames()
+	if has_meta("eoa_begin_swallow_press_pending"):
+		remove_meta("eoa_begin_swallow_press_pending")
+		set_meta("eoa_begin_swallow_press_seen_frame", now_frame)
+		return
+	if int(get_meta("eoa_begin_swallow_press_seen_frame", -1)) == now_frame:
+		return
+	var arm_frame: int = int(get_meta("eoa_begin_swallow_arm_frame", -1))
+	if now_frame > arm_frame:
+		_clear_begin_title_release_swallow()
+
+
+func _tick_begin_title_release_swallow() -> void:
+	if not has_meta("eoa_begin_swallow_release"):
+		return
+	if not has_meta("eoa_begin_swallow_clock_ready"):
+		var arm_frame: int = int(get_meta("eoa_begin_swallow_arm_frame", -1))
+		if Engine.get_process_frames() > arm_frame:
+			set_meta("eoa_begin_swallow_arm_msec", Time.get_ticks_msec())
+			set_meta("eoa_begin_swallow_clock_ready", true)
+		return
+	if _begin_title_release_swallow_expired():
+		_clear_begin_title_release_swallow()
+
+
+func _clear_begin_title_release_swallow() -> void:
+	if has_meta("eoa_begin_swallow_release"):
+		remove_meta("eoa_begin_swallow_release")
+	if has_meta("eoa_begin_swallow_arm_msec"):
+		remove_meta("eoa_begin_swallow_arm_msec")
+	if has_meta("eoa_begin_swallow_arm_frame"):
+		remove_meta("eoa_begin_swallow_arm_frame")
+	if has_meta("eoa_begin_swallow_clock_ready"):
+		remove_meta("eoa_begin_swallow_clock_ready")
+	if has_meta("eoa_begin_swallow_press_pending"):
+		remove_meta("eoa_begin_swallow_press_pending")
+	if has_meta("eoa_begin_swallow_press_seen_frame"):
+		remove_meta("eoa_begin_swallow_press_seen_frame")
 
 
 func dismiss_first_session_action_tip() -> void:
@@ -25400,6 +25601,16 @@ func _sync_map_label_glyph_stack(zoom_metric: float = -1.0) -> void:
 		_layout_zoomed_map_glyphs_for_province_node(int(pid), zz, show_glyphs)
 
 
+func _sync_supply_name_label_z_only() -> void:
+	## L toggle only needs name Label z so they stay above rings. Do not walk
+	## province_nodes / reset_size glyphs here — that was the live 1.6–4.8 s pause.
+	var z := _map_province_name_label_z_index()
+	for id in _province_name_labels:
+		var lbl: Variant = _province_name_labels[id]
+		if lbl is Label and is_instance_valid(lbl):
+			(lbl as Label).z_index = z
+
+
 func _sync_supply_route_canvas_stack() -> void:
 	if supply_map_layer == null or not is_instance_valid(supply_map_layer):
 		return
@@ -25412,11 +25623,13 @@ func _sync_supply_route_canvas_stack() -> void:
 	else:
 		supply_map_layer.self_modulate = Color.WHITE
 		supply_map_layer.trade_corridor_supply_dim = 1.0
-	_sync_map_label_glyph_stack()
+	_sync_supply_name_label_z_only()
 	supply_map_layer.queue_redraw()
 
 
 func _setup_supply_layer() -> void:
+	if _supply_toggle_in_progress:
+		_supply_toggle_setups += 1
 	if container == null:
 		return
 	if supply_map_layer == null or not is_instance_valid(supply_map_layer):
@@ -25640,6 +25853,7 @@ func _toggle_supply_overlay() -> void:
 	var sm := _supply_manager()
 	if sm == null:
 		return
+	_supply_toggle_in_progress = true
 	sm.toggle_overlay()
 	supply_mode = sm.overlay_visible
 	if supply_map_layer:
@@ -25658,16 +25872,18 @@ func _toggle_supply_overlay() -> void:
 		if ol_infra.has_method("queue_redraw"):
 			ol_infra.queue_redraw()
 	if supply_mode:
-		_setup_supply_layer()
+		# Boot already called `_setup_supply_layer`. Re-entering it on every L-on
+		# restacked 3k glyph Labels + recomputed roles (live ~4.5 s after batch cache).
+		if supply_map_layer == null or not is_instance_valid(supply_map_layer):
+			_setup_supply_layer()
 		# Hang-class: do not BFS a 3520-board corridor on the L/G frame.
 		_show_inspector_toast("Supply legend ON · click a unit chip to order (march / Ctrl+click assault)", 4.0)
-		_update_supply_overlay_legend()
+		_refresh_supply_highlights(true)
 	else:
 		_end_supply_reroute()
 		if supply_map_layer != null and supply_map_layer.has_method("clear_route_highlight"):
 			supply_map_layer.call("clear_route_highlight")
-	# Skip full fill recolor on toggle — was expensive; tint handles on next mapmode.
-	_refresh_supply_highlights()
+		_refresh_supply_highlights()
 	_update_supply_overlay_legend()
 	if _hover_province != null:
 		_refresh_hover_tooltip(_hover_province)
@@ -25675,6 +25891,7 @@ func _toggle_supply_overlay() -> void:
 		if not supply_mode:
 			supply_overlay_panel.hide_panel()
 	_sync_supply_route_canvas_stack()
+	_supply_toggle_in_progress = false
 
 
 func _refresh_supply_routes() -> void:
@@ -26111,6 +26328,7 @@ func _ensure_sea_nation_layer() -> Node2D:
 
 
 func _clear_sea_nation_layer_icons(only_pid: int = -1) -> void:
+	_invalidate_sea_fleet_offset_cache()
 	var layer: Node2D = _ensure_sea_nation_layer()
 	if layer == null:
 		return
@@ -26206,18 +26424,49 @@ func _sea_nation_anchor_shift(pid: int) -> Vector2:
 	return _sea_poly_centroid(poly) - _unit_chip_base_world(pid)
 
 
+## Shared-sea stack layout is zoom-invariant (pid + plate count + radius).
+## Rebuilding it every 6th unpaused frame was the idle ~150–230 ms hitch.
+var _sea_fleet_offset_cache: Dictionary = {}
+var _sea_fleet_offset_cache_enabled: bool = true
+var _fleet2_plate_label_log: Dictionary = {}
+
+
+func _invalidate_sea_fleet_offset_cache() -> void:
+	_sea_fleet_offset_cache.clear()
+
+
+func _sea_fleet_offset_cache_key(pid: int, count: int, radius: float) -> String:
+	return "%d|%d|%.3f" % [pid, count, radius]
+
+
+func _copy_sea_fleet_offset_array(src: Array) -> Array:
+	var out: Array = []
+	for v in src:
+		out.append(v as Vector2)
+	return out
+
+
 func _sea_nation_fleet_stack_offsets(count: int, radius: float, pid: int = -1) -> Array:
 	# 1 plate: chip base. 2: side-by-side if that stays over sea, else a column.
 	# 3+: 2x2 / column / row — pick the layout that stays inside (or closest
 	# to) the sea polygon so the Channel cannot fan across Kent / Belgium.
+	var key: String = _sea_fleet_offset_cache_key(pid, count, radius)
+	if _sea_fleet_offset_cache_enabled and _sea_fleet_offset_cache.has(key):
+		return _copy_sea_fleet_offset_array(_sea_fleet_offset_cache[key] as Array)
 	var r: float = maxf(radius, 12.0)
 	if count >= 3 and pid >= 0:
 		r = _sea_nation_fit_radius(pid, count, r)
 	if count <= 1:
-		return [Vector2.ZERO]
+		var single: Array = [Vector2.ZERO]
+		if _sea_fleet_offset_cache_enabled:
+			_sea_fleet_offset_cache[key] = _copy_sea_fleet_offset_array(single)
+		return single
 	var cands: Array = _sea_nation_layout_candidates(count, r)
 	if cands.is_empty():
-		return [Vector2.ZERO]
+		var empty_c: Array = [Vector2.ZERO]
+		if _sea_fleet_offset_cache_enabled:
+			_sea_fleet_offset_cache[key] = _copy_sea_fleet_offset_array(empty_c)
+		return empty_c
 	if pid >= 0 and count >= 3:
 		var shift: Vector2 = _sea_nation_anchor_shift(pid)
 		if shift.length_squared() > 0.01:
@@ -26230,9 +26479,15 @@ func _sea_nation_fleet_stack_offsets(count: int, radius: float, pid: int = -1) -
 				shifted.append(one)
 			cands = shifted
 	if pid < 0:
-		return cands[0] as Array
+		var raw0: Array = cands[0] as Array
+		if _sea_fleet_offset_cache_enabled:
+			_sea_fleet_offset_cache[key] = _copy_sea_fleet_offset_array(raw0)
+		return raw0
 	var chosen: Array = _sea_nation_choose_clamped_offsets(pid, cands, r)
-	return _sea_nation_maybe_fallback_chip_base(pid, chosen, r, count)
+	var result: Array = _sea_nation_maybe_fallback_chip_base(pid, chosen, r, count)
+	if _sea_fleet_offset_cache_enabled:
+		_sea_fleet_offset_cache[key] = _copy_sea_fleet_offset_array(result)
+	return result
 
 
 func _sea_nation_layout_candidates(count: int, radius: float) -> Array:
@@ -26709,9 +26964,13 @@ func _sea_nation_plate_label(fo: Object, tag: String, _index: int = 0) -> String
 	if fo != null and "formation_id" in fo:
 		fid = str(fo.formation_id)
 	var label: String = "%s\nFleet %d" % [t, num]
-	print("EOA_FLEET2 who=plate_label fid=%s tag=%s ordinal=%d label='%s'" % [
-		fid, t, num, label.replace("\n", "|")
-	])
+	var log_key: String = fid if not fid.is_empty() else "%s|%d" % [t, num]
+	var prev_label: String = str(_fleet2_plate_label_log.get(log_key, ""))
+	if prev_label != label:
+		_fleet2_plate_label_log[log_key] = label
+		print("EOA_FLEET2 who=plate_label fid=%s tag=%s ordinal=%d label='%s'" % [
+			fid, t, num, label.replace("\n", "|")
+		])
 	return label
 
 
@@ -28937,12 +29196,15 @@ func _set_compare_preview_outline(province_id: int, visible: bool) -> void:
 
 
 func _supply_highlight_roles() -> Dictionary[int, String]:
+	if _supply_toggle_in_progress:
+		_supply_toggle_role_computes += 1
 	var roles: Dictionary[int, String] = {}
 	if not supply_mode:
 		return roles
 	var sm := _supply_manager()
 	for pid in province_nodes.keys():
-		if ProvinceInsight.depot_fill_ratio(int(pid)) >= 0.0:
+		var depot: Variant = sm.get_depot_state(int(pid)) if sm != null else null
+		if depot != null and float(depot.fill_ratio()) >= 0.0:
 			roles[int(pid)] = "hub"  # overwritten below if on route / preview / selected
 	if sm == null:
 		return roles
@@ -28992,7 +29254,7 @@ func _supply_highlight_roles() -> Dictionary[int, String]:
 
 
 func _apply_infra_pressure_overlay_roles(roles: Dictionary[int, String]) -> void:
-	if not supply_mode or typeof(MapManager) == TYPE_NIL:
+	if not supply_mode:
 		return
 	for pid_var in province_nodes.keys():
 		var pid := int(pid_var)
@@ -29004,12 +29266,34 @@ func _apply_infra_pressure_overlay_roles(roles: Dictionary[int, String]) -> void
 		var p: Province = provinces[pid] as Province
 		if p == null:
 			continue
+		var focus := ProvinceInsight.agent_pressure_focus_kind(p)
+		# Mass 1936 path: infra < 45 + owned land → engineers_recommended.
+		# Must not call get_engineer_assignment_snapshot / breakdown per pid
+		# (that was the L-on hang: 3k snapshots + 6k Line2Ds).
+		if focus != "sabotage":
+			var tag := str(p.controller_tag).strip_edges().to_upper()
+			if tag.is_empty():
+				tag = str(p.owner_tag).strip_edges().to_upper()
+			if not tag.is_empty() and ProvinceInsight.province_benefits_country(p, tag):
+				if int(p.infrastructure) < 45:
+					roles[pid] = "engineers_recommended"
+					continue
+				if focus == "disrupt":
+					roles[pid] = "supply_pressure"
+					continue
+				continue
+			if focus == "disrupt":
+				roles[pid] = "supply_pressure"
+				continue
+			continue
+		if typeof(MapManager) == TYPE_NIL:
+			continue
 		var bd: Dictionary = MapManager.get_infrastructure_repair_breakdown(pid)
 		var eng_role := ProvinceInsight.get_engineer_supply_overlay_role(p, bd)
 		if not eng_role.is_empty():
 			roles[pid] = eng_role
 			continue
-		if ProvinceInsight.agent_pressure_focus_kind(p) == "disrupt":
+		if focus == "disrupt":
 			roles[pid] = "supply_pressure"
 			continue
 		var depot_sab := float(bd.get("depot_sabotage_level", 0.0))
@@ -29019,6 +29303,17 @@ func _apply_infra_pressure_overlay_roles(roles: Dictionary[int, String]) -> void
 
 
 func _pulse_supply_outlines() -> void:
+	if _supply_outline_batch != null and is_instance_valid(_supply_outline_batch) and _supply_outline_batch.visible:
+		var skip: Dictionary = {}
+		for flash_pid in _engineer_assign_flash_by_province.keys():
+			skip[int(flash_pid)] = true
+		if _hover_outline_province_id >= 0:
+			skip[_hover_outline_province_id] = true
+		if _supply_outline_batch.has_method("set_skip_pids"):
+			_supply_outline_batch.call("set_skip_pids", skip)
+		if _supply_outline_batch.has_method("set_pulse_phase"):
+			_supply_outline_batch.call("set_pulse_phase", _outline_pulse_phase)
+		return
 	for pid in _supply_role_by_province.keys():
 		if _engineer_assign_flash_by_province.has(pid):
 			continue  # `_apply_engineer_assignment_flash_pulses` owns NODE_SUPPLY for this province.
@@ -29085,33 +29380,136 @@ func _pulse_amount_for_supply_role(role: String) -> float:
 			return 0.28
 
 
-func _refresh_supply_highlights() -> void:
-	# Hang-class: province pick must not walk 3520 outlines when supply overlay is off.
-	if not supply_mode and _supply_role_by_province.is_empty():
+func _refresh_supply_highlights(reuse_cached_roles: bool = false) -> void:
+	# Hang-class: L off is hide-only. Never walk 3520 nodes or rebuild Line2Ds.
+	if not supply_mode:
+		_set_supply_outline_batch_visible(false)
+		_supply_role_by_province = {}
+		return
+	if reuse_cached_roles and _supply_outline_batch_is_ready() and not _supply_roles_cache.is_empty():
+		_supply_role_by_province = _supply_roles_cache.duplicate()
+		_set_supply_outline_batch_visible(true)
 		return
 	var roles := _supply_highlight_roles()
 	_supply_role_by_province = roles
-	if roles.is_empty() and not supply_mode:
+	if _supply_roles_cache_matches(roles) and _supply_outline_batch_is_ready():
+		_set_supply_outline_batch_visible(true)
 		return
-	for pid in province_nodes.keys():
+	_supply_roles_cache = roles.duplicate()
+	_apply_supply_roles_to_batch(roles)
+
+
+func get_supply_overlay_outline_visible_count() -> int:
+	if not supply_mode:
+		return 0
+	if _supply_outline_batch_is_ready() and _supply_outline_batch.visible:
+		if _supply_outline_batch.has_method("visible_item_count"):
+			return int(_supply_outline_batch.call("visible_item_count"))
+	var n := 0
+	for pid in _supply_role_by_province.keys():
 		var node := _province_node(int(pid))
 		if node == null:
 			continue
-		var role: String = str(roles.get(int(pid), ""))
+		var line := node.get_node_or_null(ProvinceMapVisuals.NODE_SUPPLY) as Line2D
+		if line != null and line.visible:
+			n += 1
+	return n
+
+
+func get_supply_outline_rebuild_count() -> int:
+	return _supply_outline_rebuild_count
+
+
+func get_supply_toggle_role_computes() -> int:
+	return _supply_toggle_role_computes
+
+
+func get_supply_toggle_setups() -> int:
+	return _supply_toggle_setups
+
+
+func get_supply_toggle_glyph_layouts() -> int:
+	return _supply_toggle_glyph_layouts
+
+
+func _supply_outline_batch_is_ready() -> bool:
+	return _supply_outline_batch != null and is_instance_valid(_supply_outline_batch)
+
+
+func _supply_roles_cache_matches(roles: Dictionary[int, String]) -> bool:
+	if roles.size() != _supply_roles_cache.size():
+		return false
+	for pid in roles.keys():
+		if str(_supply_roles_cache.get(int(pid), "")) != str(roles[pid]):
+			return false
+	return true
+
+
+func _set_supply_outline_batch_visible(on: bool) -> void:
+	if not _supply_outline_batch_is_ready():
+		return
+	_supply_outline_batch.visible = on
+
+
+func _cached_supply_polygon(node: Node2D, pid: int) -> PackedVector2Array:
+	if _supply_poly_cache.has(pid):
+		return _supply_poly_cache[pid]
+	var pts := _province_polygon(node)
+	_supply_poly_cache[pid] = pts
+	return pts
+
+
+func _ensure_supply_outline_batch() -> Node2D:
+	if _supply_outline_batch_is_ready():
+		return _supply_outline_batch
+	if container == null:
+		return null
+	var existing := container.get_node_or_null("SupplyOutlineBatch") as Node2D
+	if existing != null:
+		_supply_outline_batch = existing
+		return _supply_outline_batch
+	var batch: Node2D = _SupplyOutlineBatchLayerScr.new() as Node2D
+	if batch == null:
+		return null
+	batch.name = "SupplyOutlineBatch"
+	container.add_child(batch)
+	_supply_outline_batch = batch
+	return _supply_outline_batch
+
+
+func _apply_supply_roles_to_batch(roles: Dictionary[int, String]) -> void:
+	var batch := _ensure_supply_outline_batch()
+	if batch == null:
+		return
+	var items: Array[Dictionary] = []
+	for pid_var in roles.keys():
+		var pid := int(pid_var)
+		var role := str(roles[pid_var])
 		if role.is_empty():
-			ProvinceMapVisuals.hide_polished_outline(node, ProvinceMapVisuals.NODE_SUPPLY)
+			continue
+		if _engineer_assign_flash_by_province.has(pid):
+			continue
+		var node := _province_node(pid)
+		if node == null:
+			continue
+		var pts := _cached_supply_polygon(node, pid)
+		if pts.size() < 3:
 			continue
 		var style: Dictionary = ProvinceMapVisuals.get_supply_outline_style(role)
-		ProvinceMapVisuals.ensure_polished_outline(
-			node,
-			_province_polygon(node),
-			ProvinceMapVisuals.NODE_SUPPLY,
-			style["color"],
-			style["width"],
-			style["glow"],
-			style["glow_extra"],
-			style["z_index"],
-		)
+		items.append({
+			"pid": pid,
+			"points": pts,
+			"color": style["color"],
+			"glow": style["glow"],
+			"width": style["width"],
+			"glow_extra": style["glow_extra"],
+			"z_index": style["z_index"],
+			"role": role,
+		})
+	if batch.has_method("set_items"):
+		batch.call("set_items", items)
+	batch.visible = true
+	_supply_outline_rebuild_count += 1
 
 
 func _update_supply_overlay_legend() -> void:
@@ -30589,6 +30987,7 @@ func _update_unit_icons_for_pids(pids: Array) -> void:
 
 
 func _rebuild_demo_unit_icons(only_pids: Dictionary) -> void:
+	_invalidate_sea_fleet_offset_cache()
 	var scoped := not only_pids.is_empty()
 	# Clear previous demo icons only where we placed them (or only listed pids).
 	var kept: Array = []
