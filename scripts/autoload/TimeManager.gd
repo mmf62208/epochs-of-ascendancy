@@ -1496,7 +1496,14 @@ func _profile_day_ai_steps() -> void:
 	var t_all := Time.get_ticks_usec()
 	var t0 := Time.get_ticks_usec()
 	_maybe_run_interactive_multi_ai()
-	steps.append({"name": "multi_ai", "ms": float(Time.get_ticks_usec() - t0) / 1000.0})
+	var multi_ms := float(Time.get_ticks_usec() - t0) / 1000.0
+	var multi_prof: Dictionary = {}
+	if typeof(GameData) != TYPE_NIL and GameData.has_method("get_last_interactive_multi_ai_profile"):
+		var mp: Variant = GameData.call("get_last_interactive_multi_ai_profile")
+		if mp is Dictionary:
+			multi_prof = mp as Dictionary
+	steps.append({"name": "multi_ai", "ms": multi_ms, "countries": multi_prof.get("countries", [])})
+	last_day_tick_profile["multi_ai_profile"] = multi_prof
 	t0 = Time.get_ticks_usec()
 	_maybe_run_ai_infra_invest()
 	steps.append({"name": "ai_infra", "ms": float(Time.get_ticks_usec() - t0) / 1000.0})

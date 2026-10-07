@@ -39,6 +39,20 @@ class TestPerf4DailySimTickProduct(unittest.TestCase):
         self.assertIn("peek_peace_state", body)
         self.assertNotIn("duplicate(true)", body)
 
+    def test_multi_ai_fix_needles(self) -> None:
+        p = build_perf4_daily_sim_tick_product()
+        for key in (
+            "multi_ai_country_profile",
+            "soft_supply_uses_light",
+            "production_day_cache",
+            "line_owner_index_hot_path",
+            "supply_interactive_light",
+            "regional_control_owner_index",
+            "headless_multi_ai_budget_test",
+            "multi_ai_wired_into_gates",
+        ):
+            self.assertIn(key, p.get("passes") or [], msg=p)
+
 
 if __name__ == "__main__":
     unittest.main()

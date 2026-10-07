@@ -8,6 +8,13 @@ Secondary: MapManager.get_provinces_by_owner walked ~3520 hexes per call.
 This product greps the shipped path. Headless
 `HeadlessPerf4DailySimTickTest` times the live-F5 day flush and checks
 outcome equivalence (same AI infra decisions, same seed).
+
+FIX #1: live Play hitch was `_maybe_run_interactive_multi_ai` (1.5–1.7s).
+The old headless clock never built a live-weight supply network, so the
+soft `apply_supply` tick looked cheap. Soft theater tick now uses
+`advance_supply_day_interactive_light` (same depot formula as the daily
+F5 listener). Production shares a per-day line-owner / modifier cache.
+`HeadlessPerf4InteractiveMultiAiTest` drives that Play entry point.
 """
 from __future__ import annotations
 
@@ -20,6 +27,9 @@ TM_GD = ROOT / "scripts" / "autoload" / "TimeManager.gd"
 MM_GD = ROOT / "scripts" / "map" / "MapManager.gd"
 IDM_GD = ROOT / "scripts" / "map" / "InfrastructureDevelopmentManager.gd"
 HD_GD = ROOT / "scripts" / "core" / "HeadlessPerf4DailySimTickTest.gd"
+HD_MULTI_GD = ROOT / "scripts" / "core" / "HeadlessPerf4InteractiveMultiAiTest.gd"
+PM_GD = ROOT / "scripts" / "autoload" / "ProductionManager.gd"
+SM_GD = ROOT / "scripts" / "supply" / "SupplyManager.gd"
 GATES_SH = ROOT / "tools" / "eoa_full_test_gates.sh"
 
 DAY_TICK_FRAME_BUDGET_MS = 500
@@ -57,6 +67,9 @@ def build_perf4_daily_sim_tick_product() -> Dict[str, Any]:
     mm = _read(MM_GD)
     idm = _read(IDM_GD)
     hd = _read(HD_GD)
+    hd_multi = _read(HD_MULTI_GD)
+    pm = _read(PM_GD)
+    sm = _read(SM_GD)
     gates = _read(GATES_SH)
 
     peek = extract_gd_func_body(gd, "peek_peace_state")
@@ -122,6 +135,43 @@ def build_perf4_daily_sim_tick_product() -> Dict[str, Any]:
         passes.append("wired_into_quick")
     else:
         fails.append("wired_into_quick")
+
+    live_ai = extract_gd_func_body(gd, "apply_interactive_multi_ai_day_live")
+    if live_ai and "country_profile" in live_ai and "begin_interactive_multi_ai_day_cache" in live_ai:
+        passes.append("multi_ai_country_profile")
+    else:
+        fails.append("multi_ai_country_profile")
+    supply_fn = extract_gd_func_body(gd, "apply_supply_route_mutation")
+    if supply_fn and "advance_supply_day_interactive_light" in supply_fn:
+        passes.append("soft_supply_uses_light")
+    else:
+        fails.append("soft_supply_uses_light")
+    if "func begin_interactive_multi_ai_day_cache" in pm:
+        passes.append("production_day_cache")
+    else:
+        fails.append("production_day_cache")
+    adv_fn = extract_gd_func_body(pm, "advance_days_for_country")
+    if adv_fn and "_interactive_ai_line_ids_by_owner" in adv_fn:
+        passes.append("line_owner_index_hot_path")
+    else:
+        fails.append("line_owner_index_hot_path")
+    if "func advance_supply_day_interactive_light" in sm:
+        passes.append("supply_interactive_light")
+    else:
+        fails.append("supply_interactive_light")
+    owner_set_fn = extract_gd_func_body(mm, "get_fully_controlled_strategic_regions")
+    if owner_set_fn and "_owned_or_controlled_pid_set" in owner_set_fn:
+        passes.append("regional_control_owner_index")
+    else:
+        fails.append("regional_control_owner_index")
+    if HD_MULTI_GD.is_file() and "_maybe_run_interactive_multi_ai" in hd_multi and "FRAME_BUDGET_MS" in hd_multi:
+        passes.append("headless_multi_ai_budget_test")
+    else:
+        fails.append("headless_multi_ai_budget_test")
+    if "launch_perf4_interactive_multi_ai" in gates:
+        passes.append("multi_ai_wired_into_gates")
+    else:
+        fails.append("multi_ai_wired_into_gates")
 
     ok = not fails
     return {

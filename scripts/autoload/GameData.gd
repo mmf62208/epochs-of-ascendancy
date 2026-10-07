@@ -4439,9 +4439,15 @@ func apply_supply_route_mutation(route_id: String = "main", priority: String = "
 		if province_id > 0 and SupplyManager.has_method("set_player_depot"):
 			SupplyManager.set_player_depot(province_id, true)
 		if SupplyManager.has_method("advance_supply_day"):
-			SupplyManager.advance_supply_day(1.0)
+			var used_light := false
+			if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("is_interactive_light_sim"):
+				if bool(TimeManager.is_interactive_light_sim()) and SupplyManager.has_method("advance_supply_day_interactive_light"):
+					SupplyManager.call("advance_supply_day_interactive_light", 1.0)
+					used_light = true
+			if not used_light:
+				SupplyManager.advance_supply_day(1.0)
 			supply_live = true
-			supply_detail = "advance_supply_day"
+			supply_detail = "advance_supply_day_light" if used_light else "advance_supply_day"
 	peace_state["supply_last_live_apply"] = {
 		"route_id": route_id,
 		"priority": priority,
@@ -26235,6 +26241,14 @@ func apply_year_multi_ai_campaign_live(days: int = 365, province_id: int = 1, le
 	return result
 
 
+## Last per-country / sub-step profile from apply_interactive_multi_ai_day_live.
+var last_interactive_multi_ai_profile: Dictionary = {}
+
+
+func get_last_interactive_multi_ai_profile() -> Dictionary:
+	return last_interactive_multi_ai_profile.duplicate(true)
+
+
 ## Interactive F5 multi-AI day: budgeted non-player major production applies so multi-day
 ## advances feel alive without full simulate_daily_ai_combat / multi-faction cascade (OOM risk).
 ## Default ON under TimeManager interactive light sim. Killswitch: EOA_INTERACTIVE_MULTI_AI=0.
@@ -26347,6 +26361,11 @@ func apply_interactive_multi_ai_day_live(province_id: int = 1) -> Dictionary:
 	var soft_tag := ""
 	var last_live: Dictionary = {}
 
+	if typeof(ProductionManager) != TYPE_NIL and ProductionManager.has_method("begin_interactive_multi_ai_day_cache"):
+		ProductionManager.call("begin_interactive_multi_ai_day_cache")
+
+	var country_profile: Array = []
+	var t_all := Time.get_ticks_usec()
 	# CRITICAL: use apply_production_for_tag(tag) — never player-scoped apply_production
 	# (order-panel production always mutates LeaderManager player stockpile).
 	for tag_v in ordered:
@@ -26355,7 +26374,9 @@ func apply_interactive_multi_ai_day_live(province_id: int = 1) -> Dictionary:
 		var tag := str(tag_v)
 		if tag == player_tag:
 			continue
+		var t_tag := Time.get_ticks_usec()
 		var live: Dictionary = apply_production_for_tag(tag)
+		var tag_ms := float(Time.get_ticks_usec() - t_tag) / 1000.0
 		last_live = live
 		var ok_apply := bool(live.get("ok", false))
 		var ag := float(aggression.get(tag, 0.5))
@@ -26372,6 +26393,15 @@ func apply_interactive_multi_ai_day_live(province_id: int = 1) -> Dictionary:
 		prod_tags.append(tag)
 		if ok_apply:
 			applied_production += 1
+		country_profile.append({
+			"tag": tag,
+			"step": "production",
+			"ms": tag_ms,
+			"ok": ok_apply,
+			"lines_touched": int(live.get("lines_touched", 0)),
+			"stock_delta": int(live.get("stock_delta", 0)),
+			"soft_stock_credit": int(live.get("soft_stock_credit", 0)),
+		})
 
 	if soft_cap > 0 and queue.size() < budget and not ordered.is_empty():
 		var pick := ""
@@ -26386,6 +26416,7 @@ func apply_interactive_multi_ai_day_live(province_id: int = 1) -> Dictionary:
 					pick = str(tag_v3)
 					break
 		var soft_ok := false
+		var t_soft := Time.get_ticks_usec()
 		if not pick.is_empty() and has_method("apply_order_panel_action"):
 			# Soft tick is theater-wide supply; tag recorded for audit only
 			var live2: Dictionary = apply_order_panel_action("apply_supply", province_id)
@@ -26393,6 +26424,7 @@ func apply_interactive_multi_ai_day_live(province_id: int = 1) -> Dictionary:
 			soft_ok = bool(live2.get("ok", live2.get("success", true)))
 		elif not pick.is_empty():
 			soft_ok = true
+		var soft_ms := float(Time.get_ticks_usec() - t_soft) / 1000.0
 		if not pick.is_empty():
 			queue.append({
 				"tag": pick,
@@ -26404,10 +26436,29 @@ func apply_interactive_multi_ai_day_live(province_id: int = 1) -> Dictionary:
 			soft_tag = pick
 			if soft_ok:
 				soft_applied = 1
+			country_profile.append({
+				"tag": pick,
+				"step": "soft_supply",
+				"ms": soft_ms,
+				"ok": soft_ok,
+			})
+
+	if typeof(ProductionManager) != TYPE_NIL and ProductionManager.has_method("end_interactive_multi_ai_day_cache"):
+		ProductionManager.call("end_interactive_multi_ai_day_cache")
 
 	var ok := applied_production >= 1 or candidates.is_empty()
 	var ticks := int(peace_state.get("interactive_multi_ai_day_ticks", 0)) + 1
 	peace_state["interactive_multi_ai_day_ticks"] = ticks
+	var total_ms := float(Time.get_ticks_usec() - t_all) / 1000.0
+	last_interactive_multi_ai_profile = {
+		"total_ms": total_ms,
+		"countries": country_profile,
+		"prod_tags": prod_tags.duplicate(),
+		"soft_tag": soft_tag,
+		"player_tag": player_tag,
+		"day_index": day_index,
+	}
+	peace_state["interactive_multi_ai_profile"] = last_interactive_multi_ai_profile.duplicate(true)
 	var result := {
 		"ok": ok,
 		"live": true,
@@ -26428,6 +26479,8 @@ func apply_interactive_multi_ai_day_live(province_id: int = 1) -> Dictionary:
 		"interactive_multi_ai_day_ticks": ticks,
 		"province_id": province_id,
 		"last_live": last_live,
+		"country_profile": country_profile,
+		"total_ms": total_ms,
 		"manager": "GameData.interactive_multi_ai_day",
 	}
 	peace_state["interactive_multi_ai_day"] = result.duplicate(true)

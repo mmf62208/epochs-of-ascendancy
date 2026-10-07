@@ -605,6 +605,12 @@ func _generate_local_supply_from_development_light(days: float) -> void:
 				daily_gen *= (1.0 - clampf(disruption * 0.25, 0.0, 0.6))
 		state.apply_inflow(daily_gen)
 
+## Interactive F5 / multi-AI soft theater tick: same depot inflow as the daily
+## light listener. Must not re-enter the full air/naval/weather cascade.
+func advance_supply_day_interactive_light(days: float = 1.0) -> void:
+	_advance_supply_day_light(days)
+
+
 func advance_supply_day(days: float = 1.0) -> void:
 	if days <= 0.0:
 		return

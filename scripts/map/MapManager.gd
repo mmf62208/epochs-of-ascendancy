@@ -883,56 +883,42 @@ func set_strategic_regions(regions: Dictionary) -> void:
 
 ## Returns list of region_ids that the given tag FULLY owns (all provinces in the region have owner_tag == tag).
 ## "Full control" is a powerful, desirable state — used for special regional rewards/bonuses.
+func _owned_or_controlled_pid_set(tag: String) -> Dictionary:
+	_ensure_owner_index()
+	var owned: Dictionary = {}
+	var raw_own: Variant = _owner_index.get(tag, [])
+	if raw_own is Array:
+		for pid_v in raw_own:
+			owned[int(pid_v)] = true
+	var raw_ctrl: Variant = _controller_index.get(tag, [])
+	if raw_ctrl is Array:
+		for pid_v2 in raw_ctrl:
+			owned[int(pid_v2)] = true
+	return owned
+
+
 func get_fully_controlled_strategic_regions(tag: String) -> Array[int]:
 	if tag.is_empty():
 		return []
+	var t := tag.strip_edges().to_upper()
+	var owned: Dictionary = _owned_or_controlled_pid_set(t)
 	var loader := get_node_or_null("/root/ScenarioLoader") as ScenarioLoader
-	if loader != null and loader.strategic_regions.size() > 0 and loader.provinces.size() > 0:
-		# Always direct from loader for scenario fidelity (post-remap + owner align from improved connections). This makes full control counts reliable.
-		var t := tag.strip_edges().to_upper()
-		var controlled: Array[int] = []
-		for rid in loader.strategic_regions.keys():
-			var r = loader.strategic_regions[rid]
-			var pids = r.get("province_ids", [])
-			if pids.is_empty(): continue
-			var fully := true
-			for pv in pids:
-				var ppid = int(pv)
-				if loader.provinces.has(ppid):
-					var pp: Province = loader.provinces[ppid]
-					var ot = str(pp.owner_tag).strip_edges().to_upper()
-					var ct = str(pp.controller_tag).strip_edges().to_upper()
-					if ot != t and ct != t:
-						fully = false
-						break
-				else:
-					fully = false
-					break
-			if fully:
-				controlled.append(int(rid))
-		return controlled
-	# Fallback to internal if loader not ready yet
 	var strategic_src: Dictionary = _strategic_regions
-	var prov_src: Dictionary = _provinces
-	if strategic_src.is_empty() or prov_src.is_empty():
+	if loader != null and loader.strategic_regions.size() > 0:
+		strategic_src = loader.strategic_regions
+	if strategic_src.is_empty():
 		return []
 	var controlled: Array[int] = []
 	for rid in strategic_src.keys():
-		var r: Dictionary = strategic_src[rid]
-		var pids: Array = r.get("province_ids", [])
+		var r: Variant = strategic_src[rid]
+		var pids: Array = []
+		if r is Dictionary:
+			pids = (r as Dictionary).get("province_ids", []) as Array
 		if pids.is_empty():
 			continue
 		var fully := true
 		for pidv in pids:
-			var pid := int(pidv)
-			var p: Province = prov_src.get(pid)
-			if p == null:
-				fully = false
-				break
-			var ot := p.owner_tag.strip_edges().to_upper()
-			var ct := p.controller_tag.strip_edges().to_upper()
-			var t := tag.strip_edges().to_upper()
-			if ot != t and ct != t:
+			if not owned.has(int(pidv)):
 				fully = false
 				break
 		if fully:
@@ -984,28 +970,6 @@ func get_active_regional_control_bonuses(tag: String) -> Dictionary:
 		if hit is Dictionary:
 			return (hit as Dictionary).duplicate(true)
 	var controlled := get_fully_controlled_strategic_regions(tag)
-	var loader := get_node_or_null("/root/ScenarioLoader") as ScenarioLoader
-	if loader != null and loader.strategic_regions.size() > 0 and loader.provinces.size() > 0:
-		# Always prefer direct compute from loader for scenario connection (post-remap/owner align + timing safe)
-		controlled = []
-		var t := tag.strip_edges().to_upper()
-		for rid in loader.strategic_regions.keys():
-			var r = loader.strategic_regions[rid]
-			var pids = r.get("province_ids", [])
-			if pids.is_empty(): continue
-			var fully := true
-			for pv in pids:
-				var ppid = int(pv)
-				if loader.provinces.has(ppid):
-					var pp: Province = loader.provinces[ppid]
-					var ot = str(pp.owner_tag).strip_edges().to_upper()
-					var ct = str(pp.controller_tag).strip_edges().to_upper()
-					if ot != t and ct != t:
-						fully=false; break
-				else:
-					fully=false; break
-			if fully:
-				controlled.append(int(rid))
 	if controlled.is_empty():
 		_regional_bonus_cache[t_cache] = {}
 		return {}

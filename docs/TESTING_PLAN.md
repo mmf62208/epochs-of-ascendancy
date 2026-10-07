@@ -370,12 +370,14 @@ tools/run_godot.sh --headless --path . --resolution 1280x740 -s res://scripts/co
 tools/eoa_fac1a_pixel_guard.sh
 ```
 
-**PERF-4 daily sim-tick hitch:** TimeManager profiles each `game_day_advanced` listener and day_ai / day_battles steps. `GameData.get_peace_state` must not `duplicate(true)` (use `peek_peace_state`; snapshot via `get_peace_state_copy`). Owner lists use `_ensure_owner_index`. Headless `HeadlessPerf4DailySimTickTest`: **FAIL on main** `425b4448` (deepcopy / no timers / no profile history, 7d wall 1396.7ms) · **PASS after merge onto `61a80433`** (worst phase 20.5ms day_ai, 7d wall 72.6ms, seed 193601 infra decisions identical). Product `test_perf4_daily_sim_tick_product` on `--quick`. Title / Begin / sea-fleet / Home star / supply overlay / chips **unedited**.
+**PERF-4 daily sim-tick hitch:** TimeManager profiles each `game_day_advanced` listener and day_ai / day_battles steps. `GameData.get_peace_state` must not `duplicate(true)` (use `peek_peace_state`; snapshot via `get_peace_state_copy`). Owner lists use `_ensure_owner_index`. Headless `HeadlessPerf4DailySimTickTest`: **FAIL on main** `425b4448` (deepcopy / no timers / no profile history, 7d wall 1396.7ms) · **PASS after merge onto `61a80433`** (worst phase 20.5ms day_ai, 7d wall 72.6ms, seed 193601 infra decisions identical). **FIX #1:** live Play of `289268ed` still 2.0–2.4 s because `_maybe_run_interactive_multi_ai` ran full `advance_supply_day` + per-country line/region walks. Soft tick uses `advance_supply_day_interactive_light`; production shares a per-day cache. Guard `HeadlessPerf4InteractiveMultiAiTest` **FAIL on main `61a80433` and `289268ed`** · **PASS** after FIX #1. Product `test_perf4_daily_sim_tick_product` on `--quick`. Title / Begin / sea-fleet / Home star / supply overlay / chips **unedited**.
 
 ```bash
 python3 -m unittest tools.map_generation.tests.test_perf4_daily_sim_tick_product -v
 EOA_DAY_TICK_PROFILE=1 tools/run_godot.sh --headless --path . \
   -s res://scripts/core/HeadlessPerf4DailySimTickTest.gd
+tools/run_godot.sh --headless --path . \
+  -s res://scripts/core/HeadlessPerf4InteractiveMultiAiTest.gd
 ```
 
 **PERF-1 FIX #1 (pan icons):** `_process` still `queue_redraw`s on ≥8px pan so previously culled airfields appear. Clusters cache per `_markers_zoom`; `_build_markers` must not increment on pan. Headless `HeadlessFac1aPanIconsTest` **RESULT=PASS** (Home z=0.33, ≥1 screen-width pan, drawn>0, build count unchanged). MapRenderer fill-zoom fix kept. Camera / edge-pan / chip pick **unedited**.
