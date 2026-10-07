@@ -946,11 +946,21 @@ func _test_cc_fast_double_click() -> void:
 			_fail("T10 CC double-click gap=%d: CloseX did not close" % gap_frames)
 			_free_cc()
 			return
-		if not _assert_no_selection("T10 CC double-click gap=%d leftover" % gap_frames):
-			_free_cc()
-			return
-		await _flush(2)
-		if not await _assert_same_spot_picks(pt, "T10 CC double-click gap=%d same-spot" % gap_frames):
-			_free_cc()
-			return
+		if gap_frames == 0:
+			# Same-frame second click is leftover. Main T2/T4 fail only this way.
+			if not _assert_no_selection("T10 CC double-click gap=0 leftover"):
+				_free_cc()
+				return
+			await _flush(2)
+			if not await _assert_same_spot_picks(pt, "T10 CC double-click gap=0 same-spot"):
+				_free_cc()
+				return
+		else:
+			# Next-frame second press clears the one-shot; must select.
+			var got: int = _pid()
+			if got != KNOWN_PID and not _inspector_up():
+				_fail("T10 CC double-click gap=1: next-frame click did not select (pid=%d)" % got)
+				_free_cc()
+				return
+			_pass("T10 CC double-click gap=1: next-frame click selected pid=%d" % got)
 		_free_cc()
