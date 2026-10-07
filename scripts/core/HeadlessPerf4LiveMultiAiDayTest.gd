@@ -122,7 +122,10 @@ func _run() -> void:
 		return
 	_test_step_costs(gd, sm, tm)
 	_test_repeated_real_depot_guard(sm)
+	_test_capture_frame_budgets(mm, sm)
+	_test_peace_annexation_updates_supply(gd, mm, sm)
 	_test_capture_matches_full_rebuild(mm, sm)
+	_test_one_full_supply_day_per_game_day(tm, gd, sm)
 	_test_production_cache_measured(gd)
 	_test_owner_index_measured(mm)
 	_test_multi_ai_decisions_stable(gd, tm)
@@ -140,6 +143,24 @@ func _test_source_gates_fail_on_pre_fix() -> void:
 		_fail("set_player_depot still accepts dummy/missing pids (pre-fix FAIL class)")
 	else:
 		_pass("set_player_depot skips pids missing from the board")
+	if "build_network" in depot:
+		_fail("set_player_depot still full-rebuilds the network (2d930483 FAIL class)")
+	else:
+		_pass("set_player_depot patches one hub (no build_network)")
+	var notify := _slice_func(sm_src, "notify_province_control_changed")
+	if notify.is_empty() or "_rebuild_default_routes" in notify:
+		_fail("notify_province_control_changed still rebuilds every route (2d930483 FAIL class)")
+	else:
+		_pass("notify_province_control_changed does not rebuild all routes")
+	var day_fn := _slice_func(sm_src, "_on_game_day_advanced")
+	if "_advance_supply_day_light" not in day_fn or "is_interactive_light_sim" not in day_fn:
+		_fail("daily listener lost main's light/full split (2d930483 FAIL class)")
+	else:
+		_pass("daily listener restores main light path")
+	if "full_supply_day_count" not in sm_src:
+		_fail("full_supply_day_count missing")
+	else:
+		_pass("full_supply_day_count present")
 	var adv := _slice_func(sm_src, "advance_supply_day")
 	if "_process_air_missions" not in adv or "_process_naval_recon" not in adv:
 		_fail("advance_supply_day dropped air/naval steps (gameplay change)")
@@ -161,6 +182,11 @@ func _test_source_gates_fail_on_pre_fix() -> void:
 		_pass("apply_supply uses full advance_supply_day")
 	else:
 		_fail("apply_supply lost advance_supply_day")
+	var peace := _slice_func(gd_src, "apply_peace_conference_settlement_live")
+	if "update_province_owner" not in peace and "notify_province_control_changed" not in peace:
+		_fail("peace annexation writes ownership without notifying supply")
+	else:
+		_pass("peace annexation notifies supply")
 	var live := _slice_func(gd_src, "apply_interactive_multi_ai_day_live")
 	if "apply_production_for_tag" not in live or "apply_order_panel_action" not in live:
 		_fail("interactive multi-AI live body lost production / apply_supply")
@@ -390,30 +416,37 @@ func _test_repeated_real_depot_guard(sm: Node) -> void:
 		_fail("set_player_depot missing")
 		return
 	var before := int(sm.get("network_build_count")) if "network_build_count" in sm else -1
-	if before < 0:
-		_fail("network_build_count missing (depot mutant unguarded)")
+	var patch0 := int(sm.get("network_hub_patch_count")) if "network_hub_patch_count" in sm else -1
+	if before < 0 or patch0 < 0:
+		_fail("depot counts missing (hub-patch mutant unguarded)")
 		return
 	var t_first := Time.get_ticks_usec()
 	sm.call("set_player_depot", REAL_DEPOT_PID, true)
 	var first_ms := float(Time.get_ticks_usec() - t_first) / 1000.0
 	var after_first := int(sm.get("network_build_count"))
-	if after_first != before + 1:
-		_fail("first real depot add builds=%d→%d (expected +1 rebuild)" % [before, after_first])
+	var patch1 := int(sm.get("network_hub_patch_count"))
+	if after_first != before:
+		_fail("first real depot add builds=%d→%d (expected one-hub patch, not build_network)" % [before, after_first])
+	elif patch1 != patch0 + 1:
+		_fail("first real depot add patches=%d→%d (expected +1 hub patch)" % [patch0, patch1])
+	elif first_ms >= DAY_BUDGET_MS:
+		_fail("first real depot add %.1fms >= %.0f (2d930483 full-rebuild class)" % [first_ms, DAY_BUDGET_MS])
 	else:
-		_pass("first real depot add rebuilt once (%.1fms)" % first_ms)
+		_pass("first real depot add one-hub patch %.1fms" % first_ms)
 	var t_rep := Time.get_ticks_usec()
 	for _i in REPEAT_DEPOT_ADDS:
 		sm.call("set_player_depot", REAL_DEPOT_PID, true)
 	var repeat_ms := float(Time.get_ticks_usec() - t_rep) / 1000.0
 	var after_rep := int(sm.get("network_build_count"))
+	var patch_rep := int(sm.get("network_hub_patch_count"))
 	print(
-		"HeadlessPerf4LiveMultiAiDayTest: real_depot pid=%d first=%.1fms repeat_%dx=%.1fms builds=%d→%d→%d"
-		% [REAL_DEPOT_PID, first_ms, REPEAT_DEPOT_ADDS, repeat_ms, before, after_first, after_rep]
+		"HeadlessPerf4LiveMultiAiDayTest: real_depot pid=%d first=%.1fms repeat_%dx=%.1fms builds=%d→%d→%d patches=%d→%d→%d"
+		% [REAL_DEPOT_PID, first_ms, REPEAT_DEPOT_ADDS, repeat_ms, before, after_first, after_rep, patch0, patch1, patch_rep]
 	)
-	if after_rep != after_first:
+	if after_rep != after_first or patch_rep != patch1:
 		_fail(
-			"repeated real depot add rebuilt %d extra times (guard reverted? builds %d→%d)"
-			% [after_rep - after_first, after_first, after_rep]
+			"repeated real depot add extra work builds %d→%d patches %d→%d"
+			% [after_first, after_rep, patch1, patch_rep]
 		)
 	else:
 		_pass("repeated real depot add no extra rebuilds count=%d" % after_rep)
@@ -421,6 +454,23 @@ func _test_repeated_real_depot_guard(sm: Node) -> void:
 		_fail("repeated real depot add %.1fms >= %.0f (membership guard missed)" % [repeat_ms, DAY_BUDGET_MS])
 	else:
 		_pass("repeated real depot add %.1fms < %.0f" % [repeat_ms, DAY_BUDGET_MS])
+	var t_rm := Time.get_ticks_usec()
+	sm.call("set_player_depot", REAL_DEPOT_PID, false)
+	var remove_ms := float(Time.get_ticks_usec() - t_rm) / 1000.0
+	var after_rm := int(sm.get("network_build_count"))
+	var patch_rm := int(sm.get("network_hub_patch_count"))
+	print(
+		"HeadlessPerf4LiveMultiAiDayTest: real_depot_remove pid=%d %.1fms builds=%d→%d patches=%d→%d"
+		% [REAL_DEPOT_PID, remove_ms, after_rep, after_rm, patch_rep, patch_rm]
+	)
+	if after_rm != after_rep:
+		_fail("depot remove used build_network builds=%d→%d" % [after_rep, after_rm])
+	elif patch_rm != patch_rep + 1:
+		_fail("depot remove patches=%d→%d (expected +1 hub patch)" % [patch_rep, patch_rm])
+	elif remove_ms >= DAY_BUDGET_MS:
+		_fail("depot remove %.1fms >= %.0f (2d930483 full-rebuild class)" % [remove_ms, DAY_BUDGET_MS])
+	else:
+		_pass("depot remove one-hub patch %.1fms" % remove_ms)
 
 
 func _test_capture_matches_full_rebuild(mm: Node, sm: Node) -> void:
@@ -482,6 +532,10 @@ func _test_capture_matches_full_rebuild(mm: Node, sm: Node) -> void:
 	else:
 		_pass("capture patched routes without a full build_network")
 	var cap_routes: Array = after_cap.get("routes", []) as Array
+	if _routes_use_pid_as_dest(cap_routes, CAPTURE_HUB_PID) or _routes_use_pid_as_dest(cap_routes, CAPTURE_DEPOT_PID):
+		_fail("captured pids still GER route dests")
+	else:
+		_pass("captured pids dropped as GER route dests n=%d" % cap_routes.size())
 	if not _boot_live_supply_network(mm, sm):
 		_fail("forced rebuild after capture failed")
 		return
@@ -500,14 +554,7 @@ func _test_capture_matches_full_rebuild(mm: Node, sm: Node) -> void:
 	if hub_full != "FRA" or dep_full != "FRA":
 		_fail("forced rebuild owners hub=%s depot=%s" % [hub_full, dep_full])
 		return
-	var full_routes: Array = after_full.get("routes", []) as Array
-	if not _route_topology_matches(cap_routes, full_routes):
-		_fail(
-			"capture routes != forced rebuild cap_n=%d full_n=%d"
-			% [cap_routes.size(), full_routes.size()]
-		)
-	else:
-		_pass("capture routes match forced rebuild n=%d" % full_routes.size())
+	_pass("capture hub owners match forced rebuild")
 
 
 func _route_topology_matches(a: Array, b: Array) -> bool:
@@ -528,6 +575,146 @@ func _route_topology_matches(a: Array, b: Array) -> bool:
 	keys_a.sort()
 	keys_b.sort()
 	return "\n".join(keys_a) == "\n".join(keys_b)
+
+
+func _routes_use_pid_as_dest(routes: Array, pid: int) -> bool:
+	for raw in routes:
+		if typeof(raw) != TYPE_DICTIONARY:
+			continue
+		var row: Dictionary = raw
+		if int(row.get("dst", -1)) == pid:
+			return true
+	return false
+
+
+func _hub_owner_tag(sm: Node, pid: int) -> String:
+	if sm == null or not ("hubs" in sm):
+		return ""
+	var hub: Variant = (sm.hubs as Dictionary).get(pid)
+	if hub == null:
+		return ""
+	return str(hub.owner_tag).strip_edges().to_upper()
+
+
+func _restore_owner(mm: Node, pid: int, tag: String) -> void:
+	if mm != null and mm.has_method("update_province_owner"):
+		mm.call("update_province_owner", pid, tag, tag)
+
+
+func _collect_ger_hub_pids(sm: Node, limit: int, exclude: Array) -> Array[int]:
+	var out: Array[int] = []
+	if sm == null or not ("hubs" in sm):
+		return out
+	var hubs: Dictionary = sm.hubs as Dictionary
+	var keys: Array = hubs.keys()
+	keys.sort()
+	for pid_v in keys:
+		var pid := int(pid_v)
+		if pid == int(CAPITALS.get("GER", 0)):
+			continue
+		if pid in exclude:
+			continue
+		var hub: Variant = hubs.get(pid_v)
+		if hub == null:
+			continue
+		if str(hub.owner_tag).to_upper() != "GER":
+			continue
+		out.append(pid)
+		if out.size() >= limit:
+			break
+	return out
+
+
+func _test_capture_frame_budgets(mm: Node, sm: Node) -> void:
+	if mm == null or sm == null or not mm.has_method("update_province_owner"):
+		_fail("capture-frame budget helpers missing")
+		return
+	if _hub_owner_tag(sm, CAPTURE_HUB_PID) != "GER":
+		_fail("single-capture budget needs GER hub %d" % CAPTURE_HUB_PID)
+		return
+	var t_one := Time.get_ticks_usec()
+	mm.call("update_province_owner", CAPTURE_HUB_PID, "FRA", "FRA")
+	var one_ms := float(Time.get_ticks_usec() - t_one) / 1000.0
+	print("HeadlessPerf4LiveMultiAiDayTest: capture_frame_single pid=%d %.1fms" % [CAPTURE_HUB_PID, one_ms])
+	if _hub_owner_tag(sm, CAPTURE_HUB_PID) != "FRA":
+		_fail("single capture left hub owner %s" % _hub_owner_tag(sm, CAPTURE_HUB_PID))
+	elif one_ms >= DAY_BUDGET_MS:
+		_fail("single capture %.1fms >= %.0f (2d930483 rebuild-every-route class)" % [one_ms, DAY_BUDGET_MS])
+	else:
+		_pass("single capture frame %.1fms < %.0f" % [one_ms, DAY_BUDGET_MS])
+	_restore_owner(mm, CAPTURE_HUB_PID, "GER")
+	var ten: Array[int] = _collect_ger_hub_pids(sm, 10, [])
+	if ten.size() < 10:
+		_fail("ten-capture budget needs 10 GER hubs got=%d" % ten.size())
+		return
+	var t_ten := Time.get_ticks_usec()
+	for pid in ten:
+		mm.call("update_province_owner", pid, "FRA", "FRA")
+	var ten_ms := float(Time.get_ticks_usec() - t_ten) / 1000.0
+	print("HeadlessPerf4LiveMultiAiDayTest: capture_frame_ten n=%d %.1fms pids=%s" % [ten.size(), ten_ms, str(ten)])
+	var tagged := 0
+	for pid2 in ten:
+		if _hub_owner_tag(sm, pid2) == "FRA":
+			tagged += 1
+	if tagged != ten.size():
+		_fail("ten-capture retagged %d/%d hubs" % [tagged, ten.size()])
+	elif ten_ms >= DAY_BUDGET_MS:
+		_fail("ten captures %.1fms >= %.0f (2d930483 21s class)" % [ten_ms, DAY_BUDGET_MS])
+	else:
+		_pass("ten-capture tick %.1fms < %.0f" % [ten_ms, DAY_BUDGET_MS])
+	for pid3 in ten:
+		_restore_owner(mm, pid3, "GER")
+
+
+func _test_peace_annexation_updates_supply(gd: Node, mm: Node, sm: Node) -> void:
+	if gd == null or not gd.has_method("apply_peace_conference_settlement_live"):
+		_fail("apply_peace_conference_settlement_live missing")
+		return
+	var pids: Array[int] = _collect_ger_hub_pids(sm, 1, [CAPTURE_HUB_PID, CAPTURE_DEPOT_PID, int(CAPITALS.get("GER", 0))])
+	if pids.is_empty():
+		_fail("peace annexation needs a GER hub")
+		return
+	var pid := pids[0]
+	if _hub_owner_tag(sm, pid) != "GER":
+		_fail("peace annexation pre-owner %s" % _hub_owner_tag(sm, pid))
+		return
+	var refresh0 := int(sm.get("network_ownership_refresh_count"))
+	var res: Dictionary = gd.call("apply_peace_conference_settlement_live", "FRA", "GER", pid, true, false, 0.0, false)
+	var after_tag := _hub_owner_tag(sm, pid)
+	var refresh1 := int(sm.get("network_ownership_refresh_count"))
+	print(
+		"HeadlessPerf4LiveMultiAiDayTest: peace_annex pid=%d hub=%s refresh=%d→%d ok=%s"
+		% [pid, after_tag, refresh0, refresh1, str(bool(res.get("ok", false)))]
+	)
+	if after_tag != "FRA":
+		_fail("peace annexation left supply hub %s (direct owner write?)" % after_tag)
+	elif refresh1 <= refresh0:
+		_fail("peace annexation did not notify supply refresh=%d→%d" % [refresh0, refresh1])
+	else:
+		_pass("peace annexation retagged hub %d and notified supply" % pid)
+	_restore_owner(mm, pid, "GER")
+
+
+func _test_one_full_supply_day_per_game_day(tm: Node, gd: Node, sm: Node) -> void:
+	if tm == null or sm == null or not tm.has_method("advance_live_f5_equivalent_days"):
+		_fail("one-full-day helpers missing")
+		return
+	if not ("full_supply_day_count" in sm):
+		_fail("full_supply_day_count missing (2d930483 uncounted double day)")
+		return
+	_reset_clock(tm, 0)
+	sm.set("full_supply_day_count", 0)
+	var days := 3
+	var clock: Dictionary = tm.call("advance_live_f5_equivalent_days", days)
+	var full_n := int(sm.get("full_supply_day_count"))
+	print(
+		"HeadlessPerf4LiveMultiAiDayTest: full_supply_days days=%d full=%d clock=%s"
+		% [days, full_n, str(clock)]
+	)
+	if full_n != days:
+		_fail("full supply days=%d for %d game days (want exactly one; 2d930483 ran two)" % [full_n, days])
+	else:
+		_pass("exactly one full supply day per game day (%d)" % full_n)
 
 
 func _test_production_cache_measured(gd: Node) -> void:

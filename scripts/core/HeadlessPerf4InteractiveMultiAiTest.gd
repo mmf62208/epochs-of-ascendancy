@@ -148,6 +148,11 @@ func _test_source_gates_fail_on_old_tips() -> void:
 		_fail("SupplyManager missing interactive light entry (289268ed FAIL class)")
 	else:
 		_pass("advance_supply_day_interactive_light present")
+	var day_fn := _slice_func(sm_src, "_on_game_day_advanced")
+	if "_advance_supply_day_light" not in day_fn or "is_interactive_light_sim" not in day_fn:
+		_fail("daily listener lost main's light/full split")
+	else:
+		_pass("daily listener uses light path on interactive sim")
 	var mm_src := _read(SRC_MM)
 	var full_fn := _slice_func(mm_src, "get_fully_controlled_strategic_regions")
 	if "_owned_or_controlled_pid_set" not in full_fn:

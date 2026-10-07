@@ -12,8 +12,10 @@ This product greps the shipped path. Headless
 boot GER + a live-weight supply network and time the Play multi-AI step.
 Soft theater tick does not rebuild the network for dummy pid 1. Live Play
 still runs the full advance_supply_day steps (air / naval / shipping).
-A depot/hub owner flip patches routes. Production shares a per-day
-line-owner cache; owner index is counted + timed.
+A depot/hub owner flip retags the hub and drops touching routes (no
+24-route rebuild). Depot add/remove patches one hub. Daily listener
+stays on main's light path so apply_supply is the one full day.
+Production shares a per-day line-owner cache; owner index is counted + timed.
 """
 from __future__ import annotations
 
@@ -129,10 +131,17 @@ def build_perf4_daily_sim_tick_product() -> Dict[str, Any]:
         fails.append("infra_start_peeks_peace")
 
     depot_fn = extract_gd_func_body(sm, "set_player_depot")
-    if depot_fn and "changed" in depot_fn and "build_network" in depot_fn:
+    if (
+        depot_fn
+        and "changed" in depot_fn
+        and "build_network" not in depot_fn
+        and "_patch_player_depot_hub" in depot_fn
+    ):
         passes.append("depot_rebuild_on_change_only")
+        passes.append("depot_one_hub_patch")
     else:
         fails.append("depot_rebuild_on_change_only")
+        fails.append("depot_one_hub_patch")
     if depot_fn and "provinces.has" in depot_fn:
         passes.append("depot_skips_missing_pid")
     else:
@@ -148,10 +157,34 @@ def build_perf4_daily_sim_tick_product() -> Dict[str, Any]:
         passes.append("supply_day_full_steps_in_live")
     else:
         fails.append("supply_day_full_steps_in_live")
-    if "func notify_province_control_changed" in sm and "network_ownership_refresh_count" in sm:
+    notify_fn = extract_gd_func_body(sm, "notify_province_control_changed")
+    if (
+        notify_fn
+        and "network_ownership_refresh_count" in notify_fn
+        and "_rebuild_default_routes" not in notify_fn
+        and "_drop_routes_touching_pid" in notify_fn
+    ):
         passes.append("supply_capture_owner_refresh")
+        passes.append("supply_capture_no_full_route_rebuild")
     else:
         fails.append("supply_capture_owner_refresh")
+        fails.append("supply_capture_no_full_route_rebuild")
+    day_listen = extract_gd_func_body(sm, "_on_game_day_advanced")
+    if day_listen and "_advance_supply_day_light" in day_listen and "is_interactive_light_sim" in day_listen:
+        passes.append("daily_listener_light_split")
+    else:
+        fails.append("daily_listener_light_split")
+    if "var full_supply_day_count" in sm:
+        passes.append("full_supply_day_count")
+    else:
+        fails.append("full_supply_day_count")
+    peace_fn = extract_gd_func_body(gd, "apply_peace_conference_settlement_live")
+    if peace_fn and (
+        "update_province_owner" in peace_fn or "notify_province_control_changed" in peace_fn
+    ):
+        passes.append("peace_annex_notifies_supply")
+    else:
+        fails.append("peace_annex_notifies_supply")
     owner_upd = extract_gd_func_body(mm, "update_province_owner")
     if owner_upd and "notify_province_control_changed" in owner_upd:
         passes.append("map_owner_notifies_supply")
@@ -202,6 +235,18 @@ def build_perf4_daily_sim_tick_product() -> Dict[str, Any]:
         passes.append("headless_owner_index_timing")
     else:
         fails.append("headless_owner_index_timing")
+    if HD_LIVE_GD.is_file() and "_test_capture_frame_budgets" in hd_live:
+        passes.append("headless_capture_frame_budget")
+    else:
+        fails.append("headless_capture_frame_budget")
+    if HD_LIVE_GD.is_file() and "_test_peace_annexation_updates_supply" in hd_live:
+        passes.append("headless_peace_annex_supply")
+    else:
+        fails.append("headless_peace_annex_supply")
+    if HD_LIVE_GD.is_file() and "_test_one_full_supply_day_per_game_day" in hd_live:
+        passes.append("headless_one_full_supply_day")
+    else:
+        fails.append("headless_one_full_supply_day")
     if "launch_perf4_daily_sim_tick" in gates:
         passes.append("wired_into_gates")
     else:

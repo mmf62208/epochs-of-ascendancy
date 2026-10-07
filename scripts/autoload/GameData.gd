@@ -4445,8 +4445,8 @@ func apply_supply_route_mutation(route_id: String = "main", priority: String = "
 		if depot_ok and SupplyManager.has_method("set_player_depot"):
 			SupplyManager.set_player_depot(province_id, true)
 		if SupplyManager.has_method("advance_supply_day"):
-			# PERF-4 FIX #2: live Play / multi-AI soft tick keep the full day
-			# (air, naval, route shipping). Do not drop steps for speed.
+			# The one full supply day per game day (air / naval / shipping).
+			# The daily listener stays on the light path (main's split).
 			SupplyManager.advance_supply_day(1.0)
 			supply_live = true
 			supply_detail = "advance_supply_day"
@@ -5219,13 +5219,17 @@ func apply_peace_conference_settlement_live(
 	var items: Array = []
 	if annex:
 		items.append({"type": "annex", "province_id": province_id})
-		# Live owner flip when map province is available
-		if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province"):
+		# Go through MapManager so the owner index and SupplyManager both see the flip.
+		if typeof(MapManager) != TYPE_NIL and MapManager.has_method("update_province_owner"):
+			MapManager.update_province_owner(province_id, w, w)
+		elif typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province"):
 			var prov = MapManager.get_province(province_id)
 			if prov != null and "owner_tag" in prov:
 				prov.owner_tag = w
 				if "controller_tag" in prov:
 					prov.controller_tag = w
+				if typeof(SupplyManager) != TYPE_NIL and SupplyManager.has_method("notify_province_control_changed"):
+					SupplyManager.notify_province_control_changed(province_id)
 	if puppet:
 		items.append({"type": "puppet", "tag": l})
 	if reparations > 0.05:

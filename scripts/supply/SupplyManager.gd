@@ -52,11 +52,20 @@ var _pending_waypoints: Array[int] = []
 var _reroute_source_id: int = -1
 var _reroute_target_id: int = -1
 var _selected_province_id: int = -1
-## PERF-4 FIX #2: count rebuilds so a reverted depot-membership guard fails
+## PERF-4: count rebuilds so a reverted depot-membership guard fails
 ## by count (repeated add of a real depot) rather than source-string checks.
 var network_build_count: int = 0
 var network_ownership_refresh_count: int = 0
 var network_route_rebuild_count: int = 0
+## FIX #3: one-hub depot add/remove (not a full build_network).
+var network_hub_patch_count: int = 0
+## FIX #3: amortized dest refill after a control change (not 24 plans).
+var network_route_refill_count: int = 0
+## FIX #3: increment only on the full air/naval/shipping path.
+var full_supply_day_count: int = 0
+## Control-change pids waiting for a cheap route drop / dest refill.
+var _control_dirty_pids: Dictionary = {}
+const ROUTE_REFRESH_BUDGET_PER_FLUSH: int = 2
 
 
 func _ready() -> void:
@@ -88,6 +97,7 @@ func build_network(
 		provinces, p_countries, city_layer, player_depot_province_ids, rules,
 	)
 	_init_depot_states()
+	_control_dirty_pids.clear()
 	refresh_intel_from_forces()
 	_rebuild_default_routes()
 	network_rebuilt.emit(hubs.size())
@@ -97,22 +107,27 @@ func _init_depot_states() -> void:
 	depot_states.clear()
 	for pid_var in hubs:
 		var hub: ProvinceSupplyHub = hubs[pid_var]
-		var throughput_rules := rules.get_block("throughput")
-		var state := ProvinceDepotState.new(hub.province_id, hub.storage_capacity)
+		_init_one_depot_state(hub, true)
 
-		# Base throughput fraction
-		var base_fraction := float(throughput_rules.get("capacity_fraction_per_day", 0.15))
 
-		# Infrastructure + Development now have strong combined effect on throughput
-		# High development provinces act as logistics hubs
-		var infra_factor := 0.8 + (float(hub.infrastructure) * 0.04)
-		var dev_factor := 0.7 + (float(hub.development_level) * 0.06)   # Stronger dev scaling
-
-		state.throughput_capacity = hub.storage_capacity * base_fraction * infra_factor * dev_factor
+func _init_one_depot_state(hub: ProvinceSupplyHub, reset_stock: bool = false) -> void:
+	if hub == null:
+		return
+	var throughput_rules := rules.get_block("throughput")
+	var existing: ProvinceDepotState = depot_states.get(hub.province_id)
+	var state: ProvinceDepotState = existing
+	if state == null:
+		state = ProvinceDepotState.new(hub.province_id, hub.storage_capacity)
+		reset_stock = true
+	state.storage_capacity = hub.storage_capacity
+	var base_fraction := float(throughput_rules.get("capacity_fraction_per_day", 0.15))
+	var infra_factor := 0.8 + (float(hub.infrastructure) * 0.04)
+	var dev_factor := 0.7 + (float(hub.development_level) * 0.06)
+	state.throughput_capacity = hub.storage_capacity * base_fraction * infra_factor * dev_factor
+	if reset_stock:
 		state.stockpile = hub.storage_capacity * float(throughput_rules.get("initial_fill_ratio", 0.65))
-		# Pass 18: seed munitions share of general stock for land ammo UI.
 		state.munitions_stockpile = state.stockpile * 0.35
-		depot_states[hub.province_id] = state
+	depot_states[hub.province_id] = state
 
 
 func get_depot_state(province_id: int) -> ProvinceDepotState:
@@ -160,10 +175,8 @@ func get_capital_hub_id() -> int:
 
 
 func set_player_depot(province_id: int, enabled: bool) -> void:
-	# PERF-4 FIX #1: rebuild only when membership changes. The interactive
-	# multi-AI soft tick used to call this every game day (dummy pid 1) and
-	# re-ran build_network + 24 route plans on the live 3520 board (~1.5s).
-	# Dummy / missing pids are never added as depots.
+	# PERF-4: membership change only. Dummy / missing pids are never depots.
+	# FIX #3: patch the one hub — do not rebuild the 3520-province network.
 	if enabled and not provinces.is_empty() and not provinces.has(province_id):
 		return
 	var changed := false
@@ -177,34 +190,152 @@ func set_player_depot(province_id: int, enabled: bool) -> void:
 	if not changed:
 		return
 	if not provinces.is_empty():
-		build_network(provinces, _countries, _city_layer, adjacency, player_tag)
+		_patch_player_depot_hub(province_id, enabled)
 
 
-## PERF-4 FIX #2: capture / occupation must retag hubs and rebuild routes.
-## Main only looked correct because it rebuilt the network every day.
+func _patch_player_depot_hub(province_id: int, enabled: bool) -> void:
+	network_hub_patch_count += 1
+	var province: Province = null
+	if provinces.has(province_id):
+		province = provinces[province_id] as Province
+	if province == null and typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province"):
+		province = MapManager.get_province(province_id) as Province
+	if province == null:
+		if not enabled:
+			hubs.erase(province_id)
+			depot_states.erase(province_id)
+			_drop_routes_touching_pid(province_id)
+		return
+	if rules == null:
+		rules = SupplyRules.load_from_path()
+	var capitals: Dictionary = SupplyNetworkBuilder._capital_by_tag(_countries)
+	var hub: ProvinceSupplyHub = SupplyNetworkBuilder._hub_from_province(
+		province, _city_layer, capitals, player_depot_province_ids, rules
+	)
+	if hub == null:
+		hubs.erase(province_id)
+		depot_states.erase(province_id)
+		_drop_routes_touching_pid(province_id)
+		_control_dirty_pids[province_id] = true
+		return
+	hubs[province_id] = hub
+	_init_one_depot_state(hub, false)
+	if not enabled:
+		_drop_routes_touching_pid(province_id)
+	_control_dirty_pids[province_id] = true
+
+
+## PERF-4 FIX #3: capture / occupation retags the hub and drops only the
+## routes that touch this pid. Route dests refill later, amortized.
+## FIX #2 rebuilt all 24 routes on every hub notify (~1.4–2.7s).
 func notify_province_control_changed(province_id: int) -> void:
 	if province_id <= 0:
 		return
-	if hubs.is_empty() and player_depot_province_ids.is_empty():
-		return
-	var is_hub := hubs.has(province_id)
-	var is_depot := province_id in player_depot_province_ids
-	if not is_hub and not is_depot:
+	if hubs.is_empty() and player_depot_province_ids.is_empty() and _routes.is_empty():
 		return
 	var live_tag := _live_control_tag_for_pid(province_id)
 	if live_tag.is_empty():
 		return
 	var hub_changed := false
-	if is_hub:
+	if hubs.has(province_id):
 		var hub: ProvinceSupplyHub = hubs[province_id]
 		if hub != null and hub.owner_tag != live_tag:
 			hub.owner_tag = live_tag
 			hub_changed = true
-	if not hub_changed and not is_depot:
+	var dropped := _drop_routes_touching_pid(province_id)
+	var is_depot := province_id in player_depot_province_ids
+	if not hub_changed and not is_depot and dropped == 0:
 		return
+	_control_dirty_pids[province_id] = true
 	network_ownership_refresh_count += 1
-	if not provinces.is_empty():
-		_rebuild_default_routes()
+
+
+func _drop_routes_touching_pid(province_id: int) -> int:
+	if _routes.is_empty():
+		return 0
+	var drop_keys: Array[String] = []
+	for key_v in _routes.keys():
+		var plan: SupplyRoutePlan = _routes[key_v]
+		if plan == null:
+			drop_keys.append(str(key_v))
+			continue
+		if int(plan.source_province_id) == province_id or int(plan.target_province_id) == province_id:
+			drop_keys.append(str(key_v))
+			continue
+		var hit := false
+		for step_v in plan.province_path:
+			if int(step_v) == province_id:
+				hit = true
+				break
+		if hit:
+			drop_keys.append(str(key_v))
+	for key in drop_keys:
+		_routes.erase(key)
+		_default_routes.erase(key)
+	return drop_keys.size()
+
+
+func flush_pending_control_route_refresh(max_plans: int = ROUTE_REFRESH_BUDGET_PER_FLUSH) -> int:
+	if not _control_dirty_pids.is_empty():
+		for pid_v in _control_dirty_pids.keys():
+			_drop_routes_touching_pid(int(pid_v))
+	var planned := _refill_missing_default_routes(max_plans)
+	if _missing_default_dest_count() == 0:
+		_control_dirty_pids.clear()
+	return planned
+
+
+func _player_route_targets() -> Array[int]:
+	var source := get_capital_hub_id()
+	var targets: Array[int] = []
+	if source < 0:
+		return targets
+	for hub: ProvinceSupplyHub in hubs.values():
+		if hub != null and hub.owner_tag == player_tag and hub.province_id != source:
+			targets.append(hub.province_id)
+	targets.sort()
+	return targets
+
+
+func _missing_default_dest_count() -> int:
+	var source := get_capital_hub_id()
+	if source < 0:
+		return 0
+	var targets: Array[int] = _player_route_targets()
+	var max_routes := mini(targets.size(), 24)
+	var missing := 0
+	for i in range(max_routes):
+		var key := "%d_%d" % [source, targets[i]]
+		if not _routes.has(key):
+			missing += 1
+	return missing
+
+
+func _refill_missing_default_routes(max_plans: int) -> int:
+	if max_plans <= 0:
+		return 0
+	var source := get_capital_hub_id()
+	if source < 0:
+		return 0
+	var targets: Array[int] = _player_route_targets()
+	var max_routes := mini(targets.size(), 24)
+	var planned := 0
+	for i in range(max_routes):
+		if planned >= max_plans:
+			break
+		var target := targets[i]
+		var key := "%d_%d" % [source, target]
+		if _routes.has(key):
+			continue
+		var plan := _plan_route(source, target, [], false)
+		plan.route_id = key
+		plan.baseline_days = plan.total_days
+		_default_routes[key] = plan
+		_routes[key] = plan
+		planned += 1
+	if planned > 0:
+		network_route_refill_count += planned
+	return planned
 
 
 func _live_control_tag_for_pid(province_id: int) -> String:
@@ -250,6 +381,10 @@ func get_network_topology_snapshot() -> Dictionary:
 		"route_n": route_rows.size(),
 		"build_count": network_build_count,
 		"ownership_refresh_count": network_ownership_refresh_count,
+		"hub_patch_count": network_hub_patch_count,
+		"route_refill_count": network_route_refill_count,
+		"full_supply_day_count": full_supply_day_count,
+		"dirty_n": _control_dirty_pids.size(),
 	}
 
 
@@ -640,16 +775,18 @@ func get_attrition_cargo_summary(_leader_id: String = "") -> Dictionary:
 
 
 func _should_use_interactive_light_supply() -> bool:
-	# PERF-4 FIX #2: live F5 / Play must run the full day (air, naval, shipping).
-	# Compact Maginot playtest clock is the only remaining light caller.
+	# Compact Maginot playtest clock only. Live apply_supply stays full.
 	if typeof(TimeManager) == TYPE_NIL:
 		return false
 	return bool(TimeManager.get("_living_playtest_clock"))
 
 
 func _on_game_day_advanced(_year: int, _month: int, _day: int) -> void:
-	# Daily supply simulation driven by central TimeManager.
-	# Live Play uses the full advance (rebuild is skipped, steps are not).
+	# Restore main's light/full split: live F5 / interactive listener is
+	# depot-only. The AI soft tick (apply_supply) runs the one full day.
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("is_interactive_light_sim") and bool(TimeManager.is_interactive_light_sim()):
+		_advance_supply_day_light(1.0)
+		return
 	advance_supply_day(1.0)
 
 
@@ -709,12 +846,15 @@ func advance_supply_day_interactive_light(days: float = 1.0) -> void:
 func advance_supply_day(days: float = 1.0) -> void:
 	if days <= 0.0:
 		return
-	# PERF-4 FIX #2: live Play keeps air / naval / route-shipping. Compact
-	# Maginot playtest clock is the only light skip. Speed comes from not
-	# rebuilding the network, not from dropping steps.
+	# Compact Maginot playtest clock is the only light skip inside this
+	# function. Live apply_supply always takes the full path (one per day).
 	if _should_use_interactive_light_supply():
 		_advance_supply_day_light(days)
 		return
+
+	full_supply_day_count += 1
+	# FIX #3: refill at most a few dests so a capture day stays under 500 ms.
+	flush_pending_control_route_refresh(ROUTE_REFRESH_BUDGET_PER_FLUSH)
 
 	# === Province Infrastructure & Development: Local Supply Generation ===
 	_generate_local_supply_from_development(days)
