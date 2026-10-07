@@ -475,6 +475,45 @@ func _cc_closed() -> bool:
 	return _cc == null or not is_instance_valid(_cc) or bool(_cc.get("_closing"))
 
 
+func _poll_mouse() -> Vector2:
+	var vp: Viewport = root.get_viewport()
+	if vp != null:
+		return vp.get_mouse_position()
+	return Vector2.ZERO
+
+
+func _prepare_poll_close_hit(btn: Button) -> Vector2:
+	# Headless warp often leaves get_mouse_position() at the last leftover
+	# (BEGIN-1 poll class). Cover (0,0) and the live poll point so
+	# handle_live_close_pointer(null) is a real × hit, then seed Köln under it.
+	if btn == null:
+		return Vector2.ZERO
+	var poll_pt: Vector2 = _poll_mouse()
+	var cover := Vector2(
+		maxf(96.0, maxf(poll_pt.x, 24.0) + 48.0),
+		maxf(96.0, maxf(poll_pt.y, 24.0) + 48.0)
+	)
+	btn.custom_minimum_size = cover
+	btn.size = cover
+	btn.set_global_position(Vector2.ZERO)
+	if btn.has_method("reset_size"):
+		btn.reset_size()
+	await _flush(2)
+	var rect: Rect2 = btn.get_global_rect()
+	var hit: Vector2 = poll_pt
+	if not rect.has_point(hit) and not rect.has_point(Vector2.ZERO):
+		_fail("poll-path × hit rect must own (0,0) or the live poll point %s (rect=%s)" % [str(poll_pt), str(rect)])
+		return Vector2.ZERO
+	if not rect.has_point(hit):
+		hit = rect.get_center()
+	_restore_home_camera()
+	_clear_inspector()
+	if not _seed_known_under_screen(hit):
+		return Vector2.ZERO
+	_warp_mouse(hit)
+	return hit
+
+
 func _prepare_under(btn: Button) -> Vector2:
 	var rect: Rect2 = btn.get_global_rect()
 	var pt: Vector2 = rect.get_center()
@@ -651,11 +690,9 @@ func _test_t6_notice_poll_leftover() -> void:
 	var btn: Button = await _show_notice()
 	if btn == null:
 		return
-	var pt: Vector2 = _prepare_under(btn)
+	var pt: Vector2 = await _prepare_poll_close_hit(btn)
 	if pt == Vector2.ZERO:
 		return
-	_warp_mouse(pt)
-	await _flush(1)
 	if not _leui.has_method("handle_live_close_pointer"):
 		_fail("T6: LeaderEventUI.handle_live_close_pointer missing (poll consume)")
 		return
@@ -681,11 +718,9 @@ func _test_t7_cc_poll_leftover() -> void:
 	var btn: Button = await _spawn_cc()
 	if btn == null:
 		return
-	var pt: Vector2 = _prepare_under(btn)
+	var pt: Vector2 = await _prepare_poll_close_hit(btn)
 	if pt == Vector2.ZERO:
 		return
-	_warp_mouse(pt)
-	await _flush(1)
 	if not _cc.has_method("handle_live_close_pointer"):
 		_fail("T7: MainMenu.handle_live_close_pointer missing (poll consume)")
 		return
