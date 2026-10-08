@@ -118,6 +118,41 @@ class TestFac1aAirfieldIcons(unittest.TestCase):
                 (FAC_DIR / f"level_badge_l{level}_16.png.import").read_text(encoding="utf-8"),
             )
 
+    def test_intact_sprites_hard_edge_and_nearest_halo(self) -> None:
+        """Criterion 1–2: real PNGs and the real facility-icon layer source."""
+        from PIL import Image
+
+        src = LAYER.read_text(encoding="utf-8")
+        self.assertIn("const HALO_PX := 2.0", src)
+        self.assertIn("const HALO_OUTLINE_ANTIALIASED := false", src)
+        self.assertIn("draw_polyline(pts, color, width, HALO_OUTLINE_ANTIALIASED)", src)
+        self.assertNotIn("draw_polyline(pts, color, width, true)", src)
+        self.assertIn("texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST", src)
+        self.assertNotIn("TEXTURE_FILTER_LINEAR", src)
+        self.assertIn("const OVAL_W_FRAC := 0.88", src)
+        self.assertIn("const OVAL_H_FRAC := 0.58", src)
+        for level in (1, 2, 3, 4):
+            for px in (32, 64):
+                png = FAC_DIR / f"airfield_l{level}_intact_{px}.png"
+                with Image.open(png) as im:
+                    rgba = im.convert("RGBA")
+                    self.assertEqual(rgba.size, (px, px), png)
+                    raw = rgba.tobytes()
+                opaque = 0
+                partial = 0
+                for i in range(3, len(raw), 4):
+                    alpha = raw[i]
+                    if alpha == 0:
+                        continue
+                    if alpha >= 250:
+                        opaque += 1
+                    else:
+                        partial += 1
+                self.assertEqual(partial, 0, png)
+                lo, hi = (150, 900) if px == 32 else (700, 3600)
+                self.assertGreaterEqual(opaque, lo, png)
+                self.assertLessEqual(opaque, hi, png)
+
     def test_layer_draw_safety(self) -> None:
         src = LAYER.read_text(encoding="utf-8")
         self.assertIn("class_name FacilityIconLayer", src)
