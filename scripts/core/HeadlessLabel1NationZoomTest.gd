@@ -187,18 +187,22 @@ func _assert_city_label_lod() -> void:
 		_fail("city labels hidden at close/mid 1.80")
 	else:
 		_pass("city labels visible at 1.80 (Köln/Bonn/Leverkusen)")
-	if not RoadTierVisualScript.end_labels_visible_at_zoom(1.50):
-		_fail("city labels must show at zoom 1.50")
+	if not RoadTierVisualScript.end_labels_visible_at_zoom(1.20):
+		_fail("city labels must show in the mid band below 1.50")
 	else:
-		_pass("city labels show at 1.50")
+		_pass("city labels show in the mid band at 1.20")
 	if RoadTierVisualScript.end_labels_visible_at_zoom(EUROPE_Z):
 		_fail("city labels must stay off at Europe Home")
 	else:
 		_pass("city labels hidden at Europe Home")
-	if RoadTierVisualScript.END_LABEL_ZOOM_MIN < 1.49:
+	if RoadTierVisualScript.end_labels_visible_at_zoom(RoadTierVisualScript.ZOOM_FAR_MAX):
+		_fail("city labels must stay off at the far-band ceiling")
+	else:
+		_pass("city labels hidden at the far-band ceiling")
+	if not is_equal_approx(RoadTierVisualScript.END_LABEL_ZOOM_MIN, RoadTierVisualScript.ZOOM_FAR_MAX):
 		_fail("END_LABEL_ZOOM_MIN=%.2f" % RoadTierVisualScript.END_LABEL_ZOOM_MIN)
 	else:
-		_pass("city label floor 1.50 kept")
+		_pass("city label floor matches the mid road band")
 
 
 func _metrics_for(z: float) -> Dictionary:

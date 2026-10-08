@@ -266,7 +266,11 @@ def build_map_nation_label_landmass_product() -> Dict[str, Any]:
             passes.append("label1_%s" % needle)
         else:
             fails.append("missing_%s" % needle)
-    if "END_LABEL_ZOOM_MIN := 1.50" in road and "Köln" in road:
+    if (
+        "END_LABEL_ZOOM_MIN := ZOOM_FAR_MAX" in road
+        and "z > END_LABEL_ZOOM_MIN" in road
+        and "Köln" in road
+    ):
         passes.append("city_labels_mid_close")
     else:
         fails.append("city_label_lod_regressed")
