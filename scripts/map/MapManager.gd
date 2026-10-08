@@ -1260,8 +1260,12 @@ func prefer_land_province_at(world_pos: Vector2, primary_hit: int) -> int:
 	return primary_hit
 
 
-## If the click is nearer a country capital star than the polygon hit, pick the capital.
-## Play: England click was Settle Devon (711467), not London (711414). Nested City of London /
+## Nearest country capital inside the zoom-aware gold-star disk.
+## Same-country land under that star snaps to the capital (Wandsworth → London 711414).
+## Foreign land keeps its own polygon (Köln 710417 stays Köln under Luxembourg's star).
+## Sea with no land polygon still snaps. Click resolve passes primary_hit -1, so the
+## land polygon is read here. The disk stays a radius test, not a nearer-centroid test.
+## Play: England click was Settle Devon (711467), not London. Nested City of London /
 ## DC / Roma polygons are a few world-units across; the gold star is ~28 screen px, so
 ## snap radius is zoom-aware (not a 28-world-unit disk that vanishes at Europe zoom).
 func prefer_capital_province_at(world_pos: Vector2, primary_hit: int) -> int:
@@ -1281,9 +1285,25 @@ func prefer_capital_province_at(world_pos: Vector2, primary_hit: int) -> int:
 			best_cap = cap_id
 	if best_cap <= 0:
 		return primary_hit
-	# Gold-star disk wins even when the click sits on a neighbouring borough
-	# polygon (London 711414 over Wandsworth) or a colocated chip hex.
+	var land_pid := _containing_land_province_at(world_pos, primary_hit)
+	if land_pid > 0 and land_pid != best_cap:
+		var land_owner := get_province_owner(land_pid)
+		var cap_owner := get_province_owner(best_cap)
+		if not land_owner.is_empty() and not cap_owner.is_empty() and land_owner != cap_owner:
+			return land_pid
 	return best_cap
+
+
+## Land polygon that contains world_pos. Sea and misses are -1 so open water can still snap.
+## Click resolve does not know the polygon yet (primary_hit is -1); do not trust that argument alone.
+func _containing_land_province_at(world_pos: Vector2, primary_hit: int) -> int:
+	var under := prefer_land_province_at(world_pos, primary_hit)
+	if under <= 0 or province_is_sea_domain(under):
+		return -1
+	var poly := _pick_geometry_provider(under)
+	if poly.size() >= 3 and Geometry2D.is_point_in_polygon(world_pos, poly):
+		return under
+	return -1
 
 
 func _pid_is_national_capital(pid: int) -> bool:

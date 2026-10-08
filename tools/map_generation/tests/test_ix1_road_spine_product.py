@@ -119,7 +119,9 @@ class TestIx1RoadSpineProduct(unittest.TestCase):
     def test_search_go_live_resolve_koln_aliases(self) -> None:
         # Play MIXED fc6c7ca: Cologne/Koln Search+Go was a silent no-op.
         for q in ("Köln", "koln", "koeln", "Cologne", "cologne", "710417"):
-            self.assertEqual(ix1_search_go_resolve(q), HUB_ID, msg=q)
+            pid = ix1_search_go_resolve(q)
+            print(f"search {q} -> {pid}")
+            self.assertEqual(pid, HUB_ID, msg=q)
         live = ix1_search_go_live_path()
         self.assertTrue(live.get("ok"), msg=live)
         p = build_ix1_road_spine_product()
