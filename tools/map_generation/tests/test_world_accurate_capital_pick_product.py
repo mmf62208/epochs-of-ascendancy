@@ -68,9 +68,20 @@ class TestWorldAccurateCapitalPickProduct(unittest.TestCase):
         self.assertIn("func _capital_star_pid_at", ren)
         self.assertIn("_capital_star_pid_at(world_pos)", ren)
         cap_i = mm.find("func prefer_capital_province_at")
-        cap_slice = mm[cap_i : cap_i + 1800]
+        cap_end = mm.find("\nfunc ", cap_i + 1)
+        cap_slice = mm[cap_i:cap_end]
+        # Same-country land still snaps (Wandsworth → London). The disk is not a
+        # nearest-centroid compare, and it is not an unconditional win over foreign land.
         self.assertIn("return best_cap", cap_slice)
         self.assertNotIn("best_d < d_hit", cap_slice)
+        self.assertIn("_containing_land_province_at(world_pos, primary_hit)", cap_slice)
+        self.assertIn("land_owner != cap_owner", cap_slice)
+        self.assertLess(
+            cap_slice.find("land_owner != cap_owner"),
+            cap_slice.find("return best_cap"),
+        )
+        self.assertNotIn("Gold-star disk wins even when", cap_slice)
+        self.assertIn("prefer_capital_province_at(world_pos, -1)", ren)
         self.assertIn('Settle %s', ren)
         self.assertNotIn('Settle #%d', ren)
 
