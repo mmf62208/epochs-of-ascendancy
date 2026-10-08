@@ -18,9 +18,10 @@ const PAVED_EDGE_SCREEN_PX := 1.2
 const HIGHWAY_SCREEN_PX := 8.0
 const HIGHWAY_CASING_SCREEN_PX := 12.0
 const HIGHWAY_STRIPE_SCREEN_PX := 3.2
-## Europe/Home only: keep the rare trunk visible without a continent carpet.
-const HIGHWAY_FAR_CASING_SCREEN_PX := 5.5
-const HIGHWAY_FAR_CORE_SCREEN_PX := 3.2
+## Europe/Home only: casing wide enough to read in a 1280 still, core
+## still inside the casing. Mid/close stay 12 / 8.
+const HIGHWAY_FAR_CASING_SCREEN_PX := 9.0
+const HIGHWAY_FAR_CORE_SCREEN_PX := 5.5
 const DIRT_DASH_SCREEN_PX := 9.0
 const DIRT_GAP_SCREEN_PX := 6.0
 
@@ -138,6 +139,15 @@ static func end_labels_visible_at_zoom(zoom: float) -> bool:
 
 static func end_labels_visible_for_span(zoom: float, _spine_span_world: float) -> bool:
 	return end_labels_visible_at_zoom(zoom)
+
+
+## Far band (Europe Home) paints the gold stripe as the core so the rare
+## trunk is not a dark hairline. Mid and close keep the dark core; their
+## stripe is a separate quad.
+static func highway_core_color(far: bool) -> Color:
+	if far:
+		return HIGHWAY_STRIPE_COLOR
+	return HIGHWAY_CORE_COLOR
 
 
 static func screen_width_for_tier(tier: int, lod_band: int) -> float:
