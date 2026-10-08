@@ -2682,7 +2682,7 @@ class RoadTierDraw extends Node2D:
         var stripe_w := _world_width(RoadTierVisualScript.HIGHWAY_STRIPE_SCREEN_PX)
         var casing := RoadTierVisualScript.HIGHWAY_CASING_COLOR
         var stripe := RoadTierVisualScript.HIGHWAY_STRIPE_COLOR
-        var core := RoadTierVisualScript.HIGHWAY_CORE_COLOR
+        var core := RoadTierVisualScript.highway_core_color(far)
         for entry in edges:
             if not _edge_visible(entry, zoom):
                 continue

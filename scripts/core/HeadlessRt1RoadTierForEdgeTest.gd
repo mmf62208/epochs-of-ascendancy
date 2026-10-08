@@ -256,6 +256,38 @@ func _test_trunk_sparsifier() -> void:
 		_fail("highway casing must be 12 px (wider than paved, thinner than gold)")
 	else:
 		_pass("highway casing 12 px")
+	if "HIGHWAY_FAR_CASING_SCREEN_PX := 9.0" not in vis_src:
+		_fail("Europe Home highway casing must be 9 px")
+	else:
+		_pass("far highway casing 9 px")
+	if "HIGHWAY_FAR_CORE_SCREEN_PX := 5.5" not in vis_src:
+		_fail("Europe Home highway core must be 5.5 px")
+	else:
+		_pass("far highway core 5.5 px")
+	if not is_equal_approx(RoadTierVisualScript.screen_width_for_tier(RoadTierVisualScript.TIER_HIGHWAY, 0), 9.0):
+		_fail("far screen width got %.2f" % RoadTierVisualScript.screen_width_for_tier(RoadTierVisualScript.TIER_HIGHWAY, 0))
+	else:
+		_pass("lod 0 highway width 9")
+	if not is_equal_approx(RoadTierVisualScript.screen_width_for_tier(RoadTierVisualScript.TIER_HIGHWAY, 1), 12.0):
+		_fail("mid screen width got %.2f" % RoadTierVisualScript.screen_width_for_tier(RoadTierVisualScript.TIER_HIGHWAY, 1))
+	else:
+		_pass("lod 1 highway width 12")
+	if RoadTierVisualScript.highway_core_color(true) != RoadTierVisualScript.HIGHWAY_STRIPE_COLOR:
+		_fail("far core must use the gold stripe color")
+	else:
+		_pass("far core is gold stripe")
+	if RoadTierVisualScript.highway_core_color(false) != RoadTierVisualScript.HIGHWAY_CORE_COLOR:
+		_fail("mid/close core must stay dark")
+	else:
+		_pass("mid/close core stays dark")
+	if "highway_core_color(far)" not in ol_src:
+		_fail("overlay far/mid core must call highway_core_color(far)")
+	else:
+		_pass("overlay uses highway_core_color(far)")
+	if "var core := RoadTierVisualScript.HIGHWAY_CORE_COLOR" in ol_src:
+		_fail("overlay must not paint the dark core on the far band")
+	else:
+		_pass("dark core is not unconditional")
 	if "_draw_road_quad" not in ol_src:
 		_fail("highways must use non-AA filled quads")
 	else:
@@ -264,7 +296,78 @@ func _test_trunk_sparsifier() -> void:
 		_fail("S2 must include a Köln city label")
 	else:
 		_pass("Köln city label")
+	_test_spine_pairs()
 	if "draw_line(pts[i - 1], pts[i], ROAD_EXPLICIT_COLOR, gold_w, true)" in ol_src:
 		_fail("gold spine must not use antialiased draw_line")
 	else:
 		_pass("gold spine non-AA")
+
+
+func _pair_kept(trunk: Array, a: int, b: int) -> bool:
+	var want := RoadTierVisualScript.edge_key(a, b)
+	for row_v in trunk:
+		var row: Dictionary = row_v
+		if RoadTierVisualScript.edge_key(int(row.get("p1", 0)), int(row.get("p2", 0))) == want:
+			return true
+	return false
+
+
+func _test_spine_pairs() -> void:
+	var draw: Array = RoadTierVisualScript.must_draw_pairs()
+	var draw_keys: Dictionary = {}
+	for pair_v in draw:
+		var pair: Array = pair_v
+		draw_keys[RoadTierVisualScript.edge_key(int(pair[0]), int(pair[1]))] = true
+	var bonn_koln := RoadTierVisualScript.edge_key(RoadTierVisualScript.BONN_ID, RoadTierVisualScript.KOELN_ID)
+	var koln_lev := RoadTierVisualScript.edge_key(RoadTierVisualScript.KOELN_ID, RoadTierVisualScript.LEVERKUSEN_ID)
+	if not draw_keys.has(bonn_koln) or not draw_keys.has(koln_lev):
+		_fail("must-draw must keep Bonn–Köln and Köln–Leverkusen")
+	else:
+		_pass("must-draw Bonn–Köln and Köln–Leverkusen")
+	for pair_v in RoadTierVisualScript.must_not_draw_pairs():
+		var pair: Array = pair_v
+		var key := RoadTierVisualScript.edge_key(int(pair[0]), int(pair[1]))
+		if draw_keys.has(key):
+			_fail("must-not pair %s is in must-draw" % key)
+			return
+	_pass("Köln–Essen and Köln–Düren stay out of must-draw")
+	var cands: Array = [
+		{
+			"p1": RoadTierVisualScript.BONN_ID,
+			"p2": RoadTierVisualScript.KOELN_ID,
+			"c1": Vector2(0, 0),
+			"c2": Vector2(4, 0),
+			"avg_infra": 1.0,
+			"weight": 1.0,
+			"explicit": false,
+			"tier": 0,
+		},
+		{
+			"p1": RoadTierVisualScript.KOELN_ID,
+			"p2": RoadTierVisualScript.LEVERKUSEN_ID,
+			"c1": Vector2(4, 0),
+			"c2": Vector2(7, 0),
+			"avg_infra": 1.0,
+			"weight": 1.0,
+			"explicit": false,
+			"tier": 0,
+		},
+	]
+	var trunk: Array = RoadTierVisualScript.select_trunk_edges(cands)
+	if not _pair_kept(trunk, RoadTierVisualScript.BONN_ID, RoadTierVisualScript.KOELN_ID):
+		_fail("trunk dropped Bonn–Köln")
+	elif not _pair_kept(trunk, RoadTierVisualScript.KOELN_ID, RoadTierVisualScript.LEVERKUSEN_ID):
+		_fail("trunk dropped Köln–Leverkusen")
+	else:
+		_pass("trunk keeps Bonn–Köln and Köln–Leverkusen")
+	# Real board drops these on the centroid-gap cap before the trunk sees them.
+	if not RoadTierVisualScript.road_edge_passes_sanity(7.86, false, false):
+		_fail("Bonn–Köln gap 7.86 must pass")
+	elif not RoadTierVisualScript.road_edge_passes_sanity(3.15, false, false):
+		_fail("Köln–Leverkusen gap 3.15 must pass")
+	elif RoadTierVisualScript.road_edge_passes_sanity(12.78, false, false):
+		_fail("Köln–Düren gap 12.78 must fail the centroid cap")
+	elif RoadTierVisualScript.road_edge_passes_sanity(14.62, false, false):
+		_fail("Köln–Essen gap 14.62 must fail the centroid cap")
+	else:
+		_pass("centroid cap keeps the spine and drops Düren and Essen")
