@@ -22,6 +22,7 @@ const MID_BADGE_PX := 8.0
 const OPS_MIN_ICON_PX := 36.0
 const OPS_SIZE_ZOOM := 1.20
 const HALO_PX := 2.0
+const HALO_OUTLINE_ANTIALIASED := false
 const COUNT_DIGIT_MIN_PX := 10.0
 const COUNT_DIGIT_PX := 16.0
 const COUNT_DISC_PX := 16.0
@@ -73,7 +74,13 @@ var _build_markers_count: int = 0
 var _debug_hit_overlay: bool = false
 
 
+func _init() -> void:
+	# Scaled draws must not blend a new fringe around the hard-edge icons.
+	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+
+
 func _ready() -> void:
+	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	name = "FacilityIconLayer"
 	z_as_relative = false
 	z_index = MAP_Z
@@ -1658,7 +1665,7 @@ func _draw_ellipse_outline(r: Rect2, color: Color, width: float) -> void:
 		var a := TAU * float(i) / float(n)
 		pts.append(c + Vector2(cos(a) * rx, sin(a) * ry))
 		i += 1
-	draw_polyline(pts, color, width, true)
+	draw_polyline(pts, color, width, HALO_OUTLINE_ANTIALIASED)
 
 
 func _draw_cluster_count(layout: Dictionary, zoom: float) -> void:
