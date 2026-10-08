@@ -39,8 +39,9 @@ const HIGHWAY_STRIPE_COLOR := Color(0.98, 0.94, 0.62, 0.98)
 const ZOOM_FAR_MAX := 1.15
 const ZOOM_CLOSE_MIN := 2.60
 const DIRT_ZOOM_FLOOR := 2.60
-## Bonn / Köln / Leverkusen city labels: mid (1.80) and close. Europe Home stays off.
-const END_LABEL_ZOOM_MIN := 1.50
+## Bonn / Köln / Leverkusen city labels start with the mid road band.
+## Hidden on the far band, including the ceiling and Europe Home. Shown strictly above it.
+const END_LABEL_ZOOM_MIN := ZOOM_FAR_MAX
 const END_LABEL_FONT_PX := 14
 
 ## Visual-only trunk. Gameplay adjacency / movement / formula tier stay intact.
@@ -133,7 +134,11 @@ static func display_tier_from_rank(rank01: float, explicit: bool) -> int:
 
 
 static func end_labels_visible_at_zoom(zoom: float) -> bool:
-	return zoom >= END_LABEL_ZOOM_MIN
+	var z: float = zoom
+	if not is_finite(z):
+		z = 1.0
+	# Far band includes the ceiling (ZOOM_FAR_MAX). Mid and close draw the three names.
+	return z > END_LABEL_ZOOM_MIN
 
 
 static func end_labels_visible_for_span(zoom: float, _spine_span_world: float) -> bool:
