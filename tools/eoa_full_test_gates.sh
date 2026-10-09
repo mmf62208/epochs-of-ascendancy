@@ -263,6 +263,10 @@ else
   run_step launch_begin1_title_release \
     tools/run_godot.sh --headless --resolution 1280x740 -s res://scripts/core/HeadlessBegin1TitleReleaseFallthroughTest.gd || fail
 
+  run_step launch_input1_close_click \
+    tools/run_godot.sh --headless --path . --resolution 1280x740 \
+    -s res://scripts/core/HeadlessInput1CloseClickFallthroughTest.gd || fail
+
   run_step launch_ix1_spine_complete \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessIx1RoadSpineCompleteTest.gd || fail
 
