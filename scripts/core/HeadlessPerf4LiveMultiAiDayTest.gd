@@ -1795,30 +1795,45 @@ func _test_depot_add_enqueues_all_24_dests(sm: Node) -> void:
 
 func _assert_dayroll_event_own_share(label: String, tm: Node, sm: Node, event_cb: Callable) -> void:
 	var mm: Node = root.get_node_or_null("/root/MapManager")
-	if sm.has_method("clear_refill_queue"):
-		sm.call("clear_refill_queue")
 	if sm.has_method("end_day_roll_plan_deferral"):
 		sm.call("end_day_roll_plan_deferral")
+	if sm.has_method("drain_pending_route_refresh"):
+		sm.call("drain_pending_route_refresh")
+	if sm.has_method("clear_refill_queue"):
+		sm.call("clear_refill_queue")
 	var refill0: int = int(sm.get("network_route_refill_count")) if "network_route_refill_count" in sm else 0
 	var t0: int = Time.get_ticks_usec()
-	_emit_day_without_multi_ai(tm)
 	event_cb.call()
-	var planned_emit: int = int(sm.get("last_flush_plan_count")) if "last_flush_plan_count" in sm else -1
+	# #88 own share: event + one full supply day. Do not emit the live
+	# game_day_advanced bus (MapManager theater auto-tick / multi_ai).
+	if sm.has_method("advance_supply_day"):
+		sm.call("advance_supply_day", 1.0)
+	var planned_day: int = int(sm.get("last_day_flush_plan_count")) if "last_day_flush_plan_count" in sm else int(sm.get("last_flush_plan_count")) if "last_flush_plan_count" in sm else -1
 	var flush_got: int = int(sm.call("flush_pending_control_route_refresh")) if sm.has_method("flush_pending_control_route_refresh") else -1
 	var planned_flush: int = int(sm.get("last_flush_plan_count")) if "last_flush_plan_count" in sm else -1
 	var share_ms: float = float(Time.get_ticks_usec() - t0) / 1000.0
 	var refill1: int = int(sm.get("network_route_refill_count")) if "network_route_refill_count" in sm else refill0
+	var prof: Dictionary = sm.get("last_supply_day_profile") if "last_supply_day_profile" in sm else {}
 	print(
-		"HeadlessPerf4LiveMultiAiDayTest: dayroll_%s own_share=%.1fms plans_emit=%d plans_flush=%d refill=%d→%d (emit+event+plans, no multi_ai)"
-		% [label, share_ms, planned_emit, planned_flush, refill0, refill1]
+		"HeadlessPerf4LiveMultiAiDayTest: dayroll_%s own_share=%.1fms plans_day=%d plans_flush=%d refill=%d→%d generate=%.1f flush=%.1f (event+advance_supply_day; theater/multi_ai out of #88 scope)"
+		% [
+			label,
+			share_ms,
+			planned_day,
+			planned_flush,
+			refill0,
+			refill1,
+			float(prof.get("generate_ms", 0.0)),
+			float(prof.get("flush_ms", 0.0)),
+		]
 	)
-	if planned_emit != 0 or flush_got != 0 or planned_flush != 0 or refill1 != refill0:
+	if planned_day != 0 or flush_got != 0 or planned_flush != 0 or refill1 != refill0:
 		_fail(
-			"dayroll+%s planned on the roll frame emit=%d flush=%d refill=%d→%d"
-			% [label, planned_emit, planned_flush, refill0, refill1]
+			"dayroll+%s planned on the roll frame day=%d flush=%d refill=%d→%d"
+			% [label, planned_day, planned_flush, refill0, refill1]
 		)
 	elif share_ms >= DAYROLL_OWN_SHARE_BUDGET_MS:
-		_fail("dayroll+%s own share %.1fms >= %.0f (emit+event+plans, no multi_ai)" % [label, share_ms, DAYROLL_OWN_SHARE_BUDGET_MS])
+		_fail("dayroll+%s own share %.1fms >= %.0f (event+supply day, no theater/multi_ai)" % [label, share_ms, DAYROLL_OWN_SHARE_BUDGET_MS])
 	else:
 		_pass("dayroll+%s own share %.1fms < %.0f plans=0" % [label, share_ms, DAYROLL_OWN_SHARE_BUDGET_MS])
 	if sm.has_method("end_day_roll_plan_deferral"):

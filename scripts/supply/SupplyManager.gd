@@ -86,6 +86,8 @@ var last_flush_plan_ms_max: float = 0.0
 var last_flush_redrop_count: int = 0
 var last_flush_planned_dests: Array[int] = []
 var last_plan_ms: float = 0.0
+## Plans executed inside advance_supply_day. 0 on a dayroll+event frame.
+var last_day_flush_plan_count: int = 0
 ## Test seam: when > 0, slice accounting uses this estimate (ms) per plan
 ## instead of wall time so predictive `used+next` vs reactive `used>=budget`
 ## is distinguishable (25 ms estimate → predictive plans 1, reactive plans 2).
@@ -1316,6 +1318,7 @@ func advance_supply_day(days: float = 1.0) -> void:
 	# returns 0 plans on this frame. Events enqueue; next frames' slice plans.
 	_begin_day_roll_plan_deferral()
 	flush_pending_control_route_refresh(ROUTE_REFRESH_BUDGET_PER_FLUSH)
+	last_day_flush_plan_count = last_flush_plan_count
 	var flush_ms: float = float(Time.get_ticks_usec() - t_sec) / 1000.0
 
 	# === Province Infrastructure & Development: Local Supply Generation ===
