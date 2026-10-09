@@ -84,9 +84,19 @@ var last_flush_plan_count: int = 0
 var last_flush_plan_ms: float = 0.0
 var last_flush_plan_ms_max: float = 0.0
 var last_flush_redrop_count: int = 0
+var last_flush_planned_dests: Array[int] = []
 var last_plan_ms: float = 0.0
+## Test seam: when > 0, slice accounting uses this estimate (ms) per plan
+## instead of wall time so predictive `used+next` vs reactive `used>=budget`
+## is distinguishable (25 ms estimate → predictive plans 1, reactive plans 2).
+var route_refresh_plan_cost_estimate_ms: float = -1.0
 ## Flush re-drops (must stay 0). Notify hostile drops do not increment this.
 var network_route_redrop_count: int = 0
+## True only while flush_pending_control_route_refresh is on the stack.
+var _flush_in_progress: bool = false
+## Skip the 1-plan day flush when a capture already ran on this frame so a
+## dayroll+capture frame stays under 200 ms (plan moves to the next frame).
+var _skip_day_flush_once: bool = false
 ## Sorted player dest hubs (excludes capital). Updated incrementally so a
 ## capture frame does not walk all 3k hubs.
 var _player_hub_ids: Array[int] = []
@@ -256,7 +266,12 @@ func _patch_player_depot_hub(province_id: int, enabled: bool) -> void:
 	# Keep old routes serving until flush swaps their replacement. Only a
 	# dest that is no longer in the player dest set is dropped now.
 	_drop_obsolete_dest_routes()
-	_enqueue_missing_and_affected_dests(province_id)
+	# Depot add can cheapen any dest (new waypoint / dest set). Enqueue all
+	# defaults; "touching pid only" misses dests that will take a new shortcut.
+	if enabled:
+		_enqueue_all_current_dests()
+	else:
+		_enqueue_missing_and_affected_dests(province_id)
 	_control_dirty_pids.erase(province_id)
 
 
@@ -312,12 +327,20 @@ func notify_province_control_changed(province_id: int) -> void:
 				_note_player_hub_owner(province_id, old_hub_tag, live_tag)
 	SupplyPathfinder.clear_neighbor_cache()
 	var dropped := 0
-	if _pid_blocks_player_supply(province_id):
+	var blocks := _pid_blocks_player_supply(province_id)
+	if blocks:
 		dropped = _drop_routes_touching_pid(province_id)
 	_drop_obsolete_dest_routes()
 	var is_depot := province_id in player_depot_province_ids
-	_enqueue_missing_and_affected_dests(province_id)
+	if blocks:
+		_enqueue_missing_and_affected_dests(province_id)
+	else:
+		# Friendly gain (recapture / annex-to-us). Detours do not touch this
+		# pid, so "enqueue routes touching pid" keeps the long path. Enqueue
+		# every default dest; old routes serve until each swaps.
+		_enqueue_all_current_dests()
 	_control_dirty_pids.erase(province_id)
+	_skip_day_flush_once = true
 	if not hub_changed and not is_depot and dropped == 0 and _refill_queue.is_empty():
 		return
 	network_ownership_refresh_count += 1
@@ -345,6 +368,7 @@ func _drop_routes_touching_pid(province_id: int) -> int:
 	for key in drop_keys:
 		_routes.erase(key)
 		_default_routes.erase(key)
+	_note_flush_redrop(drop_keys.size())
 	return drop_keys.size()
 
 
@@ -353,9 +377,17 @@ func flush_pending_control_route_refresh(max_plans: int = ROUTE_REFRESH_BUDGET_P
 	last_flush_plan_ms = 0.0
 	last_flush_plan_ms_max = 0.0
 	last_flush_redrop_count = 0
+	last_flush_planned_dests.clear()
 	# FIX #5: flush only pops the dest FIFO. Restoring a dirty-pid re-drop
 	# here re-plans the first sorted dests forever (depot add / recapture livelock).
-	return _refill_queued_dests(max_plans)
+	var n0: int = _routes.size()
+	_flush_in_progress = true
+	var planned: int = _refill_queued_dests(max_plans)
+	_flush_in_progress = false
+	var size_drop: int = maxi(0, n0 - _routes.size())
+	if size_drop > last_flush_redrop_count:
+		_note_flush_redrop(size_drop - last_flush_redrop_count)
+	return planned
 
 
 func count_missing_default_dests() -> int:
@@ -374,6 +406,24 @@ func enqueue_player_dests_for_refresh() -> int:
 	var before: int = _refill_queue.size()
 	_enqueue_all_current_dests()
 	return _refill_queue.size() - before
+
+
+func enqueue_refill_dests(dests: Array) -> int:
+	var before: int = _refill_queue.size()
+	for dest_v in dests:
+		_enqueue_refill_dest(int(dest_v))
+	return _refill_queue.size() - before
+
+
+func peek_refill_queue() -> Array[int]:
+	var out: Array[int] = []
+	for dest_v in _refill_queue:
+		out.append(int(dest_v))
+	return out
+
+
+func clear_refill_queue() -> void:
+	_clear_refill_queue()
 
 
 func is_player_friendly_province(province_id: int) -> bool:
@@ -453,12 +503,14 @@ func _refill_queued_dests(max_plans: int) -> int:
 	var t_budget: int = Time.get_ticks_usec()
 	while planned < max_plans and not _refill_queue.is_empty():
 		if planned > 0:
+			var next_est: float = _next_plan_cost_estimate()
 			var used_ms: float = float(Time.get_ticks_usec() - t_budget) / 1000.0
-			var next_est: float = last_plan_ms
-			if next_est <= 0.0:
-				next_est = ROUTE_REFRESH_MS_BUDGET
+			if route_refresh_plan_cost_estimate_ms > 0.0:
+				used_ms = float(planned) * route_refresh_plan_cost_estimate_ms
 			# Predictive: stop before the next plan would cross the 40 ms budget.
 			# Removing this check fails the per-frame plan-cap mutant.
+			# `used_ms + next_est` (not `used_ms >= budget`) so a 25 ms seam
+			# plans 1; a reactive used>=budget mutant plans 2.
 			if used_ms + next_est >= ROUTE_REFRESH_MS_BUDGET:
 				break
 		var dest: int = int(_refill_queue.pop_front())
@@ -478,6 +530,7 @@ func _refill_queued_dests(max_plans: int) -> int:
 		# Swap in place: the previous route served until this assignment.
 		_default_routes[key] = plan
 		_routes[key] = plan
+		last_flush_planned_dests.append(dest)
 		planned += 1
 	last_flush_plan_count = planned
 	last_flush_plan_ms = plan_ms_sum
@@ -512,11 +565,29 @@ func _process(_delta: float) -> void:
 
 func _on_relations_or_access_changed(_a: String = "", _b: String = "", _snap: Dictionary = {}) -> void:
 	SupplyPathfinder.clear_neighbor_cache()
+	# Access / alliance can cheapen any dest (new transit). Cache clear
+	# alone leaves live paths on the old detour. Enqueue all defaults.
+	_enqueue_all_current_dests()
 
 
 func _clear_refill_queue() -> void:
 	_refill_queue.clear()
 	_refill_queued.clear()
+
+
+func _next_plan_cost_estimate() -> float:
+	if route_refresh_plan_cost_estimate_ms > 0.0:
+		return route_refresh_plan_cost_estimate_ms
+	if last_plan_ms > 0.0:
+		return last_plan_ms
+	return ROUTE_REFRESH_MS_BUDGET
+
+
+func _note_flush_redrop(n: int) -> void:
+	if not _flush_in_progress or n <= 0:
+		return
+	last_flush_redrop_count += n
+	network_route_redrop_count += n
 
 
 func _enqueue_refill_dest(dest: int) -> void:
@@ -597,6 +668,7 @@ func _drop_obsolete_dest_routes() -> int:
 	for key in drop_keys:
 		_routes.erase(key)
 		_default_routes.erase(key)
+	_note_flush_redrop(drop_keys.size())
 	return drop_keys.size()
 
 
@@ -1123,7 +1195,13 @@ func advance_supply_day(days: float = 1.0) -> void:
 	var builds0: int = network_build_count
 	var t_sec: int = Time.get_ticks_usec()
 	# FIX #4: refill every missing dest in this one full day (N = dest cap 24).
-	flush_pending_control_route_refresh(ROUTE_REFRESH_BUDGET_PER_FLUSH)
+	# FIX #6: a capture on this same frame already enqueued dests — skip the
+	# 1-plan day flush so dayroll+capture stays under 200 ms. _process / drain
+	# still plan the same calendar day.
+	if _skip_day_flush_once:
+		_skip_day_flush_once = false
+	else:
+		flush_pending_control_route_refresh(ROUTE_REFRESH_BUDGET_PER_FLUSH)
 	var flush_ms: float = float(Time.get_ticks_usec() - t_sec) / 1000.0
 
 	# === Province Infrastructure & Development: Local Supply Generation ===

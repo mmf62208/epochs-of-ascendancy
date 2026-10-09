@@ -12,11 +12,14 @@ This product greps the shipped path. Headless
 boot GER + a live-weight supply network and time the Play multi-AI step.
 Soft theater tick does not rebuild the network for dummy pid 1. Live Play
 still runs the full advance_supply_day steps (air / naval / shipping).
-A depot/hub owner flip retags the hub and enqueues affected dests once
-(no re-drop). Flush pops a deduped FIFO; old routes keep serving until
-swap. Dropped dests refill the same day (dest cap 24, predictive 40 ms
-slice) with the same Dijkstra tie-breaks as a rebuild.
-Infra/dev complete recalculates that hub's capacity. Depot add/remove
+A depot/hub owner flip retags the hub and enqueues dests once
+(no re-drop). Friendly gain (recapture, depot add, military access)
+enqueues all default dests so live paths match a rebuild. Flush pops a
+deduped FIFO; old routes keep serving until swap. Dropped dests refill
+the same day (dest cap 24, predictive 40 ms slice) with the same
+Dijkstra tie-breaks as a rebuild. Flush redrop counters increment when
+a flush drops a planned route. Infra/dev complete and GameData
+settlement-improve recalculate hub capacity. Depot add/remove
 patches one hub. Daily listener stays on main's light path so
 apply_supply is the one full day. Production shares a per-day
 line-owner cache; owner index is counted + timed.
@@ -291,6 +294,34 @@ def build_perf4_daily_sim_tick_product() -> Dict[str, Any]:
         passes.append("headless_slice_plan_cap")
     else:
         fails.append("headless_slice_plan_cap")
+    if HD_LIVE_GD.is_file() and "_test_recapture_710314_path_identity" in hd_live:
+        passes.append("headless_recapture_path_identity")
+    else:
+        fails.append("headless_recapture_path_identity")
+    if HD_LIVE_GD.is_file() and "_test_military_access_path_identity" in hd_live:
+        passes.append("headless_access_path_identity")
+    else:
+        fails.append("headless_access_path_identity")
+    if HD_LIVE_GD.is_file() and "_test_fifo_dequeue_matches_enqueue" in hd_live:
+        passes.append("headless_fifo_order")
+    else:
+        fails.append("headless_fifo_order")
+    if HD_LIVE_GD.is_file() and "_test_slice_predictive_vs_reactive_seam" in hd_live:
+        passes.append("headless_slice_estimate_seam")
+    else:
+        fails.append("headless_slice_estimate_seam")
+    if HD_LIVE_GD.is_file() and "_test_dayroll_with_capture_under_200ms" in hd_live:
+        passes.append("headless_dayroll_capture_frame")
+    else:
+        fails.append("headless_dayroll_capture_frame")
+    if HD_LIVE_GD.is_file() and "TEN_CAPTURE_FRAME_BUDGET_MS" not in hd_live:
+        passes.append("headless_no_ten_capture_wall")
+    else:
+        fails.append("headless_no_ten_capture_wall")
+    if HD_LIVE_GD.is_file() and "apply_ascendancy_initiative_player_province_choice" in hd_live:
+        passes.append("headless_gamedata_infra_behaviour")
+    else:
+        fails.append("headless_gamedata_infra_behaviour")
     if HD_LIVE_GD.is_file() and "QUIET_DAY_BUDGET_MS" not in hd_live:
         passes.append("headless_no_200ms_wall")
     else:
@@ -337,6 +368,24 @@ def build_perf4_daily_sim_tick_product() -> Dict[str, Any]:
         passes.append("predictive_40ms_slice")
     else:
         fails.append("predictive_40ms_slice")
+    if "route_refresh_plan_cost_estimate_ms" in sm:
+        passes.append("slice_plan_cost_estimate_seam")
+    else:
+        fails.append("slice_plan_cost_estimate_seam")
+    if "func _note_flush_redrop" in sm and "network_route_redrop_count +=" in sm:
+        passes.append("flush_redrop_counters_increment")
+    else:
+        fails.append("flush_redrop_counters_increment")
+    notify_all = extract_gd_func_body(sm, "notify_province_control_changed")
+    if notify_all and "_enqueue_all_current_dests" in notify_all:
+        passes.append("friendly_gain_enqueues_all_dests")
+    else:
+        fails.append("friendly_gain_enqueues_all_dests")
+    rel_fn = extract_gd_func_body(sm, "_on_relations_or_access_changed")
+    if rel_fn and "_enqueue_all_current_dests" in rel_fn:
+        passes.append("access_enqueues_all_dests")
+    else:
+        fails.append("access_enqueues_all_dests")
     notify = extract_gd_func_body(sm, "notify_province_control_changed")
     if notify and "_pid_blocks_player_supply" in notify:
         passes.append("keep_old_routes_until_swap")

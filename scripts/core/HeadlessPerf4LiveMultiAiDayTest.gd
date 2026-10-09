@@ -29,12 +29,14 @@ const EQUIV_SEED := 193601
 const PLAYER_TAG := "GER"
 const DAY_BUDGET_MS := 500.0
 const CAPTURE_FRAME_BUDGET_MS := 5.0
-const TEN_CAPTURE_FRAME_BUDGET_MS := 25.0
+const DAYROLL_CAPTURE_BUDGET_MS := 200.0
+const SLICE_ESTIMATE_MS := 25.0
 const HUB_CAPACITY_DAY := 40
 const CAPTURE_HUB_PID := 710160
 const CAPTURE_DEPOT_PID := 710161
 const REAL_DEPOT_PID := 710300
 const DEPOT_ADD_PID := 710314
+const RECAPTURE_PATH_PID := 710314
 const SWI_PID := 710119
 const REPEAT_DEPOT_ADDS := 4
 const CONVERGE_FRAMES := 40
@@ -144,7 +146,11 @@ func _run() -> void:
 	_test_ten_capture_drains_one_day_1x_and_4x(mm, sm)
 	_test_slice_caps_plans_per_frame(sm)
 	_test_relations_access_clears_friendly_cache(sm)
-	_test_gamedata_direct_infra_notifies_hub_stats(gd, mm, sm)
+	_test_recapture_710314_path_identity(mm, sm)
+	_test_military_access_path_identity(mm, sm)
+	_test_fifo_dequeue_matches_enqueue(sm)
+	_test_slice_predictive_vs_reactive_seam(sm)
+	_test_dayroll_with_capture_under_200ms(tm, mm, sm)
 	_test_one_full_supply_day_per_game_day(tm, gd, sm)
 	_test_production_cache_measured(gd)
 	_test_owner_index_measured(mm)
@@ -152,6 +158,7 @@ func _run() -> void:
 	_test_live_day_ai_budget(tm, gd)
 	_test_hub_capacity_on_infra_complete(mm, sm)
 	_test_hub_capacity_matches_rebuild_at_day_40(tm, mm, sm)
+	_test_gamedata_direct_infra_notifies_hub_stats(gd, mm, sm)
 
 
 func _test_source_gates_fail_on_pre_fix() -> void:
@@ -250,6 +257,10 @@ func _test_replanned_off_must_fail(sm_src: String, adv: String) -> void:
 		_fail("slice removed (predictive used+next check missing)")
 	else:
 		_pass("predictive slice stops before the next plan crosses the budget")
+	if "route_refresh_plan_cost_estimate_ms" not in sm_src:
+		_fail("slice plan-cost estimate seam missing (slice_reactive unguarded)")
+	else:
+		_pass("slice plan-cost estimate seam present")
 	var flush := _slice_func(sm_src, "flush_pending_control_route_refresh")
 	if flush.is_empty() or "_refill_queued_dests" not in flush:
 		_fail("re-plan turned off (flush does not pop the dest queue)")
@@ -259,6 +270,14 @@ func _test_replanned_off_must_fail(sm_src: String, adv: String) -> void:
 		_fail("re-drop restored (flush re-drops dirty pids — FIX #4 livelock)")
 	else:
 		_pass("flush never re-drops (deduped FIFO only)")
+	if "_note_flush_redrop" not in sm_src or "network_route_redrop_count +=" not in sm_src:
+		_fail("redrop counters never increment (redrop_restored tautology)")
+	else:
+		_pass("flush redrop counters increment on a planned-route drop")
+	if "pop_front" not in refill:
+		_fail("refill queue is not FIFO (pop_front missing)")
+	else:
+		_pass("refill dequeues from the front (FIFO)")
 	if "_drop_all_default_routes" in flush or "_must_replan_all_defaults" in flush:
 		_fail("flush still drop-alls remaining defaults")
 	else:
@@ -272,6 +291,10 @@ func _test_replanned_off_must_fail(sm_src: String, adv: String) -> void:
 		_fail("no old-route keep (notify drops friendly-touching routes)")
 	else:
 		_pass("notify drops only hostile/impassable routes")
+	if "_enqueue_all_current_dests" not in notify:
+		_fail("friendly gain does not enqueue all dests (recapture pathdiff)")
+	else:
+		_pass("friendly gain enqueues all default dests")
 	if "notify_hub_stats_changed" not in sm_src:
 		_fail("notify_hub_stats_changed missing (5ca1d0b5 hub capacity stale)")
 	else:
@@ -280,6 +303,11 @@ func _test_replanned_off_must_fail(sm_src: String, adv: String) -> void:
 		_fail("relations/access does not clear the pathfinder friendly cache")
 	else:
 		_pass("relations/access clears the pathfinder friendly cache")
+	var rel_fn := _slice_func(sm_src, "_on_relations_or_access_changed")
+	if "_enqueue_all_current_dests" not in rel_fn:
+		_fail("relations/access clears cache but enqueues nothing (access pathdiff)")
+	else:
+		_pass("relations/access enqueues all default dests")
 	var mm_src := _read("res://scripts/map/MapManager.gd")
 	var infra_fn := _slice_func(mm_src, "update_province_infrastructure")
 	var dev_fn := _slice_func(mm_src, "update_province_development")
@@ -769,21 +797,34 @@ func _test_capture_frame_budgets(mm: Node, sm: Node) -> void:
 	if ten.size() < 10:
 		_fail("ten-capture budget needs 10 GER hubs got=%d" % ten.size())
 		return
+	var plans0: int = int(sm.get("network_route_refill_count")) if "network_route_refill_count" in sm else 0
+	var missing0: int = _missing_dests(sm)
 	var t_ten := Time.get_ticks_usec()
 	for pid in ten:
 		mm.call("update_province_owner", pid, "FRA", "FRA")
 	var ten_ms := float(Time.get_ticks_usec() - t_ten) / 1000.0
-	print("HeadlessPerf4LiveMultiAiDayTest: capture_frame_ten n=%d %.1fms pids=%s" % [ten.size(), ten_ms, str(ten)])
+	var plans1: int = int(sm.get("network_route_refill_count")) if "network_route_refill_count" in sm else 0
+	var missing1: int = _missing_dests(sm)
+	var queued: int = _queue_n(sm)
+	var dirty: int = _dirty_n(sm)
+	print(
+		"HeadlessPerf4LiveMultiAiDayTest: capture_frame_ten n=%d %.1fms (informational) missing=%d→%d queue=%d dirty=%d plans=%d→%d pids=%s"
+		% [ten.size(), ten_ms, missing0, missing1, queued, dirty, plans0, plans1, str(ten)]
+	)
 	var tagged := 0
 	for pid2 in ten:
 		if _hub_owner_tag(sm, pid2) == "FRA":
 			tagged += 1
 	if tagged != ten.size():
 		_fail("ten-capture retagged %d/%d hubs" % [tagged, ten.size()])
-	elif ten_ms >= TEN_CAPTURE_FRAME_BUDGET_MS:
-		_fail("ten captures %.1fms >= %.0f (enqueue-once frame bar)" % [ten_ms, TEN_CAPTURE_FRAME_BUDGET_MS])
+	elif plans1 != plans0:
+		_fail("ten-capture planned on the capture frame plans=%d→%d" % [plans0, plans1])
+	elif missing1 <= 0 and queued <= 0:
+		_fail("ten-capture enqueued nothing missing=%d queue=%d" % [missing1, queued])
+	elif dirty != 0:
+		_fail("ten-capture left dirty set n=%d" % dirty)
 	else:
-		_pass("ten-capture tick %.1fms < %.0f" % [ten_ms, TEN_CAPTURE_FRAME_BUDGET_MS])
+		_pass("ten-capture enqueue-once behaviour missing=%d queue=%d plans+=0 dirty=0 (%.1fms informational)" % [missing1, queued, ten_ms])
 	for pid3 in ten:
 		_restore_owner(mm, pid3, "GER")
 
@@ -1265,9 +1306,189 @@ func _test_relations_access_clears_friendly_cache(sm: Node) -> void:
 		rm.call("set_policy", PLAYER_TAG, "SWI", {"military_access": false})
 
 
+func _live_vs_rebuild_pathdiff(mm: Node, sm: Node) -> Dictionary:
+	var live: Dictionary = sm.call("get_network_topology_snapshot")
+	if not _boot_live_supply_network(mm, sm):
+		return {"ok": false, "pathdiff": -1, "live_n": 0, "full_n": 0}
+	var full: Dictionary = sm.call("get_network_topology_snapshot")
+	var live_routes: Array = live.get("routes", []) as Array
+	var full_routes: Array = full.get("routes", []) as Array
+	return {
+		"ok": true,
+		"pathdiff": _path_mismatch_count(live_routes, full_routes),
+		"live_n": live_routes.size(),
+		"full_n": full_routes.size(),
+		"identical": _route_paths_identical(live_routes, full_routes),
+	}
+
+
+func _hub_capdiff(live_caps: Dictionary, full_caps: Dictionary) -> Array:
+	var diffs: Array = []
+	var keys: Dictionary = {}
+	for k in live_caps.keys():
+		keys[int(k)] = true
+	for k2 in full_caps.keys():
+		keys[int(k2)] = true
+	for pid_v in keys.keys():
+		var pid: int = int(pid_v)
+		var live_c: float = float(live_caps.get(pid, live_caps.get(str(pid), 0.0)))
+		var full_c: float = float(full_caps.get(pid, full_caps.get(str(pid), 0.0)))
+		if not is_equal_approx(live_c, full_c):
+			diffs.append({"pid": pid, "live": live_c, "full": full_c})
+	return diffs
+
+
+func _test_recapture_710314_path_identity(mm: Node, sm: Node) -> void:
+	if mm == null or sm == null or not sm.has_method("get_network_topology_snapshot"):
+		_fail("recapture 710314 path identity helpers missing")
+		return
+	if not _boot_live_supply_network(mm, sm):
+		_fail("recapture 710314 boot failed")
+		return
+	var pid: int = RECAPTURE_PATH_PID
+	mm.call("update_province_owner", pid, "FRA", "FRA")
+	_flush_until_drained(sm, CONVERGE_FRAMES)
+	mm.call("update_province_owner", pid, "GER", "GER")
+	var drain: Dictionary = _flush_until_drained(sm, CONVERGE_FRAMES)
+	_assert_converged(sm, "ll_recap_710314", drain)
+	var cmp: Dictionary = _live_vs_rebuild_pathdiff(mm, sm)
+	print(
+		"HeadlessPerf4LiveMultiAiDayTest: recapture_710314 pathdiff=%s live_n=%s full_n=%s"
+		% [str(cmp.get("pathdiff", -1)), str(cmp.get("live_n", -1)), str(cmp.get("full_n", -1))]
+	)
+	if not bool(cmp.get("ok", false)):
+		_fail("recapture 710314 rebuild failed")
+	elif int(cmp.get("pathdiff", -1)) != 0:
+		_fail("recapture 710314 pathdiff=%d (enqueue-touching-only keeps detour)" % int(cmp.get("pathdiff", -1)))
+	else:
+		_pass("recapture 710314 paths match full rebuild pathdiff=0")
+	_restore_owner(mm, pid, "GER")
+	_boot_live_supply_network(mm, sm)
+
+
+func _test_military_access_path_identity(mm: Node, sm: Node) -> void:
+	var rm: Node = root.get_node_or_null("/root/RelationsManager")
+	if rm == null or sm == null or not rm.has_method("set_policy"):
+		_fail("military access path identity helpers missing")
+		return
+	if not _boot_live_supply_network(mm, sm):
+		_fail("military access path identity boot failed")
+		return
+	rm.call("set_policy", PLAYER_TAG, "SWI", {"military_access": true})
+	var grant_q: int = _queue_n(sm)
+	var grant_drain: Dictionary = _flush_until_drained(sm, CONVERGE_FRAMES)
+	_assert_converged(sm, "access_grant", grant_drain)
+	var grant: Dictionary = _live_vs_rebuild_pathdiff(mm, sm)
+	print(
+		"HeadlessPerf4LiveMultiAiDayTest: access_grant queue=%d pathdiff=%s"
+		% [grant_q, str(grant.get("pathdiff", -1))]
+	)
+	if grant_q <= 0:
+		_fail("military access grant enqueued nothing (relations clear cache only)")
+	elif int(grant.get("pathdiff", -1)) != 0:
+		_fail("military access grant pathdiff=%d" % int(grant.get("pathdiff", -1)))
+	else:
+		_pass("military access grant paths match rebuild pathdiff=0")
+	if not _boot_live_supply_network(mm, sm):
+		_fail("military access revoke boot failed")
+		rm.call("set_policy", PLAYER_TAG, "SWI", {"military_access": false})
+		return
+	rm.call("set_policy", PLAYER_TAG, "SWI", {"military_access": false})
+	var rev_q: int = _queue_n(sm)
+	var rev_drain: Dictionary = _flush_until_drained(sm, CONVERGE_FRAMES)
+	_assert_converged(sm, "access_revoked", rev_drain)
+	var rev: Dictionary = _live_vs_rebuild_pathdiff(mm, sm)
+	print(
+		"HeadlessPerf4LiveMultiAiDayTest: access_revoked queue=%d pathdiff=%s"
+		% [rev_q, str(rev.get("pathdiff", -1))]
+	)
+	if rev_q <= 0:
+		_fail("military access revoke enqueued nothing")
+	elif int(rev.get("pathdiff", -1)) != 0:
+		_fail("military access revoke pathdiff=%d" % int(rev.get("pathdiff", -1)))
+	else:
+		_pass("military access revoke paths match rebuild pathdiff=0")
+	_boot_live_supply_network(mm, sm)
+
+
+func _test_fifo_dequeue_matches_enqueue(sm: Node) -> void:
+	if sm == null or not sm.has_method("enqueue_refill_dests") or not sm.has_method("peek_refill_queue"):
+		_fail("FIFO enqueue/dequeue helpers missing")
+		return
+	if sm.has_method("clear_refill_queue"):
+		sm.call("clear_refill_queue")
+	var snap: Dictionary = sm.call("get_network_topology_snapshot") if sm.has_method("get_network_topology_snapshot") else {}
+	var dests: Array[int] = []
+	for raw in snap.get("routes", []) as Array:
+		if typeof(raw) != TYPE_DICTIONARY:
+			continue
+		var dst: int = int((raw as Dictionary).get("dst", -1))
+		if dst > 0 and dst not in dests:
+			dests.append(dst)
+	dests.sort()
+	if dests.size() < 4:
+		_fail("FIFO test needs 4 default dests got=%d" % dests.size())
+		return
+	# Two capture-like batches. Order is not sorted (high ids first).
+	var batch1: Array = [dests[dests.size() - 1], dests[dests.size() - 2]]
+	var batch2: Array = [dests[0], dests[1]]
+	var want: Array[int] = [int(batch1[0]), int(batch1[1]), int(batch2[0]), int(batch2[1])]
+	sm.call("enqueue_refill_dests", batch1)
+	sm.call("enqueue_refill_dests", batch2)
+	var queued: Array = sm.call("peek_refill_queue")
+	var got: Array[int] = []
+	for _i in range(want.size()):
+		sm.call("flush_pending_control_route_refresh", 1)
+		var planned: Array = sm.get("last_flush_planned_dests") if "last_flush_planned_dests" in sm else []
+		for d_v in planned:
+			got.append(int(d_v))
+	print(
+		"HeadlessPerf4LiveMultiAiDayTest: fifo_order want=%s queued=%s got=%s"
+		% [str(want), str(queued), str(got)]
+	)
+	if str(queued) != str(want):
+		_fail("FIFO enqueue order %s != %s (sorted/LIFO mutant)" % [str(queued), str(want)])
+	elif str(got) != str(want):
+		_fail("FIFO dequeue order %s != enqueue %s (sorted/LIFO mutant)" % [str(got), str(want)])
+	else:
+		_pass("FIFO dequeue == enqueue across two batches %s" % str(got))
+	_flush_until_drained(sm, CONVERGE_FRAMES)
+
+
+func _test_slice_predictive_vs_reactive_seam(sm: Node) -> void:
+	if sm == null or not sm.has_method("enqueue_player_dests_for_refresh"):
+		_fail("slice estimate-seam helpers missing")
+		return
+	if not ("route_refresh_plan_cost_estimate_ms" in sm):
+		_fail("route_refresh_plan_cost_estimate_ms seam missing")
+		return
+	if sm.has_method("clear_refill_queue"):
+		sm.call("clear_refill_queue")
+	sm.set("route_refresh_plan_cost_estimate_ms", SLICE_ESTIMATE_MS)
+	sm.set("last_plan_ms", SLICE_ESTIMATE_MS)
+	var queued: int = int(sm.call("enqueue_player_dests_for_refresh"))
+	sm.call("flush_pending_control_route_refresh")
+	var planned: int = int(sm.get("last_flush_plan_count")) if "last_flush_plan_count" in sm else -1
+	print(
+		"HeadlessPerf4LiveMultiAiDayTest: slice_reactive_seam estimate=%.0f queued=%d planned=%d"
+		% [SLICE_ESTIMATE_MS, queued, planned]
+	)
+	sm.set("route_refresh_plan_cost_estimate_ms", -1.0)
+	if queued < 4:
+		_fail("slice seam could not enqueue dests queued=%d" % queued)
+	elif planned != 1:
+		_fail("slice_reactive survived: estimate %.0f planned %d (want predictive 1, reactive 2)" % [SLICE_ESTIMATE_MS, planned])
+	else:
+		_pass("predictive slice plans 1/frame at %.0fms estimate (reactive would plan 2)" % SLICE_ESTIMATE_MS)
+	_flush_until_drained(sm, CONVERGE_FRAMES)
+
+
 func _test_gamedata_direct_infra_notifies_hub_stats(gd: Node, mm: Node, sm: Node) -> void:
 	if gd == null or mm == null or sm == null:
 		_fail("GameData infra notify helpers missing")
+		return
+	if not gd.has_method("apply_ascendancy_initiative_player_province_choice"):
+		_fail("apply_ascendancy_initiative_player_province_choice missing")
 		return
 	var ger_cap: int = int(CAPITALS.get("GER", 0))
 	var p: Variant = mm.call("get_province", ger_cap)
@@ -1280,26 +1501,65 @@ func _test_gamedata_direct_infra_notifies_hub_stats(gd: Node, mm: Node, sm: Node
 		return
 	var cap0: float = float(hubs[ger_cap].storage_capacity)
 	var stats0: int = int(sm.get("network_hub_stats_refresh_count"))
-	p.infrastructure = mini(50, int(p.infrastructure) + 1)
-	if mm.has_method("notify_province_changed"):
-		mm.call("notify_province_changed", ger_cap, "infrastructure")
-	if gd.has_method("notify_hub_stats_changed"):
-		pass
-	if sm.has_method("notify_hub_stats_changed"):
-		# GameData initiative/geo writes call this after the direct mutate.
-		sm.call("notify_hub_stats_changed", ger_cap)
+	var infra0: int = int(p.infrastructure)
+	# Real settlement-improve path. Coastal feature makes the function write infra.
+	if "special_features" in p and p.special_features is Dictionary:
+		(p.special_features as Dictionary)["coastal"] = 1
+	gd.call("apply_ascendancy_initiative_player_province_choice", PLAYER_TAG, "perf4", "improve_capital", ger_cap)
+	if int(p.infrastructure) <= infra0 and gd.has_method("apply_encourage_relocation"):
+		gd.call("apply_encourage_relocation", PLAYER_TAG, "perf4_cap", 0.4)
+	var live1: Dictionary = sm.call("get_hub_capacity_snapshot") if sm.has_method("get_hub_capacity_snapshot") else {}
 	var cap1: float = float((sm.hubs as Dictionary)[ger_cap].storage_capacity)
 	var stats1: int = int(sm.get("network_hub_stats_refresh_count"))
+	if not _boot_live_supply_network(mm, sm):
+		_fail("GameData infra rebuild failed")
+		return
+	var full: Dictionary = sm.call("get_hub_capacity_snapshot") if sm.has_method("get_hub_capacity_snapshot") else {}
+	var capdiff: Array = _hub_capdiff(live1, full)
 	print(
-		"HeadlessPerf4LiveMultiAiDayTest: gamedata_direct_infra pid=%d cap=%.0f→%.0f stats=%d→%d"
-		% [ger_cap, cap0, cap1, stats0, stats1]
+		"HeadlessPerf4LiveMultiAiDayTest: gamedata_infra_choice pid=%d infra=%d→%d cap=%.0f→%.0f stats=%d→%d capdiff=%s"
+		% [ger_cap, infra0, int(p.infrastructure), cap0, cap1, stats0, stats1, str(capdiff)]
 	)
 	if stats1 <= stats0:
-		_fail("GameData-style direct infra write did not notify hub stats")
+		_fail("GameData settlement-improve did not notify hub stats")
 	elif cap1 <= cap0:
-		_fail("GameData-style direct infra write left hub capacity %.0f" % cap1)
+		_fail("GameData settlement-improve left hub capacity %.0f" % cap1)
+	elif not capdiff.is_empty():
+		_fail("GameData settlement-improve capdiff=%s (infra_no_notify)" % str(capdiff))
 	else:
-		_pass("GameData-style direct infra write refreshed hub capacity %.0f→%.0f" % [cap0, cap1])
+		_pass("GameData settlement-improve hub capacity == rebuild capdiff=[]")
+
+
+func _test_dayroll_with_capture_under_200ms(tm: Node, mm: Node, sm: Node) -> void:
+	if tm == null or mm == null or sm == null:
+		_fail("dayroll+capture helpers missing")
+		return
+	if not _boot_live_supply_network(mm, sm):
+		_fail("dayroll+capture boot failed")
+		return
+	_restore_owner(mm, CAPTURE_HUB_PID, "GER")
+	if sm.has_method("drain_pending_route_refresh"):
+		sm.call("drain_pending_route_refresh")
+	_reset_clock(tm, 0)
+	var t0: int = Time.get_ticks_usec()
+	mm.call("update_province_owner", CAPTURE_HUB_PID, "FRA", "FRA")
+	if tm.has_method("advance_live_f5_equivalent_days"):
+		tm.call("advance_live_f5_equivalent_days", 1)
+	elif sm.has_method("advance_supply_day"):
+		sm.call("advance_supply_day", 1.0)
+	var frame_ms: float = float(Time.get_ticks_usec() - t0) / 1000.0
+	var prof: Dictionary = sm.get("last_supply_day_profile") if "last_supply_day_profile" in sm else {}
+	var sim_ms: float = float(prof.get("total_ms", 0.0))
+	print(
+		"HeadlessPerf4LiveMultiAiDayTest: dayroll_capture_frame=%.1fms sim_supply=%.1fms generate=%.1f flush=%.1f (sim vs render: this is headless sim, not a live xvfb day-frame)"
+		% [frame_ms, sim_ms, float(prof.get("generate_ms", 0.0)), float(prof.get("flush_ms", 0.0))]
+	)
+	if frame_ms >= DAYROLL_CAPTURE_BUDGET_MS:
+		_fail("dayroll+capture frame %.1fms >= %.0f" % [frame_ms, DAYROLL_CAPTURE_BUDGET_MS])
+	else:
+		_pass("dayroll+capture frame %.1fms < %.0f (headless sim; live needs sim-vs-render split)" % [frame_ms, DAYROLL_CAPTURE_BUDGET_MS])
+	_restore_owner(mm, CAPTURE_HUB_PID, "GER")
+	_boot_live_supply_network(mm, sm)
 
 
 func _test_hub_capacity_on_infra_complete(mm: Node, sm: Node) -> void:

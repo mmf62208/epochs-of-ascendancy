@@ -2265,9 +2265,12 @@ func apply_ascendancy_initiative_player_province_choice(tag: String, branch: Str
 		peace_state[prog_key][tag] = {}
 	var node_key : Variant = branch + "/" + node_name
 	peace_state[prog_key][tag][node_key] = {"completed": true, "chosen_pid": chosen_pid, "geo": {"river": is_river, "coastal": is_coastal, "border": is_border}}
-	# Notify for map visuals (vitality, overlays), combat recalc, supply
+	# Notify for map visuals (vitality, overlays), combat recalc, supply.
+	# Hub capacity is refreshed only via notify_hub_stats_changed (settlement
+	# notify does not retag hubs). Removing that call leaves capacity stale.
 	MapManager.notify_province_changed(chosen_pid, "settlement")
-	MapManager.notify_province_changed(chosen_pid, "infrastructure")
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_signal("province_data_changed"):
+		MapManager.province_data_changed.emit(chosen_pid, "infrastructure")
 	if typeof(SupplyManager) != TYPE_NIL and SupplyManager.has_method("notify_hub_stats_changed"):
 		SupplyManager.notify_hub_stats_changed(chosen_pid)
 	# Pillar nudge based on geo (e.g. coastal/river give Mandate for trade)
@@ -3124,9 +3127,8 @@ func apply_encourage_relocation(tag: String, target_culture_or_area: String, sca
 			# Prefer MapManager updaters when they exist (they emit province_data_changed for renderer/inspector).
 			if MapManager.has_method("update_province_infrastructure"):
 				MapManager.update_province_infrastructure(pid, p.infrastructure)
-			# Dev has no dedicated updater in all builds; direct + optional notify.
-			if MapManager.has_method("notify_province_changed"):
-				MapManager.notify_province_changed(pid, "development")
+			# Infra was already written above, so the updater is a no-op.
+			# Hub capacity is refreshed only via notify_hub_stats_changed.
 			if typeof(SupplyManager) != TYPE_NIL and SupplyManager.has_method("notify_hub_stats_changed"):
 				SupplyManager.notify_hub_stats_changed(pid)
 			# Explicit emit so MapRenderer tints (settlement cyan-green vitality + welfare strain) and inspector refresh live for playtest.

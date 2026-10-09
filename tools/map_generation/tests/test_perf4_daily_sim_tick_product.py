@@ -83,8 +83,19 @@ class TestPerf4DailySimTickProduct(unittest.TestCase):
             "headless_ten_capture_1x_4x_drain",
             "headless_slice_plan_cap",
             "headless_no_200ms_wall",
+            "headless_recapture_path_identity",
+            "headless_access_path_identity",
+            "headless_fifo_order",
+            "headless_slice_estimate_seam",
+            "headless_dayroll_capture_frame",
+            "headless_no_ten_capture_wall",
+            "headless_gamedata_infra_behaviour",
             "fifo_refill_no_redrop",
             "predictive_40ms_slice",
+            "slice_plan_cost_estimate_seam",
+            "flush_redrop_counters_increment",
+            "friendly_gain_enqueues_all_dests",
+            "access_enqueues_all_dests",
             "keep_old_routes_until_swap",
             "relations_clears_friendly_cache",
             "gamedata_direct_infra_notifies_hub",
@@ -166,7 +177,12 @@ class TestPerf4DailySimTickProduct(unittest.TestCase):
         self.assertIn("_test_depot_add_710314_converges", hd)
         self.assertIn("_test_recapture_ger_converges", hd)
         self.assertIn("_test_keep_old_routes_until_swap", hd)
+        self.assertIn("_test_recapture_710314_path_identity", hd)
+        self.assertIn("_test_military_access_path_identity", hd)
+        self.assertIn("_test_fifo_dequeue_matches_enqueue", hd)
+        self.assertIn("_test_slice_predictive_vs_reactive_seam", hd)
         self.assertNotIn("QUIET_DAY_BUDGET_MS", hd)
+        self.assertNotIn("TEN_CAPTURE_FRAME_BUDGET_MS", hd)
 
     def test_live_multi_ai_harness_exists(self) -> None:
         hd = ROOT / "scripts" / "core" / "HeadlessPerf4LiveMultiAiDayTest.gd"
