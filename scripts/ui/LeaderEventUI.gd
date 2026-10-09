@@ -9,6 +9,8 @@ const MAX_NEWS_ITEMS := 40
 const TOAST_DURATION_SEC := 6.0
 const TOAST_DISMISSING_META := "eoa_toast_dismissing"
 const NOTICE_CLOSE_GROUP := "eoa_ui_close_x"
+const TOAST_PTR_MOVE_PX: float = 6.0
+const TOAST_PTR_PREV_FILTER_META := "eoa_toast_ptr_prev_filter"
 
 var news_history: Array[Dictionary] = []
 var _retirement_queue: Array[String] = []
@@ -28,6 +30,9 @@ var _mech_icon: Texture2D = null
 var _versailles_icon: Texture2D = null
 ## Edge-trigger for `_process` pointer poll (computerUse / DisplayServer leftover).
 var _notice_ptr_poll_held: bool = false
+## After a user × close, surviving toasts ignore the pointer until it moves.
+var _toast_ptr_passthrough: bool = false
+var _toast_ptr_anchor: Vector2 = Vector2.ZERO
 ## Headless INPUT-1 / toast-click guards opt in. Product `post_news` / `show_toast`
 ## stay skipped in headless so Maginot / CompleteTest quit after RESULT=PASS.
 var force_toast_ui: bool = false
@@ -221,7 +226,7 @@ func show_toast(message: String, duration_sec: float = 3.0, is_error: bool = fal
 	close_btn.add_to_group(NOTICE_CLOSE_GROUP)
 	# Press arms leftover-release swallow before MapRenderer `_input` sees the up.
 	close_btn.button_down.connect(_on_notice_close_button_down)
-	close_btn.pressed.connect(_dismiss_toast.bind(panel))
+	close_btn.pressed.connect(_user_close_toast.bind(weakref(panel)))
 	title_row.add_child(close_btn)
 	vbox.add_child(title_row)
 
@@ -521,7 +526,7 @@ func _show_toast(entry: Dictionary) -> void:
 
 	_arm_toast_timeout(panel, TOAST_DURATION_SEC)
 	dismiss_button.button_down.connect(_on_notice_close_button_down)
-	dismiss_button.pressed.connect(_dismiss_toast.bind(weakref(panel)))
+	dismiss_button.pressed.connect(_user_close_toast.bind(weakref(panel)))
 
 
 func _arm_toast_timeout(panel: PanelContainer, duration_sec: float) -> void:
@@ -560,6 +565,87 @@ func _dismiss_toast(panel: Variant = null) -> void:
 		# Deferred free so the same leftover release cannot pick while the
 		# Control is mid-pressed teardown (TipDismiss / BEGIN-1 leftover class).
 		call_deferred("_free_notice_toast_node", node)
+
+
+func _user_close_toast(panel_ref: Variant) -> void:
+	# User × / poll close only. Timer, trim, and Respond stay on `_dismiss_toast`.
+	var toast: Object = _toast_object_from_ref(panel_ref)
+	if toast == null or not is_instance_valid(toast):
+		return
+	if toast.has_meta(TOAST_DISMISSING_META) and bool(toast.get_meta(TOAST_DISMISSING_META)):
+		return
+	_dismiss_toast(toast)
+	_begin_toast_stack_passthrough()
+
+
+func _save_and_ignore_toast_filters(ctrl: Control) -> void:
+	if ctrl == null or not is_instance_valid(ctrl):
+		return
+	if not ctrl.has_meta(TOAST_PTR_PREV_FILTER_META):
+		ctrl.set_meta(TOAST_PTR_PREV_FILTER_META, int(ctrl.mouse_filter))
+	ctrl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var kids: Array[Node] = ctrl.get_children()
+	var i: int = 0
+	while i < kids.size():
+		var kid: Node = kids[i]
+		if kid is Control:
+			_save_and_ignore_toast_filters(kid as Control)
+		i += 1
+
+
+func _restore_toast_filters(ctrl: Control) -> void:
+	if ctrl == null or not is_instance_valid(ctrl):
+		return
+	if ctrl.has_meta(TOAST_PTR_PREV_FILTER_META):
+		ctrl.mouse_filter = int(ctrl.get_meta(TOAST_PTR_PREV_FILTER_META))
+		ctrl.remove_meta(TOAST_PTR_PREV_FILTER_META)
+	var kids: Array[Node] = ctrl.get_children()
+	var i: int = 0
+	while i < kids.size():
+		var kid: Node = kids[i]
+		if kid is Control:
+			_restore_toast_filters(kid as Control)
+		i += 1
+
+
+func _begin_toast_stack_passthrough() -> void:
+	var vp: Viewport = get_viewport()
+	if vp != null:
+		_toast_ptr_anchor = vp.get_mouse_position()
+	_toast_ptr_passthrough = true
+	if _toast_container == null:
+		return
+	var kids: Array[Node] = _toast_container.get_children()
+	var i: int = 0
+	while i < kids.size():
+		var kid: Node = kids[i]
+		if kid is Control:
+			_save_and_ignore_toast_filters(kid as Control)
+		i += 1
+
+
+func _end_toast_stack_passthrough() -> void:
+	if _toast_container != null:
+		var kids: Array[Node] = _toast_container.get_children()
+		var i: int = 0
+		while i < kids.size():
+			var kid: Node = kids[i]
+			if kid is Control:
+				_restore_toast_filters(kid as Control)
+			i += 1
+	_toast_ptr_passthrough = false
+
+
+func _tick_toast_stack_passthrough() -> void:
+	if not _toast_ptr_passthrough:
+		return
+	if _toast_container == null or _toast_container.get_child_count() == 0:
+		_end_toast_stack_passthrough()
+		return
+	var vp: Viewport = get_viewport()
+	var pos: Vector2 = vp.get_mouse_position() if vp != null else Vector2.ZERO
+	if pos.distance_to(_toast_ptr_anchor) >= TOAST_PTR_MOVE_PX:
+		_end_toast_stack_passthrough()
 
 
 func _toast_object_from_ref(panel: Variant) -> Object:
@@ -789,10 +875,15 @@ func notice_close_button() -> Button:
 			if grouped.name != "NoticeClose":
 				continue
 			if grouped.visible and grouped.is_visible_in_tree():
+				if grouped.mouse_filter == Control.MOUSE_FILTER_IGNORE:
+					continue
 				return grouped
 	if _toast_container == null:
 		return null
-	return _toast_container.find_child("NoticeClose", true, false) as Button
+	var fallback: Button = _toast_container.find_child("NoticeClose", true, false) as Button
+	if fallback != null and fallback.mouse_filter == Control.MOUSE_FILTER_IGNORE:
+		return null
+	return fallback
 
 
 func handle_live_close_pointer(event: InputEvent = null) -> String:
@@ -825,7 +916,7 @@ func handle_live_close_pointer(event: InputEvent = null) -> String:
 	while panel != null and not (panel is PanelContainer):
 		panel = panel.get_parent()
 	if panel != null:
-		_dismiss_toast(panel)
+		_user_close_toast(panel)
 	return "close"
 
 
@@ -848,6 +939,12 @@ func _poll_notice_close_just_pressed() -> bool:
 	return false
 
 
+func _input(event: InputEvent) -> void:
+	if event is InputEventMouseMotion:
+		_tick_toast_stack_passthrough()
+
+
 func _process(_delta: float) -> void:
+	_tick_toast_stack_passthrough()
 	if _poll_notice_close_just_pressed():
 		handle_live_close_pointer(null)

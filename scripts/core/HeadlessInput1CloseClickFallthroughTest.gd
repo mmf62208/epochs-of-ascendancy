@@ -30,6 +30,10 @@ extends SceneTree
 ##       second click, like T2/T4). Main fails by leftover Köln.
 ##   T11 poll-pending swallow must expire: after 750 ms + 2 frames a
 ##       same-spot click must select. Stuck tick leaves pid=-1.
+##   T12 reflow same-spot at z0.907 after a user ×. A surviving toast
+##       slides into the freed slot; passthrough lets the map pick.
+##       T12a News× over Notice (live pair). T12b Notice× over Notice.
+##       T12c News× over News. T12d move-away restores STOP (blocks).
 ##
 ##   tools/run_godot.sh --headless --path . --resolution 1280x740 \
 ##     -s res://scripts/core/HeadlessInput1CloseClickFallthroughTest.gd
@@ -43,6 +47,7 @@ const PLAY_SIZE := Vector2i(1280, 740)
 const KNOWN_PID := 710417
 const HOLD_MS := 80
 const ZOOM0 := 0.776
+const ZOOM_PLAY := 0.907
 const CAM0 := Vector2(4200, 1000)
 const MAP_PT := Vector2(640, 400)
 const FIXTURE_NOTICE_PT := Vector2(1188, 92)
@@ -125,6 +130,7 @@ func _run() -> void:
 	await _test_g_same_spot()
 	await _test_cc_fast_double_click()
 	await _test_t11_swallow_expiry_must_select()
+	await _test_t12_reflow_same_spot()
 	_test_source_needles()
 
 
@@ -1111,4 +1117,298 @@ func _test_t11_swallow_expiry_must_select() -> void:
 	await _flush(4)
 	if not await _assert_same_spot_picks(pt, "T11 swallow expiry must select"):
 		return
+	_hide_notices()
+
+
+func _play_zoom_camera() -> void:
+	_cam.position = CAM0
+	_cam.zoom = Vector2(ZOOM_PLAY, ZOOM_PLAY)
+
+
+func _toast_box() -> Node:
+	if _leui == null:
+		return null
+	var box: Variant = _leui.get("_toast_container")
+	if box is Node:
+		return box as Node
+	var layer: Node = _leui.get_node_or_null("LeaderNewsLayer")
+	if layer == null:
+		return null
+	return layer.get_node_or_null("ToastContainer")
+
+
+func _toast_panels() -> Array[PanelContainer]:
+	var out: Array[PanelContainer] = []
+	var box: Node = _toast_box()
+	if box == null:
+		return out
+	for child in box.get_children():
+		if child is PanelContainer:
+			out.append(child as PanelContainer)
+	return out
+
+
+func _panel_close(panel: Node) -> Button:
+	if panel == null or not is_instance_valid(panel):
+		return null
+	return panel.find_child("NoticeClose", true, false) as Button
+
+
+func _close_on_panel(panel: Node, news: bool) -> Button:
+	var btn: Button = _panel_close(panel)
+	if btn == null:
+		return null
+	var is_news: bool = btn.tooltip_text == "Dismiss notification"
+	if news != is_news:
+		return null
+	return btn
+
+
+func _first_close(news: bool) -> Button:
+	var panels: Array[PanelContainer] = _toast_panels()
+	var i: int = 0
+	while i < panels.size():
+		var btn: Button = _close_on_panel(panels[i], news)
+		if btn != null:
+			return btn
+		i += 1
+	if panels.size() > 0:
+		return _panel_close(panels[0])
+	return null
+
+
+func _post_news_card(title: String, body: String) -> void:
+	_enable_toast_ui()
+	var before: int = _toast_panels().size()
+	if _leui != null and _leui.has_method("post_news"):
+		_leui.call("post_news", title, body, "infrastructure")
+	if _toast_panels().size() == before and _leui != null and _leui.has_method("_show_toast"):
+		# Main headless skips post_news; `_show_toast` still builds the News card.
+		_leui.call("_show_toast", {
+			"title": title,
+			"body": body,
+			"category": "infrastructure",
+		})
+
+
+func _post_notice_card(message: String) -> void:
+	_enable_toast_ui()
+	var before: int = _toast_panels().size()
+	if _leui != null and _leui.has_method("show_toast"):
+		_leui.call("show_toast", message, 30.0)
+	if _toast_panels().size() == before and _leui != null and _leui.has_method("_show_toast"):
+		_leui.call("_show_toast", {
+			"title": "Notice",
+			"body": message,
+			"category": "system",
+		})
+
+
+func _survivor_panel(prefer_notice: bool) -> PanelContainer:
+	var panels: Array[PanelContainer] = _toast_panels()
+	if prefer_notice:
+		var i: int = 0
+		while i < panels.size():
+			if _close_on_panel(panels[i], false) != null:
+				return panels[i]
+			i += 1
+	if panels.size() > 0:
+		return panels[0]
+	return null
+
+
+func _prepare_under_play(btn: Button) -> Vector2:
+	if btn == null or not is_instance_valid(btn):
+		return Vector2.ZERO
+	var rect: Rect2 = btn.get_global_rect()
+	var pt: Vector2 = rect.get_center()
+	if rect.size.x < 1.0 or rect.size.y < 1.0:
+		pt = btn.global_position + Vector2(10, 10)
+	_play_zoom_camera()
+	_clear_inspector()
+	if not _seed_known_under_screen(pt):
+		return Vector2.ZERO
+	_hide_harness_map_chrome()
+	_aim_mouse(pt)
+	return pt
+
+
+func _same_spot_play_click(screen_pt: Vector2) -> void:
+	_play_zoom_camera()
+	_clear_inspector()
+	_seed_known_under_screen(screen_pt)
+	_hide_harness_map_chrome()
+	_aim_mouse(screen_pt)
+	_send_pipeline(screen_pt, true)
+	await _wait_hold_ms(HOLD_MS)
+	_send_pipeline(screen_pt, false)
+	await _flush(2)
+
+
+func _assert_t12_selected(why: String, survivor: Node) -> bool:
+	if survivor == null or not is_instance_valid(survivor) or survivor.get_parent() == null:
+		_fail("%s: survivor toast left the tree (timer or poll close)" % why)
+		return false
+	var got_pid: int = _pid()
+	if got_pid == KNOWN_PID or _inspector_up():
+		_pass("%s: same-spot click selected pid=%d" % [why, got_pid])
+		return true
+	_fail("%s: same-spot click after close did not select (pid=%d)" % [why, got_pid])
+	return false
+
+
+func _test_t12_reflow_same_spot() -> void:
+	await _test_t12a_news_over_notice()
+	await _test_t12b_notice_over_notice()
+	await _test_t12c_news_over_news()
+	await _test_t12d_restore_blocks()
+
+
+func _test_t12a_news_over_notice() -> void:
+	_hide_notices()
+	_enable_toast_ui()
+	if _leui == null:
+		_fail("T12a: LeaderEventUI missing")
+		return
+	_post_news_card(
+		"Infrastructure Complete",
+		"The rail yard at Testland is complete.\nCapacity is now sufficient for wartime traffic.\nInfrastructure is level 4."
+	)
+	_post_notice_card("Investment complete in Testland: infra now level 4")
+	await _flush(3)
+	var btn: Button = _first_close(true)
+	if btn == null:
+		_fail("T12a: post_news News × missing")
+		return
+	var pt: Vector2 = _prepare_under_play(btn)
+	if pt == Vector2.ZERO:
+		return
+	await _click_close(pt)
+	await _flush(2)
+	if not _assert_no_selection("T12a News× leftover"):
+		return
+	var survivor: PanelContainer = _survivor_panel(true)
+	if survivor == null or not survivor.get_global_rect().has_point(pt):
+		_fail("T12a setup: survivor did not reflow under ×")
+		_hide_notices()
+		return
+	await _wait_hold_ms(1300)
+	await _same_spot_play_click(pt)
+	if not _assert_t12_selected("T12a News× over Notice", survivor):
+		_hide_notices()
+		return
+	_hide_notices()
+
+
+func _test_t12b_notice_over_notice() -> void:
+	_hide_notices()
+	_enable_toast_ui()
+	if _leui == null:
+		_fail("T12b: LeaderEventUI missing")
+		return
+	_post_notice_card("INPUT-1 T12b notice A stacked")
+	_post_notice_card("INPUT-1 T12b notice B stacked")
+	await _flush(3)
+	var btn: Button = _first_close(false)
+	if btn == null:
+		_fail("T12b: Notice × missing")
+		return
+	var pt: Vector2 = _prepare_under_play(btn)
+	if pt == Vector2.ZERO:
+		return
+	await _click_close(pt)
+	await _flush(2)
+	if not _assert_no_selection("T12b Notice× leftover"):
+		return
+	var survivor: PanelContainer = _survivor_panel(false)
+	var sx: Button = _panel_close(survivor)
+	if survivor == null or sx == null or not sx.get_global_rect().has_point(pt):
+		_fail("T12b setup: survivor × did not reflow under close point")
+		_hide_notices()
+		return
+	await _wait_hold_ms(1300)
+	await _same_spot_play_click(pt)
+	if not _assert_t12_selected("T12b Notice× over Notice", survivor):
+		_hide_notices()
+		return
+	_hide_notices()
+
+
+func _test_t12c_news_over_news() -> void:
+	_hide_notices()
+	_enable_toast_ui()
+	if _leui == null:
+		_fail("T12c: LeaderEventUI missing")
+		return
+	var body: String = "The rail yard at Testland is complete.\nCapacity is now sufficient for wartime traffic.\nInfrastructure is level 4."
+	_post_news_card("Infrastructure Complete", body)
+	_post_news_card("Infrastructure Complete", body)
+	await _flush(3)
+	var btn: Button = _first_close(true)
+	if btn == null:
+		_fail("T12c: News × missing")
+		return
+	var pt: Vector2 = _prepare_under_play(btn)
+	if pt == Vector2.ZERO:
+		return
+	await _click_close(pt)
+	await _flush(2)
+	if not _assert_no_selection("T12c News× leftover"):
+		return
+	var survivor: PanelContainer = _survivor_panel(false)
+	var sx: Button = _panel_close(survivor)
+	if survivor == null or sx == null or not sx.get_global_rect().has_point(pt):
+		_fail("T12c setup: survivor × did not reflow under close point")
+		_hide_notices()
+		return
+	await _wait_hold_ms(1300)
+	await _same_spot_play_click(pt)
+	if not _assert_t12_selected("T12c News× over News", survivor):
+		_hide_notices()
+		return
+	_hide_notices()
+
+
+func _test_t12d_restore_blocks() -> void:
+	_hide_notices()
+	_enable_toast_ui()
+	if _leui == null:
+		_fail("T12d: LeaderEventUI missing")
+		return
+	_post_news_card(
+		"Infrastructure Complete",
+		"The rail yard at Testland is complete.\nCapacity is now sufficient for wartime traffic.\nInfrastructure is level 4."
+	)
+	_post_notice_card("Investment complete in Testland: infra now level 4")
+	await _flush(3)
+	var btn: Button = _first_close(true)
+	if btn == null:
+		_fail("T12d: post_news News × missing")
+		return
+	var pt: Vector2 = _prepare_under_play(btn)
+	if pt == Vector2.ZERO:
+		return
+	await _click_close(pt)
+	await _flush(2)
+	if not _assert_no_selection("T12d News× leftover"):
+		return
+	var survivor: PanelContainer = _survivor_panel(true)
+	if survivor == null or not survivor.get_global_rect().has_point(pt):
+		_fail("T12d setup: survivor did not reflow under ×")
+		_hide_notices()
+		return
+	_aim_mouse(MAP_PT)
+	await _flush(2)
+	_aim_mouse(pt)
+	await _flush(2)
+	await _same_spot_play_click(pt)
+	if survivor == null or not is_instance_valid(survivor) or survivor.get_parent() == null:
+		_fail("T12d: Notice left the tree")
+		_hide_notices()
+		return
+	var got_pid: int = _pid()
+	if got_pid == -1 and not _inspector_up():
+		_pass("T12d restore: toast body blocked same-spot (pid=-1)")
+	else:
+		_fail("T12d: after move-away same-spot selected pid=%d" % got_pid)
 	_hide_notices()
