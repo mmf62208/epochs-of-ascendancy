@@ -1224,6 +1224,40 @@ func _post_notice_card(message: String) -> void:
 			"body": message,
 			"category": "system",
 		})
+		# Main `show_toast` skips headless. `_show_toast` News layout parks ×
+		# on the far right (EXPAND title). Real Notice × sits after a short
+		# title, so shrink the title and drop the News tooltip.
+		var panels: Array[PanelContainer] = _toast_panels()
+		if panels.size() > 0:
+			_layout_notice_like_show_toast(panels[panels.size() - 1])
+
+
+func _layout_notice_like_show_toast(panel: PanelContainer) -> void:
+	if panel == null or not is_instance_valid(panel):
+		return
+	var found: Array[Button] = []
+	_collect_buttons(panel, found)
+	var i: int = 0
+	while i < found.size():
+		var b: Button = found[i]
+		if b.text == "×" or b.tooltip_text == "Dismiss notification":
+			b.tooltip_text = ""
+			b.custom_minimum_size = Vector2(20, 20)
+			b.size = Vector2(20, 20)
+		i += 1
+	_shrink_notice_titles(panel)
+
+
+func _shrink_notice_titles(n: Node) -> void:
+	if n == null or not is_instance_valid(n):
+		return
+	if n is Label:
+		var lb: Label = n as Label
+		if lb.text == "Notice":
+			lb.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	for child in n.get_children():
+		if child is Node:
+			_shrink_notice_titles(child as Node)
 
 
 func _survivor_panel(prefer_notice: bool) -> PanelContainer:
@@ -1420,9 +1454,18 @@ func _test_t12d_restore_blocks() -> void:
 		return
 	_aim_mouse(MAP_PT)
 	await _flush(2)
-	_aim_mouse(pt)
+	# Click the Notice body (CLICKS 5b). If the survivor × sat on the News ×
+	# slot (main `_show_toast` fallback), inset so we hit STOP chrome, not ×.
+	var body_pt: Vector2 = pt
+	var sx: Button = _panel_close(survivor)
+	if sx != null and sx.get_global_rect().has_point(pt):
+		var r: Rect2 = survivor.get_global_rect()
+		body_pt = Vector2(r.position.x + 28.0, r.get_center().y)
+		if sx.get_global_rect().has_point(body_pt):
+			body_pt = Vector2(r.position.x + 16.0, r.position.y + 40.0)
+	_aim_mouse(body_pt)
 	await _flush(2)
-	await _same_spot_play_click(pt)
+	await _same_spot_play_click(body_pt)
 	if survivor == null or not is_instance_valid(survivor) or survivor.get_parent() == null:
 		_fail("T12d: Notice left the tree")
 		_hide_notices()
