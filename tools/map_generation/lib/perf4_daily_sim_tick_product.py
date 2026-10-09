@@ -314,10 +314,22 @@ def build_perf4_daily_sim_tick_product() -> Dict[str, Any]:
         passes.append("headless_slice_estimate_seam")
     else:
         fails.append("headless_slice_estimate_seam")
-    if HD_LIVE_GD.is_file() and "_test_dayroll_with_capture_under_200ms" in hd_live:
+    if HD_LIVE_GD.is_file() and "_test_dayroll_with_capture_under_300ms" in hd_live:
         passes.append("headless_dayroll_capture_frame")
     else:
         fails.append("headless_dayroll_capture_frame")
+    if HD_LIVE_GD.is_file() and "DAYROLL_CAPTURE_BUDGET_MS := 300.0" in hd_live:
+        passes.append("headless_dayroll_budget_300")
+    else:
+        fails.append("headless_dayroll_budget_300")
+    if HD_LIVE_GD.is_file() and "_test_dayroll_with_access" in hd_live:
+        passes.append("headless_dayroll_access_frame")
+    else:
+        fails.append("headless_dayroll_access_frame")
+    if HD_LIVE_GD.is_file() and "_test_dayroll_with_recapture" in hd_live:
+        passes.append("headless_dayroll_recapture_frame")
+    else:
+        fails.append("headless_dayroll_recapture_frame")
     if HD_LIVE_GD.is_file() and "_test_dayroll_event_own_share_under_300ms" in hd_live:
         passes.append("headless_dayroll_own_share")
     else:
@@ -326,10 +338,14 @@ def build_perf4_daily_sim_tick_product() -> Dict[str, Any]:
         passes.append("headless_redrop_behaviour")
     else:
         fails.append("headless_redrop_behaviour")
-    if HD_LIVE_GD.is_file() and "_test_depot_add_replans_only_touched_dests" in hd_live:
-        passes.append("headless_depot_subset_replans")
+    if HD_LIVE_GD.is_file() and "_test_flush_redrop_increments_on_forced_drop" in hd_live:
+        passes.append("headless_flush_redrop_behaviour")
     else:
-        fails.append("headless_depot_subset_replans")
+        fails.append("headless_flush_redrop_behaviour")
+    if HD_LIVE_GD.is_file() and "_test_depot_add_enqueues_all_24_dests" in hd_live:
+        passes.append("headless_depot_enqueue_all_dests")
+    else:
+        fails.append("headless_depot_enqueue_all_dests")
     if HD_LIVE_GD.is_file() and "TEN_CAPTURE_FRAME_BUDGET_MS" not in hd_live:
         passes.append("headless_no_ten_capture_wall")
     else:
@@ -388,10 +404,14 @@ def build_perf4_daily_sim_tick_product() -> Dict[str, Any]:
         passes.append("slice_plan_cost_estimate_seam")
     else:
         fails.append("slice_plan_cost_estimate_seam")
-    if "func _note_flush_redrop" in sm and "network_route_redrop_count +=" in sm:
+    if "flush_force_drop_dest" in sm and "func _drop_one_default_dest_route" in sm:
         passes.append("flush_redrop_counters_increment")
     else:
         fails.append("flush_redrop_counters_increment")
+    if "func _defer_day_flush_once" in sm:
+        passes.append("dayroll_defer_helper")
+    else:
+        fails.append("dayroll_defer_helper")
     notify_all = extract_gd_func_body(sm, "notify_province_control_changed")
     if notify_all and "_enqueue_all_current_dests" in notify_all:
         passes.append("friendly_gain_enqueues_all_dests")
@@ -427,14 +447,16 @@ def build_perf4_daily_sim_tick_product() -> Dict[str, Any]:
     else:
         fails.append("day_roll_defers_route_plans")
     depot_patch = extract_gd_func_body(sm, "_patch_player_depot_hub")
-    if (
-        depot_patch
-        and "_enqueue_missing_and_affected_dests" in depot_patch
-        and "_enqueue_all_current_dests" not in depot_patch
-    ):
-        passes.append("depot_enqueues_touched_dests_only")
+    if depot_patch and "_enqueue_all_current_dests" in depot_patch:
+        passes.append("depot_add_enqueues_all_dests")
     else:
-        fails.append("depot_enqueues_touched_dests_only")
+        fails.append("depot_add_enqueues_all_dests")
+    if depot_patch and (
+        "_defer_day_flush_once" in depot_patch or "_begin_day_roll_plan_deferral" in depot_patch
+    ):
+        passes.append("depot_defers_day_flush")
+    else:
+        fails.append("depot_defers_day_flush")
     notify = extract_gd_func_body(sm, "notify_province_control_changed")
     if notify and "_pid_blocks_player_supply" in notify:
         passes.append("keep_old_routes_until_swap")

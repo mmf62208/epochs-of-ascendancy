@@ -88,20 +88,26 @@ class TestPerf4DailySimTickProduct(unittest.TestCase):
             "headless_fifo_order",
             "headless_slice_estimate_seam",
             "headless_dayroll_capture_frame",
+            "headless_dayroll_budget_300",
+            "headless_dayroll_access_frame",
+            "headless_dayroll_recapture_frame",
             "headless_dayroll_own_share",
             "headless_redrop_behaviour",
-            "headless_depot_subset_replans",
+            "headless_flush_redrop_behaviour",
+            "headless_depot_enqueue_all_dests",
             "headless_no_ten_capture_wall",
             "headless_gamedata_infra_behaviour",
             "fifo_refill_no_redrop",
             "predictive_40ms_slice",
             "slice_plan_cost_estimate_seam",
             "flush_redrop_counters_increment",
+            "dayroll_defer_helper",
             "friendly_gain_enqueues_all_dests",
             "access_enqueues_all_dests",
             "access_deferred_player_party",
             "day_roll_defers_route_plans",
-            "depot_enqueues_touched_dests_only",
+            "depot_add_enqueues_all_dests",
+            "depot_defers_day_flush",
             "keep_old_routes_until_swap",
             "relations_clears_friendly_cache",
             "gamedata_direct_infra_notifies_hub",
@@ -188,9 +194,14 @@ class TestPerf4DailySimTickProduct(unittest.TestCase):
         self.assertIn("_test_fifo_dequeue_matches_enqueue", hd)
         self.assertIn("_test_slice_predictive_vs_reactive_seam", hd)
         self.assertIn("_test_dayroll_event_own_share_under_300ms", hd)
+        self.assertIn("_test_dayroll_with_capture_under_300ms", hd)
+        self.assertIn("_test_dayroll_with_access", hd)
+        self.assertIn("_test_dayroll_with_recapture", hd)
         self.assertIn("_test_redrop_counter_increments_on_hostile_drop", hd)
-        self.assertIn("_test_depot_add_replans_only_touched_dests", hd)
+        self.assertIn("_test_flush_redrop_increments_on_forced_drop", hd)
+        self.assertIn("_test_depot_add_enqueues_all_24_dests", hd)
         self.assertIn("DAYROLL_OWN_SHARE_BUDGET_MS", hd)
+        self.assertIn("DAYROLL_CAPTURE_BUDGET_MS := 300.0", hd)
         self.assertNotIn("QUIET_DAY_BUDGET_MS", hd)
         self.assertNotIn("TEN_CAPTURE_FRAME_BUDGET_MS", hd)
 

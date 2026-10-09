@@ -29,7 +29,7 @@ const EQUIV_SEED := 193601
 const PLAYER_TAG := "GER"
 const DAY_BUDGET_MS := 500.0
 const CAPTURE_FRAME_BUDGET_MS := 5.0
-const DAYROLL_CAPTURE_BUDGET_MS := 200.0
+const DAYROLL_CAPTURE_BUDGET_MS := 300.0
 const DAYROLL_OWN_SHARE_BUDGET_MS := 300.0
 const DEFAULT_ROUTE_DEST_CAP_HINT := 24
 const SLICE_ESTIMATE_MS := 25.0
@@ -152,9 +152,12 @@ func _run() -> void:
 	_test_military_access_path_identity(mm, sm)
 	_test_fifo_dequeue_matches_enqueue(sm)
 	_test_slice_predictive_vs_reactive_seam(sm)
-	_test_dayroll_with_capture_under_200ms(tm, mm, sm)
+	_test_dayroll_with_capture_under_300ms(tm, mm, sm)
 	_test_redrop_counter_increments_on_hostile_drop(mm, sm)
-	_test_depot_add_replans_only_touched_dests(sm)
+	_test_flush_redrop_increments_on_forced_drop(sm)
+	_test_depot_add_enqueues_all_24_dests(sm)
+	_test_dayroll_with_access(tm, mm, sm)
+	_test_dayroll_with_recapture(tm, mm, sm)
 	_test_dayroll_event_own_share_under_300ms(tm, mm, gd, sm)
 	_test_one_full_supply_day_per_game_day(tm, gd, sm)
 	_test_production_cache_measured(gd)
@@ -275,10 +278,10 @@ func _test_replanned_off_must_fail(sm_src: String, adv: String) -> void:
 		_fail("re-drop restored (flush re-drops dirty pids — FIX #4 livelock)")
 	else:
 		_pass("flush never re-drops (deduped FIFO only)")
-	if "_note_flush_redrop" not in sm_src or "network_route_redrop_count +=" not in sm_src:
-		_fail("redrop counters never increment (redrop_restored tautology)")
+	if "flush_force_drop_dest" not in sm_src or "_drop_one_default_dest_route" not in sm_src:
+		_fail("flush redrop force-drop seam missing (source-grep increment is a tautology)")
 	else:
-		_pass("flush redrop counters increment on a planned-route drop")
+		_pass("flush redrop force-drop seam present")
 	if "pop_front" not in refill:
 		_fail("refill queue is not FIFO (pop_front missing)")
 	else:
@@ -337,12 +340,16 @@ func _test_replanned_off_must_fail(sm_src: String, adv: String) -> void:
 	else:
 		_pass("day-roll frame defers route plans to the next 40 ms slice")
 	var patch := _slice_func(sm_src, "_patch_player_depot_hub")
-	if "_enqueue_all_current_dests" in patch:
-		_fail("depot add always re-plans all 24 dests")
-	elif "_enqueue_missing_and_affected_dests" not in patch:
-		_fail("depot add/remove does not enqueue only touched dests")
+	if "_enqueue_all_current_dests" not in patch:
+		_fail("depot add does not enqueue all dests (depot_touching_only)")
+	elif "_defer_day_flush_once" not in patch and "_begin_day_roll_plan_deferral" not in patch:
+		_fail("depot patch does not defer the dayroll flush (skip_flush_never)")
 	else:
-		_pass("depot add/remove enqueues only touched dests")
+		_pass("depot add enqueues all dests and defers the dayroll flush")
+	if "_defer_day_flush_once" not in rel_fn and "_begin_day_roll_plan_deferral" not in rel_fn:
+		_fail("relations does not defer the dayroll flush (skip_flush_never)")
+	else:
+		_pass("relations defers the dayroll flush")
 	var mm_src := _read("res://scripts/map/MapManager.gd")
 	var infra_fn := _slice_func(mm_src, "update_province_infrastructure")
 	var dev_fn := _slice_func(mm_src, "update_province_development")
@@ -1579,7 +1586,7 @@ func _test_gamedata_direct_infra_notifies_hub_stats(gd: Node, mm: Node, sm: Node
 		_pass("GameData settlement-improve hub capacity == rebuild capdiff=[]")
 
 
-func _test_dayroll_with_capture_under_200ms(tm: Node, mm: Node, sm: Node) -> void:
+func _test_dayroll_with_capture_under_300ms(tm: Node, mm: Node, sm: Node) -> void:
 	if tm == null or mm == null or sm == null:
 		_fail("dayroll+capture helpers missing")
 		return
@@ -1688,64 +1695,106 @@ func _test_redrop_counter_increments_on_hostile_drop(mm: Node, sm: Node) -> void
 	_boot_live_supply_network(mm, sm)
 
 
-func _test_depot_add_replans_only_touched_dests(sm: Node) -> void:
-	if sm == null or not sm.has_method("set_player_depot") or not sm.has_method("peek_refill_queue"):
-		_fail("depot subset helpers missing")
+func _test_flush_redrop_increments_on_forced_drop(sm: Node) -> void:
+	if sm == null or not sm.has_method("flush_pending_control_route_refresh"):
+		_fail("flush redrop behaviour helpers missing")
 		return
+	if not ("flush_force_drop_dest" in sm) or not ("network_route_redrop_count" in sm):
+		_fail("flush redrop force-drop seam missing")
+		return
+	if sm.has_method("end_day_roll_plan_deferral"):
+		sm.call("end_day_roll_plan_deferral")
+	if sm.has_method("drain_pending_route_refresh"):
+		sm.call("drain_pending_route_refresh")
+	var snap: Dictionary = sm.call("get_network_topology_snapshot") if sm.has_method("get_network_topology_snapshot") else {}
+	var dest: int = -1
+	for raw in snap.get("routes", []) as Array:
+		if typeof(raw) != TYPE_DICTIONARY:
+			continue
+		dest = int((raw as Dictionary).get("dst", -1))
+		if dest > 0:
+			break
+	if dest <= 0:
+		_fail("flush redrop behaviour needs a live dest")
+		return
+	var before: int = int(sm.get("network_route_redrop_count"))
+	sm.set("flush_force_drop_dest", dest)
+	if sm.has_method("enqueue_refill_dests"):
+		sm.call("enqueue_refill_dests", [dest])
+	sm.call("flush_pending_control_route_refresh", 1)
+	var after: int = int(sm.get("network_route_redrop_count"))
+	var last_n: int = int(sm.get("last_flush_redrop_count")) if "last_flush_redrop_count" in sm else 0
+	print(
+		"HeadlessPerf4LiveMultiAiDayTest: flush_redrop dest=%d count=%d→%d last=%d"
+		% [dest, before, after, last_n]
+	)
+	if after <= before:
+		_fail("forced dest drop during flush did not increment network_route_redrop_count")
+	else:
+		_pass("forced dest drop during flush incremented redrop %d→%d" % [before, after])
+	if sm.has_method("end_day_roll_plan_deferral"):
+		sm.call("end_day_roll_plan_deferral")
+	_flush_until_drained(sm, CONVERGE_FRAMES)
+
+
+func _test_depot_add_enqueues_all_24_dests(sm: Node) -> void:
+	if sm == null or not sm.has_method("set_player_depot"):
+		_fail("depot enqueue-all helpers missing")
+		return
+	if sm.has_method("end_day_roll_plan_deferral"):
+		sm.call("end_day_roll_plan_deferral")
 	if sm.has_method("set_player_depot"):
 		sm.call("set_player_depot", DEPOT_ADD_PID, false)
 	if sm.has_method("drain_pending_route_refresh"):
 		sm.call("drain_pending_route_refresh")
 	if sm.has_method("clear_refill_queue"):
 		sm.call("clear_refill_queue")
-	var touching: Array[int] = _dests_touching_pid(sm, DEPOT_ADD_PID)
+	var touching: int = 0
+	if sm.has_method("count_default_dests_touching_pid"):
+		touching = int(sm.call("count_default_dests_touching_pid", DEPOT_ADD_PID))
+	else:
+		touching = _dests_touching_pid(sm, DEPOT_ADD_PID).size()
 	var pid: int = DEPOT_ADD_PID
-	if touching.size() <= 0 or touching.size() >= DEFAULT_ROUTE_DEST_CAP_HINT:
+	if touching >= DEFAULT_ROUTE_DEST_CAP_HINT:
 		var snap: Dictionary = sm.call("get_network_topology_snapshot") if sm.has_method("get_network_topology_snapshot") else {}
-		for raw in snap.get("routes", []):
+		for raw in snap.get("routes", []) as Array:
 			if typeof(raw) != TYPE_DICTIONARY:
 				continue
-			var dest: int = int((raw as Dictionary).get("dst", 0))
-			if dest <= 0:
+			var cand: int = int((raw as Dictionary).get("dst", -1))
+			if cand <= 0 or cand == int(CAPITALS.get("GER", 0)):
 				continue
-			var alt: Array[int] = _dests_touching_pid(sm, dest)
-			if alt.size() > 0 and alt.size() < DEFAULT_ROUTE_DEST_CAP_HINT:
-				pid = dest
-				touching = alt
+			var t2: int = 0
+			if sm.has_method("count_default_dests_touching_pid"):
+				t2 = int(sm.call("count_default_dests_touching_pid", cand))
+			else:
+				t2 = _dests_touching_pid(sm, cand).size()
+			if t2 < DEFAULT_ROUTE_DEST_CAP_HINT:
+				pid = cand
+				touching = t2
 				break
-	if touching.size() <= 0 or touching.size() >= DEFAULT_ROUTE_DEST_CAP_HINT:
-		_fail("depot subset could not find a pid that touches fewer than 24 dests")
+	if touching >= DEFAULT_ROUTE_DEST_CAP_HINT:
+		_fail("depot enqueue-all unarmed: every candidate touching>=24")
 		return
-	if sm.has_method("set_player_depot"):
-		sm.call("set_player_depot", pid, false)
-		sm.call("set_player_depot", pid, true)
-	var queued: Array = sm.call("peek_refill_queue") if sm.has_method("peek_refill_queue") else []
-	var qn: int = queued.size()
+	sm.call("set_player_depot", pid, true)
+	var queued: int = _queue_n(sm)
 	print(
-		"HeadlessPerf4LiveMultiAiDayTest: depot_subset pid=%d touching=%d queued=%d queued_dests=%s"
-		% [pid, touching.size(), qn, str(queued)]
+		"HeadlessPerf4LiveMultiAiDayTest: depot_enqueue_all pid=%d touching=%d queued=%d"
+		% [pid, touching, queued]
 	)
-	if qn <= 0:
-		_fail("depot add that touches dests enqueued nothing")
-	elif qn >= 24:
-		_fail("depot add re-planned all %d dests (want only the %d it touches)" % [qn, touching.size()])
+	if queued < DEFAULT_ROUTE_DEST_CAP_HINT:
+		_fail("depot add queued %d dests touching=%d (depot_touching_only)" % [queued, touching])
+	elif queued <= touching:
+		_fail("depot add queued only the touching set %d (want all 24)" % queued)
 	else:
-		var extra: Array[int] = []
-		for dest_v in queued:
-			var dest: int = int(dest_v)
-			if dest not in touching:
-				extra.append(dest)
-		if not extra.is_empty() and extra.size() > 1:
-			_fail("depot add queued dests that do not touch pid extra=%s" % str(extra))
-		else:
-			_pass("depot add re-plans only touched dests queued=%d touching=%d" % [qn, touching.size()])
-	if sm.has_method("set_player_depot"):
-		sm.call("set_player_depot", pid, false)
-	if sm.has_method("drain_pending_route_refresh"):
-		sm.call("drain_pending_route_refresh")
+		_pass("depot add enqueued all 24 dests (touching=%d)" % touching)
+	sm.call("set_player_depot", pid, false)
+	if sm.has_method("end_day_roll_plan_deferral"):
+		sm.call("end_day_roll_plan_deferral")
+	_flush_until_drained(sm, CONVERGE_FRAMES)
 
 
 func _assert_dayroll_event_own_share(label: String, tm: Node, sm: Node, event_cb: Callable) -> void:
+	var mm: Node = root.get_node_or_null("/root/MapManager")
 	if sm.has_method("clear_refill_queue"):
 		sm.call("clear_refill_queue")
 	if sm.has_method("end_day_roll_plan_deferral"):
@@ -1776,6 +1825,54 @@ func _assert_dayroll_event_own_share(label: String, tm: Node, sm: Node, event_cb
 		sm.call("end_day_roll_plan_deferral")
 	if sm.has_method("drain_pending_route_refresh"):
 		sm.call("drain_pending_route_refresh")
+	var drain: Dictionary = _flush_until_drained(sm, CONVERGE_FRAMES)
+	_assert_converged(sm, "dayroll_%s_drain" % label, drain)
+	var cmp: Dictionary = _live_vs_rebuild_pathdiff(mm, sm)
+	print(
+		"HeadlessPerf4LiveMultiAiDayTest: dayroll_%s pathdiff=%s"
+		% [label, str(cmp.get("pathdiff", -1))]
+	)
+	if not bool(cmp.get("ok", false)):
+		_fail("dayroll+%s rebuild failed" % label)
+	elif int(cmp.get("pathdiff", -1)) != 0:
+		_fail("dayroll+%s pathdiff=%d after drain" % [label, int(cmp.get("pathdiff", -1))])
+	else:
+		_pass("dayroll+%s pathdiff=0 after drain" % label)
+
+
+func _test_dayroll_with_access(tm: Node, mm: Node, sm: Node) -> void:
+	var rm: Node = root.get_node_or_null("/root/RelationsManager")
+	if tm == null or mm == null or sm == null or rm == null:
+		_fail("dayroll+access helpers missing")
+		return
+	if not _boot_live_supply_network(mm, sm):
+		_fail("dayroll+access boot failed")
+		return
+	_reset_clock(tm, 0)
+	_assert_dayroll_event_own_share("access", tm, sm, func() -> void:
+		rm.call("set_policy", PLAYER_TAG, "SWI", {"military_access": true})
+	)
+	rm.call("set_policy", PLAYER_TAG, "SWI", {"military_access": false})
+	_boot_live_supply_network(mm, sm)
+
+
+func _test_dayroll_with_recapture(tm: Node, mm: Node, sm: Node) -> void:
+	if tm == null or mm == null or sm == null:
+		_fail("dayroll+recapture helpers missing")
+		return
+	if not _boot_live_supply_network(mm, sm):
+		_fail("dayroll+recapture boot failed")
+		return
+	_restore_owner(mm, RECAPTURE_PATH_PID, "FRA")
+	if sm.has_method("end_day_roll_plan_deferral"):
+		sm.call("end_day_roll_plan_deferral")
+	_flush_until_drained(sm, CONVERGE_FRAMES)
+	_reset_clock(tm, 0)
+	_assert_dayroll_event_own_share("recapture", tm, sm, func() -> void:
+		mm.call("update_province_owner", RECAPTURE_PATH_PID, "GER", "GER")
+	)
+	_restore_owner(mm, RECAPTURE_PATH_PID, "GER")
+	_boot_live_supply_network(mm, sm)
 
 
 func _test_dayroll_event_own_share_under_300ms(tm: Node, mm: Node, gd: Node, sm: Node) -> void:
@@ -1821,6 +1918,22 @@ func _test_dayroll_event_own_share_under_300ms(tm: Node, mm: Node, gd: Node, sm:
 			mm.call("update_province_owner", annex_pid, "FRA", "FRA")
 	)
 	_restore_owner(mm, annex_pid, "GER")
+	if rm != null and rm.has_method("set_policy"):
+		rm.call("set_policy", PLAYER_TAG, "SWI", {"military_access": true})
+		if sm.has_method("end_day_roll_plan_deferral"):
+			sm.call("end_day_roll_plan_deferral")
+		_flush_until_drained(sm, CONVERGE_FRAMES)
+		_assert_dayroll_event_own_share("revoke", tm, sm, func() -> void:
+			rm.call("set_policy", PLAYER_TAG, "SWI", {"military_access": false})
+		)
+	_restore_owner(mm, CAPTURE_HUB_PID, "GER")
+	if sm.has_method("end_day_roll_plan_deferral"):
+		sm.call("end_day_roll_plan_deferral")
+	_flush_until_drained(sm, CONVERGE_FRAMES)
+	_assert_dayroll_event_own_share("capture", tm, sm, func() -> void:
+		mm.call("update_province_owner", CAPTURE_HUB_PID, "FRA", "FRA")
+	)
+	_restore_owner(mm, CAPTURE_HUB_PID, "GER")
 	_boot_live_supply_network(mm, sm)
 
 

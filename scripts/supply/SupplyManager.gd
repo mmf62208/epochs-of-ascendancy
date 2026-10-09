@@ -90,13 +90,17 @@ var last_plan_ms: float = 0.0
 ## instead of wall time so predictive `used+next` vs reactive `used>=budget`
 ## is distinguishable (25 ms estimate → predictive plans 1, reactive plans 2).
 var route_refresh_plan_cost_estimate_ms: float = -1.0
+## Test seam: next flush drops this dest's current route so redrop counters
+## must increment during flush. Production keep-until-swap never sets this.
+var flush_force_drop_dest: int = -1
 ## Routes dropped because they became hostile / obsolete. Flush FIFO swaps
-## do not increment this; a live hostile capture must.
+## do not increment this; a live hostile capture must. Forced flush drops do.
 var network_route_redrop_count: int = 0
 ## True only while flush_pending_control_route_refresh is on the stack.
 var _flush_in_progress: bool = false
-## FIX #7: process-frame id of the last day roll. Flush / _process must not
-## `_plan_route` on that frame; the next frames' 40 ms slice pops the FIFO.
+## FIX #7: process-frame id of the last day roll (or a deferred event).
+## Flush / _process must not `_plan_route` on that frame; the next frames'
+## 40 ms slice pops the FIFO. Relations/depot call the same deferral.
 var _day_roll_plan_frame: int = -1
 ## Sorted player dest hubs (excludes capital). Updated incrementally so a
 ## capture frame does not walk all 3k hubs.
@@ -260,6 +264,7 @@ func _patch_player_depot_hub(province_id: int, enabled: bool) -> void:
 		_drop_obsolete_dest_routes()
 		_enqueue_missing_and_affected_dests(province_id)
 		_control_dirty_pids.erase(province_id)
+		_defer_day_flush_once()
 		return
 	hubs[province_id] = hub
 	_init_one_depot_state(hub, false)
@@ -267,11 +272,15 @@ func _patch_player_depot_hub(province_id: int, enabled: bool) -> void:
 	# Keep old routes serving until flush swaps their replacement. Only a
 	# dest that is no longer in the player dest set is dropped now.
 	_drop_obsolete_dest_routes()
-	# Depot add/remove: re-plan only dests whose live path touches this pid
-	# (plus missing dests). Enqueue-all would re-plan 24 even when the depot
-	# touches a handful. Same day-roll deferral as capture — enqueue only.
-	_enqueue_missing_and_affected_dests(province_id)
+	# Depot add can cheapen any dest (new waypoint / dest set). Enqueue all
+	# defaults; "touching pid only" misses dests that will take a new shortcut.
+	# Remove still uses the touching set. Same day-roll deferral as capture.
+	if enabled:
+		_enqueue_all_current_dests()
+	else:
+		_enqueue_missing_and_affected_dests(province_id)
 	_control_dirty_pids.erase(province_id)
+	_defer_day_flush_once()
 
 
 ## PERF-4 FIX #4: infra / development complete recalculates this hub's
@@ -339,6 +348,7 @@ func notify_province_control_changed(province_id: int) -> void:
 		# every default dest; old routes serve until each swaps.
 		_enqueue_all_current_dests()
 	_control_dirty_pids.erase(province_id)
+	_defer_day_flush_once()
 	if not hub_changed and not is_depot and dropped == 0 and _refill_queue.is_empty():
 		return
 	network_ownership_refresh_count += 1
@@ -379,17 +389,22 @@ func flush_pending_control_route_refresh(max_plans: int = ROUTE_REFRESH_BUDGET_P
 	# FIX #7: never `_plan_route` on the day-roll frame. Events still enqueue;
 	# the next frames' 40 ms slice pops the FIFO. Removing this check fails
 	# the 0-plans-on-roll and 300 ms own-share bars.
-	if _is_day_roll_plan_frame():
+	if _is_day_roll_plan_frame() and flush_force_drop_dest <= 0:
 		return 0
 	# FIX #5: flush only pops the dest FIFO. Restoring a dirty-pid re-drop
 	# here re-plans the first sorted dests forever (depot add / recapture livelock).
 	var n0: int = _routes.size()
 	_flush_in_progress = true
-	var planned: int = _refill_queued_dests(max_plans)
-	_flush_in_progress = false
+	if flush_force_drop_dest > 0:
+		_drop_one_default_dest_route(flush_force_drop_dest)
+		flush_force_drop_dest = -1
+	var planned: int = 0
+	if not _is_day_roll_plan_frame():
+		planned = _refill_queued_dests(max_plans)
 	var size_drop: int = maxi(0, n0 - _routes.size())
 	if size_drop > last_flush_redrop_count:
 		_note_flush_redrop(size_drop - last_flush_redrop_count)
+	_flush_in_progress = false
 	return planned
 
 
@@ -403,6 +418,36 @@ func count_refill_queue() -> int:
 
 func count_control_dirty() -> int:
 	return _control_dirty_pids.size()
+
+
+func count_default_dests_touching_pid(province_id: int) -> int:
+	if province_id <= 0:
+		return 0
+	var source: int = get_capital_hub_id()
+	if source < 0:
+		return 0
+	var n: int = 0
+	var targets: Array[int] = _player_route_targets()
+	var max_n: int = mini(targets.size(), DEFAULT_ROUTE_DEST_CAP)
+	for i in range(max_n):
+		var dest: int = targets[i]
+		var key: String = "%d_%d" % [source, dest]
+		if _routes.has(key) and _route_plan_touches_pid(_routes[key], province_id):
+			n += 1
+	return n
+
+
+func _drop_one_default_dest_route(dest: int) -> int:
+	var source: int = get_capital_hub_id()
+	if source < 0 or dest <= 0:
+		return 0
+	var key: String = "%d_%d" % [source, dest]
+	if not _routes.has(key) and not _default_routes.has(key):
+		return 0
+	_routes.erase(key)
+	_default_routes.erase(key)
+	_note_flush_redrop(1)
+	return 1
 
 
 func enqueue_player_dests_for_refresh() -> int:
@@ -579,13 +624,45 @@ func _on_relations_or_access_changed(a: String = "", b: String = "", _snap: Dict
 	if not _relations_change_involves_supply_owner(a, b):
 		return
 	_enqueue_all_current_dests()
+	_defer_day_flush_once()
 
 
 func _relations_change_involves_supply_owner(a: String, b: String) -> bool:
 	var owner: String = player_tag.strip_edges().to_upper()
 	if owner.is_empty():
 		return false
-	return a.strip_edges().to_upper() == owner or b.strip_edges().to_upper() == owner
+	var aa: String = a.strip_edges().to_upper()
+	var bb: String = b.strip_edges().to_upper()
+	if aa == owner or bb == owner:
+		return true
+	# W2: a non-player pair still matters when one tag sits on a live GER route.
+	if _tag_on_player_supply_graph(aa) or _tag_on_player_supply_graph(bb):
+		return true
+	return false
+
+
+func _tag_on_player_supply_graph(tag: String) -> bool:
+	var want: String = tag.strip_edges().to_upper()
+	if want.is_empty():
+		return false
+	for key_v in _routes.keys():
+		var plan: SupplyRoutePlan = _routes[key_v]
+		if plan == null:
+			continue
+		for step_v in plan.province_path:
+			var pid: int = int(step_v)
+			var p: Province = null
+			if provinces.has(pid):
+				p = provinces[pid] as Province
+			if p == null:
+				continue
+			if _ctrl(p).strip_edges().to_upper() == want:
+				return true
+	return false
+
+
+func _defer_day_flush_once() -> void:
+	_begin_day_roll_plan_deferral()
 
 
 func _begin_day_roll_plan_deferral() -> void:
