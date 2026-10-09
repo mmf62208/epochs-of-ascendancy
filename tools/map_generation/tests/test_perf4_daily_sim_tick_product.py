@@ -92,6 +92,8 @@ class TestPerf4DailySimTickProduct(unittest.TestCase):
             "headless_dayroll_access_frame",
             "headless_dayroll_recapture_frame",
             "headless_dayroll_own_share",
+            "headless_leftover_queue_roll",
+            "headless_flush_livelock_redrop",
             "headless_redrop_behaviour",
             "headless_flush_redrop_behaviour",
             "headless_depot_enqueue_all_dests",

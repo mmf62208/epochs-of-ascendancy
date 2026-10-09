@@ -334,6 +334,14 @@ def build_perf4_daily_sim_tick_product() -> Dict[str, Any]:
         passes.append("headless_dayroll_own_share")
     else:
         fails.append("headless_dayroll_own_share")
+    if HD_LIVE_GD.is_file() and "_test_leftover_queue_zero_plans_on_later_node_roll" in hd_live:
+        passes.append("headless_leftover_queue_roll")
+    else:
+        fails.append("headless_leftover_queue_roll")
+    if HD_LIVE_GD.is_file() and "_test_flush_livelock_redrop_counter" in hd_live:
+        passes.append("headless_flush_livelock_redrop")
+    else:
+        fails.append("headless_flush_livelock_redrop")
     if HD_LIVE_GD.is_file() and "_test_redrop_counter_increments_on_hostile_drop" in hd_live:
         passes.append("headless_redrop_behaviour")
     else:
@@ -435,13 +443,19 @@ def build_perf4_daily_sim_tick_product() -> Dict[str, Any]:
     adv_fn = extract_gd_func_body(sm, "advance_supply_day")
     flush_fn = extract_gd_func_body(sm, "flush_pending_control_route_refresh")
     proc_fn = extract_gd_func_body(sm, "_process")
+    # FIX #8: leftover FIFO dests must not plan on the roll frame.
+    # _process defers after the clock (autoload #8 used to run first).
     if (
         adv_fn
         and "_begin_day_roll_plan_deferral" in adv_fn
         and flush_fn
         and "_is_day_roll_plan_frame" in flush_fn
         and proc_fn
-        and "_is_day_roll_plan_frame" in proc_fn
+        and "call_deferred" in proc_fn
+        and "_flush_refill_after_clock" in sm
+        and "network_flush_livelock_redrop_count" in sm
+        and HD_LIVE_GD.is_file()
+        and "_test_leftover_queue_zero_plans_on_later_node_roll" in hd_live
     ):
         passes.append("day_roll_defers_route_plans")
     else:
