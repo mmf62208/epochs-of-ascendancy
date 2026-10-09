@@ -1148,10 +1148,32 @@ func _toast_panels() -> Array[PanelContainer]:
 	return out
 
 
+func _collect_buttons(n: Node, out: Array[Button]) -> void:
+	if n == null or not is_instance_valid(n):
+		return
+	if n is Button:
+		out.append(n as Button)
+	for child in n.get_children():
+		if child is Node:
+			_collect_buttons(child as Node, out)
+
+
 func _panel_close(panel: Node) -> Button:
 	if panel == null or not is_instance_valid(panel):
 		return null
-	return panel.find_child("NoticeClose", true, false) as Button
+	var named: Button = panel.find_child("NoticeClose", true, false) as Button
+	if named != null:
+		return named
+	# Main 61a80433 × buttons are unnamed (no NoticeClose).
+	var found: Array[Button] = []
+	_collect_buttons(panel, found)
+	var i: int = 0
+	while i < found.size():
+		var b: Button = found[i]
+		if b.text == "×" or b.tooltip_text == "Dismiss notification":
+			return b
+		i += 1
+	return null
 
 
 func _close_on_panel(panel: Node, news: bool) -> Button:
@@ -1245,12 +1267,17 @@ func _same_spot_play_click(screen_pt: Vector2) -> void:
 	await _flush(2)
 
 
-func _assert_t12_selected(why: String, survivor: Node) -> bool:
-	if survivor == null or not is_instance_valid(survivor) or survivor.get_parent() == null:
-		_fail("%s: survivor toast left the tree (timer or poll close)" % why)
-		return false
+func _assert_t12_selected(why: String, survivor: Variant) -> bool:
 	var got_pid: int = _pid()
+	var alive: bool = (
+		survivor is Node
+		and is_instance_valid(survivor)
+		and (survivor as Node).get_parent() != null
+	)
 	if got_pid == KNOWN_PID or _inspector_up():
+		if not alive:
+			_fail("%s: selected but survivor toast left the tree (poll close)" % why)
+			return false
 		_pass("%s: same-spot click selected pid=%d" % [why, got_pid])
 		return true
 	_fail("%s: same-spot click after close did not select (pid=%d)" % [why, got_pid])
