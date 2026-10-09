@@ -4,7 +4,7 @@ Window **1280×740** Absolute **@(0, 29)** · GER 1936 · `world_accurate`.
 Do **not** raise the window. Do **not** use Ctrl.
 Headless / xvfb ≠ live Play.
 
-**Code SHA:** LeaderEventUI FIX #4 on this branch (MapRenderer / MainMenu still `977c9a84`). Guard **PASS** failures=0. Pure main `61a80433` and FIX #3 tip `b64b98f3` **FAIL** T12a–c same-spot pid=-1. See `docs/CURRENT_STATE.md` INPUT-1 FIX #4.
+**Code SHA:** tip `5246847c` (LeaderEventUI FIX #4; MapRenderer / MainMenu still `977c9a84`). Guard **PASS** failures=0. Pure main `61a80433` and FIX #3 tip `b64b98f3` **FAIL** T12a–c (b64 all pid=-1; main T12a pid=-1). See `docs/CURRENT_STATE.md` INPUT-1 FIX #4.
 
 ## Pre-step
 
