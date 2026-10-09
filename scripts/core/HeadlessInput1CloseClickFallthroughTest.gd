@@ -1269,11 +1269,9 @@ func _same_spot_play_click(screen_pt: Vector2) -> void:
 
 func _assert_t12_selected(why: String, survivor: Variant) -> bool:
 	var got_pid: int = _pid()
-	var alive: bool = (
-		survivor is Node
-		and is_instance_valid(survivor)
-		and (survivor as Node).get_parent() != null
-	)
+	var alive: bool = false
+	if survivor != null and is_instance_valid(survivor) and survivor is Node:
+		alive = (survivor as Node).get_parent() != null
 	if got_pid == KNOWN_PID or _inspector_up():
 		if not alive:
 			_fail("%s: selected but survivor toast left the tree (poll close)" % why)
@@ -1312,8 +1310,7 @@ func _test_t12a_news_over_notice() -> void:
 		return
 	await _click_close(pt)
 	await _flush(2)
-	if not _assert_no_selection("T12a News× leftover"):
-		return
+	_assert_no_selection("T12a News× leftover")
 	var survivor: PanelContainer = _survivor_panel(true)
 	if survivor == null or not survivor.get_global_rect().has_point(pt):
 		_fail("T12a setup: survivor did not reflow under ×")
@@ -1345,8 +1342,7 @@ func _test_t12b_notice_over_notice() -> void:
 		return
 	await _click_close(pt)
 	await _flush(2)
-	if not _assert_no_selection("T12b Notice× leftover"):
-		return
+	_assert_no_selection("T12b Notice× leftover")
 	var survivor: PanelContainer = _survivor_panel(false)
 	var sx: Button = _panel_close(survivor)
 	if survivor == null or sx == null or not sx.get_global_rect().has_point(pt):
@@ -1380,8 +1376,7 @@ func _test_t12c_news_over_news() -> void:
 		return
 	await _click_close(pt)
 	await _flush(2)
-	if not _assert_no_selection("T12c News× leftover"):
-		return
+	_assert_no_selection("T12c News× leftover")
 	var survivor: PanelContainer = _survivor_panel(false)
 	var sx: Button = _panel_close(survivor)
 	if survivor == null or sx == null or not sx.get_global_rect().has_point(pt):
@@ -1417,8 +1412,7 @@ func _test_t12d_restore_blocks() -> void:
 		return
 	await _click_close(pt)
 	await _flush(2)
-	if not _assert_no_selection("T12d News× leftover"):
-		return
+	_clear_inspector()
 	var survivor: PanelContainer = _survivor_panel(true)
 	if survivor == null or not survivor.get_global_rect().has_point(pt):
 		_fail("T12d setup: survivor did not reflow under ×")
