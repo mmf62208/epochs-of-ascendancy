@@ -9,6 +9,7 @@ extends Node2D
 
 const _Rx1 := preload("res://scripts/map/Rx1RhineCrossing.gd")
 const _Canvas := preload("res://scripts/map/MapCanvasConfig.gd")
+const _Road := preload("res://scripts/map/RoadTierVisual.gd")
 
 ## DemoUnitIcon_* uses z_as_relative=false, z_index=28 (MapRenderer).
 ## Nation labels stay under the river (NATION_LABEL_Z=18).
@@ -24,6 +25,13 @@ const HALO_SCREEN_PX := 14.0
 const RIVER_SCREEN_PX := 7.0
 const BRIDGE_SCREEN_PX := 5.0
 const MAX_SEGS := 160
+## North of Duisburg, beside the stroke. Bonn/Köln/Leverkusen sit on the south half.
+const RHINE_LABEL := "Rhine"
+const RHINE_LABEL_ALONG := 0.84
+const RHINE_LABEL_OFFSET_PX := 18.0
+const RHINE_LABEL_FONT_PX := 14.0
+const RHINE_LABEL_COLOR := Color(0.85, 0.93, 1.0, 1.0)
+const RHINE_LABEL_INK := Color(0.04, 0.08, 0.14, 1.0)
 
 var _last_zoom: float = -1.0
 
@@ -89,6 +97,63 @@ func _draw() -> void:
 			break
 		last = nxt
 	_draw_bridge_markers()
+	if rhine_label_visible_at_zoom(_canvas_zoom()):
+		_draw_rhine_name(pts)
+
+
+## Far band, including the ceiling, stays unlabeled. Mid and close name the river.
+static func rhine_label_visible_at_zoom(zoom: float) -> bool:
+	var z: float = zoom
+	if not is_finite(z):
+		z = 1.0
+	return z > _Road.ZOOM_FAR_MAX
+
+
+func _draw_rhine_name(pts: PackedVector2Array) -> void:
+	var font: Font = ThemeDB.fallback_font
+	if font == null or pts.size() < 2:
+		return
+	var anchor := _rhine_label_point(pts)
+	if not anchor.is_finite():
+		return
+	var z := maxf(_canvas_zoom(), 0.04)
+	var font_sz := maxi(8, int(round(RHINE_LABEL_FONT_PX / z)))
+	var size := font.get_string_size(RHINE_LABEL, HORIZONTAL_ALIGNMENT_LEFT, -1, font_sz)
+	var pos := anchor - size * 0.5
+	var ink := _world_width(1.2)
+	for step in [Vector2(-1, 0), Vector2(1, 0), Vector2(0, -1), Vector2(0, 1)]:
+		draw_string(font, pos + step * ink, RHINE_LABEL, HORIZONTAL_ALIGNMENT_LEFT, -1, font_sz, RHINE_LABEL_INK)
+	draw_string(font, pos, RHINE_LABEL, HORIZONTAL_ALIGNMENT_LEFT, -1, font_sz, RHINE_LABEL_COLOR)
+
+
+func _rhine_label_point(pts: PackedVector2Array) -> Vector2:
+	var lengths: Array[float] = []
+	var total := 0.0
+	var i := 1
+	while i < pts.size():
+		var d := pts[i - 1].distance_to(pts[i])
+		lengths.append(d)
+		total += d
+		i += 1
+	if total <= 0.0:
+		return pts[0]
+	var target := total * RHINE_LABEL_ALONG
+	var walked := 0.0
+	i = 0
+	while i < lengths.size():
+		var span: float = lengths[i]
+		if walked + span >= target or i == lengths.size() - 1:
+			var t := 0.0 if span <= 0.0 else clampf((target - walked) / span, 0.0, 1.0)
+			var a: Vector2 = pts[i]
+			var b: Vector2 = pts[i + 1]
+			var tangent := b - a
+			if tangent.length_squared() < 0.0001:
+				tangent = Vector2.DOWN
+			var normal := Vector2(-tangent.y, tangent.x).normalized()
+			return a.lerp(b, t) + normal * _world_width(RHINE_LABEL_OFFSET_PX)
+		walked += span
+		i += 1
+	return pts[pts.size() - 1]
 
 
 func _draw_bridge_markers() -> void:
