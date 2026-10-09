@@ -30,6 +30,8 @@ const PLAYER_TAG := "GER"
 const DAY_BUDGET_MS := 500.0
 const CAPTURE_FRAME_BUDGET_MS := 5.0
 const DAYROLL_CAPTURE_BUDGET_MS := 200.0
+const DAYROLL_OWN_SHARE_BUDGET_MS := 300.0
+const DEFAULT_ROUTE_DEST_CAP_HINT := 24
 const SLICE_ESTIMATE_MS := 25.0
 const HUB_CAPACITY_DAY := 40
 const CAPTURE_HUB_PID := 710160
@@ -151,6 +153,9 @@ func _run() -> void:
 	_test_fifo_dequeue_matches_enqueue(sm)
 	_test_slice_predictive_vs_reactive_seam(sm)
 	_test_dayroll_with_capture_under_200ms(tm, mm, sm)
+	_test_redrop_counter_increments_on_hostile_drop(mm, sm)
+	_test_depot_add_replans_only_touched_dests(sm)
+	_test_dayroll_event_own_share_under_300ms(tm, mm, gd, sm)
 	_test_one_full_supply_day_per_game_day(tm, gd, sm)
 	_test_production_cache_measured(gd)
 	_test_owner_index_measured(mm)
@@ -308,6 +313,36 @@ func _test_replanned_off_must_fail(sm_src: String, adv: String) -> void:
 		_fail("relations/access clears cache but enqueues nothing (access pathdiff)")
 	else:
 		_pass("relations/access enqueues all default dests")
+	if "_relations_change_involves_supply_owner" not in rel_fn and "player_tag" not in rel_fn:
+		_fail("access/relations re-enqueues when the player is not a party")
+	else:
+		_pass("access/relations enqueues only when the player supply owner is a party")
+	if (
+		"_plan_route" in rel_fn
+		or "flush_pending_control_route_refresh" in rel_fn
+		or "_refill_queued_dests" in rel_fn
+	):
+		_fail("access/relations plans immediately (access not deferred)")
+	else:
+		_pass("access/relations only enqueues (same day-roll deferral)")
+	var adv_defer := _slice_func(sm_src, "advance_supply_day")
+	var flush_defer := _slice_func(sm_src, "flush_pending_control_route_refresh")
+	var proc_fn := _slice_func(sm_src, "_process")
+	if "_begin_day_roll_plan_deferral" not in adv_defer:
+		_fail("advance_supply_day does not mark the day-roll plan frame")
+	elif "_is_day_roll_plan_frame" not in flush_defer:
+		_fail("flush still plans on the day-roll frame")
+	elif "_is_day_roll_plan_frame" not in proc_fn:
+		_fail("_process still plans on the day-roll frame")
+	else:
+		_pass("day-roll frame defers route plans to the next 40 ms slice")
+	var patch := _slice_func(sm_src, "_patch_player_depot_hub")
+	if "_enqueue_all_current_dests" in patch:
+		_fail("depot add always re-plans all 24 dests")
+	elif "_enqueue_missing_and_affected_dests" not in patch:
+		_fail("depot add/remove does not enqueue only touched dests")
+	else:
+		_pass("depot add/remove enqueues only touched dests")
 	var mm_src := _read("res://scripts/map/MapManager.gd")
 	var infra_fn := _slice_func(mm_src, "update_province_infrastructure")
 	var dev_fn := _slice_func(mm_src, "update_province_development")
@@ -349,6 +384,8 @@ func _boot_live_supply_network(mm: Node, sm: Node) -> bool:
 		}
 	var t0 := Time.get_ticks_usec()
 	sm.call("build_network", provs, countries, city, adj, PLAYER_TAG)
+	if sm.has_method("end_day_roll_plan_deferral"):
+		sm.call("end_day_roll_plan_deferral")
 	var boot_ms := float(Time.get_ticks_usec() - t0) / 1000.0
 	var hubs_n := 0
 	if "hubs" in sm and sm.hubs is Dictionary:
@@ -1047,6 +1084,8 @@ func _redrop_n(sm: Node) -> int:
 
 
 func _flush_until_drained(sm: Node, max_frames: int) -> Dictionary:
+	if sm != null and sm.has_method("end_day_roll_plan_deferral"):
+		sm.call("end_day_roll_plan_deferral")
 	var frames: int = 0
 	var plans_total: int = 0
 	var plans_max: int = 0
@@ -1289,6 +1328,15 @@ func _test_relations_access_clears_friendly_cache(sm: Node) -> void:
 		_fail("is_player_friendly_province missing")
 		return
 	var before: bool = bool(sm.call("is_player_friendly_province", SWI_PID))
+	if sm.has_method("clear_refill_queue"):
+		sm.call("clear_refill_queue")
+	if rm.has_method("set_policy"):
+		rm.call("set_policy", "JAP", "CHI", {"military_access": true})
+	var foreign_q: int = _queue_n(sm)
+	if foreign_q > 0:
+		_fail("JAP–CHI access enqueued GER dests n=%d (player not a party)" % foreign_q)
+	else:
+		_pass("JAP–CHI access did not enqueue GER dests")
 	if rm.has_method("set_policy"):
 		rm.call("set_policy", PLAYER_TAG, "SWI", {"military_access": true})
 	var after: bool = bool(sm.call("is_player_friendly_province", SWI_PID))
@@ -1304,6 +1352,7 @@ func _test_relations_access_clears_friendly_cache(sm: Node) -> void:
 		_pass("GER→SWI became friendly after access (cache cleared)")
 	if rm.has_method("set_policy"):
 		rm.call("set_policy", PLAYER_TAG, "SWI", {"military_access": false})
+		rm.call("set_policy", "JAP", "CHI", {"military_access": false})
 
 
 func _live_vs_rebuild_pathdiff(mm: Node, sm: Node) -> Dictionary:
@@ -1559,6 +1608,219 @@ func _test_dayroll_with_capture_under_200ms(tm: Node, mm: Node, sm: Node) -> voi
 	else:
 		_pass("dayroll+capture frame %.1fms < %.0f (headless sim; live needs sim-vs-render split)" % [frame_ms, DAYROLL_CAPTURE_BUDGET_MS])
 	_restore_owner(mm, CAPTURE_HUB_PID, "GER")
+	_boot_live_supply_network(mm, sm)
+
+
+func _emit_day_without_multi_ai(tm: Node) -> void:
+	if tm != null and tm.has_method("_emit_game_day_advanced_profiled"):
+		tm.call(
+			"_emit_game_day_advanced_profiled",
+			int(tm.get("current_year")) if "current_year" in tm else 1936,
+			int(tm.get("current_month")) if "current_month" in tm else 1,
+			int(tm.get("current_day")) if "current_day" in tm else 1
+		)
+
+
+func _dests_touching_pid(sm: Node, pid: int) -> Array[int]:
+	var out: Array[int] = []
+	if sm == null or not sm.has_method("get_network_topology_snapshot"):
+		return out
+	var snap: Dictionary = sm.call("get_network_topology_snapshot")
+	var seen: Dictionary = {}
+	for raw in snap.get("routes", []):
+		if typeof(raw) != TYPE_DICTIONARY:
+			continue
+		var row: Dictionary = raw
+		var dst: int = int(row.get("dst", 0))
+		var hit := dst == pid or int(row.get("src", 0)) == pid
+		if not hit:
+			for step_v in row.get("path", []):
+				if int(step_v) == pid:
+					hit = true
+					break
+		if hit and dst > 0 and not seen.has(dst):
+			seen[dst] = true
+			out.append(dst)
+	return out
+
+
+func _test_redrop_counter_increments_on_hostile_drop(mm: Node, sm: Node) -> void:
+	if mm == null or sm == null or not sm.has_method("get_network_topology_snapshot"):
+		_fail("redrop behaviour helpers missing")
+		return
+	if not _boot_live_supply_network(mm, sm):
+		_fail("redrop behaviour boot failed")
+		return
+	if sm.has_method("drain_pending_route_refresh"):
+		sm.call("drain_pending_route_refresh")
+	var n0: int = _redrop_n(sm)
+	var victim: int = 0
+	var snap: Dictionary = sm.call("get_network_topology_snapshot")
+	var capital: int = int(CAPITALS.get("GER", 0))
+	for raw in snap.get("routes", []):
+		if typeof(raw) != TYPE_DICTIONARY:
+			continue
+		var row: Dictionary = raw
+		for step_v in row.get("path", []):
+			var step: int = int(step_v)
+			if step <= 0 or step == capital or step == int(row.get("dst", 0)):
+				continue
+			if sm.has_method("is_player_friendly_province") and not bool(sm.call("is_player_friendly_province", step)):
+				continue
+			victim = step
+			break
+		if victim > 0:
+			break
+	if victim <= 0:
+		_fail("redrop behaviour found no friendly mid-path pid")
+		return
+	mm.call("update_province_owner", victim, "FRA", "FRA")
+	var n1: int = _redrop_n(sm)
+	print(
+		"HeadlessPerf4LiveMultiAiDayTest: redrop_behaviour pid=%d count=%d→%d"
+		% [victim, n0, n1]
+	)
+	if n1 <= n0:
+		_fail("redrop counter dead n=%d→%d (hostile drop of a planned route)" % [n0, n1])
+	else:
+		_pass("redrop counter incremented %d→%d on hostile drop of pid %d" % [n0, n1, victim])
+	_restore_owner(mm, victim, "GER")
+	_boot_live_supply_network(mm, sm)
+
+
+func _test_depot_add_replans_only_touched_dests(sm: Node) -> void:
+	if sm == null or not sm.has_method("set_player_depot") or not sm.has_method("peek_refill_queue"):
+		_fail("depot subset helpers missing")
+		return
+	if sm.has_method("set_player_depot"):
+		sm.call("set_player_depot", DEPOT_ADD_PID, false)
+	if sm.has_method("drain_pending_route_refresh"):
+		sm.call("drain_pending_route_refresh")
+	if sm.has_method("clear_refill_queue"):
+		sm.call("clear_refill_queue")
+	var touching: Array[int] = _dests_touching_pid(sm, DEPOT_ADD_PID)
+	var pid: int = DEPOT_ADD_PID
+	if touching.size() <= 0 or touching.size() >= DEFAULT_ROUTE_DEST_CAP_HINT:
+		var snap: Dictionary = sm.call("get_network_topology_snapshot") if sm.has_method("get_network_topology_snapshot") else {}
+		for raw in snap.get("routes", []):
+			if typeof(raw) != TYPE_DICTIONARY:
+				continue
+			var dest: int = int((raw as Dictionary).get("dst", 0))
+			if dest <= 0:
+				continue
+			var alt: Array[int] = _dests_touching_pid(sm, dest)
+			if alt.size() > 0 and alt.size() < DEFAULT_ROUTE_DEST_CAP_HINT:
+				pid = dest
+				touching = alt
+				break
+	if touching.size() <= 0 or touching.size() >= DEFAULT_ROUTE_DEST_CAP_HINT:
+		_fail("depot subset could not find a pid that touches fewer than 24 dests")
+		return
+	if sm.has_method("set_player_depot"):
+		sm.call("set_player_depot", pid, false)
+		sm.call("set_player_depot", pid, true)
+	var queued: Array = sm.call("peek_refill_queue") if sm.has_method("peek_refill_queue") else []
+	var qn: int = queued.size()
+	print(
+		"HeadlessPerf4LiveMultiAiDayTest: depot_subset pid=%d touching=%d queued=%d queued_dests=%s"
+		% [pid, touching.size(), qn, str(queued)]
+	)
+	if qn <= 0:
+		_fail("depot add that touches dests enqueued nothing")
+	elif qn >= 24:
+		_fail("depot add re-planned all %d dests (want only the %d it touches)" % [qn, touching.size()])
+	else:
+		var extra: Array[int] = []
+		for dest_v in queued:
+			var dest: int = int(dest_v)
+			if dest not in touching:
+				extra.append(dest)
+		if not extra.is_empty() and extra.size() > 1:
+			_fail("depot add queued dests that do not touch pid extra=%s" % str(extra))
+		else:
+			_pass("depot add re-plans only touched dests queued=%d touching=%d" % [qn, touching.size()])
+	if sm.has_method("set_player_depot"):
+		sm.call("set_player_depot", pid, false)
+	if sm.has_method("drain_pending_route_refresh"):
+		sm.call("drain_pending_route_refresh")
+
+
+func _assert_dayroll_event_own_share(label: String, tm: Node, sm: Node, event_cb: Callable) -> void:
+	if sm.has_method("clear_refill_queue"):
+		sm.call("clear_refill_queue")
+	if sm.has_method("end_day_roll_plan_deferral"):
+		sm.call("end_day_roll_plan_deferral")
+	var refill0: int = int(sm.get("network_route_refill_count")) if "network_route_refill_count" in sm else 0
+	var t0: int = Time.get_ticks_usec()
+	_emit_day_without_multi_ai(tm)
+	event_cb.call()
+	var planned_emit: int = int(sm.get("last_flush_plan_count")) if "last_flush_plan_count" in sm else -1
+	var flush_got: int = int(sm.call("flush_pending_control_route_refresh")) if sm.has_method("flush_pending_control_route_refresh") else -1
+	var planned_flush: int = int(sm.get("last_flush_plan_count")) if "last_flush_plan_count" in sm else -1
+	var share_ms: float = float(Time.get_ticks_usec() - t0) / 1000.0
+	var refill1: int = int(sm.get("network_route_refill_count")) if "network_route_refill_count" in sm else refill0
+	print(
+		"HeadlessPerf4LiveMultiAiDayTest: dayroll_%s own_share=%.1fms plans_emit=%d plans_flush=%d refill=%d→%d (emit+event+plans, no multi_ai)"
+		% [label, share_ms, planned_emit, planned_flush, refill0, refill1]
+	)
+	if planned_emit != 0 or flush_got != 0 or planned_flush != 0 or refill1 != refill0:
+		_fail(
+			"dayroll+%s planned on the roll frame emit=%d flush=%d refill=%d→%d"
+			% [label, planned_emit, planned_flush, refill0, refill1]
+		)
+	elif share_ms >= DAYROLL_OWN_SHARE_BUDGET_MS:
+		_fail("dayroll+%s own share %.1fms >= %.0f (emit+event+plans, no multi_ai)" % [label, share_ms, DAYROLL_OWN_SHARE_BUDGET_MS])
+	else:
+		_pass("dayroll+%s own share %.1fms < %.0f plans=0" % [label, share_ms, DAYROLL_OWN_SHARE_BUDGET_MS])
+	if sm.has_method("end_day_roll_plan_deferral"):
+		sm.call("end_day_roll_plan_deferral")
+	if sm.has_method("drain_pending_route_refresh"):
+		sm.call("drain_pending_route_refresh")
+
+
+func _test_dayroll_event_own_share_under_300ms(tm: Node, mm: Node, gd: Node, sm: Node) -> void:
+	if tm == null or mm == null or sm == null:
+		_fail("dayroll own-share helpers missing")
+		return
+	if not _boot_live_supply_network(mm, sm):
+		_fail("dayroll own-share boot failed")
+		return
+	_reset_clock(tm, 0)
+	var rm: Node = root.get_node_or_null("/root/RelationsManager")
+	_assert_dayroll_event_own_share("access", tm, sm, func() -> void:
+		if rm != null and rm.has_method("set_policy"):
+			rm.call("set_policy", PLAYER_TAG, "SWI", {"military_access": true})
+	)
+	if rm != null and rm.has_method("set_policy"):
+		rm.call("set_policy", PLAYER_TAG, "SWI", {"military_access": false})
+	_restore_owner(mm, RECAPTURE_PATH_PID, "FRA")
+	if sm.has_method("drain_pending_route_refresh"):
+		sm.call("drain_pending_route_refresh")
+	_assert_dayroll_event_own_share("recapture", tm, sm, func() -> void:
+		mm.call("update_province_owner", RECAPTURE_PATH_PID, "GER", "GER")
+	)
+	_restore_owner(mm, RECAPTURE_PATH_PID, "GER")
+	if sm.has_method("set_player_depot"):
+		sm.call("set_player_depot", DEPOT_ADD_PID, false)
+	if sm.has_method("drain_pending_route_refresh"):
+		sm.call("drain_pending_route_refresh")
+	_assert_dayroll_event_own_share("depot_add", tm, sm, func() -> void:
+		sm.call("set_player_depot", DEPOT_ADD_PID, true)
+	)
+	if sm.has_method("set_player_depot"):
+		sm.call("set_player_depot", DEPOT_ADD_PID, false)
+	var annex_pids: Array[int] = _collect_ger_hub_pids(sm, 1, [CAPTURE_HUB_PID, CAPTURE_DEPOT_PID, int(CAPITALS.get("GER", 0))])
+	var annex_pid: int = annex_pids[0] if not annex_pids.is_empty() else CAPTURE_HUB_PID
+	_restore_owner(mm, annex_pid, "GER")
+	if sm.has_method("drain_pending_route_refresh"):
+		sm.call("drain_pending_route_refresh")
+	_assert_dayroll_event_own_share("annex", tm, sm, func() -> void:
+		if gd != null and gd.has_method("apply_peace_conference_settlement_live"):
+			gd.call("apply_peace_conference_settlement_live", "FRA", "GER", annex_pid, true, false, 0.0, false)
+		else:
+			mm.call("update_province_owner", annex_pid, "FRA", "FRA")
+	)
+	_restore_owner(mm, annex_pid, "GER")
 	_boot_live_supply_network(mm, sm)
 
 

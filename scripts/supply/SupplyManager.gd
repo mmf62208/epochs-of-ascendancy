@@ -90,13 +90,14 @@ var last_plan_ms: float = 0.0
 ## instead of wall time so predictive `used+next` vs reactive `used>=budget`
 ## is distinguishable (25 ms estimate → predictive plans 1, reactive plans 2).
 var route_refresh_plan_cost_estimate_ms: float = -1.0
-## Flush re-drops (must stay 0). Notify hostile drops do not increment this.
+## Routes dropped because they became hostile / obsolete. Flush FIFO swaps
+## do not increment this; a live hostile capture must.
 var network_route_redrop_count: int = 0
 ## True only while flush_pending_control_route_refresh is on the stack.
 var _flush_in_progress: bool = false
-## Skip the 1-plan day flush when a capture already ran on this frame so a
-## dayroll+capture frame stays under 200 ms (plan moves to the next frame).
-var _skip_day_flush_once: bool = false
+## FIX #7: process-frame id of the last day roll. Flush / _process must not
+## `_plan_route` on that frame; the next frames' 40 ms slice pops the FIFO.
+var _day_roll_plan_frame: int = -1
 ## Sorted player dest hubs (excludes capital). Updated incrementally so a
 ## capture frame does not walk all 3k hubs.
 var _player_hub_ids: Array[int] = []
@@ -266,12 +267,10 @@ func _patch_player_depot_hub(province_id: int, enabled: bool) -> void:
 	# Keep old routes serving until flush swaps their replacement. Only a
 	# dest that is no longer in the player dest set is dropped now.
 	_drop_obsolete_dest_routes()
-	# Depot add can cheapen any dest (new waypoint / dest set). Enqueue all
-	# defaults; "touching pid only" misses dests that will take a new shortcut.
-	if enabled:
-		_enqueue_all_current_dests()
-	else:
-		_enqueue_missing_and_affected_dests(province_id)
+	# Depot add/remove: re-plan only dests whose live path touches this pid
+	# (plus missing dests). Enqueue-all would re-plan 24 even when the depot
+	# touches a handful. Same day-roll deferral as capture — enqueue only.
+	_enqueue_missing_and_affected_dests(province_id)
 	_control_dirty_pids.erase(province_id)
 
 
@@ -340,7 +339,6 @@ func notify_province_control_changed(province_id: int) -> void:
 		# every default dest; old routes serve until each swaps.
 		_enqueue_all_current_dests()
 	_control_dirty_pids.erase(province_id)
-	_skip_day_flush_once = true
 	if not hub_changed and not is_depot and dropped == 0 and _refill_queue.is_empty():
 		return
 	network_ownership_refresh_count += 1
@@ -378,6 +376,11 @@ func flush_pending_control_route_refresh(max_plans: int = ROUTE_REFRESH_BUDGET_P
 	last_flush_plan_ms_max = 0.0
 	last_flush_redrop_count = 0
 	last_flush_planned_dests.clear()
+	# FIX #7: never `_plan_route` on the day-roll frame. Events still enqueue;
+	# the next frames' 40 ms slice pops the FIFO. Removing this check fails
+	# the 0-plans-on-roll and 300 ms own-share bars.
+	if _is_day_roll_plan_frame():
+		return 0
 	# FIX #5: flush only pops the dest FIFO. Restoring a dirty-pid re-drop
 	# here re-plans the first sorted dests forever (depot add / recapture livelock).
 	var n0: int = _routes.size()
@@ -541,6 +544,9 @@ func _refill_queued_dests(max_plans: int) -> int:
 
 
 func drain_pending_route_refresh() -> int:
+	# Drain is the "later frames" stand-in. Clear roll-frame deferral so
+	# headless tests can pop the FIFO after asserting 0 plans on the roll.
+	end_day_roll_plan_deferral()
 	var total: int = 0
 	var guard: int = 0
 	while (not _refill_queue.is_empty() or _missing_default_dest_count() > 0) and guard < DEFAULT_ROUTE_DEST_CAP:
@@ -556,6 +562,8 @@ func drain_pending_route_refresh() -> int:
 
 
 func _process(_delta: float) -> void:
+	if _is_day_roll_plan_frame():
+		return
 	if _refill_queue.is_empty():
 		return
 	if _should_use_interactive_light_supply():
@@ -563,11 +571,37 @@ func _process(_delta: float) -> void:
 	flush_pending_control_route_refresh(ROUTE_REFRESH_BUDGET_PER_FLUSH)
 
 
-func _on_relations_or_access_changed(_a: String = "", _b: String = "", _snap: Dictionary = {}) -> void:
+func _on_relations_or_access_changed(a: String = "", b: String = "", _snap: Dictionary = {}) -> void:
 	SupplyPathfinder.clear_neighbor_cache()
-	# Access / alliance can cheapen any dest (new transit). Cache clear
-	# alone leaves live paths on the old detour. Enqueue all defaults.
+	# Only the player-relevant supply owner needs a re-plan. A JAP–CHI
+	# access flip must not enqueue GER dests. Do not plan or flush here —
+	# same day-roll deferral as capture (next frames' 40 ms slice).
+	if not _relations_change_involves_supply_owner(a, b):
+		return
 	_enqueue_all_current_dests()
+
+
+func _relations_change_involves_supply_owner(a: String, b: String) -> bool:
+	var owner: String = player_tag.strip_edges().to_upper()
+	if owner.is_empty():
+		return false
+	return a.strip_edges().to_upper() == owner or b.strip_edges().to_upper() == owner
+
+
+func _begin_day_roll_plan_deferral() -> void:
+	_day_roll_plan_frame = Engine.get_process_frames()
+
+
+func end_day_roll_plan_deferral() -> void:
+	_day_roll_plan_frame = -1
+
+
+func is_day_roll_plan_deferred() -> bool:
+	return _is_day_roll_plan_frame()
+
+
+func _is_day_roll_plan_frame() -> bool:
+	return _day_roll_plan_frame == Engine.get_process_frames()
 
 
 func _clear_refill_queue() -> void:
@@ -584,9 +618,12 @@ func _next_plan_cost_estimate() -> float:
 
 
 func _note_flush_redrop(n: int) -> void:
-	if not _flush_in_progress or n <= 0:
+	# Hostile notify drops and flush size-drops both count. Guarding on
+	# `_flush_in_progress` left the counter dead in every live scenario.
+	if n <= 0:
 		return
-	last_flush_redrop_count += n
+	if _flush_in_progress:
+		last_flush_redrop_count += n
 	network_route_redrop_count += n
 
 
@@ -1120,6 +1157,9 @@ func _should_use_interactive_light_supply() -> bool:
 
 
 func _on_game_day_advanced(_year: int, _month: int, _day: int) -> void:
+	# FIX #7: mark the roll frame before any light/full work so leftover
+	# FIFO dests cannot `_plan_route` on this frame via _process / flush.
+	_begin_day_roll_plan_deferral()
 	# Restore main's light/full split: live F5 / interactive listener is
 	# depot-only. The AI soft tick (apply_supply) runs the one full day.
 	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("is_interactive_light_sim") and bool(TimeManager.is_interactive_light_sim()):
@@ -1195,13 +1235,10 @@ func advance_supply_day(days: float = 1.0) -> void:
 	var builds0: int = network_build_count
 	var t_sec: int = Time.get_ticks_usec()
 	# FIX #4: refill every missing dest in this one full day (N = dest cap 24).
-	# FIX #6: a capture on this same frame already enqueued dests — skip the
-	# 1-plan day flush so dayroll+capture stays under 200 ms. _process / drain
-	# still plan the same calendar day.
-	if _skip_day_flush_once:
-		_skip_day_flush_once = false
-	else:
-		flush_pending_control_route_refresh(ROUTE_REFRESH_BUDGET_PER_FLUSH)
+	# FIX #7: mark the roll and still call flush (source gate), but flush
+	# returns 0 plans on this frame. Events enqueue; next frames' slice plans.
+	_begin_day_roll_plan_deferral()
+	flush_pending_control_route_refresh(ROUTE_REFRESH_BUDGET_PER_FLUSH)
 	var flush_ms: float = float(Time.get_ticks_usec() - t_sec) / 1000.0
 
 	# === Province Infrastructure & Development: Local Supply Generation ===

@@ -13,16 +13,20 @@ boot GER + a live-weight supply network and time the Play multi-AI step.
 Soft theater tick does not rebuild the network for dummy pid 1. Live Play
 still runs the full advance_supply_day steps (air / naval / shipping).
 A depot/hub owner flip retags the hub and enqueues dests once
-(no re-drop). Friendly gain (recapture, depot add, military access)
-enqueues all default dests so live paths match a rebuild. Flush pops a
-deduped FIFO; old routes keep serving until swap. Dropped dests refill
-the same day (dest cap 24, predictive 40 ms slice) with the same
-Dijkstra tie-breaks as a rebuild. Flush redrop counters increment when
-a flush drops a planned route. Infra/dev complete and GameData
-settlement-improve recalculate hub capacity. Depot add/remove
-patches one hub. Daily listener stays on main's light path so
-apply_supply is the one full day. Production shares a per-day
-line-owner cache; owner index is counted + timed.
+(no re-drop). Friendly gain (recapture, military access) enqueues all
+default dests so live paths match a rebuild. Depot add/remove enqueues
+only dests whose live path touches the pid. Flush pops a deduped FIFO;
+old routes keep serving until swap. Day-roll frames never `_plan_route`
+— events enqueue and the next frames' 40 ms slice plans. Access /
+relations use that same deferral and re-enqueue only when the player
+supply owner is a party. Dropped dests refill the same day (dest cap 24,
+predictive 40 ms slice) with the same Dijkstra tie-breaks as a rebuild.
+Redrop counters increment on a hostile drop of a planned route.
+Infra/dev complete and GameData settlement-improve recalculate hub
+capacity. Depot add/remove patches one hub. Daily listener stays on
+main's light path so apply_supply is the one full day. Production shares
+a per-day line-owner cache; owner index is counted + timed. multi_ai
+is out of scope for the day-roll 300 ms own-share bar.
 """
 from __future__ import annotations
 
@@ -314,6 +318,18 @@ def build_perf4_daily_sim_tick_product() -> Dict[str, Any]:
         passes.append("headless_dayroll_capture_frame")
     else:
         fails.append("headless_dayroll_capture_frame")
+    if HD_LIVE_GD.is_file() and "_test_dayroll_event_own_share_under_300ms" in hd_live:
+        passes.append("headless_dayroll_own_share")
+    else:
+        fails.append("headless_dayroll_own_share")
+    if HD_LIVE_GD.is_file() and "_test_redrop_counter_increments_on_hostile_drop" in hd_live:
+        passes.append("headless_redrop_behaviour")
+    else:
+        fails.append("headless_redrop_behaviour")
+    if HD_LIVE_GD.is_file() and "_test_depot_add_replans_only_touched_dests" in hd_live:
+        passes.append("headless_depot_subset_replans")
+    else:
+        fails.append("headless_depot_subset_replans")
     if HD_LIVE_GD.is_file() and "TEN_CAPTURE_FRAME_BUDGET_MS" not in hd_live:
         passes.append("headless_no_ten_capture_wall")
     else:
@@ -386,6 +402,39 @@ def build_perf4_daily_sim_tick_product() -> Dict[str, Any]:
         passes.append("access_enqueues_all_dests")
     else:
         fails.append("access_enqueues_all_dests")
+    if (
+        rel_fn
+        and "_relations_change_involves_supply_owner" in rel_fn
+        and "_plan_route" not in rel_fn
+        and "flush_pending_control_route_refresh" not in rel_fn
+        and "_refill_queued_dests" not in rel_fn
+    ):
+        passes.append("access_deferred_player_party")
+    else:
+        fails.append("access_deferred_player_party")
+    adv_fn = extract_gd_func_body(sm, "advance_supply_day")
+    flush_fn = extract_gd_func_body(sm, "flush_pending_control_route_refresh")
+    proc_fn = extract_gd_func_body(sm, "_process")
+    if (
+        adv_fn
+        and "_begin_day_roll_plan_deferral" in adv_fn
+        and flush_fn
+        and "_is_day_roll_plan_frame" in flush_fn
+        and proc_fn
+        and "_is_day_roll_plan_frame" in proc_fn
+    ):
+        passes.append("day_roll_defers_route_plans")
+    else:
+        fails.append("day_roll_defers_route_plans")
+    depot_patch = extract_gd_func_body(sm, "_patch_player_depot_hub")
+    if (
+        depot_patch
+        and "_enqueue_missing_and_affected_dests" in depot_patch
+        and "_enqueue_all_current_dests" not in depot_patch
+    ):
+        passes.append("depot_enqueues_touched_dests_only")
+    else:
+        fails.append("depot_enqueues_touched_dests_only")
     notify = extract_gd_func_body(sm, "notify_province_control_changed")
     if notify and "_pid_blocks_player_supply" in notify:
         passes.append("keep_old_routes_until_swap")
