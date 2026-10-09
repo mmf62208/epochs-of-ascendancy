@@ -2,6 +2,25 @@ class_name SupplyPathfinder
 extends RefCounted
 
 ## Multimodal supply paths: land columns, sealift (ports/sea), airlift (airports).
+##
+## PERF-4 FIX #4: binary min-heap + sorted neighbors + equal-cost predecessor-pid
+## tie-break. FIX #3 sorted the whole open set on every pop (O(n² log n)); a
+## large frontier after captures could take 0.9–9.3 s for one AI supply day.
+## Incremental refill now uses the same deterministic path as a full rebuild.
+
+static var last_search_pops: int = 0
+static var last_search_open_peak: int = 0
+static var last_search_ms: float = 0.0
+## Friendly-neighbor lists are stable until a control / infra change.
+static var _land_nbr_cache: Dictionary = {}
+static var _friendly_cache: Dictionary = {}
+static var _cache_owner_tag: String = ""
+
+
+static func clear_neighbor_cache() -> void:
+	_land_nbr_cache.clear()
+	_friendly_cache.clear()
+	_cache_owner_tag = ""
 
 
 static func find_route(
@@ -69,6 +88,62 @@ static func find_route_for_mode(
 	return plan
 
 
+static func _heap_less(a: Array, b: Array) -> bool:
+	var ca: float = float(a[0])
+	var cb: float = float(b[0])
+	if ca < cb:
+		return true
+	if ca > cb:
+		return false
+	return int(a[1]) < int(b[1])
+
+
+static func _heap_push(heap: Array, item: Array) -> void:
+	heap.append(item)
+	var i: int = heap.size() - 1
+	while i > 0:
+		var parent: int = int((i - 1) / 2)
+		var cur_item: Array = heap[i]
+		var par_item: Array = heap[parent]
+		if _heap_less(cur_item, par_item):
+			heap[parent] = cur_item
+			heap[i] = par_item
+			i = parent
+		else:
+			break
+
+
+static func _heap_pop(heap: Array) -> Array:
+	var result: Array = heap[0]
+	var last: Array = heap.pop_back()
+	if heap.is_empty():
+		return result
+	heap[0] = last
+	var i: int = 0
+	var n: int = heap.size()
+	while true:
+		var left: int = 2 * i + 1
+		var right: int = 2 * i + 2
+		var smallest: int = i
+		if left < n:
+			var left_item: Array = heap[left]
+			var small_item: Array = heap[smallest]
+			if _heap_less(left_item, small_item):
+				smallest = left
+		if right < n:
+			var right_item: Array = heap[right]
+			var small2: Array = heap[smallest]
+			if _heap_less(right_item, small2):
+				smallest = right
+		if smallest == i:
+			break
+		var tmp: Array = heap[i]
+		heap[i] = heap[smallest]
+		heap[smallest] = tmp
+		i = smallest
+	return result
+
+
 static func _mode_dijkstra(
 	mode: String,
 	source_id: int,
@@ -79,33 +154,46 @@ static func _mode_dijkstra(
 	hubs: Dictionary,
 	rules: SupplyRules,
 ) -> Array[int]:
+	last_search_pops = 0
+	last_search_open_peak = 1
+	var t0: int = Time.get_ticks_usec()
 	var dist: Dictionary = {source_id: 0.0}
 	var prev: Dictionary = {}
-	var open: Array = [[0.0, source_id]]
+	var open: Array = []
+	_heap_push(open, [0.0, source_id])
 
 	while not open.is_empty():
-		open.sort_custom(func(a, b): return a[0] < b[0])
-		var entry: Array = open.pop_front()
-		var cost: float = entry[0]
-		var pid: int = entry[1]
+		if open.size() > last_search_open_peak:
+			last_search_open_peak = open.size()
+		var entry: Array = _heap_pop(open)
+		last_search_pops += 1
+		var cost: float = float(entry[0])
+		var pid: int = int(entry[1])
 		if pid == target_id:
 			break
 		if cost > float(dist.get(pid, INF)):
 			continue
 
 		for neighbor_id in _supply_neighbors(mode, pid, owner_tag, provinces, adjacency, hubs, rules):
-			var edge_cost := _edge_cost_for_mode(mode, pid, neighbor_id, provinces, hubs, rules)
-			var new_cost := cost + edge_cost
-			if new_cost < float(dist.get(neighbor_id, INF)):
+			var edge_cost: float = _edge_cost_for_mode(mode, pid, neighbor_id, provinces, hubs, rules)
+			var new_cost: float = cost + edge_cost
+			var old_cost: float = float(dist.get(neighbor_id, INF))
+			if new_cost < old_cost:
 				dist[neighbor_id] = new_cost
 				prev[neighbor_id] = pid
-				open.append([new_cost, neighbor_id])
+				_heap_push(open, [new_cost, neighbor_id])
+			elif is_equal_approx(new_cost, old_cost) and prev.has(neighbor_id):
+				# Same length: keep the smaller predecessor pid so incremental
+				# refill matches a full rebuild (not first-found visit order).
+				if pid < int(prev[neighbor_id]):
+					prev[neighbor_id] = pid
 
+	last_search_ms = float(Time.get_ticks_usec() - t0) / 1000.0
 	if not dist.has(target_id):
 		return []
 
 	var path: Array[int] = [target_id]
-	var cur := target_id
+	var cur: int = target_id
 	while prev.has(cur):
 		cur = int(prev[cur])
 		path.push_front(cur)
@@ -168,6 +256,11 @@ static func _supply_neighbors(
 				if nh != null and nh.airport_level >= min_air:
 					out.append(nid)
 		_:
+			if _cache_owner_tag != owner_tag:
+				clear_neighbor_cache()
+				_cache_owner_tag = owner_tag
+			if _land_nbr_cache.has(pid):
+				return _land_nbr_cache[pid]
 			for nid in adjacency.get_land_neighbors(pid):
 				if _is_friendly(nid, owner_tag, provinces):
 					out.append(nid)
@@ -176,6 +269,13 @@ static func _supply_neighbors(
 					var np: Province = provinces.get(nid)
 					if np != null and not np.is_sea and _is_friendly(nid, owner_tag, provinces):
 						out.append(nid)
+			out.sort()
+			var stored: Array[int] = []
+			for stored_id in out:
+				stored.append(int(stored_id))
+			_land_nbr_cache[pid] = stored
+			return out
+	out.sort()
 	return out
 
 
@@ -275,29 +375,41 @@ static func _segment_mode(
 ## Own land, open sea, unowned land, OR transit rights (alliance / military access / basing / docking).
 ## Neutral foreign land without agreement blocks overland supply (East Prussia → Baltic sea path).
 static func _is_friendly(province_id: int, owner_tag: String, provinces: Dictionary) -> bool:
+	if _cache_owner_tag != owner_tag:
+		clear_neighbor_cache()
+		_cache_owner_tag = owner_tag
+	if _friendly_cache.has(province_id):
+		return bool(_friendly_cache[province_id])
 	var p: Province = provinces.get(province_id)
 	if p == null:
+		_friendly_cache[province_id] = false
 		return false
 	# Open water is always usable for sealift (enemy fleets handled via interdiction, not block).
 	if p.is_sea:
+		_friendly_cache[province_id] = true
 		return true
 	var ctrl := str(p.controller_tag).strip_edges().to_upper() if not str(p.controller_tag).is_empty() else str(p.owner_tag).strip_edges().to_upper()
 	if ctrl.is_empty():
+		_friendly_cache[province_id] = true
 		return true  # unowned land
 	var tag := owner_tag.strip_edges().to_upper()
 	if tag.is_empty():
+		_friendly_cache[province_id] = true
 		return true
 	if ctrl == tag:
+		_friendly_cache[province_id] = true
 		return true
 	# Diplomatic transit: alliance or explicit basing / military access / docking rights.
+	var ok: bool = false
 	if typeof(RelationsManager) != TYPE_NIL:
 		if RelationsManager.has_method("is_allied") and RelationsManager.is_allied(tag, ctrl):
-			return true
-		if RelationsManager.has_method("get_policy"):
+			ok = true
+		elif RelationsManager.has_method("get_policy"):
 			var pol: Dictionary = RelationsManager.get_policy(tag, ctrl)
 			if bool(pol.get("military_access", false)) \
 				or bool(pol.get("docking_rights", false)) \
 				or bool(pol.get("basing_rights", false)) \
 				or bool(pol.get("supply_transit", false)):
-				return true
-	return false
+				ok = true
+	_friendly_cache[province_id] = ok
+	return ok

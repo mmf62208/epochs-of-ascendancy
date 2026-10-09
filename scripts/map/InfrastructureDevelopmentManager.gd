@@ -963,8 +963,12 @@ func try_start_infrastructure_investment(province_id: int, investor_tag: String)
 	# Real Political Power / Mandate spend (high-value wiring for player investment loop)
 	var pp_cost := int(preview.get("cost_pp", 0))
 	if typeof(GameData) != TYPE_NIL:
-		# Validate Mandate (primary for infra)
-		var ps: Dictionary = GameData.get_peace_state() if GameData.has_method("get_peace_state") else {}
+		# Validate Mandate (primary for infra). PERF-4: peek, never deep-copy peace_state.
+		var ps: Dictionary = {}
+		if GameData.has_method("peek_peace_state"):
+			ps = GameData.peek_peace_state()
+		elif GameData.has_method("get_peace_state"):
+			ps = GameData.get_peace_state()
 		var current_mand := int(ps.get("mandate", {}).get(investor_tag, 0))
 		if current_mand < pp_cost:
 			return {"success": false, "reason": "Insufficient Mandate (%d < %d)" % [current_mand, pp_cost], "preview": preview}
@@ -1146,8 +1150,12 @@ func get_ix1_road_spine_mandate_cost() -> int:
 func get_ix1_displayed_mandate(tag: String = "GER") -> int:
 	## Live HUD / Invest gate read the raw peace_state map (empty → 0), not get_pillar's 50 baseline.
 	var t := tag.strip_edges().to_upper()
-	if typeof(GameData) != TYPE_NIL and GameData.has_method("get_peace_state"):
-		var ps: Dictionary = GameData.get_peace_state()
+	if typeof(GameData) != TYPE_NIL:
+		var ps: Dictionary = {}
+		if GameData.has_method("peek_peace_state"):
+			ps = GameData.peek_peace_state()
+		elif GameData.has_method("get_peace_state"):
+			ps = GameData.get_peace_state()
 		return int(ps.get("mandate", {}).get(t, 0))
 	return 0
 
@@ -2093,7 +2101,9 @@ func _capital_pid_for_tag(tag: String) -> int:
 
 func _pick_ai_infra_province(tag: String) -> int:
 	# Live F5: never walk get_provinces_by_owner / get_all_provinces (3520).
-	# Capital → a few capital neighbors → at most two cached border from_ids.
+	# Capital → a few capital neighbors → live-border from_ids (Maginot / CHI-JAP).
+	# Border scan is not gated by the neighbor budget — a high-infra capital
+	# neighborhood used to eat AI_INFRA_PICK_CAP and return FRA no_candidate.
 	if typeof(MapManager) == TYPE_NIL:
 		return 0
 	var t := tag.strip_edges().to_upper()
@@ -2103,20 +2113,26 @@ func _pick_ai_infra_province(tag: String) -> int:
 	if _ai_infra_pid_ok(cap_pid, t):
 		_ai_infra_provinces_considered += 1
 		return cap_pid
-	if cap_pid > 0 and MapManager.has_method("get_adjacent_provinces"):
-		var nbr: Array = MapManager.get_adjacent_provinces(cap_pid, true)
-		for pid_var in nbr:
-			if _ai_infra_provinces_considered >= AI_INFRA_PICK_CAP:
-				break
-			var pid := int(pid_var)
-			_ai_infra_provinces_considered += 1
-			if _ai_infra_pid_ok(pid, t):
-				return pid
+	if cap_pid > 0:
+		_ai_infra_provinces_considered += 1
+		if MapManager.has_method("get_adjacent_provinces"):
+			var nbr: Array = MapManager.get_adjacent_provinces(cap_pid, true)
+			var nbr_ids: Array = []
+			for pid_var in nbr:
+				nbr_ids.append(int(pid_var))
+			nbr_ids.sort()
+			for pid_v2 in nbr_ids:
+				if _ai_infra_provinces_considered >= AI_INFRA_PICK_CAP:
+					break
+				var pid := int(pid_v2)
+				_ai_infra_provinces_considered += 1
+				if _ai_infra_pid_ok(pid, t):
+					return pid
 	if MapManager.has_method("collect_live_border_assault_targets"):
+		# Always consider the live-border from_ids even if the capital
+		# neighborhood already spent AI_INFRA_PICK_CAP (FRA Maginot 710739).
 		var fronts: Array = MapManager.collect_live_border_assault_targets(t, 2)
 		for raw in fronts:
-			if _ai_infra_provinces_considered >= AI_INFRA_PICK_CAP:
-				break
 			if typeof(raw) != TYPE_DICTIONARY:
 				continue
 			var from_id := int((raw as Dictionary).get("from_province_id", 0))
