@@ -98,12 +98,18 @@ var flush_force_drop_dest: int = -1
 ## Routes dropped because they became hostile / obsolete. Flush FIFO swaps
 ## do not increment this; a live hostile capture must. Forced flush drops do.
 var network_route_redrop_count: int = 0
+## Flush-time livelock re-drops only (still-friendly dirty pid). Hostile
+## captures raise network_route_redrop_count, not this. Production flush
+## never increments it; a dirty-pid re-drop mutant must.
+var network_flush_livelock_redrop_count: int = 0
 ## True only while flush_pending_control_route_refresh is on the stack.
 var _flush_in_progress: bool = false
 ## FIX #7: process-frame id of the last day roll (or a deferred event).
 ## Flush / _process must not `_plan_route` on that frame; the next frames'
 ## 40 ms slice pops the FIFO. Relations/depot call the same deferral.
 var _day_roll_plan_frame: int = -1
+## FIX #8: at most one deferred leftover refill per process frame.
+var _refill_after_clock_queued: bool = false
 ## Sorted player dest hubs (excludes capital). Updated incrementally so a
 ## capture frame does not walk all 3k hubs.
 var _player_hub_ids: Array[int] = []
@@ -379,6 +385,10 @@ func _drop_routes_touching_pid(province_id: int) -> int:
 		_routes.erase(key)
 		_default_routes.erase(key)
 	_note_flush_redrop(drop_keys.size())
+	# Hostile notify runs outside flush. Only a flush that re-drops a
+	# still-friendly pid (FIX #4 livelock mutant) counts here.
+	if _flush_in_progress and drop_keys.size() > 0 and not _pid_blocks_player_supply(province_id):
+		network_flush_livelock_redrop_count += drop_keys.size()
 	return drop_keys.size()
 
 
@@ -609,13 +619,51 @@ func drain_pending_route_refresh() -> int:
 
 
 func _process(_delta: float) -> void:
-	if _is_day_roll_plan_frame():
+	# FIX #8: autoload #8 _process runs BEFORE TimeManager (#10) and
+	# TopInfoBar roll the day. Never `_plan_route` here — leftover FIFO
+	# dests would land on the roll frame (7/7 live, 6/6 headless).
+	if _should_skip_refill_this_frame():
+		return
+	if _refill_queue.is_empty():
+		return
+	if _should_use_interactive_light_supply():
+		return
+	if _refill_after_clock_queued:
+		return
+	_refill_after_clock_queued = true
+	call_deferred("_flush_refill_after_clock")
+
+
+func _flush_refill_after_clock() -> void:
+	_refill_after_clock_queued = false
+	if _should_skip_refill_this_frame():
 		return
 	if _refill_queue.is_empty():
 		return
 	if _should_use_interactive_light_supply():
 		return
 	flush_pending_control_route_refresh(ROUTE_REFRESH_BUDGET_PER_FLUSH)
+
+
+func _should_skip_refill_this_frame() -> bool:
+	if _is_day_roll_plan_frame():
+		return true
+	return _clock_will_cross_midnight_this_frame()
+
+
+func _clock_will_cross_midnight_this_frame() -> bool:
+	if typeof(TimeManager) == TYPE_NIL:
+		return false
+	if "paused" in TimeManager and bool(TimeManager.paused):
+		return false
+	var hour: int = 0
+	if "current_hour" in TimeManager:
+		hour = int(TimeManager.current_hour)
+	var scale: float = 1.0
+	if "time_scale" in TimeManager:
+		scale = maxf(float(TimeManager.time_scale), 0.1)
+	var hours_this_tick: int = mini(maxi(int(ceili(scale)), 1), 6)
+	return hour + hours_this_tick >= 24
 
 
 func _on_relations_or_access_changed(a: String = "", b: String = "", _snap: Dictionary = {}) -> void:
@@ -838,6 +886,7 @@ func get_network_topology_snapshot() -> Dictionary:
 		"dirty_n": _control_dirty_pids.size(),
 		"refill_queue_n": _refill_queue.size(),
 		"redrop_count": network_route_redrop_count,
+		"flush_livelock_redrop_count": network_flush_livelock_redrop_count,
 		"missing_dests": _missing_default_dest_count(),
 	}
 

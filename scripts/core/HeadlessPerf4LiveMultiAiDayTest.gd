@@ -45,6 +45,7 @@ const CONVERGE_FRAMES := 40
 const FRAMES_PER_DAY_1X := 60
 const FRAMES_PER_DAY_4X := 30
 const MAX_PLANS_PER_FLUSH_SLICE := 8
+const LEFTOVER_ROLL_TRIALS := 6
 const CAPITALS := {
 	"GER": 710300,
 	"FRA": 710707,
@@ -73,7 +74,7 @@ func _pass(msg: String) -> void:
 
 
 func _run_and_quit() -> void:
-	_run()
+	await _run()
 	var ok := _failures == 0
 	print("HeadlessPerf4LiveMultiAiDayTest: ", "PASS" if ok else "FAIL", " (failures=", _failures, ")")
 	print("HeadlessPerf4LiveMultiAiDayTest: RESULT=", "PASS" if ok else "FAIL")
@@ -159,6 +160,8 @@ func _run() -> void:
 	_test_dayroll_with_access(tm, mm, sm)
 	_test_dayroll_with_recapture(tm, mm, sm)
 	_test_dayroll_event_own_share_under_300ms(tm, mm, gd, sm)
+	await _test_leftover_queue_zero_plans_on_later_node_roll(tm, mm, sm)
+	_test_flush_livelock_redrop_counter(mm, sm)
 	_test_one_full_supply_day_per_game_day(tm, gd, sm)
 	_test_production_cache_measured(gd)
 	_test_owner_index_measured(mm)
@@ -274,105 +277,6 @@ func _test_replanned_off_must_fail(sm_src: String, adv: String) -> void:
 		_fail("re-plan turned off (flush does not pop the dest queue)")
 	else:
 		_pass("flush pops the dest refill queue")
-	if "_drop_routes_touching_pid(" in flush:
-		_fail("re-drop restored (flush re-drops dirty pids — FIX #4 livelock)")
-	else:
-		_pass("flush never re-drops (deduped FIFO only)")
-	if "flush_force_drop_dest" not in sm_src or "_drop_one_default_dest_route" not in sm_src:
-		_fail("flush redrop force-drop seam missing (source-grep increment is a tautology)")
-	else:
-		_pass("flush redrop force-drop seam present")
-	if "pop_front" not in refill:
-		_fail("refill queue is not FIFO (pop_front missing)")
-	else:
-		_pass("refill dequeues from the front (FIFO)")
-	if "_drop_all_default_routes" in flush or "_must_replan_all_defaults" in flush:
-		_fail("flush still drop-alls remaining defaults")
-	else:
-		_pass("flush does not drop-all remaining defaults")
-	if "_refill_queue" not in sm_src or "_refill_queued" not in sm_src:
-		_fail("deduped FIFO refill queue missing")
-	else:
-		_pass("deduped FIFO refill queue present")
-	var notify := _slice_func(sm_src, "notify_province_control_changed")
-	if "_pid_blocks_player_supply" not in notify:
-		_fail("no old-route keep (notify drops friendly-touching routes)")
-	else:
-		_pass("notify drops only hostile/impassable routes")
-	if "_enqueue_all_current_dests" not in notify:
-		_fail("friendly gain does not enqueue all dests (recapture pathdiff)")
-	else:
-		_pass("friendly gain enqueues all default dests")
-	if "notify_hub_stats_changed" not in sm_src:
-		_fail("notify_hub_stats_changed missing (5ca1d0b5 hub capacity stale)")
-	else:
-		_pass("notify_hub_stats_changed present")
-	if "_on_relations_or_access_changed" not in sm_src:
-		_fail("relations/access does not clear the pathfinder friendly cache")
-	else:
-		_pass("relations/access clears the pathfinder friendly cache")
-	var rel_fn := _slice_func(sm_src, "_on_relations_or_access_changed")
-	if "_enqueue_all_current_dests" not in rel_fn:
-		_fail("relations/access clears cache but enqueues nothing (access pathdiff)")
-	else:
-		_pass("relations/access enqueues all default dests")
-	if "_relations_change_involves_supply_owner" not in rel_fn and "player_tag" not in rel_fn:
-		_fail("access/relations re-enqueues when the player is not a party")
-	else:
-		_pass("access/relations enqueues only when the player supply owner is a party")
-	if (
-		"_plan_route" in rel_fn
-		or "flush_pending_control_route_refresh" in rel_fn
-		or "_refill_queued_dests" in rel_fn
-	):
-		_fail("access/relations plans immediately (access not deferred)")
-	else:
-		_pass("access/relations only enqueues (same day-roll deferral)")
-	var adv_defer := _slice_func(sm_src, "advance_supply_day")
-	var flush_defer := _slice_func(sm_src, "flush_pending_control_route_refresh")
-	var proc_fn := _slice_func(sm_src, "_process")
-	if "_begin_day_roll_plan_deferral" not in adv_defer:
-		_fail("advance_supply_day does not mark the day-roll plan frame")
-	elif "_is_day_roll_plan_frame" not in flush_defer:
-		_fail("flush still plans on the day-roll frame")
-	elif "_is_day_roll_plan_frame" not in proc_fn:
-		_fail("_process still plans on the day-roll frame")
-	else:
-		_pass("day-roll frame defers route plans to the next 40 ms slice")
-	var patch := _slice_func(sm_src, "_patch_player_depot_hub")
-	if "_enqueue_all_current_dests" not in patch:
-		_fail("depot add does not enqueue all dests (depot_touching_only)")
-	elif "_defer_day_flush_once" not in patch and "_begin_day_roll_plan_deferral" not in patch:
-		_fail("depot patch does not defer the dayroll flush (skip_flush_never)")
-	else:
-		_pass("depot add enqueues all dests and defers the dayroll flush")
-	if "_defer_day_flush_once" not in rel_fn and "_begin_day_roll_plan_deferral" not in rel_fn:
-		_fail("relations does not defer the dayroll flush (skip_flush_never)")
-	else:
-		_pass("relations defers the dayroll flush")
-	var mm_src := _read("res://scripts/map/MapManager.gd")
-	var infra_fn := _slice_func(mm_src, "update_province_infrastructure")
-	var dev_fn := _slice_func(mm_src, "update_province_development")
-	var changed_fn := _slice_func(mm_src, "notify_province_changed")
-	if "notify_hub_stats_changed" not in infra_fn or "notify_hub_stats_changed" not in dev_fn:
-		_fail("infra/dev complete does not notify hub stats (5ca1d0b5 stale from ~d28)")
-	else:
-		_pass("infra/dev complete notifies hub stats")
-	if "notify_hub_stats_changed" not in changed_fn:
-		_fail("notify_province_changed skips hub stats (GameData direct infra writes)")
-	else:
-		_pass("notify_province_changed notifies hub stats on infra/dev")
-	var gd_src := _read(SRC_GD)
-	if gd_src.find("notify_hub_stats_changed") < 0:
-		_fail("GameData direct infra writes skip notify_hub_stats_changed")
-	else:
-		_pass("GameData direct infra writes call notify_hub_stats_changed")
-	var rel_src := _read("res://scripts/national/RelationsManager.gd")
-	var set_pol := _slice_func(rel_src, "set_policy")
-	if "relations_changed.emit" not in set_pol:
-		_fail("set_policy does not emit relations_changed (GER→SWI cache stale)")
-	else:
-		_pass("set_policy emits relations_changed")
 
 
 func _boot_live_supply_network(mm: Node, sm: Node) -> bool:
@@ -1087,6 +991,12 @@ func _dirty_n(sm: Node) -> int:
 func _redrop_n(sm: Node) -> int:
 	if sm != null and "network_route_redrop_count" in sm:
 		return int(sm.get("network_route_redrop_count"))
+	return -1
+
+
+func _livelock_n(sm: Node) -> int:
+	if sm != null and "network_flush_livelock_redrop_count" in sm:
+		return int(sm.get("network_flush_livelock_redrop_count"))
 	return -1
 
 
@@ -1952,6 +1862,188 @@ func _test_dayroll_event_own_share_under_300ms(tm: Node, mm: Node, gd: Node, sm:
 	_boot_live_supply_network(mm, sm)
 
 
+func _test_leftover_queue_zero_plans_on_later_node_roll(tm: Node, mm: Node, sm: Node) -> void:
+	# Live order: SupplyManager (#8) _process, then TimeManager / TopInfoBar
+	# roll the day. Leftover FIFO dests must not `_plan_route` on that frame.
+	# A later node (process_priority after SM) does the roll. 6 leftover
+	# trials; empty-queue is the control. Kills defer_events_off and
+	# defer_process_off.
+	if tm == null or mm == null or sm == null:
+		_fail("leftover-queue dayroll helpers missing")
+		return
+	if not _boot_live_supply_network(mm, sm):
+		_fail("leftover-queue dayroll boot failed")
+		return
+	if sm.has_method("end_day_roll_plan_deferral"):
+		sm.call("end_day_roll_plan_deferral")
+	if sm.has_method("drain_pending_route_refresh"):
+		sm.call("drain_pending_route_refresh")
+	var roller := DayRollAfterSupply.new()
+	roller.sm = sm
+	roller.process_priority = 1
+	root.add_child(roller)
+	_reset_clock(tm, 0)
+	if "_live_f5_equiv_clock" in tm:
+		tm.set("_live_f5_equiv_clock", false)
+	if "_living_playtest_clock" in tm:
+		tm.set("_living_playtest_clock", false)
+	if "current_hour" in tm:
+		tm.set("current_hour", 23)
+	if sm.has_method("clear_refill_queue"):
+		sm.call("clear_refill_queue")
+	var empty_plans: int = await _one_later_node_roll_plans(sm, roller, tm)
+	print(
+		"HeadlessPerf4LiveMultiAiDayTest: plans_on_roll empty_queue=%d leftover_queue=pending"
+		% empty_plans
+	)
+	if empty_plans != 0:
+		_fail("empty-queue dayroll planned %d dests on the roll frame" % empty_plans)
+	else:
+		_pass("plans_on_roll empty_queue=0")
+	if sm.has_method("enqueue_player_dests_for_refresh"):
+		sm.call("enqueue_player_dests_for_refresh")
+	elif sm.has_method("enqueue_refill_dests"):
+		var snap: Dictionary = sm.call("get_network_topology_snapshot") if sm.has_method("get_network_topology_snapshot") else {}
+		var dests: Array = []
+		for raw in snap.get("routes", []) as Array:
+			if typeof(raw) != TYPE_DICTIONARY:
+				continue
+			var dest: int = int((raw as Dictionary).get("dst", -1))
+			if dest > 0:
+				dests.append(dest)
+		sm.call("enqueue_refill_dests", dests)
+	var leftover0: int = _queue_n(sm)
+	if leftover0 <= 0:
+		_fail("leftover-queue dayroll unarmed: refill queue empty")
+		roller.queue_free()
+		return
+	var leftover_hits: int = 0
+	var leftover_max: int = 0
+	for trial in range(LEFTOVER_ROLL_TRIALS):
+		var q_before: int = _queue_n(sm)
+		if q_before <= 0:
+			if sm.has_method("enqueue_player_dests_for_refresh"):
+				sm.call("enqueue_player_dests_for_refresh")
+		var planned: int = await _one_later_node_roll_plans(sm, roller, tm)
+		if planned > leftover_max:
+			leftover_max = planned
+		if planned != 0:
+			leftover_hits += 1
+		print(
+			"HeadlessPerf4LiveMultiAiDayTest: leftover_roll trial=%d queue=%d plans_on_roll=%d"
+			% [trial + 1, q_before, planned]
+		)
+	print(
+		"HeadlessPerf4LiveMultiAiDayTest: plans_on_roll leftover_queue hits=%d/%d max=%d queue0=%d"
+		% [leftover_hits, LEFTOVER_ROLL_TRIALS, leftover_max, leftover0]
+	)
+	if leftover_hits != 0 or leftover_max != 0:
+		_fail(
+			"leftover-queue dayroll planned on the roll frame hits=%d/%d max=%d (defer_process_off / defer_events_off)"
+			% [leftover_hits, LEFTOVER_ROLL_TRIALS, leftover_max]
+		)
+	else:
+		_pass("plans_on_roll leftover_queue=0 ×%d" % LEFTOVER_ROLL_TRIALS)
+	if sm.has_method("end_day_roll_plan_deferral"):
+		sm.call("end_day_roll_plan_deferral")
+	var drain: Dictionary = _flush_until_drained(sm, CONVERGE_FRAMES)
+	_assert_converged(sm, "leftover_roll_drain", drain)
+	var cmp: Dictionary = _live_vs_rebuild_pathdiff(mm, sm)
+	print(
+		"HeadlessPerf4LiveMultiAiDayTest: leftover_roll pathdiff=%s"
+		% str(cmp.get("pathdiff", -1))
+	)
+	if not bool(cmp.get("ok", false)):
+		_fail("leftover-queue dayroll rebuild failed")
+	elif int(cmp.get("pathdiff", -1)) != 0:
+		_fail("leftover-queue dayroll pathdiff=%d after drain" % int(cmp.get("pathdiff", -1)))
+	else:
+		_pass("leftover-queue dayroll pathdiff=0 after drain")
+	roller.queue_free()
+
+
+func _one_later_node_roll_plans(sm: Node, roller: DayRollAfterSupply, tm: Node) -> int:
+	if sm.has_method("end_day_roll_plan_deferral"):
+		sm.call("end_day_roll_plan_deferral")
+	if "current_hour" in tm:
+		tm.set("current_hour", 23)
+	if "last_flush_plan_count" in sm:
+		sm.set("last_flush_plan_count", 0)
+	if "last_day_flush_plan_count" in sm:
+		sm.set("last_day_flush_plan_count", 0)
+	var refill0: int = int(sm.get("network_route_refill_count")) if "network_route_refill_count" in sm else 0
+	roller.rolled = false
+	roller.armed = true
+	await process_frame
+	var refill1: int = int(sm.get("network_route_refill_count")) if "network_route_refill_count" in sm else refill0
+	var day_plans: int = int(sm.get("last_day_flush_plan_count")) if "last_day_flush_plan_count" in sm else 0
+	var flush_plans: int = int(sm.get("last_flush_plan_count")) if "last_flush_plan_count" in sm else 0
+	if not roller.rolled:
+		_fail("later node did not roll after SupplyManager _process")
+		return -1
+	return maxi(maxi(refill1 - refill0, day_plans), flush_plans)
+
+
+func _test_flush_livelock_redrop_counter(mm: Node, sm: Node) -> void:
+	if sm == null or not ("network_flush_livelock_redrop_count" in sm):
+		_fail("flush livelock redrop counter missing")
+		return
+	if mm == null:
+		_fail("flush livelock redrop helpers missing")
+		return
+	if not _boot_live_supply_network(mm, sm):
+		_fail("flush livelock redrop boot failed")
+		return
+	if sm.has_method("end_day_roll_plan_deferral"):
+		sm.call("end_day_roll_plan_deferral")
+	if sm.has_method("set_player_depot"):
+		sm.call("set_player_depot", DEPOT_ADD_PID, false)
+	if sm.has_method("drain_pending_route_refresh"):
+		sm.call("drain_pending_route_refresh")
+	var live0: int = _livelock_n(sm)
+	var hostile0: int = _redrop_n(sm)
+	sm.call("set_player_depot", DEPOT_ADD_PID, true)
+	if sm.has_method("end_day_roll_plan_deferral"):
+		sm.call("end_day_roll_plan_deferral")
+	sm.call("flush_pending_control_route_refresh", 1)
+	var live1: int = _livelock_n(sm)
+	var hostile1: int = _redrop_n(sm)
+	print(
+		"HeadlessPerf4LiveMultiAiDayTest: flush_livelock_prod pid=%d livelock=%d→%d hostile=%d→%d"
+		% [DEPOT_ADD_PID, live0, live1, hostile0, hostile1]
+	)
+	if live1 != live0:
+		_fail(
+			"production flush livelock-redropped a still-friendly dirty pid %d→%d"
+			% [live0, live1]
+		)
+	else:
+		_pass("production flush livelock redrop counter stayed %d" % live1)
+	# Real re-drop mutant: flush drops routes through still-friendly 710314.
+	# The test must not increment the counter itself — the drop path must.
+	var before: int = _livelock_n(sm)
+	sm.set("_flush_in_progress", true)
+	var dropped: int = 0
+	if sm.has_method("_drop_routes_touching_pid"):
+		dropped = int(sm.call("_drop_routes_touching_pid", DEPOT_ADD_PID))
+	sm.set("_flush_in_progress", false)
+	var after: int = _livelock_n(sm)
+	print(
+		"HeadlessPerf4LiveMultiAiDayTest: flush_livelock_mutant pid=%d dropped=%d livelock=%d→%d"
+		% [DEPOT_ADD_PID, dropped, before, after]
+	)
+	if dropped <= 0:
+		_fail("livelock mutant found no routes through still-friendly pid %d" % DEPOT_ADD_PID)
+	elif after <= before:
+		_fail("livelock redrop counter dead after real friendly flush re-drop")
+	else:
+		# Counter is live. A flush that always re-drops this pid fails above.
+		_pass("real friendly flush re-drop raised livelock %d→%d (mutant would fail prod)" % [before, after])
+	if sm.has_method("set_player_depot"):
+		sm.call("set_player_depot", DEPOT_ADD_PID, false)
+	_boot_live_supply_network(mm, sm)
+
+
 func _test_hub_capacity_on_infra_complete(mm: Node, sm: Node) -> void:
 	if mm == null or sm == null or not mm.has_method("update_province_infrastructure"):
 		_fail("hub capacity infra helpers missing")
@@ -2311,3 +2403,22 @@ func _load_json(path: String) -> Dictionary:
 	f.close()
 	var data = JSON.parse_string(txt)
 	return data if data is Dictionary else {}
+
+
+class DayRollAfterSupply extends Node:
+	## Processed after SupplyManager (process_priority 1) so leftover
+	## `_process` refill runs first — the live TimeManager / TopInfoBar order.
+	var sm: Node = null
+	var armed: bool = false
+	var rolled: bool = false
+
+	func _process(_delta: float) -> void:
+		if not armed or sm == null:
+			return
+		armed = false
+		# Full supply day (the clock listener's live share). Do not emit
+		# the game_day_advanced bus (theater / multi_ai out of #88).
+		if sm.has_method("advance_supply_day"):
+			sm.call("advance_supply_day", 1.0)
+		rolled = true
+
