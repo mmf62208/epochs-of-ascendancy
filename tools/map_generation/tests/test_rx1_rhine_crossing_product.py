@@ -124,6 +124,25 @@ class TestRx1RhineCrossingProduct(unittest.TestCase):
         self.assertTrue(panel.get("no_reoffer"), msg=panel)
         self.assertTrue(panel.get("bridge_scope"), msg=panel)
 
+    def test_rhine_name_above_far_ceiling(self) -> None:
+        layer_path = ROOT / "scripts" / "map" / "Rx1RhineLayer.gd"
+        road_path = ROOT / "scripts" / "map" / "RoadTierVisual.gd"
+        layer = layer_path.read_text(encoding="utf-8")
+        road = road_path.read_text(encoding="utf-8")
+        self.assertIn("const ZOOM_FAR_MAX := 1.15", road)
+        self.assertIn("const END_LABEL_ZOOM_MIN := 1.50", road)
+        self.assertIn('const RHINE_LABEL := "Rhine"', layer)
+        self.assertIn("const RHINE_LABEL_ALONG := 0.84", layer)
+        self.assertIn("static func rhine_label_visible_at_zoom", layer)
+        self.assertIn("return z > _Road.ZOOM_FAR_MAX", layer)
+        draw = layer[layer.find("func _draw") : layer.find("static func rhine_label_visible_at_zoom")]
+        self.assertIn("rhine_label_visible_at_zoom(_canvas_zoom())", draw)
+        self.assertIn("_draw_rhine_name(pts)", draw)
+        self.assertIn("draw_string", layer)
+        self.assertIn("const RIVER_SCREEN_PX := 7.0", layer)
+        self.assertIn("const HALO_SCREEN_PX := 14.0", layer)
+        self.assertIn("const MAP_BELOW_UNITS_Z := 22", layer)
+
     def test_fresh_checkout_launch_imports_class_cache(self) -> None:
         fresh = fresh_checkout_launch()
         self.assertTrue(fresh.get("ok"), msg=fresh)
