@@ -109,14 +109,15 @@ static func country_border_alpha(t: Tier) -> float:
 			return 0.92
 
 
-static func coast_border_width(t: Tier) -> float:
-	match t:
-		Tier.STRATEGIC:
-			return 1.4
-		Tier.OPERATIONAL:
-			return 1.2
-		_:
-			return 1.0
+## Shore ink in screen pixels. World width is this / camera zoom so Europe
+## Home (~0.318) still shows a coast. Same-owner ProvEdge_ stays tactical-only.
+const COAST_SCREEN_PX := 4.5
+
+static func coast_border_width_for_zoom(zoom: float) -> float:
+	var z := zoom
+	if not is_finite(z):
+		z = 1.0
+	return COAST_SCREEN_PX / maxf(z, 0.04)
 
 
 ## Subtle same-owner province edges — tactical only (avoids NUTS spiderweb at operational).

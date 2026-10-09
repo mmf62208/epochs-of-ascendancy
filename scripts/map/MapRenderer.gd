@@ -207,7 +207,7 @@ const UI_MAP_TOOLBAR_HEIGHT := 56.0
 ## Never stroke every unmatched GIS edge in owner color — that creates the NUTS spiderweb.
 const COUNTRY_BORDER_COLOR := Color(0.04, 0.05, 0.08, 0.94)
 const COUNTRY_BORDER_WIDTH := 3.2
-const COAST_BORDER_COLOR := Color(0.02, 0.04, 0.08, 0.55)
+const COAST_BORDER_COLOR := Color(0.02, 0.04, 0.08, 0.94)
 const PROVINCE_INTERNAL_BORDER_COLOR := Color(0.08, 0.09, 0.12, 0.22)
 const COUNTRY_FRONTIER_PREFIX := "CountryFrontier_"
 const COAST_FRONTIER_PREFIX := "CoastEdge_"
@@ -440,6 +440,7 @@ var _btn_attack: Button = null
 var _btn_open_fight: Button = null
 var border_layer: Node2D = null
 var _border_lod_tier_built: int = -999  # last tier used when frontiers were rebuilt
+var _coast_ink_zoom_applied: float = -1.0
 var _political_labels_layer: Node2D = null
 var _political_labels_rebuild_pending: bool = false
 var _region_highlight_layer: Node2D = null
@@ -3605,6 +3606,7 @@ func _process(delta: float) -> void:
 	if not _left_pan_active and _left_drag_should_pan():
 		_activate_left_drag_pan_from_slop()
 	_handle_camera_input(delta)
+	_apply_coast_ink_width()
 	# Active empty-area drag must apply; Close lock cannot snap the camera back.
 	# CLOSE-1b: first top-edge after a mid-panel Close must also stick — do not
 	# reassert GIS lock on the same frame edge-pan applied a delta (Play
@@ -15579,7 +15581,8 @@ func _sync_border_lod(tier: int) -> void:
 		_border_lod_tier_built = tier
 	var w: float = MapZoomLODScript.country_border_width(tier)
 	var a: float = MapZoomLODScript.country_border_alpha(tier)
-	var cw: float = MapZoomLODScript.coast_border_width(tier)
+	var coast_z := _coast_zoom_now()
+	var cw: float = MapZoomLODScript.coast_border_width_for_zoom(coast_z)
 	var iw: float = MapZoomLODScript.province_internal_border_width(tier)
 	for child in border_layer.get_children():
 		if not (child is Line2D):
@@ -15596,6 +15599,7 @@ func _sync_border_lod(tier: int) -> void:
 		elif nm.begins_with(PROVINCE_EDGE_PREFIX):
 			seg.width = iw
 			seg.visible = want_internal
+	_coast_ink_zoom_applied = coast_z
 
 
 func _get_camera_world_rect(margin_ratio: float = 0.10) -> Rect2:
@@ -31901,7 +31905,8 @@ func _sync_shared_edge_frontiers(_scan_pids: Array) -> void:
 	var show_internal := MapZoomLODScript.show_province_internal_borders(_map_lod_tier)
 	var intl_w: float = MapZoomLODScript.country_border_width(_map_lod_tier)
 	var intl_a: float = MapZoomLODScript.country_border_alpha(_map_lod_tier)
-	var coast_w: float = MapZoomLODScript.coast_border_width(_map_lod_tier)
+	var coast_z := _coast_zoom_now()
+	var coast_w: float = MapZoomLODScript.coast_border_width_for_zoom(coast_z)
 	var internal_w: float = MapZoomLODScript.province_internal_border_width(_map_lod_tier)
 	var seg_idx := 0
 	var coast_idx := 0
@@ -31967,7 +31972,30 @@ func _sync_shared_edge_frontiers(_scan_pids: Array) -> void:
 			iseg.z_index = 0
 			border_layer.add_child(iseg)
 			internal_idx += 1
+	_coast_ink_zoom_applied = coast_z
 
+
+func _coast_zoom_now() -> float:
+	var z := _get_camera_zoom()
+	if not is_finite(z):
+		z = 1.0
+	return maxf(z, 0.04)
+
+
+## Zoom only retints existing CoastEdge_ width. Do not rebuild frontiers.
+func _apply_coast_ink_width() -> void:
+	if border_layer == null or not is_instance_valid(border_layer):
+		return
+	var z := _coast_zoom_now()
+	if _coast_ink_zoom_applied > 0.0 and absf(z - _coast_ink_zoom_applied) < 0.008:
+		return
+	var cw := MapZoomLODScript.coast_border_width_for_zoom(z)
+	_coast_ink_zoom_applied = z
+	for child in border_layer.get_children():
+		if not (child is Line2D):
+			continue
+		if str(child.name).begins_with(COAST_FRONTIER_PREFIX):
+			(child as Line2D).width = cw
 
 
 func _live_owner_tag(province_id: int) -> String:

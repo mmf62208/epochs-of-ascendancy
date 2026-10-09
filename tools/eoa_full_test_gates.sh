@@ -114,6 +114,7 @@ run_step unit_board_play_path \
     tools.map_generation.tests.test_map_state_labels_surface_product \
     tools.map_generation.tests.test_map_nation_label_landmass_product \
     tools.map_generation.tests.test_map_live_border_fronts_surface_product \
+    tools.map_generation.tests.test_shore1_coast_ink_product \
     tools.map_generation.tests.test_map_supply_corridor_product \
     tools.map_generation.tests.test_map_supply_hub_brief_product \
     tools.map_generation.tests.test_hoi_full_test_gap_matrix_product \
