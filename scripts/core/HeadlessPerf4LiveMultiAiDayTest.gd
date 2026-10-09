@@ -1882,6 +1882,8 @@ func _test_leftover_queue_zero_plans_on_later_node_roll(tm: Node, mm: Node, sm: 
 	roller.sm = sm
 	roller.process_priority = 1
 	root.add_child(roller)
+	# First process frame after add_child can skip the new node.
+	await process_frame
 	_reset_clock(tm, 0)
 	if "_live_f5_equiv_clock" in tm:
 		tm.set("_live_f5_equiv_clock", false)
