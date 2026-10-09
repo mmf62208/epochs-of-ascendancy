@@ -4,7 +4,7 @@ Window **1280×740** Absolute **@(0, 29)** · GER 1936 · `world_accurate`.
 Do **not** raise the window. Do **not** use Ctrl.
 Headless / xvfb ≠ live Play.
 
-**Code SHA:** product `977c9a841524c7e1a41f16722a00dc414b0a7533` (FIX #2, unedited). FIX #3 is **tests / docs only**. Guard **PASS** failures=0. Pure main `61a80433` **FAIL** by leftover Köln / unit (T1–T7, news T1/T3/T5, T10, T11). See `docs/CURRENT_STATE.md` INPUT-1 FIX #3.
+**Code SHA:** LeaderEventUI FIX #4 on this branch (MapRenderer / MainMenu still `977c9a84`). Guard **PASS** failures=0. Pure main `61a80433` and FIX #3 tip `b64b98f3` **FAIL** T12a–c same-spot pid=-1. See `docs/CURRENT_STATE.md` INPUT-1 FIX #4.
 
 ## Pre-step
 
@@ -28,6 +28,14 @@ Screen x = client x + **0**.
 5. Open **Command Center** (Esc when idle, or menu). Click panel **✕**.
    Expect the same: CC closes, map under ✕ does **not** pick. Next click
    selects normally.
+5b. Wait for an **Infrastructure Complete** News card with a **Notice:
+    Investment complete in …** card under it (same pair as
+    `InfrastructureDevelopmentManager` 571–573). At **z0.9**, close the
+    News **×**. Without moving the mouse, click the same spot at about
+    **1 s**: the map under it must select. Then move the mouse away and
+    back, and click the Notice **body**: nothing is selected. If two
+    Notices are stacked, the same still-click after the top × must
+    select (the survivor × must not poll-close).
 
 ## 1280×740 close points (approx)
 
