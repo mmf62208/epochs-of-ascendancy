@@ -675,17 +675,24 @@ func peek_roll_window_plans() -> int:
 
 
 func _should_skip_refill_this_frame() -> bool:
-	return _is_day_roll_plan_frame()
+	if _is_day_roll_plan_frame():
+		return true
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("day_rolled_this_frame"):
+		return bool(TimeManager.call("day_rolled_this_frame"))
+	return false
 
 
 func note_clock_order(phase: String) -> void:
 	if not _clock_order_enabled and OS.get_environment("EOA_PERF4_CLOCK_ORDER") != "1":
 		return
+	var rolled: bool = _is_day_roll_plan_frame()
+	if not rolled and typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("day_rolled_this_frame"):
+		rolled = bool(TimeManager.call("day_rolled_this_frame"))
 	var line: String = "PERF4_CLOCK_ORDER phase=%s frame=%d msec=%d roll=%s" % [
 		phase,
 		Engine.get_process_frames(),
 		Time.get_ticks_msec(),
-		"1" if _is_day_roll_plan_frame() else "0",
+		"1" if rolled else "0",
 	]
 	clock_order_log.append(line)
 	print(line)

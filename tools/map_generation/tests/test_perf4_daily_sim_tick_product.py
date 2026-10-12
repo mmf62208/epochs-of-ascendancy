@@ -95,6 +95,7 @@ class TestPerf4DailySimTickProduct(unittest.TestCase):
             "headless_leftover_queue_roll",
             "headless_leftover_queue_topbar_clock",
             "headless_leftover_queue_scene_order",
+            "headless_leftover_queue_windowed_backup",
             "headless_event_frame_leftover",
             "headless_midnight_guess_gone",
             "headless_flush_livelock_redrop",
@@ -210,6 +211,10 @@ class TestPerf4DailySimTickProduct(unittest.TestCase):
         self.assertIn("_test_leftover_queue_zero_plans_on_scene_order", hd)
         self.assertIn("SCENE_ORDER_ROLL_TRIALS", hd)
         self.assertIn("SceneOrderMapRenderer", hd)
+        self.assertIn("_test_leftover_queue_zero_plans_on_windowed_backup", hd)
+        self.assertIn("WINDOWED_BACKUP_ROLL_TRIALS", hd)
+        self.assertIn("_force_windowed_backup_clock", hd)
+        self.assertIn("tm_calendar_roll", hd)
         self.assertIn("_test_event_frame_zero_plans_non_roll", hd)
         self.assertIn("TOPBAR_SCENE", hd)
         self.assertIn("DAYROLL_OWN_SHARE_BUDGET_MS", hd)
@@ -226,9 +231,20 @@ class TestPerf4DailySimTickProduct(unittest.TestCase):
         self.assertNotIn("is_tick_due_this_frame", proc)
         self.assertIn("func refill_after_clock", sm)
         self.assertIn("plans_on_roll_frame", sm)
+        self.assertIn("day_rolled_this_frame", extract_gd_func_body(sm, "_should_skip_refill_this_frame"))
         tib = (ROOT / "scripts" / "ui" / "TopInfoBar.gd").read_text(encoding="utf-8")
         self.assertIn("_refill_supply_after_clock", extract_gd_func_body(tib, "_process"))
         self.assertIn("refill_after_clock", tib)
+        self.assertIn("day_rolled_this_frame", extract_gd_func_body(tib, "_refill_supply_after_clock"))
+        tm = (ROOT / "scripts" / "autoload" / "TimeManager.gd").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("func day_rolled_this_frame", tm)
+        self.assertIn("_mark_calendar_day_roll", tm)
+        self.assertIn("maybe_run_windowed_backup_clock", tm)
+        self.assertIn("tm_calendar_roll", tm)
+        self.assertIn("BACKUP_CLOCK_STARVE_MS", tm)
+        self.assertIn("_mark_calendar_day_roll", extract_gd_func_body(tm, "advance_days"))
 
     def test_live_multi_ai_harness_exists(self) -> None:
         hd = ROOT / "scripts" / "core" / "HeadlessPerf4LiveMultiAiDayTest.gd"

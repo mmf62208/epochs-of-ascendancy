@@ -991,7 +991,12 @@ func _refill_supply_after_clock() -> void:
 		return
 	if sm.has_method("note_clock_order"):
 		sm.call("note_clock_order", "tib_clock")
-	if sm.has_method("is_day_roll_plan_deferred") and bool(sm.call("is_day_roll_plan_deferred")):
+	var rolled: bool = false
+	if sm.has_method("is_day_roll_plan_deferred"):
+		rolled = bool(sm.call("is_day_roll_plan_deferred"))
+	if not rolled and typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("day_rolled_this_frame"):
+		rolled = bool(TimeManager.call("day_rolled_this_frame"))
+	if rolled:
 		if sm.has_method("note_clock_order"):
 			sm.call("note_clock_order", "tib_skip_refill")
 		return

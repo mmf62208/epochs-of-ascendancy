@@ -84,6 +84,13 @@ var _live_f5_equiv_clock: bool = false
 var _draining_f5_flush: bool = false
 ## Wall-clock last advance_real_time (msec). Windowed Play fallback if TopInfoBar skips a tick.
 var _last_advance_real_msec: int = 0
+## Process-frame id of the last calendar day boundary (set in advance_days
+## before the deferred `_flush_sim_events`). Refill skips on this frame.
+var _day_rolled_frame: int = -1
+## Test seam: run the windowed backup clock under headless and even while
+## TopInfoBar is live (reproduces the FIX #10 live race).
+var _force_windowed_backup_clock: bool = false
+const BACKUP_CLOCK_STARVE_MS: int = 2000
 ## Soft budget (ms) for deferred sim work per frame — keeps pan/hover live past month ends.
 const INTERACTIVE_SIM_FLUSH_BUDGET_MS := 10
 ## PERF-4: worst daily-tick frame budget (live 1x / live-F5-equiv). Aim < 250ms.
@@ -133,18 +140,84 @@ func _process(_delta: float) -> void:
 	# Windowed Play only: if unpaused but TopInfoBar lost a tick (busy latch /
 	# swallowed click race), keep the hour hand moving. Headless -s stays manual.
 	# Do not self-drive during load / living title (Begin still start-paused).
+	# FIX #11: one clock owner — stay off while TopInfoBar is ticking; the
+	# safety net only fires after BACKUP_CLOCK_STARVE_MS with no TIB tick.
+	maybe_run_windowed_backup_clock()
+
+
+func maybe_run_windowed_backup_clock() -> bool:
 	if paused:
-		return
-	if DisplayServer.get_name() == "headless" or OS.has_feature("dedicated_server"):
-		return
-	if not living_title_has_closed():
-		return
-	var now_ms := Time.get_ticks_msec()
+		return false
+	if not _windowed_backup_clock_allowed():
+		return false
+	if not _force_windowed_backup_clock and not living_title_has_closed():
+		return false
+	var now_ms: int = Time.get_ticks_msec()
 	if _last_advance_real_msec <= 0:
 		_last_advance_real_msec = now_ms
+		return false
+	if _backup_clock_blocked_by_top_bar(now_ms):
+		return false
+	if now_ms - _last_advance_real_msec < 1000:
+		return false
+	advance_real_time(1.0)
+	return true
+
+
+func _windowed_backup_clock_allowed() -> bool:
+	if _force_windowed_backup_clock:
+		return true
+	if DisplayServer.get_name() == "headless" or OS.has_feature("dedicated_server"):
+		return false
+	return true
+
+
+func _backup_clock_blocked_by_top_bar(now_ms: int) -> bool:
+	if _force_windowed_backup_clock:
+		return false
+	var bar: Node = _find_live_top_info_bar()
+	if bar == null or not is_instance_valid(bar):
+		return false
+	if bar.is_queued_for_deletion() or not bar.is_processing():
+		return false
+	if "is_paused" in bar and bool(bar.get("is_paused")):
+		return false
+	var last_tick: int = 0
+	if "_last_sim_tick_msec" in bar:
+		last_tick = int(bar.get("_last_sim_tick_msec"))
+	if last_tick <= 0:
+		return true
+	return now_ms - last_tick <= BACKUP_CLOCK_STARVE_MS
+
+
+func _find_live_top_info_bar() -> Node:
+	var tree := get_tree()
+	if tree == null or tree.root == null:
+		return null
+	var matches: Array[Node] = tree.root.find_children("TopInfoBar", "", true, false)
+	for n in matches:
+		if n != null and is_instance_valid(n) and not n.is_queued_for_deletion():
+			return n
+	return null
+
+
+func day_rolled_this_frame() -> bool:
+	return _day_rolled_frame == Engine.get_process_frames()
+
+
+func _mark_calendar_day_roll() -> void:
+	# FIX #11: mark at the calendar boundary, before deferred `_flush_sim_events`.
+	# game_day_advanced used to set SupplyManager's skip too late.
+	_day_rolled_frame = Engine.get_process_frames()
+	var sm: Node = get_node_or_null("/root/SupplyManager")
+	if sm == null:
 		return
-	if now_ms - _last_advance_real_msec >= 1000:
-		advance_real_time(1.0)
+	if sm.has_method("_begin_day_roll_plan_deferral"):
+		sm.call("_begin_day_roll_plan_deferral")
+	if sm.has_method("_note_day_roll_plan_window"):
+		sm.call("_note_day_roll_plan_window")
+	if sm.has_method("note_clock_order"):
+		sm.call("note_clock_order", "tm_calendar_roll")
 
 ## Called by ScenarioLoader when a scenario is loaded.
 ## Parses "YYYY-MM-DD" (falls back gracefully to year-only).
@@ -912,6 +985,10 @@ func advance_days(days: float) -> void:
 		return
 
 	_accumulated_game_days -= days_to_advance
+
+	# FIX #11: mark before listeners / deferred flush so leftover refill
+	# skips on this frame even when game_day_advanced is call_deferred.
+	_mark_calendar_day_roll()
 
 	var light := is_interactive_light_sim()
 	for i in days_to_advance:

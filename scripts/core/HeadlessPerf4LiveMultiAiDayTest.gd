@@ -50,6 +50,7 @@ const LEFTOVER_ROLL_TRIALS := 6
 const SCENE_ORDER_ROLL_TRIALS := 7
 const SCENE_ORDER_BURN_MS := 120
 const SCENE_ORDER_TICK_LAG_MS := 900
+const WINDOWED_BACKUP_ROLL_TRIALS := 7
 const CAPITALS := {
 	"GER": 710300,
 	"FRA": 710707,
@@ -141,6 +142,9 @@ func _run() -> void:
 	if OS.get_environment("EOA_PERF4_SCENE_ORDER_ONLY") == "1":
 		await _test_leftover_queue_zero_plans_on_scene_order(tm, mm, sm)
 		return
+	if OS.get_environment("EOA_PERF4_WINDOWED_BACKUP_ONLY") == "1":
+		await _test_leftover_queue_zero_plans_on_windowed_backup(tm, mm, sm)
+		return
 	_test_step_costs(gd, sm, tm)
 	_test_repeated_real_depot_guard(sm)
 	_test_capture_frame_budgets(mm, sm)
@@ -169,6 +173,7 @@ func _run() -> void:
 	_test_dayroll_event_own_share_under_300ms(tm, mm, gd, sm)
 	await _test_leftover_queue_zero_plans_on_topbar_clock(tm, mm, sm)
 	await _test_leftover_queue_zero_plans_on_scene_order(tm, mm, sm)
+	await _test_leftover_queue_zero_plans_on_windowed_backup(tm, mm, sm)
 	_test_event_frame_zero_plans_non_roll(tm, mm, sm)
 	_test_flush_livelock_redrop_counter(mm, sm)
 	_test_one_full_supply_day_per_game_day(tm, gd, sm)
@@ -320,6 +325,26 @@ func _test_replanned_off_must_fail(sm_src: String, adv: String) -> void:
 		_fail("scene-order leftover-queue test missing (must fail on c722a2c0)")
 	else:
 		_pass("scene-order leftover-queue test drives MapRenderer + TopInfoBar")
+	var tm_src := _read("res://scripts/autoload/TimeManager.gd")
+	if (
+		"func day_rolled_this_frame" not in tm_src
+		or "_mark_calendar_day_roll" not in tm_src
+		or "maybe_run_windowed_backup_clock" not in tm_src
+		or "tm_calendar_roll" not in tm_src
+		or "BACKUP_CLOCK_STARVE_MS" not in tm_src
+	):
+		_fail("FIX #11 calendar-roll mark / one-clock-owner missing (must fail on 1cddb51c)")
+	else:
+		_pass("calendar-roll mark + windowed backup owner present")
+	if (
+		"_test_leftover_queue_zero_plans_on_windowed_backup" not in hd_src
+		or "WINDOWED_BACKUP_ROLL_TRIALS" not in hd_src
+		or "_force_windowed_backup_clock" not in hd_src
+		or "_live_f5_equiv_clock" not in hd_src
+	):
+		_fail("windowed-backup leftover-queue test missing (must fail on 1cddb51c)")
+	else:
+		_pass("windowed-backup leftover-queue test drives backup clock + deferred day emit")
 	if "_test_event_frame_zero_plans_non_roll" not in hd_src:
 		_fail("event-frame leftover behaviour (defer_events_off) missing")
 	else:
@@ -2101,6 +2126,95 @@ func _test_leftover_queue_zero_plans_on_scene_order(tm: Node, mm: Node, sm: Node
 	_free_scene_order_nodes(bar, burn, sm)
 
 
+func _test_leftover_queue_zero_plans_on_windowed_backup(tm: Node, mm: Node, sm: Node) -> void:
+	# FIX #11: windowed Play TimeManager._process backup clock (1000 ms)
+	# can roll the calendar before TopInfoBar. game_day_advanced is
+	# deferred (`_live_f5_equiv_clock`), so FIX #10's SM mark arrives
+	# after refill_after_clock. 7 leftover-queue rolls must plan 0.
+	# Fails on 1cddb51c (backup headless-off; mark only in the flush).
+	if tm == null or mm == null or sm == null:
+		_fail("windowed-backup leftover helpers missing")
+		return
+	if not _boot_live_supply_network(mm, sm):
+		_fail("windowed-backup leftover boot failed")
+		return
+	if sm.has_method("end_day_roll_plan_deferral"):
+		sm.call("end_day_roll_plan_deferral")
+	if sm.has_method("drain_pending_route_refresh"):
+		sm.call("drain_pending_route_refresh")
+	var bar: Node = _instance_player_clock_bar(tm)
+	if bar == null:
+		_fail("windowed-backup TopInfoBar scene failed to instance")
+		return
+	await process_frame
+	_arm_player_clock_4x(bar, tm)
+	_arm_windowed_backup_race(tm)
+	if "_clock_order_enabled" in sm:
+		sm.set("_clock_order_enabled", true)
+	if "clock_order_log" in sm:
+		sm.set("clock_order_log", PackedStringArray())
+	_enqueue_leftover_dests(sm)
+	var leftover0: int = _queue_n(sm)
+	if leftover0 <= 0:
+		_fail("windowed-backup leftover unarmed: refill queue empty")
+		_disarm_windowed_backup_race(tm)
+		_free_clock_bar(bar, sm)
+		return
+	var leftover_hits: int = 0
+	var leftover_max: int = 0
+	var leftover_rolls: int = 0
+	for trial in range(WINDOWED_BACKUP_ROLL_TRIALS):
+		var q_before: int = _queue_n(sm)
+		if q_before <= 0:
+			_enqueue_leftover_dests(sm)
+			q_before = _queue_n(sm)
+		var planned: int = await _one_windowed_backup_roll_plans(sm, bar, tm)
+		leftover_rolls += 1
+		if planned > leftover_max:
+			leftover_max = planned
+		if planned != 0:
+			leftover_hits += 1
+		print(
+			"HeadlessPerf4LiveMultiAiDayTest: windowed_backup trial=%d queue=%d plans_on_roll=%d"
+			% [trial + 1, q_before, planned]
+		)
+	print(
+		"HeadlessPerf4LiveMultiAiDayTest: windowed-backup leftover-queue rolls=%d / plans_on_roll hits=%d/%d max=%d queue0=%d"
+		% [leftover_rolls, leftover_hits, WINDOWED_BACKUP_ROLL_TRIALS, leftover_max, leftover0]
+	)
+	_print_clock_order_log(sm)
+	if leftover_hits != 0 or leftover_max != 0 or leftover_rolls < WINDOWED_BACKUP_ROLL_TRIALS:
+		_fail(
+			"windowed-backup leftover dayroll planned on the roll frame rolls=%d hits=%d/%d max=%d"
+			% [leftover_rolls, leftover_hits, WINDOWED_BACKUP_ROLL_TRIALS, leftover_max]
+		)
+	else:
+		_pass("plans_on_roll leftover_queue=0 ×%d (windowed backup + deferred day emit)" % leftover_rolls)
+	if not _clock_order_has_tm_roll_then_skip(sm, WINDOWED_BACKUP_ROLL_TRIALS):
+		_fail("clock order missing tm_calendar_roll → tib_skip_refill on every leftover roll frame")
+	else:
+		_pass("clock order tm_calendar_roll → tib_skip_refill on every leftover roll frame")
+	if sm.has_method("end_day_roll_plan_deferral"):
+		sm.call("end_day_roll_plan_deferral")
+	if "_clock_order_enabled" in sm:
+		sm.set("_clock_order_enabled", false)
+	_disarm_windowed_backup_race(tm)
+	var drain: Dictionary = _flush_until_drained(sm, CONVERGE_FRAMES)
+	_assert_converged(sm, "windowed_backup_roll_drain", drain)
+	var cmp: Dictionary = _live_vs_rebuild_pathdiff(mm, sm)
+	print(
+		"HeadlessPerf4LiveMultiAiDayTest: windowed_backup pathdiff=%s"
+		% str(cmp.get("pathdiff", -1))
+	)
+	if not bool(cmp.get("ok", false)):
+		_fail("windowed-backup leftover rebuild failed")
+	elif int(cmp.get("pathdiff", -1)) != 0:
+		_fail("windowed-backup leftover pathdiff=%d after drain" % int(cmp.get("pathdiff", -1)))
+	else:
+		_pass("windowed-backup leftover pathdiff=0 after drain")
+	_free_clock_bar(bar, sm)
+
+
 func _test_event_frame_zero_plans_non_roll(tm: Node, mm: Node, sm: Node) -> void:
 	# defer_events_off: `_defer_day_flush_once` no-op. An event on a
 	# non-roll frame with a leftover queue must plan 0 from flush (same
@@ -2241,6 +2355,48 @@ func _print_clock_order_log(sm: Node) -> void:
 		print(lines[i])
 
 
+func _clock_order_has_tm_roll_then_skip(sm: Node, min_rolls: int) -> bool:
+	if sm == null or not ("clock_order_log" in sm):
+		return false
+	var lines: PackedStringArray = sm.get("clock_order_log")
+	if lines.is_empty():
+		return false
+	var by_frame: Dictionary = {}
+	for raw in lines:
+		var line: String = str(raw)
+		var frame: int = _clock_order_frame(line)
+		if frame < 0:
+			continue
+		if not by_frame.has(frame):
+			by_frame[frame] = []
+		(by_frame[frame] as Array).append(line)
+	var roll_skips: int = 0
+	var last_frame: int = -1
+	for frame_v in by_frame.keys():
+		var frame: int = int(frame_v)
+		var group: Array = by_frame[frame]
+		var saw_roll: bool = false
+		var saw_skip: bool = false
+		var roll_msec: int = -1
+		var skip_msec: int = -1
+		for raw2 in group:
+			var line2: String = str(raw2)
+			if line2.find("phase=tm_calendar_roll") >= 0:
+				saw_roll = true
+				roll_msec = _clock_order_msec(line2)
+			elif line2.find("phase=tib_skip_refill") >= 0:
+				saw_skip = true
+				skip_msec = _clock_order_msec(line2)
+		if saw_roll and saw_skip and skip_msec >= roll_msec:
+			roll_skips += 1
+			last_frame = frame
+	print(
+		"HeadlessPerf4LiveMultiAiDayTest: clock_order tm_roll_then_skip=%d last_frame=%d need=%d"
+		% [roll_skips, last_frame, min_rolls]
+	)
+	return roll_skips >= min_rolls
+
+
 func _clock_order_is_sm_then_tib(sm: Node) -> bool:
 	if sm == null or not ("clock_order_log" in sm):
 		return false
@@ -2366,6 +2522,79 @@ func _one_topbar_roll_plans(sm: Node, bar: Node, tm: Node, tick_lag_ms: int = 11
 		_fail("plans_on_roll_frame window did not close after TopInfoBar roll")
 		return -1
 	return window_plans
+
+
+func _arm_windowed_backup_race(tm: Node) -> void:
+	if tm == null:
+		return
+	if "_live_f5_equiv_clock" in tm:
+		tm.set("_live_f5_equiv_clock", true)
+	if "_living_playtest_clock" in tm:
+		tm.set("_living_playtest_clock", false)
+	if "_force_windowed_backup_clock" in tm:
+		tm.set("_force_windowed_backup_clock", true)
+
+
+func _disarm_windowed_backup_race(tm: Node) -> void:
+	if tm == null:
+		return
+	if "_force_windowed_backup_clock" in tm:
+		tm.set("_force_windowed_backup_clock", false)
+	if "_live_f5_equiv_clock" in tm:
+		tm.set("_live_f5_equiv_clock", false)
+
+
+func _one_windowed_backup_roll_plans(sm: Node, bar: Node, tm: Node) -> int:
+	# Windowed backup + deferred day emit. TIB tick is not due; TM
+	# `_process` (or the 1cddb51c fallback) rolls first.
+	if sm.has_method("end_day_roll_plan_deferral"):
+		sm.call("end_day_roll_plan_deferral")
+	_arm_player_clock_4x(bar, tm)
+	_arm_windowed_backup_race(tm)
+	if "current_hour" in tm:
+		tm.set("current_hour", 20)
+	if "_accumulated_game_hours" in tm:
+		tm.set("_accumulated_game_hours", 0.0)
+	if "last_flush_plan_count" in sm:
+		sm.set("last_flush_plan_count", 0)
+	if "last_day_flush_plan_count" in sm:
+		sm.set("last_day_flush_plan_count", 0)
+	if "plans_on_roll_frame" in sm:
+		sm.set("plans_on_roll_frame", -1)
+	if "_window_saw_day_roll" in sm:
+		sm.set("_window_saw_day_roll", false)
+	if "_last_sim_tick_msec" in bar:
+		bar.set("_last_sim_tick_msec", Time.get_ticks_msec())
+	var days0: int = int(tm.get("total_days_elapsed")) if "total_days_elapsed" in tm else 0
+	var refill0: int = int(sm.get("network_route_refill_count")) if "network_route_refill_count" in sm else 0
+	var force_ok: bool = tm != null and "_force_windowed_backup_clock" in tm
+	if force_ok:
+		if "_last_advance_real_msec" in tm:
+			tm.set("_last_advance_real_msec", Time.get_ticks_msec() - 1100)
+		await process_frame
+		await process_frame
+		var days1: int = int(tm.get("total_days_elapsed")) if "total_days_elapsed" in tm else days0
+		var window_plans: int = int(sm.get("plans_on_roll_frame")) if "plans_on_roll_frame" in sm else -1
+		if days1 <= days0:
+			_fail("windowed backup clock did not roll the day (days %d→%d)" % [days0, days1])
+			return -1
+		if window_plans < 0:
+			_fail("plans_on_roll_frame window did not close after windowed backup roll")
+			return -1
+		return window_plans
+	# 1cddb51c: DisplayServer==headless turns the backup off. Drive the
+	# same race: advance_real_time under deferred emit, then refill
+	# before `_flush_sim_events` sets the SM mark.
+	if tm.has_method("advance_real_time"):
+		tm.call("advance_real_time", 1.0)
+	if bar.has_method("_refill_supply_after_clock"):
+		bar.call("_refill_supply_after_clock")
+	var days1b: int = int(tm.get("total_days_elapsed")) if "total_days_elapsed" in tm else days0
+	if days1b <= days0:
+		_fail("windowed-backup fallback advance_real_time did not roll the day")
+		return -1
+	var refill1: int = int(sm.get("network_route_refill_count")) if "network_route_refill_count" in sm else refill0
+	return refill1 - refill0
 
 
 func _one_hour20_no_tick_plans(sm: Node, bar: Node, tm: Node) -> int:
