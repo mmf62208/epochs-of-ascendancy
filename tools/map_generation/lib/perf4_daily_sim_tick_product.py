@@ -17,9 +17,9 @@ A depot/hub owner flip retags the hub and enqueues dests once
 default dests so live paths match a rebuild. Depot add/remove enqueues
 only dests whose live path touches the pid. Flush pops a deduped FIFO;
 old routes keep serving until swap. Day-roll frames never `_plan_route`
-— leftover refill reads the real TopInfoBar tick (wall interval +
-`_accumulated_game_hours`) and plans in `_process` only when that tick
-is not a midnight roll. Events enqueue and the next frames' 40 ms
+— leftover refill runs after TopInfoBar's clock decision
+(`refill_after_clock`), not by predicting the tick from an earlier
+`_process`. Events enqueue and the next frames' 40 ms
 slice plans. Access /
 relations use that same deferral and re-enqueue only when the player
 supply owner is a party. Dropped dests refill the same day (dest cap 24,
@@ -355,6 +355,15 @@ def build_perf4_daily_sim_tick_product() -> Dict[str, Any]:
         passes.append("headless_event_frame_leftover")
     else:
         fails.append("headless_event_frame_leftover")
+    if (
+        HD_LIVE_GD.is_file()
+        and "_test_leftover_queue_zero_plans_on_scene_order" in hd_live
+        and "SCENE_ORDER_ROLL_TRIALS" in hd_live
+        and "SceneOrderMapRenderer" in hd_live
+    ):
+        passes.append("headless_leftover_queue_scene_order")
+    else:
+        fails.append("headless_leftover_queue_scene_order")
     if HD_LIVE_GD.is_file() and "_one_hour20_no_tick_plans" in hd_live:
         passes.append("headless_midnight_guess_gone")
     else:
@@ -465,10 +474,11 @@ def build_perf4_daily_sim_tick_product() -> Dict[str, Any]:
     flush_fn = extract_gd_func_body(sm, "flush_pending_control_route_refresh")
     proc_fn = extract_gd_func_body(sm, "_process")
     skip_fn = extract_gd_func_body(sm, "_should_skip_refill_this_frame")
-    tick_fn = extract_gd_func_body(sm, "is_tick_due_this_frame")
-    roll_fn = extract_gd_func_body(sm, "_clock_tick_would_roll_day")
-    # FIX #9: leftover FIFO dests must not plan on the roll frame.
-    # Order against the real TopInfoBar clock (not call_deferred).
+    refill_fn = extract_gd_func_body(sm, "refill_after_clock")
+    tib = (ROOT / "scripts" / "ui" / "TopInfoBar.gd").read_text(encoding="utf-8")
+    tib_proc = extract_gd_func_body(tib, "_process")
+    # FIX #10: leftover FIFO dests must not plan on the roll frame.
+    # Refill after the clock decision — no tick prediction, no call_deferred.
     if (
         adv_fn
         and "_begin_day_roll_plan_deferral" in adv_fn
@@ -478,17 +488,20 @@ def build_perf4_daily_sim_tick_product() -> Dict[str, Any]:
         and "call_deferred(" not in proc_fn
         and "_flush_refill_after_clock" not in sm
         and "_clock_will_cross_midnight_this_frame" not in sm
-        and "func is_tick_due_this_frame" in sm
-        and tick_fn
-        and "LIVE_SIM_TICK_INTERVAL_MS" in tick_fn
-        and roll_fn
-        and "_accumulated_game_hours" in roll_fn
+        and "is_tick_due_this_frame" not in proc_fn
+        and "_clock_tick_would_roll_day" not in proc_fn
         and skip_fn
-        and "is_tick_due_this_frame" in skip_fn
+        and "is_tick_due_this_frame" not in skip_fn
+        and refill_fn
+        and "_plan_leftover_refill_slice" in refill_fn
+        and tib_proc
+        and "_refill_supply_after_clock" in tib_proc
+        and "refill_after_clock" in tib
         and "network_flush_livelock_redrop_count" in sm
         and "plans_on_roll_frame" in sm
         and HD_LIVE_GD.is_file()
         and "_test_leftover_queue_zero_plans_on_topbar_clock" in hd_live
+        and "_test_leftover_queue_zero_plans_on_scene_order" in hd_live
     ):
         passes.append("day_roll_defers_route_plans")
     else:

@@ -108,8 +108,6 @@ var _flush_in_progress: bool = false
 ## Flush / _process must not `_plan_route` on that frame; the next frames'
 ## 40 ms slice pops the FIFO. Relations/depot call the same deferral.
 var _day_roll_plan_frame: int = -1
-## Wall interval of the live TopInfoBar 1 Hz clock (SIM_TICK_INTERVAL_MS).
-const LIVE_SIM_TICK_INTERVAL_MS: int = 1000
 ## G88_ROLL window: plans from this `_process` start to the next. The live
 ## leftover-queue bar is plans_on_roll_frame == 0 (frame start → roll →
 ## next frame start). Do not use call_deferred — it flushed mid-list.
@@ -118,6 +116,9 @@ var plans_on_roll_frame: int = 0
 var _window_refill_anchor: int = 0
 var _window_saw_day_roll: bool = false
 var _clock_bar: Node = null
+## FIX #10 order log (SM._process → TopInfoBar clock → refill_after_clock).
+var _clock_order_enabled: bool = false
+var clock_order_log: PackedStringArray = PackedStringArray()
 ## Sorted player dest hubs (excludes capital). Updated incrementally so a
 ## capture frame does not walk all 3k hubs.
 var _player_hub_ids: Array[int] = []
@@ -627,14 +628,29 @@ func drain_pending_route_refresh() -> int:
 
 
 func _process(_delta: float) -> void:
-	# FIX #9: plan directly here. A deferred flush ran after MapRenderer
-	# and before TopInfoBar `_on_tick` on live 4x leftover rolls (3 of 7).
-	# Skip when this frame's TopInfoBar tick is due and would roll the
-	# day, or when the roll/event mark is already set. No midnight-hour
-	# guess (that cost ~17% of the 4x drain and did not stop the 3 fails).
+	# FIX #10: open the G88_ROLL window at frame start (autoload, early).
+	# Do not predict the later TopInfoBar clock — that sample goes stale
+	# after MapRenderer. Live TIB calls refill_after_clock() last.
+	# Headless / no-TIB still plans here; skip only on the roll mark.
 	_begin_process_plan_window()
+	note_clock_order("sm_process")
+	if _clock_bar_owns_after_clock_refill():
+		return
 	if _should_skip_refill_this_frame():
 		return
+	_plan_leftover_refill_slice()
+
+
+func refill_after_clock() -> void:
+	# Called from TopInfoBar._process after the clock decision. Skip when
+	# this frame already rolled (mark set by `_on_tick` / day handlers).
+	note_clock_order("sm_refill")
+	if _should_skip_refill_this_frame():
+		return
+	_plan_leftover_refill_slice()
+
+
+func _plan_leftover_refill_slice() -> void:
 	if _refill_queue.is_empty():
 		return
 	if _should_use_interactive_light_supply():
@@ -659,55 +675,43 @@ func peek_roll_window_plans() -> int:
 
 
 func _should_skip_refill_this_frame() -> bool:
-	if _is_day_roll_plan_frame():
-		return true
-	# `_process` only when no roll-tick is due. Non-roll ticks still
-	# refill this frame; the roll-tick waits for the next frame start.
-	return is_tick_due_this_frame() and _clock_tick_would_roll_day()
+	return _is_day_roll_plan_frame()
 
 
-func is_tick_due_this_frame() -> bool:
-	if typeof(TimeManager) != TYPE_NIL and "paused" in TimeManager and bool(TimeManager.paused):
-		return false
-	var last_msec: int = 0
+func note_clock_order(phase: String) -> void:
+	if not _clock_order_enabled and OS.get_environment("EOA_PERF4_CLOCK_ORDER") != "1":
+		return
+	var line: String = "PERF4_CLOCK_ORDER phase=%s frame=%d msec=%d roll=%s" % [
+		phase,
+		Engine.get_process_frames(),
+		Time.get_ticks_msec(),
+		"1" if _is_day_roll_plan_frame() else "0",
+	]
+	clock_order_log.append(line)
+	print(line)
+
+
+func _clock_bar_owns_after_clock_refill() -> bool:
 	var bar: Node = _find_live_clock_bar()
-	if bar != null:
-		if "is_paused" in bar and bool(bar.get("is_paused")):
-			return false
-		if "_sim_tick_busy" in bar and bool(bar.get("_sim_tick_busy")):
-			return false
-		if "_last_sim_tick_msec" in bar:
-			last_msec = int(bar.get("_last_sim_tick_msec"))
-	elif typeof(TimeManager) != TYPE_NIL and "_last_advance_real_msec" in TimeManager:
-		last_msec = int(TimeManager.get("_last_advance_real_msec"))
-	if last_msec <= 0:
+	if bar == null or not is_instance_valid(bar):
 		return false
-	return Time.get_ticks_msec() - last_msec >= LIVE_SIM_TICK_INTERVAL_MS
-
-
-func _clock_tick_would_roll_day() -> bool:
-	if typeof(TimeManager) == TYPE_NIL:
+	if bar.is_queued_for_deletion():
 		return false
-	var hour: int = 0
-	if "current_hour" in TimeManager:
-		hour = int(TimeManager.current_hour)
-	var acc: float = 0.0
-	if "_accumulated_game_hours" in TimeManager:
-		acc = float(TimeManager.get("_accumulated_game_hours"))
-	var scale: float = 1.0
-	if "time_scale" in TimeManager:
-		scale = maxf(float(TimeManager.time_scale), 0.1)
-	var hours_this_tick: float = minf(1.0 * scale, 6.0)
-	return hour + int(acc + hours_this_tick) >= 24
+	if not bar.is_processing():
+		return false
+	return true
 
 
 func _find_live_clock_bar() -> Node:
-	if _clock_bar != null and is_instance_valid(_clock_bar):
+	if _clock_bar != null and is_instance_valid(_clock_bar) and not _clock_bar.is_queued_for_deletion():
 		return _clock_bar
 	var tree := get_tree()
 	if tree == null or tree.root == null:
+		_clock_bar = null
 		return null
 	_clock_bar = tree.root.find_child("TopInfoBar", true, false)
+	if _clock_bar != null and _clock_bar.is_queued_for_deletion():
+		_clock_bar = null
 	return _clock_bar
 
 

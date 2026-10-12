@@ -47,6 +47,9 @@ const FRAMES_PER_DAY_1X := 60
 const FRAMES_PER_DAY_4X := 30
 const MAX_PLANS_PER_FLUSH_SLICE := 8
 const LEFTOVER_ROLL_TRIALS := 6
+const SCENE_ORDER_ROLL_TRIALS := 7
+const SCENE_ORDER_BURN_MS := 120
+const SCENE_ORDER_TICK_LAG_MS := 900
 const CAPITALS := {
 	"GER": 710300,
 	"FRA": 710707,
@@ -135,6 +138,9 @@ func _run() -> void:
 	if not _boot_live_supply_network(mm, sm):
 		_fail("supply network boot failed")
 		return
+	if OS.get_environment("EOA_PERF4_SCENE_ORDER_ONLY") == "1":
+		await _test_leftover_queue_zero_plans_on_scene_order(tm, mm, sm)
+		return
 	_test_step_costs(gd, sm, tm)
 	_test_repeated_real_depot_guard(sm)
 	_test_capture_frame_budgets(mm, sm)
@@ -162,6 +168,7 @@ func _run() -> void:
 	_test_dayroll_with_recapture(tm, mm, sm)
 	_test_dayroll_event_own_share_under_300ms(tm, mm, gd, sm)
 	await _test_leftover_queue_zero_plans_on_topbar_clock(tm, mm, sm)
+	await _test_leftover_queue_zero_plans_on_scene_order(tm, mm, sm)
 	_test_event_frame_zero_plans_non_roll(tm, mm, sm)
 	_test_flush_livelock_redrop_counter(mm, sm)
 	_test_one_full_supply_day_per_game_day(tm, gd, sm)
@@ -278,15 +285,23 @@ func _test_replanned_off_must_fail(sm_src: String, adv: String) -> void:
 	if "call_deferred(" in proc_fn or "_flush_refill_after_clock" in sm_src:
 		_fail("leftover refill still uses a deferred flush (live 3/7 roll-frame plans)")
 	else:
-		_pass("leftover refill plans in _process against the real clock")
+		_pass("leftover refill is not deferred")
 	if "_clock_will_cross_midnight_this_frame" in sm_src or "ceili(scale)" in sm_src:
 		_fail("ceil(time_scale) midnight guess still present (midnight_off / 17% 4x drain)")
 	else:
 		_pass("midnight hour guess deleted")
-	if "func is_tick_due_this_frame" not in sm_src or "_accumulated_game_hours" not in sm_src:
-		_fail("is_tick_due_this_frame / _accumulated_game_hours clock skip missing")
+	if "is_tick_due_this_frame" in proc_fn or "_clock_tick_would_roll_day" in proc_fn:
+		_fail("leftover refill still predicts the later TopInfoBar clock from _process")
+	elif "func refill_after_clock" not in sm_src:
+		_fail("refill_after_clock missing (refill must run after the clock decision)")
 	else:
-		_pass("is_tick_due_this_frame uses wall interval + accumulated hours")
+		_pass("leftover refill runs after the clock decision (no tick prediction)")
+	var tib_src := _read("res://scripts/ui/TopInfoBar.gd")
+	var tib_proc := _slice_func(tib_src, "_process")
+	if "refill_after_clock" not in tib_src or "_refill_supply_after_clock" not in tib_proc:
+		_fail("TopInfoBar _process does not refill after the clock decision")
+	else:
+		_pass("TopInfoBar calls refill after the clock decision")
 	var hd_src := _read("res://scripts/core/HeadlessPerf4LiveMultiAiDayTest.gd")
 	if (
 		"_test_leftover_queue_zero_plans_on_topbar_clock" not in hd_src
@@ -297,6 +312,14 @@ func _test_replanned_off_must_fail(sm_src: String, adv: String) -> void:
 		_fail("leftover-queue test is not the real TopInfoBar clock path")
 	else:
 		_pass("leftover-queue test drives TopInfoBar _process/_on_tick")
+	if (
+		"_test_leftover_queue_zero_plans_on_scene_order" not in hd_src
+		or "SCENE_ORDER_ROLL_TRIALS" not in hd_src
+		or "SceneOrderMapRenderer" not in hd_src
+	):
+		_fail("scene-order leftover-queue test missing (must fail on c722a2c0)")
+	else:
+		_pass("scene-order leftover-queue test drives MapRenderer + TopInfoBar")
 	if "_test_event_frame_zero_plans_non_roll" not in hd_src:
 		_fail("event-frame leftover behaviour (defer_events_off) missing")
 	else:
@@ -1990,6 +2013,94 @@ func _test_leftover_queue_zero_plans_on_topbar_clock(tm: Node, mm: Node, sm: Nod
 	_free_clock_bar(bar, sm)
 
 
+func _test_leftover_queue_zero_plans_on_scene_order(tm: Node, mm: Node, sm: Node) -> void:
+	# FIX #10: live order is SupplyManager (autoload) → MapRenderer
+	# `_process` → TopInfoBar clock. FIX #9 predicted the tick at SM
+	# `_process` start; MapRenderer then burned 60–90 ms; TIB rolled.
+	# 7 leftover-queue rolls at 4x with last_tick just under 1000 ms
+	# must plan 0. Fails on c722a2c0 (prediction + intra-frame gap).
+	if tm == null or mm == null or sm == null:
+		_fail("scene-order leftover helpers missing")
+		return
+	if not _boot_live_supply_network(mm, sm):
+		_fail("scene-order leftover boot failed")
+		return
+	if sm.has_method("end_day_roll_plan_deferral"):
+		sm.call("end_day_roll_plan_deferral")
+	if sm.has_method("drain_pending_route_refresh"):
+		sm.call("drain_pending_route_refresh")
+	var burn: Node = _instance_scene_order_map_renderer()
+	var bar: Node = _instance_player_clock_bar(tm)
+	if burn == null or bar == null:
+		_fail("scene-order MapRenderer + TopInfoBar failed to instance")
+		_free_scene_order_nodes(bar, burn, sm)
+		return
+	await process_frame
+	_arm_player_clock_4x(bar, tm)
+	if "_clock_order_enabled" in sm:
+		sm.set("_clock_order_enabled", true)
+	if "clock_order_log" in sm:
+		sm.set("clock_order_log", PackedStringArray())
+	_enqueue_leftover_dests(sm)
+	var leftover0: int = _queue_n(sm)
+	if leftover0 <= 0:
+		_fail("scene-order leftover unarmed: refill queue empty")
+		_free_scene_order_nodes(bar, burn, sm)
+		return
+	var leftover_hits: int = 0
+	var leftover_max: int = 0
+	var leftover_rolls: int = 0
+	for trial in range(SCENE_ORDER_ROLL_TRIALS):
+		var q_before: int = _queue_n(sm)
+		if q_before <= 0:
+			_enqueue_leftover_dests(sm)
+			q_before = _queue_n(sm)
+		var planned: int = await _one_topbar_roll_plans(sm, bar, tm, SCENE_ORDER_TICK_LAG_MS)
+		leftover_rolls += 1
+		if planned > leftover_max:
+			leftover_max = planned
+		if planned != 0:
+			leftover_hits += 1
+		print(
+			"HeadlessPerf4LiveMultiAiDayTest: scene_order trial=%d queue=%d plans_on_roll=%d"
+			% [trial + 1, q_before, planned]
+		)
+	print(
+		"HeadlessPerf4LiveMultiAiDayTest: scene-order leftover-queue rolls=%d / plans_on_roll hits=%d/%d max=%d queue0=%d"
+		% [leftover_rolls, leftover_hits, SCENE_ORDER_ROLL_TRIALS, leftover_max, leftover0]
+	)
+	_print_clock_order_log(sm)
+	if leftover_hits != 0 or leftover_max != 0 or leftover_rolls < SCENE_ORDER_ROLL_TRIALS:
+		_fail(
+			"scene-order leftover dayroll planned on the roll frame rolls=%d hits=%d/%d max=%d"
+			% [leftover_rolls, leftover_hits, SCENE_ORDER_ROLL_TRIALS, leftover_max]
+		)
+	else:
+		_pass("plans_on_roll leftover_queue=0 ×%d (scene order MapRenderer+TopInfoBar 4x)" % leftover_rolls)
+	if not _clock_order_is_sm_then_tib(sm):
+		_fail("clock order log is not sm_process → tib_clock → refill/skip")
+	else:
+		_pass("clock order sm_process → tib_clock → refill/skip")
+	if sm.has_method("end_day_roll_plan_deferral"):
+		sm.call("end_day_roll_plan_deferral")
+	if "_clock_order_enabled" in sm:
+		sm.set("_clock_order_enabled", false)
+	var drain: Dictionary = _flush_until_drained(sm, CONVERGE_FRAMES)
+	_assert_converged(sm, "scene_order_roll_drain", drain)
+	var cmp: Dictionary = _live_vs_rebuild_pathdiff(mm, sm)
+	print(
+		"HeadlessPerf4LiveMultiAiDayTest: scene_order pathdiff=%s"
+		% str(cmp.get("pathdiff", -1))
+	)
+	if not bool(cmp.get("ok", false)):
+		_fail("scene-order leftover rebuild failed")
+	elif int(cmp.get("pathdiff", -1)) != 0:
+		_fail("scene-order leftover pathdiff=%d after drain" % int(cmp.get("pathdiff", -1)))
+	else:
+		_pass("scene-order leftover pathdiff=0 after drain")
+	_free_scene_order_nodes(bar, burn, sm)
+
+
 func _test_event_frame_zero_plans_non_roll(tm: Node, mm: Node, sm: Node) -> void:
 	# defer_events_off: `_defer_day_flush_once` no-op. An event on a
 	# non-roll frame with a leftover queue must plan 0 from flush (same
@@ -2096,9 +2207,109 @@ func _arm_player_clock_4x(bar: Node, tm: Node) -> void:
 
 func _free_clock_bar(bar: Node, sm: Node) -> void:
 	if bar != null and is_instance_valid(bar):
+		if bar.has_method("set_process"):
+			bar.set_process(false)
 		bar.queue_free()
 	if sm != null and "_clock_bar" in sm:
 		sm.set("_clock_bar", null)
+
+
+func _instance_scene_order_map_renderer() -> Node:
+	var burn: SceneOrderMapRenderer = SceneOrderMapRenderer.new()
+	burn.name = "MapRenderer"
+	burn.burn_msec = SCENE_ORDER_BURN_MS
+	root.add_child(burn)
+	return burn
+
+
+func _free_scene_order_nodes(bar: Node, burn: Node, sm: Node) -> void:
+	if burn != null and is_instance_valid(burn):
+		if burn.has_method("set_process"):
+			burn.set_process(false)
+		burn.queue_free()
+	_free_clock_bar(bar, sm)
+
+
+func _print_clock_order_log(sm: Node) -> void:
+	if sm == null or not ("clock_order_log" in sm):
+		return
+	var lines: PackedStringArray = sm.get("clock_order_log")
+	var n: int = mini(lines.size(), 24)
+	var start: int = maxi(0, lines.size() - n)
+	for i in range(start, lines.size()):
+		print(lines[i])
+
+
+func _clock_order_is_sm_then_tib(sm: Node) -> bool:
+	if sm == null or not ("clock_order_log" in sm):
+		return false
+	var lines: PackedStringArray = sm.get("clock_order_log")
+	if lines.is_empty():
+		return false
+	var by_frame: Dictionary = {}
+	for raw in lines:
+		var line: String = str(raw)
+		var frame: int = _clock_order_frame(line)
+		if frame < 0:
+			continue
+		if not by_frame.has(frame):
+			by_frame[frame] = []
+		(by_frame[frame] as Array).append(line)
+	var ok_frames: int = 0
+	var last_sm: int = -1
+	var last_tib: int = -1
+	var last_frame: int = -1
+	for frame_v in by_frame.keys():
+		var frame: int = int(frame_v)
+		var group: Array = by_frame[frame]
+		var sm_msec: int = -1
+		var tib_msec: int = -1
+		var after_msec: int = -1
+		for raw2 in group:
+			var line2: String = str(raw2)
+			if line2.find("phase=sm_process") >= 0:
+				sm_msec = _clock_order_msec(line2)
+			elif line2.find("phase=tib_clock") >= 0:
+				tib_msec = _clock_order_msec(line2)
+			elif line2.find("phase=tib_skip_refill") >= 0 or line2.find("phase=sm_refill") >= 0:
+				after_msec = _clock_order_msec(line2)
+		if sm_msec < 0 or tib_msec < 0 or after_msec < 0:
+			continue
+		if tib_msec < sm_msec or after_msec < tib_msec:
+			continue
+		ok_frames += 1
+		last_sm = sm_msec
+		last_tib = tib_msec
+		last_frame = frame
+	print(
+		"HeadlessPerf4LiveMultiAiDayTest: clock_order ok_frames=%d last_frame=%d sm_msec=%d tib_msec=%d"
+		% [ok_frames, last_frame, last_sm, last_tib]
+	)
+	return ok_frames > 0
+
+
+func _clock_order_msec(line: String) -> int:
+	var key := "msec="
+	var i: int = line.find(key)
+	if i < 0:
+		return -1
+	var rest: String = line.substr(i + key.length())
+	var bits: PackedStringArray = rest.split(" ")
+	if bits.is_empty():
+		return -1
+	return int(bits[0])
+
+
+func _clock_order_frame(line: String) -> int:
+	var key := "frame="
+	var i: int = line.find(key)
+	if i < 0:
+		return -1
+	var rest: String = line.substr(i + key.length())
+	var bits: PackedStringArray = rest.split(" ")
+	if bits.is_empty():
+		return -1
+	return int(bits[0])
 
 
 func _enqueue_leftover_dests(sm: Node) -> void:
@@ -2121,7 +2332,7 @@ func _enqueue_leftover_dests(sm: Node) -> void:
 		sm.call("enqueue_refill_dests", dests)
 
 
-func _one_topbar_roll_plans(sm: Node, bar: Node, tm: Node) -> int:
+func _one_topbar_roll_plans(sm: Node, bar: Node, tm: Node, tick_lag_ms: int = 1100) -> int:
 	if sm.has_method("end_day_roll_plan_deferral"):
 		sm.call("end_day_roll_plan_deferral")
 	_arm_player_clock_4x(bar, tm)
@@ -2138,7 +2349,7 @@ func _one_topbar_roll_plans(sm: Node, bar: Node, tm: Node) -> int:
 	if "_window_saw_day_roll" in sm:
 		sm.set("_window_saw_day_roll", false)
 	if "_last_sim_tick_msec" in bar:
-		bar.set("_last_sim_tick_msec", Time.get_ticks_msec() - 1100)
+		bar.set("_last_sim_tick_msec", Time.get_ticks_msec() - tick_lag_ms)
 	var days0: int = int(tm.get("total_days_elapsed")) if "total_days_elapsed" in tm else 0
 	await process_frame
 	await process_frame
@@ -2591,6 +2802,18 @@ func _load_json(path: String) -> Dictionary:
 	f.close()
 	var data = JSON.parse_string(txt)
 	return data if data is Dictionary else {}
+
+
+class SceneOrderMapRenderer extends Node:
+	## Live MapRenderer `_process` sits between SupplyManager (autoload)
+	## and TopInfoBar. Burn wall time so a just-under-1000 ms clock at
+	## SM `_process` is due by the time TopInfoBar samples.
+	var burn_msec: int = 120
+
+	func _process(_delta: float) -> void:
+		var t0: int = Time.get_ticks_msec()
+		while Time.get_ticks_msec() - t0 < burn_msec:
+			pass
 
 
 
