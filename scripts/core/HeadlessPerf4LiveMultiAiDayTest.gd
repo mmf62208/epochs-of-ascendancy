@@ -145,6 +145,9 @@ func _run() -> void:
 	if OS.get_environment("EOA_PERF4_WINDOWED_BACKUP_ONLY") == "1":
 		await _test_leftover_queue_zero_plans_on_windowed_backup(tm, mm, sm)
 		return
+	if OS.get_environment("EOA_PERF4_EVENT_FRAME_ONLY") == "1":
+		_test_event_frame_zero_plans_non_roll(tm, mm, sm)
+		return
 	_test_step_costs(gd, sm, tm)
 	_test_repeated_real_depot_guard(sm)
 	_test_capture_frame_budgets(mm, sm)
