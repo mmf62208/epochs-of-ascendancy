@@ -108,8 +108,16 @@ var _flush_in_progress: bool = false
 ## Flush / _process must not `_plan_route` on that frame; the next frames'
 ## 40 ms slice pops the FIFO. Relations/depot call the same deferral.
 var _day_roll_plan_frame: int = -1
-## FIX #8: at most one deferred leftover refill per process frame.
-var _refill_after_clock_queued: bool = false
+## Wall interval of the live TopInfoBar 1 Hz clock (SIM_TICK_INTERVAL_MS).
+const LIVE_SIM_TICK_INTERVAL_MS: int = 1000
+## G88_ROLL window: plans from this `_process` start to the next. The live
+## leftover-queue bar is plans_on_roll_frame == 0 (frame start → roll →
+## next frame start). Do not use call_deferred — it flushed mid-list.
+var last_frame_plan_count: int = 0
+var plans_on_roll_frame: int = 0
+var _window_refill_anchor: int = 0
+var _window_saw_day_roll: bool = false
+var _clock_bar: Node = null
 ## Sorted player dest hubs (excludes capital). Updated incrementally so a
 ## capture frame does not walk all 3k hubs.
 var _player_hub_ids: Array[int] = []
@@ -619,23 +627,12 @@ func drain_pending_route_refresh() -> int:
 
 
 func _process(_delta: float) -> void:
-	# FIX #8: autoload #8 _process runs BEFORE TimeManager (#10) and
-	# TopInfoBar roll the day. Never `_plan_route` here — leftover FIFO
-	# dests would land on the roll frame (7/7 live, 6/6 headless).
-	if _should_skip_refill_this_frame():
-		return
-	if _refill_queue.is_empty():
-		return
-	if _should_use_interactive_light_supply():
-		return
-	if _refill_after_clock_queued:
-		return
-	_refill_after_clock_queued = true
-	call_deferred("_flush_refill_after_clock")
-
-
-func _flush_refill_after_clock() -> void:
-	_refill_after_clock_queued = false
+	# FIX #9: plan directly here. A deferred flush ran after MapRenderer
+	# and before TopInfoBar `_on_tick` on live 4x leftover rolls (3 of 7).
+	# Skip when this frame's TopInfoBar tick is due and would roll the
+	# day, or when the roll/event mark is already set. No midnight-hour
+	# guess (that cost ~17% of the 4x drain and did not stop the 3 fails).
+	_begin_process_plan_window()
 	if _should_skip_refill_this_frame():
 		return
 	if _refill_queue.is_empty():
@@ -645,25 +642,73 @@ func _flush_refill_after_clock() -> void:
 	flush_pending_control_route_refresh(ROUTE_REFRESH_BUDGET_PER_FLUSH)
 
 
+func _begin_process_plan_window() -> void:
+	last_frame_plan_count = network_route_refill_count - _window_refill_anchor
+	if _window_saw_day_roll:
+		plans_on_roll_frame = last_frame_plan_count
+		_window_saw_day_roll = false
+	_window_refill_anchor = network_route_refill_count
+
+
+func _note_day_roll_plan_window() -> void:
+	_window_saw_day_roll = true
+
+
+func peek_roll_window_plans() -> int:
+	return network_route_refill_count - _window_refill_anchor
+
+
 func _should_skip_refill_this_frame() -> bool:
 	if _is_day_roll_plan_frame():
 		return true
-	return _clock_will_cross_midnight_this_frame()
+	# `_process` only when no roll-tick is due. Non-roll ticks still
+	# refill this frame; the roll-tick waits for the next frame start.
+	return is_tick_due_this_frame() and _clock_tick_would_roll_day()
 
 
-func _clock_will_cross_midnight_this_frame() -> bool:
-	if typeof(TimeManager) == TYPE_NIL:
+func is_tick_due_this_frame() -> bool:
+	if typeof(TimeManager) != TYPE_NIL and "paused" in TimeManager and bool(TimeManager.paused):
 		return false
-	if "paused" in TimeManager and bool(TimeManager.paused):
+	var last_msec: int = 0
+	var bar: Node = _find_live_clock_bar()
+	if bar != null:
+		if "is_paused" in bar and bool(bar.get("is_paused")):
+			return false
+		if "_sim_tick_busy" in bar and bool(bar.get("_sim_tick_busy")):
+			return false
+		if "_last_sim_tick_msec" in bar:
+			last_msec = int(bar.get("_last_sim_tick_msec"))
+	elif typeof(TimeManager) != TYPE_NIL and "_last_advance_real_msec" in TimeManager:
+		last_msec = int(TimeManager.get("_last_advance_real_msec"))
+	if last_msec <= 0:
+		return false
+	return Time.get_ticks_msec() - last_msec >= LIVE_SIM_TICK_INTERVAL_MS
+
+
+func _clock_tick_would_roll_day() -> bool:
+	if typeof(TimeManager) == TYPE_NIL:
 		return false
 	var hour: int = 0
 	if "current_hour" in TimeManager:
 		hour = int(TimeManager.current_hour)
+	var acc: float = 0.0
+	if "_accumulated_game_hours" in TimeManager:
+		acc = float(TimeManager.get("_accumulated_game_hours"))
 	var scale: float = 1.0
 	if "time_scale" in TimeManager:
 		scale = maxf(float(TimeManager.time_scale), 0.1)
-	var hours_this_tick: int = mini(maxi(int(ceili(scale)), 1), 6)
-	return hour + hours_this_tick >= 24
+	var hours_this_tick: float = minf(1.0 * scale, 6.0)
+	return hour + int(acc + hours_this_tick) >= 24
+
+
+func _find_live_clock_bar() -> Node:
+	if _clock_bar != null and is_instance_valid(_clock_bar):
+		return _clock_bar
+	var tree := get_tree()
+	if tree == null or tree.root == null:
+		return null
+	_clock_bar = tree.root.find_child("TopInfoBar", true, false)
+	return _clock_bar
 
 
 func _on_relations_or_access_changed(a: String = "", b: String = "", _snap: Dictionary = {}) -> void:
@@ -1288,6 +1333,7 @@ func _on_game_day_advanced(_year: int, _month: int, _day: int) -> void:
 	# FIX #7: mark the roll frame before any light/full work so leftover
 	# FIFO dests cannot `_plan_route` on this frame via _process / flush.
 	_begin_day_roll_plan_deferral()
+	_note_day_roll_plan_window()
 	# Restore main's light/full split: live F5 / interactive listener is
 	# depot-only. The AI soft tick (apply_supply) runs the one full day.
 	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("is_interactive_light_sim") and bool(TimeManager.is_interactive_light_sim()):
@@ -1366,6 +1412,7 @@ func advance_supply_day(days: float = 1.0) -> void:
 	# FIX #7: mark the roll and still call flush (source gate), but flush
 	# returns 0 plans on this frame. Events enqueue; next frames' slice plans.
 	_begin_day_roll_plan_deferral()
+	_note_day_roll_plan_window()
 	flush_pending_control_route_refresh(ROUTE_REFRESH_BUDGET_PER_FLUSH)
 	last_day_flush_plan_count = last_flush_plan_count
 	var flush_ms: float = float(Time.get_ticks_usec() - t_sec) / 1000.0

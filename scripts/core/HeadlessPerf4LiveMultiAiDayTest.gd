@@ -24,6 +24,7 @@ const PROV_SCRIPT := "res://scripts/data/Province.gd"
 const MAP_DATA_SCRIPT := "res://scripts/data/MapScenarioData.gd"
 const SRC_SM := "res://scripts/supply/SupplyManager.gd"
 const SRC_GD := "res://scripts/autoload/GameData.gd"
+const TOPBAR_SCENE := "res://scenes/ui/TopInfoBar.tscn"
 const EQUIV_DAYS := 5
 const EQUIV_SEED := 193601
 const PLAYER_TAG := "GER"
@@ -160,7 +161,8 @@ func _run() -> void:
 	_test_dayroll_with_access(tm, mm, sm)
 	_test_dayroll_with_recapture(tm, mm, sm)
 	_test_dayroll_event_own_share_under_300ms(tm, mm, gd, sm)
-	await _test_leftover_queue_zero_plans_on_later_node_roll(tm, mm, sm)
+	await _test_leftover_queue_zero_plans_on_topbar_clock(tm, mm, sm)
+	_test_event_frame_zero_plans_non_roll(tm, mm, sm)
 	_test_flush_livelock_redrop_counter(mm, sm)
 	_test_one_full_supply_day_per_game_day(tm, gd, sm)
 	_test_production_cache_measured(gd)
@@ -272,6 +274,33 @@ func _test_replanned_off_must_fail(sm_src: String, adv: String) -> void:
 		_fail("slice plan-cost estimate seam missing (slice_reactive unguarded)")
 	else:
 		_pass("slice plan-cost estimate seam present")
+	var proc_fn := _slice_func(sm_src, "_process")
+	if "call_deferred(" in proc_fn or "_flush_refill_after_clock" in sm_src:
+		_fail("leftover refill still uses a deferred flush (live 3/7 roll-frame plans)")
+	else:
+		_pass("leftover refill plans in _process against the real clock")
+	if "_clock_will_cross_midnight_this_frame" in sm_src or "ceili(scale)" in sm_src:
+		_fail("ceil(time_scale) midnight guess still present (midnight_off / 17% 4x drain)")
+	else:
+		_pass("midnight hour guess deleted")
+	if "func is_tick_due_this_frame" not in sm_src or "_accumulated_game_hours" not in sm_src:
+		_fail("is_tick_due_this_frame / _accumulated_game_hours clock skip missing")
+	else:
+		_pass("is_tick_due_this_frame uses wall interval + accumulated hours")
+	var hd_src := _read("res://scripts/core/HeadlessPerf4LiveMultiAiDayTest.gd")
+	if (
+		"_test_leftover_queue_zero_plans_on_topbar_clock" not in hd_src
+		or "TOPBAR_SCENE" not in hd_src
+		or "_on_tick" not in hd_src
+		or "player_owns_clock" not in hd_src
+	):
+		_fail("leftover-queue test is not the real TopInfoBar clock path")
+	else:
+		_pass("leftover-queue test drives TopInfoBar _process/_on_tick")
+	if "_test_event_frame_zero_plans_non_roll" not in hd_src:
+		_fail("event-frame leftover behaviour (defer_events_off) missing")
+	else:
+		_pass("event-frame leftover behaviour present")
 	var flush := _slice_func(sm_src, "flush_pending_control_route_refresh")
 	if flush.is_empty() or "_refill_queued_dests" not in flush:
 		_fail("re-plan turned off (flush does not pop the dest queue)")
@@ -1862,71 +1891,68 @@ func _test_dayroll_event_own_share_under_300ms(tm: Node, mm: Node, gd: Node, sm:
 	_boot_live_supply_network(mm, sm)
 
 
-func _test_leftover_queue_zero_plans_on_later_node_roll(tm: Node, mm: Node, sm: Node) -> void:
-	# Live order: SupplyManager (#8) _process, then TimeManager / TopInfoBar
-	# roll the day. Leftover FIFO dests must not `_plan_route` on that frame.
-	# A later node (process_priority after SM) does the roll. 6 leftover
-	# trials; empty-queue is the control. Kills defer_events_off and
-	# defer_process_off.
+func _test_leftover_queue_zero_plans_on_topbar_clock(tm: Node, mm: Node, sm: Node) -> void:
+	# FIX #9: drive the day roll through the real TopInfoBar `_process` /
+	# `_on_tick` (player-owned 4x clock). Same-group Roller does not
+	# reproduce live order. G88_ROLL window = SM frame start → roll →
+	# next frame start. ≥6 leftover rolls must plan 0; pathdiff 0 after drain.
+	# midnight_off is deleted (hour-20 + tick-not-due must still plan).
 	if tm == null or mm == null or sm == null:
-		_fail("leftover-queue dayroll helpers missing")
+		_fail("leftover-queue topbar helpers missing")
 		return
 	if not _boot_live_supply_network(mm, sm):
-		_fail("leftover-queue dayroll boot failed")
+		_fail("leftover-queue topbar boot failed")
 		return
 	if sm.has_method("end_day_roll_plan_deferral"):
 		sm.call("end_day_roll_plan_deferral")
 	if sm.has_method("drain_pending_route_refresh"):
 		sm.call("drain_pending_route_refresh")
-	var roller := DayRollAfterSupply.new()
-	roller.sm = sm
-	roller.process_priority = 1
-	root.add_child(roller)
-	# First process frame after add_child can skip the new node.
+	var bar: Node = _instance_player_clock_bar(tm)
+	if bar == null:
+		_fail("TopInfoBar scene failed to instance (real clock path)")
+		return
 	await process_frame
-	_reset_clock(tm, 0)
-	if "_live_f5_equiv_clock" in tm:
-		tm.set("_live_f5_equiv_clock", false)
-	if "_living_playtest_clock" in tm:
-		tm.set("_living_playtest_clock", false)
-	if "current_hour" in tm:
-		tm.set("current_hour", 23)
+	_arm_player_clock_4x(bar, tm)
 	if sm.has_method("clear_refill_queue"):
 		sm.call("clear_refill_queue")
-	var empty_plans: int = await _one_later_node_roll_plans(sm, roller, tm)
+	var empty_plans: int = await _one_topbar_roll_plans(sm, bar, tm)
 	print(
 		"HeadlessPerf4LiveMultiAiDayTest: plans_on_roll empty_queue=%d leftover_queue=pending"
 		% empty_plans
 	)
 	if empty_plans != 0:
-		_fail("empty-queue dayroll planned %d dests on the roll frame" % empty_plans)
+		_fail("empty-queue topbar dayroll planned %d dests on the roll frame" % empty_plans)
 	else:
 		_pass("plans_on_roll empty_queue=0")
-	if sm.has_method("enqueue_player_dests_for_refresh"):
-		sm.call("enqueue_player_dests_for_refresh")
-	elif sm.has_method("enqueue_refill_dests"):
-		var snap: Dictionary = sm.call("get_network_topology_snapshot") if sm.has_method("get_network_topology_snapshot") else {}
-		var dests: Array = []
-		for raw in snap.get("routes", []) as Array:
-			if typeof(raw) != TYPE_DICTIONARY:
-				continue
-			var dest: int = int((raw as Dictionary).get("dst", -1))
-			if dest > 0:
-				dests.append(dest)
-		sm.call("enqueue_refill_dests", dests)
+	_enqueue_leftover_dests(sm)
 	var leftover0: int = _queue_n(sm)
 	if leftover0 <= 0:
-		_fail("leftover-queue dayroll unarmed: refill queue empty")
-		roller.queue_free()
+		_fail("leftover-queue topbar unarmed: refill queue empty")
+		_free_clock_bar(bar, sm)
 		return
+	# midnight_off / ceil(time_scale) guess: hour 20 at 4x with no tick
+	# due must still plan (the last-hour skip cost ~17% of the 4x drain).
+	var midnight_plans: int = await _one_hour20_no_tick_plans(sm, bar, tm)
+	print(
+		"HeadlessPerf4LiveMultiAiDayTest: hour20_no_tick leftover_plans=%d (midnight_off must plan)"
+		% midnight_plans
+	)
+	if midnight_plans <= 0:
+		_fail("hour 20 / 4x / tick-not-due planned 0 (midnight guess still skipping the last hour)")
+	else:
+		_pass("hour20_no_tick planned %d (midnight guess gone)" % midnight_plans)
+	if _queue_n(sm) <= 0:
+		_enqueue_leftover_dests(sm)
 	var leftover_hits: int = 0
 	var leftover_max: int = 0
+	var leftover_rolls: int = 0
 	for trial in range(LEFTOVER_ROLL_TRIALS):
 		var q_before: int = _queue_n(sm)
 		if q_before <= 0:
-			if sm.has_method("enqueue_player_dests_for_refresh"):
-				sm.call("enqueue_player_dests_for_refresh")
-		var planned: int = await _one_later_node_roll_plans(sm, roller, tm)
+			_enqueue_leftover_dests(sm)
+			q_before = _queue_n(sm)
+		var planned: int = await _one_topbar_roll_plans(sm, bar, tm)
+		leftover_rolls += 1
 		if planned > leftover_max:
 			leftover_max = planned
 		if planned != 0:
@@ -1936,16 +1962,16 @@ func _test_leftover_queue_zero_plans_on_later_node_roll(tm: Node, mm: Node, sm: 
 			% [trial + 1, q_before, planned]
 		)
 	print(
-		"HeadlessPerf4LiveMultiAiDayTest: plans_on_roll leftover_queue hits=%d/%d max=%d queue0=%d"
-		% [leftover_hits, LEFTOVER_ROLL_TRIALS, leftover_max, leftover0]
+		"HeadlessPerf4LiveMultiAiDayTest: leftover-queue rolls=%d / plans_on_roll hits=%d/%d max=%d queue0=%d"
+		% [leftover_rolls, leftover_hits, LEFTOVER_ROLL_TRIALS, leftover_max, leftover0]
 	)
-	if leftover_hits != 0 or leftover_max != 0:
+	if leftover_hits != 0 or leftover_max != 0 or leftover_rolls < LEFTOVER_ROLL_TRIALS:
 		_fail(
-			"leftover-queue dayroll planned on the roll frame hits=%d/%d max=%d (defer_process_off / defer_events_off)"
-			% [leftover_hits, LEFTOVER_ROLL_TRIALS, leftover_max]
+			"leftover-queue topbar dayroll planned on the roll frame rolls=%d hits=%d/%d max=%d"
+			% [leftover_rolls, leftover_hits, LEFTOVER_ROLL_TRIALS, leftover_max]
 		)
 	else:
-		_pass("plans_on_roll leftover_queue=0 ×%d" % LEFTOVER_ROLL_TRIALS)
+		_pass("plans_on_roll leftover_queue=0 ×%d (TopInfoBar 4x)" % leftover_rolls)
 	if sm.has_method("end_day_roll_plan_deferral"):
 		sm.call("end_day_roll_plan_deferral")
 	var drain: Dictionary = _flush_until_drained(sm, CONVERGE_FRAMES)
@@ -1956,34 +1982,194 @@ func _test_leftover_queue_zero_plans_on_later_node_roll(tm: Node, mm: Node, sm: 
 		% str(cmp.get("pathdiff", -1))
 	)
 	if not bool(cmp.get("ok", false)):
-		_fail("leftover-queue dayroll rebuild failed")
+		_fail("leftover-queue topbar rebuild failed")
 	elif int(cmp.get("pathdiff", -1)) != 0:
-		_fail("leftover-queue dayroll pathdiff=%d after drain" % int(cmp.get("pathdiff", -1)))
+		_fail("leftover-queue topbar pathdiff=%d after drain" % int(cmp.get("pathdiff", -1)))
 	else:
-		_pass("leftover-queue dayroll pathdiff=0 after drain")
-	roller.queue_free()
+		_pass("leftover-queue topbar pathdiff=0 after drain")
+	_free_clock_bar(bar, sm)
 
 
-func _one_later_node_roll_plans(sm: Node, roller: DayRollAfterSupply, tm: Node) -> int:
+func _test_event_frame_zero_plans_non_roll(tm: Node, mm: Node, sm: Node) -> void:
+	# defer_events_off: `_defer_day_flush_once` no-op. An event on a
+	# non-roll frame with a leftover queue must plan 0 from flush (same
+	# frame as the mark). Do not call advance_supply_day — that mark
+	# would hide a dead event helper.
+	if tm == null or mm == null or sm == null:
+		_fail("event-frame leftover helpers missing")
+		return
+	if not _boot_live_supply_network(mm, sm):
+		_fail("event-frame leftover boot failed")
+		return
 	if sm.has_method("end_day_roll_plan_deferral"):
 		sm.call("end_day_roll_plan_deferral")
+	if sm.has_method("drain_pending_route_refresh"):
+		sm.call("drain_pending_route_refresh")
+	_reset_clock(tm, 0)
 	if "current_hour" in tm:
-		tm.set("current_hour", 23)
+		tm.set("current_hour", 10)
+	if "time_scale" in tm:
+		tm.set("time_scale", 4.0)
+	if tm.has_method("set_paused"):
+		tm.call("set_paused", false)
+	_enqueue_leftover_dests(sm)
+	if _queue_n(sm) <= 0:
+		_fail("event-frame leftover unarmed: refill queue empty")
+		return
+	if sm.has_method("end_day_roll_plan_deferral"):
+		sm.call("end_day_roll_plan_deferral")
+	if sm.has_method("set_player_depot"):
+		sm.call("set_player_depot", DEPOT_ADD_PID, false)
+		sm.call("set_player_depot", DEPOT_ADD_PID, true)
+	if sm.has_method("is_day_roll_plan_deferred") and not bool(sm.call("is_day_roll_plan_deferred")):
+		_fail("event-frame mark missing after depot add (defer_events_off)")
+		return
+	var refill0: int = int(sm.get("network_route_refill_count")) if "network_route_refill_count" in sm else 0
+	var flushed: int = int(sm.call("flush_pending_control_route_refresh"))
+	var refill1: int = int(sm.get("network_route_refill_count")) if "network_route_refill_count" in sm else refill0
+	var planned: int = maxi(flushed, refill1 - refill0)
+	print(
+		"HeadlessPerf4LiveMultiAiDayTest: event_frame_non_roll plans=%d flush=%d queue=%d"
+		% [planned, flushed, _queue_n(sm)]
+	)
+	if planned != 0:
+		_fail("event on a non-roll frame planned %d dests (defer_events_off)" % planned)
+	else:
+		_pass("event-frame leftover plans=0 (defer_events_off killed)")
+	if sm.has_method("set_player_depot"):
+		sm.call("set_player_depot", DEPOT_ADD_PID, false)
+	if sm.has_method("end_day_roll_plan_deferral"):
+		sm.call("end_day_roll_plan_deferral")
+	if sm.has_method("clear_refill_queue"):
+		sm.call("clear_refill_queue")
+
+
+func _instance_player_clock_bar(tm: Node) -> Node:
+	if not ResourceLoader.exists(TOPBAR_SCENE):
+		return null
+	var packed: PackedScene = load(TOPBAR_SCENE) as PackedScene
+	if packed == null:
+		return null
+	var bar: Node = packed.instantiate()
+	if bar == null:
+		return null
+	bar.set_meta("player_owns_clock", true)
+	if "is_paused" in bar:
+		bar.set("is_paused", false)
+	if "current_speed" in bar:
+		bar.set("current_speed", 4)
+	root.add_child(bar)
+	_reset_clock(tm, 0)
+	if "_live_f5_equiv_clock" in tm:
+		tm.set("_live_f5_equiv_clock", false)
+	if "_living_playtest_clock" in tm:
+		tm.set("_living_playtest_clock", false)
+	if "_smoke_chunk_active" in tm:
+		tm.set("_smoke_chunk_active", false)
+	var sm_live: Node = root.get_node_or_null("/root/SupplyManager")
+	if sm_live != null and "_clock_bar" in sm_live:
+		sm_live.set("_clock_bar", null)
+	return bar
+
+
+func _arm_player_clock_4x(bar: Node, tm: Node) -> void:
+	if bar == null or tm == null:
+		return
+	bar.set_meta("player_owns_clock", true)
+	if "is_paused" in bar:
+		bar.set("is_paused", false)
+	if "current_speed" in bar:
+		bar.set("current_speed", 4)
+	if "_sim_tick_busy" in bar:
+		bar.set("_sim_tick_busy", false)
+	if tm.has_method("set_paused"):
+		tm.call("set_paused", false)
+	if tm.has_method("set_time_scale"):
+		tm.call("set_time_scale", 4.0)
+	if "paused" in tm:
+		tm.set("paused", false)
+	if "time_scale" in tm:
+		tm.set("time_scale", 4.0)
+	if "_last_sim_tick_msec" in bar:
+		bar.set("_last_sim_tick_msec", Time.get_ticks_msec())
+
+
+func _free_clock_bar(bar: Node, sm: Node) -> void:
+	if bar != null and is_instance_valid(bar):
+		bar.queue_free()
+	if sm != null and "_clock_bar" in sm:
+		sm.set("_clock_bar", null)
+
+
+func _enqueue_leftover_dests(sm: Node) -> void:
+	if sm == null:
+		return
+	if sm.has_method("end_day_roll_plan_deferral"):
+		sm.call("end_day_roll_plan_deferral")
+	if sm.has_method("enqueue_player_dests_for_refresh"):
+		sm.call("enqueue_player_dests_for_refresh")
+		return
+	if sm.has_method("enqueue_refill_dests"):
+		var snap: Dictionary = sm.call("get_network_topology_snapshot") if sm.has_method("get_network_topology_snapshot") else {}
+		var dests: Array = []
+		for raw in snap.get("routes", []) as Array:
+			if typeof(raw) != TYPE_DICTIONARY:
+				continue
+			var dest: int = int((raw as Dictionary).get("dst", -1))
+			if dest > 0:
+				dests.append(dest)
+		sm.call("enqueue_refill_dests", dests)
+
+
+func _one_topbar_roll_plans(sm: Node, bar: Node, tm: Node) -> int:
+	if sm.has_method("end_day_roll_plan_deferral"):
+		sm.call("end_day_roll_plan_deferral")
+	_arm_player_clock_4x(bar, tm)
+	if "current_hour" in tm:
+		tm.set("current_hour", 20)
+	if "_accumulated_game_hours" in tm:
+		tm.set("_accumulated_game_hours", 0.0)
 	if "last_flush_plan_count" in sm:
 		sm.set("last_flush_plan_count", 0)
 	if "last_day_flush_plan_count" in sm:
 		sm.set("last_day_flush_plan_count", 0)
+	if "plans_on_roll_frame" in sm:
+		sm.set("plans_on_roll_frame", -1)
+	if "_window_saw_day_roll" in sm:
+		sm.set("_window_saw_day_roll", false)
+	if "_last_sim_tick_msec" in bar:
+		bar.set("_last_sim_tick_msec", Time.get_ticks_msec() - 1100)
+	var days0: int = int(tm.get("total_days_elapsed")) if "total_days_elapsed" in tm else 0
+	await process_frame
+	await process_frame
+	var days1: int = int(tm.get("total_days_elapsed")) if "total_days_elapsed" in tm else days0
+	var window_plans: int = int(sm.get("plans_on_roll_frame")) if "plans_on_roll_frame" in sm else -1
+	if days1 <= days0:
+		_fail("TopInfoBar _process/_on_tick did not roll the day (days %d→%d)" % [days0, days1])
+		return -1
+	# G88_ROLL: plans from SM frame start through the roll to the next
+	# frame start. Do not use refill across both awaits — the second
+	# frame is a non-roll leftover slice and is allowed to plan 1.
+	if window_plans < 0:
+		_fail("plans_on_roll_frame window did not close after TopInfoBar roll")
+		return -1
+	return window_plans
+
+
+func _one_hour20_no_tick_plans(sm: Node, bar: Node, tm: Node) -> int:
+	if sm.has_method("end_day_roll_plan_deferral"):
+		sm.call("end_day_roll_plan_deferral")
+	_arm_player_clock_4x(bar, tm)
+	if "current_hour" in tm:
+		tm.set("current_hour", 20)
+	if "_accumulated_game_hours" in tm:
+		tm.set("_accumulated_game_hours", 0.0)
+	if "_last_sim_tick_msec" in bar:
+		bar.set("_last_sim_tick_msec", Time.get_ticks_msec())
 	var refill0: int = int(sm.get("network_route_refill_count")) if "network_route_refill_count" in sm else 0
-	roller.rolled = false
-	roller.armed = true
 	await process_frame
 	var refill1: int = int(sm.get("network_route_refill_count")) if "network_route_refill_count" in sm else refill0
-	var day_plans: int = int(sm.get("last_day_flush_plan_count")) if "last_day_flush_plan_count" in sm else 0
-	var flush_plans: int = int(sm.get("last_flush_plan_count")) if "last_flush_plan_count" in sm else 0
-	if not roller.rolled:
-		_fail("later node did not roll after SupplyManager _process")
-		return -1
-	return maxi(maxi(refill1 - refill0, day_plans), flush_plans)
+	return refill1 - refill0
 
 
 func _test_flush_livelock_redrop_counter(mm: Node, sm: Node) -> void:
@@ -2407,20 +2593,4 @@ func _load_json(path: String) -> Dictionary:
 	return data if data is Dictionary else {}
 
 
-class DayRollAfterSupply extends Node:
-	## Processed after SupplyManager (process_priority 1) so leftover
-	## `_process` refill runs first — the live TimeManager / TopInfoBar order.
-	var sm: Node = null
-	var armed: bool = false
-	var rolled: bool = false
-
-	func _process(_delta: float) -> void:
-		if not armed or sm == null:
-			return
-		armed = false
-		# Full supply day (the clock listener's live share). Do not emit
-		# the game_day_advanced bus (theater / multi_ai out of #88).
-		if sm.has_method("advance_supply_day"):
-			sm.call("advance_supply_day", 1.0)
-		rolled = true
 

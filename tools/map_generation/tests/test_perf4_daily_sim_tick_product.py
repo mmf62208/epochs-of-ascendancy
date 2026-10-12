@@ -93,6 +93,9 @@ class TestPerf4DailySimTickProduct(unittest.TestCase):
             "headless_dayroll_recapture_frame",
             "headless_dayroll_own_share",
             "headless_leftover_queue_roll",
+            "headless_leftover_queue_topbar_clock",
+            "headless_event_frame_leftover",
+            "headless_midnight_guess_gone",
             "headless_flush_livelock_redrop",
             "headless_redrop_behaviour",
             "headless_flush_redrop_behaviour",
@@ -202,10 +205,22 @@ class TestPerf4DailySimTickProduct(unittest.TestCase):
         self.assertIn("_test_redrop_counter_increments_on_hostile_drop", hd)
         self.assertIn("_test_flush_redrop_increments_on_forced_drop", hd)
         self.assertIn("_test_depot_add_enqueues_all_24_dests", hd)
+        self.assertIn("_test_leftover_queue_zero_plans_on_topbar_clock", hd)
+        self.assertIn("_test_event_frame_zero_plans_non_roll", hd)
+        self.assertIn("TOPBAR_SCENE", hd)
         self.assertIn("DAYROLL_OWN_SHARE_BUDGET_MS", hd)
         self.assertIn("DAYROLL_CAPTURE_BUDGET_MS := 300.0", hd)
         self.assertNotIn("QUIET_DAY_BUDGET_MS", hd)
         self.assertNotIn("TEN_CAPTURE_FRAME_BUDGET_MS", hd)
+        self.assertNotIn("_test_leftover_queue_zero_plans_on_later_node_roll", hd)
+        sm = (ROOT / "scripts" / "supply" / "SupplyManager.gd").read_text(
+            encoding="utf-8"
+        )
+        proc = extract_gd_func_body(sm, "_process")
+        self.assertNotIn("call_deferred(", proc)
+        self.assertNotIn("_clock_will_cross_midnight_this_frame", sm)
+        self.assertIn("func is_tick_due_this_frame", sm)
+        self.assertIn("plans_on_roll_frame", sm)
 
     def test_live_multi_ai_harness_exists(self) -> None:
         hd = ROOT / "scripts" / "core" / "HeadlessPerf4LiveMultiAiDayTest.gd"
