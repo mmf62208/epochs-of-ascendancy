@@ -692,7 +692,10 @@ func note_clock_order(phase: String) -> void:
 
 
 func _clock_bar_owns_after_clock_refill() -> bool:
-	var bar: Node = _find_live_clock_bar()
+	return _clock_bar_is_live(_find_live_clock_bar())
+
+
+func _clock_bar_is_live(bar: Node) -> bool:
 	if bar == null or not is_instance_valid(bar):
 		return false
 	if bar.is_queued_for_deletion():
@@ -703,16 +706,18 @@ func _clock_bar_owns_after_clock_refill() -> bool:
 
 
 func _find_live_clock_bar() -> Node:
-	if _clock_bar != null and is_instance_valid(_clock_bar) and not _clock_bar.is_queued_for_deletion():
+	if _clock_bar_is_live(_clock_bar):
 		return _clock_bar
+	_clock_bar = null
 	var tree := get_tree()
 	if tree == null or tree.root == null:
-		_clock_bar = null
 		return null
-	_clock_bar = tree.root.find_child("TopInfoBar", true, false)
-	if _clock_bar != null and _clock_bar.is_queued_for_deletion():
-		_clock_bar = null
-	return _clock_bar
+	var matches: Array[Node] = tree.root.find_children("TopInfoBar", "", true, false)
+	for n in matches:
+		if _clock_bar_is_live(n):
+			_clock_bar = n
+			return n
+	return null
 
 
 func _on_relations_or_access_changed(a: String = "", b: String = "", _snap: Dictionary = {}) -> void:

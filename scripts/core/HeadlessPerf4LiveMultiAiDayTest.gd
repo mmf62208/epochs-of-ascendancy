@@ -2179,7 +2179,7 @@ func _instance_player_clock_bar(tm: Node) -> Node:
 		tm.set("_smoke_chunk_active", false)
 	var sm_live: Node = root.get_node_or_null("/root/SupplyManager")
 	if sm_live != null and "_clock_bar" in sm_live:
-		sm_live.set("_clock_bar", null)
+		sm_live.set("_clock_bar", bar)
 	return bar
 
 
@@ -2209,6 +2209,7 @@ func _free_clock_bar(bar: Node, sm: Node) -> void:
 	if bar != null and is_instance_valid(bar):
 		if bar.has_method("set_process"):
 			bar.set_process(false)
+		bar.name = "TopInfoBar_dying"
 		bar.queue_free()
 	if sm != null and "_clock_bar" in sm:
 		sm.set("_clock_bar", null)
