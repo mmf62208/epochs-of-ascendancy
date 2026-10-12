@@ -678,10 +678,15 @@ func _b4_deferred_refill_depot_hub() -> void:
 		p.set("infrastructure", 10)
 	_sm.call("set_player_depot", depot_pid, true)
 	_drop_routes_touching(depot_pid)
-	await _after_change_frame()
+	# Pulse this frame before leftover refill drains so role is hub, not route.
+	if _mr.has_method("_pulse_supply_outlines"):
+		_mr.call("_pulse_supply_outlines")
+	var qn0 := _refill_queue_n()
+	_info("B4 queue after depot add (pre-process) n=%d on_route=%s" % [qn0, str(_pid_on_sm_route(depot_pid))])
 	if _pid_on_sm_route(depot_pid):
 		_drop_routes_touching(depot_pid)
-		await _after_change_frame()
+		if _mr.has_method("_pulse_supply_outlines"):
+			_mr.call("_pulse_supply_outlines")
 	var role := _role_of(depot_pid)
 	if role != "hub":
 		_fail("B4 frame+1 depot pid %d has role '%s' (want hub, not engineers_recommended)" % [depot_pid, role])
@@ -696,7 +701,6 @@ func _b4_deferred_refill_depot_hub() -> void:
 
 	var injected: Array[int] = []
 	var drained := 0
-	var qn0 := _refill_queue_n()
 	if qn0 > 0:
 		_info("B4 #88 refill queue n=%d — drain 1/frame via process" % qn0)
 		var frames := 0
