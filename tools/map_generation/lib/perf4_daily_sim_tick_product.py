@@ -572,6 +572,10 @@ def build_perf4_daily_sim_tick_product() -> Dict[str, Any]:
         passes.append("live_multi_ai_wired_into_gates")
     else:
         fails.append("live_multi_ai_wired_into_gates")
+    if "launch_perf4_windowed_backup" in gates and "EOA_PERF4_WINDOWED_BACKUP_ONLY" in gates:
+        passes.append("windowed_backup_wired_into_gates")
+    else:
+        fails.append("windowed_backup_wired_into_gates")
     if "test_perf4_daily_sim_tick_product" in gates:
         passes.append("wired_into_quick")
     else:

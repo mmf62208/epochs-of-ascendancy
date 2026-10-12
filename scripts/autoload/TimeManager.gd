@@ -87,6 +87,8 @@ var _last_advance_real_msec: int = 0
 ## Process-frame id of the last calendar day boundary (set in advance_days
 ## before the deferred `_flush_sim_events`). Refill skips on this frame.
 var _day_rolled_frame: int = -1
+## Cached live TopInfoBar (clock owner). Avoid find_children every frame.
+var _clock_bar: Node = null
 ## Test seam: run the windowed backup clock under headless and even while
 ## TopInfoBar is live (reproduces the FIX #10 live race).
 var _force_windowed_backup_clock: bool = false
@@ -156,9 +158,10 @@ func maybe_run_windowed_backup_clock() -> bool:
 	if _last_advance_real_msec <= 0:
 		_last_advance_real_msec = now_ms
 		return false
-	if _backup_clock_blocked_by_top_bar(now_ms):
-		return false
+	# Cheap 1 Hz gate first — do not walk the scene tree every frame.
 	if now_ms - _last_advance_real_msec < 1000:
+		return false
+	if _backup_clock_blocked_by_top_bar(now_ms):
 		return false
 	advance_real_time(1.0)
 	return true
@@ -185,18 +188,24 @@ func _backup_clock_blocked_by_top_bar(now_ms: int) -> bool:
 	var last_tick: int = 0
 	if "_last_sim_tick_msec" in bar:
 		last_tick = int(bar.get("_last_sim_tick_msec"))
+	# Never-ticked bar: starve from TM's last advance so the 2 s safety
+	# net can still fire (last_tick<=0 must not block forever).
 	if last_tick <= 0:
-		return true
+		last_tick = _last_advance_real_msec if _last_advance_real_msec > 0 else now_ms
 	return now_ms - last_tick <= BACKUP_CLOCK_STARVE_MS
 
 
 func _find_live_top_info_bar() -> Node:
+	if _clock_bar != null and is_instance_valid(_clock_bar) and not _clock_bar.is_queued_for_deletion():
+		return _clock_bar
+	_clock_bar = null
 	var tree := get_tree()
 	if tree == null or tree.root == null:
 		return null
 	var matches: Array[Node] = tree.root.find_children("TopInfoBar", "", true, false)
 	for n in matches:
 		if n != null and is_instance_valid(n) and not n.is_queued_for_deletion():
+			_clock_bar = n
 			return n
 	return null
 

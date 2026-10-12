@@ -258,6 +258,13 @@ else
   run_step launch_perf4_interactive_multi_ai \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessPerf4InteractiveMultiAiTest.gd || fail
 
+  # PERF-4 FIX #11: leftover-queue ×7 on the windowed backup clock + deferred
+  # day emit. Isolates the live race (TM self-drive before TIB; mark was
+  # deferred). Must FAIL on 1cddb51c and PASS on the tip. Also runs inside
+  # launch_perf4_live_multi_ai_day.
+  run_step launch_perf4_windowed_backup \
+    env EOA_PERF4_WINDOWED_BACKUP_ONLY=1 tools/run_godot.sh --headless -s res://scripts/core/HeadlessPerf4LiveMultiAiDayTest.gd || fail
+
   run_step launch_perf4_live_multi_ai_day \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessPerf4LiveMultiAiDayTest.gd || fail
 

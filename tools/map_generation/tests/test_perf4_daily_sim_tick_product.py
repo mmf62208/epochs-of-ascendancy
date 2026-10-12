@@ -124,6 +124,7 @@ class TestPerf4DailySimTickProduct(unittest.TestCase):
             "full_supply_day_count",
             "peace_annex_notifies_supply",
             "live_multi_ai_wired_into_gates",
+            "windowed_backup_wired_into_gates",
         ):
             self.assertIn(key, p.get("passes") or [], msg=p)
 
