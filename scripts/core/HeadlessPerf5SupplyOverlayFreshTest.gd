@@ -111,6 +111,77 @@ func _batch_count() -> int:
 	return -1
 
 
+func _batch_role_of(pid: int) -> String:
+	var batch: Node = _mr.get("_supply_outline_batch") as Node
+	if batch == null:
+		return ""
+	var items: Variant = batch.get("_items")
+	if typeof(items) != TYPE_ARRAY:
+		return ""
+	for item_var in items:
+		if typeof(item_var) != TYPE_DICTIONARY:
+			continue
+		var item: Dictionary = item_var
+		if int(item.get("pid", -1)) == pid:
+			return str(item.get("role", ""))
+	return ""
+
+
+func _rebuild_count() -> int:
+	if _mr != null and _mr.has_method("get_supply_outline_rebuild_count"):
+		return int(_mr.call("get_supply_outline_rebuild_count"))
+	return -1
+
+
+func _refill_queue_n() -> int:
+	if _sm != null and _sm.has_method("count_refill_queue"):
+		return int(_sm.call("count_refill_queue"))
+	return 0
+
+
+func _pid_on_sm_route(pid: int) -> bool:
+	if _sm == null or not _sm.has_method("get_all_routes"):
+		return false
+	for plan_var in _sm.get_all_routes():
+		if not (plan_var is Object):
+			continue
+		if bool(plan_var.get("represents_trade_flow")):
+			continue
+		var path: Array = plan_var.get("province_path")
+		if path.has(pid):
+			return true
+	return false
+
+
+func _inject_route_through(depot_pid: int) -> Array[int]:
+	var path: Array[int] = [_cap_pid]
+	if not ("_routes" in _sm):
+		return path
+	var plan_scr: Script = load("res://scripts/supply/SupplyRoutePlan.gd") as Script
+	if plan_scr == null:
+		return path
+	var dest_col := (depot_pid - BASE_PID) % COLS
+	var dest_row := int((depot_pid - BASE_PID) / COLS)
+	var r := 1
+	while r <= dest_row:
+		path.append(_pid_at(0, r))
+		r += 1
+	var c := 1
+	while c <= dest_col:
+		path.append(_pid_at(c, dest_row))
+		c += 1
+	if path[path.size() - 1] != depot_pid:
+		path.append(depot_pid)
+	var key := "%d_%d" % [_cap_pid, depot_pid]
+	var plan: Object = plan_scr.new()
+	plan.set("route_id", key)
+	plan.set("source_province_id", _cap_pid)
+	plan.set("target_province_id", depot_pid)
+	plan.set("province_path", path)
+	_sm._routes[key] = plan
+	return path
+
+
 func _run() -> void:
 	DisplayServer.window_set_size(Vector2i(1280, 740))
 	if root != null:
@@ -123,6 +194,7 @@ func _run() -> void:
 	await _b1_real_api()
 	await _b2_silent_mutation()
 	await _b3_no_change_frames()
+	await _b4_deferred_refill_depot_hub()
 	if _mr != null and is_instance_valid(_mr):
 		_mr.queue_free()
 
@@ -588,3 +660,112 @@ func _b3_no_change_frames() -> void:
 		_fail("B3 no-change L off/on recomputed roles %d→%d (PERF-3 cache-hit)" % [roles0, roles1])
 	else:
 		_pass("B3 no-change L off/on cache hit (roles=%d)" % roles1)
+
+
+func _b4_deferred_refill_depot_hub() -> void:
+	# Deferred-refill shape: a new low-infra player depot with no route through
+	# it yet (#88 queues dest refills 1/frame; on main we strip the rebuilt
+	# routes). Frame+1 must be hub, not engineers_recommended. After a refill
+	# or injected plan, depot + path pids become route via patch_items.
+	_ensure_l_on()
+	await process_frame
+	var depot_pid := _off_route_pid
+	if "player_depot_province_ids" in _sm and depot_pid in _sm.player_depot_province_ids:
+		_sm.call("set_player_depot", depot_pid, false)
+		await _after_change_frame()
+	var p: Variant = _mr.provinces.get(depot_pid)
+	if p != null:
+		p.set("infrastructure", 10)
+	_sm.call("set_player_depot", depot_pid, true)
+	_drop_routes_touching(depot_pid)
+	await _after_change_frame()
+	if _pid_on_sm_route(depot_pid):
+		_drop_routes_touching(depot_pid)
+		await _after_change_frame()
+	var role := _role_of(depot_pid)
+	if role != "hub":
+		_fail("B4 frame+1 depot pid %d has role '%s' (want hub, not engineers_recommended)" % [depot_pid, role])
+	else:
+		_pass("B4 frame+1 depot pid %d role=hub" % depot_pid)
+	var batch_role := _batch_role_of(depot_pid)
+	if batch_role != "hub":
+		_fail("B4 frame+1 batch item pid %d role='%s' want hub" % [depot_pid, batch_role])
+	else:
+		_pass("B4 frame+1 batch has hub outline for %d" % depot_pid)
+	_assert_overlay("B4 hub-before-refill", depot_pid, "hub")
+
+	var injected: Array[int] = []
+	var drained := 0
+	var qn0 := _refill_queue_n()
+	if qn0 > 0:
+		_info("B4 #88 refill queue n=%d — drain 1/frame via process" % qn0)
+		var frames := 0
+		while frames < 48 and (_refill_queue_n() > 0 or not _pid_on_sm_route(depot_pid)):
+			var patch_before := _batch_patches()
+			var rebuild_before := _rebuild_count()
+			var q_before := _refill_queue_n()
+			await _after_change_frame()
+			frames += 1
+			drained += 1
+			var rms := _reconcile_ms()
+			var patch_after := _batch_patches()
+			var rebuild_after := _rebuild_count()
+			var q_after := _refill_queue_n()
+			_info("B4 refill frame %d q=%d→%d rec=%.3fms patches=%d→%d rebuilds=%d→%d role=%s" % [
+				frames, q_before, q_after, rms, patch_before, patch_after, rebuild_before, rebuild_after, _role_of(depot_pid),
+			])
+			if rms >= 1.0:
+				_fail("B4 refill frame %d reconcile %.3f ms >= 1" % [frames, rms])
+			if rebuild_after > rebuild_before:
+				_fail("B4 refill frame %d took full rebuild not patch_items (%d→%d)" % [frames, rebuild_before, rebuild_after])
+			elif q_after != q_before or patch_after > patch_before:
+				_pass("B4 refill frame %d incremental patch_items=%d rec=%.3fms" % [frames, patch_after - patch_before, rms])
+			if _pid_on_sm_route(depot_pid):
+				break
+			if q_after <= 0 and q_before <= 0:
+				break
+	if not _pid_on_sm_route(depot_pid):
+		injected = _inject_route_through(depot_pid)
+		_info("B4 injected route through %d path=%s" % [depot_pid, str(injected)])
+		var patch0 := _batch_patches()
+		var rebuild0 := _rebuild_count()
+		await _after_change_frame()
+		var patch1 := _batch_patches()
+		var rebuild1 := _rebuild_count()
+		var rms_after := _reconcile_ms()
+		_info("B4 post-inject patches=%d→%d rebuilds=%d→%d rec=%.3fms drained=%d" % [
+			patch0, patch1, rebuild0, rebuild1, rms_after, drained,
+		])
+		if rebuild1 > rebuild0:
+			_fail("B4 post-inject took full rebuild not patch_items")
+		elif patch1 <= patch0:
+			_fail("B4 post-inject expected incremental patch_items (%d→%d)" % [patch0, patch1])
+		else:
+			_pass("B4 post-inject incremental patch_items %d→%d rec=%.3fms" % [patch0, patch1, rms_after])
+		if rms_after >= 1.0:
+			_fail("B4 post-inject reconcile %.3f ms >= 1" % rms_after)
+		else:
+			_pass("B4 post-inject reconcile %.3f ms < 1" % rms_after)
+	var role_after := _role_of(depot_pid)
+	if role_after != "route":
+		_fail("B4 after refill/inject depot pid %d role='%s' want route" % [depot_pid, role_after])
+	else:
+		_pass("B4 after refill/inject depot pid %d role=route" % depot_pid)
+	var path_ok := true
+	var sm_routes: Array = _sm.get_all_routes()
+	for plan_var in sm_routes:
+		if not (plan_var is Object):
+			continue
+		if bool(plan_var.get("represents_trade_flow")):
+			continue
+		var path: Array = plan_var.get("province_path")
+		if not path.has(depot_pid):
+			continue
+		for pid_var in path:
+			if _role_of(int(pid_var)) not in ["route", "active", "preview"]:
+				path_ok = false
+				_fail("B4 new route pid %d role='%s' want route" % [int(pid_var), _role_of(int(pid_var))])
+				break
+	if path_ok:
+		_pass("B4 new route pids have role route")
+	_assert_overlay("B4 after refill/inject", depot_pid, "hub")

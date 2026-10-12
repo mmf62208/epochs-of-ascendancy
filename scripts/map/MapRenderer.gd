@@ -29303,6 +29303,11 @@ func _supply_role_context() -> Dictionary:
 			var depot: Variant = sm.get_depot_state(int(pid_var)) if sm.has_method("get_depot_state") else sm.depot_states[pid_var]
 			if depot != null and depot.has_method("fill_ratio") and float(depot.fill_ratio()) >= 0.0:
 				(ctx["has_depot"] as Dictionary)[int(pid_var)] = true
+	# Player depots are hubs even before a route refill threads them
+	# (#88 queues one dest per frame; the depot_state exists immediately).
+	if sm != null and "player_depot_province_ids" in sm:
+		for pid_var in sm.player_depot_province_ids:
+			(ctx["has_depot"] as Dictionary)[int(pid_var)] = true
 	if sm != null and sm.has_method("get_selected_province_id"):
 		ctx["selected"] = int(sm.get_selected_province_id())
 	if int(ctx["selected"]) < 0:
@@ -29353,6 +29358,8 @@ func _supply_role_for_pid(pid: int, ctx: Dictionary = {}) -> String:
 	var roles: Dictionary[int, String] = {}
 	if not role.is_empty():
 		roles[pid] = role
+	# Hub (player depot / depot_states) is protected inside the helper
+	# the same way as route/active/preview — infra<45 must not replace it.
 	_apply_infra_pressure_role_for_pid(pid, roles)
 	return str(roles.get(pid, ""))
 
@@ -29383,7 +29390,12 @@ func _apply_infra_pressure_role_for_pid(pid: int, roles: Dictionary[int, String]
 	if not supply_mode:
 		return
 	var existing: String = str(roles.get(pid, ""))
-	if existing in ["active", "preview", "route"]:
+	if existing in ["active", "preview", "route", "hub"]:
+		return
+	if _pid_is_player_supply_hub(pid):
+		# Same precedence as the full-build path: a player depot keeps hub
+		# even when the caller has not stamped the role yet (infra<45).
+		roles[pid] = "hub"
 		return
 	if not provinces.has(pid):
 		return
@@ -29668,11 +29680,28 @@ func _collect_supply_route_pids() -> Dictionary:
 func _collect_supply_depot_pids() -> Dictionary:
 	var out := {}
 	var sm := _supply_manager()
-	if sm == null or not ("depot_states" in sm):
+	if sm == null:
 		return out
-	for pid_var in sm.depot_states.keys():
-		out[int(pid_var)] = true
+	if "depot_states" in sm:
+		for pid_var in sm.depot_states.keys():
+			out[int(pid_var)] = true
+	if "player_depot_province_ids" in sm:
+		for pid_var in sm.player_depot_province_ids:
+			out[int(pid_var)] = true
 	return out
+
+
+func _pid_is_player_supply_hub(pid: int) -> bool:
+	var sm := _supply_manager()
+	if sm == null:
+		return false
+	if "player_depot_province_ids" in sm:
+		if pid in (sm.player_depot_province_ids as Array):
+			return true
+	if "depot_states" in sm:
+		if (sm.depot_states as Dictionary).has(pid):
+			return true
+	return false
 
 
 func _store_supply_roles_cache_fingerprint() -> void:
