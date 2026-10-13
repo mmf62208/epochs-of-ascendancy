@@ -29569,6 +29569,13 @@ func get_supply_outline_rebuild_count() -> int:
 	return _supply_outline_rebuild_count
 
 
+func get_supply_outline_draw_commands() -> int:
+	if _supply_outline_batch != null and is_instance_valid(_supply_outline_batch):
+		if _supply_outline_batch.has_method("last_draw_command_count"):
+			return int(_supply_outline_batch.call("last_draw_command_count"))
+	return -1
+
+
 func get_supply_toggle_role_computes() -> int:
 	return _supply_toggle_role_computes
 
