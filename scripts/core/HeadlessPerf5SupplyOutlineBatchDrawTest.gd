@@ -257,6 +257,9 @@ func _direct_batch_layer() -> void:
 
 	# Pulse is modulate-only: no geometry rebuild, same draw-command count.
 	var cmds_before: int = _draw_commands(_batch)
+	var rebuilds_before: int = 0
+	if _batch.has_method("last_style_rebuilds"):
+		rebuilds_before = int(_batch.call("last_style_rebuilds"))
 	if _batch.has_method("set_pulse_phase"):
 		_batch.call("set_pulse_phase", 1.25)
 	await _flush()
@@ -267,10 +270,10 @@ func _direct_batch_layer() -> void:
 		_pass("pulse modulate-only (cmds=%d)" % cmds_after)
 	if _batch.has_method("last_style_rebuilds"):
 		var pulse_rebuilds: int = int(_batch.call("last_style_rebuilds"))
-		if pulse_rebuilds != 0:
-			_fail("pulse rebuilt %d styles" % pulse_rebuilds)
+		if pulse_rebuilds != rebuilds_before:
+			_fail("pulse rebuilt styles %d→%d (must stay modulate-only)" % [rebuilds_before, pulse_rebuilds])
 		else:
-			_pass("pulse rebuilt 0 styles")
+			_pass("pulse rebuilt 0 extra styles (still %d from last patch)" % pulse_rebuilds)
 
 
 func _l_on_map_renderer() -> void:
