@@ -29449,6 +29449,8 @@ func _pulse_supply_outlines() -> void:
 			skip[_hover_outline_province_id] = true
 		if _supply_outline_batch.has_method("set_skip_pids"):
 			_supply_outline_batch.call("set_skip_pids", skip)
+		if _supply_outline_batch.has_method("notify_view"):
+			_supply_outline_batch.call("notify_view")
 		if _supply_outline_batch.has_method("set_pulse_phase"):
 			_supply_outline_batch.call("set_pulse_phase", _outline_pulse_phase)
 		return
@@ -29573,6 +29575,27 @@ func get_supply_outline_draw_commands() -> int:
 	if _supply_outline_batch != null and is_instance_valid(_supply_outline_batch):
 		if _supply_outline_batch.has_method("last_draw_command_count"):
 			return int(_supply_outline_batch.call("last_draw_command_count"))
+	return -1
+
+
+func get_supply_outline_aa_line_commands() -> int:
+	if _supply_outline_batch != null and is_instance_valid(_supply_outline_batch):
+		if _supply_outline_batch.has_method("last_aa_line_command_count"):
+			return int(_supply_outline_batch.call("last_aa_line_command_count"))
+	return -1
+
+
+func get_supply_outline_drawn_segments() -> int:
+	if _supply_outline_batch != null and is_instance_valid(_supply_outline_batch):
+		if _supply_outline_batch.has_method("last_drawn_segment_count"):
+			return int(_supply_outline_batch.call("last_drawn_segment_count"))
+	return -1
+
+
+func get_supply_outline_drawn_vertices() -> int:
+	if _supply_outline_batch != null and is_instance_valid(_supply_outline_batch):
+		if _supply_outline_batch.has_method("last_drawn_vertex_count"):
+			return int(_supply_outline_batch.call("last_drawn_vertex_count"))
 	return -1
 
 
