@@ -242,6 +242,11 @@ else
   run_step launch_perf3_supply_toggle \
     tools/run_godot.sh --headless --resolution 1280x740 -s res://scripts/core/HeadlessPerf3SupplyToggleTest.gd || fail
 
+  run_step launch_perf5_legend_day_tick \
+    tools/run_godot.sh --headless --resolution 1280x740 -s res://scripts/core/HeadlessPerf5LegendDayTickTest.gd || fail
+  run_step launch_perf5_supply_overlay_fresh \
+    tools/run_godot.sh --headless --resolution 1280x740 -s res://scripts/core/HeadlessPerf5SupplyOverlayFreshTest.gd || fail
+
   run_step launch_mv1b_input_gate \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessMv1bInputGateTest.gd || fail
 
