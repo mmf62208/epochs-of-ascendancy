@@ -29879,6 +29879,21 @@ func _cached_supply_polygon(node: Node2D, pid: int) -> PackedVector2Array:
 	if _supply_poly_cache.has(pid):
 		return _supply_poly_cache[pid]
 	var pts := _province_polygon(node)
+	var poly := _get_province_polygon(node)
+	if poly != null and pts.size() >= 3:
+		# Batch is a sibling under container. Live GIS hosts sit at origin
+		# with world-space polys (identity). Synthetic harnesses offset the
+		# host and keep a local ring — map those into container space so
+		# camera-rect buckets match what the player sees.
+		var xf: Transform2D = node.transform * poly.transform
+		if xf != Transform2D.IDENTITY:
+			var world_pts := PackedVector2Array()
+			world_pts.resize(pts.size())
+			var i := 0
+			while i < pts.size():
+				world_pts[i] = xf * pts[i]
+				i += 1
+			pts = world_pts
 	_supply_poly_cache[pid] = pts
 	return pts
 

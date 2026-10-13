@@ -342,6 +342,15 @@ func _l_on_map_renderer() -> void:
 	await _flush()
 	_mr.call("_toggle_supply_overlay")
 	await _flush()
+	var batch_view: Node = _mr.get("_supply_outline_batch") as Node
+	# _ready recenters MapCamera on Europe; pin a rect over the synthetic
+	# grid so FIX #3 still counts the batched L-on commands.
+	if batch_view != null:
+		if batch_view.has_method("set_view_zoom"):
+			batch_view.call("set_view_zoom", 2.0)
+		if batch_view.has_method("set_view_rect"):
+			batch_view.call("set_view_rect", Rect2(-80.0, -80.0, 3360.0, 1760.0))
+	await _flush()
 	var visible_n: int = 0
 	if _mr.has_method("get_supply_overlay_outline_visible_count"):
 		visible_n = int(_mr.call("get_supply_overlay_outline_visible_count"))

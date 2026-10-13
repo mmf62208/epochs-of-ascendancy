@@ -329,13 +329,19 @@ func _l_on_map_renderer() -> void:
 	await _flush()
 	_mr.call("_toggle_supply_overlay")
 	await _flush()
-	if _mr.has_method("_pulse_supply_outlines"):
-		_mr.call("_pulse_supply_outlines")
-	await _flush()
 	var batch: Node = _mr.get("_supply_outline_batch") as Node
 	if batch == null:
 		_fail("L-on batch missing")
 		return
+	# MapRenderer._ready recenters MapCamera on Europe; pin the batch view
+	# to the synthetic Home rect so this path measures the same counters.
+	if batch.has_method("set_view_zoom"):
+		batch.call("set_view_zoom", HOME_Z)
+	if batch.has_method("set_view_rect"):
+		batch.call("set_view_rect", VIEW_RECT)
+	if _mr.has_method("_pulse_supply_outlines"):
+		_mr.call("_pulse_supply_outlines")
+	await _flush()
 	var item_n: int = 0
 	if batch.has_method("item_count"):
 		item_n = int(batch.call("item_count"))
