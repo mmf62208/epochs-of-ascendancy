@@ -287,9 +287,9 @@ func _rebuild_style_merged(key: String) -> void:
 
 
 func _flush_dirty_styles() -> void:
-	_last_style_rebuilds = 0
 	if _dirty_styles.is_empty():
 		return
+	_last_style_rebuilds = 0
 	for key_var in _dirty_styles.keys():
 		var key: String = str(key_var)
 		_rebuild_style_merged(key)
