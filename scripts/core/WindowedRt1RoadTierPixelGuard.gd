@@ -43,6 +43,7 @@ var _out_dir: String = ""
 var _captures: PackedStringArray = PackedStringArray()
 var _last_wait_log: int = -1
 var _matrix_i: int = 0
+var _matrix_dismiss_pending: bool = false
 var _width_hits: Dictionary = {}
 var _soft: Dictionary = {}
 var _rss_start_kb: int = 0
@@ -178,6 +179,7 @@ func _begin_matrix_band() -> void:
 	_force_political_clean()
 	_set_units_view(false)
 	_frame_over_koln(float(row["z"]), true)
+	_matrix_dismiss_pending = true
 	_settle_left = SETTLE_FRAMES
 	_phase = Phase.MATRIX_SETTLE
 
@@ -191,6 +193,14 @@ func _do_matrix_capture() -> void:
 	if _matrix_i >= zooms.size():
 		_go_settle(Phase.SOFT)
 		return
+	if _matrix_dismiss_pending:
+		_dismiss_inspector_tooltip()
+		_matrix_dismiss_pending = false
+		_settle_left = 1
+		_after_settle = Phase.MATRIX_CAPTURE
+		_phase = Phase.SETTLE
+		return
+	_dismiss_inspector_tooltip()
 	var row: Dictionary = zooms[_matrix_i]
 	_capture_matrix_band(str(row["name"]), float(row["z"]))
 	_matrix_i += 1
@@ -237,6 +247,11 @@ func _resolve_sample_pair(kind: String, fallback_a: int, fallback_b: int) -> Vec
 		var row: Dictionary = row_v
 		var a := int(row.get("p1", 0))
 		var b := int(row.get("p2", 0))
+		var c1: Vector2 = row.get("c1", Vector2.ZERO)
+		var c2: Vector2 = row.get("c2", Vector2.ZERO)
+		var mid: Vector2 = c1.lerp(c2, 0.5)
+		if _world_mid_under_visible_control(mid):
+			continue
 		if (a == fallback_a and b == fallback_b) or (b == fallback_a and a == fallback_b):
 			return Vector2i(a, b)
 		if bool(row.get("explicit", false)):
@@ -246,9 +261,6 @@ func _resolve_sample_pair(kind: String, fallback_a: int, fallback_b: int) -> Vec
 		# Gold spine neighbours read as 16 px amber, not the paved/dirt look.
 		if a == KOELN or b == KOELN or a == BONN or b == BONN or a == LEV or b == LEV:
 			continue
-		var c1: Vector2 = row.get("c1", Vector2.ZERO)
-		var c2: Vector2 = row.get("c2", Vector2.ZERO)
-		var mid: Vector2 = c1.lerp(c2, 0.5)
 		var d: float = mid.distance_to(koln)
 		if d < best_d:
 			best_d = d
@@ -665,11 +677,58 @@ func _select_koln() -> void:
 
 
 func _close_panel() -> void:
+	_dismiss_inspector_tooltip()
+
+
+func _dismiss_inspector_tooltip() -> void:
 	var mr := _map_renderer()
-	if mr != null and mr.has_method("hide_info_panel"):
-		mr.call("hide_info_panel")
-	elif mr != null and mr.has_method("_dismiss_inspector_and_restore_input"):
+	if mr == null:
+		return
+	if mr.has_method("_dismiss_inspector_and_restore_input"):
 		mr.call("_dismiss_inspector_and_restore_input")
+	if mr.has_method("hide_info_panel"):
+		mr.call("hide_info_panel")
+	if mr.has_method("_hide_hover_tooltip"):
+		mr.call("_hide_hover_tooltip")
+	mr.set("_hold_camera_until_msec", 0)
+	mr.set("_close_camera_locked", false)
+
+
+func _world_mid_under_visible_control(world_mid: Vector2) -> bool:
+	var layer := _road_layer()
+	var xform := Transform2D.IDENTITY
+	if layer != null:
+		xform = layer.get_global_transform_with_canvas()
+	return _screen_under_visible_control(xform * world_mid)
+
+
+func _screen_under_visible_control(screen: Vector2) -> bool:
+	var vp_size := Vector2(1280.0, 720.0)
+	var vp := root.get_viewport() if root != null else null
+	if vp != null:
+		var vr := vp.get_visible_rect()
+		vp_size = Vector2(vr.size)
+	return _walk_control_covers(root, screen, vp_size, false)
+
+
+func _walk_control_covers(n: Node, screen: Vector2, vp_size: Vector2, under_canvas: bool) -> bool:
+	if n == null:
+		return false
+	var on_canvas: bool = under_canvas or (n is CanvasLayer)
+	# Inspector / compare tooltip / HUD live on CanvasLayer. Map Labels are Node2D children.
+	if on_canvas and n is Control:
+		var c := n as Control
+		if c.is_visible_in_tree():
+			var r := c.get_global_rect()
+			if r.size.x >= 1.0 and r.size.y >= 1.0:
+				var area: float = r.size.x * r.size.y
+				var vp_area: float = maxf(vp_size.x * vp_size.y, 1.0)
+				if area / vp_area < 0.90 and r.has_point(screen):
+					return true
+	for ch in n.get_children():
+		if _walk_control_covers(ch, screen, vp_size, on_canvas):
+			return true
+	return false
 
 
 func _set_units_view(on: bool) -> void:
@@ -838,8 +897,8 @@ func _frame_over_koln(zoom: float, hide_inspector: bool) -> void:
 		mr.call("player_path_search_go", KOELN)
 	elif mr != null and mr.has_method("open_province_inspector_from_search"):
 		mr.call("open_province_inspector_from_search", KOELN)
-	if hide_inspector and mr != null and mr.has_method("hide_info_panel"):
-		mr.call("hide_info_panel")
+	if hide_inspector:
+		_dismiss_inspector_tooltip()
 	if mr != null and mr.has_method("player_path_wheel_toward_world"):
 		_cam_zoom = float(mr.call("player_path_wheel_toward_world", _koln_world(), zoom))
 	var cam := _camera()

@@ -98,12 +98,87 @@ func _has_key(keys: Dictionary, a: int, b: int) -> bool:
 	return keys.has(RoadTierVisualScript.edge_key(a, b))
 
 
+func _uf_find(parent: Dictionary, x: int) -> int:
+	if not parent.has(x):
+		parent[x] = x
+	var p: int = int(parent[x])
+	if p != x:
+		p = _uf_find(parent, p)
+		parent[x] = p
+	return p
+
+
+func _uf_union(parent: Dictionary, a: int, b: int) -> void:
+	var ra: int = _uf_find(parent, a)
+	var rb: int = _uf_find(parent, b)
+	if ra != rb:
+		parent[rb] = ra
+
+
+## Local copy so this script loads on main 61a80433 (no `_hwy1_*` parse).
+func _component_stats(cache: Array) -> Dictionary:
+	if RoadTierVisualScript.has_method("_hwy1_component_stats"):
+		var via: Variant = RoadTierVisualScript.call("_hwy1_component_stats", cache)
+		if typeof(via) == TYPE_DICTIONARY:
+			return via
+	var parent: Dictionary = {}
+	var hwy_rows: Array = []
+	for row_v in cache:
+		if typeof(row_v) != TYPE_DICTIONARY:
+			continue
+		var row: Dictionary = row_v
+		if int(row.get("display_tier", 0)) != RoadTierVisualScript.TIER_HIGHWAY:
+			continue
+		var a: int = int(row.get("p1", 0))
+		var b: int = int(row.get("p2", 0))
+		if a == 0 or b == 0:
+			continue
+		hwy_rows.append(row)
+		_uf_union(parent, a, b)
+	var edges_by_root: Dictionary = {}
+	for row2_v in hwy_rows:
+		var row2: Dictionary = row2_v
+		var a2: int = int(row2.get("p1", 0))
+		var root: int = _uf_find(parent, a2)
+		edges_by_root[root] = int(edges_by_root.get(root, 0)) + 1
+	var sizes: Array = []
+	for root_v in edges_by_root.keys():
+		sizes.append(int(edges_by_root[root_v]))
+	sizes.sort()
+	var singletons: int = 0
+	for sz_v in sizes:
+		if int(sz_v) <= 1:
+			singletons += 1
+	var median: float = 0.0
+	if not sizes.is_empty():
+		var mid: int = sizes.size() / 2
+		if sizes.size() % 2 == 1:
+			median = float(sizes[mid])
+		else:
+			median = (float(sizes[mid - 1]) + float(sizes[mid])) * 0.5
+	return {
+		"highways": hwy_rows.size(),
+		"components": sizes.size(),
+		"singletons": singletons,
+		"sizes": sizes,
+		"median": median,
+	}
+
+
 func _component_sizes(cache: Array) -> Array:
-	var st: Dictionary = RoadTierVisualScript._hwy1_component_stats(cache)
+	var st: Dictionary = _component_stats(cache)
 	var sizes_v: Variant = st.get("sizes", [])
 	if typeof(sizes_v) != TYPE_ARRAY:
 		return []
 	return sizes_v
+
+
+func _hwy_budget(inferred_n: int) -> int:
+	if RoadTierVisualScript.has_method("_hwy1_budget"):
+		return int(RoadTierVisualScript.call("_hwy1_budget", inferred_n))
+	if inferred_n <= 0:
+		return 0
+	return ceili(float(inferred_n) * (1.0 - RoadTierVisualScript.HIGHWAY_RARE_RANK))
 
 
 func _assign(cache: Array) -> void:
@@ -309,7 +384,7 @@ func _apply_legacy_rank(cache: Array) -> void:
 
 
 func _print_measure(tag: String, cache: Array, extra: Dictionary) -> void:
-	var st: Dictionary = RoadTierVisualScript._hwy1_component_stats(cache)
+	var st: Dictionary = _component_stats(cache)
 	var sizes: Array = []
 	var sizes_v: Variant = st.get("sizes", [])
 	if typeof(sizes_v) == TYPE_ARRAY:
@@ -546,8 +621,8 @@ func _test_part_b_live_1936() -> void:
 		]
 	)
 
-	var after_st: Dictionary = RoadTierVisualScript._hwy1_component_stats(cache)
-	var before_st: Dictionary = RoadTierVisualScript._hwy1_component_stats(legacy)
+	var after_st: Dictionary = _component_stats(cache)
+	var before_st: Dictionary = _component_stats(legacy)
 	var after_hwy: int = int(after_st.get("highways", 0))
 	var before_hwy: int = int(before_st.get("highways", 0))
 	var comps: int = int(after_st.get("components", 0))
@@ -618,7 +693,8 @@ func _test_part_b_live_1936() -> void:
 	var legacy_ms: PackedFloat32Array = PackedFloat32Array()
 	var new_ms: PackedFloat32Array = PackedFloat32Array()
 	var sets: Array = []
-	for _run_i in range(3):
+	const TIMING_REPEATS := 5
+	for _run_i in range(TIMING_REPEATS):
 		var legacy_clone: Array = _clone_cache(cache)
 		_reset_inferred_tiers(legacy_clone)
 		var tl: int = Time.get_ticks_usec()
@@ -687,7 +763,7 @@ func _test_part_b_live_1936() -> void:
 		"HWY1_BARS inferred_n=%d budget=%d before_hwy=%d after_hwy=%d comps=%d sings=%d median=%.2f"
 		% [
 			inferred_n,
-			RoadTierVisualScript._hwy1_budget(inferred_n),
+			_hwy_budget(inferred_n),
 			before_hwy,
 			after_hwy,
 			comps,
