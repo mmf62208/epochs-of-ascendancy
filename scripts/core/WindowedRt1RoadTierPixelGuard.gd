@@ -807,6 +807,7 @@ func _measure_run_at(img: Image, sa: Vector2, sb: Vector2, kind: String) -> Dict
 	var r_acc := 0.0
 	var g_acc := 0.0
 	var b_acc := 0.0
+	var t_widths: Array = []
 	# Dirt is dashed at mid/close; sample several t values so a gap cannot zero the width.
 	# Use the longest contiguous run nearest the centre — the Europe mesh would
 	# otherwise stretch first-hit→last-hit across neighbouring edges.
@@ -852,13 +853,20 @@ func _measure_run_at(img: Image, sa: Vector2, sb: Vector2, kind: String) -> Dict
 			var dist3 := mini(absi(run_start), 20)
 			if run > best_run or (run == best_run and dist3 < best_run_dist):
 				best_run = run
+		t_widths.append(best_run)
 		if best_run > best_w:
 			best_w = best_run
 			out["hit_x"] = mid.x
 			out["hit_y"] = mid.y
+	# Highway: median across t-samples so a merged parallel at one t cannot
+	# inflate past the default ceiling, and a core-only clip cannot hide casing.
+	if kind == "highway" and t_widths.size() >= 3:
+		t_widths.sort()
+		var mid_i: int = int(t_widths.size()) / 2
+		best_w = int(t_widths[mid_i])
 	# Same pair only — never re-pick another edge. Hunt nearby pixels when the
 	# centroid chord clips a cased stroke (far Home was measuring 7 of 9).
-	if best_w < 8 and kind == "highway":
+	if best_w < 9 and kind == "highway":
 		# Default-band centroid chord can sit a few px off the cased stroke
 		# (or under leftover inspector chrome). Hunt nearby casing/stripe pixels
 		# and keep the longest perpendicular run (do not stop on the first edge hit).
