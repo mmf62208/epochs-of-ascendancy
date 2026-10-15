@@ -584,132 +584,177 @@ static func _hwy1_budget(inferred_n: int) -> int:
 	return ceili(float(inferred_n) * (1.0 - HIGHWAY_RARE_RANK))
 
 
-static func _hwy1_weight_more(a: Dictionary, b: Dictionary) -> bool:
-	var wa: float = float(a.get("weight", 0.0))
-	var wb: float = float(b.get("weight", 0.0))
+## Weight desc, infra desc, int pair-key asc (same order as string edge_key on 6-digit pids).
+static func _hwy1_idx_weight_more(
+	ia: int,
+	ib: int,
+	weights: PackedFloat32Array,
+	infras: PackedFloat32Array,
+	keys: Array,
+) -> bool:
+	var wa: float = weights[ia]
+	var wb: float = weights[ib]
 	if wa == wb:
-		var ia: float = float(a.get("avg_infra", 0.0))
-		var ib: float = float(b.get("avg_infra", 0.0))
-		if ia == ib:
-			return _entry_key(a) < _entry_key(b)
-		return ia > ib
+		var infa: float = infras[ia]
+		var infb: float = infras[ib]
+		if infa == infb:
+			return int(keys[ia]) < int(keys[ib])
+		return infa > infb
 	return wa > wb
 
 
-static func _hwy1_endpoint_index(cache: Array) -> Dictionary:
-	var by_pid: Dictionary = {}
-	for row_v in cache:
-		if typeof(row_v) != TYPE_DICTIONARY:
-			continue
-		var row: Dictionary = row_v
-		var a: int = int(row.get("p1", 0))
-		var b: int = int(row.get("p2", 0))
-		if a == 0 or b == 0 or a == b:
-			continue
-		if not by_pid.has(a):
-			by_pid[a] = []
-		if not by_pid.has(b):
-			by_pid[b] = []
-		(by_pid[a] as Array).append(row)
-		(by_pid[b] as Array).append(row)
-	return by_pid
+static func _hwy1_sort_adj_desc(
+	lst: Array,
+	weights: PackedFloat32Array,
+	infras: PackedFloat32Array,
+	keys: Array,
+) -> void:
+	var m: int = lst.size()
+	for i in range(1, m):
+		var x: int = int(lst[i])
+		var j: int = i - 1
+		while j >= 0:
+			var y: int = int(lst[j])
+			if not _hwy1_idx_weight_more(x, y, weights, infras, keys):
+				break
+			lst[j + 1] = y
+			j -= 1
+		lst[j + 1] = x
 
 
-static func _hwy1_above_paved_floor(row: Dictionary, ranks: Dictionary) -> bool:
-	if bool(row.get("explicit", false)):
+static func _hwy1_add_pid(pids: PackedInt32Array, pid: int) -> void:
+	if pid == 0:
+		return
+	for i in range(pids.size()):
+		if pids[i] == pid:
+			return
+	pids.append(pid)
+
+
+static func _hwy1_above_paved_idx(ei: int, explicit_flags: PackedByteArray, rank_at: PackedFloat32Array) -> bool:
+	if explicit_flags[ei] == 1:
 		return true
-	return float(ranks.get(_hwy1_row_key(row), 0.0)) >= PAVED_RANK_FLOOR
+	return rank_at[ei] >= PAVED_RANK_FLOOR
 
 
-static func _hwy1_absorb_explicit(chain: Array, in_chain: Dictionary, by_pid: Dictionary) -> void:
+static func _hwy1_absorb_explicit_idx(
+	chain: PackedInt32Array,
+	in_chain: PackedByteArray,
+	pids: PackedInt32Array,
+	by_pid: Dictionary,
+	explicit_flags: PackedByteArray,
+	p1s: PackedInt32Array,
+	p2s: PackedInt32Array,
+) -> void:
 	var grew: bool = true
 	while grew:
 		grew = false
-		var endpoints: Dictionary = {}
-		for row_v in chain:
-			var row: Dictionary = row_v
-			endpoints[int(row.get("p1", 0))] = true
-			endpoints[int(row.get("p2", 0))] = true
-		for pid_v in endpoints.keys():
-			var list_v: Variant = by_pid.get(int(pid_v), [])
+		var snap: int = pids.size()
+		for pi in range(snap):
+			var pid: int = pids[pi]
+			var list_v: Variant = by_pid.get(pid, [])
 			if typeof(list_v) != TYPE_ARRAY:
 				continue
 			var list: Array = list_v
-			for nb_v in list:
-				if typeof(nb_v) != TYPE_DICTIONARY:
+			for j in range(list.size()):
+				var ei: int = int(list[j])
+				if in_chain[ei] == 1:
 					continue
-				var nb: Dictionary = nb_v
-				if not bool(nb.get("explicit", false)):
+				if explicit_flags[ei] != 1:
 					continue
-				var nk: int = _hwy1_row_key(nb)
-				if in_chain.has(nk):
-					continue
-				chain.append(nb)
-				in_chain[nk] = true
+				chain.append(ei)
+				in_chain[ei] = 1
+				_hwy1_add_pid(pids, p1s[ei])
+				_hwy1_add_pid(pids, p2s[ei])
 				grew = true
 
 
-static func _hwy1_heaviest_unpicked_neighbour(
-	chain: Array,
+static func _hwy1_heaviest_nbr_idx(
+	pids: PackedInt32Array,
 	by_pid: Dictionary,
-	in_chain: Dictionary,
-	picked: Dictionary,
-	ranks: Dictionary,
-) -> Dictionary:
-	var endpoints: Dictionary = {}
-	for row_v in chain:
-		var row: Dictionary = row_v
-		endpoints[int(row.get("p1", 0))] = true
-		endpoints[int(row.get("p2", 0))] = true
-	var best: Dictionary = {}
+	in_chain: PackedByteArray,
+	picked: PackedByteArray,
+	weights: PackedFloat32Array,
+	infras: PackedFloat32Array,
+	keys: Array,
+	explicit_flags: PackedByteArray,
+	rank_at: PackedFloat32Array,
+) -> int:
+	var best_i: int = -1
+	var best_w: float = 0.0
+	var best_infra: float = 0.0
+	var best_k: int = 0
 	var have: bool = false
-	for pid_v in endpoints.keys():
-		var list_v: Variant = by_pid.get(int(pid_v), [])
+	for pi in range(pids.size()):
+		var list_v: Variant = by_pid.get(pids[pi], [])
 		if typeof(list_v) != TYPE_ARRAY:
 			continue
 		var list: Array = list_v
-		for nb_v in list:
-			if typeof(nb_v) != TYPE_DICTIONARY:
+		for j in range(list.size()):
+			var ei: int = int(list[j])
+			if in_chain[ei] == 1 or picked[ei] == 1:
 				continue
-			var nb: Dictionary = nb_v
-			var nk: int = _hwy1_row_key(nb)
-			if in_chain.has(nk) or picked.has(nk):
-				continue
-			if not have or _hwy1_weight_more(nb, best):
-				best = nb
+			var w: float = weights[ei]
+			var inf: float = infras[ei]
+			var k: int = int(keys[ei])
+			if (
+				not have
+				or w > best_w
+				or (w == best_w and inf > best_infra)
+				or (w == best_w and inf == best_infra and k < best_k)
+			):
+				best_i = ei
+				best_w = w
+				best_infra = inf
+				best_k = k
 				have = true
+			break
 	if not have:
-		return {}
-	if not _hwy1_above_paved_floor(best, ranks):
-		return {}
-	return best
+		return -1
+	if not _hwy1_above_paved_idx(best_i, explicit_flags, rank_at):
+		return -1
+	return best_i
 
 
-static func _hwy1_grow_chain(
-	seed: Dictionary,
+static func _hwy1_grow_chain_idx(
+	seed_i: int,
+	p1s: PackedInt32Array,
+	p2s: PackedInt32Array,
+	picked: PackedByteArray,
 	by_pid: Dictionary,
-	picked: Dictionary,
-	ranks: Dictionary,
+	weights: PackedFloat32Array,
+	infras: PackedFloat32Array,
+	keys: Array,
+	explicit_flags: PackedByteArray,
+	rank_at: PackedFloat32Array,
 	has_explicit: bool,
-) -> Array:
-	var chain: Array = [seed]
-	var in_chain: Dictionary = {}
-	in_chain[_hwy1_row_key(seed)] = true
+) -> PackedInt32Array:
+	var chain: PackedInt32Array = PackedInt32Array()
+	chain.append(seed_i)
+	var in_chain: PackedByteArray = PackedByteArray()
+	in_chain.resize(p1s.size())
+	in_chain[seed_i] = 1
+	var pids: PackedInt32Array = PackedInt32Array()
+	_hwy1_add_pid(pids, p1s[seed_i])
+	_hwy1_add_pid(pids, p2s[seed_i])
 	if has_explicit:
-		_hwy1_absorb_explicit(chain, in_chain, by_pid)
+		_hwy1_absorb_explicit_idx(chain, in_chain, pids, by_pid, explicit_flags, p1s, p2s)
 	while chain.size() < 3:
-		var nxt: Dictionary = _hwy1_heaviest_unpicked_neighbour(
-			chain, by_pid, in_chain, picked, ranks
+		var nxt: int = _hwy1_heaviest_nbr_idx(
+			pids, by_pid, in_chain, picked, weights, infras, keys, explicit_flags, rank_at
 		)
-		if nxt.is_empty():
+		if nxt < 0:
 			break
 		chain.append(nxt)
-		in_chain[_hwy1_row_key(nxt)] = true
+		in_chain[nxt] = 1
+		_hwy1_add_pid(pids, p1s[nxt])
+		_hwy1_add_pid(pids, p2s[nxt])
 		if has_explicit:
-			_hwy1_absorb_explicit(chain, in_chain, by_pid)
+			_hwy1_absorb_explicit_idx(chain, in_chain, pids, by_pid, explicit_flags, p1s, p2s)
 	return chain
 
 
+## One adjacency (int pid → Array of cache indices). No String keys, no per-seed rebuild.
 static func _hwy1_pick_highway_chains(
 	cache: Array,
 	inferred: Array,
@@ -719,20 +764,62 @@ static func _hwy1_pick_highway_chains(
 	var budget: int = _hwy1_budget(inferred.size())
 	if budget <= 0:
 		return
-	var by_pid: Dictionary = _hwy1_endpoint_index(cache)
-	var picked: Dictionary = {}
+	var n: int = cache.size()
+	var p1s: PackedInt32Array = PackedInt32Array()
+	var p2s: PackedInt32Array = PackedInt32Array()
+	var weights: PackedFloat32Array = PackedFloat32Array()
+	var infras: PackedFloat32Array = PackedFloat32Array()
+	var rank_at: PackedFloat32Array = PackedFloat32Array()
+	var explicit_flags: PackedByteArray = PackedByteArray()
+	var picked: PackedByteArray = PackedByteArray()
+	p1s.resize(n)
+	p2s.resize(n)
+	weights.resize(n)
+	infras.resize(n)
+	rank_at.resize(n)
+	explicit_flags.resize(n)
+	picked.resize(n)
+	var keys: Array = []
+	keys.resize(n)
+	var idx_by_key: Dictionary = {}
+	var by_pid: Dictionary = {}
 	var has_explicit: bool = false
-	for row_v in cache:
+	for i in range(n):
+		var row_v: Variant = cache[i]
 		if typeof(row_v) != TYPE_DICTIONARY:
+			keys[i] = 0
 			continue
 		var row: Dictionary = row_v
-		if bool(row.get("explicit", false)):
-			picked[_hwy1_row_key(row)] = true
+		var a: int = int(row.get("p1", 0))
+		var b: int = int(row.get("p2", 0))
+		p1s[i] = a
+		p2s[i] = b
+		weights[i] = float(row.get("weight", 0.0))
+		infras[i] = float(row.get("avg_infra", 0.0))
+		var k: int = _hwy1_pair_key(a, b)
+		keys[i] = k
+		idx_by_key[k] = i
+		rank_at[i] = float(ranks.get(k, 0.0))
+		var is_ex: bool = bool(row.get("explicit", false))
+		if is_ex:
+			explicit_flags[i] = 1
+			picked[i] = 1
 			has_explicit = true
+		if a == 0 or b == 0 or a == b:
+			continue
+		var lst_a: Array = by_pid.get(a, [])
+		lst_a.append(i)
+		by_pid[a] = lst_a
+		var lst_b: Array = by_pid.get(b, [])
+		lst_b.append(i)
+		by_pid[b] = lst_b
+	for pid_v in by_pid.keys():
+		var lst: Array = by_pid[pid_v]
+		_hwy1_sort_adj_desc(lst, weights, infras, keys)
+		by_pid[pid_v] = lst
 	var seeds: Array = seeds_desc
 	if seeds.is_empty():
-		seeds = inferred.duplicate()
-		seeds.sort_custom(_hwy1_weight_more)
+		seeds = inferred
 	var used: int = 0
 	var seed_cap: int = mini(seeds.size(), maxi(budget * 2, 16))
 	var seed_i: int = 0
@@ -742,27 +829,35 @@ static func _hwy1_pick_highway_chains(
 		seed_i += 1
 		if seed_i > seed_cap:
 			break
+		if typeof(seed_v) != TYPE_DICTIONARY:
+			continue
 		var seed: Dictionary = seed_v
 		var sk: int = _hwy1_row_key(seed)
-		if picked.has(sk):
+		var si: int = int(idx_by_key.get(sk, -1))
+		if si < 0 or picked[si] == 1:
 			continue
-		var chain: Array = _hwy1_grow_chain(seed, by_pid, picked, ranks, has_explicit)
+		var chain: PackedInt32Array = _hwy1_grow_chain_idx(
+			si, p1s, p2s, picked, by_pid, weights, infras, keys, explicit_flags, rank_at, has_explicit
+		)
 		if chain.size() < 3:
 			continue
 		var inferred_n: int = 0
-		for ch_v in chain:
-			var ch: Dictionary = ch_v
-			if not bool(ch.get("explicit", false)):
+		for ci in range(chain.size()):
+			if explicit_flags[chain[ci]] != 1:
 				inferred_n += 1
 		if inferred_n <= 0 or inferred_n > (budget - used):
 			continue
-		for ch2_v in chain:
+		for ci2 in range(chain.size()):
+			var ei2: int = chain[ci2]
+			picked[ei2] = 1
+			if explicit_flags[ei2] == 1:
+				continue
+			var ch2_v: Variant = cache[ei2]
+			if typeof(ch2_v) != TYPE_DICTIONARY:
+				continue
 			var ch2: Dictionary = ch2_v
-			var ck: int = _hwy1_row_key(ch2)
-			picked[ck] = true
-			if not bool(ch2.get("explicit", false)):
-				ch2["display_tier"] = TIER_HIGHWAY
-				used += 1
+			ch2["display_tier"] = TIER_HIGHWAY
+			used += 1
 
 
 ## HWY-1 log / bars: connected components of highway edges (size = edge count).
