@@ -32,9 +32,9 @@ const DIRT_GAP_SCREEN_PX := 6.0
 const DIRT_COLOR := Color(0.84, 0.56, 0.18, 0.96)
 const PAVED_COLOR := Color(0.34, 0.36, 0.40, 0.94)
 const PAVED_EDGE_COLOR := Color(0.16, 0.17, 0.20, 0.82)
-const HIGHWAY_CASING_COLOR := Color(0.05, 0.05, 0.07, 0.96)
-const HIGHWAY_CORE_COLOR := Color(0.22, 0.24, 0.28, 0.95)
-const HIGHWAY_STRIPE_COLOR := Color(0.98, 0.94, 0.62, 0.98)
+const HIGHWAY_CASING_COLOR := Color(0.05, 0.05, 0.07, 1.0)
+const HIGHWAY_CORE_COLOR := Color(0.22, 0.24, 0.28, 1.0)
+const HIGHWAY_STRIPE_COLOR := Color(0.98, 0.94, 0.62, 1.0)
 
 ## Zoom LOD. Europe Home is ~0.33–0.69 (strategic / low operational). The
 ## previous FAR_MAX=0.45 left Home in the mid band, so every NUTS3 dirt

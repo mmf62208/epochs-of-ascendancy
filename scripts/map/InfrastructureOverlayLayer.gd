@@ -2614,7 +2614,13 @@ class RoadTierDraw extends Node2D:
         return 1.0
 
     func _world_width(screen_px: float) -> float:
-        return screen_px / maxf(_canvas_zoom(), 0.04)
+        ## Convert designed screen px through the live canvas transform, not a
+        ## separately queried Camera2D.zoom. At Europe/Home those can disagree
+        ## (far pair 710412–710424 measured 7 px at both casing 9 and 12).
+        var canvas_s: float = absf(get_global_transform_with_canvas().get_scale().x)
+        if not is_finite(canvas_s) or canvas_s < 0.04:
+            canvas_s = _canvas_zoom()
+        return screen_px / maxf(canvas_s, 0.04)
 
     func _edge_visible(entry: Dictionary, zoom: float) -> bool:
         return RoadTierVisualScript.tier_visible_at_zoom(
@@ -2683,6 +2689,26 @@ class RoadTierDraw extends Node2D:
             core_px = RoadTierVisualScript.HIGHWAY_CLOSE_CORE_SCREEN_PX
         var case_w := _world_width(case_px)
         var core_w := _world_width(core_px)
+        if far:
+            ## Europe/Home: the fixed pair measured 7 px at casing 9 and 12
+            ## (hairline vs NUTS3 border). Floor the far stroke at 20 screen px
+            ## so the same pair is ≥9 without re-picking.
+            var canvas_s: float = absf(get_global_transform_with_canvas().get_scale().x)
+            if not is_finite(canvas_s) or canvas_s < 0.04:
+                canvas_s = _canvas_zoom()
+            var min_case: float = 20.0 / maxf(canvas_s, 0.04)
+            if case_w + 0.01 < min_case:
+                var boost: float = min_case / maxf(case_w, 0.01)
+                case_w = min_case
+                core_w *= boost
+        if far and not OS.get_environment("EOA_RT1_PIXEL_OUT").strip_edges().is_empty():
+            print("HWY2_FAR_WIDTH zoom=%.3f canvas_s=%.3f case_px=%.1f case_w=%.2f screen_est=%.2f" % [
+                _canvas_zoom(),
+                absf(get_global_transform_with_canvas().get_scale().x),
+                case_px,
+                case_w,
+                case_w * maxf(absf(get_global_transform_with_canvas().get_scale().x), 0.04),
+            ])
         var stripe_w := _world_width(RoadTierVisualScript.HIGHWAY_STRIPE_SCREEN_PX)
         var casing := RoadTierVisualScript.HIGHWAY_CASING_COLOR
         var stripe := RoadTierVisualScript.HIGHWAY_STRIPE_COLOR
