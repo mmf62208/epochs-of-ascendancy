@@ -284,7 +284,9 @@ func _layout_drawn_marker(rec: Dictionary, zoom: float) -> Dictionary:
 	var is_round := _art_is_round(rec)
 	var art_rect := _art_body_rect(icon_rect, is_round)
 	var halo_w := _halo_grow_world(zoom)
-	var hit_icon := art_rect.grow(halo_w) if halo_w > 0.0 else art_rect
+	## FIX #8: the halo is paint only. Clicks belong to the drawn art
+	## (oval for L1–L3, circle for L4), never the HALO_PX ring.
+	var hit_icon := art_rect
 	var oval_rect := _oval_rect(icon_rect)
 	var hits: Array[Rect2] = [hit_icon]
 	var badge_rect := Rect2()
