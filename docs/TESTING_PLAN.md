@@ -974,7 +974,7 @@ Per-edge rank in `assign_rare_display_tiers` painted the top ~4% of trunk edges 
 
 Guard `HeadlessHwy1HighwayChainTest` Part A (5-chain line, star 3-spokes, two 5-clusters, explicit 4-chain, nondet) + Part B live 1936: median **≥4**, **0** singletons, **≤12** components, highway count ±10%, Ruhr ordered pids measured (no assign whitelist). **Must not call `_hwy1_*` statics**. Timing median of ≥5 vs legacy rank. Wired as `launch_hwy1_highway_chain`.
 
-Pixel: `WindowedRt1RoadTierPixelGuard` measures the **fixed** `710412–710424` pair at far/default/close (no `_measure_best_highway` re-pick). Fail if a sample is **<8 px**. Highway mins: far **≥9**, default **≥12**, close **≥16**. Screenshots `docs/evidence/hwy2/`. **Headless + xvfb, live Play pending.**
+Pixel: `WindowedRt1RoadTierPixelGuard` measures the **fixed** `710412–710424` pair at far/default/close (no `_measure_best_highway` re-pick). Fail if a sample is **<8 px**. Highway mins: far **≥9**, default **≥12**, close **≥16**. Far may Y-flip the same pair when unflip <8 (viewport image vs canvas; cap 8–48 px). Measured tip: far **40** / default **17** / close **20**. Screenshots `docs/evidence/hwy2/`. **Headless + xvfb, live Play pending.**
 
 ### RX-1 Rhine Crossing (Phase B draft)
 
