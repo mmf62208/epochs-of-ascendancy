@@ -1,16 +1,16 @@
 {
-	"delta_ms": 211.152,
+	"delta_ms": 198.748,
 	"display": "X11",
-	"hue_olive_edge": 7343,
-	"hue_orange_edge": 10401,
-	"hue_teal_edge": 40119,
-	"hue_teal_fill": 182995,
-	"hue_teal_share": 0.69334462437136,
-	"loff_frame1_ms": 185.823,
-	"loff_frame2_ms": 220.669,
-	"lon_frame1_ms": 324.875,
-	"lon_frame2_ms": 431.821,
+	"hue_olive_edge": 239,
+	"hue_orange_edge": 8916,
+	"hue_teal_edge": 41434,
+	"hue_teal_fill": 152857,
+	"hue_teal_share": 0.819031805333175,
+	"loff_frame1_ms": 188.403,
+	"loff_frame2_ms": 223.252,
+	"lon_frame1_ms": 321.457,
+	"lon_frame2_ms": 422.0,
 	"measure_a": true,
 	"sha": "5df8e7fcc8c5dceb3b0429e14c87c83b116feee7",
-	"width_proxy": 4.5613051172761
+	"width_proxy": 3.68916831587585
 }
