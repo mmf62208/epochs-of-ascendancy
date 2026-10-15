@@ -229,11 +229,22 @@ func _capture_matrix_band(band: String, zoom: float) -> void:
 		var kind := str(s["kind"])
 		var crop := _capture("rt1_%s_%s" % [band, kind])
 		var pair: Vector2i = Vector2i(int(s["a"]), int(s["b"]))
+		var meas: Dictionary = {}
 		if kind == "highway":
 			pair = _hwy_sample
+			meas = _measure_edge(crop, pair.x, pair.y, kind)
 		else:
+			# Keep-green paved/dirt may skip a hub-route neighbour that no longer
+			# reads as grey/tan. Highway stays one pair, no re-pick.
+			var tried: Dictionary = {}
 			pair = _resolve_sample_pair(kind, int(s["a"]), int(s["b"]))
-		var meas: Dictionary = _measure_edge(crop, pair.x, pair.y, kind)
+			meas = _measure_edge(crop, pair.x, pair.y, kind)
+			var guard_i := 0
+			while float(meas.get("width_px", 0.0)) <= 0.15 and guard_i < 8:
+				tried[_hwy_pair_key(pair.x, pair.y)] = true
+				pair = _resolve_sample_pair(kind, int(s["a"]), int(s["b"]), tried)
+				meas = _measure_edge(crop, pair.x, pair.y, kind)
+				guard_i += 1
 		# HWY-3: one fixed orientation, one hub-route pair chosen by rule. No re-pick.
 		_width_hits["%s_%s" % [kind, band]] = meas
 		_log("EOA_RT1_PIXEL_GUARD who=guard.sample kind=%s zoom=%s pair=%d-%d w=%.2f sig=%s flipped=%s" % [
@@ -442,7 +453,11 @@ func _capture_wide_germany() -> void:
 		_fail_reasons.append("wide_germany_runs_%d" % n)
 
 
-func _resolve_sample_pair(kind: String, fallback_a: int, fallback_b: int) -> Vector2i:
+func _hwy_pair_key(a: int, b: int) -> int:
+	return mini(a, b) * 1000000 + maxi(a, b)
+
+
+func _resolve_sample_pair(kind: String, fallback_a: int, fallback_b: int, skip: Dictionary = {}) -> Vector2i:
 	var ol := _overlay()
 	if ol == null or not ol.has_method("get_road_tier_cache"):
 		return Vector2i(fallback_a, fallback_b)
@@ -473,8 +488,13 @@ func _resolve_sample_pair(kind: String, fallback_a: int, fallback_b: int) -> Vec
 			continue
 		if c1.distance_to(c2) < 6.0:
 			continue
+		if skip.has(_hwy_pair_key(a, b)):
+			continue
+		if _hwy_pair_key(a, b) == _hwy_pair_key(_hwy_sample.x, _hwy_sample.y):
+			continue
 		if (a == fallback_a and b == fallback_b) or (b == fallback_a and a == fallback_b):
-			return Vector2i(a, b)
+			if skip.is_empty():
+				return Vector2i(a, b)
 		# Gold spine neighbours read as 16 px amber, not the paved/dirt look.
 		if a == KOELN or b == KOELN or a == BONN or b == BONN or a == LEV or b == LEV:
 			continue
