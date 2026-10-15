@@ -891,6 +891,8 @@ func _measure_run_at(img: Image, sa: Vector2, sb: Vector2, kind: String) -> Dict
 					run_h += 1
 				if run_h > best_w:
 					best_w = run_h
+					out["hit_x"] = float(hx)
+					out["hit_y"] = float(hy)
 					r_acc += hc.r
 					g_acc += hc.g
 					b_acc += hc.b

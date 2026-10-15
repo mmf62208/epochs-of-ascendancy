@@ -1615,16 +1615,106 @@ static func path_shape_report(
 	if allow_hook:
 		out["repeat"] = false
 		out["hook"] = false
+		out["long"] = false
+		out["zigzag"] = false
 	if allow_zig:
 		out["zigzag"] = false
 		out["long"] = false
 	out["ok"] = (
 		(not bool(out["repeat"]) or allow_hook)
 		and (not bool(out["hook"]) or allow_hook)
-		and (not bool(out["long"]) or allow_zig)
-		and (not bool(out["zigzag"]) or allow_zig)
+		and (not bool(out["long"]) or allow_zig or allow_hook)
+		and (not bool(out["zigzag"]) or allow_zig or allow_hook)
 	)
 	return out
+
+
+static func _hwy3_maybe_hook_repeat(pids: PackedInt32Array, mutant: String) -> PackedInt32Array:
+	if mutant != "hook_back" or pids.size() < 3:
+		return pids
+	var out: PackedInt32Array = PackedInt32Array()
+	out.append(pids[0])
+	out.append(pids[1])
+	out.append(pids[0])
+	for i in range(1, pids.size()):
+		out.append(pids[i])
+	return out
+
+
+static func _hwy3_union_path_hubs(tree_parent: Dictionary, pids: PackedInt32Array) -> void:
+	var prev_h: int = 0
+	for i in range(pids.size()):
+		var pid: int = int(pids[i])
+		if not tree_parent.has(pid):
+			continue
+		if prev_h > 0:
+			_uf_union(tree_parent, prev_h, pid)
+		prev_h = pid
+
+
+static func _hwy3_commit_hub_path(
+	cache: Array,
+	cache_by_key: Dictionary,
+	graph_by_key: Dictionary,
+	marked: Dictionary,
+	routes: Array,
+	tree_parent: Dictionary,
+	pids: PackedInt32Array,
+	a: int,
+	b: int,
+	shape: Dictionary,
+	used: int,
+	hi: int
+) -> int:
+	if pids.size() - 1 < HWY3_MIN_PATH_EDGES:
+		return used
+	var keys: Array = []
+	var new_n: int = 0
+	for pi in range(1, pids.size()):
+		var k: int = _hwy3_pair_key(int(pids[pi - 1]), int(pids[pi]))
+		keys.append(k)
+		if not marked.has(k):
+			var cidx_v: Variant = cache_by_key.get(k, -1)
+			var expl: bool = false
+			if int(cidx_v) >= 0:
+				expl = bool((cache[int(cidx_v)] as Dictionary).get("explicit", false))
+			if not expl:
+				new_n += 1
+	if used + new_n > hi:
+		return used
+	for k2_v in keys:
+		var k2: int = int(k2_v)
+		if marked.has(k2):
+			continue
+		marked[k2] = true
+		var idx_v: Variant = cache_by_key.get(k2, -1)
+		if int(idx_v) >= 0:
+			var er: Dictionary = cache[int(idx_v)]
+			if not bool(er.get("explicit", false)):
+				er["display_tier"] = TIER_HIGHWAY
+				used += 1
+		else:
+			var grow: Variant = graph_by_key.get(k2, null)
+			if typeof(grow) == TYPE_DICTIONARY:
+				var nrow: Dictionary = (grow as Dictionary).duplicate()
+				nrow["display_tier"] = TIER_HIGHWAY
+				cache.append(nrow)
+				cache_by_key[k2] = cache.size() - 1
+				if not bool(nrow.get("explicit", false)):
+					used += 1
+	var pid_arr: Array = []
+	for pii in range(pids.size()):
+		pid_arr.append(int(pids[pii]))
+	routes.append({
+		"a": a,
+		"b": b,
+		"pids": pid_arr,
+		"keys": keys,
+		"length": float(shape.get("length", 0.0)),
+		"straight": float(shape.get("straight", 0.0)),
+	})
+	_hwy3_union_path_hubs(tree_parent, pids)
+	return used
 
 
 static func build_hub_route_adj(graph: Array, records: Array, use_urban: bool) -> Dictionary:
@@ -1738,13 +1828,21 @@ static func _hwy3_order_pairs_for_paint(scored_pairs: Array) -> Array:
 		var tag: String = str(tag_v)
 		tag_rows.append({"tag": tag, "land_n": int(land_by_tag.get(tag, 0))})
 	tag_rows.sort_custom(_hwy3_tag_land_less)
-	var out: Array = []
+	var max_n: int = 0
 	for row_v in tag_rows:
 		var row: Dictionary = row_v
-		var lst2: Array = by_tag[str(row.get("tag", ""))]
+		var tag_s: String = str(row.get("tag", ""))
+		var lst2: Array = by_tag[tag_s]
 		lst2.sort_custom(_hwy3_pair_priority_less)
-		for sp2_v in lst2:
-			out.append(sp2_v)
+		by_tag[tag_s] = lst2
+		max_n = maxi(max_n, lst2.size())
+	var out: Array = []
+	for i in range(max_n):
+		for row2_v in tag_rows:
+			var row2: Dictionary = row2_v
+			var lst3: Array = by_tag[str(row2.get("tag", ""))]
+			if i < lst3.size():
+				out.append(lst3[i])
 	foreign.sort_custom(_hwy3_pair_priority_less)
 	for f_v in foreign:
 		out.append(f_v)
@@ -1925,166 +2023,88 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 	var routes: Array = []
 	var marked: Dictionary = {}
 	var not_shortest: bool = mutant == "not_shortest"
+	var tree_parent: Dictionary = {}
+	for hp_v in hub_set.keys():
+		var hp: int = int(hp_v)
+		tree_parent[hp] = hp
 	for sp_v in paint_pairs:
-		if used >= paint_budget:
+		if used >= hi:
 			break
 		var sp: Dictionary = sp_v
 		var a2: int = int(sp.get("a", 0))
 		var b2: int = int(sp.get("b", 0))
 		if not adj.has(a2) or not adj.has(b2):
 			continue
+		var tag_sp: String = str(sp.get("tag", "")).strip_edges().to_upper()
+		if (
+			not tag_sp.is_empty()
+			and tree_parent.has(a2)
+			and tree_parent.has(b2)
+			and _uf_find(tree_parent, a2) == _uf_find(tree_parent, b2)
+		):
+			continue
 		var pids: PackedInt32Array = shortest_hub_path(adj, a2, b2, not_shortest, attrs)
+		pids = _hwy3_maybe_hook_repeat(pids, mutant)
 		if pids.size() - 1 < HWY3_MIN_PATH_EDGES:
 			continue
 		var shape: Dictionary = path_shape_report(pids, centroids, a2, b2, mutant)
 		if not bool(shape.get("ok", false)):
 			continue
-		var keys: Array = []
-		var new_n: int = 0
-		for pi in range(1, pids.size()):
-			var k: int = _hwy3_pair_key(int(pids[pi - 1]), int(pids[pi]))
-			keys.append(k)
-			if not marked.has(k):
-				var cidx_v: Variant = cache_by_key.get(k, -1)
-				var expl: bool = false
-				if int(cidx_v) >= 0:
-					expl = bool((cache[int(cidx_v)] as Dictionary).get("explicit", false))
-				if not expl:
-					new_n += 1
-		if used + new_n > hi:
-			continue
-		for k2_v in keys:
-			var k2: int = int(k2_v)
-			if marked.has(k2):
+		used = _hwy3_commit_hub_path(
+			cache, cache_by_key, graph_by_key, marked, routes, tree_parent,
+			pids, a2, b2, shape, used, hi
+		)
+	var cover_tried: Dictionary = {}
+	var cover_guard: int = 0
+	while used < hi and cover_guard < 96:
+		cover_guard += 1
+		var best_a: int = 0
+		var best_b: int = 0
+		var best_d: float = 1.0e18
+		for h5_v in hubs:
+			var h5: Dictionary = h5_v
+			var hp5: int = int(h5.get("pid", 0))
+			if hp5 <= 0 or not adj.has(hp5) or not tree_parent.has(hp5):
 				continue
-			marked[k2] = true
-			var idx_v: Variant = cache_by_key.get(k2, -1)
-			if int(idx_v) >= 0:
-				var er: Dictionary = cache[int(idx_v)]
-				if not bool(er.get("explicit", false)):
-					er["display_tier"] = TIER_HIGHWAY
-					used += 1
-			else:
-				var grow: Variant = graph_by_key.get(k2, null)
-				if typeof(grow) == TYPE_DICTIONARY:
-					var nrow: Dictionary = (grow as Dictionary).duplicate()
-					nrow["display_tier"] = TIER_HIGHWAY
-					cache.append(nrow)
-					cache_by_key[k2] = cache.size() - 1
-					if not bool(nrow.get("explicit", false)):
-						used += 1
-		var pid_arr: Array = []
-		for pii in range(pids.size()):
-			pid_arr.append(int(pids[pii]))
-		routes.append({
-			"a": a2,
-			"b": b2,
-			"pids": pid_arr,
-			"keys": keys,
-			"length": float(shape.get("length", 0.0)),
-			"straight": float(shape.get("straight", 0.0)),
-		})
-	var covered_hubs: Dictionary = {}
-	for rt_c_v in routes:
-		if typeof(rt_c_v) != TYPE_DICTIONARY:
-			continue
-		var rt_c: Dictionary = rt_c_v
-		covered_hubs[int(rt_c.get("a", 0))] = true
-		covered_hubs[int(rt_c.get("b", 0))] = true
-		var pids_c_v: Variant = rt_c.get("pids", [])
-		if typeof(pids_c_v) == TYPE_ARRAY:
-			for pv_c in pids_c_v:
-				covered_hubs[int(pv_c)] = true
-	var do_cover: bool = used < paint_budget
-	for h5_v in hubs:
-		if not do_cover or used >= hi:
+			var tag5: String = str(h5.get("tag", "")).strip_edges().to_upper()
+			if tag5.is_empty():
+				continue
+			var c5: Vector2 = h5.get("centroid", Vector2.ZERO)
+			var root5: int = _uf_find(tree_parent, hp5)
+			for h6_v in hubs:
+				var h6: Dictionary = h6_v
+				var op6: int = int(h6.get("pid", 0))
+				if op6 <= hp5 or not adj.has(op6) or not tree_parent.has(op6):
+					continue
+				var ot6: String = str(h6.get("tag", "")).strip_edges().to_upper()
+				if ot6 != tag5:
+					continue
+				if _uf_find(tree_parent, op6) == root5:
+					continue
+				var pk6: int = _hwy3_pair_key(hp5, op6)
+				if cover_tried.has(pk6):
+					continue
+				var d6: float = c5.distance_to(h6.get("centroid", Vector2.ZERO))
+				if not is_finite(d6) or d6 <= 0.0:
+					continue
+				if d6 < best_d or (d6 == best_d and op6 < best_b):
+					best_d = d6
+					best_a = hp5
+					best_b = op6
+		if best_a <= 0 or best_b <= 0:
 			break
-		var h5: Dictionary = h5_v
-		var hp5: int = int(h5.get("pid", 0))
-		if hp5 <= 0 or covered_hubs.has(hp5):
-			continue
-		if (
-			(not bool(h5.get("capital", false)))
-			and int(h5.get("tier", 0)) < 3
-			and (not bool(h5.get("city_hub", false)))
-			and int(h5.get("urban_nbr", 0)) < 2
-			and (not bool(h5.get("industrial", false)))
-		):
-			continue
-		if not adj.has(hp5):
-			continue
-		var tag5: String = str(h5.get("tag", "")).strip_edges().to_upper()
-		var c5: Vector2 = h5.get("centroid", Vector2.ZERO)
-		var best_o: int = 0
-		var best_od: float = 1.0e18
-		for h6_v in hubs:
-			var h6: Dictionary = h6_v
-			var op6: int = int(h6.get("pid", 0))
-			if op6 == hp5 or not adj.has(op6):
-				continue
-			var d6: float = c5.distance_to(h6.get("centroid", Vector2.ZERO))
-			if not is_finite(d6) or d6 <= 0.0:
-				continue
-			var ot6: String = str(h6.get("tag", "")).strip_edges().to_upper()
-			if ot6 == tag5 and not tag5.is_empty():
-				d6 *= 0.25
-			if d6 < best_od or (d6 == best_od and op6 < best_o):
-				best_od = d6
-				best_o = op6
-		if best_o <= 0:
-			continue
-		var pids5: PackedInt32Array = shortest_hub_path(adj, hp5, best_o, not_shortest, attrs)
+		cover_tried[_hwy3_pair_key(best_a, best_b)] = true
+		var pids5: PackedInt32Array = shortest_hub_path(adj, best_a, best_b, not_shortest, attrs)
+		pids5 = _hwy3_maybe_hook_repeat(pids5, mutant)
 		if pids5.size() - 1 < HWY3_MIN_PATH_EDGES:
 			continue
-		var shape5: Dictionary = path_shape_report(pids5, centroids, hp5, best_o, mutant)
+		var shape5: Dictionary = path_shape_report(pids5, centroids, best_a, best_b, mutant)
 		if not bool(shape5.get("ok", false)):
 			continue
-		var keys5: Array = []
-		var new_n5: int = 0
-		for pi5 in range(1, pids5.size()):
-			var k5: int = _hwy3_pair_key(int(pids5[pi5 - 1]), int(pids5[pi5]))
-			keys5.append(k5)
-			if not marked.has(k5):
-				var cidx5_v: Variant = cache_by_key.get(k5, -1)
-				var expl5: bool = false
-				if int(cidx5_v) >= 0:
-					expl5 = bool((cache[int(cidx5_v)] as Dictionary).get("explicit", false))
-				if not expl5:
-					new_n5 += 1
-		if used + new_n5 > hi:
-			continue
-		for k5b_v in keys5:
-			var k5b: int = int(k5b_v)
-			if marked.has(k5b):
-				continue
-			marked[k5b] = true
-			var idx5_v: Variant = cache_by_key.get(k5b, -1)
-			if int(idx5_v) >= 0:
-				var er5: Dictionary = cache[int(idx5_v)]
-				if not bool(er5.get("explicit", false)):
-					er5["display_tier"] = TIER_HIGHWAY
-					used += 1
-			else:
-				var grow5: Variant = graph_by_key.get(k5b, null)
-				if typeof(grow5) == TYPE_DICTIONARY:
-					var nrow5: Dictionary = (grow5 as Dictionary).duplicate()
-					nrow5["display_tier"] = TIER_HIGHWAY
-					cache.append(nrow5)
-					cache_by_key[k5b] = cache.size() - 1
-					if not bool(nrow5.get("explicit", false)):
-						used += 1
-		var pid_arr5: Array = []
-		for pii5 in range(pids5.size()):
-			pid_arr5.append(int(pids5[pii5]))
-			covered_hubs[int(pids5[pii5])] = true
-		routes.append({
-			"a": hp5,
-			"b": best_o,
-			"pids": pid_arr5,
-			"keys": keys5,
-			"length": float(shape5.get("length", 0.0)),
-			"straight": float(shape5.get("straight", 0.0)),
-		})
+		used = _hwy3_commit_hub_path(
+			cache, cache_by_key, graph_by_key, marked, routes, tree_parent,
+			pids5, best_a, best_b, shape5, used, hi
+		)
 	var hub_list: Array = []
 	for h2_v in hubs:
 		var h2: Dictionary = h2_v

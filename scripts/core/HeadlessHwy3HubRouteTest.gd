@@ -718,13 +718,47 @@ func _test_h4_germany() -> void:
 		var h4: Dictionary = h4_v
 		if int(h4.get("tier", 0)) < 4:
 			continue
+		if str(h4.get("tag", "")).strip_edges().to_upper() != "GER":
+			continue
 		var hp4: int = int(h4.get("pid", 0))
 		if hp4 > 0 and not on_route.has(hp4):
 			t4_miss.append("%s:%d" % [str(h4.get("tag", "")), hp4])
 	if not t4_miss.is_empty():
-		_fail("H4: tier-4 city hubs not on a route %s" % str(t4_miss))
+		_fail("H4: GER tier-4 city hubs not on a route %s" % str(t4_miss))
 	else:
-		_pass("H4: every tier-4 city hub sits on a route")
+		_pass("H4: every GER tier-4 city hub sits on a route")
+	var major_hub_n: Dictionary = {}
+	var major_route: Dictionary = {}
+	for h_m_v in _debug().get("hubs", []):
+		if typeof(h_m_v) != TYPE_DICTIONARY:
+			continue
+		var h_m: Dictionary = h_m_v
+		var tm: String = str(h_m.get("tag", "")).strip_edges().to_upper()
+		if not MAJORS.has(tm):
+			continue
+		major_hub_n[tm] = int(major_hub_n.get(tm, 0)) + 1
+	for rt_m_v in _routes():
+		if typeof(rt_m_v) != TYPE_DICTIONARY:
+			continue
+		var rt_m: Dictionary = rt_m_v
+		for rec_m_v in recs:
+			if typeof(rec_m_v) != TYPE_DICTIONARY:
+				continue
+			var rec_m: Dictionary = rec_m_v
+			var pid_m: int = int(rec_m.get("pid", 0))
+			if pid_m != int(rt_m.get("a", 0)) and pid_m != int(rt_m.get("b", 0)):
+				continue
+			var tm2: String = str(rec_m.get("tag", "")).strip_edges().to_upper()
+			if MAJORS.has(tm2):
+				major_route[tm2] = true
+	var major_miss: Array = []
+	for tag_m in MAJORS:
+		if int(major_hub_n.get(tag_m, 0)) >= 2 and not bool(major_route.get(tag_m, false)):
+			major_miss.append(tag_m)
+	if not major_miss.is_empty():
+		_fail("H4: majors with ≥2 hubs have no hub route %s" % str(major_miss))
+	else:
+		_pass("H4: every multi-hub major painted a hub route")
 	var ger_hubs: Dictionary = {}
 	for h5_v in _debug().get("hubs", []):
 		if typeof(h5_v) != TYPE_DICTIONARY:
@@ -741,10 +775,16 @@ func _test_h4_germany() -> void:
 		if typeof(rt3_v) != TYPE_DICTIONARY:
 			continue
 		var rt3: Dictionary = rt3_v
-		var a3: int = int(rt3.get("a", 0))
-		var b3: int = int(rt3.get("b", 0))
-		if parent_g.has(a3) and parent_g.has(b3):
-			_uf_union_local(parent_g, a3, b3)
+		var pids3_v: Variant = rt3.get("pids", [])
+		var pids3: Array = pids3_v if typeof(pids3_v) == TYPE_ARRAY else []
+		var prev_g: int = 0
+		for pv3 in pids3:
+			var pid3: int = int(pv3)
+			if not parent_g.has(pid3):
+				continue
+			if prev_g > 0:
+				_uf_union_local(parent_g, prev_g, pid3)
+			prev_g = pid3
 	var roots_g: Dictionary = {}
 	for gp2 in parent_g.keys():
 		roots_g[_uf_find_local(parent_g, int(gp2))] = true
