@@ -463,6 +463,47 @@ Mutants the behaviour test kills: (a) sync supply on the roll frame (M3 day_ai 1
 
 Atomic defer + generate-step bound **PASS**. Depot diff none. Seed 193601 two collects identical (md5 `0e7237ac2a2f6feedf5c8032045e866d`): JAP 903951 / FRA 710739 / ITA 710859 / ENG 711481 / POL 711054 / SOV none / JAP 902474. `--quick` same 14 `unit_board_play_path` reds. map_qc NE **0.9853**.
 
+**FIX #2 (progress guarantee + estimate decay):** FIX #1 stored a phase's last cost clamped to 20 ms. Afford is `remaining ≤ estimate + 2`, so a 19 ms spike can never start under the 20 ms budget; the phase is never re-measured and the day stalls until deadline-0 catch-up. Headless harnesses that do not force the windowed backup (LiveMultiAi, Perf6 4× on a slow box) then finish 0 full supply days.
+
+Fix in `_run_supply_day_job` / `_generate_local_supply_range` / `_ship_routes_range`: if this slice has done **no work yet this frame**, always run the next atomic phase or at least one generate/ship item. Only defer after some work in the same frame. Deadline 0 still runs everything. `_supply_slice_note_phase_ms` EMA-blends `0.75·old + 0.25·new` (same as the item EMA) and clamps to `[0.05, 20]`. A deferred phase (or item) decays `×0.8` toward the 0.05 ms floor each frame it is skipped. Phase order, key order, and WHAT are unchanged — budgets still only change WHEN work runs. `_test_atomic_phase_defer` / `_test_generate_step_bound` still assert FIX #1 deferral **after** the frame has already done work.
+
+`HeadlessPerf6StarveTest` (wired `launch_perf6_starve`) forces a 19 ms atomic-phase estimate and, separately, a 20 ms generate-item estimate through the real job path at a 20 ms budget; pumps `_process` frames at 1× and 4× **without** catch-up / deadline-0; asserts `full_supply_day_count +1` within 160 frames and no slice `> 25 ms`; resets `supply_slice_phase_cost_estimate_ms` after each case.
+
+`HeadlessPerf6StarveTest` **FAIL on `d31e3223`** / **PASS on the tip**:
+
+```
+HeadlessPerf6StarveTest: RESULT=FAIL   # d31e3223 (phase/item 1×+4× starved 0→0 left=1 frames=160)
+HeadlessPerf6StarveTest: RESULT=PASS   # tip (phase 1× 10f slice_max=15.03; 4× 8f 15.02; item 1×/4× 5f)
+```
+
+`HeadlessPerf6DayRollTest` **3/3 PASS** (FIX #2 sitting). Paste clock lines:
+
+```
+clock 1x frames=870 full=12 unfinished_rolls=0 slice_max=17.77 slice_over=0 day_ai_n=12 p95=10.9 max=13.0 listener_n=12 listener_max=1.1
+clock 4x frames=221 full=12 unfinished_rolls=0 slice_max=17.98 slice_over=0 day_ai_n=12 p95=8.9 max=8.9 listener_n=12 listener_max=1.0
+clock 1x frames=870 full=12 unfinished_rolls=0 slice_max=17.53 slice_over=0 day_ai_n=12 p95=13.6 max=18.8 listener_n=12 listener_max=1.1
+clock 4x frames=221 full=12 unfinished_rolls=0 slice_max=18.51 slice_over=0 day_ai_n=12 p95=8.6 max=8.7 listener_n=12 listener_max=1.0
+clock 1x frames=870 full=12 unfinished_rolls=0 slice_max=17.49 slice_over=0 day_ai_n=12 p95=12.9 max=15.8 listener_n=12 listener_max=1.2
+clock 4x frames=222 full=12 unfinished_rolls=0 slice_max=17.93 slice_over=0 day_ai_n=12 p95=8.7 max=9.2 listener_n=12 listener_max=1.1
+```
+
+`HeadlessPerf4LiveMultiAiDayTest` **3/3 PASS** (exactly one full supply day per game day). Interactive **PASS** (one full supply day per soft apply). Daily **PASS** (7d wall 33.6 ms). Leftover-queue / MUST1 inside LiveMultiAi: TopInfoBar 6/0, scene-order 7/0, windowed-backup 7/0 `plans_on_roll=0`, refill after the clock, `tm_calendar_roll` → `tib_skip_refill`. Stockpile **PASS**. Perf5 overlay **PASS**. Legend **PASS** p95 5.50 / worst 17.77. Seed 193601 `multi_ai_decisions` identical across 3 OS-process runs and unchanged vs `d31e3223`. Locked infra: JAP 903951 / FRA 710739 / ITA 710859 / POL 711054 / ENG 711481 / USA 800075. `--quick` same 14 `unit_board_play_path` reds (`se_england` fill-toe 1, first-session play surface 1, unit_centric_pick 3, unit_counter_chrome 2, unit_card_fill_toe 3, living_unit_order_loop 4). map_qc NE **0.9853**.
+
+Mutants killed by `HeadlessPerf6StarveTest` behaviour:
+
+| mutant | killing check |
+|---|---|
+| (i) remove the progress guarantee | `progress_first` + queued 19 ms phase 1×/4× starve (`full 0→0 left=1`) |
+| (ii) remove the estimate decay | `defer_decay` (`naval_last_ms` stays 19.000, want ~15.210) |
+| (iii) clamp the estimate to 20 ms again with no decay | `run_ema` (last=actual 2.144, not 0.75·19+0.25·actual) + `defer_decay` |
+
+```bash
+tools/run_godot.sh --headless --path . \
+  -s res://scripts/core/HeadlessPerf6StarveTest.gd
+```
+
+Wired as `launch_perf6_starve` immediately after `launch_perf6_day_roll`. Merge **HOLD**. Headless; live A/B pending.
+
 The two `perf4_daily_sim_tick_product.py` edits (and their unit test) stay: `advance_supply_day` now only builds a job and calls `_run_supply_day_job(..., 0)`, so the PERF-4 grep for `_process_air_missions` / `_process_naval_recon` / day-roll deferral has to read the runner body. Without that, `--quick` would fail `supply_day_full_steps_in_live`.
 
 Other headless this sitting: Interactive **PASS** (one full supply day per soft apply, +2, `queued_supply_day`, worst day_ai 14.3 ms). Daily **PASS** (7d wall 33.7 ms, worst day_ai 11.7 ms). Seed 193601, two collects inside that process, identical to the documented sequence JAP 903951 / FRA 710739 / ITA 710859 / ENG 711481 / POL 711054 / SOV none / JAP 902474. A third OS process was not run. Windowed-backup MUST1 **PASS** (7/7 `plans_on_roll=0`, `tm_calendar_roll` → `tib_skip_refill`). Live-equivalent **PASS** (full supply days 3/3; leftover 6/0, scene-order 7/0, windowed 7/0). Legend **PASS** p95 6.45 / worst 18.84. Overlay B1–B4 **PASS**. `HeadlessDailyProductionStockpileTest` **PASS**. `HeadlessProductionTest` does not finish on this tree (see CURRENT_STATE). `--quick` the same 14 `unit_board_play_path` reds (`se_england` fill-toe 1, first-session play surface 1, unit_centric_pick 3, unit_counter_chrome 2, unit_card_fill_toe 3, living_unit_order_loop 4). map_qc NE land hit **0.9853**. Live Play A/B is pending.
