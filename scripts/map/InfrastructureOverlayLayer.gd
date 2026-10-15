@@ -122,6 +122,10 @@ var _road_shared_border_keys: Dictionary = {}
 var _road_shared_border_ready: bool = false
 var _road_cache_rebuild_count: int = 0
 var _road_tier_draw: Dictionary = {}
+## Render-only urban-NUTS3 neighbour counts (name suffix). Cached once per board.
+var _urban_nbr_counts: Dictionary = {}
+var _urban_pids: Dictionary = {}
+var _urban_nbr_counts_ready: bool = false
 
 func _ready():
     infrastructure_manager = get_node_or_null("/root/InfrastructureDevelopmentManager")
@@ -577,6 +581,7 @@ func _rebuild_road_layer_inner() -> void:
 
     var cache: Array[Dictionary] = []
     var drawn := {}
+    var urban_counts: Dictionary = _ensure_urban_nbr_counts(provinces)
     for pid in provinces:
         var p: Province = provinces[pid]
         if p == null or p.is_sea:
@@ -619,6 +624,8 @@ func _rebuild_road_layer_inner() -> void:
             var w2: float = RoadTierVisualScript.province_weight(
                 float(n.infrastructure), float(n.development_level), float(n.population)
             )
+            var urban_n1: int = int(urban_counts.get(int(pid), 0))
+            var urban_n2: int = int(urban_counts.get(int(nid), 0))
             var entry: Dictionary = {
                 "p1": int(pid),
                 "p2": int(nid),
@@ -632,6 +639,8 @@ func _rebuild_road_layer_inner() -> void:
                 "weight": (w1 + w2) * 0.5,
                 "w1": w1,
                 "w2": w2,
+                "urban_nbrs_1": urban_n1,
+                "urban_nbrs_2": urban_n2,
             }
             cache.append(entry)
             if supply_on and on_corridor:
@@ -645,6 +654,8 @@ func _rebuild_road_layer_inner() -> void:
     for trunk_v in trunk:
         if typeof(trunk_v) == TYPE_DICTIONARY:
             cache.append(trunk_v)
+    # Display ranking only — after the visual trunk so sparsifier/degree stay HWY-2.
+    _apply_urban_display_weight(cache, urban_counts)
     _assign_display_tiers(cache)
     var deg: Dictionary = RoadTierVisualScript.degree_stats(cache)
     var tri: int = RoadTierVisualScript.count_undirected_triangles(cache)
@@ -1040,6 +1051,9 @@ func rebuild_all_infra_layers():
     _last_era_band = _get_era_band(_get_map_year())
     _road_shared_border_ready = false
     _road_shared_border_keys.clear()
+    _urban_nbr_counts_ready = false
+    _urban_nbr_counts.clear()
+    _urban_pids.clear()
     rebuild_road_layer()
     rebuild_rail_layer()
     if BUILD_CITY_NODES:
@@ -1451,6 +1465,57 @@ func _get_provinces_for_road_cache() -> Dictionary:
         if p.built_road_neighbors != null and p.built_road_neighbors.size() > 0:
             out[pid] = p
     return out
+
+
+func _ensure_urban_nbr_counts(provinces: Dictionary) -> Dictionary:
+    if _urban_nbr_counts_ready:
+        return _urban_nbr_counts
+    var names: Dictionary = {}
+    var land_adj: Dictionary = {}
+    var adjacency = map_manager.get_adjacency_system() if map_manager != null else null
+    for pid_v in provinces.keys():
+        var pid: int = int(pid_v)
+        var p: Province = provinces[pid_v]
+        if p == null or p.is_sea:
+            continue
+        names[pid] = str(p.name)
+        var nbrs: Array = []
+        if adjacency != null and adjacency.has_method("get_land_neighbors"):
+            var raw_v: Variant = adjacency.call("get_land_neighbors", pid)
+            if typeof(raw_v) == TYPE_ARRAY or typeof(raw_v) == TYPE_PACKED_INT32_ARRAY:
+                for nid_v in raw_v:
+                    nbrs.append(int(nid_v))
+        land_adj[pid] = nbrs
+    _urban_nbr_counts = RoadTierVisualScript.urban_neighbor_counts(names, land_adj)
+    _urban_pids.clear()
+    for pid_v2 in names.keys():
+        if RoadTierVisualScript.is_urban_nuts3_name(str(names[pid_v2])):
+            _urban_pids[int(pid_v2)] = true
+    _urban_nbr_counts_ready = not _urban_nbr_counts.is_empty()
+    return _urban_nbr_counts
+
+
+func get_urban_nbr_counts() -> Dictionary:
+    return _urban_nbr_counts
+
+
+func _apply_urban_display_weight(cache: Array[Dictionary], urban_counts: Dictionary) -> void:
+    for entry in cache:
+        var a: int = int(entry.get("p1", 0))
+        var b: int = int(entry.get("p2", 0))
+        var n1: int = int(entry.get("urban_nbrs_1", urban_counts.get(a, 0)))
+        var n2: int = int(entry.get("urban_nbrs_2", urban_counts.get(b, 0)))
+        var b1: float = RoadTierVisualScript.urban_road_bonus(n1, _urban_pids.has(a))
+        var b2: float = RoadTierVisualScript.urban_road_bonus(n2, _urban_pids.has(b))
+        if b1 == 0.0 and b2 == 0.0:
+            continue
+        var w1: float = float(entry.get("w1", 0.0)) + b1
+        var w2: float = float(entry.get("w2", 0.0)) + b2
+        entry["w1"] = w1
+        entry["w2"] = w2
+        entry["weight"] = (w1 + w2) * 0.5
+        entry["urban_nbrs_1"] = n1
+        entry["urban_nbrs_2"] = n2
 
 
 func _ensure_road_shared_border_keys(provinces: Dictionary) -> void:

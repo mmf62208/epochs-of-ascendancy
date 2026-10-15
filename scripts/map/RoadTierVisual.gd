@@ -260,6 +260,61 @@ static func province_weight(infra: float, development: float, population: float)
 	return maxf(infra, 0.0) * 2.0 + maxf(development, 1.0) + maxf(population, 0.0) / 200000.0
 
 
+## Render-only. German NUTS3 city units already carry these suffixes in provinces_base.
+const URBAN_NUTS3_SUFFIX_KREISFREI := ", Kreisfreie Stadt"
+const URBAN_NUTS3_SUFFIX_STADTKREIS := ", Stadtkreis"
+const URBAN_ROAD_BONUS_PER_NBR := 1.5
+const URBAN_ROAD_BONUS_CAP := 6.0
+
+
+static func is_urban_nuts3_name(province_name: String) -> bool:
+	var n: String = province_name.strip_edges()
+	if n.ends_with(URBAN_NUTS3_SUFFIX_KREISFREI):
+		return true
+	if n.ends_with(URBAN_NUTS3_SUFFIX_STADTKREIS):
+		return true
+	return false
+
+
+const URBAN_ROAD_SELF_BONUS := 2.0
+
+
+## +1.5 per urban neighbour, capped at +6, plus +2 if the province itself is urban.
+## Display ranking only — not province_weight. Self term so city–city edges beat
+## rural kreise that only touch the mesh (Mettmann 8, Ennepe-Ruhr 9).
+static func urban_road_bonus(urban_nbrs: int, is_urban: bool = false) -> float:
+	var b: float = 0.0
+	if urban_nbrs > 0:
+		b = minf(float(urban_nbrs) * URBAN_ROAD_BONUS_PER_NBR, URBAN_ROAD_BONUS_CAP)
+	if is_urban:
+		b += URBAN_ROAD_SELF_BONUS
+	return b
+
+
+## names: pid→String. land_adj: pid→Array of neighbour pids. Returns pid→urban-nbr count.
+static func urban_neighbor_counts(names: Dictionary, land_adj: Dictionary) -> Dictionary:
+	var urban: Dictionary = {}
+	for pid_v in names.keys():
+		var pid: int = int(pid_v)
+		if is_urban_nuts3_name(str(names[pid_v])):
+			urban[pid] = true
+	var counts: Dictionary = {}
+	for pid_v in land_adj.keys():
+		var pid2: int = int(pid_v)
+		var nbrs_v: Variant = land_adj[pid_v]
+		var n: int = 0
+		if typeof(nbrs_v) == TYPE_ARRAY or typeof(nbrs_v) == TYPE_PACKED_INT32_ARRAY:
+			for nid_v in nbrs_v:
+				if urban.has(int(nid_v)):
+					n += 1
+		counts[pid2] = n
+	for pid_v2 in names.keys():
+		var pid3: int = int(pid_v2)
+		if not counts.has(pid3):
+			counts[pid3] = 0
+	return counts
+
+
 static func trunk_edge_score(entry: Dictionary) -> float:
 	var c1: Vector2 = entry.get("c1", Vector2.ZERO)
 	var c2: Vector2 = entry.get("c2", Vector2.ZERO)
