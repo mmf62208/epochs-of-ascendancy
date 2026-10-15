@@ -16,15 +16,15 @@ const PAVED_SCREEN_PX := 4.0
 const PAVED_EDGE_SCREEN_PX := 1.2
 ## Mid: casing 12 (paved+2 at default is 6; 12 reads over red fills, gold mid 28 is ≥1.8×).
 ## Close: casing 16 (dark outline vs fills; gold close stays 16/20 halo).
-## Far: casing 9 so Europe/Home still shows a corridor, not a 5 px hairline.
+## Far: casing 12 so the fixed-pair pixel run is ≥9 px at Europe/Home (measured 7 at 9).
 const HIGHWAY_SCREEN_PX := 8.0
 const HIGHWAY_CASING_SCREEN_PX := 12.0
 const HIGHWAY_CLOSE_CASING_SCREEN_PX := 16.0
 const HIGHWAY_CLOSE_CORE_SCREEN_PX := 12.0
 const HIGHWAY_STRIPE_SCREEN_PX := 3.2
 ## Europe/Home only: keep the rare trunk visible without a continent carpet.
-const HIGHWAY_FAR_CASING_SCREEN_PX := 9.0
-const HIGHWAY_FAR_CORE_SCREEN_PX := 5.5
+const HIGHWAY_FAR_CASING_SCREEN_PX := 12.0
+const HIGHWAY_FAR_CORE_SCREEN_PX := 8.0
 const DIRT_DASH_SCREEN_PX := 9.0
 const DIRT_GAP_SCREEN_PX := 6.0
 

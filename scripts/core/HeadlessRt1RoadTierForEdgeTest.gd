@@ -256,10 +256,10 @@ func _test_trunk_sparsifier() -> void:
 		_fail("mid highway casing must be 12 px (wider than paved, thinner than mid gold 28)")
 	else:
 		_pass("mid highway casing 12 px")
-	if "HIGHWAY_FAR_CASING_SCREEN_PX := 9.0" not in vis_src:
-		_fail("far highway casing must be 9 px")
+	if "HIGHWAY_FAR_CASING_SCREEN_PX := 12.0" not in vis_src:
+		_fail("far highway casing must be 12 px")
 	else:
-		_pass("far highway casing 9 px")
+		_pass("far highway casing 12 px")
 	if "HIGHWAY_CLOSE_CASING_SCREEN_PX := 16.0" not in vis_src:
 		_fail("close highway casing must be 16 px")
 	else:

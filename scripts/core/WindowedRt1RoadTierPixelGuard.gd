@@ -445,7 +445,7 @@ func _measure_edge(img: Image, a: int, b: int, kind: String) -> Dictionary:
 		var best_run := 0
 		var best_run_dist := 999
 		var in_run := false
-		for i in range(-12, 13):
+		for i in range(-20, 21):
 			var p: Vector2 = mid + perp * float(i)
 			var x := int(round(p.x))
 			var y := int(round(p.y))
@@ -477,12 +477,14 @@ func _measure_edge(img: Image, a: int, b: int, kind: String) -> Dictionary:
 				in_run = false
 				run = 0
 		if in_run:
-			var dist3 := mini(absi(run_start), 12)
+			var dist3 := mini(absi(run_start), 20)
 			if run > best_run or (run == best_run and dist3 < best_run_dist):
 				best_run = run
 		if best_run > best_w:
 			best_w = best_run
-	if best_w <= 0 and kind == "highway":
+	# Same pair only — never re-pick another edge. Hunt nearby pixels when the
+	# centroid chord clips a cased stroke (far Home was measuring 7 of 9).
+	if best_w < 8 and kind == "highway":
 		# Default-band centroid chord can sit a few px off the cased stroke
 		# (or under leftover inspector chrome). Hunt nearby casing/stripe pixels
 		# and keep the longest perpendicular run (do not stop on the first edge hit).
@@ -497,7 +499,7 @@ func _measure_edge(img: Image, a: int, b: int, kind: String) -> Dictionary:
 				if not _is_tier_color(hc, "highway"):
 					continue
 				var run_h := 1
-				for s in range(1, 16):
+				for s in range(1, 22):
 					var px := hx + int(round(perp.x * float(s)))
 					var py := hy + int(round(perp.y * float(s)))
 					if px < 0 or py < 0 or px >= w or py >= h:
@@ -505,7 +507,7 @@ func _measure_edge(img: Image, a: int, b: int, kind: String) -> Dictionary:
 					if not _is_tier_color(img.get_pixel(px, py), "highway"):
 						break
 					run_h += 1
-				for s2 in range(1, 16):
+				for s2 in range(1, 22):
 					var px2 := hx - int(round(perp.x * float(s2)))
 					var py2 := hy - int(round(perp.y * float(s2)))
 					if px2 < 0 or py2 < 0 or px2 >= w or py2 >= h:
