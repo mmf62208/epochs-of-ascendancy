@@ -22,6 +22,7 @@ const MAJORS: Array = ["GER", "FRA", "ITA", "POL", "ENG", "USA", "JAP", "SOV"]
 var _failures: int = 0
 var _ol: Node2D = null
 var _cache: Array = []
+var _vis_inst: Object = null
 
 
 func _init() -> void:
@@ -93,8 +94,15 @@ func _read_text(path: String) -> String:
 	return t
 
 
+func _vis_obj() -> Object:
+	if _vis_inst == null:
+		var scr: GDScript = load(SRC_VIS) as GDScript
+		_vis_inst = scr.new()
+	return _vis_inst
+
+
 func _vis_call(method: String, args: Array = []) -> Variant:
-	return RoadTierVisualScript.callv(method, args)
+	return _vis_obj().callv(method, args)
 
 
 func _debug() -> Dictionary:
