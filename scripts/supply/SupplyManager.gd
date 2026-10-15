@@ -95,13 +95,20 @@ const SUPPLY_DAY_SLICE_FUEL_ESTIMATE_MS: float = 4.5
 const SUPPLY_DAY_SLICE_AIR_ESTIMATE_MS: float = 1.0
 const SUPPLY_DAY_SLICE_ITEM_ESTIMATE_MS: float = 0.25
 const SUPPLY_DAY_SLICE_ITEM_COST_MAX_MS: float = 2.0
+## Floor for stored phase / item estimates (same min as the FIX #1 clamps).
+const SUPPLY_DAY_SLICE_ESTIMATE_FLOOR_MS: float = 0.05
+## Blend last cost with a new measurement: 0.75·old + 0.25·new.
+const SUPPLY_DAY_SLICE_ESTIMATE_EMA_OLD: float = 0.75
+const SUPPLY_DAY_SLICE_ESTIMATE_EMA_NEW: float = 0.25
+## Each deferred frame multiplies (estimate − floor) by this so a spike
+## becomes affordable again without a deadline-0 catch-up.
+const SUPPLY_DAY_SLICE_DEFER_DECAY: float = 0.8
 ## Last full-day section timings (spike diagnosis: heap vs rebuild vs generate).
 var last_supply_day_profile: Dictionary = {}
 ## CPU ms spent inside the supply-day slicer on the last drain. 0 when skipped.
 var last_supply_slice_ms: float = 0.0
-## Last measured atomic-phase costs (ms). Seeded pessimistically; each finished
-## phase overwrites its key. Jobs copy these into *_last_ms so later slices
-## of the same day and later days can afford-check before starting.
+## Last measured atomic-phase costs (ms). Seeded pessimistically; EMA-blended
+## on each run and decayed toward the floor on each deferred frame.
 var _supply_slice_phase_ms: Dictionary = {
 	"flush": SUPPLY_DAY_SLICE_FLUSH_ESTIMATE_MS,
 	"naval": SUPPLY_DAY_SLICE_NAVAL_ESTIMATE_MS,
@@ -110,9 +117,14 @@ var _supply_slice_phase_ms: Dictionary = {
 }
 ## EMA of one generate/ship item. Capped so a GC spike cannot poison the next yield.
 var _supply_slice_last_item_ms: float = SUPPLY_DAY_SLICE_ITEM_ESTIMATE_MS
+## True after this drain has started at least one phase or item. Progress
+## guarantee: the first unit of work in a frame always runs.
+var _supply_slice_did_work: bool = false
 ## Test seam: when >= 0, atomic-phase afford uses this ms instead of last measured.
 ## Same idea as route_refresh_plan_cost_estimate_ms (WHEN, not WHAT).
 var supply_slice_phase_cost_estimate_ms: float = -1.0
+## Test seam: when >= 0, generate/ship afford uses this ms instead of the EMA.
+var supply_slice_item_cost_estimate_ms: float = -1.0
 ## FIFO of full supply days queued off the roll frame. Sync advance_supply_day
 ## does not use this.
 var _supply_day_queue: Array = []
@@ -1539,6 +1551,12 @@ func _supply_slice_phase_estimate_ms(job: Dictionary, key: String) -> float:
 	return float(_supply_slice_phase_ms.get(key, 1.0))
 
 
+func _supply_slice_item_estimate_ms() -> float:
+	if supply_slice_item_cost_estimate_ms >= 0.0:
+		return supply_slice_item_cost_estimate_ms
+	return _supply_slice_last_item_ms
+
+
 func _supply_slice_cannot_afford_phase(deadline_usec: int, estimated_ms: float) -> bool:
 	if deadline_usec <= 0:
 		return false
@@ -1561,26 +1579,87 @@ func _supply_slice_cannot_afford_item(deadline_usec: int, last_item_ms: float) -
 	return remaining_ms <= need_ms
 
 
+func _supply_slice_clamp_phase_estimate(ms: float) -> float:
+	return clampf(ms, SUPPLY_DAY_SLICE_ESTIMATE_FLOOR_MS, SUPPLY_DAY_SLICE_MS_BUDGET)
+
+
+func _supply_slice_store_phase_estimate(job: Dictionary, key: String, measured_ms: float) -> void:
+	if measured_ms < SUPPLY_DAY_SLICE_ESTIMATE_FLOOR_MS:
+		return
+	var old_ms: float = float(job.get(key + "_last_ms", -1.0))
+	if old_ms < 0.0:
+		old_ms = float(_supply_slice_phase_ms.get(key, measured_ms))
+	var blended: float = (
+		old_ms * SUPPLY_DAY_SLICE_ESTIMATE_EMA_OLD
+		+ measured_ms * SUPPLY_DAY_SLICE_ESTIMATE_EMA_NEW
+	)
+	var stored: float = _supply_slice_clamp_phase_estimate(blended)
+	job[key + "_last_ms"] = stored
+	_supply_slice_phase_ms[key] = stored
+
+
+func _supply_slice_decay_phase_estimate(job: Dictionary, key: String) -> void:
+	var old_ms: float = float(job.get(key + "_last_ms", -1.0))
+	if old_ms < 0.0:
+		old_ms = float(_supply_slice_phase_ms.get(key, SUPPLY_DAY_SLICE_ESTIMATE_FLOOR_MS))
+	var decayed: float = (
+		SUPPLY_DAY_SLICE_ESTIMATE_FLOOR_MS
+		+ (old_ms - SUPPLY_DAY_SLICE_ESTIMATE_FLOOR_MS) * SUPPLY_DAY_SLICE_DEFER_DECAY
+	)
+	var stored: float = _supply_slice_clamp_phase_estimate(decayed)
+	job[key + "_last_ms"] = stored
+	_supply_slice_phase_ms[key] = stored
+
+
+func _supply_slice_decay_item_estimate() -> void:
+	if supply_slice_item_cost_estimate_ms >= 0.0:
+		return
+	var old_ms: float = _supply_slice_last_item_ms
+	var decayed: float = (
+		SUPPLY_DAY_SLICE_ESTIMATE_FLOOR_MS
+		+ (old_ms - SUPPLY_DAY_SLICE_ESTIMATE_FLOOR_MS) * SUPPLY_DAY_SLICE_DEFER_DECAY
+	)
+	var hi: float = maxf(old_ms, SUPPLY_DAY_SLICE_ITEM_COST_MAX_MS)
+	_supply_slice_last_item_ms = clampf(decayed, SUPPLY_DAY_SLICE_ESTIMATE_FLOOR_MS, hi)
+
+
+func _supply_slice_defer_phase(job: Dictionary, key: String) -> bool:
+	if not _supply_slice_did_work:
+		return false
+	_supply_slice_decay_phase_estimate(job, key)
+	return true
+
+
+func _supply_slice_defer_item() -> bool:
+	if not _supply_slice_did_work:
+		return false
+	_supply_slice_decay_item_estimate()
+	return true
+
+
 func _supply_slice_note_phase_ms(job: Dictionary, key: String, dt_usec: int) -> void:
 	var ms: float = float(dt_usec) / 1000.0
 	job[key + "_ms"] = float(job.get(key + "_ms", 0.0)) + ms
 	job["worked_usec"] = int(job.get("worked_usec", 0)) + dt_usec
-	if ms >= 0.05:
-		var stored: float = clampf(ms, 0.05, SUPPLY_DAY_SLICE_MS_BUDGET)
-		job[key + "_last_ms"] = stored
-		_supply_slice_phase_ms[key] = stored
+	_supply_slice_store_phase_estimate(job, key, ms)
+	_supply_slice_did_work = true
 
 
 func _supply_slice_note_item_ms(dt_usec: int) -> void:
 	if dt_usec <= 0:
+		_supply_slice_did_work = true
 		return
 	var step_ms: float = float(dt_usec) / 1000.0
-	var blended: float = _supply_slice_last_item_ms * 0.75 + step_ms * 0.25
+	var blended: float = (
+		_supply_slice_last_item_ms * SUPPLY_DAY_SLICE_ESTIMATE_EMA_OLD
+		+ step_ms * SUPPLY_DAY_SLICE_ESTIMATE_EMA_NEW
+	)
 	_supply_slice_last_item_ms = clampf(
 		blended,
-		0.05,
+		SUPPLY_DAY_SLICE_ESTIMATE_FLOOR_MS,
 		SUPPLY_DAY_SLICE_ITEM_COST_MAX_MS
 	)
+	_supply_slice_did_work = true
 
 
 func _run_supply_day_job(job: Dictionary, deadline_usec: int) -> bool:
@@ -1588,12 +1667,13 @@ func _run_supply_day_job(job: Dictionary, deadline_usec: int) -> bool:
 		return true
 	var days := float(job.get("days", 1.0))
 	while int(job.get("phase", 0)) < 6:
-		if deadline_usec > 0 and Time.get_ticks_usec() >= deadline_usec:
+		if deadline_usec > 0 and Time.get_ticks_usec() >= deadline_usec and _supply_slice_did_work:
 			return false
 		var phase := int(job.get("phase", 0))
 		if phase == 0:
 			if _supply_slice_cannot_afford_phase(deadline_usec, _supply_slice_phase_estimate_ms(job, "flush")):
-				return false
+				if _supply_slice_defer_phase(job, "flush"):
+					return false
 			var t_flush := Time.get_ticks_usec()
 			if bool(job.get("defer_flush", false)):
 				_begin_day_roll_plan_deferral()
@@ -1626,7 +1706,8 @@ func _run_supply_day_job(job: Dictionary, deadline_usec: int) -> bool:
 			job["phase"] = 2
 		elif phase == 2:
 			if _supply_slice_cannot_afford_phase(deadline_usec, _supply_slice_phase_estimate_ms(job, "naval")):
-				return false
+				if _supply_slice_defer_phase(job, "naval"):
+					return false
 			var t_naval := Time.get_ticks_usec()
 			_process_naval_recon(days)
 			var naval_dt := Time.get_ticks_usec() - t_naval
@@ -1634,7 +1715,8 @@ func _run_supply_day_job(job: Dictionary, deadline_usec: int) -> bool:
 			job["phase"] = 3
 		elif phase == 3:
 			if _supply_slice_cannot_afford_phase(deadline_usec, _supply_slice_phase_estimate_ms(job, "fuel")):
-				return false
+				if _supply_slice_defer_phase(job, "fuel"):
+					return false
 			var t_fuel := Time.get_ticks_usec()
 			_process_naval_fuel_endurance_and_repair(days)
 			var fuel_dt := Time.get_ticks_usec() - t_fuel
@@ -1642,7 +1724,8 @@ func _run_supply_day_job(job: Dictionary, deadline_usec: int) -> bool:
 			job["phase"] = 4
 		elif phase == 4:
 			if _supply_slice_cannot_afford_phase(deadline_usec, _supply_slice_phase_estimate_ms(job, "air")):
-				return false
+				if _supply_slice_defer_phase(job, "air"):
+					return false
 			var t_air := Time.get_ticks_usec()
 			_process_air_missions(days)
 			var air_dt := Time.get_ticks_usec() - t_air
@@ -1655,10 +1738,8 @@ func _run_supply_day_job(job: Dictionary, deadline_usec: int) -> bool:
 			job["decay_ms"] = float(job.get("decay_ms", 0.0)) + float(decay_dt) / 1000.0
 			job["worked_usec"] = int(job.get("worked_usec", 0)) + decay_dt
 			var air_total_dt: int = air_dt + decay_dt
-			if air_total_dt >= 50:
-				var air_stored: float = clampf(float(air_total_dt) / 1000.0, 0.05, SUPPLY_DAY_SLICE_MS_BUDGET)
-				job["air_last_ms"] = air_stored
-				_supply_slice_phase_ms["air"] = air_stored
+			_supply_slice_store_phase_estimate(job, "air", float(air_total_dt) / 1000.0)
+			_supply_slice_did_work = true
 			job["phase"] = 5
 		elif phase == 5:
 			if not bool(job.get("ship_ready", false)):
@@ -1740,6 +1821,7 @@ func _drain_queued_supply_day_slice() -> void:
 		last_supply_slice_ms = 0.0
 		return
 	var t0 := Time.get_ticks_usec()
+	_supply_slice_did_work = false
 	var deadline := 0
 	if not _should_catch_up_supply_day():
 		deadline = t0 + int(SUPPLY_DAY_SLICE_MS_BUDGET * 1000.0)
@@ -1833,8 +1915,10 @@ func _ship_routes_range(days: float, keys: Array, start: int, attrition_tons: fl
 	var i := start
 	var n := keys.size()
 	while i < n:
-		if _supply_slice_cannot_afford_item(deadline_usec, _supply_slice_last_item_ms):
-			return i
+		if _supply_slice_cannot_afford_item(deadline_usec, _supply_slice_item_estimate_ms()):
+			if _supply_slice_defer_item():
+				return i
+		_supply_slice_did_work = true
 		var t_item: int = 0
 		if deadline_usec > 0:
 			t_item = Time.get_ticks_usec()
@@ -2032,8 +2116,10 @@ func _generate_local_supply_range(days: float, keys: Array, start: int, deadline
 	var i := start
 	var n := keys.size()
 	while i < n:
-		if _supply_slice_cannot_afford_item(deadline_usec, _supply_slice_last_item_ms):
-			return i
+		if _supply_slice_cannot_afford_item(deadline_usec, _supply_slice_item_estimate_ms()):
+			if _supply_slice_defer_item():
+				return i
+		_supply_slice_did_work = true
 		var t_item: int = 0
 		if deadline_usec > 0:
 			t_item = Time.get_ticks_usec()

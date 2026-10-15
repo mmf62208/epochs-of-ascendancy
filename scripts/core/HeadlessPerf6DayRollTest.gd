@@ -5,6 +5,8 @@ extends SceneTree
 ## FIX #1: atomic phases yield unless remaining budget >= last cost + 2 ms;
 ## generate/ship items also keep a 5 ms reserve so a last step + GC stays
 ## under the 25 ms cap. The cap itself is unchanged.
+## FIX #2: the first phase/item of a frame always runs (progress guarantee);
+## phase estimates EMA-blend on run and decay toward the floor when deferred.
 ##
 ##   tools/run_godot.sh --headless --path . \
 ##     -s res://scripts/core/HeadlessPerf6DayRollTest.gd
@@ -141,6 +143,10 @@ func _test_atomic_phase_defer(sm: Node) -> void:
 	var job: Dictionary = sm.call("_make_supply_day_job", 1.0)
 	job["phase"] = 2
 	job["naval_last_ms"] = 12.0
+	# After some work this frame, FIX #1 still defers. The first unit of
+	# work in a frame is forced (progress guarantee; see StarveTest).
+	if "_supply_slice_did_work" in sm:
+		sm.set("_supply_slice_did_work", true)
 	var done_tight := bool(sm.call("_run_supply_day_job", job, tight))
 	var phase_tight := int(job.get("phase", -1))
 	var naval_tight := float(job.get("naval_ms", -1.0))
@@ -179,6 +185,8 @@ func _test_generate_step_bound(sm: Node) -> void:
 	var item_saved: float = float(sm.get("_supply_slice_last_item_ms")) if "_supply_slice_last_item_ms" in sm else 0.25
 	var base := _snap_depots(sm)
 	sm.set("_supply_slice_last_item_ms", 8.0)
+	if "_supply_slice_did_work" in sm:
+		sm.set("_supply_slice_did_work", true)
 	var now := Time.get_ticks_usec()
 	var mid: int = now + 6000
 	var cannot_mid := bool(sm.call("_supply_slice_cannot_afford_item", mid, 8.0))
