@@ -665,6 +665,41 @@ grep -o 'multi_ai_decisions=.*' /tmp/render1-seed/runN.log | md5sum
 
 day0 JAP/SOV/ITA soft USA; d1 SOV/ITA/USA soft POL; d2 ITA/USA/POL soft ENG; d3 USA/POL/ENG soft FRA; d4 POL/ENG/FRA soft JAP. `--quick` same 14 `unit_board_play_path` reds. map_qc NE **0.9853**. Headless; live A/B pending.
 
+**FIX #2 (windowed draw gate + 8 ms idle + real GPU warm):** Ship g101b NOT READY. (e′) **198–209** ms headless / **246** windowed — this box's own 180 target failed on `a065eb49`. Idle max_step **8.2–10.0** vs 8.0 (105–111 ms / 14–15 frames). `counter_lie` survived: grep started at `func _ci_draw_mesh(` (the header contains `draw_mesh(`), so dummy delta=0 always passed.
+
+Fix:
+
+- Windowed `tools/eoa_render1_draw_guard.sh` (xvfb, like `eoa_rt1_pixel_guard.sh`). DisplayServer must not be headless. Engine L-on vs L-off delta **< mesh_calls is FAIL**. **0 is FAIL**. No grep fallback. `skip_engine_draw` (draw_mesh removed, counters kept) must produce delta 0. Headless `independent_draw_info` no longer PASSes on a source scan.
+- Idle: one phase per frame; 5.5 ms work cap so one last chunk cannot push **max_step > 8.0** (assert is `> 8.0` fail, no 12 ms slack). Fingerprint / `begin_idle` / warm each get their own frame.
+- Hidden warm submits at **a=1** for 3 presents (a=0 was culled — GPU upload stayed on L). `_draw` uses cached chunk vert counts (no `surface_get_arrays` on the L frame). Early L-on (`_finish_supply_ring_prebuild_if_needed`) drains mesh ingest so an empty ready batch cannot show visible=0 (Perf3).
+
+`HeadlessRender1SupplyRingMeshTest` **3/3 PASS** (not best-of):
+
+| run | (e′) cold ms | toggle | first_frame | max_step | refresh | legend | batch |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| 1 | **83.5** | 21.0 | 62.5 | **7.992** | 0.48 | 20.4 | 0 |
+| 2 | **78.6** | 18.8 | 59.8 | **5.678** | 0.42 | 18.3 | 0 |
+| 3 | **72.5** | 16.8 | 55.7 | **5.518** | 0.36 | 16.4 | 0 |
+
+Target ≤180, bar 250 kept. (a)–(g) hold. (e) warm 4.3–5.1.
+
+`tools/eoa_render1_draw_guard.sh` **PASS** (xvfb, DisplayServer=X11, RSS **2614** MB):
+
+```
+skip_engine_draw delta=0  → would FAIL (0 count is FAIL)
+live engine on={ draws: 392, prims: 76704, can_d: 392 }
+independent_draw_info killed mutant_counter_lie: engine delta=76704 >= mesh_calls=392
+```
+
+Regression: OverlayFresh B1–B4 **PASS**; Legend p95 **6.32** / worst **18.97**; Perf3 **PASS** (MAX_TOGGLE_MS=1000; Home **160.5 / 5.3 / 132.4**; z0.760 **6.0 / 4.9 / 5.9**; roles=1 setups=0 glyphs=0); Perf6 DayRoll **PASS** (1× slice_max **16.99** / 4× **16.12**, full=12 sync=0); Starve **PASS**; Pace **PASS** (budget 22.00, lag 4× **17.02** sync=0). Seed 193601 ×3:
+
+```
+grep -o 'multi_ai_decisions=.*' log | md5sum
+# 20fe9063de285f19d4f9b8a105abfd31  -
+```
+
+`--quick` same 14 `unit_board_play_path` reds. map_qc NE **0.9853**. Wired as `launch_render1_draw_guard` after `launch_render1_supply_ring_mesh`. Headless; live A/B pending.
+
 ```bash
 tools/run_godot.sh --headless --path . --resolution 1280x740 \
   -s res://scripts/core/HeadlessRender1SupplyRingMeshTest.gd
