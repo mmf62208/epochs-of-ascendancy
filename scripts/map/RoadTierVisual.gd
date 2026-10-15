@@ -1828,21 +1828,24 @@ static func _hwy3_order_pairs_for_paint(scored_pairs: Array) -> Array:
 		var tag: String = str(tag_v)
 		tag_rows.append({"tag": tag, "land_n": int(land_by_tag.get(tag, 0))})
 	tag_rows.sort_custom(_hwy3_tag_land_less)
-	var max_n: int = 0
+	var large: Array = []
+	var small: Array = []
 	for row_v in tag_rows:
 		var row: Dictionary = row_v
-		var tag_s: String = str(row.get("tag", ""))
-		var lst2: Array = by_tag[tag_s]
-		lst2.sort_custom(_hwy3_pair_priority_less)
-		by_tag[tag_s] = lst2
-		max_n = maxi(max_n, lst2.size())
+		var lst2: Array = by_tag[str(row.get("tag", ""))]
+		if int(row.get("land_n", 0)) >= 180:
+			for sp_l in lst2:
+				large.append(sp_l)
+		else:
+			for sp_s in lst2:
+				small.append(sp_s)
+	large.sort_custom(_hwy3_pair_priority_less)
+	small.sort_custom(_hwy3_pair_priority_less)
 	var out: Array = []
-	for i in range(max_n):
-		for row2_v in tag_rows:
-			var row2: Dictionary = row2_v
-			var lst3: Array = by_tag[str(row2.get("tag", ""))]
-			if i < lst3.size():
-				out.append(lst3[i])
+	for sp2_v in large:
+		out.append(sp2_v)
+	for sp3_v in small:
+		out.append(sp3_v)
 	foreign.sort_custom(_hwy3_pair_priority_less)
 	for f_v in foreign:
 		out.append(f_v)

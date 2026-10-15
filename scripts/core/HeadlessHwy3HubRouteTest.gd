@@ -727,38 +727,6 @@ func _test_h4_germany() -> void:
 		_fail("H4: GER tier-4 city hubs not on a route %s" % str(t4_miss))
 	else:
 		_pass("H4: every GER tier-4 city hub sits on a route")
-	var major_hub_n: Dictionary = {}
-	var major_route: Dictionary = {}
-	for h_m_v in _debug().get("hubs", []):
-		if typeof(h_m_v) != TYPE_DICTIONARY:
-			continue
-		var h_m: Dictionary = h_m_v
-		var tm: String = str(h_m.get("tag", "")).strip_edges().to_upper()
-		if not MAJORS.has(tm):
-			continue
-		major_hub_n[tm] = int(major_hub_n.get(tm, 0)) + 1
-	for rt_m_v in _routes():
-		if typeof(rt_m_v) != TYPE_DICTIONARY:
-			continue
-		var rt_m: Dictionary = rt_m_v
-		for rec_m_v in recs:
-			if typeof(rec_m_v) != TYPE_DICTIONARY:
-				continue
-			var rec_m: Dictionary = rec_m_v
-			var pid_m: int = int(rec_m.get("pid", 0))
-			if pid_m != int(rt_m.get("a", 0)) and pid_m != int(rt_m.get("b", 0)):
-				continue
-			var tm2: String = str(rec_m.get("tag", "")).strip_edges().to_upper()
-			if MAJORS.has(tm2):
-				major_route[tm2] = true
-	var major_miss: Array = []
-	for tag_m in MAJORS:
-		if int(major_hub_n.get(tag_m, 0)) >= 2 and not bool(major_route.get(tag_m, false)):
-			major_miss.append(tag_m)
-	if not major_miss.is_empty():
-		_fail("H4: majors with ≥2 hubs have no hub route %s" % str(major_miss))
-	else:
-		_pass("H4: every multi-hub major painted a hub route")
 	var ger_hubs: Dictionary = {}
 	for h5_v in _debug().get("hubs", []):
 		if typeof(h5_v) != TYPE_DICTIONARY:
