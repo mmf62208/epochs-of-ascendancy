@@ -17,7 +17,9 @@ const MAX_PATCH_P50_MS := 1.0
 const MAX_PATCH_WORST_MS := 50.0
 const MAX_WARM_FRAME_MS := 100.0
 const MAX_COLD_MS := 250.0
+const TARGET_COLD_MS := 180.0
 const HOME_VERT_RATIO := 0.25
+const PREBUILD_WAIT_FRAMES := 180
 const LAYER_PATH := "res://scripts/map/SupplyOutlineBatchLayer.gd"
 const ROLES: Array[String] = [
 	"active", "preview", "route", "infra_sabotage", "infra_repair",
@@ -145,6 +147,59 @@ func _scan_layer_source() -> Dictionary:
 		"aa_hits": aa_hits,
 		"polished_hits": polished_hits,
 		"ok": line_hits == 0 and aa_hits == 0 and polished_hits == 0,
+		"ci_draw_mesh_live": _ci_draw_mesh_has_live_submit(txt),
+	}
+
+
+func _ci_draw_mesh_has_live_submit(txt: String = "") -> bool:
+	if txt.is_empty():
+		txt = FileAccess.get_file_as_string(LAYER_PATH)
+	var start := txt.find("func _ci_draw_mesh(")
+	if start < 0:
+		return false
+	var rest := txt.substr(start)
+	var next_fn := rest.find("\nfunc ", 1)
+	if next_fn >= 0:
+		rest = rest.substr(0, next_fn)
+	var live := 0
+	for raw in rest.split("\n"):
+		var line := str(raw)
+		var hash_at := line.find("#")
+		if hash_at >= 0:
+			line = line.substr(0, hash_at)
+		line = line.strip_edges()
+		if line.is_empty():
+			continue
+		if line.begins_with("if false") or line.begins_with("if 0"):
+			continue
+		if line.find("draw_mesh(") >= 0:
+			live += 1
+	return live >= 1
+
+
+func _engine_draw_snapshot() -> Dictionary:
+	var draws := int(RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME))
+	var prims := int(RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_PRIMITIVES_IN_FRAME))
+	var objs := int(RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_OBJECTS_IN_FRAME))
+	var vis_d := 0
+	var vis_p := 0
+	var can_d := 0
+	var can_p := 0
+	if root != null:
+		var vp := root.get_viewport()
+		if vp != null:
+			vis_d = int(vp.get_render_info(Viewport.RENDER_INFO_TYPE_VISIBLE, Viewport.RENDER_INFO_DRAW_CALLS_IN_FRAME))
+			vis_p = int(vp.get_render_info(Viewport.RENDER_INFO_TYPE_VISIBLE, Viewport.RENDER_INFO_PRIMITIVES_IN_FRAME))
+			can_d = int(vp.get_render_info(Viewport.RENDER_INFO_TYPE_CANVAS, Viewport.RENDER_INFO_DRAW_CALLS_IN_FRAME))
+			can_p = int(vp.get_render_info(Viewport.RENDER_INFO_TYPE_CANVAS, Viewport.RENDER_INFO_PRIMITIVES_IN_FRAME))
+	return {
+		"draws": draws,
+		"prims": prims,
+		"objs": objs,
+		"vis_d": vis_d,
+		"vis_p": vis_p,
+		"can_d": can_d,
+		"can_p": can_p,
 	}
 
 
@@ -248,6 +303,7 @@ func _test_layer_bars(items: Array[Dictionary]) -> void:
 	var full_built := int(layer.call("get_built_vertex_count")) if layer.has_method("get_built_vertex_count") else 0
 	await _check_b(home_built, full_built, layer, full_rect)
 	_check_counter_lie(full_stats)
+	await _check_independent_draw(layer, full_stats)
 
 	layer.call("set_view", HOME_Z, full_rect)
 	await _flush()
@@ -330,7 +386,47 @@ func _check_counter_lie(stats: Dictionary) -> void:
 	elif drawn_v != sink_v or drawn_v <= 0:
 		_fail("mutant_counter_lie: drawn_verts=%d sink_verts=%d" % [drawn_v, sink_v])
 	else:
-		_pass("mutant_counter_lie killed: counters match real draw_mesh arrays verts=%d calls=%d" % [drawn_v, mesh_calls])
+		_pass("mutant_counter_lie wrapper: counters match sink verts=%d calls=%d" % [drawn_v, mesh_calls])
+
+
+func _check_independent_draw(layer: Node, stats: Dictionary) -> void:
+	var mesh_calls := int(stats.get("mesh_calls", 0))
+	if layer is CanvasItem:
+		(layer as CanvasItem).visible = false
+	await process_frame
+	await process_frame
+	var off: Dictionary = _engine_draw_snapshot()
+	if layer is CanvasItem:
+		(layer as CanvasItem).visible = true
+		(layer as CanvasItem).queue_redraw()
+	await process_frame
+	await process_frame
+	var on_s: Dictionary = _engine_draw_snapshot()
+	var d_draws := int(on_s.get("draws", 0)) - int(off.get("draws", 0))
+	var d_prims := int(on_s.get("prims", 0)) - int(off.get("prims", 0))
+	var d_vis := int(on_s.get("vis_d", 0)) - int(off.get("vis_d", 0))
+	var d_can := int(on_s.get("can_d", 0)) - int(off.get("can_d", 0))
+	var engine_delta := maxi(maxi(d_draws, d_prims), maxi(d_vis, d_can))
+	var src_live := _ci_draw_mesh_has_live_submit()
+	_info(
+		"independent_draw_info off=%s on=%s delta draws=%d prims=%d vis=%d canvas=%d mesh_calls=%d src_live=%s"
+		% [str(off), str(on_s), d_draws, d_prims, d_vis, d_can, mesh_calls, str(src_live)]
+	)
+	if engine_delta > 0:
+		if engine_delta < mesh_calls or mesh_calls <= 0:
+			_fail(
+				"independent_draw_info: L-on vs L-off delta=%d < mesh_calls=%d (mutant_counter_lie: draw_mesh removed)"
+				% [engine_delta, mesh_calls]
+			)
+		else:
+			_pass(
+				"independent_draw_info killed mutant_counter_lie: engine delta=%d >= mesh_calls=%d"
+				% [engine_delta, mesh_calls]
+			)
+	elif not src_live:
+		_fail("independent_draw_info: dummy renderer delta=0 and _ci_draw_mesh has no live draw_mesh (mutant_counter_lie)")
+	else:
+		_pass("independent_draw_info killed mutant_counter_lie: live draw_mesh in _ci_draw_mesh (dummy delta=0)")
 
 
 func _check_c(layer: Node) -> void:
@@ -517,6 +613,21 @@ func _setup_renderer() -> bool:
 	return true
 
 
+func _wait_idle_prebuild() -> Dictionary:
+	var stats: Dictionary = {}
+	var i := 0
+	while i < PREBUILD_WAIT_FRAMES:
+		if _mr.has_method("get_supply_ring_prebuild_stats"):
+			stats = _mr.call("get_supply_ring_prebuild_stats") as Dictionary
+			if bool(stats.get("done", false)) and int(stats.get("item_count", 0)) >= 3000:
+				return stats
+		await process_frame
+		i += 1
+	if _mr.has_method("get_supply_ring_prebuild_stats"):
+		stats = _mr.call("get_supply_ring_prebuild_stats") as Dictionary
+	return stats
+
+
 func _test_maprenderer_toggle() -> void:
 	if not _setup_renderer():
 		return
@@ -525,26 +636,39 @@ func _test_maprenderer_toggle() -> void:
 	if sm != null and "overlay_visible" in sm:
 		sm.overlay_visible = false
 	_mr.supply_mode = false
-	if "_supply_roles_cache" in _mr:
-		var roles_cache: Variant = _mr.get("_supply_roles_cache")
-		if typeof(roles_cache) == TYPE_DICTIONARY:
-			(roles_cache as Dictionary).clear()
-	if "_supply_roles_cache_fingerprint" in _mr:
-		_mr._supply_roles_cache_fingerprint = ""
-	if "_supply_outline_batch" in _mr:
-		var old_batch: Node = _mr.get("_supply_outline_batch") as Node
-		if old_batch != null and is_instance_valid(old_batch):
-			old_batch.queue_free()
-		_mr.set("_supply_outline_batch", null)
-	if "_supply_poly_cache" in _mr:
-		var poly_cache: Variant = _mr.get("_supply_poly_cache")
-		if typeof(poly_cache) == TYPE_DICTIONARY:
-			(poly_cache as Dictionary).clear()
+	var pre: Dictionary = await _wait_idle_prebuild()
+	_info(
+		"idle_prebuild done=%s phase=%s total=%.3f setup=%.3f max_step=%.3f frames=%d warmed=%s items=%d budget=%.1f"
+		% [
+			str(pre.get("done", false)),
+			str(pre.get("phase", -1)),
+			float(pre.get("total_ms", -1.0)),
+			float(pre.get("setup_ms", -1.0)),
+			float(pre.get("max_step_ms", -1.0)),
+			int(pre.get("frames", -1)),
+			str(pre.get("warmed", false)),
+			int(pre.get("item_count", -1)),
+			float(pre.get("budget_ms", -1.0)),
+		]
+	)
+	if not bool(pre.get("done", false)) or int(pre.get("item_count", 0)) < 3000:
+		_fail("(e′) idle Home-LOD prebuild did not finish items=%d done=%s" % [
+			int(pre.get("item_count", 0)), str(pre.get("done", false)),
+		])
+	if float(pre.get("max_step_ms", 0.0)) > 12.0:
+		_fail("(e′) idle prebuild step %.3f ms exceeds 8ms budget (12ms slack)" % float(pre.get("max_step_ms", 0.0)))
+	else:
+		_pass("(e′) idle prebuild total=%.1f ms frames=%d max_step=%.3f" % [
+			float(pre.get("total_ms", 0.0)), int(pre.get("frames", 0)), float(pre.get("max_step_ms", 0.0)),
+		])
 
-	var t0 := Time.get_ticks_usec()
+	var t_toggle := Time.get_ticks_usec()
 	_mr.call("_toggle_supply_overlay")
+	var toggle_ms := float(Time.get_ticks_usec() - t_toggle) / 1000.0
+	var t_frame := Time.get_ticks_usec()
 	await process_frame
-	var cold_ms := float(Time.get_ticks_usec() - t0) / 1000.0
+	var first_frame_ms := float(Time.get_ticks_usec() - t_frame) / 1000.0
+	var cold_ms := toggle_ms + first_frame_ms
 	var vis := 0
 	if _mr.has_method("get_supply_overlay_outline_visible_count"):
 		vis = int(_mr.call("get_supply_overlay_outline_visible_count"))
@@ -552,23 +676,29 @@ func _test_maprenderer_toggle() -> void:
 	if _mr.has_method("get_last_supply_toggle_profile"):
 		profile = _mr.call("get_last_supply_toggle_profile") as Dictionary
 	_info(
-		"cold_first sm=%.3f refresh=%.3f batch=%.3f legend=%.3f sync=%.3f total=%.3f frame_total=%.3f vis=%d"
+		"cold_first sm=%.3f refresh=%.3f batch=%.3f legend=%.3f sync=%.3f toggle=%.3f first_frame=%.3f frame_total=%.3f vis=%d prebuild=%.3f"
 		% [
 			float(profile.get("sm_toggle_ms", -1.0)),
 			float(profile.get("refresh_highlights_ms", -1.0)),
 			float(profile.get("batch_mesh_build_ms", -1.0)),
 			float(profile.get("legend_ms", -1.0)),
 			float(profile.get("sync_stack_ms", -1.0)),
-			float(profile.get("total_ms", -1.0)),
+			toggle_ms,
+			first_frame_ms,
 			cold_ms, vis,
+			float(profile.get("prebuild_total_ms", -1.0)),
 		]
 	)
 	if vis < 3000:
 		_fail("(e′) cold L-on visible=%d want >=3000" % vis)
 	if cold_ms >= MAX_COLD_MS:
 		_fail("(e′) cold first L-on %.1f ms (limit %.0f; cold_full_build mutant)" % [cold_ms, MAX_COLD_MS])
+	elif cold_ms > TARGET_COLD_MS:
+		_fail("(e′) cold first L-on %.1f ms (target %.0f; first-frame GPU/refresh still on L)" % [cold_ms, TARGET_COLD_MS])
 	else:
-		_pass("(e′) cold first L-on %.1f ms" % cold_ms)
+		_pass("(e′) cold first L-on %.1f ms (toggle=%.1f first_frame=%.1f target<=%.0f bar=%.0f)" % [
+			cold_ms, toggle_ms, first_frame_ms, TARGET_COLD_MS, MAX_COLD_MS,
+		])
 		_pass("mutant_cold_full_build killed by (e′) %.1f ms" % cold_ms)
 
 	_mr.call("_toggle_supply_overlay")

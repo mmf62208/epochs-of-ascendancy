@@ -58,6 +58,22 @@ var _scratch_iy: PackedFloat32Array = PackedFloat32Array()
 ## Test sink: optional Object with note_draw_mesh(mesh, vertex_count, index_count).
 var draw_sink: Object = null
 
+const IDLE_PREBUILD_NONE := 0
+const IDLE_PREBUILD_INGEST := 1
+const IDLE_PREBUILD_MESH := 2
+const IDLE_PREBUILD_WARM := 3
+const IDLE_PREBUILD_DONE := 4
+
+var _idle_phase: int = IDLE_PREBUILD_NONE
+var _idle_item_source: Array[Dictionary] = []
+var _idle_ingest_at: int = 0
+var _idle_chunk_keys: PackedStringArray = PackedStringArray()
+var _idle_chunk_at: int = 0
+var _last_idle_step_ms: float = 0.0
+var _idle_total_ms: float = 0.0
+var _idle_warm_saved_modulate: Color = Color.WHITE
+var _idle_warmed: bool = false
+
 
 func _ready() -> void:
 	z_as_relative = false
@@ -81,6 +97,11 @@ func _clear_state() -> void:
 	_built_index_count = 0
 	_last_chunk_rebuild_count = 0
 	_last_rebuilt_chunk_keys = PackedStringArray()
+	_idle_item_source.clear()
+	_idle_ingest_at = 0
+	_idle_chunk_keys = PackedStringArray()
+	_idle_chunk_at = 0
+	_idle_phase = IDLE_PREBUILD_NONE
 
 
 func clear_items() -> void:
@@ -103,7 +124,125 @@ func set_items(items: Array[Dictionary]) -> void:
 		idx += 1
 	_rebuild_dirty_chunks(_all_chunk_keys(), true)
 	_last_mesh_build_ms = float(Time.get_ticks_usec() - t0) / 1000.0
+	_idle_phase = IDLE_PREBUILD_DONE
+	_idle_warmed = false
 	queue_redraw()
+
+
+func begin_idle_set_items(items: Array[Dictionary]) -> void:
+	_clear_state()
+	_idle_item_source = items
+	_idle_ingest_at = 0
+	_idle_chunk_keys = PackedStringArray()
+	_idle_chunk_at = 0
+	_idle_phase = IDLE_PREBUILD_INGEST
+	_idle_total_ms = 0.0
+	_last_idle_step_ms = 0.0
+	_idle_warmed = false
+
+
+func step_idle_prebuild(budget_ms: float) -> bool:
+	if _idle_phase == IDLE_PREBUILD_DONE:
+		_last_idle_step_ms = 0.0
+		return true
+	if _idle_phase == IDLE_PREBUILD_NONE or _idle_phase == IDLE_PREBUILD_WARM:
+		_last_idle_step_ms = 0.0
+		return _idle_phase == IDLE_PREBUILD_WARM
+	var t0 := Time.get_ticks_usec()
+	var budget_usec := maxi(1, int(budget_ms * 1000.0))
+	if _idle_phase == IDLE_PREBUILD_INGEST:
+		_step_idle_ingest(t0, budget_usec)
+	if _idle_phase == IDLE_PREBUILD_MESH and _usec_left(t0, budget_usec) > 0:
+		_step_idle_mesh(t0, budget_usec)
+	_last_idle_step_ms = float(Time.get_ticks_usec() - t0) / 1000.0
+	_idle_total_ms += _last_idle_step_ms
+	return _idle_phase == IDLE_PREBUILD_WARM or _idle_phase == IDLE_PREBUILD_DONE
+
+
+func finish_idle_prebuild() -> void:
+	while _idle_phase == IDLE_PREBUILD_INGEST or _idle_phase == IDLE_PREBUILD_MESH:
+		step_idle_prebuild(10000.0)
+
+
+func begin_hidden_warm() -> void:
+	if _idle_warmed or _item_count <= 0:
+		_idle_phase = IDLE_PREBUILD_DONE
+		return
+	_idle_warm_saved_modulate = modulate
+	modulate = Color(1.0, 1.0, 1.0, 0.0)
+	visible = true
+	queue_redraw()
+	_idle_phase = IDLE_PREBUILD_WARM
+
+
+func finish_hidden_warm() -> void:
+	if _idle_phase != IDLE_PREBUILD_WARM and not _idle_warmed:
+		_idle_phase = IDLE_PREBUILD_DONE
+		return
+	visible = false
+	modulate = _idle_warm_saved_modulate
+	_idle_warmed = true
+	_idle_phase = IDLE_PREBUILD_DONE
+
+
+func is_idle_prebuild_ready() -> bool:
+	return _idle_phase == IDLE_PREBUILD_DONE and _item_count > 0
+
+
+func get_idle_prebuild_stats() -> Dictionary:
+	return {
+		"phase": _idle_phase,
+		"last_step_ms": _last_idle_step_ms,
+		"total_ms": _idle_total_ms,
+		"warmed": _idle_warmed,
+		"item_count": _item_count,
+		"ingest_at": _idle_ingest_at,
+		"chunk_at": _idle_chunk_at,
+		"chunk_n": _idle_chunk_keys.size(),
+	}
+
+
+func _usec_left(t0: int, budget_usec: int) -> int:
+	return budget_usec - (Time.get_ticks_usec() - t0)
+
+
+func _step_idle_ingest(t0: int, budget_usec: int) -> void:
+	var n := _idle_item_source.size()
+	while _idle_ingest_at < n and _usec_left(t0, budget_usec) > 0:
+		var item: Dictionary = _idle_item_source[_idle_ingest_at]
+		var pid := int(item.get("pid", -1))
+		if pid >= 0:
+			_item_by_pid[pid] = _items.size()
+		_items.append(item)
+		_ingest_item(item, false)
+		_idle_ingest_at += 1
+	if _idle_ingest_at >= n:
+		_idle_chunk_keys = PackedStringArray()
+		for key_var in _chunk_pids.keys():
+			_idle_chunk_keys.append(str(key_var))
+		_idle_chunk_at = 0
+		_last_rebuilt_chunk_keys = PackedStringArray()
+		_last_chunk_rebuild_count = 0
+		_idle_phase = IDLE_PREBUILD_MESH
+		if _idle_chunk_keys.is_empty():
+			_recount_built_geometry()
+			_last_mesh_build_ms = _idle_total_ms
+			_idle_phase = IDLE_PREBUILD_WARM
+
+
+func _step_idle_mesh(t0: int, budget_usec: int) -> void:
+	var n := _idle_chunk_keys.size()
+	while _idle_chunk_at < n and _usec_left(t0, budget_usec) > 0:
+		var key := _idle_chunk_keys[_idle_chunk_at]
+		_rebuild_chunk(key)
+		_last_rebuilt_chunk_keys.append(key)
+		_last_chunk_rebuild_count += 1
+		_mesh_rebuild_count += 1
+		_idle_chunk_at += 1
+	if _idle_chunk_at >= n:
+		_recount_built_geometry()
+		_last_mesh_build_ms = _idle_total_ms + float(Time.get_ticks_usec() - t0) / 1000.0
+		_idle_phase = IDLE_PREBUILD_WARM
 
 
 func patch_items(upserts: Array, removed_pids: Array) -> void:

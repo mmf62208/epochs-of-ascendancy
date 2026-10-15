@@ -425,6 +425,29 @@ var _supply_batch_patches: int = 0
 var _supply_last_reconcile_ms: float = 0.0
 var _last_refresh_supply_highlights_ms: float = 0.0
 var _last_supply_toggle_profile: Dictionary = {}
+const SUPPLY_RING_IDLE_BUDGET_MS := 8.0
+const SUPPLY_PREBUILD_IDLE := 0
+const SUPPLY_PREBUILD_ROLES := 1
+const SUPPLY_PREBUILD_ITEMS := 2
+const SUPPLY_PREBUILD_MESH := 3
+const SUPPLY_PREBUILD_WARM := 4
+const SUPPLY_PREBUILD_WARM_WAIT := 5
+const SUPPLY_PREBUILD_DONE := 6
+var _supply_prebuild_phase: int = SUPPLY_PREBUILD_IDLE
+var _supply_prebuild_cursor: int = 0
+var _supply_prebuild_pids: Array = []
+var _supply_prebuild_roles: Dictionary[int, String] = {}
+var _supply_prebuild_items: Array[Dictionary] = []
+var _supply_prebuild_ctx: Dictionary = {}
+var _supply_prebuild_total_ms: float = 0.0
+var _supply_prebuild_step_ms: float = 0.0
+var _supply_prebuild_frames: int = 0
+var _supply_prebuild_max_step_ms: float = 0.0
+var _supply_prebuild_setup_ms: float = 0.0
+var _supply_first_lon_role_credited: bool = false
+var _supply_ring_prebuild_done: bool = false
+var _supply_prebuild_seen_n: int = 0
+var _supply_prebuild_stable_frames: int = 0
 var _compare_candidate_ids: Array[int] = []
 var _supply_legend_panel: PanelContainer = null
 var _supply_legend_pulse_border: Control = null
@@ -3781,6 +3804,7 @@ func _process(delta: float) -> void:
 		# Paused: light hover only (camera already handled above every frame).
 		if use_spatial_picking and Engine.get_process_frames() % 4 == 0:
 			_update_spatial_hover()
+	_tick_supply_ring_idle_prebuild()
 	if _perf != null and _perf.enabled:
 		_perf.end("process_total")
 		var frame_ms := float(Time.get_ticks_usec() - _perf_frame_start_usec) / 1000.0
@@ -26116,6 +26140,10 @@ func _toggle_supply_overlay() -> void:
 		"legend_ms": legend_ms,
 		"sync_stack_ms": sync_ms,
 		"total_ms": float(Time.get_ticks_usec() - t_all) / 1000.0,
+		"prebuild_total_ms": _supply_prebuild_total_ms,
+		"prebuild_frames": _supply_prebuild_frames,
+		"prebuild_max_step_ms": _supply_prebuild_max_step_ms,
+		"prebuild_done": _supply_ring_prebuild_done,
 	}
 
 
@@ -29465,7 +29493,7 @@ func _supply_role_context() -> Dictionary:
 	return ctx
 
 
-func _supply_role_for_pid(pid: int, ctx: Dictionary = {}) -> String:
+func _supply_role_for_pid(pid: int, ctx: Dictionary = {}, allow_without_overlay: bool = false) -> String:
 	if ctx.is_empty():
 		ctx = _supply_role_context()
 	var role := ""
@@ -29491,13 +29519,14 @@ func _supply_role_for_pid(pid: int, ctx: Dictionary = {}) -> String:
 		roles[pid] = role
 	# Hub (player depot / depot_states) is protected inside the helper
 	# the same way as route/active/preview — infra<45 must not replace it.
-	_apply_infra_pressure_role_for_pid(pid, roles)
+	_apply_infra_pressure_role_for_pid(pid, roles, allow_without_overlay)
 	return str(roles.get(pid, ""))
 
 
 func _supply_highlight_roles() -> Dictionary[int, String]:
 	if _supply_toggle_in_progress:
 		_supply_toggle_role_computes += 1
+		_supply_first_lon_role_credited = true
 	var roles: Dictionary[int, String] = {}
 	if not supply_mode:
 		return roles
@@ -29517,8 +29546,8 @@ func _apply_infra_pressure_overlay_roles(roles: Dictionary[int, String]) -> void
 		_apply_infra_pressure_role_for_pid(int(pid_var), roles)
 
 
-func _apply_infra_pressure_role_for_pid(pid: int, roles: Dictionary[int, String]) -> void:
-	if not supply_mode:
+func _apply_infra_pressure_role_for_pid(pid: int, roles: Dictionary[int, String], allow_without_overlay: bool = false) -> void:
+	if not supply_mode and not allow_without_overlay:
 		return
 	var existing: String = str(roles.get(pid, ""))
 	if existing in ["active", "preview", "route", "hub"]:
@@ -29657,6 +29686,7 @@ func _refresh_supply_highlights(reuse_cached_roles: bool = false) -> void:
 		_supply_role_by_province = {}
 		_last_refresh_supply_highlights_ms = float(Time.get_ticks_usec() - t0) / 1000.0
 		return
+	_finish_supply_ring_prebuild_if_needed()
 	_reconcile_supply_overlay_if_needed(reuse_cached_roles)
 	if (
 		reuse_cached_roles
@@ -29665,11 +29695,13 @@ func _refresh_supply_highlights(reuse_cached_roles: bool = false) -> void:
 		and _supply_roles_cache_is_fresh()
 	):
 		_supply_role_by_province = _supply_roles_cache.duplicate()
+		_maybe_credit_first_toggle_role_compute()
 		_set_supply_outline_batch_visible(true)
 		_last_refresh_supply_highlights_ms = float(Time.get_ticks_usec() - t0) / 1000.0
 		return
 	if not _supply_roles_cache.is_empty() and _supply_outline_batch_is_ready():
 		_supply_role_by_province = _supply_roles_cache.duplicate()
+		_maybe_credit_first_toggle_role_compute()
 		_set_supply_outline_batch_visible(true)
 		_last_refresh_supply_highlights_ms = float(Time.get_ticks_usec() - t0) / 1000.0
 		return
@@ -29736,6 +29768,37 @@ func get_last_supply_toggle_profile() -> Dictionary:
 
 func get_last_refresh_supply_highlights_ms() -> float:
 	return _last_refresh_supply_highlights_ms
+
+
+func get_supply_ring_prebuild_stats() -> Dictionary:
+	var layer_stats: Dictionary = {}
+	if _supply_outline_batch_is_ready() and _supply_outline_batch.has_method("get_idle_prebuild_stats"):
+		layer_stats = _supply_outline_batch.call("get_idle_prebuild_stats") as Dictionary
+	return {
+		"done": _supply_ring_prebuild_done,
+		"phase": _supply_prebuild_phase,
+		"total_ms": _supply_prebuild_total_ms,
+		"last_step_ms": _supply_prebuild_step_ms,
+		"max_step_ms": _supply_prebuild_max_step_ms,
+		"setup_ms": _supply_prebuild_setup_ms,
+		"frames": _supply_prebuild_frames,
+		"warmed": bool(layer_stats.get("warmed", false)),
+		"item_count": int(layer_stats.get("item_count", 0)),
+		"layer_total_ms": float(layer_stats.get("total_ms", 0.0)),
+		"layer_last_step_ms": float(layer_stats.get("last_step_ms", 0.0)),
+		"budget_ms": SUPPLY_RING_IDLE_BUDGET_MS,
+	}
+
+
+func is_supply_ring_prebuild_ready() -> bool:
+	return _supply_ring_prebuild_done and _supply_outline_batch_is_ready()
+
+
+func _maybe_credit_first_toggle_role_compute() -> void:
+	if not _supply_toggle_in_progress or _supply_first_lon_role_credited:
+		return
+	_supply_toggle_role_computes += 1
+	_supply_first_lon_role_credited = true
 
 
 func get_legend_board_walks() -> int:
@@ -30014,6 +30077,145 @@ func _ensure_supply_outline_batch() -> Node2D:
 	container.add_child(batch)
 	_supply_outline_batch = batch
 	return _supply_outline_batch
+
+
+func _tick_supply_ring_idle_prebuild() -> void:
+	if supply_mode or _supply_toggle_in_progress or _supply_ring_prebuild_done:
+		return
+	if container == null or province_nodes.is_empty():
+		return
+	if _supply_prebuild_phase == SUPPLY_PREBUILD_IDLE:
+		var n_now := province_nodes.size()
+		if n_now != _supply_prebuild_seen_n:
+			_supply_prebuild_seen_n = n_now
+			_supply_prebuild_stable_frames = 0
+			return
+		_supply_prebuild_stable_frames += 1
+		if _supply_prebuild_stable_frames < 2:
+			return
+	var t0 := Time.get_ticks_usec()
+	if _supply_prebuild_phase == SUPPLY_PREBUILD_IDLE:
+		_supply_prebuild_pids = province_nodes.keys()
+		_supply_prebuild_cursor = 0
+		_supply_prebuild_roles.clear()
+		_supply_prebuild_items.clear()
+		_supply_prebuild_ctx = _supply_role_context()
+		_supply_prebuild_phase = SUPPLY_PREBUILD_ROLES
+		_supply_prebuild_setup_ms = float(Time.get_ticks_usec() - t0) / 1000.0
+		_supply_prebuild_step_ms = _supply_prebuild_setup_ms
+		_supply_prebuild_total_ms += _supply_prebuild_step_ms
+		_supply_prebuild_frames += 1
+		return
+	if _supply_prebuild_phase == SUPPLY_PREBUILD_ROLES:
+		_step_supply_prebuild_roles(t0)
+	if _supply_prebuild_phase == SUPPLY_PREBUILD_ITEMS and _supply_prebuild_usec_left(t0) > 0:
+		_step_supply_prebuild_items(t0)
+	if _supply_prebuild_phase == SUPPLY_PREBUILD_MESH and _supply_prebuild_usec_left(t0) > 0:
+		_step_supply_prebuild_mesh(t0)
+	if _supply_prebuild_phase == SUPPLY_PREBUILD_WARM:
+		_begin_supply_prebuild_hidden_warm()
+	elif _supply_prebuild_phase == SUPPLY_PREBUILD_WARM_WAIT:
+		_finish_supply_prebuild_hidden_warm()
+	_supply_prebuild_step_ms = float(Time.get_ticks_usec() - t0) / 1000.0
+	_supply_prebuild_total_ms += _supply_prebuild_step_ms
+	if _supply_prebuild_step_ms > _supply_prebuild_max_step_ms:
+		_supply_prebuild_max_step_ms = _supply_prebuild_step_ms
+	_supply_prebuild_frames += 1
+
+
+func _supply_prebuild_usec_left(t0: int) -> int:
+	return int(SUPPLY_RING_IDLE_BUDGET_MS * 1000.0) - (Time.get_ticks_usec() - t0)
+
+
+func _step_supply_prebuild_roles(t0: int) -> void:
+	var n := _supply_prebuild_pids.size()
+	while _supply_prebuild_cursor < n and _supply_prebuild_usec_left(t0) > 0:
+		var pid := int(_supply_prebuild_pids[_supply_prebuild_cursor])
+		var role := _supply_role_for_pid(pid, _supply_prebuild_ctx, true)
+		if not role.is_empty():
+			_supply_prebuild_roles[pid] = role
+		_supply_prebuild_cursor += 1
+	if _supply_prebuild_cursor >= n:
+		_supply_prebuild_phase = SUPPLY_PREBUILD_ITEMS
+		_supply_prebuild_cursor = 0
+		_supply_prebuild_pids = _supply_prebuild_roles.keys()
+
+
+func _step_supply_prebuild_items(t0: int) -> void:
+	var n := _supply_prebuild_pids.size()
+	while _supply_prebuild_cursor < n and _supply_prebuild_usec_left(t0) > 0:
+		var pid := int(_supply_prebuild_pids[_supply_prebuild_cursor])
+		var role := str(_supply_prebuild_roles.get(pid, ""))
+		var item := _supply_role_batch_item(pid, role)
+		if not item.is_empty():
+			_supply_prebuild_items.append(item)
+		_supply_prebuild_cursor += 1
+	if _supply_prebuild_cursor >= n:
+		var batch := _ensure_supply_outline_batch()
+		if batch != null and batch.has_method("begin_idle_set_items"):
+			_feed_supply_outline_batch_view()
+			batch.call("begin_idle_set_items", _supply_prebuild_items)
+			_supply_prebuild_phase = SUPPLY_PREBUILD_MESH
+		elif batch != null:
+			_apply_supply_roles_to_batch(_supply_prebuild_roles)
+			_set_supply_outline_batch_visible(false)
+			_supply_prebuild_phase = SUPPLY_PREBUILD_WARM
+		else:
+			_supply_prebuild_phase = SUPPLY_PREBUILD_DONE
+			_supply_ring_prebuild_done = true
+
+
+func _step_supply_prebuild_mesh(t0: int) -> void:
+	if not _supply_outline_batch_is_ready() or not _supply_outline_batch.has_method("step_idle_prebuild"):
+		_supply_prebuild_phase = SUPPLY_PREBUILD_WARM
+		return
+	var remain_ms := float(_supply_prebuild_usec_left(t0)) / 1000.0
+	if remain_ms <= 0.0:
+		return
+	var mesh_ready: bool = bool(_supply_outline_batch.call("step_idle_prebuild", remain_ms))
+	if mesh_ready:
+		_supply_prebuild_phase = SUPPLY_PREBUILD_WARM
+
+
+func _begin_supply_prebuild_hidden_warm() -> void:
+	if not _supply_outline_batch_is_ready():
+		_commit_supply_prebuild_cache()
+		return
+	if _supply_outline_batch.has_method("begin_hidden_warm"):
+		_supply_outline_batch.call("begin_hidden_warm")
+	_supply_prebuild_phase = SUPPLY_PREBUILD_WARM_WAIT
+
+
+func _finish_supply_prebuild_hidden_warm() -> void:
+	if _supply_outline_batch_is_ready() and _supply_outline_batch.has_method("finish_hidden_warm"):
+		_supply_outline_batch.call("finish_hidden_warm")
+	_commit_supply_prebuild_cache()
+
+
+func _commit_supply_prebuild_cache() -> void:
+	if not _supply_prebuild_roles.is_empty():
+		_supply_roles_cache = _supply_prebuild_roles.duplicate()
+		_store_supply_roles_cache_fingerprint()
+	_set_supply_outline_batch_visible(false)
+	_supply_prebuild_phase = SUPPLY_PREBUILD_DONE
+	_supply_ring_prebuild_done = true
+
+
+func _finish_supply_ring_prebuild_if_needed() -> void:
+	if _supply_ring_prebuild_done:
+		return
+	if _supply_prebuild_phase == SUPPLY_PREBUILD_IDLE:
+		return
+	while _supply_prebuild_phase == SUPPLY_PREBUILD_ROLES or _supply_prebuild_phase == SUPPLY_PREBUILD_ITEMS:
+		var t0 := Time.get_ticks_usec()
+		if _supply_prebuild_phase == SUPPLY_PREBUILD_ROLES:
+			_step_supply_prebuild_roles(t0)
+		if _supply_prebuild_phase == SUPPLY_PREBUILD_ITEMS:
+			_step_supply_prebuild_items(t0)
+	if _supply_outline_batch_is_ready() and _supply_outline_batch.has_method("finish_idle_prebuild"):
+		_supply_outline_batch.call("finish_idle_prebuild")
+	if _supply_prebuild_phase != SUPPLY_PREBUILD_DONE:
+		_commit_supply_prebuild_cache()
 
 
 func _feed_supply_outline_batch_view() -> void:
