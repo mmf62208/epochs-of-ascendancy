@@ -159,15 +159,15 @@ func _test_lag_completes_without_sync(tm: Node, sm: Node) -> void:
 		"HeadlessPerf6PaceTest: lag_4x skipped=%d drain_frames=%d full %d→%d left=%d slice_max=%.2f slice_over=%d sync %d→%d"
 		% [SKIP_FRAMES, frames, before, after, left, slice_max, slice_over, sync_before, sync_after]
 	)
-	if after != before + 1 or left != 0:
+	if slice_over > 0 or slice_max > SLICE_MAX_MS:
+		_fail("lag 4x slice max %.2fms over %d (cap %.0f; unbounded catch-up)" % [slice_max, slice_over, SLICE_MAX_MS])
+	elif sync_after != sync_before:
+		_fail("lag 4x used unbounded sync finish (sync %d→%d slice_max=%.2f)" % [sync_before, sync_after, slice_max])
+	elif after != before + 1 or left != 0:
 		_fail(
 			"lag 4x day did not finish before roll (full %d→%d left=%d frames=%d)"
 			% [before, after, left, frames]
 		)
-	elif slice_over > 0 or slice_max > SLICE_MAX_MS:
-		_fail("lag 4x slice max %.2fms over %d (cap %.0f)" % [slice_max, slice_over, SLICE_MAX_MS])
-	elif sync_after != sync_before:
-		_fail("lag 4x used unbounded sync finish (sync %d→%d slice_max=%.2f)" % [sync_before, sync_after, slice_max])
 	else:
 		_pass("lag 4x completed in %d frames slice_max=%.2f sync=0" % [frames, slice_max])
 	var count_at_roll := int(sm.get("full_supply_day_count"))
