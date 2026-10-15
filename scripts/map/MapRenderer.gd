@@ -448,6 +448,9 @@ var _supply_first_lon_role_credited: bool = false
 var _supply_ring_prebuild_done: bool = false
 var _supply_prebuild_seen_n: int = 0
 var _supply_prebuild_stable_frames: int = 0
+var _supply_prebuild_fp: String = ""
+var _supply_prebuild_route_pids: Dictionary = {}
+var _supply_prebuild_depot_pids: Dictionary = {}
 var _compare_candidate_ids: Array[int] = []
 var _supply_legend_panel: PanelContainer = null
 var _supply_legend_pulse_border: Control = null
@@ -29697,23 +29700,28 @@ func _refresh_supply_highlights(reuse_cached_roles: bool = false) -> void:
 		_supply_role_by_province = _supply_roles_cache.duplicate()
 		_maybe_credit_first_toggle_role_compute()
 		_set_supply_outline_batch_visible(true)
+		_supply_ring_prebuild_done = true
 		_last_refresh_supply_highlights_ms = float(Time.get_ticks_usec() - t0) / 1000.0
 		return
 	if not _supply_roles_cache.is_empty() and _supply_outline_batch_is_ready():
 		_supply_role_by_province = _supply_roles_cache.duplicate()
 		_maybe_credit_first_toggle_role_compute()
 		_set_supply_outline_batch_visible(true)
+		_supply_ring_prebuild_done = true
 		_last_refresh_supply_highlights_ms = float(Time.get_ticks_usec() - t0) / 1000.0
 		return
 	var roles := _supply_highlight_roles()
 	_supply_role_by_province = roles
 	if _supply_roles_cache_matches(roles) and _supply_outline_batch_is_ready():
 		_set_supply_outline_batch_visible(true)
+		_supply_ring_prebuild_done = true
 		_last_refresh_supply_highlights_ms = float(Time.get_ticks_usec() - t0) / 1000.0
 		return
 	_supply_roles_cache = roles.duplicate()
 	_store_supply_roles_cache_fingerprint()
 	_apply_supply_roles_to_batch(roles)
+	_supply_ring_prebuild_done = true
+	_supply_prebuild_phase = SUPPLY_PREBUILD_DONE
 	_last_refresh_supply_highlights_ms = float(Time.get_ticks_usec() - t0) / 1000.0
 
 
@@ -30084,6 +30092,9 @@ func _tick_supply_ring_idle_prebuild() -> void:
 		return
 	if container == null or province_nodes.is_empty():
 		return
+	if _supply_outline_batch_is_ready() and not _supply_roles_cache.is_empty() and _supply_prebuild_phase == SUPPLY_PREBUILD_IDLE:
+		_supply_ring_prebuild_done = true
+		return
 	if _supply_prebuild_phase == SUPPLY_PREBUILD_IDLE:
 		var n_now := province_nodes.size()
 		if n_now != _supply_prebuild_seen_n:
@@ -30136,6 +30147,9 @@ func _step_supply_prebuild_roles(t0: int) -> void:
 			_supply_prebuild_roles[pid] = role
 		_supply_prebuild_cursor += 1
 	if _supply_prebuild_cursor >= n:
+		_supply_prebuild_fp = _supply_topology_fingerprint()
+		_supply_prebuild_route_pids = _collect_supply_route_pids()
+		_supply_prebuild_depot_pids = _collect_supply_depot_pids()
 		_supply_prebuild_phase = SUPPLY_PREBUILD_ITEMS
 		_supply_prebuild_cursor = 0
 		_supply_prebuild_pids = _supply_prebuild_roles.keys()
@@ -30195,7 +30209,13 @@ func _finish_supply_prebuild_hidden_warm() -> void:
 func _commit_supply_prebuild_cache() -> void:
 	if not _supply_prebuild_roles.is_empty():
 		_supply_roles_cache = _supply_prebuild_roles.duplicate()
-		_store_supply_roles_cache_fingerprint()
+		if _supply_prebuild_fp.is_empty():
+			_supply_prebuild_fp = _supply_topology_fingerprint()
+			_supply_prebuild_route_pids = _collect_supply_route_pids()
+			_supply_prebuild_depot_pids = _collect_supply_depot_pids()
+		_supply_roles_cache_fingerprint = _supply_prebuild_fp
+		_supply_cache_route_pids = _supply_prebuild_route_pids.duplicate()
+		_supply_cache_depot_pids = _supply_prebuild_depot_pids.duplicate()
 	_set_supply_outline_batch_visible(false)
 	_supply_prebuild_phase = SUPPLY_PREBUILD_DONE
 	_supply_ring_prebuild_done = true
