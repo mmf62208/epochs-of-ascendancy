@@ -703,7 +703,7 @@ func _test_maprenderer_toggle() -> void:
 
 	_mr.call("_toggle_supply_overlay")
 	await process_frame
-	t0 = Time.get_ticks_usec()
+	var t0 := Time.get_ticks_usec()
 	_mr.call("_toggle_supply_overlay")
 	await process_frame
 	var warm_ms := float(Time.get_ticks_usec() - t0) / 1000.0
