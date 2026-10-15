@@ -405,6 +405,15 @@ func _measure_edge(img: Image, a: int, b: int, kind: String) -> Dictionary:
 		xform = layer.get_global_transform_with_canvas()
 	var sa: Vector2 = xform * c1
 	var sb: Vector2 = xform * c2
+	var vp := root.get_viewport()
+	if vp != null:
+		var vsz: Vector2 = vp.get_visible_rect().size
+		if vsz.x > 1.0 and vsz.y > 1.0:
+			var sx: float = float(img.get_width()) / vsz.x
+			var sy: float = float(img.get_height()) / vsz.y
+			if absf(sx - 1.0) > 0.02 or absf(sy - 1.0) > 0.02:
+				sa = Vector2(sa.x * sx, sa.y * sy)
+				sb = Vector2(sb.x * sx, sb.y * sy)
 	var dir: Vector2 = (sb - sa)
 	if dir.length() < 1.0:
 		return out
@@ -463,6 +472,44 @@ func _measure_edge(img: Image, a: int, b: int, kind: String) -> Dictionary:
 				best_run = run
 		if best_run > best_w:
 			best_w = best_run
+	if best_w <= 0 and kind == "highway":
+		# Default-band centroid chord can sit a few px off the cased stroke
+		# (or under leftover inspector chrome). Hunt a nearby casing/stripe pixel.
+		var hunt_h: Vector2 = sa.lerp(sb, 0.5)
+		for dy in range(-20, 21, 2):
+			for dx in range(-20, 21, 2):
+				var hx := int(round(hunt_h.x + float(dx)))
+				var hy := int(round(hunt_h.y + float(dy)))
+				if hx < 0 or hy < 0 or hx >= w or hy >= h:
+					continue
+				var hc := img.get_pixel(hx, hy)
+				if not _is_tier_color(hc, "highway"):
+					continue
+				var run_h := 1
+				for s in range(1, 16):
+					var px := hx + int(round(perp.x * float(s)))
+					var py := hy + int(round(perp.y * float(s)))
+					if px < 0 or py < 0 or px >= w or py >= h:
+						break
+					if not _is_tier_color(img.get_pixel(px, py), "highway"):
+						break
+					run_h += 1
+				for s2 in range(1, 16):
+					var px2 := hx - int(round(perp.x * float(s2)))
+					var py2 := hy - int(round(perp.y * float(s2)))
+					if px2 < 0 or py2 < 0 or px2 >= w or py2 >= h:
+						break
+					if not _is_tier_color(img.get_pixel(px2, py2), "highway"):
+						break
+					run_h += 1
+				best_w = maxi(best_w, run_h)
+				r_acc += hc.r
+				g_acc += hc.g
+				b_acc += hc.b
+				samples += 1
+				break
+			if best_w > 0:
+				break
 	if best_w <= 0 and kind == "dirt":
 		# Dashed dirt at default zoom: a gap can sit on every t-sample. Hunt a
 		# nearby tan pixel and re-measure the perpendicular there.
