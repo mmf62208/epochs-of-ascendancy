@@ -474,7 +474,8 @@ func _measure_edge(img: Image, a: int, b: int, kind: String) -> Dictionary:
 			best_w = best_run
 	if best_w <= 0 and kind == "highway":
 		# Default-band centroid chord can sit a few px off the cased stroke
-		# (or under leftover inspector chrome). Hunt a nearby casing/stripe pixel.
+		# (or under leftover inspector chrome). Hunt nearby casing/stripe pixels
+		# and keep the longest perpendicular run (do not stop on the first edge hit).
 		var hunt_h: Vector2 = sa.lerp(sb, 0.5)
 		for dy in range(-20, 21, 2):
 			for dx in range(-20, 21, 2):
@@ -502,14 +503,12 @@ func _measure_edge(img: Image, a: int, b: int, kind: String) -> Dictionary:
 					if not _is_tier_color(img.get_pixel(px2, py2), "highway"):
 						break
 					run_h += 1
-				best_w = maxi(best_w, run_h)
-				r_acc += hc.r
-				g_acc += hc.g
-				b_acc += hc.b
-				samples += 1
-				break
-			if best_w > 0:
-				break
+				if run_h > best_w:
+					best_w = run_h
+					r_acc += hc.r
+					g_acc += hc.g
+					b_acc += hc.b
+					samples += 1
 	if best_w <= 0 and kind == "dirt":
 		# Dashed dirt at default zoom: a gap can sit on every t-sample. Hunt a
 		# nearby tan pixel and re-measure the perpendicular there.
