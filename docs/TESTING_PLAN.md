@@ -976,6 +976,17 @@ Guard `HeadlessHwy1HighwayChainTest` Part A (5-chain line, star 3-spokes, two 5-
 
 Pixel: `WindowedRt1RoadTierPixelGuard` measures the **fixed** `710412–710424` pair at far/default/close (no `_measure_best_highway` re-pick). Fail if a sample is **<8 px**. Highway mins: far **≥9**, default **≥12**, close **≥16**. Far may Y-flip the same pair when unflip <8 (viewport image vs canvas; cap 8–48 px). Measured tip: far **40** / default **17** / close **20**. Screenshots `docs/evidence/hwy2/`. **Headless + xvfb, live Play pending.**
 
+### HWY-3 Ruhr urban-adjacency weight (draft HOLD)
+
+1936 `province_economy_layer` is a placeholder for almost all DE NUTS3 (pop 20000 / infra 4 / dev 2), so `province_weight` cannot rank the Ruhr over farmland. **HWY-3** adds a render-only urban-neighbour bonus to road **display** weight only:
+
+- Urban = name ends with `, Kreisfreie Stadt` or `, Stadtkreis` (already in `provinces_base`).
+- `RoadTierVisual.urban_road_bonus(n)` = +1.5 per urban neighbour, cap +6.
+- Overlay precomputes counts once per board from adjacency + names and adds the bonus to cache `w1/w2`.
+- No pid whitelist. No economy / city / ix1 data edits. `province_weight` callers outside road display stay on the old formula.
+
+Guard `HeadlessHwy3UrbanCorridorTest` finds the densest urban-NUTS3 connected component by the rule (not pids) and asserts that cluster contains a highway chain of **≥4 edges through ≥3 urban NUTS3**. Also: highway count **52 ±10%**, median **≥4**, **≤12** components, **0** singletons; display weight = `province_weight + bonus`; Province fields unchanged; mutants **bonus_removed**, **urban_detection_always_false**, **bonus_applied_to_sim_weight** killed. **Must FAIL on d4a3a1ff**. Wired as `launch_hwy3_urban_corridor` next to `launch_hwy1_highway_chain`. Screenshots `docs/evidence/hwy3/`. **Headless + xvfb, live Play pending.** HOLD merge until Mike KEEPs.
+
 ### RX-1 Rhine Crossing (Phase B draft)
 
 Pure product `test_rx1_rhine_crossing_product` is on `--quick`. Headless: `HeadlessRx1RhineCrossingTest` (edge penalties, shared-border guard, Build Bridge complete) + `HeadlessRx1RhineLiveStayAliveTickTest` (FIX3 calendar tick: 0% → >0 in ~5d → COMPLETE via `advance_real_time`) + `HeadlessRx1RhineVisibilityTest` (FIX1: Rhine/road z > DemoUnitIcon 28; spine chrome absent on Neuss). Windowed smoke `tools/eoa_rx1_bridge_live_progress_guard.sh` sets `EOA_SMOKE_RX1_LIVE_PROGRESS=1` and presses **Build Bridge** on Neuss `710413`. The smoke harness is **not** the product. IX-1 spine tests stay green and unchanged. `run_godot.sh` one-time `--import` when the class cache lacks `Rx1RhineCrossing`.
