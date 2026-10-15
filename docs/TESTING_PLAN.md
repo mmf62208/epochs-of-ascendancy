@@ -739,6 +739,16 @@ Fix:
 
 Keep: windowed draw guard + counter_lie source edit, 9 mutants, Perf3/5/6, seed 193601 `grep -o 'multi_ai_decisions=.*' log | md5sum` → `20fe9063` ×3, `--quick` 14, map_qc NE 0.9853. Wired as `launch_render1_live_cold` after `launch_render1_draw_guard`. Stay DRAFT / HOLD.
 
+Tip `d0107744` live-boot **3/3 PASS** (not best-of). Roles `{hub: 3158, route: 38}` == fresh compute (A was hub 3157 / route 38 / active 1). Hue vs `5df8e7fc`: teal **46608 / 46606 / 46605** · olive **3386** · orange **6504**. Live-boot:
+
+| run | L-on frame1 | L-on frame2 | L-off frame2 | Δ | B/A |
+|---|---:|---:|---:|---:|---:|
+| 1 | 245.101 | 296.609 | 253.583 | 43.026 | 0.485 |
+| 2 | 244.425 | 298.210 | 270.885 | 27.325 | 0.488 |
+| 3 | 214.620 | 262.789 | 252.267 | 10.522 | 0.430 |
+
+`allow_without_overlay` mutant killed. Fixture L-on 82.3 ms. max_step **5.647 / 5.559 / 6.38**. Seed ×3 `20fe9063de285f19d4f9b8a105abfd31`. `--quick` 14 reds. map_qc NE **0.9853**.
+
 ```bash
 tools/run_godot.sh --headless --path . --resolution 1280x740 \
   -s res://scripts/core/HeadlessRender1SupplyRingMeshTest.gd
