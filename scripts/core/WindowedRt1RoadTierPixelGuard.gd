@@ -208,6 +208,7 @@ func _do_matrix_capture() -> void:
 
 
 func _capture_matrix_band(band: String, zoom: float) -> void:
+	_dismiss_inspector_tooltip()
 	var img := _capture("rt1_%s_overview" % band)
 	var samples: Array = [
 		{"kind": "dirt", "a": DIRT_A, "b": DIRT_B},
@@ -215,6 +216,7 @@ func _capture_matrix_band(band: String, zoom: float) -> void:
 		{"kind": "highway", "a": HWY_A, "b": HWY_B},
 	]
 	for s in samples:
+		_dismiss_inspector_tooltip()
 		var kind := str(s["kind"])
 		var pair: Vector2i = _resolve_sample_pair(kind, int(s["a"]), int(s["b"]))
 		var crop := _capture("rt1_%s_%s" % [band, kind])
@@ -682,16 +684,19 @@ func _close_panel() -> void:
 
 func _dismiss_inspector_tooltip() -> void:
 	var mr := _map_renderer()
-	if mr == null:
-		return
-	if mr.has_method("_dismiss_inspector_and_restore_input"):
-		mr.call("_dismiss_inspector_and_restore_input")
-	if mr.has_method("hide_info_panel"):
-		mr.call("hide_info_panel")
-	if mr.has_method("_hide_hover_tooltip"):
-		mr.call("_hide_hover_tooltip")
-	mr.set("_hold_camera_until_msec", 0)
-	mr.set("_close_camera_locked", false)
+	if mr != null:
+		if mr.has_method("_dismiss_inspector_and_restore_input"):
+			mr.call("_dismiss_inspector_and_restore_input")
+		if mr.has_method("hide_info_panel"):
+			mr.call("hide_info_panel")
+		if mr.has_method("_hide_hover_tooltip"):
+			mr.call("_hide_hover_tooltip")
+		mr.set("_hold_camera_until_msec", 0)
+		mr.set("_close_camera_locked", false)
+	# Search/Go + wheel warps the cursor onto Köln; park it off the sample so
+	# ProvinceHoverTooltip / compare glance cannot cover the highway pixels.
+	if DisplayServer.get_name() != "headless":
+		DisplayServer.warp_mouse(Vector2i(24, 700))
 
 
 func _world_mid_under_visible_control(world_mid: Vector2) -> bool:
