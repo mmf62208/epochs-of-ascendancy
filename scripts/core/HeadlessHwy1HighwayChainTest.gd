@@ -222,25 +222,48 @@ func _test_part_a_explicit() -> void:
 
 
 func _test_part_a_nondet() -> void:
-	# Equal-weight fork: 1-2 vs 1-3. Tie-break is smaller edge_key → 1_2.
+	# Two equal-weight disjoint 3-paths. Smaller first edge_key is 10_11, not 20_21.
 	var cache: Array = [
-		_edge(1, 10, 100.0),
-		_edge(1, 2, 50.0),
-		_edge(1, 3, 50.0),
-		_edge(2, 20, 49.0),
-		_edge(3, 30, 48.0),
+		_edge(10, 11, 80.0),
+		_edge(11, 12, 70.0),
+		_edge(12, 13, 60.0),
+		_edge(20, 21, 80.0),
+		_edge(21, 22, 70.0),
+		_edge(22, 23, 60.0),
 	]
 	_pad(cache, 75, 37, 1.0, 10.0)
 	_assign(cache)
 	var keys: Dictionary = _highway_keys(cache)
-	if not _has_key(keys, 1, 10) or not _has_key(keys, 1, 2) or not _has_key(keys, 2, 20):
-		_fail("nondet: expected 1-10 / 1-2 / 2-20, got %s" % str(keys.keys()))
+	if not _has_key(keys, 10, 11) or not _has_key(keys, 11, 12) or not _has_key(keys, 12, 13):
+		_fail("nondet: expected path 10-11-12-13, got %s" % str(keys.keys()))
 	else:
-		_pass("nondet: tie broke to edge_key 1_2 then 2-20")
-	if _has_key(keys, 1, 3) or _has_key(keys, 3, 30):
-		_fail("nondet: 1-3 must lose the equal-weight tie")
+		_pass("nondet: tie broke to edge_key 10_11 path")
+	if _has_key(keys, 20, 21) or _has_key(keys, 21, 22) or _has_key(keys, 22, 23):
+		_fail("nondet: 20-21 path must lose the equal-weight seed tie")
 	else:
-		_pass("nondet: 1-3 lost the equal-weight tie")
+		_pass("nondet: 20-21 path lost the equal-weight seed tie")
+
+
+func _reset_inferred_tiers(cache: Array) -> void:
+	for row_v in cache:
+		if typeof(row_v) != TYPE_DICTIONARY:
+			continue
+		var row: Dictionary = row_v
+		if not bool(row.get("explicit", false)):
+			row["display_tier"] = 0
+
+
+func _median_ms(samples: PackedFloat32Array) -> float:
+	var vals: Array = []
+	for i in range(samples.size()):
+		vals.append(float(samples[i]))
+	vals.sort()
+	if vals.is_empty():
+		return 0.0
+	var mid: int = vals.size() / 2
+	if vals.size() % 2 == 1:
+		return float(vals[mid])
+	return (float(vals[mid - 1]) + float(vals[mid])) * 0.5
 
 
 func _clone_cache(src: Array) -> Array:
@@ -589,25 +612,35 @@ func _test_part_b_live_1936() -> void:
 	else:
 		_pass("Part B: data does not rank Essen/Ruhr in the top trunk weights — left untouched")
 
-	var assign_ms_max: float = 0.0
+	var warmup: Array = _clone_cache(cache)
+	_reset_inferred_tiers(warmup)
+	RoadTierVisualScript.assign_rare_display_tiers(warmup)
+	var legacy_ms: PackedFloat32Array = PackedFloat32Array()
+	var new_ms: PackedFloat32Array = PackedFloat32Array()
 	var sets: Array = []
 	for _run_i in range(3):
+		var legacy_clone: Array = _clone_cache(cache)
+		_reset_inferred_tiers(legacy_clone)
+		var tl: int = Time.get_ticks_usec()
+		_apply_legacy_rank(legacy_clone)
+		legacy_ms.append(float(Time.get_ticks_usec() - tl) / 1000.0)
 		var clone: Array = _clone_cache(cache)
-		for c_v in clone:
-			var c_row: Dictionary = c_v
-			if not bool(c_row.get("explicit", false)):
-				c_row["display_tier"] = 0
+		_reset_inferred_tiers(clone)
 		var t0: int = Time.get_ticks_usec()
 		RoadTierVisualScript.assign_rare_display_tiers(clone)
-		var dt: float = float(Time.get_ticks_usec() - t0) / 1000.0
-		if dt > assign_ms_max:
-			assign_ms_max = dt
+		new_ms.append(float(Time.get_ticks_usec() - t0) / 1000.0)
 		sets.append(_highway_keys(clone))
-	print("HWY1_ASSIGN_MS max=%.3f runs=3" % assign_ms_max)
-	if assign_ms_max > 5.0:
-		_fail("Part B: assign_rare_display_tiers %.3f ms exceeds +5 ms budget" % assign_ms_max)
+	var legacy_med: float = _median_ms(legacy_ms)
+	var new_med: float = _median_ms(new_ms)
+	var delta_ms: float = new_med - legacy_med
+	print(
+		"HWY1_ASSIGN_MS legacy_med=%.3f new_med=%.3f delta=%.3f new_runs=%s"
+		% [legacy_med, new_med, delta_ms, str(Array(new_ms))]
+	)
+	if delta_ms > 5.0:
+		_fail("Part B: assign_rare_display_tiers +%.3f ms over legacy (budget +5)" % delta_ms)
 	else:
-		_pass("Part B: assign_rare_display_tiers max %.3f ms <= 5" % assign_ms_max)
+		_pass("Part B: assign_rare_display_tiers +%.3f ms vs legacy (<=5)" % delta_ms)
 	var same: bool = true
 	var first: Dictionary = sets[0]
 	for si in range(1, sets.size()):

@@ -527,29 +527,55 @@ static func assign_rare_display_tiers(cache: Array) -> void:
 		inferred.append(row)
 	if inferred.is_empty():
 		return
-	var ranks: Dictionary = _hwy1_rank_inferred(inferred)
+	var ranked: Dictionary = _hwy1_rank_inferred(inferred)
+	var ranks: Dictionary = ranked.get("ranks", {})
+	var seeds_desc: Array = ranked.get("seeds_desc", [])
 	for row2_v in inferred:
 		var row2: Dictionary = row2_v
-		var rank: float = float(ranks.get(_entry_key(row2), 0.0))
+		var rank: float = float(ranks.get(_hwy1_row_key(row2), 0.0))
 		var tier: int = display_tier_from_rank(rank, false)
 		# Highways come from chain pick only. Rank still paints paved/dirt.
 		if tier == TIER_HIGHWAY:
 			tier = TIER_PAVED
 		row2["display_tier"] = tier
-	_hwy1_pick_highway_chains(cache, inferred, ranks)
+	_hwy1_pick_highway_chains(cache, inferred, ranks, seeds_desc)
 
 
 ## HWY-1: same percentile map as the old per-edge rank (lowest→highest weight).
+## Sorts `inferred` in place (lowest weight first). Seeds are heaviest-first.
 static func _hwy1_rank_inferred(inferred: Array) -> Dictionary:
-	var sorted_inf: Array = inferred.duplicate()
-	sorted_inf.sort_custom(_weight_less)
-	var n: int = sorted_inf.size()
+	inferred.sort_custom(_weight_less)
+	var n: int = inferred.size()
 	var ranks: Dictionary = {}
 	for i in range(n):
 		var rank: float = 0.0 if n <= 1 else float(i) / float(n)
-		var row: Dictionary = sorted_inf[i]
-		ranks[_entry_key(row)] = rank
-	return ranks
+		var row: Dictionary = inferred[i]
+		ranks[_hwy1_row_key(row)] = rank
+	# Heaviest first, but keep _weight_less tie order (smaller edge_key first).
+	var seeds_desc: Array = []
+	var i_hi: int = n - 1
+	while i_hi >= 0:
+		var i_lo: int = i_hi
+		while i_lo > 0:
+			var left: Dictionary = inferred[i_lo - 1]
+			var right: Dictionary = inferred[i_lo]
+			if float(left.get("weight", 0.0)) != float(right.get("weight", 0.0)):
+				break
+			if float(left.get("avg_infra", 0.0)) != float(right.get("avg_infra", 0.0)):
+				break
+			i_lo -= 1
+		for j in range(i_lo, i_hi + 1):
+			seeds_desc.append(inferred[j])
+		i_hi = i_lo - 1
+	return {"ranks": ranks, "seeds_desc": seeds_desc}
+
+
+static func _hwy1_row_key(row: Dictionary) -> int:
+	return _hwy1_pair_key(int(row.get("p1", 0)), int(row.get("p2", 0)))
+
+
+static func _hwy1_pair_key(a: int, b: int) -> int:
+	return mini(a, b) * 1000000 + maxi(a, b)
 
 
 static func _hwy1_budget(inferred_n: int) -> int:
@@ -584,19 +610,15 @@ static func _hwy1_endpoint_index(cache: Array) -> Dictionary:
 			by_pid[a] = []
 		if not by_pid.has(b):
 			by_pid[b] = []
-		var la: Array = by_pid[a]
-		var lb: Array = by_pid[b]
-		la.append(row)
-		lb.append(row)
-		by_pid[a] = la
-		by_pid[b] = lb
+		(by_pid[a] as Array).append(row)
+		(by_pid[b] as Array).append(row)
 	return by_pid
 
 
 static func _hwy1_above_paved_floor(row: Dictionary, ranks: Dictionary) -> bool:
 	if bool(row.get("explicit", false)):
 		return true
-	return float(ranks.get(_entry_key(row), 0.0)) >= PAVED_RANK_FLOOR
+	return float(ranks.get(_hwy1_row_key(row), 0.0)) >= PAVED_RANK_FLOOR
 
 
 static func _hwy1_absorb_explicit(chain: Array, in_chain: Dictionary, by_pid: Dictionary) -> void:
@@ -619,7 +641,7 @@ static func _hwy1_absorb_explicit(chain: Array, in_chain: Dictionary, by_pid: Di
 				var nb: Dictionary = nb_v
 				if not bool(nb.get("explicit", false)):
 					continue
-				var nk: String = _entry_key(nb)
+				var nk: int = _hwy1_row_key(nb)
 				if in_chain.has(nk):
 					continue
 				chain.append(nb)
@@ -650,7 +672,7 @@ static func _hwy1_heaviest_unpicked_neighbour(
 			if typeof(nb_v) != TYPE_DICTIONARY:
 				continue
 			var nb: Dictionary = nb_v
-			var nk: String = _entry_key(nb)
+			var nk: int = _hwy1_row_key(nb)
 			if in_chain.has(nk) or picked.has(nk):
 				continue
 			if not have or _hwy1_weight_more(nb, best):
@@ -668,11 +690,13 @@ static func _hwy1_grow_chain(
 	by_pid: Dictionary,
 	picked: Dictionary,
 	ranks: Dictionary,
+	has_explicit: bool,
 ) -> Array:
 	var chain: Array = [seed]
 	var in_chain: Dictionary = {}
-	in_chain[_entry_key(seed)] = true
-	_hwy1_absorb_explicit(chain, in_chain, by_pid)
+	in_chain[_hwy1_row_key(seed)] = true
+	if has_explicit:
+		_hwy1_absorb_explicit(chain, in_chain, by_pid)
 	while chain.size() < 3:
 		var nxt: Dictionary = _hwy1_heaviest_unpicked_neighbour(
 			chain, by_pid, in_chain, picked, ranks
@@ -680,34 +704,49 @@ static func _hwy1_grow_chain(
 		if nxt.is_empty():
 			break
 		chain.append(nxt)
-		in_chain[_entry_key(nxt)] = true
-		_hwy1_absorb_explicit(chain, in_chain, by_pid)
+		in_chain[_hwy1_row_key(nxt)] = true
+		if has_explicit:
+			_hwy1_absorb_explicit(chain, in_chain, by_pid)
 	return chain
 
 
-static func _hwy1_pick_highway_chains(cache: Array, inferred: Array, ranks: Dictionary) -> void:
+static func _hwy1_pick_highway_chains(
+	cache: Array,
+	inferred: Array,
+	ranks: Dictionary,
+	seeds_desc: Array,
+) -> void:
 	var budget: int = _hwy1_budget(inferred.size())
 	if budget <= 0:
 		return
 	var by_pid: Dictionary = _hwy1_endpoint_index(cache)
 	var picked: Dictionary = {}
+	var has_explicit: bool = false
 	for row_v in cache:
 		if typeof(row_v) != TYPE_DICTIONARY:
 			continue
 		var row: Dictionary = row_v
 		if bool(row.get("explicit", false)):
-			picked[_entry_key(row)] = true
-	var seeds: Array = inferred.duplicate()
-	seeds.sort_custom(_hwy1_weight_more)
+			picked[_hwy1_row_key(row)] = true
+			has_explicit = true
+	var seeds: Array = seeds_desc
+	if seeds.is_empty():
+		seeds = inferred.duplicate()
+		seeds.sort_custom(_hwy1_weight_more)
 	var used: int = 0
+	var seed_cap: int = mini(seeds.size(), maxi(budget * 2, 16))
+	var seed_i: int = 0
 	for seed_v in seeds:
 		if used >= budget:
 			break
+		seed_i += 1
+		if seed_i > seed_cap:
+			break
 		var seed: Dictionary = seed_v
-		var sk: String = _entry_key(seed)
+		var sk: int = _hwy1_row_key(seed)
 		if picked.has(sk):
 			continue
-		var chain: Array = _hwy1_grow_chain(seed, by_pid, picked, ranks)
+		var chain: Array = _hwy1_grow_chain(seed, by_pid, picked, ranks, has_explicit)
 		if chain.size() < 3:
 			continue
 		var inferred_n: int = 0
@@ -719,7 +758,7 @@ static func _hwy1_pick_highway_chains(cache: Array, inferred: Array, ranks: Dict
 			continue
 		for ch2_v in chain:
 			var ch2: Dictionary = ch2_v
-			var ck: String = _entry_key(ch2)
+			var ck: int = _hwy1_row_key(ch2)
 			picked[ck] = true
 			if not bool(ch2.get("explicit", false)):
 				ch2["display_tier"] = TIER_HIGHWAY
