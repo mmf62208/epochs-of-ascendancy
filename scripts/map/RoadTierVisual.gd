@@ -276,11 +276,19 @@ static func is_urban_nuts3_name(province_name: String) -> bool:
 	return false
 
 
-## +1.5 per urban neighbour, capped at +6. Display ranking only — not province_weight.
-static func urban_road_bonus(urban_nbrs: int) -> float:
-	if urban_nbrs <= 0:
-		return 0.0
-	return minf(float(urban_nbrs) * URBAN_ROAD_BONUS_PER_NBR, URBAN_ROAD_BONUS_CAP)
+const URBAN_ROAD_SELF_BONUS := 2.0
+
+
+## +1.5 per urban neighbour, capped at +6, plus +2 if the province itself is urban.
+## Display ranking only — not province_weight. Self term so city–city edges beat
+## rural kreise that only touch the mesh (Mettmann 8, Ennepe-Ruhr 9).
+static func urban_road_bonus(urban_nbrs: int, is_urban: bool = false) -> float:
+	var b: float = 0.0
+	if urban_nbrs > 0:
+		b = minf(float(urban_nbrs) * URBAN_ROAD_BONUS_PER_NBR, URBAN_ROAD_BONUS_CAP)
+	if is_urban:
+		b += URBAN_ROAD_SELF_BONUS
+	return b
 
 
 ## names: pid→String. land_adj: pid→Array of neighbour pids. Returns pid→urban-nbr count.

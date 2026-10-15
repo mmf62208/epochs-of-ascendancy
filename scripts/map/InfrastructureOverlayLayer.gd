@@ -124,6 +124,7 @@ var _road_cache_rebuild_count: int = 0
 var _road_tier_draw: Dictionary = {}
 ## Render-only urban-NUTS3 neighbour counts (name suffix). Cached once per board.
 var _urban_nbr_counts: Dictionary = {}
+var _urban_pids: Dictionary = {}
 var _urban_nbr_counts_ready: bool = false
 
 func _ready():
@@ -625,9 +626,6 @@ func _rebuild_road_layer_inner() -> void:
             )
             var urban_n1: int = int(urban_counts.get(int(pid), 0))
             var urban_n2: int = int(urban_counts.get(int(nid), 0))
-            # Display ranking only. province_weight / Province fields stay untouched.
-            w1 += RoadTierVisualScript.urban_road_bonus(urban_n1)
-            w2 += RoadTierVisualScript.urban_road_bonus(urban_n2)
             var entry: Dictionary = {
                 "p1": int(pid),
                 "p2": int(nid),
@@ -656,6 +654,8 @@ func _rebuild_road_layer_inner() -> void:
     for trunk_v in trunk:
         if typeof(trunk_v) == TYPE_DICTIONARY:
             cache.append(trunk_v)
+    # Display ranking only — after the visual trunk so sparsifier/degree stay HWY-2.
+    _apply_urban_display_weight(cache, urban_counts)
     _assign_display_tiers(cache)
     var deg: Dictionary = RoadTierVisualScript.degree_stats(cache)
     var tri: int = RoadTierVisualScript.count_undirected_triangles(cache)
@@ -1053,6 +1053,7 @@ func rebuild_all_infra_layers():
     _road_shared_border_keys.clear()
     _urban_nbr_counts_ready = false
     _urban_nbr_counts.clear()
+    _urban_pids.clear()
     rebuild_road_layer()
     rebuild_rail_layer()
     if BUILD_CITY_NODES:
@@ -1486,12 +1487,35 @@ func _ensure_urban_nbr_counts(provinces: Dictionary) -> Dictionary:
                     nbrs.append(int(nid_v))
         land_adj[pid] = nbrs
     _urban_nbr_counts = RoadTierVisualScript.urban_neighbor_counts(names, land_adj)
+    _urban_pids.clear()
+    for pid_v2 in names.keys():
+        if RoadTierVisualScript.is_urban_nuts3_name(str(names[pid_v2])):
+            _urban_pids[int(pid_v2)] = true
     _urban_nbr_counts_ready = not _urban_nbr_counts.is_empty()
     return _urban_nbr_counts
 
 
 func get_urban_nbr_counts() -> Dictionary:
     return _urban_nbr_counts
+
+
+func _apply_urban_display_weight(cache: Array[Dictionary], urban_counts: Dictionary) -> void:
+    for entry in cache:
+        var a: int = int(entry.get("p1", 0))
+        var b: int = int(entry.get("p2", 0))
+        var n1: int = int(entry.get("urban_nbrs_1", urban_counts.get(a, 0)))
+        var n2: int = int(entry.get("urban_nbrs_2", urban_counts.get(b, 0)))
+        var b1: float = RoadTierVisualScript.urban_road_bonus(n1, _urban_pids.has(a))
+        var b2: float = RoadTierVisualScript.urban_road_bonus(n2, _urban_pids.has(b))
+        if b1 == 0.0 and b2 == 0.0:
+            continue
+        var w1: float = float(entry.get("w1", 0.0)) + b1
+        var w2: float = float(entry.get("w2", 0.0)) + b2
+        entry["w1"] = w1
+        entry["w2"] = w2
+        entry["weight"] = (w1 + w2) * 0.5
+        entry["urban_nbrs_1"] = n1
+        entry["urban_nbrs_2"] = n2
 
 
 func _ensure_road_shared_border_keys(provinces: Dictionary) -> void:

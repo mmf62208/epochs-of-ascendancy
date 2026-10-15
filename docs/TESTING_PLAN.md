@@ -981,11 +981,11 @@ Pixel: `WindowedRt1RoadTierPixelGuard` measures the **fixed** `710412–710424` 
 1936 `province_economy_layer` is a placeholder for almost all DE NUTS3 (pop 20000 / infra 4 / dev 2), so `province_weight` cannot rank the Ruhr over farmland. **HWY-3** adds a render-only urban-neighbour bonus to road **display** weight only:
 
 - Urban = name ends with `, Kreisfreie Stadt` or `, Stadtkreis` (already in `provinces_base`).
-- `RoadTierVisual.urban_road_bonus(n)` = +1.5 per urban neighbour, cap +6.
-- Overlay precomputes counts once per board from adjacency + names and adds the bonus to cache `w1/w2`.
+- `RoadTierVisual.urban_road_bonus(n, is_urban)` = +1.5 per urban neighbour, cap +6, plus +2 if the province itself is urban (so city–city beats rural kreise that only touch the mesh).
+- Overlay precomputes counts once per board from adjacency + names and applies the bonus to cache `w1/w2` **after** the visual trunk (sparsifier / max_deg stay HWY-2).
 - No pid whitelist. No economy / city / ix1 data edits. `province_weight` callers outside road display stay on the old formula.
 
-Guard `HeadlessHwy3UrbanCorridorTest` finds the densest urban-NUTS3 connected component by the rule (not pids) and asserts that cluster contains a highway chain of **≥4 edges through ≥3 urban NUTS3**. Also: highway count **52 ±10%**, median **≥4**, **≤12** components, **0** singletons; display weight = `province_weight + bonus`; Province fields unchanged; mutants **bonus_removed**, **urban_detection_always_false**, **bonus_applied_to_sim_weight** killed. **Must FAIL on d4a3a1ff**. Wired as `launch_hwy3_urban_corridor` next to `launch_hwy1_highway_chain`. Screenshots `docs/evidence/hwy3/`. **Headless + xvfb, live Play pending.** HOLD merge until Mike KEEPs.
+Guard `HeadlessHwy3UrbanCorridorTest` finds the densest urban-NUTS3 connected component by the rule (not pids) and asserts a **closed-neighbourhood** highway chain of **≥4 edges through ≥3 urban NUTS3 with core_nbrs ≥4**. Also: highway count **52 ±10%**, median **≥4**, **≤12** components, **0** singletons; display weight = `province_weight + bonus`; Province fields unchanged; mutants **bonus_removed**, **urban_detection_always_false**, **bonus_applied_to_sim_weight** killed. **Must FAIL on d4a3a1ff**. Wired as `launch_hwy3_urban_corridor` next to `launch_hwy1_highway_chain`. Screenshots `docs/evidence/hwy3/`. **Headless + xvfb, live Play pending.** HOLD merge until Mike KEEPs.
 
 ### RX-1 Rhine Crossing (Phase B draft)
 
