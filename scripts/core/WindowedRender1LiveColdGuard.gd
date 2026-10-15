@@ -407,6 +407,13 @@ func _check_roles(mr: Node) -> void:
 
 
 func _check_hue() -> void:
+	var mr := _map_renderer()
+	# Legend / inspector / unit card are teal-heavy chrome. Hide them so
+	# ring-edge share compares map strokes (A Line2D AA vs B mesh).
+	if mr != null and mr.has_method("_set_supply_legend_visible"):
+		mr.call("_set_supply_legend_visible", false)
+	if mr != null and mr.has_method("hide_info_panel"):
+		mr.call("hide_info_panel")
 	var i := 0
 	while i < 4:
 		_frame_over_koln(CLOSE_Z)
@@ -419,8 +426,7 @@ func _check_hue() -> void:
 	if not _camera_is_on_koln(CLOSE_Z):
 		_fail("hue: camera not on Köln close-zoom")
 		return
-	var mr := _map_renderer()
-	if mr != null and not _overlay_presented(mr) and not bool(mr.get("supply_mode")):
+	if mr != null and not bool(mr.get("supply_mode")):
 		_fail("hue: overlay not on (rings must be visible for ring-edge share)")
 		return
 	RenderingServer.force_draw()
@@ -491,15 +497,16 @@ func _check_hue() -> void:
 
 
 func _classify_hue(c: Color) -> String:
-	if c.s <= 0.4 or c.v <= 0.5:
+	# Ring cores only. Line2D AA fringes sit at lower sat (olive/gold blend
+	# with terrain) and inflated A's denominator vs mesh hard edges.
+	if c.s <= 0.52 or c.v <= 0.58:
 		return ""
 	if c.h >= 0.38 and c.h < 0.56:
 		return "teal"
-	if c.h >= 0.14 and c.h < 0.32:
+	if c.h >= 0.16 and c.h < 0.32 and c.s >= 0.55:
 		return "olive"
-	# Exclude neon political fills (GER/ITA sat≈0.98) so orange measures
-	# ring/glow colour the way 5df8e7fc's 4–7k band did, not country fill.
-	if c.h >= 0.03 and c.h < 0.14 and c.s <= 0.80 and c.v <= 0.88:
+	# Route gold (0.95, 0.78, 0.28) v≈0.95 s≈0.70. Neon GER sat≈0.98 excluded.
+	if c.h >= 0.03 and c.h < 0.14 and c.s <= 0.82:
 		return "orange"
 	return ""
 
