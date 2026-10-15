@@ -24,6 +24,8 @@ tools/run_godot.sh --headless --path . --resolution 1280x740 \
 
 Must **FAIL** on main `61a80433` MapRenderer and **PASS** on this tip.
 
+Recorded: tip `cb7d12ac` **RESULT=PASS**. Main MapRenderer swap **RESULT=FAIL** (`no_wheel_suppress`; in=1.243 out=0.757). `--quick` `FAILED (failures=14)`. `map_qc` NE land hit **0.9853**. EDGE-1 hd **RESULT=PASS**.
+
 ## Live Play (when a human opens F5)
 
 Window 1280×740, paused, Units off, Search/Go Köln.
