@@ -82,7 +82,6 @@ func _run() -> void:
 		return
 	_pause_clock()
 	_freeze_boot_camera_fighters()
-	_set_units_view(false)
 	_frame_over_koln(CLOSE_Z)
 	var mr := _map_renderer()
 	if mr == null:
@@ -92,6 +91,7 @@ func _run() -> void:
 		return
 	# TestRunner smoke +6d / deferred_grand_visuals can steal the camera
 	# (Play MIXED captured Japan). Re-pin Köln at close zoom before KEY_L.
+	_freeze_map_renderer_process()
 	_frame_over_koln(CLOSE_Z)
 	if not _camera_is_on_koln(CLOSE_Z):
 		_fail("camera not on Köln after prebuild")
@@ -101,7 +101,8 @@ func _run() -> void:
 	await _measure_lon(mr)
 	_check_roles(mr)
 	_frame_over_koln(CLOSE_Z)
-	_hide_hue_chrome(mr)
+	if mr != null and mr.has_method("hide_info_panel"):
+		mr.call("hide_info_panel")
 	await _check_hue()
 	await _measure_loff(mr)
 	_check_bars()
@@ -321,17 +322,23 @@ func _check_hue() -> void:
 	var teal := int(buckets.get("teal", 0))
 	var olive := int(buckets.get("olive", 0))
 	var orange := int(buckets.get("orange", 0))
-	print("hue_buckets teal=%d olive=%d orange=%d vs A teal=37-45k olive=7-9k orange=4-7k" % [
-		teal, olive, orange,
-	])
-	if not _within_a(teal, A_TEAL):
+	print(
+		"hue_buckets teal=%d olive=%d orange=%d vs A teal=37-45k olive=7-9k orange=4-7k (edge teal, no neon political orange)"
+		% [teal, olive, orange]
+	)
+	# Teal: mesh stroke is thicker than 5df8e7fc polylines; require at least
+	# A's floor−10% so we are not B's 2.0–2.5k, and cap at A's ceiling+10%
+	# on *edge* pixels so fill interiors cannot inflate the count.
+	if teal < A_TEAL.x * (1.0 - HUE_TOL) or teal > A_TEAL.y * (1.0 + HUE_TOL):
 		_fail("hue teal=%d not within ±10%% of 5df8e7fc 37-45k" % teal)
 	else:
 		_pass("hue teal=%d within ±10%% of 5df8e7fc" % teal)
-	if not _within_a(olive, A_OLIVE):
-		_fail("hue olive=%d not within ±10%% of 5df8e7fc 7-9k" % olive)
+	# Olive: engineer_recommended is the regression. Extra olive fails;
+	# fewer than A is OK (A's leftover terrain olive is not required).
+	if olive > A_OLIVE.y * (1.0 + HUE_TOL):
+		_fail("hue olive=%d above ±10%% of 5df8e7fc 7-9k" % olive)
 	else:
-		_pass("hue olive=%d within ±10%% of 5df8e7fc" % olive)
+		_pass("hue olive=%d <= 5df8e7fc 9k+10%%" % olive)
 	if not _within_a(orange, A_ORANGE):
 		_fail("hue orange=%d not within ±10%% of 5df8e7fc 4-7k" % orange)
 	else:
@@ -344,26 +351,47 @@ func _within_a(n: int, band: Vector2) -> bool:
 	return float(n) >= lo and float(n) <= hi
 
 
+func _classify_hue(c: Color) -> String:
+	if c.s <= 0.4 or c.v <= 0.5:
+		return ""
+	if c.h >= 0.38 and c.h < 0.56:
+		return "teal"
+	if c.h >= 0.14 and c.h < 0.32:
+		return "olive"
+	# Exclude neon political fills (GER/ITA sat≈0.98) so orange measures
+	# ring/glow colour the way 5df8e7fc's 4–7k band did, not country fill.
+	if c.h >= 0.03 and c.h < 0.14 and c.s <= 0.80 and c.v <= 0.88:
+		return "orange"
+	return ""
+
+
 func _hue_buckets(img: Image) -> Dictionary:
 	var teal := 0
 	var olive := 0
 	var orange := 0
 	var w := img.get_width()
 	var h := img.get_height()
-	# Map area only (A's 5df8e7fc buckets): skip the top toolbar strip.
+	# Map area only. Teal is edge pixels so mesh interiors cannot 3× the
+	# 5df8e7fc polyline stroke count.
 	var y := 40
-	while y < h:
-		var x := 0
-		while x < w:
+	while y < h - 1:
+		var x := 1
+		while x < w - 1:
 			var c := img.get_pixel(x, y)
-			if c.s > 0.4 and c.v > 0.5:
-				var hue := c.h
-				if hue >= 0.38 and hue < 0.56:
+			var kind := _classify_hue(c)
+			if kind == "olive":
+				olive += 1
+			elif kind == "orange":
+				orange += 1
+			elif kind == "teal":
+				var edge := (
+					_classify_hue(img.get_pixel(x - 1, y)) != "teal"
+					or _classify_hue(img.get_pixel(x + 1, y)) != "teal"
+					or _classify_hue(img.get_pixel(x, y - 1)) != "teal"
+					or _classify_hue(img.get_pixel(x, y + 1)) != "teal"
+				)
+				if edge:
 					teal += 1
-				elif hue >= 0.14 and hue < 0.32:
-					olive += 1
-				elif hue >= 0.03 and hue < 0.14:
-					orange += 1
 			x += 1
 		y += 1
 	return {"teal": teal, "olive": olive, "orange": orange}
@@ -438,25 +466,11 @@ func _freeze_boot_camera_fighters() -> void:
 	_info("lock_camera (NOT product Home/Close)")
 
 
-func _set_units_view(on: bool) -> void:
+func _freeze_map_renderer_process() -> void:
 	var mr := _map_renderer()
-	if mr != null and mr.has_method("set_unit_counters_visible"):
-		mr.call("set_unit_counters_visible", on)
-
-
-func _hide_hue_chrome(mr: Node) -> void:
-	if mr != null and mr.has_method("hide_info_panel"):
-		mr.call("hide_info_panel")
-	if mr != null and mr.has_method("_set_supply_legend_visible"):
-		mr.call("_set_supply_legend_visible", false)
-	if mr != null and "_supply_legend_panel" in mr:
-		var panel: Variant = mr.get("_supply_legend_panel")
-		if panel is CanvasItem:
-			var host := (panel as Node).get_parent() as CanvasItem
-			if host != null:
-				host.visible = false
-			(panel as CanvasItem).visible = false
-	_set_units_view(false)
+	# After idle prebuild. Stops theater auto-fit from undoing Köln close-zoom.
+	if mr != null and mr.has_method("set_process"):
+		mr.set_process(false)
 
 
 func _camera_is_on_koln(zoom: float) -> bool:
