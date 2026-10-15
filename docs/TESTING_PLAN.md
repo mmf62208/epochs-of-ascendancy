@@ -727,9 +727,22 @@ grep -o 'multi_ai_decisions=.*' log | md5sum
 
 `--quick` same 14 `unit_board_play_path` reds. map_qc NE **0.9853**. Headless; live A/B pending.
 
+**FIX #4 (ring colour + honest live-boot cold L-on):** Play MIXED on `9ddeecc3`: L-on roles were `engineers_recommended` 1678 / hub 1517 vs A's hub 3157 / route 38. Cause: idle prebuild called `_supply_role_for_pid(..., allow_without_overlay=true)` and L-on reused that cache. Fixture `cold_ms` also measured a synthetic 3196-gon grid, not Play's KEY_L / frame2 / full TestScenario.
+
+Fix:
+
+- Prebuild uses the exact L-on role walk (`_supply_role_lon_semantics`, no `allow_without_overlay=true`), waits until province+depot counts are stable, and fingerprints role-context inputs. L-on show/hide only when both topology and role fps match; otherwise recompute.
+- Fixture metric renamed **fixture L-on** (250 bar kept). `max_step ≤ 8.0` unchanged.
+- Live-boot windowed gate `WindowedRender1LiveColdGuard` / `tools/eoa_render1_live_cold_guard.sh`: real TestScenario, `Input.parse_input_event(KEY_L)`, t0 in `_input`, stop at `RenderingServer.frame_post_draw` of first `mesh_calls > 0`. Report frame2 and same-run L-off frame2. Bar: Δ(L-on − L-off frame2) ≤ 250 ms and frame2 B/A ≤ 0.75, 3/3 not best-of.
+- Colour: L-on histogram == fresh `_supply_highlight_roles()`; close-zoom hue buckets (sat>0.4, val>0.5) within ±10% of `5df8e7fc` (teal 37–45k / olive 7–9k / orange 4–7k).
+- Mutant: prebuild with `allow_without_overlay=true` → FAIL (source body of `_step_supply_prebuild_roles`).
+
+Keep: windowed draw guard + counter_lie source edit, 9 mutants, Perf3/5/6, seed 193601 `grep -o 'multi_ai_decisions=.*' log | md5sum` → `20fe9063` ×3, `--quick` 14, map_qc NE 0.9853. Wired as `launch_render1_live_cold` after `launch_render1_draw_guard`. Stay DRAFT / HOLD.
+
 ```bash
 tools/run_godot.sh --headless --path . --resolution 1280x740 \
   -s res://scripts/core/HeadlessRender1SupplyRingMeshTest.gd
+tools/eoa_render1_live_cold_guard.sh
 ```
 
 Wired as `launch_render1_supply_ring_mesh` immediately after `launch_perf5_supply_overlay_fresh`. Merge **HOLD**.

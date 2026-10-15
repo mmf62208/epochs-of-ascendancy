@@ -187,15 +187,15 @@ func _measure_cold_lon() -> void:
 	if _mr.has_method("get_supply_overlay_outline_visible_count"):
 		vis = int(_mr.call("get_supply_overlay_outline_visible_count"))
 	print("cold_raw display=%s ms=%.3f" % [DisplayServer.get_name(), cold_ms])
-	_info("cold_first toggle=%.3f first_frame=%.3f frame_total=%.3f vis=%d" % [
+	_info("fixture L-on toggle=%.3f first_frame=%.3f frame_total=%.3f vis=%d" % [
 		toggle_ms, first_frame_ms, cold_ms, vis,
 	])
 	if vis < 3000:
-		_fail("(e′) windowed cold L-on visible=%d want >=3000" % vis)
+		_fail("windowed fixture L-on visible=%d want >=3000" % vis)
 	if cold_ms >= MAX_COLD_MS:
-		_fail("(e′) windowed cold first L-on %.1f ms (bar %.0f)" % [cold_ms, MAX_COLD_MS])
+		_fail("windowed fixture L-on %.1f ms (bar %.0f)" % [cold_ms, MAX_COLD_MS])
 	else:
-		_pass("(e′) windowed cold first L-on %.1f ms (bar=%.0f)" % [cold_ms, MAX_COLD_MS])
+		_pass("windowed fixture L-on %.1f ms (bar=%.0f)" % [cold_ms, MAX_COLD_MS])
 	if _mr != null and is_instance_valid(_mr):
 		_mr.queue_free()
 		_mr = null

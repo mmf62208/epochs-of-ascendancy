@@ -626,9 +626,9 @@ func _test_maprenderer_toggle() -> void:
 			int(pre.get("item_count", 0)), str(pre.get("done", false)),
 		])
 	if float(pre.get("max_step_ms", 0.0)) > 8.0:
-		_fail("(e′) idle prebuild step %.3f ms exceeds 8.0 ms budget" % float(pre.get("max_step_ms", 0.0)))
+		_fail("idle prebuild step %.3f ms exceeds 8.0 ms budget" % float(pre.get("max_step_ms", 0.0)))
 	else:
-		_pass("(e′) idle prebuild total=%.1f ms frames=%d max_step=%.3f" % [
+		_pass("idle prebuild total=%.1f ms frames=%d max_step=%.3f" % [
 			float(pre.get("total_ms", 0.0)), int(pre.get("frames", 0)), float(pre.get("max_step_ms", 0.0)),
 		])
 
@@ -661,14 +661,16 @@ func _test_maprenderer_toggle() -> void:
 	)
 	print("cold_raw display=%s ms=%.3f" % [DisplayServer.get_name(), cold_ms])
 	if vis < 3000:
-		_fail("(e′) cold L-on visible=%d want >=3000" % vis)
+		_fail("fixture L-on visible=%d want >=3000" % vis)
 	if cold_ms >= MAX_COLD_MS:
-		_fail("(e′) cold first L-on %.1f ms (bar %.0f; cold_full_build mutant)" % [cold_ms, MAX_COLD_MS])
+		_fail("fixture L-on %.1f ms (bar %.0f; cold_full_build mutant)" % [cold_ms, MAX_COLD_MS])
 	else:
-		_pass("(e′) cold first L-on %.1f ms (toggle=%.1f first_frame=%.1f bar=%.0f)" % [
+		_pass("fixture L-on %.1f ms (toggle=%.1f first_frame=%.1f bar=%.0f)" % [
 			cold_ms, toggle_ms, first_frame_ms, MAX_COLD_MS,
 		])
-		_pass("mutant_cold_full_build killed by (e′) %.1f ms" % cold_ms)
+		_pass("mutant_cold_full_build killed by fixture L-on %.1f ms" % cold_ms)
+	_check_lon_roles_vs_fresh()
+	_check_allow_without_overlay_mutant()
 
 	_mr.call("_toggle_supply_overlay")
 	await process_frame
@@ -681,3 +683,40 @@ func _test_maprenderer_toggle() -> void:
 	else:
 		_pass("(e) warm L toggle first frame %.1f ms" % warm_ms)
 	_info("warm_toggle_frame_ms=%.3f" % warm_ms)
+
+
+func _check_lon_roles_vs_fresh() -> void:
+	if _mr == null or not _mr.has_method("supply_roles_match_fresh_lon"):
+		_fail("L-on roles vs fresh: MapRenderer missing supply_roles_match_fresh_lon")
+		return
+	var live: Dictionary = {}
+	if _mr.has_method("get_supply_roles_cache_copy"):
+		live = _mr.call("get_supply_roles_cache_copy") as Dictionary
+	if live.is_empty() and "_supply_role_by_province" in _mr:
+		live = _mr.get("_supply_role_by_province") as Dictionary
+	var hist: Dictionary = {}
+	if _mr.has_method("get_supply_roles_histogram"):
+		hist = _mr.call("get_supply_roles_histogram", live) as Dictionary
+	_info("L-on role histogram=%s" % str(hist))
+	if not bool(_mr.call("supply_roles_match_fresh_lon")):
+		_fail("L-on roles histogram != fresh _supply_highlight_roles() hist=%s" % str(hist))
+	else:
+		_pass("L-on roles histogram == fresh compute %s" % str(hist))
+
+
+func _check_allow_without_overlay_mutant() -> void:
+	var txt := FileAccess.get_file_as_string("res://scripts/map/MapRenderer.gd")
+	var needle := "func _step_supply_prebuild_roles"
+	var start := txt.find(needle)
+	if start < 0:
+		_fail("mutant_allow_without_overlay: _step_supply_prebuild_roles missing")
+		return
+	var nxt := txt.find("\nfunc ", start + needle.length())
+	var body := txt.substr(start, nxt - start if nxt > start else 800)
+	if body.find("allow_without_overlay") >= 0 or body.find(", true)") >= 0 or body.find(",true)") >= 0:
+		_fail("mutant_allow_without_overlay: prebuild still passes allow_without_overlay=true")
+		return
+	if body.find("_supply_role_for_pid") < 0:
+		_fail("mutant_allow_without_overlay: prebuild no longer calls _supply_role_for_pid")
+		return
+	_pass("mutant_allow_without_overlay killed: prebuild uses L-on role context")
