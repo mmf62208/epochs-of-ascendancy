@@ -450,7 +450,18 @@ ProductionManager's listener on this board is about 1.2 ms. The roll-frame cost 
 
 Mutants the behaviour test kills: (a) sync supply on the roll frame (M3 day_ai 107–112 vs tip 12–14); (b) unfinished at the next roll (`unfinished_rolls=0`); (c) generate cursor not resumed (depot diff none); (d) harvest and reinforce on the same day (day-12 reinforces 3, harvests 2, `both=false`); (e) slice order / key order (1e-6 depot equality); (f) slicing while paused (cursor held, slice ms 0); (g) atomic phase starting inside the last 2 ms of the 20 ms budget (naval stays at phase 2, `naval_ms=0`); (h) a generate step whose last cost exceeds remaining budget (index stays 0).
 
-**FIX #1 (slice cap on a slower box):** Verification on tip `6471a65e` failed 4/4 **only** on slice max (1× 26.34–36.55, 4× 25.22–27.57). Atomic phases (flush / naval / fuel / air) ran whole once started, so a phase that began near 19.9 ms landed at 23–27 ms; a generate step plus GC reached ~36 ms. Fix: `_run_supply_day_job` does not start an atomic phase unless remaining budget ≥ last measured cost + 2 ms (pessimistic defaults naval 6.0 / fuel 4.5 until measured, stored on the job). Generate/ship loops also stop when remaining < max(last item + 0.5 ms, 5 ms reserve). Deadline 0 (sync `advance_supply_day` / midnight catch-up) still runs the rest. Phase order, one-day-per-day, pause, and depot equality are unchanged — budgets change WHEN work runs, not WHAT. The 25 ms bar stays. `HeadlessPerf6DayRollTest` adds `_test_atomic_phase_defer` and `_test_generate_step_bound` (deadline logic, not wall-clock speed). Per-run slice numbers after this fix are recorded on the PR and in CURRENT_STATE once the 3/3 gate is in.
+**FIX #1 (slice cap on a slower box):** Verification on tip `6471a65e` failed 4/4 **only** on slice max (1× 26.34–36.55, 4× 25.22–27.57). Atomic phases (flush / naval / fuel / air) ran whole once started, so a phase that began near 19.9 ms landed at 23–27 ms; a generate step plus GC reached ~36 ms. Fix: `_run_supply_day_job` does not start an atomic phase unless remaining budget ≥ last measured cost + 2 ms (pessimistic defaults naval 6.0 / fuel 4.5 until measured, stored on the job). Generate/ship loops also stop when remaining < max(last item + 0.5 ms, 5 ms reserve). Deadline 0 (sync `advance_supply_day` / midnight catch-up) still runs the rest. Phase order, one-day-per-day, pause, and depot equality are unchanged — budgets change WHEN work runs, not WHAT. The 25 ms bar stays. `HeadlessPerf6DayRollTest` adds `_test_atomic_phase_defer` and `_test_generate_step_bound` (deadline logic, not wall-clock speed).
+
+`HeadlessPerf6DayRollTest` **3/3 PASS** on tip (plus one 3-busy-loop CPU-load run), slice max ≤25 and 0 frames over:
+
+| run | 1× slice max (over) | 4× slice max (over) |
+|---|---:|---:|
+| 1 | 16.13 (0) | 17.48 (0) |
+| 2 | 15.13 (0) | 17.99 (0) |
+| 3 | 18.14 (0) | 17.82 (0) |
+| CPU load | 16.41 (0) | 17.78 (0) |
+
+Atomic defer + generate-step bound **PASS**. Depot diff none. Seed 193601 two collects identical (md5 `0e7237ac2a2f6feedf5c8032045e866d`): JAP 903951 / FRA 710739 / ITA 710859 / ENG 711481 / POL 711054 / SOV none / JAP 902474. `--quick` same 14 `unit_board_play_path` reds. map_qc NE **0.9853**.
 
 The two `perf4_daily_sim_tick_product.py` edits (and their unit test) stay: `advance_supply_day` now only builds a job and calls `_run_supply_day_job(..., 0)`, so the PERF-4 grep for `_process_air_missions` / `_process_naval_recon` / day-roll deferral has to read the runner body. Without that, `--quick` would fail `supply_day_full_steps_in_live`.
 
