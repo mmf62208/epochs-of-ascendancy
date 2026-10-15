@@ -17,7 +17,7 @@ const ECON_PATH := "res://data/provinces_world_accurate/province_economy_layer.j
 const CITY_PATH := "res://data/provinces_world_accurate/province_city_layer.json"
 const PROV_SCRIPT := "res://scripts/data/Province.gd"
 const MAP_DATA_SCRIPT := "res://scripts/data/MapScenarioData.gd"
-const MAJORS: PackedStringArray = PackedStringArray(["GER", "FRA", "ITA", "POL", "ENG", "USA", "JAP", "SOV"])
+const MAJORS: Array = ["GER", "FRA", "ITA", "POL", "ENG", "USA", "JAP", "SOV"]
 
 var _failures: int = 0
 var _ol: Node2D = null
@@ -155,8 +155,13 @@ func _boot_live_1936() -> bool:
 		_fail("live 1936 trunk cache is empty")
 		return false
 	var dbg: Dictionary = _debug()
+	var ends: Array = []
+	for rt0_v in _routes():
+		if typeof(rt0_v) == TYPE_DICTIONARY:
+			var rt0: Dictionary = rt0_v
+			ends.append("%d-%d n=%d" % [int(rt0.get("a", 0)), int(rt0.get("b", 0)), (rt0.get("pids", []) as Array).size() if typeof(rt0.get("pids", [])) == TYPE_ARRAY else 0])
 	print(
-		"HWY3_MEASURE mode=%s hubs=%d routes=%d used=%d budget=%d cache=%d"
+		"HWY3_MEASURE mode=%s hubs=%d routes=%d used=%d budget=%d cache=%d adj_ms=%.2f ends=%s"
 		% [
 			str(dbg.get("mode", "")),
 			(_debug().get("hubs", []) as Array).size() if typeof(dbg.get("hubs", [])) == TYPE_ARRAY else 0,
@@ -164,6 +169,8 @@ func _boot_live_1936() -> bool:
 			int(dbg.get("used", 0)),
 			int(dbg.get("budget", 0)),
 			_cache.size(),
+			float(dbg.get("adj_ms", 0.0)),
+			str(ends),
 		]
 	)
 	return true
@@ -359,7 +366,14 @@ func _test_h2_routes() -> void:
 			graph = gv
 	if graph.is_empty():
 		graph = _cache
-	var adj: Dictionary = RoadTierVisualScript.build_hub_route_adj(graph, _records(), true)
+	var recs_h2: Array = _records()
+	var adj: Dictionary = RoadTierVisualScript.build_hub_route_adj(graph, recs_h2, true)
+	var attrs_h2: Dictionary = {}
+	for rec_h2_v in recs_h2:
+		if typeof(rec_h2_v) != TYPE_DICTIONARY:
+			continue
+		var rec_h2: Dictionary = rec_h2_v
+		attrs_h2[int(rec_h2.get("pid", 0))] = rec_h2
 	var bad_end: int = 0
 	var bad_short: int = 0
 	for rt_v in routes:
@@ -373,7 +387,7 @@ func _test_h2_routes() -> void:
 			continue
 		var want_v: Variant = rt.get("pids", [])
 		var want: Array = want_v if typeof(want_v) == TYPE_ARRAY else []
-		var got: PackedInt32Array = RoadTierVisualScript.shortest_hub_path(adj, a, b, false)
+		var got: PackedInt32Array = RoadTierVisualScript.shortest_hub_path(adj, a, b, false, attrs_h2)
 		if got.size() != want.size():
 			bad_short += 1
 			continue
@@ -622,8 +636,19 @@ func _test_h6_determinism() -> void:
 		var gv: Variant = _ol.call("get_hwy3_graph_rows")
 		if typeof(gv) == TYPE_ARRAY:
 			graph = gv
+	var recs_h6: Array = _records()
+	var by_pid_h6: Dictionary = {}
+	var select_h6: Array = []
+	for rec_h6_v in recs_h6:
+		if typeof(rec_h6_v) == TYPE_DICTIONARY:
+			var rec_h6: Dictionary = rec_h6_v
+			by_pid_h6[int(rec_h6.get("pid", 0))] = rec_h6
+			if RoadTierVisualScript._hwy3_rec_is_hub_candidate(rec_h6):
+				select_h6.append(rec_h6)
 	var ctx: Dictionary = {
-		"records": _records(),
+		"records": recs_h6,
+		"select_records": select_h6,
+		"by_pid": by_pid_h6,
 		"graph": graph,
 		"use_urban": true,
 		"tag_borders": {},
@@ -663,7 +688,7 @@ func _test_h6_determinism() -> void:
 	if delta > 5.0:
 		_fail("H6: assign +%.3f ms over legacy (budget +5)" % delta)
 	else:
-		_pass("H6: assign +%.3f ms vs legacy (<=5)" % delta)
+		_pass("H6: assign %+.3f ms vs legacy (<=5)" % delta)
 
 
 func _test_mutants() -> void:
@@ -673,7 +698,18 @@ func _test_mutants() -> void:
 		if typeof(gv) == TYPE_ARRAY:
 			graph = gv
 	var recs: Array = _records()
-	var ctx: Dictionary = {"records": recs, "graph": graph, "use_urban": true, "tag_borders": {}}
+	var by_pid_m: Dictionary = {}
+	for rec_bp_v in recs:
+		if typeof(rec_bp_v) == TYPE_DICTIONARY:
+			var rec_bp: Dictionary = rec_bp_v
+			by_pid_m[int(rec_bp.get("pid", 0))] = rec_bp
+	var ctx: Dictionary = {
+		"records": recs,
+		"by_pid": by_pid_m,
+		"graph": graph,
+		"use_urban": true,
+		"tag_borders": {},
+	}
 	_mutant_expect("rank_grow_back", ctx, "H2")
 	_mutant_expect("no_capitals", ctx, "H1")
 	_mutant_expect("urban_required", ctx, "H1")
@@ -703,12 +739,18 @@ func _mutant_expect(name: String, ctx: Dictionary, bar: String) -> void:
 			var adj: Dictionary = RoadTierVisualScript.build_hub_route_adj(
 				ctx2.get("graph", []), rec_copy, true
 			)
+			var attrs_m: Dictionary = {}
+			for rec_m_v in rec_copy:
+				if typeof(rec_m_v) != TYPE_DICTIONARY:
+					continue
+				var rec_m: Dictionary = rec_m_v
+				attrs_m[int(rec_m.get("pid", 0))] = rec_m
 			for rt_v in dbg.get("routes", []):
 				if typeof(rt_v) != TYPE_DICTIONARY:
 					continue
 				var rt: Dictionary = rt_v
 				var got: PackedInt32Array = RoadTierVisualScript.shortest_hub_path(
-					adj, int(rt.get("a", 0)), int(rt.get("b", 0)), false
+					adj, int(rt.get("a", 0)), int(rt.get("b", 0)), false, attrs_m
 				)
 				var want_v: Variant = rt.get("pids", [])
 				var want: Array = want_v if typeof(want_v) == TYPE_ARRAY else []
@@ -763,13 +805,23 @@ func _mutant_expect(name: String, ctx: Dictionary, bar: String) -> void:
 		# Mutant disables shape checks, so a known-bad polyline must be accepted.
 		var cents: Dictionary = {}
 		var pids: PackedInt32Array = PackedInt32Array()
-		pids.append(1)
-		pids.append(2)
-		pids.append(1)
-		cents[1] = Vector2(0, 0)
-		cents[2] = Vector2(10, 0)
-		var shape: Dictionary = RoadTierVisualScript.path_shape_report(pids, cents, 1, 1, name)
-		killed = bool(shape.get("ok", false))
+		if name == "hook_back":
+			pids.append(1)
+			pids.append(2)
+			pids.append(1)
+			cents[1] = Vector2(0, 0)
+			cents[2] = Vector2(10, 0)
+			var shape_h: Dictionary = RoadTierVisualScript.path_shape_report(pids, cents, 1, 1, name)
+			killed = bool(shape_h.get("ok", false))
+		else:
+			# Alternating zigzag, no vertex repeat; turn sum 2.5π > 1.5π per 6 edges.
+			for zi in range(7):
+				pids.append(zi + 1)
+				cents[zi + 1] = Vector2(float(zi) * 10.0, 0.0 if (zi % 2) == 0 else 10.0)
+			var shape_z: Dictionary = RoadTierVisualScript.path_shape_report(
+				pids, cents, 1, 7, name
+			)
+			killed = bool(shape_z.get("ok", false))
 	OS.set_environment("EOA_HWY3_MUTANT", "")
 	if killed:
 		_pass("mutant %s killed by %s" % [name, bar])

@@ -1698,8 +1698,19 @@ func _collect_hwy3_hub_ctx() -> Dictionary:
     for t4_v in best_by_tag.keys():
         var best: Dictionary = best_by_tag[t4_v]
         best["capital"] = true
+    var by_pid: Dictionary = {}
+    var select_records: Array = []
+    for rec_bp_v in records:
+        if typeof(rec_bp_v) != TYPE_DICTIONARY:
+            continue
+        var rec_bp: Dictionary = rec_bp_v
+        by_pid[int(rec_bp.get("pid", 0))] = rec_bp
+        if RoadTierVisualScript._hwy3_rec_is_hub_candidate(rec_bp):
+            select_records.append(rec_bp)
     return {
         "records": records,
+        "select_records": select_records,
+        "by_pid": by_pid,
         "tag_borders": tag_borders,
         "use_urban": true,
     }
