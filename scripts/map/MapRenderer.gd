@@ -19504,14 +19504,14 @@ func _resolve_map_pick_pid(world_pos: Vector2) -> int:
 	return pid
 
 
-## FIX #5: a facility icon at the click point overrides a stale hover / cache dest.
-## Miss of every facility rect keeps the MV-1 cache-dest / GIS path as on base.
+## FIX #8: a facility icon at the click point wins. A miss commits to the
+## province under this world (event.position). Stale hover / cache dest never does.
 func _still_click_province_pid(world_pos: Vector2, mv1_commit: bool) -> int:
 	var fac_click: int = _facility_icon_pid_at(world_pos)
 	if fac_click > 0:
 		return fac_click
-	if mv1_commit and _march_preview_cache_dest > 0:
-		return _march_preview_cache_dest
+	if mv1_commit:
+		return _resolve_hex_pick_pid(world_pos)
 	var pid := _resolve_map_pick_pid(world_pos)
 	if pid <= 0 and typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_at_world_pos"):
 		pid = MapManager.get_province_at_world_pos(world_pos, true)
@@ -19979,15 +19979,17 @@ func _mv1_event_province_pid(world_pos: Vector2) -> int:
 
 
 func _mv1_re_resolve_commit_pid(world_pos: Vector2, picked_pid: int, mv1_commit: bool) -> int:
-	# Cached-dest still-click can return the stale hover dest. Re-resolve at
-	# the release world (same pick as dest_matches). Facility hits keep
-	# still_click's icon pid. GIS miss keeps the cache dest (FAC-1a miss-path).
+	# FIX #8: the commit is whatever is under event.position. A stale
+	# `_march_preview_cache_dest` passed in as picked_pid never wins.
 	if not mv1_commit:
 		return picked_pid
-	if _facility_icon_pid_at(world_pos) > 0:
-		return picked_pid
+	var fac_pid: int = _facility_icon_pid_at(world_pos)
+	if fac_pid > 0:
+		return fac_pid
 	var event_pid: int = _resolve_hex_pick_pid(world_pos)
 	if event_pid > 0:
+		return event_pid
+	if picked_pid == _march_preview_cache_dest and _march_preview_cache_dest > 0:
 		return event_pid
 	return picked_pid
 
@@ -20007,8 +20009,9 @@ func _mv1_preview_dest_matches_world(world_pos: Vector2) -> bool:
 	# must not match (MV-1e: Bad Kreuznach vs stale Hildesheim).
 	if click_pid > 0:
 		return false
+	# FIX #8: a GIS miss must not fall through to the stale hover province.
 	if _hover_province != null and int(_hover_province.id) == dest:
-		return true
+		return false
 	return false
 
 

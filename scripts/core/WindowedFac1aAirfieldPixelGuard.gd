@@ -1109,13 +1109,16 @@ func _assert_stale_hover_override() -> bool:
 						continue
 					var miss_pid: int = int(mr.call("_still_click_province_pid", o, true))
 					if miss_pid == STALE_HOVER_PID:
-						miss_ok = true
+						ok = false
+						_log("EOA_FAC1A_PIXEL_GUARD who=guard.stale FAIL stale dest stole miss scale=%.0f z=%.2f (NOT live Play)" % [scale, z])
 						break
-				if miss_ok:
+					miss_ok = true
+					break
+				if not ok:
 					break
 			if not miss_ok:
 				ok = false
-				_log("EOA_FAC1A_PIXEL_GUARD who=guard.stale FAIL miss-path cache dest scale=%.0f z=%.2f (NOT live Play)" % [scale, z])
+				_log("EOA_FAC1A_PIXEL_GUARD who=guard.stale FAIL miss-path did not stay on event province scale=%.0f z=%.2f (NOT live Play)" % [scale, z])
 	if tm != null and tm.has_method("set_time_scale"):
 		tm.call("set_time_scale", 1.0)
 	_pause_clock_only()
