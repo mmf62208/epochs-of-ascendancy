@@ -79,7 +79,8 @@ const ROUTE_REFRESH_BUDGET_PER_FLUSH: int = DEFAULT_ROUTE_DEST_CAP
 ## so refill frames stay under ~200 ms. First plan is always allowed.
 const ROUTE_REFRESH_MS_BUDGET: float = 40.0
 ## PERF-6: full supply-day sections spread across later frames. Route planning
-## keeps the 40 ms budget above. A supply slice stops before 20 ms.
+## keeps the 40 ms budget above. A supply slice stops before 20 ms, or 22 ms
+## when behind pace / in the last few non-roll frames before midnight.
 const SUPPLY_DAY_SLICE_MS_BUDGET: float = 20.0
 ## Do not start an atomic phase unless remaining budget covers last cost + this.
 const SUPPLY_DAY_SLICE_ATOMIC_HEADROOM_MS: float = 2.0
@@ -103,10 +104,23 @@ const SUPPLY_DAY_SLICE_ESTIMATE_EMA_NEW: float = 0.25
 ## Each deferred frame multiplies (estimate − floor) by this so a spike
 ## becomes affordable again without a deadline-0 catch-up.
 const SUPPLY_DAY_SLICE_DEFER_DECAY: float = 0.8
+## Raise the per-frame budget up to this when behind pace or in the
+## last few non-roll frames before midnight. Still under the 25 ms cap.
+const SUPPLY_DAY_SLICE_PACE_BUDGET_MS: float = 22.0
+## Catch-up window: last N non-roll frames before the midnight tick.
+const SUPPLY_DAY_CATCH_UP_FRAMES: int = 4
 ## Last full-day section timings (spike diagnosis: heap vs rebuild vs generate).
 var last_supply_day_profile: Dictionary = {}
 ## CPU ms spent inside the supply-day slicer on the last drain. 0 when skipped.
 var last_supply_slice_ms: float = 0.0
+## True when the last drain ran inside the midnight catch-up window.
+var last_supply_slice_catch_up: bool = false
+## Unbounded last-resort sync finish (deadline 0) on the final non-roll frame.
+## Separate from last_supply_slice_ms so the 25 ms cap still counts the frame.
+var supply_catch_up_sync_ms: float = 0.0
+var supply_catch_up_sync_count: int = 0
+## Test seam: when >= 8, catch-up / pace frame-time uses this ms.
+var supply_slice_frame_ms_override: float = -1.0
 ## Last measured atomic-phase costs (ms). Seeded pessimistically; EMA-blended
 ## on each run and decayed toward the floor on each deferred frame.
 var _supply_slice_phase_ms: Dictionary = {
@@ -1814,6 +1828,7 @@ func _finish_supply_day_job(job: Dictionary) -> void:
 
 
 func _drain_queued_supply_day_slice() -> void:
+	last_supply_slice_catch_up = false
 	if _supply_slice_paused():
 		last_supply_slice_ms = 0.0
 		return
@@ -1822,9 +1837,13 @@ func _drain_queued_supply_day_slice() -> void:
 		return
 	var t0 := Time.get_ticks_usec()
 	_supply_slice_did_work = false
+	var sync_finish := _should_sync_finish_supply_day()
+	var in_catch_up := sync_finish or _should_catch_up_supply_day()
+	last_supply_slice_catch_up = in_catch_up
 	var deadline := 0
-	if not _should_catch_up_supply_day():
-		deadline = t0 + int(SUPPLY_DAY_SLICE_MS_BUDGET * 1000.0)
+	if not sync_finish:
+		var budget_ms: float = _supply_slice_paced_budget_ms()
+		deadline = t0 + int(budget_ms * 1000.0)
 	var guard := 0
 	while not _supply_day_queue.is_empty() and guard < 16:
 		var job: Dictionary = _supply_day_queue[0]
@@ -1837,6 +1856,13 @@ func _drain_queued_supply_day_slice() -> void:
 			break
 		guard += 1
 	last_supply_slice_ms = float(Time.get_ticks_usec() - t0) / 1000.0
+	if sync_finish and last_supply_slice_ms > 0.0:
+		supply_catch_up_sync_ms = last_supply_slice_ms
+		supply_catch_up_sync_count += 1
+		print(
+			"[SUPPLY-CATCH-UP-SYNC] ms=%.2f count=%d"
+			% [supply_catch_up_sync_ms, supply_catch_up_sync_count]
+		)
 
 
 func _supply_slice_paused() -> bool:
@@ -1896,6 +1922,96 @@ func _next_tick_crosses_midnight() -> bool:
 	return hour + int(acc + _next_backup_tick_hours()) >= 24
 
 
+func _supply_slice_frame_ms() -> float:
+	if supply_slice_frame_ms_override >= 8.0:
+		return supply_slice_frame_ms_override
+	var dt: float = 16.67
+	if is_inside_tree():
+		dt = get_process_delta_time() * 1000.0
+	if dt < 8.0:
+		dt = 16.67
+	return clampf(dt, 8.0, 33.34)
+
+
+func _supply_slice_remaining_work_ms() -> float:
+	if _supply_day_queue.is_empty():
+		return 0.0
+	var job: Dictionary = _supply_day_queue[0]
+	if bool(job.get("finished", false)):
+		return 0.0
+	var phase := int(job.get("phase", 0))
+	var item_ms: float = _supply_slice_item_estimate_ms()
+	var work: float = 0.0
+	if phase <= 0:
+		work += _supply_slice_phase_estimate_ms(job, "flush")
+	if phase <= 1:
+		var gen_left := 0
+		if bool(job.get("gen_ready", false)):
+			var keys: Array = job.get("keys", [])
+			gen_left = maxi(0, keys.size() - int(job.get("index", 0)))
+		else:
+			gen_left = depot_states.size()
+		work += float(gen_left) * item_ms
+	if phase <= 2:
+		work += _supply_slice_phase_estimate_ms(job, "naval")
+	if phase <= 3:
+		work += _supply_slice_phase_estimate_ms(job, "fuel")
+	if phase <= 4:
+		work += _supply_slice_phase_estimate_ms(job, "air")
+	if phase <= 5:
+		var ship_left := 0
+		if bool(job.get("ship_ready", false)):
+			var rkeys: Array = job.get("route_keys", [])
+			ship_left = maxi(0, rkeys.size() - int(job.get("route_index", 0)))
+		else:
+			ship_left = _routes.size()
+		work += float(ship_left) * item_ms
+	return work
+
+
+func _supply_slice_frames_until_midnight_roll() -> int:
+	if not _backup_clock_is_allowed() or _supply_slice_paused():
+		return 1000
+	var until := _ms_until_backup_tick()
+	var frame_ms: float = _supply_slice_frame_ms()
+	if frame_ms < 1.0:
+		frame_ms = 16.67
+	var frames_to_tick := 0
+	if until > 0:
+		frames_to_tick = maxi(1, int(ceili(float(until) / frame_ms)))
+	if _next_tick_crosses_midnight():
+		return frames_to_tick
+	var hour := 0
+	var acc := 0.0
+	if typeof(TimeManager) != TYPE_NIL:
+		hour = int(TimeManager.get("current_hour"))
+		acc = float(TimeManager.get("_accumulated_game_hours"))
+	var hours_left: float = 24.0 - float(hour) - acc
+	var step: float = _next_backup_tick_hours()
+	if step < 0.1:
+		step = 0.1
+	var ticks_needed: int = int(ceili(hours_left / step))
+	var ticks_after: int = maxi(0, ticks_needed - 1)
+	var frames_per_tick: int = maxi(1, int(round(1000.0 / frame_ms)))
+	return frames_to_tick + ticks_after * frames_per_tick
+
+
+func _supply_slice_paced_budget_ms() -> float:
+	var budget: float = SUPPLY_DAY_SLICE_MS_BUDGET
+	if _supply_day_queue.is_empty():
+		return budget
+	var remaining: float = _supply_slice_remaining_work_ms()
+	var frames_left: int = _supply_slice_frames_until_midnight_roll()
+	if frames_left < 1:
+		frames_left = 1
+	var need: float = remaining / float(frames_left)
+	if _should_catch_up_supply_day():
+		budget = SUPPLY_DAY_SLICE_PACE_BUDGET_MS
+	elif need > budget:
+		budget = minf(SUPPLY_DAY_SLICE_PACE_BUDGET_MS, need)
+	return budget
+
+
 func _should_catch_up_supply_day() -> bool:
 	if _supply_day_queue.is_empty():
 		return false
@@ -1905,10 +2021,18 @@ func _should_catch_up_supply_day() -> bool:
 		return false
 	if _supply_slice_paused():
 		return false
-	var until := _ms_until_backup_tick()
-	if until <= 0 or until > 80:
+	if not _next_tick_crosses_midnight():
 		return false
-	return _next_tick_crosses_midnight()
+	var frames_left: int = _supply_slice_frames_until_midnight_roll()
+	return frames_left >= 1 and frames_left <= SUPPLY_DAY_CATCH_UP_FRAMES
+
+
+func _should_sync_finish_supply_day() -> bool:
+	if not _should_catch_up_supply_day():
+		return false
+	var until := _ms_until_backup_tick()
+	var frame_ms: float = _supply_slice_frame_ms()
+	return until > 0 and until <= int(ceili(frame_ms))
 
 
 func _ship_routes_range(days: float, keys: Array, start: int, attrition_tons: float, deadline_usec: int) -> int:

@@ -267,6 +267,9 @@ else
   run_step launch_perf6_starve \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessPerf6StarveTest.gd || fail
 
+  run_step launch_perf6_pace \
+    tools/run_godot.sh --headless -s res://scripts/core/HeadlessPerf6PaceTest.gd || fail
+
   # PERF-4 FIX #11: leftover-queue ×7 on the windowed backup clock + deferred
   # day emit. Isolates the live race (TM self-drive before TIB; mark was
   # deferred). Must FAIL on 1cddb51c and PASS on the tip. Also runs inside
