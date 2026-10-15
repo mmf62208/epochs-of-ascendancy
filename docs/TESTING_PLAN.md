@@ -976,6 +976,12 @@ Guard `HeadlessHwy1HighwayChainTest` Part A (5-chain line, star 3-spokes, two 5-
 
 Pixel: `WindowedRt1RoadTierPixelGuard` measures the **fixed** `710412–710424` pair at far/default/close (no `_measure_best_highway` re-pick). Fail if a sample is **<8 px**. Highway mins: far **≥9**, default **≥12**, close **≥16**. Far may Y-flip the same pair when unflip <8 (viewport image vs canvas; cap 8–48 px). Measured tip: far **40** / default **17** / close **20**. Screenshots `docs/evidence/hwy2/`. **Headless + xvfb, live Play pending.**
 
+### HWY-3 hub-route display highways (draft HOLD)
+
+Display highways are **trunk shortest paths between hubs** (capitals, largest cities, significant ports). Urban-district neighbour count is an **optional weight** only. Rank-and-grow stays as a fallback for synthetic Part A (no hub records) and as the `rank_grow_back` mutant. Each accepted route is a **simple path** (no repeated vertex, no >150° hook-back, length ≤1.6× hub chord, zigzag ≤1.5π per 6 edges). Budget still ~4% of inferred trunk (52 ±15%), 0 singletons, median ≥4. Far highways keep casing/core + 20 px floor so the wide Germany frame shows routes; dirt/paved stay culled.
+
+Guard `HeadlessHwy3HubRouteTest` H1–H6 + named mutants (`rank_grow_back`, `no_capitals`, `urban_required`, `zigzag_ok`, `hook_back`, `not_shortest`, `far_hidden`, `flip_max`, `pid_list`). Wired as `launch_hwy3_hub_route`. Pixel guard: **one fixed orientation** (`HWY3_FIXED_ORIENTATION=1`, landmark vs max-of-orientations), hub-route sample pair by rule, far ≥9 / default ≥12 / close ≥16, wide-Germany ≥3 highway runs ≥9 px. Shots `docs/evidence/hwy3/`. `select_trunk_edges` / `road_tier_for_edge` / seed 193601 **unedited**. **HOLD merge.**
+
 ### RX-1 Rhine Crossing (Phase B draft)
 
 Pure product `test_rx1_rhine_crossing_product` is on `--quick`. Headless: `HeadlessRx1RhineCrossingTest` (edge penalties, shared-border guard, Build Bridge complete) + `HeadlessRx1RhineLiveStayAliveTickTest` (FIX3 calendar tick: 0% → >0 in ~5d → COMPLETE via `advance_real_time`) + `HeadlessRx1RhineVisibilityTest` (FIX1: Rhine/road z > DemoUnitIcon 28; spine chrome absent on Neuss). Windowed smoke `tools/eoa_rx1_bridge_live_progress_guard.sh` sets `EOA_SMOKE_RX1_LIVE_PROGRESS=1` and presses **Build Bridge** on Neuss `710413`. The smoke harness is **not** the product. IX-1 spine tests stay green and unchanged. `run_godot.sh` one-time `--import` when the class cache lacks `Rx1RhineCrossing`.

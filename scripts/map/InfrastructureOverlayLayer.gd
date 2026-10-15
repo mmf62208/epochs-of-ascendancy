@@ -122,6 +122,10 @@ var _road_shared_border_keys: Dictionary = {}
 var _road_shared_border_ready: bool = false
 var _road_cache_rebuild_count: int = 0
 var _road_tier_draw: Dictionary = {}
+var _hwy3_city_layer: Dictionary = {}
+var _hwy3_econ_layer: Dictionary = {}
+var _hwy3_layers_ready: bool = false
+var _hwy3_graph_rows: Array = []
 
 func _ready():
     infrastructure_manager = get_node_or_null("/root/InfrastructureDevelopmentManager")
@@ -640,12 +644,16 @@ func _rebuild_road_layer_inner() -> void:
                 _add_explicit_lookup_line(c1, c2, int(pid), int(nid), tier, on_corridor)
     _paint_explicit_ix1_spine_if_missing(provinces, drawn, cache)
     _road_candidate_count = cache.size()
+    var graph_rows: Array = []
+    for cand_v in cache:
+        if typeof(cand_v) == TYPE_DICTIONARY:
+            graph_rows.append((cand_v as Dictionary).duplicate())
     var trunk: Array = RoadTierVisualScript.select_trunk_edges(cache)
     cache.clear()
     for trunk_v in trunk:
         if typeof(trunk_v) == TYPE_DICTIONARY:
             cache.append(trunk_v)
-    _assign_display_tiers(cache)
+    _assign_display_tiers(cache, graph_rows)
     var deg: Dictionary = RoadTierVisualScript.degree_stats(cache)
     var tri: int = RoadTierVisualScript.count_undirected_triangles(cache)
     var hwy_st: Dictionary = RoadTierVisualScript._hwy1_component_stats(cache)
@@ -1501,12 +1509,21 @@ func _display_tier_less(a: Dictionary, b: Dictionary) -> bool:
     return ka < kb
 
 
-## Visual-only: explicit + top few percent of the trunk are highways. Not terciles.
-func _assign_display_tiers(cache: Array[Dictionary]) -> void:
+## Visual-only: explicit stay highway; inferred highways are hub-to-hub shortest paths.
+func _assign_display_tiers(cache: Array[Dictionary], graph_rows: Array = []) -> void:
     var as_array: Array = []
     for entry in cache:
         as_array.append(entry)
-    RoadTierVisualScript.assign_rare_display_tiers(as_array)
+    var ctx: Dictionary = _collect_hwy3_hub_ctx()
+    if not graph_rows.is_empty():
+        ctx["graph"] = graph_rows
+        _hwy3_graph_rows = graph_rows
+    RoadTierVisualScript.assign_rare_display_tiers(as_array, ctx)
+    if as_array.size() != cache.size():
+        cache.clear()
+        for row_v in as_array:
+            if typeof(row_v) == TYPE_DICTIONARY:
+                cache.append(row_v)
 
 
 func _count_display_highways(cache: Array[Dictionary]) -> int:
@@ -1519,6 +1536,173 @@ func _count_display_highways(cache: Array[Dictionary]) -> int:
 
 func get_road_candidate_count() -> int:
     return _road_candidate_count
+
+
+func get_hwy3_debug() -> Dictionary:
+    return RoadTierVisualScript.last_hwy3_debug
+
+
+func get_hwy3_graph_rows() -> Array:
+    return _hwy3_graph_rows
+
+
+func _ensure_hwy3_layers() -> void:
+    if _hwy3_layers_ready:
+        return
+    _hwy3_city_layer = _load_hwy3_layer_json("province_city_layer.json")
+    _hwy3_econ_layer = _load_hwy3_layer_json("province_economy_layer.json")
+    var loader: Node = _find_scenario_loader()
+    if loader != null and loader.has_method("get_city_layer"):
+        var live_v: Variant = loader.call("get_city_layer")
+        if typeof(live_v) == TYPE_DICTIONARY and not (live_v as Dictionary).is_empty():
+            _hwy3_city_layer = live_v
+    _hwy3_layers_ready = true
+
+
+func _load_hwy3_layer_json(filename: String) -> Dictionary:
+    var path: String = "res://data/provinces_world_accurate/%s" % filename
+    if not FileAccess.file_exists(path):
+        return {}
+    var f: FileAccess = FileAccess.open(path, FileAccess.READ)
+    if f == null:
+        return {}
+    var parsed: Variant = JSON.parse_string(f.get_as_text())
+    f.close()
+    if typeof(parsed) != TYPE_DICTIONARY:
+        return {}
+    var root: Dictionary = parsed
+    var raw: Variant = root.get("provinces", root)
+    if typeof(raw) != TYPE_DICTIONARY:
+        return {}
+    return raw
+
+
+func _find_scenario_loader() -> Node:
+    var tree: SceneTree = get_tree()
+    if tree != null and tree.root != null:
+        var named: Node = tree.root.get_node_or_null("/root/ScenarioLoader")
+        if named != null:
+            return named
+        return tree.root.find_child("ScenarioLoader", true, false)
+    return null
+
+
+func _collect_hwy3_hub_ctx() -> Dictionary:
+    _ensure_hwy3_layers()
+    var records: Array = []
+    var tag_borders: Dictionary = {}
+    var land_n_by_tag: Dictionary = {}
+    if map_manager == null or not map_manager.has_method("get_all_provinces"):
+        return {"records": records, "tag_borders": tag_borders, "use_urban": true}
+    var all: Dictionary = map_manager.get_all_provinces()
+    var adj = map_manager.get_adjacency_system() if map_manager.has_method("get_adjacency_system") else null
+    var urban_flags: Dictionary = {}
+    var owner_of: Dictionary = {}
+    for pid_v in all.keys():
+        var pid: int = int(pid_v)
+        var p: Province = all[pid_v]
+        if p == null or p.is_sea:
+            continue
+        var tag: String = str(p.owner_tag).strip_edges().to_upper()
+        owner_of[pid] = tag
+        urban_flags[pid] = RoadTierVisualScript.is_urban_district_name(str(p.name))
+        if not tag.is_empty():
+            land_n_by_tag[tag] = int(land_n_by_tag.get(tag, 0)) + 1
+    var cap_by_tag: Dictionary = {}
+    for tag_v in land_n_by_tag.keys():
+        var tag: String = str(tag_v)
+        if map_manager.has_method("get_country"):
+            var c: Variant = map_manager.call("get_country", tag)
+            var cap_id: int = 0
+            if c is Object and "capital_province_id" in c:
+                cap_id = int(c.capital_province_id)
+            elif typeof(c) == TYPE_DICTIONARY:
+                cap_id = int((c as Dictionary).get("capital_province_id", 0))
+            if cap_id > 0:
+                cap_by_tag[tag] = cap_id
+    for pid2_v in all.keys():
+        var pid2: int = int(pid2_v)
+        var p2: Province = all[pid2_v]
+        if p2 == null or p2.is_sea:
+            continue
+        var tag2: String = str(owner_of.get(pid2, str(p2.owner_tag).strip_edges().to_upper()))
+        var city_v: Variant = _hwy3_city_layer.get(str(pid2), {})
+        var city: Dictionary = city_v if typeof(city_v) == TYPE_DICTIONARY else {}
+        var econ_v: Variant = _hwy3_econ_layer.get(str(pid2), {})
+        var econ: Dictionary = econ_v if typeof(econ_v) == TYPE_DICTIONARY else {}
+        var is_cap: bool = bool(p2.has_feature("capital")) if p2.has_method("has_feature") else false
+        if bool(city.get("is_capital", false)) or bool(city.get("capital", false)):
+            is_cap = true
+        if int(cap_by_tag.get(tag2, 0)) == pid2:
+            is_cap = true
+        var has_port: bool = false
+        if p2.has_method("resolve_has_port"):
+            has_port = bool(p2.resolve_has_port())
+        else:
+            has_port = bool(p2.has_port)
+        var urban_nbr: int = 0
+        if adj != null and adj.has_method("get_land_neighbors"):
+            var nbrs: Array = adj.call("get_land_neighbors", pid2)
+            for nid_v in nbrs:
+                var nid: int = int(nid_v)
+                if bool(urban_flags.get(nid, false)):
+                    urban_nbr += 1
+                var ot: String = str(owner_of.get(nid, ""))
+                if not tag2.is_empty() and not ot.is_empty() and ot != tag2:
+                    var bset: Dictionary = tag_borders.get(tag2, {})
+                    bset[ot] = true
+                    tag_borders[tag2] = bset
+        var centroid: Vector2 = Vector2.ZERO
+        if map_manager.has_method("get_province_centroid"):
+            centroid = map_manager.call("get_province_centroid", pid2)
+        if centroid == Vector2.ZERO:
+            centroid = p2.coordinates
+        records.append({
+            "pid": pid2,
+            "tag": tag2,
+            "population": int(p2.population),
+            "port": has_port,
+            "capital": is_cap,
+            "tier": int(city.get("tier", 0)),
+            "city_hub": bool(city.get("hub", false)),
+            "industrial": bool(econ.get("industrial_hub", false)),
+            "urban": bool(urban_flags.get(pid2, false)),
+            "urban_nbr": urban_nbr,
+            "centroid": centroid,
+            "land_n": int(land_n_by_tag.get(tag2, 0)),
+            "name": str(p2.name),
+            "city_name": str(city.get("city_name", "")),
+        })
+    var cap_tags: Dictionary = {}
+    for rec_v in records:
+        var rec: Dictionary = rec_v
+        if bool(rec.get("capital", false)):
+            cap_tags[str(rec.get("tag", ""))] = true
+    var best_by_tag: Dictionary = {}
+    for rec2_v in records:
+        var rec2: Dictionary = rec2_v
+        var t3: String = str(rec2.get("tag", ""))
+        if t3.is_empty() or cap_tags.has(t3):
+            continue
+        var sc: float = RoadTierVisualScript.hwy3_hub_score(rec2, true)
+        rec2["score"] = sc
+        var prev_v: Variant = best_by_tag.get(t3, null)
+        if prev_v == null:
+            best_by_tag[t3] = rec2
+        else:
+            var prev: Dictionary = prev_v
+            if sc > float(prev.get("score", 0.0)) or (
+                sc == float(prev.get("score", 0.0)) and int(rec2.get("pid", 0)) < int(prev.get("pid", 0))
+            ):
+                best_by_tag[t3] = rec2
+    for t4_v in best_by_tag.keys():
+        var best: Dictionary = best_by_tag[t4_v]
+        best["capital"] = true
+    return {
+        "records": records,
+        "tag_borders": tag_borders,
+        "use_urban": true,
+    }
 
 
 func get_road_trunk_stats() -> Dictionary:
@@ -2681,18 +2865,19 @@ class RoadTierDraw extends Node2D:
         var close: bool = _lod >= 2
         var case_px: float = RoadTierVisualScript.HIGHWAY_CASING_SCREEN_PX
         var core_px: float = RoadTierVisualScript.HIGHWAY_SCREEN_PX
+        var far_hidden: bool = OS.get_environment("EOA_HWY3_MUTANT").strip_edges() == "far_hidden"
         if far:
-            case_px = RoadTierVisualScript.HIGHWAY_FAR_CASING_SCREEN_PX
-            core_px = RoadTierVisualScript.HIGHWAY_FAR_CORE_SCREEN_PX
+            case_px = 5.5 if far_hidden else RoadTierVisualScript.HIGHWAY_FAR_CASING_SCREEN_PX
+            core_px = 3.0 if far_hidden else RoadTierVisualScript.HIGHWAY_FAR_CORE_SCREEN_PX
         elif close:
             case_px = RoadTierVisualScript.HIGHWAY_CLOSE_CASING_SCREEN_PX
             core_px = RoadTierVisualScript.HIGHWAY_CLOSE_CORE_SCREEN_PX
         var case_w := _world_width(case_px)
         var core_w := _world_width(core_px)
-        if far:
-            ## Europe/Home: the fixed pair measured 7 px at casing 9 and 12
-            ## (hairline vs NUTS3 border). Floor the far stroke at 20 screen px
-            ## so the same pair is ≥9 without re-picking.
+        if far and not far_hidden:
+            ## Europe/Home: hub-route highways must read at the wide Germany frame.
+            ## Floor the far stroke at 20 screen px so an honest (one-orientation)
+            ## sample is ≥9 without Y-flip shopping.
             var canvas_s: float = absf(get_global_transform_with_canvas().get_scale().x)
             if not is_finite(canvas_s) or canvas_s < 0.04:
                 canvas_s = _canvas_zoom()
