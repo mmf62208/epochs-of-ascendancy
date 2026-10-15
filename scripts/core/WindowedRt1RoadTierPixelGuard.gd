@@ -743,6 +743,23 @@ func _dismiss_inspector_tooltip() -> void:
 	# ProvinceHoverTooltip / compare glance cannot cover the highway pixels.
 	if DisplayServer.get_name() != "headless":
 		DisplayServer.warp_mouse(Vector2i(24, 700))
+	_hide_notice_toasts()
+
+
+func _hide_notice_toasts() -> void:
+	# LeaderEventUI "Notice" cards sit on CanvasLayer 90 (bottom-right) and cover
+	# Ruhr-east highway samples after Search/Go Köln.
+	for nm in ["LeaderNewsLayer", "ToastContainer"]:
+		var n := _find_named(nm)
+		if n == null:
+			continue
+		if n is CanvasItem:
+			(n as CanvasItem).visible = false
+		if n is CanvasLayer:
+			(n as CanvasLayer).visible = false
+		for ch in n.get_children():
+			if ch is CanvasItem:
+				(ch as CanvasItem).visible = false
 
 
 func _world_mid_under_visible_control(world_mid: Vector2) -> bool:
