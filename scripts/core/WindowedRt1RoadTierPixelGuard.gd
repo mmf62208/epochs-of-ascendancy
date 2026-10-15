@@ -427,6 +427,38 @@ func _measure_edge(img: Image, a: int, b: int, kind: String) -> Dictionary:
 	var dir: Vector2 = (sb - sa)
 	if dir.length() < 1.0:
 		return out
+	var img_h: int = img.get_height()
+	# Viewport get_image() can be Y-flipped vs canvas on GL. Same pair — try both.
+	# Far Home put Köln in the upper half; a flip samples the Mediterranean and
+	# reports a 7 px border independent of casing (9 and 12 and floor-20 all
+	# measured 7). Mid/close sit near the image centre so they still passed.
+	if kind == "highway":
+		var unflip: Dictionary = _measure_run_at(img, sa, sb, kind)
+		var sa_f := Vector2(sa.x, float(img_h) - sa.y)
+		var sb_f := Vector2(sb.x, float(img_h) - sb.y)
+		var flip: Dictionary = _measure_run_at(img, sa_f, sb_f, kind)
+		var uf_w: float = float(unflip.get("width_px", 0.0))
+		var ff_w: float = float(flip.get("width_px", 0.0))
+		# Only adopt the flipped chord when the unflipped sample is a miss (<8)
+		# and the flip looks like a cased stroke, not an ocean-sized dark run.
+		var use_flip: bool = uf_w < 8.0 and ff_w >= 8.0 and ff_w <= 48.0
+		var chosen: Dictionary = flip if use_flip else unflip
+		_log("EOA_RT1_PIXEL_GUARD who=guard.yflip pair=%d-%d dist=%.1f unflip=%.1f flip=%.1f use_flip=%s sa=%.0f,%.0f" % [
+			a, b, dir.length(),
+			float(unflip.get("width_px", 0.0)),
+			float(flip.get("width_px", 0.0)),
+			str(use_flip),
+			sa.x, sa.y,
+		])
+		return chosen
+	return _measure_run_at(img, sa, sb, kind)
+
+
+func _measure_run_at(img: Image, sa: Vector2, sb: Vector2, kind: String) -> Dictionary:
+	var out := {"width_px": 0.0, "sig": ""}
+	var dir: Vector2 = (sb - sa)
+	if dir.length() < 1.0:
+		return out
 	var perp := Vector2(-dir.y, dir.x).normalized()
 	var w := img.get_width()
 	var h := img.get_height()
