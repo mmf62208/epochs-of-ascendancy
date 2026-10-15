@@ -28,6 +28,7 @@ var _frame2_ms: float = -1.0
 var _loff_frame1_ms: float = -1.0
 var _loff_frame2_ms: float = -1.0
 var _t0_usec: int = 0
+var _t0_before_press: int = 0
 var _last_wait_log: int = -1
 var _phase: String = ""
 var _a_metrics: Dictionary = {}
@@ -101,8 +102,12 @@ func _run() -> void:
 	# (Play MIXED captured Japan). Re-pin Köln at close zoom before KEY_L.
 	_freeze_map_renderer_process()
 	_frame_over_koln(CLOSE_Z)
+	_feed_batch_view()
 	if not _camera_is_on_koln(CLOSE_Z):
 		_fail("camera not on Köln after prebuild")
+		return
+	if _loading_screen_up():
+		_fail("LoadingScreen still up after map_ready")
 		return
 	if not RenderingServer.frame_post_draw.is_connected(_on_frame_post_draw):
 		RenderingServer.frame_post_draw.connect(_on_frame_post_draw)
@@ -134,8 +139,12 @@ func _wait_map_ready() -> bool:
 			_last_wait_log = elapsed
 			_info("wait_map elapsed=%d n=%d" % [elapsed, _province_count()])
 		_dismiss_title()
+		if _province_count() >= 3500:
+			_dismiss_loading()
 		if _map_is_ready():
-			_info("map_ready elapsed=%d n=%d" % [elapsed, _province_count()])
+			_info("map_ready elapsed=%d n=%d loading=%s" % [
+				elapsed, _province_count(), str(_loading_screen_up()),
+			])
 			var i := 0
 			while i < 12:
 				await process_frame
@@ -179,11 +188,12 @@ func _on_frame_post_draw() -> void:
 	var mr := _map_renderer()
 	if mr == null:
 		return
-	var now := Time.get_ticks_usec()
-	if _t0_usec <= 0 and mr.has_method("get_supply_lon_input_t0_usec"):
-		_t0_usec = int(mr.call("get_supply_lon_input_t0_usec"))
-	if _t0_usec <= 0:
+	var stamped := _read_lon_t0(mr)
+	if stamped > _t0_before_press:
+		_t0_usec = stamped
+	if _t0_usec <= _t0_before_press:
 		return
+	var now := Time.get_ticks_usec()
 	var ms := float(now - _t0_usec) / 1000.0
 	var presented := _overlay_presented(mr)
 	if _phase == "lon":
@@ -197,6 +207,8 @@ func _on_frame_post_draw() -> void:
 			_armed = false
 		return
 	if _phase == "loff":
+		# Wait until the overlay is actually hidden, then the next two
+		# post_draw frames. Do not reuse L-on's t0 (parse_input_event is deferred).
 		if presented:
 			return
 		if not _got_frame1:
@@ -217,14 +229,39 @@ func _mesh_calls(mr: Node) -> int:
 
 
 func _overlay_presented(mr: Node) -> bool:
-	if _mesh_calls(mr) > 0:
-		return true
+	# Hide is supply_mode false. Stale mesh_calls from idle-warm / last L-on
+	# _draw must not count as presented (that was the 10–43 ms lie).
+	if not bool(mr.get("supply_mode")):
+		return false
+	var draw_usec := _batch_last_draw_usec(mr)
+	if draw_usec > 0:
+		return draw_usec > _t0_usec and _mesh_calls(mr) > 0
 	if mr.has_method("get_supply_overlay_outline_visible_count"):
 		if int(mr.call("get_supply_overlay_outline_visible_count")) > 0:
 			return true
-	if bool(mr.get("supply_mode")):
-		return _count_visible_supply_outlines(mr) > 0
-	return false
+	return _count_visible_supply_outlines(mr) > 0
+
+
+func _batch_last_draw_usec(mr: Node) -> int:
+	if mr.has_method("get_supply_batch_draw_stats"):
+		var st: Dictionary = mr.call("get_supply_batch_draw_stats") as Dictionary
+		var u := int(st.get("draw_usec", 0))
+		if u > 0:
+			return u
+	var layer: Node = null
+	if "container" in mr:
+		var c: Node = mr.get("container") as Node
+		if c != null:
+			layer = c.get_node_or_null("SupplyOutlineBatch")
+	if layer != null and layer.has_method("get_last_draw_usec"):
+		return int(layer.call("get_last_draw_usec"))
+	return 0
+
+
+func _read_lon_t0(mr: Node) -> int:
+	if mr != null and mr.has_method("get_supply_lon_input_t0_usec"):
+		return int(mr.call("get_supply_lon_input_t0_usec"))
+	return 0
 
 
 func _count_visible_supply_outlines(mr: Node) -> int:
@@ -243,20 +280,14 @@ func _count_visible_supply_outlines(mr: Node) -> int:
 
 
 func _press_l() -> void:
+	# Down only. MapRenderer already ignores key-up (`event.pressed`), but a
+	# release would still overwrite t0 if a handler stamps every KEY_L event.
 	var ev := InputEventKey.new()
 	ev.pressed = true
 	ev.echo = false
 	ev.keycode = KEY_L
 	ev.physical_keycode = KEY_L
 	Input.parse_input_event(ev)
-	if Input.has_method("flush_buffered_events"):
-		Input.flush_buffered_events()
-	var ev_up := InputEventKey.new()
-	ev_up.pressed = false
-	ev_up.echo = false
-	ev_up.keycode = KEY_L
-	ev_up.physical_keycode = KEY_L
-	Input.parse_input_event(ev_up)
 	if Input.has_method("flush_buffered_events"):
 		Input.flush_buffered_events()
 
@@ -266,24 +297,25 @@ func _measure_lon(mr: Node) -> void:
 	_got_frame2 = false
 	_frame1_ms = -1.0
 	_frame2_ms = -1.0
+	_t0_before_press = _read_lon_t0(mr)
 	_t0_usec = 0
 	_phase = "lon"
 	_armed = true
 	_press_l()
-	if mr.has_method("get_supply_lon_input_t0_usec"):
-		_t0_usec = int(mr.call("get_supply_lon_input_t0_usec"))
-	if _t0_usec <= 0:
-		_t0_usec = Time.get_ticks_usec()
-		if not _measure_a:
-			_fail("KEY_L t0 missing (MapRenderer._input did not stamp)")
-			_armed = false
-			return
-		_info("A path: t0 stamped after parse_input_event (no get_supply_lon_input_t0_usec)")
 	var guard := 0
 	while (not _got_frame2) and guard < 90:
+		if _t0_usec <= 0:
+			var stamped := _read_lon_t0(mr)
+			if stamped > _t0_before_press:
+				_t0_usec = stamped
+			elif _measure_a and guard >= 1 and stamped <= 0:
+				_t0_usec = Time.get_ticks_usec()
+				_info("A path: t0 stamped after parse_input_event (no get_supply_lon_input_t0_usec)")
 		await process_frame
 		guard += 1
 	_armed = false
+	if not _measure_a and _t0_usec <= _t0_before_press:
+		_fail("KEY_L t0 missing (MapRenderer._input did not stamp a new t0)")
 	_info(
 		"live L-on frame1=%.3f frame2=%.3f presented=%s mesh=%d vis=%d"
 		% [
@@ -300,16 +332,19 @@ func _measure_loff(mr: Node) -> void:
 	_got_frame2 = false
 	_loff_frame1_ms = -1.0
 	_loff_frame2_ms = -1.0
+	_t0_before_press = _read_lon_t0(mr)
 	_t0_usec = 0
 	_phase = "loff"
 	_armed = true
 	_press_l()
-	if mr.has_method("get_supply_lon_input_t0_usec"):
-		_t0_usec = int(mr.call("get_supply_lon_input_t0_usec"))
-	if _t0_usec <= 0:
-		_t0_usec = Time.get_ticks_usec()
 	var guard := 0
 	while (not _got_frame2) and guard < 90:
+		if _t0_usec <= 0:
+			var stamped := _read_lon_t0(mr)
+			if stamped > _t0_before_press:
+				_t0_usec = stamped
+			elif guard >= 1 and stamped <= _t0_before_press:
+				_t0_usec = Time.get_ticks_usec()
 		await process_frame
 		guard += 1
 	_armed = false
@@ -375,10 +410,18 @@ func _check_hue() -> void:
 	var i := 0
 	while i < 4:
 		_frame_over_koln(CLOSE_Z)
+		_feed_batch_view()
 		await process_frame
 		i += 1
+	if _loading_screen_up():
+		_fail("hue: LoadingScreen still covering the map")
+		return
 	if not _camera_is_on_koln(CLOSE_Z):
 		_fail("hue: camera not on Köln close-zoom")
+		return
+	var mr := _map_renderer()
+	if mr != null and not _overlay_presented(mr) and not bool(mr.get("supply_mode")):
+		_fail("hue: overlay not on (rings must be visible for ring-edge share)")
 		return
 	RenderingServer.force_draw()
 	_frame_over_koln(CLOSE_Z)
@@ -414,6 +457,9 @@ func _check_hue() -> void:
 		"hue_buckets ring_edge teal=%d olive=%d orange=%d share=%.4f fill_teal=%d width_proxy=%.3f (mesh stroke reads thinner than Line2D AA; width_scale option)"
 		% [teal, olive, orange, share, fill_teal, width_proxy]
 	)
+	if teal < 80:
+		_fail("hue ring-edge teal=%d too low (LoadingScreen / missed Köln?)" % teal)
+		return
 	if _measure_a:
 		_pass("MEASURE_A hue ring-edge teal=%d share=%.4f width_proxy=%.3f" % [teal, share, width_proxy])
 		return
@@ -574,9 +620,40 @@ func _write_run_json() -> void:
 func _map_is_ready() -> bool:
 	if not _title_closed():
 		return false
-	if _province_count() < 3000:
+	if _loading_screen_up():
+		return false
+	# Full world_accurate board, not mid-render 3280/3536 under LoadingScreen.
+	if _province_count() < 3500:
 		return false
 	return _map_renderer() != null and _camera() != null
+
+
+func _loading_screen_up() -> bool:
+	var ls: Node = _find_named("LoadingScreen")
+	if ls == null:
+		return false
+	if "visible" in ls and not bool(ls.get("visible")):
+		return false
+	return true
+
+
+func _dismiss_loading() -> void:
+	var tr := _find_named("TestRunner")
+	if tr != null and tr.has_method("_dismiss_loading_screen"):
+		tr.call("_dismiss_loading_screen")
+	var ls: Node = _find_named("LoadingScreen")
+	if ls == null:
+		return
+	if ls.has_method("hide_and_free"):
+		ls.call("hide_and_free")
+	elif "visible" in ls:
+		ls.set("visible", false)
+
+
+func _feed_batch_view() -> void:
+	var mr := _map_renderer()
+	if mr != null and mr.has_method("_feed_supply_outline_batch_view"):
+		mr.call("_feed_supply_outline_batch_view")
 
 
 func _title_closed() -> bool:
@@ -586,8 +663,6 @@ func _title_closed() -> bool:
 	var boot: Node = _find_named("LivingTitleBoot")
 	if boot != null and bool(boot.get("_closed")):
 		return true
-	if boot == null and _province_count() >= 3000:
-		return int((Time.get_ticks_msec() - _t0_msec) / 1000.0) >= 8
 	return false
 
 
@@ -680,6 +755,7 @@ func _frame_over_koln(zoom: float) -> void:
 			cam.reset_smoothing()
 			cam.enabled = true
 			cam.make_current()
+	_feed_batch_view()
 	_info("frame Köln zoom=%.2f pos=%.1f,%.1f" % [zoom, pos.x, pos.y])
 
 

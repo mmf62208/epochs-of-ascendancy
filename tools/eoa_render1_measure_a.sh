@@ -64,13 +64,29 @@ if "func get_supply_lon_input_t0_usec()" not in t:
 p.write_text(t)
 print("patched", p)
 PY
-echo "EOA_RENDER1_MEASURE_A who=5df8e7fc out=$OUT"
+GODOT=""
+for c in \
+  "${HOME}/Applications/Godot-4.7.1/Godot_v4.7.1-rc2_linux.x86_64" \
+  "${HOME}/Applications/Godot-4.7.1/godot" \
+  "${HOME}/Applications/godot-latest"; do
+  if [[ -x "$c" ]]; then GODOT="$c"; break; fi
+done
+if [[ -z "$GODOT" ]]; then
+  echo "No Godot binary under ~/Applications/Godot-4.7*" >&2
+  exit 1
+fi
+# Do not use tools/run_godot.sh here: it forces --path <repo-root>.
+echo "EOA_RENDER1_MEASURE_A who=5df8e7fc godot=$GODOT out=$OUT"
+if [[ ! -f "$WORKDIR/.godot/global_script_class_cache.cfg" ]]; then
+  echo "EOA_RENDER1_MEASURE_A importing 5df8e7fc class cache"
+  "$GODOT" --path "$WORKDIR" --headless --import --quit
+fi
 cd "$WORKDIR"
 EOA_RENDER1_MEASURE_A=1 \
 EOA_RENDER1_A_FRAME2_FILE="$OUT" \
 EOA_RENDER1_LIVE_OUT="$(dirname "$OUT")" \
 xvfb-run -a -s "-screen 0 1280x740x24" \
-  "$ROOT/tools/run_godot.sh" --path "$WORKDIR" --resolution 1280x740 \
+  "$GODOT" --path "$WORKDIR" --resolution 1280x740 \
   -s res://scripts/core/WindowedRender1LiveColdGuard.gd
 echo "EOA_RENDER1_MEASURE_A wrote $OUT"
 test -s "$OUT"

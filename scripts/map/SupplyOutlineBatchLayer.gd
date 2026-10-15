@@ -51,6 +51,7 @@ var _built_index_count: int = 0
 var _last_mesh_calls: int = 0
 var _last_line_calls: int = 0
 var _last_aa_calls: int = 0
+var _last_draw_usec: int = 0
 var _last_drawn_vertex_count: int = 0
 var _last_drawn_index_count: int = 0
 var _last_drawn_meshes: Array = []
@@ -457,11 +458,16 @@ func get_lod_level() -> int:
 	return _lod_level
 
 
+func get_last_draw_usec() -> int:
+	return _last_draw_usec
+
+
 func get_last_draw_stats() -> Dictionary:
 	return {
 		"mesh_calls": _last_mesh_calls,
 		"line_calls": _last_line_calls,
 		"aa_calls": _last_aa_calls,
+		"draw_usec": _last_draw_usec,
 		"drawn_vertices": _last_drawn_vertex_count,
 		"drawn_indices": _last_drawn_index_count,
 		"drawn_mesh_n": _last_drawn_meshes.size(),
@@ -506,6 +512,7 @@ func get_roles_in_meshes() -> Dictionary:
 
 
 func _draw() -> void:
+	_last_draw_usec = Time.get_ticks_usec()
 	_last_mesh_calls = 0
 	_last_line_calls = 0
 	_last_aa_calls = 0
