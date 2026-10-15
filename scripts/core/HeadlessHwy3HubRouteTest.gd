@@ -67,6 +67,9 @@ func _run() -> void:
 	_test_h2_routes()
 	_test_h3_simple_paths()
 	_test_h4_germany()
+	_test_h4_major_trunks()
+	_test_h4_ruhr_span()
+	_test_h4_no_near_parallel()
 	_test_h5_budget()
 	_test_h6_determinism()
 	_test_mutants()
@@ -187,7 +190,7 @@ func _boot_live_1936() -> bool:
 			var rt0: Dictionary = rt0_v
 			ends.append("%d-%d n=%d" % [int(rt0.get("a", 0)), int(rt0.get("b", 0)), (rt0.get("pids", []) as Array).size() if typeof(rt0.get("pids", [])) == TYPE_ARRAY else 0])
 	print(
-		"HWY3_MEASURE mode=%s hubs=%d routes=%d used=%d budget=%d cache=%d adj_ms=%.2f ends=%s"
+		"HWY3_MEASURE mode=%s hubs=%d routes=%d used=%d budget=%d cache=%d adj_ms=%.2f dropped_parallel=%d dropped_cap=%d ends=%s"
 		% [
 			str(dbg.get("mode", "")),
 			(_debug().get("hubs", []) as Array).size() if typeof(dbg.get("hubs", [])) == TYPE_ARRAY else 0,
@@ -196,6 +199,8 @@ func _boot_live_1936() -> bool:
 			int(dbg.get("budget", 0)),
 			_cache.size(),
 			float(dbg.get("adj_ms", 0.0)),
+			int(dbg.get("dropped_parallel", 0)),
+			int(dbg.get("dropped_cap", 0)),
 			str(ends),
 		]
 	)
@@ -563,6 +568,17 @@ func _test_h3_simple_paths() -> void:
 		_fail("H3: trap zigzag route accepted (%d bad of %d)" % [trap_bad, trap_n])
 	else:
 		_pass("H3: trap zigzag adjacency rejected by product shape")
+	# Hook-back trap: a path that doubles back > HWY3_HOOK_TURN. Same pattern.
+	var saved_hook: Dictionary = _debug().duplicate(true)
+	var hook_trap: Dictionary = _assign_trap_shape("hook", "")
+	var hook_bad: int = int(hook_trap.get("independent_bad", 0))
+	var hook_n: int = int(hook_trap.get("routes", 0))
+	_vis_call("hwy3_set_debug", [saved_hook])
+	_vis_call("hwy3_clear_memos", [])
+	if hook_bad > 0:
+		_fail("H3: trap hook-back route accepted (%d bad of %d)" % [hook_bad, hook_n])
+	else:
+		_pass("H3: trap hook-back adjacency rejected by product shape")
 
 
 func _test_h4_germany() -> void:
@@ -760,6 +776,178 @@ func _test_h4_germany() -> void:
 		_fail("H4: GER hub routes are %d components, want one tree" % roots_g.size())
 	else:
 		_pass("H4: GER hub routes form one connected tree")
+
+
+func _rec_label(rec: Dictionary) -> String:
+	var cn: String = str(rec.get("city_name", "")).strip_edges()
+	if cn.is_empty():
+		cn = str(rec.get("name", ""))
+	return cn
+
+
+func _score_pid_less_local(a: Dictionary, b: Dictionary) -> bool:
+	var sa: float = float(a.get("score", 0.0))
+	var sb: float = float(b.get("score", 0.0))
+	if sa == sb:
+		return int(a.get("pid", 0)) < int(b.get("pid", 0))
+	return sa > sb
+
+
+func _test_h4_major_trunks() -> void:
+	var recs: Array = _records()
+	var rec_by: Dictionary = {}
+	for rec_v in recs:
+		if typeof(rec_v) != TYPE_DICTIONARY:
+			continue
+		var rec: Dictionary = rec_v
+		rec_by[int(rec.get("pid", 0))] = rec
+	var hubs_by_tag: Dictionary = {}
+	for h_v in _debug().get("hubs", []):
+		if typeof(h_v) != TYPE_DICTIONARY:
+			continue
+		var h: Dictionary = h_v
+		var tag: String = str(h.get("tag", "")).strip_edges().to_upper()
+		if tag.is_empty():
+			continue
+		if not hubs_by_tag.has(tag):
+			hubs_by_tag[tag] = []
+		var lst: Array = hubs_by_tag[tag]
+		lst.append(h)
+		hubs_by_tag[tag] = lst
+	var on_route: Dictionary = {}
+	var parent: Dictionary = {}
+	for rt_v in _routes():
+		if typeof(rt_v) != TYPE_DICTIONARY:
+			continue
+		var rt: Dictionary = rt_v
+		var pids_v: Variant = rt.get("pids", [])
+		var pids: Array = pids_v if typeof(pids_v) == TYPE_ARRAY else []
+		var prev: int = 0
+		for pv in pids:
+			var pid: int = int(pv)
+			on_route[pid] = true
+			if not parent.has(pid):
+				parent[pid] = pid
+			if prev > 0:
+				_uf_union_local(parent, prev, pid)
+			prev = pid
+	var missed: Array = []
+	for tag in MAJORS:
+		var hl_v: Variant = hubs_by_tag.get(tag, [])
+		var hl: Array = hl_v if typeof(hl_v) == TYPE_ARRAY else []
+		if hl.size() < 2:
+			missed.append("%s:need_2_hubs" % tag)
+			continue
+		var cap_pid: int = 0
+		var rows: Array = []
+		for h2_v in hl:
+			if typeof(h2_v) != TYPE_DICTIONARY:
+				continue
+			var h2: Dictionary = h2_v
+			rows.append(h2)
+			if bool(h2.get("capital", false)) and cap_pid <= 0:
+				cap_pid = int(h2.get("pid", 0))
+		rows.sort_custom(_score_pid_less_local)
+		if cap_pid <= 0 and not rows.is_empty():
+			cap_pid = int((rows[0] as Dictionary).get("pid", 0))
+		var second: int = 0
+		for h3_v in rows:
+			var h3: Dictionary = h3_v
+			var hp: int = int(h3.get("pid", 0))
+			if hp != cap_pid:
+				second = hp
+				break
+		if cap_pid <= 0 or second <= 0:
+			missed.append("%s:no_second" % tag)
+			continue
+		if not on_route.has(cap_pid) or not on_route.has(second):
+			var cap_rec_v: Variant = rec_by.get(cap_pid, {})
+			var sec_rec_v: Variant = rec_by.get(second, {})
+			var cap_rec: Dictionary = cap_rec_v if typeof(cap_rec_v) == TYPE_DICTIONARY else {}
+			var sec_rec: Dictionary = sec_rec_v if typeof(sec_rec_v) == TYPE_DICTIONARY else {}
+			var cap_nm: String = _rec_label(cap_rec)
+			var sec_nm: String = _rec_label(sec_rec)
+			missed.append("%s:%s-%s" % [tag, cap_nm, sec_nm])
+			continue
+		if _uf_find_local(parent, cap_pid) != _uf_find_local(parent, second):
+			missed.append("%s:disconnected" % tag)
+	if not missed.is_empty():
+		_fail("H4: major capital not connected to 2nd hub %s" % str(missed))
+	else:
+		_pass("H4: every major capital connects to its 2nd hub")
+
+
+func _test_h4_ruhr_span() -> void:
+	var recs: Array = _records()
+	var ruhr: Dictionary = {}
+	for rec_v in recs:
+		if typeof(rec_v) != TYPE_DICTIONARY:
+			continue
+		var rec: Dictionary = rec_v
+		if str(rec.get("tag", "")).to_upper() != "GER":
+			continue
+		var nm: String = str(rec.get("name", "")).to_lower()
+		var cnm: String = str(rec.get("city_name", "")).to_lower()
+		var hit: String = ""
+		if cnm.contains("duisburg") or nm.contains("duisburg"):
+			hit = "duisburg"
+		elif cnm.contains("essen") or nm.contains("essen, kreisfreie"):
+			hit = "essen"
+		elif cnm.contains("bochum") or nm.contains("bochum"):
+			hit = "bochum"
+		elif cnm.contains("dortmund") or nm.contains("dortmund"):
+			hit = "dortmund"
+		elif cnm.contains("gelsenkirchen") or nm.contains("gelsenkirchen"):
+			hit = "gelsenkirchen"
+		if hit != "":
+			ruhr[int(rec.get("pid", 0))] = hit
+	if ruhr.size() < 3:
+		_fail("H4: Ruhr city records missing (have %d)" % ruhr.size())
+		return
+	var best: int = 0
+	var best_names: Array = []
+	for rt_v in _routes():
+		if typeof(rt_v) != TYPE_DICTIONARY:
+			continue
+		var rt: Dictionary = rt_v
+		var pids_v: Variant = rt.get("pids", [])
+		var pids: Array = pids_v if typeof(pids_v) == TYPE_ARRAY else []
+		var names: Dictionary = {}
+		for pv in pids:
+			var pid: int = int(pv)
+			if ruhr.has(pid):
+				names[str(ruhr[pid])] = true
+		if names.size() > best:
+			best = names.size()
+			best_names = names.keys()
+	if best < 3:
+		_fail("H4: Ruhr span has %d of Duisburg/Essen/Bochum/Dortmund/Gelsenkirchen on one route %s" % [best, str(best_names)])
+	else:
+		_pass("H4: Ruhr span has %d cluster cities on one route %s" % [best, str(best_names)])
+
+
+func _test_h4_no_near_parallel() -> void:
+	var cents: Dictionary = _cents_from_recs(_records())
+	var routes: Array = _routes()
+	var bad: Array = []
+	for i in range(routes.size()):
+		if typeof(routes[i]) != TYPE_DICTIONARY:
+			continue
+		var ra: Dictionary = routes[i]
+		for j in range(i + 1, routes.size()):
+			if typeof(routes[j]) != TYPE_DICTIONARY:
+				continue
+			var rb: Dictionary = routes[j]
+			var par_v: Variant = _vis_call("_hwy3_routes_near_parallel", [ra, rb, cents])
+			if bool(par_v):
+				bad.append("%d-%d/%d-%d" % [
+					int(ra.get("a", 0)), int(ra.get("b", 0)),
+					int(rb.get("a", 0)), int(rb.get("b", 0)),
+				])
+	if not bad.is_empty():
+		_fail("H4: near-parallel routes remain %s" % str(bad))
+	else:
+		_pass("H4: no two routes share end regions within Hausdorff cover")
 
 
 func _test_h5_budget() -> void:
