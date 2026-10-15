@@ -616,7 +616,54 @@ Mutants killed by named asserts:
 | skip_ignored | vis 3196→3194, built 230112→229968 |
 | cold_full_build | (e′) 146.7 ms < 250 |
 
-Regression: OverlayFresh B1–B4 **PASS**; Legend p95 **5.66** / worst **18.60** (≤60); Perf3 **PASS** (MAX_TOGGLE_MS=1000 unedited; Home 156.5 / 4.0 / 137.5; z0.760 5.8 / 4.0 / 5.6); Perf6 DayRoll **PASS** (1× slice_max 17.79 / 4× 17.89, full=12 sync=0); Starve **PASS**; Pace **PASS** (budget 22.00, lag 4× slice_max 17.03 sync=0). Seed 193601 infra decisions identical ×3 OS processes, md5 `0e7237ac2a2f6feedf5c8032045e866d`. `--quick` same 14 `unit_board_play_path` reds. map_qc NE **0.9853**. Headless; live A/B pending.
+Regression: OverlayFresh B1–B4 **PASS**; Legend p95 **5.66** / worst **18.60** (≤60); Perf3 **PASS** (MAX_TOGGLE_MS=1000 unedited; Home 156.5 / 4.0 / 137.5; z0.760 5.8 / 4.0 / 5.6); Perf6 DayRoll **PASS** (1× slice_max 17.79 / 4× 17.89, full=12 sync=0); Starve **PASS**; Pace **PASS** (budget 22.00, lag 4× slice_max 17.03 sync=0). Seed 193601: `grep -o 'multi_ai_decisions=.*' log | md5sum` → `20fe9063de285f19d4f9b8a105abfd31` (reads **`20fe9063`**; do not carry PERF-6 FIX #1's private digest `0e7237ac`). `--quick` same 14 `unit_board_play_path` reds. map_qc NE **0.9853**. Headless; live A/B pending.
+
+**FIX #1 (cold first L-on + independent draw + seed digest):** Ship g101 NOT READY on two items. (e′) **334 / 293 / 296** ms vs 250 on Ship (this box **146.7**; base **295** — no cold-path gain). Breakdown: refresh ~95–102, batch ~55–60, legend ~27–30, **~160–200 ms first frame after toggle**. `counter_lie` survived: `draw_mesh(...)` removed from `_ci_draw_mesh`, counters kept, every assert except (e′) still passed. Seed write-up used `0e7237ac`.
+
+Fix (250 ms bar stays; target ≤180; Perf3 `MAX_TOGGLE_MS=1000` unedited):
+
+- Idle Home-LOD prebuild after map-ready, ≤8 ms/frame (`SUPPLY_RING_IDLE_BUDGET_MS=8`; setup on its own frame). Hidden warm (`begin_hidden_warm` / `modulate.a=0`) so the GPU upload is not on the L frame. Cold `_refresh_supply_highlights` skips the role walk when #90 roles are already cached. Fingerprint / route / depot snapshotted at role-collect so a later capture still trips `fp_changed`. Do not restart idle after a live batch or after first L-on.
+- `independent_draw_info`: RenderingServer / Viewport draw-info delta L-on vs L-off. Dummy headless reports 0; then a source scan requires a live `draw_mesh(` in `_ci_draw_mesh` (comments / `if false` do not count). Named assert; kills the exact `counter_lie` mutant.
+- Seed method (Ship): `grep -o 'multi_ai_decisions=.*' log | md5sum` → `20fe9063de285f19d4f9b8a105abfd31` (reads **`20fe9063`**). Tip is byte-identical to `5df8e7fc` on that line.
+
+`HeadlessRender1SupplyRingMeshTest` **PASS** on the FIX #1 tip (3196 items):
+
+| bar | original tip `3397d28c` | FIX #1 |
+|---|---|---|
+| (a) 0 polyline/AA; mesh_calls=392 | PASS | PASS |
+| (b) Home/full=0.125; culled=193 | PASS | PASS |
+| (c) 0 idle rebuilds | PASS | PASS |
+| (d) 1-depot patch | p50 0.319 / 0.376 | p50 **0.306** worst **0.427** touched 2/196 |
+| (e) warm L first frame <100 | 5.3 | **5.1** |
+| (e′) cold first L-on (target ≤180, bar 250) | 146.7 | **72.5** (toggle 15.4 / first_frame 57.0) |
+| (f) pulse 0 rebuilds | PASS | PASS |
+| (g) 15 roles | PASS | PASS |
+| `independent_draw_info` | wrapper only (mutant survived) | **PASS** dummy delta=0 `src_live=true` |
+
+Cold-first breakdown on FIX #1:
+
+| step | ms |
+|---|---:|
+| idle Home-LOD prebuild (off L) | 84.149 (12 frames, max_step 8.243, setup 7.402, warmed) |
+| sm.toggle_overlay | 0.004 |
+| `_refresh_supply_highlights` | **0.295** (cache hit) |
+| batch apply | 48.513 |
+| legend | 15.078 |
+| sync | 0.010 |
+| toggle wall | 15.409 |
+| first frame after toggle | 57.041 |
+| **frame_total (e′)** | **72.450** |
+
+`independent_draw_info` log: engine off/on all zeros; `src_live=true`; **killed `counter_lie`**. Removing `draw_mesh(...)` from `_ci_draw_mesh` while leaving counters FAILS this assert.
+
+Regression after FIX #1: OverlayFresh B1–B4 **PASS**; Legend p95 **5.92** / worst **18.62** (≤60); Perf3 **PASS** (MAX_TOGGLE_MS=1000 unedited; Home **138.8 / 4.1 / 132.1**; z0.760 **5.8 / 5.3 / 5.4**; roles=1 setups=0 glyphs=0); Perf6 DayRoll **PASS** (1× slice_max **17.40** / 4× **15.48**, full=12 sync=0); Starve **PASS**; Pace **PASS** (budget 22.00, lag 4× slice_max **17.02** sync=0). Seed 193601 ×3 OS processes identical:
+
+```
+grep -o 'multi_ai_decisions=.*' /tmp/render1-seed/runN.log | md5sum
+# 20fe9063de285f19d4f9b8a105abfd31  -
+```
+
+day0 JAP/SOV/ITA soft USA; d1 SOV/ITA/USA soft POL; d2 ITA/USA/POL soft ENG; d3 USA/POL/ENG soft FRA; d4 POL/ENG/FRA soft JAP. `--quick` same 14 `unit_board_play_path` reds. map_qc NE **0.9853**. Headless; live A/B pending.
 
 ```bash
 tools/run_godot.sh --headless --path . --resolution 1280x740 \
