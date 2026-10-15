@@ -164,12 +164,17 @@ def build_perf4_daily_sim_tick_product() -> Dict[str, Any]:
     else:
         fails.append("depot_skips_missing_pid")
     adv_fn = extract_gd_func_body(sm, "advance_supply_day")
+    # PERF-6 runs the same full-day sections from a resumable job. The sync
+    # entry still calls that runner with deadline 0.
+    supply_runner = adv_fn
+    if adv_fn and "_run_supply_day_job" in adv_fn:
+        supply_runner = extract_gd_func_body(sm, "_run_supply_day_job") or adv_fn
     if (
-        adv_fn
-        and "_process_air_missions" in adv_fn
-        and "_process_naval_recon" in adv_fn
-        and "is_live_f5_play_path" not in adv_fn
-        and "is_interactive_light_sim" not in adv_fn
+        supply_runner
+        and "_process_air_missions" in supply_runner
+        and "_process_naval_recon" in supply_runner
+        and "is_live_f5_play_path" not in (adv_fn or "")
+        and "is_interactive_light_sim" not in (adv_fn or "")
     ):
         passes.append("supply_day_full_steps_in_live")
     else:
@@ -496,9 +501,15 @@ def build_perf4_daily_sim_tick_product() -> Dict[str, Any]:
     # FIX #10/#11: leftover FIFO dests must not plan on the roll frame.
     # Refill after the clock decision — no tick prediction, no call_deferred.
     # Mark at the calendar boundary before deferred `_flush_sim_events`.
+    defer_body = adv_fn or ""
+    if adv_fn and "_run_supply_day_job" in adv_fn:
+        defer_body = defer_body + "\n" + (
+            extract_gd_func_body(sm, "_run_supply_day_job") or ""
+        )
     if (
         adv_fn
-        and "_begin_day_roll_plan_deferral" in adv_fn
+        and "defer_flush" in adv_fn
+        and "_begin_day_roll_plan_deferral" in defer_body
         and flush_fn
         and "_is_day_roll_plan_frame" in flush_fn
         and proc_fn

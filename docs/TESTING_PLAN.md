@@ -398,6 +398,67 @@ tools/run_godot.sh --headless --path . --resolution 1280x740 \
 
 Wired as `launch_perf3_supply_toggle` in `tools/eoa_full_test_gates.sh` (full path only). `--quick` is unchanged pure-python. Not live Play. Merge **HOLD**.
 
+### PERF-5 legend day tick + supply overlay freshness (draft HOLD)
+
+Off main `61a80433`. Tip `ae88fea5` PR **#90**. Two MapRenderer-only bugs: (a) L-on `_on_game_day_advanced_legend` mutated the legend StyleBox every day (theme + fit_content relayout); (b) PERF-3 cache reuse left stale rings after depot/capture because nothing called `set_routes` and `_supply_roles_cache` had no fingerprint. Fix: pulse via a sibling modulate overlay, per-day count cache, hint write-on-change, expiry restyle-only; overlay fingerprint poll + dirty pids + incremental `patch_items` (signals are accelerators only — #88 mutation paths emit nothing). Headless legend p95 **17.11** / worst **32.03** (ops 0/0/0); overlay B1/B2/B3 PASS; PERF-3 second L-on roles=1. Mutants A1–A6 B1–B8 FAIL by selection. Local #88 merge @ `34d76f21` overlay still PASS. Wired after `launch_perf3_supply_toggle`. `--quick` still the same 14 known `unit_board_play_path` reds. `HeadlessPerf3SupplyToggleTest` unedited. Not live Play. Merge **HOLD**.
+
+```bash
+tools/run_godot.sh --headless --path . --resolution 1280x740 \
+  -s res://scripts/core/HeadlessPerf5LegendDayTickTest.gd
+tools/run_godot.sh --headless --path . --resolution 1280x740 \
+  -s res://scripts/core/HeadlessPerf5SupplyOverlayFreshTest.gd
+```
+
+### PERF-6 day-roll supply slices (draft HOLD, headless; live A/B pending)
+
+Simulated M3 is local `eab3d0c9` (`cursor/m3-sim-88-89-90`: #88 `7529eac9`, #89 `6b1d9cb0`, #90 `2c68a67c`). `ac9926c5` is absent here and on GitHub. `origin/main` remains `61a80433`. Rebase onto the real M3 SHA when it lands. Interactive light sim queues the one full supply day; slices drain through `SupplyManager._process` / `refill_after_clock` at ≤20 ms, in order flush → generate → naval → fuel → air → shipping. Generate walks `depot_states` insertion order with a resumable cursor. A backup tick that would cross midnight finishes the open job on that non-roll frame. Paused frames do no slice work. Light production harvest stays on `day_n % 5 == 0`; reinforce moves to `day_n % 5 == 2`. Non-light callers still run `advance_supply_day` synchronously.
+
+Measured soft-supply split on this machine (Home 1x, player GER, soft USA, 3196 depots), from `last_supply_day_profile`:
+
+| section | ms |
+|---|---:|
+| total | 98.866 |
+| flush | 0.004 |
+| generate | 92.693 |
+| naval | 3.455 |
+| fuel | 2.448 |
+| air | 0.043 |
+| shipping | 0.040 |
+| plans | 0 |
+| rebuilds | 0 |
+
+Generate is the dominant section (92.693 of 98.866 ms).
+
+`HeadlessPerf6DayRollTest` **FAIL on M3 product** / **PASS on the tip**:
+
+| check | M3 product | tip |
+|---|---|---|
+| queue | `queue_full_supply_day` missing | queued |
+| 1× day_ai p95 / max | 107.1 / 112.0 | 12.1 / 14.4 |
+| 4× day_ai p95 / max | 102.3 / 102.5 | 10.7 / 10.9 |
+| slice max | 0.00 (no slicer) | 20.03 |
+| listener max | 1.2 | 1.2 (1×) / 1.3 (4×) |
+| unfinished rolls | 0 | 0 |
+| depot equality | (queue missing; stagger saw 0 days) | diff none, 6 drains |
+| production 10d | — | harvests 2, reinforces 2, diff none |
+| production day 12 | — | harvests 2, reinforces 3, both false |
+| pause mid-slice | — | phase 1 index 608, cursor held |
+| catch-up | — | 7.79 ms, count 0→1 |
+| roll-frame slice | — | 0.00 ms |
+
+ProductionManager's listener on this board is about 1.2 ms. The roll-frame cost that moved is the supply day inside `day_ai`.
+
+Mutants the behaviour test kills: (a) sync supply on the roll frame (M3 day_ai 107–112 vs tip 12–14); (b) unfinished at the next roll (`unfinished_rolls=0`); (c) generate cursor not resumed (depot diff none); (d) harvest and reinforce on the same day (day-12 reinforces 3, harvests 2, `both=false`); (e) slice order / key order (1e-6 depot equality); (f) slicing while paused (cursor held, slice ms 0).
+
+Other headless this sitting: Interactive **PASS** (one full supply day per soft apply, +2, `queued_supply_day`, worst day_ai 14.3 ms). Daily **PASS** (7d wall 33.7 ms, worst day_ai 11.7 ms). Seed 193601, two collects inside that process, identical to the documented sequence JAP 903951 / FRA 710739 / ITA 710859 / ENG 711481 / POL 711054 / SOV none / JAP 902474. A third OS process was not run. Windowed-backup MUST1 **PASS** (7/7 `plans_on_roll=0`, `tm_calendar_roll` → `tib_skip_refill`). Live-equivalent **PASS** (full supply days 3/3; leftover 6/0, scene-order 7/0, windowed 7/0). Legend **PASS** p95 6.45 / worst 18.84. Overlay B1–B4 **PASS**. `HeadlessDailyProductionStockpileTest` **PASS**. `HeadlessProductionTest` does not finish on this tree (see CURRENT_STATE). `--quick` the same 14 `unit_board_play_path` reds (`se_england` fill-toe 1, first-session play surface 1, unit_centric_pick 3, unit_counter_chrome 2, unit_card_fill_toe 3, living_unit_order_loop 4). map_qc NE land hit **0.9853**. Live Play A/B is pending.
+
+```bash
+tools/run_godot.sh --headless --path . \
+  -s res://scripts/core/HeadlessPerf6DayRollTest.gd
+```
+
+Wired as `launch_perf6_day_roll` immediately after `launch_perf4_interactive_multi_ai`. Merge **HOLD**.
+
 xvfb screenshots go to `/opt/cursor/artifacts/fac1a/`, `/opt/cursor/artifacts/fac1a_fix2/`, `/opt/cursor/artifacts/fac1a_fix2b/`, `/opt/cursor/artifacts/fac1a_fix2c/`, `/opt/cursor/artifacts/fac1a_fix3/`, and `/opt/cursor/artifacts/fac1a_fix4/` and are **NOT live Play**. Peak RSS must stay under 3 GB (isolated process tree — do not sum leftover Godot). Merge **HOLD**.
 
 **FIX #4 (Play MIXED `76fb4808`):** click ownership + badge-in-footprint + cluster digit + lone min size + split guard 1.53. Seeds unchanged. Isolated keep-green:
