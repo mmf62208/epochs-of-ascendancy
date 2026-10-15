@@ -88,6 +88,9 @@ const HWY3_URBAN_CLUSTER_R := 20.0
 const HWY3_PARALLEL_HAUSDORFF := 12.0
 const HWY3_PARALLEL_END := 18.0
 const HWY3_PARALLEL_COVER := 0.45
+## Same-corridor drop: Jaccard on province sets, or one shared end + half the hops.
+const HWY3_CORRIDOR_JACCARD := 0.5
+const HWY3_CORRIDOR_SHARE := 0.5
 const HWY3_TRUNK_MAX_DIST := 400.0
 const HWY3_TRUNK_MIN_DIST := 32.0
 const HWY3_COVER_RESERVE := 24
@@ -1976,6 +1979,56 @@ static func _hwy3_end_region_share(a0: Vector2, a1: Vector2, b0: Vector2, b1: Ve
 	return n
 
 
+static func _hwy3_route_pid_set(rt: Dictionary) -> Dictionary:
+	var out: Dictionary = {}
+	var pids_v: Variant = rt.get("pids", [])
+	if typeof(pids_v) == TYPE_ARRAY:
+		var pids: Array = pids_v
+		for pv in pids:
+			var pid: int = int(pv)
+			if pid > 0:
+				out[pid] = true
+	elif typeof(pids_v) == TYPE_PACKED_INT32_ARRAY:
+		var packed: PackedInt32Array = pids_v
+		for i in range(packed.size()):
+			var pid2: int = int(packed[i])
+			if pid2 > 0:
+				out[pid2] = true
+	return out
+
+
+## Same drawn corridor: Jaccard ≥ 0.5, or a shared endpoint plus ≥50% of either set.
+## overlap_ok leaves both copies so the independent Hub3 assert can kill the mutant.
+static func _hwy3_routes_share_corridor(ra: Dictionary, rb: Dictionary) -> bool:
+	if hwy3_mutant_name() == "overlap_ok":
+		return false
+	var sa: Dictionary = _hwy3_route_pid_set(ra)
+	var sb: Dictionary = _hwy3_route_pid_set(rb)
+	if sa.is_empty() or sb.is_empty():
+		return false
+	var inter: int = 0
+	for k_v in sa.keys():
+		if sb.has(k_v):
+			inter += 1
+	if inter <= 0:
+		return false
+	var uni: int = sa.size() + sb.size() - inter
+	var jaccard: float = float(inter) / float(maxi(uni, 1))
+	if jaccard + 0.0001 >= HWY3_CORRIDOR_JACCARD:
+		return true
+	var share_end: bool = (
+		int(ra.get("a", 0)) == int(rb.get("a", 0))
+		or int(ra.get("a", 0)) == int(rb.get("b", 0))
+		or int(ra.get("b", 0)) == int(rb.get("a", 0))
+		or int(ra.get("b", 0)) == int(rb.get("b", 0))
+	)
+	if not share_end:
+		return false
+	var frac_a: float = float(inter) / float(maxi(sa.size(), 1))
+	var frac_b: float = float(inter) / float(maxi(sb.size(), 1))
+	return frac_a + 0.0001 >= HWY3_CORRIDOR_SHARE or frac_b + 0.0001 >= HWY3_CORRIDOR_SHARE
+
+
 static func _hwy3_routes_near_parallel(ra: Dictionary, rb: Dictionary, cents: Dictionary) -> bool:
 	var pa_v: Variant = ra.get("pids", [])
 	var pb_v: Variant = rb.get("pids", [])
@@ -1983,6 +2036,8 @@ static func _hwy3_routes_near_parallel(ra: Dictionary, rb: Dictionary, cents: Di
 	var pb: Array = pb_v if typeof(pb_v) == TYPE_ARRAY else []
 	if pa.size() < 2 or pb.size() < 2:
 		return false
+	if _hwy3_routes_share_corridor(ra, rb):
+		return true
 	var poly_a: PackedVector2Array = _hwy3_route_polyline(pa, cents)
 	var poly_b: PackedVector2Array = _hwy3_route_polyline(pb, cents)
 	if poly_a.size() < 2 or poly_b.size() < 2:

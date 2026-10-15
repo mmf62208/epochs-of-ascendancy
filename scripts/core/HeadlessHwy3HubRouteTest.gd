@@ -70,6 +70,7 @@ func _run() -> void:
 	_test_h4_major_trunks()
 	_test_h4_ruhr_span()
 	_test_h4_no_near_parallel()
+	_test_h4_no_duplicate_corridor()
 	_test_h5_budget()
 	_test_h6_determinism()
 	_test_mutants()
@@ -964,6 +965,118 @@ func _test_h4_no_near_parallel() -> void:
 		_pass("H4: no two routes share end regions within Hausdorff cover")
 
 
+func _rec_name_local(rec: Dictionary) -> String:
+	var cn: String = str(rec.get("city_name", "")).strip_edges()
+	if cn.is_empty():
+		cn = str(rec.get("name", "")).strip_edges()
+	var comma: int = cn.find(",")
+	if comma >= 0:
+		cn = cn.substr(0, comma).strip_edges()
+	return cn
+
+
+func _route_name_chain(rt: Dictionary, rec_by: Dictionary) -> String:
+	var names: Array = []
+	for pid in _route_pids(rt):
+		var rec_v: Variant = rec_by.get(int(pid), {})
+		var rec: Dictionary = rec_v if typeof(rec_v) == TYPE_DICTIONARY else {}
+		var nm: String = _rec_name_local(rec)
+		if nm.is_empty():
+			nm = str(int(pid))
+		names.append(nm)
+	return " → ".join(names)
+
+
+func _route_pid_set_local(rt: Dictionary) -> Dictionary:
+	var out: Dictionary = {}
+	for pid in _route_pids(rt):
+		var p: int = int(pid)
+		if p > 0:
+			out[p] = true
+	return out
+
+
+## Independent of RoadTierVisual._hwy3_routes_share_corridor (overlap_ok must not share it).
+func _independent_corridor_overlap(ra: Dictionary, rb: Dictionary) -> Dictionary:
+	var sa: Dictionary = _route_pid_set_local(ra)
+	var sb: Dictionary = _route_pid_set_local(rb)
+	var out: Dictionary = {
+		"overlap": false,
+		"jaccard": 0.0,
+		"inter": 0,
+		"union": 0,
+		"share_end": false,
+		"frac_a": 0.0,
+		"frac_b": 0.0,
+	}
+	if sa.is_empty() or sb.is_empty():
+		return out
+	var inter: int = 0
+	for k_v in sa.keys():
+		if sb.has(k_v):
+			inter += 1
+	var uni: int = sa.size() + sb.size() - inter
+	var jaccard: float = float(inter) / float(maxi(uni, 1))
+	var share_end: bool = (
+		int(ra.get("a", 0)) == int(rb.get("a", 0))
+		or int(ra.get("a", 0)) == int(rb.get("b", 0))
+		or int(ra.get("b", 0)) == int(rb.get("a", 0))
+		or int(ra.get("b", 0)) == int(rb.get("b", 0))
+	)
+	var frac_a: float = float(inter) / float(maxi(sa.size(), 1))
+	var frac_b: float = float(inter) / float(maxi(sb.size(), 1))
+	out["inter"] = inter
+	out["union"] = uni
+	out["jaccard"] = jaccard
+	out["share_end"] = share_end
+	out["frac_a"] = frac_a
+	out["frac_b"] = frac_b
+	out["overlap"] = (
+		jaccard + 0.0001 >= 0.5
+		or (share_end and (frac_a + 0.0001 >= 0.5 or frac_b + 0.0001 >= 0.5))
+	)
+	return out
+
+
+func _test_h4_no_duplicate_corridor() -> void:
+	var rec_by: Dictionary = {}
+	for rec_v in _records():
+		if typeof(rec_v) != TYPE_DICTIONARY:
+			continue
+		var rec: Dictionary = rec_v
+		rec_by[int(rec.get("pid", 0))] = rec
+	var routes: Array = _routes()
+	var bad: Array = []
+	var paris_rows: Array = []
+	for i in range(routes.size()):
+		if typeof(routes[i]) != TYPE_DICTIONARY:
+			continue
+		var ra: Dictionary = routes[i]
+		var chain_a: String = _route_name_chain(ra, rec_by)
+		var looks_paris: bool = chain_a.to_lower().contains("paris") and (
+			chain_a.to_lower().contains("nord") or chain_a.to_lower().contains("somme")
+		)
+		if looks_paris:
+			paris_rows.append(chain_a)
+		for j in range(i + 1, routes.size()):
+			if typeof(routes[j]) != TYPE_DICTIONARY:
+				continue
+			var rb: Dictionary = routes[j]
+			var ov: Dictionary = _independent_corridor_overlap(ra, rb)
+			if not bool(ov.get("overlap", false)):
+				continue
+			var chain_b: String = _route_name_chain(rb, rec_by)
+			bad.append(
+				"%s | %s j=%.2f share_end=%s"
+				% [chain_a, chain_b, float(ov.get("jaccard", 0.0)), str(ov.get("share_end", false))]
+			)
+	print("HWY3_PARIS_NORD %s" % str(paris_rows))
+	if not bad.is_empty():
+		_fail("H4: duplicate corridor routes remain %s" % str(bad))
+	else:
+		_pass("H4: no route pair shares a corridor (Jaccard ≥0.5 or shared end + ≥50%)")
+
+
 func _test_h5_budget() -> void:
 	var st: Dictionary = _component_stats(_cache)
 	var hwy: int = int(st.get("highways", 0))
@@ -1274,6 +1387,7 @@ func _test_mutants() -> void:
 	_mutant_expect("zigzag_ok", ctx, "H3")
 	_mutant_expect("hook_back", ctx, "H3")
 	_mutant_expect("not_shortest", ctx, "H2")
+	_mutant_expect("overlap_ok", ctx, "H4c")
 	OS.set_environment("EOA_HWY3_MUTANT", "")
 	_vis_call("hwy3_clear_memos", [])
 
@@ -1373,6 +1487,38 @@ func _mutant_expect(name: String, ctx: Dictionary, bar: String) -> void:
 		var trap: Dictionary = _assign_trap_shape(kind, name)
 		killed = int(trap.get("independent_bad", 0)) > 0
 		_vis_call("hwy3_clear_memos", [])
+	elif bar == "H4c":
+		# Independent Jaccard / shared-end math — not _hwy3_routes_share_corridor.
+		var rec_by_m: Dictionary = {}
+		for rec_ov_v in rec_copy:
+			if typeof(rec_ov_v) != TYPE_DICTIONARY:
+				continue
+			var rec_ov: Dictionary = rec_ov_v
+			rec_by_m[int(rec_ov.get("pid", 0))] = rec_ov
+		var routes_m_v: Variant = dbg.get("routes", [])
+		var routes_m: Array = routes_m_v if typeof(routes_m_v) == TYPE_ARRAY else []
+		for i_m in range(routes_m.size()):
+			if typeof(routes_m[i_m]) != TYPE_DICTIONARY:
+				continue
+			var ra_m: Dictionary = routes_m[i_m]
+			for j_m in range(i_m + 1, routes_m.size()):
+				if typeof(routes_m[j_m]) != TYPE_DICTIONARY:
+					continue
+				var rb_m: Dictionary = routes_m[j_m]
+				var ov_m: Dictionary = _independent_corridor_overlap(ra_m, rb_m)
+				if bool(ov_m.get("overlap", false)):
+					killed = true
+					print(
+						"HWY3_OVERLAP_OK %s | %s j=%.2f"
+						% [
+							_route_name_chain(ra_m, rec_by_m),
+							_route_name_chain(rb_m, rec_by_m),
+							float(ov_m.get("jaccard", 0.0)),
+						]
+					)
+					break
+			if killed:
+				break
 	OS.set_environment("EOA_HWY3_MUTANT", "")
 	if killed:
 		_pass("mutant %s killed by %s" % [name, bar])
