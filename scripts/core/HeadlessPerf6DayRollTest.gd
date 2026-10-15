@@ -2,6 +2,9 @@ extends SceneTree
 
 ## PERF-6: the AI soft-supply full day is queued on the roll and sliced on
 ## later frames. Production harvest and reinforce no longer share a 1x day.
+## FIX #1: atomic phases yield unless remaining budget >= last cost + 2 ms;
+## generate/ship items also keep a 5 ms reserve so a last step + GC stays
+## under the 25 ms cap. The cap itself is unchanged.
 ##
 ##   tools/run_godot.sh --headless --path . \
 ##     -s res://scripts/core/HeadlessPerf6DayRollTest.gd
@@ -81,6 +84,8 @@ func _run() -> void:
 		_fail("queue_full_supply_day missing (sync roll-frame supply day)")
 	else:
 		_test_depot_equality(sm)
+		_test_atomic_phase_defer(sm)
+		_test_generate_step_bound(sm)
 		_test_production_totals(pm, tm)
 	await _test_clock(tm, sm, pm, 1.0, true)
 	await _test_clock(tm, sm, pm, 4.0, false)
@@ -116,6 +121,90 @@ func _test_depot_equality(sm: Node) -> void:
 	_restore_depots(sm, base)
 	sm.set("full_supply_day_count", 0)
 	sm.set("_supply_day_queue", [])
+
+
+func _test_atomic_phase_defer(sm: Node) -> void:
+	# Deadline logic, not wall-clock speed: a 12 ms naval phase must not start
+	# with 3 ms remaining, and deadline 0 (sync / catch-up) must still run.
+	if not sm.has_method("_supply_slice_cannot_afford_phase"):
+		_fail("atomic phase afford helper missing")
+		return
+	if not sm.has_method("_make_supply_day_job") or not sm.has_method("_run_supply_day_job"):
+		_fail("supply-day job runner missing")
+		return
+	var now := Time.get_ticks_usec()
+	var tight: int = now + 3000
+	var wide: int = now + 50000
+	var cannot_tight := bool(sm.call("_supply_slice_cannot_afford_phase", tight, 12.0))
+	var cannot_sync := bool(sm.call("_supply_slice_cannot_afford_phase", 0, 12.0))
+	var cannot_wide := bool(sm.call("_supply_slice_cannot_afford_phase", wide, 12.0))
+	var job: Dictionary = sm.call("_make_supply_day_job", 1.0)
+	job["phase"] = 2
+	job["naval_last_ms"] = 12.0
+	var done_tight := bool(sm.call("_run_supply_day_job", job, tight))
+	var phase_tight := int(job.get("phase", -1))
+	var naval_tight := float(job.get("naval_ms", -1.0))
+	print(
+		"HeadlessPerf6DayRollTest: atomic_defer helper tight=%s sync=%s wide=%s job_done=%s phase=%d naval_ms=%.3f"
+		% [str(cannot_tight), str(cannot_sync), str(cannot_wide), str(done_tight), phase_tight, naval_tight]
+	)
+	if not cannot_tight:
+		_fail("atomic afford helper started a 12ms phase with 3ms remaining")
+	elif cannot_sync:
+		_fail("atomic afford helper deferred deadline 0 (sync/catch-up must run)")
+	elif cannot_wide:
+		_fail("atomic afford helper deferred a 12ms phase with 50ms remaining")
+	elif done_tight or phase_tight != 2 or naval_tight > 0.0:
+		_fail(
+			"naval phase ran with 3ms remaining (done=%s phase=%d naval_ms=%.3f)"
+			% [str(done_tight), phase_tight, naval_tight]
+		)
+	else:
+		_pass("atomic naval phase deferred when remaining budget < last cost + 2ms")
+
+
+func _test_generate_step_bound(sm: Node) -> void:
+	# 6 ms remaining vs last generate step 8 ms: do not start another depot.
+	# Old slicer only checked `now >= deadline` and would process at least one.
+	if not sm.has_method("_supply_slice_cannot_afford_item"):
+		_fail("generate item afford helper missing")
+		return
+	if not ("depot_states" in sm) or not sm.has_method("_run_supply_day_job"):
+		_fail("generate bound setup missing")
+		return
+	var states: Dictionary = sm.depot_states
+	if states.is_empty():
+		_fail("generate bound needs depot keys")
+		return
+	var item_saved: float = float(sm.get("_supply_slice_last_item_ms")) if "_supply_slice_last_item_ms" in sm else 0.25
+	var base := _snap_depots(sm)
+	sm.set("_supply_slice_last_item_ms", 8.0)
+	var now := Time.get_ticks_usec()
+	var mid: int = now + 6000
+	var cannot_mid := bool(sm.call("_supply_slice_cannot_afford_item", mid, 8.0))
+	var cannot_sync := bool(sm.call("_supply_slice_cannot_afford_item", 0, 8.0))
+	var job: Dictionary = sm.call("_make_supply_day_job", 1.0)
+	job["phase"] = 1
+	job["gen_ready"] = true
+	job["keys"] = states.keys()
+	job["index"] = 0
+	var done := bool(sm.call("_run_supply_day_job", job, mid))
+	var idx := int(job.get("index", -1))
+	var phase := int(job.get("phase", -1))
+	sm.set("_supply_slice_last_item_ms", item_saved)
+	_restore_depots(sm, base)
+	print(
+		"HeadlessPerf6DayRollTest: gen_step_bound helper mid=%s sync=%s done=%s phase=%d index=%d"
+		% [str(cannot_mid), str(cannot_sync), str(done), phase, idx]
+	)
+	if not cannot_mid:
+		_fail("item afford helper started an 8ms step with 6ms remaining")
+	elif cannot_sync:
+		_fail("item afford helper deferred deadline 0")
+	elif done or phase != 1 or idx != 0:
+		_fail("generate stepped with 6ms remaining (done=%s phase=%d index=%d)" % [str(done), phase, idx])
+	else:
+		_pass("generate step deferred when remaining budget < last step + headroom")
 
 
 func _test_production_totals(pm: Node, tm: Node) -> void:

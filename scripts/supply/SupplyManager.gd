@@ -81,10 +81,38 @@ const ROUTE_REFRESH_MS_BUDGET: float = 40.0
 ## PERF-6: full supply-day sections spread across later frames. Route planning
 ## keeps the 40 ms budget above. A supply slice stops before 20 ms.
 const SUPPLY_DAY_SLICE_MS_BUDGET: float = 20.0
+## Do not start an atomic phase unless remaining budget covers last cost + this.
+const SUPPLY_DAY_SLICE_ATOMIC_HEADROOM_MS: float = 2.0
+## Extra pad before starting another generate/ship item (on top of last step).
+const SUPPLY_DAY_SLICE_ITEM_HEADROOM_MS: float = 0.5
+## Leave this much of the 20 ms budget unused so a last item + GC still lands
+## under the 25 ms test cap (20 + 5). Generate/ship stop when remaining < this.
+const SUPPLY_DAY_SLICE_RESERVE_MS: float = 5.0
+## Pessimistic first-day atomic costs (ms) until a job measures them.
+const SUPPLY_DAY_SLICE_FLUSH_ESTIMATE_MS: float = 1.0
+const SUPPLY_DAY_SLICE_NAVAL_ESTIMATE_MS: float = 6.0
+const SUPPLY_DAY_SLICE_FUEL_ESTIMATE_MS: float = 4.5
+const SUPPLY_DAY_SLICE_AIR_ESTIMATE_MS: float = 1.0
+const SUPPLY_DAY_SLICE_ITEM_ESTIMATE_MS: float = 0.25
+const SUPPLY_DAY_SLICE_ITEM_COST_MAX_MS: float = 2.0
 ## Last full-day section timings (spike diagnosis: heap vs rebuild vs generate).
 var last_supply_day_profile: Dictionary = {}
 ## CPU ms spent inside the supply-day slicer on the last drain. 0 when skipped.
 var last_supply_slice_ms: float = 0.0
+## Last measured atomic-phase costs (ms). Seeded pessimistically; each finished
+## phase overwrites its key. Jobs copy these into *_last_ms so later slices
+## of the same day and later days can afford-check before starting.
+var _supply_slice_phase_ms: Dictionary = {
+	"flush": SUPPLY_DAY_SLICE_FLUSH_ESTIMATE_MS,
+	"naval": SUPPLY_DAY_SLICE_NAVAL_ESTIMATE_MS,
+	"fuel": SUPPLY_DAY_SLICE_FUEL_ESTIMATE_MS,
+	"air": SUPPLY_DAY_SLICE_AIR_ESTIMATE_MS,
+}
+## EMA of one generate/ship item. Capped so a GC spike cannot poison the next yield.
+var _supply_slice_last_item_ms: float = SUPPLY_DAY_SLICE_ITEM_ESTIMATE_MS
+## Test seam: when >= 0, atomic-phase afford uses this ms instead of last measured.
+## Same idea as route_refresh_plan_cost_estimate_ms (WHEN, not WHAT).
+var supply_slice_phase_cost_estimate_ms: float = -1.0
 ## FIFO of full supply days queued off the roll frame. Sync advance_supply_day
 ## does not use this.
 var _supply_day_queue: Array = []
@@ -1475,6 +1503,10 @@ func _make_supply_day_job(days: float) -> Dictionary:
 		"air_ms": 0.0,
 		"decay_ms": 0.0,
 		"shipping_ms": 0.0,
+		"flush_last_ms": float(_supply_slice_phase_ms.get("flush", SUPPLY_DAY_SLICE_FLUSH_ESTIMATE_MS)),
+		"naval_last_ms": float(_supply_slice_phase_ms.get("naval", SUPPLY_DAY_SLICE_NAVAL_ESTIMATE_MS)),
+		"fuel_last_ms": float(_supply_slice_phase_ms.get("fuel", SUPPLY_DAY_SLICE_FUEL_ESTIMATE_MS)),
+		"air_last_ms": float(_supply_slice_phase_ms.get("air", SUPPLY_DAY_SLICE_AIR_ESTIMATE_MS)),
 		"worked_usec": 0,
 		"plans": 0,
 		"plan_ms": 0.0,
@@ -1492,6 +1524,65 @@ func _make_supply_day_job(days: float) -> Dictionary:
 	}
 
 
+func _supply_slice_remaining_ms(deadline_usec: int) -> float:
+	if deadline_usec <= 0:
+		return 100000.0
+	return float(deadline_usec - Time.get_ticks_usec()) / 1000.0
+
+
+func _supply_slice_phase_estimate_ms(job: Dictionary, key: String) -> float:
+	if supply_slice_phase_cost_estimate_ms >= 0.0:
+		return supply_slice_phase_cost_estimate_ms
+	var from_job: float = float(job.get(key + "_last_ms", -1.0))
+	if from_job >= 0.0:
+		return from_job
+	return float(_supply_slice_phase_ms.get(key, 1.0))
+
+
+func _supply_slice_cannot_afford_phase(deadline_usec: int, estimated_ms: float) -> bool:
+	if deadline_usec <= 0:
+		return false
+	var remaining_ms: float = _supply_slice_remaining_ms(deadline_usec)
+	if remaining_ms <= 0.0:
+		return true
+	return remaining_ms <= estimated_ms + SUPPLY_DAY_SLICE_ATOMIC_HEADROOM_MS
+
+
+func _supply_slice_cannot_afford_item(deadline_usec: int, last_item_ms: float) -> bool:
+	if deadline_usec <= 0:
+		return false
+	var remaining_ms: float = _supply_slice_remaining_ms(deadline_usec)
+	if remaining_ms <= 0.0:
+		return true
+	var need_ms: float = maxf(
+		last_item_ms + SUPPLY_DAY_SLICE_ITEM_HEADROOM_MS,
+		SUPPLY_DAY_SLICE_RESERVE_MS
+	)
+	return remaining_ms <= need_ms
+
+
+func _supply_slice_note_phase_ms(job: Dictionary, key: String, dt_usec: int) -> void:
+	var ms: float = float(dt_usec) / 1000.0
+	job[key + "_ms"] = float(job.get(key + "_ms", 0.0)) + ms
+	job["worked_usec"] = int(job.get("worked_usec", 0)) + dt_usec
+	if ms >= 0.05:
+		var stored: float = clampf(ms, 0.05, SUPPLY_DAY_SLICE_MS_BUDGET)
+		job[key + "_last_ms"] = stored
+		_supply_slice_phase_ms[key] = stored
+
+
+func _supply_slice_note_item_ms(dt_usec: int) -> void:
+	if dt_usec <= 0:
+		return
+	var step_ms: float = float(dt_usec) / 1000.0
+	var blended: float = _supply_slice_last_item_ms * 0.75 + step_ms * 0.25
+	_supply_slice_last_item_ms = clampf(
+		blended,
+		0.05,
+		SUPPLY_DAY_SLICE_ITEM_COST_MAX_MS
+	)
+
+
 func _run_supply_day_job(job: Dictionary, deadline_usec: int) -> bool:
 	if bool(job.get("finished", false)):
 		return true
@@ -1501,6 +1592,8 @@ func _run_supply_day_job(job: Dictionary, deadline_usec: int) -> bool:
 			return false
 		var phase := int(job.get("phase", 0))
 		if phase == 0:
+			if _supply_slice_cannot_afford_phase(deadline_usec, _supply_slice_phase_estimate_ms(job, "flush")):
+				return false
 			var t_flush := Time.get_ticks_usec()
 			if bool(job.get("defer_flush", false)):
 				_begin_day_roll_plan_deferral()
@@ -1508,8 +1601,7 @@ func _run_supply_day_job(job: Dictionary, deadline_usec: int) -> bool:
 			flush_pending_control_route_refresh(ROUTE_REFRESH_BUDGET_PER_FLUSH)
 			last_day_flush_plan_count = last_flush_plan_count
 			var flush_dt := Time.get_ticks_usec() - t_flush
-			job["flush_ms"] = float(job.get("flush_ms", 0.0)) + float(flush_dt) / 1000.0
-			job["worked_usec"] = int(job.get("worked_usec", 0)) + flush_dt
+			_supply_slice_note_phase_ms(job, "flush", flush_dt)
 			job["plans"] = last_flush_plan_count
 			job["plan_ms"] = last_flush_plan_ms
 			job["plan_ms_max"] = last_flush_plan_ms_max
@@ -1533,20 +1625,24 @@ func _run_supply_day_job(job: Dictionary, deadline_usec: int) -> bool:
 				return false
 			job["phase"] = 2
 		elif phase == 2:
+			if _supply_slice_cannot_afford_phase(deadline_usec, _supply_slice_phase_estimate_ms(job, "naval")):
+				return false
 			var t_naval := Time.get_ticks_usec()
 			_process_naval_recon(days)
 			var naval_dt := Time.get_ticks_usec() - t_naval
-			job["naval_ms"] = float(job.get("naval_ms", 0.0)) + float(naval_dt) / 1000.0
-			job["worked_usec"] = int(job.get("worked_usec", 0)) + naval_dt
+			_supply_slice_note_phase_ms(job, "naval", naval_dt)
 			job["phase"] = 3
 		elif phase == 3:
+			if _supply_slice_cannot_afford_phase(deadline_usec, _supply_slice_phase_estimate_ms(job, "fuel")):
+				return false
 			var t_fuel := Time.get_ticks_usec()
 			_process_naval_fuel_endurance_and_repair(days)
 			var fuel_dt := Time.get_ticks_usec() - t_fuel
-			job["fuel_ms"] = float(job.get("fuel_ms", 0.0)) + float(fuel_dt) / 1000.0
-			job["worked_usec"] = int(job.get("worked_usec", 0)) + fuel_dt
+			_supply_slice_note_phase_ms(job, "fuel", fuel_dt)
 			job["phase"] = 4
 		elif phase == 4:
+			if _supply_slice_cannot_afford_phase(deadline_usec, _supply_slice_phase_estimate_ms(job, "air")):
+				return false
 			var t_air := Time.get_ticks_usec()
 			_process_air_missions(days)
 			var air_dt := Time.get_ticks_usec() - t_air
@@ -1558,6 +1654,11 @@ func _run_supply_day_job(job: Dictionary, deadline_usec: int) -> bool:
 			var decay_dt := Time.get_ticks_usec() - t_decay
 			job["decay_ms"] = float(job.get("decay_ms", 0.0)) + float(decay_dt) / 1000.0
 			job["worked_usec"] = int(job.get("worked_usec", 0)) + decay_dt
+			var air_total_dt: int = air_dt + decay_dt
+			if air_total_dt >= 50:
+				var air_stored: float = clampf(float(air_total_dt) / 1000.0, 0.05, SUPPLY_DAY_SLICE_MS_BUDGET)
+				job["air_last_ms"] = air_stored
+				_supply_slice_phase_ms["air"] = air_stored
 			job["phase"] = 5
 		elif phase == 5:
 			if not bool(job.get("ship_ready", false)):
@@ -1732,8 +1833,11 @@ func _ship_routes_range(days: float, keys: Array, start: int, attrition_tons: fl
 	var i := start
 	var n := keys.size()
 	while i < n:
-		if deadline_usec > 0 and Time.get_ticks_usec() >= deadline_usec:
+		if _supply_slice_cannot_afford_item(deadline_usec, _supply_slice_last_item_ms):
 			return i
+		var t_item: int = 0
+		if deadline_usec > 0:
+			t_item = Time.get_ticks_usec()
 		var key = keys[i]
 		i += 1
 		if not _routes.has(key):
@@ -1826,6 +1930,8 @@ func _ship_routes_range(days: float, keys: Array, start: int, attrition_tons: fl
 		if overflow > 0.0 and src != null:
 			src.apply_inflow(overflow * 0.5)
 		depot_stock_changed.emit(dst.province_id, dst.stockpile)
+		if deadline_usec > 0:
+			_supply_slice_note_item_ms(Time.get_ticks_usec() - t_item)
 	return i
 
 
@@ -1926,12 +2032,17 @@ func _generate_local_supply_range(days: float, keys: Array, start: int, deadline
 	var i := start
 	var n := keys.size()
 	while i < n:
-		if deadline_usec > 0 and Time.get_ticks_usec() >= deadline_usec:
+		if _supply_slice_cannot_afford_item(deadline_usec, _supply_slice_last_item_ms):
 			return i
+		var t_item: int = 0
+		if deadline_usec > 0:
+			t_item = Time.get_ticks_usec()
 		var pid = keys[i]
 		i += 1
 		var state: ProvinceDepotState = depot_states[pid]
 		if state == null:
+			if deadline_usec > 0:
+				_supply_slice_note_item_ms(Time.get_ticks_usec() - t_item)
 			continue
 
 		# Decay per-province sabotage state from agent networks (targeted supply disruption lingers but fades)
@@ -1948,6 +2059,8 @@ func _generate_local_supply_range(days: float, keys: Array, start: int, deadline
 			if loader != null and loader.has_method("get_province"):
 				province = loader.call("get_province", pid)
 		if province == null:
+			if deadline_usec > 0:
+				_supply_slice_note_item_ms(Time.get_ticks_usec() - t_item)
 			continue
 
 		# Use ProvinceEffects when available (dev + national modifiers for local supply)
@@ -1960,6 +2073,8 @@ func _generate_local_supply_range(days: float, keys: Array, start: int, deadline
 			else province.get_local_supply_generation_modifier()
 		)
 		if local_gen <= 0.0:
+			if deadline_usec > 0:
+				_supply_slice_note_item_ms(Time.get_ticks_usec() - t_item)
 			continue
 
 		# Base local supply generation scaled by development + effects
@@ -1984,6 +2099,8 @@ func _generate_local_supply_range(days: float, keys: Array, start: int, deadline
 				daily_gen *= (1.0 - penalty)
 
 		state.apply_inflow(daily_gen)
+		if deadline_usec > 0:
+			_supply_slice_note_item_ms(Time.get_ticks_usec() - t_item)
 
 	# Note: stray menu-ranking code was previously inserted here by accident (removed in Phase 1 verify).
 	# _generate is fire-and-forget; depot menu uses its own ranking in get_depot_menu_lines.
