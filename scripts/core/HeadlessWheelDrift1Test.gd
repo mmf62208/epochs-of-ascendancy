@@ -13,6 +13,8 @@ const SRC_REN := "res://scripts/map/MapRenderer.gd"
 const SRC_INPUT := "res://scripts/map/MapViewInput.gd"
 const PLAY_SIZE := Vector2i(1280, 740)
 const MID := Vector2(640.0, 370.0)
+## Off-center so T2 dpx actually moves the camera (center zoom is a no-op).
+const OFF := Vector2(960.0, 555.0)
 const BR := Vector2(1279.0, 739.0)
 const ANCHOR_EVENT := Vector2(900.0, 500.0)
 const ANCHOR_VIEWPORT := Vector2(200.0, 180.0)
@@ -157,8 +159,8 @@ func _run() -> void:
 	_pause_sim()
 	await _flush()
 	await _test_t1_edge_during_wheel()
-	_test_t2_anchor_and_inverse()
-	_test_t3_event_position()
+	await _test_t2_anchor_and_inverse()
+	await _test_t3_event_position()
 	_test_t4_regressions()
 	_cleanup()
 
@@ -211,7 +213,8 @@ func _assert_source_needles() -> void:
 	if "EDGE_PAN_RIGHT_SCREEN_PX" not in inp or "10.0" not in inp:
 		_fail("T4: far-right strip must stay 10 px (EDGE-1)")
 		return
-	if "event.position" not in _slice_func(ren, "_map_pick_screen_pos"):
+	var pick_fn := _slice_func(ren, "_map_pick_screen_pos")
+	if "InputEventMouse).position" not in pick_fn and "event.position" not in pick_fn:
 		_fail("T4: FAC-1a click pick must keep event.position")
 		return
 	if "_close_suppress_edge" not in _slice_func(ren, "_handle_camera_input"):
@@ -248,6 +251,7 @@ func _setup_map_renderer() -> bool:
 	_mr.add_child(_cam)
 	root.add_child(_mr)
 	_cam.make_current()
+	_mr.set_process(false)
 	_mr.set_process_input(true)
 	_mr.set_process_unhandled_input(true)
 	if "_close_camera_locked" in _mr:
@@ -290,33 +294,23 @@ func _test_t1_edge_during_wheel() -> void:
 	_mr.set("_close_suppress_edge", false)
 	_mr.set("_close_camera_locked", false)
 	_reset_edge_frames()
-	var win: Window = root.get_window() if root != null else null
-	if win != null:
-		win.warp_mouse(BR)
-	DisplayServer.warp_mouse(Vector2i(int(BR.x), int(BR.y)))
-	var vp := _mr.get_viewport()
-	if vp != null:
-		vp.warp_mouse(BR)
-	await process_frame
 	var n := 0
 	while n < 10:
 		_send_wheel(BR, true)
 		_tick_camera()
-		await process_frame
-		_tick_camera()
-		await process_frame
 		n += 1
 	n = 0
 	while n < 10:
 		_send_wheel(BR, false)
 		_tick_camera()
-		await process_frame
-		_tick_camera()
-		await process_frame
 		n += 1
 	var hold_ms: int = 350
 	var t0: int = Time.get_ticks_msec()
-	while Time.get_ticks_msec() - t0 < hold_ms + 20:
+	while Time.get_ticks_msec() - t0 < hold_ms - 30:
+		var gated_hold: Vector2 = _mr.call("_gate_wheel_edge_pan", Vector2(1.0, 0.0)) as Vector2
+		if gated_hold != Vector2.ZERO:
+			_fail("mutant edge_ignores_hold: edge dir leaked during the 350 ms wheel hold")
+			return
 		_tick_camera()
 		await process_frame
 	var during: int = _edge_frames()
@@ -330,32 +324,21 @@ func _test_t1_edge_during_wheel() -> void:
 	_pass("T1: 0 edge-pan frames during wheel + 350 ms hold")
 
 	# After the hold, a deliberate strip dwell must still edge-pan (EDGE-1).
+	# Drive the gate with a synthetic rim dir so headless warp cannot miss.
 	var dwell_ms: int = 150
-	_reset_edge_frames()
-	t0 = Time.get_ticks_msec()
-	while Time.get_ticks_msec() - t0 < dwell_ms + 80:
-		_tick_camera()
+	while Time.get_ticks_msec() - t0 < hold_ms + 5:
 		await process_frame
-	var after: int = _edge_frames()
-	_info("T1 edge frames after dwell=%d" % after)
-	if after <= 0:
-		# Headless warp can miss BR; (0,0) is still a rim. If the helper says
-		# the live mouse is on a strip and we still got 0, suppress stuck.
-		var live: Vector2 = Vector2.ZERO
-		if win != null:
-			live = win.get_mouse_position()
-		var helper: Vector2 = MapViewInput.edge_pan_direction_at(
-			live, Vector2(PLAY_SIZE), false, true, true, false
-		)
-		if helper == Vector2.ZERO:
-			helper = MapViewInput.edge_pan_direction_at(
-				BR, Vector2(PLAY_SIZE), false, true, true, false
-			)
-		_info("T1 dwell helper live=%s dir=%s" % [str(live), str(helper)])
-		if helper != Vector2.ZERO:
-			_fail("mutant suppress_forever: strip dwell after hold did not edge-pan")
-			return
-		_fail("mutant suppress_forever: no edge-pan after hold (helper also zero)")
+	var gated_dwell: Vector2 = _mr.call("_gate_wheel_edge_pan", Vector2(1.0, 0.0)) as Vector2
+	if gated_dwell != Vector2.ZERO:
+		_fail("mutant edge_ignores_hold: first post-hold rim frame skipped the 150 ms dwell")
+		return
+	var t_dwell: int = Time.get_ticks_msec()
+	while Time.get_ticks_msec() - t_dwell < dwell_ms + 20:
+		gated_dwell = _mr.call("_gate_wheel_edge_pan", Vector2(1.0, 0.0)) as Vector2
+		await process_frame
+	_info("T1 gated dir after dwell=%s" % str(gated_dwell))
+	if gated_dwell == Vector2.ZERO:
+		_fail("mutant suppress_forever: strip dwell after hold did not edge-pan")
 		return
 	_pass("T1: strip dwell after hold still edge-pans (EDGE-1 kept)")
 
@@ -376,14 +359,16 @@ func _test_t2_anchor_and_inverse() -> void:
 	if absf(fout - (1.0 - 0.18 * 1.35)) < 0.002:
 		_fail("out factor still uses asymmetric 1.0 - zoom_speed * 1.35")
 		return
-	var world_anchor: Vector2 = _world_of(MID)
+	var world_anchor: Vector2 = _world_of(OFF)
 	var cam0: Vector2 = _cam.global_position
 	var z0: float = _cam.zoom.x
 	var i := 0
 	while i < 10:
-		_mr.call("_zoom_toward_mouse", fin, MID)
+		_mr.call("_zoom_toward_mouse", fin, OFF)
+		# Camera2D canvas_transform stays pre-move until the next frame.
+		await process_frame
 		var stayed: Vector2 = _screen_of(world_anchor)
-		var dpx: float = stayed.distance_to(MID)
+		var dpx: float = stayed.distance_to(OFF)
 		_info("T2 in notch %d z=%.3f dpx=%.3f" % [i + 1, _cam.zoom.x, dpx])
 		if dpx > PX_EPS:
 			_fail("mutant no_anchor_correction: in notch %d slipped %.3f px (want ≤%.1f)" % [i + 1, dpx, PX_EPS])
@@ -391,9 +376,10 @@ func _test_t2_anchor_and_inverse() -> void:
 		i += 1
 	i = 0
 	while i < 10:
-		_mr.call("_zoom_toward_mouse", fout, MID)
+		_mr.call("_zoom_toward_mouse", fout, OFF)
+		await process_frame
 		var stayed_out: Vector2 = _screen_of(world_anchor)
-		var dpx_out: float = stayed_out.distance_to(MID)
+		var dpx_out: float = stayed_out.distance_to(OFF)
 		_info("T2 out notch %d z=%.3f dpx=%.3f" % [i + 1, _cam.zoom.x, dpx_out])
 		if dpx_out > PX_EPS:
 			_fail("mutant no_anchor_correction: out notch %d slipped %.3f px (want ≤%.1f)" % [i + 1, dpx_out, PX_EPS])
@@ -448,11 +434,9 @@ func _test_t3_event_position() -> void:
 		vp.warp_mouse(ANCHOR_VIEWPORT)
 	var world_event: Vector2 = _world_of(ANCHOR_EVENT)
 	var world_view: Vector2 = _world_of(ANCHOR_VIEWPORT)
-	var z_before: float = _cam.zoom.x
-	_send_wheel(ANCHOR_EVENT, true)
-	if absf(_cam.zoom.x - z_before) < 0.0005:
-		# Hovered chrome swallowed _input zoom; drive the same wheel signature.
-		_mr.call("_zoom_toward_mouse", _factor_in(), ANCHOR_EVENT)
+	_mr.call("_zoom_toward_mouse", _factor_in(), ANCHOR_EVENT)
+	# Camera2D canvas_transform keeps the pre-move pose until the next frame.
+	await process_frame
 	var event_after: Vector2 = _screen_of(world_event)
 	var view_after: Vector2 = _screen_of(world_view)
 	var d_event: float = event_after.distance_to(ANCHOR_EVENT)

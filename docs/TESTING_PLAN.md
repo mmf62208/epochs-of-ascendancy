@@ -934,7 +934,7 @@ Product (MapRenderer only, off main `61a80433`): `_zoom_toward_mouse(factor, eve
 Guard `HeadlessWheelDrift1Test` (fixture, not WorldMap.tscn / 3520):
 
 - **T1** BR rim, 10 in + 10 out: `_nav_edge_pan_frames` during wheel + 350 ms = 0 (`no_wheel_suppress`, `edge_ignores_hold`). After the hold, a strip dwell still pans (`suppress_forever`).
-- **T2** mid-screen, 10 in + 10 out: ≤2 px per notch (`no_anchor_correction`); zoom+camera round-trip; clamp-bind zoom-out must not runaway (`clamp_before_anchor`).
+- **T2** off-center (960,555), 10 in + 10 out: ≤2 px per notch after a process frame (`no_anchor_correction`); zoom+camera round-trip; clamp-bind zoom-out must not runaway (`clamp_before_anchor`).
 - **T3** event.position ≠ warped viewport mouse: anchor follows the event (`anchor_from_viewport_mouse`).
 - **T4** UI-1 rest (97,731), EDGE-1 L/R/T/B helpers, CLOSE-1b `_close_suppress_edge`, FAC-1a `event.position` pick, Vis1 harness present.
 
