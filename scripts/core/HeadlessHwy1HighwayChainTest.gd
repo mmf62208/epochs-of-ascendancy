@@ -115,12 +115,8 @@ func _uf_union(parent: Dictionary, a: int, b: int) -> void:
 		parent[rb] = ra
 
 
-## Local copy so this script loads on main 61a80433 (no `_hwy1_*` parse).
+## Local UF so this script loads on main 61a80433 (no `_hwy1_*` parse).
 func _component_stats(cache: Array) -> Dictionary:
-	if RoadTierVisualScript.has_method("_hwy1_component_stats"):
-		var via: Variant = RoadTierVisualScript.call("_hwy1_component_stats", cache)
-		if typeof(via) == TYPE_DICTIONARY:
-			return via
 	var parent: Dictionary = {}
 	var hwy_rows: Array = []
 	for row_v in cache:
@@ -174,8 +170,6 @@ func _component_sizes(cache: Array) -> Array:
 
 
 func _hwy_budget(inferred_n: int) -> int:
-	if RoadTierVisualScript.has_method("_hwy1_budget"):
-		return int(RoadTierVisualScript.call("_hwy1_budget", inferred_n))
 	if inferred_n <= 0:
 		return 0
 	return ceili(float(inferred_n) * (1.0 - RoadTierVisualScript.HIGHWAY_RARE_RANK))
