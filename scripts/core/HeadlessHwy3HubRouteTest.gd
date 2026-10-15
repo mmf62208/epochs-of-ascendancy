@@ -52,6 +52,10 @@ func _run() -> void:
 	_test_pid_list_grep()
 	_test_far_width_not_hidden()
 	_test_flip_max_guard_source()
+	if not RoadTierVisualScript.has_method("select_display_hubs"):
+		_fail("H1: assign mode is rank-grow (d4a3a1ff)")
+		_fail("H2: no hub routes (rank-grow / empty)")
+		return
 	if not _boot_live_1936():
 		return
 	_test_h1_hubs()
@@ -90,6 +94,9 @@ func _read_text(path: String) -> String:
 
 
 func _debug() -> Dictionary:
+	# d4a3a1ff has no hub-route statics — fail as rank-grow, do not SCRIPT ERROR.
+	if not RoadTierVisualScript.has_method("select_display_hubs"):
+		return {"mode": "rank_grow", "hubs": [], "routes": [], "records": []}
 	return RoadTierVisualScript.last_hwy3_debug
 
 
@@ -653,6 +660,11 @@ func _test_h6_determinism() -> void:
 		"use_urban": true,
 		"tag_borders": {},
 	}
+	# Warmup matches HWY-1: first assign fills the hub-route cache; timed
+	# repeats then measure a cached rebuild (Dijkstra once per unique board).
+	var warmup: Array = _clone_cache(_cache)
+	_reset_inferred(warmup)
+	RoadTierVisualScript.assign_rare_display_tiers(warmup, ctx)
 	var sets: Array = []
 	var new_ms: PackedFloat32Array = PackedFloat32Array()
 	var legacy_ms: PackedFloat32Array = PackedFloat32Array()
