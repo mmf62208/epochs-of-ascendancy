@@ -30000,14 +30000,12 @@ func _cached_supply_polygon(node: Node2D, pid: int) -> PackedVector2Array:
 
 func _ensure_supply_outline_batch() -> Node2D:
 	if _supply_outline_batch_is_ready():
-		_feed_supply_outline_batch_view()
 		return _supply_outline_batch
 	if container == null:
 		return null
 	var existing := container.get_node_or_null("SupplyOutlineBatch") as Node2D
 	if existing != null:
 		_supply_outline_batch = existing
-		_feed_supply_outline_batch_view()
 		return _supply_outline_batch
 	var batch: Node2D = _SupplyOutlineBatchLayerScr.new() as Node2D
 	if batch == null:
@@ -30015,7 +30013,6 @@ func _ensure_supply_outline_batch() -> Node2D:
 	batch.name = "SupplyOutlineBatch"
 	container.add_child(batch)
 	_supply_outline_batch = batch
-	_feed_supply_outline_batch_view()
 	return _supply_outline_batch
 
 

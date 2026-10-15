@@ -19,12 +19,12 @@ const MAX_WARM_FRAME_MS := 100.0
 const MAX_COLD_MS := 250.0
 const HOME_VERT_RATIO := 0.25
 const LAYER_PATH := "res://scripts/map/SupplyOutlineBatchLayer.gd"
-const ROLES: PackedStringArray = PackedStringArray([
+const ROLES: Array[String] = [
 	"active", "preview", "route", "infra_sabotage", "infra_repair",
 	"infra_repair_engineers", "engineers_stationed", "engineers_needed",
 	"engineers_recommended", "engineers_insufficient", "infra_duel_even",
 	"depot_sabotage", "supply_pressure", "trade_transit", "hub",
-])
+]
 
 var _failures: int = 0
 var _mr: Node = null
@@ -526,16 +526,20 @@ func _test_maprenderer_toggle() -> void:
 		sm.overlay_visible = false
 	_mr.supply_mode = false
 	if "_supply_roles_cache" in _mr:
-		_mr._supply_roles_cache = {}
+		var roles_cache: Variant = _mr.get("_supply_roles_cache")
+		if typeof(roles_cache) == TYPE_DICTIONARY:
+			(roles_cache as Dictionary).clear()
 	if "_supply_roles_cache_fingerprint" in _mr:
 		_mr._supply_roles_cache_fingerprint = ""
 	if "_supply_outline_batch" in _mr:
 		var old_batch: Node = _mr.get("_supply_outline_batch") as Node
 		if old_batch != null and is_instance_valid(old_batch):
 			old_batch.queue_free()
-		_mr._supply_outline_batch = null
+		_mr.set("_supply_outline_batch", null)
 	if "_supply_poly_cache" in _mr:
-		_mr._supply_poly_cache = {}
+		var poly_cache: Variant = _mr.get("_supply_poly_cache")
+		if typeof(poly_cache) == TYPE_DICTIONARY:
+			(poly_cache as Dictionary).clear()
 
 	var t0 := Time.get_ticks_usec()
 	_mr.call("_toggle_supply_overlay")
