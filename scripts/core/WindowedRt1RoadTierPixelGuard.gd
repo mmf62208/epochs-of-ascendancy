@@ -23,6 +23,12 @@ const WAIT_MAP_SECS := 420
 const SETTLE_FRAMES := 36
 const GOLD_COVER_MIN := 0.90
 const WIDTH_TOL := 2.75
+## HWY3_FAR_WIDTH_CEILING=26 — max-of-orientations inflates far past this.
+const HWY3_FAR_WIDTH_CEILING := 26.0
+## HWY3_DEFAULT_WIDTH_CEILING=18
+const HWY3_DEFAULT_WIDTH_CEILING := 18.0
+## HWY3_PAIR_SCREEN_POS_MAX=28 — sampled run vs landmark-projected pair midpoint.
+const HWY3_PAIR_SCREEN_POS_MAX := 28.0
 
 enum Phase {
 	WAIT_MAP,
@@ -377,50 +383,125 @@ func _germany_screen_bbox(img: Image) -> Rect2i:
 	return Rect2i(min_x, min_y, maxi(max_x - min_x, 8), maxi(max_y - min_y, 8))
 
 
+func _hub_route_keys() -> Dictionary:
+	var keys: Dictionary = {}
+	var ol := _overlay()
+	if ol == null or not ol.has_method("get_hwy3_debug"):
+		return keys
+	var dbg_v: Variant = ol.call("get_hwy3_debug")
+	if typeof(dbg_v) != TYPE_DICTIONARY:
+		return keys
+	var dbg: Dictionary = dbg_v
+	var routes_v: Variant = dbg.get("routes", [])
+	if typeof(routes_v) != TYPE_ARRAY:
+		return keys
+	for rt_v in routes_v:
+		if typeof(rt_v) != TYPE_DICTIONARY:
+			continue
+		var rt: Dictionary = rt_v
+		var kv: Variant = rt.get("keys", [])
+		if typeof(kv) == TYPE_ARRAY:
+			for k_v in kv:
+				keys[int(k_v)] = true
+		var pids_v: Variant = rt.get("pids", [])
+		if typeof(pids_v) == TYPE_ARRAY:
+			var pids: Array = pids_v
+			for i in range(1, pids.size()):
+				var pa: int = int(pids[i - 1])
+				var pb: int = int(pids[i])
+				keys[mini(pa, pb) * 1000000 + maxi(pa, pb)] = true
+	return keys
+
+
 func _count_germany_hwy_runs(img: Image, bbox: Rect2i) -> int:
 	if img == null:
 		return 0
+	var route_keys: Dictionary = _hub_route_keys()
+	if route_keys.is_empty():
+		return 0
+	var ol := _overlay()
+	if ol == null or not ol.has_method("get_road_tier_cache"):
+		return 0
+	var cache_v: Variant = ol.call("get_road_tier_cache")
+	if typeof(cache_v) != TYPE_ARRAY:
+		return 0
+	var mm := _map_manager()
+	var layer := _road_layer()
+	var xform := Transform2D.IDENTITY
+	if layer != null:
+		xform = layer.get_global_transform_with_canvas()
 	var runs := 0
-	var step := 6
-	var x0 := bbox.position.x
-	var y0 := bbox.position.y
-	var x1 := bbox.position.x + bbox.size.x
-	var y1 := bbox.position.y + bbox.size.y
 	var seen: Dictionary = {}
-	for y in range(y0, y1, step):
+	var img_h: int = img.get_height()
+	var img_w: int = img.get_width()
+	for row_v in cache_v:
+		if typeof(row_v) != TYPE_DICTIONARY:
+			continue
+		var row: Dictionary = row_v
+		if int(row.get("display_tier", 0)) != 2:
+			continue
+		if bool(row.get("explicit", false)):
+			continue
+		var a: int = int(row.get("p1", 0))
+		var b: int = int(row.get("p2", 0))
+		var k: int = mini(a, b) * 1000000 + maxi(a, b)
+		if not route_keys.has(k):
+			continue
+		var c1: Vector2 = row.get("c1", Vector2.ZERO)
+		var c2: Vector2 = row.get("c2", Vector2.ZERO)
+		if mm != null:
+			var wc1: Vector2 = mm.call("get_province_centroid", a)
+			var wc2: Vector2 = mm.call("get_province_centroid", b)
+			if wc1 != Vector2.ZERO:
+				c1 = wc1
+			if wc2 != Vector2.ZERO:
+				c2 = wc2
+		var sa: Vector2 = xform * c1
+		var sb: Vector2 = xform * c2
+		if _image_y_flipped:
+			sa = Vector2(sa.x, float(img_h) - sa.y)
+			sb = Vector2(sb.x, float(img_h) - sb.y)
+		var mid: Vector2 = sa.lerp(sb, 0.5)
+		var mx: int = int(round(mid.x))
+		var my: int = int(round(mid.y))
+		if mx < bbox.position.x or my < bbox.position.y or mx >= bbox.position.x + bbox.size.x or my >= bbox.position.y + bbox.size.y:
+			continue
+		var steps: int = maxi(8, int((sb - sa).length() / 3.0))
 		var run := 0
-		for x in range(x0, x1):
-			if x < 0 or y < 0 or x >= img.get_width() or y >= img.get_height():
-				run = 0
-				continue
-			var c := img.get_pixel(x, y)
-			if _is_tier_color(c, "highway"):
+		var seg_runs := 0
+		for s in range(steps + 1):
+			var p: Vector2 = sa.lerp(sb, float(s) / float(steps))
+			var x: int = int(round(p.x))
+			var y: int = int(round(p.y))
+			var hit := false
+			if x >= 0 and y >= 0 and x < img_w and y < img_h:
+				if _is_tier_color(img.get_pixel(x, y), "highway"):
+					hit = true
+				else:
+					for ox in range(-2, 3):
+						for oy in range(-2, 3):
+							var xx: int = x + ox
+							var yy: int = y + oy
+							if xx < 0 or yy < 0 or xx >= img_w or yy >= img_h:
+								continue
+							if _is_tier_color(img.get_pixel(xx, yy), "highway"):
+								hit = true
+								break
+						if hit:
+							break
+			if hit:
 				run += 1
 			else:
 				if run >= 9:
-					var bucket := "%d_%d" % [y / 18, x / 40]
-					if not seen.has(bucket):
-						seen[bucket] = true
-						runs += 1
+					seg_runs += 1
 				run = 0
 		if run >= 9:
-			runs += 1
-	for x2 in range(x0, x1, step):
-		var run2 := 0
-		for y2 in range(y0, y1):
-			if x2 < 0 or y2 < 0 or x2 >= img.get_width() or y2 >= img.get_height():
-				run2 = 0
-				continue
-			var c2 := img.get_pixel(x2, y2)
-			if _is_tier_color(c2, "highway"):
-				run2 += 1
-			else:
-				if run2 >= 9:
-					var bucket2 := "v_%d_%d" % [x2 / 40, y2 / 18]
-					if not seen.has(bucket2):
-						seen[bucket2] = true
-						runs += 1
-				run2 = 0
+			seg_runs += 1
+		if seg_runs > 0:
+			var bucket := "%d_%d" % [int(mid.x) / 40, int(mid.y) / 18]
+			if not seen.has(bucket):
+				seen[bucket] = true
+				runs += 1
 	return runs
 
 
@@ -585,6 +666,20 @@ func _judge_widths() -> void:
 					_fail_reasons.append("width_highway_%s_under8_%.2f" % [band, w])
 				elif w + 0.01 < need:
 					_fail_reasons.append("width_highway_%s_%.2f_need_%.0f" % [band, w, need])
+				if band == "far" and w > HWY3_FAR_WIDTH_CEILING + 0.01:
+					_fail_reasons.append("width_highway_far_ceiling_%.2f" % w)
+				if band == "default" and w > HWY3_DEFAULT_WIDTH_CEILING + 0.01:
+					_fail_reasons.append("width_highway_default_ceiling_%.2f" % w)
+				var hx := float(meas.get("hit_x", 0.0))
+				var hy := float(meas.get("hit_y", 0.0))
+				var ex := float(meas.get("exp_x", 0.0))
+				var ey := float(meas.get("exp_y", 0.0))
+				var derr: float = Vector2(hx, hy).distance_to(Vector2(ex, ey))
+				if derr > HWY3_PAIR_SCREEN_POS_MAX + 0.01:
+					_fail_reasons.append("hub_pair_screen_err_%.1f_%s" % [derr, band])
+				_log("EOA_RT1_PIXEL_GUARD who=guard.pos band=%s hit=%.1f,%.1f exp=%.1f,%.1f err=%.1f" % [
+					band, hx, hy, ex, ey, derr
+				])
 			elif w <= 0.15:
 				_fail_reasons.append("width_%s_%s_zero" % [kind, band])
 			elif w + 0.01 < tgt - tol:
@@ -670,6 +765,7 @@ func _measure_edge(img: Image, a: int, b: int, kind: String) -> Dictionary:
 		if _image_y_flipped:
 			sa_u = Vector2(sa.x, float(img_h) - sa.y)
 			sb_u = Vector2(sb.x, float(img_h) - sb.y)
+		var landmark_mid: Vector2 = sa_u.lerp(sb_u, 0.5)
 		if OS.get_environment("EOA_HWY3_MUTANT").strip_edges() == "flip_max":
 			var unflip: Dictionary = _measure_run_at(img, sa, sb, kind)
 			var flip: Dictionary = _measure_run_at(
@@ -677,8 +773,14 @@ func _measure_edge(img: Image, a: int, b: int, kind: String) -> Dictionary:
 			)
 			var uf_w: float = float(unflip.get("width_px", 0.0))
 			var ff_w: float = float(flip.get("width_px", 0.0))
-			return flip if ff_w > uf_w else unflip
-		return _measure_run_at(img, sa_u, sb_u, kind)
+			var picked: Dictionary = flip if ff_w > uf_w else unflip
+			picked["exp_x"] = landmark_mid.x
+			picked["exp_y"] = landmark_mid.y
+			return picked
+		var honest: Dictionary = _measure_run_at(img, sa_u, sb_u, kind)
+		honest["exp_x"] = landmark_mid.x
+		honest["exp_y"] = landmark_mid.y
+		return honest
 	var sa2 := sa
 	var sb2 := sb
 	if _image_y_flipped:
@@ -688,7 +790,12 @@ func _measure_edge(img: Image, a: int, b: int, kind: String) -> Dictionary:
 
 
 func _measure_run_at(img: Image, sa: Vector2, sb: Vector2, kind: String) -> Dictionary:
-	var out := {"width_px": 0.0, "sig": ""}
+	var out := {"width_px": 0.0, "sig": "", "hit_x": 0.0, "hit_y": 0.0, "exp_x": 0.0, "exp_y": 0.0}
+	var expect: Vector2 = sa.lerp(sb, 0.5)
+	out["exp_x"] = expect.x
+	out["exp_y"] = expect.y
+	out["hit_x"] = expect.x
+	out["hit_y"] = expect.y
 	var dir: Vector2 = (sb - sa)
 	if dir.length() < 1.0:
 		return out
@@ -747,6 +854,8 @@ func _measure_run_at(img: Image, sa: Vector2, sb: Vector2, kind: String) -> Dict
 				best_run = run
 		if best_run > best_w:
 			best_w = best_run
+			out["hit_x"] = mid.x
+			out["hit_y"] = mid.y
 	# Same pair only — never re-pick another edge. Hunt nearby pixels when the
 	# centroid chord clips a cased stroke (far Home was measuring 7 of 9).
 	if best_w < 8 and kind == "highway":

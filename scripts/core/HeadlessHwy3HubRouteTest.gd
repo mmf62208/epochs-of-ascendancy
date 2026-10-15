@@ -18,6 +18,10 @@ const CITY_PATH := "res://data/provinces_world_accurate/province_city_layer.json
 const PROV_SCRIPT := "res://scripts/data/Province.gd"
 const MAP_DATA_SCRIPT := "res://scripts/data/MapScenarioData.gd"
 const MAJORS: Array = ["GER", "FRA", "ITA", "POL", "ENG", "USA", "JAP", "SOV"]
+## Independent of RoadTierVisual.path_shape_report (mutants must not share that fn).
+const SHAPE_HOOK := 2.61799387799149 ## 150°
+const SHAPE_ZIGZAG := 4.71238898038469 ## 1.5π
+const SHAPE_LEN_RATIO := 1.6
 
 var _failures: int = 0
 var _ol: Node2D = null
@@ -438,38 +442,127 @@ func _test_h2_routes() -> void:
 		_pass("H2: every route matches recomputed Dijkstra")
 
 
-func _test_h3_simple_paths() -> void:
-	var routes: Array = _routes()
-	if routes.is_empty():
-		_fail("H3: no routes")
-		return
-	var recs: Array = _records()
+func _independent_shape(pids: PackedInt32Array, cents: Dictionary, start: int, goal: int) -> Dictionary:
+	var out: Dictionary = {
+		"ok": false,
+		"repeat": false,
+		"hook": false,
+		"long": false,
+		"zigzag": false,
+		"length": 0.0,
+		"straight": 0.0,
+		"turn_sum": 0.0,
+	}
+	if pids.size() < 2:
+		return out
+	var seen: Dictionary = {}
+	for i in range(pids.size()):
+		var pid: int = pids[i]
+		if seen.has(pid):
+			out["repeat"] = true
+		seen[pid] = true
+	var length: float = 0.0
+	var dirs: Array = []
+	for i2 in range(1, pids.size()):
+		var a: int = pids[i2 - 1]
+		var b: int = pids[i2]
+		var c1: Vector2 = cents.get(a, Vector2.ZERO)
+		var c2: Vector2 = cents.get(b, Vector2.ZERO)
+		var delta: Vector2 = c2 - c1
+		var dist: float = delta.length()
+		length += dist
+		if dist > 0.0001:
+			dirs.append(delta)
+	out["length"] = length
+	var cs: Vector2 = cents.get(start, Vector2.ZERO)
+	var cg: Vector2 = cents.get(goal, Vector2.ZERO)
+	var straight: float = cs.distance_to(cg)
+	out["straight"] = straight
+	if straight > 0.0001 and length > straight * SHAPE_LEN_RATIO + 0.0001:
+		out["long"] = true
+	var turn_sum: float = 0.0
+	var hook: bool = false
+	for i3 in range(1, dirs.size()):
+		var d0: Vector2 = dirs[i3 - 1]
+		var d1: Vector2 = dirs[i3]
+		var ang: float = absf(d0.angle_to(d1))
+		turn_sum += ang
+		if ang > SHAPE_HOOK:
+			hook = true
+	out["turn_sum"] = turn_sum
+	out["hook"] = hook
+	var n_edges: int = maxi(pids.size() - 1, 1)
+	var windows: float = maxf(float(n_edges) / 6.0, 1.0)
+	if turn_sum > SHAPE_ZIGZAG * windows + 0.0001:
+		out["zigzag"] = true
+	out["ok"] = (
+		(not bool(out["repeat"]))
+		and (not bool(out["hook"]))
+		and (not bool(out["long"]))
+		and (not bool(out["zigzag"]))
+	)
+	return out
+
+
+func _route_pids(rt: Dictionary) -> PackedInt32Array:
+	var packed: PackedInt32Array = PackedInt32Array()
+	var pids_v: Variant = rt.get("pids", [])
+	if typeof(pids_v) == TYPE_ARRAY:
+		for pv in pids_v:
+			packed.append(int(pv))
+	elif typeof(pids_v) == TYPE_PACKED_INT32_ARRAY:
+		packed = pids_v
+	return packed
+
+
+func _cents_from_recs(recs: Array) -> Dictionary:
 	var cents: Dictionary = {}
 	for rec_v in recs:
 		if typeof(rec_v) != TYPE_DICTIONARY:
 			continue
 		var rec: Dictionary = rec_v
 		cents[int(rec.get("pid", 0))] = rec.get("centroid", Vector2.ZERO)
+	return cents
+
+
+func _shape_fail_count(routes: Array, cents: Dictionary) -> int:
 	var bad: int = 0
 	for rt_v in routes:
 		if typeof(rt_v) != TYPE_DICTIONARY:
 			continue
 		var rt: Dictionary = rt_v
-		var pids_v: Variant = rt.get("pids", [])
-		var packed: PackedInt32Array = PackedInt32Array()
-		if typeof(pids_v) == TYPE_ARRAY:
-			for pv in pids_v:
-				packed.append(int(pv))
-		var shape_v: Variant = _vis_call("path_shape_report", [
-			packed, cents, int(rt.get("a", 0)), int(rt.get("b", 0)), ""
-		])
-		var shape: Dictionary = shape_v if typeof(shape_v) == TYPE_DICTIONARY else {}
+		var packed: PackedInt32Array = _route_pids(rt)
+		var shape: Dictionary = _independent_shape(
+			packed, cents, int(rt.get("a", 0)), int(rt.get("b", 0))
+		)
 		if not bool(shape.get("ok", false)):
 			bad += 1
+	return bad
+
+
+func _test_h3_simple_paths() -> void:
+	var routes: Array = _routes()
+	if routes.is_empty():
+		_fail("H3: no routes")
+		return
+	var cents: Dictionary = _cents_from_recs(_records())
+	var bad: int = _shape_fail_count(routes, cents)
 	if bad > 0:
-		_fail("H3: %d routes fail simple-path / zigzag / hook-back" % bad)
+		_fail("H3: %d routes fail independent simple-path / zigzag / hook-back" % bad)
 	else:
 		_pass("H3: every route is a simple path within turn/length bars")
+	# Trap: a zigzag-only adjacency. Healthy product rejects it; forcing
+	# path_shape_report ok/zigzag/hook/repeat false paints it and H3 fails.
+	var saved_dbg: Dictionary = _debug().duplicate(true)
+	var trap: Dictionary = _assign_trap_shape("zigzag", "")
+	var trap_bad: int = int(trap.get("independent_bad", 0))
+	var trap_n: int = int(trap.get("routes", 0))
+	_vis_call("hwy3_set_debug", [saved_dbg])
+	_vis_call("hwy3_clear_memos", [])
+	if trap_bad > 0:
+		_fail("H3: trap zigzag route accepted (%d bad of %d)" % [trap_bad, trap_n])
+	else:
+		_pass("H3: trap zigzag adjacency rejected by product shape")
 
 
 func _test_h4_germany() -> void:
@@ -566,6 +659,99 @@ func _test_h4_germany() -> void:
 		_pass("H4: a route passes ≥3 urban NUTS3 in the ranked Ruhr")
 	else:
 		_pass("H4: urban bonus did not rank a Ruhr hub — skip ≥3 urban path")
+	var munich: int = 0
+	var ruhr_cities: Dictionary = {}
+	for rec4_v in recs:
+		if typeof(rec4_v) != TYPE_DICTIONARY:
+			continue
+		var rec4: Dictionary = rec4_v
+		if str(rec4.get("tag", "")).to_upper() != "GER":
+			continue
+		var nm4: String = str(rec4.get("name", "")).to_lower()
+		var cnm4: String = str(rec4.get("city_name", "")).to_lower()
+		if (
+			int(rec4.get("tier", 0)) >= 3
+			and (cnm4.contains("munich") or cnm4.contains("münchen") or nm4.contains("münchen") or nm4.contains("munich"))
+		):
+			munich = int(rec4.get("pid", 0))
+		if (
+			cnm4.contains("essen")
+			or cnm4.contains("dortmund")
+			or cnm4.contains("duisburg")
+			or nm4.contains("essen, kreisfreie")
+			or nm4.contains("dortmund, kreisfreie")
+			or nm4.contains("duisburg, kreisfreie")
+		):
+			ruhr_cities[int(rec4.get("pid", 0))] = str(rec4.get("city_name", rec4.get("name", "")))
+	var munich_ok: bool = false
+	var ruhr_city_ok: bool = false
+	var on_route: Dictionary = {}
+	for rt2_v in _routes():
+		if typeof(rt2_v) != TYPE_DICTIONARY:
+			continue
+		var rt2: Dictionary = rt2_v
+		var pids2_v: Variant = rt2.get("pids", [])
+		var pids2: Array = pids2_v if typeof(pids2_v) == TYPE_ARRAY else []
+		for pv2 in pids2:
+			var pid2: int = int(pv2)
+			on_route[pid2] = true
+			if pid2 == munich:
+				munich_ok = true
+			if ruhr_cities.has(pid2):
+				ruhr_city_ok = true
+	if munich <= 0:
+		_fail("H4: GER Munich hub city not in records")
+	elif not munich_ok:
+		_fail("H4: Munich is not on any hub route")
+	else:
+		_pass("H4: Munich is on a hub route")
+	if ruhr_cities.is_empty():
+		_fail("H4: Essen/Dortmund/Duisburg not in GER records")
+	elif not ruhr_city_ok:
+		_fail("H4: no route passes Essen or Dortmund or Duisburg")
+	else:
+		_pass("H4: a route passes Essen or Dortmund or Duisburg")
+	var t4_miss: Array = []
+	for h4_v in _debug().get("hubs", []):
+		if typeof(h4_v) != TYPE_DICTIONARY:
+			continue
+		var h4: Dictionary = h4_v
+		if int(h4.get("tier", 0)) < 4:
+			continue
+		var hp4: int = int(h4.get("pid", 0))
+		if hp4 > 0 and not on_route.has(hp4):
+			t4_miss.append("%s:%d" % [str(h4.get("tag", "")), hp4])
+	if not t4_miss.is_empty():
+		_fail("H4: tier-4 city hubs not on a route %s" % str(t4_miss))
+	else:
+		_pass("H4: every tier-4 city hub sits on a route")
+	var ger_hubs: Dictionary = {}
+	for h5_v in _debug().get("hubs", []):
+		if typeof(h5_v) != TYPE_DICTIONARY:
+			continue
+		var h5: Dictionary = h5_v
+		if str(h5.get("tag", "")).to_upper() == "GER":
+			ger_hubs[int(h5.get("pid", 0))] = true
+	var parent_g: Dictionary = {}
+	for gh in ger_hubs.keys():
+		var gpid: int = int(gh)
+		if on_route.has(gpid):
+			parent_g[gpid] = gpid
+	for rt3_v in _routes():
+		if typeof(rt3_v) != TYPE_DICTIONARY:
+			continue
+		var rt3: Dictionary = rt3_v
+		var a3: int = int(rt3.get("a", 0))
+		var b3: int = int(rt3.get("b", 0))
+		if parent_g.has(a3) and parent_g.has(b3):
+			_uf_union_local(parent_g, a3, b3)
+	var roots_g: Dictionary = {}
+	for gp2 in parent_g.keys():
+		roots_g[_uf_find_local(parent_g, int(gp2))] = true
+	if parent_g.size() >= 2 and roots_g.size() > 1:
+		_fail("H4: GER hub routes are %d components, want one tree" % roots_g.size())
+	else:
+		_pass("H4: GER hub routes form one connected tree")
 
 
 func _test_h5_budget() -> void:
@@ -577,10 +763,10 @@ func _test_h5_budget() -> void:
 		"HWY3_BARS highways=%d comps=%d sings=%d median=%.2f sizes=%s"
 		% [hwy, int(st.get("components", 0)), sings, median, str(st.get("sizes", []))]
 	)
-	if hwy < 45 or hwy > 59:
-		_fail("H5: highway count %d not within 52 ±15%%" % hwy)
+	if hwy < 60 or hwy > 114:
+		_fail("H5: highway count %d not within 60–114 (2× of 52)" % hwy)
 	else:
-		_pass("H5: highway count %d within 52 ±15%%" % hwy)
+		_pass("H5: highway count %d within 60–114 (2× of 52)" % hwy)
 	if sings != 0:
 		_fail("H5: singletons=%d want 0" % sings)
 	else:
@@ -589,6 +775,26 @@ func _test_h5_budget() -> void:
 		_fail("H5: median chain %.2f < 4" % median)
 	else:
 		_pass("H5: median chain %.2f ≥ 4" % median)
+
+
+func _uf_find_local(parent: Dictionary, x: int) -> int:
+	var cur: int = x
+	var guard: int = 0
+	while int(parent.get(cur, cur)) != cur and guard < 64:
+		cur = int(parent.get(cur, cur))
+		guard += 1
+	return cur
+
+
+func _uf_union_local(parent: Dictionary, a: int, b: int) -> void:
+	var ra: int = _uf_find_local(parent, a)
+	var rb: int = _uf_find_local(parent, b)
+	if ra == rb:
+		return
+	if ra < rb:
+		parent[rb] = ra
+	else:
+		parent[ra] = rb
 
 
 func _clone_cache(src: Array) -> Array:
@@ -727,6 +933,112 @@ func _test_h6_determinism() -> void:
 		_pass("H6: assign %+.3f ms vs legacy (<=5)" % delta)
 
 
+func _trap_rec(pid: int, tag: String, capital: bool, centroid: Vector2) -> Dictionary:
+	return {
+		"pid": pid,
+		"tag": tag,
+		"capital": capital,
+		"tier": 4 if capital else 3,
+		"population": 400000,
+		"industrial": false,
+		"city_hub": true,
+		"port": false,
+		"urban": false,
+		"urban_nbr": 0,
+		"centroid": centroid,
+		"land_n": 30,
+		"name": "trap_%d" % pid,
+		"city_name": "trap_%d" % pid,
+		"score": 100000.0 if capital else 5000.0,
+	}
+
+
+func _trap_edge(a: int, b: int, ca: Vector2, cb: Vector2) -> Dictionary:
+	return {
+		"p1": a,
+		"p2": b,
+		"c1": ca,
+		"c2": cb,
+		"weight": 10.0,
+		"w1": 10.0,
+		"w2": 10.0,
+		"avg_infra": 8.0,
+		"explicit": false,
+		"tier": 0,
+		"display_tier": 0,
+	}
+
+
+func _assign_trap_shape(kind: String, mutant: String) -> Dictionary:
+	var cents: Dictionary = {}
+	var recs: Array = []
+	var graph: Array = []
+	var pids: PackedInt32Array = PackedInt32Array()
+	if kind == "hook":
+		# A→B→C→D with a >150° turn at B, path still ≤1.6× chord.
+		var pts: Array = [
+			Vector2(0.0, 0.0),
+			Vector2(15.0, 0.0),
+			Vector2(14.0, 0.4),
+			Vector2(30.0, 1.0),
+		]
+		for i in range(pts.size()):
+			var pid: int = i + 1
+			pids.append(pid)
+			cents[pid] = pts[i]
+			recs.append(_trap_rec(pid, "ZZZ", i == 0 or i == pts.size() - 1, pts[i]))
+		for i2 in range(1, pts.size()):
+			graph.append(_trap_edge(i2, i2 + 1, pts[i2 - 1], pts[i2]))
+	else:
+		for zi in range(8):
+			var pidz: int = zi + 1
+			var cz: Vector2 = Vector2(float(zi) * 10.0, 0.0 if (zi % 2) == 0 else 12.0)
+			pids.append(pidz)
+			cents[pidz] = cz
+			recs.append(_trap_rec(pidz, "ZZZ", zi == 0 or zi == 7, cz))
+		for zj in range(1, 8):
+			graph.append(_trap_edge(zj, zj + 1, cents[zj], cents[zj + 1]))
+	var cache: Array = []
+	for g_v in graph:
+		cache.append((g_v as Dictionary).duplicate())
+	for pad_i in range(40, 2040):
+		var pa: int = 200000 + pad_i
+		var pb: int = 300000 + pad_i
+		var ca2: Vector2 = Vector2(float(pad_i), 500.0)
+		var cb2: Vector2 = Vector2(float(pad_i) + 1.0, 500.0)
+		cache.append(_trap_edge(pa, pb, ca2, cb2))
+	var prev_mut: String = OS.get_environment("EOA_HWY3_MUTANT")
+	if mutant != "":
+		OS.set_environment("EOA_HWY3_MUTANT", mutant)
+	else:
+		OS.set_environment("EOA_HWY3_MUTANT", "")
+	var by_pid: Dictionary = {}
+	for rec_v in recs:
+		var rec: Dictionary = rec_v
+		by_pid[int(rec.get("pid", 0))] = rec
+	var ctx: Dictionary = {
+		"records": recs,
+		"select_records": recs,
+		"by_pid": by_pid,
+		"graph": graph,
+		"use_urban": false,
+		"tag_borders": {},
+	}
+	_vis_call("hwy3_clear_memos", [])
+	_vis_call("assign_rare_display_tiers", [cache, ctx])
+	var dbg: Dictionary = _debug()
+	var routes_v: Variant = dbg.get("routes", [])
+	var routes: Array = routes_v if typeof(routes_v) == TYPE_ARRAY else []
+	var bad: int = _shape_fail_count(routes, cents)
+	OS.set_environment("EOA_HWY3_MUTANT", prev_mut)
+	return {
+		"routes": routes.size(),
+		"independent_bad": bad,
+		"used": int(dbg.get("used", 0)),
+		"mode": str(dbg.get("mode", "")),
+	}
+
+
 func _test_mutants() -> void:
 	var graph: Array = []
 	if _ol != null and _ol.has_method("get_hwy3_graph_rows"):
@@ -753,6 +1065,7 @@ func _test_mutants() -> void:
 	_mutant_expect("hook_back", ctx, "H3")
 	_mutant_expect("not_shortest", ctx, "H2")
 	OS.set_environment("EOA_HWY3_MUTANT", "")
+	_vis_call("hwy3_clear_memos", [])
 
 
 func _mutant_expect(name: String, ctx: Dictionary, bar: String) -> void:
@@ -844,26 +1157,12 @@ func _mutant_expect(name: String, ctx: Dictionary, bar: String) -> void:
 			if major_miss or off.is_empty():
 				killed = true
 	elif bar == "H3":
-		# Mutant disables shape checks, so a known-bad polyline must be accepted.
-		var cents: Dictionary = {}
-		var pids: PackedInt32Array = PackedInt32Array()
-		if name == "hook_back":
-			pids.append(1)
-			pids.append(2)
-			pids.append(1)
-			cents[1] = Vector2(0, 0)
-			cents[2] = Vector2(10, 0)
-			var shape_hv: Variant = _vis_call("path_shape_report", [pids, cents, 1, 1, name])
-			var shape_h: Dictionary = shape_hv if typeof(shape_hv) == TYPE_DICTIONARY else {}
-			killed = bool(shape_h.get("ok", false))
-		else:
-			# Alternating zigzag, no vertex repeat; turn sum 2.5π > 1.5π per 6 edges.
-			for zi in range(7):
-				pids.append(zi + 1)
-				cents[zi + 1] = Vector2(float(zi) * 10.0, 0.0 if (zi % 2) == 0 else 10.0)
-			var shape_zv: Variant = _vis_call("path_shape_report", [pids, cents, 1, 7, name])
-			var shape_z: Dictionary = shape_zv if typeof(shape_zv) == TYPE_DICTIONARY else {}
-			killed = bool(shape_z.get("ok", false))
+		# Inject a zigzag/hook-only adjacency. Independent math must FAIL the
+		# painted route; product path_shape_report is not consulted.
+		var kind: String = "hook" if name == "hook_back" else "zigzag"
+		var trap: Dictionary = _assign_trap_shape(kind, name)
+		killed = int(trap.get("independent_bad", 0)) > 0
+		_vis_call("hwy3_clear_memos", [])
 	OS.set_environment("EOA_HWY3_MUTANT", "")
 	if killed:
 		_pass("mutant %s killed by %s" % [name, bar])
@@ -910,3 +1209,15 @@ func _test_flip_max_guard_source() -> void:
 		_fail("flip_max: max-of-orientations Y-flip pick restored")
 	else:
 		_pass("flip_max: no max-of-orientations Y-flip pick")
+	if "HWY3_FAR_WIDTH_CEILING=26" not in src:
+		_fail("flip_max: guard missing far width ceiling")
+	else:
+		_pass("flip_max: far width ceiling is behavioral")
+	if "HWY3_DEFAULT_WIDTH_CEILING=18" not in src:
+		_fail("flip_max: guard missing default width ceiling")
+	else:
+		_pass("flip_max: default width ceiling is behavioral")
+	if "HWY3_PAIR_SCREEN_POS_MAX=28" not in src:
+		_fail("flip_max: guard missing hub-pair screen-position check")
+	else:
+		_pass("flip_max: hub-pair screen position is checked")

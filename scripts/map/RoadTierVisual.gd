@@ -69,6 +69,8 @@ const HWY3_PATH_LEN_RATIO := 1.6
 const HWY3_ZIGZAG_TURN_BUDGET := 4.71238898038469 ## 1.5π
 const HWY3_HOOK_TURN := 2.61799387799149 ## 150°
 const HWY3_BUDGET_SLACK := 0.15
+const HWY3_BUDGET_MULT := 2
+const HWY3_BUDGET_CAP := 114
 const HWY3_SCORE_CAPITAL := 100000.0
 const HWY3_SCORE_TIER := 800.0
 const HWY3_SCORE_POP_DIV := 1000.0
@@ -77,18 +79,32 @@ const HWY3_SCORE_CITY_HUB := 400.0
 const HWY3_SCORE_PORT := 200.0
 const HWY3_SCORE_URBAN := 200.0
 const HWY3_SCORE_URBAN_NBR := 120.0
-const HWY3_MIN_PATH_EDGES := 3
+const HWY3_MIN_PATH_EDGES := 2
 ## Last hub-route rebuild (tests / overlay logs). Not gameplay state.
 static var last_hwy3_debug: Dictionary = {}
 
 
 static func hwy3_debug() -> Dictionary:
 	return last_hwy3_debug
+
+
+static func hwy3_set_debug(d: Dictionary) -> void:
+	last_hwy3_debug = d
+
+
 static var _hwy3_adj_memo_key: String = ""
 static var _hwy3_adj_memo: Dictionary = {}
 static var _hwy3_route_memo_key: String = ""
 static var _hwy3_route_memo_marked: Dictionary = {}
 static var _hwy3_route_memo_debug: Dictionary = {}
+
+
+static func hwy3_clear_memos() -> void:
+	_hwy3_adj_memo_key = ""
+	_hwy3_adj_memo = {}
+	_hwy3_route_memo_key = ""
+	_hwy3_route_memo_marked = {}
+	_hwy3_route_memo_debug = {}
 
 ## Fallback when the board has no usable shared-border set.
 ## Tuned on the Rhineland: Bonn–Köln 7.86 and Köln–Leverkusen 3.15 pass;
@@ -1030,12 +1046,12 @@ static func _hwy3_hub_n_for_land(land_n: int) -> int:
 	if land_n < 80:
 		return 2
 	if land_n < 180:
-		return 3
-	if land_n < 320:
 		return 4
+	if land_n < 320:
+		return 8
 	if land_n < 500:
-		return 6
-	return 8
+		return 12
+	return 16
 
 
 static func _hwy3_score_pid_less(a: Dictionary, b: Dictionary) -> bool:
@@ -1097,6 +1113,7 @@ static func select_display_hubs(records: Array, use_urban: bool) -> Array:
 		if n_keep <= 0:
 			n_keep = 1
 		var kept: int = 0
+		var kept_pids: Dictionary = {}
 		for rec3_v in lst2:
 			if kept >= n_keep:
 				break
@@ -1105,7 +1122,35 @@ static func select_display_hubs(records: Array, use_urban: bool) -> Array:
 			var is_cap3: bool = bool(rec3.get("capital", false))
 			if is_cap3 or sc3 >= 50.0:
 				hubs.append(rec3)
+				kept_pids[int(rec3.get("pid", 0))] = true
 				kept += 1
+		if use_urban:
+			var best_u: Dictionary = {}
+			var best_un: int = -1
+			var best_us: float = -1.0
+			var best_up: int = 1 << 30
+			for rec4_v in lst2:
+				var rec4: Dictionary = rec4_v
+				var pid4: int = int(rec4.get("pid", 0))
+				if kept_pids.has(pid4):
+					continue
+				if not bool(rec4.get("urban", false)):
+					continue
+				var un4: int = int(rec4.get("urban_nbr", 0))
+				if un4 < 2:
+					continue
+				var sc4: float = float(rec4.get("score", 0.0))
+				if (
+					un4 > best_un
+					or (un4 == best_un and sc4 > best_us)
+					or (un4 == best_un and sc4 == best_us and pid4 < best_up)
+				):
+					best_u = rec4
+					best_un = un4
+					best_us = sc4
+					best_up = pid4
+			if not best_u.is_empty():
+				hubs.append(best_u)
 	hubs.sort_custom(_hwy3_score_pid_less)
 	return hubs
 
@@ -1662,9 +1707,18 @@ static func _hwy3_pair_priority_less(a: Dictionary, b: Dictionary) -> bool:
 	return int(a.get("key", 0)) < int(b.get("key", 0))
 
 
+static func _hwy3_tag_land_less(a: Dictionary, b: Dictionary) -> bool:
+	var la: int = int(a.get("land_n", 0))
+	var lb: int = int(b.get("land_n", 0))
+	if la != lb:
+		return la > lb
+	return str(a.get("tag", "")) < str(b.get("tag", ""))
+
+
 static func _hwy3_order_pairs_for_paint(scored_pairs: Array) -> Array:
 	var by_tag: Dictionary = {}
 	var foreign: Array = []
+	var land_by_tag: Dictionary = {}
 	for sp_v in scored_pairs:
 		if typeof(sp_v) != TYPE_DICTIONARY:
 			continue
@@ -1678,26 +1732,20 @@ static func _hwy3_order_pairs_for_paint(scored_pairs: Array) -> Array:
 		var lst: Array = by_tag[tag]
 		lst.append(sp)
 		by_tag[tag] = lst
-	var tags: Array = by_tag.keys()
-	tags.sort()
-	for tag_v in tags:
-		var lst2: Array = by_tag[str(tag_v)]
-		lst2.sort_custom(_hwy3_pair_priority_less)
-		by_tag[str(tag_v)] = lst2
-	foreign.sort_custom(_hwy3_pair_priority_less)
+		land_by_tag[tag] = maxi(int(land_by_tag.get(tag, 0)), int(sp.get("land_n", 0)))
+	var tag_rows: Array = []
+	for tag_v in by_tag.keys():
+		var tag: String = str(tag_v)
+		tag_rows.append({"tag": tag, "land_n": int(land_by_tag.get(tag, 0))})
+	tag_rows.sort_custom(_hwy3_tag_land_less)
 	var out: Array = []
-	var round_i: int = 0
-	var more: bool = true
-	while more:
-		more = false
-		for tag2_v in tags:
-			var lst3: Array = by_tag[str(tag2_v)]
-			if round_i < lst3.size():
-				out.append(lst3[round_i])
-				more = true
-		round_i += 1
-		if round_i > 64:
-			break
+	for row_v in tag_rows:
+		var row: Dictionary = row_v
+		var lst2: Array = by_tag[str(row.get("tag", ""))]
+		lst2.sort_custom(_hwy3_pair_priority_less)
+		for sp2_v in lst2:
+			out.append(sp2_v)
+	foreign.sort_custom(_hwy3_pair_priority_less)
 	for f_v in foreign:
 		out.append(f_v)
 	return out
@@ -1856,6 +1904,7 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 			"key": _hwy3_pair_key(a, b),
 			"dist": pd,
 			"tag": ta if ta == tb else "",
+			"land_n": maxi(int(ra.get("land_n", 0)), int(rb.get("land_n", 0))),
 		})
 	var paint_pairs: Array = _hwy3_order_pairs_for_paint(scored_pairs)
 	var inferred_n: int = inferred.size()
@@ -1864,9 +1913,12 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 	var budget: int = _hwy1_budget(inferred_n)
 	if budget <= 0:
 		budget = 52
-	var hi: int = int(floor(float(budget) * (1.0 + HWY3_BUDGET_SLACK)))
-	if hi > 59:
-		hi = 59
+	var paint_budget: int = budget * HWY3_BUDGET_MULT
+	if paint_budget < budget:
+		paint_budget = budget
+	var hi: int = int(floor(float(paint_budget) * (1.0 + HWY3_BUDGET_SLACK)))
+	if hi > HWY3_BUDGET_CAP:
+		hi = HWY3_BUDGET_CAP
 	if hi < 45:
 		hi = 45
 	var used: int = 0
@@ -1874,7 +1926,7 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 	var marked: Dictionary = {}
 	var not_shortest: bool = mutant == "not_shortest"
 	for sp_v in paint_pairs:
-		if used >= budget:
+		if used >= paint_budget:
 			break
 		var sp: Dictionary = sp_v
 		var a2: int = int(sp.get("a", 0))
@@ -1943,7 +1995,7 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 		if typeof(pids_c_v) == TYPE_ARRAY:
 			for pv_c in pids_c_v:
 				covered_hubs[int(pv_c)] = true
-	var do_cover: bool = used < 45
+	var do_cover: bool = used < paint_budget
 	for h5_v in hubs:
 		if not do_cover or used >= hi:
 			break
@@ -1955,6 +2007,8 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 			(not bool(h5.get("capital", false)))
 			and int(h5.get("tier", 0)) < 3
 			and (not bool(h5.get("city_hub", false)))
+			and int(h5.get("urban_nbr", 0)) < 2
+			and (not bool(h5.get("industrial", false)))
 		):
 			continue
 		if not adj.has(hp5):
@@ -2042,6 +2096,9 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 			"tier": int(h2.get("tier", 0)),
 			"urban": bool(h2.get("urban", false)),
 			"urban_nbr": int(h2.get("urban_nbr", 0)),
+			"city_hub": bool(h2.get("city_hub", false)),
+			"city_name": str(h2.get("city_name", "")),
+			"name": str(h2.get("name", "")),
 		})
 	last_hwy3_debug = {
 		"mutant": mutant,
@@ -2054,7 +2111,7 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 		"records": records,
 		"marked": marked.size(),
 		"used": used,
-		"budget": budget,
+		"budget": paint_budget,
 		"adj_ms": t_adj_ms,
 		"hubs_ms": t_hubs_ms,
 		"route_ms": float(Time.get_ticks_usec() - t_route0) / 1000.0,

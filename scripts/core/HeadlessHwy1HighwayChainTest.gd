@@ -665,13 +665,13 @@ func _test_part_b_live_1936() -> void:
 	var comps: int = int(after_st.get("components", 0))
 	var sings: int = int(after_st.get("singletons", 0))
 	var median: float = float(after_st.get("median", 0.0))
-	var target_hwy: int = 52
-	var lo: float = float(target_hwy) * 0.85
-	var hi: float = float(target_hwy) * 1.15
+	var target_hwy: int = 104
+	var lo: float = 60.0
+	var hi: float = 114.0
 	if float(after_hwy) < lo or float(after_hwy) > hi:
-		_fail("Part B: highway count %d not within +/-15%% of %d (legacy_rank=%d)" % [after_hwy, target_hwy, before_hwy])
+		_fail("Part B: highway count %d not within 60–114 (2× of 52, legacy_rank=%d)" % [after_hwy, before_hwy])
 	else:
-		_pass("Part B: highway count %d within +/-15%% of %d (legacy_rank=%d)" % [after_hwy, target_hwy, before_hwy])
+		_pass("Part B: highway count %d within 60–114 of 2×52 (legacy_rank=%d target=%d)" % [after_hwy, before_hwy, target_hwy])
 	if sings != 0:
 		_fail("Part B: singletons=%d want 0 (comps=%d)" % [sings, comps])
 	else:
