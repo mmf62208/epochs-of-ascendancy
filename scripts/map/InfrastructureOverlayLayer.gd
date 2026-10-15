@@ -648,8 +648,9 @@ func _rebuild_road_layer_inner() -> void:
     _assign_display_tiers(cache)
     var deg: Dictionary = RoadTierVisualScript.degree_stats(cache)
     var tri: int = RoadTierVisualScript.count_undirected_triangles(cache)
+    var hwy_st: Dictionary = RoadTierVisualScript._hwy1_component_stats(cache)
     print(
-        "EOA_RT1_TRUNK who=overlay candidates=%d trunk=%d triangles=%d max_deg=%d avg_deg=%.2f highways=%d"
+        "EOA_RT1_TRUNK who=overlay candidates=%d trunk=%d triangles=%d max_deg=%d avg_deg=%.2f highways=%d hwy_components=%d hwy_singletons=%d"
         % [
             _road_candidate_count,
             cache.size(),
@@ -657,6 +658,8 @@ func _rebuild_road_layer_inner() -> void:
             int(deg.get("max", 0)),
             float(deg.get("avg", 0.0)),
             _count_display_highways(cache),
+            int(hwy_st.get("components", 0)),
+            int(hwy_st.get("singletons", 0)),
         ]
     )
     _apply_road_tier_cache(cache)

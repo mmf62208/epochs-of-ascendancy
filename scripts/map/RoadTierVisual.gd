@@ -527,9 +527,246 @@ static func assign_rare_display_tiers(cache: Array) -> void:
 		inferred.append(row)
 	if inferred.is_empty():
 		return
-	inferred.sort_custom(_weight_less)
-	var n: int = inferred.size()
+	var ranks: Dictionary = _hwy1_rank_inferred(inferred)
+	for row2_v in inferred:
+		var row2: Dictionary = row2_v
+		var rank: float = float(ranks.get(_entry_key(row2), 0.0))
+		var tier: int = display_tier_from_rank(rank, false)
+		# Highways come from chain pick only. Rank still paints paved/dirt.
+		if tier == TIER_HIGHWAY:
+			tier = TIER_PAVED
+		row2["display_tier"] = tier
+	_hwy1_pick_highway_chains(cache, inferred, ranks)
+
+
+## HWY-1: same percentile map as the old per-edge rank (lowest→highest weight).
+static func _hwy1_rank_inferred(inferred: Array) -> Dictionary:
+	var sorted_inf: Array = inferred.duplicate()
+	sorted_inf.sort_custom(_weight_less)
+	var n: int = sorted_inf.size()
+	var ranks: Dictionary = {}
 	for i in range(n):
 		var rank: float = 0.0 if n <= 1 else float(i) / float(n)
-		var row2: Dictionary = inferred[i]
-		row2["display_tier"] = display_tier_from_rank(rank, false)
+		var row: Dictionary = sorted_inf[i]
+		ranks[_entry_key(row)] = rank
+	return ranks
+
+
+static func _hwy1_budget(inferred_n: int) -> int:
+	if inferred_n <= 0:
+		return 0
+	return ceili(float(inferred_n) * (1.0 - HIGHWAY_RARE_RANK))
+
+
+static func _hwy1_weight_more(a: Dictionary, b: Dictionary) -> bool:
+	var wa: float = float(a.get("weight", 0.0))
+	var wb: float = float(b.get("weight", 0.0))
+	if wa == wb:
+		var ia: float = float(a.get("avg_infra", 0.0))
+		var ib: float = float(b.get("avg_infra", 0.0))
+		if ia == ib:
+			return _entry_key(a) < _entry_key(b)
+		return ia > ib
+	return wa > wb
+
+
+static func _hwy1_endpoint_index(cache: Array) -> Dictionary:
+	var by_pid: Dictionary = {}
+	for row_v in cache:
+		if typeof(row_v) != TYPE_DICTIONARY:
+			continue
+		var row: Dictionary = row_v
+		var a: int = int(row.get("p1", 0))
+		var b: int = int(row.get("p2", 0))
+		if a == 0 or b == 0 or a == b:
+			continue
+		if not by_pid.has(a):
+			by_pid[a] = []
+		if not by_pid.has(b):
+			by_pid[b] = []
+		var la: Array = by_pid[a]
+		var lb: Array = by_pid[b]
+		la.append(row)
+		lb.append(row)
+		by_pid[a] = la
+		by_pid[b] = lb
+	return by_pid
+
+
+static func _hwy1_above_paved_floor(row: Dictionary, ranks: Dictionary) -> bool:
+	if bool(row.get("explicit", false)):
+		return true
+	return float(ranks.get(_entry_key(row), 0.0)) >= PAVED_RANK_FLOOR
+
+
+static func _hwy1_absorb_explicit(chain: Array, in_chain: Dictionary, by_pid: Dictionary) -> void:
+	var grew: bool = true
+	while grew:
+		grew = false
+		var endpoints: Dictionary = {}
+		for row_v in chain:
+			var row: Dictionary = row_v
+			endpoints[int(row.get("p1", 0))] = true
+			endpoints[int(row.get("p2", 0))] = true
+		for pid_v in endpoints.keys():
+			var list_v: Variant = by_pid.get(int(pid_v), [])
+			if typeof(list_v) != TYPE_ARRAY:
+				continue
+			var list: Array = list_v
+			for nb_v in list:
+				if typeof(nb_v) != TYPE_DICTIONARY:
+					continue
+				var nb: Dictionary = nb_v
+				if not bool(nb.get("explicit", false)):
+					continue
+				var nk: String = _entry_key(nb)
+				if in_chain.has(nk):
+					continue
+				chain.append(nb)
+				in_chain[nk] = true
+				grew = true
+
+
+static func _hwy1_heaviest_unpicked_neighbour(
+	chain: Array,
+	by_pid: Dictionary,
+	in_chain: Dictionary,
+	picked: Dictionary,
+	ranks: Dictionary,
+) -> Dictionary:
+	var endpoints: Dictionary = {}
+	for row_v in chain:
+		var row: Dictionary = row_v
+		endpoints[int(row.get("p1", 0))] = true
+		endpoints[int(row.get("p2", 0))] = true
+	var best: Dictionary = {}
+	var have: bool = false
+	for pid_v in endpoints.keys():
+		var list_v: Variant = by_pid.get(int(pid_v), [])
+		if typeof(list_v) != TYPE_ARRAY:
+			continue
+		var list: Array = list_v
+		for nb_v in list:
+			if typeof(nb_v) != TYPE_DICTIONARY:
+				continue
+			var nb: Dictionary = nb_v
+			var nk: String = _entry_key(nb)
+			if in_chain.has(nk) or picked.has(nk):
+				continue
+			if not have or _hwy1_weight_more(nb, best):
+				best = nb
+				have = true
+	if not have:
+		return {}
+	if not _hwy1_above_paved_floor(best, ranks):
+		return {}
+	return best
+
+
+static func _hwy1_grow_chain(
+	seed: Dictionary,
+	by_pid: Dictionary,
+	picked: Dictionary,
+	ranks: Dictionary,
+) -> Array:
+	var chain: Array = [seed]
+	var in_chain: Dictionary = {}
+	in_chain[_entry_key(seed)] = true
+	_hwy1_absorb_explicit(chain, in_chain, by_pid)
+	while chain.size() < 3:
+		var nxt: Dictionary = _hwy1_heaviest_unpicked_neighbour(
+			chain, by_pid, in_chain, picked, ranks
+		)
+		if nxt.is_empty():
+			break
+		chain.append(nxt)
+		in_chain[_entry_key(nxt)] = true
+		_hwy1_absorb_explicit(chain, in_chain, by_pid)
+	return chain
+
+
+static func _hwy1_pick_highway_chains(cache: Array, inferred: Array, ranks: Dictionary) -> void:
+	var budget: int = _hwy1_budget(inferred.size())
+	if budget <= 0:
+		return
+	var by_pid: Dictionary = _hwy1_endpoint_index(cache)
+	var picked: Dictionary = {}
+	for row_v in cache:
+		if typeof(row_v) != TYPE_DICTIONARY:
+			continue
+		var row: Dictionary = row_v
+		if bool(row.get("explicit", false)):
+			picked[_entry_key(row)] = true
+	var seeds: Array = inferred.duplicate()
+	seeds.sort_custom(_hwy1_weight_more)
+	var used: int = 0
+	for seed_v in seeds:
+		if used >= budget:
+			break
+		var seed: Dictionary = seed_v
+		var sk: String = _entry_key(seed)
+		if picked.has(sk):
+			continue
+		var chain: Array = _hwy1_grow_chain(seed, by_pid, picked, ranks)
+		if chain.size() < 3:
+			continue
+		var inferred_n: int = 0
+		for ch_v in chain:
+			var ch: Dictionary = ch_v
+			if not bool(ch.get("explicit", false)):
+				inferred_n += 1
+		if inferred_n <= 0 or inferred_n > (budget - used):
+			continue
+		for ch2_v in chain:
+			var ch2: Dictionary = ch2_v
+			var ck: String = _entry_key(ch2)
+			picked[ck] = true
+			if not bool(ch2.get("explicit", false)):
+				ch2["display_tier"] = TIER_HIGHWAY
+				used += 1
+
+
+## HWY-1 log / bars: connected components of highway edges (size = edge count).
+static func _hwy1_component_stats(cache: Array) -> Dictionary:
+	var parent: Dictionary = {}
+	var hwy_rows: Array = []
+	for row_v in cache:
+		if typeof(row_v) != TYPE_DICTIONARY:
+			continue
+		var row: Dictionary = row_v
+		if int(row.get("display_tier", 0)) != TIER_HIGHWAY:
+			continue
+		var a: int = int(row.get("p1", 0))
+		var b: int = int(row.get("p2", 0))
+		if a == 0 or b == 0:
+			continue
+		hwy_rows.append(row)
+		_uf_union(parent, a, b)
+	var edges_by_root: Dictionary = {}
+	for row2_v in hwy_rows:
+		var row2: Dictionary = row2_v
+		var a2: int = int(row2.get("p1", 0))
+		var root: int = _uf_find(parent, a2)
+		edges_by_root[root] = int(edges_by_root.get(root, 0)) + 1
+	var sizes: Array = []
+	for root_v in edges_by_root.keys():
+		sizes.append(int(edges_by_root[root_v]))
+	sizes.sort()
+	var singletons: int = 0
+	for sz_v in sizes:
+		if int(sz_v) <= 1:
+			singletons += 1
+	var median: float = 0.0
+	if not sizes.is_empty():
+		var mid: int = sizes.size() / 2
+		if sizes.size() % 2 == 1:
+			median = float(sizes[mid])
+		else:
+			median = (float(sizes[mid - 1]) + float(sizes[mid])) * 0.5
+	return {
+		"highways": hwy_rows.size(),
+		"components": sizes.size(),
+		"singletons": singletons,
+		"sizes": sizes,
+		"median": median,
+	}
