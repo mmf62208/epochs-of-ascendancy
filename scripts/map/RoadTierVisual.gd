@@ -80,6 +80,10 @@ const HWY3_SCORE_URBAN_NBR := 120.0
 const HWY3_MIN_PATH_EDGES := 3
 ## Last hub-route rebuild (tests / overlay logs). Not gameplay state.
 static var last_hwy3_debug: Dictionary = {}
+
+
+static func hwy3_debug() -> Dictionary:
+	return last_hwy3_debug
 static var _hwy3_adj_memo_key: String = ""
 static var _hwy3_adj_memo: Dictionary = {}
 static var _hwy3_route_memo_key: String = ""

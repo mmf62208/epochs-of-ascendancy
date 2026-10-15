@@ -52,7 +52,7 @@ func _run() -> void:
 	_test_pid_list_grep()
 	_test_far_width_not_hidden()
 	_test_flip_max_guard_source()
-	if not RoadTierVisualScript.has_method("select_display_hubs"):
+	if "static func select_display_hubs" not in _read_text(SRC_VIS):
 		_fail("H1: assign mode is rank-grow (d4a3a1ff)")
 		_fail("H2: no hub routes (rank-grow / empty)")
 		return
@@ -93,11 +93,18 @@ func _read_text(path: String) -> String:
 	return t
 
 
+func _vis_call(method: String, args: Array = []) -> Variant:
+	return RoadTierVisualScript.callv(method, args)
+
+
 func _debug() -> Dictionary:
 	# d4a3a1ff has no hub-route statics — fail as rank-grow, do not SCRIPT ERROR.
-	if not RoadTierVisualScript.has_method("select_display_hubs"):
+	if "static func hwy3_debug" not in _read_text(SRC_VIS):
 		return {"mode": "rank_grow", "hubs": [], "routes": [], "records": []}
-	return RoadTierVisualScript.last_hwy3_debug
+	var v: Variant = _vis_call("hwy3_debug", [])
+	if typeof(v) == TYPE_DICTIONARY:
+		return v
+	return {"mode": "rank_grow", "hubs": [], "routes": [], "records": []}
 
 
 func _hub_set() -> Dictionary:
@@ -326,7 +333,8 @@ func _test_h1_hubs() -> void:
 		_fail("H1: no non-major capital hub")
 	else:
 		_pass("H1: a non-major capital is a hub")
-	var off: Array = RoadTierVisualScript.select_display_hubs(recs, false)
+	var off_v: Variant = _vis_call("select_display_hubs", [recs, false])
+	var off: Array = off_v if typeof(off_v) == TYPE_ARRAY else []
 	var off_set: Dictionary = {}
 	var off_tags: Dictionary = {}
 	for h_v in off:
@@ -374,7 +382,8 @@ func _test_h2_routes() -> void:
 	if graph.is_empty():
 		graph = _cache
 	var recs_h2: Array = _records()
-	var adj: Dictionary = RoadTierVisualScript.build_hub_route_adj(graph, recs_h2, true)
+	var adj_v: Variant = _vis_call("build_hub_route_adj", [graph, recs_h2, true])
+	var adj: Dictionary = adj_v if typeof(adj_v) == TYPE_DICTIONARY else {}
 	var attrs_h2: Dictionary = {}
 	for rec_h2_v in recs_h2:
 		if typeof(rec_h2_v) != TYPE_DICTIONARY:
@@ -394,7 +403,13 @@ func _test_h2_routes() -> void:
 			continue
 		var want_v: Variant = rt.get("pids", [])
 		var want: Array = want_v if typeof(want_v) == TYPE_ARRAY else []
-		var got: PackedInt32Array = RoadTierVisualScript.shortest_hub_path(adj, a, b, false, attrs_h2)
+		var got_v: Variant = _vis_call("shortest_hub_path", [adj, a, b, false, attrs_h2])
+		var got: PackedInt32Array = PackedInt32Array()
+		if typeof(got_v) == TYPE_PACKED_INT32_ARRAY:
+			got = got_v
+		elif typeof(got_v) == TYPE_ARRAY:
+			for gv in got_v:
+				got.append(int(gv))
 		if got.size() != want.size():
 			bad_short += 1
 			continue
@@ -437,9 +452,10 @@ func _test_h3_simple_paths() -> void:
 		if typeof(pids_v) == TYPE_ARRAY:
 			for pv in pids_v:
 				packed.append(int(pv))
-		var shape: Dictionary = RoadTierVisualScript.path_shape_report(
+		var shape_v: Variant = _vis_call("path_shape_report", [
 			packed, cents, int(rt.get("a", 0)), int(rt.get("b", 0)), ""
-		)
+		])
+		var shape: Dictionary = shape_v if typeof(shape_v) == TYPE_DICTIONARY else {}
 		if not bool(shape.get("ok", false)):
 			bad += 1
 	if bad > 0:
@@ -467,7 +483,7 @@ func _test_h4_germany() -> void:
 			nm.contains("köln") or cnm.contains("cologne") or cnm.contains("köln")
 		):
 			cologne = int(rec.get("pid", 0))
-		if RoadTierVisualScript.is_urban_district_name(str(rec.get("name", ""))):
+		if bool(_vis_call("is_urban_district_name", [str(rec.get("name", ""))])):
 			urban_ruhr[int(rec.get("pid", 0))] = true
 	# City layer name "Cologne" lives on the record name from provinces_base ("Köln, Kreisfreie Stadt").
 	if cologne == 0:
@@ -650,7 +666,7 @@ func _test_h6_determinism() -> void:
 		if typeof(rec_h6_v) == TYPE_DICTIONARY:
 			var rec_h6: Dictionary = rec_h6_v
 			by_pid_h6[int(rec_h6.get("pid", 0))] = rec_h6
-			if RoadTierVisualScript._hwy3_rec_is_hub_candidate(rec_h6):
+			if bool(_vis_call("_hwy3_rec_is_hub_candidate", [rec_h6])):
 				select_h6.append(rec_h6)
 	var ctx: Dictionary = {
 		"records": recs_h6,
@@ -664,7 +680,7 @@ func _test_h6_determinism() -> void:
 	# repeats then measure a cached rebuild (Dijkstra once per unique board).
 	var warmup: Array = _clone_cache(_cache)
 	_reset_inferred(warmup)
-	RoadTierVisualScript.assign_rare_display_tiers(warmup, ctx)
+	_vis_call("assign_rare_display_tiers", [warmup, ctx])
 	var sets: Array = []
 	var new_ms: PackedFloat32Array = PackedFloat32Array()
 	var legacy_ms: PackedFloat32Array = PackedFloat32Array()
@@ -677,7 +693,7 @@ func _test_h6_determinism() -> void:
 		var clone: Array = _clone_cache(_cache)
 		_reset_inferred(clone)
 		var t0: int = Time.get_ticks_usec()
-		RoadTierVisualScript.assign_rare_display_tiers(clone, ctx)
+		_vis_call("assign_rare_display_tiers", [clone, ctx])
 		new_ms.append(float(Time.get_ticks_usec() - t0) / 1000.0)
 		sets.append(_highway_keys(clone))
 	var same: bool = true
@@ -741,16 +757,15 @@ func _mutant_expect(name: String, ctx: Dictionary, bar: String) -> void:
 			rec_copy.append((rec_v as Dictionary).duplicate())
 	var ctx2: Dictionary = ctx.duplicate()
 	ctx2["records"] = rec_copy
-	RoadTierVisualScript.assign_rare_display_tiers(clone, ctx2)
+	_vis_call("assign_rare_display_tiers", [clone, ctx2])
 	var dbg: Dictionary = _debug()
 	var killed: bool = false
 	if bar == "H2":
 		if str(dbg.get("mode", "")) == "rank_grow":
 			killed = true
 		else:
-			var adj: Dictionary = RoadTierVisualScript.build_hub_route_adj(
-				ctx2.get("graph", []), rec_copy, true
-			)
+			var adj_mv: Variant = _vis_call("build_hub_route_adj", [ctx2.get("graph", []), rec_copy, true])
+			var adj: Dictionary = adj_mv if typeof(adj_mv) == TYPE_DICTIONARY else {}
 			var attrs_m: Dictionary = {}
 			for rec_m_v in rec_copy:
 				if typeof(rec_m_v) != TYPE_DICTIONARY:
@@ -761,9 +776,15 @@ func _mutant_expect(name: String, ctx: Dictionary, bar: String) -> void:
 				if typeof(rt_v) != TYPE_DICTIONARY:
 					continue
 				var rt: Dictionary = rt_v
-				var got: PackedInt32Array = RoadTierVisualScript.shortest_hub_path(
+				var got_mv: Variant = _vis_call("shortest_hub_path", [
 					adj, int(rt.get("a", 0)), int(rt.get("b", 0)), false, attrs_m
-				)
+				])
+				var got: PackedInt32Array = PackedInt32Array()
+				if typeof(got_mv) == TYPE_PACKED_INT32_ARRAY:
+					got = got_mv
+				elif typeof(got_mv) == TYPE_ARRAY:
+					for gv2 in got_mv:
+						got.append(int(gv2))
 				var want_v: Variant = rt.get("pids", [])
 				var want: Array = want_v if typeof(want_v) == TYPE_ARRAY else []
 				if got.size() != want.size():
@@ -798,7 +819,8 @@ func _mutant_expect(name: String, ctx: Dictionary, bar: String) -> void:
 		if cap_ger > 0 and not hs.has(cap_ger):
 			killed = true
 		if name == "urban_required":
-			var off: Array = RoadTierVisualScript.select_display_hubs(rec_copy, false)
+			var off_mv: Variant = _vis_call("select_display_hubs", [rec_copy, false])
+			var off: Array = off_mv if typeof(off_mv) == TYPE_ARRAY else []
 			if off.is_empty():
 				killed = true
 			var major_miss: bool = false
@@ -823,16 +845,16 @@ func _mutant_expect(name: String, ctx: Dictionary, bar: String) -> void:
 			pids.append(1)
 			cents[1] = Vector2(0, 0)
 			cents[2] = Vector2(10, 0)
-			var shape_h: Dictionary = RoadTierVisualScript.path_shape_report(pids, cents, 1, 1, name)
+			var shape_hv: Variant = _vis_call("path_shape_report", [pids, cents, 1, 1, name])
+			var shape_h: Dictionary = shape_hv if typeof(shape_hv) == TYPE_DICTIONARY else {}
 			killed = bool(shape_h.get("ok", false))
 		else:
 			# Alternating zigzag, no vertex repeat; turn sum 2.5π > 1.5π per 6 edges.
 			for zi in range(7):
 				pids.append(zi + 1)
 				cents[zi + 1] = Vector2(float(zi) * 10.0, 0.0 if (zi % 2) == 0 else 10.0)
-			var shape_z: Dictionary = RoadTierVisualScript.path_shape_report(
-				pids, cents, 1, 7, name
-			)
+			var shape_zv: Variant = _vis_call("path_shape_report", [pids, cents, 1, 7, name])
+			var shape_z: Dictionary = shape_zv if typeof(shape_zv) == TYPE_DICTIONARY else {}
 			killed = bool(shape_z.get("ok", false))
 	OS.set_environment("EOA_HWY3_MUTANT", "")
 	if killed:
