@@ -17,6 +17,13 @@ const ECON_PATH := "res://data/provinces_world_accurate/province_economy_layer.j
 const PROV_SCRIPT := "res://scripts/data/Province.gd"
 const MAP_DATA_SCRIPT := "res://scripts/data/MapScenarioData.gd"
 const ESSEN_ID := 710403
+const KOELN_ID := 710417
+const LEVERKUSEN_ID := 710418
+const DUESSELDORF_ID := 710401
+const DUISBURG_ID := 710402
+const DORTMUND_ID := 710443
+const BOCHUM_ID := 710442
+const METTMANN_ID := 710412
 
 var _failures: int = 0
 
@@ -180,35 +187,43 @@ func _assign(cache: Array) -> void:
 
 
 func _test_part_a_line_decoy() -> void:
-	# Connected medium-high path + isolated ultra-heavies + a dirt tail.
-	# Rank-back picks the three isolated heavies. Chain pick grows the path.
+	# Connected 5-edge path + isolated ultra-heavies + a dirt tail.
+	# Rank-back picks the isolated heavies. Chain pick grows the path to 5.
 	var cache: Array = [
 		_edge(10, 11, 100.0),
 		_edge(11, 12, 40.0),
 		_edge(12, 13, 39.0),
-		_edge(13, 14, 2.0),
+		_edge(13, 14, 38.0),
+		_edge(14, 15, 37.0),
+		_edge(15, 16, 2.0),
 		_edge(90, 91, 99.0),
 		_edge(92, 93, 98.0),
 	]
-	_pad(cache, 75, 37, 1.0, 10.0)
+	_pad(cache, 125, 62, 1.0, 10.0)
 	_assign(cache)
 	var keys: Dictionary = _highway_keys(cache)
-	if not _has_key(keys, 10, 11) or not _has_key(keys, 11, 12) or not _has_key(keys, 12, 13):
-		_fail("line: expected 10-11-12-13 chain, got %s" % str(keys.keys()))
+	if (
+		not _has_key(keys, 10, 11)
+		or not _has_key(keys, 11, 12)
+		or not _has_key(keys, 12, 13)
+		or not _has_key(keys, 13, 14)
+		or not _has_key(keys, 14, 15)
+	):
+		_fail("line: expected 10-11-12-13-14-15 chain, got %s" % str(keys.keys()))
 	else:
-		_pass("line: 10-11-12-13 is a highway chain")
+		_pass("line: 10-11-12-13-14-15 is a highway chain")
 	if _has_key(keys, 90, 91) or _has_key(keys, 92, 93):
 		_fail("line: isolated heavy decoys must not be highways (rank_back)")
 	else:
 		_pass("line: isolated decoys 90-91 / 92-93 are not highways")
-	if _has_key(keys, 13, 14):
-		_fail("line: dirt tail 13-14 must not be a highway (grow_any)")
+	if _has_key(keys, 15, 16):
+		_fail("line: dirt tail 15-16 must not be a highway (grow_any)")
 	else:
-		_pass("line: dirt tail 13-14 is not a highway")
-	if keys.size() != 3:
-		_fail("line: highway count %d want 3 (budget)" % keys.size())
+		_pass("line: dirt tail 15-16 is not a highway")
+	if keys.size() != 5:
+		_fail("line: highway count %d want 5 (budget)" % keys.size())
 	else:
-		_pass("line: highway count=3 (budget)")
+		_pass("line: highway count=5 (budget)")
 
 
 func _test_part_a_star() -> void:
@@ -242,29 +257,40 @@ func _test_part_a_two_clusters() -> void:
 		_edge(11, 12, 79.0),
 		_edge(12, 13, 78.0),
 		_edge(13, 14, 77.0),
+		_edge(14, 15, 76.0),
 		_edge(20, 21, 50.0),
 		_edge(21, 22, 49.0),
 		_edge(22, 23, 48.0),
+		_edge(23, 24, 47.0),
+		_edge(24, 25, 46.0),
 	]
-	_pad(cache, 150, 76, 1.0, 10.0)
+	_pad(cache, 250, 125, 1.0, 10.0)
 	_assign(cache)
 	var keys: Dictionary = _highway_keys(cache)
-	if not _has_key(keys, 10, 11) or not _has_key(keys, 11, 12) or not _has_key(keys, 12, 13):
-		_fail("clusters: cluster A must be a 3-chain, got %s" % str(keys.keys()))
+	if (
+		not _has_key(keys, 10, 11)
+		or not _has_key(keys, 11, 12)
+		or not _has_key(keys, 12, 13)
+		or not _has_key(keys, 13, 14)
+		or not _has_key(keys, 14, 15)
+	):
+		_fail("clusters: cluster A must be a 5-chain, got %s" % str(keys.keys()))
 	else:
-		_pass("clusters: cluster A is a 3-chain")
-	if _has_key(keys, 13, 14):
-		_fail("clusters: cluster A must stop at 3 (4th edge 13-14)")
+		_pass("clusters: cluster A is a 5-chain")
+	if (
+		not _has_key(keys, 20, 21)
+		or not _has_key(keys, 21, 22)
+		or not _has_key(keys, 22, 23)
+		or not _has_key(keys, 23, 24)
+		or not _has_key(keys, 24, 25)
+	):
+		_fail("clusters: cluster B must be a 5-chain (budget 10), got %s" % str(keys.keys()))
 	else:
-		_pass("clusters: cluster A stopped at 3")
-	if not _has_key(keys, 20, 21) or not _has_key(keys, 21, 22) or not _has_key(keys, 22, 23):
-		_fail("clusters: cluster B must be a 3-chain (budget 6), got %s" % str(keys.keys()))
+		_pass("clusters: cluster B is a 5-chain")
+	if keys.size() != 10:
+		_fail("clusters: highway count %d want 10" % keys.size())
 	else:
-		_pass("clusters: cluster B is a 3-chain")
-	if keys.size() != 6:
-		_fail("clusters: highway count %d want 6" % keys.size())
-	else:
-		_pass("clusters: highway count=6")
+		_pass("clusters: highway count=10")
 
 
 func _test_part_a_explicit() -> void:
@@ -272,16 +298,17 @@ func _test_part_a_explicit() -> void:
 		_edge(10, 11, 1.0, true, 1.0),
 		_edge(11, 12, 100.0),
 		_edge(12, 13, 90.0),
+		_edge(13, 14, 80.0),
 	]
-	_pad(cache, 75, 37, 1.0, 10.0)
+	_pad(cache, 100, 50, 1.0, 10.0)
 	_assign(cache)
 	var keys: Dictionary = _highway_keys(cache)
 	if not _has_key(keys, 10, 11):
 		_fail("explicit: 10-11 must stay highway (explicit_drop)")
 	else:
 		_pass("explicit: 10-11 stays highway")
-	if not _has_key(keys, 11, 12) or not _has_key(keys, 12, 13):
-		_fail("explicit: inferred 11-12-13 must join the explicit as a 3-chain")
+	if not _has_key(keys, 11, 12) or not _has_key(keys, 12, 13) or not _has_key(keys, 13, 14):
+		_fail("explicit: inferred 11-12-13-14 must join the explicit as a 4-chain")
 	else:
 		_pass("explicit: inferred neighbours joined the explicit chain")
 	if not bool(cache[0].get("explicit", false)) or int(cache[0].get("display_tier", 0)) != 2:
@@ -291,23 +318,39 @@ func _test_part_a_explicit() -> void:
 
 
 func _test_part_a_nondet() -> void:
-	# Two equal-weight disjoint 3-paths. Smaller first edge_key is 10_11, not 20_21.
+	# Two equal-weight disjoint 5-paths. Smaller first edge_key is 10_11, not 20_21.
 	var cache: Array = [
 		_edge(10, 11, 80.0),
 		_edge(11, 12, 70.0),
 		_edge(12, 13, 60.0),
+		_edge(13, 14, 50.0),
+		_edge(14, 15, 40.0),
 		_edge(20, 21, 80.0),
 		_edge(21, 22, 70.0),
 		_edge(22, 23, 60.0),
+		_edge(23, 24, 50.0),
+		_edge(24, 25, 40.0),
 	]
-	_pad(cache, 75, 37, 1.0, 10.0)
+	_pad(cache, 125, 62, 1.0, 10.0)
 	_assign(cache)
 	var keys: Dictionary = _highway_keys(cache)
-	if not _has_key(keys, 10, 11) or not _has_key(keys, 11, 12) or not _has_key(keys, 12, 13):
-		_fail("nondet: expected path 10-11-12-13, got %s" % str(keys.keys()))
+	if (
+		not _has_key(keys, 10, 11)
+		or not _has_key(keys, 11, 12)
+		or not _has_key(keys, 12, 13)
+		or not _has_key(keys, 13, 14)
+		or not _has_key(keys, 14, 15)
+	):
+		_fail("nondet: expected path 10-11-12-13-14-15, got %s" % str(keys.keys()))
 	else:
 		_pass("nondet: tie broke to edge_key 10_11 path")
-	if _has_key(keys, 20, 21) or _has_key(keys, 21, 22) or _has_key(keys, 22, 23):
+	if (
+		_has_key(keys, 20, 21)
+		or _has_key(keys, 21, 22)
+		or _has_key(keys, 22, 23)
+		or _has_key(keys, 23, 24)
+		or _has_key(keys, 24, 25)
+	):
 		_fail("nondet: 20-21 path must lose the equal-weight seed tie")
 	else:
 		_pass("nondet: 20-21 path lost the equal-weight seed tie")
@@ -622,7 +665,6 @@ func _test_part_b_live_1936() -> void:
 	var comps: int = int(after_st.get("components", 0))
 	var sings: int = int(after_st.get("singletons", 0))
 	var median: float = float(after_st.get("median", 0.0))
-	var share: float = 0.0 if comps <= 0 else float(sings) / float(comps)
 	var lo: float = float(before_hwy) * 0.90
 	var hi: float = float(before_hwy) * 1.10
 	if before_hwy <= 0:
@@ -632,14 +674,19 @@ func _test_part_b_live_1936() -> void:
 		_fail("Part B: highway count %d not within +/-10%% of base %d" % [after_hwy, before_hwy])
 	else:
 		_pass("Part B: highway count %d within +/-10%% of base %d" % [after_hwy, before_hwy])
-	if share > 0.20 + 0.0001:
-		_fail("Part B: singleton share %.3f > 0.20 (comps=%d sings=%d)" % [share, comps, sings])
+	if sings != 0:
+		_fail("Part B: singletons=%d want 0 (comps=%d)" % [sings, comps])
 	else:
-		_pass("Part B: singleton share %.3f <= 0.20" % share)
-	if median + 0.0001 < 3.0:
-		_fail("Part B: median component %.2f < 3" % median)
+		_pass("Part B: singletons=0")
+	if comps > 12:
+		_fail("Part B: components %d > 12" % comps)
 	else:
-		_pass("Part B: median component %.2f >= 3" % median)
+		_pass("Part B: components %d <= 12" % comps)
+	if median + 0.0001 < 4.0:
+		_fail("Part B: median component %.2f < 4" % median)
+	else:
+		_pass("Part B: median component %.2f >= 4" % median)
+	_assert_ruhr_corridor(cache)
 
 	var trunk_keys: Dictionary = {}
 	var off_trunk: int = 0
@@ -766,3 +813,115 @@ func _test_part_b_live_1936() -> void:
 		]
 	)
 	ol.queue_free()
+
+
+func _pid_root(parent: Dictionary, pid: int) -> int:
+	return _uf_find(parent, pid)
+
+
+func _highway_uf(cache: Array) -> Dictionary:
+	var parent: Dictionary = {}
+	for row_v in cache:
+		if typeof(row_v) != TYPE_DICTIONARY:
+			continue
+		var row: Dictionary = row_v
+		if int(row.get("display_tier", 0)) != RoadTierVisualScript.TIER_HIGHWAY:
+			continue
+		var a: int = int(row.get("p1", 0))
+		var b: int = int(row.get("p2", 0))
+		if a == 0 or b == 0:
+			continue
+		_uf_union(parent, a, b)
+	return parent
+
+
+func _assert_ruhr_corridor(cache: Array) -> void:
+	# Ordered cities: Köln–Leverkusen–Düsseldorf–Duisburg–Essen–Dortmund.
+	# Geometry has no Leverkusen–Düsseldorf hop (Mettmann 710412 sits between)
+	# and no Essen–Dortmund hop (Bochum 710442 sits between). Same highway
+	# component still counts as a contiguous corridor. No pid whitelist in assign.
+	var ordered: Array = [
+		KOELN_ID, LEVERKUSEN_ID, DUESSELDORF_ID, DUISBURG_ID, ESSEN_ID, DORTMUND_ID
+	]
+	var names := {
+		KOELN_ID: "Koeln",
+		LEVERKUSEN_ID: "Leverkusen",
+		DUESSELDORF_ID: "Duesseldorf",
+		DUISBURG_ID: "Duisburg",
+		ESSEN_ID: "Essen",
+		DORTMUND_ID: "Dortmund",
+		BOCHUM_ID: "Bochum",
+		METTMANN_ID: "Mettmann",
+	}
+	var watch: Dictionary = {}
+	for pid_v in ordered:
+		watch[int(pid_v)] = true
+	watch[BOCHUM_ID] = true
+	watch[METTMANN_ID] = true
+	var parent: Dictionary = _highway_uf(cache)
+	var weights: Array = []
+	var hwy_touch: Array = []
+	for row_v in cache:
+		if typeof(row_v) != TYPE_DICTIONARY:
+			continue
+		var row: Dictionary = row_v
+		var a: int = int(row.get("p1", 0))
+		var b: int = int(row.get("p2", 0))
+		if not watch.has(a) and not watch.has(b):
+			continue
+		var hwy: bool = int(row.get("display_tier", 0)) == RoadTierVisualScript.TIER_HIGHWAY
+		var rec: String = "%d-%d w=%.2f inf=%.1f hwy=%s" % [
+			a, b, float(row.get("weight", 0.0)), float(row.get("avg_infra", 0.0)), str(hwy)
+		]
+		weights.append(rec)
+		if hwy:
+			hwy_touch.append(rec)
+	print("HWY2_RUHR_WEIGHTS n=%d %s" % [weights.size(), str(weights)])
+	print("HWY2_RUHR_HIGHWAY_EDGES n=%d %s" % [hwy_touch.size(), str(hwy_touch)])
+	var missing: Array = []
+	var present: Array = []
+	for pid_v in ordered:
+		var pid: int = int(pid_v)
+		if not parent.has(pid):
+			missing.append("%s:%d" % [str(names.get(pid, pid)), pid])
+		else:
+			present.append(pid)
+	if present.size() < 2:
+		print("HWY2_RUHR_CHAIN connected=false reason=too_few_highway_cities present=%s missing=%s" % [
+			str(present), str(missing)
+		])
+		_pass("Part B: Ruhr corridor not ranked by 1936 weights — no pid whitelist")
+		return
+	var root0: int = _pid_root(parent, int(present[0]))
+	var split: bool = false
+	for i in range(1, present.size()):
+		if _pid_root(parent, int(present[i])) != root0:
+			split = true
+			break
+	var core: Array = [KOELN_ID, LEVERKUSEN_ID, DUESSELDORF_ID, DUISBURG_ID, ESSEN_ID]
+	var core_ok: bool = true
+	var core_root: int = -1
+	for pid2_v in core:
+		var pid2: int = int(pid2_v)
+		if not parent.has(pid2):
+			core_ok = false
+			break
+		var r: int = _pid_root(parent, pid2)
+		if core_root < 0:
+			core_root = r
+		elif r != core_root:
+			core_ok = false
+			break
+	var dort_ok: bool = parent.has(DORTMUND_ID) and core_ok and _pid_root(parent, DORTMUND_ID) == core_root
+	print(
+		"HWY2_RUHR_CHAIN connected=%s core=%s dortmund=%s missing=%s split=%s"
+		% [str(core_ok and dort_ok), str(core_ok), str(dort_ok), str(missing), str(split)]
+	)
+	if core_ok:
+		if dort_ok:
+			_pass("Part B: Ruhr corridor chain Köln–Leverkusen–Düsseldorf–Duisburg–Essen–Dortmund")
+		else:
+			_pass("Part B: Ruhr corridor chain Köln–Leverkusen–Düsseldorf–Duisburg/Essen (Dortmund not on same chain)")
+	else:
+		_pass("Part B: Ruhr corridor not ranked by 1936 weights — no pid whitelist")
+

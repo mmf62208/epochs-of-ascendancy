@@ -14,13 +14,17 @@ const TIER_HIGHWAY := 2
 const DIRT_SCREEN_PX := 2.6
 const PAVED_SCREEN_PX := 4.0
 const PAVED_EDGE_SCREEN_PX := 1.2
-## Mid/close: casing must read wider than paved (~5.2) and thinner than gold (16).
+## Mid: casing 12 (paved+2 at default is 6; 12 reads over red fills, gold mid 28 is ≥1.8×).
+## Close: casing 16 (dark outline vs fills; gold close stays 16/20 halo).
+## Far: casing 9 so Europe/Home still shows a corridor, not a 5 px hairline.
 const HIGHWAY_SCREEN_PX := 8.0
 const HIGHWAY_CASING_SCREEN_PX := 12.0
+const HIGHWAY_CLOSE_CASING_SCREEN_PX := 16.0
+const HIGHWAY_CLOSE_CORE_SCREEN_PX := 12.0
 const HIGHWAY_STRIPE_SCREEN_PX := 3.2
 ## Europe/Home only: keep the rare trunk visible without a continent carpet.
-const HIGHWAY_FAR_CASING_SCREEN_PX := 5.5
-const HIGHWAY_FAR_CORE_SCREEN_PX := 3.2
+const HIGHWAY_FAR_CASING_SCREEN_PX := 9.0
+const HIGHWAY_FAR_CORE_SCREEN_PX := 5.5
 const DIRT_DASH_SCREEN_PX := 9.0
 const DIRT_GAP_SCREEN_PX := 6.0
 
@@ -52,6 +56,13 @@ const TRUNK_HUB_FRAC := 0.08
 const HIGHWAY_RARE_FRAC := 0.04
 const HIGHWAY_RARE_RANK := 0.96
 const PAVED_RANK_FLOOR := 0.51
+## HWY-2 corridors: grow past the HWY-1 3-stub cap. Min 3 keeps Part A stars;
+## max 6 targets a live median of 4–6 and ≤12 components at the same ~4% budget.
+const HWY1_CHAIN_MIN := 3
+const HWY1_CHAIN_MAX := 6
+## Continuation along a seeded chain may use typical trunk weights (NUTS3 ~10.1)
+## so a corridor can walk off a heavy hub. Dirt tails (weight ~2) stay out.
+const HWY1_GROW_WEIGHT_FLOOR := 7.0
 
 ## Fallback when the board has no usable shared-border set.
 ## Tuned on the Rhineland: Bonn–Köln 7.86 and Köln–Leverkusen 3.15 pass;
@@ -146,7 +157,12 @@ static func screen_width_for_tier(tier: int, lod_band: int) -> float:
 		TIER_PAVED:
 			w = PAVED_SCREEN_PX
 		TIER_HIGHWAY:
-			w = HIGHWAY_CASING_SCREEN_PX if lod_band >= 1 else HIGHWAY_FAR_CASING_SCREEN_PX
+			if lod_band <= 0:
+				w = HIGHWAY_FAR_CASING_SCREEN_PX
+			elif lod_band >= 2:
+				w = HIGHWAY_CLOSE_CASING_SCREEN_PX
+			else:
+				w = HIGHWAY_CASING_SCREEN_PX
 		_:
 			w = DIRT_SCREEN_PX
 	return w
@@ -648,6 +664,22 @@ static func _hwy1_absorb_explicit_idx(
 				grew = true
 
 
+static func _hwy1_grow_ok(
+	cache: Array,
+	ei: int,
+	explicit_flags: PackedByteArray,
+	rank_at: PackedFloat32Array,
+) -> bool:
+	if ei < 0 or ei >= cache.size():
+		return false
+	if explicit_flags[ei] == 1:
+		return true
+	if rank_at[ei] + 0.0001 >= PAVED_RANK_FLOOR:
+		return true
+	var row: Dictionary = cache[ei]
+	return float(row.get("weight", 0.0)) + 0.0001 >= HWY1_GROW_WEIGHT_FLOOR
+
+
 static func _hwy1_heaviest_nbr_idx(
 	cache: Array,
 	pids: PackedInt32Array,
@@ -656,10 +688,15 @@ static func _hwy1_heaviest_nbr_idx(
 	picked: PackedByteArray,
 	explicit_flags: PackedByteArray,
 	rank_at: PackedFloat32Array,
+	deg: Dictionary,
+	endpoints_only: bool,
 ) -> int:
 	var best_i: int = -1
 	for pi in range(pids.size()):
-		var list_v: Variant = by_pid.get(pids[pi], [])
+		var pid: int = pids[pi]
+		if endpoints_only and int(deg.get(pid, 0)) != 1:
+			continue
+		var list_v: Variant = by_pid.get(pid, [])
 		if typeof(list_v) != TYPE_ARRAY:
 			continue
 		var list: Array = list_v
@@ -667,13 +704,17 @@ static func _hwy1_heaviest_nbr_idx(
 			var ei: int = int(list[j])
 			if in_chain.has(ei) or picked[ei] == 1:
 				continue
+			if not _hwy1_grow_ok(cache, ei, explicit_flags, rank_at):
+				continue
 			if best_i < 0 or _hwy1_idx_more(cache, ei, best_i):
 				best_i = ei
-	if best_i < 0:
-		return -1
-	if explicit_flags[best_i] != 1 and rank_at[best_i] < PAVED_RANK_FLOOR:
-		return -1
 	return best_i
+
+
+static func _hwy1_bump_deg(deg: Dictionary, pid: int) -> void:
+	if pid == 0:
+		return
+	deg[pid] = int(deg.get(pid, 0)) + 1
 
 
 static func _hwy1_grow_chain_idx(
@@ -690,23 +731,45 @@ static func _hwy1_grow_chain_idx(
 	in_chain[seed_i] = true
 	var seed_row: Dictionary = cache[seed_i]
 	var pids: PackedInt32Array = PackedInt32Array()
-	_hwy1_add_pid(pids, int(seed_row.get("p1", 0)))
-	_hwy1_add_pid(pids, int(seed_row.get("p2", 0)))
+	var deg: Dictionary = {}
+	var a0: int = int(seed_row.get("p1", 0))
+	var b0: int = int(seed_row.get("p2", 0))
+	_hwy1_add_pid(pids, a0)
+	_hwy1_add_pid(pids, b0)
+	_hwy1_bump_deg(deg, a0)
+	_hwy1_bump_deg(deg, b0)
 	if has_explicit:
+		var before: int = chain.size()
 		_hwy1_absorb_explicit_idx(cache, chain, in_chain, pids, by_pid, explicit_flags)
-	while chain.size() < 3:
+		for ci in range(before, chain.size()):
+			var er: Dictionary = cache[int(chain[ci])]
+			_hwy1_bump_deg(deg, int(er.get("p1", 0)))
+			_hwy1_bump_deg(deg, int(er.get("p2", 0)))
+	while chain.size() < HWY1_CHAIN_MAX:
+		# Below min length: blob (star spokes). At min+: endpoints only so a
+		# heavy hub walks a corridor instead of spending the budget on spokes.
+		var endpoints_only: bool = chain.size() >= HWY1_CHAIN_MIN
 		var nxt: int = _hwy1_heaviest_nbr_idx(
-			cache, pids, by_pid, in_chain, picked, explicit_flags, rank_at
+			cache, pids, by_pid, in_chain, picked, explicit_flags, rank_at, deg, endpoints_only
 		)
 		if nxt < 0:
 			break
 		chain.append(nxt)
 		in_chain[nxt] = true
 		var nxt_row: Dictionary = cache[nxt]
-		_hwy1_add_pid(pids, int(nxt_row.get("p1", 0)))
-		_hwy1_add_pid(pids, int(nxt_row.get("p2", 0)))
+		var na: int = int(nxt_row.get("p1", 0))
+		var nb: int = int(nxt_row.get("p2", 0))
+		_hwy1_add_pid(pids, na)
+		_hwy1_add_pid(pids, nb)
+		_hwy1_bump_deg(deg, na)
+		_hwy1_bump_deg(deg, nb)
 		if has_explicit:
+			var before2: int = chain.size()
 			_hwy1_absorb_explicit_idx(cache, chain, in_chain, pids, by_pid, explicit_flags)
+			for ci2 in range(before2, chain.size()):
+				var er2: Dictionary = cache[int(chain[ci2])]
+				_hwy1_bump_deg(deg, int(er2.get("p1", 0)))
+				_hwy1_bump_deg(deg, int(er2.get("p2", 0)))
 	return chain
 
 
@@ -756,7 +819,7 @@ static func _hwy1_pick_highway_chains(
 	if seeds.is_empty():
 		seeds = inferred
 	var used: int = 0
-	var seed_cap: int = mini(seeds.size(), maxi(budget * 2, 16))
+	var seed_cap: int = mini(seeds.size(), maxi(budget * 4, 16))
 	var seed_i: int = 0
 	for seed_v in seeds:
 		if used >= budget:
@@ -773,22 +836,74 @@ static func _hwy1_pick_highway_chains(
 		var chain: Array = _hwy1_grow_chain_idx(
 			cache, si, picked, by_pid, explicit_flags, rank_at, has_explicit
 		)
-		if chain.size() < 3:
+		if chain.size() < HWY1_CHAIN_MIN:
 			continue
 		var inferred_n: int = 0
 		for ci in range(chain.size()):
 			if explicit_flags[int(chain[ci])] != 1:
 				inferred_n += 1
-		if inferred_n <= 0 or inferred_n > (budget - used):
+		var room: int = budget - used
+		if inferred_n <= 0:
 			continue
+		var take_n: int = inferred_n
+		if take_n > room:
+			if room < HWY1_CHAIN_MIN:
+				continue
+			take_n = room
+		var taken: int = 0
 		for ci2 in range(chain.size()):
 			var ei2: int = int(chain[ci2])
 			picked[ei2] = 1
 			if explicit_flags[ei2] == 1:
 				continue
+			if taken >= take_n:
+				picked[ei2] = 0
+				continue
 			var ch2: Dictionary = cache[ei2]
 			ch2["display_tier"] = TIER_HIGHWAY
 			used += 1
+			taken += 1
+	# Leftover budget extends already-picked corridor endpoints (not new stubs).
+	if used < budget:
+		_hwy1_extend_picked(cache, picked, by_pid, explicit_flags, rank_at, budget, used)
+
+
+static func _hwy1_extend_picked(
+	cache: Array,
+	picked: PackedByteArray,
+	by_pid: Dictionary,
+	explicit_flags: PackedByteArray,
+	rank_at: PackedFloat32Array,
+	budget: int,
+	used_in: int,
+) -> void:
+	var used: int = used_in
+	while used < budget:
+		var deg: Dictionary = {}
+		var pids: PackedInt32Array = PackedInt32Array()
+		var in_chain: Dictionary = {}
+		for i in range(cache.size()):
+			if picked[i] != 1:
+				continue
+			in_chain[i] = true
+			var row: Dictionary = cache[i]
+			var a: int = int(row.get("p1", 0))
+			var b: int = int(row.get("p2", 0))
+			_hwy1_add_pid(pids, a)
+			_hwy1_add_pid(pids, b)
+			_hwy1_bump_deg(deg, a)
+			_hwy1_bump_deg(deg, b)
+		var nxt: int = _hwy1_heaviest_nbr_idx(
+			cache, pids, by_pid, in_chain, picked, explicit_flags, rank_at, deg, true
+		)
+		if nxt < 0:
+			break
+		picked[nxt] = 1
+		if explicit_flags[nxt] == 1:
+			continue
+		var row2: Dictionary = cache[nxt]
+		row2["display_tier"] = TIER_HIGHWAY
+		used += 1
 
 
 ## HWY-1 log / bars: connected components of highway edges (size = edge count).

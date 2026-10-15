@@ -219,12 +219,11 @@ func _capture_matrix_band(band: String, zoom: float) -> void:
 		_dismiss_inspector_tooltip()
 		var kind := str(s["kind"])
 		var crop := _capture("rt1_%s_%s" % [band, kind])
-		var pair: Vector2i = _resolve_sample_pair(kind, int(s["a"]), int(s["b"]))
+		var pair: Vector2i = Vector2i(int(s["a"]), int(s["b"]))
+		if kind != "highway":
+			pair = _resolve_sample_pair(kind, int(s["a"]), int(s["b"]))
 		var meas: Dictionary = _measure_edge(crop, pair.x, pair.y, kind)
-		if kind == "highway" and float(meas.get("width_px", 0.0)) + 0.01 < 8.0:
-			var alt: Dictionary = _measure_best_highway(crop, pair, meas)
-			pair = alt.get("pair", pair)
-			meas = alt.get("meas", meas)
+		# HWY-2: fixed sample pair. Under 8 px must fail — do not re-pick.
 		_width_hits["%s_%s" % [kind, band]] = meas
 		_log("EOA_RT1_PIXEL_GUARD who=guard.sample kind=%s zoom=%s pair=%d-%d w=%.2f sig=%s" % [
 			kind, band, pair.x, pair.y, float(meas.get("width_px", 0.0)), str(meas.get("sig", ""))
@@ -277,54 +276,6 @@ func _resolve_sample_pair(kind: String, fallback_a: int, fallback_b: int) -> Vec
 	return Vector2i(fallback_a, fallback_b)
 
 
-func _measure_best_highway(crop: Image, fallback: Vector2i, fallback_meas: Dictionary) -> Dictionary:
-	var out := {"pair": fallback, "meas": fallback_meas}
-	var best_w := float(fallback_meas.get("width_px", 0.0))
-	var ol := _overlay()
-	if ol == null or not ol.has_method("get_road_tier_cache"):
-		return out
-	var cache: Array = ol.call("get_road_tier_cache")
-	var koln := _koln_world()
-	var ranked: Array = []
-	for row_v in cache:
-		if typeof(row_v) != TYPE_DICTIONARY:
-			continue
-		var row: Dictionary = row_v
-		if bool(row.get("explicit", false)):
-			continue
-		if int(row.get("display_tier", row.get("tier", -1))) != 2:
-			continue
-		var a := int(row.get("p1", 0))
-		var b := int(row.get("p2", 0))
-		if a == KOELN or b == KOELN or a == BONN or b == BONN or a == LEV or b == LEV:
-			continue
-		var c1: Vector2 = row.get("c1", Vector2.ZERO)
-		var c2: Vector2 = row.get("c2", Vector2.ZERO)
-		var mid: Vector2 = c1.lerp(c2, 0.5)
-		if _world_mid_under_visible_control(mid):
-			continue
-		ranked.append({"a": a, "b": b, "d": mid.distance_to(koln)})
-	ranked.sort_custom(_hwy_cand_closer)
-	var n_try: int = mini(ranked.size(), 8)
-	for i in range(n_try):
-		var cand: Dictionary = ranked[i]
-		var pair := Vector2i(int(cand["a"]), int(cand["b"]))
-		if pair == fallback or Vector2i(pair.y, pair.x) == fallback:
-			continue
-		var meas: Dictionary = _measure_edge(crop, pair.x, pair.y, "highway")
-		var w := float(meas.get("width_px", 0.0))
-		if w > best_w:
-			best_w = w
-			out = {"pair": pair, "meas": meas}
-		if best_w + 0.01 >= 8.0:
-			break
-	return out
-
-
-func _hwy_cand_closer(a: Dictionary, b: Dictionary) -> bool:
-	return float(a.get("d", 0.0)) < float(b.get("d", 0.0))
-
-
 func _do_soft() -> void:
 	_phase = Phase.DONE
 	_frame_over_koln(MID_ZOOM, false)
@@ -375,6 +326,7 @@ func _judge_widths() -> void:
 	var bands: PackedStringArray = PackedStringArray(["far", "default", "close"])
 	var kinds: PackedStringArray = PackedStringArray(["dirt", "paved", "highway"])
 	var targets := {"dirt": 2.6, "paved": 4.0, "highway": 12.0}
+	var hwy_min := {"far": 9.0, "default": 12.0, "close": 16.0}
 	for kind in kinds:
 		var sigs: PackedStringArray = PackedStringArray()
 		for band in bands:
@@ -389,12 +341,18 @@ func _judge_widths() -> void:
 			if kind == "dirt":
 				tol += 8.0
 			# Europe/Home cull: dirt never draws at far/default. Paved hidden at far.
-			# Far inferred highways are rare and often off the Köln frame.
-			var culled := (kind == "dirt" and band != "close") or (kind == "paved" and band == "far") or (kind == "highway" and band == "far")
+			# Highway is measured on the FIXED pair at every zoom (no skip, no re-pick).
+			var culled := (kind == "dirt" and band != "close") or (kind == "paved" and band == "far")
 			if culled:
 				_log("EOA_RT1_PIXEL_GUARD who=guard.skip_cull kind=%s band=%s w=%.2f" % [kind, band, w])
 				continue
-			if w <= 0.15:
+			if kind == "highway":
+				var need := float(hwy_min[band])
+				if w + 0.01 < 8.0:
+					_fail_reasons.append("width_highway_%s_under8_%.2f" % [band, w])
+				elif w + 0.01 < need:
+					_fail_reasons.append("width_highway_%s_%.2f_need_%.0f" % [band, w, need])
+			elif w <= 0.15:
 				_fail_reasons.append("width_%s_%s_zero" % [kind, band])
 			elif w + 0.01 < tgt - tol:
 				_fail_reasons.append("width_%s_%s_%.2f" % [kind, band, w])

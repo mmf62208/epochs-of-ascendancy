@@ -108,7 +108,7 @@ const GOLD_SPINE_Z := 23
 const ROAD_EXPLICIT_SCREEN_PX := 7.0
 const ROAD_INFERRED_SCREEN_PX := 4.0
 ## Non-AA filled quads. Close/far stay 16/20 (Play PASS). Mid only is 28/34
-## so on-screen gold ≥ 1.8× the 12 px highway casing.
+## so on-screen gold ≥ 1.8× the mid 12 px highway casing (close gold 16/20; close highway casing 16).
 const GOLD_SPINE_SCREEN_PX := 16.0
 const GOLD_SPINE_HALO_SCREEN_PX := 20.0
 const GOLD_SPINE_MID_SCREEN_PX := 28.0
@@ -2672,14 +2672,15 @@ class RoadTierDraw extends Node2D:
         ## Non-AA quads so the player-seen width matches HIGHWAY_*_SCREEN_PX.
         ## Never antialiased draw_line (IX-1 windowed OOM).
         var far: bool = _lod <= 0
-        var case_px: float = (
-            RoadTierVisualScript.HIGHWAY_FAR_CASING_SCREEN_PX if far
-            else RoadTierVisualScript.HIGHWAY_CASING_SCREEN_PX
-        )
-        var core_px: float = (
-            RoadTierVisualScript.HIGHWAY_FAR_CORE_SCREEN_PX if far
-            else RoadTierVisualScript.HIGHWAY_SCREEN_PX
-        )
+        var close: bool = _lod >= 2
+        var case_px: float = RoadTierVisualScript.HIGHWAY_CASING_SCREEN_PX
+        var core_px: float = RoadTierVisualScript.HIGHWAY_SCREEN_PX
+        if far:
+            case_px = RoadTierVisualScript.HIGHWAY_FAR_CASING_SCREEN_PX
+            core_px = RoadTierVisualScript.HIGHWAY_FAR_CORE_SCREEN_PX
+        elif close:
+            case_px = RoadTierVisualScript.HIGHWAY_CLOSE_CASING_SCREEN_PX
+            core_px = RoadTierVisualScript.HIGHWAY_CLOSE_CORE_SCREEN_PX
         var case_w := _world_width(case_px)
         var core_w := _world_width(core_px)
         var stripe_w := _world_width(RoadTierVisualScript.HIGHWAY_STRIPE_SCREEN_PX)

@@ -253,9 +253,17 @@ func _test_trunk_sparsifier() -> void:
 			vis_src = vf.get_as_text()
 			vf.close()
 	if "HIGHWAY_CASING_SCREEN_PX := 12.0" not in vis_src:
-		_fail("highway casing must be 12 px (wider than paved, thinner than gold)")
+		_fail("mid highway casing must be 12 px (wider than paved, thinner than mid gold 28)")
 	else:
-		_pass("highway casing 12 px")
+		_pass("mid highway casing 12 px")
+	if "HIGHWAY_FAR_CASING_SCREEN_PX := 9.0" not in vis_src:
+		_fail("far highway casing must be 9 px")
+	else:
+		_pass("far highway casing 9 px")
+	if "HIGHWAY_CLOSE_CASING_SCREEN_PX := 16.0" not in vis_src:
+		_fail("close highway casing must be 16 px")
+	else:
+		_pass("close highway casing 16 px")
 	if "_draw_road_quad" not in ol_src:
 		_fail("highways must use non-AA filled quads")
 	else:
