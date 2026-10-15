@@ -204,6 +204,21 @@ func _boot_live_1936() -> bool:
 			str(ends),
 		]
 	)
+	print("HWY3_FAILED_TRUNKS %s" % str(dbg.get("failed_trunks", [])))
+	print("HWY3_FAILED_SPANS %s" % str(dbg.get("failed_spans", [])))
+	print("HWY3_SPANS %s" % str(dbg.get("spans", [])))
+	print("HWY3_PERI %s" % str(dbg.get("peri", [])))
+	print("HWY3_TRUNKS %s" % str(dbg.get("trunks", [])))
+	print("HWY3_SECOND %s" % str(dbg.get("second_by_tag", {})))
+	var ger_nm: Array = []
+	for hg_v in dbg.get("hubs", []):
+		if typeof(hg_v) != TYPE_DICTIONARY:
+			continue
+		var hg: Dictionary = hg_v
+		if str(hg.get("tag", "")).to_upper() != "GER":
+			continue
+		ger_nm.append("%s:%d" % [str(hg.get("city_name", hg.get("name", ""))), int(hg.get("pid", 0))])
+	print("HWY3_GER_HUBS %s" % str(ger_nm))
 	return true
 
 
@@ -851,12 +866,11 @@ func _test_h4_major_trunks() -> void:
 		if cap_pid <= 0 and not rows.is_empty():
 			cap_pid = int((rows[0] as Dictionary).get("pid", 0))
 		var second: int = 0
-		for h3_v in rows:
-			var h3: Dictionary = h3_v
-			var hp: int = int(h3.get("pid", 0))
-			if hp != cap_pid:
-				second = hp
-				break
+		var second_map_v: Variant = _debug().get("second_by_tag", {})
+		if typeof(second_map_v) == TYPE_DICTIONARY:
+			var second_map: Dictionary = second_map_v
+			if second_map.has(tag):
+				second = int(second_map.get(tag, 0))
 		if cap_pid <= 0 or second <= 0:
 			missed.append("%s:no_second" % tag)
 			continue

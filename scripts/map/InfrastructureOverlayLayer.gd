@@ -570,6 +570,7 @@ func _rebuild_road_layer_inner() -> void:
         return
 
     var era: Dictionary = _get_era_infra_profile()
+    _ensure_hwy3_layers()
     _ensure_road_shared_border_keys(provinces)
 
     var supply_on := false
@@ -580,9 +581,15 @@ func _rebuild_road_layer_inner() -> void:
         supply_on = true
 
     var cache: Array[Dictionary] = []
+    var graph_rows: Array = []
     var drawn := {}
-    for pid in provinces:
-        var p: Province = provinces[pid]
+    var walk: Dictionary = provinces
+    if map_manager.has_method("get_all_provinces"):
+        var all_land: Dictionary = map_manager.get_all_provinces()
+        if not all_land.is_empty():
+            walk = all_land
+    for pid in walk:
+        var p: Province = walk[pid]
         if p == null or p.is_sea:
             continue
         var neighbors = adjacency.get_land_neighbors(pid)
@@ -590,13 +597,13 @@ func _rebuild_road_layer_inner() -> void:
         if c1 == Vector2.ZERO:
             c1 = p.coordinates
         for nid in neighbors:
-            if not provinces.has(nid):
+            if not walk.has(nid):
                 continue
             var key := RoadTierVisualScript.edge_key(int(pid), int(nid))
             if drawn.has(key):
                 continue
             drawn[key] = true
-            var n: Province = provinces.get(nid)
+            var n: Province = walk.get(nid)
             if n == null or n.is_sea:
                 continue
             var has_explicit: bool = (nid in p.built_road_neighbors) or (pid in (n.built_road_neighbors if n else []))
@@ -604,15 +611,13 @@ func _rebuild_road_layer_inner() -> void:
             var c2: Vector2 = map_manager.get_province_centroid(nid)
             if c2 == Vector2.ZERO:
                 c2 = n.coordinates
-            if not has_explicit:
-                if not _road_edge_passes_filter(int(pid), int(nid), c1, c2):
-                    continue
-                # Political map shows NUTS3 intact tiers; Infra mode keeps extras elsewhere.
-                # Non-NUTS3 inferred edges stay Infra-only (no world carpet).
-                if not show_roads and not RoadTierVisualScript.is_nuts3_pid(int(pid)):
-                    continue
-                if not show_roads and not RoadTierVisualScript.is_nuts3_pid(int(nid)):
-                    continue
+            var nuts_paint: bool = (
+                show_roads
+                or (
+                    RoadTierVisualScript.is_nuts3_pid(int(pid))
+                    and RoadTierVisualScript.is_nuts3_pid(int(nid))
+                )
+            )
             var on_corridor := _edge_on_supply_corridor(int(pid), int(nid), mr)
             if supply_on and not on_corridor:
                 continue
@@ -637,17 +642,41 @@ func _rebuild_road_layer_inner() -> void:
                 "w1": w1,
                 "w2": w2,
             }
-            cache.append(entry)
-            if supply_on and on_corridor:
-                _add_supply_corridor_line(c1, c2, int(pid), int(nid))
-            if has_explicit:
-                _add_explicit_lookup_line(c1, c2, int(pid), int(nid), tier, on_corridor)
+            # Routing: NUTS–NUTS still sanity-filtered (no fake long hops). RoW/US
+            # land adjacencies are included so major trunks can leave Europe.
+            # Political paint stays NUTS3 + explicit — no world carpet.
+            var route_ok: bool = true
+            if nuts_paint and not has_explicit:
+                route_ok = _road_edge_passes_filter(int(pid), int(nid), c1, c2)
+                if not route_ok and (_hwy3_pid_is_city_hub(int(pid)) or _hwy3_pid_is_city_hub(int(nid))):
+                    route_ok = true
+            if route_ok:
+                graph_rows.append(entry.duplicate())
+            var paint_ok: bool = has_explicit or nuts_paint
+            if paint_ok and not has_explicit:
+                paint_ok = _road_edge_passes_filter(int(pid), int(nid), c1, c2)
+            if paint_ok:
+                cache.append(entry)
+                if supply_on and on_corridor:
+                    _add_supply_corridor_line(c1, c2, int(pid), int(nid))
+                if has_explicit:
+                    _add_explicit_lookup_line(c1, c2, int(pid), int(nid), tier, on_corridor)
     _paint_explicit_ix1_spine_if_missing(provinces, drawn, cache)
     _road_candidate_count = cache.size()
-    var graph_rows: Array = []
+    var seen_graph: Dictionary = {}
+    for g_v in graph_rows:
+        if typeof(g_v) == TYPE_DICTIONARY:
+            var g_row: Dictionary = g_v
+            seen_graph[RoadTierVisualScript.edge_key(int(g_row.get("p1", 0)), int(g_row.get("p2", 0)))] = true
     for cand_v in cache:
-        if typeof(cand_v) == TYPE_DICTIONARY:
-            graph_rows.append((cand_v as Dictionary).duplicate())
+        if typeof(cand_v) != TYPE_DICTIONARY:
+            continue
+        var cand_row: Dictionary = cand_v
+        var ck: String = RoadTierVisualScript.edge_key(int(cand_row.get("p1", 0)), int(cand_row.get("p2", 0)))
+        if seen_graph.has(ck):
+            continue
+        graph_rows.append(cand_row.duplicate())
+        seen_graph[ck] = true
     var trunk: Array = RoadTierVisualScript.select_trunk_edges(cache)
     cache.clear()
     for trunk_v in trunk:
@@ -1544,6 +1573,20 @@ func get_hwy3_debug() -> Dictionary:
 
 func get_hwy3_graph_rows() -> Array:
     return _hwy3_graph_rows
+
+
+func _hwy3_pid_is_city_hub(pid: int) -> bool:
+    if pid <= 0:
+        return false
+    var city_v: Variant = _hwy3_city_layer.get(str(pid), {})
+    if typeof(city_v) != TYPE_DICTIONARY:
+        return false
+    var city: Dictionary = city_v
+    if bool(city.get("hub", false)) or bool(city.get("is_capital", false)) or bool(city.get("capital", false)):
+        return true
+    if int(city.get("tier", 0)) >= 3:
+        return true
+    return false
 
 
 func _ensure_hwy3_layers() -> void:

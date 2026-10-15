@@ -83,13 +83,18 @@ const HWY3_MIN_PATH_EDGES := 2
 ## Urban agglomeration span (world units, ~NUTS3 hops). No pid whitelist.
 const HWY3_URBAN_SPAN_MIN := 8.0
 const HWY3_URBAN_SPAN_MAX := 28.0
+const HWY3_URBAN_CLUSTER_R := 20.0
 ## Near-parallel drop: partial cover of sampled length within this distance.
-const HWY3_PARALLEL_HAUSDORFF := 8.0
+const HWY3_PARALLEL_HAUSDORFF := 12.0
 const HWY3_PARALLEL_END := 18.0
-const HWY3_PARALLEL_COVER := 0.5
+const HWY3_PARALLEL_COVER := 0.45
+const HWY3_TRUNK_MAX_DIST := 400.0
+const HWY3_TRUNK_MIN_DIST := 32.0
+const HWY3_COVER_RESERVE := 24
 const HWY3_KIND_TRUNK := 2
 const HWY3_KIND_SPAN := 1
 const HWY3_KIND_OTHER := 0
+const HWY3_MAJOR_TAGS := ["GER", "FRA", "ITA", "POL", "ENG", "USA", "JAP", "SOV"]
 ## Last hub-route rebuild (tests / overlay logs). Not gameplay state.
 static var last_hwy3_debug: Dictionary = {}
 
@@ -1145,8 +1150,191 @@ static func select_display_hubs(records: Array, use_urban: bool) -> Array:
 					continue
 				hubs.append(su)
 				kept_pids[spid] = true
+		var cap_keep: int = _hwy3_capital_hub_pid(lst2)
+		var second_keep: int = _hwy3_second_hub_pid(lst2, cap_keep)
+		if second_keep > 0 and not kept_pids.has(second_keep) and land_n >= 80:
+			for rec5_v in lst2:
+				if typeof(rec5_v) != TYPE_DICTIONARY:
+					continue
+				var rec5: Dictionary = rec5_v
+				if int(rec5.get("pid", 0)) != second_keep:
+					continue
+				hubs.append(rec5)
+				kept_pids[second_keep] = true
+				break
+		var extra_spread: int = 0
+		if HWY3_MAJOR_TAGS.has(tag):
+			extra_spread = 3
+		elif land_n >= 180:
+			extra_spread = 2
+		elif land_n >= 80:
+			extra_spread = 1
+		if extra_spread > 0:
+			_hwy3_add_spread_hubs(lst2, hubs, kept_pids, extra_spread)
+		if HWY3_MAJOR_TAGS.has(tag):
+			_hwy3_add_steiner_hubs(lst2, hubs, kept_pids, 2)
+		_hwy3_mark_periphery_hub(hubs, kept_pids, cap_keep, second_keep)
 	hubs.sort_custom(_hwy3_score_pid_less)
 	return hubs
+
+
+static func _hwy3_is_spread_candidate(rec: Dictionary) -> bool:
+	if bool(rec.get("capital", false)):
+		return false
+	if bool(rec.get("city_hub", false)):
+		return true
+	if int(rec.get("tier", 0)) >= 3:
+		return true
+	return false
+
+
+static func _hwy3_add_spread_hubs(lst: Array, hubs: Array, kept_pids: Dictionary, extra: int) -> void:
+	var guard: int = 0
+	while extra > 0 and guard < 8:
+		guard += 1
+		var best_rec: Dictionary = {}
+		var best_pid: int = 0
+		var best_d: float = -1.0
+		for rec_v in lst:
+			if typeof(rec_v) != TYPE_DICTIONARY:
+				continue
+			var rec: Dictionary = rec_v
+			var pid: int = int(rec.get("pid", 0))
+			if pid <= 0 or kept_pids.has(pid):
+				continue
+			if not _hwy3_is_spread_candidate(rec):
+				continue
+			var c: Vector2 = rec.get("centroid", Vector2.ZERO)
+			var md: float = 1.0e18
+			for h_v in hubs:
+				if typeof(h_v) != TYPE_DICTIONARY:
+					continue
+				var h: Dictionary = h_v
+				if not kept_pids.has(int(h.get("pid", 0))):
+					continue
+				var d: float = c.distance_to(h.get("centroid", Vector2.ZERO))
+				if is_finite(d) and d < md:
+					md = d
+			if not is_finite(md) or md < HWY3_TRUNK_MIN_DIST:
+				continue
+			if md > best_d or (md == best_d and pid < best_pid):
+				best_d = md
+				best_pid = pid
+				best_rec = rec
+		if best_pid <= 0:
+			break
+		best_rec["periphery"] = true
+		hubs.append(best_rec)
+		kept_pids[best_pid] = true
+		extra -= 1
+
+
+static func _hwy3_add_steiner_hubs(lst: Array, hubs: Array, kept_pids: Dictionary, extra: int) -> void:
+	var guard: int = 0
+	while extra > 0 and guard < 6:
+		guard += 1
+		var kept: Array = []
+		for h_v in hubs:
+			if typeof(h_v) != TYPE_DICTIONARY:
+				continue
+			var h: Dictionary = h_v
+			if kept_pids.has(int(h.get("pid", 0))):
+				kept.append(h)
+		if kept.size() < 2:
+			break
+		var far_a: Dictionary = {}
+		var far_b: Dictionary = {}
+		var far_d: float = -1.0
+		for i in range(kept.size()):
+			var a: Dictionary = kept[i]
+			var ac: Vector2 = a.get("centroid", Vector2.ZERO)
+			for j in range(i + 1, kept.size()):
+				var b: Dictionary = kept[j]
+				var d: float = ac.distance_to(b.get("centroid", Vector2.ZERO))
+				if d > far_d:
+					far_d = d
+					far_a = a
+					far_b = b
+		if far_d < HWY3_TRUNK_MIN_DIST * 2.0:
+			break
+		var mid: Vector2 = (far_a.get("centroid", Vector2.ZERO) + far_b.get("centroid", Vector2.ZERO)) * 0.5
+		var best_rec: Dictionary = {}
+		var best_pid: int = 0
+		var best_d: float = 1.0e18
+		for rec_v in lst:
+			if typeof(rec_v) != TYPE_DICTIONARY:
+				continue
+			var rec: Dictionary = rec_v
+			var pid: int = int(rec.get("pid", 0))
+			if pid <= 0 or kept_pids.has(pid):
+				continue
+			if not _hwy3_is_spread_candidate(rec):
+				continue
+			var c: Vector2 = rec.get("centroid", Vector2.ZERO)
+			var da: float = c.distance_to(far_a.get("centroid", Vector2.ZERO))
+			var db: float = c.distance_to(far_b.get("centroid", Vector2.ZERO))
+			if da < HWY3_TRUNK_MIN_DIST or db < HWY3_TRUNK_MIN_DIST:
+				continue
+			var dm: float = c.distance_to(mid)
+			if not is_finite(dm):
+				continue
+			if dm < best_d or (dm == best_d and pid < best_pid):
+				best_d = dm
+				best_pid = pid
+				best_rec = rec
+		if best_pid <= 0:
+			break
+		hubs.append(best_rec)
+		kept_pids[best_pid] = true
+		extra -= 1
+
+
+static func _hwy3_mark_periphery_hub(
+	hubs: Array, kept_pids: Dictionary, cap_pid: int, second_pid: int = 0
+) -> void:
+	var cap_c: Vector2 = Vector2.ZERO
+	var sec_c: Vector2 = Vector2.ZERO
+	for rec_v in hubs:
+		if typeof(rec_v) != TYPE_DICTIONARY:
+			continue
+		var rec: Dictionary = rec_v
+		var pid0: int = int(rec.get("pid", 0))
+		if pid0 == cap_pid:
+			cap_c = rec.get("centroid", Vector2.ZERO)
+		if second_pid > 0 and pid0 == second_pid:
+			sec_c = rec.get("centroid", Vector2.ZERO)
+	var outlier_min: float = HWY3_TRUNK_MIN_DIST * 2.5
+	var best_pid: int = 0
+	var best_d: float = -1.0
+	for rec2_v in hubs:
+		if typeof(rec2_v) != TYPE_DICTIONARY:
+			continue
+		var rec2: Dictionary = rec2_v
+		var pid: int = int(rec2.get("pid", 0))
+		if pid <= 0 or pid == cap_pid or pid == second_pid or not kept_pids.has(pid):
+			continue
+		if not _hwy3_is_spread_candidate(rec2):
+			continue
+		var c2: Vector2 = rec2.get("centroid", Vector2.ZERO)
+		var d_cap: float = cap_c.distance_to(c2)
+		var d_sec: float = sec_c.distance_to(c2) if sec_c != Vector2.ZERO else d_cap
+		var d_near: float = minf(d_cap, d_sec)
+		if not is_finite(d_near):
+			continue
+		if d_cap > best_d:
+			best_d = d_cap
+			best_pid = pid
+		if d_near >= outlier_min:
+			rec2["periphery"] = true
+	if best_pid <= 0:
+		return
+	for rec3_v in hubs:
+		if typeof(rec3_v) != TYPE_DICTIONARY:
+			continue
+		var rec3: Dictionary = rec3_v
+		if int(rec3.get("pid", 0)) == best_pid:
+			rec3["periphery"] = true
+			break
 
 
 static func _hwy3_pair_key(a: int, b: int) -> int:
@@ -1268,6 +1456,27 @@ static func _hwy3_add_country_pairs(pairs: Dictionary, hubs: Array) -> void:
 	var span: Vector2i = _hwy3_urban_span_pair_ids(hubs)
 	if span.x > 0 and span.y > 0:
 		_hwy3_add_pair(pairs, span.x, span.y)
+		var att: Vector2i = _hwy3_urban_span_attach_ids(hubs, span)
+		if att.x > 0 and att.y > 0:
+			_hwy3_add_pair(pairs, att.x, att.y)
+	_hwy3_add_periphery_pairs(pairs, hubs)
+
+
+static func _hwy3_add_periphery_pairs(pairs: Dictionary, hubs: Array) -> void:
+	for rec_v in hubs:
+		if typeof(rec_v) != TYPE_DICTIONARY:
+			continue
+		var rec: Dictionary = rec_v
+		if not bool(rec.get("periphery", false)):
+			continue
+		var peri_pid: int = int(rec.get("pid", 0))
+		if peri_pid <= 0:
+			continue
+		var attach: int = _hwy3_nearest_city_hub(hubs, Vector2i(peri_pid, peri_pid))
+		if attach <= 0:
+			attach = _hwy3_farthest_city_hub(hubs, peri_pid)
+		if attach > 0:
+			_hwy3_add_pair(pairs, peri_pid, attach)
 
 
 static func _hwy3_capital_hub_pid(hubs: Array) -> int:
@@ -1287,7 +1496,28 @@ static func _hwy3_capital_hub_pid(hubs: Array) -> int:
 	return best
 
 
+static func _hwy3_hub_dist_ok(cap_c: Vector2, rec: Dictionary) -> bool:
+	if cap_c == Vector2.ZERO:
+		return true
+	var d: float = cap_c.distance_to(rec.get("centroid", Vector2.ZERO))
+	if not is_finite(d):
+		return false
+	if d < HWY3_TRUNK_MIN_DIST:
+		return false
+	if d > HWY3_TRUNK_MAX_DIST:
+		return false
+	return true
+
+
 static func _hwy3_second_hub_pid(hubs: Array, cap_pid: int) -> int:
+	var cap_c: Vector2 = Vector2.ZERO
+	for rec0_v in hubs:
+		if typeof(rec0_v) != TYPE_DICTIONARY:
+			continue
+		var rec0: Dictionary = rec0_v
+		if int(rec0.get("pid", 0)) == cap_pid:
+			cap_c = rec0.get("centroid", Vector2.ZERO)
+			break
 	var rows: Array = []
 	for rec_v in hubs:
 		if typeof(rec_v) != TYPE_DICTIONARY:
@@ -1297,7 +1527,143 @@ static func _hwy3_second_hub_pid(hubs: Array, cap_pid: int) -> int:
 	for rec2_v in rows:
 		var rec2: Dictionary = rec2_v
 		var pid: int = int(rec2.get("pid", 0))
-		if pid > 0 and pid != cap_pid:
+		if pid <= 0 or pid == cap_pid:
+			continue
+		if not bool(rec2.get("city_hub", false)):
+			continue
+		if not _hwy3_hub_dist_ok(cap_c, rec2):
+			continue
+		return pid
+	for rec3_v in rows:
+		var rec3: Dictionary = rec3_v
+		var pid3: int = int(rec3.get("pid", 0))
+		if pid3 <= 0 or pid3 == cap_pid:
+			continue
+		if int(rec3.get("tier", 0)) < 3:
+			continue
+		if not _hwy3_hub_dist_ok(cap_c, rec3):
+			continue
+		return pid3
+	for rec4_v in rows:
+		var rec4: Dictionary = rec4_v
+		var pid4: int = int(rec4.get("pid", 0))
+		if pid4 <= 0 or pid4 == cap_pid:
+			continue
+		if not _hwy3_hub_dist_ok(cap_c, rec4):
+			continue
+		return pid4
+	return 0
+
+
+static func _hwy3_reachable_second(hubs: Array, cap_pid: int, adj: Dictionary, attrs: Dictionary) -> int:
+	var cap_c: Vector2 = Vector2.ZERO
+	for rec0_v in hubs:
+		if typeof(rec0_v) != TYPE_DICTIONARY:
+			continue
+		var rec0: Dictionary = rec0_v
+		if int(rec0.get("pid", 0)) == cap_pid:
+			cap_c = rec0.get("centroid", Vector2.ZERO)
+			break
+	var rows: Array = []
+	for rec_v in hubs:
+		if typeof(rec_v) != TYPE_DICTIONARY:
+			continue
+		rows.append(rec_v)
+	rows.sort_custom(_hwy3_score_pid_less)
+	var tf: String = ""
+	if cap_pid > 0 and attrs.has(cap_pid):
+		var cap_rec_v: Variant = attrs.get(cap_pid, {})
+		if typeof(cap_rec_v) == TYPE_DICTIONARY:
+			tf = str((cap_rec_v as Dictionary).get("tag", "")).strip_edges().to_upper()
+	var prev: Dictionary = {}
+	if cap_pid > 0 and adj.has(cap_pid):
+		prev = _hwy3_dijkstra_prev(adj, cap_pid, tf, attrs, 0)
+	if prev.is_empty():
+		return 0
+	var found: int = _hwy3_second_from_rows(rows, cap_pid, cap_c, prev, attrs)
+	if found > 0:
+		return found
+	var extra_rows: Array = []
+	for ak in attrs.keys():
+		var ar_v: Variant = attrs.get(ak, {})
+		if typeof(ar_v) != TYPE_DICTIONARY:
+			continue
+		var ar: Dictionary = ar_v
+		if str(ar.get("tag", "")).strip_edges().to_upper() != tf:
+			continue
+		if int(ar.get("pid", 0)) == cap_pid:
+			continue
+		extra_rows.append(ar)
+	extra_rows.sort_custom(_hwy3_score_pid_less)
+	return _hwy3_second_from_rows(extra_rows, cap_pid, cap_c, prev, attrs)
+
+
+static func _hwy3_farthest_valid_second(
+	rows: Array, cap_pid: int, cap_c: Vector2, prev: Dictionary, attrs: Dictionary
+) -> int:
+	var best: int = 0
+	var best_d: float = -1.0
+	for rec_v in rows:
+		if typeof(rec_v) != TYPE_DICTIONARY:
+			continue
+		var rec: Dictionary = rec_v
+		var pid: int = int(rec.get("pid", 0))
+		if pid <= 0 or pid == cap_pid:
+			continue
+		if not bool(rec.get("city_hub", false)) and int(rec.get("tier", 0)) < 3:
+			continue
+		if not prev.has(pid):
+			continue
+		var packed: PackedInt32Array = _hwy3_extract_path(prev, cap_pid, pid)
+		if packed.size() - 1 < HWY3_MIN_PATH_EDGES:
+			continue
+		var shp: Dictionary = path_shape_report(packed, attrs, cap_pid, pid, "")
+		if not bool(shp.get("ok", false)):
+			continue
+		var d: float = cap_c.distance_to(rec.get("centroid", Vector2.ZERO))
+		if cap_c == Vector2.ZERO:
+			d = float(packed.size())
+		if not is_finite(d) or d < HWY3_TRUNK_MIN_DIST:
+			continue
+		if d > best_d or (d == best_d and pid < best):
+			best_d = d
+			best = pid
+	return best
+
+
+static func _hwy3_second_from_rows(
+	rows: Array, cap_pid: int, cap_c: Vector2, prev: Dictionary, attrs: Dictionary
+) -> int:
+	var passes: Array = [
+		{"city": true, "tier": 0},
+		{"city": false, "tier": 3},
+		{"city": false, "tier": 0},
+	]
+	for pass_v in passes:
+		var prow: Dictionary = pass_v
+		var need_city: bool = bool(prow.get("city", false))
+		var need_tier: int = int(prow.get("tier", 0))
+		for rec2_v in rows:
+			var rec2: Dictionary = rec2_v
+			var pid: int = int(rec2.get("pid", 0))
+			if pid <= 0 or pid == cap_pid:
+				continue
+			if need_city and not bool(rec2.get("city_hub", false)):
+				continue
+			if need_tier > 0 and int(rec2.get("tier", 0)) < need_tier:
+				continue
+			if cap_c != Vector2.ZERO:
+				var d2: float = cap_c.distance_to(rec2.get("centroid", Vector2.ZERO))
+				if not is_finite(d2) or d2 < HWY3_TRUNK_MIN_DIST:
+					continue
+			if not prev.has(pid):
+				continue
+			var packed: PackedInt32Array = _hwy3_extract_path(prev, cap_pid, pid)
+			if packed.size() - 1 < HWY3_MIN_PATH_EDGES:
+				continue
+			var shp: Dictionary = path_shape_report(packed, attrs, cap_pid, pid, "")
+			if not bool(shp.get("ok", false)):
+				continue
 			return pid
 	return 0
 
@@ -1351,6 +1717,135 @@ static func _hwy3_select_urban_span_hubs(lst: Array, kept_pids: Dictionary) -> A
 	return out
 
 
+static func _hwy3_nearest_city_hub(hubs: Array, span: Vector2i) -> int:
+	var best: int = 0
+	var best_d: float = 1.0e18
+	var ca: Vector2 = Vector2.ZERO
+	var cb: Vector2 = Vector2.ZERO
+	for rec_v in hubs:
+		if typeof(rec_v) != TYPE_DICTIONARY:
+			continue
+		var rec: Dictionary = rec_v
+		var pid: int = int(rec.get("pid", 0))
+		if pid == span.x:
+			ca = rec.get("centroid", Vector2.ZERO)
+		elif pid == span.y:
+			cb = rec.get("centroid", Vector2.ZERO)
+	for rec2_v in hubs:
+		if typeof(rec2_v) != TYPE_DICTIONARY:
+			continue
+		var rec2: Dictionary = rec2_v
+		var pid2: int = int(rec2.get("pid", 0))
+		if pid2 == span.x or pid2 == span.y:
+			continue
+		if not bool(rec2.get("city_hub", false)) and int(rec2.get("tier", 0)) < 3:
+			continue
+		var c2: Vector2 = rec2.get("centroid", Vector2.ZERO)
+		var d: float = minf(c2.distance_to(ca), c2.distance_to(cb))
+		if not is_finite(d) or d <= 0.0:
+			continue
+		if d < best_d or (d == best_d and pid2 < best):
+			best_d = d
+			best = pid2
+	return best
+
+
+static func _hwy3_urban_span_attach_ids(hubs: Array, span: Vector2i) -> Vector2i:
+	if span.x <= 0 or span.y <= 0:
+		return Vector2i.ZERO
+	var attach: int = _hwy3_nearest_city_hub(hubs, span)
+	if attach <= 0:
+		return Vector2i.ZERO
+	var rec_a: Dictionary = {}
+	var rec_b: Dictionary = {}
+	var rec_t: Dictionary = {}
+	for hv in hubs:
+		if typeof(hv) != TYPE_DICTIONARY:
+			continue
+		var hr: Dictionary = hv
+		var hpid: int = int(hr.get("pid", 0))
+		if hpid == span.x:
+			rec_a = hr
+		elif hpid == span.y:
+			rec_b = hr
+		elif hpid == attach:
+			rec_t = hr
+	var near_span: int = span.x
+	var tc: Vector2 = rec_t.get("centroid", Vector2.ZERO)
+	var da: float = tc.distance_to(rec_a.get("centroid", Vector2.ZERO))
+	var db: float = tc.distance_to(rec_b.get("centroid", Vector2.ZERO))
+	if db < da:
+		near_span = span.y
+	return Vector2i(near_span, attach)
+
+
+static func _hwy3_farthest_city_hub(hubs: Array, from_pid: int) -> int:
+	var from_c: Vector2 = Vector2.ZERO
+	for rec_v in hubs:
+		if typeof(rec_v) != TYPE_DICTIONARY:
+			continue
+		var rec: Dictionary = rec_v
+		if int(rec.get("pid", 0)) == from_pid:
+			from_c = rec.get("centroid", Vector2.ZERO)
+			break
+	var best: int = 0
+	var best_d: float = -1.0
+	for rec2_v in hubs:
+		if typeof(rec2_v) != TYPE_DICTIONARY:
+			continue
+		var rec2: Dictionary = rec2_v
+		var pid2: int = int(rec2.get("pid", 0))
+		if pid2 == from_pid:
+			continue
+		if not bool(rec2.get("city_hub", false)) and int(rec2.get("tier", 0)) < 3:
+			continue
+		var d: float = from_c.distance_to(rec2.get("centroid", Vector2.ZERO))
+		if not is_finite(d) or d < HWY3_TRUNK_MIN_DIST:
+			continue
+		if d > best_d or (d == best_d and pid2 < best):
+			best_d = d
+			best = pid2
+	return best
+
+
+static func _hwy3_city_hubs_by_dist(hubs: Array, from_pid: int) -> Array:
+	var from_c: Vector2 = Vector2.ZERO
+	for rec_v in hubs:
+		if typeof(rec_v) != TYPE_DICTIONARY:
+			continue
+		var rec: Dictionary = rec_v
+		if int(rec.get("pid", 0)) == from_pid:
+			from_c = rec.get("centroid", Vector2.ZERO)
+			break
+	var rows: Array = []
+	for rec2_v in hubs:
+		if typeof(rec2_v) != TYPE_DICTIONARY:
+			continue
+		var rec2: Dictionary = rec2_v
+		var pid2: int = int(rec2.get("pid", 0))
+		if pid2 <= 0 or pid2 == from_pid:
+			continue
+		if not bool(rec2.get("city_hub", false)) and int(rec2.get("tier", 0)) < 3:
+			continue
+		var d: float = from_c.distance_to(rec2.get("centroid", Vector2.ZERO))
+		if not is_finite(d) or d < HWY3_TRUNK_MIN_DIST:
+			continue
+		rows.append({"pid": pid2, "dist": d, "key": _hwy3_pair_key(from_pid, pid2)})
+	rows.sort_custom(_hwy3_dist_pid_less)
+	return rows
+
+
+static func _hwy3_is_major_city_hub(rec: Dictionary) -> bool:
+	if bool(rec.get("capital", false)):
+		return false
+	var tag: String = str(rec.get("tag", "")).strip_edges().to_upper()
+	if not HWY3_MAJOR_TAGS.has(tag):
+		return false
+	if bool(rec.get("city_hub", false)):
+		return true
+	return int(rec.get("tier", 0)) >= 3
+
+
 static func _hwy3_is_urban_span_candidate(rec: Dictionary) -> bool:
 	if not bool(rec.get("urban", false)):
 		return false
@@ -1364,36 +1859,56 @@ static func _hwy3_is_urban_span_candidate(rec: Dictionary) -> bool:
 
 
 static func _hwy3_urban_span_pair_ids(hubs: Array) -> Vector2i:
+	var cands: Array = []
+	for rec_v in hubs:
+		if typeof(rec_v) != TYPE_DICTIONARY:
+			continue
+		var rec: Dictionary = rec_v
+		if _hwy3_is_urban_span_candidate(rec):
+			cands.append(rec)
+	if cands.size() < 2:
+		return Vector2i.ZERO
+	var seed_i: int = 0
+	var seed_sc: float = -1.0
+	for i in range(cands.size()):
+		var a: Dictionary = cands[i]
+		var ac: Vector2 = a.get("centroid", Vector2.ZERO)
+		var sc: float = 0.0
+		for j in range(cands.size()):
+			var b: Dictionary = cands[j]
+			var d: float = ac.distance_to(b.get("centroid", Vector2.ZERO))
+			if is_finite(d) and d <= HWY3_URBAN_CLUSTER_R:
+				sc += 1.0 + float(int(b.get("urban_nbr", 0)))
+		if sc > seed_sc or (sc == seed_sc and int(a.get("pid", 0)) < int((cands[seed_i] as Dictionary).get("pid", 0))):
+			seed_sc = sc
+			seed_i = i
+	var cluster: Array = []
+	var seed_c: Vector2 = (cands[seed_i] as Dictionary).get("centroid", Vector2.ZERO)
+	for c2_v in cands:
+		var c2: Dictionary = c2_v
+		var d2: float = seed_c.distance_to(c2.get("centroid", Vector2.ZERO))
+		if is_finite(d2) and d2 <= HWY3_URBAN_CLUSTER_R:
+			cluster.append(c2)
 	var best_a: int = 0
 	var best_b: int = 0
 	var best_val: float = -1.0
-	for i in range(hubs.size()):
-		if typeof(hubs[i]) != TYPE_DICTIONARY:
-			continue
-		var a: Dictionary = hubs[i]
-		if not _hwy3_is_urban_span_candidate(a):
-			continue
-		var ua: int = int(a.get("urban_nbr", 0))
-		var ap: int = int(a.get("pid", 0))
-		var ac: Vector2 = a.get("centroid", Vector2.ZERO)
-		for j in range(i + 1, hubs.size()):
-			if typeof(hubs[j]) != TYPE_DICTIONARY:
+	for i2 in range(cluster.size()):
+		var u: Dictionary = cluster[i2]
+		var up: int = int(u.get("pid", 0))
+		var ua: int = int(u.get("urban_nbr", 0))
+		var uc: Vector2 = u.get("centroid", Vector2.ZERO)
+		for j2 in range(i2 + 1, cluster.size()):
+			var v: Dictionary = cluster[j2]
+			var vp: int = int(v.get("pid", 0))
+			var ub: int = int(v.get("urban_nbr", 0))
+			var d3: float = uc.distance_to(v.get("centroid", Vector2.ZERO))
+			if not is_finite(d3) or d3 < HWY3_URBAN_SPAN_MIN:
 				continue
-			var b: Dictionary = hubs[j]
-			if not _hwy3_is_urban_span_candidate(b):
-				continue
-			var ub: int = int(b.get("urban_nbr", 0))
-			var bp: int = int(b.get("pid", 0))
-			var d: float = ac.distance_to(b.get("centroid", Vector2.ZERO))
-			if not is_finite(d) or d < HWY3_URBAN_SPAN_MIN or d > HWY3_URBAN_SPAN_MAX:
-				continue
-			var val: float = d * float(ua + ub)
-			var lo: int = mini(ap, bp)
-			var hi: int = maxi(ap, bp)
-			if val > best_val or (val == best_val and lo < mini(best_a, best_b)):
+			var val: float = d3 * float(ua + ub)
+			if val > best_val or (val == best_val and mini(up, vp) < mini(best_a, best_b)):
 				best_val = val
-				best_a = lo
-				best_b = hi
+				best_a = mini(up, vp)
+				best_b = maxi(up, vp)
 	return Vector2i(best_a, best_b)
 
 
@@ -1472,18 +1987,32 @@ static func _hwy3_routes_near_parallel(ra: Dictionary, rb: Dictionary, cents: Di
 	var poly_b: PackedVector2Array = _hwy3_route_polyline(pb, cents)
 	if poly_a.size() < 2 or poly_b.size() < 2:
 		return false
+	var share_pid: bool = (
+		int(ra.get("a", 0)) == int(rb.get("a", 0))
+		or int(ra.get("a", 0)) == int(rb.get("b", 0))
+		or int(ra.get("b", 0)) == int(rb.get("a", 0))
+		or int(ra.get("b", 0)) == int(rb.get("b", 0))
+	)
 	var ends: int = _hwy3_end_region_share(poly_a[0], poly_a[poly_a.size() - 1], poly_b[0], poly_b[poly_b.size() - 1])
-	if ends < 1:
+	if ends < 2 and not share_pid:
 		return false
 	var cover_ab: float = _hwy3_partial_cover(poly_a, poly_b, HWY3_PARALLEL_HAUSDORFF)
 	var cover_ba: float = _hwy3_partial_cover(poly_b, poly_a, HWY3_PARALLEL_HAUSDORFF)
 	var need: float = HWY3_PARALLEL_COVER
 	if ends >= 2:
 		return cover_ab >= need or cover_ba >= need
-	return cover_ab >= need and cover_ba >= need
+	if share_pid:
+		# One shared end is a fork (Ruhr span vs Ruhr→Cologne attach), not a
+		# duplicate corridor, unless each path almost sits on the other.
+		return cover_ab >= 0.75 and cover_ba >= 0.75
+	return false
 
 
 static func _hwy3_keep_parallel_less(a: Dictionary, b: Dictionary) -> bool:
+	var ca: bool = bool(a.get("span_core", false))
+	var cb: bool = bool(b.get("span_core", false))
+	if ca != cb:
+		return ca
 	var ka: int = int(a.get("kind", 0))
 	var kb: int = int(b.get("kind", 0))
 	if ka != kb:
@@ -1515,7 +2044,7 @@ static func _hwy3_drop_near_parallel(cands: Array, cents: Dictionary) -> Diction
 			if _hwy3_routes_near_parallel(c2, krow, cents):
 				is_par = true
 				break
-		if is_par and int(c2.get("kind", 0)) == HWY3_KIND_OTHER:
+		if is_par:
 			dropped += 1
 			continue
 		kept.append(c2)
@@ -1917,9 +2446,11 @@ static func _hwy3_commit_hub_path(
 	b: int,
 	shape: Dictionary,
 	used: int,
-	hi: int
+	hi: int,
+	min_edges: int = -1
 ) -> int:
-	if pids.size() - 1 < HWY3_MIN_PATH_EDGES:
+	var need_e: int = HWY3_MIN_PATH_EDGES if min_edges < 0 else min_edges
+	if pids.size() - 1 < need_e:
 		return used
 	var keys: Array = []
 	var new_n: int = 0
@@ -2252,8 +2783,58 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 		var tg1: String = str(tg1_v)
 		var hl1: Array = hubs_by_tag[tg1]
 		var cap1: int = _hwy3_capital_hub_pid(hl1)
-		second_by_tag[tg1] = _hwy3_second_hub_pid(hl1, cap1)
+		second_by_tag[tg1] = _hwy3_reachable_second(hl1, cap1, adj, attrs)
 		span_by_tag[tg1] = _hwy3_urban_span_pair_ids(hl1)
+		var sec1: int = int(second_by_tag[tg1])
+		if sec1 > 0 and not hub_set.has(sec1) and rec_by_pid.has(sec1):
+			var rec_sec_v: Variant = rec_by_pid.get(sec1, {})
+			if typeof(rec_sec_v) == TYPE_DICTIONARY:
+				var rec_sec: Dictionary = rec_sec_v
+				hubs.append(rec_sec)
+				hub_set[sec1] = true
+				hl1.append(rec_sec)
+				hubs_by_tag[tg1] = hl1
+		if cap1 > 0 and sec1 > 0:
+			var already: bool = false
+			for pr_v in pair_ids:
+				if typeof(pr_v) != TYPE_ARRAY:
+					continue
+				var pr: Array = pr_v
+				if pr.size() < 2:
+					continue
+				if (int(pr[0]) == cap1 and int(pr[1]) == sec1) or (int(pr[0]) == sec1 and int(pr[1]) == cap1):
+					already = true
+					break
+			if not already:
+				pair_ids.append([mini(cap1, sec1), maxi(cap1, sec1)])
+		for hp1_v in hl1:
+			if typeof(hp1_v) != TYPE_DICTIONARY:
+				continue
+			var hp1: Dictionary = hp1_v
+			if not bool(hp1.get("periphery", false)):
+				continue
+			var peri1: int = int(hp1.get("pid", 0))
+			if peri1 <= 0:
+				continue
+			var attach1: int = _hwy3_nearest_city_hub(hl1, Vector2i(peri1, peri1))
+			if attach1 <= 0:
+				attach1 = _hwy3_farthest_city_hub(hl1, peri1)
+			if attach1 <= 0:
+				continue
+			var already_p: bool = false
+			for pr2_v in pair_ids:
+				if typeof(pr2_v) != TYPE_ARRAY:
+					continue
+				var pr2: Array = pr2_v
+				if pr2.size() < 2:
+					continue
+				if (int(pr2[0]) == peri1 and int(pr2[1]) == attach1) or (
+					int(pr2[0]) == attach1 and int(pr2[1]) == peri1
+				):
+					already_p = true
+					break
+			if not already_p:
+				pair_ids.append([mini(peri1, attach1), maxi(peri1, attach1)])
 	var scored_pairs: Array = []
 	for pair_v in pair_ids:
 		if typeof(pair_v) != TYPE_ARRAY:
@@ -2275,12 +2856,13 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 			pd = 999999.0
 		var tag_ab: String = ta if ta == tb else ""
 		var kind: int = HWY3_KIND_OTHER
+		var span_core: bool = false
 		if not tag_ab.is_empty():
 			var second_n: int = int(second_by_tag.get(tag_ab, 0))
 			var hl_ab_v: Variant = hubs_by_tag.get(tag_ab, [])
 			var hl_ab: Array = hl_ab_v if typeof(hl_ab_v) == TYPE_ARRAY else []
 			var cap_n: int = _hwy3_capital_hub_pid(hl_ab)
-			if cap_n > 0 and second_n > 0 and (
+			if cap_n > 0 and second_n > 0 and HWY3_MAJOR_TAGS.has(tag_ab) and (
 				(a == cap_n and b == second_n) or (b == cap_n and a == second_n)
 			):
 				kind = HWY3_KIND_TRUNK
@@ -2291,6 +2873,31 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 					(mini(a, b) == mini(spn.x, spn.y) and maxi(a, b) == maxi(spn.x, spn.y))
 				):
 					kind = HWY3_KIND_SPAN
+					span_core = true
+				elif spn.x > 0:
+					var att_ab: Vector2i = _hwy3_urban_span_attach_ids(hl_ab, spn)
+					if att_ab.x > 0 and (
+						(mini(a, b) == mini(att_ab.x, att_ab.y) and maxi(a, b) == maxi(att_ab.x, att_ab.y))
+					):
+						kind = HWY3_KIND_SPAN
+				if kind < HWY3_KIND_SPAN:
+					for hp_ab_v in hl_ab:
+						if typeof(hp_ab_v) != TYPE_DICTIONARY:
+							continue
+						var hp_ab: Dictionary = hp_ab_v
+						if not bool(hp_ab.get("periphery", false)):
+							continue
+						var peri_pid: int = int(hp_ab.get("pid", 0))
+						if peri_pid <= 0:
+							continue
+						var attach_p: int = _hwy3_nearest_city_hub(hl_ab, Vector2i(peri_pid, peri_pid))
+						if attach_p <= 0:
+							attach_p = _hwy3_farthest_city_hub(hl_ab, peri_pid)
+						if attach_p > 0 and (
+							(a == peri_pid and b == attach_p) or (b == peri_pid and a == attach_p)
+						):
+							kind = HWY3_KIND_SPAN
+							break
 		scored_pairs.append({
 			"a": a,
 			"b": b,
@@ -2300,6 +2907,7 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 			"tag": tag_ab,
 			"land_n": maxi(int(ra.get("land_n", 0)), int(rb.get("land_n", 0))),
 			"kind": kind,
+			"span_core": span_core,
 		})
 	var paint_pairs: Array = _hwy3_order_pairs_for_paint(scored_pairs)
 	var inferred_n: int = inferred.size()
@@ -2325,18 +2933,56 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 		var hp: int = int(hp_v)
 		tree_parent[hp] = hp
 	var candidates: Array = []
+	var failed_trunks: Array = []
+	var failed_spans: Array = []
+	var trunk_ids: Array = []
+	var span_ids: Array = []
 	for sp_v in paint_pairs:
 		var sp: Dictionary = sp_v
 		var a2: int = int(sp.get("a", 0))
 		var b2: int = int(sp.get("b", 0))
+		var kind2: int = int(sp.get("kind", 0))
 		if not adj.has(a2) or not adj.has(b2):
+			if kind2 >= HWY3_KIND_TRUNK:
+				failed_trunks.append("%d-%d no_adj" % [a2, b2])
+			elif kind2 == HWY3_KIND_SPAN:
+				failed_spans.append("%d-%d no_adj" % [a2, b2])
 			continue
+		if kind2 >= HWY3_KIND_TRUNK:
+			trunk_ids.append("%s:%d-%d" % [str(sp.get("tag", "")), a2, b2])
+		elif kind2 == HWY3_KIND_SPAN:
+			span_ids.append("%s:%d-%d" % [str(sp.get("tag", "")), a2, b2])
 		var pids: PackedInt32Array = shortest_hub_path(adj, a2, b2, not_shortest, attrs)
 		pids = _hwy3_maybe_hook_repeat(pids, mutant)
+		if pids.size() - 1 < HWY3_MIN_PATH_EDGES and kind2 >= HWY3_KIND_TRUNK and mutant != "not_shortest":
+			var tf2: String = _hwy3_same_tag_filter(a2, b2, attrs)
+			var prev_t: Dictionary = _hwy3_dijkstra_prev(adj, a2, tf2, attrs, 0)
+			pids = _hwy3_extract_path(prev_t, a2, b2)
+			pids = _hwy3_maybe_hook_repeat(pids, mutant)
 		if pids.size() - 1 < HWY3_MIN_PATH_EDGES:
+			if kind2 >= HWY3_KIND_TRUNK:
+				failed_trunks.append("%d-%d empty_n=%d" % [a2, b2, pids.size()])
+			elif kind2 == HWY3_KIND_SPAN:
+				failed_spans.append("%d-%d empty_n=%d" % [a2, b2, pids.size()])
 			continue
 		var shape: Dictionary = path_shape_report(pids, centroids, a2, b2, mutant)
 		if not bool(shape.get("ok", false)):
+			var shape_msg: String = (
+				"%d-%d hook=%s zig=%s long=%s n=%d len=%.1f str=%.1f"
+				% [
+					a2, b2,
+					str(shape.get("hook", false)),
+					str(shape.get("zigzag", false)),
+					str(shape.get("long", false)),
+					pids.size(),
+					float(shape.get("length", 0.0)),
+					float(shape.get("straight", 0.0)),
+				]
+			)
+			if kind2 >= HWY3_KIND_TRUNK:
+				failed_trunks.append(shape_msg)
+			elif kind2 == HWY3_KIND_SPAN:
+				failed_spans.append(shape_msg)
 			continue
 		var pid_arr_c: Array = []
 		for pii_c in range(pids.size()):
@@ -2347,12 +2993,186 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 		cand["shape"] = shape
 		cand["length"] = float(shape.get("length", 0.0))
 		candidates.append(cand)
+	var peri_has: Dictionary = {}
+	for cand_p_v in candidates:
+		if typeof(cand_p_v) != TYPE_DICTIONARY:
+			continue
+		var cand_p: Dictionary = cand_p_v
+		peri_has[int(cand_p.get("a", 0))] = true
+		peri_has[int(cand_p.get("b", 0))] = true
+	for hperi_c_v in hubs:
+		if typeof(hperi_c_v) != TYPE_DICTIONARY:
+			continue
+		var hperi_c: Dictionary = hperi_c_v
+		if not bool(hperi_c.get("periphery", false)):
+			continue
+		var peri_c: int = int(hperi_c.get("pid", 0))
+		if peri_c <= 0 or peri_has.has(peri_c) or not adj.has(peri_c):
+			continue
+		var tag_pc: String = str(hperi_c.get("tag", "")).strip_edges().to_upper()
+		var hl_pc_v: Variant = hubs_by_tag.get(tag_pc, [])
+		var hl_pc: Array = hl_pc_v if typeof(hl_pc_v) == TYPE_ARRAY else []
+		var attach_rows: Array = _hwy3_city_hubs_by_dist(hl_pc, peri_c)
+		for ar_v in attach_rows:
+			if typeof(ar_v) != TYPE_DICTIONARY:
+				continue
+			var ar: Dictionary = ar_v
+			var attach_c: int = int(ar.get("pid", 0))
+			if attach_c <= 0 or not adj.has(attach_c):
+				continue
+			var pids_pc: PackedInt32Array = shortest_hub_path(adj, peri_c, attach_c, not_shortest, attrs)
+			pids_pc = _hwy3_maybe_hook_repeat(pids_pc, mutant)
+			if pids_pc.size() - 1 < HWY3_MIN_PATH_EDGES:
+				continue
+			var shape_pc: Dictionary = path_shape_report(pids_pc, centroids, peri_c, attach_c, mutant)
+			if not bool(shape_pc.get("ok", false)):
+				continue
+			var pid_arr_pc: Array = []
+			for pii_pc in range(pids_pc.size()):
+				pid_arr_pc.append(int(pids_pc[pii_pc]))
+			var ra_pc: Dictionary = rec_by_pid.get(peri_c, hperi_c)
+			var rb_pc: Dictionary = rec_by_pid.get(attach_c, {})
+			candidates.append({
+				"a": peri_c,
+				"b": attach_c,
+				"score": float(ra_pc.get("score", 0.0)) + float(rb_pc.get("score", 0.0)),
+				"key": _hwy3_pair_key(peri_c, attach_c),
+				"dist": float(ar.get("dist", 0.0)),
+				"tag": tag_pc,
+				"land_n": maxi(int(ra_pc.get("land_n", 0)), int(rb_pc.get("land_n", 0))),
+				"kind": HWY3_KIND_SPAN,
+				"pids": pid_arr_pc,
+				"packed": pids_pc,
+				"shape": shape_pc,
+				"length": float(shape_pc.get("length", 0.0)),
+			})
+			peri_has[peri_c] = true
+			break
 	var par_drop: Dictionary = _hwy3_drop_near_parallel(candidates, centroids)
 	var kept_v: Variant = par_drop.get("kept", [])
 	var kept_cands: Array = kept_v if typeof(kept_v) == TYPE_ARRAY else []
 	var dropped_parallel: int = int(par_drop.get("dropped", 0))
 	kept_cands.sort_custom(_hwy3_pair_priority_less)
+	var kept_ends: Dictionary = {}
+	for ke_v in kept_cands:
+		if typeof(ke_v) != TYPE_DICTIONARY:
+			continue
+		var ke: Dictionary = ke_v
+		kept_ends[int(ke.get("a", 0))] = true
+		kept_ends[int(ke.get("b", 0))] = true
+		var kps_v: Variant = ke.get("pids", [])
+		if typeof(kps_v) == TYPE_ARRAY:
+			for kp_v in kps_v:
+				kept_ends[int(kp_v)] = true
+	for hperi_v in hubs:
+		if typeof(hperi_v) != TYPE_DICTIONARY:
+			continue
+		var hperi: Dictionary = hperi_v
+		if not bool(hperi.get("periphery", false)):
+			continue
+		var peri_e: int = int(hperi.get("pid", 0))
+		if peri_e <= 0 or kept_ends.has(peri_e):
+			continue
+		var best_rest: Dictionary = {}
+		for cand_r_v in candidates:
+			if typeof(cand_r_v) != TYPE_DICTIONARY:
+				continue
+			var cand_r: Dictionary = cand_r_v
+			if int(cand_r.get("a", 0)) != peri_e and int(cand_r.get("b", 0)) != peri_e:
+				continue
+			var par_k: bool = false
+			for ke2_v in kept_cands:
+				if typeof(ke2_v) != TYPE_DICTIONARY:
+					continue
+				if _hwy3_routes_near_parallel(cand_r, ke2_v as Dictionary, centroids):
+					par_k = true
+					break
+			if par_k:
+				continue
+			if best_rest.is_empty() or int(cand_r.get("kind", 0)) > int(best_rest.get("kind", 0)):
+				best_rest = cand_r
+		if not best_rest.is_empty():
+			kept_cands.append(best_rest)
+			dropped_parallel = maxi(dropped_parallel - 1, 0)
+			kept_ends[peri_e] = true
+	for horph_v in hubs:
+		if typeof(horph_v) != TYPE_DICTIONARY:
+			continue
+		var horph: Dictionary = horph_v
+		if not _hwy3_is_major_city_hub(horph) and not bool(horph.get("periphery", false)):
+			continue
+		var orph_pid: int = int(horph.get("pid", 0))
+		if orph_pid <= 0 or kept_ends.has(orph_pid) or not adj.has(orph_pid):
+			continue
+		var tag_or: String = str(horph.get("tag", "")).strip_edges().to_upper()
+		var hl_or_v: Variant = hubs_by_tag.get(tag_or, [])
+		var hl_or: Array = hl_or_v if typeof(hl_or_v) == TYPE_ARRAY else []
+		var attach_or: Array = _hwy3_city_hubs_by_dist(hl_or, orph_pid)
+		var attach_kept: Array = []
+		var attach_rest: Array = []
+		for ars_v in attach_or:
+			if typeof(ars_v) != TYPE_DICTIONARY:
+				continue
+			var ars: Dictionary = ars_v
+			if kept_ends.has(int(ars.get("pid", 0))):
+				attach_kept.append(ars)
+			else:
+				attach_rest.append(ars)
+		attach_or = []
+		for ak_v in attach_kept:
+			attach_or.append(ak_v)
+		for ar2_v in attach_rest:
+			attach_or.append(ar2_v)
+		for ao_v in attach_or:
+			if typeof(ao_v) != TYPE_DICTIONARY:
+				continue
+			var ao: Dictionary = ao_v
+			var attach_o: int = int(ao.get("pid", 0))
+			if attach_o <= 0 or not adj.has(attach_o):
+				continue
+			var pids_o: PackedInt32Array = shortest_hub_path(adj, orph_pid, attach_o, not_shortest, attrs)
+			pids_o = _hwy3_maybe_hook_repeat(pids_o, mutant)
+			if pids_o.size() - 1 < HWY3_MIN_PATH_EDGES:
+				continue
+			var shape_o: Dictionary = path_shape_report(pids_o, centroids, orph_pid, attach_o, mutant)
+			if not bool(shape_o.get("ok", false)):
+				continue
+			var pid_arr_o: Array = []
+			for pii_o in range(pids_o.size()):
+				pid_arr_o.append(int(pids_o[pii_o]))
+			var ra_o: Dictionary = rec_by_pid.get(orph_pid, horph)
+			var rb_o: Dictionary = rec_by_pid.get(attach_o, {})
+			var cand_o: Dictionary = {
+				"a": orph_pid,
+				"b": attach_o,
+				"score": float(ra_o.get("score", 0.0)) + float(rb_o.get("score", 0.0)),
+				"key": _hwy3_pair_key(orph_pid, attach_o),
+				"dist": float(ao.get("dist", 0.0)),
+				"tag": tag_or,
+				"land_n": maxi(int(ra_o.get("land_n", 0)), int(rb_o.get("land_n", 0))),
+				"kind": HWY3_KIND_SPAN,
+				"pids": pid_arr_o,
+				"packed": pids_o,
+				"shape": shape_o,
+				"length": float(shape_o.get("length", 0.0)),
+			}
+			var par_o: bool = false
+			for ke3_v in kept_cands:
+				if typeof(ke3_v) != TYPE_DICTIONARY:
+					continue
+				if _hwy3_routes_near_parallel(cand_o, ke3_v as Dictionary, centroids):
+					par_o = true
+					break
+			if par_o:
+				continue
+			kept_cands.append(cand_o)
+			kept_ends[orph_pid] = true
+			for po_v in pid_arr_o:
+				kept_ends[int(po_v)] = true
+			break
+	kept_cands.sort_custom(_hwy3_pair_priority_less)
 	var dropped_cap: int = 0
+	var marked_verts: Dictionary = {}
 	for kc_v in kept_cands:
 		if typeof(kc_v) != TYPE_DICTIONARY:
 			continue
@@ -2361,6 +3181,9 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 		var b3: int = int(kc.get("b", 0))
 		var kind3: int = int(kc.get("kind", 0))
 		var tag_sp: String = str(kc.get("tag", "")).strip_edges().to_upper()
+		var commit_hi: int = hi
+		if kind3 == HWY3_KIND_OTHER:
+			commit_hi = maxi(hi - HWY3_COVER_RESERVE, 45)
 		if (
 			kind3 == HWY3_KIND_OTHER
 			and not tag_sp.is_empty()
@@ -2368,6 +3191,9 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 			and tree_parent.has(b3)
 			and _uf_find(tree_parent, a3) == _uf_find(tree_parent, b3)
 		):
+			continue
+		if kind3 == HWY3_KIND_OTHER and used >= commit_hi:
+			dropped_cap += 1
 			continue
 		var packed_v: Variant = kc.get("packed", PackedInt32Array())
 		var pids_k: PackedInt32Array = PackedInt32Array()
@@ -2378,9 +3204,12 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 		var used_before: int = used
 		used = _hwy3_commit_hub_path(
 			cache, cache_by_key, graph_by_key, marked, routes, tree_parent,
-			pids_k, a3, b3, shape_k, used, hi
+			pids_k, a3, b3, shape_k, used, commit_hi
 		)
-		if used == used_before and used_before >= hi:
+		if used > used_before:
+			for pi_v in range(pids_k.size()):
+				marked_verts[int(pids_k[pi_v])] = true
+		if used == used_before and used_before >= commit_hi:
 			dropped_cap += 1
 		elif used == used_before and pids_k.size() - 1 >= HWY3_MIN_PATH_EDGES:
 			var new_need: int = 0
@@ -2388,7 +3217,7 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 				var kn: int = _hwy3_pair_key(int(pids_k[pi_n - 1]), int(pids_k[pi_n]))
 				if not marked.has(kn):
 					new_need += 1
-			if used + new_need > hi:
+			if used + new_need > commit_hi:
 				dropped_cap += 1
 	var cover_tried: Dictionary = {}
 	var cover_guard: int = 0
@@ -2396,7 +3225,7 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 		cover_guard += 1
 		var best_a: int = 0
 		var best_b: int = 0
-		var best_d: float = 1.0e18
+		var best_sc: float = -1.0e18
 		for h5_v in hubs:
 			var h5: Dictionary = h5_v
 			var hp5: int = int(h5.get("pid", 0))
@@ -2407,6 +3236,8 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 				continue
 			var c5: Vector2 = h5.get("centroid", Vector2.ZERO)
 			var root5: int = _uf_find(tree_parent, hp5)
+			var land5: int = int(h5.get("land_n", 0))
+			var city5: bool = bool(h5.get("city_hub", false)) or int(h5.get("tier", 0)) >= 3
 			for h6_v in hubs:
 				var h6: Dictionary = h6_v
 				var op6: int = int(h6.get("pid", 0))
@@ -2423,8 +3254,22 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 				var d6: float = c5.distance_to(h6.get("centroid", Vector2.ZERO))
 				if not is_finite(d6) or d6 <= 0.0:
 					continue
-				if d6 < best_d or (d6 == best_d and op6 < best_b):
-					best_d = d6
+				var city6: bool = bool(h6.get("city_hub", false)) or int(h6.get("tier", 0)) >= 3
+				var sc6: float = -d6
+				if HWY3_MAJOR_TAGS.has(tag5) or land5 >= 180:
+					sc6 += 10000.0
+				elif land5 >= 50:
+					sc6 += 3000.0
+				if city5 and city6:
+					sc6 += 500.0
+				var on5: bool = marked_verts.has(hp5)
+				var on6: bool = marked_verts.has(op6)
+				if on5 and on6:
+					sc6 += 40000.0
+				elif on5 or on6:
+					sc6 += 15000.0
+				if sc6 > best_sc or (sc6 == best_sc and op6 < best_b):
+					best_sc = sc6
 					best_a = hp5
 					best_b = op6
 		if best_a <= 0 or best_b <= 0:
@@ -2432,7 +3277,7 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 		cover_tried[_hwy3_pair_key(best_a, best_b)] = true
 		var pids5: PackedInt32Array = shortest_hub_path(adj, best_a, best_b, not_shortest, attrs)
 		pids5 = _hwy3_maybe_hook_repeat(pids5, mutant)
-		if pids5.size() - 1 < HWY3_MIN_PATH_EDGES:
+		if pids5.size() < 2:
 			continue
 		var shape5: Dictionary = path_shape_report(pids5, centroids, best_a, best_b, mutant)
 		if not bool(shape5.get("ok", false)):
@@ -2440,6 +3285,10 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 		var pid_arr5: Array = []
 		for pii5 in range(pids5.size()):
 			pid_arr5.append(int(pids5[pii5]))
+		var cover_min: int = HWY3_MIN_PATH_EDGES
+		if pids5.size() == 2:
+			if marked_verts.has(int(pids5[0])) or marked_verts.has(int(pids5[1])):
+				cover_min = 1
 		var cover_row: Dictionary = {
 			"a": best_a,
 			"b": best_b,
@@ -2456,10 +3305,14 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 		if cover_par:
 			dropped_parallel += 1
 			continue
+		var used_cover: int = used
 		used = _hwy3_commit_hub_path(
 			cache, cache_by_key, graph_by_key, marked, routes, tree_parent,
-			pids5, best_a, best_b, shape5, used, hi
+			pids5, best_a, best_b, shape5, used, hi, cover_min
 		)
+		if used > used_cover:
+			for pi5b in range(pids5.size()):
+				marked_verts[int(pids5[pi5b])] = true
 	var hub_list: Array = []
 	for h2_v in hubs:
 		var h2: Dictionary = h2_v
@@ -2474,7 +3327,18 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 			"city_hub": bool(h2.get("city_hub", false)),
 			"city_name": str(h2.get("city_name", "")),
 			"name": str(h2.get("name", "")),
+			"centroid": h2.get("centroid", Vector2.ZERO),
+			"land_n": int(h2.get("land_n", 0)),
+			"periphery": bool(h2.get("periphery", false)),
 		})
+	var peri_dbg: Array = []
+	for h3_v in hubs:
+		if typeof(h3_v) != TYPE_DICTIONARY:
+			continue
+		var h3: Dictionary = h3_v
+		if not bool(h3.get("periphery", false)):
+			continue
+		peri_dbg.append("%s:%d" % [str(h3.get("city_name", h3.get("name", ""))), int(h3.get("pid", 0))])
 	last_hwy3_debug = {
 		"mutant": mutant,
 		"mode": "hub_routes",
@@ -2490,6 +3354,12 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 		"dropped_parallel": dropped_parallel,
 		"dropped_cap": dropped_cap,
 		"candidates": candidates.size(),
+		"failed_trunks": failed_trunks,
+		"failed_spans": failed_spans,
+		"trunks": trunk_ids,
+		"spans": span_ids,
+		"peri": peri_dbg,
+		"second_by_tag": second_by_tag,
 		"adj_ms": t_adj_ms,
 		"hubs_ms": t_hubs_ms,
 		"route_ms": float(Time.get_ticks_usec() - t_route0) / 1000.0,
