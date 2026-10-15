@@ -30118,6 +30118,7 @@ func _tick_supply_ring_idle_prebuild() -> void:
 		_supply_prebuild_mesh_begun = false
 		_supply_prebuild_warm_frames = 0
 		_supply_prebuild_ctx = _supply_role_context()
+		_ensure_supply_outline_batch()
 		_supply_prebuild_phase = SUPPLY_PREBUILD_ROLES
 		_supply_prebuild_setup_ms = float(Time.get_ticks_usec() - t0) / 1000.0
 		_supply_prebuild_step_ms = _supply_prebuild_setup_ms
@@ -30262,8 +30263,14 @@ func _finish_supply_ring_prebuild_if_needed() -> void:
 			_step_supply_prebuild_roles(t0)
 		if _supply_prebuild_phase == SUPPLY_PREBUILD_ITEMS:
 			_step_supply_prebuild_items(t0)
+	if _supply_prebuild_phase == SUPPLY_PREBUILD_MESH and not _supply_prebuild_mesh_begun:
+		_step_supply_prebuild_mesh(Time.get_ticks_usec())
 	if _supply_outline_batch_is_ready() and _supply_outline_batch.has_method("finish_idle_prebuild"):
 		_supply_outline_batch.call("finish_idle_prebuild")
+		if _supply_prebuild_phase == SUPPLY_PREBUILD_MESH:
+			_supply_prebuild_phase = SUPPLY_PREBUILD_WARM
+	if _supply_outline_batch_is_ready() and _supply_outline_batch.has_method("finish_hidden_warm"):
+		_supply_outline_batch.call("finish_hidden_warm")
 	if _supply_prebuild_phase != SUPPLY_PREBUILD_DONE:
 		_commit_supply_prebuild_cache()
 
