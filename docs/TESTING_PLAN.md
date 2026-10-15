@@ -700,6 +700,33 @@ grep -o 'multi_ai_decisions=.*' log | md5sum
 
 `--quick` same 14 `unit_board_play_path` reds. map_qc NE **0.9853**. Wired as `launch_render1_draw_guard` after `launch_render1_supply_ring_mesh`. Headless; live A/B pending.
 
+**FINAL cleanup (cap the cold-L chase; honest 250 bar):** Ship measured cold first L-on **188–210** ms headless / **208–246** ms windowed. That passes the project bar of **250**. This box's 72–84 / 180 target is not the gate. Do not chase further.
+
+- Product: `skip_engine_draw` removed from `SupplyOutlineBatchLayer`. `draw_mesh` always submits.
+- `counter_lie` mutant is a **source edit** in `WindowedRender1DrawGuard`: the test reloads the layer with `draw_mesh(...)` stripped and counters kept. Engine delta **0**. No product flag.
+- Leftover `_ci_draw_mesh_has_live_submit` / `ci_draw_mesh_live` grep deleted.
+- Cold assert is **250** only (`MAX_COLD_MS`). Each run prints `cold_raw display=… ms=…`. Never best-of.
+
+Six raw `cold_raw` on this box (3 headless + 3 windowed):
+
+| run | display | ms |
+|---|---|---:|
+| 1 | headless | **79.140** |
+| 2 | headless | **75.984** |
+| 3 | headless | **65.587** |
+| 1 | X11 | **90.655** |
+| 2 | X11 | **83.494** |
+| 3 | X11 | **80.322** |
+
+Windowed guard **3/3 PASS**: source-edit probe delta **0** (counters=392); live engine delta **76704** ≥ mesh_calls **392**. Seed 193601 ×3:
+
+```
+grep -o 'multi_ai_decisions=.*' log | md5sum
+# 20fe9063de285f19d4f9b8a105abfd31  -
+```
+
+`--quick` same 14 `unit_board_play_path` reds. map_qc NE **0.9853**. Headless; live A/B pending.
+
 ```bash
 tools/run_godot.sh --headless --path . --resolution 1280x740 \
   -s res://scripts/core/HeadlessRender1SupplyRingMeshTest.gd
