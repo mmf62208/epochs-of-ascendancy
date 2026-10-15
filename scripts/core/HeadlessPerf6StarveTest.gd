@@ -260,6 +260,12 @@ func _reset_overrides(sm: Node) -> void:
 		})
 	if "_supply_day_queue" in sm:
 		sm.set("_supply_day_queue", [])
+	if "supply_slice_frame_ms_override" in sm:
+		sm.set("supply_slice_frame_ms_override", -1.0)
+	if "supply_catch_up_sync_count" in sm:
+		sm.set("supply_catch_up_sync_count", 0)
+	if "supply_catch_up_sync_ms" in sm:
+		sm.set("supply_catch_up_sync_ms", 0.0)
 
 
 func _boot_live_supply_network(mm: Node, sm: Node) -> int:

@@ -7,6 +7,8 @@ extends SceneTree
 ## under the 25 ms cap. The cap itself is unchanged.
 ## FIX #2: the first phase/item of a frame always runs (progress guarantee);
 ## phase estimates EMA-blend on run and decay toward the floor when deferred.
+## FIX #3: pace the slice budget up to 22 ms when behind, and drain the last
+## 3–4 non-roll frames at ≤22 ms instead of one unbounded midnight catch-up.
 ##
 ##   tools/run_godot.sh --headless --path . \
 ##     -s res://scripts/core/HeadlessPerf6DayRollTest.gd
@@ -332,6 +334,8 @@ func _test_clock(tm: Node, sm: Node, pm: Node, scale: float, do_pause: bool) -> 
 	_arm_clock(tm, sm, scale)
 	var slice_max := 0.0
 	var slice_over := 0
+	var catch_up_frames := 0
+	var catch_up_max := 0.0
 	var unfinished := 0
 	var pause_checked := not do_pause
 	var pause_ok := true
@@ -366,6 +370,11 @@ func _test_clock(tm: Node, sm: Node, pm: Node, scale: float, do_pause: bool) -> 
 				slice_max = sms
 			if sms > SLICE_MAX_MS:
 				slice_over += 1
+			var was_catch := bool(sm.get("last_supply_slice_catch_up")) if "last_supply_slice_catch_up" in sm else false
+			if was_catch and sms > 0.0:
+				catch_up_frames += 1
+				if sms > catch_up_max:
+					catch_up_max = sms
 		if pm.has_meta("perf6_light_day_n"):
 			var dn := int(pm.get_meta("perf6_light_day_n"))
 			if dn > 0 and not sched.has(dn):
@@ -374,13 +383,15 @@ func _test_clock(tm: Node, sm: Node, pm: Node, scale: float, do_pause: bool) -> 
 					"r": bool(pm.get_meta("perf6_light_reinforce")),
 				}
 	var full_n := int(sm.get("full_supply_day_count")) if "full_supply_day_count" in sm else -1
+	var sync_n := int(sm.get("supply_catch_up_sync_count")) if "supply_catch_up_sync_count" in sm else -1
 	var history: Array = tm.call("get_day_tick_history") if tm.has_method("get_day_tick_history") else []
 	var ai := _day_ai_stats(history)
 	var listener := _listener_stats(history)
 	print(
-		"HeadlessPerf6DayRollTest: clock %.0fx frames=%d full=%d unfinished_rolls=%d slice_max=%.2f slice_over=%d day_ai_n=%d p95=%.1f max=%.1f listener_n=%d listener_max=%.1f"
+		"HeadlessPerf6DayRollTest: clock %.0fx frames=%d full=%d unfinished_rolls=%d slice_max=%.2f slice_over=%d catch_up_frames=%d catch_up_sync_count=%d catch_up_max=%.2f day_ai_n=%d p95=%.1f max=%.1f listener_n=%d listener_max=%.1f"
 		% [
 			scale, frames, full_n, unfinished, slice_max, slice_over,
+			catch_up_frames, sync_n, catch_up_max,
 			int(ai.get("n", 0)), float(ai.get("p95", -1.0)), float(ai.get("max", -1.0)),
 			int(listener.get("n", 0)), float(listener.get("max", -1.0)),
 		]
@@ -400,6 +411,12 @@ func _test_clock(tm: Node, sm: Node, pm: Node, scale: float, do_pause: bool) -> 
 		_fail("%s slice max %.2fms over %d frames (cap %.0f)" % [label, slice_max, slice_over, SLICE_MAX_MS])
 	else:
 		_pass("%s slice max %.2fms <= %.0f" % [label, slice_max, SLICE_MAX_MS])
+	if not ("supply_catch_up_sync_count" in sm):
+		_fail("%s supply_catch_up_sync_count missing" % label)
+	elif sync_n != 0:
+		_fail("%s catch_up_sync_count=%d (want 0; unbounded midnight finish)" % [label, sync_n])
+	else:
+		_pass("%s catch_up_sync_count=0 catch_up_frames=%d catch_up_max=%.2f" % [label, catch_up_frames, catch_up_max])
 	if int(ai.get("n", 0)) < DAYS:
 		_fail("%s day_ai samples=%d (want %d)" % [label, int(ai.get("n", 0)), DAYS])
 	elif float(ai.get("p95", 999.0)) > DAY_AI_P95_MS or float(ai.get("max", 999.0)) > DAY_AI_MAX_MS:
@@ -470,22 +487,46 @@ func _test_catch_up(tm: Node, sm: Node) -> void:
 	job["gen_ready"] = true
 	job["index"] = maxi(0, keys.size() - 30)
 	var before := int(sm.get("full_supply_day_count"))
-	var now_ms := Time.get_ticks_msec()
-	tm.set("_last_advance_real_msec", now_ms - 960)
-	await process_frame
-	var catch_ms := float(sm.get("last_supply_slice_ms")) if "last_supply_slice_ms" in sm else -1.0
-	var after := int(sm.get("full_supply_day_count"))
+	var sync_before := int(sm.get("supply_catch_up_sync_count")) if "supply_catch_up_sync_count" in sm else 0
+	var catch_ms := 0.0
+	var catch_max := 0.0
+	var catch_frames := 0
+	var after := before
 	var left := _queue_depth(sm)
+	var guard := 0
+	var now_ms := 0
+	while left != 0 and after == before and guard < 8:
+		now_ms = Time.get_ticks_msec()
+		tm.set("_last_advance_real_msec", now_ms - 960)
+		await process_frame
+		guard += 1
+		var sms := float(sm.get("last_supply_slice_ms")) if "last_supply_slice_ms" in sm else -1.0
+		if sms > catch_ms:
+			catch_ms = sms
+		var was_catch := false
+		if "last_supply_slice_catch_up" in sm:
+			was_catch = bool(sm.get("last_supply_slice_catch_up"))
+		elif sms > 0.0:
+			was_catch = true
+		if was_catch:
+			catch_frames += 1
+			if sms > catch_max:
+				catch_max = sms
+		after = int(sm.get("full_supply_day_count"))
+		left = _queue_depth(sm)
+	var sync_after := int(sm.get("supply_catch_up_sync_count")) if "supply_catch_up_sync_count" in sm else -1
 	print(
-		"HeadlessPerf6DayRollTest: catch_up ms=%.2f count %d→%d left=%d"
-		% [catch_ms, before, after, left]
+		"HeadlessPerf6DayRollTest: catch_up ms=%.2f frames=%d max=%.2f sync %d→%d count %d→%d left=%d"
+		% [catch_ms, catch_frames, catch_max, sync_before, sync_after, before, after, left]
 	)
 	if left != 0 or after != before + 1:
 		_fail("catch-up did not finish the open supply day (left=%d count %d→%d)" % [left, before, after])
-	elif catch_ms > SLICE_MAX_MS:
-		_fail("catch-up slice %.2fms > %.0f" % [catch_ms, SLICE_MAX_MS])
+	elif catch_ms > SLICE_MAX_MS or catch_max > SLICE_MAX_MS:
+		_fail("catch-up slice %.2fms > %.0f" % [maxf(catch_ms, catch_max), SLICE_MAX_MS])
+	elif sync_after != sync_before:
+		_fail("catch-up used unbounded sync finish (sync %d→%d)" % [sync_before, sync_after])
 	else:
-		_pass("catch-up finished the remainder in %.2fms" % catch_ms)
+		_pass("catch-up finished the remainder in %.2fms over %d frames" % [catch_ms, catch_frames])
 	var count_at_roll := int(sm.get("full_supply_day_count"))
 	now_ms = Time.get_ticks_msec()
 	tm.set("_last_advance_real_msec", now_ms - 1000)
@@ -524,6 +565,14 @@ func _arm_clock(tm: Node, sm: Node, scale: float) -> void:
 	sm.set("full_supply_day_count", 0)
 	if "_supply_day_queue" in sm:
 		sm.set("_supply_day_queue", [])
+	if "supply_catch_up_sync_count" in sm:
+		sm.set("supply_catch_up_sync_count", 0)
+	if "supply_catch_up_sync_ms" in sm:
+		sm.set("supply_catch_up_sync_ms", 0.0)
+	if "last_supply_slice_catch_up" in sm:
+		sm.set("last_supply_slice_catch_up", false)
+	if "supply_slice_frame_ms_override" in sm:
+		sm.set("supply_slice_frame_ms_override", -1.0)
 
 
 func _tick_would_roll(tm: Node) -> bool:
