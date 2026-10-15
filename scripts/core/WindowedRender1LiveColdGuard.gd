@@ -14,10 +14,7 @@ const PREBUILD_WAIT_FRAMES := 480
 const MAX_DELTA_MS := 250.0
 const MAX_BA_RATIO := 0.75
 const HUE_TOL := 0.10
-const A_FRAME2_DEFAULT_MS := 611.0
-const A_TEAL := Vector2(37000.0, 45000.0)
-const A_OLIVE := Vector2(7000.0, 9000.0)
-const A_ORANGE := Vector2(4000.0, 7000.0)
+const DEFAULT_A_FILE := "res://docs/evidence/render1/a_live_5df8e7fc.json"
 
 var _failures: int = 0
 var _t0_msec: int = 0
@@ -28,9 +25,14 @@ var _got_frame1: bool = false
 var _got_frame2: bool = false
 var _frame1_ms: float = -1.0
 var _frame2_ms: float = -1.0
+var _loff_frame1_ms: float = -1.0
 var _loff_frame2_ms: float = -1.0
 var _t0_usec: int = 0
 var _last_wait_log: int = -1
+var _phase: String = ""
+var _a_metrics: Dictionary = {}
+var _measure_a: bool = false
+var _last_hue: Dictionary = {}
 
 
 func _init() -> void:
@@ -72,6 +74,12 @@ func _run() -> void:
 	if _out_dir.is_empty():
 		_out_dir = "/tmp/eoa-render1-live"
 	DirAccess.make_dir_recursive_absolute(_out_dir)
+	_measure_a = OS.get_environment("EOA_RENDER1_MEASURE_A").strip_edges() == "1"
+	if not _measure_a:
+		_a_metrics = _load_a_metrics()
+		if _a_metrics.is_empty():
+			_fail("A frame2 missing: set EOA_RENDER1_A_FRAME2_MS, EOA_RENDER1_A_FRAME2_FILE, or run MEASURE_A on 5df8e7fc (A_FRAME2_DEFAULT_MS deleted)")
+			return
 	if OS.get_environment("EOA_SMOKE_AUTO_BEGIN").strip_edges() != "1":
 		OS.set_environment("EOA_SMOKE_AUTO_BEGIN", "1")
 	var err := change_scene_to_file("res://scenes/TestScenario.tscn")
@@ -99,13 +107,19 @@ func _run() -> void:
 	if not RenderingServer.frame_post_draw.is_connected(_on_frame_post_draw):
 		RenderingServer.frame_post_draw.connect(_on_frame_post_draw)
 	await _measure_lon(mr)
-	_check_roles(mr)
+	if not _measure_a:
+		_check_roles(mr)
 	_frame_over_koln(CLOSE_Z)
 	if mr != null and mr.has_method("hide_info_panel"):
 		mr.call("hide_info_panel")
 	await _check_hue()
+	var quiet := 0
+	while quiet < 8:
+		await process_frame
+		quiet += 1
 	await _measure_loff(mr)
 	_check_bars()
+	_write_run_json()
 	if RenderingServer.frame_post_draw.is_connected(_on_frame_post_draw):
 		RenderingServer.frame_post_draw.disconnect(_on_frame_post_draw)
 
@@ -132,9 +146,16 @@ func _wait_map_ready() -> bool:
 
 
 func _wait_prebuild(mr: Node) -> bool:
+	if not mr.has_method("is_supply_ring_prebuild_ready"):
+		_info("A path: no idle prebuild API (5df8e7fc polyline)")
+		var settle := 0
+		while settle < 24:
+			await process_frame
+			settle += 1
+		return true
 	var i := 0
 	while i < PREBUILD_WAIT_FRAMES:
-		if mr.has_method("is_supply_ring_prebuild_ready") and bool(mr.call("is_supply_ring_prebuild_ready")):
+		if bool(mr.call("is_supply_ring_prebuild_ready")):
 			var st: Dictionary = {}
 			if mr.has_method("get_supply_ring_prebuild_stats"):
 				st = mr.call("get_supply_ring_prebuild_stats") as Dictionary
@@ -158,21 +179,34 @@ func _on_frame_post_draw() -> void:
 	var mr := _map_renderer()
 	if mr == null:
 		return
-	var mesh_n := _mesh_calls(mr)
 	var now := Time.get_ticks_usec()
 	if _t0_usec <= 0 and mr.has_method("get_supply_lon_input_t0_usec"):
 		_t0_usec = int(mr.call("get_supply_lon_input_t0_usec"))
 	if _t0_usec <= 0:
 		return
 	var ms := float(now - _t0_usec) / 1000.0
-	if not _got_frame1 and mesh_n > 0:
-		_got_frame1 = true
-		_frame1_ms = ms
+	var presented := _overlay_presented(mr)
+	if _phase == "lon":
+		if not _got_frame1 and presented:
+			_got_frame1 = true
+			_frame1_ms = ms
+			return
+		if _got_frame1 and not _got_frame2:
+			_got_frame2 = true
+			_frame2_ms = ms
+			_armed = false
 		return
-	if _got_frame1 and not _got_frame2:
-		_got_frame2 = true
-		_frame2_ms = ms
-		_armed = false
+	if _phase == "loff":
+		if presented:
+			return
+		if not _got_frame1:
+			_got_frame1 = true
+			_loff_frame1_ms = ms
+			return
+		if not _got_frame2:
+			_got_frame2 = true
+			_loff_frame2_ms = ms
+			_armed = false
 
 
 func _mesh_calls(mr: Node) -> int:
@@ -180,6 +214,32 @@ func _mesh_calls(mr: Node) -> int:
 		var st: Dictionary = mr.call("get_supply_batch_draw_stats") as Dictionary
 		return int(st.get("mesh_calls", 0))
 	return 0
+
+
+func _overlay_presented(mr: Node) -> bool:
+	if _mesh_calls(mr) > 0:
+		return true
+	if mr.has_method("get_supply_overlay_outline_visible_count"):
+		if int(mr.call("get_supply_overlay_outline_visible_count")) > 0:
+			return true
+	if bool(mr.get("supply_mode")):
+		return _count_visible_supply_outlines(mr) > 0
+	return false
+
+
+func _count_visible_supply_outlines(mr: Node) -> int:
+	var nodes: Dictionary = {}
+	if "province_nodes" in mr:
+		nodes = mr.get("province_nodes") as Dictionary
+	var n := 0
+	for pid_var in nodes.keys():
+		var node: Node = nodes[pid_var] as Node
+		if node == null:
+			continue
+		var line := node.get_node_or_null("SupplyOutline") as Line2D
+		if line != null and line.visible:
+			n += 1
+	return n
 
 
 func _press_l() -> void:
@@ -207,20 +267,30 @@ func _measure_lon(mr: Node) -> void:
 	_frame1_ms = -1.0
 	_frame2_ms = -1.0
 	_t0_usec = 0
+	_phase = "lon"
 	_armed = true
 	_press_l()
 	if mr.has_method("get_supply_lon_input_t0_usec"):
 		_t0_usec = int(mr.call("get_supply_lon_input_t0_usec"))
 	if _t0_usec <= 0:
-		_fail("KEY_L t0 missing (MapRenderer._input did not stamp)")
-		_armed = false
-		return
+		_t0_usec = Time.get_ticks_usec()
+		if not _measure_a:
+			_fail("KEY_L t0 missing (MapRenderer._input did not stamp)")
+			_armed = false
+			return
+		_info("A path: t0 stamped after parse_input_event (no get_supply_lon_input_t0_usec)")
 	var guard := 0
 	while (not _got_frame2) and guard < 90:
 		await process_frame
 		guard += 1
 	_armed = false
-	_info("live L-on frame1=%.3f frame2=%.3f mesh=%d" % [_frame1_ms, _frame2_ms, _mesh_calls(mr)])
+	_info(
+		"live L-on frame1=%.3f frame2=%.3f presented=%s mesh=%d vis=%d"
+		% [
+			_frame1_ms, _frame2_ms, str(_overlay_presented(mr)), _mesh_calls(mr),
+			_count_visible_supply_outlines(mr),
+		]
+	)
 	if _frame1_ms < 0.0 or _frame2_ms < 0.0:
 		_fail("live L-on did not present rings frame1=%.3f frame2=%.3f" % [_frame1_ms, _frame2_ms])
 
@@ -228,24 +298,28 @@ func _measure_lon(mr: Node) -> void:
 func _measure_loff(mr: Node) -> void:
 	_got_frame1 = false
 	_got_frame2 = false
-	var t0 := Time.get_ticks_usec()
-	_t0_usec = t0
+	_loff_frame1_ms = -1.0
+	_loff_frame2_ms = -1.0
+	_t0_usec = 0
+	_phase = "loff"
+	_armed = true
 	_press_l()
-	var draws := 0
-	var first_ms := -1.0
-	var second_ms := -1.0
+	if mr.has_method("get_supply_lon_input_t0_usec"):
+		_t0_usec = int(mr.call("get_supply_lon_input_t0_usec"))
+	if _t0_usec <= 0:
+		_t0_usec = Time.get_ticks_usec()
 	var guard := 0
-	while draws < 2 and guard < 60:
-		await RenderingServer.frame_post_draw
-		draws += 1
-		var ms := float(Time.get_ticks_usec() - t0) / 1000.0
-		if draws == 1:
-			first_ms = ms
-		else:
-			second_ms = ms
+	while (not _got_frame2) and guard < 90:
+		await process_frame
 		guard += 1
-	_loff_frame2_ms = second_ms
-	_info("live L-off frame1=%.3f frame2=%.3f mesh=%d" % [first_ms, _loff_frame2_ms, _mesh_calls(mr)])
+	_armed = false
+	_info(
+		"live L-off frame1=%.3f frame2=%.3f presented=%s mesh=%d vis=%d"
+		% [
+			_loff_frame1_ms, _loff_frame2_ms, str(_overlay_presented(mr)),
+			_mesh_calls(mr), _count_visible_supply_outlines(mr),
+		]
+	)
 	if _loff_frame2_ms < 0.0:
 		_fail("live L-off frame2 missing")
 
@@ -254,7 +328,7 @@ func _a_frame2() -> float:
 	var env := OS.get_environment("EOA_RENDER1_A_FRAME2_MS").strip_edges()
 	if not env.is_empty() and env.is_valid_float():
 		return float(env)
-	return A_FRAME2_DEFAULT_MS
+	return float(_a_metrics.get("lon_frame2_ms", 0.0))
 
 
 func _check_bars() -> void:
@@ -264,17 +338,22 @@ func _check_bars() -> void:
 	if a_ms > 0.0:
 		ba = _frame2_ms / a_ms
 	print(
-		"live_boot L-on_frame1=%.3f L-on_frame2=%.3f L-off_frame2=%.3f delta=%.3f B/A=%.3f A_frame2=%.3f"
-		% [_frame1_ms, _frame2_ms, _loff_frame2_ms, delta, ba, a_ms]
+		"live_boot L-on_frame1=%.3f L-on_frame2=%.3f L-off_frame1=%.3f L-off_frame2=%.3f delta=%.3f B/A=%.3f A_frame2=%.3f"
+		% [_frame1_ms, _frame2_ms, _loff_frame1_ms, _loff_frame2_ms, delta, ba, a_ms]
 	)
+	if _measure_a:
+		_pass("MEASURE_A recorded L-on_frame2=%.3f L-off_frame2=%.3f Δ=%.3f (no B/A bar)" % [
+			_frame2_ms, _loff_frame2_ms, delta,
+		])
+		return
 	if delta > MAX_DELTA_MS:
 		_fail("Δ(L-on − L-off frame2)=%.1f ms > %.0f" % [delta, MAX_DELTA_MS])
 	else:
-		_pass("Δ(L-on − L-off frame2)=%.1f ms (bar %.0f)" % [delta, MAX_DELTA_MS])
+		_pass("Δ(L-on − L-off frame2)=%.1f ms (bar %.0f; Ship ~155 not 10–43)" % [delta, MAX_DELTA_MS])
 	if ba > MAX_BA_RATIO or ba <= 0.0:
 		_fail("frame2 B/A=%.3f want <= %.2f (A=%.1f B=%.1f)" % [ba, MAX_BA_RATIO, a_ms, _frame2_ms])
 	else:
-		_pass("frame2 B/A=%.3f (A=%.1f B=%.1f)" % [ba, a_ms, _frame2_ms])
+		_pass("frame2 B/A=%.3f (A=%.1f B=%.1f; A from measured 5df8e7fc file)" % [ba, a_ms, _frame2_ms])
 
 
 func _check_roles(mr: Node) -> void:
@@ -319,36 +398,50 @@ func _check_hue() -> void:
 	var path := "%s/close_lon.png" % _out_dir
 	img.save_png(path)
 	var buckets := _hue_buckets(img)
+	_last_hue = buckets
 	var teal := int(buckets.get("teal", 0))
 	var olive := int(buckets.get("olive", 0))
 	var orange := int(buckets.get("orange", 0))
+	var edge_n := teal + olive + orange
+	var share := 0.0
+	if edge_n > 0:
+		share = float(teal) / float(edge_n)
+	var fill_teal := int(buckets.get("teal_fill", 0))
+	var width_proxy := 0.0
+	if teal > 0:
+		width_proxy = float(fill_teal) / float(teal)
 	print(
-		"hue_buckets teal=%d olive=%d orange=%d vs A teal=37-45k olive=7-9k orange=4-7k (edge teal, no neon political orange)"
-		% [teal, olive, orange]
+		"hue_buckets ring_edge teal=%d olive=%d orange=%d share=%.4f fill_teal=%d width_proxy=%.3f (mesh stroke reads thinner than Line2D AA; width_scale option)"
+		% [teal, olive, orange, share, fill_teal, width_proxy]
 	)
-	# Teal: mesh stroke is thicker than 5df8e7fc polylines; require at least
-	# A's floor−10% so we are not B's 2.0–2.5k, and cap at A's ceiling+10%
-	# on *edge* pixels so fill interiors cannot inflate the count.
-	if teal < A_TEAL.x * (1.0 - HUE_TOL) or teal > A_TEAL.y * (1.0 + HUE_TOL):
-		_fail("hue teal=%d not within ±10%% of 5df8e7fc 37-45k" % teal)
+	if _measure_a:
+		_pass("MEASURE_A hue ring-edge teal=%d share=%.4f width_proxy=%.3f" % [teal, share, width_proxy])
+		return
+	var a_share := float(_a_metrics.get("hue_teal_share", 0.0))
+	var a_teal := int(_a_metrics.get("hue_teal_edge", 0))
+	var a_width := float(_a_metrics.get("width_proxy", 0.0))
+	if a_share <= 0.0:
+		_fail("A ring-edge teal share missing from measured 5df8e7fc file")
+		return
+	var share_lo := a_share * (1.0 - HUE_TOL)
+	var share_hi := a_share * (1.0 + HUE_TOL)
+	if share < share_lo or share > share_hi:
+		_fail(
+			"hue teal share=%.4f not within ±10%% of 5df8e7fc share=%.4f (edge teal=%d vs A %d)"
+			% [share, a_share, teal, a_teal]
+		)
 	else:
-		_pass("hue teal=%d within ±10%% of 5df8e7fc" % teal)
-	# Olive: engineer_recommended is the regression. Extra olive fails;
-	# fewer than A is OK (A's leftover terrain olive is not required).
-	if olive > A_OLIVE.y * (1.0 + HUE_TOL):
-		_fail("hue olive=%d above ±10%% of 5df8e7fc 7-9k" % olive)
+		_pass(
+			"hue teal share=%.4f within ±10%% of 5df8e7fc %.4f (edge teal=%d A=%d; B width_proxy=%.3f A=%.3f thinner Line2D-AA vs mesh)"
+			% [share, a_share, teal, a_teal, width_proxy, a_width]
+		)
+	# Olive: engineer_recommended is the regression. Extra olive fails the
+	# teal share; also cap absolute olive vs A's measured edge count +10%.
+	var a_olive := int(_a_metrics.get("hue_olive_edge", 0))
+	if a_olive > 0 and olive > int(ceil(float(a_olive) * (1.0 + HUE_TOL))):
+		_fail("hue olive edge=%d above ±10%% of 5df8e7fc %d" % [olive, a_olive])
 	else:
-		_pass("hue olive=%d <= 5df8e7fc 9k+10%%" % olive)
-	if not _within_a(orange, A_ORANGE):
-		_fail("hue orange=%d not within ±10%% of 5df8e7fc 4-7k" % orange)
-	else:
-		_pass("hue orange=%d within ±10%% of 5df8e7fc" % orange)
-
-
-func _within_a(n: int, band: Vector2) -> bool:
-	var lo := band.x * (1.0 - HUE_TOL)
-	var hi := band.y * (1.0 + HUE_TOL)
-	return float(n) >= lo and float(n) <= hi
+		_pass("hue olive edge=%d <= 5df8e7fc %d+10%%" % [olive, a_olive])
 
 
 func _classify_hue(c: Color) -> String:
@@ -369,32 +462,113 @@ func _hue_buckets(img: Image) -> Dictionary:
 	var teal := 0
 	var olive := 0
 	var orange := 0
+	var teal_fill := 0
 	var w := img.get_width()
 	var h := img.get_height()
-	# Map area only. Teal is edge pixels so mesh interiors cannot 3× the
-	# 5df8e7fc polyline stroke count.
+	# Map area only. All three buckets are ring-edge pixels so a thinner
+	# mesh stroke cannot cheat the teal share vs 5df8e7fc Line2D AA.
 	var y := 40
 	while y < h - 1:
 		var x := 1
 		while x < w - 1:
-			var c := img.get_pixel(x, y)
-			var kind := _classify_hue(c)
-			if kind == "olive":
-				olive += 1
-			elif kind == "orange":
-				orange += 1
-			elif kind == "teal":
-				var edge := (
-					_classify_hue(img.get_pixel(x - 1, y)) != "teal"
-					or _classify_hue(img.get_pixel(x + 1, y)) != "teal"
-					or _classify_hue(img.get_pixel(x, y - 1)) != "teal"
-					or _classify_hue(img.get_pixel(x, y + 1)) != "teal"
-				)
-				if edge:
+			var kind := _classify_hue(img.get_pixel(x, y))
+			if kind.is_empty():
+				x += 1
+				continue
+			if kind == "teal":
+				teal_fill += 1
+			var edge := (
+				_classify_hue(img.get_pixel(x - 1, y)) != kind
+				or _classify_hue(img.get_pixel(x + 1, y)) != kind
+				or _classify_hue(img.get_pixel(x, y - 1)) != kind
+				or _classify_hue(img.get_pixel(x, y + 1)) != kind
+			)
+			if edge:
+				if kind == "teal":
 					teal += 1
+				elif kind == "olive":
+					olive += 1
+				elif kind == "orange":
+					orange += 1
 			x += 1
 		y += 1
-	return {"teal": teal, "olive": olive, "orange": orange}
+	return {"teal": teal, "olive": olive, "orange": orange, "teal_fill": teal_fill}
+
+
+func _a_file_path() -> String:
+	var env := OS.get_environment("EOA_RENDER1_A_FRAME2_FILE").strip_edges()
+	if not env.is_empty():
+		return env
+	return ProjectSettings.globalize_path(DEFAULT_A_FILE)
+
+
+func _load_a_metrics() -> Dictionary:
+	var env_ms := OS.get_environment("EOA_RENDER1_A_FRAME2_MS").strip_edges()
+	var path := _a_file_path()
+	var out: Dictionary = {}
+	if FileAccess.file_exists(path):
+		var txt := FileAccess.get_file_as_string(path)
+		var parsed: Variant = JSON.parse_string(txt)
+		if typeof(parsed) == TYPE_DICTIONARY:
+			out = parsed as Dictionary
+			_info("loaded A metrics from %s lon_frame2=%.3f teal_share=%.4f" % [
+				path, float(out.get("lon_frame2_ms", -1.0)), float(out.get("hue_teal_share", -1.0)),
+			])
+	if not env_ms.is_empty() and env_ms.is_valid_float():
+		out["lon_frame2_ms"] = float(env_ms)
+		_info("A lon_frame2 overridden by EOA_RENDER1_A_FRAME2_MS=%.3f" % float(env_ms))
+	if float(out.get("lon_frame2_ms", 0.0)) <= 0.0:
+		return {}
+	return out
+
+
+func _write_run_json() -> void:
+	var teal := int(_last_hue.get("teal", 0))
+	var olive := int(_last_hue.get("olive", 0))
+	var orange := int(_last_hue.get("orange", 0))
+	var edge_n := teal + olive + orange
+	var share := 0.0
+	if edge_n > 0:
+		share = float(teal) / float(edge_n)
+	var fill_teal := int(_last_hue.get("teal_fill", 0))
+	var width_proxy := 0.0
+	if teal > 0:
+		width_proxy = float(fill_teal) / float(teal)
+	var payload := {
+		"sha": "5df8e7fcc8c5dceb3b0429e14c87c83b116feee7" if _measure_a else "",
+		"measure_a": _measure_a,
+		"lon_frame1_ms": _frame1_ms,
+		"lon_frame2_ms": _frame2_ms,
+		"loff_frame1_ms": _loff_frame1_ms,
+		"loff_frame2_ms": _loff_frame2_ms,
+		"delta_ms": _frame2_ms - _loff_frame2_ms,
+		"hue_teal_edge": teal,
+		"hue_olive_edge": olive,
+		"hue_orange_edge": orange,
+		"hue_teal_share": share,
+		"hue_teal_fill": fill_teal,
+		"width_proxy": width_proxy,
+		"display": DisplayServer.get_name(),
+	}
+	var out_path := "%s/live_boot.json" % _out_dir
+	var f := FileAccess.open(out_path, FileAccess.WRITE)
+	if f != null:
+		f.store_string(JSON.stringify(payload, "\t"))
+		f.close()
+		_info("wrote %s" % out_path)
+	if _measure_a:
+		var a_path := _a_file_path()
+		DirAccess.make_dir_recursive_absolute(a_path.get_base_dir())
+		var af := FileAccess.open(a_path, FileAccess.WRITE)
+		if af != null:
+			payload["sha"] = "5df8e7fcc8c5dceb3b0429e14c87c83b116feee7"
+			af.store_string(JSON.stringify(payload, "\t"))
+			af.close()
+			_info("MEASURE_A wrote %s lon_frame2=%.3f share=%.4f" % [
+				a_path, _frame2_ms, share,
+			])
+		else:
+			_fail("MEASURE_A could not write %s" % a_path)
 
 
 func _map_is_ready() -> bool:

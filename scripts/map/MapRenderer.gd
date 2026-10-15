@@ -460,6 +460,7 @@ var _supply_prebuild_seen_depots: int = 0
 var _supply_roles_cache_role_fp: String = ""
 var _supply_role_lon_semantics: bool = false
 var _supply_lon_input_t0_usec: int = 0
+var _supply_prebuild_used_allow_without: bool = false
 var _compare_candidate_ids: Array[int] = []
 var _supply_legend_panel: PanelContainer = null
 var _supply_legend_pulse_border: Control = null
@@ -29519,6 +29520,8 @@ func _supply_role_context() -> Dictionary:
 
 
 func _supply_role_for_pid(pid: int, ctx: Dictionary = {}, allow_without_overlay: bool = false) -> String:
+	if allow_without_overlay and _supply_prebuild_phase == SUPPLY_PREBUILD_ROLES:
+		_supply_prebuild_used_allow_without = true
 	if ctx.is_empty():
 		ctx = _supply_role_context()
 	var role := ""
@@ -29862,6 +29865,14 @@ func get_supply_roles_cache_copy() -> Dictionary:
 	return _supply_roles_cache.duplicate()
 
 
+func get_supply_prebuild_roles_copy() -> Dictionary:
+	return _supply_prebuild_roles.duplicate()
+
+
+func prebuild_used_allow_without_overlay() -> bool:
+	return _supply_prebuild_used_allow_without
+
+
 func is_supply_ring_prebuild_ready() -> bool:
 	return _supply_ring_prebuild_done and _supply_outline_batch_is_ready()
 
@@ -30178,6 +30189,9 @@ func _ensure_supply_outline_batch() -> Node2D:
 	batch.name = "SupplyOutlineBatch"
 	container.add_child(batch)
 	_supply_outline_batch = batch
+	var env_w := OS.get_environment("EOA_RENDER1_RING_WIDTH_SCALE").strip_edges()
+	if env_w.is_valid_float() and batch.has_method("set_width_scale"):
+		batch.call("set_width_scale", float(env_w))
 	return _supply_outline_batch
 
 
@@ -30211,6 +30225,7 @@ func _tick_supply_ring_idle_prebuild() -> void:
 		_supply_prebuild_mesh_begun = false
 		_supply_prebuild_warm_frames = 0
 		_supply_prebuild_ctx = _supply_role_context()
+		_supply_prebuild_used_allow_without = false
 		_ensure_supply_outline_batch()
 		_supply_prebuild_phase = SUPPLY_PREBUILD_ROLES
 		_supply_prebuild_setup_ms = float(Time.get_ticks_usec() - t0) / 1000.0
@@ -30236,6 +30251,10 @@ func _tick_supply_ring_idle_prebuild() -> void:
 	_supply_prebuild_frames += 1
 
 
+func _prebuild_role_allow_flag() -> bool:
+	return OS.get_environment("EOA_RENDER1_PREBUILD_MUTANT").strip_edges() == "allow_without_overlay"
+
+
 func _supply_prebuild_usec_left(t0: int) -> int:
 	return int(SUPPLY_RING_IDLE_WORK_MS * 1000.0) - (Time.get_ticks_usec() - t0)
 
@@ -30252,10 +30271,13 @@ func _step_supply_prebuild_roles(t0: int) -> void:
 		_supply_prebuild_ctx = _supply_role_context()
 	var saved_sem := _supply_role_lon_semantics
 	_supply_role_lon_semantics = true
+	var mutant := OS.get_environment("EOA_RENDER1_PREBUILD_MUTANT").strip_edges()
+	if mutant == "lon_semantics_off":
+		_supply_role_lon_semantics = false
 	var n := _supply_prebuild_pids.size()
 	while _supply_prebuild_cursor < n and _supply_prebuild_usec_left(t0) > 0:
 		var pid := int(_supply_prebuild_pids[_supply_prebuild_cursor])
-		var role := _supply_role_for_pid(pid, _supply_prebuild_ctx)
+		var role := _supply_role_for_pid(pid, _supply_prebuild_ctx, _prebuild_role_allow_flag())
 		if not role.is_empty():
 			_supply_prebuild_roles[pid] = role
 		_supply_prebuild_cursor += 1

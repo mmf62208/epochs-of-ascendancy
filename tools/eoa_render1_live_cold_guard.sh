@@ -10,7 +10,13 @@ cd "$ROOT"
 OUT="${EOA_RENDER1_LIVE_OUT:-/tmp/eoa-render1-live}"
 mkdir -p "$OUT"
 export EOA_RENDER1_LIVE_OUT="$OUT"
-echo "EOA_RENDER1_LIVE_COLD who=wrapper out=$OUT xvfb=1 runs=3 (NOT product Play)"
+A_FILE="${EOA_RENDER1_A_FRAME2_FILE:-$ROOT/docs/evidence/render1/a_live_5df8e7fc.json}"
+export EOA_RENDER1_A_FRAME2_FILE="$A_FILE"
+echo "EOA_RENDER1_LIVE_COLD who=wrapper out=$OUT a_file=$A_FILE xvfb=1 runs=3 (NOT product Play)"
+if [[ "${EOA_RENDER1_MEASURE_A:-}" != "1" && -z "${EOA_RENDER1_A_FRAME2_MS:-}" && ! -f "$A_FILE" ]]; then
+  echo "WindowedRender1LiveColdGuard: RESULT=FAIL A frame2 file missing: $A_FILE (measure on 5df8e7fc; A_FRAME2_DEFAULT_MS deleted)" >&2
+  exit 1
+fi
 if ! command -v xvfb-run >/dev/null 2>&1; then
   echo "WindowedRender1LiveColdGuard: RESULT=FAIL need xvfb-run" >&2
   exit 1

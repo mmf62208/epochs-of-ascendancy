@@ -250,6 +250,8 @@ else
 
   run_step launch_render1_supply_ring_mesh \
     tools/run_godot.sh --headless --resolution 1280x740 -s res://scripts/core/HeadlessRender1SupplyRingMeshTest.gd || fail
+  run_step launch_render1_prebuild_roles \
+    tools/eoa_render1_prebuild_role.sh || fail
   run_step launch_render1_draw_guard \
     tools/eoa_render1_draw_guard.sh || fail
   run_step launch_render1_live_cold \

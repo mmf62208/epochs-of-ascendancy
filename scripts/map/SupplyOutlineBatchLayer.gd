@@ -4,6 +4,12 @@ extends Node2D
 ## underlay). One mesh pair per (role colour × map chunk). Steady _draw only
 ## submits those meshes via draw_mesh. Home-zoom uses decimated rings; close-up
 ## uses full geometry plus a view-rect cull. Pulse is modulate-only.
+##
+## Mesh extrusion has hard edges, so the same style width reads thinner than
+## 5df8e7fc's antialiased Line2D stroke. `width_scale` (default 1.0) thickens
+## the world-space extrusion; set via `set_width_scale` or
+## EOA_RENDER1_RING_WIDTH_SCALE. Hue gates compare ring-edge teal *share*, not
+## absolute fill counts.
 
 const CHUNK_WORLD := 192.0
 const HOME_ZOOM := 0.318
@@ -73,6 +79,9 @@ var _last_idle_step_ms: float = 0.0
 var _idle_total_ms: float = 0.0
 var _idle_warm_saved_modulate: Color = Color.WHITE
 var _idle_warmed: bool = false
+## Product default 1.0. Line2D AA on 5df8e7fc reads thicker at the same style
+## width; raise this (e.g. 1.35) to match visual weight without changing roles.
+var width_scale: float = 1.0
 
 
 func _ready() -> void:
@@ -102,6 +111,14 @@ func _clear_state() -> void:
 	_idle_chunk_keys = PackedStringArray()
 	_idle_chunk_at = 0
 	_idle_phase = IDLE_PREBUILD_NONE
+
+
+func set_width_scale(scale: float) -> void:
+	width_scale = maxf(scale, 0.05)
+
+
+func get_width_scale() -> float:
+	return width_scale
 
 
 func clear_items() -> void:
@@ -670,13 +687,14 @@ func _rebuild_chunk(key: String) -> void:
 			width = float(meta.get("width", 1.8))
 			glow_extra = float(meta.get("glow_extra", 2.0))
 		var ring := _points_for_lod(pid)
-		var hw_glow := width + glow_extra
+		var scaled_w := width * width_scale
+		var hw_glow := scaled_w + glow_extra * width_scale
 		if radial:
 			glow_at = _write_radial(ring, hw_glow, glow_v, glow_at)
-			core_at = _write_radial(ring, width, core_v, core_at)
+			core_at = _write_radial(ring, scaled_w, core_v, core_at)
 		else:
 			glow_at = _write_miter(ring, hw_glow, glow_v, glow_at)
-			core_at = _write_miter(ring, width, core_v, core_at)
+			core_at = _write_miter(ring, scaled_w, core_v, core_at)
 		var ring_aabb := _ring_aabb(ring, hw_glow * 0.5)
 		if not aabb_set:
 			aabb = ring_aabb
