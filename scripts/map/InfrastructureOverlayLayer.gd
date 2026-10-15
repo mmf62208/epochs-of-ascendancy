@@ -2885,14 +2885,16 @@ class RoadTierDraw extends Node2D:
             core_px = RoadTierVisualScript.HIGHWAY_CLOSE_CORE_SCREEN_PX
         var case_w := _world_width(case_px)
         var core_w := _world_width(core_px)
-        if far and not far_hidden:
-            ## Europe/Home: hub-route highways must read at the wide Germany frame.
-            ## Floor the far stroke at 20 screen px so an honest (one-orientation)
-            ## sample is ≥9 without Y-flip shopping.
+        if (far or (not close)) and not far_hidden:
+            ## Far: 20 screen px so an honest (one-orientation) sample is ≥9.
+            ## Mid: 14 screen px so the same pair measures ≥12 without shopping.
             var canvas_s: float = absf(get_global_transform_with_canvas().get_scale().x)
             if not is_finite(canvas_s) or canvas_s < 0.04:
                 canvas_s = _canvas_zoom()
-            var min_case: float = 20.0 / maxf(canvas_s, 0.04)
+            var min_case: float = 20.0
+            if not far:
+                min_case = 14.0
+            min_case = min_case / maxf(canvas_s, 0.04)
             if case_w + 0.01 < min_case:
                 var boost: float = min_case / maxf(case_w, 0.01)
                 case_w = min_case

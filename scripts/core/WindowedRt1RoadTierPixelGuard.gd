@@ -467,12 +467,14 @@ func _resolve_sample_pair(kind: String, fallback_a: int, fallback_b: int) -> Vec
 		var mid: Vector2 = c1.lerp(c2, 0.5)
 		if _world_mid_under_visible_control(mid):
 			continue
-		if (a == fallback_a and b == fallback_b) or (b == fallback_a and a == fallback_b):
-			return Vector2i(a, b)
 		if bool(row.get("explicit", false)):
 			continue
 		if int(row.get("display_tier", row.get("tier", -1))) != want:
 			continue
+		if c1.distance_to(c2) < 6.0:
+			continue
+		if (a == fallback_a and b == fallback_b) or (b == fallback_a and a == fallback_b):
+			return Vector2i(a, b)
 		# Gold spine neighbours read as 16 px amber, not the paved/dirt look.
 		if a == KOELN or b == KOELN or a == BONN or b == BONN or a == LEV or b == LEV:
 			continue
@@ -866,6 +868,9 @@ func _sample_gold_on_spine(img: Image) -> float:
 	for i in range(1, pts.size()):
 		var a: Vector2 = xform * pts[i - 1]
 		var b: Vector2 = xform * pts[i]
+		if _image_y_flipped:
+			a = Vector2(a.x, float(img.get_height()) - a.y)
+			b = Vector2(b.x, float(img.get_height()) - b.y)
 		var steps := maxi(8, int(a.distance_to(b) / 3.0))
 		for s in range(steps + 1):
 			var p := a.lerp(b, float(s) / float(steps))
@@ -874,7 +879,7 @@ func _sample_gold_on_spine(img: Image) -> float:
 			if x < 1 or y < 1 or x >= img.get_width() - 1 or y >= img.get_height() - 1:
 				continue
 			total += 1
-			if _neighborhood_gold(img, x, y, 3):
+			if _neighborhood_gold(img, x, y, 4):
 				hits += 1
 	if total <= 0:
 		return 0.0
