@@ -940,6 +940,21 @@ Guard `HeadlessWheelDrift1Test` (fixture, not WorldMap.tscn / 3520):
 
 Must **FAIL** on main MapRenderer and **PASS** on this tip. Recipe `docs/evidence/wheeldrift1/CLICKS.md`. CameraController / GameData / TipDismiss / ORDERS **unedited**. Headless + xvfb **NOT live Play**.
 
+### EDGE-2 calm rim pan (draft HOLD, stacked on #105)
+
+Probe on WHEELDRIFT-1 `b7affe58`: cursor on the right rim starts pan ~0.5 s after the last wheel notch then runs at full speed instantly (~2200–2600 screen px/s ÷ zoom; ~3× world at Home ~0.33). No dwell outside the post-wheel window, no ramp, no far-zoom cap. Left rim never pans: `edge_pan_direction_at` is symmetric, but `edge_pan_blocked_by_gui` / `hovered_ui_blocks_edge_pan` treat MapModeToolbar / legend / left-docked InfoPanel / minimap as blockers (UI-1 TopInfoBar exemption is north-only), and `_mouse_over_map_chrome_blocks_edge_pan` skipped only the north 6px strip.
+
+Product (MapRenderer nav block + MapViewInput HUD exemption; off `b7affe58`): 250 ms continuous rim contact before any pan; speed ramps 0→full over ~600 ms of contact (reset on leave); below Home zoom 0.33 do not scale world speed by 1/zoom past Home; left HUD exempt **only** in the UI-1 6px left strip (toasts / unit cards / Leaders still block). WHEELDRIFT-1 350+150 and 6/10 px strips **unedited**.
+
+Guard `HeadlessEdge2RimFeelTest` (fixture, not WorldMap.tscn / 3520):
+
+- 0 px panned before 250 ms dwell (`no_dwell`)
+- distance at 0.3 s of contact < 25% of full-speed distance (`no_dwell` / `no_ramp`)
+- far-zoom world speed capped at Home (`no_cap`)
+- left-rim direction non-zero with HUD present (`left_blocked`)
+
+Must **FAIL** on `b7affe58` and **PASS** on this tip. Recipe `docs/evidence/edge2/CLICKS.md`. CameraController / GameData / TipDismiss / ORDERS **unedited**. Headless **NOT live Play**.
+
 ### EDGE-1 first-session edge-pan feel (draft HOLD)
 
 Play 1280×740: far-right hover ≈x=1270 (incl. top-right corner y≈1) missed while left/top/bottom panned. **Proven:** UI-1 6px strip starts at `x >= 1274`. Existing `MapViewInput` adds `EDGE_PAN_RIGHT_SCREEN_PX=10`; other rims stay 6px so (97,731) still rests. Toast hover still blocks. Close-held north-strip suppress kept. Home framing unedited. Toast-before-drag / large-drag-south hunches not reproduced. Guard: `HeadlessEdge1CameraFeelTest` + `tools/eoa_edge1_guard.sh`. Recipe `docs/evidence/edge1/CLICKS.md`. TipDismiss / ORDERS layout / chip hit-rank **unedited**. Headless + xvfb **NOT live Play**.
