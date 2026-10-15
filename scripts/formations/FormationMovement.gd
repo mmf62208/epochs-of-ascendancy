@@ -49,10 +49,12 @@ static func _clamp(v: float, lo: float, hi: float) -> float:
 
 static func hop_days(terrain: String, infra: float, template_speed: float, template_kind: String = "infantry") -> float:
 	# mirrors unit_own_land_march_product.hop_days
-	var terr := str(terrain or "plains").strip_edges().to_lower()
+	var terr := str(terrain).strip_edges().to_lower()
 	if terr.is_empty():
 		terr = "plains"
-	var kind := str(template_kind or "infantry").strip_edges().to_lower()
+	var kind := str(template_kind).strip_edges().to_lower()
+	if kind.is_empty():
+		kind = "infantry"
 	var days := BASE_HOP_DAYS * _terrain_cost(terr) * _infra_cost(infra) * _speed_cost(template_speed)
 	if terr == "mountain" and "mountain" in kind:
 		days *= MOUNTAIN_INFANTRY_DISCOUNT
