@@ -925,6 +925,21 @@ Halt / Press / Hold / Withdraw / Assign must not `free()` `UnitDetailPopup` whil
 
 Title **Begin** fires on press and `queue_free()`s the overlay. A normal ~80–150 ms mouse-up then still-clicked the map (Loir-et-Cher after Home at 1280×740 ~284,580): inspector + soft click-zoom ~0.776→0.900. Instant 0 ms release did not. Product: TipDismiss-style one-shot swallow of the leftover left release, armed on pointer Begin only (keyboard Enter/Space/B must not eat the next map click). **FIX #2 (code SHA `f18a341a`; later commits test/docs only):** clock starts on the first `_process` after the Begin frame (restamp); expiry only after that restamp and frames >= arm_frame + 2. Poll-path `handle_live_pointer(null)` sets `begin_press_pending` so the click's own N+1 press keeps the arm. Event-path keeps the same-frame rule. **FIX #3 (test-only):** leftover / follow-up go through `_title._input` + same-frame `Input.parse_input_event` + `flush_buffered_events` (direct `_mr._input` leftover does not pick on main). T1 FAIL on main (Loir `710671`) / PASS on tip. T2 later click picks (M2). T3 poll 1000 ms + 3 frames then first click (M1). T4 same-frame 900 ms release N+2 swallowed (M7). T5 keeps (b); M3 outside-button leftover; M9 no T1–T5 behavior difference. Guard `HeadlessBegin1TitleReleaseFallthroughTest` + `tools/eoa_begin1_guard.sh`. **FIX #4 (gate wiring only):** `tools/eoa_full_test_gates.sh` `run_step launch_begin1_title_release` after `launch_ix1_title_esc_begin`. Code SHA remains `f18a341a`; later commits are test / docs / gates only. TipDismiss / camera / edge-pan / labels / fleet / unit pick **unedited**. Recipe `docs/evidence/begin1/CLICKS.md` (pre-step `timeout 1500 tools/run_godot.sh --headless --path . --import --quit`). Headless + xvfb **NOT live Play**.
 
+### WHEELDRIFT-1 wheel zoom + rim edge-pan (draft HOLD)
+
+Play (`d4a3a1ff`): wheel-only kept the point under the cursor (0 px), but in ×1.243 / out ×0.757 so 5 in + 5 out left the view ~26% further out. A cursor on the right/top/bottom rim (~3–4 px) edge-scrolled at ~1000 px/s; a wheel notch cleared `_close_suppress_edge` so zoom-at-the-edge flew the camera. Left rim at Home did not pan (theater clamp / 6 px strip). 15 px in did not pan (UI-1 strip, not the unused 64 px `edge_margin` export).
+
+Product (MapRenderer only, off main `61a80433`): `_zoom_toward_mouse(factor, event.position)` — clamp zoom, correct the world point under the event, then `_clamp_camera_to_theater` (no re-anchor). In/out are `factor_in` / `1/factor_in`. Every wheel notch arms a 350 ms edge hold + 150 ms strip dwell so EDGE-1 pan cannot run during the wheel. MapViewInput 6/10 px strips and edge speed **unedited**.
+
+Guard `HeadlessWheelDrift1Test` (fixture, not WorldMap.tscn / 3520):
+
+- **T1** BR rim, 10 in + 10 out: `_nav_edge_pan_frames` during wheel + 350 ms = 0 (`no_wheel_suppress`, `edge_ignores_hold`). After the hold, a strip dwell still pans (`suppress_forever`).
+- **T2** off-center (960,555), 10 in + 10 out: ≤2 px per notch after a process frame (`no_anchor_correction`); zoom+camera round-trip; clamp-bind zoom-out must not runaway (`clamp_before_anchor`).
+- **T3** event.position ≠ warped viewport mouse: anchor follows the event (`anchor_from_viewport_mouse`).
+- **T4** UI-1 rest (97,731), EDGE-1 L/R/T/B helpers, CLOSE-1b `_close_suppress_edge`, FAC-1a `event.position` pick, Vis1 harness present.
+
+Must **FAIL** on main MapRenderer and **PASS** on this tip. Recipe `docs/evidence/wheeldrift1/CLICKS.md`. CameraController / GameData / TipDismiss / ORDERS **unedited**. Headless + xvfb **NOT live Play**.
+
 ### EDGE-1 first-session edge-pan feel (draft HOLD)
 
 Play 1280×740: far-right hover ≈x=1270 (incl. top-right corner y≈1) missed while left/top/bottom panned. **Proven:** UI-1 6px strip starts at `x >= 1274`. Existing `MapViewInput` adds `EDGE_PAN_RIGHT_SCREEN_PX=10`; other rims stay 6px so (97,731) still rests. Toast hover still blocks. Close-held north-strip suppress kept. Home framing unedited. Toast-before-drag / large-drag-south hunches not reproduced. Guard: `HeadlessEdge1CameraFeelTest` + `tools/eoa_edge1_guard.sh`. Recipe `docs/evidence/edge1/CLICKS.md`. TipDismiss / ORDERS layout / chip hit-rank **unedited**. Headless + xvfb **NOT live Play**.
