@@ -1,15 +1,19 @@
 extends SceneTree
 
-## WINDOWED RENDER-1 draw gate. xvfb is NOT live Play.
+## WINDOWED RENDER-1 draw + cold-L gate. xvfb is NOT live Play.
 ## Engine draw counters must rise on L-on (392 on the tip). A 0 count is FAIL.
-## No grep fallback. skip_engine_draw (counter_lie) must produce delta 0.
+## counter_lie is a source edit in this test (draw_mesh removed, counters kept).
+## No product flag. No grep fallback.
 ##
 ##   tools/eoa_render1_draw_guard.sh
 
 const LAND_N := 3196
 const POLY_SIDES := 48
 const HOME_Z := 0.318
+const MAX_COLD_MS := 250.0
+const PREBUILD_WAIT_FRAMES := 240
 const LAYER_PATH := "res://scripts/map/SupplyOutlineBatchLayer.gd"
+const DRAW_MESH_CALL := "draw_mesh(mesh, null, Transform2D(), mesh_modulate)"
 const ROLES: Array[String] = [
 	"active", "preview", "route", "infra_sabotage", "infra_repair",
 	"infra_repair_engineers", "engineers_stationed", "engineers_needed",
@@ -18,6 +22,9 @@ const ROLES: Array[String] = [
 ]
 
 var _failures: int = 0
+var _mr: Node = null
+var _cam: Camera2D = null
+var _container: Node2D = null
 
 
 func _init() -> void:
@@ -57,25 +64,85 @@ func _run() -> void:
 	if root != null:
 		root.size = Vector2i(1280, 740)
 
+	var items := _make_items(LAND_N)
+	await _check_counter_lie_source_edit(items)
+	await _check_product_draws(items)
+	await _measure_cold_lon()
+
+
+func _load_layer_script(src: String) -> Script:
+	if src.is_empty():
+		return load(LAYER_PATH) as Script
+	var gs := GDScript.new()
+	gs.source_code = src
+	if gs.reload() != OK:
+		return null
+	return gs
+
+
+func _counter_lie_mutant_source() -> String:
+	var src := FileAccess.get_file_as_string(LAYER_PATH)
+	if src.find(DRAW_MESH_CALL) < 0:
+		return ""
+	return src.replace(DRAW_MESH_CALL, "pass # counter_lie mutant: draw_mesh removed")
+
+
+func _spawn_layer(scr: Script, items: Array[Dictionary]) -> Node2D:
+	var layer: Node2D = scr.new() as Node2D
+	if layer == null:
+		return null
+	root.add_child(layer)
+	layer.visible = true
+	layer.call("set_view", HOME_Z, Rect2(-2000, -2000, 8000, 4000))
+	layer.call("set_items", items)
+	return layer
+
+
+func _check_counter_lie_source_edit(items: Array[Dictionary]) -> void:
+	var mutant_src := _counter_lie_mutant_source()
+	if mutant_src.is_empty():
+		_fail("counter_lie source edit: product has no live draw_mesh call to strip")
+		return
+	var scr := _load_layer_script(mutant_src)
+	if scr == null:
+		_fail("counter_lie source edit: mutant script failed to reload")
+		return
+	var layer := _spawn_layer(scr, items)
+	if layer == null:
+		_fail("counter_lie source edit: could not instance mutant layer")
+		return
+	await _flush(4)
+	layer.queue_redraw()
+	await process_frame
+	await process_frame
+	var mesh_calls := 0
+	if layer.has_method("get_last_draw_stats"):
+		var st: Dictionary = layer.call("get_last_draw_stats") as Dictionary
+		mesh_calls = int(st.get("mesh_calls", 0))
+	var probe_delta := await _measure_engine_delta(layer)
+	_info("counter_lie source-edit probe mesh_calls=%d delta=%d (must be 0)" % [mesh_calls, probe_delta])
+	if probe_delta > 0:
+		_fail("counter_lie source-edit survived: draw_mesh stripped but engine delta=%d" % probe_delta)
+	else:
+		_pass("counter_lie source-edit: draw_mesh removed, counters=%d, engine delta=0 (FAIL path)" % mesh_calls)
+	layer.queue_free()
+
+
+func _check_product_draws(items: Array[Dictionary]) -> void:
 	var scr: Script = load(LAYER_PATH) as Script
 	if scr == null:
 		_fail("SupplyOutlineBatchLayer.gd missing")
 		return
-	var layer: Node2D = scr.new() as Node2D
+	var layer := _spawn_layer(scr, items)
 	if layer == null:
-		_fail("could not instance SupplyOutlineBatchLayer")
+		_fail("could not instance product SupplyOutlineBatchLayer")
 		return
-	root.add_child(layer)
-	layer.visible = true
-	var items := _make_items(LAND_N)
-	layer.call("set_view", HOME_Z, Rect2(-2000, -2000, 8000, 4000))
-	layer.call("set_items", items)
 	await _flush(4)
+	layer.queue_redraw()
+	await process_frame
+	await process_frame
 	var mesh_calls := 0
 	if layer.has_method("get_last_draw_stats"):
-		layer.queue_redraw()
-		await process_frame
-		await process_frame
 		var st: Dictionary = layer.call("get_last_draw_stats") as Dictionary
 		mesh_calls = int(st.get("mesh_calls", 0))
 	if mesh_calls < 300:
@@ -83,16 +150,6 @@ func _run() -> void:
 		layer.queue_free()
 		return
 	_info("mesh_calls=%d items=%d" % [mesh_calls, items.size()])
-
-	layer.set("skip_engine_draw", true)
-	var probe_delta := await _measure_engine_delta(layer)
-	layer.set("skip_engine_draw", false)
-	_info("counter_lie probe skip_engine_draw delta=%d (must be 0 / < mesh_calls)" % probe_delta)
-	if probe_delta >= mesh_calls and probe_delta > 0:
-		_fail("counter_lie probe survived: skip_engine_draw still reports delta=%d" % probe_delta)
-	else:
-		_pass("counter_lie probe: skip_engine_draw delta=%d would FAIL (0 count is FAIL)" % probe_delta)
-
 	var live_delta := await _measure_engine_delta(layer)
 	_info("independent_draw_info engine delta=%d mesh_calls=%d" % [live_delta, mesh_calls])
 	if live_delta <= 0:
@@ -104,6 +161,120 @@ func _run() -> void:
 			live_delta, mesh_calls,
 		])
 	layer.queue_free()
+
+
+func _measure_cold_lon() -> void:
+	if not _setup_renderer():
+		return
+	await _flush(3)
+	var sm: Node = root.get_node_or_null("SupplyManager")
+	if sm != null and "overlay_visible" in sm:
+		sm.overlay_visible = false
+	_mr.supply_mode = false
+	var pre: Dictionary = await _wait_idle_prebuild()
+	_info(
+		"idle_prebuild done=%s items=%d max_step=%.3f"
+		% [str(pre.get("done", false)), int(pre.get("item_count", -1)), float(pre.get("max_step_ms", -1.0))]
+	)
+	var t_toggle := Time.get_ticks_usec()
+	_mr.call("_toggle_supply_overlay")
+	var toggle_ms := float(Time.get_ticks_usec() - t_toggle) / 1000.0
+	var t_frame := Time.get_ticks_usec()
+	await process_frame
+	var first_frame_ms := float(Time.get_ticks_usec() - t_frame) / 1000.0
+	var cold_ms := toggle_ms + first_frame_ms
+	var vis := 0
+	if _mr.has_method("get_supply_overlay_outline_visible_count"):
+		vis = int(_mr.call("get_supply_overlay_outline_visible_count"))
+	print("cold_raw display=%s ms=%.3f" % [DisplayServer.get_name(), cold_ms])
+	_info("cold_first toggle=%.3f first_frame=%.3f frame_total=%.3f vis=%d" % [
+		toggle_ms, first_frame_ms, cold_ms, vis,
+	])
+	if vis < 3000:
+		_fail("(e′) windowed cold L-on visible=%d want >=3000" % vis)
+	if cold_ms >= MAX_COLD_MS:
+		_fail("(e′) windowed cold first L-on %.1f ms (bar %.0f)" % [cold_ms, MAX_COLD_MS])
+	else:
+		_pass("(e′) windowed cold first L-on %.1f ms (bar=%.0f)" % [cold_ms, MAX_COLD_MS])
+	if _mr != null and is_instance_valid(_mr):
+		_mr.queue_free()
+		_mr = null
+
+
+func _setup_renderer() -> bool:
+	var mr_script: Script = load("res://scripts/map/MapRenderer.gd") as Script
+	if mr_script == null:
+		_fail("MapRenderer.gd missing")
+		return false
+	_mr = mr_script.new()
+	var ui := CanvasLayer.new()
+	ui.name = "UI"
+	_mr.add_child(ui)
+	_cam = Camera2D.new()
+	_cam.name = "MapCamera"
+	_cam.position = Vector2(1600, 800)
+	_cam.zoom = Vector2(HOME_Z, HOME_Z)
+	_mr.add_child(_cam)
+	_container = Node2D.new()
+	_container.name = "ProvinceContainers"
+	_mr.add_child(_container)
+	_mr.container = _container
+	root.add_child(_mr)
+	_cam.make_current()
+	var pscr: Script = load("res://scripts/data/Province.gd") as Script
+	var sm: Node = root.get_node_or_null("SupplyManager")
+	var mm: Node = root.get_node_or_null("MapManager")
+	var depot_scr: Script = load("res://scripts/supply/ProvinceDepotState.gd") as Script
+	var i := 0
+	while i < LAND_N:
+		var pid := 710000 + i
+		var host := Node2D.new()
+		host.name = "Prov_%d" % pid
+		var poly := Polygon2D.new()
+		poly.polygon = _make_ring(Vector2(float(i % 80) * 40.0, float(i / 80) * 40.0), 24.0, POLY_SIDES)
+		host.add_child(poly)
+		_container.add_child(host)
+		_mr.province_nodes[pid] = host
+		if pscr != null:
+			var p: Object = pscr.new()
+			p.set("id", pid)
+			p.set("name", "Land %d" % pid)
+			p.set("owner_tag", "GER")
+			p.set("controller_tag", "GER")
+			p.set("infrastructure", 1)
+			p.set("is_sea", false)
+			_mr.provinces[pid] = p
+			if mm != null and "_provinces" in mm:
+				mm._provinces[pid] = p
+		if depot_scr != null and sm != null and "depot_states" in sm:
+			sm.depot_states[pid] = depot_scr.new(pid, 100.0)
+		i += 1
+	var layer_scr: Script = load("res://scripts/supply/SupplyMapLayer.gd") as Script
+	if layer_scr != null:
+		var sl: Node2D = layer_scr.new() as Node2D
+		sl.name = "SupplyMapLayer"
+		sl.visible = false
+		_container.add_child(sl)
+		_mr.supply_map_layer = sl
+	if sm != null and "overlay_visible" in sm:
+		sm.overlay_visible = false
+	_mr.supply_mode = false
+	return true
+
+
+func _wait_idle_prebuild() -> Dictionary:
+	var stats: Dictionary = {}
+	var i := 0
+	while i < PREBUILD_WAIT_FRAMES:
+		if _mr.has_method("get_supply_ring_prebuild_stats"):
+			stats = _mr.call("get_supply_ring_prebuild_stats") as Dictionary
+			if bool(stats.get("done", false)) and int(stats.get("item_count", 0)) >= 3000:
+				return stats
+		await process_frame
+		i += 1
+	if _mr.has_method("get_supply_ring_prebuild_stats"):
+		stats = _mr.call("get_supply_ring_prebuild_stats") as Dictionary
+	return stats
 
 
 func _measure_engine_delta(layer: Node2D) -> int:

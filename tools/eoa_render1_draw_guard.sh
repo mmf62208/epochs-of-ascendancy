@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# WINDOWED RENDER-1 draw-call guard. xvfb is NOT product Play.
+# WINDOWED RENDER-1 draw-call + cold-L guard. xvfb is NOT product Play.
 # Engine L-on vs L-off draw delta must be >= mesh_calls (392 on the tip).
-# A 0 count is FAIL. No grep fallback. counter_lie (draw_mesh removed) dies here.
+# A 0 count is FAIL. No grep fallback. counter_lie is a source edit in the test.
 #
 #   tools/eoa_render1_draw_guard.sh
 #   EOA_RENDER1_DRAW_OUT=/tmp/eoa-render1-draw tools/eoa_render1_draw_guard.sh

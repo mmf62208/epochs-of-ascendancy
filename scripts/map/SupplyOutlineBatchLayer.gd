@@ -57,8 +57,6 @@ var _scratch_iy: PackedFloat32Array = PackedFloat32Array()
 
 ## Test sink: optional Object with note_draw_mesh(mesh, vertex_count, index_count).
 var draw_sink: Object = null
-## Windowed counter_lie probe: keep wrapper counters, skip the real submit.
-var skip_engine_draw: bool = false
 
 const IDLE_PREBUILD_NONE := 0
 const IDLE_PREBUILD_INGEST := 1
@@ -529,8 +527,7 @@ func _ci_draw_mesh(mesh: Mesh, mesh_modulate: Color, cached_v: int = 0, cached_i
 		return
 	var v_n := cached_v
 	var i_n := cached_i
-	if not skip_engine_draw:
-		draw_mesh(mesh, null, Transform2D(), mesh_modulate)
+	draw_mesh(mesh, null, Transform2D(), mesh_modulate)
 	_last_mesh_calls += 1
 	_last_drawn_vertex_count += v_n
 	_last_drawn_index_count += i_n
