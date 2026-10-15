@@ -423,6 +423,8 @@ var _supply_toggle_glyph_layouts: int = 0
 var _supply_full_role_recomputes: int = 0
 var _supply_batch_patches: int = 0
 var _supply_last_reconcile_ms: float = 0.0
+var _last_refresh_supply_highlights_ms: float = 0.0
+var _last_supply_toggle_profile: Dictionary = {}
 var _compare_candidate_ids: Array[int] = []
 var _supply_legend_panel: PanelContainer = null
 var _supply_legend_pulse_border: Control = null
@@ -3085,6 +3087,7 @@ func _refresh_terrain_zoom_light() -> void:
 	_sync_capital_star_scales(z)
 	# Camera-space G stroke: keep ~26 screen px after Home wheel-zoom (no path rebuild).
 	_refresh_visible_supply_route_polyline_width()
+	_feed_supply_outline_batch_view()
 	# Do not rebuild 3520 fills on a wheel notch — LOD/counters only. Fill bucket
 	# updates happen on mapmode change / boot, not per zoom tick (Rhine chip carpet hang).
 
@@ -26055,8 +26058,11 @@ func _toggle_supply_overlay() -> void:
 	var sm := _supply_manager()
 	if sm == null:
 		return
+	var t_all := Time.get_ticks_usec()
 	_supply_toggle_in_progress = true
+	var t0 := t_all
 	sm.toggle_overlay()
+	var sm_ms := float(Time.get_ticks_usec() - t0) / 1000.0
 	supply_mode = sm.overlay_visible
 	if supply_map_layer:
 		supply_map_layer.visible = supply_mode
@@ -26073,6 +26079,7 @@ func _toggle_supply_overlay() -> void:
 			ol_infra.call("clear_supply_corridor_path")
 		if ol_infra.has_method("queue_redraw"):
 			ol_infra.queue_redraw()
+	t0 = Time.get_ticks_usec()
 	if supply_mode:
 		# Boot already called `_setup_supply_layer`. Re-entering it on every L-on
 		# restacked 3k glyph Labels + recomputed roles (live ~4.5 s after batch cache).
@@ -26086,14 +26093,30 @@ func _toggle_supply_overlay() -> void:
 		if supply_map_layer != null and supply_map_layer.has_method("clear_route_highlight"):
 			supply_map_layer.call("clear_route_highlight")
 		_refresh_supply_highlights()
+	var refresh_ms := float(Time.get_ticks_usec() - t0) / 1000.0
+	t0 = Time.get_ticks_usec()
 	_update_supply_overlay_legend()
+	var legend_ms := float(Time.get_ticks_usec() - t0) / 1000.0
 	if _hover_province != null:
 		_refresh_hover_tooltip(_hover_province)
 	if supply_overlay_panel:
 		if not supply_mode:
 			supply_overlay_panel.hide_panel()
+	t0 = Time.get_ticks_usec()
 	_sync_supply_route_canvas_stack()
+	var sync_ms := float(Time.get_ticks_usec() - t0) / 1000.0
 	_supply_toggle_in_progress = false
+	var batch_ms := 0.0
+	if _supply_outline_batch_is_ready() and _supply_outline_batch.has_method("get_last_mesh_build_ms"):
+		batch_ms = float(_supply_outline_batch.call("get_last_mesh_build_ms"))
+	_last_supply_toggle_profile = {
+		"sm_toggle_ms": sm_ms,
+		"refresh_highlights_ms": refresh_ms,
+		"batch_mesh_build_ms": batch_ms,
+		"legend_ms": legend_ms,
+		"sync_stack_ms": sync_ms,
+		"total_ms": float(Time.get_ticks_usec() - t_all) / 1000.0,
+	}
 
 
 func _refresh_supply_routes() -> void:
@@ -29627,10 +29650,12 @@ func _pulse_amount_for_supply_role(role: String) -> float:
 
 
 func _refresh_supply_highlights(reuse_cached_roles: bool = false) -> void:
+	var t0 := Time.get_ticks_usec()
 	# Hang-class: L off is hide-only. Never walk 3520 nodes or rebuild Line2Ds.
 	if not supply_mode:
 		_set_supply_outline_batch_visible(false)
 		_supply_role_by_province = {}
+		_last_refresh_supply_highlights_ms = float(Time.get_ticks_usec() - t0) / 1000.0
 		return
 	_reconcile_supply_overlay_if_needed(reuse_cached_roles)
 	if (
@@ -29641,19 +29666,23 @@ func _refresh_supply_highlights(reuse_cached_roles: bool = false) -> void:
 	):
 		_supply_role_by_province = _supply_roles_cache.duplicate()
 		_set_supply_outline_batch_visible(true)
+		_last_refresh_supply_highlights_ms = float(Time.get_ticks_usec() - t0) / 1000.0
 		return
 	if not _supply_roles_cache.is_empty() and _supply_outline_batch_is_ready():
 		_supply_role_by_province = _supply_roles_cache.duplicate()
 		_set_supply_outline_batch_visible(true)
+		_last_refresh_supply_highlights_ms = float(Time.get_ticks_usec() - t0) / 1000.0
 		return
 	var roles := _supply_highlight_roles()
 	_supply_role_by_province = roles
 	if _supply_roles_cache_matches(roles) and _supply_outline_batch_is_ready():
 		_set_supply_outline_batch_visible(true)
+		_last_refresh_supply_highlights_ms = float(Time.get_ticks_usec() - t0) / 1000.0
 		return
 	_supply_roles_cache = roles.duplicate()
 	_store_supply_roles_cache_fingerprint()
 	_apply_supply_roles_to_batch(roles)
+	_last_refresh_supply_highlights_ms = float(Time.get_ticks_usec() - t0) / 1000.0
 
 
 func get_supply_overlay_outline_visible_count() -> int:
@@ -29699,6 +29728,14 @@ func get_supply_batch_patches() -> int:
 
 func get_last_supply_reconcile_ms() -> float:
 	return _supply_last_reconcile_ms
+
+
+func get_last_supply_toggle_profile() -> Dictionary:
+	return _last_supply_toggle_profile.duplicate()
+
+
+func get_last_refresh_supply_highlights_ms() -> float:
+	return _last_refresh_supply_highlights_ms
 
 
 func get_legend_board_walks() -> int:
@@ -29963,12 +30000,14 @@ func _cached_supply_polygon(node: Node2D, pid: int) -> PackedVector2Array:
 
 func _ensure_supply_outline_batch() -> Node2D:
 	if _supply_outline_batch_is_ready():
+		_feed_supply_outline_batch_view()
 		return _supply_outline_batch
 	if container == null:
 		return null
 	var existing := container.get_node_or_null("SupplyOutlineBatch") as Node2D
 	if existing != null:
 		_supply_outline_batch = existing
+		_feed_supply_outline_batch_view()
 		return _supply_outline_batch
 	var batch: Node2D = _SupplyOutlineBatchLayerScr.new() as Node2D
 	if batch == null:
@@ -29976,7 +30015,37 @@ func _ensure_supply_outline_batch() -> Node2D:
 	batch.name = "SupplyOutlineBatch"
 	container.add_child(batch)
 	_supply_outline_batch = batch
+	_feed_supply_outline_batch_view()
 	return _supply_outline_batch
+
+
+func _feed_supply_outline_batch_view() -> void:
+	if not _supply_outline_batch_is_ready():
+		return
+	if not _supply_outline_batch.has_method("set_view"):
+		return
+	var cam := get_viewport().get_camera_2d() if get_viewport() else null
+	var z := 0.318
+	var view := Rect2(-1.0e7, -1.0e7, 2.0e7, 2.0e7)
+	if cam != null:
+		z = maxf(cam.zoom.x, cam.zoom.y)
+		view = _camera_world_view_rect(cam)
+	elif container != null:
+		var cs := absf(container.scale.x)
+		if cs > 0.0001:
+			z = cs
+	_supply_outline_batch.call("set_view", z, view)
+
+
+func _camera_world_view_rect(cam: Camera2D) -> Rect2:
+	var size := Vector2(1280.0, 740.0)
+	var vp := get_viewport()
+	if vp != null:
+		size = vp.get_visible_rect().size
+	var zx := maxf(cam.zoom.x, 0.001)
+	var zy := maxf(cam.zoom.y, 0.001)
+	var world_size := Vector2(size.x / zx, size.y / zy)
+	return Rect2(cam.global_position - world_size * 0.5, world_size).grow(64.0)
 
 
 func _apply_supply_roles_to_batch(roles: Dictionary[int, String]) -> void:
