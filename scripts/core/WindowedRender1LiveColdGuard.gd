@@ -81,6 +81,8 @@ func _run() -> void:
 	if not await _wait_map_ready():
 		return
 	_pause_clock()
+	_freeze_boot_camera_fighters()
+	_set_units_view(false)
 	_frame_over_koln(CLOSE_Z)
 	var mr := _map_renderer()
 	if mr == null:
@@ -88,10 +90,18 @@ func _run() -> void:
 		return
 	if not await _wait_prebuild(mr):
 		return
+	# TestRunner smoke +6d / deferred_grand_visuals can steal the camera
+	# (Play MIXED captured Japan). Re-pin Köln at close zoom before KEY_L.
+	_frame_over_koln(CLOSE_Z)
+	if not _camera_is_on_koln(CLOSE_Z):
+		_fail("camera not on Köln after prebuild")
+		return
 	if not RenderingServer.frame_post_draw.is_connected(_on_frame_post_draw):
 		RenderingServer.frame_post_draw.connect(_on_frame_post_draw)
 	await _measure_lon(mr)
 	_check_roles(mr)
+	_frame_over_koln(CLOSE_Z)
+	_hide_hue_chrome(mr)
 	await _check_hue()
 	await _measure_loff(mr)
 	_check_bars()
@@ -284,8 +294,14 @@ func _check_roles(mr: Node) -> void:
 func _check_hue() -> void:
 	var i := 0
 	while i < 4:
+		_frame_over_koln(CLOSE_Z)
 		await process_frame
 		i += 1
+	if not _camera_is_on_koln(CLOSE_Z):
+		_fail("hue: camera not on Köln close-zoom")
+		return
+	RenderingServer.force_draw()
+	_frame_over_koln(CLOSE_Z)
 	RenderingServer.force_draw()
 	var vp := root.get_viewport()
 	if vp == null:
@@ -334,7 +350,8 @@ func _hue_buckets(img: Image) -> Dictionary:
 	var orange := 0
 	var w := img.get_width()
 	var h := img.get_height()
-	var y := 0
+	# Map area only (A's 5df8e7fc buckets): skip the top toolbar strip.
+	var y := 40
 	while y < h:
 		var x := 0
 		while x < w:
@@ -398,16 +415,84 @@ func _pause_clock() -> void:
 		tm.call("set_paused", true)
 
 
-func _frame_over_koln(zoom: float) -> void:
+func _freeze_boot_camera_fighters() -> void:
+	# Same pin as WindowedRx1RhinePixelGuard: TestRunner deferred Home /
+	# +6d grand visuals must not steal the Köln close-zoom frame.
+	if root != null:
+		root.set_meta("eoa_rx1_pixel_lock_camera", true)
 	var mr := _map_renderer()
-	if mr != null and mr.has_method("player_path_search_go"):
-		mr.call("player_path_search_go", KOELN)
+	if mr != null:
+		mr.set("_europe_focus_retry", 99)
+		mr.set("_close_camera_locked", true)
+		mr.set("_hold_camera_until_msec", Time.get_ticks_msec() + 120000)
+	var tr := _find_named("TestRunner")
+	if tr != null and tr.has_method("set_process"):
+		tr.set_process(false)
+	var cc := _find_named("CameraController")
+	if cc != null:
+		if "enable_pan" in cc:
+			cc.set("enable_pan", false)
+		if "enable_zoom" in cc:
+			cc.set("enable_zoom", false)
+		cc.set_process(false)
+	_info("lock_camera (NOT product Home/Close)")
+
+
+func _set_units_view(on: bool) -> void:
+	var mr := _map_renderer()
+	if mr != null and mr.has_method("set_unit_counters_visible"):
+		mr.call("set_unit_counters_visible", on)
+
+
+func _hide_hue_chrome(mr: Node) -> void:
 	if mr != null and mr.has_method("hide_info_panel"):
 		mr.call("hide_info_panel")
-	if mr != null and mr.has_method("player_path_wheel_toward_world"):
-		mr.call("player_path_wheel_toward_world", _koln_world(), zoom)
+	if mr != null and mr.has_method("_set_supply_legend_visible"):
+		mr.call("_set_supply_legend_visible", false)
+	if mr != null and "_supply_legend_panel" in mr:
+		var panel: Variant = mr.get("_supply_legend_panel")
+		if panel is CanvasItem:
+			var host := (panel as Node).get_parent() as CanvasItem
+			if host != null:
+				host.visible = false
+			(panel as CanvasItem).visible = false
+	_set_units_view(false)
+
+
+func _camera_is_on_koln(zoom: float) -> bool:
+	var cam := _camera()
+	if cam == null:
+		return false
+	var dist := cam.global_position.distance_to(_koln_world())
+	var z := maxf(absf(cam.zoom.x), absf(cam.zoom.y))
+	_info("cam pos=%.1f,%.1f zoom=%.3f koln_dist=%.1f" % [
+		cam.global_position.x, cam.global_position.y, z, dist,
+	])
+	if dist > 520.0:
+		return false
+	if absf(z - zoom) > 0.35:
+		return false
+	return true
+
+
+func _frame_over_koln(zoom: float) -> void:
+	var pos := _koln_world()
+	if root != null:
+		root.set_meta("eoa_rx1_pixel_lock_camera", true)
+	var mr := _map_renderer()
+	if mr != null and mr.has_method("hide_info_panel"):
+		mr.call("hide_info_panel")
 	if mr != null and mr.has_method("lock_pixel_guard_camera"):
-		mr.call("lock_pixel_guard_camera", _koln_world(), zoom)
+		mr.call("lock_pixel_guard_camera", pos, zoom)
+	else:
+		var cam := _camera()
+		if cam != null:
+			cam.zoom = Vector2(zoom, zoom)
+			cam.global_position = pos
+			cam.reset_smoothing()
+			cam.enabled = true
+			cam.make_current()
+	_info("frame Köln zoom=%.2f pos=%.1f,%.1f" % [zoom, pos.x, pos.y])
 
 
 func _koln_world() -> Vector2:
