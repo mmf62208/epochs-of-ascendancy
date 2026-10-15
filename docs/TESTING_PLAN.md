@@ -564,6 +564,67 @@ tools/run_godot.sh --headless --path . \
 
 Wired as `launch_perf6_day_roll` immediately after `launch_perf4_interactive_multi_ai`. Merge **HOLD**.
 
+### RENDER-1 L-on supply rings (ArrayMesh + Home LOD) (draft HOLD, headless; live A/B pending)
+
+Stack on #99 tip `5df8e7fc` (`cursor/perf6-dayroll-c4e1`). Main `61a80433` does not contain #90's `SupplyOutlineBatchLayer`. PR **#101**. Fence: layer + MapRenderer zoom/view-rect feed (`_refresh_terrain_zoom_light` only; `_ensure` does not force Full LOD) + `HeadlessRender1SupplyRingMeshTest` + gates register. OUT: `draw_polished_ring`, SupplyManager / PERF-6, #90 role logic, GameData, world data.
+
+**Ask 1 — base measure** (`5df8e7fc`, 3196×48-gon, Home z=0.318, headless):
+
+| mode | p50 | p90 | worst | notes |
+|---|---:|---:|---:|---|
+| L-off frame | 6.890 | 6.966 | 7.035 | |
+| L-on frame | 40.851 | 41.346 | 42.926 | |
+| L-on `_draw` CPU | 112.260 | 113.954 | 117.715 | 6392 AA polylines, 313208 polyline verts |
+
+Cold-first L-on on the base (empty role/batch caches, full `_toggle_supply_overlay`):
+
+| step | ms |
+|---|---:|
+| sm.toggle_overlay | 0.007 |
+| `_refresh_supply_highlights` | 45.955 |
+| legend | 18.466 |
+| sync | 0.012 |
+| total_incl_frame | 159.508 |
+
+Tip cold-first (`HeadlessRender1` (e′)): sm **0.005** / refresh **79.118** / batch **47.125** / legend **15.108** / sync **0.011** / toggle total **94.254** / frame_total **146.659**.
+
+`HeadlessRender1SupplyRingMeshTest` **FAIL on `5df8e7fc`** (polyline/AA `_draw`; mesh/LOD API missing) / **PASS on the tip** (≥3000 items):
+
+| bar | base `5df8e7fc` | tip |
+|---|---|---|
+| (a) 0 polyline/multiline and 0 AA in steady `_draw` | FAIL 6392 AA polylines | PASS mesh_calls=392 line=0 aa=0 |
+| (b) Home verts ≤25% of full; cull above threshold | FAIL (no LOD) | PASS 230112/1840896=**0.125**; culled=193 |
+| (c) 0 rebuilds across 60 idle frames | FAIL (per-frame polyline) | PASS |
+| (d) 1-depot `patch_items` p50≤1 ms, worst<50, touched chunks only | n/a polyline | PASS p50 **0.319** worst **0.376** touched **2/196** |
+| (e) warm L toggle first frame <100 ms | n/a | PASS **5.3** ms |
+| (e′) cold first L-on after boot <250 ms | polyline path | PASS **146.7** ms |
+| (f) pulse 0 rebuilds | n/a | PASS modulate-only |
+| (g) colour/width parity; every role present | n/a | PASS 15 roles |
+
+Mutants killed by named asserts:
+
+| mutant | killing assert |
+|---|---|
+| aa_on | (a) source `antialiased` hits=0 + runtime aa_calls=0 |
+| polyline_loop | (a) 0 line calls / mesh path |
+| lod_off | (b) Home/full=0.125 |
+| rebuild_in_draw | (c) rebuild count unchanged across 60 idle frames |
+| patch_full_rebuild | (d) touched=2/196 |
+| pulse_rebuild | (f) pulse leaves rebuild count unchanged |
+| counter_lie | sink mesh_calls/verts match real `draw_mesh` arrays |
+| cull_off | (b) culled_chunks=193, drawn < built |
+| skip_ignored | vis 3196→3194, built 230112→229968 |
+| cold_full_build | (e′) 146.7 ms < 250 |
+
+Regression: OverlayFresh B1–B4 **PASS**; Legend p95 **5.66** / worst **18.60** (≤60); Perf3 **PASS** (MAX_TOGGLE_MS=1000 unedited; Home 156.5 / 4.0 / 137.5; z0.760 5.8 / 4.0 / 5.6); Perf6 DayRoll **PASS** (1× slice_max 17.79 / 4× 17.89, full=12 sync=0); Starve **PASS**; Pace **PASS** (budget 22.00, lag 4× slice_max 17.03 sync=0). Seed 193601 infra decisions identical ×3 OS processes, md5 `0e7237ac2a2f6feedf5c8032045e866d`. `--quick` same 14 `unit_board_play_path` reds. map_qc NE **0.9853**. Headless; live A/B pending.
+
+```bash
+tools/run_godot.sh --headless --path . --resolution 1280x740 \
+  -s res://scripts/core/HeadlessRender1SupplyRingMeshTest.gd
+```
+
+Wired as `launch_render1_supply_ring_mesh` immediately after `launch_perf5_supply_overlay_fresh`. Merge **HOLD**.
+
 xvfb screenshots go to `/opt/cursor/artifacts/fac1a/`, `/opt/cursor/artifacts/fac1a_fix2/`, `/opt/cursor/artifacts/fac1a_fix2b/`, `/opt/cursor/artifacts/fac1a_fix2c/`, `/opt/cursor/artifacts/fac1a_fix3/`, and `/opt/cursor/artifacts/fac1a_fix4/` and are **NOT live Play**. Peak RSS must stay under 3 GB (isolated process tree — do not sum leftover Godot). Merge **HOLD**.
 
 **FIX #4 (Play MIXED `76fb4808`):** click ownership + badge-in-footprint + cluster digit + lone min size + split guard 1.53. Seeds unchanged. Isolated keep-green:
