@@ -426,6 +426,8 @@ var _supply_last_reconcile_ms: float = 0.0
 var _last_refresh_supply_highlights_ms: float = 0.0
 var _last_supply_toggle_profile: Dictionary = {}
 const SUPPLY_RING_IDLE_BUDGET_MS := 8.0
+const SUPPLY_RING_IDLE_WORK_MS := 5.5
+const SUPPLY_PREBUILD_WARM_FRAMES := 3
 const SUPPLY_PREBUILD_IDLE := 0
 const SUPPLY_PREBUILD_ROLES := 1
 const SUPPLY_PREBUILD_ITEMS := 2
@@ -448,6 +450,8 @@ var _supply_first_lon_role_credited: bool = false
 var _supply_ring_prebuild_done: bool = false
 var _supply_prebuild_seen_n: int = 0
 var _supply_prebuild_stable_frames: int = 0
+var _supply_prebuild_warm_frames: int = 0
+var _supply_prebuild_mesh_begun: bool = false
 var _supply_prebuild_fp: String = ""
 var _supply_prebuild_route_pids: Dictionary = {}
 var _supply_prebuild_depot_pids: Dictionary = {}
@@ -30110,6 +30114,9 @@ func _tick_supply_ring_idle_prebuild() -> void:
 		_supply_prebuild_cursor = 0
 		_supply_prebuild_roles.clear()
 		_supply_prebuild_items.clear()
+		_supply_prebuild_fp = ""
+		_supply_prebuild_mesh_begun = false
+		_supply_prebuild_warm_frames = 0
 		_supply_prebuild_ctx = _supply_role_context()
 		_supply_prebuild_phase = SUPPLY_PREBUILD_ROLES
 		_supply_prebuild_setup_ms = float(Time.get_ticks_usec() - t0) / 1000.0
@@ -30117,16 +30124,17 @@ func _tick_supply_ring_idle_prebuild() -> void:
 		_supply_prebuild_total_ms += _supply_prebuild_step_ms
 		_supply_prebuild_frames += 1
 		return
+	# One phase per idle frame so setup/warm/fingerprint cannot stack over 8 ms.
 	if _supply_prebuild_phase == SUPPLY_PREBUILD_ROLES:
 		_step_supply_prebuild_roles(t0)
-	if _supply_prebuild_phase == SUPPLY_PREBUILD_ITEMS and _supply_prebuild_usec_left(t0) > 0:
+	elif _supply_prebuild_phase == SUPPLY_PREBUILD_ITEMS:
 		_step_supply_prebuild_items(t0)
-	if _supply_prebuild_phase == SUPPLY_PREBUILD_MESH and _supply_prebuild_usec_left(t0) > 0:
+	elif _supply_prebuild_phase == SUPPLY_PREBUILD_MESH:
 		_step_supply_prebuild_mesh(t0)
-	if _supply_prebuild_phase == SUPPLY_PREBUILD_WARM:
+	elif _supply_prebuild_phase == SUPPLY_PREBUILD_WARM:
 		_begin_supply_prebuild_hidden_warm()
 	elif _supply_prebuild_phase == SUPPLY_PREBUILD_WARM_WAIT:
-		_finish_supply_prebuild_hidden_warm()
+		_step_supply_prebuild_hidden_warm()
 	_supply_prebuild_step_ms = float(Time.get_ticks_usec() - t0) / 1000.0
 	_supply_prebuild_total_ms += _supply_prebuild_step_ms
 	if _supply_prebuild_step_ms > _supply_prebuild_max_step_ms:
@@ -30135,7 +30143,7 @@ func _tick_supply_ring_idle_prebuild() -> void:
 
 
 func _supply_prebuild_usec_left(t0: int) -> int:
-	return int(SUPPLY_RING_IDLE_BUDGET_MS * 1000.0) - (Time.get_ticks_usec() - t0)
+	return int(SUPPLY_RING_IDLE_WORK_MS * 1000.0) - (Time.get_ticks_usec() - t0)
 
 
 func _step_supply_prebuild_roles(t0: int) -> void:
@@ -30147,15 +30155,17 @@ func _step_supply_prebuild_roles(t0: int) -> void:
 			_supply_prebuild_roles[pid] = role
 		_supply_prebuild_cursor += 1
 	if _supply_prebuild_cursor >= n:
-		_supply_prebuild_fp = _supply_topology_fingerprint()
-		_supply_prebuild_route_pids = _collect_supply_route_pids()
-		_supply_prebuild_depot_pids = _collect_supply_depot_pids()
 		_supply_prebuild_phase = SUPPLY_PREBUILD_ITEMS
 		_supply_prebuild_cursor = 0
 		_supply_prebuild_pids = _supply_prebuild_roles.keys()
 
 
 func _step_supply_prebuild_items(t0: int) -> void:
+	if _supply_prebuild_fp.is_empty():
+		_supply_prebuild_fp = _supply_topology_fingerprint()
+		_supply_prebuild_route_pids = _collect_supply_route_pids()
+		_supply_prebuild_depot_pids = _collect_supply_depot_pids()
+		return
 	var n := _supply_prebuild_pids.size()
 	while _supply_prebuild_cursor < n and _supply_prebuild_usec_left(t0) > 0:
 		var pid := int(_supply_prebuild_pids[_supply_prebuild_cursor])
@@ -30165,21 +30175,26 @@ func _step_supply_prebuild_items(t0: int) -> void:
 			_supply_prebuild_items.append(item)
 		_supply_prebuild_cursor += 1
 	if _supply_prebuild_cursor >= n:
+		_supply_prebuild_phase = SUPPLY_PREBUILD_MESH
+
+
+func _step_supply_prebuild_mesh(t0: int) -> void:
+	if not _supply_prebuild_mesh_begun:
 		var batch := _ensure_supply_outline_batch()
 		if batch != null and batch.has_method("begin_idle_set_items"):
 			_feed_supply_outline_batch_view()
 			batch.call("begin_idle_set_items", _supply_prebuild_items)
-			_supply_prebuild_phase = SUPPLY_PREBUILD_MESH
-		elif batch != null:
+			_supply_prebuild_mesh_begun = true
+			return
+		if batch != null:
 			_apply_supply_roles_to_batch(_supply_prebuild_roles)
 			_set_supply_outline_batch_visible(false)
+			_supply_prebuild_mesh_begun = true
 			_supply_prebuild_phase = SUPPLY_PREBUILD_WARM
 		else:
 			_supply_prebuild_phase = SUPPLY_PREBUILD_DONE
 			_supply_ring_prebuild_done = true
-
-
-func _step_supply_prebuild_mesh(t0: int) -> void:
+		return
 	if not _supply_outline_batch_is_ready() or not _supply_outline_batch.has_method("step_idle_prebuild"):
 		_supply_prebuild_phase = SUPPLY_PREBUILD_WARM
 		return
@@ -30197,13 +30212,28 @@ func _begin_supply_prebuild_hidden_warm() -> void:
 		return
 	if _supply_outline_batch.has_method("begin_hidden_warm"):
 		_supply_outline_batch.call("begin_hidden_warm")
+	_force_supply_ring_gpu_submit()
+	_supply_prebuild_warm_frames = 0
 	_supply_prebuild_phase = SUPPLY_PREBUILD_WARM_WAIT
 
 
-func _finish_supply_prebuild_hidden_warm() -> void:
+func _step_supply_prebuild_hidden_warm() -> void:
+	if _supply_outline_batch_is_ready() and _supply_outline_batch.has_method("step_hidden_warm"):
+		_supply_outline_batch.call("step_hidden_warm")
+	_force_supply_ring_gpu_submit()
+	_supply_prebuild_warm_frames += 1
+	if _supply_prebuild_warm_frames < SUPPLY_PREBUILD_WARM_FRAMES:
+		return
 	if _supply_outline_batch_is_ready() and _supply_outline_batch.has_method("finish_hidden_warm"):
 		_supply_outline_batch.call("finish_hidden_warm")
 	_commit_supply_prebuild_cache()
+
+
+func _force_supply_ring_gpu_submit() -> void:
+	# Queue only. force_draw here would land in the 8 ms idle slice.
+	# The engine presents at end of frame; WARM_WAIT waits three presents.
+	if _supply_outline_batch_is_ready() and _supply_outline_batch is CanvasItem:
+		(_supply_outline_batch as CanvasItem).queue_redraw()
 
 
 func _commit_supply_prebuild_cache() -> void:

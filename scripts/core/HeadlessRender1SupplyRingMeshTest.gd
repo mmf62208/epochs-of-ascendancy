@@ -19,7 +19,7 @@ const MAX_WARM_FRAME_MS := 100.0
 const MAX_COLD_MS := 250.0
 const TARGET_COLD_MS := 180.0
 const HOME_VERT_RATIO := 0.25
-const PREBUILD_WAIT_FRAMES := 180
+const PREBUILD_WAIT_FRAMES := 240
 const LAYER_PATH := "res://scripts/map/SupplyOutlineBatchLayer.gd"
 const ROLES: Array[String] = [
 	"active", "preview", "route", "infra_sabotage", "infra_repair",
@@ -169,6 +169,9 @@ func _ci_draw_mesh_has_live_submit(txt: String = "") -> bool:
 			line = line.substr(0, hash_at)
 		line = line.strip_edges()
 		if line.is_empty():
+			continue
+		# The func header itself contains "draw_mesh(" — never count that line.
+		if line.begins_with("func "):
 			continue
 		if line.begins_with("if false") or line.begins_with("if 0"):
 			continue
@@ -407,26 +410,24 @@ func _check_independent_draw(layer: Node, stats: Dictionary) -> void:
 	var d_vis := int(on_s.get("vis_d", 0)) - int(off.get("vis_d", 0))
 	var d_can := int(on_s.get("can_d", 0)) - int(off.get("can_d", 0))
 	var engine_delta := maxi(maxi(d_draws, d_prims), maxi(d_vis, d_can))
-	var src_live := _ci_draw_mesh_has_live_submit()
 	_info(
-		"independent_draw_info off=%s on=%s delta draws=%d prims=%d vis=%d canvas=%d mesh_calls=%d src_live=%s"
-		% [str(off), str(on_s), d_draws, d_prims, d_vis, d_can, mesh_calls, str(src_live)]
+		"independent_draw_info off=%s on=%s delta draws=%d prims=%d vis=%d canvas=%d mesh_calls=%d display=%s"
+		% [str(off), str(on_s), d_draws, d_prims, d_vis, d_can, mesh_calls, DisplayServer.get_name()]
 	)
-	if engine_delta > 0:
-		if engine_delta < mesh_calls or mesh_calls <= 0:
-			_fail(
-				"independent_draw_info: L-on vs L-off delta=%d < mesh_calls=%d (mutant_counter_lie: draw_mesh removed)"
-				% [engine_delta, mesh_calls]
-			)
-		else:
-			_pass(
-				"independent_draw_info killed mutant_counter_lie: engine delta=%d >= mesh_calls=%d"
-				% [engine_delta, mesh_calls]
-			)
-	elif not src_live:
-		_fail("independent_draw_info: dummy renderer delta=0 and _ci_draw_mesh has no live draw_mesh (mutant_counter_lie)")
+	# No grep fallback. Dummy/headless reports 0 — windowed gate owns the kill.
+	if DisplayServer.get_name() == "headless":
+		_info("independent_draw_info: dummy/headless delta=0; tools/eoa_render1_draw_guard.sh owns counter_lie")
+		return
+	if engine_delta <= 0 or mesh_calls <= 0 or engine_delta < mesh_calls:
+		_fail(
+			"independent_draw_info: engine delta=%d mesh_calls=%d (0 is FAIL; mutant_counter_lie)"
+			% [engine_delta, mesh_calls]
+		)
 	else:
-		_pass("independent_draw_info killed mutant_counter_lie: live draw_mesh in _ci_draw_mesh (dummy delta=0)")
+		_pass(
+			"independent_draw_info killed mutant_counter_lie: engine delta=%d >= mesh_calls=%d"
+			% [engine_delta, mesh_calls]
+		)
 
 
 func _check_c(layer: Node) -> void:
@@ -655,8 +656,8 @@ func _test_maprenderer_toggle() -> void:
 		_fail("(e′) idle Home-LOD prebuild did not finish items=%d done=%s" % [
 			int(pre.get("item_count", 0)), str(pre.get("done", false)),
 		])
-	if float(pre.get("max_step_ms", 0.0)) > 12.0:
-		_fail("(e′) idle prebuild step %.3f ms exceeds 8ms budget (12ms slack)" % float(pre.get("max_step_ms", 0.0)))
+	if float(pre.get("max_step_ms", 0.0)) > 8.0:
+		_fail("(e′) idle prebuild step %.3f ms exceeds 8.0 ms budget" % float(pre.get("max_step_ms", 0.0)))
 	else:
 		_pass("(e′) idle prebuild total=%.1f ms frames=%d max_step=%.3f" % [
 			float(pre.get("total_ms", 0.0)), int(pre.get("frames", 0)), float(pre.get("max_step_ms", 0.0)),

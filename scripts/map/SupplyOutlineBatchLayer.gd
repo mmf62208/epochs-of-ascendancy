@@ -57,6 +57,8 @@ var _scratch_iy: PackedFloat32Array = PackedFloat32Array()
 
 ## Test sink: optional Object with note_draw_mesh(mesh, vertex_count, index_count).
 var draw_sink: Object = null
+## Windowed counter_lie probe: keep wrapper counters, skip the real submit.
+var skip_engine_draw: bool = false
 
 const IDLE_PREBUILD_NONE := 0
 const IDLE_PREBUILD_INGEST := 1
@@ -149,13 +151,17 @@ func step_idle_prebuild(budget_ms: float) -> bool:
 		_last_idle_step_ms = 0.0
 		return _idle_phase == IDLE_PREBUILD_WARM
 	var t0 := Time.get_ticks_usec()
-	var budget_usec := maxi(1, int(budget_ms * 1000.0))
+	# Leave headroom so one last ingest/chunk cannot push the MapRenderer tick over 8.0.
+	var capped_ms := minf(maxf(budget_ms, 0.25), 5.5)
+	var budget_usec := maxi(1, int(capped_ms * 1000.0))
 	if _idle_phase == IDLE_PREBUILD_INGEST:
 		_step_idle_ingest(t0, budget_usec)
-	if _idle_phase == IDLE_PREBUILD_MESH and _usec_left(t0, budget_usec) > 0:
+	elif _idle_phase == IDLE_PREBUILD_MESH:
 		_step_idle_mesh(t0, budget_usec)
 	_last_idle_step_ms = float(Time.get_ticks_usec() - t0) / 1000.0
 	_idle_total_ms += _last_idle_step_ms
+	if _idle_phase == IDLE_PREBUILD_WARM or _idle_phase == IDLE_PREBUILD_DONE:
+		_last_mesh_build_ms = 0.0
 	return _idle_phase == IDLE_PREBUILD_WARM or _idle_phase == IDLE_PREBUILD_DONE
 
 
@@ -169,10 +175,18 @@ func begin_hidden_warm() -> void:
 		_idle_phase = IDLE_PREBUILD_DONE
 		return
 	_idle_warm_saved_modulate = modulate
-	modulate = Color(1.0, 1.0, 1.0, 0.0)
+	# a=0 is culled; a real first submit is required so GPU upload is not on L.
+	modulate = Color.WHITE
 	visible = true
 	queue_redraw()
 	_idle_phase = IDLE_PREBUILD_WARM
+
+
+func step_hidden_warm() -> void:
+	if _idle_phase != IDLE_PREBUILD_WARM:
+		return
+	visible = true
+	queue_redraw()
 
 
 func finish_hidden_warm() -> void:
@@ -182,6 +196,7 @@ func finish_hidden_warm() -> void:
 	visible = false
 	modulate = _idle_warm_saved_modulate
 	_idle_warmed = true
+	_last_mesh_build_ms = 0.0
 	_idle_phase = IDLE_PREBUILD_DONE
 
 
@@ -208,7 +223,14 @@ func _usec_left(t0: int, budget_usec: int) -> int:
 
 func _step_idle_ingest(t0: int, budget_usec: int) -> void:
 	var n := _idle_item_source.size()
-	while _idle_ingest_at < n and _usec_left(t0, budget_usec) > 0:
+	var last_item_usec := 0
+	while _idle_ingest_at < n:
+		var left := _usec_left(t0, budget_usec)
+		if left <= 0:
+			break
+		if last_item_usec > 0 and left < last_item_usec:
+			break
+		var item_t0 := Time.get_ticks_usec()
 		var item: Dictionary = _idle_item_source[_idle_ingest_at]
 		var pid := int(item.get("pid", -1))
 		if pid >= 0:
@@ -216,6 +238,7 @@ func _step_idle_ingest(t0: int, budget_usec: int) -> void:
 		_items.append(item)
 		_ingest_item(item, false)
 		_idle_ingest_at += 1
+		last_item_usec = Time.get_ticks_usec() - item_t0
 	if _idle_ingest_at >= n:
 		_idle_chunk_keys = PackedStringArray()
 		for key_var in _chunk_pids.keys():
@@ -226,22 +249,30 @@ func _step_idle_ingest(t0: int, budget_usec: int) -> void:
 		_idle_phase = IDLE_PREBUILD_MESH
 		if _idle_chunk_keys.is_empty():
 			_recount_built_geometry()
-			_last_mesh_build_ms = _idle_total_ms
+			_last_mesh_build_ms = 0.0
 			_idle_phase = IDLE_PREBUILD_WARM
 
 
 func _step_idle_mesh(t0: int, budget_usec: int) -> void:
 	var n := _idle_chunk_keys.size()
-	while _idle_chunk_at < n and _usec_left(t0, budget_usec) > 0:
+	var last_chunk_usec := 0
+	while _idle_chunk_at < n:
+		var left := _usec_left(t0, budget_usec)
+		if left <= 0:
+			break
+		if last_chunk_usec > 0 and left < last_chunk_usec:
+			break
+		var chunk_t0 := Time.get_ticks_usec()
 		var key := _idle_chunk_keys[_idle_chunk_at]
 		_rebuild_chunk(key)
 		_last_rebuilt_chunk_keys.append(key)
 		_last_chunk_rebuild_count += 1
 		_mesh_rebuild_count += 1
 		_idle_chunk_at += 1
+		last_chunk_usec = Time.get_ticks_usec() - chunk_t0
 	if _idle_chunk_at >= n:
 		_recount_built_geometry()
-		_last_mesh_build_ms = _idle_total_ms + float(Time.get_ticks_usec() - t0) / 1000.0
+		_last_mesh_build_ms = 0.0
 		_idle_phase = IDLE_PREBUILD_WARM
 
 
@@ -478,29 +509,28 @@ func _draw() -> void:
 		var glow_mesh: ArrayMesh = ch.get("mesh_glow", null) as ArrayMesh
 		var core_mesh: ArrayMesh = ch.get("mesh_core", null) as ArrayMesh
 		if glow_mesh != null:
-			_ci_draw_mesh(glow_mesh, ch.get("glow", Color.WHITE) as Color)
+			_ci_draw_mesh(
+				glow_mesh,
+				ch.get("glow", Color.WHITE) as Color,
+				int(ch.get("glow_verts", 0)),
+				int(ch.get("glow_idx", 0)),
+			)
 		if core_mesh != null:
-			_ci_draw_mesh(core_mesh, ch.get("color", Color.WHITE) as Color)
+			_ci_draw_mesh(
+				core_mesh,
+				ch.get("color", Color.WHITE) as Color,
+				int(ch.get("core_verts", 0)),
+				int(ch.get("core_idx", 0)),
+			)
 
 
-func _ci_draw_mesh(mesh: Mesh, mesh_modulate: Color) -> void:
+func _ci_draw_mesh(mesh: Mesh, mesh_modulate: Color, cached_v: int = 0, cached_i: int = 0) -> void:
 	if mesh == null or mesh.get_surface_count() < 1:
 		return
-	var v_n := 0
-	var i_n := 0
-	var s := 0
-	while s < mesh.get_surface_count():
-		var arr: Array = mesh.surface_get_arrays(s)
-		var verts: Variant = arr[Mesh.ARRAY_VERTEX]
-		if verts is PackedVector3Array:
-			v_n += (verts as PackedVector3Array).size()
-		elif verts is PackedVector2Array:
-			v_n += (verts as PackedVector2Array).size()
-		var idx: Variant = arr[Mesh.ARRAY_INDEX]
-		if idx is PackedInt32Array:
-			i_n += (idx as PackedInt32Array).size()
-		s += 1
-	draw_mesh(mesh, null, Transform2D(), mesh_modulate)
+	var v_n := cached_v
+	var i_n := cached_i
+	if not skip_engine_draw:
+		draw_mesh(mesh, null, Transform2D(), mesh_modulate)
 	_last_mesh_calls += 1
 	_last_drawn_vertex_count += v_n
 	_last_drawn_index_count += i_n
@@ -678,6 +708,10 @@ func _rebuild_chunk(key: String) -> void:
 		"mesh_glow": mesh_glow,
 		"mesh_core": mesh_core,
 		"aabb": aabb,
+		"glow_verts": glow_v.size(),
+		"core_verts": core_v.size(),
+		"glow_idx": 0,
+		"core_idx": 0,
 		"vertex_count": glow_v.size() + core_v.size(),
 		"index_count": 0,
 	}

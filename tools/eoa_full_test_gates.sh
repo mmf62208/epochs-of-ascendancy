@@ -250,6 +250,8 @@ else
 
   run_step launch_render1_supply_ring_mesh \
     tools/run_godot.sh --headless --resolution 1280x740 -s res://scripts/core/HeadlessRender1SupplyRingMeshTest.gd || fail
+  run_step launch_render1_draw_guard \
+    tools/eoa_render1_draw_guard.sh || fail
 
   run_step launch_mv1b_input_gate \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessMv1bInputGateTest.gd || fail
