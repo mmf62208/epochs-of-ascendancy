@@ -541,21 +541,28 @@ static func assign_rare_display_tiers(cache: Array) -> void:
 	_hwy1_pick_highway_chains(cache, inferred, ranks, seeds_desc)
 
 
-## HWY-1: same percentile map as the old per-edge rank (lowest→highest weight).
-## Sorts `inferred` in place (lowest weight first). Seeds are heaviest-first.
+## Weight desc, infra desc, int pair-key asc (same as string edge_key on 6-digit pids).
+static func _hwy1_weight_more_int(a: Dictionary, b: Dictionary) -> bool:
+	var wa: float = float(a.get("weight", 0.0))
+	var wb: float = float(b.get("weight", 0.0))
+	if wa == wb:
+		var ia: float = float(a.get("avg_infra", 0.0))
+		var ib: float = float(b.get("avg_infra", 0.0))
+		if ia == ib:
+			return _hwy1_row_key(a) < _hwy1_row_key(b)
+		return ia > ib
+	return wa > wb
+
+
+## One sort (heaviest first). Rank i/n matches lowest→highest weight (light groups first).
 static func _hwy1_rank_inferred(inferred: Array) -> Dictionary:
-	inferred.sort_custom(_weight_less)
+	inferred.sort_custom(_hwy1_weight_more_int)
 	var n: int = inferred.size()
 	var ranks: Dictionary = {}
-	for i in range(n):
-		var rank: float = 0.0 if n <= 1 else float(i) / float(n)
-		var row: Dictionary = inferred[i]
-		ranks[_hwy1_row_key(row)] = rank
-	# Heaviest first, but keep _weight_less tie order (smaller edge_key first).
-	var seeds_desc: Array = []
-	var i_hi: int = n - 1
-	while i_hi >= 0:
-		var i_lo: int = i_hi
+	var rank_i: int = 0
+	var i: int = n - 1
+	while i >= 0:
+		var i_lo: int = i
 		while i_lo > 0:
 			var left: Dictionary = inferred[i_lo - 1]
 			var right: Dictionary = inferred[i_lo]
@@ -564,10 +571,13 @@ static func _hwy1_rank_inferred(inferred: Array) -> Dictionary:
 			if float(left.get("avg_infra", 0.0)) != float(right.get("avg_infra", 0.0)):
 				break
 			i_lo -= 1
-		for j in range(i_lo, i_hi + 1):
-			seeds_desc.append(inferred[j])
-		i_hi = i_lo - 1
-	return {"ranks": ranks, "seeds_desc": seeds_desc}
+		for j in range(i_lo, i + 1):
+			var row: Dictionary = inferred[j]
+			var rank: float = 0.0 if n <= 1 else float(rank_i) / float(n)
+			ranks[_hwy1_row_key(row)] = rank
+			rank_i += 1
+		i = i_lo - 1
+	return {"ranks": ranks, "seeds_desc": inferred}
 
 
 static func _hwy1_row_key(row: Dictionary) -> int:
