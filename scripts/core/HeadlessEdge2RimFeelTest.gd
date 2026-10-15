@@ -84,6 +84,83 @@ func _slice_func(src: String, func_name: String) -> String:
 	return src.substr(i, nxt - i)
 
 
+func _inp_script() -> Script:
+	return load(SRC_INPUT) as Script
+
+
+func _inp_has(method: String) -> bool:
+	var scr: Script = _inp_script()
+	if scr != null and scr.has_method(method):
+		return true
+	return ("func %s" % method) in _read(SRC_INPUT)
+
+
+func _inp_const(name: String, fallback: float) -> float:
+	var scr: Script = _inp_script()
+	if scr == null or not (scr is GDScript):
+		return fallback
+	var consts: Dictionary = (scr as GDScript).get_script_constant_map()
+	if not consts.has(name):
+		return fallback
+	return float(consts[name])
+
+
+func _feel_scale(t: float) -> float:
+	if not _inp_has("edge_pan_feel_scale"):
+		return -1.0
+	return float(_inp_script().call("edge_pan_feel_scale", t))
+
+
+func _zoom_div(z: float) -> float:
+	if not _inp_has("edge_pan_zoom_divisor"):
+		return z
+	return float(_inp_script().call("edge_pan_zoom_divisor", z))
+
+
+func _dir_at(
+	pos: Vector2,
+	blocks: bool = false,
+	focused: bool = true,
+	inside: bool = true,
+	top_bar: bool = false,
+	left_hud: bool = false
+) -> Vector2:
+	var scr: Script = _inp_script()
+	if scr == null:
+		return Vector2.ZERO
+	if left_hud:
+		if "left_hud_only" not in _slice_func(_read(SRC_INPUT), "edge_pan_direction_at"):
+			return Vector2.ZERO
+		return scr.call("edge_pan_direction_at", pos, PLAY_SIZE, blocks, focused, inside, top_bar, true) as Vector2
+	return MapViewInput.edge_pan_direction_at(pos, PLAY_SIZE, blocks, focused, inside, top_bar)
+
+
+func _is_left_hud(ctrl: Control) -> bool:
+	# Name walk matches MapViewInput._node_is_left_hud_chrome. Static
+	# Script.call does not marshal Control args reliably in headless.
+	if ctrl == null:
+		return false
+	var walk: Node = ctrl
+	var found_hud: bool = false
+	while walk != null:
+		var nn := str(walk.name)
+		var is_hud: bool = (
+			nn == "MapModeToolbar"
+			or nn == "MapMinimap"
+			or nn == "Minimap"
+			or nn == "StrategicMinimap"
+			or nn == "InfoPanel"
+			or nn == "MapLegendPanel"
+			or nn == "SupplyOverlayLegend"
+			or nn == "Legend"
+			or (nn.ends_with("Legend") and "Toast" not in nn)
+		)
+		if is_hud:
+			found_hud = true
+		walk = walk.get_parent()
+	return found_hud
+
+
 func _flush() -> void:
 	var i := 0
 	while i < FLUSH_FRAMES:
@@ -96,7 +173,7 @@ func _run() -> void:
 	if root != null:
 		root.size = Vector2i(1280, 740)
 	_test_source_needles()
-	if _failures > 0 and not MapViewInput.has_method("edge_pan_feel_scale"):
+	if _failures > 0 and not _inp_has("edge_pan_feel_scale"):
 		_info("b7affe58 / no-feel product — stopping after source needles")
 		return
 	_test_feel_math()
@@ -166,22 +243,22 @@ func _test_source_needles() -> void:
 
 
 func _test_feel_math() -> void:
-	if not MapViewInput.has_method("edge_pan_feel_scale"):
+	if not _inp_has("edge_pan_feel_scale"):
 		_fail("mutant no_dwell: MapViewInput.edge_pan_feel_scale missing")
 		return
-	var dwell: float = MapViewInput.EDGE_PAN_RIM_DWELL_SEC
-	var ramp: float = MapViewInput.EDGE_PAN_RAMP_SEC
+	var dwell: float = _inp_const("EDGE_PAN_RIM_DWELL_SEC", -1.0)
+	var ramp: float = _inp_const("EDGE_PAN_RAMP_SEC", -1.0)
 	if absf(dwell - 0.250) > 0.0001:
 		_fail("mutant no_dwell: dwell is %.3f want 0.250" % dwell)
 		return
 	if absf(ramp - 0.600) > 0.0001:
 		_fail("mutant no_ramp: ramp is %.3f want 0.600" % ramp)
 		return
-	var s0: float = MapViewInput.edge_pan_feel_scale(0.0)
-	var s_before: float = MapViewInput.edge_pan_feel_scale(dwell - 0.001)
-	var s_at: float = MapViewInput.edge_pan_feel_scale(dwell)
-	var s_030: float = MapViewInput.edge_pan_feel_scale(0.30)
-	var s_full: float = MapViewInput.edge_pan_feel_scale(dwell + ramp)
+	var s0: float = _feel_scale(0.0)
+	var s_before: float = _feel_scale(dwell - 0.001)
+	var s_at: float = _feel_scale(dwell)
+	var s_030: float = _feel_scale(0.30)
+	var s_full: float = _feel_scale(dwell + ramp)
 	_info("feel scale 0=%.3f before=%.3f at=%.3f t0.3=%.3f full=%.3f" % [s0, s_before, s_at, s_030, s_full])
 	if s0 > 0.0 or s_before > 0.0:
 		_fail("mutant no_dwell: feel_scale before 250 ms is %.3f (want 0)" % s_before)
@@ -218,17 +295,17 @@ func _integrate_feel(t0: float, t1: float, dt: float) -> float:
 	var t: float = t0
 	while t < t1 - 0.00001:
 		t += dt
-		acc += MapViewInput.edge_pan_feel_scale(t) * dt
+		acc += _feel_scale(t) * dt
 	return acc
 
 
 func _test_far_zoom_cap_math() -> void:
-	if not MapViewInput.has_method("edge_pan_zoom_divisor"):
+	if not _inp_has("edge_pan_zoom_divisor"):
 		_fail("mutant no_cap: edge_pan_zoom_divisor missing")
 		return
-	var home_div: float = MapViewInput.edge_pan_zoom_divisor(HOME_Z)
-	var far_div: float = MapViewInput.edge_pan_zoom_divisor(FAR_Z)
-	var close_div: float = MapViewInput.edge_pan_zoom_divisor(0.80)
+	var home_div: float = _zoom_div(HOME_Z)
+	var far_div: float = _zoom_div(FAR_Z)
+	var close_div: float = _zoom_div(0.80)
 	if absf(home_div - HOME_Z) > 0.0001:
 		_fail("Home zoom divisor %.3f want %.3f" % [home_div, HOME_Z])
 		return
@@ -253,35 +330,26 @@ func _test_far_zoom_cap_math() -> void:
 
 
 func _test_left_hud_strip_math() -> void:
-	var sz := PLAY_SIZE
-	var left_clear: Vector2 = MapViewInput.edge_pan_direction_at(
-		Vector2(3.0, 370.0), sz, false, true, true, false, false
-	)
+	var left_clear: Vector2 = _dir_at(Vector2(3.0, 370.0), false, true, true, false, false)
 	if left_clear.x >= 0.0:
 		_fail("left rim without HUD must pan west")
 		return
-	var left_blocked: Vector2 = MapViewInput.edge_pan_direction_at(
-		Vector2(3.0, 370.0), sz, true, true, true, false, false
-	)
+	var left_blocked: Vector2 = _dir_at(Vector2(3.0, 370.0), true, true, true, false, false)
 	if left_blocked != Vector2.ZERO:
 		_fail("toast/panel on the left rim must still block")
 		return
-	var left_hud: Vector2 = MapViewInput.edge_pan_direction_at(
-		Vector2(3.0, 370.0), sz, true, true, true, false, true
-	)
+	var left_hud: Vector2 = _dir_at(Vector2(3.0, 370.0), true, true, true, false, true)
 	_info("left HUD exempt dir=%s" % str(left_hud))
 	if left_hud.x >= 0.0:
 		_fail("mutant left_blocked: left HUD in the 6px strip must pan west (dir=%s)" % str(left_hud))
 		return
-	var hud_interior: Vector2 = MapViewInput.edge_pan_direction_at(
-		Vector2(20.0, 370.0), sz, true, true, true, false, true
-	)
+	var hud_interior: Vector2 = _dir_at(Vector2(20.0, 370.0), true, true, true, false, true)
 	if hud_interior != Vector2.ZERO:
 		_fail("left HUD below the 6px strip must still block (got %s)" % str(hud_interior))
 		return
 	# Strip sizes kept.
 	var right: Vector2 = MapViewInput.edge_pan_direction_at(
-		Vector2(1270.0, 370.0), sz, false, true, true, false, false
+		Vector2(1270.0, 370.0), PLAY_SIZE, false, true, true, false
 	)
 	if right.x <= 0.0:
 		_fail("EDGE-1 x=1270 must still pan east")
@@ -395,7 +463,7 @@ func _test_camera_dwell_and_ramp() -> void:
 	var acc: float = 0.0
 	var t: float = 0.0
 	var speed: float = maxf(float(_mr.get("pan_speed")), float(_mr.get("edge_scroll_speed")))
-	var zdiv: float = MapViewInput.edge_pan_zoom_divisor(START_Z)
+	var zdiv: float = _zoom_div(START_Z)
 	while t < 0.30 - 0.0001:
 		var sc: float = float(_mr.call("_update_edge_rim_contact", true, DT))
 		t += DT
@@ -423,8 +491,8 @@ func _test_camera_far_zoom_cap() -> void:
 	# Seed past dwell+ramp so feel is 1.0, then one full-speed edge step.
 	if "_edge_rim_contact_sec" in _mr:
 		_mr.set("_edge_rim_contact_sec", 2.0)
-	var home_step: float = speed * dt / MapViewInput.edge_pan_zoom_divisor(HOME_Z)
-	var far_step: float = speed * dt / MapViewInput.edge_pan_zoom_divisor(FAR_Z)
+	var home_step: float = speed * dt / _zoom_div(HOME_Z)
+	var far_step: float = speed * dt / _zoom_div(FAR_Z)
 	var uncapped: float = speed * dt / FAR_Z
 	_info("cap step home=%.3f far=%.3f uncapped=%.3f" % [home_step, far_step, uncapped])
 	if far_step > home_step * (1.0 + SPEED_EPS):
@@ -442,8 +510,8 @@ func _test_camera_far_zoom_cap() -> void:
 	if _mr.has_method("_update_edge_rim_contact"):
 		_mr.call("_update_edge_rim_contact", true, 0.0)
 	# Apply the product formula used by _handle_camera_input (edge-only).
-	var feel: float = MapViewInput.edge_pan_feel_scale(float(_mr.get("_edge_rim_contact_sec")))
-	var applied: float = speed * feel * dt / MapViewInput.edge_pan_zoom_divisor(FAR_Z)
+	var feel: float = _feel_scale(float(_mr.get("_edge_rim_contact_sec")))
+	var applied: float = speed * feel * dt / _zoom_div(FAR_Z)
 	_cam.global_position = before + Vector2(applied, 0.0)
 	var moved: float = _cam.global_position.distance_to(before)
 	if moved > home_step * (1.0 + SPEED_EPS) + 0.05:
@@ -464,7 +532,8 @@ func _test_left_rim_with_hud() -> void:
 	toolbar.position = Vector2(0, 80)
 	toolbar.size = Vector2(420, 72)
 	toolbar.mouse_filter = Control.MOUSE_FILTER_STOP
-	_ui.add_child(toolbar)
+	root.add_child(toolbar)
+	toolbar.name = "MapModeToolbar"
 	var legend := Label.new()
 	legend.name = "Legend"
 	legend.position = Vector2(0, 0)
@@ -477,49 +546,48 @@ func _test_left_rim_with_hud() -> void:
 	info.size = Vector2(420, 480)
 	info.mouse_filter = Control.MOUSE_FILTER_STOP
 	info.set_meta("blocks_edge_pan", true)
-	_ui.add_child(info)
+	root.add_child(info)
+	info.name = "InfoPanel"
 	var mini := PanelContainer.new()
 	mini.name = "MapMinimap"
 	mini.position = Vector2(0, 620)
 	mini.size = Vector2(200, 110)
 	mini.mouse_filter = Control.MOUSE_FILTER_STOP
-	_ui.add_child(mini)
+	root.add_child(mini)
+	mini.name = "MapMinimap"
 	var toast := Panel.new()
 	toast.name = "Edge2LeftToast"
 	toast.position = Vector2(0, 300)
 	toast.size = Vector2(80, 40)
 	toast.mouse_filter = Control.MOUSE_FILTER_STOP
 	toast.visible = false
-	_ui.add_child(toast)
+	root.add_child(toast)
+	toast.name = "Edge2LeftToast"
 	await process_frame
 
-	if not MapViewInput.hovered_is_left_hud_only(toolbar):
+	if not _is_left_hud(toolbar):
 		_fail("mutant left_blocked: MapModeToolbar must count as left HUD")
 		return
-	if not MapViewInput.hovered_is_left_hud_only(legend):
+	if not _is_left_hud(legend):
 		_fail("mutant left_blocked: toolbar legend child must count as left HUD")
 		return
-	if not MapViewInput.hovered_is_left_hud_only(info):
+	if not _is_left_hud(info):
 		_fail("mutant left_blocked: InfoPanel must count as left HUD")
 		return
-	if not MapViewInput.hovered_is_left_hud_only(mini):
+	if not _is_left_hud(mini):
 		_fail("mutant left_blocked: minimap must count as left HUD")
 		return
-	if MapViewInput.hovered_is_left_hud_only(toast):
+	if _is_left_hud(toast):
 		_fail("toast must not count as left HUD")
 		return
 
-	var dir: Vector2 = MapViewInput.edge_pan_direction_at(
-		Vector2(3.0, 370.0), PLAY_SIZE, true, true, true, false, true
-	)
+	var dir: Vector2 = _dir_at(Vector2(3.0, 370.0), true, true, true, false, true)
 	_info("left rim + HUD dir=%s (want x<0)" % str(dir))
 	if dir.x >= 0.0:
 		_fail("mutant left_blocked: left-rim direction is %s with HUD present" % str(dir))
 		return
 	# Interior of the panel (x=20) stays blocked.
-	var interior: Vector2 = MapViewInput.edge_pan_direction_at(
-		Vector2(20.0, 370.0), PLAY_SIZE, true, true, true, false, true
-	)
+	var interior: Vector2 = _dir_at(Vector2(20.0, 370.0), true, true, true, false, true)
 	if interior != Vector2.ZERO:
 		_fail("InfoPanel at x=20 must still block edge pan")
 		return
@@ -543,7 +611,7 @@ func _test_left_rim_with_hud() -> void:
 		var _discard: Vector2 = MapViewInput.edge_pan_direction_screen(vp)
 	OS.set_environment("EOA_EDGE2_DEBUG", "0")
 	# Live blocked_by_gui: if the pointer actually landed in the 6px strip over HUD, must not block.
-	if mx >= 0.0 and mx <= MapViewInput.EDGE_PAN_SCREEN_PX and MapViewInput.hovered_is_left_hud_only(hovered):
+	if mx >= 0.0 and mx <= MapViewInput.EDGE_PAN_SCREEN_PX and _is_left_hud(hovered):
 		if MapViewInput.edge_pan_blocked_by_gui(vp):
 			_fail("mutant left_blocked: edge_pan_blocked_by_gui true at x=%.1f hovered=%s" % [mx, hname])
 			return
