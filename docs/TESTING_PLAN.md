@@ -734,7 +734,7 @@ Fix:
 - Prebuild uses the exact L-on role walk (`_supply_role_lon_semantics`, no `allow_without_overlay=true`), waits until province+depot counts are stable, and fingerprints role-context inputs. L-on show/hide only when both topology and role fps match; otherwise recompute.
 - Fixture metric renamed **fixture L-on** (250 bar kept). `max_step ≤ 8.0` unchanged.
 - Live-boot windowed gate `WindowedRender1LiveColdGuard` / `tools/eoa_render1_live_cold_guard.sh`: real TestScenario, `Input.parse_input_event(KEY_L)`, t0 in `_input`, stop at `RenderingServer.frame_post_draw` of first `mesh_calls > 0`. Report frame2 and same-run L-off frame2. Bar: Δ(L-on − L-off frame2) ≤ 250 ms and frame2 B/A ≤ 0.75, 3/3 not best-of. Pin Köln `710417` at z=3.2 with the RX-1 `lock_pixel_guard_camera` + `eoa_rx1_pixel_lock_camera` (TestRunner +6d grand visuals otherwise steal Asia).
-- Colour: L-on histogram == fresh `_supply_highlight_roles()`; close-zoom hue buckets (sat>0.4, val>0.5, map area below the toolbar) within ±10% of `5df8e7fc` (teal 37–45k / olive 7–9k / orange 4–7k).
+- Colour: L-on histogram == fresh `_supply_highlight_roles()`; close-zoom hue buckets (sat>0.4, val>0.5, map area below the toolbar; teal on outline edges so mesh interiors cannot 3× A's polyline stroke; orange excludes neon political fills) within ±10% of `5df8e7fc` (teal 37–45k / olive ≤9k+10% / orange 4–7k).
 - Mutant: prebuild with `allow_without_overlay=true` → FAIL (source body of `_step_supply_prebuild_roles`).
 
 Keep: windowed draw guard + counter_lie source edit, 9 mutants, Perf3/5/6, seed 193601 `grep -o 'multi_ai_decisions=.*' log | md5sum` → `20fe9063` ×3, `--quick` 14, map_qc NE 0.9853. Wired as `launch_render1_live_cold` after `launch_render1_draw_guard`. Stay DRAFT / HOLD.
