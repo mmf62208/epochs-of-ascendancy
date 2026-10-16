@@ -53,7 +53,7 @@ func _run_and_quit() -> void:
 
 
 func _run() -> void:
-	OS.set_environment("EOA_HWY3_MUTANT", "")
+	_test_env_branches_deleted()
 	_test_pid_list_grep()
 	_test_far_width_not_hidden()
 	_test_flip_max_guard_source()
@@ -222,6 +222,15 @@ func _boot_live_1936() -> bool:
 			continue
 		ger_nm.append("%s:%d" % [str(hg.get("city_name", hg.get("name", ""))), int(hg.get("pid", 0))])
 	print("HWY3_GER_HUBS %s" % str(ger_nm))
+	var rec_by_t: Dictionary = {}
+	for rec_t_v in _records():
+		if typeof(rec_t_v) == TYPE_DICTIONARY:
+			rec_by_t[int((rec_t_v as Dictionary).get("pid", 0))] = rec_t_v
+	var trimmed_v: Variant = dbg.get("trimmed_routes", [])
+	var trimmed: Array = trimmed_v if typeof(trimmed_v) == TYPE_ARRAY else []
+	for tr_v in trimmed:
+		if typeof(tr_v) == TYPE_DICTIONARY:
+			print("HWY3_TRIMMED %s kind=%d" % [_route_name_chain(tr_v as Dictionary, rec_by_t), int((tr_v as Dictionary).get("kind", 0))])
 	return true
 
 
@@ -1401,11 +1410,6 @@ func _assign_trap_shape(kind: String, mutant: String) -> Dictionary:
 		var ca2: Vector2 = Vector2(float(pad_i), 500.0)
 		var cb2: Vector2 = Vector2(float(pad_i) + 1.0, 500.0)
 		cache.append(_trap_edge(pa, pb, ca2, cb2))
-	var prev_mut: String = OS.get_environment("EOA_HWY3_MUTANT")
-	if mutant != "":
-		OS.set_environment("EOA_HWY3_MUTANT", mutant)
-	else:
-		OS.set_environment("EOA_HWY3_MUTANT", "")
 	var by_pid: Dictionary = {}
 	for rec_v in recs:
 		var rec: Dictionary = rec_v
@@ -1418,19 +1422,161 @@ func _assign_trap_shape(kind: String, mutant: String) -> Dictionary:
 		"use_urban": false,
 		"tag_borders": {},
 	}
-	_vis_call("hwy3_clear_memos", [])
-	_vis_call("assign_rare_display_tiers", [cache, ctx])
-	var dbg: Dictionary = _debug()
+	var gs: GDScript = _mutated_vis(mutant)
+	if gs == null:
+		return {"routes": 0, "independent_bad": 0, "used": 0, "mode": ""}
+	if gs.has_method("hwy3_clear_memos"):
+		gs.call("hwy3_clear_memos")
+	gs.call("assign_rare_display_tiers", cache, ctx)
+	var dbg_v: Variant = gs.call("hwy3_debug")
+	var dbg: Dictionary = dbg_v if typeof(dbg_v) == TYPE_DICTIONARY else {}
 	var routes_v: Variant = dbg.get("routes", [])
 	var routes: Array = routes_v if typeof(routes_v) == TYPE_ARRAY else []
 	var bad: int = _shape_fail_count(routes, cents)
-	OS.set_environment("EOA_HWY3_MUTANT", prev_mut)
 	return {
 		"routes": routes.size(),
 		"independent_bad": bad,
 		"used": int(dbg.get("used", 0)),
 		"mode": str(dbg.get("mode", "")),
 	}
+
+
+func _test_env_branches_deleted() -> void:
+	var vis: String = _read_text(SRC_VIS)
+	var ol: String = _read_text(SRC_OL)
+	var names: PackedStringArray = PackedStringArray([
+		"overlap_ok", "urban_required", "rank_grow_back", "no_capitals",
+		"hook_back", "zigzag_ok", "not_shortest", "far_hidden",
+		"EOA_HWY3_MUTANT", "hwy3_mutant_name",
+	])
+	var hits: int = 0
+	for n in names:
+		hits += vis.count(n)
+		hits += ol.count(n)
+	print("HWY3_ENV_BRANCH_GREP count=%d" % hits)
+	if hits != 0:
+		_fail("env branches still in product grep count=%d" % hits)
+	else:
+		_pass("env branches deleted (grep count 0)")
+
+
+func _mutated_vis(name: String) -> GDScript:
+	var src: String = _read_text(SRC_VIS)
+	src = src.replace("class_name RoadTierVisual\n", "")
+	for pair_v in _mutant_replacements(name):
+		if typeof(pair_v) != TYPE_DICTIONARY:
+			continue
+		var pair: Dictionary = pair_v
+		var old_s: String = str(pair.get("old", ""))
+		var new_s: String = str(pair.get("new", ""))
+		if old_s.is_empty() or old_s not in src:
+			print("HWY3_SOURCE_MUTANT missing_needle name=%s" % name)
+			return null
+		src = src.replace(old_s, new_s)
+	var gs := GDScript.new()
+	gs.source_code = src
+	if gs.reload() != OK:
+		print("HWY3_SOURCE_MUTANT parse_fail name=%s" % name)
+		return null
+	return gs
+
+
+func _mutant_replacements(name: String) -> Array:
+	if name == "rank_grow_back":
+		return [{"old": "	if not has_hubs:", "new": "	if true:"}]
+	if name == "no_capitals":
+		return [{
+			"old": "	var hubs: Array = select_display_hubs(recs_for_select, use_urban)",
+			"new": (
+				"	var hubs: Array = select_display_hubs(recs_for_select, use_urban)\n"
+				+ "	var _nc: Array = []\n"
+				+ "	for _hv in hubs:\n"
+				+ "		if typeof(_hv) == TYPE_DICTIONARY and not bool((_hv as Dictionary).get(\"capital\", false)):\n"
+				+ "			_nc.append(_hv)\n"
+				+ "	hubs = _nc"
+			),
+		}]
+	if name == "urban_required":
+		return [{
+			"old": "	var hubs: Array = select_display_hubs(recs_for_select, use_urban)",
+			"new": (
+				"	recs_for_select = []\n"
+				+ "	for rec2_v in records:\n"
+				+ "		if typeof(rec2_v) != TYPE_DICTIONARY:\n"
+				+ "			continue\n"
+				+ "		var rec2: Dictionary = rec2_v\n"
+				+ "		var only: Dictionary = rec2.duplicate()\n"
+				+ "		only[\"capital\"] = false\n"
+				+ "		only[\"tier\"] = 0\n"
+				+ "		only[\"population\"] = 0\n"
+				+ "		only[\"industrial\"] = false\n"
+				+ "		only[\"city_hub\"] = false\n"
+				+ "		only[\"port\"] = false\n"
+				+ "		recs_for_select.append(only)\n"
+				+ "	var hubs: Array = select_display_hubs(recs_for_select, use_urban)"
+			),
+		}]
+	if name == "zigzag_ok":
+		return [{
+			"old": (
+				"	out[\"ok\"] = (\n"
+				+ "		(not bool(out[\"repeat\"]))\n"
+				+ "		and (not bool(out[\"hook\"]))\n"
+				+ "		and (not bool(out[\"long\"]))\n"
+				+ "		and (not bool(out[\"zigzag\"]))\n"
+				+ "	)"
+			),
+			"new": (
+				"	out[\"ok\"] = (\n"
+				+ "		(not bool(out[\"repeat\"]))\n"
+				+ "		and (not bool(out[\"hook\"]))\n"
+				+ "	)"
+			),
+		}]
+	if name == "hook_back":
+		return [
+			{
+				"old": (
+					"	out[\"ok\"] = (\n"
+					+ "		(not bool(out[\"repeat\"]))\n"
+					+ "		and (not bool(out[\"hook\"]))\n"
+					+ "		and (not bool(out[\"long\"]))\n"
+					+ "		and (not bool(out[\"zigzag\"]))\n"
+					+ "	)"
+				),
+				"new": "	out[\"ok\"] = true",
+			},
+			{
+				"old": "	return pids\n",
+				"new": (
+					"	if pids.size() < 3:\n"
+					+ "		return pids\n"
+					+ "	var hout: PackedInt32Array = PackedInt32Array()\n"
+					+ "	hout.append(pids[0])\n"
+					+ "	hout.append(pids[1])\n"
+					+ "	hout.append(pids[0])\n"
+					+ "	for hi in range(1, pids.size()):\n"
+					+ "		hout.append(pids[hi])\n"
+					+ "	return hout\n"
+				),
+			},
+		]
+	if name == "not_shortest":
+		return [{"old": "	if use_detour:", "new": "	if true:"}]
+	if name == "overlap_ok":
+		return [
+			{
+				"old": "static func _hwy3_routes_share_corridor(ra: Dictionary, rb: Dictionary) -> bool:\n	var sa: Dictionary = _hwy3_route_pid_set(ra)",
+				"new": "static func _hwy3_routes_share_corridor(ra: Dictionary, rb: Dictionary) -> bool:\n	return false\n	var sa: Dictionary = _hwy3_route_pid_set(ra)",
+			},
+			{
+				"old": "static func _hwy3_routes_near_parallel(ra: Dictionary, rb: Dictionary, cents: Dictionary) -> bool:\n	var pa_v: Variant = ra.get(\"pids\", [])",
+				"new": "static func _hwy3_routes_near_parallel(ra: Dictionary, rb: Dictionary, cents: Dictionary) -> bool:\n	return false\n	var pa_v: Variant = ra.get(\"pids\", [])",
+			},
+		]
+	if name == "far_hidden":
+		return [{"old": "const HIGHWAY_FAR_CASING_SCREEN_PX := 12.0", "new": "const HIGHWAY_FAR_CASING_SCREEN_PX := 5.5"}]
+	return []
 
 
 func _test_mutants() -> void:
@@ -1459,12 +1605,14 @@ func _test_mutants() -> void:
 	_mutant_expect("hook_back", ctx, "H3")
 	_mutant_expect("not_shortest", ctx, "H2")
 	_mutant_expect("overlap_ok", ctx, "H4c")
-	OS.set_environment("EOA_HWY3_MUTANT", "")
 	_vis_call("hwy3_clear_memos", [])
 
 
 func _mutant_expect(name: String, ctx: Dictionary, bar: String) -> void:
-	OS.set_environment("EOA_HWY3_MUTANT", name)
+	var gs: GDScript = _mutated_vis(name)
+	if gs == null:
+		_fail("mutant %s source-edit failed to load" % name)
+		return
 	var clone: Array = _clone_cache(_cache)
 	_reset_inferred(clone)
 	var rec_copy: Array = []
@@ -1473,14 +1621,17 @@ func _mutant_expect(name: String, ctx: Dictionary, bar: String) -> void:
 			rec_copy.append((rec_v as Dictionary).duplicate())
 	var ctx2: Dictionary = ctx.duplicate()
 	ctx2["records"] = rec_copy
-	_vis_call("assign_rare_display_tiers", [clone, ctx2])
-	var dbg: Dictionary = _debug()
+	if gs.has_method("hwy3_clear_memos"):
+		gs.call("hwy3_clear_memos")
+	gs.call("assign_rare_display_tiers", clone, ctx2)
+	var dbg_v: Variant = gs.call("hwy3_debug")
+	var dbg: Dictionary = dbg_v if typeof(dbg_v) == TYPE_DICTIONARY else {}
 	var killed: bool = false
 	if bar == "H2":
 		if str(dbg.get("mode", "")) == "rank_grow":
 			killed = true
 		else:
-			var adj_mv: Variant = _vis_call("build_hub_route_adj", [ctx2.get("graph", []), rec_copy, true])
+			var adj_mv: Variant = gs.call("build_hub_route_adj", ctx2.get("graph", []), rec_copy, true)
 			var adj: Dictionary = adj_mv if typeof(adj_mv) == TYPE_DICTIONARY else {}
 			var attrs_m: Dictionary = {}
 			for rec_m_v in rec_copy:
@@ -1492,9 +1643,7 @@ func _mutant_expect(name: String, ctx: Dictionary, bar: String) -> void:
 				if typeof(rt_v) != TYPE_DICTIONARY:
 					continue
 				var rt: Dictionary = rt_v
-				var got_mv: Variant = _vis_call("shortest_hub_path", [
-					adj, int(rt.get("a", 0)), int(rt.get("b", 0)), false, attrs_m
-				])
+				var got_mv: Variant = gs.call("shortest_hub_path", adj, int(rt.get("a", 0)), int(rt.get("b", 0)), false, attrs_m)
 				var got: PackedInt32Array = PackedInt32Array()
 				if typeof(got_mv) == TYPE_PACKED_INT32_ARRAY:
 					got = got_mv
@@ -1516,26 +1665,29 @@ func _mutant_expect(name: String, ctx: Dictionary, bar: String) -> void:
 			if typeof(h_v) == TYPE_DICTIONARY:
 				hs[int((h_v as Dictionary).get("pid", 0))] = true
 		var cap_ger: int = 0
-		for rec_v in rec_copy:
-			if typeof(rec_v) != TYPE_DICTIONARY:
+		for rec2_v in _records():
+			if typeof(rec2_v) != TYPE_DICTIONARY:
 				continue
-			var rec: Dictionary = rec_v
-			if str(rec.get("tag", "")).to_upper() == "GER" and bool(rec.get("capital", false)):
-				cap_ger = int(rec.get("pid", 0))
+			var rec2: Dictionary = rec2_v
+			if str(rec2.get("tag", "")).to_upper() == "GER" and bool(rec2.get("capital", false)):
+				cap_ger = int(rec2.get("pid", 0))
 				break
-		# After no_capitals, capital flags are cleared on the copy; look at original recs.
-		if cap_ger <= 0:
-			for rec2_v in _records():
-				if typeof(rec2_v) != TYPE_DICTIONARY:
-					continue
-				var rec2: Dictionary = rec2_v
-				if str(rec2.get("tag", "")).to_upper() == "GER" and bool(rec2.get("capital", false)):
-					cap_ger = int(rec2.get("pid", 0))
-					break
 		if cap_ger > 0 and not hs.has(cap_ger):
 			killed = true
 		if name == "urban_required":
-			var off_mv: Variant = _vis_call("select_display_hubs", [rec_copy, false])
+			var stripped: Array = []
+			for rec3_v in rec_copy:
+				if typeof(rec3_v) != TYPE_DICTIONARY:
+					continue
+				var only: Dictionary = (rec3_v as Dictionary).duplicate()
+				only["capital"] = false
+				only["tier"] = 0
+				only["population"] = 0
+				only["industrial"] = false
+				only["city_hub"] = false
+				only["port"] = false
+				stripped.append(only)
+			var off_mv: Variant = gs.call("select_display_hubs", stripped, false)
 			var off: Array = off_mv if typeof(off_mv) == TYPE_ARRAY else []
 			if off.is_empty():
 				killed = true
@@ -1552,14 +1704,12 @@ func _mutant_expect(name: String, ctx: Dictionary, bar: String) -> void:
 			if major_miss or off.is_empty():
 				killed = true
 	elif bar == "H3":
-		# Inject a zigzag/hook-only adjacency. Independent math must FAIL the
-		# painted route; product path_shape_report is not consulted.
 		var kind: String = "hook" if name == "hook_back" else "zigzag"
 		var trap: Dictionary = _assign_trap_shape(kind, name)
 		killed = int(trap.get("independent_bad", 0)) > 0
-		_vis_call("hwy3_clear_memos", [])
+		if gs.has_method("hwy3_clear_memos"):
+			gs.call("hwy3_clear_memos")
 	elif bar == "H4c":
-		# Independent Jaccard / shared-end math — not _hwy3_routes_share_corridor.
 		var rec_by_m: Dictionary = {}
 		for rec_ov_v in rec_copy:
 			if typeof(rec_ov_v) != TYPE_DICTIONARY:
@@ -1590,7 +1740,6 @@ func _mutant_expect(name: String, ctx: Dictionary, bar: String) -> void:
 					break
 			if killed:
 				break
-	OS.set_environment("EOA_HWY3_MUTANT", "")
 	if killed:
 		_pass("mutant %s killed by %s" % [name, bar])
 	else:
@@ -1599,7 +1748,7 @@ func _mutant_expect(name: String, ctx: Dictionary, bar: String) -> void:
 
 func _test_pid_list_grep() -> void:
 	var src: String = _read_text(SRC_VIS)
-	var start: int = src.find("static func hwy3_mutant_name")
+	var start: int = src.find("static func select_display_hubs")
 	if start < 0:
 		_fail("pid_list: hwy3 functions missing")
 		return
@@ -1616,14 +1765,23 @@ func _test_pid_list_grep() -> void:
 func _test_far_width_not_hidden() -> void:
 	var far_w: float = RoadTierVisualScript.screen_width_for_tier(RoadTierVisualScript.TIER_HIGHWAY, 0)
 	if far_w + 0.01 < 9.0:
-		_fail("far_hidden: far highway width %.2f < 9" % far_w)
+		_fail("far width %.2f < 9" % far_w)
 	else:
-		_pass("far width %.2f ≥ 9 (far_hidden mutant would drop to 5.5)" % far_w)
+		_pass("far width %.2f ≥ 9" % far_w)
 	var ol_src: String = _read_text(SRC_OL)
 	if "min_case: float = 20.0" not in ol_src:
-		_fail("far_hidden: overlay lost the 20 px far floor")
+		_fail("overlay lost the 20 px far floor")
 	else:
-		_pass("far_hidden: overlay keeps the 20 px far floor")
+		_pass("overlay keeps the 20 px far floor")
+	var gs: GDScript = _mutated_vis("far_hidden")
+	if gs == null:
+		_fail("far_hidden source-edit failed to load")
+		return
+	var mut_w: float = float(gs.call("screen_width_for_tier", 2, 0))
+	if mut_w + 0.01 < 9.0:
+		_pass("far_hidden source-edit killed far width %.2f" % mut_w)
+	else:
+		_fail("far_hidden source-edit survived far width %.2f" % mut_w)
 
 
 func _test_flip_max_guard_source() -> void:

@@ -84,10 +84,13 @@ const HWY3_MIN_PATH_EDGES := 2
 const HWY3_URBAN_SPAN_MIN := 8.0
 const HWY3_URBAN_SPAN_MAX := 28.0
 const HWY3_URBAN_CLUSTER_R := 20.0
-## Metro corridor: ≥3 named hubs inside this radius get thicker casing + labels.
+## Metro corridor: ≥3 named hubs inside this radius get thicker core/stripe + labels.
+## Casing stays at the RT-1 ceilings (far 26 / default 18); only core/stripe grow.
 const HWY3_METRO_CLUSTER_R := 30.0
 const HWY3_METRO_MIN_HUBS := 3
 const HWY3_METRO_CASING_MULT := 1.3
+const HWY3_FAR_CASING_CEILING_PX := 26.0
+const HWY3_DEFAULT_CASING_CEILING_PX := 18.0
 ## Hub city labels (display only). Population is the province/city-layer pop on the hub record.
 const HWY3_HUB_LABEL_ZOOM_MIN := 2.0
 const HWY3_HUB_LABEL_POP_MIN := 15000
@@ -250,6 +253,106 @@ static func should_label_hub_city(rec: Dictionary, zoom: float, cluster_n: int) 
 	if bool(rec.get("urban", false)) and int(rec.get("population", 0)) >= HWY3_HUB_LABEL_POP_MIN:
 		return true
 	return int(rec.get("population", 0)) >= HWY3_HUB_LABEL_POP_MIN and int(rec.get("tier", 0)) >= 2
+
+
+## Fold city vs province spellings so Cologne/Köln share one key.
+static func hwy3_label_alias_key(text: String) -> String:
+	var n: String = text.strip_edges().to_lower()
+	var comma: int = n.find(",")
+	if comma >= 0:
+		n = n.substr(0, comma).strip_edges()
+	n = n.replace("ä", "a").replace("ö", "o").replace("ü", "u").replace("ß", "ss")
+	n = n.replace("á", "a").replace("é", "e").replace("í", "i").replace("ó", "o")
+	if n == "cologne" or n == "koln" or n == "koeln" or n.begins_with("koln "):
+		return "koln"
+	if n == "dusseldorf" or n == "duesseldorf" or n.begins_with("dusseldorf "):
+		return "dusseldorf"
+	if n.begins_with("mulheim") or n.begins_with("muelheim"):
+		return "mulheim"
+	if n.begins_with("mülheim"):
+		return "mulheim"
+	return n
+
+
+## Hub (capital / city_hub) beats metro-other. Gold-spine ends use priority 90.
+static func hwy3_label_priority(rec: Dictionary) -> int:
+	if bool(rec.get("gold_spine", false)):
+		return 90
+	if bool(rec.get("capital", false)):
+		return 100
+	if bool(rec.get("city_hub", false)):
+		return 80
+	if int(rec.get("tier", 0)) >= 3:
+		return 60
+	if bool(rec.get("industrial", false)):
+		return 50
+	return 20
+
+
+## Test-side source-edit flips this to false (no-cull mutant).
+static func hwy3_cull_labels_enabled() -> bool:
+	return true
+
+
+## Keep higher-priority labels; drop alias dupes and overlapping rects.
+static func hwy3_cull_label_candidates(cands: Array) -> Array:
+	if not hwy3_cull_labels_enabled():
+		return cands
+	var ordered: Array = []
+	for c_v in cands:
+		if typeof(c_v) == TYPE_DICTIONARY:
+			ordered.append(c_v)
+	ordered.sort_custom(_hwy3_label_cand_more)
+	var kept: Array = []
+	var seen: Dictionary = {}
+	for c2_v in ordered:
+		var c2: Dictionary = c2_v
+		var key: String = str(c2.get("key", ""))
+		if key.is_empty():
+			key = hwy3_label_alias_key(str(c2.get("text", "")))
+		if key.is_empty() or seen.has(key):
+			continue
+		var rect: Rect2 = c2.get("rect", Rect2())
+		var hit: bool = false
+		for k_v in kept:
+			var k: Dictionary = k_v
+			var kr: Rect2 = k.get("rect", Rect2())
+			if rect.size.x <= 0.5 or kr.size.x <= 0.5:
+				continue
+			if rect.intersects(kr):
+				hit = true
+				break
+		if hit:
+			continue
+		seen[key] = true
+		kept.append(c2)
+	return kept
+
+
+static func _hwy3_label_cand_more(a: Dictionary, b: Dictionary) -> bool:
+	var pa: int = int(a.get("priority", 0))
+	var pb: int = int(b.get("priority", 0))
+	if pa != pb:
+		return pa > pb
+	return str(a.get("text", "")) < str(b.get("text", ""))
+
+
+static func hwy3_labels_have_overlap(cands: Array) -> bool:
+	for i in range(cands.size()):
+		if typeof(cands[i]) != TYPE_DICTIONARY:
+			continue
+		var ra: Rect2 = (cands[i] as Dictionary).get("rect", Rect2())
+		if ra.size.x <= 0.5 or ra.size.y <= 0.5:
+			continue
+		for j in range(i + 1, cands.size()):
+			if typeof(cands[j]) != TYPE_DICTIONARY:
+				continue
+			var rb: Rect2 = (cands[j] as Dictionary).get("rect", Rect2())
+			if rb.size.x <= 0.5 or rb.size.y <= 0.5:
+				continue
+			if ra.intersects(rb):
+				return true
+	return false
 
 
 static func hwy3_metro_cluster_n(hubs: Array, rec: Dictionary) -> int:
@@ -680,21 +783,16 @@ static func assign_rare_display_tiers(cache: Array, hub_ctx: Dictionary = {}) ->
 		inferred.append(row)
 	if inferred.is_empty() and hub_ctx.is_empty():
 		return
-	var mutant: String = hwy3_mutant_name()
 	var records_v: Variant = hub_ctx.get("records", [])
 	var has_hubs: bool = typeof(records_v) == TYPE_ARRAY and (records_v as Array).size() > 0
 	var graph_fast_v: Variant = hub_ctx.get("graph", cache)
 	var graph_fast: Array = graph_fast_v if typeof(graph_fast_v) == TYPE_ARRAY else cache
 	var use_urban_fast: bool = bool(hub_ctx.get("use_urban", true))
-	if mutant == "urban_required":
-		use_urban_fast = true
-	var route_key_fast: String = "%s|%s|%d" % [
-		_hwy3_adj_cache_key(graph_fast, use_urban_fast), mutant, (records_v as Array).size() if has_hubs else 0
+	var route_key_fast: String = "%s|%d" % [
+		_hwy3_adj_cache_key(graph_fast, use_urban_fast), (records_v as Array).size() if has_hubs else 0
 	]
 	if (
 		has_hubs
-		and mutant != "rank_grow_back"
-		and mutant != "not_shortest"
 		and route_key_fast == _hwy3_route_memo_key
 		and not _hwy3_route_memo_marked.is_empty()
 	):
@@ -705,7 +803,6 @@ static func assign_rare_display_tiers(cache: Array, hub_ctx: Dictionary = {}) ->
 		_hwy3_stamp_metro_edges(cache, hubs_fast)
 		last_hwy3_debug["used"] = used_fast
 		last_hwy3_debug["drawn"] = _hwy3_count_highways(cache)
-		last_hwy3_debug["mutant"] = mutant
 		last_hwy3_debug["total_ms"] = 0.0
 		return
 	var ranked: Dictionary = _hwy1_rank_inferred(inferred) if not inferred.is_empty() else {"ranks": {}, "seeds_desc": []}
@@ -719,11 +816,11 @@ static func assign_rare_display_tiers(cache: Array, hub_ctx: Dictionary = {}) ->
 		if tier == TIER_HIGHWAY:
 			tier = TIER_PAVED
 		row2["display_tier"] = tier
-	if mutant == "rank_grow_back" or (not has_hubs):
+	if not has_hubs:
 		_hwy1_pick_highway_chains(cache, inferred, ranks, seeds_desc)
-		last_hwy3_debug = {"mutant": mutant, "hubs": [], "routes": [], "mode": "rank_grow", "records": hub_ctx.get("records", [])}
+		last_hwy3_debug = {"hubs": [], "routes": [], "mode": "rank_grow", "records": hub_ctx.get("records", [])}
 		return
-	_hwy3_pick_hub_routes(cache, inferred, hub_ctx, mutant)
+	_hwy3_pick_hub_routes(cache, inferred, hub_ctx)
 
 
 ## Weight desc, infra desc, int pair-key asc (same as string edge_key on 6-digit pids).
@@ -1119,10 +1216,6 @@ static func _hwy1_component_stats(cache: Array) -> Dictionary:
 		"sizes": sizes,
 		"median": median,
 	}
-
-
-static func hwy3_mutant_name() -> String:
-	return OS.get_environment("EOA_HWY3_MUTANT").strip_edges()
 
 
 static func is_urban_district_name(province_name: String) -> bool:
@@ -2392,10 +2485,7 @@ static func _hwy3_route_pid_set(rt: Dictionary) -> Dictionary:
 
 
 ## Same drawn corridor: Jaccard ≥ 0.5, or a shared endpoint plus ≥50% of either set.
-## overlap_ok leaves both copies so the independent Hub3 assert can kill the mutant.
 static func _hwy3_routes_share_corridor(ra: Dictionary, rb: Dictionary) -> bool:
-	if hwy3_mutant_name() == "overlap_ok":
-		return false
 	var sa: Dictionary = _hwy3_route_pid_set(ra)
 	var sb: Dictionary = _hwy3_route_pid_set(rb)
 	if sa.is_empty() or sb.is_empty():
@@ -2424,8 +2514,6 @@ static func _hwy3_routes_share_corridor(ra: Dictionary, rb: Dictionary) -> bool:
 
 
 static func _hwy3_routes_near_parallel(ra: Dictionary, rb: Dictionary, cents: Dictionary) -> bool:
-	if hwy3_mutant_name() == "overlap_ok":
-		return false
 	var pa_v: Variant = ra.get("pids", [])
 	var pb_v: Variant = rb.get("pids", [])
 	var pa: Array = pa_v if typeof(pa_v) == TYPE_ARRAY else []
@@ -2731,7 +2819,7 @@ static func _hwy3_extract_path(prev: Dictionary, start: int, goal: int) -> Packe
 
 
 static func shortest_hub_path(
-	adj: Dictionary, start: int, goal: int, not_shortest: bool, attrs: Dictionary = {}
+	adj: Dictionary, start: int, goal: int, use_detour: bool, attrs: Dictionary = {}
 ) -> PackedInt32Array:
 	var empty: PackedInt32Array = PackedInt32Array()
 	if start <= 0 or goal <= 0:
@@ -2742,7 +2830,7 @@ static func shortest_hub_path(
 		return one
 	if not adj.has(start) or not adj.has(goal):
 		return empty
-	if not_shortest:
+	if use_detour:
 		return _hwy3_random_trunk_walk(adj, start, goal)
 	var tag_filter: String = _hwy3_same_tag_filter(start, goal, attrs)
 	var prev: Dictionary = _hwy3_dijkstra_prev(adj, start, tag_filter, attrs, goal)
@@ -2844,35 +2932,17 @@ static func path_shape_report(
 	var windows: float = maxf(float(n_edges) / 6.0, 1.0)
 	if turn_sum > HWY3_ZIGZAG_TURN_BUDGET * windows + 0.0001:
 		out["zigzag"] = true
-	var allow_hook: bool = mutant == "hook_back"
-	var allow_zig: bool = mutant == "zigzag_ok"
-	if allow_hook:
-		out["repeat"] = false
-		out["hook"] = false
-		out["long"] = false
-		out["zigzag"] = false
-	if allow_zig:
-		out["zigzag"] = false
-		out["long"] = false
 	out["ok"] = (
-		(not bool(out["repeat"]) or allow_hook)
-		and (not bool(out["hook"]) or allow_hook)
-		and (not bool(out["long"]) or allow_zig or allow_hook)
-		and (not bool(out["zigzag"]) or allow_zig or allow_hook)
+		(not bool(out["repeat"]))
+		and (not bool(out["hook"]))
+		and (not bool(out["long"]))
+		and (not bool(out["zigzag"]))
 	)
 	return out
 
 
-static func _hwy3_maybe_hook_repeat(pids: PackedInt32Array, mutant: String) -> PackedInt32Array:
-	if mutant != "hook_back" or pids.size() < 3:
-		return pids
-	var out: PackedInt32Array = PackedInt32Array()
-	out.append(pids[0])
-	out.append(pids[1])
-	out.append(pids[0])
-	for i in range(1, pids.size()):
-		out.append(pids[i])
-	return out
+static func _hwy3_maybe_hook_repeat(pids: PackedInt32Array, _mutant: String) -> PackedInt32Array:
+	return pids
 
 
 static func _hwy3_union_path_hubs(tree_parent: Dictionary, pids: PackedInt32Array) -> void:
@@ -3047,7 +3117,8 @@ static func _hwy3_trim_over_cap(
 	marked: Dictionary,
 	routes: Array,
 	used: int,
-	cap: int
+	cap: int,
+	trimmed_out: Array
 ) -> int:
 	var hwy: int = _hwy3_count_highways(cache)
 	if hwy <= cap:
@@ -3101,6 +3172,13 @@ static func _hwy3_trim_over_cap(
 			dropped_any = true
 		if dropped_any:
 			drop_idx[vi] = true
+			trimmed_out.append({
+				"a": int(rt2.get("a", 0)),
+				"b": int(rt2.get("b", 0)),
+				"kind": int(rt2.get("kind", 0)),
+				"score": float(rt2.get("score", 0.0)),
+				"pids": rt2.get("pids", []),
+			})
 	if not drop_idx.is_empty():
 		var kept: Array = []
 		for ri2 in range(routes.size()):
@@ -3319,20 +3397,14 @@ static func _hwy3_apply_marked_highways(cache: Array, graph: Array, marked: Dict
 	return used
 
 
-static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictionary, mutant: String) -> void:
+static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictionary) -> void:
 	var records_v: Variant = hub_ctx.get("records", [])
 	var records: Array = records_v if typeof(records_v) == TYPE_ARRAY else []
 	var use_urban: bool = bool(hub_ctx.get("use_urban", true))
-	if mutant == "urban_required":
-		use_urban = true
 	var graph_v: Variant = hub_ctx.get("graph", cache)
 	var graph: Array = graph_v if typeof(graph_v) == TYPE_ARRAY else cache
-	var route_key: String = "%s|%s|%d" % [_hwy3_adj_cache_key(graph, use_urban), mutant, records.size()]
-	if (
-		mutant != "not_shortest"
-		and route_key == _hwy3_route_memo_key
-		and not _hwy3_route_memo_marked.is_empty()
-	):
+	var route_key: String = "%s|%d" % [_hwy3_adj_cache_key(graph, use_urban), records.size()]
+	if route_key == _hwy3_route_memo_key and not _hwy3_route_memo_marked.is_empty():
 		var used_m: int = _hwy3_apply_marked_highways(cache, graph, _hwy3_route_memo_marked)
 		last_hwy3_debug = _hwy3_route_memo_debug.duplicate()
 		var hubs_m_v: Variant = last_hwy3_debug.get("hubs", [])
@@ -3340,34 +3412,13 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 		_hwy3_stamp_metro_edges(cache, hubs_m)
 		last_hwy3_debug["used"] = used_m
 		last_hwy3_debug["drawn"] = _hwy3_count_highways(cache)
-		last_hwy3_debug["mutant"] = mutant
 		last_hwy3_debug["total_ms"] = 0.0
 		return
-	if mutant == "no_capitals":
-		for rec_v in records:
-			if typeof(rec_v) == TYPE_DICTIONARY:
-				var rec_nc: Dictionary = rec_v
-				if bool(rec_nc.get("capital", false)):
-					rec_nc["_skip"] = true
 	var t_all0: int = Time.get_ticks_usec()
 	var recs_for_select: Array = records
 	var select_v: Variant = hub_ctx.get("select_records", [])
 	if typeof(select_v) == TYPE_ARRAY and (select_v as Array).size() > 0:
 		recs_for_select = select_v
-	if mutant == "urban_required":
-		recs_for_select = []
-		for rec2_v in records:
-			if typeof(rec2_v) != TYPE_DICTIONARY:
-				continue
-			var rec2: Dictionary = rec2_v
-			var only: Dictionary = rec2.duplicate()
-			only["capital"] = false
-			only["tier"] = 0
-			only["population"] = 0
-			only["industrial"] = false
-			only["city_hub"] = false
-			only["port"] = false
-			recs_for_select.append(only)
 	var hubs: Array = select_display_hubs(recs_for_select, use_urban)
 	var hub_set: Dictionary = {}
 	var rec_by_pid: Dictionary = {}
@@ -3672,7 +3723,6 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 	var used: int = 0
 	var routes: Array = []
 	var marked: Dictionary = {}
-	var not_shortest: bool = mutant == "not_shortest"
 	var tree_parent: Dictionary = {}
 	for hp_v in hub_set.keys():
 		var hp: int = int(hp_v)
@@ -3701,20 +3751,20 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 			trunk_ids.append("%s:%d-%d" % [str(sp.get("tag", "")), a2, b2])
 		elif kind2 == HWY3_KIND_SPAN:
 			span_ids.append("%s:%d-%d" % [str(sp.get("tag", "")), a2, b2])
-		var pids: PackedInt32Array = shortest_hub_path(adj, a2, b2, not_shortest, attrs)
-		pids = _hwy3_maybe_hook_repeat(pids, mutant)
-		if pids.size() - 1 < HWY3_MIN_PATH_EDGES and kind2 >= HWY3_KIND_TRUNK and mutant != "not_shortest":
+		var pids: PackedInt32Array = shortest_hub_path(adj, a2, b2, false, attrs)
+		pids = _hwy3_maybe_hook_repeat(pids, "")
+		if pids.size() - 1 < HWY3_MIN_PATH_EDGES and kind2 >= HWY3_KIND_TRUNK:
 			var tf2: String = _hwy3_same_tag_filter(a2, b2, attrs)
 			var prev_t: Dictionary = _hwy3_dijkstra_prev(adj, a2, tf2, attrs, 0)
 			pids = _hwy3_extract_path(prev_t, a2, b2)
-			pids = _hwy3_maybe_hook_repeat(pids, mutant)
+			pids = _hwy3_maybe_hook_repeat(pids, "")
 		if pids.size() - 1 < HWY3_MIN_PATH_EDGES:
 			if kind2 >= HWY3_KIND_TRUNK:
 				failed_trunks.append("%d-%d empty_n=%d" % [a2, b2, pids.size()])
 			elif kind2 == HWY3_KIND_SPAN:
 				failed_spans.append("%d-%d empty_n=%d" % [a2, b2, pids.size()])
 			continue
-		var shape: Dictionary = path_shape_report(pids, centroids, a2, b2, mutant)
+		var shape: Dictionary = path_shape_report(pids, centroids, a2, b2, "")
 		if _hwy3_path_touches_dropped_second_sector(
 			pids, str(sp.get("tag", "")), second_by_tag, sector2_by_tag, rec_by_pid, hubs_by_tag
 		):
@@ -3773,11 +3823,11 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 			var attach_c: int = int(ar.get("pid", 0))
 			if attach_c <= 0 or not adj.has(attach_c):
 				continue
-			var pids_pc: PackedInt32Array = shortest_hub_path(adj, peri_c, attach_c, not_shortest, attrs)
-			pids_pc = _hwy3_maybe_hook_repeat(pids_pc, mutant)
+			var pids_pc: PackedInt32Array = shortest_hub_path(adj, peri_c, attach_c, false, attrs)
+			pids_pc = _hwy3_maybe_hook_repeat(pids_pc, "")
 			if pids_pc.size() - 1 < HWY3_MIN_PATH_EDGES:
 				continue
-			var shape_pc: Dictionary = path_shape_report(pids_pc, centroids, peri_c, attach_c, mutant)
+			var shape_pc: Dictionary = path_shape_report(pids_pc, centroids, peri_c, attach_c, "")
 			if not bool(shape_pc.get("ok", false)):
 				continue
 			var pid_arr_pc: Array = []
@@ -3902,11 +3952,11 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 			var attach_o: int = int(ao.get("pid", 0))
 			if attach_o <= 0 or not adj.has(attach_o):
 				continue
-			var pids_o: PackedInt32Array = shortest_hub_path(adj, orph_pid, attach_o, not_shortest, attrs)
-			pids_o = _hwy3_maybe_hook_repeat(pids_o, mutant)
+			var pids_o: PackedInt32Array = shortest_hub_path(adj, orph_pid, attach_o, false, attrs)
+			pids_o = _hwy3_maybe_hook_repeat(pids_o, "")
 			if pids_o.size() - 1 < HWY3_MIN_PATH_EDGES:
 				continue
-			var shape_o: Dictionary = path_shape_report(pids_o, centroids, orph_pid, attach_o, mutant)
+			var shape_o: Dictionary = path_shape_report(pids_o, centroids, orph_pid, attach_o, "")
 			if not bool(shape_o.get("ok", false)):
 				continue
 			var pid_arr_o: Array = []
@@ -4079,8 +4129,8 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 		if best_a <= 0 or best_b <= 0:
 			break
 		cover_tried[_hwy3_pair_key(best_a, best_b)] = true
-		var pids5: PackedInt32Array = shortest_hub_path(adj, best_a, best_b, not_shortest, attrs)
-		pids5 = _hwy3_maybe_hook_repeat(pids5, mutant)
+		var pids5: PackedInt32Array = shortest_hub_path(adj, best_a, best_b, false, attrs)
+		pids5 = _hwy3_maybe_hook_repeat(pids5, "")
 		if pids5.size() < 2:
 			continue
 		var cover_tag: String = ""
@@ -4091,7 +4141,7 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 			pids5, cover_tag, second_by_tag, sector2_by_tag, rec_by_pid, hubs_by_tag
 		):
 			continue
-		var shape5: Dictionary = path_shape_report(pids5, centroids, best_a, best_b, mutant)
+		var shape5: Dictionary = path_shape_report(pids5, centroids, best_a, best_b, "")
 		if not bool(shape5.get("ok", false)):
 			continue
 		var pid_arr5: Array = []
@@ -4126,9 +4176,9 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 		if used > used_cover:
 			for pi5b in range(pids5.size()):
 				marked_verts[int(pids5[pi5b])] = true
-	if mutant != "overlap_ok":
-		used = _hwy3_trim_over_cap(cache, cache_by_key, marked, routes, used, HWY3_BUDGET_CAP)
-		used = _hwy3_drop_singleton_highways(cache, marked, used)
+	var trimmed_routes: Array = []
+	used = _hwy3_trim_over_cap(cache, cache_by_key, marked, routes, used, HWY3_BUDGET_CAP, trimmed_routes)
+	used = _hwy3_drop_singleton_highways(cache, marked, used)
 	_hwy3_stamp_metro_edges(cache, hubs)
 	var hub_list: Array = []
 	for h2_v in hubs:
@@ -4157,7 +4207,6 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 			continue
 		peri_dbg.append("%s:%d" % [str(h3.get("city_name", h3.get("name", ""))), int(h3.get("pid", 0))])
 	last_hwy3_debug = {
-		"mutant": mutant,
 		"mode": "hub_routes",
 		"use_urban": use_urban,
 		"hubs": hub_list,
@@ -4171,6 +4220,7 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 		"budget": paint_budget,
 		"dropped_parallel": dropped_parallel,
 		"dropped_cap": dropped_cap,
+		"trimmed_routes": trimmed_routes,
 		"candidates": candidates.size(),
 		"failed_trunks": failed_trunks,
 		"failed_spans": failed_spans,
@@ -4185,7 +4235,6 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 		"route_ms": float(Time.get_ticks_usec() - t_route0) / 1000.0,
 		"total_ms": float(Time.get_ticks_usec() - t_all0) / 1000.0,
 	}
-	if mutant != "not_shortest":
-		_hwy3_route_memo_key = route_key
-		_hwy3_route_memo_marked = marked.duplicate()
-		_hwy3_route_memo_debug = last_hwy3_debug.duplicate()
+	_hwy3_route_memo_key = route_key
+	_hwy3_route_memo_marked = marked.duplicate()
+	_hwy3_route_memo_debug = last_hwy3_debug.duplicate()

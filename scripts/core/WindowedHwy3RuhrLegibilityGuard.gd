@@ -1,5 +1,7 @@
 extends SceneTree
 
+const RoadTierVisualScript = preload("res://scripts/map/RoadTierVisual.gd")
+
 ## HWY-3 FIX #5: Ruhr live legibility at Essen (7356, 1606) z 2.4 / 4.0.
 ## Boots TestScenario through ScenarioLoader like Play. Pixel-samples highway
 ## casing along the metro chain; requires ≥3 hub city labels. Fixed orientation.
@@ -161,6 +163,10 @@ func _do_capture() -> void:
 		_fail_reasons.append("casing_%s_%d" % [str(row["name"]), px])
 	if labels.size() < 3:
 		_fail_reasons.append("labels_%s_%d" % [str(row["name"]), labels.size()])
+	if _hub_labels_overlap():
+		_fail_reasons.append("label_overlap_%s" % str(row["name"]))
+	if _koln_label_count() > 1:
+		_fail_reasons.append("koln_dup_%s_%d" % [str(row["name"]), _koln_label_count()])
 	_capture_i += 1
 	root.set_meta("hwy3_ruhr_band", -1)
 	_phase = Phase.CAPTURE
@@ -207,6 +213,15 @@ func _do_mutants() -> void:
 		(node as Node2D).z_index = 24
 	if z_before <= RIVER_Z:
 		_fail_reasons.append("highway_under_river")
+	if ol != null and ol.has_method("get_hub_label_candidates_uncull"):
+		var raw_v: Variant = ol.call("get_hub_label_candidates_uncull")
+		var raw: Array = raw_v if typeof(raw_v) == TYPE_ARRAY else []
+		var had_overlap: bool = RoadTierVisualScript.hwy3_labels_have_overlap(raw)
+		_log("HWY3_RUHR who=mutant_no_cull raw=%d overlap=%s" % [raw.size(), str(had_overlap)])
+		if had_overlap:
+			_log("HWY3_RUHR who=mutant_no_cull killed")
+		else:
+			_fail_reasons.append("no_cull_survived")
 	var ok: bool = _fail_reasons.is_empty()
 	_log(
 		"HWY3_RUHR bars z24_px=%d z4_px=%d z24_labels=%d z4_labels=%d hwy_z=%d"
@@ -236,6 +251,30 @@ func _frame_essen(zoom: float) -> void:
 	if ol != null and ol.has_method("refresh_ix1_gold_spine"):
 		ol.call("refresh_ix1_gold_spine", true)
 	_log("HWY3_RUHR who=frame zoom=%.2f pos=%.1f,%.1f" % [zoom, pos.x, pos.y])
+
+
+func _hub_labels_overlap() -> bool:
+	var ol := _overlay()
+	if ol == null or not ol.has_method("get_visible_hub_label_rects"):
+		return false
+	var raw_v: Variant = ol.call("get_visible_hub_label_rects")
+	var raw: Array = raw_v if typeof(raw_v) == TYPE_ARRAY else []
+	return RoadTierVisualScript.hwy3_labels_have_overlap(raw)
+
+
+func _koln_label_count() -> int:
+	var n: int = 0
+	var ol := _overlay()
+	if ol != null and ol.has_method("get_visible_hub_label_rects"):
+		var raw_v: Variant = ol.call("get_visible_hub_label_rects")
+		var raw: Array = raw_v if typeof(raw_v) == TYPE_ARRAY else []
+		for row_v in raw:
+			if typeof(row_v) != TYPE_DICTIONARY:
+				continue
+			var key: String = str((row_v as Dictionary).get("key", ""))
+			if key == "koln":
+				n += 1
+	return n
 
 
 func _ruhr_label_names() -> Array:

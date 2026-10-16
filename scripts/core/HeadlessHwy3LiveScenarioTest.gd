@@ -42,7 +42,6 @@ func _run_and_quit() -> void:
 
 
 func _run() -> void:
-	OS.set_environment("EOA_HWY3_MUTANT", "")
 	if not await _boot_live_scenario():
 		return
 	_print_live_routes()
@@ -54,6 +53,8 @@ func _run() -> void:
 	_test_highway_z_above_river()
 	_test_ruhr_label_rule()
 	_test_env_mutants_removed()
+	_test_trimmed_route()
+	_test_label_cull()
 	_test_rome_north_source_mutant()
 	if _ol != null:
 		_ol.queue_free()
@@ -208,6 +209,12 @@ func _print_live_routes() -> void:
 	print("HWY3_LIVE_SECOND %s" % str(dbg.get("second_by_tag", {})))
 	print("HWY3_LIVE_SECTOR2 %s" % str(dbg.get("sector2_by_tag", {})))
 	print("HWY3_LIVE_TRUNKS %s" % str(dbg.get("trunks", [])))
+	var trimmed_v: Variant = dbg.get("trimmed_routes", [])
+	var trimmed: Array = trimmed_v if typeof(trimmed_v) == TYPE_ARRAY else []
+	for tr_v in trimmed:
+		if typeof(tr_v) != TYPE_DICTIONARY:
+			continue
+		print("HWY3_LIVE_TRIMMED %s kind=%d" % [_route_name_chain(tr_v as Dictionary, rec_by), int((tr_v as Dictionary).get("kind", 0))])
 	for rt_v in _routes():
 		if typeof(rt_v) != TYPE_DICTIONARY:
 			continue
@@ -423,11 +430,19 @@ func _test_highway_z_above_river() -> void:
 		_fail("highway z: overlay missing get_highway_draw_z_index")
 		return
 	var z: int = int(_ol.call("get_highway_draw_z_index"))
-	print("HWY3_LIVE_HWY_Z z=%d river=22" % z)
+	var gold_z: int = 0
+	var scr: GDScript = _ol.get_script() as GDScript
+	if scr != null:
+		gold_z = int(scr.get_script_constant_map().get("GOLD_SPINE_Z", 0))
+	print("HWY3_LIVE_HWY_Z z=%d river=22 gold=%d" % [z, gold_z])
 	if z <= 22:
-		_fail("highway z %d not above river/IX-1 spine 22" % z)
+		_fail("highway z %d not above river 22" % z)
 	else:
 		_pass("highway z %d above river 22" % z)
+	if gold_z <= z:
+		_fail("gold spine z %d not above highway %d" % [gold_z, z])
+	else:
+		_pass("gold spine z %d above highway %d" % [gold_z, z])
 
 
 func _test_ruhr_label_rule() -> void:
@@ -491,6 +506,95 @@ func _test_env_mutants_removed() -> void:
 		_fail("no_second_sector env branch still in product")
 	else:
 		_pass("no_second_sector env branch removed from product")
+	var names: PackedStringArray = PackedStringArray([
+		"overlap_ok", "urban_required", "rank_grow_back", "no_capitals",
+		"hook_back", "zigzag_ok", "not_shortest", "far_hidden",
+		"EOA_HWY3_MUTANT", "hwy3_mutant_name",
+	])
+	var hits: int = 0
+	for n in names:
+		hits += ol_src.count(n)
+		hits += vis_src.count(n)
+	print("HWY3_ENV_BRANCH_GREP count=%d" % hits)
+	if hits != 0:
+		_fail("env branches still in product grep count=%d" % hits)
+	else:
+		_pass("env branches deleted (grep count 0)")
+
+
+func _test_trimmed_route() -> void:
+	var dbg: Dictionary = _debug()
+	var rec_by: Dictionary = _rec_by_pid()
+	var trimmed_v: Variant = dbg.get("trimmed_routes", [])
+	var trimmed: Array = trimmed_v if typeof(trimmed_v) == TYPE_ARRAY else []
+	if trimmed.is_empty():
+		_pass("trim: no leftover over-cap OTHER/SPAN (count already ≤114)")
+		return
+	var names: Array = []
+	var protected_hit: bool = false
+	for tr_v in trimmed:
+		if typeof(tr_v) != TYPE_DICTIONARY:
+			continue
+		var tr: Dictionary = tr_v
+		var chain: String = _route_name_chain(tr, rec_by)
+		names.append(chain)
+		var kind: int = int(tr.get("kind", 0))
+		if kind >= RoadTierVisualScript.HWY3_KIND_TRUNK:
+			protected_hit = true
+	print("HWY3_TRIMMED_NAMED %s" % str(names))
+	if protected_hit:
+		_fail("trim removed a focus trunk")
+	else:
+		_pass("trim removed non-trunk %s" % str(names))
+
+
+func _test_label_cull() -> void:
+	var essen: Dictionary = {
+		"text": "Essen", "key": "essen", "rect": Rect2(0, 0, 80, 20), "priority": 80
+	}
+	var mulheim: Dictionary = {
+		"text": "Mülheim", "key": "mulheim", "rect": Rect2(20, 0, 80, 20), "priority": 20
+	}
+	var duis: Dictionary = {
+		"text": "Duisburg", "key": "duisburg", "rect": Rect2(10, 2, 80, 20), "priority": 80
+	}
+	var raw: Array = [essen, mulheim, duis]
+	if not RoadTierVisualScript.hwy3_labels_have_overlap(raw):
+		_fail("label cull: fixture must overlap before cull")
+		return
+	var kept: Array = RoadTierVisualScript.hwy3_cull_label_candidates(raw)
+	if RoadTierVisualScript.hwy3_labels_have_overlap(kept):
+		_fail("label cull: kept rects still overlap")
+	else:
+		_pass("label cull: no overlap after hub>other")
+	var cologne: Dictionary = {
+		"text": "Cologne", "key": "koln", "rect": Rect2(200, 0, 70, 18), "priority": 80
+	}
+	var koln: Dictionary = {
+		"text": "Köln", "key": "koln", "rect": Rect2(400, 0, 50, 18), "priority": 90
+	}
+	var ck: Array = RoadTierVisualScript.hwy3_cull_label_candidates([cologne, koln])
+	if ck.size() != 1:
+		_fail("label cull: Cologne/Köln kept %d" % ck.size())
+	else:
+		_pass("label cull: single Köln alias")
+	var src: String = _read_text(SRC_VIS)
+	var needle: String = "static func hwy3_cull_labels_enabled() -> bool:\n	return true"
+	if needle not in src:
+		_fail("label cull mutant: enabled() needle missing")
+		return
+	var mutated: String = src.replace(needle, "static func hwy3_cull_labels_enabled() -> bool:\n	return false")
+	mutated = mutated.replace("class_name RoadTierVisual\n", "")
+	var gs := GDScript.new()
+	gs.source_code = mutated
+	if gs.reload() != OK:
+		_fail("label cull mutant: mutated script failed to parse")
+		return
+	var raw2: Array = gs.call("hwy3_cull_label_candidates", raw)
+	if bool(gs.call("hwy3_labels_have_overlap", raw2)):
+		_pass("label cull mutant without culling killed")
+	else:
+		_fail("label cull mutant without culling survived")
 
 
 func _rome_reaches_north_from(dbg: Dictionary) -> Dictionary:
