@@ -549,6 +549,27 @@ func _rome_reaches_north_from(dbg: Dictionary) -> Dictionary:
 	return out
 
 
+func _write_text(path: String, text: String) -> bool:
+	var f: FileAccess = FileAccess.open(path, FileAccess.WRITE)
+	if f == null:
+		return false
+	f.store_string(text)
+	f.close()
+	return true
+
+
+func _rebuild_live_cache() -> void:
+	RoadTierVisualScript.hwy3_clear_memos()
+	if _ol != null and _ol.has_method("reset_hwy3_layers"):
+		_ol.call("reset_hwy3_layers")
+	if _ol != null:
+		_ol.call("_rebuild_road_layer_inner")
+		if _ol.has_method("get_road_tier_cache"):
+			var cache_v: Variant = _ol.call("get_road_tier_cache")
+			if typeof(cache_v) == TYPE_ARRAY:
+				_cache = cache_v
+
+
 func _test_rome_north_source_mutant() -> void:
 	var src: String = _read_text(SRC_VIS)
 	var needle: String = "var second: int = _hwy3_reachable_second_sector(hubs, cap_pid, first, adj, attrs)"
@@ -559,34 +580,22 @@ func _test_rome_north_source_mutant() -> void:
 		_fail("rome-north source mutant: expected one second-sector assign, got %d" % src.count(needle))
 		return
 	var mutated: String = src.replace(needle, "var second: int = 0")
-	mutated = mutated.replace("class_name RoadTierVisual\n", "")
-	var gs := GDScript.new()
-	gs.source_code = mutated
-	if gs.reload() != OK:
-		_fail("rome-north source mutant: mutated script failed to parse")
+	if not _write_text(SRC_VIS, mutated):
+		_fail("rome-north source mutant: could not write mutated source")
 		return
-	var cache_clone: Array = []
-	for row_v in _cache:
-		if typeof(row_v) == TYPE_DICTIONARY:
-			var dup: Dictionary = (row_v as Dictionary).duplicate()
-			if not bool(dup.get("explicit", false)) and int(dup.get("display_tier", 0)) == RoadTierVisualScript.TIER_HIGHWAY:
-				dup["display_tier"] = RoadTierVisualScript.TIER_PAVED
-			cache_clone.append(dup)
-	if _ol == null or not _ol.has_method("_collect_hwy3_hub_ctx"):
-		_fail("rome-north source mutant: overlay missing hub ctx")
+	var reload_err: Error = RoadTierVisualScript.reload()
+	if reload_err != OK:
+		_write_text(SRC_VIS, src)
+		RoadTierVisualScript.reload()
+		_fail("rome-north source mutant: mutated source failed to reload (%s)" % str(reload_err))
 		return
-	var ctx: Dictionary = _ol.call("_collect_hwy3_hub_ctx")
-	if _ol.has_method("get_hwy3_graph_rows"):
-		var g_v: Variant = _ol.call("get_hwy3_graph_rows")
-		if typeof(g_v) == TYPE_ARRAY and not (g_v as Array).is_empty():
-			ctx["graph"] = g_v
-	if gs.has_method("hwy3_clear_memos"):
-		gs.call("hwy3_clear_memos")
-	gs.call("assign_rare_display_tiers", cache_clone, ctx)
-	var dbg_v: Variant = gs.call("hwy3_debug")
-	var dbg: Dictionary = dbg_v if typeof(dbg_v) == TYPE_DICTIONARY else {}
-	var got: Dictionary = _rome_reaches_north_from(dbg)
-	print("HWY3_LIVE_SOURCE_MUTANT %s" % str(got))
+	_rebuild_live_cache()
+	var got: Dictionary = _rome_reaches_north()
+	var sector2: Variant = _debug().get("sector2_by_tag", {})
+	print("HWY3_LIVE_SOURCE_MUTANT %s sector2=%s" % [str(got), str(sector2)])
+	_write_text(SRC_VIS, src)
+	RoadTierVisualScript.reload()
+	_rebuild_live_cache()
 	if bool(got.get("ok", false)):
 		_fail("mutant reachable_sectors second=0 survived Rome-north %s" % str(got.get("chain", "")))
 	else:
