@@ -296,6 +296,12 @@ static func hwy3_cull_labels_enabled() -> bool:
 
 ## Keep higher-priority labels; drop alias dupes and overlapping rects.
 static func hwy3_cull_label_candidates(cands: Array) -> Array:
+	return hwy3_resolve_label_positions(cands)
+
+
+## Place higher-priority labels first (camera-center wins ties). Nudge a
+## later label onto a nearby offset before dropping it for overlap.
+static func hwy3_resolve_label_positions(cands: Array) -> Array:
 	if not hwy3_cull_labels_enabled():
 		return cands
 	var ordered: Array = []
@@ -305,6 +311,14 @@ static func hwy3_cull_label_candidates(cands: Array) -> Array:
 	ordered.sort_custom(_hwy3_label_cand_more)
 	var kept: Array = []
 	var seen: Dictionary = {}
+	var offs: Array = [
+		Vector2(0.0, 0.0),
+		Vector2(0.0, -18.0),
+		Vector2(0.0, 16.0),
+		Vector2(-26.0, -6.0),
+		Vector2(26.0, -6.0),
+		Vector2(0.0, -34.0),
+	]
 	for c2_v in ordered:
 		var c2: Dictionary = c2_v
 		var key: String = str(c2.get("key", ""))
@@ -312,20 +326,33 @@ static func hwy3_cull_label_candidates(cands: Array) -> Array:
 			key = hwy3_label_alias_key(str(c2.get("text", "")))
 		if key.is_empty() or seen.has(key):
 			continue
-		var rect: Rect2 = c2.get("rect", Rect2())
-		var hit: bool = false
-		for k_v in kept:
-			var k: Dictionary = k_v
-			var kr: Rect2 = k.get("rect", Rect2())
-			if rect.size.x <= 0.5 or kr.size.x <= 0.5:
-				continue
-			if rect.intersects(kr):
-				hit = true
-				break
-		if hit:
+		var base: Rect2 = c2.get("rect", Rect2())
+		if base.size.x <= 0.5:
+			seen[key] = true
+			kept.append(c2)
 			continue
-		seen[key] = true
-		kept.append(c2)
+		var placed: bool = false
+		for off_v in offs:
+			var off: Vector2 = off_v
+			var rect: Rect2 = Rect2(base.position + off, base.size)
+			var hit: bool = false
+			for k_v in kept:
+				var k: Dictionary = k_v
+				var kr: Rect2 = k.get("rect", Rect2())
+				if kr.size.x <= 0.5:
+					continue
+				if rect.intersects(kr):
+					hit = true
+					break
+			if hit:
+				continue
+			c2["rect"] = rect
+			seen[key] = true
+			kept.append(c2)
+			placed = true
+			break
+		if not placed:
+			continue
 	return kept
 
 
@@ -334,6 +361,15 @@ static func _hwy3_label_cand_more(a: Dictionary, b: Dictionary) -> bool:
 	var pb: int = int(b.get("priority", 0))
 	if pa != pb:
 		return pa > pb
+	var ra: Rect2 = a.get("rect", Rect2())
+	var rb: Rect2 = b.get("rect", Rect2())
+	var ca: Vector2 = a.get("screen", ra.position + ra.size * 0.5)
+	var cb: Vector2 = b.get("screen", rb.position + rb.size * 0.5)
+	var mid := Vector2(640.0, 360.0)
+	var da: float = ca.distance_squared_to(mid)
+	var db: float = cb.distance_squared_to(mid)
+	if absf(da - db) > 0.01:
+		return da < db
 	return str(a.get("text", "")) < str(b.get("text", ""))
 
 

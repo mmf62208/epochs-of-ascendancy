@@ -2202,15 +2202,21 @@ func _sync_hub_city_labels() -> void:
         row["rect"] = Rect2(lbl.position, lbl.size)
         row["text"] = text
         placed.append(row)
-    var kept: Array = RoadTierVisualScript.hwy3_cull_label_candidates(placed)
+    var kept: Array = RoadTierVisualScript.hwy3_resolve_label_positions(placed)
     var keep_keys: Dictionary = {}
     for k_v in kept:
         if typeof(k_v) != TYPE_DICTIONARY:
             continue
         var krow: Dictionary = k_v
         var kk: String = str(krow.get("key", ""))
-        if not kk.is_empty():
-            keep_keys[kk] = true
+        if kk.is_empty():
+            continue
+        keep_keys[kk] = true
+        if _hub_labels.has(kk) and _hub_labels[kk] is Label and is_instance_valid(_hub_labels[kk]):
+            var placed_lbl: Label = _hub_labels[kk]
+            var placed_rect: Rect2 = krow.get("rect", Rect2())
+            placed_lbl.position = placed_rect.position
+            placed_lbl.visible = true
     for leftover_k in _hub_labels.keys():
         if keep_keys.has(str(leftover_k)):
             continue
