@@ -290,6 +290,21 @@ else
   run_step launch_hwy1_highway_chain \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessHwy1HighwayChainTest.gd || fail
 
+  run_step launch_hwy3_hub_route \
+    tools/run_godot.sh --headless -s res://scripts/core/HeadlessHwy3HubRouteTest.gd || fail
+
+  run_step launch_hwy3_live_scenario \
+    tools/run_godot.sh --headless -s res://scripts/core/HeadlessHwy3LiveScenarioTest.gd || fail
+
+  run_step launch_hwy3_supply_toggle_cache \
+    tools/run_godot.sh --headless -s res://scripts/core/HeadlessHwy3SupplyToggleCacheTest.gd || fail
+
+  run_step launch_live_lon_probe \
+    tools/run_godot.sh --headless -s res://scripts/core/HeadlessLiveLonProbe.gd || fail
+
+  run_step launch_hwy3_ruhr_legibility \
+    tools/eoa_hwy3_ruhr_legibility_guard.sh || fail
+
   run_step launch_rx1_panel_state \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessRx1RhinePanelStateTest.gd || fail
 
