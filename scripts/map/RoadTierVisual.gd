@@ -3526,11 +3526,21 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 				if _hwy3_routes_near_parallel(cand_r, ke2_v as Dictionary, centroids):
 					par_k = true
 					break
-			if par_k and not bool(hperi.get("periphery_primary", false)):
+			if par_k and not bool(hperi.get("periphery", false)):
 				continue
 			if best_rest.is_empty() or int(cand_r.get("kind", 0)) > int(best_rest.get("kind", 0)):
 				best_rest = cand_r
 		if not best_rest.is_empty():
+			var tag_pe: String = str(hperi.get("tag", "")).strip_edges().to_upper()
+			var second_pe: int = int(second_by_tag.get(tag_pe, 0))
+			var ba_pe: int = int(best_rest.get("a", 0))
+			var bb_pe: int = int(best_rest.get("b", 0))
+			if HWY3_MAJOR_TAGS.has(tag_pe) and _hwy3_is_major_city_hub(hperi) and (
+				ba_pe == second_pe or bb_pe == second_pe
+			):
+				best_rest["peri_keep"] = true
+			if int(best_rest.get("kind", 0)) < HWY3_KIND_SPAN:
+				best_rest["kind"] = HWY3_KIND_SPAN
 			kept_cands.append(best_rest)
 			dropped_parallel = maxi(dropped_parallel - 1, 0)
 			kept_ends[peri_e] = true
@@ -3592,7 +3602,9 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 				"kind": HWY3_KIND_SPAN,
 				"span_core": false,
 				"sector_keep": false,
-				"peri_keep": bool(horph.get("periphery_primary", false)) and HWY3_MAJOR_TAGS.has(tag_or),
+				"peri_keep": HWY3_MAJOR_TAGS.has(tag_or) and _hwy3_is_major_city_hub(horph) and (
+					attach_o == int(second_by_tag.get(tag_or, 0))
+				),
 				"pids": pid_arr_o,
 				"packed": pids_o,
 				"shape": shape_o,
