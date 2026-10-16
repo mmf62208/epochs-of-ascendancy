@@ -1662,27 +1662,92 @@ static func _hwy3_sectors_apart(a: float, b: float) -> bool:
 	return absf(angle_difference(a, b)) + 0.0001 >= HWY3_SECTOR_MIN_ANGLE
 
 
-static func _hwy3_pair_is_dropped_second_sector(
-	_a: int,
-	_b: int,
-	_tag: String,
-	_second_by_tag: Dictionary,
-	_sector2_by_tag: Dictionary,
-	_rec_by_pid: Dictionary,
-	_hubs_by_tag: Dictionary
+static func _hwy3_unpicked_second_sector_hub(
+	pid: int,
+	tag: String,
+	second_by_tag: Dictionary,
+	sector2_by_tag: Dictionary,
+	rec_by_pid: Dictionary,
+	hubs_by_tag: Dictionary
 ) -> bool:
+	if int(sector2_by_tag.get(tag, 0)) > 0:
+		return false
+	var first: int = int(second_by_tag.get(tag, 0))
+	if first <= 0 or pid == first or pid <= 0:
+		return false
+	var hl_v: Variant = hubs_by_tag.get(tag, [])
+	var hl: Array = hl_v if typeof(hl_v) == TYPE_ARRAY else []
+	var cap: int = _hwy3_capital_hub_pid(hl)
+	if cap <= 0 or pid == cap:
+		return false
+	var cap_v: Variant = rec_by_pid.get(cap, {})
+	var first_v: Variant = rec_by_pid.get(first, {})
+	var other_v: Variant = rec_by_pid.get(pid, {})
+	if typeof(cap_v) != TYPE_DICTIONARY or typeof(first_v) != TYPE_DICTIONARY or typeof(other_v) != TYPE_DICTIONARY:
+		return false
+	var cap_c: Vector2 = (cap_v as Dictionary).get("centroid", Vector2.ZERO)
+	var first_br: float = _hwy3_bearing(cap_c, (first_v as Dictionary).get("centroid", Vector2.ZERO))
+	var other_br: float = _hwy3_bearing(cap_c, (other_v as Dictionary).get("centroid", Vector2.ZERO))
+	return _hwy3_sectors_apart(first_br, other_br)
+
+
+static func _hwy3_pair_is_dropped_second_sector(
+	a: int,
+	b: int,
+	tag: String,
+	second_by_tag: Dictionary,
+	sector2_by_tag: Dictionary,
+	rec_by_pid: Dictionary,
+	hubs_by_tag: Dictionary
+) -> bool:
+	if int(sector2_by_tag.get(tag, 0)) > 0:
+		return false
+	var hl_v: Variant = hubs_by_tag.get(tag, [])
+	var hl: Array = hl_v if typeof(hl_v) == TYPE_ARRAY else []
+	var cap: int = _hwy3_capital_hub_pid(hl)
+	if cap <= 0:
+		return false
+	if a == cap:
+		return _hwy3_unpicked_second_sector_hub(
+			b, tag, second_by_tag, sector2_by_tag, rec_by_pid, hubs_by_tag
+		)
+	if b == cap:
+		return _hwy3_unpicked_second_sector_hub(
+			a, tag, second_by_tag, sector2_by_tag, rec_by_pid, hubs_by_tag
+		)
 	return false
 
 
 static func _hwy3_path_touches_dropped_second_sector(
-	_pids_any: Variant,
-	_tag: String,
-	_second_by_tag: Dictionary,
-	_sector2_by_tag: Dictionary,
-	_rec_by_pid: Dictionary,
-	_hubs_by_tag: Dictionary
+	pids_any: Variant,
+	tag: String,
+	second_by_tag: Dictionary,
+	sector2_by_tag: Dictionary,
+	rec_by_pid: Dictionary,
+	hubs_by_tag: Dictionary
 ) -> bool:
-	return false
+	if int(sector2_by_tag.get(tag, 0)) > 0:
+		return false
+	var hl_v: Variant = hubs_by_tag.get(tag, [])
+	var hl: Array = hl_v if typeof(hl_v) == TYPE_ARRAY else []
+	var cap: int = _hwy3_capital_hub_pid(hl)
+	if cap <= 0:
+		return false
+	var pids: Array = pids_any if typeof(pids_any) == TYPE_ARRAY else []
+	if pids.is_empty() and typeof(pids_any) == TYPE_PACKED_INT32_ARRAY:
+		for pi in range((pids_any as PackedInt32Array).size()):
+			pids.append(int((pids_any as PackedInt32Array)[pi]))
+	var has_cap: bool = false
+	var has_opp: bool = false
+	for pv in pids:
+		var pid: int = int(pv)
+		if pid == cap:
+			has_cap = true
+		elif _hwy3_unpicked_second_sector_hub(
+			pid, tag, second_by_tag, sector2_by_tag, rec_by_pid, hubs_by_tag
+		):
+			has_opp = true
+	return has_cap and has_opp
 
 
 static func _hwy3_second_sector_hub_pid(hubs: Array, cap_pid: int, first_pid: int) -> int:
