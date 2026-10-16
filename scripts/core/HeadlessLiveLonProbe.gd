@@ -48,8 +48,11 @@ func _run_and_quit() -> void:
 func _run() -> void:
 	if not await _boot():
 		return
+	await process_frame
 	var load_ms: float = 0.0
 	var t_load: int = Time.get_ticks_usec()
+	if _ol.has_method("invalidate_hwy3_route_cache"):
+		_ol.call("invalidate_hwy3_route_cache")
 	_ol.call("_rebuild_road_layer_inner")
 	load_ms = float(Time.get_ticks_usec() - t_load) / 1000.0
 	print("LIVE_LON_PROBE load_ms=%.2f" % load_ms)
@@ -101,9 +104,14 @@ func _boot() -> bool:
 		mm.call("initialize_from_map_data", map_data)
 	if mm.has_method("rebuild_pick_grid"):
 		mm.call("rebuild_pick_grid")
-	_mr = MapRendererStub.new()
-	_mr.name = "MapRendererStub"
-	root.add_child(_mr)
+	var existing: Node = root.get_first_node_in_group("map_renderer")
+	if existing != null:
+		_mr = existing
+	else:
+		_mr = MapRendererStub.new()
+		_mr.name = "MapRendererStub"
+		_mr.add_to_group("map_renderer")
+		root.add_child(_mr)
 	var ol_script: GDScript = load(SRC_OL) as GDScript
 	_ol = ol_script.new() as Node2D
 	root.add_child(_ol)

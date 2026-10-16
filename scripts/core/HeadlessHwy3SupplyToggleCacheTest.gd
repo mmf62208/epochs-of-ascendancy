@@ -129,21 +129,46 @@ func _boot_live_scenario() -> bool:
 		mm.call("initialize_from_map_data", map_data)
 	if mm.has_method("rebuild_pick_grid"):
 		mm.call("rebuild_pick_grid")
-	_mr = MapRendererStub.new()
-	_mr.name = "MapRendererStub"
-	root.add_child(_mr)
+	_bind_map_renderer()
 	_ol = _make_overlay(load(SRC_OL) as GDScript)
 	if _ol == null:
 		return false
+	await process_frame
 	var t0: int = Time.get_ticks_usec()
+	if _ol.has_method("invalidate_hwy3_route_cache"):
+		_ol.call("invalidate_hwy3_route_cache")
 	_ol.call("_rebuild_road_layer_inner")
 	_load_ms = float(Time.get_ticks_usec() - t0) / 1000.0
-	print("LIVE_LON_PROBE load_ms=%.2f" % _load_ms)
+	var dbg_v: Variant = RoadTierVisualScript.hwy3_debug()
+	if typeof(dbg_v) == TYPE_DICTIONARY:
+		var dbg: Dictionary = dbg_v
+		print(
+			"LIVE_LON_PROBE load_ms=%.2f route_ms=%.2f hubs_ms=%.2f adj_ms=%.2f"
+			% [
+				_load_ms,
+				float(dbg.get("route_ms", 0.0)),
+				float(dbg.get("hubs_ms", 0.0)),
+				float(dbg.get("adj_ms", 0.0)),
+			]
+		)
+	else:
+		print("LIVE_LON_PROBE load_ms=%.2f" % _load_ms)
 	if _cache().is_empty():
 		_fail("live scenario trunk cache is empty")
 		return false
 	_ol.call("set_supply_corridor_path", [710417, 710416])
 	return true
+
+
+func _bind_map_renderer() -> void:
+	var existing: Node = root.get_first_node_in_group("map_renderer")
+	if existing != null:
+		_mr = existing
+		return
+	_mr = MapRendererStub.new()
+	_mr.name = "MapRendererStub"
+	_mr.add_to_group("map_renderer")
+	root.add_child(_mr)
 
 
 func _make_overlay(gs: GDScript) -> Node2D:
@@ -351,7 +376,7 @@ func _mutated_overlay(kind: String) -> Node2D:
 	inject_at += String("extends Node2D\n").length()
 	mutated = (
 		mutated.substr(0, inject_at)
-		+ "func hwy3_supply_cache_mutant_token() -> String:\n	return \"%s\"\n" % kind
+		+ "func hwy3_supply_cache_mutant_token() -> String:\n    return \"%s\"\n" % kind
 		+ mutated.substr(inject_at)
 	)
 	var gs := GDScript.new()
