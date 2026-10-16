@@ -1734,13 +1734,13 @@ static func _hwy3_second_sector_hub_pid(hubs: Array, cap_pid: int, first_pid: in
 
 
 static func _hwy3_sector_hub_pids(hubs: Array, cap_pid: int) -> PackedInt32Array:
+	## Score #2 only. The opposite-sector capital span (Rome-north) is added
+	## exclusively by _hwy3_reachable_sectors so a source-edit on that line
+	## can kill it. Bearing-only second here is not the live path.
 	var out: PackedInt32Array = PackedInt32Array()
 	var first: int = _hwy3_second_hub_pid(hubs, cap_pid)
 	if first > 0:
 		out.append(first)
-	var second: int = _hwy3_second_sector_hub_pid(hubs, cap_pid, first)
-	if second > 0:
-		out.append(second)
 	return out
 
 

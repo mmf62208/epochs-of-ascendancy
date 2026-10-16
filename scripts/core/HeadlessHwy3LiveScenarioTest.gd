@@ -607,7 +607,11 @@ func _test_rome_north_source_mutant() -> void:
 	)
 	var gs := GDScript.new()
 	gs.source_code = mutated
-	if gs.reload() != OK:
+	var reload_err: Error = gs.reload()
+	if reload_err != OK:
+		print("HWY3_LIVE_SOURCE_MUTANT reload_err=%s needle_left=%s" % [
+			str(reload_err), str("var second: int = _hwy3_reachable_second_sector" in mutated)
+		])
 		_fail("rome-north source mutant: mutated script failed to parse")
 		return
 	var token: String = ""
