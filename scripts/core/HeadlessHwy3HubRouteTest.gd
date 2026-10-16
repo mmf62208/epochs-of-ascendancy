@@ -1573,6 +1573,10 @@ func _mutant_replacements(name: String) -> Array:
 				"old": "static func _hwy3_routes_near_parallel(ra: Dictionary, rb: Dictionary, cents: Dictionary) -> bool:\n	var pa_v: Variant = ra.get(\"pids\", [])",
 				"new": "static func _hwy3_routes_near_parallel(ra: Dictionary, rb: Dictionary, cents: Dictionary) -> bool:\n	return false\n	var pa_v: Variant = ra.get(\"pids\", [])",
 			},
+			{
+				"old": "	var hwy: int = _hwy3_count_highways(cache)\n	if hwy <= cap:\n		return used",
+				"new": "	var hwy: int = _hwy3_count_highways(cache)\n	if false:\n		return used",
+			},
 		]
 	if name == "far_hidden":
 		return [{"old": "const HIGHWAY_FAR_CASING_SCREEN_PX := 12.0", "new": "const HIGHWAY_FAR_CASING_SCREEN_PX := 5.5"}]
@@ -1643,7 +1647,11 @@ func _mutant_expect(name: String, ctx: Dictionary, bar: String) -> void:
 				if typeof(rt_v) != TYPE_DICTIONARY:
 					continue
 				var rt: Dictionary = rt_v
-				var got_mv: Variant = gs.call("shortest_hub_path", adj, int(rt.get("a", 0)), int(rt.get("b", 0)), false, attrs_m)
+				## Product Dijkstra, not the mutated shortest_hub_path (not_shortest
+				## flips use_detour so gs.call(..., false) would match itself).
+				var got_mv: Variant = RoadTierVisualScript.shortest_hub_path(
+					adj, int(rt.get("a", 0)), int(rt.get("b", 0)), false, attrs_m
+				)
 				var got: PackedInt32Array = PackedInt32Array()
 				if typeof(got_mv) == TYPE_PACKED_INT32_ARRAY:
 					got = got_mv
@@ -1740,6 +1748,19 @@ func _mutant_expect(name: String, ctx: Dictionary, bar: String) -> void:
 					break
 			if killed:
 				break
+		if not killed:
+			var fa: Dictionary = {"a": 1, "b": 5, "pids": [1, 2, 3, 4, 5]}
+			var fb: Dictionary = {"a": 5, "b": 1, "pids": [5, 4, 3, 2, 1]}
+			var ind_fx: Dictionary = _independent_corridor_overlap(fa, fb)
+			var mut_share: bool = false
+			if gs.has_method("_hwy3_routes_share_corridor"):
+				mut_share = bool(gs.call("_hwy3_routes_share_corridor", fa, fb))
+			if bool(ind_fx.get("overlap", false)) and not mut_share:
+				killed = true
+				print(
+					"HWY3_OVERLAP_OK fixture j=%.2f share=%s"
+					% [float(ind_fx.get("jaccard", 0.0)), str(mut_share)]
+				)
 	if killed:
 		_pass("mutant %s killed by %s" % [name, bar])
 	else:

@@ -2217,13 +2217,32 @@ func _sync_hub_city_labels() -> void:
         lbl.position = pos
         lbl.visible = true
         row["rect"] = Rect2(lbl.position, lbl.size)
+    ## Second pass: actual Label sizes can overlap even when estimates did not.
+    var placed: Array = []
+    for s2_v in spine:
+        placed.append(s2_v)
+    for k2_v in kept:
+        if typeof(k2_v) == TYPE_DICTIONARY:
+            placed.append(k2_v)
+    var kept2: Array = RoadTierVisualScript.hwy3_cull_label_candidates(placed)
+    var keep2_keys: Dictionary = {}
+    for k3_v in kept2:
+        if typeof(k3_v) != TYPE_DICTIONARY:
+            continue
+        var row3: Dictionary = k3_v
+        if str(row3.get("source", "")) != "hub":
+            continue
+        var k3: String = str(row3.get("key", ""))
+        if not k3.is_empty():
+            keep2_keys[k3] = true
+    keep_keys = keep2_keys
     for leftover_k in _hub_labels.keys():
         if keep_keys.has(str(leftover_k)):
             continue
         var leftover_v: Variant = _hub_labels[leftover_k]
         if leftover_v is Label and is_instance_valid(leftover_v):
             (leftover_v as Label).visible = false
-    _cull_province_labels_against(kept)
+    _cull_province_labels_against(kept2)
 
 
 func get_cached_road_edge(p1: int, p2: int) -> Dictionary:
