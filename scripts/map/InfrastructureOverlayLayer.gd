@@ -130,6 +130,12 @@ var _hwy3_econ_layer: Dictionary = {}
 var _hwy3_layers_ready: bool = false
 var _hwy3_city_source: String = "json"
 var _hwy3_graph_rows: Array = []
+## HWY-3 hub-route snapshot. Keyed on era / owner / infra / built roads / city source.
+## Supply toggle restyles this snapshot; it does not re-walk adjacency or re-route.
+var _hwy3_cached_input_key: String = ""
+var _hwy3_cached_rows: Array[Dictionary] = []
+var _hwy3_route_compute_count: int = 0
+var _hwy3_styling_pass_count: int = 0
 var _hub_label_layer: CanvasLayer = null
 var _hub_labels: Dictionary = {}
 
@@ -564,11 +570,30 @@ func _rebuild_road_layer_inner() -> void:
     _ensure_road_tier_draw_nodes()
     # Keep the three RoadTierDraw nodes. Free only per-edge Line2D leftovers
     # (explicit lookup stubs + supply glow). Never rebuild those draw nodes on zoom.
-    _clear_road_line2d_children()
 
     if map_manager == null:
+        _clear_road_line2d_children()
         _apply_road_tier_cache([])
         return
+
+    var supply_on: bool = _read_supply_on()
+    var mr: Node = _map_renderer_or_null()
+    # HWY3_SUPPLY_TOGGLE_CACHE: reuse hub routes when era/owner/infra/built/city match.
+    var hwy3_key: String = _hwy3_route_input_key()
+    var hwy3_cache_hit: bool = (
+        not hwy3_key.is_empty()
+        and hwy3_key == _hwy3_cached_input_key
+        and not _hwy3_cached_rows.is_empty()
+    )
+    if hwy3_cache_hit:
+        _apply_cached_hwy3_rows()
+        _apply_hwy3_corridor_styling(supply_on)
+        refresh_ix1_gold_spine()
+        if (not _road_edge_cache.is_empty() or road_layer.get_child_count() > 0) and _get_current_zoom() > 0.10:
+            road_layer.visible = true
+        return
+
+    _clear_road_line2d_children()
 
     var provinces: Dictionary = _get_provinces_for_road_cache()
     var adjacency = map_manager.get_adjacency_system()
@@ -579,13 +604,6 @@ func _rebuild_road_layer_inner() -> void:
     var era: Dictionary = _get_era_infra_profile()
     _ensure_hwy3_layers()
     _ensure_road_shared_border_keys(provinces)
-
-    var supply_on := false
-    var mr := get_tree().get_first_node_in_group("map_renderer") if get_tree() else null
-    if mr != null and bool(mr.get("supply_mode")):
-        supply_on = true
-    if mr != null and str(mr.get("current_map_mode")) in ["supply", "munitions"]:
-        supply_on = true
 
     var cache: Array[Dictionary] = []
     var graph_rows: Array = []
@@ -626,8 +644,6 @@ func _rebuild_road_layer_inner() -> void:
                 )
             )
             var on_corridor := _edge_on_supply_corridor(int(pid), int(nid), mr)
-            if supply_on and not on_corridor:
-                continue
             var tier: int = RoadTierVisualScript.road_tier_for_edge(avg_infra, era, has_explicit)
             var w1: float = RoadTierVisualScript.province_weight(
                 float(p.infrastructure), float(p.development_level), float(p.population)
@@ -652,6 +668,8 @@ func _rebuild_road_layer_inner() -> void:
             # Routing: NUTS–NUTS still sanity-filtered (no fake long hops). RoW/US
             # land adjacencies are included so major trunks can leave Europe.
             # Political paint stays NUTS3 + explicit — no world carpet.
+            # Supply mode does not drop edges here — hub routes are independent
+            # of L. Corridor glow is applied after assign.
             var route_ok: bool = true
             if nuts_paint and not has_explicit:
                 route_ok = _road_edge_passes_filter(int(pid), int(nid), c1, c2)
@@ -664,8 +682,6 @@ func _rebuild_road_layer_inner() -> void:
                 paint_ok = _road_edge_passes_filter(int(pid), int(nid), c1, c2)
             if paint_ok:
                 cache.append(entry)
-                if supply_on and on_corridor:
-                    _add_supply_corridor_line(c1, c2, int(pid), int(nid))
                 if has_explicit:
                     _add_explicit_lookup_line(c1, c2, int(pid), int(nid), tier, on_corridor)
     _paint_explicit_ix1_spine_if_missing(provinces, drawn, cache)
@@ -690,6 +706,8 @@ func _rebuild_road_layer_inner() -> void:
         if typeof(trunk_v) == TYPE_DICTIONARY:
             cache.append(trunk_v)
     _assign_display_tiers(cache, graph_rows)
+    _hwy3_cached_input_key = hwy3_key
+    _hwy3_cached_rows = _clone_hwy3_rows(cache)
     var deg: Dictionary = RoadTierVisualScript.degree_stats(cache)
     var tri: int = RoadTierVisualScript.count_undirected_triangles(cache)
     var hwy_st: Dictionary = RoadTierVisualScript._hwy1_component_stats(cache)
@@ -707,6 +725,7 @@ func _rebuild_road_layer_inner() -> void:
         ]
     )
     _apply_road_tier_cache(cache)
+    _apply_hwy3_corridor_styling(supply_on)
     refresh_ix1_gold_spine()
     if (not cache.is_empty() or road_layer.get_child_count() > 0) and _get_current_zoom() > 0.10:
         road_layer.visible = true
@@ -1084,6 +1103,7 @@ func rebuild_all_infra_layers():
     _last_era_band = _get_era_band(_get_map_year())
     _road_shared_border_ready = false
     _road_shared_border_keys.clear()
+    invalidate_hwy3_route_cache()
     rebuild_road_layer()
     rebuild_rail_layer()
     if BUILD_CITY_NODES:
@@ -1556,6 +1576,7 @@ func _display_tier_less(a: Dictionary, b: Dictionary) -> bool:
 
 ## Visual-only: explicit stay highway; inferred highways are hub-to-hub shortest paths.
 func _assign_display_tiers(cache: Array[Dictionary], graph_rows: Array = []) -> void:
+    _hwy3_route_compute_count += 1
     var as_array: Array = []
     for entry in cache:
         as_array.append(entry)
@@ -1575,6 +1596,136 @@ func _count_display_highways(cache: Array[Dictionary]) -> int:
     var n: int = 0
     for entry in cache:
         if int(entry.get("display_tier", 0)) == RoadTierVisualScript.TIER_HIGHWAY:
+            n += 1
+    return n
+
+
+func _map_renderer_or_null() -> Node:
+    var tree: SceneTree = get_tree()
+    if tree == null:
+        return null
+    return tree.get_first_node_in_group("map_renderer")
+
+
+func _read_supply_on() -> bool:
+    var mr: Node = _map_renderer_or_null()
+    if mr == null:
+        return false
+    if bool(mr.get("supply_mode")):
+        return true
+    if str(mr.get("current_map_mode")) in ["supply", "munitions"]:
+        return true
+    return false
+
+
+func _clone_hwy3_rows(src: Array) -> Array[Dictionary]:
+    var out: Array[Dictionary] = []
+    for row_v in src:
+        if typeof(row_v) != TYPE_DICTIONARY:
+            continue
+        out.append((row_v as Dictionary).duplicate())
+    return out
+
+
+func _hwy3_owner_infra_built_signature() -> Dictionary:
+    var owner_h: int = 0
+    var infra_h: int = 0
+    var built_h: int = 0
+    var n: int = 0
+    if map_manager == null or not map_manager.has_method("get_all_provinces"):
+        return {"owner": 0, "infra": 0, "built": 0, "n": 0}
+    var all: Dictionary = map_manager.get_all_provinces()
+    for pid_v in all.keys():
+        var pid: int = int(pid_v)
+        var p: Province = all[pid_v]
+        if p == null or p.is_sea:
+            continue
+        n += 1
+        var tag: String = str(p.owner_tag)
+        owner_h = (owner_h + pid * 131 + tag.hash()) & 0x7fffffff
+        infra_h = (infra_h + pid * 137 + int(p.infrastructure) * 10007) & 0x7fffffff
+        var roads: Array = p.built_road_neighbors if p.built_road_neighbors != null else []
+        for nid_v in roads:
+            built_h = (built_h + pid * 1000003 + int(nid_v)) & 0x7fffffff
+    return {"owner": owner_h, "infra": infra_h, "built": built_h, "n": n}
+
+
+func _hwy3_route_input_key() -> String:
+    var era: Dictionary = _get_era_infra_profile()
+    var era_bit: String = "%s|%d|%.3f" % [
+        str(era.get("label", "")),
+        int(era.get("year", 0)),
+        float(era.get("road_infra_min", 0.0)),
+    ]
+    var board: Dictionary = _hwy3_owner_infra_built_signature()
+    var infra_bit: String = str(board.get("infra", 0))
+    var owner_bit: String = str(board.get("owner", 0))
+    var built_bit: String = str(board.get("built", 0))
+    var city_bit: String = get_hwy3_city_source()
+    # HWY3_CACHE_KEY_INFRA — mutants that drop infra_bit fail (b).
+    return "%s|o%s|i%s|b%s|c%s|n%s" % [
+        era_bit, owner_bit, infra_bit, built_bit, city_bit, str(board.get("n", 0))
+    ]
+
+
+func invalidate_hwy3_route_cache() -> void:
+    _hwy3_cached_input_key = ""
+    _hwy3_cached_rows.clear()
+
+
+func _apply_cached_hwy3_rows() -> void:
+    _road_edge_cache = _clone_hwy3_rows(_hwy3_cached_rows)
+    _road_candidate_count = _road_edge_cache.size()
+
+
+func _clear_supply_corridor_lines() -> void:
+    if road_layer == null:
+        return
+    var kids: Array = road_layer.get_children()
+    for k in kids:
+        if not (k is Line2D):
+            continue
+        var glow: bool = bool(k.get_meta("glow", false))
+        var corridor: bool = bool(k.get_meta("corridor", false))
+        var explicit: bool = bool(k.get_meta("explicit", false))
+        if glow or (corridor and not explicit):
+            road_layer.remove_child(k)
+            k.queue_free()
+
+
+func _apply_hwy3_corridor_styling(supply_on: bool) -> void:
+    _hwy3_styling_pass_count += 1
+    _clear_supply_corridor_lines()
+    var mr: Node = _map_renderer_or_null()
+    for entry in _road_edge_cache:
+        var p1: int = int(entry.get("p1", 0))
+        var p2: int = int(entry.get("p2", 0))
+        var on_corridor: bool = _edge_on_supply_corridor(p1, p2, mr)
+        entry["corridor"] = on_corridor
+        if supply_on and on_corridor:
+            var c1: Vector2 = entry.get("c1", Vector2.ZERO)
+            var c2: Vector2 = entry.get("c2", Vector2.ZERO)
+            _add_supply_corridor_line(c1, c2, p1, p2)
+
+
+func get_hwy3_route_compute_count() -> int:
+    return _hwy3_route_compute_count
+
+
+func get_hwy3_styling_pass_count() -> int:
+    return _hwy3_styling_pass_count
+
+
+func get_hwy3_route_input_key() -> String:
+    return _hwy3_route_input_key()
+
+
+func get_supply_corridor_line_count() -> int:
+    if road_layer == null:
+        return 0
+    var n: int = 0
+    for child in road_layer.get_children():
+        if child is Line2D and bool(child.get_meta("glow", false)):
             n += 1
     return n
 
@@ -1620,6 +1771,7 @@ func reset_hwy3_layers() -> void:
     _hwy3_city_layer = {}
     _hwy3_econ_layer = {}
     _hwy3_city_source = "json"
+    invalidate_hwy3_route_cache()
 
 
 func _ensure_hwy3_layers() -> void:
