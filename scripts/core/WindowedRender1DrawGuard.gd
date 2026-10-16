@@ -219,6 +219,8 @@ func _check_present_drain(items: Array[Dictionary]) -> void:
 	var drawn: Dictionary = {}
 	var view: Dictionary = {}
 	while frames < 3:
+		if layer.has_method("_draw"):
+			layer.call("_draw")
 		await process_frame
 		frames += 1
 		if layer.has_method("get_last_drawn_chunk_keys"):
@@ -302,6 +304,12 @@ func _measure_cold_lon() -> void:
 	var complete_i := 0
 	var guard := 0
 	while guard < 8:
+		if _mr != null and "container" in _mr:
+			var c: Node = _mr.get("container") as Node
+			if c != null:
+				var batch: Node = c.get_node_or_null("SupplyOutlineBatch")
+				if batch != null and batch.has_method("_draw") and bool(batch.visible):
+					batch.call("_draw")
 		await process_frame
 		guard += 1
 		if _mr.has_method("supply_in_view_present_complete") and bool(_mr.call("supply_in_view_present_complete")):

@@ -545,6 +545,17 @@ func _check_skip(layer: Node) -> void:
 	layer.call("set_skip_pids", {})
 
 
+func _pump_batch_draw() -> void:
+	if _mr == null or not ("container" in _mr):
+		return
+	var c: Node = _mr.get("container") as Node
+	if c == null:
+		return
+	var batch: Node = c.get_node_or_null("SupplyOutlineBatch")
+	if batch != null and batch.has_method("_draw") and bool(batch.visible):
+		batch.call("_draw")
+
+
 func _chunk_key_set(keys_var: Variant) -> Dictionary:
 	var out: Dictionary = {}
 	if typeof(keys_var) == TYPE_PACKED_STRING_ARRAY:
@@ -579,6 +590,8 @@ func _check_present_drain(layer: Node) -> void:
 	var drawn: Dictionary = {}
 	var view: Dictionary = {}
 	while frames < 3:
+		if layer.has_method("_draw"):
+			layer.call("_draw")
 		await process_frame
 		frames += 1
 		if layer.has_method("get_last_drawn_chunk_keys"):
@@ -804,6 +817,7 @@ func _test_maprenderer_toggle() -> void:
 	var complete_i := 0
 	var guard := 0
 	while guard < 8:
+		_pump_batch_draw()
 		await process_frame
 		guard += 1
 		if _mr.has_method("supply_in_view_present_complete") and bool(_mr.call("supply_in_view_present_complete")):

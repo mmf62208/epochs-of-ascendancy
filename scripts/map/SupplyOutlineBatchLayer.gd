@@ -626,14 +626,13 @@ func _keys_for_present(in_view: PackedStringArray) -> PackedStringArray:
 	if not _split_present_pending or _gpu_upload_in_progress:
 		return in_view
 	_present_frame_i += 1
-	var never_drain := _never_drain_mutant()
-	if never_drain:
+	if _never_drain_mutant():
 		# Broken FIX #6 path: only this frame's budget, drop the rest.
 		return _take_new_keys_by_mesh_budget(in_view, FIRST_PRESENT_MESH_BUDGET, false)
-	if _present_frame_i >= 2:
-		# Frames 2–3: all in-view. Re-submit accepted so _draw does not drop them.
-		return in_view
-	return _take_new_keys_by_mesh_budget(in_view, FIRST_PRESENT_MESH_BUDGET, true)
+	# Product: submit the full in-view set this _draw. Godot replaces the
+	# canvas item, so a leftover slice would drop already-drawn rings.
+	# PRESENT_DRAIN_MAX_FRAMES is the test deadline (this path completes on 1).
+	return in_view
 
 
 func _take_new_keys_by_mesh_budget(
