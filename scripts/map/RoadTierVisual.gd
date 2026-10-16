@@ -3834,7 +3834,8 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 		if used > used_cover:
 			for pi5b in range(pids5.size()):
 				marked_verts[int(pids5[pi5b])] = true
-	used = _hwy3_trim_over_cap(cache, cache_by_key, marked, routes, used, HWY3_BUDGET_CAP)
+	if mutant != "overlap_ok":
+		used = _hwy3_trim_over_cap(cache, cache_by_key, marked, routes, used, HWY3_BUDGET_CAP)
 	var hub_list: Array = []
 	for h2_v in hubs:
 		var h2: Dictionary = h2_v
