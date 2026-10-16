@@ -3319,6 +3319,11 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 					):
 						kind = HWY3_KIND_SPAN
 						span_core = true
+					elif att_ab.y > 0 and second_n > 0 and (
+						(a == second_n and b == att_ab.y) or (b == second_n and a == att_ab.y)
+					):
+						kind = HWY3_KIND_SPAN
+						span_core = true
 				if kind < HWY3_KIND_SPAN:
 					for hp_ab_v in hl_ab:
 						if typeof(hp_ab_v) != TYPE_DICTIONARY:
@@ -3372,6 +3377,22 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 		var tgk2: String = str(spk2.get("tag", "")).strip_edges().to_upper()
 		if int(spk2.get("key", 0)) != int(best_peri_key.get(tgk2, 0)):
 			spk2["peri_keep"] = false
+	var tags_with_span: Dictionary = {}
+	for sps_v in scored_pairs:
+		if typeof(sps_v) != TYPE_DICTIONARY:
+			continue
+		var sps: Dictionary = sps_v
+		if bool(sps.get("span_core", false)):
+			tags_with_span[str(sps.get("tag", "")).strip_edges().to_upper()] = true
+	for sps2_v in scored_pairs:
+		if typeof(sps2_v) != TYPE_DICTIONARY:
+			continue
+		var sps2: Dictionary = sps2_v
+		if not bool(sps2.get("peri_keep", false)):
+			continue
+		var tgs2: String = str(sps2.get("tag", "")).strip_edges().to_upper()
+		if not tags_with_span.has(tgs2):
+			sps2["peri_keep"] = false
 	var paint_pairs: Array = _hwy3_order_pairs_for_paint(scored_pairs)
 	var inferred_n: int = inferred.size()
 	if inferred_n <= 0:
