@@ -293,6 +293,9 @@ else
   run_step launch_hwy3_hub_route \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessHwy3HubRouteTest.gd || fail
 
+  run_step launch_hwy3_live_scenario \
+    tools/run_godot.sh --headless -s res://scripts/core/HeadlessHwy3LiveScenarioTest.gd || fail
+
   run_step launch_rx1_panel_state \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessRx1RhinePanelStateTest.gd || fail
 

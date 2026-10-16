@@ -125,6 +125,7 @@ var _road_tier_draw: Dictionary = {}
 var _hwy3_city_layer: Dictionary = {}
 var _hwy3_econ_layer: Dictionary = {}
 var _hwy3_layers_ready: bool = false
+var _hwy3_city_source: String = "json"
 var _hwy3_graph_rows: Array = []
 
 func _ready():
@@ -1589,16 +1590,37 @@ func _hwy3_pid_is_city_hub(pid: int) -> bool:
     return false
 
 
+func get_hwy3_city_layer() -> Dictionary:
+    _ensure_hwy3_layers()
+    return _hwy3_city_layer
+
+
+func get_hwy3_city_source() -> String:
+    _ensure_hwy3_layers()
+    return _hwy3_city_source
+
+
+func reset_hwy3_layers() -> void:
+    _hwy3_layers_ready = false
+    _hwy3_city_layer = {}
+    _hwy3_econ_layer = {}
+    _hwy3_city_source = "json"
+
+
 func _ensure_hwy3_layers() -> void:
     if _hwy3_layers_ready:
         return
     _hwy3_city_layer = _load_hwy3_layer_json("province_city_layer.json")
     _hwy3_econ_layer = _load_hwy3_layer_json("province_economy_layer.json")
-    var loader: Node = _find_scenario_loader()
-    if loader != null and loader.has_method("get_city_layer"):
-        var live_v: Variant = loader.call("get_city_layer")
-        if typeof(live_v) == TYPE_DICTIONARY and not (live_v as Dictionary).is_empty():
-            _hwy3_city_layer = live_v
+    _hwy3_city_source = "json"
+    var mutant: String = RoadTierVisualScript.hwy3_mutant_name()
+    if mutant != "json_layer":
+        var loader: Node = _find_scenario_loader()
+        if loader != null and loader.has_method("get_city_layer"):
+            var live_v: Variant = loader.call("get_city_layer")
+            if typeof(live_v) == TYPE_DICTIONARY and not (live_v as Dictionary).is_empty():
+                _hwy3_city_layer = live_v
+                _hwy3_city_source = "scenario"
     _hwy3_layers_ready = true
 
 
@@ -1756,6 +1778,7 @@ func _collect_hwy3_hub_ctx() -> Dictionary:
         "by_pid": by_pid,
         "tag_borders": tag_borders,
         "use_urban": true,
+        "city_source": _hwy3_city_source,
     }
 
 

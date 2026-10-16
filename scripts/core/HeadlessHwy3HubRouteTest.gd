@@ -68,6 +68,7 @@ func _run() -> void:
 	_test_h3_simple_paths()
 	_test_h4_germany()
 	_test_h4_major_trunks()
+	_test_h4_rome_north()
 	_test_h4_ruhr_span()
 	_test_h4_no_near_parallel()
 	_test_h4_no_duplicate_corridor()
@@ -890,6 +891,58 @@ func _test_h4_major_trunks() -> void:
 		_fail("H4: major capital not connected to 2nd hub %s" % str(missed))
 	else:
 		_pass("H4: every major capital connects to its 2nd hub")
+
+
+func _test_h4_rome_north() -> void:
+	var rec_by: Dictionary = {}
+	var rome_pid: int = 0
+	for rec_v in _records():
+		if typeof(rec_v) != TYPE_DICTIONARY:
+			continue
+		var rec: Dictionary = rec_v
+		rec_by[int(rec.get("pid", 0))] = rec
+		var blob: String = (
+			"%s %s" % [str(rec.get("city_name", "")), str(rec.get("name", ""))]
+		).strip_edges().to_lower()
+		if rome_pid <= 0 and (blob.contains("rome") or blob.contains("roma")):
+			if str(rec.get("tag", "")).to_upper() == "ITA":
+				rome_pid = int(rec.get("pid", 0))
+	if rome_pid <= 0:
+		_fail("H4: Rome record missing")
+		return
+	var chain: String = ""
+	var hit: String = ""
+	for rt_v in _routes():
+		if typeof(rt_v) != TYPE_DICTIONARY:
+			continue
+		var rt: Dictionary = rt_v
+		var pids: Array = _route_pids(rt)
+		var has_rome: bool = false
+		var local_hit: String = ""
+		for pv in pids:
+			var pid: int = int(pv)
+			if pid == rome_pid:
+				has_rome = true
+			var rec2_v: Variant = rec_by.get(pid, {})
+			var rec2: Dictionary = rec2_v if typeof(rec2_v) == TYPE_DICTIONARY else {}
+			var nm: String = _rec_name_local(rec2).to_lower()
+			if (
+				nm.contains("firenze")
+				or nm.contains("florence")
+				or nm.contains("bologna")
+				or nm.contains("milano")
+				or nm.contains("milan")
+			):
+				local_hit = nm
+		if has_rome and local_hit != "":
+			hit = local_hit
+			chain = _route_name_chain(rt, rec_by)
+			break
+	print("HWY3_ROME_NORTH hit=%s %s" % [hit, chain])
+	if hit == "":
+		_fail("H4: no Roma route reaches Firenze/Bologna/Milano")
+	else:
+		_pass("H4: Rome-north %s" % chain)
 
 
 func _test_h4_ruhr_span() -> void:
