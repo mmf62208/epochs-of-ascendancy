@@ -594,21 +594,53 @@ func _test_rome_north_source_mutant() -> void:
 		_fail("rome-north source mutant: expected one second-sector assign, got %d" % src.count(needle))
 		return
 	var mutated: String = src.replace(needle, "var second: int = 0")
-	if not _write_text(SRC_VIS, mutated):
-		_fail("rome-north source mutant: could not write mutated source")
+	mutated = mutated.replace(
+		"class_name RoadTierVisual\n",
+		"class_name RoadTierVisualMutant\nstatic func hwy3_fix5_mutant_token() -> String:\n	return \"second_zero\"\n"
+	)
+	var gs := GDScript.new()
+	gs.source_code = mutated
+	if gs.reload() != OK:
+		_fail("rome-north source mutant: mutated script failed to parse")
 		return
-	if not _reload_vis_from_disk():
-		_write_text(SRC_VIS, src)
-		_reload_vis_from_disk()
-		_fail("rome-north source mutant: mutated source failed to reload")
+	var token: String = ""
+	if gs.has_method("hwy3_fix5_mutant_token"):
+		token = str(gs.call("hwy3_fix5_mutant_token"))
+	print("HWY3_LIVE_SOURCE_MUTANT token=%s" % token)
+	if token != "second_zero":
+		_fail("rome-north source mutant: in-memory script is not the mutated source")
 		return
-	_rebuild_live_cache()
-	var got: Dictionary = _rome_reaches_north()
-	var sector2: Variant = _debug().get("sector2_by_tag", {})
-	print("HWY3_LIVE_SOURCE_MUTANT %s sector2=%s" % [str(got), str(sector2)])
-	_write_text(SRC_VIS, src)
-	_reload_vis_from_disk()
-	_rebuild_live_cache()
+	var cache_clone: Array = []
+	for row_v in _cache:
+		if typeof(row_v) != TYPE_DICTIONARY:
+			continue
+		var dup: Dictionary = (row_v as Dictionary).duplicate()
+		if not bool(dup.get("explicit", false)):
+			dup["display_tier"] = int(dup.get("tier", 0))
+			dup.erase("metro")
+		cache_clone.append(dup)
+	if _ol == null or not _ol.has_method("_collect_hwy3_hub_ctx"):
+		_fail("rome-north source mutant: overlay missing hub ctx")
+		return
+	var ctx: Dictionary = _ol.call("_collect_hwy3_hub_ctx")
+	if _ol.has_method("get_hwy3_graph_rows"):
+		var g_v: Variant = _ol.call("get_hwy3_graph_rows")
+		if typeof(g_v) == TYPE_ARRAY and not (g_v as Array).is_empty():
+			ctx["graph"] = g_v
+	if gs.has_method("hwy3_clear_memos"):
+		gs.call("hwy3_clear_memos")
+	gs.call("assign_rare_display_tiers", cache_clone, ctx)
+	var dbg_v: Variant = gs.call("hwy3_debug")
+	var dbg: Dictionary = dbg_v if typeof(dbg_v) == TYPE_DICTIONARY else {}
+	var got: Dictionary = _rome_reaches_north_from(dbg)
+	var sector2: Variant = dbg.get("sector2_by_tag", {})
+	var ita2: int = 0
+	if typeof(sector2) == TYPE_DICTIONARY:
+		ita2 = int((sector2 as Dictionary).get("ITA", 0))
+	print("HWY3_LIVE_SOURCE_MUTANT %s ita_sector2=%d sector2=%s" % [str(got), ita2, str(sector2)])
+	if ita2 != 0:
+		_fail("mutant reachable_sectors second=0 left ITA sector2=%d" % ita2)
+		return
 	if bool(got.get("ok", false)):
 		_fail("mutant reachable_sectors second=0 survived Rome-north %s" % str(got.get("chain", "")))
 	else:
