@@ -96,6 +96,10 @@ const HWY3_TRUNK_MIN_DIST := 32.0
 ## Capital connects to the top-2 hubs by score in distinct bearing sectors.
 const HWY3_SECTOR_MIN_ANGLE := 1.5707963267948966 ## 90°
 const HWY3_COVER_RESERVE := 24
+## Trunks may overflow the paint hi so a second capital sector still commits.
+## SPANs get a smaller overflow so Munich–Frankfurt is not starved after that.
+const HWY3_TRUNK_OVERFLOW := 48
+const HWY3_SPAN_OVERFLOW := 24
 const HWY3_KIND_TRUNK := 2
 const HWY3_KIND_SPAN := 1
 const HWY3_KIND_OTHER := 0
@@ -3566,7 +3570,9 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 		var tag_sp: String = str(kc.get("tag", "")).strip_edges().to_upper()
 		var commit_hi: int = hi
 		if kind3 >= HWY3_KIND_TRUNK:
-			commit_hi = hi + 48
+			commit_hi = hi + HWY3_TRUNK_OVERFLOW
+		elif kind3 == HWY3_KIND_SPAN:
+			commit_hi = hi + HWY3_SPAN_OVERFLOW
 		elif kind3 == HWY3_KIND_OTHER:
 			commit_hi = maxi(hi - HWY3_COVER_RESERVE, 45)
 		if (
