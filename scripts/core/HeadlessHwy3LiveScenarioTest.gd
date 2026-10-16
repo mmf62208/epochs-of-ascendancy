@@ -558,7 +558,14 @@ func _write_text(path: String, text: String) -> bool:
 	return true
 
 
+func _vis_script() -> GDScript:
+	return load(SRC_VIS) as GDScript
+
+
 func _rebuild_live_cache() -> void:
+	var vis_gs: GDScript = _vis_script()
+	if vis_gs != null and vis_gs.has_method("hwy3_clear_memos"):
+		vis_gs.call("hwy3_clear_memos")
 	RoadTierVisualScript.hwy3_clear_memos()
 	if _ol != null and _ol.has_method("reset_hwy3_layers"):
 		_ol.call("reset_hwy3_layers")
@@ -568,6 +575,13 @@ func _rebuild_live_cache() -> void:
 			var cache_v: Variant = _ol.call("get_road_tier_cache")
 			if typeof(cache_v) == TYPE_ARRAY:
 				_cache = cache_v
+
+
+func _reload_vis_from_disk() -> bool:
+	var vis_gs: GDScript = _vis_script()
+	if vis_gs == null:
+		return false
+	return vis_gs.reload() == OK
 
 
 func _test_rome_north_source_mutant() -> void:
@@ -583,18 +597,17 @@ func _test_rome_north_source_mutant() -> void:
 	if not _write_text(SRC_VIS, mutated):
 		_fail("rome-north source mutant: could not write mutated source")
 		return
-	var reload_err: Error = RoadTierVisualScript.reload()
-	if reload_err != OK:
+	if not _reload_vis_from_disk():
 		_write_text(SRC_VIS, src)
-		RoadTierVisualScript.reload()
-		_fail("rome-north source mutant: mutated source failed to reload (%s)" % str(reload_err))
+		_reload_vis_from_disk()
+		_fail("rome-north source mutant: mutated source failed to reload")
 		return
 	_rebuild_live_cache()
 	var got: Dictionary = _rome_reaches_north()
 	var sector2: Variant = _debug().get("sector2_by_tag", {})
 	print("HWY3_LIVE_SOURCE_MUTANT %s sector2=%s" % [str(got), str(sector2)])
 	_write_text(SRC_VIS, src)
-	RoadTierVisualScript.reload()
+	_reload_vis_from_disk()
 	_rebuild_live_cache()
 	if bool(got.get("ok", false)):
 		_fail("mutant reachable_sectors second=0 survived Rome-north %s" % str(got.get("chain", "")))
