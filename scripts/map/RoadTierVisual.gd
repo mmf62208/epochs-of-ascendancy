@@ -1320,6 +1320,8 @@ static func _hwy3_mark_periphery_hub(
 	var outlier_min: float = HWY3_TRUNK_MIN_DIST * 2.5
 	var best_pid: int = 0
 	var best_d: float = -1.0
+	var best_city: int = 0
+	var best_city_d: float = -1.0
 	for rec2_v in hubs:
 		if typeof(rec2_v) != TYPE_DICTIONARY:
 			continue
@@ -1338,8 +1340,14 @@ static func _hwy3_mark_periphery_hub(
 		if d_cap > best_d:
 			best_d = d_cap
 			best_pid = pid
+		var is_city: bool = bool(rec2.get("city_hub", false)) or int(rec2.get("tier", 0)) >= 3
+		if is_city and (d_cap > best_city_d or (d_cap == best_city_d and (best_city <= 0 or pid < best_city))):
+			best_city_d = d_cap
+			best_city = pid
 		if d_near >= outlier_min:
 			rec2["periphery"] = true
+	if best_city > 0:
+		best_pid = best_city
 	if best_pid <= 0:
 		return
 	for rec3_v in hubs:
@@ -2301,12 +2309,18 @@ static func _hwy3_drop_near_parallel(cands: Array, cents: Dictionary) -> Diction
 	var dropped: int = 0
 	for c2_v in ranked:
 		var c2: Dictionary = c2_v
+		var protect: bool = (
+			bool(c2.get("span_core", false))
+			or bool(c2.get("sector_keep", false))
+			or bool(c2.get("peri_keep", false))
+		)
 		var is_par: bool = false
-		for k_v in kept:
-			var krow: Dictionary = k_v
-			if _hwy3_routes_near_parallel(c2, krow, cents):
-				is_par = true
-				break
+		if not protect:
+			for k_v in kept:
+				var krow: Dictionary = k_v
+				if _hwy3_routes_near_parallel(c2, krow, cents):
+					is_par = true
+					break
 		if is_par:
 			dropped += 1
 			continue
@@ -3256,7 +3270,7 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 		var kind: int = HWY3_KIND_OTHER
 		var span_core: bool = false
 		var sector_keep: bool = false
-		var peri_keep: bool = bool(ra.get("periphery_primary", false)) or bool(rb.get("periphery_primary", false))
+		var peri_keep: bool = false
 		if not tag_ab.is_empty():
 			var second_n: int = int(second_by_tag.get(tag_ab, 0))
 			var sector2_n: int = int(sector2_by_tag.get(tag_ab, 0))
@@ -3272,6 +3286,26 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 			):
 				kind = HWY3_KIND_SPAN
 				sector_keep = true
+			if HWY3_MAJOR_TAGS.has(tag_ab):
+				var peri_pid: int = 0
+				if bool(ra.get("periphery_primary", false)):
+					peri_pid = a
+				elif bool(rb.get("periphery_primary", false)):
+					peri_pid = b
+				if peri_pid > 0:
+					var attach_keep: int = _hwy3_nearest_city_hub(hl_ab, Vector2i(peri_pid, peri_pid))
+					if attach_keep <= 0:
+						attach_keep = _hwy3_farthest_city_hub(hl_ab, peri_pid)
+					if attach_keep > 0 and (
+						(a == peri_pid and b == attach_keep) or (b == peri_pid and a == attach_keep)
+					):
+						peri_keep = true
+						if kind < HWY3_KIND_SPAN:
+							kind = HWY3_KIND_SPAN
+			if kind == HWY3_KIND_TRUNK:
+				pass
+			elif kind == HWY3_KIND_SPAN and (sector_keep or peri_keep):
+				pass
 			else:
 				var spn_v: Variant = span_by_tag.get(tag_ab, Vector2i.ZERO)
 				var spn: Vector2i = spn_v if typeof(spn_v) == TYPE_VECTOR2I else Vector2i.ZERO
@@ -3293,14 +3327,14 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 						var hp_ab: Dictionary = hp_ab_v
 						if not bool(hp_ab.get("periphery", false)):
 							continue
-						var peri_pid: int = int(hp_ab.get("pid", 0))
-						if peri_pid <= 0:
+						var peri_pid2: int = int(hp_ab.get("pid", 0))
+						if peri_pid2 <= 0:
 							continue
-						var attach_p: int = _hwy3_nearest_city_hub(hl_ab, Vector2i(peri_pid, peri_pid))
+						var attach_p: int = _hwy3_nearest_city_hub(hl_ab, Vector2i(peri_pid2, peri_pid2))
 						if attach_p <= 0:
-							attach_p = _hwy3_farthest_city_hub(hl_ab, peri_pid)
+							attach_p = _hwy3_farthest_city_hub(hl_ab, peri_pid2)
 						if attach_p > 0 and (
-							(a == peri_pid and b == attach_p) or (b == peri_pid and a == attach_p)
+							(a == peri_pid2 and b == attach_p) or (b == peri_pid2 and a == attach_p)
 						):
 							kind = HWY3_KIND_SPAN
 							break
@@ -3451,7 +3485,7 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 				"kind": HWY3_KIND_SPAN,
 				"span_core": false,
 				"sector_keep": false,
-				"peri_keep": bool(ra_pc.get("periphery_primary", false)) or bool(rb_pc.get("periphery_primary", false)),
+				"peri_keep": bool(hperi_c.get("periphery_primary", false)) and HWY3_MAJOR_TAGS.has(tag_pc),
 				"pids": pid_arr_pc,
 				"packed": pids_pc,
 				"shape": shape_pc,
@@ -3564,7 +3598,7 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 				"kind": HWY3_KIND_SPAN,
 				"span_core": false,
 				"sector_keep": false,
-				"peri_keep": bool(ra_o.get("periphery_primary", false)) or bool(rb_o.get("periphery_primary", false)),
+				"peri_keep": bool(horph.get("periphery_primary", false)) and HWY3_MAJOR_TAGS.has(tag_or),
 				"pids": pid_arr_o,
 				"packed": pids_o,
 				"shape": shape_o,
