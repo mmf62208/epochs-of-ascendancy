@@ -3290,7 +3290,7 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 				elif b == second_n and _hwy3_is_major_city_hub(ra):
 					city_rec = ra
 					city_pid = a
-				if city_pid > 0 and cap_n > 0:
+				if city_pid > 0 and cap_n > 0 and city_pid != sector2_n:
 					var cap_keep_v: Variant = rec_by_pid.get(cap_n, {})
 					var cap_keep_rec: Dictionary = cap_keep_v if typeof(cap_keep_v) == TYPE_DICTIONARY else {}
 					var d_city: float = cap_keep_rec.get("centroid", Vector2.ZERO).distance_to(
@@ -3318,6 +3318,7 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 						(mini(a, b) == mini(att_ab.x, att_ab.y) and maxi(a, b) == maxi(att_ab.x, att_ab.y))
 					):
 						kind = HWY3_KIND_SPAN
+						span_core = true
 				if kind < HWY3_KIND_SPAN:
 					for hp_ab_v in hl_ab:
 						if typeof(hp_ab_v) != TYPE_DICTIONARY:
@@ -3349,6 +3350,28 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 			"sector_keep": sector_keep,
 			"peri_keep": peri_keep,
 		})
+	var best_peri_d: Dictionary = {}
+	var best_peri_key: Dictionary = {}
+	for spk_v in scored_pairs:
+		if typeof(spk_v) != TYPE_DICTIONARY:
+			continue
+		var spk: Dictionary = spk_v
+		if not bool(spk.get("peri_keep", false)):
+			continue
+		var tgk: String = str(spk.get("tag", "")).strip_edges().to_upper()
+		var d_pk: float = float(spk.get("dist", 0.0))
+		if not best_peri_d.has(tgk) or d_pk > float(best_peri_d.get(tgk, -1.0)):
+			best_peri_d[tgk] = d_pk
+			best_peri_key[tgk] = int(spk.get("key", 0))
+	for spk2_v in scored_pairs:
+		if typeof(spk2_v) != TYPE_DICTIONARY:
+			continue
+		var spk2: Dictionary = spk2_v
+		if not bool(spk2.get("peri_keep", false)):
+			continue
+		var tgk2: String = str(spk2.get("tag", "")).strip_edges().to_upper()
+		if int(spk2.get("key", 0)) != int(best_peri_key.get(tgk2, 0)):
+			spk2["peri_keep"] = false
 	var paint_pairs: Array = _hwy3_order_pairs_for_paint(scored_pairs)
 	var inferred_n: int = inferred.size()
 	if inferred_n <= 0:
