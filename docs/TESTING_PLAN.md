@@ -749,6 +749,20 @@ Tip `d0107744` live-boot **3/3 PASS** (not best-of). Roles `{hub: 3158, route: 3
 
 `allow_without_overlay` mutant killed. Fixture L-on 82.3 ms. max_step **5.647 / 5.559 / 6.38**. Seed ×3 `20fe9063de285f19d4f9b8a105abfd31`. `--quick` 14 reds. map_qc NE **0.9853**.
 
+**FIX #5 (test honesty):** `A_FRAME2_DEFAULT_MS` deleted. Measure A's frame2 on `5df8e7fc` (`tools/eoa_render1_measure_a.sh` → `docs/evidence/render1/a_live_5df8e7fc.json`). Wait until LoadingScreen is gone (first capture was title art). L-off uses a fresh KEY_L t0 (parse_input_event is deferred; do not reuse L-on's stamp). L-on frame1 is the first `frame_post_draw` whose batch `_draw` ran *after* that t0 (`get_last_draw_usec`; stale idle-warm `mesh_calls` read as presented and produced the 10–43 ms lie). Report real L-on minus L-off frame2 (Ship GPU ~155 ms). `HeadlessRender1PrebuildRoleTest` / `tools/eoa_render1_prebuild_role.sh`: per-pid prebuild vs fresh `_compute_supply_highlight_roles()` at L-on — tip green, `lon_semantics_off` red, `allow_without_overlay` red. Ring-edge hue is teal *share* of ring-core pixels (sat>0.52, val>0.58; olive sat≥0.55 so Line2D AA fringe cannot dilute vs mesh) ±10% vs measured A. Mesh extrusion reads thinner than Line2D AA; `SupplyOutlineBatchLayer.width_scale` / `EOA_RENDER1_RING_WIDTH_SCALE` (default 1.0).
+
+Measured A `5df8e7fc`: L-on frame2 **422.000** / L-off **223.252** / Δ **198.748**; teal share **0.8190** (edge 41434 / olive 239 / orange 8916); width_proxy **3.689**.
+
+Tip live-boot **3/3 PASS** (xvfb llvmpipe, not product Play / not Ship GPU):
+
+| run | L-on frame1 | L-on frame2 | L-off frame2 | Δ | B/A | teal share |
+|---|---:|---:|---:|---:|---:|---:|
+| 1 | 200.882 | 256.898 | 233.106 | 23.792 | 0.609 | 0.8041 |
+| 2 | 202.587 | 261.071 | 226.081 | 34.990 | 0.619 | 0.8041 |
+| 3 | 193.314 | 253.600 | 229.584 | 24.016 | 0.601 | 0.8041 |
+
+This box's Δ is 24–35 ms because close-zoom fills make L-off ~230 ms too; Ship GPU ~155 ms. B/A vs measured A 422 ms. Prebuild roles: tip PASS n=208 (hub 48 + engineers 160); `lon_semantics_off` FAIL mismatch=160; `allow_without_overlay` FAIL used_allow. Mesh test **PASS**. `--quick` 14 reds. map_qc NE **0.9853**. Display-only; seed 193601 **`20fe9063`**. Stay DRAFT / HOLD.
+
 ```bash
 tools/run_godot.sh --headless --path . --resolution 1280x740 \
   -s res://scripts/core/HeadlessRender1SupplyRingMeshTest.gd
