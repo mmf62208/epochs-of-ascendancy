@@ -3526,21 +3526,11 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 				if _hwy3_routes_near_parallel(cand_r, ke2_v as Dictionary, centroids):
 					par_k = true
 					break
-			if par_k and not bool(hperi.get("periphery", false)):
+			if par_k:
 				continue
 			if best_rest.is_empty() or int(cand_r.get("kind", 0)) > int(best_rest.get("kind", 0)):
 				best_rest = cand_r
 		if not best_rest.is_empty():
-			var tag_pe: String = str(hperi.get("tag", "")).strip_edges().to_upper()
-			var second_pe: int = int(second_by_tag.get(tag_pe, 0))
-			var ba_pe: int = int(best_rest.get("a", 0))
-			var bb_pe: int = int(best_rest.get("b", 0))
-			if HWY3_MAJOR_TAGS.has(tag_pe) and _hwy3_is_major_city_hub(hperi) and (
-				ba_pe == second_pe or bb_pe == second_pe
-			):
-				best_rest["peri_keep"] = true
-			if int(best_rest.get("kind", 0)) < HWY3_KIND_SPAN:
-				best_rest["kind"] = HWY3_KIND_SPAN
 			kept_cands.append(best_rest)
 			dropped_parallel = maxi(dropped_parallel - 1, 0)
 			kept_ends[peri_e] = true
@@ -3557,6 +3547,7 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 		var hl_or_v: Variant = hubs_by_tag.get(tag_or, [])
 		var hl_or: Array = hl_or_v if typeof(hl_or_v) == TYPE_ARRAY else []
 		var attach_or: Array = _hwy3_city_hubs_by_dist(hl_or, orph_pid)
+		var second_or: int = int(second_by_tag.get(tag_or, 0))
 		var attach_kept: Array = []
 		var attach_rest: Array = []
 		for ars_v in attach_or:
@@ -3568,9 +3559,15 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 			else:
 				attach_rest.append(ars)
 		attach_or = []
+		if _hwy3_is_major_city_hub(horph) and second_or > 0:
+			attach_or.append({"pid": second_or, "dist": 0.0, "key": _hwy3_pair_key(orph_pid, second_or)})
 		for ak_v in attach_kept:
+			if int((ak_v as Dictionary).get("pid", 0)) == second_or:
+				continue
 			attach_or.append(ak_v)
 		for ar2_v in attach_rest:
+			if int((ar2_v as Dictionary).get("pid", 0)) == second_or:
+				continue
 			attach_or.append(ar2_v)
 		for ao_v in attach_or:
 			if typeof(ao_v) != TYPE_DICTIONARY:
