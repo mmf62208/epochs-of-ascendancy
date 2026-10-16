@@ -763,7 +763,17 @@ Tip live-boot **3/3 PASS** (xvfb llvmpipe, not product Play / not Ship GPU):
 
 This box's Δ is 24–35 ms because close-zoom fills make L-off ~230 ms too; Ship GPU ~155 ms. B/A vs measured A 422 ms. Prebuild roles: tip PASS n=208 (hub 48 + engineers 160); `lon_semantics_off` FAIL mismatch=160; `allow_without_overlay` FAIL used_allow. Mesh test **PASS**. `--quick` 14 reds. map_qc NE **0.9853**. Display-only; seed 193601 **`20fe9063`**. Stay DRAFT / HOLD.
 
-**FIX #6 (same-run A/B + fixture headroom + behavioural allow mutant):** Live guard boots A `5df8e7fc` and B in the same wrapper run. Report each raw L-on frame2 and L-off frame2. Δ = L-on − L-off. B/A = B frame2 / A frame2. Never read A from a JSON file. Ship measures B's Δ at 129–254 ms, not 24–35; B/A 0.61 does not follow from 24–35 / 198.7. Fixture L-on: idle deferred `force_draw` upload + first-present budget 32 + legend warmed off L; target ≤ 200 ms at load ~2 (250 bar kept). `allow_without_overlay` killed by per-pid mismatch on 8 unowned infra-pressure pids (no self-report flag). Hue stays ring-edge share. `width_scale` default 1.0. Numbers after same-run gates. Stay DRAFT / HOLD.
+**FIX #6 (same-run A/B + fixture headroom + behavioural allow mutant):** Live guard boots A `5df8e7fc` and B in the same wrapper run. Report each raw L-on frame2 and L-off frame2. Δ = L-on − L-off. B/A = B frame2 / A frame2. Never read A from a JSON file. Ship measures B's Δ at 129–254 ms, not 24–35; B/A 0.61 does not follow from 24–35 / 198.7.
+
+Same-run 3/3 PASS (xvfb llvmpipe, load 1.5–2.1; not product Play / not Ship GPU):
+
+| run | A lon2 | A loff2 | A Δ | B lon2 | B loff2 | B Δ | B/A | load |
+|---|---:|---:|---:|---:|---:|---:|---:|---|
+| 1 | 463.493 | 231.993 | 231.500 | 263.846 | 250.399 | 13.447 | 0.569 | 1.84 |
+| 2 | 434.059 | 225.647 | 208.412 | 236.606 | 232.952 | 3.654 | 0.545 | 1.49 |
+| 3 | 435.990 | 229.816 | 206.174 | 251.753 | 251.388 | 0.365 | 0.577 | 1.52 |
+
+Hue B **0.8045** vs same-run A **0.8190** (ring-edge share). Fixture L-on ×5 **50.500 / 53.246 / 51.041 / 50.367 / 51.560** ms at load **1.49 / 1.41 / 1.35 / 1.29 / 1.25** (≤200; bar 250). `allow_without_overlay` killed by behaviour: pids 710240–710247 pre=`engineers_recommended` fresh=empty mismatch=8 (flag deleted). `lon_semantics_off` mismatch=160. Tip n=208 hub 48 + engineers 160. Seed ×3 `20fe9063de285f19d4f9b8a105abfd31`. `--quick` 14 reds. map_qc NE **0.9853**. `width_scale` default 1.0. Stay DRAFT / HOLD.
 
 ```bash
 tools/run_godot.sh --headless --path . --resolution 1280x740 \
