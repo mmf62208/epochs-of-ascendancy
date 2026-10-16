@@ -680,6 +680,34 @@ static func assign_rare_display_tiers(cache: Array, hub_ctx: Dictionary = {}) ->
 		inferred.append(row)
 	if inferred.is_empty() and hub_ctx.is_empty():
 		return
+	var mutant: String = hwy3_mutant_name()
+	var records_v: Variant = hub_ctx.get("records", [])
+	var has_hubs: bool = typeof(records_v) == TYPE_ARRAY and (records_v as Array).size() > 0
+	var graph_fast_v: Variant = hub_ctx.get("graph", cache)
+	var graph_fast: Array = graph_fast_v if typeof(graph_fast_v) == TYPE_ARRAY else cache
+	var use_urban_fast: bool = bool(hub_ctx.get("use_urban", true))
+	if mutant == "urban_required":
+		use_urban_fast = true
+	var route_key_fast: String = "%s|%s|%d" % [
+		_hwy3_adj_cache_key(graph_fast, use_urban_fast), mutant, (records_v as Array).size() if has_hubs else 0
+	]
+	if (
+		has_hubs
+		and mutant != "rank_grow_back"
+		and mutant != "not_shortest"
+		and route_key_fast == _hwy3_route_memo_key
+		and not _hwy3_route_memo_marked.is_empty()
+	):
+		var used_fast: int = _hwy3_apply_marked_highways(cache, graph_fast, _hwy3_route_memo_marked)
+		last_hwy3_debug = _hwy3_route_memo_debug.duplicate()
+		var hubs_fast_v: Variant = last_hwy3_debug.get("hubs", [])
+		var hubs_fast: Array = hubs_fast_v if typeof(hubs_fast_v) == TYPE_ARRAY else []
+		_hwy3_stamp_metro_edges(cache, hubs_fast)
+		last_hwy3_debug["used"] = used_fast
+		last_hwy3_debug["drawn"] = _hwy3_count_highways(cache)
+		last_hwy3_debug["mutant"] = mutant
+		last_hwy3_debug["total_ms"] = 0.0
+		return
 	var ranked: Dictionary = _hwy1_rank_inferred(inferred) if not inferred.is_empty() else {"ranks": {}, "seeds_desc": []}
 	var ranks: Dictionary = ranked.get("ranks", {})
 	var seeds_desc: Array = ranked.get("seeds_desc", [])
@@ -691,9 +719,6 @@ static func assign_rare_display_tiers(cache: Array, hub_ctx: Dictionary = {}) ->
 		if tier == TIER_HIGHWAY:
 			tier = TIER_PAVED
 		row2["display_tier"] = tier
-	var mutant: String = hwy3_mutant_name()
-	var records_v: Variant = hub_ctx.get("records", [])
-	var has_hubs: bool = typeof(records_v) == TYPE_ARRAY and (records_v as Array).size() > 0
 	if mutant == "rank_grow_back" or (not has_hubs):
 		_hwy1_pick_highway_chains(cache, inferred, ranks, seeds_desc)
 		last_hwy3_debug = {"mutant": mutant, "hubs": [], "routes": [], "mode": "rank_grow", "records": hub_ctx.get("records", [])}
