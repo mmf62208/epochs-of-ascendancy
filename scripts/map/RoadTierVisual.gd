@@ -3548,6 +3548,15 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 		var hl_or: Array = hl_or_v if typeof(hl_or_v) == TYPE_ARRAY else []
 		var attach_or: Array = _hwy3_city_hubs_by_dist(hl_or, orph_pid)
 		var second_or: int = int(second_by_tag.get(tag_or, 0))
+		var cap_or: int = _hwy3_capital_hub_pid(hl_or)
+		var far_from_cap: bool = false
+		if cap_or > 0 and rec_by_pid.has(cap_or):
+			var cap_rec_or_v: Variant = rec_by_pid.get(cap_or, {})
+			var cap_rec_or: Dictionary = cap_rec_or_v if typeof(cap_rec_or_v) == TYPE_DICTIONARY else {}
+			var d_cap_or: float = cap_rec_or.get("centroid", Vector2.ZERO).distance_to(
+				horph.get("centroid", Vector2.ZERO)
+			)
+			far_from_cap = is_finite(d_cap_or) and d_cap_or >= HWY3_TRUNK_MIN_DIST * 2.5
 		var attach_kept: Array = []
 		var attach_rest: Array = []
 		for ars_v in attach_or:
@@ -3559,14 +3568,14 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 			else:
 				attach_rest.append(ars)
 		attach_or = []
-		if _hwy3_is_major_city_hub(horph) and second_or > 0:
+		if _hwy3_is_major_city_hub(horph) and second_or > 0 and far_from_cap:
 			attach_or.append({"pid": second_or, "dist": 0.0, "key": _hwy3_pair_key(orph_pid, second_or)})
 		for ak_v in attach_kept:
-			if int((ak_v as Dictionary).get("pid", 0)) == second_or:
+			if far_from_cap and int((ak_v as Dictionary).get("pid", 0)) == second_or:
 				continue
 			attach_or.append(ak_v)
 		for ar2_v in attach_rest:
-			if int((ar2_v as Dictionary).get("pid", 0)) == second_or:
+			if far_from_cap and int((ar2_v as Dictionary).get("pid", 0)) == second_or:
 				continue
 			attach_or.append(ar2_v)
 		for ao_v in attach_or:
@@ -3599,7 +3608,7 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 				"kind": HWY3_KIND_SPAN,
 				"span_core": false,
 				"sector_keep": false,
-				"peri_keep": HWY3_MAJOR_TAGS.has(tag_or) and _hwy3_is_major_city_hub(horph) and (
+				"peri_keep": HWY3_MAJOR_TAGS.has(tag_or) and _hwy3_is_major_city_hub(horph) and far_from_cap and (
 					attach_o == int(second_by_tag.get(tag_or, 0))
 				),
 				"pids": pid_arr_o,
@@ -3614,7 +3623,7 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 				if _hwy3_routes_near_parallel(cand_o, ke3_v as Dictionary, centroids):
 					par_o = true
 					break
-			if par_o and not bool(horph.get("periphery_primary", false)) and not _hwy3_is_major_city_hub(horph):
+			if par_o and not (far_from_cap and _hwy3_is_major_city_hub(horph)):
 				continue
 			kept_cands.append(cand_o)
 			kept_ends[orph_pid] = true
