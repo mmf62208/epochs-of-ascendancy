@@ -191,8 +191,11 @@ func _do_mutants() -> void:
 			node = nv
 	var z_before: int = hwy_z
 	if node is Node2D:
+		(node as Node2D).z_as_relative = false
 		(node as Node2D).z_index = 20
-	var z_after: int = 20
+	var z_after: int = -1
+	if node is Node2D:
+		z_after = (node as Node2D).z_index
 	if ol != null and ol.has_method("get_highway_draw_z_index"):
 		z_after = int(ol.call("get_highway_draw_z_index"))
 	_log("HWY3_RUHR who=mutant_under_river before=%d after=%d river=%d" % [z_before, z_after, RIVER_Z])

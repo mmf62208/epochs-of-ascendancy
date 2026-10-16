@@ -1934,9 +1934,16 @@ func get_drawn_highway_count() -> int:
 
 
 func get_highway_draw_z_index() -> int:
-    var node: Node = get_road_tier_draw(2)
-    if node is Node2D:
-        return (node as Node2D).z_index
+    ## Read the live tier-2 node z. Do not call _ensure_road_tier_draw_nodes:
+    ## that restamps HIGHWAY_ABOVE_RIVER_Z and hides an under-river mutant.
+    var existing: Node = null
+    if road_layer != null:
+        existing = road_layer.get_node_or_null("RoadTierDraw_2")
+    if existing is Node2D and is_instance_valid(existing):
+        return (existing as Node2D).z_index
+    var cached_v: Variant = _road_tier_draw.get(2, null)
+    if cached_v is Node2D and is_instance_valid(cached_v):
+        return (cached_v as Node2D).z_index
     return HIGHWAY_ABOVE_RIVER_Z
 
 
