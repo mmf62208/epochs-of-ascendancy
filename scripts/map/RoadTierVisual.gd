@@ -1595,8 +1595,68 @@ static func _hwy3_sectors_apart(a: float, b: float) -> bool:
 	return absf(angle_difference(a, b)) + 0.0001 >= HWY3_SECTOR_MIN_ANGLE
 
 
+static func _hwy3_pair_is_dropped_second_sector(
+	a: int,
+	b: int,
+	tag: String,
+	second_by_tag: Dictionary,
+	sector2_by_tag: Dictionary,
+	rec_by_pid: Dictionary,
+	hubs_by_tag: Dictionary
+) -> bool:
+	if not _hwy3_drop_second_sector():
+		return false
+	var tg: String = tag.strip_edges().to_upper()
+	if tg.is_empty():
+		var ra0_v: Variant = rec_by_pid.get(a, {})
+		var rb0_v: Variant = rec_by_pid.get(b, {})
+		var ra0: Dictionary = ra0_v if typeof(ra0_v) == TYPE_DICTIONARY else {}
+		var rb0: Dictionary = rb0_v if typeof(rb0_v) == TYPE_DICTIONARY else {}
+		var ta0: String = str(ra0.get("tag", "")).strip_edges().to_upper()
+		var tb0: String = str(rb0.get("tag", "")).strip_edges().to_upper()
+		if ta0 == tb0:
+			tg = ta0
+	if tg.is_empty():
+		return false
+	var hl_v: Variant = hubs_by_tag.get(tg, [])
+	var hl: Array = hl_v if typeof(hl_v) == TYPE_ARRAY else []
+	var cap_n: int = _hwy3_capital_hub_pid(hl)
+	if cap_n <= 0:
+		return false
+	var other: int = 0
+	if a == cap_n:
+		other = b
+	elif b == cap_n:
+		other = a
+	else:
+		return false
+	if other <= 0:
+		return false
+	var sector2_n: int = int(sector2_by_tag.get(tg, 0))
+	if sector2_n > 0 and other == sector2_n:
+		return true
+	var first_n: int = int(second_by_tag.get(tg, 0))
+	if first_n <= 0 or first_n == other:
+		return false
+	var cap_v: Variant = rec_by_pid.get(cap_n, {})
+	var first_v: Variant = rec_by_pid.get(first_n, {})
+	var other_v: Variant = rec_by_pid.get(other, {})
+	if (
+		typeof(cap_v) != TYPE_DICTIONARY
+		or typeof(first_v) != TYPE_DICTIONARY
+		or typeof(other_v) != TYPE_DICTIONARY
+	):
+		return false
+	var cap_c: Vector2 = (cap_v as Dictionary).get("centroid", Vector2.ZERO)
+	var first_c: Vector2 = (first_v as Dictionary).get("centroid", Vector2.ZERO)
+	var other_c: Vector2 = (other_v as Dictionary).get("centroid", Vector2.ZERO)
+	if cap_c == Vector2.ZERO or first_c == Vector2.ZERO or other_c == Vector2.ZERO:
+		return false
+	return _hwy3_sectors_apart(_hwy3_bearing(cap_c, first_c), _hwy3_bearing(cap_c, other_c))
+
+
 static func _hwy3_second_sector_hub_pid(hubs: Array, cap_pid: int, first_pid: int) -> int:
-	if first_pid <= 0 or _hwy3_drop_second_sector():
+	if first_pid <= 0:
 		return 0
 	var cap_c: Vector2 = Vector2.ZERO
 	var first_c: Vector2 = Vector2.ZERO
@@ -1750,7 +1810,7 @@ static func _hwy3_second_sector_from_rows(
 static func _hwy3_reachable_second_sector(
 	hubs: Array, cap_pid: int, first_pid: int, adj: Dictionary, attrs: Dictionary
 ) -> int:
-	if first_pid <= 0 or _hwy3_drop_second_sector():
+	if first_pid <= 0:
 		return 0
 	var cap_c: Vector2 = Vector2.ZERO
 	var first_c: Vector2 = Vector2.ZERO
@@ -3185,8 +3245,12 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 		var hl1: Array = hubs_by_tag[tg1]
 		var cap1: int = _hwy3_capital_hub_pid(hl1)
 		var sectors1: PackedInt32Array = _hwy3_reachable_sectors(hl1, cap1, adj, attrs)
-		second_by_tag[tg1] = int(sectors1[0]) if sectors1.size() > 0 else 0
-		sector2_by_tag[tg1] = int(sectors1[1]) if sectors1.size() > 1 else 0
+		var first_sec1: int = int(sectors1[0]) if sectors1.size() > 0 else 0
+		var second_sec1: int = int(sectors1[1]) if sectors1.size() > 1 else 0
+		if second_sec1 <= 0 and first_sec1 > 0:
+			second_sec1 = _hwy3_reachable_second_sector(hl1, cap1, first_sec1, adj, attrs)
+		second_by_tag[tg1] = first_sec1
+		sector2_by_tag[tg1] = second_sec1
 		span_by_tag[tg1] = _hwy3_urban_span_pair_ids(hl1)
 		for si1 in range(sectors1.size()):
 			var sec1: int = int(sectors1[si1])
@@ -3252,6 +3316,11 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 		var rb: Dictionary = rec_by_pid.get(b, {})
 		var ta: String = str(ra.get("tag", "")).strip_edges().to_upper()
 		var tb: String = str(rb.get("tag", "")).strip_edges().to_upper()
+		var tag_ab_early: String = ta if ta == tb else ""
+		if _hwy3_pair_is_dropped_second_sector(
+			a, b, tag_ab_early, second_by_tag, sector2_by_tag, rec_by_pid, hubs_by_tag
+		):
+			continue
 		var sc: float = float(ra.get("score", 0.0)) + float(rb.get("score", 0.0))
 		var ca: Vector2 = ra.get("centroid", Vector2.ZERO)
 		var cb: Vector2 = rb.get("centroid", Vector2.ZERO)
@@ -3273,8 +3342,14 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 				(a == cap_n and b == second_n) or (b == cap_n and a == second_n)
 			):
 				kind = HWY3_KIND_TRUNK
-			elif cap_n > 0 and HWY3_MAJOR_TAGS.has(tag_ab) and sector2_n > 0 and (
-				(a == cap_n and b == sector2_n) or (b == cap_n and a == sector2_n)
+			elif (
+				not _hwy3_drop_second_sector()
+				and cap_n > 0
+				and HWY3_MAJOR_TAGS.has(tag_ab)
+				and sector2_n > 0
+				and (
+					(a == cap_n and b == sector2_n) or (b == cap_n and a == sector2_n)
+				)
 			):
 				kind = HWY3_KIND_SPAN
 				sector_keep = true
@@ -3423,6 +3498,10 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 		var a2: int = int(sp.get("a", 0))
 		var b2: int = int(sp.get("b", 0))
 		var kind2: int = int(sp.get("kind", 0))
+		if _hwy3_pair_is_dropped_second_sector(
+			a2, b2, str(sp.get("tag", "")), second_by_tag, sector2_by_tag, rec_by_pid, hubs_by_tag
+		):
+			continue
 		if not adj.has(a2) or not adj.has(b2):
 			if kind2 >= HWY3_KIND_TRUNK:
 				failed_trunks.append("%d-%d no_adj" % [a2, b2])
@@ -3686,6 +3765,10 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 		var b3: int = int(kc.get("b", 0))
 		var kind3: int = int(kc.get("kind", 0))
 		var tag_sp: String = str(kc.get("tag", "")).strip_edges().to_upper()
+		if _hwy3_pair_is_dropped_second_sector(
+			a3, b3, tag_sp, second_by_tag, sector2_by_tag, rec_by_pid, hubs_by_tag
+		):
+			continue
 		var commit_hi: int = hi
 		var span_core3: bool = bool(kc.get("span_core", false))
 		var sector_keep3: bool = bool(kc.get("sector_keep", false))
@@ -3765,6 +3848,10 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 					continue
 				var ot6: String = str(h6.get("tag", "")).strip_edges().to_upper()
 				if ot6 != tag5:
+					continue
+				if _hwy3_pair_is_dropped_second_sector(
+					hp5, op6, tag5, second_by_tag, sector2_by_tag, rec_by_pid, hubs_by_tag
+				):
 					continue
 				if _uf_find(tree_parent, op6) == root5:
 					continue

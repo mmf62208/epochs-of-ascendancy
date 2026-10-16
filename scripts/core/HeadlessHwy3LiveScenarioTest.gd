@@ -405,7 +405,19 @@ func _rebuild_with_mutant(name: String) -> void:
 			var cache_v: Variant = _ol.call("get_road_tier_cache")
 			if typeof(cache_v) == TYPE_ARRAY:
 				_cache = cache_v
+
+
+func _restore_after_mutant() -> void:
 	OS.set_environment("EOA_HWY3_MUTANT", "")
+	RoadTierVisualScript.hwy3_clear_memos()
+	if _ol != null and _ol.has_method("reset_hwy3_layers"):
+		_ol.call("reset_hwy3_layers")
+	if _ol != null:
+		_ol.call("_rebuild_road_layer_inner")
+		if _ol.has_method("get_road_tier_cache"):
+			var cache_v: Variant = _ol.call("get_road_tier_cache")
+			if typeof(cache_v) == TYPE_ARRAY:
+				_cache = cache_v
 
 
 func _test_json_layer_mutant() -> void:
@@ -415,15 +427,16 @@ func _test_json_layer_mutant() -> void:
 	_rebuild_with_mutant("json_layer")
 	var live_v: Variant = _loader.call("get_city_layer")
 	var used_v: Variant = _ol.call("get_hwy3_city_layer")
-	var same: bool = typeof(used_v) == TYPE_DICTIONARY and used_v == live_v
-	if same:
+	var source: String = ""
+	if _ol.has_method("get_hwy3_city_source"):
+		source = str(_ol.call("get_hwy3_city_source"))
+	var same_ref: bool = typeof(used_v) == TYPE_DICTIONARY and is_same(used_v, live_v)
+	print("HWY3_LIVE_JSON_LAYER source=%s same_ref=%s" % [source, str(same_ref)])
+	if source == "scenario" or same_ref:
 		_fail("mutant json_layer survived (still ScenarioLoader city layer)")
 	else:
 		_pass("mutant json_layer killed (JSON layer only)")
-	RoadTierVisualScript.hwy3_clear_memos()
-	if _ol.has_method("reset_hwy3_layers"):
-		_ol.call("reset_hwy3_layers")
-	_ol.call("_rebuild_road_layer_inner")
+	_restore_after_mutant()
 
 
 func _test_no_second_sector_mutant() -> void:
@@ -434,8 +447,4 @@ func _test_no_second_sector_mutant() -> void:
 		_fail("mutant no_second_sector survived Rome-north %s" % str(got.get("chain", "")))
 	else:
 		_pass("mutant no_second_sector killed (no Rome-north span)")
-	RoadTierVisualScript.hwy3_clear_memos()
-	if _ol != null and _ol.has_method("reset_hwy3_layers"):
-		_ol.call("reset_hwy3_layers")
-	if _ol != null:
-		_ol.call("_rebuild_road_layer_inner")
+	_restore_after_mutant()
