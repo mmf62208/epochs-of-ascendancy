@@ -2246,6 +2246,8 @@ static func _hwy3_routes_share_corridor(ra: Dictionary, rb: Dictionary) -> bool:
 
 
 static func _hwy3_routes_near_parallel(ra: Dictionary, rb: Dictionary, cents: Dictionary) -> bool:
+	if hwy3_mutant_name() == "overlap_ok":
+		return false
 	var pa_v: Variant = ra.get("pids", [])
 	var pb_v: Variant = rb.get("pids", [])
 	var pa: Array = pa_v if typeof(pa_v) == TYPE_ARRAY else []
@@ -2872,10 +2874,7 @@ static func _hwy3_trim_over_cap(
 		var uniq: Array = _hwy3_route_unique_keys(rt2, routes, vi)
 		if uniq.is_empty():
 			continue
-		var unmarked: int = 0
 		for k_v in uniq:
-			if hwy <= cap:
-				break
 			var k: int = int(k_v)
 			var idx_v: Variant = cache_by_key.get(k, -1)
 			if int(idx_v) < 0:
@@ -2889,9 +2888,7 @@ static func _hwy3_trim_over_cap(
 			marked.erase(k)
 			used = maxi(used - 1, 0)
 			hwy -= 1
-			unmarked += 1
-		if unmarked >= uniq.size():
-			drop_idx[vi] = true
+		drop_idx[vi] = true
 	if not drop_idx.is_empty():
 		var kept: Array = []
 		for ri2 in range(routes.size()):
