@@ -161,14 +161,14 @@ func _boot_live_scenario() -> bool:
 
 
 func _bind_map_renderer() -> void:
-	var existing: Node = root.get_first_node_in_group("map_renderer")
+	var existing: Node = get_first_node_in_group("map_renderer")
 	if existing != null:
 		_mr = existing
 		return
 	_mr = MapRendererStub.new()
 	_mr.name = "MapRendererStub"
-	_mr.add_to_group("map_renderer")
 	root.add_child(_mr)
+	_mr.add_to_group("map_renderer")
 
 
 func _make_overlay(gs: GDScript) -> Node2D:

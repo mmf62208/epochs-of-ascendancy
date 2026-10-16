@@ -104,14 +104,14 @@ func _boot() -> bool:
 		mm.call("initialize_from_map_data", map_data)
 	if mm.has_method("rebuild_pick_grid"):
 		mm.call("rebuild_pick_grid")
-	var existing: Node = root.get_first_node_in_group("map_renderer")
+	var existing: Node = get_first_node_in_group("map_renderer")
 	if existing != null:
 		_mr = existing
 	else:
 		_mr = MapRendererStub.new()
 		_mr.name = "MapRendererStub"
-		_mr.add_to_group("map_renderer")
 		root.add_child(_mr)
+		_mr.add_to_group("map_renderer")
 	var ol_script: GDScript = load(SRC_OL) as GDScript
 	_ol = ol_script.new() as Node2D
 	root.add_child(_ol)
