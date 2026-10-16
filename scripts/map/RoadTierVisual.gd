@@ -2309,18 +2309,12 @@ static func _hwy3_drop_near_parallel(cands: Array, cents: Dictionary) -> Diction
 	var dropped: int = 0
 	for c2_v in ranked:
 		var c2: Dictionary = c2_v
-		var protect: bool = (
-			bool(c2.get("span_core", false))
-			or bool(c2.get("sector_keep", false))
-			or bool(c2.get("peri_keep", false))
-		)
 		var is_par: bool = false
-		if not protect:
-			for k_v in kept:
-				var krow: Dictionary = k_v
-				if _hwy3_routes_near_parallel(c2, krow, cents):
-					is_par = true
-					break
+		for k_v in kept:
+			var krow: Dictionary = k_v
+			if _hwy3_routes_near_parallel(c2, krow, cents):
+				is_par = true
+				break
 		if is_par:
 			dropped += 1
 			continue
@@ -3532,7 +3526,7 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 				if _hwy3_routes_near_parallel(cand_r, ke2_v as Dictionary, centroids):
 					par_k = true
 					break
-			if par_k:
+			if par_k and not bool(hperi.get("periphery_primary", false)):
 				continue
 			if best_rest.is_empty() or int(cand_r.get("kind", 0)) > int(best_rest.get("kind", 0)):
 				best_rest = cand_r
@@ -3611,7 +3605,7 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 				if _hwy3_routes_near_parallel(cand_o, ke3_v as Dictionary, centroids):
 					par_o = true
 					break
-			if par_o:
+			if par_o and not bool(horph.get("periphery_primary", false)) and not _hwy3_is_major_city_hub(horph):
 				continue
 			kept_cands.append(cand_o)
 			kept_ends[orph_pid] = true
