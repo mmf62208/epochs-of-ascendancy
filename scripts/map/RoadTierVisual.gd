@@ -1655,6 +1655,84 @@ static func _hwy3_pair_is_dropped_second_sector(
 	return _hwy3_sectors_apart(_hwy3_bearing(cap_c, first_c), _hwy3_bearing(cap_c, other_c))
 
 
+static func _hwy3_path_touches_dropped_second_sector(
+	pids_any: Variant,
+	tag: String,
+	second_by_tag: Dictionary,
+	sector2_by_tag: Dictionary,
+	rec_by_pid: Dictionary,
+	hubs_by_tag: Dictionary
+) -> bool:
+	if not _hwy3_drop_second_sector():
+		return false
+	var pids: Array = []
+	if typeof(pids_any) == TYPE_PACKED_INT32_ARRAY:
+		var packed: PackedInt32Array = pids_any
+		for i in range(packed.size()):
+			pids.append(int(packed[i]))
+	elif typeof(pids_any) == TYPE_ARRAY:
+		for pv in pids_any:
+			pids.append(int(pv))
+	if pids.size() < 2:
+		return false
+	var tg: String = tag.strip_edges().to_upper()
+	if tg.is_empty():
+		var r0_v: Variant = rec_by_pid.get(int(pids[0]), {})
+		if typeof(r0_v) == TYPE_DICTIONARY:
+			tg = str((r0_v as Dictionary).get("tag", "")).strip_edges().to_upper()
+	if tg.is_empty():
+		return false
+	var hl_v: Variant = hubs_by_tag.get(tg, [])
+	var hl: Array = hl_v if typeof(hl_v) == TYPE_ARRAY else []
+	var cap_n: int = _hwy3_capital_hub_pid(hl)
+	if cap_n <= 0:
+		return false
+	var has_cap: bool = false
+	for pid_c in pids:
+		if int(pid_c) == cap_n:
+			has_cap = true
+			break
+	if not has_cap:
+		return false
+	var sector2_n: int = int(sector2_by_tag.get(tg, 0))
+	if sector2_n > 0:
+		for pid_s in pids:
+			if int(pid_s) == sector2_n:
+				return true
+	var first_n: int = int(second_by_tag.get(tg, 0))
+	if first_n <= 0:
+		return false
+	var cap_v: Variant = rec_by_pid.get(cap_n, {})
+	var first_v: Variant = rec_by_pid.get(first_n, {})
+	if typeof(cap_v) != TYPE_DICTIONARY or typeof(first_v) != TYPE_DICTIONARY:
+		return false
+	var cap_c: Vector2 = (cap_v as Dictionary).get("centroid", Vector2.ZERO)
+	var first_c: Vector2 = (first_v as Dictionary).get("centroid", Vector2.ZERO)
+	if cap_c == Vector2.ZERO or first_c == Vector2.ZERO:
+		return false
+	var first_br: float = _hwy3_bearing(cap_c, first_c)
+	for pid3 in pids:
+		var p3: int = int(pid3)
+		if p3 == cap_n or p3 == first_n:
+			continue
+		var oth_v: Variant = rec_by_pid.get(p3, {})
+		if typeof(oth_v) != TYPE_DICTIONARY:
+			continue
+		var oth: Dictionary = oth_v
+		if (
+			not bool(oth.get("city_hub", false))
+			and not bool(oth.get("capital", false))
+			and int(oth.get("tier", 0)) < 3
+		):
+			continue
+		var oc: Vector2 = oth.get("centroid", Vector2.ZERO)
+		if oc == Vector2.ZERO:
+			continue
+		if _hwy3_sectors_apart(first_br, _hwy3_bearing(cap_c, oc)):
+			return true
+	return false
+
+
 static func _hwy3_second_sector_hub_pid(hubs: Array, cap_pid: int, first_pid: int) -> int:
 	if first_pid <= 0:
 		return 0
@@ -3526,6 +3604,10 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 				failed_spans.append("%d-%d empty_n=%d" % [a2, b2, pids.size()])
 			continue
 		var shape: Dictionary = path_shape_report(pids, centroids, a2, b2, mutant)
+		if _hwy3_path_touches_dropped_second_sector(
+			pids, str(sp.get("tag", "")), second_by_tag, sector2_by_tag, rec_by_pid, hubs_by_tag
+		):
+			continue
 		if not bool(shape.get("ok", false)):
 			var shape_msg: String = (
 				"%d-%d hook=%s zig=%s long=%s n=%d len=%.1f str=%.1f"
@@ -3769,6 +3851,10 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 			a3, b3, tag_sp, second_by_tag, sector2_by_tag, rec_by_pid, hubs_by_tag
 		):
 			continue
+		if _hwy3_path_touches_dropped_second_sector(
+			kc.get("pids", []), tag_sp, second_by_tag, sector2_by_tag, rec_by_pid, hubs_by_tag
+		):
+			continue
 		var commit_hi: int = hi
 		var span_core3: bool = bool(kc.get("span_core", false))
 		var sector_keep3: bool = bool(kc.get("sector_keep", false))
@@ -3886,6 +3972,14 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 		pids5 = _hwy3_maybe_hook_repeat(pids5, mutant)
 		if pids5.size() < 2:
 			continue
+		var cover_tag: String = ""
+		var cover_rec_v: Variant = rec_by_pid.get(best_a, {})
+		if typeof(cover_rec_v) == TYPE_DICTIONARY:
+			cover_tag = str((cover_rec_v as Dictionary).get("tag", "")).strip_edges().to_upper()
+		if _hwy3_path_touches_dropped_second_sector(
+			pids5, cover_tag, second_by_tag, sector2_by_tag, rec_by_pid, hubs_by_tag
+		):
+			continue
 		var shape5: Dictionary = path_shape_report(pids5, centroids, best_a, best_b, mutant)
 		if not bool(shape5.get("ok", false)):
 			continue
@@ -3923,6 +4017,33 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 				marked_verts[int(pids5[pi5b])] = true
 	if mutant != "overlap_ok":
 		used = _hwy3_trim_over_cap(cache, cache_by_key, marked, routes, used, HWY3_BUDGET_CAP)
+	if _hwy3_drop_second_sector():
+		var kept_rt: Array = []
+		for rt_drop_v in routes:
+			if typeof(rt_drop_v) != TYPE_DICTIONARY:
+				continue
+			var rt_drop: Dictionary = rt_drop_v
+			if _hwy3_pair_is_dropped_second_sector(
+				int(rt_drop.get("a", 0)),
+				int(rt_drop.get("b", 0)),
+				str(rt_drop.get("tag", "")),
+				second_by_tag,
+				sector2_by_tag,
+				rec_by_pid,
+				hubs_by_tag
+			):
+				continue
+			if _hwy3_path_touches_dropped_second_sector(
+				rt_drop.get("pids", []),
+				str(rt_drop.get("tag", "")),
+				second_by_tag,
+				sector2_by_tag,
+				rec_by_pid,
+				hubs_by_tag
+			):
+				continue
+			kept_rt.append(rt_drop)
+		routes = kept_rt
 	var hub_list: Array = []
 	for h2_v in hubs:
 		var h2: Dictionary = h2_v
