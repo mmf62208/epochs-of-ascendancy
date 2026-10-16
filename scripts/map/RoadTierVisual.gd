@@ -2763,7 +2763,7 @@ static func _hwy3_commit_hub_path(
 	return used
 
 
-static func _hwy3_stamp_last_route(routes: Array, kind: int, score: float) -> void:
+static func _hwy3_stamp_last_route(routes: Array, kind: int, score: float, span_core: bool = false) -> void:
 	if routes.is_empty():
 		return
 	var last_v: Variant = routes[routes.size() - 1]
@@ -2772,6 +2772,7 @@ static func _hwy3_stamp_last_route(routes: Array, kind: int, score: float) -> vo
 	var last: Dictionary = last_v
 	last["kind"] = kind
 	last["score"] = score
+	last["span_core"] = span_core
 
 
 static func _hwy3_count_highways(cache: Array) -> int:
@@ -2840,6 +2841,8 @@ static func _hwy3_trim_over_cap(
 		var rt: Dictionary = routes[ri]
 		var kind: int = int(rt.get("kind", 0))
 		if kind >= HWY3_KIND_TRUNK:
+			continue
+		if bool(rt.get("span_core", false)):
 			continue
 		victims.append({"i": ri, "kind": kind, "score": float(rt.get("score", 0.0)), "a": int(rt.get("a", 0)), "b": int(rt.get("b", 0))})
 	victims.sort_custom(_hwy3_trim_victim_less)
@@ -3569,7 +3572,8 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 		var kind3: int = int(kc.get("kind", 0))
 		var tag_sp: String = str(kc.get("tag", "")).strip_edges().to_upper()
 		var commit_hi: int = hi
-		if kind3 >= HWY3_KIND_TRUNK:
+		var span_core3: bool = bool(kc.get("span_core", false))
+		if kind3 >= HWY3_KIND_TRUNK or span_core3:
 			commit_hi = hi + HWY3_TRUNK_OVERFLOW
 		elif kind3 == HWY3_KIND_SPAN:
 			commit_hi = hi + HWY3_SPAN_OVERFLOW
@@ -3593,11 +3597,13 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 		var shape_v: Variant = kc.get("shape", {})
 		var shape_k: Dictionary = shape_v if typeof(shape_v) == TYPE_DICTIONARY else {}
 		var used_before: int = used
+		var routes_before: int = routes.size()
 		used = _hwy3_commit_hub_path(
 			cache, cache_by_key, graph_by_key, marked, routes, tree_parent,
 			pids_k, a3, b3, shape_k, used, commit_hi
 		)
-		_hwy3_stamp_last_route(routes, kind3, float(kc.get("score", 0.0)))
+		if routes.size() > routes_before:
+			_hwy3_stamp_last_route(routes, kind3, float(kc.get("score", 0.0)), span_core3)
 		if used > used_before:
 			for pi_v in range(pids_k.size()):
 				marked_verts[int(pids_k[pi_v])] = true
