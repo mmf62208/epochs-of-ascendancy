@@ -29868,6 +29868,22 @@ func get_supply_batch_draw_stats() -> Dictionary:
 	return {}
 
 
+func supply_in_view_present_complete() -> bool:
+	if not supply_mode or not _supply_outline_batch_is_ready():
+		return false
+	if not bool(_supply_outline_batch.visible):
+		return false
+	if _supply_outline_batch.has_method("in_view_present_complete"):
+		return bool(_supply_outline_batch.call("in_view_present_complete"))
+	return false
+
+
+func get_supply_present_frame_index() -> int:
+	if _supply_outline_batch_is_ready() and _supply_outline_batch.has_method("get_present_frame_index"):
+		return int(_supply_outline_batch.call("get_present_frame_index"))
+	return 0
+
+
 func get_supply_roles_cache_copy() -> Dictionary:
 	return _supply_roles_cache.duplicate()
 
@@ -30353,9 +30369,7 @@ func _begin_supply_prebuild_hidden_warm() -> void:
 		return
 	if _supply_outline_batch.has_method("begin_hidden_warm"):
 		_supply_outline_batch.call("begin_hidden_warm")
-	if _supply_outline_batch.has_method("request_deferred_gpu_upload"):
-		_supply_outline_batch.call("request_deferred_gpu_upload")
-	_force_supply_ring_gpu_submit()
+	# Do not force_draw or present rings while L is off.
 	_supply_prebuild_warm_frames = 0
 	_supply_prebuild_phase = SUPPLY_PREBUILD_WARM_WAIT
 

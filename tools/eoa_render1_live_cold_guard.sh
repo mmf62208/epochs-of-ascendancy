@@ -119,11 +119,12 @@ p = "$json"
 d = json.load(open(p))
 def f(k):
     return float(d.get(k, -1))
-print("%.6f %.6f %.6f %.6f %.6f %d %d %.6f" % (
+print("%.6f %.6f %.6f %.6f %.6f %d %d %.6f %d" % (
     f("lon_frame2_ms"), f("loff_frame2_ms"), f("delta_ms"),
     f("lon_frame1_ms"), f("loff_frame1_ms"),
     int(d.get("hue_teal_edge", 0)), int(d.get("hue_olive_edge", 0)),
     f("hue_teal_share"),
+    int(d.get("lon_complete_frame", 0)),
 ))
 print("%.6f" % f("width_proxy"))
 PY
@@ -188,7 +189,8 @@ while [ "$run" -le 3 ]; do
   A_TEAL="$(echo "$a_line1" | awk '{print $6}')"
   A_OLIVE="$(echo "$a_line1" | awk '{print $7}')"
   A_SHARE="$(echo "$a_line1" | awk '{print $8}')"
-  echo "same_run A L-on_frame1=$A_LON1 L-on_frame2=$A_LON L-off_frame1=$A_LOFF1 L-off_frame2=$A_LOFF delta=$A_DELTA teal_share=$A_SHARE loadavg=$(loadavg)"
+  A_COMPLETE="$(echo "$a_line1" | awk '{print $9}')"
+  echo "same_run A L-on_frame1=$A_LON1 L-on_frame2=$A_LON complete_frame=$A_COMPLETE L-off_frame1=$A_LOFF1 L-off_frame2=$A_LOFF delta=$A_DELTA teal_share=$A_SHARE loadavg=$(loadavg)"
 
   echo "EOA_RENDER1_LIVE_COLD who=B.run=$run"
   set +e
@@ -216,9 +218,10 @@ while [ "$run" -le 3 ]; do
   B_DELTA="$(echo "$b_line1" | awk '{print $3}')"
   B_LON1="$(echo "$b_line1" | awk '{print $4}')"
   B_LOFF1="$(echo "$b_line1" | awk '{print $5}')"
+  B_COMPLETE="$(echo "$b_line1" | awk '{print $9}')"
   BA="$(python3 -c "a=float('$A_LON'); b=float('$B_LON'); print('%.6f' % (b/a if a>0 else 0))")"
-  echo "same_run B L-on_frame1=$B_LON1 L-on_frame2=$B_LON L-off_frame1=$B_LOFF1 L-off_frame2=$B_LOFF delta=$B_DELTA"
-  echo "same_run run=$run A_lon2=$A_LON A_loff2=$A_LOFF A_delta=$A_DELTA B_lon2=$B_LON B_loff2=$B_LOFF B_delta=$B_DELTA B/A=$BA loadavg=$(loadavg)"
+  echo "same_run B L-on_frame1=$B_LON1 L-on_complete=$B_LON complete_frame=$B_COMPLETE L-off_frame1=$B_LOFF1 L-off_frame2=$B_LOFF delta=$B_DELTA"
+  echo "same_run run=$run A_lon2=$A_LON A_loff2=$A_LOFF A_delta=$A_DELTA B_lon2=$B_LON B_loff2=$B_LOFF B_delta=$B_DELTA B/A=$BA B_complete_frame=$B_COMPLETE loadavg=$(loadavg)"
   set +e
   python3 - <<PY
 a_lon=float("$A_LON"); b_lon=float("$B_LON"); b_delta=float("$B_DELTA"); ba=float("$BA")

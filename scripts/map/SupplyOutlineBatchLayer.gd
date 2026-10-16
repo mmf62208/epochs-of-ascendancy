@@ -80,11 +80,17 @@ var _last_idle_step_ms: float = 0.0
 var _idle_total_ms: float = 0.0
 var _idle_warm_saved_modulate: Color = Color.WHITE
 var _idle_warmed: bool = false
-## First L-on present after hide submits a budget of meshes; the rest
-## queue_redraw onto the next frame so upload/submit is not one hitch.
+## First L-on present after hide may budget new meshes. Godot _draw replaces
+## the canvas item, so already-accepted keys must be re-submitted every frame
+## or they vanish. Remaining in-view keys drain by PRESENT_DRAIN_MAX_FRAMES.
 const FIRST_PRESENT_MESH_BUDGET := 32
-var _split_present_pending: bool = true
+const PRESENT_DRAIN_MAX_FRAMES := 3
+var _split_present_pending: bool = false
 var _present_deferred_keys: PackedStringArray = PackedStringArray()
+var _present_accepted_keys: Dictionary = {}
+var _present_frame_i: int = 0
+var _last_drawn_chunk_keys: PackedStringArray = PackedStringArray()
+var _last_in_view_chunk_keys: PackedStringArray = PackedStringArray()
 var _gpu_upload_in_progress: bool = false
 ## Product default 1.0. Line2D AA on 5df8e7fc reads thicker at the same style
 ## width; raise this (e.g. 1.35) to match visual weight without changing roles.
@@ -118,6 +124,7 @@ func _clear_state() -> void:
 	_idle_chunk_keys = PackedStringArray()
 	_idle_chunk_at = 0
 	_idle_phase = IDLE_PREBUILD_NONE
+	_reset_present_split(false)
 
 
 func set_width_scale(scale: float) -> void:
@@ -150,6 +157,7 @@ func set_items(items: Array[Dictionary]) -> void:
 	_last_mesh_build_ms = float(Time.get_ticks_usec() - t0) / 1000.0
 	_idle_phase = IDLE_PREBUILD_DONE
 	_idle_warmed = false
+	_reset_present_split(false)
 	queue_redraw()
 
 
@@ -197,18 +205,18 @@ func begin_hidden_warm() -> void:
 		_idle_phase = IDLE_PREBUILD_DONE
 		return
 	_idle_warm_saved_modulate = modulate
-	# a=0 is culled; a real first submit is required so GPU upload is not on L.
-	modulate = Color.WHITE
-	visible = true
-	queue_redraw()
+	# Never present rings while L is off (idle hitch + pre-L flash).
+	# CPU meshes are already built; GPU upload lands on the first L-on present.
+	modulate = Color(1.0, 1.0, 1.0, 0.0)
+	visible = false
 	_idle_phase = IDLE_PREBUILD_WARM
 
 
 func step_hidden_warm() -> void:
 	if _idle_phase != IDLE_PREBUILD_WARM:
 		return
-	visible = true
-	queue_redraw()
+	visible = false
+	modulate = Color(1.0, 1.0, 1.0, 0.0)
 
 
 func finish_hidden_warm() -> void:
@@ -220,13 +228,11 @@ func finish_hidden_warm() -> void:
 	_idle_warmed = true
 	_last_mesh_build_ms = 0.0
 	_idle_phase = IDLE_PREBUILD_DONE
-	_split_present_pending = true
-	_present_deferred_keys = PackedStringArray()
+	_reset_present_split(true)
 
 
 func mark_hidden_for_split_present() -> void:
-	_split_present_pending = true
-	_present_deferred_keys = PackedStringArray()
+	_reset_present_split(true)
 
 
 func request_deferred_gpu_upload() -> void:
@@ -234,26 +240,26 @@ func request_deferred_gpu_upload() -> void:
 
 
 func upload_meshes_now() -> void:
-	# Idle / pre-L path. force_draw is deferred so it is not inside the 8 ms
-	# MapRenderer idle slice. Uploads every chunk at the current LOD.
+	# Idle / pre-L path. Do not force_draw a visible present while L is off
+	# (~80 ms hitch + pre-L flash). CPU ArrayMeshes are already built.
 	if _item_count <= 0 or _chunks.is_empty():
 		_idle_warmed = true
 		return
-	var was_visible := visible
-	var saved_mod := modulate
-	_gpu_upload_in_progress = true
-	_split_present_pending = false
-	_present_deferred_keys = PackedStringArray()
-	visible = true
-	modulate = Color.WHITE
-	queue_redraw()
-	RenderingServer.force_draw()
 	_gpu_upload_in_progress = false
 	_idle_warmed = true
-	visible = was_visible
-	modulate = saved_mod
-	_split_present_pending = not was_visible
+	visible = false
+	modulate = _idle_warm_saved_modulate
+	_reset_present_split(true)
 	_last_mesh_build_ms = 0.0
+
+
+func _reset_present_split(pending: bool) -> void:
+	_split_present_pending = pending
+	_present_deferred_keys = PackedStringArray()
+	_present_accepted_keys.clear()
+	_present_frame_i = 0
+	_last_drawn_chunk_keys = PackedStringArray()
+	_last_in_view_chunk_keys = PackedStringArray()
 
 
 func is_idle_prebuild_ready() -> bool:
@@ -516,7 +522,42 @@ func get_last_draw_stats() -> Dictionary:
 		"built_indices": _built_index_count,
 		"rebuilds": _mesh_rebuild_count,
 		"chunk_n": _chunks.size(),
+		"present_complete": in_view_present_complete(),
+		"present_frame": _present_frame_i,
+		"in_view_chunks": _last_in_view_chunk_keys.size(),
+		"drawn_chunks": _last_drawn_chunk_keys.size(),
 	}
+
+
+func get_in_view_chunk_keys() -> PackedStringArray:
+	return _collect_in_view_chunk_keys()
+
+
+func get_last_drawn_chunk_keys() -> PackedStringArray:
+	return _last_drawn_chunk_keys.duplicate()
+
+
+func get_present_frame_index() -> int:
+	return _present_frame_i
+
+
+func in_view_present_complete() -> bool:
+	if not visible:
+		return false
+	var in_view := _last_in_view_chunk_keys
+	if in_view.is_empty():
+		in_view = _collect_in_view_chunk_keys()
+	if in_view.is_empty():
+		return _item_count <= 0 or _chunks.is_empty()
+	if _last_drawn_chunk_keys.size() != in_view.size():
+		return false
+	var drawn: Dictionary = {}
+	for key in _last_drawn_chunk_keys:
+		drawn[str(key)] = true
+	for key2 in in_view:
+		if not drawn.has(str(key2)):
+			return false
+	return true
 
 
 func get_last_drawn_meshes() -> Array:
@@ -551,6 +592,75 @@ func get_roles_in_meshes() -> Dictionary:
 	return roles
 
 
+func _collect_in_view_chunk_keys() -> PackedStringArray:
+	var keys: PackedStringArray = PackedStringArray()
+	var cull := _lod_level == LOD_FULL and _view_rect_valid
+	for key_var in _chunks.keys():
+		var key := str(key_var)
+		var ch: Dictionary = _chunks[key]
+		if cull:
+			var aabb: Rect2 = ch.get("aabb", Rect2()) as Rect2
+			if not aabb.intersects(_view_rect):
+				continue
+		keys.append(key)
+	return keys
+
+
+func _chunk_mesh_count(key: String) -> int:
+	if not _chunks.has(key):
+		return 0
+	var ch: Dictionary = _chunks[key]
+	var n := 0
+	if ch.get("mesh_glow", null) != null:
+		n += 1
+	if ch.get("mesh_core", null) != null:
+		n += 1
+	return n
+
+
+func _never_drain_mutant() -> bool:
+	return OS.get_environment("EOA_RENDER1_PRESENT_MUTANT").strip_edges() == "never_drain"
+
+
+func _keys_for_present(in_view: PackedStringArray) -> PackedStringArray:
+	if not _split_present_pending or _gpu_upload_in_progress:
+		return in_view
+	_present_frame_i += 1
+	var never_drain := _never_drain_mutant()
+	if never_drain:
+		# Broken FIX #6 path: only this frame's budget, drop the rest.
+		return _take_new_keys_by_mesh_budget(in_view, FIRST_PRESENT_MESH_BUDGET, false)
+	if _present_frame_i >= 2:
+		# Frames 2–3: all in-view. Re-submit accepted so _draw does not drop them.
+		return in_view
+	return _take_new_keys_by_mesh_budget(in_view, FIRST_PRESENT_MESH_BUDGET, true)
+
+
+func _take_new_keys_by_mesh_budget(
+	in_view: PackedStringArray, mesh_budget: int, include_accepted: bool
+) -> PackedStringArray:
+	var out: PackedStringArray = PackedStringArray()
+	var submitted := 0
+	for key in in_view:
+		var accepted := _present_accepted_keys.has(key)
+		if accepted:
+			if include_accepted:
+				out.append(key)
+			continue
+		if submitted >= mesh_budget:
+			_present_deferred_keys.append(key)
+			continue
+		var add := _chunk_mesh_count(key)
+		if add <= 0:
+			continue
+		if submitted + add > mesh_budget and submitted > 0:
+			_present_deferred_keys.append(key)
+			continue
+		out.append(key)
+		submitted += add
+	return out
+
+
 func _draw() -> void:
 	_last_draw_usec = Time.get_ticks_usec()
 	_last_mesh_calls = 0
@@ -559,19 +669,12 @@ func _draw() -> void:
 	_last_drawn_vertex_count = 0
 	_last_drawn_index_count = 0
 	_last_drawn_meshes.clear()
-	_last_culled_chunks = 0
-	var cull := _lod_level == LOD_FULL and _view_rect_valid
-	var keys: PackedStringArray = PackedStringArray()
-	if not _present_deferred_keys.is_empty():
-		keys = _present_deferred_keys
-		_present_deferred_keys = PackedStringArray()
-	else:
-		for key_var in _chunks.keys():
-			keys.append(str(key_var))
-	var budget := -1
-	if _split_present_pending and not _gpu_upload_in_progress:
-		budget = FIRST_PRESENT_MESH_BUDGET
-	var submitted := 0
+	_last_drawn_chunk_keys = PackedStringArray()
+	_present_deferred_keys = PackedStringArray()
+	var in_view := _collect_in_view_chunk_keys()
+	_last_in_view_chunk_keys = in_view
+	_last_culled_chunks = maxi(0, _chunks.size() - in_view.size())
+	var keys := _keys_for_present(in_view)
 	var ki := 0
 	while ki < keys.size():
 		var key := keys[ki]
@@ -579,16 +682,6 @@ func _draw() -> void:
 			ki += 1
 			continue
 		var ch: Dictionary = _chunks[key]
-		if cull:
-			var aabb: Rect2 = ch.get("aabb", Rect2()) as Rect2
-			if not aabb.intersects(_view_rect):
-				_last_culled_chunks += 1
-				ki += 1
-				continue
-		if budget >= 0 and submitted >= budget:
-			_present_deferred_keys.append(key)
-			ki += 1
-			continue
 		var glow_mesh: ArrayMesh = ch.get("mesh_glow", null) as ArrayMesh
 		var core_mesh: ArrayMesh = ch.get("mesh_core", null) as ArrayMesh
 		if glow_mesh != null:
@@ -598,7 +691,6 @@ func _draw() -> void:
 				int(ch.get("glow_verts", 0)),
 				int(ch.get("glow_idx", 0)),
 			)
-			submitted += 1
 		if core_mesh != null:
 			_ci_draw_mesh(
 				core_mesh,
@@ -606,12 +698,21 @@ func _draw() -> void:
 				int(ch.get("core_verts", 0)),
 				int(ch.get("core_idx", 0)),
 			)
-			submitted += 1
+		_last_drawn_chunk_keys.append(key)
+		_present_accepted_keys[key] = true
 		ki += 1
-	if not _present_deferred_keys.is_empty():
-		queue_redraw()
-	else:
+	var complete := in_view_present_complete()
+	if complete:
 		_split_present_pending = false
+		_present_deferred_keys = PackedStringArray()
+	elif _split_present_pending:
+		if _present_frame_i < PRESENT_DRAIN_MAX_FRAMES and not _never_drain_mutant():
+			queue_redraw()
+		elif _never_drain_mutant():
+			queue_redraw()
+		else:
+			# Frame 3 safety: submit whatever is left next draw.
+			queue_redraw()
 
 
 func _ci_draw_mesh(mesh: Mesh, mesh_modulate: Color, cached_v: int = 0, cached_i: int = 0) -> void:

@@ -272,6 +272,8 @@ func _test_layer_bars(items: Array[Dictionary]) -> void:
 	var home_stats := await _draw_layer(layer)
 	_check_a(src, home_stats)
 	_check_g(layer, items)
+	await _check_present_drain(layer)
+	await _check_never_drain_mutant(items)
 	var home_built := int(layer.call("get_built_vertex_count")) if layer.has_method("get_built_vertex_count") else 0
 	var home_idx := int(layer.call("get_built_index_count")) if layer.has_method("get_built_index_count") else 0
 	_info("Home built verts=%d idx=%d mesh_calls=%d chunks=%d" % [
@@ -356,7 +358,45 @@ func _check_b(home_built: int, full_built: int, layer: Node, full_rect: Rect2) -
 	layer.call("set_view", CLOSE_Z, full_rect)
 
 
+func _ci_draw_mesh_body_has_live_draw_mesh(src: String) -> bool:
+	# Body only — the signature `func _ci_draw_mesh(` must not count.
+	var needle := "func _ci_draw_mesh"
+	var start := src.find(needle)
+	if start < 0:
+		return false
+	var body_start := src.find("\n", start)
+	if body_start < 0:
+		return false
+	var nxt := src.find("\nfunc ", body_start + 1)
+	var body_len := src.length() - body_start - 1
+	if nxt > body_start:
+		body_len = nxt - body_start - 1
+	var body := src.substr(body_start + 1, body_len)
+	var skip_next := false
+	for raw in body.split("\n"):
+		var line := str(raw)
+		var hash_at := line.find("#")
+		if hash_at >= 0:
+			line = line.substr(0, hash_at)
+		line = line.strip_edges()
+		if line.is_empty():
+			continue
+		if skip_next:
+			skip_next = false
+			continue
+		if line.begins_with("if false"):
+			skip_next = line.ends_with(":")
+			continue
+		if line.find("draw_mesh(") >= 0:
+			return true
+	return false
+
+
 func _check_counter_lie(stats: Dictionary) -> void:
+	var src := FileAccess.get_file_as_string(LAYER_PATH)
+	if not _ci_draw_mesh_body_has_live_draw_mesh(src):
+		_fail("mutant_counter_lie: _ci_draw_mesh body has no live draw_mesh( (comments / if false do not count)")
+		return
 	var mesh_calls := int(stats.get("mesh_calls", 0))
 	var sink_n := int(stats.get("sink_mesh_n", 0))
 	var drawn_v := int(stats.get("drawn_vertices", 0))
@@ -367,7 +407,15 @@ func _check_counter_lie(stats: Dictionary) -> void:
 	elif drawn_v != sink_v or drawn_v <= 0:
 		_fail("mutant_counter_lie: drawn_verts=%d sink_verts=%d" % [drawn_v, sink_v])
 	else:
-		_pass("mutant_counter_lie wrapper: counters match sink verts=%d calls=%d" % [drawn_v, mesh_calls])
+		_pass("mutant_counter_lie: live draw_mesh( in _ci_draw_mesh body; counters match sink verts=%d calls=%d" % [drawn_v, mesh_calls])
+	var mutant_src := src.replace(
+		"draw_mesh(mesh, null, Transform2D(), mesh_modulate)",
+		"pass # counter_lie mutant: draw_mesh removed",
+	)
+	if _ci_draw_mesh_body_has_live_draw_mesh(mutant_src):
+		_fail("mutant_counter_lie source-edit still has live draw_mesh( — scanner matched the header")
+	else:
+		_pass("mutant_counter_lie source-edit: stripping draw_mesh fails the headless live-submit scan")
 
 
 func _check_independent_draw(layer: Node, stats: Dictionary) -> void:
@@ -392,9 +440,14 @@ func _check_independent_draw(layer: Node, stats: Dictionary) -> void:
 		"independent_draw_info off=%s on=%s delta draws=%d prims=%d vis=%d canvas=%d mesh_calls=%d display=%s"
 		% [str(off), str(on_s), d_draws, d_prims, d_vis, d_can, mesh_calls, DisplayServer.get_name()]
 	)
-	# No grep fallback. Dummy/headless reports 0 — windowed gate owns the kill.
+	# Dummy/headless reports 0. The live `draw_mesh(` body scan kills counter_lie
+	# here so a source-edit that strips draw_mesh FAILS this test again.
 	if DisplayServer.get_name() == "headless":
-		_info("independent_draw_info: dummy/headless delta=0; tools/eoa_render1_draw_guard.sh owns counter_lie")
+		var src := FileAccess.get_file_as_string(LAYER_PATH)
+		if not _ci_draw_mesh_body_has_live_draw_mesh(src):
+			_fail("independent_draw_info / mutant_counter_lie: no live draw_mesh( in _ci_draw_mesh body")
+		else:
+			_pass("independent_draw_info killed mutant_counter_lie: live draw_mesh( in _ci_draw_mesh body (dummy delta=0)")
 		return
 	if engine_delta <= 0 or mesh_calls <= 0 or engine_delta < mesh_calls:
 		_fail(
@@ -490,6 +543,109 @@ func _check_skip(layer: Node) -> void:
 	else:
 		_pass("mutant_skip_ignored killed: vis %d→%d built %d→%d" % [before_vis, after_vis, before_built, after_built])
 	layer.call("set_skip_pids", {})
+
+
+func _chunk_key_set(keys_var: Variant) -> Dictionary:
+	var out: Dictionary = {}
+	if typeof(keys_var) == TYPE_PACKED_STRING_ARRAY:
+		for key in keys_var as PackedStringArray:
+			out[str(key)] = true
+	elif typeof(keys_var) == TYPE_ARRAY:
+		for key_var in keys_var as Array:
+			out[str(key_var)] = true
+	return out
+
+
+func _sets_equal(a: Dictionary, b: Dictionary) -> bool:
+	if a.size() != b.size():
+		return false
+	for k in a.keys():
+		if not b.has(k):
+			return false
+	return true
+
+
+func _check_present_drain(layer: Node) -> void:
+	if not layer.has_method("mark_hidden_for_split_present") or not layer.has_method("in_view_present_complete"):
+		_fail("present drain: layer missing in-view present API")
+		return
+	layer.visible = false
+	layer.call("mark_hidden_for_split_present")
+	layer.visible = true
+	if layer is CanvasItem:
+		(layer as CanvasItem).queue_redraw()
+	var frames := 0
+	var complete := false
+	var drawn: Dictionary = {}
+	var view: Dictionary = {}
+	while frames < 3:
+		await process_frame
+		frames += 1
+		if layer.has_method("get_last_drawn_chunk_keys"):
+			drawn = _chunk_key_set(layer.call("get_last_drawn_chunk_keys"))
+		if layer.has_method("get_in_view_chunk_keys"):
+			view = _chunk_key_set(layer.call("get_in_view_chunk_keys"))
+		complete = bool(layer.call("in_view_present_complete")) and _sets_equal(drawn, view)
+		if complete:
+			break
+	if not complete or not _sets_equal(drawn, view) or view.is_empty():
+		_fail(
+			"present drain: drawn mesh set != built chunk set in view after %d frames drawn=%d view=%d"
+			% [frames, drawn.size(), view.size()]
+		)
+	else:
+		_pass("present drain: drawn == in-view built set after %d frames n=%d" % [frames, view.size()])
+
+
+func _check_never_drain_mutant(items: Array[Dictionary]) -> void:
+	var src := FileAccess.get_file_as_string(LAYER_PATH)
+	var seam := 'OS.get_environment("EOA_RENDER1_PRESENT_MUTANT").strip_edges() == "never_drain"'
+	if src.find(seam) < 0:
+		_fail("never_drain mutant: product has no PRESENT_MUTANT drain seam")
+		return
+	var mutant := src.replace(seam, "true")
+	var gs := GDScript.new()
+	gs.source_code = mutant
+	if gs.reload() != OK:
+		_fail("never_drain mutant: failed to reload")
+		return
+	var layer: Node2D = gs.new() as Node2D
+	if layer == null:
+		_fail("never_drain mutant: could not instance")
+		return
+	root.add_child(layer)
+	var full_rect := Rect2(-2000, -2000, 8000, 4000)
+	layer.visible = false
+	layer.call("set_view", HOME_Z, full_rect)
+	layer.call("set_items", items)
+	if layer.has_method("mark_hidden_for_split_present"):
+		layer.call("mark_hidden_for_split_present")
+	layer.visible = true
+	layer.queue_redraw()
+	var frames := 0
+	while frames < 3:
+		await process_frame
+		frames += 1
+	var drawn: Dictionary = {}
+	var view: Dictionary = {}
+	if layer.has_method("get_last_drawn_chunk_keys"):
+		drawn = _chunk_key_set(layer.call("get_last_drawn_chunk_keys"))
+	if layer.has_method("get_in_view_chunk_keys"):
+		view = _chunk_key_set(layer.call("get_in_view_chunk_keys"))
+	var complete := false
+	if layer.has_method("in_view_present_complete"):
+		complete = bool(layer.call("in_view_present_complete"))
+	if complete or _sets_equal(drawn, view):
+		_fail(
+			"never_drain mutant survived: complete=%s drawn=%d view=%d after 3 frames"
+			% [str(complete), drawn.size(), view.size()]
+		)
+	else:
+		_pass(
+			"never_drain mutant killed: drawn=%d < view=%d after 3 frames"
+			% [drawn.size(), view.size()]
+		)
+	layer.queue_free()
 
 
 func _check_g(layer: Node, items: Array[Dictionary]) -> void:
@@ -645,9 +801,16 @@ func _test_maprenderer_toggle() -> void:
 	_mr.call("_toggle_supply_overlay")
 	var toggle_ms := float(Time.get_ticks_usec() - t_toggle) / 1000.0
 	var t_frame := Time.get_ticks_usec()
-	await process_frame
-	var first_frame_ms := float(Time.get_ticks_usec() - t_frame) / 1000.0
-	var cold_ms := toggle_ms + first_frame_ms
+	var complete_i := 0
+	var guard := 0
+	while guard < 8:
+		await process_frame
+		guard += 1
+		if _mr.has_method("supply_in_view_present_complete") and bool(_mr.call("supply_in_view_present_complete")):
+			complete_i = guard
+			break
+	var first_complete_ms := float(Time.get_ticks_usec() - t_frame) / 1000.0
+	var cold_ms := toggle_ms + first_complete_ms
 	var vis := 0
 	if _mr.has_method("get_supply_overlay_outline_visible_count"):
 		vis = int(_mr.call("get_supply_overlay_outline_visible_count"))
@@ -655,7 +818,7 @@ func _test_maprenderer_toggle() -> void:
 	if _mr.has_method("get_last_supply_toggle_profile"):
 		profile = _mr.call("get_last_supply_toggle_profile") as Dictionary
 	_info(
-		"cold_first sm=%.3f refresh=%.3f batch=%.3f legend=%.3f sync=%.3f toggle=%.3f first_frame=%.3f frame_total=%.3f vis=%d prebuild=%.3f"
+		"cold_first sm=%.3f refresh=%.3f batch=%.3f legend=%.3f sync=%.3f toggle=%.3f complete_frame=%.3f complete_i=%d frame_total=%.3f vis=%d prebuild=%.3f"
 		% [
 			float(profile.get("sm_toggle_ms", -1.0)),
 			float(profile.get("refresh_highlights_ms", -1.0)),
@@ -663,19 +826,25 @@ func _test_maprenderer_toggle() -> void:
 			float(profile.get("legend_ms", -1.0)),
 			float(profile.get("sync_stack_ms", -1.0)),
 			toggle_ms,
-			first_frame_ms,
+			first_complete_ms,
+			complete_i,
 			cold_ms, vis,
 			float(profile.get("prebuild_total_ms", -1.0)),
 		]
 	)
-	print("cold_raw display=%s ms=%.3f loadavg=%s" % [DisplayServer.get_name(), cold_ms, _loadavg_line()])
+	print(
+		"cold_raw display=%s ms=%.3f complete_frame=%d loadavg=%s"
+		% [DisplayServer.get_name(), cold_ms, complete_i, _loadavg_line()]
+	)
+	if complete_i <= 0 or complete_i > 3:
+		_fail("fixture L-on rings did not complete within 3 frames complete_i=%d" % complete_i)
 	if vis < 3000:
 		_fail("fixture L-on visible=%d want >=3000" % vis)
 	if cold_ms >= MAX_COLD_MS:
 		_fail("fixture L-on %.1f ms (bar %.0f; cold_full_build mutant)" % [cold_ms, MAX_COLD_MS])
 	else:
-		_pass("fixture L-on %.1f ms (toggle=%.1f first_frame=%.1f bar=%.0f)" % [
-			cold_ms, toggle_ms, first_frame_ms, MAX_COLD_MS,
+		_pass("fixture L-on %.1f ms (toggle=%.1f complete_frame=%.1f i=%d bar=%.0f)" % [
+			cold_ms, toggle_ms, first_complete_ms, complete_i, MAX_COLD_MS,
 		])
 		_pass("mutant_cold_full_build killed by fixture L-on %.1f ms" % cold_ms)
 	_check_lon_roles_vs_fresh()

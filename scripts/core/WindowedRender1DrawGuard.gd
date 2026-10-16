@@ -76,6 +76,8 @@ func _run() -> void:
 	var items := _make_items(LAND_N)
 	await _check_counter_lie_source_edit(items)
 	await _check_product_draws(items)
+	await _check_present_drain(items)
+	await _check_never_drain_mutant(items)
 	await _measure_cold_lon()
 
 
@@ -150,6 +152,12 @@ func _check_product_draws(items: Array[Dictionary]) -> void:
 	layer.queue_redraw()
 	await process_frame
 	await process_frame
+	if layer.has_method("in_view_present_complete"):
+		var drain_i := 0
+		while drain_i < 3 and not bool(layer.call("in_view_present_complete")):
+			layer.queue_redraw()
+			await process_frame
+			drain_i += 1
 	var mesh_calls := 0
 	if layer.has_method("get_last_draw_stats"):
 		var st: Dictionary = layer.call("get_last_draw_stats") as Dictionary
@@ -172,6 +180,108 @@ func _check_product_draws(items: Array[Dictionary]) -> void:
 	layer.queue_free()
 
 
+func _chunk_key_set(keys_var: Variant) -> Dictionary:
+	var out: Dictionary = {}
+	if typeof(keys_var) == TYPE_PACKED_STRING_ARRAY:
+		for key in keys_var as PackedStringArray:
+			out[str(key)] = true
+	elif typeof(keys_var) == TYPE_ARRAY:
+		for key_var in keys_var as Array:
+			out[str(key_var)] = true
+	return out
+
+
+func _sets_equal(a: Dictionary, b: Dictionary) -> bool:
+	if a.size() != b.size():
+		return false
+	for k in a.keys():
+		if not b.has(k):
+			return false
+	return true
+
+
+func _check_present_drain(items: Array[Dictionary]) -> void:
+	var scr: Script = load(LAYER_PATH) as Script
+	if scr == null:
+		_fail("present drain: SupplyOutlineBatchLayer.gd missing")
+		return
+	var layer := _spawn_layer(scr, items)
+	if layer == null:
+		_fail("present drain: could not instance layer")
+		return
+	layer.visible = false
+	if layer.has_method("mark_hidden_for_split_present"):
+		layer.call("mark_hidden_for_split_present")
+	layer.visible = true
+	layer.queue_redraw()
+	var frames := 0
+	var complete := false
+	var drawn: Dictionary = {}
+	var view: Dictionary = {}
+	while frames < 3:
+		await process_frame
+		frames += 1
+		if layer.has_method("get_last_drawn_chunk_keys"):
+			drawn = _chunk_key_set(layer.call("get_last_drawn_chunk_keys"))
+		if layer.has_method("get_in_view_chunk_keys"):
+			view = _chunk_key_set(layer.call("get_in_view_chunk_keys"))
+		if layer.has_method("in_view_present_complete"):
+			complete = bool(layer.call("in_view_present_complete")) and _sets_equal(drawn, view)
+		if complete:
+			break
+	if not complete or view.is_empty():
+		_fail(
+			"present drain: drawn mesh set != built chunk set in view after %d frames drawn=%d view=%d"
+			% [frames, drawn.size(), view.size()]
+		)
+	else:
+		_pass("present drain: drawn == in-view built set after %d frames n=%d" % [frames, view.size()])
+	layer.queue_free()
+
+
+func _check_never_drain_mutant(items: Array[Dictionary]) -> void:
+	var src := FileAccess.get_file_as_string(LAYER_PATH)
+	var seam := 'OS.get_environment("EOA_RENDER1_PRESENT_MUTANT").strip_edges() == "never_drain"'
+	if src.find(seam) < 0:
+		_fail("never_drain mutant: product has no PRESENT_MUTANT drain seam")
+		return
+	var mutant := src.replace(seam, "true")
+	var gs := _load_layer_script(mutant)
+	if gs == null:
+		_fail("never_drain mutant: failed to reload")
+		return
+	var layer := _spawn_layer(gs, items)
+	if layer == null:
+		_fail("never_drain mutant: could not instance")
+		return
+	layer.visible = false
+	if layer.has_method("mark_hidden_for_split_present"):
+		layer.call("mark_hidden_for_split_present")
+	layer.visible = true
+	layer.queue_redraw()
+	var frames := 0
+	while frames < 3:
+		await process_frame
+		frames += 1
+	var drawn: Dictionary = {}
+	var view: Dictionary = {}
+	if layer.has_method("get_last_drawn_chunk_keys"):
+		drawn = _chunk_key_set(layer.call("get_last_drawn_chunk_keys"))
+	if layer.has_method("get_in_view_chunk_keys"):
+		view = _chunk_key_set(layer.call("get_in_view_chunk_keys"))
+	var complete := false
+	if layer.has_method("in_view_present_complete"):
+		complete = bool(layer.call("in_view_present_complete"))
+	if complete or _sets_equal(drawn, view):
+		_fail(
+			"never_drain mutant survived: complete=%s drawn=%d view=%d after 3 frames"
+			% [str(complete), drawn.size(), view.size()]
+		)
+	else:
+		_pass("never_drain mutant killed: drawn=%d < view=%d after 3 frames" % [drawn.size(), view.size()])
+	layer.queue_free()
+
+
 func _measure_cold_lon() -> void:
 	if not _setup_renderer():
 		return
@@ -189,16 +299,28 @@ func _measure_cold_lon() -> void:
 	_mr.call("_toggle_supply_overlay")
 	var toggle_ms := float(Time.get_ticks_usec() - t_toggle) / 1000.0
 	var t_frame := Time.get_ticks_usec()
-	await process_frame
-	var first_frame_ms := float(Time.get_ticks_usec() - t_frame) / 1000.0
-	var cold_ms := toggle_ms + first_frame_ms
+	var complete_i := 0
+	var guard := 0
+	while guard < 8:
+		await process_frame
+		guard += 1
+		if _mr.has_method("supply_in_view_present_complete") and bool(_mr.call("supply_in_view_present_complete")):
+			complete_i = guard
+			break
+	var first_complete_ms := float(Time.get_ticks_usec() - t_frame) / 1000.0
+	var cold_ms := toggle_ms + first_complete_ms
 	var vis := 0
 	if _mr.has_method("get_supply_overlay_outline_visible_count"):
 		vis = int(_mr.call("get_supply_overlay_outline_visible_count"))
-	print("cold_raw display=%s ms=%.3f loadavg=%s" % [DisplayServer.get_name(), cold_ms, _loadavg_line()])
-	_info("fixture L-on toggle=%.3f first_frame=%.3f frame_total=%.3f vis=%d" % [
-		toggle_ms, first_frame_ms, cold_ms, vis,
+	print(
+		"cold_raw display=%s ms=%.3f complete_frame=%d loadavg=%s"
+		% [DisplayServer.get_name(), cold_ms, complete_i, _loadavg_line()]
+	)
+	_info("fixture L-on toggle=%.3f complete_frame=%.3f i=%d frame_total=%.3f vis=%d" % [
+		toggle_ms, first_complete_ms, complete_i, cold_ms, vis,
 	])
+	if complete_i <= 0 or complete_i > 3:
+		_fail("windowed fixture L-on rings did not complete within 3 frames i=%d" % complete_i)
 	if vis < 3000:
 		_fail("windowed fixture L-on visible=%d want >=3000" % vis)
 	if cold_ms >= MAX_COLD_MS:

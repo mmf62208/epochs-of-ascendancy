@@ -24,6 +24,8 @@ var _got_frame1: bool = false
 var _got_frame2: bool = false
 var _frame1_ms: float = -1.0
 var _frame2_ms: float = -1.0
+var _presented_n: int = 0
+var _complete_frame_i: int = 0
 var _loff_frame1_ms: float = -1.0
 var _loff_frame2_ms: float = -1.0
 var _t0_usec: int = 0
@@ -200,11 +202,29 @@ func _on_frame_post_draw() -> void:
 		if not _got_frame1 and presented:
 			_got_frame1 = true
 			_frame1_ms = ms
+			_presented_n = 1
+			if _measure_a:
+				return
+			if _overlay_complete(mr):
+				_got_frame2 = true
+				_frame2_ms = ms
+				_complete_frame_i = _read_complete_frame(mr, 1)
+				_armed = false
 			return
 		if _got_frame1 and not _got_frame2:
-			_got_frame2 = true
-			_frame2_ms = ms
-			_armed = false
+			if presented:
+				_presented_n += 1
+			if _measure_a:
+				_got_frame2 = true
+				_frame2_ms = ms
+				_complete_frame_i = 2
+				_armed = false
+				return
+			if _overlay_complete(mr):
+				_got_frame2 = true
+				_frame2_ms = ms
+				_complete_frame_i = _read_complete_frame(mr, _presented_n)
+				_armed = false
 		return
 	if _phase == "loff":
 		# Wait until the overlay is actually hidden, then the next two
@@ -226,6 +246,24 @@ func _mesh_calls(mr: Node) -> int:
 		var st: Dictionary = mr.call("get_supply_batch_draw_stats") as Dictionary
 		return int(st.get("mesh_calls", 0))
 	return 0
+
+
+func _read_complete_frame(mr: Node, fallback: int) -> int:
+	if mr != null and mr.has_method("get_supply_present_frame_index"):
+		var pi := int(mr.call("get_supply_present_frame_index"))
+		if pi > 0:
+			return pi
+	return maxi(fallback, 1)
+
+
+func _overlay_complete(mr: Node) -> bool:
+	# First frame with ALL in-view rings drawn. A's polyline path has no
+	# mesh API — first present is the complete set.
+	if not bool(mr.get("supply_mode")):
+		return false
+	if mr.has_method("supply_in_view_present_complete"):
+		return bool(mr.call("supply_in_view_present_complete"))
+	return _overlay_presented(mr)
 
 
 func _overlay_presented(mr: Node) -> bool:
@@ -297,6 +335,8 @@ func _measure_lon(mr: Node) -> void:
 	_got_frame2 = false
 	_frame1_ms = -1.0
 	_frame2_ms = -1.0
+	_presented_n = 0
+	_complete_frame_i = 0
 	_t0_before_press = _read_lon_t0(mr)
 	_t0_usec = 0
 	_phase = "lon"
@@ -317,14 +357,16 @@ func _measure_lon(mr: Node) -> void:
 	if not _measure_a and _t0_usec <= _t0_before_press:
 		_fail("KEY_L t0 missing (MapRenderer._input did not stamp a new t0)")
 	_info(
-		"live L-on frame1=%.3f frame2=%.3f presented=%s mesh=%d vis=%d"
+		"live L-on frame1=%.3f complete=%.3f complete_frame=%d presented=%s mesh=%d vis=%d"
 		% [
-			_frame1_ms, _frame2_ms, str(_overlay_presented(mr)), _mesh_calls(mr),
-			_count_visible_supply_outlines(mr),
+			_frame1_ms, _frame2_ms, _complete_frame_i, str(_overlay_presented(mr)),
+			_mesh_calls(mr), _count_visible_supply_outlines(mr),
 		]
 	)
 	if _frame1_ms < 0.0 or _frame2_ms < 0.0:
-		_fail("live L-on did not present rings frame1=%.3f frame2=%.3f" % [_frame1_ms, _frame2_ms])
+		_fail("live L-on did not present rings frame1=%.3f complete=%.3f" % [_frame1_ms, _frame2_ms])
+	elif not _measure_a and (_complete_frame_i <= 0 or _complete_frame_i > 3):
+		_fail("live L-on rings did not complete within 3 presented frames i=%d" % _complete_frame_i)
 
 
 func _measure_loff(mr: Node) -> void:
@@ -370,12 +412,12 @@ func _check_bars() -> void:
 	if a_ms > 0.0:
 		ba = _frame2_ms / a_ms
 	print(
-		"live_boot L-on_frame1=%.3f L-on_frame2=%.3f L-off_frame1=%.3f L-off_frame2=%.3f delta=%.3f B/A=%.3f A_frame2=%.3f"
-		% [_frame1_ms, _frame2_ms, _loff_frame1_ms, _loff_frame2_ms, delta, ba, a_ms]
+		"live_boot L-on_frame1=%.3f L-on_complete=%.3f complete_frame=%d L-off_frame1=%.3f L-off_frame2=%.3f delta=%.3f B/A=%.3f A_frame2=%.3f"
+		% [_frame1_ms, _frame2_ms, _complete_frame_i, _loff_frame1_ms, _loff_frame2_ms, delta, ba, a_ms]
 	)
 	print(
-		"same_run_raw who=%s L-on_frame2=%.3f L-off_frame2=%.3f delta=%.3f"
-		% ["A" if _measure_a else "B", _frame2_ms, _loff_frame2_ms, delta]
+		"same_run_raw who=%s L-on_complete=%.3f complete_frame=%d L-off_frame2=%.3f delta=%.3f"
+		% ["A" if _measure_a else "B", _frame2_ms, _complete_frame_i, _loff_frame2_ms, delta]
 	)
 	if _measure_a:
 		_pass("MEASURE_A recorded L-on_frame2=%.3f L-off_frame2=%.3f Δ=%.3f (no B/A bar)" % [
@@ -383,9 +425,12 @@ func _check_bars() -> void:
 		])
 		return
 	if delta > MAX_DELTA_MS:
-		_fail("Δ(L-on − L-off frame2)=%.1f ms > %.0f" % [delta, MAX_DELTA_MS])
+		_fail("Δ(L-on complete − L-off frame2)=%.1f ms > %.0f" % [delta, MAX_DELTA_MS])
 	else:
-		_pass("Δ(L-on − L-off frame2)=%.1f ms (bar %.0f; Ship measures B Δ 129–254)" % [delta, MAX_DELTA_MS])
+		_pass(
+			"Δ(L-on complete − L-off frame2)=%.1f ms complete_frame=%d (bar %.0f; Ship frame2 182–245)"
+			% [delta, _complete_frame_i, MAX_DELTA_MS]
+		)
 	if a_ms <= 0.0:
 		_info("B/A skipped in-process: same-run A frame2 not passed via env (wrapper computes it)")
 		return
@@ -594,6 +639,7 @@ func _write_run_json() -> void:
 		"measure_a": _measure_a,
 		"lon_frame1_ms": _frame1_ms,
 		"lon_frame2_ms": _frame2_ms,
+		"lon_complete_frame": _complete_frame_i,
 		"loff_frame1_ms": _loff_frame1_ms,
 		"loff_frame2_ms": _loff_frame2_ms,
 		"delta_ms": _frame2_ms - _loff_frame2_ms,
