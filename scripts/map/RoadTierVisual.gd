@@ -2310,11 +2310,12 @@ static func _hwy3_drop_near_parallel(cands: Array, cents: Dictionary) -> Diction
 	for c2_v in ranked:
 		var c2: Dictionary = c2_v
 		var is_par: bool = false
-		for k_v in kept:
-			var krow: Dictionary = k_v
-			if _hwy3_routes_near_parallel(c2, krow, cents):
-				is_par = true
-				break
+		if not bool(c2.get("peri_keep", false)):
+			for k_v in kept:
+				var krow: Dictionary = k_v
+				if _hwy3_routes_near_parallel(c2, krow, cents):
+					is_par = true
+					break
 		if is_par:
 			dropped += 1
 			continue
@@ -3280,19 +3281,22 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 			):
 				kind = HWY3_KIND_SPAN
 				sector_keep = true
-			if HWY3_MAJOR_TAGS.has(tag_ab):
-				var peri_pid: int = 0
-				if bool(ra.get("periphery_primary", false)):
-					peri_pid = a
-				elif bool(rb.get("periphery_primary", false)):
-					peri_pid = b
-				if peri_pid > 0:
-					var attach_keep: int = _hwy3_nearest_city_hub(hl_ab, Vector2i(peri_pid, peri_pid))
-					if attach_keep <= 0:
-						attach_keep = _hwy3_farthest_city_hub(hl_ab, peri_pid)
-					if attach_keep > 0 and (
-						(a == peri_pid and b == attach_keep) or (b == peri_pid and a == attach_keep)
-					):
+			if HWY3_MAJOR_TAGS.has(tag_ab) and second_n > 0:
+				var city_rec: Dictionary = {}
+				var city_pid: int = 0
+				if a == second_n and _hwy3_is_major_city_hub(rb):
+					city_rec = rb
+					city_pid = b
+				elif b == second_n and _hwy3_is_major_city_hub(ra):
+					city_rec = ra
+					city_pid = a
+				if city_pid > 0 and cap_n > 0:
+					var cap_keep_v: Variant = rec_by_pid.get(cap_n, {})
+					var cap_keep_rec: Dictionary = cap_keep_v if typeof(cap_keep_v) == TYPE_DICTIONARY else {}
+					var d_city: float = cap_keep_rec.get("centroid", Vector2.ZERO).distance_to(
+						city_rec.get("centroid", Vector2.ZERO)
+					)
+					if is_finite(d_city) and d_city >= HWY3_TRUNK_MIN_DIST * 2.5:
 						peri_keep = true
 						if kind < HWY3_KIND_SPAN:
 							kind = HWY3_KIND_SPAN
