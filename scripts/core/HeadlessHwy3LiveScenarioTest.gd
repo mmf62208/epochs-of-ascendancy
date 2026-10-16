@@ -594,9 +594,16 @@ func _test_rome_north_source_mutant() -> void:
 		_fail("rome-north source mutant: expected one second-sector assign, got %d" % src.count(needle))
 		return
 	var mutated: String = src.replace(needle, "var second: int = 0")
-	mutated = mutated.replace(
-		"class_name RoadTierVisual\n",
-		"class_name RoadTierVisualMutant\nstatic func hwy3_fix5_mutant_token() -> String:\n	return \"second_zero\"\n"
+	mutated = mutated.replace("class_name RoadTierVisual\n", "")
+	var inject_at: int = mutated.find("extends RefCounted\n")
+	if inject_at < 0:
+		_fail("rome-north source mutant: extends RefCounted missing")
+		return
+	inject_at += String("extends RefCounted\n").length()
+	mutated = (
+		mutated.substr(0, inject_at)
+		+ "static func hwy3_fix5_mutant_token() -> String:\n	return \"second_zero\"\n"
+		+ mutated.substr(inject_at)
 	)
 	var gs := GDScript.new()
 	gs.source_code = mutated
