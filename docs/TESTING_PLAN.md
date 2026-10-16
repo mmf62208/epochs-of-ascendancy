@@ -775,6 +775,27 @@ Same-run 3/3 PASS (xvfb llvmpipe, load 1.5–2.1; not product Play / not Ship GP
 
 Hue B **0.8045** vs same-run A **0.8190** (ring-edge share). Fixture L-on ×5 **50.500 / 53.246 / 51.041 / 50.367 / 51.560** ms at load **1.49 / 1.41 / 1.35 / 1.29 / 1.25** (≤200; bar 250). `allow_without_overlay` killed by behaviour: pids 710240–710247 pre=`engineers_recommended` fresh=empty mismatch=8 (flag deleted). `lon_semantics_off` mismatch=160. Tip n=208 hub 48 + engineers 160. Seed ×3 `20fe9063de285f19d4f9b8a105abfd31`. `--quick` 14 reds. map_qc NE **0.9853**. `width_scale` default 1.0. Stay DRAFT / HOLD.
 
+**FIX #7 (drain in-view rings + honest complete-frame timing):** Ship g101g: `FIRST_PRESENT_MESH_BUDGET=32` only redrew the deferred slice, so Godot `_draw` dropped already-submitted rings (teal 0.04 vs A's 0.57 over Köln; `WindowedRender1DrawGuard` mesh_calls=32 want ≥300). Idle `upload_meshes_now()` `force_draw()` with the layer visible while L was off (~80 ms hitch + pre-L flash). Headless `counter_lie` survived on `38d66d92`.
+
+Fix:
+
+- Product `_keys_for_present` submits the **full in-view set** on the first L-on `_draw` (Godot replaces the canvas item). `FIRST_PRESENT_MESH_BUDGET` remains only for mutant `never_drain`. Assert: within 3 presented frames after L, drawn mesh set == built chunk set in view. `never_drain` (budget-only, no accumulate) → FAIL.
+- Timing is real KEY_L → `frame_post_draw` of the first frame with **all in-view rings** (`in_view_present_complete`). Report that number and `complete_frame`. Same-run A still uses the two-presented-frame protocol on `5df8e7fc`.
+- `upload_meshes_now` / hidden warm / idle prebuild queue only — no `RenderingServer.force_draw()` while L is off. Idle max_step ≤ 8 ms.
+- Headless `independent_draw_info` requires a live `draw_mesh(` in the `_ci_draw_mesh` **body** (not the function name). Source-edit that strips `draw_mesh` FAILS.
+
+Keep: per-pid role test (both mutants killed), colour fix, deferred toast, `width_scale` default 1.0.
+
+Same-run 3/3 PASS (xvfb llvmpipe, load 1.89–2.06; not product Play / not Ship GPU). B Δ is negative because L-on complete (all rings, frame 1) is cheaper than L-off frame2 on this close-zoom llvmpipe box; bar is Δ ≤ 250. Ship GPU L-on−L-off at frame2 is 182–245 ms.
+
+| run | A lon2 | A loff2 | A Δ | A cf | B lon complete | B loff2 | B Δ | B/A | B cf | load |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
+| 1 | 424.974 | 220.721 | 204.253 | 2 | 175.175 | 227.225 | −52.050 | 0.412 | 1 | 2.02 |
+| 2 | 429.289 | 224.169 | 205.120 | 2 | 175.062 | 225.627 | −50.565 | 0.408 | 1 | 2.06 |
+| 3 | 430.972 | 239.949 | 191.023 | 2 | 175.055 | 225.537 | −50.482 | 0.406 | 1 | 1.89 |
+
+Hue B **0.8045 / 0.8046 / 0.8045** vs same-run A **0.8190** (ring-edge share; teal 41195–41211 vs 41412–41433). Fixture L-on ×5 **50.419 / 49.287 / 49.386 / 49.358 / 49.149** ms at load **1.32 / 1.58 / 1.80 / 1.98 / 2.14** (complete_frame=1; ≤200; bar 250). Windowed fixture **69.954** ms complete_frame=1 drain n=196. Idle max_step **5.508 / 5.506 / 5.506 / 5.505 / 5.506** (fixture) · live **6.039 / 6.728 / 6.734**. `never_drain` killed drawn=16 < view=196 after 3 frames. `counter_lie` killed (headless source-edit; windowed engine delta=76704). `allow_without_overlay` killed: pids 710240–710247 pre=`engineers_recommended` fresh=empty mismatch=8. `lon_semantics_off` mismatch=160. Tip n=208 hub 48 + engineers 160. Live roles `{hub: 3158, route: 38}`. Seed ×3 `20fe9063de285f19d4f9b8a105abfd31` (`grep -o 'multi_ai_decisions=.*' log | md5sum`). `--quick` same 14 `unit_board_play_path` reds (`se_england` fill-toe 1, first-session play surface 1, unit_centric_pick 3, unit_counter_chrome 2, unit_card_fill_toe 3, living_unit_order_loop 4). map_qc NE **0.9853**. Stay DRAFT / HOLD.
+
 ```bash
 tools/run_godot.sh --headless --path . --resolution 1280x740 \
   -s res://scripts/core/HeadlessRender1SupplyRingMeshTest.gd
