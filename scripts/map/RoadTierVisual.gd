@@ -277,7 +277,7 @@ static func hwy3_label_alias_key(text: String) -> String:
 ## Hub (capital / city_hub) beats metro-other. Gold-spine ends use priority 90.
 static func hwy3_label_priority(rec: Dictionary) -> int:
 	if bool(rec.get("gold_spine", false)):
-		return 90
+		return 70
 	if bool(rec.get("capital", false)):
 		return 100
 	if bool(rec.get("city_hub", false)):

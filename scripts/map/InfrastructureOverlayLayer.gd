@@ -1977,12 +1977,13 @@ func get_visible_hub_label_rects() -> Array:
             "text": str(lbl.text),
             "key": RoadTierVisualScript.hwy3_label_alias_key(str(lbl.text)),
             "rect": Rect2(lbl.position, lbl.size),
+            "priority": 80,
             "source": "hub",
         })
     for sp_v in _gold_spine_visible_labels():
         if typeof(sp_v) == TYPE_DICTIONARY:
             out.append(sp_v)
-    return out
+    return RoadTierVisualScript.hwy3_cull_label_candidates(out)
 
 
 func get_hub_label_candidates_uncull() -> Array:
@@ -2074,12 +2075,10 @@ func _collect_hub_label_candidates() -> Array:
         if c == Vector2.ZERO:
             continue
         var screen: Vector2 = xf * c
-        if not vr.grow(48.0).has_point(screen):
+        if not vr.has_point(screen):
             continue
         var est: Vector2 = Vector2(maxi(int(text.length()) * 8 + 12, 36), 20)
         var pos: Vector2 = screen - Vector2(est.x * 0.5, est.y + 6.0)
-        pos.x = clampf(pos.x, 2.0, maxf(vr.size.x - est.x - 2.0, 2.0))
-        pos.y = clampf(pos.y, 2.0, maxf(vr.size.y - est.y - 2.0, 2.0))
         out.append({
             "text": text,
             "key": key,
@@ -2138,7 +2137,7 @@ func _gold_spine_visible_labels() -> Array:
             "text": nm,
             "key": key,
             "rect": Rect2(lbl.position, lbl.size),
-            "priority": 90,
+            "priority": 70,
             "source": "gold_spine",
         })
     return out
@@ -2173,29 +2172,15 @@ func _sync_hub_city_labels() -> void:
                 (hide_v as Label).visible = false
         return
     var raw: Array = _collect_hub_label_candidates()
-    var spine: Array = _gold_spine_visible_labels()
-    var merged: Array = []
-    for s_v in spine:
-        merged.append(s_v)
+    var placed: Array = []
     for r_v in raw:
-        merged.append(r_v)
-    var kept: Array = RoadTierVisualScript.hwy3_cull_label_candidates(merged)
-    var keep_keys: Dictionary = {}
-    var vp := get_viewport()
-    var vr := Rect2(Vector2.ZERO, Vector2(1280, 720))
-    if vp != null:
-        vr = Rect2(Vector2.ZERO, Vector2(vp.get_visible_rect().size))
-    for k_v in kept:
-        if typeof(k_v) != TYPE_DICTIONARY:
+        if typeof(r_v) != TYPE_DICTIONARY:
             continue
-        var row: Dictionary = k_v
-        if str(row.get("source", "")) != "hub":
-            continue
+        var row: Dictionary = r_v
         var text: String = str(row.get("text", ""))
         var key: String = str(row.get("key", RoadTierVisualScript.hwy3_label_alias_key(text)))
         if text.is_empty() or key.is_empty():
             continue
-        keep_keys[key] = true
         var lbl: Label = null
         if _hub_labels.has(key) and _hub_labels[key] is Label and is_instance_valid(_hub_labels[key]):
             lbl = _hub_labels[key]
@@ -2212,37 +2197,27 @@ func _sync_hub_city_labels() -> void:
         lbl.reset_size()
         var screen: Vector2 = row.get("screen", Vector2.ZERO)
         var pos: Vector2 = screen - Vector2(lbl.size.x * 0.5, lbl.size.y + 6.0)
-        pos.x = clampf(pos.x, 2.0, maxf(vr.size.x - lbl.size.x - 2.0, 2.0))
-        pos.y = clampf(pos.y, 2.0, maxf(vr.size.y - lbl.size.y - 2.0, 2.0))
         lbl.position = pos
         lbl.visible = true
         row["rect"] = Rect2(lbl.position, lbl.size)
-    ## Second pass: actual Label sizes can overlap even when estimates did not.
-    var placed: Array = []
-    for s2_v in spine:
-        placed.append(s2_v)
-    for k2_v in kept:
-        if typeof(k2_v) == TYPE_DICTIONARY:
-            placed.append(k2_v)
-    var kept2: Array = RoadTierVisualScript.hwy3_cull_label_candidates(placed)
-    var keep2_keys: Dictionary = {}
-    for k3_v in kept2:
-        if typeof(k3_v) != TYPE_DICTIONARY:
+        row["text"] = text
+        placed.append(row)
+    var kept: Array = RoadTierVisualScript.hwy3_cull_label_candidates(placed)
+    var keep_keys: Dictionary = {}
+    for k_v in kept:
+        if typeof(k_v) != TYPE_DICTIONARY:
             continue
-        var row3: Dictionary = k3_v
-        if str(row3.get("source", "")) != "hub":
-            continue
-        var k3: String = str(row3.get("key", ""))
-        if not k3.is_empty():
-            keep2_keys[k3] = true
-    keep_keys = keep2_keys
+        var krow: Dictionary = k_v
+        var kk: String = str(krow.get("key", ""))
+        if not kk.is_empty():
+            keep_keys[kk] = true
     for leftover_k in _hub_labels.keys():
         if keep_keys.has(str(leftover_k)):
             continue
         var leftover_v: Variant = _hub_labels[leftover_k]
         if leftover_v is Label and is_instance_valid(leftover_v):
             (leftover_v as Label).visible = false
-    _cull_province_labels_against(kept2)
+    _cull_province_labels_against(kept)
 
 
 func get_cached_road_edge(p1: int, p2: int) -> Dictionary:
