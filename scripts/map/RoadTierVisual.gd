@@ -84,6 +84,13 @@ const HWY3_MIN_PATH_EDGES := 2
 const HWY3_URBAN_SPAN_MIN := 8.0
 const HWY3_URBAN_SPAN_MAX := 28.0
 const HWY3_URBAN_CLUSTER_R := 20.0
+## Metro corridor: ≥3 named hubs inside this radius get thicker casing + labels.
+const HWY3_METRO_CLUSTER_R := 30.0
+const HWY3_METRO_MIN_HUBS := 3
+const HWY3_METRO_CASING_MULT := 1.3
+## Hub city labels (display only). Population is the province/city-layer pop on the hub record.
+const HWY3_HUB_LABEL_ZOOM_MIN := 2.0
+const HWY3_HUB_LABEL_POP_MIN := 15000
 ## Near-parallel drop: partial cover of sampled length within this distance.
 const HWY3_PARALLEL_HAUSDORFF := 12.0
 const HWY3_PARALLEL_END := 18.0
@@ -215,6 +222,70 @@ static func end_labels_visible_at_zoom(zoom: float) -> bool:
 
 static func end_labels_visible_for_span(zoom: float, _spine_span_world: float) -> bool:
 	return end_labels_visible_at_zoom(zoom)
+
+
+static func hub_city_labels_visible_at_zoom(zoom: float) -> bool:
+	return zoom + 0.0001 >= HWY3_HUB_LABEL_ZOOM_MIN
+
+
+static func hwy3_city_label_text(rec: Dictionary) -> String:
+	var cn: String = str(rec.get("city_name", "")).strip_edges()
+	if cn.is_empty():
+		cn = str(rec.get("name", "")).strip_edges()
+	var comma: int = cn.find(",")
+	if comma >= 0:
+		cn = cn.substr(0, comma).strip_edges()
+	return cn
+
+
+static func should_label_hub_city(rec: Dictionary, zoom: float, cluster_n: int) -> bool:
+	if not hub_city_labels_visible_at_zoom(zoom):
+		return false
+	if hwy3_city_label_text(rec).is_empty():
+		return false
+	if cluster_n >= HWY3_METRO_MIN_HUBS:
+		return true
+	if bool(rec.get("city_hub", false)) or bool(rec.get("capital", false)):
+		return int(rec.get("population", 0)) >= HWY3_HUB_LABEL_POP_MIN or bool(rec.get("city_hub", false))
+	if bool(rec.get("urban", false)) and int(rec.get("population", 0)) >= HWY3_HUB_LABEL_POP_MIN:
+		return true
+	return int(rec.get("population", 0)) >= HWY3_HUB_LABEL_POP_MIN and int(rec.get("tier", 0)) >= 2
+
+
+static func hwy3_metro_cluster_n(hubs: Array, rec: Dictionary) -> int:
+	var c: Vector2 = rec.get("centroid", Vector2.ZERO)
+	if c == Vector2.ZERO:
+		return 0
+	var n: int = 0
+	for h_v in hubs:
+		if typeof(h_v) != TYPE_DICTIONARY:
+			continue
+		var h: Dictionary = h_v
+		if hwy3_city_label_text(h).is_empty():
+			continue
+		var hc: Vector2 = h.get("centroid", Vector2.ZERO)
+		if hc == Vector2.ZERO:
+			continue
+		if c.distance_to(hc) <= HWY3_METRO_CLUSTER_R + 0.0001:
+			n += 1
+	return n
+
+
+static func hwy3_metro_cluster_pids(hubs: Array) -> Dictionary:
+	var out: Dictionary = {}
+	for h_v in hubs:
+		if typeof(h_v) != TYPE_DICTIONARY:
+			continue
+		var h: Dictionary = h_v
+		if hwy3_metro_cluster_n(hubs, h) >= HWY3_METRO_MIN_HUBS:
+			var pid: int = int(h.get("pid", 0))
+			if pid > 0:
+				out[pid] = true
+	return out
+
+
+static func hwy3_drawn_highway_count(cache: Array) -> int:
+	return _hwy3_count_highways(cache)
 
 
 static func screen_width_for_tier(tier: int, lod_band: int) -> float:
@@ -1580,10 +1651,6 @@ static func _hwy3_second_hub_pid(hubs: Array, cap_pid: int) -> int:
 	return 0
 
 
-static func _hwy3_drop_second_sector() -> bool:
-	return hwy3_mutant_name() == "no_second_sector"
-
-
 static func _hwy3_bearing(from_c: Vector2, to_c: Vector2) -> float:
 	var d: Vector2 = to_c - from_c
 	if d == Vector2.ZERO:
@@ -1596,140 +1663,25 @@ static func _hwy3_sectors_apart(a: float, b: float) -> bool:
 
 
 static func _hwy3_pair_is_dropped_second_sector(
-	a: int,
-	b: int,
-	tag: String,
-	second_by_tag: Dictionary,
-	sector2_by_tag: Dictionary,
-	rec_by_pid: Dictionary,
-	hubs_by_tag: Dictionary
+	_a: int,
+	_b: int,
+	_tag: String,
+	_second_by_tag: Dictionary,
+	_sector2_by_tag: Dictionary,
+	_rec_by_pid: Dictionary,
+	_hubs_by_tag: Dictionary
 ) -> bool:
-	if not _hwy3_drop_second_sector():
-		return false
-	var tg: String = tag.strip_edges().to_upper()
-	if tg.is_empty():
-		var ra0_v: Variant = rec_by_pid.get(a, {})
-		var rb0_v: Variant = rec_by_pid.get(b, {})
-		var ra0: Dictionary = ra0_v if typeof(ra0_v) == TYPE_DICTIONARY else {}
-		var rb0: Dictionary = rb0_v if typeof(rb0_v) == TYPE_DICTIONARY else {}
-		var ta0: String = str(ra0.get("tag", "")).strip_edges().to_upper()
-		var tb0: String = str(rb0.get("tag", "")).strip_edges().to_upper()
-		if ta0 == tb0:
-			tg = ta0
-	if tg.is_empty():
-		return false
-	var hl_v: Variant = hubs_by_tag.get(tg, [])
-	var hl: Array = hl_v if typeof(hl_v) == TYPE_ARRAY else []
-	var cap_n: int = _hwy3_capital_hub_pid(hl)
-	if cap_n <= 0:
-		return false
-	var other: int = 0
-	if a == cap_n:
-		other = b
-	elif b == cap_n:
-		other = a
-	else:
-		return false
-	if other <= 0:
-		return false
-	var sector2_n: int = int(sector2_by_tag.get(tg, 0))
-	if sector2_n > 0 and other == sector2_n:
-		return true
-	var first_n: int = int(second_by_tag.get(tg, 0))
-	if first_n <= 0 or first_n == other:
-		return false
-	var cap_v: Variant = rec_by_pid.get(cap_n, {})
-	var first_v: Variant = rec_by_pid.get(first_n, {})
-	var other_v: Variant = rec_by_pid.get(other, {})
-	if (
-		typeof(cap_v) != TYPE_DICTIONARY
-		or typeof(first_v) != TYPE_DICTIONARY
-		or typeof(other_v) != TYPE_DICTIONARY
-	):
-		return false
-	var cap_c: Vector2 = (cap_v as Dictionary).get("centroid", Vector2.ZERO)
-	var first_c: Vector2 = (first_v as Dictionary).get("centroid", Vector2.ZERO)
-	var other_c: Vector2 = (other_v as Dictionary).get("centroid", Vector2.ZERO)
-	if cap_c == Vector2.ZERO or first_c == Vector2.ZERO or other_c == Vector2.ZERO:
-		return false
-	return _hwy3_sectors_apart(_hwy3_bearing(cap_c, first_c), _hwy3_bearing(cap_c, other_c))
+	return false
 
 
 static func _hwy3_path_touches_dropped_second_sector(
-	pids_any: Variant,
-	tag: String,
-	second_by_tag: Dictionary,
-	sector2_by_tag: Dictionary,
-	rec_by_pid: Dictionary,
-	hubs_by_tag: Dictionary
+	_pids_any: Variant,
+	_tag: String,
+	_second_by_tag: Dictionary,
+	_sector2_by_tag: Dictionary,
+	_rec_by_pid: Dictionary,
+	_hubs_by_tag: Dictionary
 ) -> bool:
-	if not _hwy3_drop_second_sector():
-		return false
-	var pids: Array = []
-	if typeof(pids_any) == TYPE_PACKED_INT32_ARRAY:
-		var packed: PackedInt32Array = pids_any
-		for i in range(packed.size()):
-			pids.append(int(packed[i]))
-	elif typeof(pids_any) == TYPE_ARRAY:
-		for pv in pids_any:
-			pids.append(int(pv))
-	if pids.size() < 2:
-		return false
-	var tg: String = tag.strip_edges().to_upper()
-	if tg.is_empty():
-		var r0_v: Variant = rec_by_pid.get(int(pids[0]), {})
-		if typeof(r0_v) == TYPE_DICTIONARY:
-			tg = str((r0_v as Dictionary).get("tag", "")).strip_edges().to_upper()
-	if tg.is_empty():
-		return false
-	var hl_v: Variant = hubs_by_tag.get(tg, [])
-	var hl: Array = hl_v if typeof(hl_v) == TYPE_ARRAY else []
-	var cap_n: int = _hwy3_capital_hub_pid(hl)
-	if cap_n <= 0:
-		return false
-	var has_cap: bool = false
-	for pid_c in pids:
-		if int(pid_c) == cap_n:
-			has_cap = true
-			break
-	if not has_cap:
-		return false
-	var sector2_n: int = int(sector2_by_tag.get(tg, 0))
-	if sector2_n > 0:
-		for pid_s in pids:
-			if int(pid_s) == sector2_n:
-				return true
-	var first_n: int = int(second_by_tag.get(tg, 0))
-	if first_n <= 0:
-		return false
-	var cap_v: Variant = rec_by_pid.get(cap_n, {})
-	var first_v: Variant = rec_by_pid.get(first_n, {})
-	if typeof(cap_v) != TYPE_DICTIONARY or typeof(first_v) != TYPE_DICTIONARY:
-		return false
-	var cap_c: Vector2 = (cap_v as Dictionary).get("centroid", Vector2.ZERO)
-	var first_c: Vector2 = (first_v as Dictionary).get("centroid", Vector2.ZERO)
-	if cap_c == Vector2.ZERO or first_c == Vector2.ZERO:
-		return false
-	var first_br: float = _hwy3_bearing(cap_c, first_c)
-	for pid3 in pids:
-		var p3: int = int(pid3)
-		if p3 == cap_n or p3 == first_n:
-			continue
-		var oth_v: Variant = rec_by_pid.get(p3, {})
-		if typeof(oth_v) != TYPE_DICTIONARY:
-			continue
-		var oth: Dictionary = oth_v
-		if (
-			not bool(oth.get("city_hub", false))
-			and not bool(oth.get("capital", false))
-			and int(oth.get("tier", 0)) < 3
-		):
-			continue
-		var oc: Vector2 = oth.get("centroid", Vector2.ZERO)
-		if oc == Vector2.ZERO:
-			continue
-		if _hwy3_sectors_apart(first_br, _hwy3_bearing(cap_c, oc)):
-			return true
 	return false
 
 
@@ -1786,8 +1738,6 @@ static func _hwy3_sector_hub_pids(hubs: Array, cap_pid: int) -> PackedInt32Array
 	var first: int = _hwy3_second_hub_pid(hubs, cap_pid)
 	if first > 0:
 		out.append(first)
-	if _hwy3_drop_second_sector():
-		return out
 	var second: int = _hwy3_second_sector_hub_pid(hubs, cap_pid, first)
 	if second > 0:
 		out.append(second)
@@ -1947,8 +1897,6 @@ static func _hwy3_reachable_sectors(
 	var first: int = _hwy3_reachable_second(hubs, cap_pid, adj, attrs)
 	if first > 0:
 		out.append(first)
-	if _hwy3_drop_second_sector():
-		return out
 	var second: int = _hwy3_reachable_second_sector(hubs, cap_pid, first, adj, attrs)
 	if second > 0:
 		out.append(second)
@@ -2935,6 +2883,34 @@ static func _hwy3_count_highways(cache: Array) -> int:
 	return n
 
 
+static func _hwy3_stamp_metro_edges(cache: Array, hubs: Array) -> void:
+	var metro: Dictionary = hwy3_metro_cluster_pids(hubs)
+	if metro.is_empty():
+		return
+	for row_v in cache:
+		if typeof(row_v) != TYPE_DICTIONARY:
+			continue
+		var row: Dictionary = row_v
+		if int(row.get("display_tier", 0)) != TIER_HIGHWAY:
+			continue
+		var a: int = int(row.get("p1", 0))
+		var b: int = int(row.get("p2", 0))
+		if metro.has(a) or metro.has(b):
+			row["metro"] = true
+
+
+static func _hwy3_route_is_trim_protected(rt: Dictionary) -> bool:
+	if int(rt.get("kind", 0)) >= HWY3_KIND_TRUNK:
+		return true
+	if bool(rt.get("span_core", false)):
+		return true
+	if bool(rt.get("sector_keep", false)):
+		return true
+	if bool(rt.get("peri_keep", false)):
+		return true
+	return false
+
+
 static func _hwy3_route_unique_keys(rt: Dictionary, routes: Array, skip_i: int) -> Array:
 	var own_v: Variant = rt.get("keys", [])
 	var own: Array = own_v if typeof(own_v) == TYPE_ARRAY else []
@@ -2989,16 +2965,15 @@ static func _hwy3_trim_over_cap(
 		if typeof(routes[ri]) != TYPE_DICTIONARY:
 			continue
 		var rt: Dictionary = routes[ri]
-		var kind: int = int(rt.get("kind", 0))
-		if kind >= HWY3_KIND_TRUNK:
+		if _hwy3_route_is_trim_protected(rt):
 			continue
-		if bool(rt.get("span_core", false)):
-			continue
-		if bool(rt.get("sector_keep", false)):
-			continue
-		if bool(rt.get("peri_keep", false)):
-			continue
-		victims.append({"i": ri, "kind": kind, "score": float(rt.get("score", 0.0)), "a": int(rt.get("a", 0)), "b": int(rt.get("b", 0))})
+		victims.append({
+			"i": ri,
+			"kind": int(rt.get("kind", 0)),
+			"score": float(rt.get("score", 0.0)),
+			"a": int(rt.get("a", 0)),
+			"b": int(rt.get("b", 0)),
+		})
 	victims.sort_custom(_hwy3_trim_victim_less)
 	var drop_idx: Dictionary = {}
 	for vic_v in victims:
@@ -3009,10 +2984,15 @@ static func _hwy3_trim_over_cap(
 		if vi < 0 or vi >= routes.size() or typeof(routes[vi]) != TYPE_DICTIONARY:
 			continue
 		var rt2: Dictionary = routes[vi]
+		if _hwy3_route_is_trim_protected(rt2):
+			continue
 		var uniq: Array = _hwy3_route_unique_keys(rt2, routes, vi)
 		if uniq.is_empty():
 			continue
+		var dropped_any: bool = false
 		for k_v in uniq:
+			if hwy <= cap:
+				break
 			var k: int = int(k_v)
 			var idx_v: Variant = cache_by_key.get(k, -1)
 			if int(idx_v) < 0:
@@ -3026,7 +3006,9 @@ static func _hwy3_trim_over_cap(
 			marked.erase(k)
 			used = maxi(used - 1, 0)
 			hwy -= 1
-		drop_idx[vi] = true
+			dropped_any = true
+		if dropped_any:
+			drop_idx[vi] = true
 	if not drop_idx.is_empty():
 		var kept: Array = []
 		for ri2 in range(routes.size()):
@@ -3225,7 +3207,11 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 	):
 		var used_m: int = _hwy3_apply_marked_highways(cache, graph, _hwy3_route_memo_marked)
 		last_hwy3_debug = _hwy3_route_memo_debug.duplicate()
+		var hubs_m_v: Variant = last_hwy3_debug.get("hubs", [])
+		var hubs_m: Array = hubs_m_v if typeof(hubs_m_v) == TYPE_ARRAY else []
+		_hwy3_stamp_metro_edges(cache, hubs_m)
 		last_hwy3_debug["used"] = used_m
+		last_hwy3_debug["drawn"] = _hwy3_count_highways(cache)
 		last_hwy3_debug["mutant"] = mutant
 		last_hwy3_debug["total_ms"] = 0.0
 		return
@@ -3325,8 +3311,6 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 		var sectors1: PackedInt32Array = _hwy3_reachable_sectors(hl1, cap1, adj, attrs)
 		var first_sec1: int = int(sectors1[0]) if sectors1.size() > 0 else 0
 		var second_sec1: int = int(sectors1[1]) if sectors1.size() > 1 else 0
-		if second_sec1 <= 0 and first_sec1 > 0:
-			second_sec1 = _hwy3_reachable_second_sector(hl1, cap1, first_sec1, adj, attrs)
 		second_by_tag[tg1] = first_sec1
 		sector2_by_tag[tg1] = second_sec1
 		span_by_tag[tg1] = _hwy3_urban_span_pair_ids(hl1)
@@ -3421,8 +3405,7 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 			):
 				kind = HWY3_KIND_TRUNK
 			elif (
-				not _hwy3_drop_second_sector()
-				and cap_n > 0
+				cap_n > 0
 				and HWY3_MAJOR_TAGS.has(tag_ab)
 				and sector2_n > 0
 				and (
@@ -4017,33 +4000,7 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 				marked_verts[int(pids5[pi5b])] = true
 	if mutant != "overlap_ok":
 		used = _hwy3_trim_over_cap(cache, cache_by_key, marked, routes, used, HWY3_BUDGET_CAP)
-	if _hwy3_drop_second_sector():
-		var kept_rt: Array = []
-		for rt_drop_v in routes:
-			if typeof(rt_drop_v) != TYPE_DICTIONARY:
-				continue
-			var rt_drop: Dictionary = rt_drop_v
-			if _hwy3_pair_is_dropped_second_sector(
-				int(rt_drop.get("a", 0)),
-				int(rt_drop.get("b", 0)),
-				str(rt_drop.get("tag", "")),
-				second_by_tag,
-				sector2_by_tag,
-				rec_by_pid,
-				hubs_by_tag
-			):
-				continue
-			if _hwy3_path_touches_dropped_second_sector(
-				rt_drop.get("pids", []),
-				str(rt_drop.get("tag", "")),
-				second_by_tag,
-				sector2_by_tag,
-				rec_by_pid,
-				hubs_by_tag
-			):
-				continue
-			kept_rt.append(rt_drop)
-		routes = kept_rt
+	_hwy3_stamp_metro_edges(cache, hubs)
 	var hub_list: Array = []
 	for h2_v in hubs:
 		var h2: Dictionary = h2_v
@@ -4081,6 +4038,7 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 		"records": records,
 		"marked": marked.size(),
 		"used": used,
+		"drawn": _hwy3_count_highways(cache),
 		"budget": paint_budget,
 		"dropped_parallel": dropped_parallel,
 		"dropped_cap": dropped_cap,

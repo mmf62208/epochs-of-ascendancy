@@ -192,12 +192,13 @@ func _boot_live_1936() -> bool:
 			var rt0: Dictionary = rt0_v
 			ends.append("%d-%d n=%d" % [int(rt0.get("a", 0)), int(rt0.get("b", 0)), (rt0.get("pids", []) as Array).size() if typeof(rt0.get("pids", [])) == TYPE_ARRAY else 0])
 	print(
-		"HWY3_MEASURE mode=%s hubs=%d routes=%d used=%d budget=%d cache=%d adj_ms=%.2f dropped_parallel=%d dropped_cap=%d ends=%s"
+		"HWY3_MEASURE mode=%s hubs=%d routes=%d used=%d drawn=%d budget=%d cache=%d adj_ms=%.2f dropped_parallel=%d dropped_cap=%d ends=%s"
 		% [
 			str(dbg.get("mode", "")),
 			(_debug().get("hubs", []) as Array).size() if typeof(dbg.get("hubs", [])) == TYPE_ARRAY else 0,
 			_routes().size(),
 			int(dbg.get("used", 0)),
+			int(dbg.get("drawn", _count_highways_cache(_cache))),
 			int(dbg.get("budget", 0)),
 			_cache.size(),
 			float(dbg.get("adj_ms", 0.0)),
@@ -1130,15 +1131,32 @@ func _test_h4_no_duplicate_corridor() -> void:
 		_pass("H4: no route pair shares a corridor (Jaccard ≥0.5 or shared end + ≥50%)")
 
 
+func _count_highways_cache(cache: Array) -> int:
+	return RoadTierVisualScript.hwy3_drawn_highway_count(cache)
+
+
 func _test_h5_budget() -> void:
 	var st: Dictionary = _component_stats(_cache)
 	var hwy: int = int(st.get("highways", 0))
+	var drawn: int = _count_highways_cache(_cache)
+	if _ol != null and _ol.has_method("get_drawn_highway_count"):
+		drawn = int(_ol.call("get_drawn_highway_count"))
 	var sings: int = int(st.get("singletons", 0))
 	var median: float = float(st.get("median", 0.0))
 	print(
-		"HWY3_BARS highways=%d comps=%d sings=%d median=%.2f sizes=%s"
-		% [hwy, int(st.get("components", 0)), sings, median, str(st.get("sizes", []))]
+		"HWY3_BARS highways=%d drawn=%d used=%d comps=%d sings=%d median=%.2f sizes=%s"
+		% [
+			hwy,
+			drawn,
+			int(_debug().get("used", 0)),
+			int(st.get("components", 0)),
+			sings,
+			median,
+			str(st.get("sizes", [])),
+		]
 	)
+	if drawn != hwy:
+		_fail("H5: drawn %d != component highway count %d (one definition)" % [drawn, hwy])
 	if hwy < 60 or hwy > 114:
 		_fail("H5: highway count %d not within 60–114 (2× of 52)" % hwy)
 	else:

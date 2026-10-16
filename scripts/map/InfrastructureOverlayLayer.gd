@@ -105,6 +105,9 @@ const SPINE_BELOW_UNITS_Z := 21
 ## Joined gold spine sits above the Rhine (22) and below DemoUnitIcon (28).
 ## Generic RoadLayer Line2Ds stay at ROAD_BELOW_UNITS_Z so RX-1 order is unchanged.
 const GOLD_SPINE_Z := 23
+## HWY-3 FIX #5: tier-2 highways sit above the Rhine (22) so the Ruhr chain
+## is not buried under the river/IX-1 spine. Still below unit counters (28).
+const HIGHWAY_ABOVE_RIVER_Z := 24
 const ROAD_EXPLICIT_SCREEN_PX := 7.0
 const ROAD_INFERRED_SCREEN_PX := 4.0
 ## Non-AA filled quads. Close/far stay 16/20 (Play PASS). Mid only is 28/34
@@ -127,6 +130,8 @@ var _hwy3_econ_layer: Dictionary = {}
 var _hwy3_layers_ready: bool = false
 var _hwy3_city_source: String = "json"
 var _hwy3_graph_rows: Array = []
+var _hub_label_layer: CanvasLayer = null
+var _hub_labels: Dictionary = {}
 
 func _ready():
     infrastructure_manager = get_node_or_null("/root/InfrastructureDevelopmentManager")
@@ -247,6 +252,7 @@ func _update_sub_layer_visibilities() -> void:
         ) and z > 0.10
         _sync_road_tier_draw_zoom(z)
         _apply_screen_space_road_widths()
+        _sync_hub_city_labels()
     if spine_preview_layer:
         # Visibility only — never rebuild/create nodes on zoom (silent-exit class).
         var prev_state := str(spine_preview_layer.get("state"))
@@ -1450,6 +1456,12 @@ func _clear_road_line2d_children() -> void:
             k.queue_free()
 
 
+func _hwy3_highway_draw_z(tier: int) -> int:
+    if tier == 2:
+        return HIGHWAY_ABOVE_RIVER_Z
+    return ROAD_BELOW_UNITS_Z
+
+
 func _ensure_road_tier_draw_nodes() -> void:
     if road_layer == null:
         return
@@ -1464,9 +1476,12 @@ func _ensure_road_tier_draw_nodes() -> void:
             node.name = nm
             node.tier = tier
             node.z_as_relative = false
-            node.z_index = ROAD_BELOW_UNITS_Z
+            node.z_index = _hwy3_highway_draw_z(tier)
             road_layer.add_child(node)
             existing = node
+        elif existing is RoadTierDraw:
+            (existing as Node2D).z_as_relative = false
+            (existing as Node2D).z_index = _hwy3_highway_draw_z(tier)
         _road_tier_draw[tier] = existing
 
 
@@ -1613,14 +1628,12 @@ func _ensure_hwy3_layers() -> void:
     _hwy3_city_layer = _load_hwy3_layer_json("province_city_layer.json")
     _hwy3_econ_layer = _load_hwy3_layer_json("province_economy_layer.json")
     _hwy3_city_source = "json"
-    var mutant: String = RoadTierVisualScript.hwy3_mutant_name()
-    if mutant != "json_layer":
-        var loader: Node = _find_scenario_loader()
-        if loader != null and loader.has_method("get_city_layer"):
-            var live_v: Variant = loader.call("get_city_layer")
-            if typeof(live_v) == TYPE_DICTIONARY and not (live_v as Dictionary).is_empty():
-                _hwy3_city_layer = live_v
-                _hwy3_city_source = "scenario"
+    var loader: Node = _find_scenario_loader()
+    if loader != null and loader.has_method("get_city_layer"):
+        var live_v: Variant = loader.call("get_city_layer")
+        if typeof(live_v) == TYPE_DICTIONARY and not (live_v as Dictionary).is_empty():
+            _hwy3_city_layer = live_v
+            _hwy3_city_source = "scenario"
     _hwy3_layers_ready = true
 
 
@@ -1906,6 +1919,149 @@ func get_road_tier_draw_node_count() -> int:
         if node != null and is_instance_valid(node):
             n += 1
     return n
+
+
+func get_road_tier_draw(tier: int) -> Node:
+    _ensure_road_tier_draw_nodes()
+    var node_v: Variant = _road_tier_draw.get(tier, null)
+    if node_v != null and node_v is Node and is_instance_valid(node_v):
+        return node_v as Node
+    return null
+
+
+func get_drawn_highway_count() -> int:
+    return RoadTierVisualScript.hwy3_drawn_highway_count(_road_edge_cache)
+
+
+func get_highway_draw_z_index() -> int:
+    var node: Node = get_road_tier_draw(2)
+    if node is Node2D:
+        return (node as Node2D).z_index
+    return HIGHWAY_ABOVE_RIVER_Z
+
+
+func get_hub_city_label_names() -> Array:
+    _ensure_hub_city_labels()
+    var names: Array = []
+    for key_v in _hub_labels.keys():
+        var lbl_v: Variant = _hub_labels[key_v]
+        if lbl_v == null or not (lbl_v is Label):
+            continue
+        var lbl: Label = lbl_v
+        if not is_instance_valid(lbl) or not lbl.visible:
+            continue
+        var nm: String = str(lbl.text).strip_edges()
+        if not nm.is_empty():
+            names.append(nm)
+    return names
+
+
+func _ensure_hub_city_labels() -> void:
+    if _hub_label_layer != null and is_instance_valid(_hub_label_layer):
+        return
+    _hub_label_layer = CanvasLayer.new()
+    _hub_label_layer.name = "Hwy3HubCityLabels"
+    _hub_label_layer.layer = 19
+    _hub_label_layer.follow_viewport_enabled = false
+    add_child(_hub_label_layer)
+
+
+func _make_hub_city_label(text: String) -> Label:
+    var lbl := Label.new()
+    lbl.name = "Hwy3HubLabel_%s" % text.replace(" ", "_")
+    lbl.text = text
+    lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    lbl.visible = false
+    lbl.add_theme_font_size_override("font_size", RoadTierVisualScript.END_LABEL_FONT_PX)
+    lbl.add_theme_color_override("font_color", Color(0.96, 0.97, 1.0, 0.96))
+    lbl.add_theme_color_override("font_outline_color", Color(0.02, 0.03, 0.06, 0.95))
+    lbl.add_theme_constant_override("outline_size", 4)
+    lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+    lbl.clip_text = false
+    lbl.autowrap_mode = TextServer.AUTOWRAP_OFF
+    return lbl
+
+
+func _sync_hub_city_labels() -> void:
+    _ensure_hub_city_labels()
+    var z: float = _get_current_zoom()
+    if not RoadTierVisualScript.hub_city_labels_visible_at_zoom(z):
+        for hide_v in _hub_labels.values():
+            if hide_v is Label and is_instance_valid(hide_v):
+                (hide_v as Label).visible = false
+        return
+    var dbg: Dictionary = RoadTierVisualScript.last_hwy3_debug
+    var recs_v: Variant = dbg.get("records", [])
+    var hubs_v: Variant = dbg.get("hubs", [])
+    var recs: Array = recs_v if typeof(recs_v) == TYPE_ARRAY else []
+    var hubs: Array = hubs_v if typeof(hubs_v) == TYPE_ARRAY else []
+    var hub_pids: Dictionary = {}
+    for h_v in hubs:
+        if typeof(h_v) != TYPE_DICTIONARY:
+            continue
+        var hp: int = int((h_v as Dictionary).get("pid", 0))
+        if hp > 0:
+            hub_pids[hp] = true
+    var rec_by: Dictionary = {}
+    var hub_recs: Array = []
+    for rec_v in recs:
+        if typeof(rec_v) != TYPE_DICTIONARY:
+            continue
+        var rec: Dictionary = rec_v
+        var pid: int = int(rec.get("pid", 0))
+        rec_by[pid] = rec
+        if hub_pids.has(pid) or bool(rec.get("city_hub", false)) or bool(rec.get("capital", false)):
+            hub_recs.append(rec)
+    if hub_recs.is_empty():
+        hub_recs = recs
+    var seen: Dictionary = {}
+    var xf: Transform2D = get_global_transform_with_canvas()
+    var vp := get_viewport()
+    var vr := Rect2(Vector2.ZERO, Vector2(1280, 720))
+    if vp != null:
+        vr = Rect2(Vector2.ZERO, Vector2(vp.get_visible_rect().size))
+    for rec2_v in hub_recs:
+        if typeof(rec2_v) != TYPE_DICTIONARY:
+            continue
+        var rec2: Dictionary = rec2_v
+        var cluster_n: int = RoadTierVisualScript.hwy3_metro_cluster_n(hub_recs, rec2)
+        if not RoadTierVisualScript.should_label_hub_city(rec2, z, cluster_n):
+            continue
+        var text: String = RoadTierVisualScript.hwy3_city_label_text(rec2)
+        if text.is_empty() or seen.has(text.to_lower()):
+            continue
+        var c: Vector2 = rec2.get("centroid", Vector2.ZERO)
+        if c == Vector2.ZERO:
+            continue
+        var screen: Vector2 = xf * c
+        if not vr.grow(48.0).has_point(screen):
+            continue
+        seen[text.to_lower()] = true
+        var key: String = text.to_lower()
+        var lbl: Label = null
+        if _hub_labels.has(key) and _hub_labels[key] is Label and is_instance_valid(_hub_labels[key]):
+            lbl = _hub_labels[key]
+        else:
+            lbl = _make_hub_city_label(text)
+            _hub_label_layer.add_child(lbl)
+            _hub_labels[key] = lbl
+        lbl.text = text
+        lbl.reset_size()
+        var ms: Vector2 = lbl.get_minimum_size()
+        lbl.custom_minimum_size = Vector2(ms.x + 8.0, ms.y + 4.0)
+        lbl.reset_size()
+        var pos: Vector2 = screen - Vector2(lbl.size.x * 0.5, lbl.size.y + 6.0)
+        pos.x = clampf(pos.x, 2.0, maxf(vr.size.x - lbl.size.x - 2.0, 2.0))
+        pos.y = clampf(pos.y, 2.0, maxf(vr.size.y - lbl.size.y - 2.0, 2.0))
+        lbl.position = pos
+        lbl.visible = true
+    for leftover_k in _hub_labels.keys():
+        if seen.has(str(leftover_k)):
+            continue
+        var leftover_v: Variant = _hub_labels[leftover_k]
+        if leftover_v is Label and is_instance_valid(leftover_v):
+            (leftover_v as Label).visible = false
 
 
 func get_cached_road_edge(p1: int, p2: int) -> Dictionary:
@@ -2842,7 +2998,7 @@ class RoadTierDraw extends Node2D:
 
     func _ready() -> void:
         z_as_relative = false
-        z_index = ROAD_BELOW_UNITS_Z
+        z_index = HIGHWAY_ABOVE_RIVER_Z if tier == 2 else ROAD_BELOW_UNITS_Z
         set_process(true)
 
     func setup_edges(new_edges: Array) -> void:
@@ -2977,6 +3133,7 @@ class RoadTierDraw extends Node2D:
         var casing := RoadTierVisualScript.HIGHWAY_CASING_COLOR
         var stripe := RoadTierVisualScript.HIGHWAY_STRIPE_COLOR
         var core := RoadTierVisualScript.HIGHWAY_CORE_COLOR
+        var metro_mult: float = RoadTierVisualScript.HWY3_METRO_CASING_MULT
         for entry in edges:
             if not _edge_visible(entry, zoom):
                 continue
@@ -2984,10 +3141,11 @@ class RoadTierDraw extends Node2D:
             var b: Vector2 = entry.get("c2", Vector2.ZERO)
             if a == Vector2.ZERO or b == Vector2.ZERO:
                 continue
-            _draw_road_quad(a, b, casing, case_w)
-            _draw_road_quad(a, b, core, core_w)
+            var mw: float = metro_mult if bool(entry.get("metro", false)) else 1.0
+            _draw_road_quad(a, b, casing, case_w * mw)
+            _draw_road_quad(a, b, core, core_w * mw)
             if not far:
-                _draw_road_quad(a, b, stripe, stripe_w)
+                _draw_road_quad(a, b, stripe, stripe_w * mw)
 
     func _draw_road_quad(from: Vector2, to: Vector2, col: Color, world_w: float) -> void:
         var delta: Vector2 = to - from

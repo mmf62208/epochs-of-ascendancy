@@ -1,8 +1,9 @@
 extends SceneTree
 
-## HWY-3 FIX #4: live ScenarioLoader city layer (TestScenario / Begin path).
-## Must FAIL if hubs come from the JSON file only, or if the second-sector
-## capital span is dropped. Same city layer Play uses.
+## HWY-3 FIX #5: live ScenarioLoader city layer (TestScenario / Begin path).
+## Drawn-edge count is THE highway number (display_tier==2 RoadTierDraw).
+## Rome-north comes from _hwy3_reachable_sectors; a source-edit mutant on
+## that second-sector line must kill it. Same city layer Play uses.
 ##
 ##   tools/run_godot.sh --headless --path . -s res://scripts/core/HeadlessHwy3LiveScenarioTest.gd
 
@@ -50,8 +51,10 @@ func _run() -> void:
 	_test_ruhr()
 	_test_paris_one_north()
 	_test_highway_count()
-	_test_json_layer_mutant()
-	_test_no_second_sector_mutant()
+	_test_highway_z_above_river()
+	_test_ruhr_label_rule()
+	_test_env_mutants_removed()
+	_test_rome_north_source_mutant()
 	if _ol != null:
 		_ol.queue_free()
 	if _loader != null:
@@ -192,13 +195,14 @@ func _print_live_routes() -> void:
 	var rec_by: Dictionary = _rec_by_pid()
 	var dbg: Dictionary = _debug()
 	print(
-		"HWY3_LIVE_MEASURE mode=%s city_source=%s hubs=%d routes=%d used=%d"
+		"HWY3_LIVE_MEASURE mode=%s city_source=%s hubs=%d routes=%d used=%d drawn=%d"
 		% [
 			str(dbg.get("mode", "")),
 			str(dbg.get("city_source", "")),
 			(_debug().get("hubs", []) as Array).size() if typeof(dbg.get("hubs", [])) == TYPE_ARRAY else 0,
 			_routes().size(),
 			int(dbg.get("used", 0)),
+			int(dbg.get("drawn", _count_highways())),
 		]
 	)
 	print("HWY3_LIVE_SECOND %s" % str(dbg.get("second_by_tag", {})))
@@ -386,65 +390,204 @@ func _test_highway_count() -> void:
 		var cache_v: Variant = _ol.call("get_road_tier_cache")
 		if typeof(cache_v) == TYPE_ARRAY:
 			_cache = cache_v
-	var hwy: int = _count_highways()
-	print("HWY3_LIVE_BARS highways=%d" % hwy)
-	if hwy < 60 or hwy > 114:
-		_fail("live highway count %d not within 60–114" % hwy)
+	var cache_n: int = _count_highways()
+	var drawn: int = cache_n
+	if _ol != null and _ol.has_method("get_drawn_highway_count"):
+		drawn = int(_ol.call("get_drawn_highway_count"))
+	var used: int = int(_debug().get("used", 0))
+	var draw_n: int = -1
+	if _ol != null and _ol.has_method("get_road_tier_draw"):
+		var node_v: Variant = _ol.call("get_road_tier_draw", 2)
+		if node_v is Node2D and "edges" in node_v:
+			var ev: Variant = node_v.get("edges")
+			if typeof(ev) == TYPE_ARRAY:
+				draw_n = (ev as Array).size()
+	print(
+		"HWY3_LIVE_BARS drawn=%d used=%d cache=%d road_tier_draw=%d"
+		% [drawn, used, cache_n, draw_n]
+	)
+	if draw_n >= 0 and draw_n != drawn:
+		_fail("live drawn %d != RoadTierDraw edges %d" % [drawn, draw_n])
+	if drawn != cache_n:
+		_fail("live drawn %d != cache display_tier==2 %d" % [drawn, cache_n])
+	if drawn < 60 or drawn > 114:
+		_fail("live drawn highway count %d not within 60–114" % drawn)
 	else:
-		_pass("live highway count %d within 60–114" % hwy)
+		_pass("live drawn highway count %d within 60–114 (used=%d explicit_gap=%d)" % [
+			drawn, used, drawn - used
+		])
 
 
-func _rebuild_with_mutant(name: String) -> void:
-	OS.set_environment("EOA_HWY3_MUTANT", name)
-	RoadTierVisualScript.hwy3_clear_memos()
-	if _ol != null and _ol.has_method("reset_hwy3_layers"):
-		_ol.call("reset_hwy3_layers")
-	if _ol != null:
-		_ol.call("_rebuild_road_layer_inner")
-		if _ol.has_method("get_road_tier_cache"):
-			var cache_v: Variant = _ol.call("get_road_tier_cache")
-			if typeof(cache_v) == TYPE_ARRAY:
-				_cache = cache_v
-
-
-func _restore_after_mutant() -> void:
-	OS.set_environment("EOA_HWY3_MUTANT", "")
-	RoadTierVisualScript.hwy3_clear_memos()
-	if _ol != null and _ol.has_method("reset_hwy3_layers"):
-		_ol.call("reset_hwy3_layers")
-	if _ol != null:
-		_ol.call("_rebuild_road_layer_inner")
-		if _ol.has_method("get_road_tier_cache"):
-			var cache_v: Variant = _ol.call("get_road_tier_cache")
-			if typeof(cache_v) == TYPE_ARRAY:
-				_cache = cache_v
-
-
-func _test_json_layer_mutant() -> void:
-	if _loader == null or _ol == null or not _ol.has_method("get_hwy3_city_layer"):
-		_fail("json_layer: overlay/loader missing")
+func _test_highway_z_above_river() -> void:
+	if _ol == null or not _ol.has_method("get_highway_draw_z_index"):
+		_fail("highway z: overlay missing get_highway_draw_z_index")
 		return
-	_rebuild_with_mutant("json_layer")
-	var live_v: Variant = _loader.call("get_city_layer")
-	var used_v: Variant = _ol.call("get_hwy3_city_layer")
-	var source: String = ""
-	if _ol.has_method("get_hwy3_city_source"):
-		source = str(_ol.call("get_hwy3_city_source"))
-	var same_ref: bool = typeof(used_v) == TYPE_DICTIONARY and is_same(used_v, live_v)
-	print("HWY3_LIVE_JSON_LAYER source=%s same_ref=%s" % [source, str(same_ref)])
-	if source == "scenario" or same_ref:
-		_fail("mutant json_layer survived (still ScenarioLoader city layer)")
+	var z: int = int(_ol.call("get_highway_draw_z_index"))
+	print("HWY3_LIVE_HWY_Z z=%d river=22" % z)
+	if z <= 22:
+		_fail("highway z %d not above river/IX-1 spine 22" % z)
 	else:
-		_pass("mutant json_layer killed (JSON layer only)")
-	_restore_after_mutant()
+		_pass("highway z %d above river 22" % z)
 
 
-func _test_no_second_sector_mutant() -> void:
-	_rebuild_with_mutant("no_second_sector")
-	var got: Dictionary = _rome_reaches_north()
-	print("HWY3_LIVE_NO_SECTOR2 %s" % str(got))
+func _test_ruhr_label_rule() -> void:
+	var recs: Array = _records()
+	var ruhr: Array = []
+	for rec_v in recs:
+		if typeof(rec_v) != TYPE_DICTIONARY:
+			continue
+		var rec: Dictionary = rec_v
+		var blob: String = (
+			"%s %s" % [str(rec.get("city_name", "")), str(rec.get("name", ""))]
+		).strip_edges().to_lower()
+		if (
+			blob.contains("duisburg")
+			or blob.contains("essen, kreisfreie")
+			or blob.contains("dortmund")
+			or blob.contains("düsseldorf")
+			or blob.contains("dusseldorf")
+		):
+			ruhr.append(rec)
+	if ruhr.size() < 3:
+		_fail("Ruhr labels: fewer than 3 named hub records")
+		return
+	var labeled: int = 0
+	var metro_n: int = 0
+	for rec2_v in ruhr:
+		var rec2: Dictionary = rec2_v
+		var cluster_n: int = RoadTierVisualScript.hwy3_metro_cluster_n(ruhr, rec2)
+		if cluster_n >= RoadTierVisualScript.HWY3_METRO_MIN_HUBS:
+			metro_n += 1
+		if RoadTierVisualScript.should_label_hub_city(rec2, 2.4, cluster_n):
+			labeled += 1
+	var metro_edges: int = 0
+	for row_v in _cache:
+		if typeof(row_v) != TYPE_DICTIONARY:
+			continue
+		var row: Dictionary = row_v
+		if int(row.get("display_tier", 0)) != RoadTierVisualScript.TIER_HIGHWAY:
+			continue
+		if bool(row.get("metro", false)):
+			metro_edges += 1
+	print("HWY3_LIVE_RUHR_LABELS labeled=%d metro_hubs=%d metro_edges=%d" % [labeled, metro_n, metro_edges])
+	if labeled < 3:
+		_fail("Ruhr labels: should_label_hub_city at z2.4 hit %d want ≥3" % labeled)
+	else:
+		_pass("Ruhr labels: %d hubs labeled at z2.4" % labeled)
+	if metro_edges < 1:
+		_fail("Ruhr metro: no display_tier==2 edge stamped metro")
+	else:
+		_pass("Ruhr metro: %d highway edges stamped" % metro_edges)
+
+
+func _test_env_mutants_removed() -> void:
+	var ol_src: String = _read_text(SRC_OL)
+	var vis_src: String = _read_text(SRC_VIS)
+	if ol_src.contains("== \"json_layer\"") or vis_src.contains("== \"json_layer\""):
+		_fail("json_layer env branch still in product")
+	else:
+		_pass("json_layer env branch removed from product")
+	if ol_src.contains("== \"no_second_sector\"") or vis_src.contains("== \"no_second_sector\""):
+		_fail("no_second_sector env branch still in product")
+	else:
+		_pass("no_second_sector env branch removed from product")
+
+
+func _rome_reaches_north_from(dbg: Dictionary) -> Dictionary:
+	var recs_v: Variant = dbg.get("records", [])
+	var routes_v: Variant = dbg.get("routes", [])
+	var recs: Array = recs_v if typeof(recs_v) == TYPE_ARRAY else []
+	var routes: Array = routes_v if typeof(routes_v) == TYPE_ARRAY else []
+	var rec_by: Dictionary = {}
+	for rec_v in recs:
+		if typeof(rec_v) != TYPE_DICTIONARY:
+			continue
+		var rec: Dictionary = rec_v
+		rec_by[int(rec.get("pid", 0))] = rec
+	var rome_pid: int = 0
+	for rec2_v in recs:
+		if typeof(rec2_v) != TYPE_DICTIONARY:
+			continue
+		var rec2: Dictionary = rec2_v
+		var blob: String = (
+			"%s %s" % [str(rec2.get("city_name", "")), str(rec2.get("name", ""))]
+		).strip_edges().to_lower()
+		if blob.contains("rome") or blob.contains("roma"):
+			rome_pid = int(rec2.get("pid", 0))
+			break
+	var out: Dictionary = {"ok": false, "chain": "", "hit": ""}
+	if rome_pid <= 0:
+		return out
+	for rt_v in routes:
+		if typeof(rt_v) != TYPE_DICTIONARY:
+			continue
+		var rt: Dictionary = rt_v
+		var pids_v: Variant = rt.get("pids", [])
+		var pids: Array = pids_v if typeof(pids_v) == TYPE_ARRAY else []
+		var has_rome: bool = false
+		var hit: String = ""
+		for pv in pids:
+			var pid: int = int(pv)
+			if pid == rome_pid:
+				has_rome = true
+			var rec3_v: Variant = rec_by.get(pid, {})
+			var rec3: Dictionary = rec3_v if typeof(rec3_v) == TYPE_DICTIONARY else {}
+			var nm: String = _rec_label(rec3).to_lower()
+			if (
+				nm.contains("firenze")
+				or nm.contains("florence")
+				or nm.contains("bologna")
+				or nm.contains("milano")
+				or nm.contains("milan")
+			):
+				hit = nm
+		if has_rome and hit != "":
+			out["ok"] = true
+			out["hit"] = hit
+			out["chain"] = _route_name_chain(rt, rec_by)
+			return out
+	return out
+
+
+func _test_rome_north_source_mutant() -> void:
+	var src: String = _read_text(SRC_VIS)
+	var needle: String = "var second: int = _hwy3_reachable_second_sector(hubs, cap_pid, first, adj, attrs)"
+	if needle not in src:
+		_fail("rome-north source mutant: _hwy3_reachable_sectors second-sector line missing")
+		return
+	if src.count(needle) != 1:
+		_fail("rome-north source mutant: expected one second-sector assign, got %d" % src.count(needle))
+		return
+	var mutated: String = src.replace(needle, "var second: int = 0")
+	mutated = mutated.replace("class_name RoadTierVisual\n", "")
+	var gs := GDScript.new()
+	gs.source_code = mutated
+	if gs.reload() != OK:
+		_fail("rome-north source mutant: mutated script failed to parse")
+		return
+	var cache_clone: Array = []
+	for row_v in _cache:
+		if typeof(row_v) == TYPE_DICTIONARY:
+			var dup: Dictionary = (row_v as Dictionary).duplicate()
+			if not bool(dup.get("explicit", false)) and int(dup.get("display_tier", 0)) == RoadTierVisualScript.TIER_HIGHWAY:
+				dup["display_tier"] = RoadTierVisualScript.TIER_PAVED
+			cache_clone.append(dup)
+	if _ol == null or not _ol.has_method("_collect_hwy3_hub_ctx"):
+		_fail("rome-north source mutant: overlay missing hub ctx")
+		return
+	var ctx: Dictionary = _ol.call("_collect_hwy3_hub_ctx")
+	if _ol.has_method("get_hwy3_graph_rows"):
+		var g_v: Variant = _ol.call("get_hwy3_graph_rows")
+		if typeof(g_v) == TYPE_ARRAY and not (g_v as Array).is_empty():
+			ctx["graph"] = g_v
+	if gs.has_method("hwy3_clear_memos"):
+		gs.call("hwy3_clear_memos")
+	gs.call("assign_rare_display_tiers", cache_clone, ctx)
+	var dbg_v: Variant = gs.call("hwy3_debug")
+	var dbg: Dictionary = dbg_v if typeof(dbg_v) == TYPE_DICTIONARY else {}
+	var got: Dictionary = _rome_reaches_north_from(dbg)
+	print("HWY3_LIVE_SOURCE_MUTANT %s" % str(got))
 	if bool(got.get("ok", false)):
-		_fail("mutant no_second_sector survived Rome-north %s" % str(got.get("chain", "")))
+		_fail("mutant reachable_sectors second=0 survived Rome-north %s" % str(got.get("chain", "")))
 	else:
-		_pass("mutant no_second_sector killed (no Rome-north span)")
-	_restore_after_mutant()
+		_pass("mutant reachable_sectors second=0 killed Rome-north")
