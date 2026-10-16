@@ -1670,6 +1670,8 @@ static func _hwy3_unpicked_second_sector_hub(
 	rec_by_pid: Dictionary,
 	hubs_by_tag: Dictionary
 ) -> bool:
+	if not HWY3_MAJOR_TAGS.has(tag):
+		return false
 	if int(sector2_by_tag.get(tag, 0)) > 0:
 		return false
 	var first: int = int(second_by_tag.get(tag, 0))
@@ -3086,6 +3088,42 @@ static func _hwy3_trim_over_cap(
 	return used
 
 
+static func _hwy3_drop_singleton_highways(cache: Array, marked: Dictionary, used: int) -> int:
+	var parent: Dictionary = {}
+	var hwy_idx: Array = []
+	for ci in range(cache.size()):
+		var crow_v: Variant = cache[ci]
+		if typeof(crow_v) != TYPE_DICTIONARY:
+			continue
+		var crow: Dictionary = crow_v
+		if int(crow.get("display_tier", 0)) != TIER_HIGHWAY:
+			continue
+		var a: int = int(crow.get("p1", 0))
+		var b: int = int(crow.get("p2", 0))
+		if a <= 0 or b <= 0:
+			continue
+		hwy_idx.append(ci)
+		_uf_union(parent, a, b)
+	var size_by_root: Dictionary = {}
+	for ci2_v in hwy_idx:
+		var ci2: int = int(ci2_v)
+		var row2: Dictionary = cache[ci2]
+		var root: int = _uf_find(parent, int(row2.get("p1", 0)))
+		size_by_root[root] = int(size_by_root.get(root, 0)) + 1
+	for ci3_v in hwy_idx:
+		var ci3: int = int(ci3_v)
+		var row3: Dictionary = cache[ci3]
+		if bool(row3.get("explicit", false)):
+			continue
+		var root3: int = _uf_find(parent, int(row3.get("p1", 0)))
+		if int(size_by_root.get(root3, 0)) != 1:
+			continue
+		row3["display_tier"] = TIER_PAVED
+		marked.erase(_hwy1_row_key(row3))
+		used = maxi(used - 1, 0)
+	return used
+
+
 static func build_hub_route_adj(graph: Array, records: Array, use_urban: bool) -> Dictionary:
 	var attrs: Dictionary = {}
 	for rec_v in records:
@@ -4065,6 +4103,7 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 				marked_verts[int(pids5[pi5b])] = true
 	if mutant != "overlap_ok":
 		used = _hwy3_trim_over_cap(cache, cache_by_key, marked, routes, used, HWY3_BUDGET_CAP)
+		used = _hwy3_drop_singleton_highways(cache, marked, used)
 	_hwy3_stamp_metro_edges(cache, hubs)
 	var hub_list: Array = []
 	for h2_v in hubs:
