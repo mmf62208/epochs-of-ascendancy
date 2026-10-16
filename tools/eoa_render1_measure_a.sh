@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # Measure 5df8e7fc live-boot frame2 + ring-edge hue with the same KEY_L protocol.
-# Writes docs/evidence/render1/a_live_5df8e7fc.json (no default A_FRAME2_MS).
+# Writes this-run LIVE_OUT/live_boot.json only. B/A must use tools/eoa_render1_live_cold_guard.sh
+# (A and B booted in the same wrapper run). Never divide by a stored A file.
 #
 #   tools/eoa_render1_measure_a.sh
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
-OUT="${EOA_RENDER1_A_FRAME2_FILE:-$ROOT/docs/evidence/render1/a_live_5df8e7fc.json}"
+OUT="${EOA_RENDER1_LIVE_OUT:-/tmp/eoa-render1-a-measure}/live_boot.json"
 WORKDIR="${EOA_RENDER1_A_WORKTREE:-/tmp/eoa-render1-a-5df8e7fc}"
 mkdir -p "$(dirname "$OUT")"
 if ! command -v xvfb-run >/dev/null 2>&1; then
@@ -83,7 +84,6 @@ if [[ ! -f "$WORKDIR/.godot/global_script_class_cache.cfg" ]]; then
 fi
 cd "$WORKDIR"
 EOA_RENDER1_MEASURE_A=1 \
-EOA_RENDER1_A_FRAME2_FILE="$OUT" \
 EOA_RENDER1_LIVE_OUT="$(dirname "$OUT")" \
 xvfb-run -a -s "-screen 0 1280x740x24" \
   "$GODOT" --path "$WORKDIR" --resolution 1280x740 \

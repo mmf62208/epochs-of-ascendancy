@@ -460,7 +460,6 @@ var _supply_prebuild_seen_depots: int = 0
 var _supply_roles_cache_role_fp: String = ""
 var _supply_role_lon_semantics: bool = false
 var _supply_lon_input_t0_usec: int = 0
-var _supply_prebuild_used_allow_without: bool = false
 var _compare_candidate_ids: Array[int] = []
 var _supply_legend_panel: PanelContainer = null
 var _supply_legend_pulse_border: Control = null
@@ -26136,7 +26135,11 @@ func _toggle_supply_overlay() -> void:
 		if supply_map_layer == null or not is_instance_valid(supply_map_layer):
 			_setup_supply_layer()
 		# Hang-class: do not BFS a 3520-board corridor on the L/G frame.
-		_show_inspector_toast("Supply legend ON · click a unit chip to order (march / Ctrl+click assault)", 4.0)
+		call_deferred(
+			"_show_inspector_toast",
+			"Supply legend ON · click a unit chip to order (march / Ctrl+click assault)",
+			4.0,
+		)
 		_refresh_supply_highlights(true)
 	else:
 		_end_supply_reroute()
@@ -29520,8 +29523,6 @@ func _supply_role_context() -> Dictionary:
 
 
 func _supply_role_for_pid(pid: int, ctx: Dictionary = {}, allow_without_overlay: bool = false) -> String:
-	if allow_without_overlay and _supply_prebuild_phase == SUPPLY_PREBUILD_ROLES:
-		_supply_prebuild_used_allow_without = true
 	if ctx.is_empty():
 		ctx = _supply_role_context()
 	var role := ""
@@ -29645,6 +29646,12 @@ func _apply_infra_pressure_role_for_pid(pid: int, roles: Dictionary[int, String]
 			if focus == "disrupt":
 				roles[pid] = "supply_pressure"
 				return
+			return
+		# Old allow_without_overlay cheat: stamp infra pressure even when the
+		# overlay is off and the province is outside L-on country match
+		# (unowned / no-benefit land). L-on lon_semantics does not.
+		if allow_without_overlay and (not p.is_sea) and int(p.infrastructure) < 45:
+			roles[pid] = "engineers_recommended"
 			return
 		if focus == "disrupt":
 			roles[pid] = "supply_pressure"
@@ -29869,12 +29876,16 @@ func get_supply_prebuild_roles_copy() -> Dictionary:
 	return _supply_prebuild_roles.duplicate()
 
 
-func prebuild_used_allow_without_overlay() -> bool:
-	return _supply_prebuild_used_allow_without
-
-
 func is_supply_ring_prebuild_ready() -> bool:
 	return _supply_ring_prebuild_done and _supply_outline_batch_is_ready()
+
+
+func warm_supply_outline_gpu_for_current_view() -> void:
+	if not _supply_outline_batch_is_ready():
+		return
+	_feed_supply_outline_batch_view()
+	if _supply_outline_batch.has_method("upload_meshes_now"):
+		_supply_outline_batch.call("upload_meshes_now")
 
 
 func _maybe_credit_first_toggle_role_compute() -> void:
@@ -30164,6 +30175,8 @@ func _set_supply_outline_batch_visible(on: bool) -> void:
 	if not _supply_outline_batch_is_ready():
 		return
 	_supply_outline_batch.visible = on
+	if not on and _supply_outline_batch.has_method("mark_hidden_for_split_present"):
+		_supply_outline_batch.call("mark_hidden_for_split_present")
 
 
 func _cached_supply_polygon(node: Node2D, pid: int) -> PackedVector2Array:
@@ -30225,7 +30238,6 @@ func _tick_supply_ring_idle_prebuild() -> void:
 		_supply_prebuild_mesh_begun = false
 		_supply_prebuild_warm_frames = 0
 		_supply_prebuild_ctx = _supply_role_context()
-		_supply_prebuild_used_allow_without = false
 		_ensure_supply_outline_batch()
 		_supply_prebuild_phase = SUPPLY_PREBUILD_ROLES
 		_supply_prebuild_setup_ms = float(Time.get_ticks_usec() - t0) / 1000.0
@@ -30341,6 +30353,8 @@ func _begin_supply_prebuild_hidden_warm() -> void:
 		return
 	if _supply_outline_batch.has_method("begin_hidden_warm"):
 		_supply_outline_batch.call("begin_hidden_warm")
+	if _supply_outline_batch.has_method("request_deferred_gpu_upload"):
+		_supply_outline_batch.call("request_deferred_gpu_upload")
 	_force_supply_ring_gpu_submit()
 	_supply_prebuild_warm_frames = 0
 	_supply_prebuild_phase = SUPPLY_PREBUILD_WARM_WAIT
@@ -30380,6 +30394,13 @@ func _commit_supply_prebuild_cache() -> void:
 	_set_supply_outline_batch_visible(false)
 	_supply_prebuild_phase = SUPPLY_PREBUILD_DONE
 	_supply_ring_prebuild_done = true
+	# Legend panel + board-stat cache after this idle slice (not on L-on).
+	call_deferred("_warm_supply_legend_off_lon")
+
+
+func _warm_supply_legend_off_lon() -> void:
+	_legend_board_stats()
+	_update_supply_overlay_legend()
 
 
 func _finish_supply_ring_prebuild_if_needed() -> void:

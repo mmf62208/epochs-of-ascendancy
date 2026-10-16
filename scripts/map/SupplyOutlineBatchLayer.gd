@@ -80,6 +80,12 @@ var _last_idle_step_ms: float = 0.0
 var _idle_total_ms: float = 0.0
 var _idle_warm_saved_modulate: Color = Color.WHITE
 var _idle_warmed: bool = false
+## First L-on present after hide submits a budget of meshes; the rest
+## queue_redraw onto the next frame so upload/submit is not one hitch.
+const FIRST_PRESENT_MESH_BUDGET := 32
+var _split_present_pending: bool = true
+var _present_deferred_keys: PackedStringArray = PackedStringArray()
+var _gpu_upload_in_progress: bool = false
 ## Product default 1.0. Line2D AA on 5df8e7fc reads thicker at the same style
 ## width; raise this (e.g. 1.35) to match visual weight without changing roles.
 var width_scale: float = 1.0
@@ -214,6 +220,40 @@ func finish_hidden_warm() -> void:
 	_idle_warmed = true
 	_last_mesh_build_ms = 0.0
 	_idle_phase = IDLE_PREBUILD_DONE
+	_split_present_pending = true
+	_present_deferred_keys = PackedStringArray()
+
+
+func mark_hidden_for_split_present() -> void:
+	_split_present_pending = true
+	_present_deferred_keys = PackedStringArray()
+
+
+func request_deferred_gpu_upload() -> void:
+	call_deferred("upload_meshes_now")
+
+
+func upload_meshes_now() -> void:
+	# Idle / pre-L path. force_draw is deferred so it is not inside the 8 ms
+	# MapRenderer idle slice. Uploads every chunk at the current LOD.
+	if _item_count <= 0 or _chunks.is_empty():
+		_idle_warmed = true
+		return
+	var was_visible := visible
+	var saved_mod := modulate
+	_gpu_upload_in_progress = true
+	_split_present_pending = false
+	_present_deferred_keys = PackedStringArray()
+	visible = true
+	modulate = Color.WHITE
+	queue_redraw()
+	RenderingServer.force_draw()
+	_gpu_upload_in_progress = false
+	_idle_warmed = true
+	visible = was_visible
+	modulate = saved_mod
+	_split_present_pending = not was_visible
+	_last_mesh_build_ms = 0.0
 
 
 func is_idle_prebuild_ready() -> bool:
@@ -521,13 +561,34 @@ func _draw() -> void:
 	_last_drawn_meshes.clear()
 	_last_culled_chunks = 0
 	var cull := _lod_level == LOD_FULL and _view_rect_valid
-	for key_var in _chunks.keys():
-		var ch: Dictionary = _chunks[key_var]
+	var keys: PackedStringArray = PackedStringArray()
+	if not _present_deferred_keys.is_empty():
+		keys = _present_deferred_keys
+		_present_deferred_keys = PackedStringArray()
+	else:
+		for key_var in _chunks.keys():
+			keys.append(str(key_var))
+	var budget := -1
+	if _split_present_pending and not _gpu_upload_in_progress:
+		budget = FIRST_PRESENT_MESH_BUDGET
+	var submitted := 0
+	var ki := 0
+	while ki < keys.size():
+		var key := keys[ki]
+		if not _chunks.has(key):
+			ki += 1
+			continue
+		var ch: Dictionary = _chunks[key]
 		if cull:
 			var aabb: Rect2 = ch.get("aabb", Rect2()) as Rect2
 			if not aabb.intersects(_view_rect):
 				_last_culled_chunks += 1
+				ki += 1
 				continue
+		if budget >= 0 and submitted >= budget:
+			_present_deferred_keys.append(key)
+			ki += 1
+			continue
 		var glow_mesh: ArrayMesh = ch.get("mesh_glow", null) as ArrayMesh
 		var core_mesh: ArrayMesh = ch.get("mesh_core", null) as ArrayMesh
 		if glow_mesh != null:
@@ -537,6 +598,7 @@ func _draw() -> void:
 				int(ch.get("glow_verts", 0)),
 				int(ch.get("glow_idx", 0)),
 			)
+			submitted += 1
 		if core_mesh != null:
 			_ci_draw_mesh(
 				core_mesh,
@@ -544,6 +606,12 @@ func _draw() -> void:
 				int(ch.get("core_verts", 0)),
 				int(ch.get("core_idx", 0)),
 			)
+			submitted += 1
+		ki += 1
+	if not _present_deferred_keys.is_empty():
+		queue_redraw()
+	else:
+		_split_present_pending = false
 
 
 func _ci_draw_mesh(mesh: Mesh, mesh_modulate: Color, cached_v: int = 0, cached_i: int = 0) -> void:

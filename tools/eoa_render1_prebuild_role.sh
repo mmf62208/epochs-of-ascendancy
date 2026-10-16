@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # RENDER-1 prebuild role map vs fresh L-on compute (per pid, not histogram).
-# Tip must PASS. Mutants lon_semantics_off and allow_without_overlay must FAIL.
+# Tip must PASS. Mutants lon_semantics_off and allow_without_overlay must FAIL
+# by per-pid role mismatch (allow_without_overlay is behavioural: unowned
+# infra-pressure pids). No self-report flag.
 #
 #   tools/eoa_render1_prebuild_role.sh
 set -euo pipefail

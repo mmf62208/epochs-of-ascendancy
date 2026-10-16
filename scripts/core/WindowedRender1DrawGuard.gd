@@ -54,6 +54,15 @@ func _info(msg: String) -> void:
 	print("  [INFO] WindowedRender1DrawGuard: ", msg)
 
 
+func _loadavg_line() -> String:
+	var f := FileAccess.open("/proc/loadavg", FileAccess.READ)
+	if f == null:
+		return "?"
+	var line := f.get_line().strip_edges()
+	f.close()
+	return line
+
+
 func _run() -> void:
 	var ds := DisplayServer.get_name()
 	_info("DisplayServer=%s" % ds)
@@ -186,7 +195,7 @@ func _measure_cold_lon() -> void:
 	var vis := 0
 	if _mr.has_method("get_supply_overlay_outline_visible_count"):
 		vis = int(_mr.call("get_supply_overlay_outline_visible_count"))
-	print("cold_raw display=%s ms=%.3f" % [DisplayServer.get_name(), cold_ms])
+	print("cold_raw display=%s ms=%.3f loadavg=%s" % [DisplayServer.get_name(), cold_ms, _loadavg_line()])
 	_info("fixture L-on toggle=%.3f first_frame=%.3f frame_total=%.3f vis=%d" % [
 		toggle_ms, first_frame_ms, cold_ms, vis,
 	])

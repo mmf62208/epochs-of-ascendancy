@@ -63,6 +63,15 @@ func _info(msg: String) -> void:
 	print("  [INFO] HeadlessRender1SupplyRingMeshTest: ", msg)
 
 
+func _loadavg_line() -> String:
+	var f := FileAccess.open("/proc/loadavg", FileAccess.READ)
+	if f == null:
+		return "?"
+	var line := f.get_line().strip_edges()
+	f.close()
+	return line
+
+
 func _flush() -> void:
 	var i := 0
 	while i < FLUSH_FRAMES:
@@ -659,7 +668,7 @@ func _test_maprenderer_toggle() -> void:
 			float(profile.get("prebuild_total_ms", -1.0)),
 		]
 	)
-	print("cold_raw display=%s ms=%.3f" % [DisplayServer.get_name(), cold_ms])
+	print("cold_raw display=%s ms=%.3f loadavg=%s" % [DisplayServer.get_name(), cold_ms, _loadavg_line()])
 	if vis < 3000:
 		_fail("fixture L-on visible=%d want >=3000" % vis)
 	if cold_ms >= MAX_COLD_MS:

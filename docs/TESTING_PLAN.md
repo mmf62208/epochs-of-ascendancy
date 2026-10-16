@@ -763,6 +763,8 @@ Tip live-boot **3/3 PASS** (xvfb llvmpipe, not product Play / not Ship GPU):
 
 This box's Δ is 24–35 ms because close-zoom fills make L-off ~230 ms too; Ship GPU ~155 ms. B/A vs measured A 422 ms. Prebuild roles: tip PASS n=208 (hub 48 + engineers 160); `lon_semantics_off` FAIL mismatch=160; `allow_without_overlay` FAIL used_allow. Mesh test **PASS**. `--quick` 14 reds. map_qc NE **0.9853**. Display-only; seed 193601 **`20fe9063`**. Stay DRAFT / HOLD.
 
+**FIX #6 (same-run A/B + fixture headroom + behavioural allow mutant):** Live guard boots A `5df8e7fc` and B in the same wrapper run. Report each raw L-on frame2 and L-off frame2. Δ = L-on − L-off. B/A = B frame2 / A frame2. Never read A from a JSON file. Ship measures B's Δ at 129–254 ms, not 24–35; B/A 0.61 does not follow from 24–35 / 198.7. Fixture L-on: idle deferred `force_draw` upload + first-present budget 32 + legend warmed off L; target ≤ 200 ms at load ~2 (250 bar kept). `allow_without_overlay` killed by per-pid mismatch on 8 unowned infra-pressure pids (no self-report flag). Hue stays ring-edge share. `width_scale` default 1.0. Numbers after same-run gates. Stay DRAFT / HOLD.
+
 ```bash
 tools/run_godot.sh --headless --path . --resolution 1280x740 \
   -s res://scripts/core/HeadlessRender1SupplyRingMeshTest.gd

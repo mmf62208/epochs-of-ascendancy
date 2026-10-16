@@ -14,7 +14,6 @@ const PREBUILD_WAIT_FRAMES := 480
 const MAX_DELTA_MS := 250.0
 const MAX_BA_RATIO := 0.75
 const HUE_TOL := 0.10
-const DEFAULT_A_FILE := "res://docs/evidence/render1/a_live_5df8e7fc.json"
 
 var _failures: int = 0
 var _t0_msec: int = 0
@@ -77,10 +76,9 @@ func _run() -> void:
 	DirAccess.make_dir_recursive_absolute(_out_dir)
 	_measure_a = OS.get_environment("EOA_RENDER1_MEASURE_A").strip_edges() == "1"
 	if not _measure_a:
-		_a_metrics = _load_a_metrics()
+		_a_metrics = _same_run_a_metrics()
 		if _a_metrics.is_empty():
-			_fail("A frame2 missing: set EOA_RENDER1_A_FRAME2_MS, EOA_RENDER1_A_FRAME2_FILE, or run MEASURE_A on 5df8e7fc (A_FRAME2_DEFAULT_MS deleted)")
-			return
+			_info("same-run A env not set yet; print B raw only (wrapper computes B/A)")
 	if OS.get_environment("EOA_SMOKE_AUTO_BEGIN").strip_edges() != "1":
 		OS.set_environment("EOA_SMOKE_AUTO_BEGIN", "1")
 	var err := change_scene_to_file("res://scenes/TestScenario.tscn")
@@ -103,6 +101,8 @@ func _run() -> void:
 	_freeze_map_renderer_process()
 	_frame_over_koln(CLOSE_Z)
 	_feed_batch_view()
+	if mr.has_method("warm_supply_outline_gpu_for_current_view"):
+		mr.call("warm_supply_outline_gpu_for_current_view")
 	if not _camera_is_on_koln(CLOSE_Z):
 		_fail("camera not on Köln after prebuild")
 		return
@@ -360,9 +360,6 @@ func _measure_loff(mr: Node) -> void:
 
 
 func _a_frame2() -> float:
-	var env := OS.get_environment("EOA_RENDER1_A_FRAME2_MS").strip_edges()
-	if not env.is_empty() and env.is_valid_float():
-		return float(env)
 	return float(_a_metrics.get("lon_frame2_ms", 0.0))
 
 
@@ -376,6 +373,10 @@ func _check_bars() -> void:
 		"live_boot L-on_frame1=%.3f L-on_frame2=%.3f L-off_frame1=%.3f L-off_frame2=%.3f delta=%.3f B/A=%.3f A_frame2=%.3f"
 		% [_frame1_ms, _frame2_ms, _loff_frame1_ms, _loff_frame2_ms, delta, ba, a_ms]
 	)
+	print(
+		"same_run_raw who=%s L-on_frame2=%.3f L-off_frame2=%.3f delta=%.3f"
+		% ["A" if _measure_a else "B", _frame2_ms, _loff_frame2_ms, delta]
+	)
 	if _measure_a:
 		_pass("MEASURE_A recorded L-on_frame2=%.3f L-off_frame2=%.3f Δ=%.3f (no B/A bar)" % [
 			_frame2_ms, _loff_frame2_ms, delta,
@@ -384,11 +385,14 @@ func _check_bars() -> void:
 	if delta > MAX_DELTA_MS:
 		_fail("Δ(L-on − L-off frame2)=%.1f ms > %.0f" % [delta, MAX_DELTA_MS])
 	else:
-		_pass("Δ(L-on − L-off frame2)=%.1f ms (bar %.0f; Ship ~155 not 10–43)" % [delta, MAX_DELTA_MS])
+		_pass("Δ(L-on − L-off frame2)=%.1f ms (bar %.0f; Ship measures B Δ 129–254)" % [delta, MAX_DELTA_MS])
+	if a_ms <= 0.0:
+		_info("B/A skipped in-process: same-run A frame2 not passed via env (wrapper computes it)")
+		return
 	if ba > MAX_BA_RATIO or ba <= 0.0:
-		_fail("frame2 B/A=%.3f want <= %.2f (A=%.1f B=%.1f)" % [ba, MAX_BA_RATIO, a_ms, _frame2_ms])
+		_fail("frame2 B/A=%.3f want <= %.2f (A=%.1f B=%.1f; same-run 5df8e7fc)" % [ba, MAX_BA_RATIO, a_ms, _frame2_ms])
 	else:
-		_pass("frame2 B/A=%.3f (A=%.1f B=%.1f; A from measured 5df8e7fc file)" % [ba, a_ms, _frame2_ms])
+		_pass("frame2 B/A=%.3f (A=%.1f B=%.1f; A from same-run 5df8e7fc boot)" % [ba, a_ms, _frame2_ms])
 
 
 func _check_roles(mr: Node) -> void:
@@ -473,7 +477,7 @@ func _check_hue() -> void:
 	var a_teal := int(_a_metrics.get("hue_teal_edge", 0))
 	var a_width := float(_a_metrics.get("width_proxy", 0.0))
 	if a_share <= 0.0:
-		_fail("A ring-edge teal share missing from measured 5df8e7fc file")
+		_info("hue vs A skipped in-process: same-run A share not passed via env (wrapper checks)")
 		return
 	var share_lo := a_share * (1.0 - HUE_TOL)
 	var share_hi := a_share * (1.0 + HUE_TOL)
@@ -548,30 +552,28 @@ func _hue_buckets(img: Image) -> Dictionary:
 	return {"teal": teal, "olive": olive, "orange": orange, "teal_fill": teal_fill}
 
 
-func _a_file_path() -> String:
-	var env := OS.get_environment("EOA_RENDER1_A_FRAME2_FILE").strip_edges()
-	if not env.is_empty():
-		return env
-	return ProjectSettings.globalize_path(DEFAULT_A_FILE)
-
-
-func _load_a_metrics() -> Dictionary:
-	var env_ms := OS.get_environment("EOA_RENDER1_A_FRAME2_MS").strip_edges()
-	var path := _a_file_path()
+func _same_run_a_metrics() -> Dictionary:
+	# Same wrapper run only. Never read a stored JSON A number.
 	var out: Dictionary = {}
-	if FileAccess.file_exists(path):
-		var txt := FileAccess.get_file_as_string(path)
-		var parsed: Variant = JSON.parse_string(txt)
-		if typeof(parsed) == TYPE_DICTIONARY:
-			out = parsed as Dictionary
-			_info("loaded A metrics from %s lon_frame2=%.3f teal_share=%.4f" % [
-				path, float(out.get("lon_frame2_ms", -1.0)), float(out.get("hue_teal_share", -1.0)),
-			])
-	if not env_ms.is_empty() and env_ms.is_valid_float():
-		out["lon_frame2_ms"] = float(env_ms)
-		_info("A lon_frame2 overridden by EOA_RENDER1_A_FRAME2_MS=%.3f" % float(env_ms))
-	if float(out.get("lon_frame2_ms", 0.0)) <= 0.0:
-		return {}
+	var env_ms := OS.get_environment("EOA_RENDER1_A_FRAME2_MS").strip_edges()
+	if env_ms.is_empty() or not env_ms.is_valid_float() or float(env_ms) <= 0.0:
+		return out
+	out["lon_frame2_ms"] = float(env_ms)
+	var env_share := OS.get_environment("EOA_RENDER1_A_HUE_SHARE").strip_edges()
+	if env_share.is_valid_float():
+		out["hue_teal_share"] = float(env_share)
+	var env_teal := OS.get_environment("EOA_RENDER1_A_HUE_TEAL").strip_edges()
+	if env_teal.is_valid_int():
+		out["hue_teal_edge"] = int(env_teal)
+	var env_olive := OS.get_environment("EOA_RENDER1_A_HUE_OLIVE").strip_edges()
+	if env_olive.is_valid_int():
+		out["hue_olive_edge"] = int(env_olive)
+	var env_width := OS.get_environment("EOA_RENDER1_A_WIDTH_PROXY").strip_edges()
+	if env_width.is_valid_float():
+		out["width_proxy"] = float(env_width)
+	_info("same-run A env lon_frame2=%.3f teal_share=%.4f" % [
+		float(out.get("lon_frame2_ms", -1.0)), float(out.get("hue_teal_share", -1.0)),
+	])
 	return out
 
 
@@ -609,19 +611,8 @@ func _write_run_json() -> void:
 		f.store_string(JSON.stringify(payload, "\t"))
 		f.close()
 		_info("wrote %s" % out_path)
-	if _measure_a:
-		var a_path := _a_file_path()
-		DirAccess.make_dir_recursive_absolute(a_path.get_base_dir())
-		var af := FileAccess.open(a_path, FileAccess.WRITE)
-		if af != null:
-			payload["sha"] = "5df8e7fcc8c5dceb3b0429e14c87c83b116feee7"
-			af.store_string(JSON.stringify(payload, "\t"))
-			af.close()
-			_info("MEASURE_A wrote %s lon_frame2=%.3f share=%.4f" % [
-				a_path, _frame2_ms, share,
-			])
-		else:
-			_fail("MEASURE_A could not write %s" % a_path)
+	elif _measure_a:
+		_fail("MEASURE_A could not write %s" % out_path)
 
 
 func _map_is_ready() -> bool:

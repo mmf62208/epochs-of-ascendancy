@@ -3,12 +3,11 @@ extends SceneTree
 ## RENDER-1: idle prebuild role map vs fresh `_compute_supply_highlight_roles()`
 ## at L-on, per pid (not the histogram).
 ##
-## Tip (no mutant env): PASS — prebuild roles == L-on compute, and prebuild
-## never passed `allow_without_overlay`.
-## Mutant `EOA_RENDER1_PREBUILD_MUTANT=lon_semantics_off` (MapRenderer ~l.30254
+## Tip (no mutant env): PASS — prebuild roles == L-on compute per pid.
+## Mutant `EOA_RENDER1_PREBUILD_MUTANT=lon_semantics_off` (MapRenderer
 ## `_supply_role_lon_semantics=false`): FAIL — infra<45 pids missing.
-## Mutant `EOA_RENDER1_PREBUILD_MUTANT=allow_without_overlay`: FAIL — prebuild
-## recorded the third-arg true path.
+## Mutant `EOA_RENDER1_PREBUILD_MUTANT=allow_without_overlay`: FAIL — unowned
+## infra-pressure pids get engineers_recommended in prebuild but not at L-on.
 ##
 ##   tools/eoa_render1_prebuild_role.sh
 ##   tools/run_godot.sh --headless --path . --resolution 1280x740 \
@@ -17,6 +16,7 @@ extends SceneTree
 const LAND_N := 240
 const HUB_N := 48
 const HIGH_INFRA_N := 32
+const OUTSIDE_OVERLAY_N := 8
 const POLY_SIDES := 24
 const HOME_Z := 0.318
 const FLUSH_FRAMES := 3
@@ -29,6 +29,7 @@ var _container: Node2D = null
 var _hub_pids: Array[int] = []
 var _low_infra_pids: Array[int] = []
 var _high_infra_pids: Array[int] = []
+var _outside_overlay_pids: Array[int] = []
 var _mutant: String = ""
 
 
@@ -118,13 +119,6 @@ func _run() -> void:
 	if pre_roles.is_empty():
 		_fail("prebuild role map empty before L-on")
 		return
-	var used_allow := false
-	if _mr.has_method("prebuild_used_allow_without_overlay"):
-		used_allow = bool(_mr.call("prebuild_used_allow_without_overlay"))
-	if used_allow:
-		_fail("prebuild used allow_without_overlay (must be L-on semantics, not third-arg true)")
-	else:
-		_pass("prebuild did not pass allow_without_overlay")
 	# L-on, then a fresh compute — not the histogram, not the cache.
 	if "supply_mode" in _mr:
 		_mr.supply_mode = false
@@ -193,6 +187,42 @@ func _compare_per_pid(pre_roles: Dictionary, fresh: Dictionary) -> void:
 	])
 	if fresh_eng < 8:
 		_fail("fixture too hub-heavy: fresh engineers_recommended=%d (lon_semantics_off mutant would be invisible)" % fresh_eng)
+	# allow_without_overlay must differ on unowned infra-pressure pids
+	# (outside supply_mode / L-on country match). No self-report flag.
+	var outside_pre_eng := 0
+	var outside_fresh_eng := 0
+	for pid in _outside_overlay_pids:
+		if str(pre_roles.get(pid, "")) == "engineers_recommended":
+			outside_pre_eng += 1
+		if str(fresh.get(pid, "")) == "engineers_recommended":
+			outside_fresh_eng += 1
+	_info(
+		"outside_overlay_infra_pressure n=%d pre_eng=%d fresh_eng=%d mutant=%s"
+		% [_outside_overlay_pids.size(), outside_pre_eng, outside_fresh_eng, _mutant]
+	)
+	print(
+		"allow_without_overlay_behaviour outside_n=%d pre_eng=%d fresh_eng=%d mismatch_extra=%d"
+		% [
+			_outside_overlay_pids.size(), outside_pre_eng, outside_fresh_eng,
+			outside_pre_eng - outside_fresh_eng,
+		]
+	)
+	if _mutant == "allow_without_overlay":
+		if outside_pre_eng <= outside_fresh_eng or mismatch == 0:
+			_fail(
+				"allow_without_overlay mutant not behavioural: outside pre_eng=%d fresh_eng=%d mismatch=%d"
+				% [outside_pre_eng, outside_fresh_eng, mismatch]
+			)
+		else:
+			_pass(
+				"allow_without_overlay killed by behaviour: outside pre_eng=%d fresh_eng=%d mismatch=%d"
+				% [outside_pre_eng, outside_fresh_eng, mismatch]
+			)
+	elif outside_pre_eng != outside_fresh_eng:
+		_fail(
+			"unowned infra-pressure pids must match on the tip: pre_eng=%d fresh_eng=%d"
+			% [outside_pre_eng, outside_fresh_eng]
+		)
 
 
 func _wait_idle_prebuild() -> Dictionary:
@@ -279,6 +309,33 @@ func _setup_renderer() -> bool:
 		else:
 			_low_infra_pids.append(pid)
 		i += 1
+	# Unowned low-infra land: L-on lon_semantics leaves them empty (no country
+	# match). allow_without_overlay stamps engineers_recommended. That is the
+	# behavioural mutant — no self-report flag.
+	var extra := 0
+	while extra < OUTSIDE_OVERLAY_N:
+		var pid := 710000 + LAND_N + extra
+		var host := Node2D.new()
+		host.name = "Prov_%d" % pid
+		host.position = Vector2.ZERO
+		var poly := Polygon2D.new()
+		poly.polygon = _make_ring(Vector2(float((LAND_N + extra) % 24) * 40.0, float((LAND_N + extra) / 24) * 40.0), 18.0, POLY_SIDES)
+		host.add_child(poly)
+		_container.add_child(host)
+		_mr.province_nodes[pid] = host
+		if pscr != null:
+			var p: Object = pscr.new()
+			p.set("id", pid)
+			p.set("name", "Outside %d" % pid)
+			p.set("owner_tag", "")
+			p.set("controller_tag", "")
+			p.set("infrastructure", 1)
+			p.set("is_sea", false)
+			_mr.provinces[pid] = p
+			if mm != null and "_provinces" in mm:
+				mm._provinces[pid] = p
+		_outside_overlay_pids.append(pid)
+		extra += 1
 	var layer_scr: Script = load("res://scripts/supply/SupplyMapLayer.gd") as Script
 	if layer_scr != null:
 		var sl: Node2D = layer_scr.new() as Node2D
@@ -290,7 +347,10 @@ func _setup_renderer() -> bool:
 		sm.overlay_visible = false
 	_mr.supply_mode = false
 	_info(
-		"seeded land=%d hubs=%d low_infra=%d high_infra=%d (mixed so lon_semantics_off is visible)"
-		% [LAND_N, _hub_pids.size(), _low_infra_pids.size(), _high_infra_pids.size()]
+		"seeded land=%d hubs=%d low_infra=%d high_infra=%d outside_overlay=%d (mixed so both mutants are visible)"
+		% [
+			LAND_N, _hub_pids.size(), _low_infra_pids.size(), _high_infra_pids.size(),
+			_outside_overlay_pids.size(),
+		]
 	)
 	return true
