@@ -3302,7 +3302,7 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 							kind = HWY3_KIND_SPAN
 			if kind == HWY3_KIND_TRUNK:
 				pass
-			elif kind == HWY3_KIND_SPAN and (sector_keep or peri_keep):
+			elif kind == HWY3_KIND_SPAN and sector_keep:
 				pass
 			else:
 				var spn_v: Variant = span_by_tag.get(tag_ab, Vector2i.ZERO)
