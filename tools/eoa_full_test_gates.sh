@@ -189,6 +189,9 @@ assert int(p.get('open_p0_n')) == 0, p
 print('open_p0_n=0 landed=%s' % p.get('landed_n'))
 " || fail
 
+run_step air_physics_p1 \
+  "$PYTHON" -m unittest tools.map_generation.tests.test_air_physics_p1_product -v || fail
+
 if [[ "$QUICK" -eq 1 ]]; then
   if [[ "$FAILED" -eq 0 ]]; then
     log "ALL PASSED (quick pure-only)"
@@ -346,6 +349,12 @@ else
       FAILED=1
     fi
   fi
+
+  run_step launch_unit_physics_calibration \
+    tools/run_godot.sh --headless -s res://scripts/core/HeadlessUnitPhysicsCalibrationTest.gd || fail
+
+  run_step launch_designer_validation \
+    tools/run_godot.sh --headless -s res://scripts/core/HeadlessDesignerValidationTest.gd || fail
 
   if [[ "$WITH_PERF" -eq 1 ]]; then
     # Perf sample is evidence only — soft 30fps FAIL is OK

@@ -41,6 +41,7 @@ var _support_row: HBoxContainer
 var _support2_row: HBoxContainer
 var _inf_bn_row: HBoxContainer
 var _tank_bn_row: HBoxContainer
+var _physics_btn: Button
 
 const DOMAIN_SYMBOLS := {
 	"land": ["infantry", "light_tank", "medium_tank", "heavy_tank", "artillery"],
@@ -328,6 +329,13 @@ func _build_ui() -> void:
 	_stats_label = Label.new()
 	_stats_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	col.add_child(_stats_label)
+
+	_physics_btn = Button.new()
+	_physics_btn.name = "PhysicsReadoutP1Btn"
+	_physics_btn.text = "Physics readout (P1)"
+	_physics_btn.visible = false
+	_physics_btn.pressed.connect(_on_physics_readout_pressed)
+	col.add_child(_physics_btn)
 
 	var btns := HBoxContainer.new()
 	btns.alignment = BoxContainer.ALIGNMENT_END
@@ -619,6 +627,10 @@ func _refresh_for_domain() -> void:
 		_inf_bn_row.visible = _domain == "land"
 	if _tank_bn_row:
 		_tank_bn_row.visible = _domain == "land"
+	if _physics_btn:
+		_physics_btn.visible = DesignCalculator.p1_readout_visible(
+			_domain, OS.get_environment("EOA_AIR_PHYSICS_P1")
+		)
 	_refresh_organize_options()
 	_update_stats()
 
@@ -630,6 +642,18 @@ func _make_module_toggler(mid: String) -> Callable:
 		else:
 			_selected_modules.erase(mid)
 		_update_stats()
+
+
+func _on_physics_readout_pressed() -> void:
+	var scr: GDScript = load("res://scripts/ui/AirPhysicsReadoutPanel.gd") as GDScript
+	if scr == null:
+		return
+	var panel: Window = scr.new() as Window
+	if panel == null:
+		return
+	get_tree().root.add_child(panel)
+	if panel.has_method("popup_centered"):
+		panel.popup_centered()
 
 
 func _update_stats() -> void:
