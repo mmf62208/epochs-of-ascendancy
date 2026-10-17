@@ -15,9 +15,11 @@ var _close_btn: Button
 
 func _ready() -> void:
 	title = "Air physics readout (P1)"
-	size = Vector2i(600, 480)
 	transient = true
 	unresizable = true
+	wrap_controls = false
+	min_size = Vector2i(600, 480)
+	size = Vector2i(600, 480)
 	close_requested.connect(_on_close)
 	_calc = _CalcScript.new()
 	if _calc.has_method("load_presets"):
@@ -44,7 +46,9 @@ func _clamp_to_viewport() -> void:
 				vw = int(r.size.x)
 				vh = int(r.size.y)
 	var max_h: int = maxi(vh - 48, 360)
-	size = Vector2i(mini(600, maxi(vw - 40, 360)), mini(480, max_h))
+	var want := Vector2i(mini(600, maxi(vw - 40, 360)), mini(480, max_h))
+	min_size = want
+	size = want
 
 
 func close_button() -> Button:

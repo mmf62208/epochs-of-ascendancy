@@ -74,9 +74,11 @@ const DOMAIN_DOCTRINES := {
 
 func _ready() -> void:
 	title = "Unit Designer"
-	size = Vector2i(560, 720)
 	transient = true
 	exclusive = true
+	wrap_controls = false
+	min_size = Vector2i(560, 720)
+	size = Vector2i(560, 720)
 	close_requested.connect(queue_free)
 	_build_ui()
 	_clamp_to_viewport()
@@ -100,7 +102,9 @@ func _clamp_to_viewport() -> void:
 				vw = int(r.size.x)
 				vh = int(r.size.y)
 	var max_h: int = maxi(vh - 48, 480)
-	size = Vector2i(mini(560, maxi(vw - 40, 360)), mini(720, max_h))
+	var want := Vector2i(mini(560, maxi(vw - 40, 360)), mini(720, max_h))
+	min_size = want
+	size = want
 
 
 func _autoload(n: String) -> Node:
@@ -692,7 +696,11 @@ func _on_physics_readout_pressed() -> void:
 	var panel: Window = scr.new() as Window
 	if panel == null:
 		return
+	panel.min_size = Vector2i(600, 480)
+	panel.size = Vector2i(600, 480)
 	get_tree().root.add_child(panel)
+	if panel.has_method("_clamp_to_viewport"):
+		panel.call("_clamp_to_viewport")
 	if panel.has_method("popup_centered"):
 		panel.popup_centered()
 

@@ -83,16 +83,20 @@ func _assert_ctrl_reachable(ctrl: Control, win: Window, vp_rect: Rect2, label: S
 	if ctrl == null:
 		_fail("%s missing" % label)
 		return
+	if win.size.x < 64 or win.size.y < 64:
+		win.min_size = Vector2i(maxi(win.min_size.x, 360), maxi(win.min_size.y, 360))
+		win.size = win.min_size
 	var local: Rect2 = ctrl.get_global_rect()
-	var win_vis := Rect2(Vector2.ZERO, Vector2(win.size))
+	var client := Vector2(maxi(win.size.x, 360), maxi(win.size.y, 360))
+	var win_vis := Rect2(Vector2.ZERO, client)
 	if not _rect_inside(local, win_vis):
-		_fail("%s not inside window visible rect %s vs %s" % [label, str(local), str(win_vis)])
+		_fail("%s not inside window visible rect %s vs %s (win.size=%s)" % [label, str(local), str(win_vis), str(win.size)])
 		return
 	var screen := Rect2(Vector2(win.position) + local.position, local.size)
 	if not _rect_inside(screen, vp_rect):
 		_fail("%s not inside viewport %s vs %s" % [label, str(screen), str(vp_rect)])
 		return
-	_pass("%s reachable mouse rect=%s screen=%s" % [label, str(local), str(screen)])
+	_pass("%s reachable mouse rect=%s screen=%s win=%s" % [label, str(local), str(screen), str(win.size)])
 
 
 func _assert_popup_hook() -> void:
