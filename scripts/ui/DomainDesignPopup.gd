@@ -84,16 +84,21 @@ func _ready() -> void:
 
 
 ## Keep the window inside a 1280×800 Play viewport (title/chrome allowance 48 px).
+## Use the root/DisplayServer size, not this Window's own 1×1 sub-viewport.
 func _clamp_to_viewport() -> void:
 	var vh := 800
 	var vw := 1280
-	var vp := get_viewport()
-	if vp != null:
-		var r := vp.get_visible_rect()
-		if r.size.y >= 1.0:
-			vh = int(r.size.y)
-		if r.size.x >= 1.0:
-			vw = int(r.size.x)
+	var ds := DisplayServer.window_get_size()
+	if ds.x >= 200 and ds.y >= 200:
+		vw = ds.x
+		vh = ds.y
+	else:
+		var t := get_tree()
+		if t != null and t.root != null:
+			var r := t.root.get_visible_rect()
+			if r.size.x >= 200.0 and r.size.y >= 200.0:
+				vw = int(r.size.x)
+				vh = int(r.size.y)
 	var max_h: int = maxi(vh - 48, 480)
 	size = Vector2i(mini(560, maxi(vw - 40, 360)), mini(720, max_h))
 
@@ -721,7 +726,10 @@ func _update_stats() -> void:
 	var sup := _support_id()
 	var inf_n := _infantry_bns()
 	var tank_n := _tank_bns()
-	var comp: Dictionary = LandCombatPower.composition_stats(mob, arm, "infantry", sup, inf_n, tank_n)
+	var comp: Dictionary = {}
+	var lcp: GDScript = load("res://scripts/combat/LandCombatPower.gd") as GDScript
+	if lcp != null and lcp.has_method("composition_stats"):
+		comp = lcp.call("composition_stats", mob, arm, "infantry", sup, inf_n, tank_n) as Dictionary
 	text += "Speed %.1f (slowest) · Armor %.0f%% · Width %.0f · Fuel use %.2f\n" % [
 		float(comp.get("speed", 1.0)),
 		float(comp.get("armor", 0.0)) * 100.0,
@@ -736,7 +744,9 @@ func _update_stats() -> void:
 		inf_n,
 		tank_n,
 	]
-	var toe: Dictionary = LandCombatPower.equipment_toe(comp)
+	var toe: Dictionary = {}
+	if lcp != null and lcp.has_method("equipment_toe"):
+		toe = lcp.call("equipment_toe", comp) as Dictionary
 	if not toe.is_empty():
 		var bits: PackedStringArray = PackedStringArray()
 		var keys: Array = toe.keys()

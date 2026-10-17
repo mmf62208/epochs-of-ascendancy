@@ -7,7 +7,6 @@ extends SceneTree
 
 const CalcScript = preload("res://scripts/units/DesignCalculator.gd")
 const PanelScript = preload("res://scripts/ui/AirPhysicsReadoutPanel.gd")
-const PopupScript = preload("res://scripts/ui/DomainDesignPopup.gd")
 
 const PLAY_SIZE := Vector2i(1280, 800)
 
@@ -180,15 +179,26 @@ func _run() -> void:
 		await process_frame
 	_force_viewport()
 	await process_frame
-	var pop: Window = PopupScript.new() as Window
+	var pop_scr: GDScript = load("res://scripts/ui/DomainDesignPopup.gd") as GDScript
+	if pop_scr == null:
+		_fail("DomainDesignPopup.gd failed to load")
+		return
+	var pop: Window = pop_scr.new() as Window
 	root.add_child(pop)
 	await process_frame
+	pop.size = Vector2i(560, 720)
+	if pop.has_method("_clamp_to_viewport"):
+		pop.call("_clamp_to_viewport")
 	if pop.has_method("set_domain"):
 		pop.call("set_domain", "air")
+	pop.visible = true
 	if pop.has_method("popup_centered"):
 		pop.popup_centered()
 	await process_frame
 	await process_frame
+	if pop.size.x < 200 or pop.size.y < 200:
+		pop.size = Vector2i(560, 720)
+		await process_frame
 	var vp_rect := Rect2(Vector2.ZERO, Vector2(PLAY_SIZE))
 	var vp_now := root.get_viewport()
 	if vp_now != null:
@@ -215,6 +225,13 @@ func _run() -> void:
 	if panel_win == null:
 		_fail("AirPhysicsReadoutPanel did not open from the button")
 	else:
+		if panel_win.has_method("_clamp_to_viewport"):
+			panel_win.call("_clamp_to_viewport")
+		if panel_win.size.x < 200 or panel_win.size.y < 200:
+			panel_win.size = Vector2i(600, 480)
+		if panel_win.has_method("popup_centered"):
+			panel_win.popup_centered()
+		await process_frame
 		var close_btn: Button = null
 		if panel_win.has_method("close_button"):
 			close_btn = panel_win.call("close_button") as Button

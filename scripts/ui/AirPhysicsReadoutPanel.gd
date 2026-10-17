@@ -28,16 +28,21 @@ func _ready() -> void:
 
 
 ## Fit a 1280×800 Play viewport so Close stays on-screen.
+## Use the root/DisplayServer size, not this Window's own 1×1 sub-viewport.
 func _clamp_to_viewport() -> void:
 	var vh := 800
 	var vw := 1280
-	var vp := get_viewport()
-	if vp != null:
-		var r := vp.get_visible_rect()
-		if r.size.y >= 1.0:
-			vh = int(r.size.y)
-		if r.size.x >= 1.0:
-			vw = int(r.size.x)
+	var ds := DisplayServer.window_get_size()
+	if ds.x >= 200 and ds.y >= 200:
+		vw = ds.x
+		vh = ds.y
+	else:
+		var t := get_tree()
+		if t != null and t.root != null:
+			var r := t.root.get_visible_rect()
+			if r.size.x >= 200.0 and r.size.y >= 200.0:
+				vw = int(r.size.x)
+				vh = int(r.size.y)
 	var max_h: int = maxi(vh - 48, 360)
 	size = Vector2i(mini(600, maxi(vw - 40, 360)), mini(480, max_h))
 
