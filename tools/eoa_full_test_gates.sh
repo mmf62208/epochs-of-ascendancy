@@ -176,6 +176,9 @@ run_step map_qc \
   "$PYTHON" tools/map_generation/scripts/map_accuracy_qc.py \
     --dir data/provinces_world_accurate --min-land-hit 0.90 || fail
 
+run_step hex_pilot_rhineland \
+  "$PYTHON" -m unittest tools.map_generation.tests.test_hex_pilot_rhineland -v || fail
+
 run_step hoi_matrix_product \
   "$PYTHON" -c "
 import sys
