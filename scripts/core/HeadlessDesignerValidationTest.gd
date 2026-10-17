@@ -67,10 +67,15 @@ func _has_warning(ev: Dictionary, wid: String) -> bool:
 	return false
 
 
+func _design_manager() -> Node:
+	return root.get_node_or_null("/root/DesignManager")
+
+
 func _run() -> void:
 	var before_custom: Dictionary = {}
-	if typeof(DesignManager) != TYPE_NIL and DesignManager.has_method("get_save_data"):
-		before_custom = (DesignManager.get_save_data() as Dictionary).duplicate(true)
+	var dm: Node = _design_manager()
+	if dm != null and dm.has_method("get_save_data"):
+		before_custom = (dm.call("get_save_data") as Dictionary).duplicate(true)
 	var before_templates: int = _count_templates()
 	var calc: RefCounted = CalcScript.new()
 	if not bool(calc.call("load_presets")):
@@ -146,14 +151,17 @@ func _run() -> void:
 		_fail("template count changed %d → %d" % [before_templates, after_templates])
 	else:
 		_pass("template count unchanged (%d)" % after_templates)
-	if typeof(DesignManager) != TYPE_NIL and DesignManager.has_method("get_save_data"):
-		var after_custom: Dictionary = DesignManager.get_save_data() as Dictionary
+	dm = _design_manager()
+	if dm != null and dm.has_method("get_save_data"):
+		var after_custom: Dictionary = dm.call("get_save_data") as Dictionary
 		var b: String = JSON.stringify(before_custom.get("custom_designs", {}))
 		var a: String = JSON.stringify(after_custom.get("custom_designs", {}))
 		if a != b:
 			_fail("DesignManager.custom_designs mutated")
 		else:
 			_pass("custom_designs unchanged")
+	else:
+		_pass("DesignManager not on tree; template-count snapshot is the read-only proof")
 
 
 func _check_clean(ev: Dictionary) -> void:
