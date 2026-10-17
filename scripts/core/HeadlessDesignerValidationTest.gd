@@ -7,6 +7,9 @@ extends SceneTree
 
 const CalcScript = preload("res://scripts/units/DesignCalculator.gd")
 const PanelScript = preload("res://scripts/ui/AirPhysicsReadoutPanel.gd")
+const PopupScript = preload("res://scripts/ui/DomainDesignPopup.gd")
+
+const PLAY_SIZE := Vector2i(1280, 800)
 
 var _failures: int = 0
 
@@ -47,6 +50,50 @@ func _count_templates() -> int:
 		name = d.get_next()
 	d.list_dir_end()
 	return n
+
+
+func _find_named(n: Node, want: String) -> Node:
+	if n.name == want:
+		return n
+	for c in n.get_children():
+		var hit: Node = _find_named(c, want)
+		if hit != null:
+			return hit
+	return null
+
+
+func _force_viewport() -> void:
+	DisplayServer.window_set_size(PLAY_SIZE)
+	if root is Window:
+		(root as Window).size = PLAY_SIZE
+	var vp := root.get_viewport()
+	if vp != null:
+		vp.size = PLAY_SIZE
+
+
+func _rect_inside(inner: Rect2, outer: Rect2, slack: float = 1.5) -> bool:
+	return (
+		inner.position.x >= outer.position.x - slack
+		and inner.position.y >= outer.position.y - slack
+		and inner.end.x <= outer.end.x + slack
+		and inner.end.y <= outer.end.y + slack
+	)
+
+
+func _assert_ctrl_reachable(ctrl: Control, win: Window, vp_rect: Rect2, label: String) -> void:
+	if ctrl == null:
+		_fail("%s missing" % label)
+		return
+	var local: Rect2 = ctrl.get_global_rect()
+	var win_vis := Rect2(Vector2.ZERO, Vector2(win.size))
+	if not _rect_inside(local, win_vis):
+		_fail("%s not inside window visible rect %s vs %s" % [label, str(local), str(win_vis)])
+		return
+	var screen := Rect2(Vector2(win.position) + local.position, local.size)
+	if not _rect_inside(screen, vp_rect):
+		_fail("%s not inside viewport %s vs %s" % [label, str(screen), str(vp_rect)])
+		return
+	_pass("%s reachable mouse rect=%s screen=%s" % [label, str(local), str(screen)])
 
 
 func _assert_popup_hook() -> void:
@@ -131,9 +178,53 @@ func _run() -> void:
 				_pass("panel Me 262 SC500 range ok")
 		panel.queue_free()
 		await process_frame
-	# DomainDesignPopup.gd names DesignManager at parse time (pre-existing).
-	# -s cannot compile it, so do not preload/new() it. Test the shared helper
-	# plus the hook text in the popup source.
+	_force_viewport()
+	await process_frame
+	var pop: Window = PopupScript.new() as Window
+	root.add_child(pop)
+	await process_frame
+	if pop.has_method("set_domain"):
+		pop.call("set_domain", "air")
+	if pop.has_method("popup_centered"):
+		pop.popup_centered()
+	await process_frame
+	await process_frame
+	var vp_rect := Rect2(Vector2.ZERO, Vector2(PLAY_SIZE))
+	var vp_now := root.get_viewport()
+	if vp_now != null:
+		var vr := vp_now.get_visible_rect()
+		if vr.size.x >= 1.0 and vr.size.y >= 1.0:
+			vp_rect = Rect2(Vector2.ZERO, vr.size)
+	var btn: Button = _find_named(pop, "PhysicsReadoutP1Btn") as Button
+	if btn == null:
+		_fail("Physics readout (P1) button missing on Air popup")
+	elif not btn.visible:
+		_fail("Physics readout (P1) button hidden on Air")
+	else:
+		_pass("Physics readout (P1) button visible on Air")
+		_assert_ctrl_reachable(btn, pop, vp_rect, "Physics readout (P1)")
+	if pop.has_method("_on_physics_readout_pressed"):
+		pop.call("_on_physics_readout_pressed")
+	await process_frame
+	await process_frame
+	var panel_win: Window = null
+	for c in root.get_children():
+		if c is Window and c != pop and str((c as Window).title).begins_with("Air physics"):
+			panel_win = c as Window
+			break
+	if panel_win == null:
+		_fail("AirPhysicsReadoutPanel did not open from the button")
+	else:
+		var close_btn: Button = null
+		if panel_win.has_method("close_button"):
+			close_btn = panel_win.call("close_button") as Button
+		if close_btn == null:
+			close_btn = _find_named(panel_win, "CloseBtn") as Button
+		_assert_ctrl_reachable(close_btn, panel_win, vp_rect, "readout Close")
+		panel_win.queue_free()
+		await process_frame
+	pop.queue_free()
+	await process_frame
 	if not bool(CalcScript.p1_readout_visible("air", "")):
 		_fail("helper hides button on air")
 	else:

@@ -111,6 +111,8 @@ Variant pairs (k cancels; |error| ≤ 5%)
 
 `k_preset` outside [0.35, 0.75] is a **soft warning** on Typhoon, B-17G, P-47D, F-86A, Fw 190, A6M2 (small fuel fraction → k has to carry the historical range). Only `k` was fitted; aero inputs that are ESTIMATE were not re-tuned to hide this.
 
+Presets with fitted k **above 0.75** (estimated aero inputs to revisit; no rebalance in P1): Typhoon 1.112 (>1), B-17 0.991, P-47 0.887, F-86 0.859, Fw 190 0.854, A6M2 0.783.
+
 ## Open for Ship/Mike
 
 1. **`STORE_CLASS_EXPONENT = 1.0` vs F2's 2/3.** Linear is required for the Me 262 1,000 kg ×0.50 case. ^(2/3) would give ×0.603 and break §4.3.

@@ -15,7 +15,7 @@ var _close_btn: Button
 
 func _ready() -> void:
 	title = "Air physics readout (P1)"
-	size = Vector2i(620, 560)
+	size = Vector2i(600, 480)
 	transient = true
 	unresizable = true
 	close_requested.connect(_on_close)
@@ -23,7 +23,27 @@ func _ready() -> void:
 	if _calc.has_method("load_presets"):
 		_calc.call("load_presets")
 	_build_ui()
+	_clamp_to_viewport()
 	_refresh()
+
+
+## Fit a 1280×800 Play viewport so Close stays on-screen.
+func _clamp_to_viewport() -> void:
+	var vh := 800
+	var vw := 1280
+	var vp := get_viewport()
+	if vp != null:
+		var r := vp.get_visible_rect()
+		if r.size.y >= 1.0:
+			vh = int(r.size.y)
+		if r.size.x >= 1.0:
+			vw = int(r.size.x)
+	var max_h: int = maxi(vh - 48, 360)
+	size = Vector2i(mini(600, maxi(vw - 40, 360)), mini(480, max_h))
+
+
+func close_button() -> Button:
+	return _close_btn
 
 
 func _build_ui() -> void:
@@ -84,11 +104,12 @@ func _build_ui() -> void:
 	_body.fit_content = false
 	_body.scroll_active = true
 	_body.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_body.custom_minimum_size = Vector2(0, 360)
+	_body.custom_minimum_size = Vector2(0, 120)
 	col.add_child(_body)
 	var btns := HBoxContainer.new()
 	btns.alignment = BoxContainer.ALIGNMENT_END
 	_close_btn = Button.new()
+	_close_btn.name = "CloseBtn"
 	_close_btn.text = "Close"
 	_close_btn.pressed.connect(_on_close)
 	btns.add_child(_close_btn)
