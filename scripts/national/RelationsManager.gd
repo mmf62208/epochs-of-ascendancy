@@ -225,7 +225,11 @@ func set_policy(a: String, b: String, policy_patch: Dictionary) -> Dictionary:
 		raise_flag(a, b, "tariff_war")
 		apply_vector_delta(a, b, {"elite": -3}, "tariff_war")
 	_pairs[_pair_key(a, b)] = pair
-	return get_snapshot(a, b)
+	var snap := get_snapshot(a, b)
+	# Military access / alliance / transit change the pathfinder's friendly set.
+	# SupplyManager listens and clears SupplyPathfinder._friendly_cache.
+	relations_changed.emit(a.strip_edges().to_upper(), b.strip_edges().to_upper(), snap)
+	return snap
 
 
 ## Pass 24: formal mutual alliance treaty (persists via pair policy).

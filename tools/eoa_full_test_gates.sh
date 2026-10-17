@@ -170,6 +170,7 @@ run_step unit_save_path \
     tools.map_generation.tests.test_long_session_save_product \
     tools.map_generation.tests.test_infra_ai_invest_product \
     tools.map_generation.tests.test_calendar_autosave_product \
+    tools.map_generation.tests.test_perf4_daily_sim_tick_product \
     -v || fail
 
 run_step map_qc \
@@ -250,6 +251,22 @@ else
 
   run_step launch_ix1_day_tick \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessIx1RoadSpineDayTickTest.gd || fail
+
+  run_step launch_perf4_daily_sim_tick \
+    tools/run_godot.sh --headless -s res://scripts/core/HeadlessPerf4DailySimTickTest.gd || fail
+
+  run_step launch_perf4_interactive_multi_ai \
+    tools/run_godot.sh --headless -s res://scripts/core/HeadlessPerf4InteractiveMultiAiTest.gd || fail
+
+  # PERF-4 FIX #11: leftover-queue ×7 on the windowed backup clock + deferred
+  # day emit. Isolates the live race (TM self-drive before TIB; mark was
+  # deferred). Must FAIL on 1cddb51c and PASS on the tip. Also runs inside
+  # launch_perf4_live_multi_ai_day.
+  run_step launch_perf4_windowed_backup \
+    env EOA_PERF4_WINDOWED_BACKUP_ONLY=1 tools/run_godot.sh --headless -s res://scripts/core/HeadlessPerf4LiveMultiAiDayTest.gd || fail
+
+  run_step launch_perf4_live_multi_ai_day \
+    tools/run_godot.sh --headless -s res://scripts/core/HeadlessPerf4LiveMultiAiDayTest.gd || fail
 
   run_step launch_ix1_live_stay_alive_tick \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessIx1RoadSpineLiveStayAliveTickTest.gd || fail

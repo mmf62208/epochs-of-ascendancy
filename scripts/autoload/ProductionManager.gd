@@ -76,6 +76,14 @@ var country_training_policy: Dictionary = {}
 # === Screen data caching ===
 var _production_screen_cache: Dictionary = {}  # country_tag -> ProductionScreenData
 
+## PERF-4 FIX #1: shared per-day lookups for interactive multi-AI (same lines / mods).
+var _interactive_ai_day_cache_ready: bool = false
+var _interactive_ai_line_ids_by_owner: Dictionary = {}
+var _interactive_ai_national_mod_cache: Dictionary = {}
+var _interactive_ai_family_count_cache: Dictionary = {}
+## PERF-4 FIX #2: full-line walks. Reverting the cache increments this.
+var interactive_ai_line_scan_count: int = 0
+
 
 func _ready() -> void:
 	_rules = GameData.design_data.production_rules
@@ -331,6 +339,42 @@ func advance_days(days: float) -> Dictionary:
 	return report
 
 
+## Shared per-day line/mod caches for interactive multi-AI. Same owners and modifiers;
+## built once so FRA/ENG/JAP do not each rescan every line and family.
+func begin_interactive_multi_ai_day_cache() -> void:
+	_interactive_ai_line_ids_by_owner.clear()
+	_interactive_ai_national_mod_cache.clear()
+	_interactive_ai_family_count_cache.clear()
+	for line_id_v in _lines.keys():
+		var line_id := str(line_id_v)
+		var line: ProductionLine = _lines[line_id_v]
+		if line == null:
+			continue
+		var owner := _resolve_line_owner_tag(line, line_id)
+		if owner.is_empty():
+			continue
+		if not _interactive_ai_line_ids_by_owner.has(owner):
+			_interactive_ai_line_ids_by_owner[owner] = []
+		(_interactive_ai_line_ids_by_owner[owner] as Array).append(line_id)
+	_interactive_ai_day_cache_ready = true
+
+
+func end_interactive_multi_ai_day_cache() -> void:
+	_interactive_ai_day_cache_ready = false
+	_interactive_ai_line_ids_by_owner.clear()
+	_interactive_ai_national_mod_cache.clear()
+	_interactive_ai_family_count_cache.clear()
+
+
+func _resolve_line_owner_tag(line: ProductionLine, line_id: String) -> String:
+	var owner := _get_line_owner_tag(line)
+	if owner.is_empty() and line_id.begins_with("oob_"):
+		var parts: PackedStringArray = line_id.split("_", false, 2)
+		if parts.size() >= 2:
+			owner = parts[1].to_upper()
+	return owner
+
+
 ## Tag-scoped day advance — only lines owned by country_tag (interactive multi-AI / lean majors).
 ## Does NOT run global daily_production_tick (avoids N× player harvest when N majors apply).
 func advance_days_for_country(country_tag: String, days: float = 1.0) -> Dictionary:
@@ -348,15 +392,21 @@ func advance_days_for_country(country_tag: String, days: float = 1.0) -> Diction
 		report["ok"] = false
 		report["reason"] = "bad_tag_or_days"
 		return report
-	for line_id in _lines:
+	var line_ids: Array = []
+	if _interactive_ai_day_cache_ready and _interactive_ai_line_ids_by_owner.has(tag):
+		line_ids = _interactive_ai_line_ids_by_owner[tag] as Array
+	else:
+		interactive_ai_line_scan_count += 1
+		for line_id_v in _lines.keys():
+			line_ids.append(str(line_id_v))
+	for line_id_v2 in line_ids:
+		var line_id := str(line_id_v2)
+		if not _lines.has(line_id):
+			continue
 		var line: ProductionLine = _lines[line_id]
 		if line == null:
 			continue
-		var owner := _get_line_owner_tag(line)
-		if owner.is_empty() and str(line_id).begins_with("oob_"):
-			var parts: PackedStringArray = str(line_id).split("_", false, 2)
-			if parts.size() >= 2:
-				owner = parts[1].to_upper()
+		var owner := _resolve_line_owner_tag(line, line_id)
 		if owner != tag:
 			continue
 		_refresh_line_modifiers(line)
@@ -2728,12 +2778,16 @@ func _compute_time_on_design_bonus(days_on_design: float) -> float:
 
 
 func _count_active_lines_for_family(family_id: String) -> int:
+	if _interactive_ai_day_cache_ready and _interactive_ai_family_count_cache.has(family_id):
+		return int(_interactive_ai_family_count_cache[family_id])
 	var count := 0
 	for line_id in _lines:
 		var line: ProductionLine = _lines[line_id]
 		var template: UnitTemplate = line.get_current_template()
 		if template != null and template.design_family == family_id:
 			count += 1
+	if _interactive_ai_day_cache_ready:
+		_interactive_ai_family_count_cache[family_id] = count
 	return count
 
 
@@ -2762,6 +2816,11 @@ func _get_line_owner_tag(line: ProductionLine) -> String:
 
 
 func _get_national_production_modifiers(country_tag: String, production_layer: String = "") -> Dictionary:
+	var cache_key := "%s|%s" % [country_tag.strip_edges().to_upper(), str(production_layer)]
+	if _interactive_ai_day_cache_ready and _interactive_ai_national_mod_cache.has(cache_key):
+		var hit: Variant = _interactive_ai_national_mod_cache[cache_key]
+		if hit is Dictionary:
+			return (hit as Dictionary).duplicate()
 	var result := {
 		"output_multiplier": 1.0,
 		"reliability_multiplier": 1.0,
@@ -2810,6 +2869,8 @@ func _get_national_production_modifiers(country_tag: String, production_layer: S
 				result["resource_output_multiplier"] *= 1.05
 				break
 
+	if _interactive_ai_day_cache_ready:
+		_interactive_ai_national_mod_cache[cache_key] = result.duplicate()
 	return result
 
 
@@ -3799,7 +3860,11 @@ func advance_production(days: float) -> void:
 		# Pop labor (new leap forward): countries with larger population provide more labor, boosting factory output (ties pop policies/growth to production).
 		var pop_labor := 1.0
 		if typeof(GameData) != TYPE_NIL and GameData.has_method("get_peace_state"):
-			var ps: Dictionary = GameData.get_peace_state()
+			var ps: Dictionary = {}
+			if GameData.has_method("peek_peace_state"):
+				ps = GameData.peek_peace_state()
+			elif GameData.has_method("get_peace_state"):
+				ps = GameData.get_peace_state()
 			var p := float(ps.get("population", {}).get(factory.owner_tag, 0.0))
 			if p > 0:
 				pop_labor = clampf(1.0 + (p / 100000000.0) * 0.2, 1.0, 1.5)
