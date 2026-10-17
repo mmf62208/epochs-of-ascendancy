@@ -7,7 +7,6 @@ extends SceneTree
 
 const CalcScript = preload("res://scripts/units/DesignCalculator.gd")
 const PanelScript = preload("res://scripts/ui/AirPhysicsReadoutPanel.gd")
-const PopupScript = preload("res://scripts/ui/DomainDesignPopup.gd")
 
 var _failures: int = 0
 
@@ -50,14 +49,32 @@ func _count_templates() -> int:
 	return n
 
 
-func _find_named(n: Node, want: String) -> Node:
-	if n.name == want:
-		return n
-	for c in n.get_children():
-		var hit: Node = _find_named(c, want)
-		if hit != null:
-			return hit
-	return null
+func _assert_popup_hook() -> void:
+	if not FileAccess.file_exists("res://scripts/ui/DomainDesignPopup.gd"):
+		_fail("DomainDesignPopup.gd missing")
+		return
+	var f: FileAccess = FileAccess.open("res://scripts/ui/DomainDesignPopup.gd", FileAccess.READ)
+	if f == null:
+		_fail("DomainDesignPopup.gd unreadable")
+		return
+	var txt: String = f.get_as_text()
+	f.close()
+	if txt.find("PhysicsReadoutP1Btn") < 0 or txt.find("Physics readout (P1)") < 0:
+		_fail("popup missing Physics readout (P1) button")
+	else:
+		_pass("popup source has Physics readout (P1) button")
+	if txt.find("EOA_AIR_PHYSICS_P1") < 0:
+		_fail("popup missing EOA_AIR_PHYSICS_P1 killswitch")
+	else:
+		_pass("popup source has killswitch")
+	if txt.find("res://scripts/ui/AirPhysicsReadoutPanel.gd") < 0:
+		_fail("popup does not load() AirPhysicsReadoutPanel")
+	else:
+		_pass("popup load()s AirPhysicsReadoutPanel")
+	if txt.find("p1_readout_visible") < 0:
+		_fail("popup does not call DesignCalculator.p1_readout_visible")
+	else:
+		_pass("popup uses p1_readout_visible helper")
 
 
 func _has_warning(ev: Dictionary, wid: String) -> bool:
@@ -114,38 +131,26 @@ func _run() -> void:
 				_pass("panel Me 262 SC500 range ok")
 		panel.queue_free()
 		await process_frame
-	var pop: Window = PopupScript.new() as Window
-	root.add_child(pop)
-	await process_frame
-	if pop.has_method("set_domain"):
-		pop.call("set_domain", "air")
-	await process_frame
-	var btn: Button = _find_named(pop, "PhysicsReadoutP1Btn") as Button
-	if btn == null:
-		_fail("Physics readout (P1) button missing")
+	# DomainDesignPopup.gd names DesignManager at parse time (pre-existing).
+	# -s cannot compile it, so do not preload/new() it. Test the shared helper
+	# plus the hook text in the popup source.
+	if not bool(CalcScript.p1_readout_visible("air", "")):
+		_fail("helper hides button on air")
 	else:
-		if not btn.visible:
-			_fail("button hidden on air domain")
-		else:
-			_pass("button visible on air")
-		if pop.has_method("set_domain"):
-			pop.call("set_domain", "land")
-		await process_frame
-		if btn.visible:
-			_fail("button visible on land")
-		else:
-			_pass("button hidden on land")
-		OS.set_environment("EOA_AIR_PHYSICS_P1", "0")
-		if pop.has_method("set_domain"):
-			pop.call("set_domain", "air")
-		await process_frame
-		if btn.visible:
-			_fail("killswitch EOA_AIR_PHYSICS_P1=0 did not hide button")
-		else:
-			_pass("killswitch hides button")
-		OS.set_environment("EOA_AIR_PHYSICS_P1", "")
-	pop.queue_free()
-	await process_frame
+		_pass("helper shows button on air")
+	if bool(CalcScript.p1_readout_visible("land", "")):
+		_fail("helper shows button on land")
+	else:
+		_pass("helper hides button on land")
+	if bool(CalcScript.p1_readout_visible("naval", "")) or bool(CalcScript.p1_readout_visible("space", "")):
+		_fail("helper shows button on naval/space")
+	else:
+		_pass("helper hides button on naval/space")
+	if bool(CalcScript.p1_readout_visible("air", "0")):
+		_fail("killswitch EOA_AIR_PHYSICS_P1=0 did not hide button")
+	else:
+		_pass("killswitch hides button")
+	_assert_popup_hook()
 	var after_templates: int = _count_templates()
 	if after_templates != before_templates:
 		_fail("template count changed %d → %d" % [before_templates, after_templates])

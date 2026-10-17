@@ -628,8 +628,9 @@ func _refresh_for_domain() -> void:
 	if _tank_bn_row:
 		_tank_bn_row.visible = _domain == "land"
 	if _physics_btn:
-		var kill := OS.get_environment("EOA_AIR_PHYSICS_P1").strip_edges() == "0"
-		_physics_btn.visible = _domain == "air" and not kill
+		_physics_btn.visible = DesignCalculator.p1_readout_visible(
+			_domain, OS.get_environment("EOA_AIR_PHYSICS_P1")
+		)
 	_refresh_organize_options()
 	_update_stats()
 

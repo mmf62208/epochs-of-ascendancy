@@ -13,6 +13,13 @@ const PRESET_ORDER: Array[String] = [
 ]
 
 
+## Popup button visibility. env_value is OS.get_environment("EOA_AIR_PHYSICS_P1").
+## Killswitch "0" hides it. DomainDesignPopup cannot be new()'d under -s (pre-existing
+## DesignManager identifier), so the test calls this helper instead of instantiating it.
+static func p1_readout_visible(domain: String, env_value: String) -> bool:
+	return domain == "air" and env_value.strip_edges() != "0"
+
+
 var _presets: Dictionary = {}
 var _loaded: bool = false
 var _errors: PackedStringArray = PackedStringArray()
