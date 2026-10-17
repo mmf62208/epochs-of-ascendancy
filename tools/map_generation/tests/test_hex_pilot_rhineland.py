@@ -43,7 +43,7 @@ class TestHexPilotRhineland(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.cfg = hap.load_config(CFG)
         cls.rows = hap.load_pilot_provinces(cls.cfg)
-        cls.report = hap.build_report(cls.cfg, write_png=False, emit_preview=True)
+        cls.report = hap.build_report(cls.cfg, write_png=False, emit_preview=True, persist=False)
 
     def test_t1_pilot_set_180_id_diff_zero(self) -> None:
         prefixes = list(self.cfg["nuts_prefixes"])
@@ -76,8 +76,8 @@ class TestHexPilotRhineland(unittest.TestCase):
         self.assertTrue(adj["agree_ge_90_vs_gis_or_explained"])
 
     def test_t4_determinism_byte_identical_json(self) -> None:
-        a = hap.build_report(self.cfg, write_png=False, emit_preview=False)
-        b = hap.build_report(self.cfg, write_png=False, emit_preview=False)
+        a = hap.build_report(self.cfg, write_png=False, emit_preview=False, persist=False)
+        b = hap.build_report(self.cfg, write_png=False, emit_preview=False, persist=False)
         da = {k: v for k, v in a.items() if not str(k).startswith("_")}
         db = {k: v for k, v in b.items() if not str(k).startswith("_")}
         ta = json.dumps(hap.round_floats(da), sort_keys=True, indent=2, ensure_ascii=False)
@@ -123,7 +123,7 @@ class TestHexPilotRhineland(unittest.TestCase):
         try:
             _reload()
             cfg = hap.load_config(CFG)
-            report = hap.build_report(cfg, write_png=False, emit_preview=False)
+            report = hap.build_report(cfg, write_png=False, emit_preview=False, persist=False)
             with self.assertRaises(AssertionError):
                 self.assertEqual(int(report["coverage_n"]), 180)
                 self.assertEqual(report["coverage"], "180/180")
@@ -140,8 +140,8 @@ class TestHexPilotRhineland(unittest.TestCase):
         try:
             _reload()
             cfg = hap.load_config(CFG)
-            a = hap.build_report(cfg, write_png=False, emit_preview=False)
-            b = hap.build_report(cfg, write_png=False, emit_preview=False)
+            a = hap.build_report(cfg, write_png=False, emit_preview=False, persist=False)
+            b = hap.build_report(cfg, write_png=False, emit_preview=False, persist=False)
             da = {k: v for k, v in a.items() if not str(k).startswith("_")}
             db = {k: v for k, v in b.items() if not str(k).startswith("_")}
             ta = json.dumps(hap.round_floats(da), sort_keys=True, indent=2)
@@ -176,7 +176,7 @@ class TestHexPilotRhineland(unittest.TestCase):
                 hap.PREVIEW_DIR_OVERRIDE, "data/provinces_world_accurate"
             )
             cfg = hap.load_config(CFG)
-            hap.build_report(cfg, write_png=False, emit_preview=True)
+            hap.build_report(cfg, write_png=False, emit_preview=True, persist=False)
             guard = hap.git_guard_paths(str(cfg.get("git_base") or BASE))
             for rel in (
                 "data/provinces_world_accurate/preview_terrain_mix.json",

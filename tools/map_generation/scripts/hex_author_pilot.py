@@ -702,6 +702,7 @@ def build_report(
     cfg: Mapping[str, Any],
     write_png: bool = True,
     emit_preview: bool = False,
+    persist: bool = True,
 ) -> Dict[str, Any]:
     rows = load_pilot_provinces(cfg)
     pids = {int(p["id"]) for p in rows}
@@ -861,7 +862,8 @@ def build_report(
         }
 
     out_json = _repo_path(str(cfg["report_json"]))
-    dump_canonical(report, out_json)
+    if persist:
+        dump_canonical(report, out_json)
     if write_png:
         centroids = {pid: _centroid_xy(gis[pid]) for pid in pids}
         render_overlay_png(
