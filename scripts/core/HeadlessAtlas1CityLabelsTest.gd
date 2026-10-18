@@ -80,6 +80,7 @@ func _run_and_quit() -> void:
 	_test_essen_at_mid_z15(layer)
 	_test_label_set_stable(layer)
 	_test_counter_avoidance(layer)
+	_test_mid_scenario_capitals(layer)
 	_finish()
 
 
@@ -216,10 +217,15 @@ func _test_nation_rect(layer: Node) -> void:
 	var cover := Rect2(Vector2.ZERO, vp)
 	layer.call("set_view", 1.55, essen, vp, [cover])
 	var placed: Array = layer.call("placed")
-	if not placed.is_empty():
-		_fail("nation rect covering the view still left %d city labels" % placed.size())
+	var leftover_towns := 0
+	for p in placed:
+		if bool(p.get("capital", false)):
+			continue
+		leftover_towns += 1
+	if leftover_towns > 0:
+		_fail("nation rect covering the view still left %d non-capital city labels" % leftover_towns)
 	else:
-		_pass("nation rect hides city labels")
+		_pass("nation rect hides non-capital city labels")
 
 
 func _test_cap(layer: Node) -> void:
@@ -539,3 +545,49 @@ func _test_counter_avoidance(layer: Node) -> void:
 		_fail("counter nudge moved Essen %.1f px from its dot" % dist)
 	else:
 		_pass("counter nudge kept Essen within %.0f px" % ANCHOR_MAX_PX)
+
+
+func _placed_has_pid(placed: Array, pid: int, want_name: String) -> bool:
+	for p in placed:
+		if float(p.get("alpha", 0.0)) < 0.04:
+			continue
+		if int(p.get("pid", 0)) != pid:
+			continue
+		var nm := str(p.get("name", ""))
+		if nm == want_name:
+			return true
+	return false
+
+
+func _test_mid_scenario_capitals(layer: Node) -> void:
+	var vp := Vector2(1280, 800)
+	var zoom := 1.35
+	var cover := Rect2(vp * 0.5 + Vector2(-90.0, -40.0), Vector2(220.0, 90.0))
+	var missing: PackedStringArray = PackedStringArray()
+	for i in TIER4.size():
+		var pid: int = TIER4[i]
+		var want := str(TIER4_NAMES[i])
+		var world: Vector2 = layer.call("world_of", pid)
+		if world == Vector2.ZERO:
+			missing.append("%s pid %d dropped from candidates" % [want, pid])
+			continue
+		var shown := str(layer.call("display_name_of", pid))
+		if shown != want:
+			missing.append("%s display is '%s'" % [want, shown])
+			continue
+		layer.call("set_view", zoom, world, vp, [])
+		var placed: Array = layer.call("placed")
+		if not _placed_has_pid(placed, pid, want):
+			missing.append("%s missing label at z1.35" % want)
+			continue
+		layer.call("set_view", zoom, world, vp, [cover], [cover])
+		placed = layer.call("placed")
+		if not _placed_has_pid(placed, pid, want):
+			missing.append("%s culled by obstacles at z1.35" % want)
+			continue
+		print("ATLAS1 city mid_capital pid=%d name=%s" % [pid, want])
+	if missing.is_empty():
+		_pass("all 8 scenario capitals have a dot and label at z1.35")
+	else:
+		for msg in missing:
+			_fail("mid capital: %s" % msg)

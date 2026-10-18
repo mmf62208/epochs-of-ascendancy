@@ -5,6 +5,8 @@ extends Node2D
 ## the zoom band, zoom (±0.03), or camera (~15% of the view) changes — not on
 ## idle frames. Labels stay next to their own dots (small screen-space shift);
 ## overlapping lower-priority names are culled. Same-city names collapse to one.
+## Scenario capitals keep a dot and a label at mid zoom: nation/counter
+## obstacles and cluster drops must not remove them.
 
 const _LOD := preload("res://scripts/map/MapZoomLOD.gd")
 const _Canvas := preload("res://scripts/map/MapCanvasConfig.gd")
@@ -257,13 +259,16 @@ func place_competing(cands: Array, zoom: float, cam: Vector2, vp: Vector2, natio
 	for c in list:
 		if not _in_band(c, zoom):
 			continue
+		var is_cap := bool(c.get("capital", false))
 		var enter := float(c.get("enter", 0.0))
 		var alpha := _LOD.city_label_fade_alpha(zoom, enter)
-		if alpha < 0.04:
+		if alpha < 0.04 and not is_cap:
 			continue
+		if is_cap and alpha < 0.04:
+			alpha = 1.0
 		var world: Vector2 = c.get("world", Vector2.ZERO)
 		var anchor_s := (world - cam) * zoom + vp * 0.5
-		if anchor_s.x < -120.0 or anchor_s.y < -80.0 or anchor_s.x > vp.x + 120.0 or anchor_s.y > vp.y + 80.0:
+		if not is_cap and (anchor_s.x < -120.0 or anchor_s.y < -80.0 or anchor_s.x > vp.x + 120.0 or anchor_s.y > vp.y + 80.0):
 			continue
 		var tier := int(c.get("tier", 1))
 		var px := _LOD.city_label_font_px(tier)
@@ -271,30 +276,39 @@ func place_competing(cands: Array, zoom: float, cam: Vector2, vp: Vector2, natio
 		var size := _measure(font, text, px)
 		var ascent := size.y * 0.78
 		var base := Vector2(8.0, -2.0)
-		if bool(c.get("capital", false)):
+		if is_cap:
 			base = Vector2(14.0, -2.0)
+		# Capitals ignore nation/counter obstacles. They still prefer a slot
+		# that misses other city labels; if none exists they take the base offset.
+		var city_only: Array = []
 		var accepted := false
 		var chosen := Rect2()
 		var chosen_off := base
+		var try_blockers: Array = city_only if is_cap else blockers
 		for off_v in _slot_offsets(base, max_shift):
 			var off: Vector2 = off_v as Vector2
 			var baseline_s: Vector2 = anchor_s + off
 			var rect := Rect2(baseline_s + Vector2(0.0, -ascent), size)
-			if _rects_clear(rect, placed, blockers, vp):
+			if _rects_clear(rect, placed, try_blockers, vp):
 				chosen = rect
 				chosen_off = off
 				accepted = true
 				break
+		if not accepted and is_cap:
+			var cap_base: Vector2 = anchor_s + base
+			chosen = Rect2(cap_base + Vector2(0.0, -ascent), size)
+			chosen_off = base
+			accepted = true
 		if not accepted:
 			continue
-		if placed.size() >= MAX_ON_SCREEN:
+		if placed.size() >= MAX_ON_SCREEN and not is_cap:
 			break
 		placed.append({
 			"name": text,
 			"pid": int(c.get("pid", 0)),
 			"screen_rect": chosen,
 			"screen_offset": chosen_off,
-			"capital": bool(c.get("capital", false)),
+			"capital": is_cap,
 			"tier": tier,
 			"alpha": alpha,
 			"score": float(c.get("score", 0.0)),
@@ -410,6 +424,8 @@ func _counter_rects_for_layout() -> Array:
 
 
 func _live_nation_rects() -> Array:
+	if _zoom >= _LOD.NATION_LABEL_HIDE_ZOOM:
+		return []
 	var parent_node := get_parent()
 	if parent_node == null:
 		return []
@@ -422,6 +438,8 @@ func _live_nation_rects() -> Array:
 			continue
 		var lbl := child as Label
 		if not lbl.visible:
+			continue
+		if lbl.modulate.a < 0.05:
 			continue
 		if not str(lbl.name).begins_with("NationLabel_"):
 			continue
@@ -779,6 +797,9 @@ func _dedupe_same_city() -> void:
 		)
 		for rec_v in recs:
 			var rec: Dictionary = rec_v
+			if bool(rec.get("capital", false)):
+				kept.append(rec)
+				continue
 			var world: Vector2 = rec.get("world", Vector2.ZERO) as Vector2
 			var pid := int(rec.get("pid", 0))
 			var absorbed := false
@@ -823,6 +844,8 @@ func _drop_district_satellites() -> void:
 	var drop: Dictionary = {}
 	for rec in _candidates:
 		if not _is_district(rec):
+			continue
+		if bool(rec.get("capital", false)):
 			continue
 		var world: Vector2 = rec.get("world", Vector2.ZERO)
 		for core in cores:
