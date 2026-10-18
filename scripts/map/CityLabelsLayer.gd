@@ -17,7 +17,7 @@ const CITY_Z := 19
 const MAX_ON_SCREEN := 60
 const MID_TIER2_SCORE_FLOOR := 400.0
 const LABEL_SHIFT_PX := 22.0
-const COUNTER_SHIFT_PX := 80.0
+const COUNTER_SHIFT_PX := 120.0
 const COUNTER_MAX_SCREEN := Vector2(88.0, 100.0)
 const ZOOM_REBUILD := 0.03
 const PAN_REBUILD_FRAC := 0.15
@@ -367,7 +367,7 @@ func place_competing(cands: Array, zoom: float, cam: Vector2, vp: Vector2, natio
 		var chosen_off := base
 		var try_blockers: Array = city_only if (must_keep or is_cap) else blockers
 		var dot_rect := Rect2(anchor_s - Vector2(DOT_BLOCK_PX, DOT_BLOCK_PX), Vector2(DOT_BLOCK_PX * 2.0, DOT_BLOCK_PX * 2.0))
-		if not must_keep and not is_cap and _dot_hits_placed(dot_rect, placed):
+		if not must_keep and not is_cap and not bool(c.get("hub", false)) and _dot_hits_placed(dot_rect, placed):
 			continue
 		for off_v in _slot_offsets(base, max_shift):
 			var off: Vector2 = off_v as Vector2
@@ -396,6 +396,18 @@ func place_competing(cands: Array, zoom: float, cam: Vector2, vp: Vector2, natio
 			chosen = Rect2(cap_base + Vector2(0.0, -ascent), size)
 			chosen_off = base
 			accepted = true
+		if not accepted and bool(c.get("hub", false)):
+			var city_and_nations: Array = []
+			for n in nation_rects:
+				city_and_nations.append(n)
+			for off_v3 in _slot_offsets(base, max_shift):
+				var off3: Vector2 = off_v3 as Vector2
+				var rect3 := Rect2(anchor_s + off3 + Vector2(0.0, -ascent), size)
+				if _rects_clear(rect3, placed, city_and_nations, vp):
+					chosen = rect3
+					chosen_off = off3
+					accepted = true
+					break
 		if not accepted:
 			continue
 		if placed.size() >= MAX_ON_SCREEN and not must_keep:
@@ -866,7 +878,7 @@ func _slot_offsets(base: Vector2, max_shift: float) -> Array:
 	var out: Array = [base]
 	if max_shift < 1.0:
 		return out
-	var radii: Array[float] = [8.0, 12.0, 16.0, 22.0, 28.0, 36.0, 48.0, 56.0, 64.0, 72.0, 80.0]
+	var radii: Array[float] = [8.0, 12.0, 16.0, 22.0, 28.0, 36.0, 48.0, 56.0, 64.0, 80.0, 96.0, 120.0]
 	var dirs: Array[Vector2] = [
 		Vector2.RIGHT, Vector2.LEFT, Vector2.UP, Vector2.DOWN,
 		Vector2(0.7071, -0.7071), Vector2(-0.7071, -0.7071),

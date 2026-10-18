@@ -621,10 +621,10 @@ func _test_counter_avoidance(layer: Node) -> void:
 	else:
 		_pass("Essen label avoids the counter rect")
 	var dist := _anchor_dist_px(names["Essen"], essen, zoom, essen, vp)
-	if dist > 80.0:
+	if dist > 120.0:
 		_fail("counter nudge moved Essen %.1f px from its dot" % dist)
 	else:
-		_pass("counter nudge kept Essen within 80 px (%.1f)" % dist)
+		_pass("counter nudge kept Essen within 120 px (%.1f)" % dist)
 
 
 func _placed_has_pid(placed: Array, pid: int, want_name: String) -> bool:

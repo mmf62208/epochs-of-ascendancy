@@ -9,7 +9,7 @@ extends SceneTree
 
 const ESSEN := 710403
 const WAIT_MAP_SECS := 420
-const SETTLE_FRAMES := 18
+const SETTLE_FRAMES := 30
 const LIVE_ZOOMS: Array[float] = [1.217, 1.512, 2.904]
 const VP := Vector2(1280, 800)
 
@@ -59,6 +59,8 @@ func _on_process() -> void:
 	if _phase == 1:
 		_tick_wait_map()
 	elif _phase == 2:
+		if _zoom_i < LIVE_ZOOMS.size():
+			_reassert_camera(LIVE_ZOOMS[_zoom_i])
 		_settle_left -= 1
 		if _settle_left <= 0:
 			_check_zoom()
@@ -226,6 +228,7 @@ func _apply_camera(pos: Vector2, zoom: float) -> void:
 		return
 	var cam := _camera()
 	if cam != null:
+		cam.position_smoothing_enabled = false
 		cam.zoom = Vector2(zoom, zoom)
 		cam.global_position = pos
 		cam.reset_smoothing()
@@ -259,6 +262,11 @@ func _essen_world() -> Vector2:
 func _maybe_shot(name: String) -> void:
 	if DisplayServer.get_name() == "headless":
 		return
+	if _zoom_i < LIVE_ZOOMS.size():
+		_reassert_camera(LIVE_ZOOMS[_zoom_i])
+	RenderingServer.force_draw()
+	if _zoom_i < LIVE_ZOOMS.size():
+		_reassert_camera(LIVE_ZOOMS[_zoom_i])
 	RenderingServer.force_draw()
 	var vp := root.get_viewport()
 	if vp == null:
