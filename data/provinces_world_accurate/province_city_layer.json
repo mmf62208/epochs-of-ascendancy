@@ -1620,15 +1620,18 @@
     },
     "710401": {
       "city_name": "Düsseldorf",
-      "tier": 2
+      "tier": 2,
+      "hub": true
     },
     "710402": {
       "city_name": "Duisburg",
-      "tier": 2
+      "tier": 2,
+      "hub": true
     },
     "710403": {
       "city_name": "Essen",
-      "tier": 2
+      "tier": 2,
+      "hub": true
     },
     "710404": {
       "city_name": "Krefeld",
@@ -1791,7 +1794,8 @@
     },
     "710443": {
       "city_name": "Dortmund",
-      "tier": 2
+      "tier": 2,
+      "hub": true
     },
     "710444": {
       "city_name": "Hagen",

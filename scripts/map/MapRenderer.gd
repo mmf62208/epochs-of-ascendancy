@@ -27638,6 +27638,8 @@ func _sync_unit_counter_visibility(z: float = -1.0) -> void:
 					(c as Node2D).visible = vis
 	_sync_unit_overlay_visibility(vis)
 	_notify_units_view_hud()
+	if _city_labels_layer != null and is_instance_valid(_city_labels_layer) and _city_labels_layer.has_method("notify_counters_dirty"):
+		_city_labels_layer.call("notify_counters_dirty")
 
 
 ## View-only: stack chips, selection rings, pin pulse, battle bubbles.
@@ -31342,6 +31344,8 @@ func _rebuild_demo_unit_icons(only_pids: Dictionary) -> void:
 	# Re-apply selected-chip chrome after pin rebuild (do not rebuild all pins for selection).
 	if not selected_formation_id.is_empty():
 		_refresh_selected_unit_chip()
+	if _city_labels_layer != null and is_instance_valid(_city_labels_layer) and _city_labels_layer.has_method("notify_counters_dirty"):
+		_city_labels_layer.call("notify_counters_dirty")
 
 
 func _sorted_sea_nation_tags(tags: Array) -> Array:

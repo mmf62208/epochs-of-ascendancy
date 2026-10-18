@@ -18,6 +18,11 @@ const RUHR := {
 	710417: "Köln",
 }
 const ESSEN := 710403
+const DUISBURG := 710402
+const DUESSELDORF := 710401
+const DORTMUND := 710443
+const HAMM := 710445
+const MUENSTER := 710429
 const METTMANN := 710412
 const VIENNA := 710022
 const VIENNA_N := 710020
@@ -78,8 +83,11 @@ func _run_and_quit() -> void:
 	_test_close_no_overlap(layer)
 	_test_no_duplicate_names(layer)
 	_test_essen_at_mid_z15(layer)
+	_test_home_cam_ruhr_mid(layer)
+	_test_ruhr_priority_over_hamm(layer)
 	_test_label_set_stable(layer)
 	_test_counter_avoidance(layer)
+	_test_no_doubled_draws(layer)
 	_test_mid_scenario_capitals(layer)
 	_finish()
 
@@ -403,15 +411,15 @@ func _test_anchor_distance(layer: Node) -> void:
 func _test_close_no_overlap(layer: Node) -> void:
 	var essen: Vector2 = layer.call("world_of", ESSEN)
 	var vp := Vector2(1280, 800)
-	var zooms: Array[float] = [2.30, 2.60, 2.90]
+	var zooms: Array[float] = [2.30, 2.60, 2.90, 2.904]
 	for z_v in zooms:
 		var z: float = z_v
 		layer.call("set_view", z, essen, vp, [])
 		var placed: Array = layer.call("placed")
-		if _placed_overlap(placed):
+		if _placed_overlap(placed) or bool(layer.call("has_visual_overlap")):
 			_fail("drawn label rects overlap at z%.2f Ruhr view" % z)
 			return
-		print("ATLAS1 city close_z%.2f n=%d" % [z, placed.size()])
+		print("ATLAS1 city close_z%.2f n=%d" % [z, int(layer.call("screen_count"))])
 	_pass("no overlapping label rects at z2.3-2.9 Ruhr")
 
 
@@ -496,6 +504,78 @@ func _test_essen_at_mid_z15(layer: Node) -> void:
 		_fail("z1.5 Ruhr labels overlap")
 	else:
 		_pass("forced z1.5 Ruhr has Essen and no overlap")
+
+
+func _test_home_cam_ruhr_mid(layer: Node) -> void:
+	## Live Play zooms Home in place. Centering the camera on Essen hid the miss.
+	var vp := Vector2(1280, 800)
+	var zooms: Array[float] = [1.217, 1.512]
+	for z_v in zooms:
+		var z: float = z_v
+		layer.call("set_view", z, HOME_CAM, vp, [])
+		var placed: Array = layer.call("placed")
+		var names := _names(placed)
+		var shown := ",".join(_name_list(placed))
+		print("ATLAS1 city home_cam z%.3f n=%d names=%s" % [z, int(layer.call("screen_count")), shown])
+		if not names.has("Essen"):
+			_fail("Essen missing at Home-cam z%.3f (live zoom-in path)" % z)
+		else:
+			_pass("Essen labelled at Home-cam z%.3f" % z)
+		if not names.has("Köln") and not names.has("Cologne"):
+			_fail("Köln missing at Home-cam z%.3f" % z)
+		if bool(layer.call("has_visual_overlap")):
+			_fail("Home-cam z%.3f label rects overlap" % z)
+
+
+func _test_ruhr_priority_over_hamm(layer: Node) -> void:
+	var essen := float(layer.call("score_of", ESSEN))
+	var duis := float(layer.call("score_of", DUISBURG))
+	var duss := float(layer.call("score_of", DUESSELDORF))
+	var dort := float(layer.call("score_of", DORTMUND))
+	var hamm := float(layer.call("score_of", HAMM))
+	var muen := float(layer.call("score_of", MUENSTER))
+	print("ATLAS1 city score_ruhr essen=%.1f duis=%.1f duss=%.1f dort=%.1f hamm=%.1f muenster=%.1f" % [
+		essen, duis, duss, dort, hamm, muen,
+	])
+	if essen <= hamm or essen <= muen:
+		_fail("Essen score %.1f must beat Hamm %.1f and Münster %.1f" % [essen, hamm, muen])
+	elif duis <= hamm or duss <= hamm or dort <= hamm:
+		_fail("Ruhr cores must beat Hamm score %.1f" % hamm)
+	else:
+		_pass("Ruhr cores beat Hamm/Münster on score")
+	var vp := Vector2(1280, 800)
+	layer.call("set_view", 1.217, HOME_CAM, vp, [])
+	var names := _names(layer.call("placed"))
+	if names.has("Hamm") and not names.has("Essen"):
+		_fail("Hamm labelled at Home-cam z1.217 while Essen is missing")
+	elif names.has("Münster") and not names.has("Essen"):
+		_fail("Münster labelled at Home-cam z1.217 while Essen is missing")
+	else:
+		_pass("Home-cam mid does not prefer Hamm/Münster over Essen")
+
+
+func _test_no_doubled_draws(layer: Node) -> void:
+	var essen: Vector2 = layer.call("world_of", ESSEN)
+	var vp := Vector2(1280, 800)
+	var zooms: Array[float] = [1.217, 1.512, 2.904]
+	for z_v in zooms:
+		var z: float = z_v
+		var cam := HOME_CAM if z < 2.0 else essen
+		layer.call("set_view", z, cam, vp, [])
+		var dups: PackedStringArray = layer.call("duplicate_drawn_names")
+		if not dups.is_empty():
+			_fail("doubled names at z%.3f: %s" % [z, ", ".join(dups)])
+			return
+		var pids: Dictionary = {}
+		for p in layer.call("placed"):
+			if float(p.get("alpha", 0.0)) < 0.04:
+				continue
+			var pid := int(p.get("pid", 0))
+			if pids.has(pid):
+				_fail("pid %d drawn twice at z%.3f" % [pid, z])
+				return
+			pids[pid] = true
+	_pass("no doubled city names or pids at live zooms")
 
 
 func _test_label_set_stable(layer: Node) -> void:

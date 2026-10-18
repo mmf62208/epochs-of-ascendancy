@@ -300,6 +300,11 @@ else
   run_step launch_atlas1_city_labels \
     env EOA_ATLAS1_BUILD_BAR_MS="$ATLAS1_BUILD_BAR_MS" tools/run_godot.sh --headless --path . -s res://scripts/core/HeadlessAtlas1CityLabelsTest.gd || fail
 
+  run_step launch_atlas1_live_ruhr \
+    env EOA_SMOKE_AUTO_BEGIN=1 EOA_ATLAS1_EVIDENCE="${EOA_ATLAS1_EVIDENCE:-/tmp/eoa-atlas1-live-ruhr}" \
+    tools/run_godot.sh --headless --path . --resolution 1280x800 \
+    -s res://scripts/core/HeadlessAtlas1LiveRuhrTest.gd || fail
+
   run_step launch_atlas1_rivers \
     env EOA_ATLAS1_BUILD_BAR_MS="$ATLAS1_BUILD_BAR_MS" tools/run_godot.sh --headless --path . -s res://scripts/core/HeadlessAtlas1RiversTest.gd || fail
 

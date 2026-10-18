@@ -9,9 +9,13 @@ const PARIS := 710707
 const BERLIN := 710300
 const VIENNA_8192 := Vector2(4467.7, 1021.1)
 const THEATER := 1.728
+const HOME_CAM := Vector2(7449.6456, 1795.9165)
 const HOME_ZOOM := 0.40
 const MID_ZOOM := 1.35
 const CLOSE_ZOOM := 2.40
+const LIVE_Z1217 := 1.217
+const LIVE_Z1512 := 1.512
+const LIVE_Z2904 := 2.904
 const WAIT_MAP_SECS := 420
 const SETTLE_FRAMES := 24
 
@@ -25,6 +29,7 @@ var _out_dir := ""
 var _cam_pos := Vector2.ZERO
 var _cam_zoom := 1.0
 var _shots: Array = []
+var _home_pos := Vector2.ZERO
 
 
 func _init() -> void:
@@ -57,6 +62,9 @@ func _start() -> void:
 		{"name": "close_paris", "zoom": CLOSE_ZOOM, "at": "paris", "probe": "paris"},
 		{"name": "mid_danube", "zoom": MID_ZOOM, "at": "vienna", "probe": "danube"},
 		{"name": "beauty_rhine", "zoom": 1.15, "at": "koln", "probe": ""},
+		{"name": "live_ruhr_z1217", "zoom": LIVE_Z1217, "at": "home", "probe": "essen", "units": true},
+		{"name": "live_ruhr_z1512", "zoom": LIVE_Z1512, "at": "home", "probe": "essen", "units": true},
+		{"name": "live_ruhr_z2904", "zoom": LIVE_Z2904, "at": "essen", "probe": "essen", "units": true},
 	]
 	_log("EOA_ATLAS1_PIXEL_GUARD who=guard.boot out=%s" % _out_dir)
 	var err := change_scene_to_file("res://scenes/TestScenario.tscn")
@@ -94,8 +102,15 @@ func _tick_wait_map() -> void:
 	if not _map_is_ready():
 		return
 	_freeze_boot_camera_fighters()
+	var cam := _camera()
+	if cam != null:
+		_home_pos = cam.global_position
+	if _home_pos == Vector2.ZERO:
+		_home_pos = HOME_CAM
 	_hide_units()
-	_log("EOA_ATLAS1_PIXEL_GUARD who=guard.map_ready n=%d" % _province_count())
+	_log("EOA_ATLAS1_PIXEL_GUARD who=guard.map_ready n=%d home=%.1f,%.1f" % [
+		_province_count(), _home_pos.x, _home_pos.y,
+	])
 	_begin_shot()
 
 
@@ -104,6 +119,7 @@ func _begin_shot() -> void:
 		_finish(_fail_reasons.is_empty())
 		return
 	var spec: Dictionary = _shots[_shot]
+	_set_units_visible(bool(spec.get("units", false)))
 	var pos := _world_for(str(spec.get("at", "essen")))
 	_apply_camera(pos, float(spec.get("zoom", 1.0)))
 	_settle_left = SETTLE_FRAMES
@@ -199,6 +215,10 @@ func _is_river(img: Image, x: int, y: int) -> bool:
 
 
 func _world_for(key: String) -> Vector2:
+	if key == "home":
+		if _home_pos != Vector2.ZERO:
+			return _home_pos
+		return HOME_CAM
 	var cities := _find_named("CityLabelsLayer")
 	var pid := 0
 	if key == "essen":
@@ -366,13 +386,18 @@ func _freeze_boot_camera_fighters() -> void:
 
 
 func _hide_units() -> void:
+	_set_units_visible(false)
 	var mr := _map_renderer()
-	if mr != null and mr.has_method("set_unit_counters_visible"):
-		mr.call("set_unit_counters_visible", false)
 	if mr != null and "info_panel" in mr:
 		var ip: Variant = mr.get("info_panel")
 		if ip is Control:
 			(ip as Control).visible = false
+
+
+func _set_units_visible(on: bool) -> void:
+	var mr := _map_renderer()
+	if mr != null and mr.has_method("set_unit_counters_visible"):
+		mr.call("set_unit_counters_visible", on)
 
 
 func _apply_camera(pos: Vector2, zoom: float) -> void:

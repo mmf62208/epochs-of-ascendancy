@@ -2,9 +2,11 @@ class_name CityLabelsLayer
 extends Node2D
 
 ## ATLAS-1 view-only city names. Candidates load once. Collision reruns when
-## the zoom band, zoom (±0.03), or camera (~15% of the view) changes — not on
-## idle frames. Labels stay next to their own dots (small screen-space shift);
-## overlapping lower-priority names are culled. Same-city names collapse to one.
+## the zoom band, zoom (±0.03), camera (~15% of the view), or live counters
+## change — not on idle frames. Labels stay next to their own dots (small
+## screen-space shift); overlapping lower-priority names are culled.
+## Collision AABBs match the drawn glyph size. Live unit/air counters and
+## already-placed city dots are obstacles. Same-city names collapse to one.
 ## Scenario capitals keep a dot and a label at mid zoom: nation/counter
 ## obstacles and cluster drops must not remove them.
 
@@ -18,9 +20,19 @@ const LABEL_SHIFT_PX := 22.0
 const ZOOM_REBUILD := 0.03
 const PAN_REBUILD_FRAC := 0.15
 const DEDUPE_WORLD := 36.0
-const COUNTER_HALF := Vector2(28.0, 32.0)
+const HUB_SCORE := 180.0
+const DOT_BLOCK_PX := 6.0
+const COUNTER_HALF := Vector2(36.0, 48.0)
 const FILL_COLOR := Color(0.08, 0.07, 0.05, 1.0)
 const OUTLINE_COLOR := Color(1.0, 0.97, 0.88, 1.0)
+## Extra mid-zoom weight so Essen / the Rhine-Ruhr cores beat Hamm and Münster
+## when Home-camera zoom-in ties on economy pop (all 20000).
+const _RUHR_CORE := {
+	710403: 90.0, # Essen
+	710401: 70.0, # Düsseldorf
+	710402: 70.0, # Duisburg
+	710443: 60.0, # Dortmund
+}
 
 const _CITY_PATH := "res://data/provinces_world_accurate/province_city_layer.json"
 const _ECON_PATH := "res://data/provinces_world_accurate/province_economy_layer.json"
@@ -70,6 +82,9 @@ var _font: Font = null
 var _by_pid: Dictionary = {}
 var _build_ms: float = -1.0
 var _dots: Node2D = null
+var _counters_dirty: bool = false
+var _last_counter_sig: int = 0
+var _last_counter_count: int = 0
 
 
 func _ready() -> void:
@@ -207,6 +222,56 @@ func screen_count() -> int:
 	return n
 
 
+func has_visual_overlap() -> bool:
+	var rects: Array = []
+	for p in _placed:
+		if float(p.get("alpha", 0.0)) < 0.04:
+			continue
+		rects.append(p.get("screen_rect", Rect2()))
+	for i in rects.size():
+		for j in range(i + 1, rects.size()):
+			var a: Rect2 = rects[i]
+			var b: Rect2 = rects[j]
+			if a.intersects(b):
+				return true
+	return false
+
+
+func duplicate_drawn_names() -> PackedStringArray:
+	var seen: Dictionary = {}
+	var dups := PackedStringArray()
+	for p in _placed:
+		if float(p.get("alpha", 0.0)) < 0.04:
+			continue
+		var nm := str(p.get("name", ""))
+		if nm.is_empty():
+			continue
+		if seen.has(nm):
+			dups.append(nm)
+		else:
+			seen[nm] = true
+	return dups
+
+
+func labels_hit_counters(counter_rects: Array = []) -> PackedStringArray:
+	var rects: Array = counter_rects
+	if rects.is_empty():
+		if _use_counter_override:
+			rects = _counter_override
+		else:
+			rects = _live_counter_rects()
+	var hits := PackedStringArray()
+	for p in _placed:
+		if float(p.get("alpha", 0.0)) < 0.04:
+			continue
+		var r: Rect2 = p.get("screen_rect", Rect2())
+		for c in rects:
+			if c is Rect2 and r.intersects(c as Rect2):
+				hits.append(str(p.get("name", "")))
+				break
+	return hits
+
+
 func last_layout_zoom() -> float:
 	return _last_layout_zoom
 
@@ -224,6 +289,19 @@ func set_view(zoom: float, camera_world: Vector2, viewport: Vector2, nation_rect
 	_layout_ready = false
 	_resolve_layout()
 	_queue_paint()
+
+
+## Live camera/zoom without freezing nation/counter obstacles to empty arrays.
+func set_live_view(zoom: float, camera_world: Vector2, viewport: Vector2) -> void:
+	_use_nation_override = false
+	_use_counter_override = false
+	_nation_override = []
+	_counter_override = []
+	sync_view(zoom, camera_world, viewport, true)
+
+
+func notify_counters_dirty() -> void:
+	_counters_dirty = true
 
 
 ## Live hysteresis. Idle frames with the same camera/zoom do not rebuild.
@@ -286,6 +364,9 @@ func place_competing(cands: Array, zoom: float, cam: Vector2, vp: Vector2, natio
 		var chosen := Rect2()
 		var chosen_off := base
 		var try_blockers: Array = city_only if (must_keep or is_cap) else blockers
+		var dot_rect := Rect2(anchor_s - Vector2(DOT_BLOCK_PX, DOT_BLOCK_PX), Vector2(DOT_BLOCK_PX * 2.0, DOT_BLOCK_PX * 2.0))
+		if not must_keep and not is_cap and _dot_hits_placed(dot_rect, placed):
+			continue
 		for off_v in _slot_offsets(base, max_shift):
 			var off: Vector2 = off_v as Vector2
 			var baseline_s: Vector2 = anchor_s + off
@@ -318,7 +399,10 @@ func place_competing(cands: Array, zoom: float, cam: Vector2, vp: Vector2, natio
 			"enter": enter,
 			"font_px": px,
 			"ascent": ascent,
+			"dot_rect": dot_rect,
 		})
+		if not must_keep and not is_cap:
+			blockers.append(dot_rect)
 	return placed
 
 
@@ -388,6 +472,12 @@ func _should_rebuild(zoom: float, pos: Vector2, vp_size: Vector2) -> bool:
 		return true
 	if vp_size.distance_squared_to(_last_vp) > 4.0:
 		return true
+	if _counters_dirty:
+		return true
+	if not _use_counter_override:
+		var n := _live_counter_count_cheap()
+		if n != _last_counter_count:
+			return true
 	return false
 
 
@@ -408,8 +498,12 @@ func _resolve_layout() -> void:
 	_last_vp = _vp
 	_layout_ready = true
 	rebuild_count += 1
+	_counters_dirty = false
 	var nations := _nation_rects_for_layout()
 	var counters := _counter_rects_for_layout()
+	if not _use_counter_override:
+		_last_counter_sig = _signature_of_rects(counters)
+		_last_counter_count = counters.size()
 	_placed = place_competing(_candidates, _zoom, _cam, _vp, nations, LABEL_SHIFT_PX, counters)
 
 
@@ -452,23 +546,143 @@ func _live_nation_rects() -> Array:
 
 
 func _live_counter_rects() -> Array:
-	var parent_node := get_parent()
-	if parent_node == null:
-		return []
 	var out: Array = []
-	_collect_counter_rects(parent_node, out, 0)
+	var seen: Dictionary = {}
+	var mr := _map_renderer_host()
+	if mr != null:
+		_collect_counters_from_map_renderer(mr, out, seen)
+		return out
+	var parent_node := get_parent()
+	if parent_node != null:
+		_collect_counter_rects(parent_node, out, seen, 0, 2)
 	return out
 
 
-func _collect_counter_rects(node: Node, out: Array, depth: int) -> void:
-	if node == null or depth > 2:
+func _live_counter_count_cheap() -> int:
+	var mr := _map_renderer_host()
+	if mr == null:
+		return _last_counter_count
+	var n := 0
+	if mr.has_method("_count_visible_unit_icons"):
+		n = int(mr.call("_count_visible_unit_icons"))
+	elif "_demo_unit_icon_pids" in mr:
+		n = (mr.get("_demo_unit_icon_pids") as Array).size()
+	var sea: Node = null
+	if "container" in mr:
+		var cont: Node = mr.get("container") as Node
+		if cont != null:
+			sea = cont.get_node_or_null("SeaNationFleetLayer")
+	if sea != null:
+		for c in sea.get_children():
+			if c is Node2D and str(c.name).begins_with("DemoUnitIcon_") and (c as Node2D).visible:
+				n += 1
+	return n
+
+
+func _map_renderer_host() -> Node:
+	var n := get_parent()
+	if n == null:
+		return null
+	var r := n.get_parent()
+	if r != null and ("province_nodes" in r or r.has_method("set_unit_counters_visible")):
+		return r
+	if n.has_method("set_unit_counters_visible") or "province_nodes" in n:
+		return n
+	return null
+
+
+func _collect_counters_from_map_renderer(mr: Node, out: Array, seen: Dictionary) -> void:
+	var pids: Array = []
+	if "_demo_unit_icon_pids" in mr:
+		pids = mr.get("_demo_unit_icon_pids") as Array
+	var nodes: Dictionary = {}
+	if "province_nodes" in mr:
+		nodes = mr.get("province_nodes") as Dictionary
+	for id_v in pids:
+		var id := int(id_v)
+		if not nodes.has(id):
+			continue
+		var host: Node = nodes[id] as Node
+		if host == null:
+			continue
+		for c in host.get_children():
+			_maybe_append_counter(c, out, seen)
+			_maybe_append_pin(c, out, seen)
+	var sea: Node = null
+	if "container" in mr:
+		var cont: Node = mr.get("container") as Node
+		if cont != null:
+			sea = cont.get_node_or_null("SeaNationFleetLayer")
+	if sea != null:
+		for c in sea.get_children():
+			_maybe_append_counter(c, out, seen)
+
+
+func _collect_counter_rects(node: Node, out: Array, seen: Dictionary, depth: int, max_depth: int) -> void:
+	if node == null or depth > max_depth:
 		return
-	if str(node.name).begins_with("DemoUnitIcon_") and node is Node2D:
-		var icon := node as Node2D
-		if icon.visible:
-			out.append(_counter_screen_rect(icon))
+	_maybe_append_counter(node, out, seen)
 	for child in node.get_children():
-		_collect_counter_rects(child, out, depth + 1)
+		_collect_counter_rects(child, out, seen, depth + 1, max_depth)
+
+
+func _maybe_append_counter(node: Node, out: Array, seen: Dictionary) -> void:
+	if node == null or not (node is Node2D):
+		return
+	if not str(node.name).begins_with("DemoUnitIcon_"):
+		return
+	var icon := node as Node2D
+	if not icon.visible:
+		return
+	var iid := icon.get_instance_id()
+	if seen.has(iid):
+		return
+	seen[iid] = true
+	out.append(_counter_label_screen_rect(icon))
+
+
+func _maybe_append_pin(node: Node, out: Array, seen: Dictionary) -> void:
+	if node == null or not (node is Node2D):
+		return
+	var nm := str(node.name)
+	if nm != "PinFocusPulse" and nm != "StackBadge" and not nm.begins_with("SelectedFrame"):
+		return
+	var icon := node as Node2D
+	if not icon.visible:
+		return
+	var iid := icon.get_instance_id()
+	if seen.has(iid):
+		return
+	seen[iid] = true
+	out.append(_counter_label_screen_rect(icon))
+
+
+func _signature_of_rects(rects: Array) -> int:
+	var sig := rects.size() * 10007
+	for r in rects:
+		if not (r is Rect2):
+			continue
+		var rr: Rect2 = r
+		sig = sig * 31 + int(round(rr.position.x)) + int(round(rr.position.y)) * 17
+		sig = sig + int(round(rr.size.x)) * 13 + int(round(rr.size.y)) * 7
+	return sig
+
+
+func _world_to_label_screen(world: Vector2) -> Vector2:
+	return (world - _cam) * _zoom + _vp * 0.5
+
+
+func _counter_label_screen_rect(icon: Node2D) -> Rect2:
+	if icon == null or not is_instance_valid(icon):
+		return Rect2()
+	var origin_w := icon.global_position
+	var local := _icon_local_aabb(icon)
+	var sc := maxf(absf(icon.scale.x), absf(icon.scale.y))
+	if sc < 0.05:
+		sc = 1.0
+	var p0 := _world_to_label_screen(origin_w + local.position * sc)
+	var p1 := _world_to_label_screen(origin_w + local.end * sc)
+	return Rect2(p0, p1 - p0).abs().grow(2.0)
 
 
 func _control_screen_rect(lbl: Control) -> Rect2:
@@ -482,15 +696,89 @@ func _control_screen_rect(lbl: Control) -> Rect2:
 
 
 func _counter_screen_rect(icon: Node2D) -> Rect2:
-	var xf := icon.get_global_transform_with_canvas()
-	var origin: Vector2 = xf * Vector2.ZERO
-	var corner: Vector2 = xf * COUNTER_HALF
-	var half := Vector2(absf(corner.x - origin.x), absf(corner.y - origin.y))
-	if half.x < 18.0:
-		half.x = 24.0
-	if half.y < 18.0:
-		half.y = 28.0
-	return Rect2(origin - half, half * 2.0)
+	return _counter_label_screen_rect(icon)
+
+
+func _icon_local_aabb(icon: Node2D) -> Rect2:
+	var acc := Rect2(-COUNTER_HALF, COUNTER_HALF * 2.0)
+	if icon == null:
+		return acc
+	for ch in icon.get_children():
+		acc = _merge_child_local_rect(acc, ch, icon)
+		if ch is Node:
+			for sub in (ch as Node).get_children():
+				acc = _merge_child_local_rect(acc, sub, icon)
+	return acc
+
+
+func _merge_child_local_rect(acc: Rect2, n: Node, icon: Node2D) -> Rect2:
+	var extra := _child_local_rect(n, icon)
+	if extra.size.x <= 0.0 and extra.size.y <= 0.0:
+		return acc
+	return acc.merge(extra)
+
+
+func _child_local_rect(n: Node, icon: Node2D) -> Rect2:
+	if n == null or not (n is Node2D) or icon == null:
+		return Rect2()
+	var node := n as Node2D
+	if not node.visible:
+		return Rect2()
+	var own := Rect2()
+	if n is Polygon2D:
+		var poly := n as Polygon2D
+		if poly.polygon.is_empty():
+			return Rect2()
+		var mn: Vector2 = poly.polygon[0]
+		var mx: Vector2 = mn
+		for v in poly.polygon:
+			var pv: Vector2 = v
+			mn = Vector2(minf(mn.x, pv.x), minf(mn.y, pv.y))
+			mx = Vector2(maxf(mx.x, pv.x), maxf(mx.y, pv.y))
+		own = Rect2(mn, mx - mn)
+	elif n is Sprite2D:
+		var spr := n as Sprite2D
+		if spr.texture == null:
+			return Rect2()
+		var sz: Vector2 = spr.texture.get_size()
+		if spr.region_enabled:
+			sz = spr.region_rect.size
+		if spr.centered:
+			own = Rect2(-sz * 0.5, sz)
+		else:
+			own = Rect2(Vector2.ZERO, sz)
+	elif "text" in n:
+		var t := str(n.get("text"))
+		if t.is_empty():
+			return Rect2()
+		var fs := 13
+		if "font_size" in n:
+			fs = int(n.get("font_size"))
+		var w := maxf(8.0, float(t.length()) * float(fs) * 0.55)
+		var ox := 0.0
+		if "align_center" in n and bool(n.get("align_center")):
+			ox = -w * 0.5
+		elif "align_right" in n and bool(n.get("align_right")):
+			ox = -w
+		own = Rect2(Vector2(ox, -float(fs)), Vector2(w, float(fs) + 4.0))
+	if own.size.x <= 0.0 and own.size.y <= 0.0:
+		return Rect2()
+	if not icon.is_inside_tree() or not node.is_inside_tree():
+		return Rect2(node.position + own.position, own.size)
+	var xf := icon.global_transform.affine_inverse() * node.global_transform
+	var corners: Array[Vector2] = [
+		own.position,
+		own.position + Vector2(own.size.x, 0.0),
+		own.end,
+		own.position + Vector2(0.0, own.size.y),
+	]
+	var mn2: Vector2 = xf * corners[0]
+	var mx2: Vector2 = mn2
+	for c in corners:
+		var p: Vector2 = xf * c
+		mn2 = Vector2(minf(mn2.x, p.x), minf(mn2.y, p.y))
+		mx2 = Vector2(maxf(mx2.x, p.x), maxf(mx2.y, p.y))
+	return Rect2(mn2, mx2 - mn2)
 
 
 func _draw() -> void:
@@ -517,7 +805,9 @@ func _draw() -> void:
 		var off: Vector2 = item.get("screen_offset", Vector2(8, -2))
 		var world_text := world + off / z
 		var px := maxi(int(item.get("font_px", 11)), 8)
-		var world_px := maxi(int(round(float(px) / z)), 8)
+		# Keep the glyph at `px` screen pixels. A world-space floor of 8 made
+		# close-zoom labels ~8*z screen px while collision still used `px`.
+		var world_px := maxi(int(round(float(px) / z)), 1)
 		var outline_px := maxi(int(round(3.0 / z)), 1)
 		var text := str(item.get("name", ""))
 		draw_string_outline(font, world_text, text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, world_px, outline_px, Color(OUTLINE_COLOR.r, OUTLINE_COLOR.g, OUTLINE_COLOR.b, alpha))
@@ -530,12 +820,20 @@ func _rects_clear(rect: Rect2, placed: Array, blockers: Array, vp: Vector2) -> b
 		return false
 	for p in placed:
 		var other: Rect2 = p.get("screen_rect", Rect2())
-		if rect.intersects(other.grow(1.0)):
+		if rect.intersects(other.grow(2.0)):
 			return false
 	for n in blockers:
-		if n is Rect2 and rect.intersects((n as Rect2).grow(1.0)):
+		if n is Rect2 and rect.intersects((n as Rect2).grow(2.0)):
 			return false
 	return true
+
+
+func _dot_hits_placed(dot_rect: Rect2, placed: Array) -> bool:
+	for p in placed:
+		var other: Rect2 = p.get("screen_rect", Rect2())
+		if dot_rect.intersects(other.grow(1.0)):
+			return true
+	return false
 
 
 func _slot_offsets(base: Vector2, max_shift: float) -> Array:
@@ -596,13 +894,16 @@ func _in_band(c: Dictionary, zoom: float) -> bool:
 	return true
 
 
-func _score_city(tier: int, pop: float, kreis: bool, port: bool) -> float:
+func _score_city(tier: int, pop: float, kreis: bool, port: bool, hub: bool = false, core_bonus: float = 0.0) -> float:
 	var score := float(tier) * 100.0
 	score += minf(pop, 5000000.0) * 0.001
 	if kreis:
 		score += 250.0
 	if port:
 		score += 40.0
+	if hub:
+		score += HUB_SCORE
+	score += core_bonus
 	return score
 
 
@@ -682,7 +983,9 @@ func _load_candidates() -> void:
 		var pname := str(names.get(pid, ""))
 		var kreis := pname.ends_with(", Kreisfreie Stadt") or pname.ends_with(", Stadtkreis")
 		var port := bool(ports.get(pid, false)) or str(row.get("city_name", "")).to_lower().find("port") >= 0
-		var score := _score_city(tier, pop, kreis, port)
+		var hub := bool(row.get("hub", false)) or bool(row.get("industrial_hub", false))
+		var core_bonus := float(_RUHR_CORE.get(pid, 0.0))
+		var score := _score_city(tier, pop, kreis, port, hub, core_bonus)
 		var raw_name := str(row.get("city_name", pname))
 		var display := _canonical_display(raw_name, pname, kreis)
 		if display.is_empty():
