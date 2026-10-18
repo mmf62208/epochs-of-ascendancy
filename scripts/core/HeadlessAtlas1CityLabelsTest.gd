@@ -57,7 +57,12 @@ func _run_and_quit() -> void:
 		_fail("CityLabelsLayer.gd missing")
 		_finish()
 		return
-	var layer: Node = load(LAYER_PATH).new()
+	var script: Variant = load(LAYER_PATH)
+	if script == null:
+		_fail("CityLabelsLayer.gd failed to load")
+		_finish()
+		return
+	var layer: Node = (script as GDScript).new()
 	root.add_child(layer)
 	_test_bands(layer)
 	_test_home(layer)
@@ -86,7 +91,7 @@ func _finish() -> void:
 
 
 func _names(placed: Array) -> Dictionary:
-	var out := {}
+	var out: Dictionary = {}
 	for p in placed:
 		out[str(p.get("name", ""))] = p
 	return out
@@ -371,13 +376,14 @@ func _test_anchor_distance(layer: Node) -> void:
 	var vp := Vector2(1280, 800)
 	var zooms: Array[float] = [0.80, 1.20, 1.50, 2.40, 2.90]
 	var worst := 0.0
-	for z in zooms:
+	for z_v in zooms:
+		var z: float = z_v
 		layer.call("set_view", z, essen, vp, [])
 		var placed: Array = layer.call("placed")
 		for p in placed:
 			if float(p.get("alpha", 0.0)) < 0.04:
 				continue
-			var world: Vector2 = p.get("world", Vector2.ZERO)
+			var world: Vector2 = p.get("world", Vector2.ZERO) as Vector2
 			var dist := _anchor_dist_px(p, world, z, essen, vp)
 			if dist > worst:
 				worst = dist
@@ -392,7 +398,8 @@ func _test_close_no_overlap(layer: Node) -> void:
 	var essen: Vector2 = layer.call("world_of", ESSEN)
 	var vp := Vector2(1280, 800)
 	var zooms: Array[float] = [2.30, 2.60, 2.90]
-	for z in zooms:
+	for z_v in zooms:
+		var z: float = z_v
 		layer.call("set_view", z, essen, vp, [])
 		var placed: Array = layer.call("placed")
 		if _placed_overlap(placed):

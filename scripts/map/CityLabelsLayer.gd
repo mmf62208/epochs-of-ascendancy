@@ -276,8 +276,9 @@ func place_competing(cands: Array, zoom: float, cam: Vector2, vp: Vector2, natio
 		var accepted := false
 		var chosen := Rect2()
 		var chosen_off := base
-		for off in _slot_offsets(base, max_shift):
-			var baseline_s := anchor_s + off
+		for off_v in _slot_offsets(base, max_shift):
+			var off: Vector2 = off_v as Vector2
+			var baseline_s: Vector2 = anchor_s + off
 			var rect := Rect2(baseline_s + Vector2(0.0, -ascent), size)
 			if _rects_clear(rect, placed, blockers, vp):
 				chosen = rect
@@ -776,12 +777,14 @@ func _dedupe_same_city() -> void:
 		recs.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
 			return _better_keep(a, b)
 		)
-		for rec in recs:
-			var world: Vector2 = rec.get("world", Vector2.ZERO)
+		for rec_v in recs:
+			var rec: Dictionary = rec_v
+			var world: Vector2 = rec.get("world", Vector2.ZERO) as Vector2
 			var pid := int(rec.get("pid", 0))
 			var absorbed := false
-			for other in kept:
-				var ow: Vector2 = other.get("world", Vector2.ZERO)
+			for other_v in kept:
+				var other: Dictionary = other_v
+				var ow: Vector2 = other.get("world", Vector2.ZERO) as Vector2
 				if world.distance_to(ow) <= DEDUPE_WORLD:
 					absorbed = true
 					drop[pid] = true
