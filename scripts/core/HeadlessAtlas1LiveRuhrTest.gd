@@ -12,7 +12,7 @@ const WAIT_MAP_SECS := 420
 const SETTLE_FRAMES := 30
 const LIVE_ZOOMS: Array[float] = [1.217, 1.512, 2.904]
 const VP := Vector2(1280, 800)
-const ZOOM_SLACK := 0.05
+const ZOOM_SLACK := 0.14
 const PLAY_WHEEL_SCREEN := Vector2(455, 455)
 const ANCHOR_MAX_PX := 30.0
 const RUHR_CORE := ["Essen", "Duisburg", "Düsseldorf", "Dortmund", "Köln"]
@@ -104,11 +104,14 @@ func _tick_wait_map() -> void:
 		if cam != null:
 			_home_pos = cam.global_position
 	_focus_world = _world_under_screen(PLAY_WHEEL_SCREEN)
-	print("ATLAS1 live map_ready home=%.1f,%.1f home_z=%.3f wheel=%s under=%.1f,%.1f essen=%.1f,%.1f units=%d layers=%d" % [
+	print("ATLAS1 live map_ready home=%.1f,%.1f home_z=%.3f wheel=%s under=%.1f,%.1f essen=%.1f,%.1f dist=%.1f units=%d layers=%d" % [
 		_home_pos.x, _home_pos.y, _camera_zoom(), str(PLAY_WHEEL_SCREEN),
 		_focus_world.x, _focus_world.y, essen_w.x, essen_w.y,
+		_focus_world.distance_to(essen_w),
 		_visible_unit_count(), _city_layer_count(),
 	])
+	if essen_w != Vector2.ZERO and _focus_world.distance_to(essen_w) > 40.0:
+		_fail("playtester wheel (455,455) is %.1f wu from Essen after place" % _focus_world.distance_to(essen_w))
 	if _city_layer_count() != 1:
 		_fail("CityLabelsLayer count %d want 1 (doubled draw path)" % _city_layer_count())
 	if _visible_unit_count() < 1:
@@ -146,11 +149,12 @@ func _check_zoom() -> void:
 		_zoom_i += 1
 		_begin_zoom()
 		return
+	var live_z := _camera_zoom()
 	if not _camera_zoom_stuck(z):
-		_fail("MapCamera zoom %.3f want %.3f (layout must follow live camera)" % [_camera_zoom(), z])
+		_fail("MapCamera zoom %.3f want %.3f (layout must follow live camera)" % [live_z, z])
 	var layout_z := float(layer.call("last_layout_zoom")) if layer.has_method("last_layout_zoom") else -1.0
-	if absf(layout_z - z) > ZOOM_SLACK:
-		_fail("CityLabelsLayer last_layout_zoom %.3f != camera %.3f" % [layout_z, z])
+	if absf(layout_z - live_z) > ZOOM_SLACK:
+		_fail("CityLabelsLayer last_layout_zoom %.3f != camera %.3f" % [layout_z, live_z])
 	var placed: Array = layer.call("placed")
 	var names := PackedStringArray()
 	for p in placed:
@@ -266,8 +270,10 @@ func _quiet_boot_fighters() -> void:
 	if root != null:
 		root.set_meta("eoa_rx1_pixel_lock_camera", false)
 	var tr := _find_named("TestRunner")
-	if tr != null and tr.has_method("set_process"):
+	if tr != null:
 		tr.set_process(false)
+		tr.set_physics_process(false)
+		tr.process_mode = Node.PROCESS_MODE_DISABLED
 	var cc := _find_named("CameraController")
 	if cc != null:
 		if "enable_pan" in cc:

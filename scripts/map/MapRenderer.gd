@@ -16832,7 +16832,9 @@ func player_path_wheel_toward_world(world: Vector2, target_zoom: float) -> float
 
 func player_path_wheel_toward_screen(screen: Vector2, target_zoom: float) -> float:
 	# Playtester path: keep this screen pixel as the wheel anchor.
-	# Main WHEELDRIFT-1 / EDGE-2 only — no second zoom helper, no overshoot clamp.
+	# Main WHEELDRIFT-1 notches only — in/out are exact inverses, so a tight
+	# target sits between two stops and the loop would oscillate. Keep the
+	# closest discrete notch (no extra zoom helper, no fractional clamp).
 	var cam := get_node_or_null("MapCamera") as Camera2D
 	if cam == null and get_viewport():
 		cam = get_viewport().get_camera_2d()
@@ -16840,28 +16842,49 @@ func player_path_wheel_toward_screen(screen: Vector2, target_zoom: float) -> flo
 		return 1.0
 	var factor_in: float = _wheel_zoom_factor(true)
 	var factor_out: float = _wheel_zoom_factor(false)
+	var best_z: float = maxf(absf(cam.zoom.x), absf(cam.zoom.y))
+	var best_pos: Vector2 = cam.global_position
+	var best_d: float = absf(best_z - target_zoom)
 	var guard: int = 0
 	while guard < 48:
 		var z: float = maxf(absf(cam.zoom.x), absf(cam.zoom.y))
 		if absf(z - target_zoom) <= 0.045:
-			break
+			return z
 		_zoom_toward_mouse(factor_in if z < target_zoom else factor_out, screen)
+		z = maxf(absf(cam.zoom.x), absf(cam.zoom.y))
+		var d: float = absf(z - target_zoom)
+		if d + 0.0005 < best_d:
+			best_d = d
+			best_z = z
+			best_pos = cam.global_position
 		guard += 1
+	cam.zoom = Vector2(best_z, best_z)
+	cam.global_position = best_pos
+	_clamp_camera_to_theater()
 	return maxf(absf(cam.zoom.x), absf(cam.zoom.y))
 
 
 func player_path_place_world_at_screen(world: Vector2, screen: Vector2) -> void:
-	# Pan only. Zoom stays. Used so the playtester wheel pixel (455,455) sits
-	# on the Ruhr after Europe Home (that Home otherwise parks Essen under
-	# the Map Mode / notice strip).
+	# Pan so `world` sits on the playtester wheel pixel. Europe Home at
+	# 1280x800 fills the theater (z≈0.34) and clamp pins the camera, so a
+	# lone pan is a no-op — wheel in toward the city until the pan sticks.
 	var cam := get_node_or_null("MapCamera") as Camera2D
 	if cam == null and get_viewport():
 		cam = get_viewport().get_camera_2d()
 	if cam == null:
 		return
-	var here: Vector2 = _screen_to_world(screen)
-	cam.global_position += world - here
-	_clamp_camera_to_theater()
+	var factor_in: float = _wheel_zoom_factor(true)
+	for _i in 16:
+		var here: Vector2 = _screen_to_world(screen)
+		if here.distance_to(world) <= 12.0:
+			return
+		cam.global_position += world - here
+		_clamp_camera_to_theater()
+		here = _screen_to_world(screen)
+		if here.distance_to(world) <= 12.0:
+			return
+		var city_screen: Vector2 = cam.get_canvas_transform() * world
+		_zoom_toward_mouse(factor_in, city_screen)
 
 
 func center_europe_in_world_view() -> void:
