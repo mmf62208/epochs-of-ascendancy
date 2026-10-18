@@ -4450,12 +4450,24 @@ func apply_supply_route_mutation(route_id: String = "main", priority: String = "
 			depot_ok = MapManager.get_province(province_id) != null
 		if depot_ok and SupplyManager.has_method("set_player_depot"):
 			SupplyManager.set_player_depot(province_id, true)
-		if SupplyManager.has_method("advance_supply_day"):
+		if SupplyManager.has_method("advance_supply_day") or SupplyManager.has_method("queue_full_supply_day"):
 			# The one full supply day per game day (air / naval / shipping).
 			# The daily listener stays on the light path (main's split).
-			SupplyManager.advance_supply_day(1.0)
-			supply_live = true
-			supply_detail = "advance_supply_day"
+			# PERF-6: interactive light sim queues that day off the roll frame.
+			var queue_day := (
+				typeof(TimeManager) != TYPE_NIL
+				and TimeManager.has_method("is_interactive_light_sim")
+				and bool(TimeManager.is_interactive_light_sim())
+				and SupplyManager.has_method("queue_full_supply_day")
+			)
+			if queue_day:
+				SupplyManager.queue_full_supply_day(1.0)
+				supply_live = true
+				supply_detail = "queued_supply_day"
+			elif SupplyManager.has_method("advance_supply_day"):
+				SupplyManager.advance_supply_day(1.0)
+				supply_live = true
+				supply_detail = "advance_supply_day"
 	peace_state["supply_last_live_apply"] = {
 		"route_id": route_id,
 		"priority": priority,
@@ -4468,6 +4480,7 @@ func apply_supply_route_mutation(route_id: String = "main", priority: String = "
 		"route_id": route_id,
 		"priority": priority,
 		"live": supply_live,
+		"detail": supply_detail,
 		"manager": "SupplyManager" if supply_live else "peace_state",
 	}
 
@@ -26428,10 +26441,11 @@ func apply_interactive_multi_ai_day_live(province_id: int = 1) -> Dictionary:
 					pick = str(tag_v3)
 					break
 		var soft_ok := false
+		var live2: Dictionary = {}
 		var t_soft := Time.get_ticks_usec()
 		if not pick.is_empty() and has_method("apply_order_panel_action"):
 			# Soft tick is theater-wide supply; tag recorded for audit only
-			var live2: Dictionary = apply_order_panel_action("apply_supply", province_id)
+			live2 = apply_order_panel_action("apply_supply", province_id)
 			last_live = live2
 			soft_ok = bool(live2.get("ok", live2.get("success", true)))
 		elif not pick.is_empty():
@@ -26453,6 +26467,7 @@ func apply_interactive_multi_ai_day_live(province_id: int = 1) -> Dictionary:
 				"step": "soft_supply",
 				"ms": soft_ms,
 				"ok": soft_ok,
+				"queued": str(live2.get("detail", "")) == "queued_supply_day",
 			})
 
 	if typeof(ProductionManager) != TYPE_NIL and ProductionManager.has_method("end_interactive_multi_ai_day_cache"):

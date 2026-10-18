@@ -148,7 +148,7 @@ func _run() -> void:
 	if OS.get_environment("EOA_PERF4_EVENT_FRAME_ONLY") == "1":
 		_test_event_frame_zero_plans_non_roll(tm, mm, sm)
 		return
-	_test_step_costs(gd, sm, tm)
+	await _test_step_costs(gd, sm, tm)
 	_test_repeated_real_depot_guard(sm)
 	_test_capture_frame_budgets(mm, sm)
 	_test_peace_annexation_updates_supply(gd, mm, sm)
@@ -179,7 +179,7 @@ func _run() -> void:
 	await _test_leftover_queue_zero_plans_on_windowed_backup(tm, mm, sm)
 	_test_event_frame_zero_plans_non_roll(tm, mm, sm)
 	_test_flush_livelock_redrop_counter(mm, sm)
-	_test_one_full_supply_day_per_game_day(tm, gd, sm)
+	await _test_one_full_supply_day_per_game_day(tm, gd, sm)
 	_test_production_cache_measured(gd)
 	_test_owner_index_measured(mm)
 	_test_multi_ai_decisions_stable(gd, tm)
@@ -219,7 +219,10 @@ func _test_source_gates_fail_on_pre_fix() -> void:
 	else:
 		_pass("full_supply_day_count present")
 	var adv := _slice_func(sm_src, "advance_supply_day")
-	if "_process_air_missions" not in adv or "_process_naval_recon" not in adv:
+	var runner := adv
+	if "_run_supply_day_job" in adv:
+		runner = _slice_func(sm_src, "_run_supply_day_job")
+	if "_process_air_missions" not in runner or "_process_naval_recon" not in runner:
 		_fail("advance_supply_day dropped air/naval steps (gameplay change)")
 	else:
 		_pass("advance_supply_day keeps air/naval/shipping steps")
@@ -227,7 +230,7 @@ func _test_source_gates_fail_on_pre_fix() -> void:
 		_fail("advance_supply_day still gates live Play onto the light path")
 	else:
 		_pass("advance_supply_day does not light-gate live Play")
-	_test_replanned_off_must_fail(sm_src, adv)
+	_test_replanned_off_must_fail(sm_src, runner)
 	var gd_src := _read(SRC_GD)
 	var mut := _slice_func(gd_src, "apply_supply_route_mutation")
 	if "get_province" not in mut:
@@ -360,6 +363,8 @@ func _test_replanned_off_must_fail(sm_src: String, adv: String) -> void:
 
 
 func _boot_live_supply_network(mm: Node, sm: Node) -> bool:
+	if sm != null and "_supply_day_queue" in sm:
+		sm.set("_supply_day_queue", [])
 	if not sm.has_method("build_network"):
 		return false
 	var city := _load_city_layer()
@@ -407,6 +412,9 @@ func _test_step_costs(gd: Node, sm: Node, tm: Node) -> void:
 	_reset_clock(tm, 0)
 	if "_live_f5_equiv_clock" in tm:
 		tm.set("_live_f5_equiv_clock", true)
+	if "_supply_day_queue" in sm:
+		sm.set("_supply_day_queue", [])
+	var supply_before := int(sm.get("full_supply_day_count")) if "full_supply_day_count" in sm else 0
 	var t0 := Time.get_ticks_usec()
 	var prod: Dictionary = gd.call("apply_production_for_tag", "JAP")
 	var prod_ms := float(Time.get_ticks_usec() - t0) / 1000.0
@@ -450,10 +458,21 @@ func _test_step_costs(gd: Node, sm: Node, tm: Node) -> void:
 			str(live.get("prod_tags", [])),
 		]
 	)
-	if supply_detail != "advance_supply_day":
-		_fail("apply_supply detail=%s (live Play must use full advance_supply_day)" % supply_detail)
+	tm.set("paused", false)
+	var supply_target := supply_before + 2
+	var pumped := 0
+	while int(sm.get("full_supply_day_count")) < supply_target and pumped < 400:
+		await process_frame
+		pumped += 1
+	var supply_got := int(sm.get("full_supply_day_count")) - supply_before
+	print(
+		"HeadlessPerf4LiveMultiAiDayTest: supply_days +%d frames=%d detail=%s"
+		% [supply_got, pumped, supply_detail]
+	)
+	if supply_got != 2:
+		_fail("full supply days +%d for 2 soft applies (want one each, detail=%s)" % [supply_got, supply_detail])
 	else:
-		_pass("apply_supply full-day detail=%s %.1fms" % [supply_detail, supply_ms])
+		_pass("one full supply day completes per soft apply (+%d, detail=%s)" % [supply_got, supply_detail])
 	if supply_ms >= DAY_BUDGET_MS:
 		_fail("apply_supply %.1fms >= %.0f (live daily hitch class)" % [supply_ms, DAY_BUDGET_MS])
 	else:
@@ -2780,9 +2799,17 @@ func _test_one_full_supply_day_per_game_day(tm: Node, gd: Node, sm: Node) -> voi
 		return
 	_reset_clock(tm, 0)
 	sm.set("full_supply_day_count", 0)
+	if "_supply_day_queue" in sm:
+		sm.set("_supply_day_queue", [])
 	var days := 3
 	var clock: Dictionary = tm.call("advance_live_f5_equivalent_days", days)
+	tm.set("paused", false)
+	var pumped := 0
+	while int(sm.get("full_supply_day_count")) < days and pumped < 2000:
+		await process_frame
+		pumped += 1
 	var full_n := int(sm.get("full_supply_day_count"))
+	print("HeadlessPerf4LiveMultiAiDayTest: full_supply_pump frames=%d" % pumped)
 	print(
 		"HeadlessPerf4LiveMultiAiDayTest: full_supply_days days=%d full=%d clock=%s"
 		% [days, full_n, str(clock)]

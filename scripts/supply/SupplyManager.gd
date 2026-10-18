@@ -78,8 +78,70 @@ const ROUTE_REFRESH_BUDGET_PER_FLUSH: int = DEFAULT_ROUTE_DEST_CAP
 ## Predictive per-frame plan slice. Stop before the next plan would cross 40 ms
 ## so refill frames stay under ~200 ms. First plan is always allowed.
 const ROUTE_REFRESH_MS_BUDGET: float = 40.0
+## PERF-6: full supply-day sections spread across later frames. Route planning
+## keeps the 40 ms budget above. A supply slice stops before 20 ms, or 22 ms
+## when behind pace / in the last few non-roll frames before midnight.
+const SUPPLY_DAY_SLICE_MS_BUDGET: float = 20.0
+## Do not start an atomic phase unless remaining budget covers last cost + this.
+const SUPPLY_DAY_SLICE_ATOMIC_HEADROOM_MS: float = 2.0
+## Extra pad before starting another generate/ship item (on top of last step).
+const SUPPLY_DAY_SLICE_ITEM_HEADROOM_MS: float = 0.5
+## Leave this much of the 20 ms budget unused so a last item + GC still lands
+## under the 25 ms test cap (20 + 5). Generate/ship stop when remaining < this.
+const SUPPLY_DAY_SLICE_RESERVE_MS: float = 5.0
+## Pessimistic first-day atomic costs (ms) until a job measures them.
+const SUPPLY_DAY_SLICE_FLUSH_ESTIMATE_MS: float = 1.0
+const SUPPLY_DAY_SLICE_NAVAL_ESTIMATE_MS: float = 6.0
+const SUPPLY_DAY_SLICE_FUEL_ESTIMATE_MS: float = 4.5
+const SUPPLY_DAY_SLICE_AIR_ESTIMATE_MS: float = 1.0
+const SUPPLY_DAY_SLICE_ITEM_ESTIMATE_MS: float = 0.25
+const SUPPLY_DAY_SLICE_ITEM_COST_MAX_MS: float = 2.0
+## Floor for stored phase / item estimates (same min as the FIX #1 clamps).
+const SUPPLY_DAY_SLICE_ESTIMATE_FLOOR_MS: float = 0.05
+## Blend last cost with a new measurement: 0.75·old + 0.25·new.
+const SUPPLY_DAY_SLICE_ESTIMATE_EMA_OLD: float = 0.75
+const SUPPLY_DAY_SLICE_ESTIMATE_EMA_NEW: float = 0.25
+## Each deferred frame multiplies (estimate − floor) by this so a spike
+## becomes affordable again without a deadline-0 catch-up.
+const SUPPLY_DAY_SLICE_DEFER_DECAY: float = 0.8
+## Raise the per-frame budget up to this when behind pace or in the
+## last few non-roll frames before midnight. Still under the 25 ms cap.
+const SUPPLY_DAY_SLICE_PACE_BUDGET_MS: float = 22.0
+## Catch-up window: last N non-roll frames before the midnight tick.
+const SUPPLY_DAY_CATCH_UP_FRAMES: int = 4
 ## Last full-day section timings (spike diagnosis: heap vs rebuild vs generate).
 var last_supply_day_profile: Dictionary = {}
+## CPU ms spent inside the supply-day slicer on the last drain. 0 when skipped.
+var last_supply_slice_ms: float = 0.0
+## True when the last drain ran inside the midnight catch-up window.
+var last_supply_slice_catch_up: bool = false
+## Unbounded last-resort sync finish (deadline 0) on the final non-roll frame.
+## Separate from last_supply_slice_ms so the 25 ms cap still counts the frame.
+var supply_catch_up_sync_ms: float = 0.0
+var supply_catch_up_sync_count: int = 0
+## Test seam: when >= 8, catch-up / pace frame-time uses this ms.
+var supply_slice_frame_ms_override: float = -1.0
+## Last measured atomic-phase costs (ms). Seeded pessimistically; EMA-blended
+## on each run and decayed toward the floor on each deferred frame.
+var _supply_slice_phase_ms: Dictionary = {
+	"flush": SUPPLY_DAY_SLICE_FLUSH_ESTIMATE_MS,
+	"naval": SUPPLY_DAY_SLICE_NAVAL_ESTIMATE_MS,
+	"fuel": SUPPLY_DAY_SLICE_FUEL_ESTIMATE_MS,
+	"air": SUPPLY_DAY_SLICE_AIR_ESTIMATE_MS,
+}
+## EMA of one generate/ship item. Capped so a GC spike cannot poison the next yield.
+var _supply_slice_last_item_ms: float = SUPPLY_DAY_SLICE_ITEM_ESTIMATE_MS
+## True after this drain has started at least one phase or item. Progress
+## guarantee: the first unit of work in a frame always runs.
+var _supply_slice_did_work: bool = false
+## Test seam: when >= 0, atomic-phase afford uses this ms instead of last measured.
+## Same idea as route_refresh_plan_cost_estimate_ms (WHEN, not WHAT).
+var supply_slice_phase_cost_estimate_ms: float = -1.0
+## Test seam: when >= 0, generate/ship afford uses this ms instead of the EMA.
+var supply_slice_item_cost_estimate_ms: float = -1.0
+## FIFO of full supply days queued off the roll frame. Sync advance_supply_day
+## does not use this.
+var _supply_day_queue: Array = []
 var last_flush_plan_count: int = 0
 var last_flush_plan_ms: float = 0.0
 var last_flush_plan_ms_max: float = 0.0
@@ -637,7 +699,16 @@ func _process(_delta: float) -> void:
 	if _clock_bar_owns_after_clock_refill():
 		return
 	if _should_skip_refill_this_frame():
+		last_supply_slice_ms = 0.0
 		return
+	# This frame's backup tick will roll the day. Do not slice on it.
+	if _backup_clock_will_tick_this_frame() and _next_tick_crosses_midnight():
+		last_supply_slice_ms = 0.0
+		return
+	if _supply_slice_paused():
+		last_supply_slice_ms = 0.0
+	else:
+		_drain_queued_supply_day_slice()
 	_plan_leftover_refill_slice()
 
 
@@ -646,7 +717,12 @@ func refill_after_clock() -> void:
 	# this frame already rolled (mark set by `_on_tick` / day handlers).
 	note_clock_order("sm_refill")
 	if _should_skip_refill_this_frame():
+		last_supply_slice_ms = 0.0
 		return
+	if _supply_slice_paused():
+		last_supply_slice_ms = 0.0
+	else:
+		_drain_queued_supply_day_slice()
 	_plan_leftover_refill_slice()
 
 
@@ -1411,6 +1487,10 @@ func advance_supply_day_interactive_light(days: float = 1.0) -> void:
 	_advance_supply_day_light(days)
 
 
+func supply_day_queue_depth() -> int:
+	return _supply_day_queue.size()
+
+
 func advance_supply_day(days: float = 1.0) -> void:
 	if days <= 0.0:
 		return
@@ -1419,44 +1499,557 @@ func advance_supply_day(days: float = 1.0) -> void:
 	if _should_use_interactive_light_supply():
 		_advance_supply_day_light(days)
 		return
+	var job := _make_supply_day_job(days)
+	job["defer_flush"] = true
+	_run_supply_day_job(job, 0)
 
+
+func queue_full_supply_day(days: float = 1.0) -> void:
+	if days <= 0.0:
+		return
+	if _should_use_interactive_light_supply():
+		_advance_supply_day_light(days)
+		return
+	var job := _make_supply_day_job(days)
+	job["defer_flush"] = false
+	_supply_day_queue.append(job)
+
+
+func _make_supply_day_job(days: float) -> Dictionary:
+	return {
+		"days": days,
+		"phase": 0,
+		"defer_flush": false,
+		"finished": false,
+		"builds0": network_build_count,
+		"flush_ms": 0.0,
+		"generate_ms": 0.0,
+		"naval_ms": 0.0,
+		"fuel_ms": 0.0,
+		"air_ms": 0.0,
+		"decay_ms": 0.0,
+		"shipping_ms": 0.0,
+		"flush_last_ms": float(_supply_slice_phase_ms.get("flush", SUPPLY_DAY_SLICE_FLUSH_ESTIMATE_MS)),
+		"naval_last_ms": float(_supply_slice_phase_ms.get("naval", SUPPLY_DAY_SLICE_NAVAL_ESTIMATE_MS)),
+		"fuel_last_ms": float(_supply_slice_phase_ms.get("fuel", SUPPLY_DAY_SLICE_FUEL_ESTIMATE_MS)),
+		"air_last_ms": float(_supply_slice_phase_ms.get("air", SUPPLY_DAY_SLICE_AIR_ESTIMATE_MS)),
+		"worked_usec": 0,
+		"plans": 0,
+		"plan_ms": 0.0,
+		"plan_ms_max": 0.0,
+		"dijkstra_pops": 0,
+		"dijkstra_open_peak": 0,
+		"dijkstra_ms": 0.0,
+		"gen_ready": false,
+		"keys": [],
+		"index": 0,
+		"ship_ready": false,
+		"route_keys": [],
+		"route_index": 0,
+		"attrition_tons": 0.0,
+	}
+
+
+func _supply_slice_remaining_ms(deadline_usec: int) -> float:
+	if deadline_usec <= 0:
+		return 100000.0
+	return float(deadline_usec - Time.get_ticks_usec()) / 1000.0
+
+
+func _supply_slice_phase_estimate_ms(job: Dictionary, key: String) -> float:
+	if supply_slice_phase_cost_estimate_ms >= 0.0:
+		return supply_slice_phase_cost_estimate_ms
+	var from_job: float = float(job.get(key + "_last_ms", -1.0))
+	if from_job >= 0.0:
+		return from_job
+	return float(_supply_slice_phase_ms.get(key, 1.0))
+
+
+func _supply_slice_item_estimate_ms() -> float:
+	if supply_slice_item_cost_estimate_ms >= 0.0:
+		return supply_slice_item_cost_estimate_ms
+	return _supply_slice_last_item_ms
+
+
+func _supply_slice_cannot_afford_phase(deadline_usec: int, estimated_ms: float) -> bool:
+	if deadline_usec <= 0:
+		return false
+	var remaining_ms: float = _supply_slice_remaining_ms(deadline_usec)
+	if remaining_ms <= 0.0:
+		return true
+	return remaining_ms <= estimated_ms + SUPPLY_DAY_SLICE_ATOMIC_HEADROOM_MS
+
+
+func _supply_slice_cannot_afford_item(deadline_usec: int, last_item_ms: float) -> bool:
+	if deadline_usec <= 0:
+		return false
+	var remaining_ms: float = _supply_slice_remaining_ms(deadline_usec)
+	if remaining_ms <= 0.0:
+		return true
+	var need_ms: float = maxf(
+		last_item_ms + SUPPLY_DAY_SLICE_ITEM_HEADROOM_MS,
+		SUPPLY_DAY_SLICE_RESERVE_MS
+	)
+	return remaining_ms <= need_ms
+
+
+func _supply_slice_clamp_phase_estimate(ms: float) -> float:
+	return clampf(ms, SUPPLY_DAY_SLICE_ESTIMATE_FLOOR_MS, SUPPLY_DAY_SLICE_MS_BUDGET)
+
+
+func _supply_slice_store_phase_estimate(job: Dictionary, key: String, measured_ms: float) -> void:
+	if measured_ms < SUPPLY_DAY_SLICE_ESTIMATE_FLOOR_MS:
+		return
+	var old_ms: float = float(job.get(key + "_last_ms", -1.0))
+	if old_ms < 0.0:
+		old_ms = float(_supply_slice_phase_ms.get(key, measured_ms))
+	var blended: float = (
+		old_ms * SUPPLY_DAY_SLICE_ESTIMATE_EMA_OLD
+		+ measured_ms * SUPPLY_DAY_SLICE_ESTIMATE_EMA_NEW
+	)
+	var stored: float = _supply_slice_clamp_phase_estimate(blended)
+	job[key + "_last_ms"] = stored
+	_supply_slice_phase_ms[key] = stored
+
+
+func _supply_slice_decay_phase_estimate(job: Dictionary, key: String) -> void:
+	var old_ms: float = float(job.get(key + "_last_ms", -1.0))
+	if old_ms < 0.0:
+		old_ms = float(_supply_slice_phase_ms.get(key, SUPPLY_DAY_SLICE_ESTIMATE_FLOOR_MS))
+	var decayed: float = (
+		SUPPLY_DAY_SLICE_ESTIMATE_FLOOR_MS
+		+ (old_ms - SUPPLY_DAY_SLICE_ESTIMATE_FLOOR_MS) * SUPPLY_DAY_SLICE_DEFER_DECAY
+	)
+	var stored: float = _supply_slice_clamp_phase_estimate(decayed)
+	job[key + "_last_ms"] = stored
+	_supply_slice_phase_ms[key] = stored
+
+
+func _supply_slice_decay_item_estimate() -> void:
+	if supply_slice_item_cost_estimate_ms >= 0.0:
+		return
+	var old_ms: float = _supply_slice_last_item_ms
+	var decayed: float = (
+		SUPPLY_DAY_SLICE_ESTIMATE_FLOOR_MS
+		+ (old_ms - SUPPLY_DAY_SLICE_ESTIMATE_FLOOR_MS) * SUPPLY_DAY_SLICE_DEFER_DECAY
+	)
+	var hi: float = maxf(old_ms, SUPPLY_DAY_SLICE_ITEM_COST_MAX_MS)
+	_supply_slice_last_item_ms = clampf(decayed, SUPPLY_DAY_SLICE_ESTIMATE_FLOOR_MS, hi)
+
+
+func _supply_slice_defer_phase(job: Dictionary, key: String) -> bool:
+	if not _supply_slice_did_work:
+		return false
+	_supply_slice_decay_phase_estimate(job, key)
+	return true
+
+
+func _supply_slice_defer_item() -> bool:
+	if not _supply_slice_did_work:
+		return false
+	_supply_slice_decay_item_estimate()
+	return true
+
+
+func _supply_slice_note_phase_ms(job: Dictionary, key: String, dt_usec: int) -> void:
+	var ms: float = float(dt_usec) / 1000.0
+	job[key + "_ms"] = float(job.get(key + "_ms", 0.0)) + ms
+	job["worked_usec"] = int(job.get("worked_usec", 0)) + dt_usec
+	_supply_slice_store_phase_estimate(job, key, ms)
+	_supply_slice_did_work = true
+
+
+func _supply_slice_note_item_ms(dt_usec: int) -> void:
+	if dt_usec <= 0:
+		_supply_slice_did_work = true
+		return
+	var step_ms: float = float(dt_usec) / 1000.0
+	var blended: float = (
+		_supply_slice_last_item_ms * SUPPLY_DAY_SLICE_ESTIMATE_EMA_OLD
+		+ step_ms * SUPPLY_DAY_SLICE_ESTIMATE_EMA_NEW
+	)
+	_supply_slice_last_item_ms = clampf(
+		blended,
+		SUPPLY_DAY_SLICE_ESTIMATE_FLOOR_MS,
+		SUPPLY_DAY_SLICE_ITEM_COST_MAX_MS
+	)
+	_supply_slice_did_work = true
+
+
+func _run_supply_day_job(job: Dictionary, deadline_usec: int) -> bool:
+	if bool(job.get("finished", false)):
+		return true
+	var days := float(job.get("days", 1.0))
+	while int(job.get("phase", 0)) < 6:
+		if deadline_usec > 0 and Time.get_ticks_usec() >= deadline_usec and _supply_slice_did_work:
+			return false
+		var phase := int(job.get("phase", 0))
+		if phase == 0:
+			if _supply_slice_cannot_afford_phase(deadline_usec, _supply_slice_phase_estimate_ms(job, "flush")):
+				if _supply_slice_defer_phase(job, "flush"):
+					return false
+			var t_flush := Time.get_ticks_usec()
+			if bool(job.get("defer_flush", false)):
+				_begin_day_roll_plan_deferral()
+				_note_day_roll_plan_window()
+			flush_pending_control_route_refresh(ROUTE_REFRESH_BUDGET_PER_FLUSH)
+			last_day_flush_plan_count = last_flush_plan_count
+			var flush_dt := Time.get_ticks_usec() - t_flush
+			_supply_slice_note_phase_ms(job, "flush", flush_dt)
+			job["plans"] = last_flush_plan_count
+			job["plan_ms"] = last_flush_plan_ms
+			job["plan_ms_max"] = last_flush_plan_ms_max
+			job["dijkstra_pops"] = SupplyPathfinder.last_search_pops
+			job["dijkstra_open_peak"] = SupplyPathfinder.last_search_open_peak
+			job["dijkstra_ms"] = SupplyPathfinder.last_search_ms
+			job["phase"] = 1
+		elif phase == 1:
+			if not bool(job.get("gen_ready", false)):
+				job["keys"] = depot_states.keys()
+				job["index"] = 0
+				job["gen_ready"] = true
+			var t_gen := Time.get_ticks_usec()
+			var gen_keys: Array = job.get("keys", [])
+			var next_i := _generate_local_supply_range(days, gen_keys, int(job.get("index", 0)), deadline_usec)
+			var gen_dt := Time.get_ticks_usec() - t_gen
+			job["generate_ms"] = float(job.get("generate_ms", 0.0)) + float(gen_dt) / 1000.0
+			job["worked_usec"] = int(job.get("worked_usec", 0)) + gen_dt
+			job["index"] = next_i
+			if next_i < gen_keys.size():
+				return false
+			job["phase"] = 2
+		elif phase == 2:
+			if _supply_slice_cannot_afford_phase(deadline_usec, _supply_slice_phase_estimate_ms(job, "naval")):
+				if _supply_slice_defer_phase(job, "naval"):
+					return false
+			var t_naval := Time.get_ticks_usec()
+			_process_naval_recon(days)
+			var naval_dt := Time.get_ticks_usec() - t_naval
+			_supply_slice_note_phase_ms(job, "naval", naval_dt)
+			job["phase"] = 3
+		elif phase == 3:
+			if _supply_slice_cannot_afford_phase(deadline_usec, _supply_slice_phase_estimate_ms(job, "fuel")):
+				if _supply_slice_defer_phase(job, "fuel"):
+					return false
+			var t_fuel := Time.get_ticks_usec()
+			_process_naval_fuel_endurance_and_repair(days)
+			var fuel_dt := Time.get_ticks_usec() - t_fuel
+			_supply_slice_note_phase_ms(job, "fuel", fuel_dt)
+			job["phase"] = 4
+		elif phase == 4:
+			if _supply_slice_cannot_afford_phase(deadline_usec, _supply_slice_phase_estimate_ms(job, "air")):
+				if _supply_slice_defer_phase(job, "air"):
+					return false
+			var t_air := Time.get_ticks_usec()
+			_process_air_missions(days)
+			var air_dt := Time.get_ticks_usec() - t_air
+			job["air_ms"] = float(job.get("air_ms", 0.0)) + float(air_dt) / 1000.0
+			job["worked_usec"] = int(job.get("worked_usec", 0)) + air_dt
+			var t_decay := Time.get_ticks_usec()
+			if force_registry and force_registry.has_method("decay_all_recon"):
+				force_registry.decay_all_recon(days)
+			var decay_dt := Time.get_ticks_usec() - t_decay
+			job["decay_ms"] = float(job.get("decay_ms", 0.0)) + float(decay_dt) / 1000.0
+			job["worked_usec"] = int(job.get("worked_usec", 0)) + decay_dt
+			var air_total_dt: int = air_dt + decay_dt
+			_supply_slice_store_phase_estimate(job, "air", float(air_total_dt) / 1000.0)
+			_supply_slice_did_work = true
+			job["phase"] = 5
+		elif phase == 5:
+			if not bool(job.get("ship_ready", false)):
+				var attrition := get_attrition_cargo_summary()
+				job["attrition_tons"] = float(attrition.get("total_tons", 0.0)) * days
+				job["route_keys"] = _routes.keys()
+				job["route_index"] = 0
+				job["ship_ready"] = true
+			var t_ship := Time.get_ticks_usec()
+			var route_keys: Array = job.get("route_keys", [])
+			var next_r := _ship_routes_range(
+				days,
+				route_keys,
+				int(job.get("route_index", 0)),
+				float(job.get("attrition_tons", 0.0)),
+				deadline_usec
+			)
+			var ship_dt := Time.get_ticks_usec() - t_ship
+			job["shipping_ms"] = float(job.get("shipping_ms", 0.0)) + float(ship_dt) / 1000.0
+			job["worked_usec"] = int(job.get("worked_usec", 0)) + ship_dt
+			job["route_index"] = next_r
+			if next_r < route_keys.size():
+				return false
+			job["phase"] = 6
+		else:
+			job["phase"] = 6
+	_finish_supply_day_job(job)
+	job["finished"] = true
+	return true
+
+
+func _finish_supply_day_job(job: Dictionary) -> void:
 	full_supply_day_count += 1
-	var t_day: int = Time.get_ticks_usec()
-	var builds0: int = network_build_count
-	var t_sec: int = Time.get_ticks_usec()
-	# FIX #4: refill every missing dest in this one full day (N = dest cap 24).
-	# FIX #7: mark the roll and still call flush (source gate), but flush
-	# returns 0 plans on this frame. Events enqueue; next frames' slice plans.
-	_begin_day_roll_plan_deferral()
-	_note_day_roll_plan_window()
-	flush_pending_control_route_refresh(ROUTE_REFRESH_BUDGET_PER_FLUSH)
-	last_day_flush_plan_count = last_flush_plan_count
-	var flush_ms: float = float(Time.get_ticks_usec() - t_sec) / 1000.0
+	var flush_ms := float(job.get("flush_ms", 0.0))
+	var generate_ms := float(job.get("generate_ms", 0.0))
+	var naval_ms := float(job.get("naval_ms", 0.0))
+	var fuel_ms := float(job.get("fuel_ms", 0.0))
+	var air_ms := float(job.get("air_ms", 0.0))
+	var shipping_ms := float(job.get("shipping_ms", 0.0))
+	var decay_ms := float(job.get("decay_ms", 0.0))
+	var total_ms := flush_ms + generate_ms + naval_ms + fuel_ms + air_ms + decay_ms + shipping_ms
+	var builds0 := int(job.get("builds0", network_build_count))
+	last_supply_day_profile = {
+		"total_ms": total_ms,
+		"flush_ms": flush_ms,
+		"refill_ms": flush_ms,
+		"generate_ms": generate_ms,
+		"naval_ms": naval_ms,
+		"fuel_ms": fuel_ms,
+		"air_ms": air_ms,
+		"shipping_ms": shipping_ms,
+		"plans": int(job.get("plans", 0)),
+		"plan_ms": float(job.get("plan_ms", 0.0)),
+		"plan_ms_max": float(job.get("plan_ms_max", 0.0)),
+		"rebuilds": network_build_count - builds0,
+		"dijkstra_pops": int(job.get("dijkstra_pops", 0)),
+		"dijkstra_open_peak": int(job.get("dijkstra_open_peak", 0)),
+		"dijkstra_ms": float(job.get("dijkstra_ms", 0.0)),
+	}
+	if total_ms >= 200.0:
+		print(
+			"[SUPPLY-DAY-SPIKE] total=%.1fms flush=%.1fms gen=%.1fms naval=%.1fms fuel=%.1fms air=%.1fms ship=%.1fms plans=%d plan_ms=%.1f max=%.1f rebuilds=%d pops=%d open_peak=%d dijkstra=%.1fms"
+			% [
+				total_ms, flush_ms, generate_ms, naval_ms, fuel_ms, air_ms, shipping_ms,
+				int(job.get("plans", 0)), float(job.get("plan_ms", 0.0)), float(job.get("plan_ms_max", 0.0)),
+				network_build_count - builds0,
+				int(job.get("dijkstra_pops", 0)),
+				int(job.get("dijkstra_open_peak", 0)),
+				float(job.get("dijkstra_ms", 0.0)),
+			]
+		)
 
-	# === Province Infrastructure & Development: Local Supply Generation ===
-	t_sec = Time.get_ticks_usec()
-	_generate_local_supply_from_development(days)
-	var generate_ms: float = float(Time.get_ticks_usec() - t_sec) / 1000.0
 
-	# Naval recon from fleets in sea zones (1 chance per day per seazone presence)
-	t_sec = Time.get_ticks_usec()
-	_process_naval_recon(days)
-	var naval_ms: float = float(Time.get_ticks_usec() - t_sec) / 1000.0
+func _drain_queued_supply_day_slice() -> void:
+	last_supply_slice_catch_up = false
+	if _supply_slice_paused():
+		last_supply_slice_ms = 0.0
+		return
+	if _supply_day_queue.is_empty():
+		last_supply_slice_ms = 0.0
+		return
+	var t0 := Time.get_ticks_usec()
+	_supply_slice_did_work = false
+	var sync_finish := _should_sync_finish_supply_day()
+	var in_catch_up := sync_finish or _should_catch_up_supply_day()
+	last_supply_slice_catch_up = in_catch_up
+	var deadline := 0
+	if not sync_finish:
+		var budget_ms: float = _supply_slice_paced_budget_ms()
+		deadline = t0 + int(budget_ms * 1000.0)
+	var guard := 0
+	while not _supply_day_queue.is_empty() and guard < 16:
+		var job: Dictionary = _supply_day_queue[0]
+		var done := _run_supply_day_job(job, deadline)
+		if done:
+			_supply_day_queue.pop_front()
+		if not done:
+			break
+		if deadline > 0 and Time.get_ticks_usec() >= deadline:
+			break
+		guard += 1
+	last_supply_slice_ms = float(Time.get_ticks_usec() - t0) / 1000.0
+	if sync_finish and last_supply_slice_ms > 0.0:
+		supply_catch_up_sync_ms = last_supply_slice_ms
+		supply_catch_up_sync_count += 1
+		print(
+			"[SUPPLY-CATCH-UP-SYNC] ms=%.2f count=%d"
+			% [supply_catch_up_sync_ms, supply_catch_up_sync_count]
+		)
 
-	# Naval fuel consumption + endurance for fleets at sea (long deployments burn fuel/supply; low = vuln/return forced; resupply at ports)
-	t_sec = Time.get_ticks_usec()
-	_process_naval_fuel_endurance_and_repair(days)
-	var fuel_ms: float = float(Time.get_ticks_usec() - t_sec) / 1000.0
 
-	t_sec = Time.get_ticks_usec()
-	_process_air_missions(days)
-	var air_ms: float = float(Time.get_ticks_usec() - t_sec) / 1000.0
-	if force_registry and force_registry.has_method("decay_all_recon"):
-		force_registry.decay_all_recon(days)  # air recon intel decays (persistent but not permanent)
-	t_sec = Time.get_ticks_usec()
-	var attrition := get_attrition_cargo_summary()
-	var attrition_tons := float(attrition.get("total_tons", 0.0)) * days
-	for key in _routes:
+func _supply_slice_paused() -> bool:
+	if typeof(TimeManager) == TYPE_NIL:
+		return false
+	if bool(TimeManager.get("paused")):
+		return true
+	if TimeManager.has_method("is_paused") and bool(TimeManager.call("is_paused")):
+		return true
+	return false
+
+
+func _backup_clock_is_allowed() -> bool:
+	if typeof(TimeManager) == TYPE_NIL:
+		return false
+	if bool(TimeManager.get("_force_windowed_backup_clock")):
+		return true
+	if DisplayServer.get_name() == "headless" or OS.has_feature("dedicated_server"):
+		return false
+	if TimeManager.has_method("living_title_has_closed") and not bool(TimeManager.call("living_title_has_closed")):
+		return false
+	return true
+
+
+func _ms_until_backup_tick() -> int:
+	if typeof(TimeManager) == TYPE_NIL:
+		return 100000
+	var last := int(TimeManager.get("_last_advance_real_msec"))
+	if last <= 0:
+		return 100000
+	return 1000 - (Time.get_ticks_msec() - last)
+
+
+func _backup_clock_will_tick_this_frame() -> bool:
+	if not _backup_clock_is_allowed():
+		return false
+	if _supply_slice_paused():
+		return false
+	return _ms_until_backup_tick() <= 0
+
+
+func _next_backup_tick_hours() -> float:
+	var scale := 1.0
+	if typeof(TimeManager) != TYPE_NIL:
+		scale = float(TimeManager.get("time_scale"))
+	var hours := maxf(scale, 0.1)
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("is_interactive_light_sim") and bool(TimeManager.is_interactive_light_sim()):
+		hours = minf(hours, 6.0)
+	return hours
+
+
+func _next_tick_crosses_midnight() -> bool:
+	if typeof(TimeManager) == TYPE_NIL:
+		return false
+	var hour := int(TimeManager.get("current_hour"))
+	var acc := float(TimeManager.get("_accumulated_game_hours"))
+	return hour + int(acc + _next_backup_tick_hours()) >= 24
+
+
+func _supply_slice_frame_ms() -> float:
+	if supply_slice_frame_ms_override >= 8.0:
+		return supply_slice_frame_ms_override
+	var dt: float = 16.67
+	if is_inside_tree():
+		dt = get_process_delta_time() * 1000.0
+	if dt < 8.0:
+		dt = 16.67
+	return clampf(dt, 8.0, 33.34)
+
+
+func _supply_slice_remaining_work_ms() -> float:
+	if _supply_day_queue.is_empty():
+		return 0.0
+	var job: Dictionary = _supply_day_queue[0]
+	if bool(job.get("finished", false)):
+		return 0.0
+	var phase := int(job.get("phase", 0))
+	var item_ms: float = _supply_slice_item_estimate_ms()
+	var work: float = 0.0
+	if phase <= 0:
+		work += _supply_slice_phase_estimate_ms(job, "flush")
+	if phase <= 1:
+		var gen_left := 0
+		if bool(job.get("gen_ready", false)):
+			var keys: Array = job.get("keys", [])
+			gen_left = maxi(0, keys.size() - int(job.get("index", 0)))
+		else:
+			gen_left = depot_states.size()
+		work += float(gen_left) * item_ms
+	if phase <= 2:
+		work += _supply_slice_phase_estimate_ms(job, "naval")
+	if phase <= 3:
+		work += _supply_slice_phase_estimate_ms(job, "fuel")
+	if phase <= 4:
+		work += _supply_slice_phase_estimate_ms(job, "air")
+	if phase <= 5:
+		var ship_left := 0
+		if bool(job.get("ship_ready", false)):
+			var rkeys: Array = job.get("route_keys", [])
+			ship_left = maxi(0, rkeys.size() - int(job.get("route_index", 0)))
+		else:
+			ship_left = _routes.size()
+		work += float(ship_left) * item_ms
+	return work
+
+
+func _supply_slice_frames_until_midnight_roll() -> int:
+	if not _backup_clock_is_allowed() or _supply_slice_paused():
+		return 1000
+	var until := _ms_until_backup_tick()
+	var frame_ms: float = _supply_slice_frame_ms()
+	if frame_ms < 1.0:
+		frame_ms = 16.67
+	var frames_to_tick := 0
+	if until > 0:
+		frames_to_tick = maxi(1, int(ceili(float(until) / frame_ms)))
+	if _next_tick_crosses_midnight():
+		return frames_to_tick
+	var hour := 0
+	var acc := 0.0
+	if typeof(TimeManager) != TYPE_NIL:
+		hour = int(TimeManager.get("current_hour"))
+		acc = float(TimeManager.get("_accumulated_game_hours"))
+	var hours_left: float = 24.0 - float(hour) - acc
+	var step: float = _next_backup_tick_hours()
+	if step < 0.1:
+		step = 0.1
+	var ticks_needed: int = int(ceili(hours_left / step))
+	var ticks_after: int = maxi(0, ticks_needed - 1)
+	var frames_per_tick: int = maxi(1, int(round(1000.0 / frame_ms)))
+	return frames_to_tick + ticks_after * frames_per_tick
+
+
+func _supply_slice_paced_budget_ms() -> float:
+	var budget: float = SUPPLY_DAY_SLICE_MS_BUDGET
+	if _supply_day_queue.is_empty():
+		return budget
+	var remaining: float = _supply_slice_remaining_work_ms()
+	var frames_left: int = _supply_slice_frames_until_midnight_roll()
+	if frames_left < 1:
+		frames_left = 1
+	var need: float = remaining / float(frames_left)
+	if _should_catch_up_supply_day():
+		budget = SUPPLY_DAY_SLICE_PACE_BUDGET_MS
+	elif need > budget:
+		budget = minf(SUPPLY_DAY_SLICE_PACE_BUDGET_MS, need)
+	return budget
+
+
+func _should_catch_up_supply_day() -> bool:
+	if _supply_day_queue.is_empty():
+		return false
+	if _should_skip_refill_this_frame():
+		return false
+	if not _backup_clock_is_allowed():
+		return false
+	if _supply_slice_paused():
+		return false
+	if not _next_tick_crosses_midnight():
+		return false
+	var frames_left: int = _supply_slice_frames_until_midnight_roll()
+	return frames_left >= 1 and frames_left <= SUPPLY_DAY_CATCH_UP_FRAMES
+
+
+func _should_sync_finish_supply_day() -> bool:
+	if not _should_catch_up_supply_day():
+		return false
+	var until := _ms_until_backup_tick()
+	var frame_ms: float = _supply_slice_frame_ms()
+	return until > 0 and until <= int(ceili(frame_ms))
+
+
+func _ship_routes_range(days: float, keys: Array, start: int, attrition_tons: float, deadline_usec: int) -> int:
+	var i := start
+	var n := keys.size()
+	while i < n:
+		if _supply_slice_cannot_afford_item(deadline_usec, _supply_slice_item_estimate_ms()):
+			if _supply_slice_defer_item():
+				return i
+		_supply_slice_did_work = true
+		var t_item: int = 0
+		if deadline_usec > 0:
+			t_item = Time.get_ticks_usec()
+		var key = keys[i]
+		i += 1
+		if not _routes.has(key):
+			continue
 		var plan: SupplyRoutePlan = _routes[key]
 		if plan == null or plan.path_length() < 2:
 			continue
@@ -1545,37 +2138,9 @@ func advance_supply_day(days: float = 1.0) -> void:
 		if overflow > 0.0 and src != null:
 			src.apply_inflow(overflow * 0.5)
 		depot_stock_changed.emit(dst.province_id, dst.stockpile)
-	var shipping_ms: float = float(Time.get_ticks_usec() - t_sec) / 1000.0
-	var total_ms: float = float(Time.get_ticks_usec() - t_day) / 1000.0
-	last_supply_day_profile = {
-		"total_ms": total_ms,
-		"flush_ms": flush_ms,
-		"refill_ms": flush_ms,
-		"generate_ms": generate_ms,
-		"naval_ms": naval_ms,
-		"fuel_ms": fuel_ms,
-		"air_ms": air_ms,
-		"shipping_ms": shipping_ms,
-		"plans": last_flush_plan_count,
-		"plan_ms": last_flush_plan_ms,
-		"plan_ms_max": last_flush_plan_ms_max,
-		"rebuilds": network_build_count - builds0,
-		"dijkstra_pops": SupplyPathfinder.last_search_pops,
-		"dijkstra_open_peak": SupplyPathfinder.last_search_open_peak,
-		"dijkstra_ms": SupplyPathfinder.last_search_ms,
-	}
-	if total_ms >= 200.0:
-		print(
-			"[SUPPLY-DAY-SPIKE] total=%.1fms flush=%.1fms gen=%.1fms naval=%.1fms fuel=%.1fms air=%.1fms ship=%.1fms plans=%d plan_ms=%.1f max=%.1f rebuilds=%d pops=%d open_peak=%d dijkstra=%.1fms"
-			% [
-				total_ms, flush_ms, generate_ms, naval_ms, fuel_ms, air_ms, shipping_ms,
-				last_flush_plan_count, last_flush_plan_ms, last_flush_plan_ms_max,
-				network_build_count - builds0,
-				SupplyPathfinder.last_search_pops,
-				SupplyPathfinder.last_search_open_peak,
-				SupplyPathfinder.last_search_ms,
-			]
-		)
+		if deadline_usec > 0:
+			_supply_slice_note_item_ms(Time.get_ticks_usec() - t_item)
+	return i
 
 
 func begin_player_reroute(source_province_id: int, target_province_id: int) -> void:
@@ -1666,10 +2231,28 @@ func _get_main_hub_for_tag(tag: String) -> int:
 func _generate_local_supply_from_development(days: float) -> void:
 	if days <= 0.0 or typeof(Province) == TYPE_NIL:
 		return
+	_generate_local_supply_range(days, depot_states.keys(), 0, 0)
 
-	for pid in depot_states.keys():
+
+func _generate_local_supply_range(days: float, keys: Array, start: int, deadline_usec: int) -> int:
+	if days <= 0.0 or typeof(Province) == TYPE_NIL:
+		return keys.size()
+	var i := start
+	var n := keys.size()
+	while i < n:
+		if _supply_slice_cannot_afford_item(deadline_usec, _supply_slice_item_estimate_ms()):
+			if _supply_slice_defer_item():
+				return i
+		_supply_slice_did_work = true
+		var t_item: int = 0
+		if deadline_usec > 0:
+			t_item = Time.get_ticks_usec()
+		var pid = keys[i]
+		i += 1
 		var state: ProvinceDepotState = depot_states[pid]
 		if state == null:
+			if deadline_usec > 0:
+				_supply_slice_note_item_ms(Time.get_ticks_usec() - t_item)
 			continue
 
 		# Decay per-province sabotage state from agent networks (targeted supply disruption lingers but fades)
@@ -1686,6 +2269,8 @@ func _generate_local_supply_from_development(days: float) -> void:
 			if loader != null and loader.has_method("get_province"):
 				province = loader.call("get_province", pid)
 		if province == null:
+			if deadline_usec > 0:
+				_supply_slice_note_item_ms(Time.get_ticks_usec() - t_item)
 			continue
 
 		# Use ProvinceEffects when available (dev + national modifiers for local supply)
@@ -1698,6 +2283,8 @@ func _generate_local_supply_from_development(days: float) -> void:
 			else province.get_local_supply_generation_modifier()
 		)
 		if local_gen <= 0.0:
+			if deadline_usec > 0:
+				_supply_slice_note_item_ms(Time.get_ticks_usec() - t_item)
 			continue
 
 		# Base local supply generation scaled by development + effects
@@ -1722,9 +2309,12 @@ func _generate_local_supply_from_development(days: float) -> void:
 				daily_gen *= (1.0 - penalty)
 
 		state.apply_inflow(daily_gen)
+		if deadline_usec > 0:
+			_supply_slice_note_item_ms(Time.get_ticks_usec() - t_item)
 
 	# Note: stray menu-ranking code was previously inserted here by accident (removed in Phase 1 verify).
 	# _generate is fire-and-forget; depot menu uses its own ranking in get_depot_menu_lines.
+	return i
 
 func toggle_overlay() -> void:
 	overlay_visible = not overlay_visible

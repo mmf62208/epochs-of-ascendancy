@@ -1600,6 +1600,16 @@ func _profile_day_ai_steps() -> void:
 	var total_ms := float(Time.get_ticks_usec() - t_all) / 1000.0
 	last_day_tick_profile["day_ai_ms"] = total_ms
 	last_day_tick_profile["day_ai_steps"] = steps
+	var sm_prof: Node = get_node_or_null("/root/SupplyManager")
+	var queued_n := 0
+	var slice_ms := 0.0
+	if sm_prof != null:
+		if sm_prof.has_method("supply_day_queue_depth"):
+			queued_n = int(sm_prof.call("supply_day_queue_depth"))
+		if "last_supply_slice_ms" in sm_prof:
+			slice_ms = float(sm_prof.get("last_supply_slice_ms"))
+	last_day_tick_profile["soft_supply_queued"] = queued_n
+	last_day_tick_profile["slice_ms"] = slice_ms
 	_note_day_tick_phase("day_ai", total_ms)
 
 
