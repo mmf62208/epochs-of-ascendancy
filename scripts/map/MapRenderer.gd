@@ -14881,7 +14881,13 @@ func _refresh_province_detail_visibility() -> void:
 	# when it does run, keep DemoUnitIcon_* in sync with the live zoom band.
 	_sync_unit_counter_paint(current_zoom)
 	var show_details: bool = MapZoomLODScript.show_province_glyphs(tier) or current_zoom > province_detail_min_zoom
-	var show_prov_names: bool = show_province_names and MapZoomLODScript.show_province_labels(tier)
+	# ATLAS-1 CityLabelsLayer owns city names. The old per-province Label
+	# stack at tactical zoom is a second draw of the same words (ghosted Ruhr).
+	var show_prov_names: bool = (
+		show_province_names
+		and MapZoomLODScript.show_province_labels(tier)
+		and not _atlas1_city_labels_active()
+	)
 	_zoom_fill_characterization_scale = current_zoom
 	# Bucket boundaries + drift are in the same space as `container.scale` length.
 	var q := clampf(fill_zoom_bucket_size, 0.028, 0.14)
@@ -14946,6 +14952,8 @@ func _refresh_province_detail_visibility() -> void:
 					if child is Label and not (child as Label).has_meta(META_MAP_GLYPH_PX):
 						(child as Label).visible = show_details
 				_layout_zoomed_map_glyphs_for_province_node(int(pid), current_zoom, show_details)
+	if _atlas1_city_labels_active():
+		_hide_legacy_province_name_labels()
 
 
 ## Smooth 0→1 ramp as map scale enters tactical band (relative to `terrain_zoom_near_thresh`).
@@ -17644,7 +17652,7 @@ func _create_or_update_province_name_label(province: Province, center: Vector2) 
 	label.reset_size()
 	var ms := label.get_minimum_size()
 	label.position = center - Vector2(ms.x * 0.5, 8)
-	label.visible = true
+	label.visible = not _atlas1_city_labels_active()
 
 
 func _count_special_icons(province: Province) -> int:
@@ -22628,6 +22636,27 @@ func _setup_atlas1_layers() -> void:
 				cities.call("bind_centroids", province_centroids)
 			if cities.has_method("set_map_mode"):
 				cities.call("set_map_mode", current_map_mode)
+			_hide_legacy_province_name_labels()
+
+
+func _atlas1_city_labels_active() -> bool:
+	return _city_labels_layer != null and is_instance_valid(_city_labels_layer)
+
+
+func _hide_legacy_province_name_labels() -> void:
+	for id in _province_name_labels:
+		var lbl: Variant = _province_name_labels[id]
+		if lbl is Label and is_instance_valid(lbl):
+			(lbl as Label).visible = false
+
+
+func count_visible_province_name_labels() -> int:
+	var n := 0
+	for id in _province_name_labels:
+		var lbl: Variant = _province_name_labels[id]
+		if lbl is Label and is_instance_valid(lbl) and (lbl as Label).visible:
+			n += 1
+	return n
 
 
 func _setup_rx1_rhine_layer() -> void:

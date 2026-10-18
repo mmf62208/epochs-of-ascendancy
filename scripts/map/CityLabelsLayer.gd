@@ -225,16 +225,22 @@ func screen_count() -> int:
 
 
 func has_visual_overlap() -> bool:
-	var rects: Array = []
+	var items: Array = []
 	for p in _placed:
 		if float(p.get("alpha", 0.0)) < 0.04:
 			continue
-		rects.append(p.get("screen_rect", Rect2()))
-	for i in rects.size():
-		for j in range(i + 1, rects.size()):
-			var a: Rect2 = rects[i]
-			var b: Rect2 = rects[j]
-			if a.intersects(b):
+		items.append(p)
+	for i in items.size():
+		var a: Dictionary = items[i]
+		var ar: Rect2 = (a.get("screen_rect", Rect2()) as Rect2).grow(1.0)
+		for j in range(i + 1, items.size()):
+			var b: Dictionary = items[j]
+			var br: Rect2 = (b.get("screen_rect", Rect2()) as Rect2).grow(1.0)
+			if ar.intersects(br):
+				return true
+			var b_dot: Rect2 = (b.get("dot_rect", Rect2()) as Rect2).grow(1.0)
+			var a_dot: Rect2 = (a.get("dot_rect", Rect2()) as Rect2).grow(1.0)
+			if ar.intersects(b_dot) or br.intersects(a_dot):
 				return true
 	return false
 
@@ -400,6 +406,8 @@ func place_competing(cands: Array, zoom: float, cam: Vector2, vp: Vector2, natio
 			var city_and_nations: Array = []
 			for n in nation_rects:
 				city_and_nations.append(n)
+			for prev in placed:
+				city_and_nations.append(prev.get("dot_rect", Rect2()))
 			for off_v3 in _slot_offsets(base, max_shift):
 				var off3: Vector2 = off_v3 as Vector2
 				var rect3 := Rect2(anchor_s + off3 + Vector2(0.0, -ascent), size)
@@ -430,7 +438,42 @@ func place_competing(cands: Array, zoom: float, cam: Vector2, vp: Vector2, natio
 		})
 		if not must_keep and not is_cap:
 			blockers.append(dot_rect)
-	return placed
+	return _cull_labels_covering_dots(placed)
+
+
+func _cull_labels_covering_dots(placed: Array) -> Array:
+	if placed.size() < 2:
+		return placed
+	var drop: Dictionary = {}
+	for i in placed.size():
+		if drop.has(i):
+			continue
+		var a: Dictionary = placed[i]
+		var a_rect: Rect2 = a.get("screen_rect", Rect2())
+		var a_dot: Rect2 = a.get("dot_rect", Rect2())
+		for j in range(i + 1, placed.size()):
+			if drop.has(j):
+				continue
+			var b: Dictionary = placed[j]
+			var b_rect: Rect2 = b.get("screen_rect", Rect2())
+			var b_dot: Rect2 = b.get("dot_rect", Rect2())
+			var a_on_b_dot := a_rect.intersects(b_dot.grow(1.0))
+			var b_on_a_dot := b_rect.intersects(a_dot.grow(1.0))
+			if not a_on_b_dot and not b_on_a_dot:
+				continue
+			if bool(b.get("must_keep", false)) or bool(b.get("capital", false)):
+				if not bool(a.get("must_keep", false)) and not bool(a.get("capital", false)):
+					drop[i] = true
+					break
+				continue
+			drop[j] = true
+	if drop.is_empty():
+		return placed
+	var out: Array = []
+	for k in placed.size():
+		if not drop.has(k):
+			out.append(placed[k])
+	return out
 
 
 func _priority_before(a: Dictionary, b: Dictionary) -> bool:
@@ -923,12 +966,13 @@ func _in_band(c: Dictionary, zoom: float) -> bool:
 	var tier := int(c.get("tier", 1))
 	var capital := bool(c.get("capital", false))
 	var score := float(c.get("score", 0.0))
+	var hub := bool(c.get("hub", false))
 	if band == _LOD.CITY_BAND_HOME:
 		return tier >= 4
 	if band == _LOD.CITY_BAND_STRATEGIC:
-		return tier >= 3 or capital
+		return tier >= 3 or capital or hub
 	if band == _LOD.CITY_BAND_MID:
-		return tier >= 3 or capital or (tier >= 2 and score >= MID_TIER2_SCORE_FLOOR)
+		return tier >= 3 or capital or hub or (tier >= 2 and score >= MID_TIER2_SCORE_FLOOR)
 	return true
 
 
@@ -945,10 +989,12 @@ func _score_city(tier: int, pop: float, kreis: bool, port: bool, hub: bool = fal
 	return score
 
 
-func _enter_zoom(tier: int, capital: bool, score: float) -> float:
+func _enter_zoom(tier: int, capital: bool, score: float, hub: bool = false) -> float:
 	if tier >= 4:
 		return 0.0
 	if tier >= 3 or capital:
+		return _LOD.CITY_LABEL_HOME_MAX
+	if hub:
 		return _LOD.CITY_LABEL_HOME_MAX
 	if tier >= 2 and score >= MID_TIER2_SCORE_FLOOR:
 		return _LOD.CITY_LABEL_STRATEGIC_MAX
@@ -1069,7 +1115,9 @@ func _load_candidates() -> void:
 	_dedupe_same_city()
 	_drop_district_satellites()
 	for rec in _candidates:
-		rec["enter"] = _enter_zoom(int(rec["tier"]), bool(rec["capital"]), float(rec["score"]))
+		rec["enter"] = _enter_zoom(
+			int(rec["tier"]), bool(rec["capital"]), float(rec["score"]), bool(rec["hub"])
+		)
 
 
 func _canonical_display(city_name: String, pname: String, kreis: bool) -> String:

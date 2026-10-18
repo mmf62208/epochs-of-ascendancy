@@ -88,6 +88,8 @@ func _run_and_quit() -> void:
 	_test_label_set_stable(layer)
 	_test_counter_avoidance(layer)
 	_test_no_doubled_draws(layer)
+	_test_ruhr_centered_live_zooms(layer)
+	_test_air_wing_cover_essen(layer)
 	_test_mid_scenario_capitals(layer)
 	_finish()
 
@@ -576,6 +578,61 @@ func _test_no_doubled_draws(layer: Node) -> void:
 				return
 			pids[pid] = true
 	_pass("no doubled city names or pids at live zooms")
+
+
+func _test_ruhr_centered_live_zooms(layer: Node) -> void:
+	## Playtester wheeled in over the Ruhr (Essen under the cursor), 1280x800.
+	var essen: Vector2 = layer.call("world_of", ESSEN)
+	var vp := Vector2(1280, 800)
+	var zooms: Array[float] = [1.217, 1.512, 2.904]
+	for z_v in zooms:
+		var z: float = z_v
+		layer.call("set_view", z, essen, vp, [])
+		var placed: Array = layer.call("placed")
+		var names := _names(placed)
+		print("ATLAS1 city ruhr_cam z%.3f n=%d names=%s" % [
+			z, int(layer.call("screen_count")), ",".join(_name_list(placed)),
+		])
+		if not names.has("Essen"):
+			_fail("Essen missing at Ruhr-cam z%.3f" % z)
+		if z < 2.0 and not names.has("Köln") and not names.has("Cologne"):
+			_fail("Köln missing at Ruhr-cam z%.3f" % z)
+		if names.has("Hamm") and not names.has("Essen"):
+			_fail("Hamm kept over Essen at Ruhr-cam z%.3f" % z)
+		if bool(layer.call("has_visual_overlap")):
+			_fail("Ruhr-cam z%.3f label/dot overlap" % z)
+	_pass("Ruhr-cam live zooms keep Essen and do not overlap")
+
+
+func _test_air_wing_cover_essen(layer: Node) -> void:
+	var essen: Vector2 = layer.call("world_of", ESSEN)
+	var vp := Vector2(1280, 800)
+	var zoom := 1.09
+	var cover := Rect2(vp * 0.5 + Vector2(-44.0, -50.0), Vector2(88.0, 100.0))
+	layer.call("set_view", zoom, essen, vp, [], [cover])
+	var placed: Array = layer.call("placed")
+	var names := _names(placed)
+	if not names.has("Essen"):
+		_fail("Essen missing under air-wing counter at z1.09")
+		return
+	var rect: Rect2 = (names["Essen"] as Dictionary).get("screen_rect", Rect2())
+	if rect.intersects(cover):
+		_fail("Essen still under air-wing AABB at z1.09")
+	else:
+		_pass("Essen nudged off air-wing counter at z1.09")
+	layer.call("set_view", 1.35, essen, vp, [], [cover])
+	placed = layer.call("placed")
+	names = _names(placed)
+	if not names.has("Essen"):
+		_fail("Essen missing under air-wing counter at z1.35")
+		return
+	rect = (names["Essen"] as Dictionary).get("screen_rect", Rect2())
+	if rect.intersects(cover):
+		_fail("Essen still under air-wing AABB at z1.35")
+	elif bool(layer.call("has_visual_overlap")):
+		_fail("air-wing cover at z1.35 caused label/dot overlap")
+	else:
+		_pass("Essen clear of air-wing counter at z1.35")
 
 
 func _test_label_set_stable(layer: Node) -> void:

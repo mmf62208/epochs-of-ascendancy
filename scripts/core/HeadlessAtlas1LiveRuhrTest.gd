@@ -12,6 +12,7 @@ const WAIT_MAP_SECS := 420
 const SETTLE_FRAMES := 30
 const LIVE_ZOOMS: Array[float] = [1.217, 1.512, 2.904]
 const VP := Vector2(1280, 800)
+const ZOOM_SLACK := 0.05
 
 var _failures := 0
 var _phase := 0
@@ -20,6 +21,7 @@ var _last_wait_log := -1
 var _settle_left := 0
 var _zoom_i := 0
 var _home_pos := Vector2.ZERO
+var _lock_pos := Vector2.ZERO
 var _out_dir := ""
 
 
@@ -60,7 +62,7 @@ func _on_process() -> void:
 		_tick_wait_map()
 	elif _phase == 2:
 		if _zoom_i < LIVE_ZOOMS.size():
-			_reassert_camera(LIVE_ZOOMS[_zoom_i])
+			_reassert_locked_zoom(LIVE_ZOOMS[_zoom_i])
 		_settle_left -= 1
 		if _settle_left <= 0:
 			_check_zoom()
@@ -93,6 +95,7 @@ func _tick_wait_map() -> void:
 		_fail("CityLabelsLayer count %d want 1 (doubled draw path)" % _city_layer_count())
 	if _visible_unit_count() < 1:
 		_fail("no live unit/air counters after Begin")
+	_check_home_cam_mid()
 	_zoom_i = 0
 	_begin_zoom()
 
@@ -102,33 +105,47 @@ func _begin_zoom() -> void:
 		_finish()
 		return
 	var z: float = LIVE_ZOOMS[_zoom_i]
-	var pos := _home_pos
-	if z > 2.0:
-		pos = _essen_world()
-		if pos == Vector2.ZERO:
-			pos = _home_pos
+	# Playtester wheeled in over the Ruhr (mouse ~455,455 on 1280x800), not
+	# Europe-Home centre. Isolated tests used to inject set_live_view so the
+	# layout could pass while MapCamera stayed at Home zoom.
+	var pos := _essen_world()
+	if pos == Vector2.ZERO:
+		pos = _home_pos
 	_apply_camera(pos, z)
-	var layer := _city_layer()
-	if layer != null and layer.has_method("set_live_view"):
-		layer.call("set_live_view", z, pos, VP)
 	_settle_left = SETTLE_FRAMES
 	_phase = 2
 	print("ATLAS1 live frame z=%.3f cam=%.1f,%.1f" % [z, pos.x, pos.y])
 
 
+func _check_home_cam_mid() -> void:
+	_apply_camera(_home_pos, 1.217)
+	var layer := _city_layer()
+	if layer == null:
+		_fail("CityLabelsLayer missing at Home-cam z1.217")
+		return
+	if not _camera_zoom_stuck(1.217):
+		_fail("MapCamera zoom %.3f want 1.217 at Home-cam (tests were injecting layout zoom)" % _camera_zoom())
+	var placed: Array = layer.call("placed")
+	if not _has_name(placed, "Essen"):
+		_fail("Essen missing at live Home-cam z1.217")
+	else:
+		_pass("Essen labelled at live Home-cam z1.217")
+
+
 func _check_zoom() -> void:
 	var z: float = LIVE_ZOOMS[_zoom_i]
-	_reassert_camera(z)
+	_reassert_locked_zoom(z)
 	var layer := _city_layer()
 	if layer == null:
 		_fail("CityLabelsLayer missing at z%.3f" % z)
 		_zoom_i += 1
 		_begin_zoom()
 		return
-	if layer.has_method("set_live_view"):
-		var cam := _camera()
-		var pos := cam.global_position if cam != null else _home_pos
-		layer.call("set_live_view", z, pos, VP)
+	if not _camera_zoom_stuck(z):
+		_fail("MapCamera zoom %.3f want %.3f (layout must follow live camera)" % [_camera_zoom(), z])
+	var layout_z := float(layer.call("last_layout_zoom")) if layer.has_method("last_layout_zoom") else -1.0
+	if absf(layout_z - z) > ZOOM_SLACK:
+		_fail("CityLabelsLayer last_layout_zoom %.3f != camera %.3f" % [layout_z, z])
 	var placed: Array = layer.call("placed")
 	var names := PackedStringArray()
 	for p in placed:
@@ -161,6 +178,11 @@ func _check_zoom() -> void:
 		_pass("no doubled names at z%.3f" % z)
 	if _city_layer_count() != 1:
 		_fail("CityLabelsLayer count %d at z%.3f" % [_city_layer_count(), z])
+	var legacy := _legacy_province_name_count()
+	if legacy > 0:
+		_fail("legacy province-name Labels still visible at z%.3f n=%d (second draw)" % [z, legacy])
+	else:
+		_pass("no legacy province-name draw at z%.3f" % z)
 	var hits: PackedStringArray = layer.call("labels_hit_counters")
 	var ruhr_hits := PackedStringArray()
 	for h in hits:
@@ -222,32 +244,72 @@ func _ensure_units_on() -> void:
 
 
 func _apply_camera(pos: Vector2, zoom: float) -> void:
+	_lock_pos = pos
 	var mr := _map_renderer()
 	if mr != null and mr.has_method("lock_pixel_guard_camera"):
 		mr.call("lock_pixel_guard_camera", pos, zoom)
-		return
-	var cam := _camera()
-	if cam != null:
-		cam.position_smoothing_enabled = false
-		cam.zoom = Vector2(zoom, zoom)
-		cam.global_position = pos
-		cam.reset_smoothing()
-		cam.enabled = true
-		cam.make_current()
-
-
-func _reassert_camera(zoom: float) -> void:
-	var cam := _camera()
-	if cam == null:
-		return
-	var pos := cam.global_position
-	if zoom > 2.0:
-		var essen := _essen_world()
-		if essen != Vector2.ZERO:
-			pos = essen
 	else:
+		var cam := _camera()
+		if cam != null:
+			cam.position_smoothing_enabled = false
+			cam.zoom = Vector2(zoom, zoom)
+			cam.global_position = pos
+			cam.reset_smoothing()
+			cam.enabled = true
+			cam.make_current()
+	_sync_live_counters(zoom)
+	_sync_layer_from_camera()
+
+
+func _reassert_locked_zoom(zoom: float) -> void:
+	var pos := _lock_pos
+	if pos == Vector2.ZERO:
+		pos = _essen_world()
+	if pos == Vector2.ZERO:
 		pos = _home_pos
 	_apply_camera(pos, zoom)
+
+
+func _sync_live_counters(zoom: float) -> void:
+	var mr := _map_renderer()
+	if mr == null:
+		return
+	if mr.has_method("_sync_unit_counter_paint"):
+		mr.call("_sync_unit_counter_paint", zoom)
+	if mr.has_method("_refresh_province_detail_visibility"):
+		mr.call("_refresh_province_detail_visibility")
+	if mr.has_method("_hide_legacy_province_name_labels"):
+		mr.call("_hide_legacy_province_name_labels")
+
+
+func _sync_layer_from_camera() -> void:
+	var layer := _city_layer()
+	var cam := _camera()
+	if layer == null or cam == null or not layer.has_method("sync_view"):
+		return
+	var z := maxf(absf(cam.zoom.x), absf(cam.zoom.y))
+	var vp := VP
+	if root != null and root.get_viewport() != null:
+		vp = root.get_viewport().get_visible_rect().size
+	layer.call("sync_view", z, cam.global_position, vp, true)
+
+
+func _camera_zoom() -> float:
+	var cam := _camera()
+	if cam == null:
+		return 0.0
+	return maxf(absf(cam.zoom.x), absf(cam.zoom.y))
+
+
+func _camera_zoom_stuck(want: float) -> bool:
+	return absf(_camera_zoom() - want) <= ZOOM_SLACK
+
+
+func _legacy_province_name_count() -> int:
+	var mr := _map_renderer()
+	if mr != null and mr.has_method("count_visible_province_name_labels"):
+		return int(mr.call("count_visible_province_name_labels"))
+	return 0
 
 
 func _essen_world() -> Vector2:
@@ -263,10 +325,10 @@ func _maybe_shot(name: String) -> void:
 	if DisplayServer.get_name() == "headless":
 		return
 	if _zoom_i < LIVE_ZOOMS.size():
-		_reassert_camera(LIVE_ZOOMS[_zoom_i])
+		_reassert_locked_zoom(LIVE_ZOOMS[_zoom_i])
 	RenderingServer.force_draw()
 	if _zoom_i < LIVE_ZOOMS.size():
-		_reassert_camera(LIVE_ZOOMS[_zoom_i])
+		_reassert_locked_zoom(LIVE_ZOOMS[_zoom_i])
 	RenderingServer.force_draw()
 	var vp := root.get_viewport()
 	if vp == null:

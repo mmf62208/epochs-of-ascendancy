@@ -62,8 +62,8 @@ func _start() -> void:
 		{"name": "close_paris", "zoom": CLOSE_ZOOM, "at": "paris", "probe": "paris"},
 		{"name": "mid_danube", "zoom": MID_ZOOM, "at": "vienna", "probe": "danube"},
 		{"name": "beauty_rhine", "zoom": 1.15, "at": "koln", "probe": ""},
-		{"name": "live_ruhr_z1217", "zoom": LIVE_Z1217, "at": "home", "probe": "essen", "units": true},
-		{"name": "live_ruhr_z1512", "zoom": LIVE_Z1512, "at": "home", "probe": "essen", "units": true},
+		{"name": "live_ruhr_z1217", "zoom": LIVE_Z1217, "at": "essen", "probe": "essen", "units": true},
+		{"name": "live_ruhr_z1512", "zoom": LIVE_Z1512, "at": "essen", "probe": "essen", "units": true},
 		{"name": "live_ruhr_z2904", "zoom": LIVE_Z2904, "at": "essen", "probe": "essen", "units": true},
 	]
 	_log("EOA_ATLAS1_PIXEL_GUARD who=guard.boot out=%s" % _out_dir)
@@ -122,6 +122,7 @@ func _begin_shot() -> void:
 	_set_units_visible(bool(spec.get("units", false)))
 	var pos := _world_for(str(spec.get("at", "essen")))
 	_apply_camera(pos, float(spec.get("zoom", 1.0)))
+	_sync_live_after_camera(float(spec.get("zoom", 1.0)))
 	_settle_left = SETTLE_FRAMES
 	_phase = 2
 	_log("EOA_ATLAS1_PIXEL_GUARD who=guard.frame shot=%s zoom=%.2f" % [str(spec.get("name", "")), _cam_zoom])
@@ -398,6 +399,28 @@ func _set_units_visible(on: bool) -> void:
 	var mr := _map_renderer()
 	if mr != null and mr.has_method("set_unit_counters_visible"):
 		mr.call("set_unit_counters_visible", on)
+	if on:
+		_sync_live_after_camera(_cam_zoom if _cam_zoom > 0.04 else 1.0)
+
+
+func _sync_live_after_camera(zoom: float) -> void:
+	var mr := _map_renderer()
+	if mr == null:
+		return
+	if mr.has_method("_sync_unit_counter_paint"):
+		mr.call("_sync_unit_counter_paint", zoom)
+	if mr.has_method("_refresh_province_detail_visibility"):
+		mr.call("_refresh_province_detail_visibility")
+	if mr.has_method("_hide_legacy_province_name_labels"):
+		mr.call("_hide_legacy_province_name_labels")
+	var layer := _find_named("CityLabelsLayer")
+	var cam := _camera()
+	if layer != null and cam != null and layer.has_method("sync_view"):
+		var z := maxf(absf(cam.zoom.x), absf(cam.zoom.y))
+		var vp := Vector2(1920, 1080)
+		if root != null and root.get_viewport() != null:
+			vp = root.get_viewport().get_visible_rect().size
+		layer.call("sync_view", z, cam.global_position, vp, true)
 
 
 func _apply_camera(pos: Vector2, zoom: float) -> void:
