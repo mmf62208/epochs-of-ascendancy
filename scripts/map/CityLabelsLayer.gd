@@ -375,7 +375,7 @@ func place_competing(cands: Array, zoom: float, cam: Vector2, vp: Vector2, natio
 		var accepted := false
 		var chosen := Rect2()
 		var chosen_off := base
-		var try_blockers: Array = city_only if (must_keep or is_cap) else blockers
+		var try_blockers: Array = city_only if is_cap else blockers
 		var dot_rect := Rect2(anchor_s - Vector2(DOT_BLOCK_PX, DOT_BLOCK_PX), Vector2(DOT_BLOCK_PX * 2.0, DOT_BLOCK_PX * 2.0))
 		if not must_keep and not is_cap and not bool(c.get("hub", false)) and _dot_hits_placed(dot_rect, placed):
 			continue
@@ -388,7 +388,7 @@ func place_competing(cands: Array, zoom: float, cam: Vector2, vp: Vector2, natio
 				chosen_off = off
 				accepted = true
 				break
-		if not accepted and not (must_keep or is_cap) and not obstacles.is_empty():
+		if not accepted and not is_cap and not obstacles.is_empty():
 			for off_v2 in _slot_offsets(base, COUNTER_SHIFT_PX):
 				var off2: Vector2 = off_v2 as Vector2
 				if off2.length() <= max_shift + 0.01:
@@ -1115,7 +1115,7 @@ func _load_candidates() -> void:
 			"tier": tier,
 			"score": score,
 			"capital": capital,
-			"must_keep": capital,
+			"must_keep": capital or core_bonus > 0.05,
 			"hub": hub or core_bonus > 0.05,
 			"world": world,
 			"enter": 0.0,

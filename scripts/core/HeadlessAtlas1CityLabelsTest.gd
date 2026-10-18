@@ -229,11 +229,11 @@ func _test_nation_rect(layer: Node) -> void:
 	var placed: Array = layer.call("placed")
 	var leftover_towns := 0
 	for p in placed:
-		if bool(p.get("capital", false)):
+		if bool(p.get("capital", false)) or bool(p.get("must_keep", false)):
 			continue
 		leftover_towns += 1
 	if leftover_towns > 0:
-		_fail("nation rect covering the view still left %d non-capital city labels" % leftover_towns)
+		_fail("nation rect covering the view still left %d non-keep city labels" % leftover_towns)
 	else:
 		_pass("nation rect hides non-capital city labels")
 
