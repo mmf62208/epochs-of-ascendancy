@@ -1,9 +1,10 @@
 class_name CityLabelsLayer
 extends Node2D
 
-## ATLAS-1 view-only city names. Candidates load once. Collision runs again
-## only when the zoom band changes or the camera moves by more than half a screen.
-## Nation labels win: a city label whose rect sits inside a nation rect is dropped.
+## ATLAS-1 view-only city names. Candidates load once. Collision reruns when
+## the zoom band, zoom (±0.03), or camera (~15% of the view) changes — not on
+## idle frames. Labels stay next to their own dots (small screen-space shift);
+## overlapping lower-priority names are culled. Same-city names collapse to one.
 
 const _LOD := preload("res://scripts/map/MapZoomLOD.gd")
 const _Canvas := preload("res://scripts/map/MapCanvasConfig.gd")
@@ -11,7 +12,11 @@ const _Canvas := preload("res://scripts/map/MapCanvasConfig.gd")
 const CITY_Z := 19
 const MAX_ON_SCREEN := 60
 const MID_TIER2_SCORE_FLOOR := 400.0
-const LABEL_SHIFT_PX := 72.0
+const LABEL_SHIFT_PX := 22.0
+const ZOOM_REBUILD := 0.03
+const PAN_REBUILD_FRAC := 0.15
+const DEDUPE_WORLD := 36.0
+const COUNTER_HALF := Vector2(28.0, 32.0)
 const FILL_COLOR := Color(0.08, 0.07, 0.05, 1.0)
 const OUTLINE_COLOR := Color(1.0, 0.97, 0.88, 1.0)
 
@@ -22,6 +27,24 @@ const _OWN_PATH := "res://data/provinces_world_accurate/province_ownership_1936.
 const _GEO_PATH := "res://data/provinces_world_accurate/provinces_geometry.json"
 const _SCENARIO_PATH := "res://data/scenarios/world_accurate.json"
 
+const _ALIAS_FOLD := {
+	"vienna": "wien",
+	"munich": "munchen",
+	"muenchen": "munchen",
+	"cologne": "koln",
+	"nuremberg": "nurnberg",
+	"nurnberg": "nurnberg",
+}
+
+const _ALIAS_LOCAL := {
+	"vienna": "Wien",
+	"munich": "München",
+	"muenchen": "München",
+	"cologne": "Köln",
+	"nuremberg": "Nürnberg",
+	"nurnberg": "Nürnberg",
+}
+
 var rebuild_count: int = 0
 
 var _candidates: Array = []
@@ -31,11 +54,14 @@ var _layout_ready: bool = false
 var _last_band: int = -1
 var _last_cam: Vector2 = Vector2(-1.0e9, -1.0e9)
 var _last_vp: Vector2 = Vector2.ZERO
+var _last_layout_zoom: float = -1.0
 var _zoom: float = 1.0
 var _cam: Vector2 = Vector2.ZERO
 var _vp: Vector2 = Vector2(1920, 1080)
 var _nation_override: Array = []
 var _use_nation_override: bool = false
+var _counter_override: Array = []
+var _use_counter_override: bool = false
 var _show_labels: bool = true
 var _mode: String = "political"
 var _font: Font = null
@@ -80,11 +106,13 @@ func set_map_mode(mode: String) -> void:
 	var show := m != "states"
 	if m == _mode and show == _show_labels:
 		return
+	var labels_changed := show != _show_labels
 	_mode = m
 	_show_labels = show
-	_layout_ready = false
-	if _candidates_ready:
-		_resolve_layout()
+	if labels_changed:
+		_layout_ready = false
+		if _candidates_ready:
+			_resolve_layout()
 	_queue_paint()
 
 
@@ -136,6 +164,13 @@ func display_name_of(pid: int) -> String:
 	return str((_by_pid[pid] as Dictionary).get("name", ""))
 
 
+func cluster_key_of(pid: int) -> String:
+	ensure_candidates()
+	if not _by_pid.has(pid):
+		return ""
+	return str((_by_pid[pid] as Dictionary).get("cluster", _cluster_key(display_name_of(pid))))
+
+
 func is_eligible(pid: int, band_name: String) -> bool:
 	ensure_candidates()
 	if not _by_pid.has(pid):
@@ -170,7 +205,11 @@ func screen_count() -> int:
 	return n
 
 
-func set_view(zoom: float, camera_world: Vector2, viewport: Vector2, nation_rects: Array = []) -> void:
+func last_layout_zoom() -> float:
+	return _last_layout_zoom
+
+
+func set_view(zoom: float, camera_world: Vector2, viewport: Vector2, nation_rects: Array = [], counter_rects: Array = []) -> void:
 	_zoom = zoom
 	_cam = camera_world
 	_vp = viewport
@@ -178,14 +217,29 @@ func set_view(zoom: float, camera_world: Vector2, viewport: Vector2, nation_rect
 		_vp = Vector2(1920, 1080)
 	_nation_override = nation_rects
 	_use_nation_override = true
-	# Callers pass an explicit view. Always rebuild so a nation-rect or zoom
-	# change is not dropped when the camera sample has not moved half a screen.
+	_counter_override = counter_rects
+	_use_counter_override = true
 	_layout_ready = false
 	_resolve_layout()
 	_queue_paint()
 
 
-func place_competing(cands: Array, zoom: float, cam: Vector2, vp: Vector2, nation_rects: Array, max_shift: float) -> Array:
+## Live hysteresis. Idle frames with the same camera/zoom do not rebuild.
+func sync_view(zoom: float, camera_world: Vector2, viewport: Vector2, force: bool = false) -> void:
+	var vp := viewport
+	if vp.x < 8.0 or vp.y < 8.0:
+		vp = Vector2(1920, 1080)
+	if not force and not _should_rebuild(zoom, camera_world, vp):
+		_zoom = zoom
+		return
+	_zoom = zoom
+	_cam = camera_world
+	_vp = vp
+	_resolve_layout()
+	_queue_paint()
+
+
+func place_competing(cands: Array, zoom: float, cam: Vector2, vp: Vector2, nation_rects: Array, max_shift: float, obstacles: Array = []) -> Array:
 	var list: Array = cands.duplicate(true)
 	for c in list:
 		var world: Vector2 = c.get("world", Vector2.ZERO)
@@ -195,11 +249,18 @@ func place_competing(cands: Array, zoom: float, cam: Vector2, vp: Vector2, natio
 	)
 	var placed: Array = []
 	var font := _font_or_null()
+	var blockers: Array = []
+	for n in nation_rects:
+		blockers.append(n)
+	for o in obstacles:
+		blockers.append(o)
 	for c in list:
 		if not _in_band(c, zoom):
 			continue
 		var enter := float(c.get("enter", 0.0))
 		var alpha := _LOD.city_label_fade_alpha(zoom, enter)
+		if alpha < 0.04:
+			continue
 		var world: Vector2 = c.get("world", Vector2.ZERO)
 		var anchor_s := (world - cam) * zoom + vp * 0.5
 		if anchor_s.x < -120.0 or anchor_s.y < -80.0 or anchor_s.x > vp.x + 120.0 or anchor_s.y > vp.y + 80.0:
@@ -208,15 +269,17 @@ func place_competing(cands: Array, zoom: float, cam: Vector2, vp: Vector2, natio
 		var px := _LOD.city_label_font_px(tier)
 		var text := str(c.get("name", ""))
 		var size := _measure(font, text, px)
-		var base := Vector2(6.0, -size.y * 0.72)
+		var ascent := size.y * 0.78
+		var base := Vector2(8.0, -2.0)
 		if bool(c.get("capital", false)):
-			base = Vector2(14.0, -size.y * 0.72)
+			base = Vector2(14.0, -2.0)
 		var accepted := false
 		var chosen := Rect2()
 		var chosen_off := base
 		for off in _slot_offsets(base, max_shift):
-			var rect := Rect2(anchor_s + off, size)
-			if _rects_clear(rect, placed, nation_rects, vp):
+			var baseline_s := anchor_s + off
+			var rect := Rect2(baseline_s + Vector2(0.0, -ascent), size)
+			if _rects_clear(rect, placed, blockers, vp):
 				chosen = rect
 				chosen_off = off
 				accepted = true
@@ -237,6 +300,7 @@ func place_competing(cands: Array, zoom: float, cam: Vector2, vp: Vector2, natio
 			"world": world,
 			"enter": enter,
 			"font_px": px,
+			"ascent": ascent,
 		})
 	return placed
 
@@ -276,23 +340,38 @@ func _process(_delta: float) -> void:
 	if vp_size.x < 8.0 or vp_size.y < 8.0:
 		vp_size = Vector2(1920, 1080)
 	var zoom := maxf(absf(cam.zoom.x), absf(cam.zoom.y))
-	var band := _LOD.city_label_band_for_zoom(zoom)
-	var half_x := vp_size.x * 0.5 / maxf(zoom, 0.04)
-	var half_y := vp_size.y * 0.5 / maxf(zoom, 0.04)
 	var pos := cam.global_position
-	var moved := absf(pos.x - _cam.x) > half_x or absf(pos.y - _cam.y) > half_y
-	var band_changed := band != _last_band
-	var zoom_changed := absf(zoom - _zoom) > 0.004
-	if not _layout_ready or band_changed or moved:
+	if _should_rebuild(zoom, pos, vp_size):
 		_zoom = zoom
 		_cam = pos
 		_vp = vp_size
 		_use_nation_override = false
+		_use_counter_override = false
 		_resolve_layout()
 		_queue_paint()
-	elif zoom_changed:
+	elif absf(zoom - _zoom) > 0.001:
 		_zoom = zoom
 		_queue_paint()
+
+
+func _should_rebuild(zoom: float, pos: Vector2, vp_size: Vector2) -> bool:
+	if not _layout_ready:
+		return true
+	if not _show_labels:
+		return false
+	var band := _LOD.city_label_band_for_zoom(zoom)
+	if band != _last_band:
+		return true
+	if absf(zoom - _last_layout_zoom) >= ZOOM_REBUILD:
+		return true
+	var z := maxf(zoom, 0.04)
+	var pan_x := vp_size.x * PAN_REBUILD_FRAC / z
+	var pan_y := vp_size.y * PAN_REBUILD_FRAC / z
+	if absf(pos.x - _last_cam.x) > pan_x or absf(pos.y - _last_cam.y) > pan_y:
+		return true
+	if vp_size.distance_squared_to(_last_vp) > 4.0:
+		return true
+	return false
 
 
 func _resolve_layout() -> void:
@@ -302,28 +381,31 @@ func _resolve_layout() -> void:
 			_placed = []
 		_layout_ready = true
 		_last_band = _LOD.city_label_band_for_zoom(_zoom)
+		_last_layout_zoom = _zoom
+		_last_cam = _cam
+		_last_vp = _vp
 		return
-	var band := _LOD.city_label_band_for_zoom(_zoom)
-	var half_x := _vp.x * 0.5 / maxf(_zoom, 0.04)
-	var half_y := _vp.y * 0.5 / maxf(_zoom, 0.04)
-	var moved := absf(_cam.x - _last_cam.x) > half_x or absf(_cam.y - _last_cam.y) > half_y
-	var band_changed := band != _last_band
-	var vp_changed := _last_vp.distance_squared_to(_vp) > 4.0
-	if _layout_ready and not band_changed and not moved and not vp_changed:
-		return
-	_last_band = band
+	_last_band = _LOD.city_label_band_for_zoom(_zoom)
+	_last_layout_zoom = _zoom
 	_last_cam = _cam
 	_last_vp = _vp
 	_layout_ready = true
 	rebuild_count += 1
 	var nations := _nation_rects_for_layout()
-	_placed = place_competing(_candidates, _zoom, _cam, _vp, nations, LABEL_SHIFT_PX)
+	var counters := _counter_rects_for_layout()
+	_placed = place_competing(_candidates, _zoom, _cam, _vp, nations, LABEL_SHIFT_PX, counters)
 
 
 func _nation_rects_for_layout() -> Array:
 	if _use_nation_override:
 		return _nation_override
 	return _live_nation_rects()
+
+
+func _counter_rects_for_layout() -> Array:
+	if _use_counter_override:
+		return _counter_override
+	return _live_counter_rects()
 
 
 func _live_nation_rects() -> Array:
@@ -334,7 +416,6 @@ func _live_nation_rects() -> Array:
 	if layer == null:
 		return []
 	var out: Array = []
-	var zoom := maxf(_zoom, 0.04)
 	for child in layer.get_children():
 		if not (child is Label):
 			continue
@@ -343,11 +424,52 @@ func _live_nation_rects() -> Array:
 			continue
 		if not str(lbl.name).begins_with("NationLabel_"):
 			continue
-		var world_pos := lbl.global_position
-		var screen_pos := (world_pos - _cam) * zoom + _vp * 0.5
-		var screen_size := lbl.size * zoom
-		out.append(Rect2(screen_pos, screen_size))
+		var rect := _control_screen_rect(lbl)
+		if rect.size.x > 1.0 and rect.size.y > 1.0:
+			out.append(rect)
 	return out
+
+
+func _live_counter_rects() -> Array:
+	var parent_node := get_parent()
+	if parent_node == null:
+		return []
+	var out: Array = []
+	_collect_counter_rects(parent_node, out, 0)
+	return out
+
+
+func _collect_counter_rects(node: Node, out: Array, depth: int) -> void:
+	if node == null or depth > 2:
+		return
+	if str(node.name).begins_with("DemoUnitIcon_") and node is Node2D:
+		var icon := node as Node2D
+		if icon.visible:
+			out.append(_counter_screen_rect(icon))
+	for child in node.get_children():
+		_collect_counter_rects(child, out, depth + 1)
+
+
+func _control_screen_rect(lbl: Control) -> Rect2:
+	if lbl == null or not lbl.is_inside_tree():
+		return Rect2()
+	var xf := lbl.get_global_transform_with_canvas()
+	var p0: Vector2 = xf * Vector2.ZERO
+	var p1: Vector2 = xf * lbl.size
+	var rect := Rect2(p0, p1 - p0).abs()
+	return rect
+
+
+func _counter_screen_rect(icon: Node2D) -> Rect2:
+	var xf := icon.get_global_transform_with_canvas()
+	var origin: Vector2 = xf * Vector2.ZERO
+	var corner: Vector2 = xf * COUNTER_HALF
+	var half := Vector2(absf(corner.x - origin.x), absf(corner.y - origin.y))
+	if half.x < 18.0:
+		half.x = 24.0
+	if half.y < 18.0:
+		half.y = 28.0
+	return Rect2(origin - half, half * 2.0)
 
 
 func _draw() -> void:
@@ -371,7 +493,7 @@ func _draw() -> void:
 		if alpha < 0.04:
 			continue
 		var world: Vector2 = item.get("world", Vector2.ZERO)
-		var off: Vector2 = item.get("screen_offset", Vector2(6, -8))
+		var off: Vector2 = item.get("screen_offset", Vector2(8, -2))
 		var world_text := world + off / z
 		var px := maxi(int(item.get("font_px", 11)), 8)
 		var world_px := maxi(int(round(float(px) / z)), 8)
@@ -381,7 +503,7 @@ func _draw() -> void:
 		draw_string(font, world_text, text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, world_px, Color(FILL_COLOR.r, FILL_COLOR.g, FILL_COLOR.b, alpha))
 
 
-func _rects_clear(rect: Rect2, placed: Array, nations: Array, vp: Vector2) -> bool:
+func _rects_clear(rect: Rect2, placed: Array, blockers: Array, vp: Vector2) -> bool:
 	var view := Rect2(Vector2.ZERO, vp).grow(8.0)
 	if not rect.intersects(view):
 		return false
@@ -389,7 +511,7 @@ func _rects_clear(rect: Rect2, placed: Array, nations: Array, vp: Vector2) -> bo
 		var other: Rect2 = p.get("screen_rect", Rect2())
 		if rect.intersects(other.grow(1.0)):
 			return false
-	for n in nations:
+	for n in blockers:
 		if n is Rect2 and rect.intersects((n as Rect2).grow(1.0)):
 			return false
 	return true
@@ -399,7 +521,7 @@ func _slot_offsets(base: Vector2, max_shift: float) -> Array:
 	var out: Array = [base]
 	if max_shift < 1.0:
 		return out
-	var radii: Array[float] = [10.0, 16.0, 24.0, 34.0, 46.0, 58.0, 72.0]
+	var radii: Array[float] = [8.0, 12.0, 16.0, 22.0]
 	var dirs: Array[Vector2] = [
 		Vector2.RIGHT, Vector2.LEFT, Vector2.UP, Vector2.DOWN,
 		Vector2(0.7071, -0.7071), Vector2(-0.7071, -0.7071),
@@ -470,7 +592,8 @@ func _enter_zoom(tier: int, capital: bool, score: float) -> float:
 		return _LOD.CITY_LABEL_HOME_MAX
 	if tier >= 2 and score >= MID_TIER2_SCORE_FLOOR:
 		return _LOD.CITY_LABEL_STRATEGIC_MAX
-	return _LOD.CITY_LABEL_MID_MAX
+	var t := clampf(1.0 - score / 600.0, 0.0, 1.0)
+	return _LOD.CITY_LABEL_MID_MAX + t * 0.85
 
 
 func _load_candidates() -> void:
@@ -536,12 +659,11 @@ func _load_candidates() -> void:
 		elif econ_rows.has(pid):
 			pop = float((econ_rows[pid] as Dictionary).get("population", 0.0))
 		var pname := str(names.get(pid, ""))
-		var kreis := pname.ends_with(", Kreisfreie Stadt")
+		var kreis := pname.ends_with(", Kreisfreie Stadt") or pname.ends_with(", Stadtkreis")
 		var port := bool(ports.get(pid, false)) or str(row.get("city_name", "")).to_lower().find("port") >= 0
 		var score := _score_city(tier, pop, kreis, port)
-		var display := str(row.get("city_name", pname))
-		if kreis:
-			display = pname.get_slice(",", 0).strip_edges()
+		var raw_name := str(row.get("city_name", pname))
+		var display := _canonical_display(raw_name, pname, kreis)
 		if display.is_empty():
 			display = pname
 		var world := Vector2.ZERO
@@ -550,9 +672,15 @@ func _load_candidates() -> void:
 		if world == Vector2.ZERO:
 			continue
 		var capital := bool(row.get("is_capital", false)) or bool(row.get("capital", false)) or explicit_pids.has(pid)
+		var cluster := _cluster_key(raw_name)
+		if cluster.is_empty():
+			cluster = _cluster_key(display)
 		var rec := {
 			"pid": pid,
 			"name": display,
+			"pname": pname,
+			"cluster": cluster,
+			"local_core": _is_local_core(display, pname, cluster),
 			"tier": tier,
 			"score": score,
 			"capital": capital,
@@ -562,20 +690,174 @@ func _load_candidates() -> void:
 		}
 		_candidates.append(rec)
 		_by_pid[pid] = rec
-		var tag := str(rec["tag"])
-		if tag.is_empty() or explicit_tags.has(tag) or capital:
+		var rec_tag := str(rec["tag"])
+		if rec_tag.is_empty() or explicit_tags.has(rec_tag) or capital:
 			continue
-		if not best_extra.has(tag):
-			best_extra[tag] = rec
+		if not best_extra.has(rec_tag):
+			best_extra[rec_tag] = rec
 		else:
-			var prev: Dictionary = best_extra[tag]
+			var prev: Dictionary = best_extra[rec_tag]
 			if _better_capital(rec, prev):
-				best_extra[tag] = rec
-	for tag in best_extra.keys():
-		var rec: Dictionary = best_extra[tag]
-		rec["capital"] = true
+				best_extra[rec_tag] = rec
+	for extra_tag in best_extra.keys():
+		var extra_rec: Dictionary = best_extra[extra_tag]
+		extra_rec["capital"] = true
+	_dedupe_same_city()
+	_drop_district_satellites()
 	for rec in _candidates:
 		rec["enter"] = _enter_zoom(int(rec["tier"]), bool(rec["capital"]), float(rec["score"]))
+
+
+func _canonical_display(city_name: String, pname: String, kreis: bool) -> String:
+	if kreis:
+		var core := pname.get_slice(",", 0).strip_edges()
+		if not core.is_empty():
+			return core
+	var display := city_name.strip_edges()
+	if display.is_empty():
+		display = pname.strip_edges()
+	var folded := _fold_name(display)
+	if _ALIAS_LOCAL.has(folded):
+		var local := str(_ALIAS_LOCAL[folded])
+		var pn := pname.strip_edges()
+		var pn_fold := _fold_name(pn.get_slice(",", 0).get_slice("/", 0))
+		var local_fold := _fold_name(local)
+		if pn_fold == local_fold or pn == local or pn.begins_with(local + ","):
+			return local
+		if not pn.is_empty() and pn_fold != local_fold:
+			if pn.find("Landkreis") >= 0 or pn.find("Umland") >= 0 or pn.begins_with("Greater "):
+				return pn
+			return local
+		return local
+	return display
+
+
+func _is_local_core(display: String, pname: String, cluster: String) -> bool:
+	var pn := _cluster_key(pname.get_slice(",", 0).get_slice("/", 0))
+	if pn == cluster:
+		return true
+	return _cluster_key(display) == cluster and pname.find("Landkreis") < 0 and pname.find("Umland") < 0 and not pname.begins_with("Greater ")
+
+
+func _cluster_key(name: String) -> String:
+	var folded := _fold_name(name.get_slice(",", 0).get_slice("/", 0))
+	if _ALIAS_FOLD.has(folded):
+		return str(_ALIAS_FOLD[folded])
+	return folded
+
+
+func _fold_name(s: String) -> String:
+	var t := s.strip_edges().to_lower()
+	t = t.replace("ü", "u").replace("ö", "o").replace("ä", "a").replace("ß", "ss")
+	t = t.replace("é", "e").replace("è", "e").replace("ê", "e")
+	t = t.replace("á", "a").replace("à", "a")
+	t = t.replace("ó", "o").replace("ò", "o")
+	t = t.replace("í", "i").replace("ì", "i")
+	t = t.replace("ú", "u")
+	t = t.replace("ñ", "n").replace("ç", "c")
+	return t
+
+
+func _dedupe_same_city() -> void:
+	var groups: Dictionary = {}
+	for rec in _candidates:
+		var key := str(rec.get("cluster", ""))
+		if key.is_empty():
+			continue
+		if not groups.has(key):
+			groups[key] = []
+		(groups[key] as Array).append(rec)
+	var drop: Dictionary = {}
+	for key in groups.keys():
+		var recs: Array = groups[key]
+		if recs.size() < 2:
+			continue
+		var kept: Array = []
+		recs.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+			return _better_keep(a, b)
+		)
+		for rec in recs:
+			var world: Vector2 = rec.get("world", Vector2.ZERO)
+			var pid := int(rec.get("pid", 0))
+			var absorbed := false
+			for other in kept:
+				var ow: Vector2 = other.get("world", Vector2.ZERO)
+				if world.distance_to(ow) <= DEDUPE_WORLD:
+					absorbed = true
+					drop[pid] = true
+					break
+			if not absorbed:
+				kept.append(rec)
+	if drop.is_empty():
+		return
+	var kept_list: Array = []
+	for rec in _candidates:
+		var pid := int(rec.get("pid", 0))
+		if drop.has(pid):
+			_by_pid.erase(pid)
+			continue
+		kept_list.append(rec)
+		_by_pid[pid] = rec
+	_candidates = kept_list
+
+
+func _is_district(rec: Dictionary) -> bool:
+	var pn := str(rec.get("pname", ""))
+	if pn.find("Landkreis") >= 0 or pn.find("Umland") >= 0:
+		return true
+	if pn.begins_with("Greater "):
+		return true
+	return false
+
+
+func _drop_district_satellites() -> void:
+	var cores: Array = []
+	for rec in _candidates:
+		if not _is_district(rec):
+			cores.append(rec)
+	if cores.is_empty():
+		return
+	var drop: Dictionary = {}
+	for rec in _candidates:
+		if not _is_district(rec):
+			continue
+		var world: Vector2 = rec.get("world", Vector2.ZERO)
+		for core in cores:
+			var ow: Vector2 = core.get("world", Vector2.ZERO)
+			if world.distance_to(ow) <= DEDUPE_WORLD:
+				drop[int(rec.get("pid", 0))] = true
+				break
+	if drop.is_empty():
+		return
+	var kept_list: Array = []
+	for rec in _candidates:
+		var pid := int(rec.get("pid", 0))
+		if drop.has(pid):
+			_by_pid.erase(pid)
+			continue
+		kept_list.append(rec)
+		_by_pid[pid] = rec
+	_candidates = kept_list
+
+
+func _better_keep(a: Dictionary, b: Dictionary) -> bool:
+	var ac := bool(a.get("capital", false))
+	var bc := bool(b.get("capital", false))
+	if ac != bc:
+		return ac
+	var al := bool(a.get("local_core", false))
+	var bl := bool(b.get("local_core", false))
+	if al != bl:
+		return al
+	var at := int(a.get("tier", 0))
+	var bt := int(b.get("tier", 0))
+	if at != bt:
+		return at > bt
+	var ascore := float(a.get("score", 0.0))
+	var bscore := float(b.get("score", 0.0))
+	if absf(ascore - bscore) > 0.05:
+		return ascore > bscore
+	return int(a.get("pid", 0)) < int(b.get("pid", 0))
 
 
 func _better_capital(a: Dictionary, b: Dictionary) -> bool:

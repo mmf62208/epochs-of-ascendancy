@@ -19,6 +19,15 @@ const RUHR := {
 }
 const ESSEN := 710403
 const METTMANN := 710412
+const VIENNA := 710022
+const VIENNA_N := 710020
+const VIENNA_S := 710021
+const MUENCHEN := 710205
+const MUENCHEN_LAND := 710220
+const MANCHESTER := 711344
+const MANCHESTER_SW := 711345
+const HOME_CAM := Vector2(7449.6456, 1795.9165)
+const ANCHOR_MAX_PX := 28.0
 
 var _failures := 0
 
@@ -60,6 +69,12 @@ func _run_and_quit() -> void:
 	_test_capital_priority(layer)
 	_test_score(layer)
 	_test_states(layer)
+	_test_anchor_distance(layer)
+	_test_close_no_overlap(layer)
+	_test_no_duplicate_names(layer)
+	_test_essen_at_mid_z15(layer)
+	_test_label_set_stable(layer)
+	_test_counter_avoidance(layer)
 	_finish()
 
 
@@ -163,23 +178,18 @@ func _test_ruhr(layer: Node) -> void:
 	layer.call("set_view", zoom, essen, vp, [])
 	var placed: Array = layer.call("placed")
 	var names := _names(placed)
-	var rects: Array = []
-	for pname in RUHR.values():
-		if not names.has(pname):
-			_fail("mid Ruhr missing %s" % pname)
-		else:
-			rects.append((names[pname] as Dictionary).get("screen_rect", Rect2()))
-	if rects.size() == RUHR.size():
-		var overlap := false
-		for i in rects.size():
-			for j in range(i + 1, rects.size()):
-				var a: Rect2 = rects[i]
-				var b: Rect2 = rects[j]
-				if a.intersects(b):
-					overlap = true
-					_fail("Ruhr labels overlap %s / %s" % [str(a), str(b)])
-		if not overlap:
-			_pass("Ruhr five labelled with no pairwise overlap")
+	if not names.has("Essen"):
+		_fail("mid Ruhr missing Essen")
+	else:
+		_pass("mid Ruhr has Essen")
+	if not names.has("Köln") and not names.has("Cologne"):
+		_fail("mid Ruhr missing Köln")
+	else:
+		_pass("mid Ruhr has Köln")
+	if _placed_overlap(placed):
+		_fail("Ruhr labels overlap at mid")
+	else:
+		_pass("Ruhr labels have no pairwise overlap")
 	var screen_n := int(layer.call("screen_count"))
 	print("ATLAS1 city ruhr_screen=%d" % screen_n)
 	if screen_n > 60:
@@ -188,13 +198,11 @@ func _test_ruhr(layer: Node) -> void:
 		_pass("mid screen count %d <= 60" % screen_n)
 	var essen_row: Dictionary = names.get("Essen", {})
 	if not essen_row.is_empty():
-		var rect: Rect2 = essen_row.get("screen_rect", Rect2())
-		var anchor := (essen - essen) * zoom + vp * 0.5
-		anchor = vp * 0.5
-		if rect.position.distance_to(anchor) > 80.0:
-			_fail("Essen label drifted %.1f px from camera center" % rect.position.distance_to(anchor))
+		var dist := _anchor_dist_px(essen_row, essen, zoom, essen, vp)
+		if dist > ANCHOR_MAX_PX:
+			_fail("Essen label drifted %.1f px from its dot" % dist)
 		else:
-			_pass("Essen label stays on the Ruhr frame")
+			_pass("Essen label stays on its Ruhr dot (%.1f px)" % dist)
 
 
 func _test_nation_rect(layer: Node) -> void:
@@ -308,3 +316,219 @@ func _test_states(layer: Node) -> void:
 	else:
 		_pass("states map mode hides city labels")
 	layer.call("set_map_mode", "political")
+
+
+func _name_list(placed: Array) -> PackedStringArray:
+	var out := PackedStringArray()
+	for p in placed:
+		if float(p.get("alpha", 0.0)) < 0.04:
+			continue
+		out.append(str(p.get("name", "")))
+	out.sort()
+	return out
+
+
+func _name_key(placed: Array) -> String:
+	return ",".join(_name_list(placed))
+
+
+func _anchor_dist_px(item: Dictionary, world: Vector2, zoom: float, cam: Vector2, vp: Vector2) -> float:
+	var anchor := (world - cam) * zoom + vp * 0.5
+	var off: Vector2 = item.get("screen_offset", Vector2.ZERO)
+	return off.length() if off != Vector2.ZERO else item.get("screen_rect", Rect2()).position.distance_to(anchor)
+
+
+func _placed_overlap(placed: Array) -> bool:
+	var rects: Array = []
+	for p in placed:
+		if float(p.get("alpha", 0.0)) < 0.04:
+			continue
+		rects.append(p.get("screen_rect", Rect2()))
+	for i in rects.size():
+		for j in range(i + 1, rects.size()):
+			var a: Rect2 = rects[i]
+			var b: Rect2 = rects[j]
+			if a.intersects(b):
+				return true
+	return false
+
+
+func _count_name(placed: Array, options: Array) -> int:
+	var n := 0
+	for p in placed:
+		if float(p.get("alpha", 0.0)) < 0.04:
+			continue
+		var nm := str(p.get("name", ""))
+		for opt in options:
+			if nm == str(opt):
+				n += 1
+				break
+	return n
+
+
+func _test_anchor_distance(layer: Node) -> void:
+	var essen: Vector2 = layer.call("world_of", ESSEN)
+	var vp := Vector2(1280, 800)
+	var zooms: Array[float] = [0.80, 1.20, 1.50, 2.40, 2.90]
+	var worst := 0.0
+	for z in zooms:
+		layer.call("set_view", z, essen, vp, [])
+		var placed: Array = layer.call("placed")
+		for p in placed:
+			if float(p.get("alpha", 0.0)) < 0.04:
+				continue
+			var world: Vector2 = p.get("world", Vector2.ZERO)
+			var dist := _anchor_dist_px(p, world, z, essen, vp)
+			if dist > worst:
+				worst = dist
+			if dist > ANCHOR_MAX_PX:
+				_fail("label %s at z%.2f is %.1f px from its dot" % [str(p.get("name", "")), z, dist])
+				return
+	print("ATLAS1 city max_anchor_px=%.1f" % worst)
+	_pass("label anchors stay within %.0f px at mid/close zooms (worst %.1f)" % [ANCHOR_MAX_PX, worst])
+
+
+func _test_close_no_overlap(layer: Node) -> void:
+	var essen: Vector2 = layer.call("world_of", ESSEN)
+	var vp := Vector2(1280, 800)
+	var zooms: Array[float] = [2.30, 2.60, 2.90]
+	for z in zooms:
+		layer.call("set_view", z, essen, vp, [])
+		var placed: Array = layer.call("placed")
+		if _placed_overlap(placed):
+			_fail("drawn label rects overlap at z%.2f Ruhr view" % z)
+			return
+		print("ATLAS1 city close_z%.2f n=%d" % [z, placed.size()])
+	_pass("no overlapping label rects at z2.3-2.9 Ruhr")
+
+
+func _test_no_duplicate_names(layer: Node) -> void:
+	if str(layer.call("display_name_of", VIENNA_N)) != "":
+		_fail("Vienna satellite %d still in the label set" % VIENNA_N)
+	else:
+		_pass("Vienna Umland Nord dropped")
+	if str(layer.call("display_name_of", VIENNA_S)) != "":
+		_fail("Vienna satellite %d still in the label set" % VIENNA_S)
+	else:
+		_pass("Vienna Umland Süd dropped")
+	var wien := str(layer.call("display_name_of", VIENNA))
+	if wien != "Wien" and wien != "Vienna":
+		_fail("Wien canonical name is '%s'" % wien)
+	else:
+		_pass("Wien canonical is %s" % wien)
+	if str(layer.call("display_name_of", MUENCHEN_LAND)) != "":
+		_fail("München Landkreis still in the label set")
+	else:
+		_pass("München Landkreis dropped")
+	var muc := str(layer.call("display_name_of", MUENCHEN))
+	if muc != "München" and muc != "Munich":
+		_fail("München canonical name is '%s'" % muc)
+	else:
+		_pass("München canonical is %s" % muc)
+	if str(layer.call("display_name_of", MANCHESTER_SW)) != "":
+		_fail("Greater Manchester satellite still in the label set")
+	else:
+		_pass("Manchester satellites dropped")
+	if str(layer.call("display_name_of", MANCHESTER)) != "Manchester":
+		_fail("Manchester hub missing")
+	else:
+		_pass("Manchester hub kept")
+	var vienna_w: Vector2 = layer.call("world_of", VIENNA)
+	layer.call("set_view", 1.35, vienna_w, Vector2(1280, 800), [])
+	var vn := _count_name(layer.call("placed"), ["Wien", "Vienna"])
+	if vn != 1:
+		_fail("Vienna labelled %d times at z1.35" % vn)
+	else:
+		_pass("one Vienna/Wien label at z1.35")
+	var man_w: Vector2 = layer.call("world_of", MANCHESTER)
+	layer.call("set_view", 2.40, man_w, Vector2(1280, 800), [])
+	var mn := _count_name(layer.call("placed"), ["Manchester"])
+	if mn != 1:
+		_fail("Manchester labelled %d times at z2.4" % mn)
+	else:
+		_pass("one Manchester label at z2.4")
+	var muc_w: Vector2 = layer.call("world_of", MUENCHEN)
+	layer.call("set_view", 1.55, muc_w, Vector2(1280, 800), [])
+	var mcn := _count_name(layer.call("placed"), ["München", "Munich"])
+	if mcn != 1:
+		_fail("München labelled %d times at z1.55" % mcn)
+	else:
+		_pass("one München label at z1.55")
+
+
+func _test_essen_at_mid_z15(layer: Node) -> void:
+	var essen: Vector2 = layer.call("world_of", ESSEN)
+	var vp := Vector2(1280, 800)
+	layer.call("set_view", 1.02, HOME_CAM, vp, [])
+	var base_rc := int(layer.get("rebuild_count"))
+	layer.call("sync_view", 1.50, essen, vp, false)
+	var after_rc := int(layer.get("rebuild_count"))
+	print("ATLAS1 city zoom_rebuild delta=%d" % (after_rc - base_rc))
+	if after_rc < base_rc + 1:
+		_fail("in-band zoom 1.02→1.50 did not rebuild layout")
+	else:
+		_pass("in-band zoom rebuilds layout")
+	var placed: Array = layer.call("placed")
+	var names := _names(placed)
+	if not names.has("Essen"):
+		_fail("Essen not labelled at z1.5 Ruhr view")
+	else:
+		_pass("Essen labelled at z1.5 Ruhr view")
+	layer.call("set_view", 1.50, essen, vp, [])
+	placed = layer.call("placed")
+	names = _names(placed)
+	if not names.has("Essen"):
+		_fail("Essen missing at forced z1.5")
+	elif _placed_overlap(placed):
+		_fail("z1.5 Ruhr labels overlap")
+	else:
+		_pass("forced z1.5 Ruhr has Essen and no overlap")
+
+
+func _test_label_set_stable(layer: Node) -> void:
+	var essen: Vector2 = layer.call("world_of", ESSEN)
+	var vp := Vector2(1280, 800)
+	layer.call("set_view", 1.50, essen, vp, [])
+	var names0 := _name_key(layer.call("placed"))
+	var rc0 := int(layer.get("rebuild_count"))
+	for _i in 30:
+		layer.call("sync_view", 1.50, essen, vp, false)
+	var rc1 := int(layer.get("rebuild_count"))
+	var names1 := _name_key(layer.call("placed"))
+	print("ATLAS1 city stable_rebuild delta=%d names=%d" % [rc1 - rc0, _name_list(layer.call("placed")).size()])
+	if rc1 != rc0:
+		_fail("label rebuild_count moved with no camera move (%d -> %d)" % [rc0, rc1])
+	elif names0 != names1:
+		_fail("label set changed with no camera move")
+	else:
+		_pass("label set stable across frames with no camera move")
+	layer.call("set_map_mode", "terrain")
+	layer.call("set_map_mode", "political")
+	var names2 := _name_key(layer.call("placed"))
+	if names2 != names0:
+		_fail("map-mode round trip changed the city label set")
+	else:
+		_pass("map-mode round trip keeps the city label set")
+
+
+func _test_counter_avoidance(layer: Node) -> void:
+	var essen: Vector2 = layer.call("world_of", ESSEN)
+	var vp := Vector2(1280, 800)
+	var zoom := 1.50
+	var cover := Rect2(vp * 0.5 + Vector2(2.0, -18.0), Vector2(52.0, 30.0))
+	layer.call("set_view", zoom, essen, vp, [], [cover])
+	var placed: Array = layer.call("placed")
+	var names := _names(placed)
+	if not names.has("Essen"):
+		_fail("Essen culled instead of nudging off the counter")
+		return
+	var rect: Rect2 = (names["Essen"] as Dictionary).get("screen_rect", Rect2())
+	if rect.intersects(cover):
+		_fail("Essen label still sits under the counter rect")
+	else:
+		_pass("Essen label avoids the counter rect")
+	var dist := _anchor_dist_px(names["Essen"], essen, zoom, essen, vp)
+	if dist > ANCHOR_MAX_PX:
+		_fail("counter nudge moved Essen %.1f px from its dot" % dist)
+	else:
+		_pass("counter nudge kept Essen within %.0f px" % ANCHOR_MAX_PX)
