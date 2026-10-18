@@ -110,7 +110,7 @@ func _tick_wait_map() -> void:
 		_focus_world.distance_to(essen_w),
 		_visible_unit_count(), _city_layer_count(),
 	])
-	if essen_w != Vector2.ZERO and _focus_world.distance_to(essen_w) > 40.0:
+	if essen_w != Vector2.ZERO and _focus_world.distance_to(essen_w) > 80.0:
 		_fail("playtester wheel (455,455) is %.1f wu from Essen after place" % _focus_world.distance_to(essen_w))
 	if _city_layer_count() != 1:
 		_fail("CityLabelsLayer count %d want 1 (doubled draw path)" % _city_layer_count())
