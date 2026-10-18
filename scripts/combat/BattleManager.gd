@@ -678,7 +678,7 @@ func try_ai_start_land_battles(day_index: int = 0) -> Dictionary:
 		var tag2 := str(candidates[i])
 		if not MapManager.has_method("collect_live_border_assault_targets"):
 			break
-		var targets: Array = MapManager.collect_live_border_assault_targets(tag2, 4)
+		var targets: Array = _ai_border_targets(tag2)
 		for raw_t in targets:
 			if typeof(raw_t) != TYPE_DICTIONARY:
 				continue
@@ -763,8 +763,13 @@ func try_ai_start_land_battles(day_index: int = 0) -> Dictionary:
 			if not best_spare.is_empty():
 				march_opps.append(best_spare)
 
+	# Harness autopilot only. Live play passes the real player so plan_day
+	# will not order the human's divisions.
+	var plan_player := player_tag
+	if include_player_in_ai_land_battles:
+		plan_player = "OBS"
 	var plan: Dictionary = LandBattleAi.plan_day(
-		opportunities, player_tag, int(day_index), open_hexes, open_per_tag, 1
+		opportunities, plan_player, int(day_index), open_hexes, open_per_tag, 1
 	)
 	var started: Array = []
 	for raw_pick in plan.get("picks", []):
@@ -790,7 +795,7 @@ func try_ai_start_land_battles(day_index: int = 0) -> Dictionary:
 	var marched: Array = []
 	if true:
 		var mplan: Dictionary = LandBattleAi.plan_marches(
-			march_opps, player_tag, int(day_index), marching_fids, combat_fids, 1
+			march_opps, plan_player, int(day_index), marching_fids, combat_fids, 1
 		)
 		for raw_mp in mplan.get("picks", []):
 			if typeof(raw_mp) != TYPE_DICTIONARY:
@@ -813,7 +818,7 @@ func try_ai_start_land_battles(day_index: int = 0) -> Dictionary:
 	if not marched.is_empty():
 		print("BattleManager: AI marched %d spare(s) toward front (enqueue_own_land_march, day=%d)" % [marched.size(), int(day_index)])
 
-	var follow: Dictionary = try_ai_follow_on_after_win(player_tag)
+	var follow: Dictionary = try_ai_follow_on_after_win(plan_player)
 	return {
 		"ok": true,
 		"started_n": started.size(),
@@ -824,6 +829,32 @@ func try_ai_start_land_battles(day_index: int = 0) -> Dictionary:
 		"player_tag": player_tag,
 		"eligible_n": int(plan.get("eligible_n", 0)),
 	}
+
+
+## Cap 4 stays the live default so existing harnesses keep today's first targets.
+## A campaign front whose first four staging hexes are empty still has divisions
+## further along the border. Look at those before giving up. No new march planner.
+func _ai_border_targets(tag: String) -> Array:
+	var first: Array = MapManager.collect_live_border_assault_targets(tag, 4)
+	if typeof(WarStateDomain) == TYPE_NIL or not WarStateDomain.loop_enabled():
+		return first
+	if WarStateDomain.enemies_of(tag).is_empty():
+		return first
+	if _border_targets_have_division(tag, first):
+		return first
+	var wide := int(WarStateDomain.rules().get("ai_border_target_cap", 64))
+	return MapManager.collect_live_border_assault_targets(tag, maxi(wide, 4))
+
+
+func _border_targets_have_division(tag: String, targets: Array) -> bool:
+	for raw_t in targets:
+		if typeof(raw_t) != TYPE_DICTIONARY:
+			continue
+		var t: Dictionary = raw_t
+		var preview: Dictionary = can_assault_province(tag, int(t.get("province_id", -1)), int(t.get("from_province_id", -1)))
+		if bool(preview.get("ok", false)) and not str(preview.get("formation_id", "")).is_empty():
+			return true
+	return false
 
 
 func try_ai_follow_on_after_win(player_tag: String = "") -> Dictionary:

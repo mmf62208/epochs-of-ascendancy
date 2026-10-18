@@ -337,6 +337,16 @@ static func is_capitulated(tag: String) -> bool:
 	return (_cap().get("capitulated", {}) as Dictionary).has(t)
 
 
+static func has_capitulated() -> bool:
+	if typeof(GameData) == TYPE_NIL:
+		return false
+	var raw: Variant = GameData.peace_state.get("campaign_capitulation", {})
+	if not (raw is Dictionary):
+		return false
+	var cap: Variant = (raw as Dictionary).get("capitulated", {})
+	return cap is Dictionary and not (cap as Dictionary).is_empty()
+
+
 static func capitulated_tags() -> Array:
 	var keys: Array = (_cap().get("capitulated", {}) as Dictionary).keys()
 	keys.sort()

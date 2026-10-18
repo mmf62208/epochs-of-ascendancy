@@ -419,6 +419,18 @@ else
   run_step launch_designer_validation \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessDesignerValidationTest.gd || fail
 
+  run_step launch_campaign_loop1_war_gate \
+    tools/run_godot.sh --headless --path . -s res://scripts/core/HeadlessCampaignLoop1WarGateTest.gd || fail
+
+  run_step launch_campaign_loop1_capitulation \
+    tools/run_godot.sh --headless --path . -s res://scripts/core/HeadlessCampaignLoop1CapitulationPeaceTest.gd || fail
+
+  run_step launch_campaign_loop1_soak \
+    tools/eoa_campaign_loop1_soak.sh || fail
+
+  run_step launch_campaign_loop1_end_screen \
+    tools/eoa_campaign_loop1_end_screen_guard.sh || fail
+
   if [[ "$WITH_PERF" -eq 1 ]]; then
     # Perf sample is evidence only — soft 30fps FAIL is OK
     run_step map_perf \

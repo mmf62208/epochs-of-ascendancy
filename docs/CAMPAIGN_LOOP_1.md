@@ -52,6 +52,7 @@ File `data/scenarios/campaign_rules_1936.json`. The loop is active only when `EO
 | ai_declare_min_day / min_aggression / min_ratio | 180 / 0.6 / 1.5 |
 | ai_declare_checks_per_day / ai_max_wars / ai_justify_days | 1 / 1 / 30 |
 | ai_may_declare_on_player | true |
+| ai_border_target_cap | 64 |
 
 Strength for the declare rule is the sum of `land_combat_power` over the tag's divisions. With no divisions, the fallback is the sum of `province_base_weight + factories` on owned land. No RNG. Attacker allies are not called. A runtime guarantee or formal alliance of the defender joins.
 
@@ -213,6 +214,73 @@ The seed hashes above were taken on this same tree (capitulation hooks were alre
 Peace sheet: `~/campaign1_evidence/peace_sheet.png` (1280×800, 35 KB). Title "Peace with LUX", buttons "Annex all" and "Keep occupied", news "LUX capitulated. Choose annex or keep occupied." Not copied into `docs/evidence/` because that directory already holds the two chrome shots. Same private gamescope display. `RESULT=PASS`. No `SCRIPT ERROR`.
 
 Chrome shots: `~/campaign1_evidence/war_hud.png` and `declare_button.png` (1280×800, about 21 KB each). `Xvfb` is not installed and sudo is unavailable, so the guard used `gamescope --backend headless` (private Xwayland, no window on the live desktop). The HUD label is one row in the top bar, reading "At war: France". The inspector button reads "Justify war on Poland". `WindowedCampaignLoop1EndScreenGuard` `RESULT=PASS`. No `SCRIPT ERROR`.
+
+## CL1c soak and end screen
+
+The first soak stalled. GER took the first border hexes, then the collector's cap of 4 kept returning those empty staging provinces, and light sim does not march spare divisions. Progress sat at 0.2214 (POL owned 40). No new march planner was added. `BattleManager._ai_border_targets` still asks for 4 targets. Only when the campaign loop is on, the tag has enemies, and none of those four can assault with a division, it asks again with `ai_border_target_cap` (64). `WarStateDomain.note_province_owner_changed` clears the front cache so a captured hex is not offered again. Real empty-hex captures then capitulated POL on day 39.
+
+`HeadlessCampaignLoop1SoakTest` on that tree, log `~/campaign1_evidence/cl1c_soak2.log`, `RESULT=PASS`, no `SCRIPT ERROR`. Sim wall 9164 ms (budget 15 min). Not split into a `--long` step. After the peaceful-day early-out, `cl1c_soak3.log` passed again: same days, same owner md5 `61abc333aec39f9c61f17bc902aca1de`, sim wall 8209 ms.
+
+| Run | Days | Wall | ms/day | Result |
+|---|---|---|---|---|
+| S4 time limit | 30 | 336 ms | — | 1936-01-31, rank0 USA, GER rank 3, title `Defeat: Eclipsed (rank 3)` |
+| S2 player POL defeat | 39 | 1897 ms | 48.6 | outcome defeat, clock paused, +20 days do not move the date |
+| S2b same seed | 39 | 1884 ms | 48.3 | owner md5 `61abc333aec39f9c61f17bc902aca1de` |
+| S1 USA observer, GER annexes POL | 39 | 2229 ms | 57.2 | `annex_all`, leader GER, one settlement row, truce |
+| S3 GER autopilot victory | 39 | 2228 ms | 57.1 | override `victory_min_majors_defeated` 1 and `victory_count_minors` true |
+
+Day 20 of each fight: progress 0.3247, POL still owned 33, 16 GER divisions stationed on the border. The end-of-run progress print is 0.0000 because `progress()` is 0 once the tag has no enemies. That is not the stall number. `stalemate_white_peace_days` stayed null.
+
+The latch pauses `TimeManager`. `advance_live_f5_equivalent_days` does not restore the pre-call pause flag when `clock_locked()` is true. A latch that forgets to pause stays unpaused, which is how M7 is visible. `ai_stopped` stays true while an outcome is latched. Keep playing is on the screen and does nothing until the button is pressed. Continue as another nation stays hidden.
+
+A peaceful day does not build the capitulation dict. Scoring still runs when a war is open, someone has already surrendered, the end date is due, or an outcome is latched. The capitulation day is covered because `at_war` is sampled before `check_all` closes those wars.
+
+Windowed guard, second run, log `~/campaign1_evidence/cl1c_end_screen2.log`. `RESULT=PASS`. No `SCRIPT ERROR`. Same gamescope headless 1280×800. The first run failed because `get_nodes_in_group` was called on the root `Window`. It is a `SceneTree` method.
+
+| Shot | What it shows |
+|---|---|
+| `~/campaign1_evidence/end_defeat.png` (49 KB) | Title Defeat. Reason "Poland capitulated on 1936-01-02". Keep playing visible. Continue hidden. |
+| `~/campaign1_evidence/end_victory.png` (52 KB) | Title Victory. Reason "Decisive victory. 1 nations capitulated." Date 1936-01-02. |
+| `~/campaign1_evidence/end_time.png` (50 KB) | Title `Defeat: Eclipsed (rank 3)`. |
+| `peace_sheet.png`, `war_hud.png`, `declare_button.png` | Recaptured in the same run. |
+
+Main menu was a real click (`Input.parse_input_event` and `flush_buffered_events`). The probe consumed it. The map sentinel did not fire. `MainMenu` opened. The inspector child count did not change. The two repo PNGs under `docs/evidence/campaign_loop1/` stay the chrome pair. The end shots are outside the tree.
+
+The end shots still show the LUX toast from the peace-sheet step earlier in the same process. The victory frame also shows the player peace sheet behind the modal (layer 124 under 125). That sheet opens on the same day the victory latches. The top-bar war line refreshes when the date line does, which is before capitulation, so a paused end frame can still name the enemy that just made peace.
+
+## CL1c mutants
+
+Copy, edit, run, restore from the copy. Not `git checkout`.
+
+| Mutant | Edit | Result |
+|---|---|---|
+| M3 | `check_all` in `_campaign_after_battles` replaced with a no-op | KILLED on the soak. POL progress stuck at 0.9114. S1, S2, S2b, and S3 did not end. `RESULT=FAIL`. Restored. |
+| M7 | latch does not set `TimeManager.paused` | KILLED. S4, S2, S2b, and S3 reported the clock not paused. `RESULT=FAIL`. Restored. |
+| M8 | uncapitulated-major check forced false | KILLED. Victory latched while FRA was still an enemy major. `RESULT=FAIL`. Restored. |
+| M9 | `CampaignEndScreen.present` removed | KILLED on the windowed guard. Defeat, victory, and time screens missing. Main menu click had no screen. `RESULT=FAIL`. No `SCRIPT ERROR`. gamescope exited 139 on teardown after the fail. Restored. `present` is back. |
+
+M1, M2, M6, M11, and M12 were killed in CL1a. M3 (capitulation test), M4, M5, and M10 were killed in CL1b. All 12 are killed. The anchors are the live calls, not the mutant no-ops.
+
+## CL1c seed and day cost
+
+Same md5 method as the base. The expected hash in `HeadlessPerf4LiveMultiAiDayTest` is not edited.
+
+Tip after the peaceful-day early-out and the boot-time rules read. Logs `cl1c_warm_seed1.log`, `cl1c_warm_seed2.log`, `cl1c_warm_seed3.log`, `cl1c_warm_kill.log`.
+
+| Run | md5 | day_ai worst | day_battles samples | RESULT |
+|---|---|---|---|---|
+| seed 1 | `20fe9063de285f19d4f9b8a105abfd31` | 5.5 ms | 0.3, 0.3, 0.3, 0.4, 0.3 | PASS |
+| seed 2 | `20fe9063de285f19d4f9b8a105abfd31` | 5.5 ms | 0.3 ×5 | PASS |
+| seed 3 | `20fe9063de285f19d4f9b8a105abfd31` | 7.3 ms | 0.3, 0.4, 0.4, 0.3, 0.3 | PASS |
+| `EOA_CAMPAIGN_LOOP=0` | `20fe9063de285f19d4f9b8a105abfd31` | 10.5 ms | 0.3 ×5 | PASS |
+
+No `SCRIPT ERROR`. The seed did not move. No re-baseline is requested.
+
+Base worst `day_ai` was 8.8 ms (the three base logs actually span 7.7–9.0). The +10% bar used in CL1a is 9.68 ms. Loop-on worst here is 7.3 ms, under that bar. It is lower than the base because January 1936 is at peace, so `ai_land` stays about 0.1 ms instead of the base's 3.7–4.3 ms of neighbour attacks.
+
+Base `day_battles` was 0.3 ms on every sample. The +10% bar is 0.33 ms. Two of the three loop-on runs printed a 0.4 ms day. The phase is printed to 0.1 ms, so 0.4 is one step over 0.33. The other days are 0.3. The peaceful battle day does not scan provinces. It checks the killswitch, whether any war is open, and whether the end year has arrived. The killswitch run's battle days are 0.3, matching the base.
+
+Killswitch `day_ai` 10.5 ms is above the 9.68 ms bar. The steps are `ai_land` 4.4–5.3 ms (base samples were 3.7–4.3) plus the same infra cost. The hash matches. `can_assault_province` still asks `loop_enabled()` on each preview so a test can flip `EOA_CAMPAIGN_LOOP` in-process. That env read is the likely extra millisecond. It was not cached, because the war-gate killswitch case depends on the next call seeing the new value.
 
 ## Pre-existing red on this base
 

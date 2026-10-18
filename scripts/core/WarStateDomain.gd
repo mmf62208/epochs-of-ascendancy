@@ -762,6 +762,9 @@ static func end_year() -> int:
 static func note_province_owner_changed() -> void:
 	if not loop_enabled():
 		return
+	# A captured hex is no longer a front. The precompute cache would keep
+	# offering it, and the next enemy hex would never be scanned.
+	invalidate_fronts()
 	var days: Variant = _override["stalemate_white_peace_days"] if _override.has("stalemate_white_peace_days") else _file_rules().get("stalemate_white_peace_days", null)
 	if days == null:
 		return

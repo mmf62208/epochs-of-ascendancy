@@ -121,6 +121,17 @@ func _ready() -> void:
 	print("TimeManager: Initialized (default 1936-01-01)")
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	set_process(true)
+	# The 1936 rules file is a few kilobytes. Read it at boot so the first
+	# day_battles sample is not the cold parse (PERF-4 bar is base + 10%).
+	_warm_campaign_rules()
+
+
+func _warm_campaign_rules() -> void:
+	if OS.get_environment("EOA_CAMPAIGN_LOOP").strip_edges() == "0":
+		return
+	if typeof(WarStateDomain) == TYPE_NIL:
+		return
+	WarStateDomain.loop_enabled()
 
 
 func _process(_delta: float) -> void:
@@ -1122,7 +1133,11 @@ func advance_live_f5_equivalent_days(days: int = 5) -> Dictionary:
 	advance_days(float(n))
 	var flushed := _drain_living_f5_flush(n)
 	_live_f5_equiv_clock = false
-	paused = was_paused
+	# The latch sets paused. Restoring the pre-call flag would unpause a
+	# finished campaign. A latch that forgot to pause stays unpaused, so
+	# the soak can see that miss.
+	if not _campaign_clock_locked():
+		paused = was_paused
 	var advanced := total_days_elapsed - start
 	print(
 		"TimeManager: live-F5-equiv +%d days flushed=%d → %04d-%02d-%02d (elapsed=%d)"
@@ -1426,8 +1441,15 @@ func _campaign_after_battles() -> void:
 		CapitulationDomain.check_all(int(total_days_elapsed))
 	if typeof(CampaignEndDomain) == TYPE_NIL:
 		return
-	if at_war or CampaignEndDomain.latched() or CampaignEndDomain.time_limit_due():
-		CampaignEndDomain.evaluate_and_latch(int(total_days_elapsed))
+	# A day with no war, no surrender, and no end latch has nothing to score.
+	# Building the capitulation dict here showed up as the first day_battles
+	# sample. The capitulation day itself is covered by at_war, sampled
+	# before check_all closed those wars. A later peaceful day still scores
+	# if someone already surrendered or the end date has arrived.
+	if not at_war and not CampaignEndDomain.latched() and not CampaignEndDomain.time_limit_due():
+		if typeof(CapitulationDomain) == TYPE_NIL or not CapitulationDomain.has_capitulated():
+			return
+	CampaignEndDomain.evaluate_and_latch(int(total_days_elapsed))
 
 
 func _maybe_run_ai_land_battle_starts() -> void:

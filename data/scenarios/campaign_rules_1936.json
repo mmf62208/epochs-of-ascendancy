@@ -20,6 +20,7 @@
   "allow_continuation": false,
   "allow_keep_playing": true,
   "stalemate_white_peace_days": null,
+  "ai_border_target_cap": 64,
   "ai_declare_checks_per_day": 1,
   "ai_declare_min_aggression": 0.6,
   "ai_declare_min_day": 180,
