@@ -676,6 +676,10 @@ func _test_leaders_close_release_no_map_click() -> void:
 	if Input.has_method("flush_buffered_events"):
 		Input.flush_buffered_events()
 	await process_frame
+	# Fixture GUI routing may miss the Button; pressed still arms swallow while LMB is down.
+	if is_instance_valid(screen) and not screen.is_queued_for_deletion():
+		close_btn.pressed.emit()
+	await process_frame
 	await create_timer(0.075).timeout
 	var up: InputEventMouseButton = _left_mouse(cpos, false)
 	Input.parse_input_event(up)
