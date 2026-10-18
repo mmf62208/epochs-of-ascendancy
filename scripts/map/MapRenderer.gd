@@ -63,6 +63,8 @@ var _ix1_last_spine_press: Dictionary = {}
 var _ix1_last_progress_band: int = -1
 const IX1_SPINE_PRESS_GUARD_MS := 180
 var _rx1_rhine_layer: Node2D = null
+var _city_labels_layer: Node2D = null
+var _major_rivers_layer: Node2D = null
 var _btn_build_rhine_bridge: Button = null
 var _label_rx1_progress: Label = null
 var _rx1_reveal_busy: bool = false
@@ -14429,6 +14431,8 @@ func set_map_mode(mode: String = "political") -> void:
 	if _political_labels_layer != null and is_instance_valid(_political_labels_layer):
 		if _political_labels_layer.has_method("set_map_mode_context"):
 			_political_labels_layer.call("set_map_mode_context", m)
+	if _city_labels_layer != null and is_instance_valid(_city_labels_layer) and _city_labels_layer.has_method("set_map_mode"):
+		_city_labels_layer.call("set_map_mode", m)
 	# Pass 22: restore remembered primary intensity for linked modes.
 	if m in INTENSITY_LINKED_MODES and primary_mapmode_intensity.has(m):
 		secondary_tint_intensity[m] = clampf(float(primary_mapmode_intensity[m]), 0.25, 2.0)
@@ -15359,6 +15363,7 @@ func _render_provinces_finish(raster_preserved: Dictionary) -> void:
 	_update_country_borders()
 	_sync_border_lod(_map_lod_tier)
 	_rebuild_political_labels()
+	_setup_atlas1_layers()
 	_rebuild_region_highlight()
 	if _map_minimap != null and is_instance_valid(_map_minimap) and _map_minimap.has_method("invalidate_political_cache"):
 		_map_minimap.call("invalidate_political_cache")
@@ -22594,6 +22599,35 @@ func _layout_spine_start_notice() -> void:
 	_label_spine_start_notice.position = Vector2(8.0, notice_y)
 	_label_spine_start_notice.custom_minimum_size = Vector2(minf(500.0, maxf(280.0, panel_w - 24.0)), 22.0)
 	_label_spine_start_notice.size = _label_spine_start_notice.custom_minimum_size
+
+
+func _setup_atlas1_layers() -> void:
+	if container == null:
+		return
+	if _major_rivers_layer == null:
+		var Rivers := load("res://scripts/map/MajorRiversLayer.gd")
+		if Rivers != null:
+			var rivers: Node2D = Rivers.new()
+			rivers.name = "MajorRiversLayer"
+			container.add_child(rivers)
+			rivers.z_as_relative = false
+			rivers.z_index = 15
+			_major_rivers_layer = rivers
+			if rivers.has_method("refresh"):
+				rivers.call("refresh")
+	if _city_labels_layer == null:
+		var Cities := load("res://scripts/map/CityLabelsLayer.gd")
+		if Cities != null:
+			var cities: Node2D = Cities.new()
+			cities.name = "CityLabelsLayer"
+			container.add_child(cities)
+			cities.z_as_relative = false
+			cities.z_index = 19
+			_city_labels_layer = cities
+			if cities.has_method("bind_centroids"):
+				cities.call("bind_centroids", province_centroids)
+			if cities.has_method("set_map_mode"):
+				cities.call("set_map_mode", current_map_mode)
 
 
 func _setup_rx1_rhine_layer() -> void:
