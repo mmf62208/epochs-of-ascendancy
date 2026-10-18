@@ -2,7 +2,7 @@
 
 Branch `grok/roads1-oldmap`. Render-only. Draft stays on HOLD. No merge.
 
-Base before these slices: `a1b4d11c` (P1 air physics, #108). The briefs were written against `6f0e5389`, which is not an ancestor of this branch. Line numbers in the briefs are stale.
+Base before these slices: `a1b4d11c` (P1 air physics, #108). Rebased onto `origin/main` `99e8d8f8` (FAC-1a #98, PERF-5 #110, INPUT-1 #89) before the final push. The briefs were written against `6f0e5389`, which is not an ancestor of this branch. Line numbers in the briefs are stale.
 
 `data/` has no diff against `a1b4d11c`. No new `EOA_*` switch. Godot stays 4.7.1 via `tools/run_godot.sh`.
 
