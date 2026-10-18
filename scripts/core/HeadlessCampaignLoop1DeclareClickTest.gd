@@ -5,21 +5,32 @@ extends SceneTree
 ## so leftover MapRenderer left-up swallow (same class as
 ## HeadlessProd1ButtonOpenTest) cannot eat the click.
 ## Inspector Declare is only for the ready target.
+##
+## Declare is diplomatic only: after the click, 3 live days must not issue
+## a new order to any player unit or move any player unit.
 
 const PLAY_SIZE := Vector2i(1280, 800)
 const FLUSH_FRAMES := 8
+const HOLD_DAYS := 3
+const HOLD_FRONT_FID := "cl1_ger_hold_front"
+const HOLD_INTERIOR_FID := "cl1_ger_hold_interior"
+const BERLIN_PID := 710300
 
 var _failures := 0
 var _event_seq := 0
 var _boot: GDScript
 var _war: GDScript
 var _chrome: GDScript
+var _move: GDScript
 var _leftover: Node
 var _ui: CanvasLayer
 var _host_pol: Panel
 var _host_fra: Panel
 var _pol_to := -1
+var _pol_from := -1
 var _fra_to := -1
+var _hold_interior := -1
+var _hold_before: Dictionary = {}
 
 
 func _init() -> void:
@@ -66,6 +77,7 @@ func _run() -> void:
 	_boot = load("res://scripts/core/CampaignLoopTestBoot.gd") as GDScript
 	_war = load("res://scripts/core/WarStateDomain.gd") as GDScript
 	_chrome = load("res://scripts/ui/CampaignWarChrome.gd") as GDScript
+	_move = load("res://scripts/formations/FormationMovement.gd") as GDScript
 	if mm == null or tm == null or _boot == null or _war == null or _chrome == null:
 		_fail("autoloads missing")
 		return
@@ -79,11 +91,12 @@ func _run() -> void:
 	_war.reset_for_test()
 	_war.clear_rule_overrides()
 	_pol_to = _border_to(mm, "GER", "POL")
+	_pol_from = _border_from(mm, "GER", "POL")
 	_fra_to = _border_to(mm, "GER", "FRA")
-	if _pol_to <= 0 or _fra_to <= 0:
-		_fail("missing GER border POL=%d FRA=%d" % [_pol_to, _fra_to])
+	if _pol_to <= 0 or _pol_from <= 0 or _fra_to <= 0:
+		_fail("missing GER border POL=%d←%d FRA=%d" % [_pol_to, _pol_from, _fra_to])
 		return
-	_pass("borders POL %d FRA %d" % [_pol_to, _fra_to])
+	_pass("borders POL %d←%d FRA %d" % [_pol_to, _pol_from, _fra_to])
 	var started: Dictionary = _war.begin_player_justify_from_province(_pol_to)
 	if not bool(started.get("ok", false)):
 		_fail("begin GER justify POL failed %s" % str(started))
@@ -105,6 +118,12 @@ func _run() -> void:
 		_fail("FRA justify ready without a FRA claim")
 		return
 	_pass("day %d GER–POL not at war, Declare ready for POL only" % int(tm.total_days_elapsed))
+	if not _station_player_hold(mm, lm):
+		return
+	_hold_before = _player_hold_snapshot(lm)
+	if _hold_before.is_empty():
+		_fail("player hold snapshot empty")
+		return
 	_leftover = _LeftoverReleaseSwallow.new()
 	_leftover.name = "Cl1LeftoverReleaseSwallow"
 	root.add_child(_leftover)
@@ -157,8 +176,26 @@ func _run() -> void:
 	await _flush()
 	if not _war.is_at_war("GER", "POL"):
 		_fail("POL Declare click did not start the war")
+		_cleanup()
 		return
 	_pass("leftover-swallow Declare click started GER–POL")
+	if not _assert_player_hold(lm, _hold_before, "on declare"):
+		_cleanup()
+		return
+	if not tm.has_method("advance_live_f5_equivalent_days"):
+		_fail("advance_live_f5_equivalent_days missing")
+		_cleanup()
+		return
+	var advanced: Dictionary = tm.call("advance_live_f5_equivalent_days", HOLD_DAYS)
+	if int(advanced.get("days", 0)) < HOLD_DAYS:
+		_fail("wanted %d live days after declare got %s" % [HOLD_DAYS, str(advanced)])
+		_cleanup()
+		return
+	_pass("advanced %d live days after declare" % HOLD_DAYS)
+	if not _assert_player_hold(lm, _hold_before, "after %d days" % HOLD_DAYS):
+		_cleanup()
+		return
+	_pass("player units held: no new order, no move")
 	_cleanup()
 
 
@@ -219,6 +256,183 @@ func _click_control(ctrl: Control, swallow_release: bool) -> bool:
 		return false
 	_click_at(r.get_center(), swallow_release)
 	return true
+
+
+func _station_player_hold(mm: Node, lm: Node) -> bool:
+	if lm == null or not ("formations" in lm) or not (lm.formations is Dictionary):
+		_fail("LeaderManager.formations missing")
+		return false
+	(lm.formations as Dictionary).clear()
+	if _move != null and _move.has_method("apply_save_data"):
+		_move.call("apply_save_data", {})
+	var bm := get_root().get_node_or_null("BattleManager")
+	if bm != null:
+		if "include_player_in_ai_land_battles" in bm:
+			bm.set("include_player_in_ai_land_battles", false)
+		if "_open_land_battles" in bm:
+			bm._open_land_battles = []
+	_hold_interior = _interior_ger(mm, _pol_from)
+	if _hold_interior <= 0:
+		_fail("no interior GER province for hold unit")
+		return false
+	_boot.make_division(HOLD_FRONT_FID, "GER", _pol_from)
+	_boot.make_division(HOLD_INTERIOR_FID, "GER", _hold_interior)
+	_pass("stationed %s @%d and %s @%d" % [HOLD_FRONT_FID, _pol_from, HOLD_INTERIOR_FID, _hold_interior])
+	return true
+
+
+func _interior_ger(mm: Node, front_pid: int) -> int:
+	if mm == null:
+		return -1
+	var berlin: Object = mm.call("get_province", BERLIN_PID) if mm.has_method("get_province") else null
+	if berlin != null and not bool(berlin.get("is_sea")) and str(berlin.get("owner_tag")).strip_edges().to_upper() == "GER":
+		if BERLIN_PID != front_pid and BERLIN_PID != _pol_to:
+			return BERLIN_PID
+	if not mm.has_method("get_provinces_by_owner"):
+		return -1
+	var owned: Array = mm.call("get_provinces_by_owner", "GER")
+	owned.sort()
+	for pid_v in owned:
+		var pid := int(pid_v)
+		if pid == front_pid or pid == _pol_to:
+			continue
+		var p: Object = mm.call("get_province", pid)
+		if p == null or bool(p.get("is_sea")):
+			continue
+		var nbrs: Array = mm.call("get_adjacent_provinces", pid, true)
+		var borders_pol := false
+		for nid_v in nbrs:
+			var n: Object = mm.call("get_province", int(nid_v))
+			if n == null or bool(n.get("is_sea")):
+				continue
+			if str(n.get("owner_tag")).strip_edges().to_upper() == "POL":
+				borders_pol = true
+				break
+		if not borders_pol:
+			return pid
+	return -1
+
+
+func _player_hold_snapshot(lm: Node) -> Dictionary:
+	var out: Dictionary = {}
+	if lm == null or not ("formations" in lm) or not (lm.formations is Dictionary):
+		return out
+	var forms: Dictionary = lm.formations
+	for fid_v in forms.keys():
+		var f: Object = forms[fid_v]
+		if f == null:
+			continue
+		var tag := ""
+		if "country_tag" in f:
+			tag = str(f.country_tag).strip_edges().to_upper()
+		if tag != "GER":
+			continue
+		if "campaign_inactive" in f and bool(f.campaign_inactive):
+			continue
+		var fid := str(fid_v)
+		var march_dest := -1
+		if _move != null and _move.has_method("get_march"):
+			var march: Dictionary = _move.call("get_march", fid)
+			if not march.is_empty():
+				march_dest = int(march.get("dest_id", -1))
+		var station := -1
+		if "stationed_province_id" in f:
+			station = int(f.stationed_province_id)
+		var mission := ""
+		if "current_land_mission" in f:
+			mission = str(f.current_land_mission)
+		var in_combat := false
+		if "is_in_combat" in f:
+			in_combat = bool(f.is_in_combat)
+		out[fid] = {
+			"station": station,
+			"mission": mission,
+			"in_combat": in_combat,
+			"march_dest": march_dest,
+		}
+	return out
+
+
+func _player_ger_marches() -> Array:
+	var fids: Array = []
+	if _move == null or not _move.has_method("list_marches"):
+		return fids
+	var marches: Array = _move.call("list_marches")
+	for raw in marches:
+		if typeof(raw) != TYPE_DICTIONARY:
+			continue
+		var row: Dictionary = raw
+		if str(row.get("country_tag", "")).strip_edges().to_upper() != "GER":
+			continue
+		fids.append(str(row.get("formation_id", "")))
+	return fids
+
+
+func _player_attack_battles() -> Array:
+	var out: Array = []
+	var bm := get_root().get_node_or_null("BattleManager")
+	if bm == null or not bm.has_method("get_open_land_battles"):
+		return out
+	var battles: Array = bm.call("get_open_land_battles")
+	for raw in battles:
+		if typeof(raw) != TYPE_DICTIONARY:
+			continue
+		var b: Dictionary = raw
+		if str(b.get("att_tag", "")).strip_edges().to_upper() != "GER":
+			continue
+		out.append("%s→%s" % [str(b.get("from_id", -1)), str(b.get("to_id", -1))])
+	return out
+
+
+func _assert_player_hold(lm: Node, before: Dictionary, label: String) -> bool:
+	var after: Dictionary = _player_hold_snapshot(lm)
+	if after.size() != before.size():
+		_fail("%s player unit count %d → %d" % [label, before.size(), after.size()])
+		return false
+	for fid_v in before.keys():
+		var fid := str(fid_v)
+		if not after.has(fid):
+			_fail("%s missing player unit %s" % [label, fid])
+			return false
+		var a: Dictionary = after[fid]
+		var b: Dictionary = before[fid]
+		if int(a.get("station", -2)) != int(b.get("station", -3)):
+			_fail("%s %s moved %s → %s" % [label, fid, str(b.get("station")), str(a.get("station"))])
+			return false
+		if str(a.get("mission", "")) != str(b.get("mission", "x")):
+			_fail("%s %s mission %s → %s" % [label, fid, str(b.get("mission")), str(a.get("mission"))])
+			return false
+		if int(a.get("march_dest", -1)) != int(b.get("march_dest", -2)):
+			_fail("%s %s new march dest %s" % [label, fid, str(a.get("march_dest"))])
+			return false
+	var marches: Array = _player_ger_marches()
+	if not marches.is_empty():
+		_fail("%s player marches %s" % [label, str(marches)])
+		return false
+	var attacks: Array = _player_attack_battles()
+	if not attacks.is_empty():
+		_fail("%s player attack orders %s" % [label, str(attacks)])
+		return false
+	_pass("%s player units held (%d)" % [label, after.size()])
+	return true
+
+
+func _border_from(mm: Node, att: String, defender: String) -> int:
+	if not mm.has_method("get_provinces_by_owner"):
+		return -1
+	var owned: Array = mm.call("get_provinces_by_owner", att)
+	owned.sort()
+	for pid_v in owned:
+		var pid := int(pid_v)
+		var nbrs: Array = mm.call("get_adjacent_provinces", pid, true)
+		nbrs.sort()
+		for nid_v in nbrs:
+			var n: Object = mm.call("get_province", int(nid_v))
+			if n == null or bool(n.get("is_sea")):
+				continue
+			if str(n.get("owner_tag")).strip_edges().to_upper() == defender:
+				return pid
+	return -1
 
 
 func _border_to(mm: Node, att: String, defender: String) -> int:

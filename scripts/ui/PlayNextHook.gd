@@ -516,13 +516,26 @@ static func apply(rec: Dictionary = {}) -> Dictionary:
 			"action": "justify",
 			"summary": str(justified.get("summary", r.get("hint", "Justify the war goal"))),
 		}
-	if action == "declare" and typeof(GameData) != TYPE_NIL and GameData.has_method("apply_war_goal_execute"):
+	if action == "declare":
 		var dpid := int(r.get("to_id", 1))
-		var declared: Dictionary = GameData.apply_war_goal_execute(dpid)
+		if typeof(WarStateDomain) != TYPE_NIL and WarStateDomain.loop_enabled():
+			var loop_declared: Dictionary = WarStateDomain.player_declare_from_province(dpid)
+			return {
+				"ok": bool(loop_declared.get("ok", false)) or bool(loop_declared.get("already", false)),
+				"action": "declare",
+				"summary": str(loop_declared.get("reason", r.get("hint", "Declare war"))),
+			}
+		if typeof(GameData) != TYPE_NIL and GameData.has_method("apply_war_goal_execute"):
+			var declared: Dictionary = GameData.apply_war_goal_execute(dpid)
+			return {
+				"ok": bool(declared.get("ok", false)),
+				"action": "declare",
+				"summary": str(declared.get("summary", r.get("hint", "Declare war"))),
+			}
 		return {
-			"ok": bool(declared.get("ok", false)),
+			"ok": false,
 			"action": "declare",
-			"summary": str(declared.get("summary", r.get("hint", "Declare war"))),
+			"summary": str(r.get("hint", "Declare war")),
 		}
 	if action == "settle_peace":
 		var pid := int(r.get("to_id", r.get("province_id", -1)))

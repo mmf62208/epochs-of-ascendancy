@@ -8,10 +8,10 @@
 ## Press-on-down matches Prod-1: leftover MapRenderer left-up swallow must
 ## not eat ACTION_MODE_BUTTON_RELEASE.
 ##
-## HOLD: Declare still also issues an attack order through the old war-goal
-## path. CampaignWarChrome._on_pressed → GameData.apply_war_goal_live("execute",
-## pid) → apply_order_panel_action("apply_assault", pid). Waiting on a
-## decision; do not change that here.
+## Declare is diplomatic only: WarStateDomain.player_declare_from_province
+## changes war state and nothing else. No apply_war_goal_live("execute"),
+## no assault, no march. Player units hold until the player orders them.
+## AI offensives stay on BattleManager.try_ai_start_land_battles (player skipped).
 class_name CampaignWarChrome
 extends RefCounted
 
@@ -86,8 +86,6 @@ static func _on_pressed(host: Node) -> void:
 		owner = str(p.owner_tag).strip_edges().to_upper()
 	if WarStateDomain.player_justify_is_ready_for(owner):
 		var declared: Dictionary = WarStateDomain.player_declare_from_province(pid)
-		if typeof(GameData) != TYPE_NIL and GameData.has_method("apply_war_goal_live"):
-			GameData.apply_war_goal_live("execute", pid)
 		_toast(str(declared.get("reason", "War declared")))
 	else:
 		WarStateDomain.begin_player_justify_from_province(pid)

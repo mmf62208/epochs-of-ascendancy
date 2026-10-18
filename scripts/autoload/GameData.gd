@@ -5854,7 +5854,11 @@ func apply_war_goal_live(step: String = "board", province_id: int = 1) -> Dictio
 			apply_order_panel_action("apply_focus", province_id)
 	elif s.begins_with("execute") or s.begins_with("push"):
 		pushes += 1
-		if has_method("apply_order_panel_action"):
+		# Campaign loop: this leaf is the old Declare path. Player war is
+		# diplomatic only (WarStateDomain). AI offensives are
+		# BattleManager.try_ai_start_land_battles, not this assault.
+		var skip_player_assault: bool = typeof(WarStateDomain) != TYPE_NIL and WarStateDomain.loop_enabled()
+		if not skip_player_assault and has_method("apply_order_panel_action"):
 			apply_order_panel_action("apply_assault", province_id)
 	st["pushes"] = pushes
 	st["tick_count"] = int(st.get("tick_count", 0)) + 1
