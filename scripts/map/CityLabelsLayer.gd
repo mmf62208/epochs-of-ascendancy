@@ -41,6 +41,7 @@ var _mode: String = "political"
 var _font: Font = null
 var _by_pid: Dictionary = {}
 var _build_ms: float = -1.0
+var _dots: Node2D = null
 
 
 func _ready() -> void:
@@ -48,6 +49,14 @@ func _ready() -> void:
 	z_index = CITY_Z
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	set_process(true)
+	var dots := _DotMarks.new()
+	dots.name = "CityLabelDots"
+	dots.host = self
+	dots.z_as_relative = false
+	dots.z_index = 46
+	dots.process_mode = Node.PROCESS_MODE_ALWAYS
+	add_child(dots)
+	_dots = dots
 	ensure_candidates()
 
 
@@ -76,7 +85,7 @@ func set_map_mode(mode: String) -> void:
 	_layout_ready = false
 	if _candidates_ready:
 		_resolve_layout()
-	queue_redraw()
+	_queue_paint()
 
 
 func ensure_candidates() -> void:
@@ -173,7 +182,7 @@ func set_view(zoom: float, camera_world: Vector2, viewport: Vector2, nation_rect
 	# change is not dropped when the camera sample has not moved half a screen.
 	_layout_ready = false
 	_resolve_layout()
-	queue_redraw()
+	_queue_paint()
 
 
 func place_competing(cands: Array, zoom: float, cam: Vector2, vp: Vector2, nation_rects: Array, max_shift: float) -> Array:
@@ -280,10 +289,10 @@ func _process(_delta: float) -> void:
 		_vp = vp_size
 		_use_nation_override = false
 		_resolve_layout()
-		queue_redraw()
+		_queue_paint()
 	elif zoom_changed:
 		_zoom = zoom
-		queue_redraw()
+		_queue_paint()
 
 
 func _resolve_layout() -> void:
@@ -368,7 +377,6 @@ func _draw() -> void:
 		var world_px := maxi(int(round(float(px) / z)), 8)
 		var outline_px := maxi(int(round(3.0 / z)), 1)
 		var text := str(item.get("name", ""))
-		draw_circle(world, 2.5 / z, Color(OUTLINE_COLOR.r, OUTLINE_COLOR.g, OUTLINE_COLOR.b, alpha))
 		draw_string_outline(font, world_text, text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, world_px, outline_px, Color(OUTLINE_COLOR.r, OUTLINE_COLOR.g, OUTLINE_COLOR.b, alpha))
 		draw_string(font, world_text, text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, world_px, Color(FILL_COLOR.r, FILL_COLOR.g, FILL_COLOR.b, alpha))
 
@@ -623,3 +631,36 @@ func _scan_anchors() -> Dictionary:
 		out[pid] = Vector2(x, y)
 		search = end_br + 1
 	return out
+
+
+func _queue_paint() -> void:
+	queue_redraw()
+	if _dots != null:
+		_dots.queue_redraw()
+
+
+## Anchor dots sit above capital stars (z 40) and roads (z 21) so the
+## cream mark stays on the city when those glyphs cover z 19.
+class _DotMarks extends Node2D:
+	var host: Node = null
+
+	func _draw() -> void:
+		if host == null or not host.has_method("placed"):
+			return
+		var zoom := 1.0
+		var viewport := get_viewport()
+		if viewport != null:
+			var cam := viewport.get_camera_2d()
+			if cam != null:
+				zoom = maxf(absf(cam.zoom.x), absf(cam.zoom.y))
+		var z := maxf(zoom, 0.04)
+		var placed: Array = host.call("placed")
+		for item in placed:
+			var enter := float(item.get("enter", 0.0))
+			var alpha := 1.0
+			if host.has_method("fade_alpha"):
+				alpha = float(host.call("fade_alpha", zoom, enter))
+			if alpha < 0.04:
+				continue
+			var world: Vector2 = item.get("world", Vector2.ZERO)
+			draw_circle(world, 4.0 / z, Color(1.0, 0.97, 0.88, alpha), true, -1.0, false)
