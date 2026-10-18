@@ -79,6 +79,11 @@ var _detail_progress_row: HBoxContainer
 var _highlight_ops_pulse: bool = false
 var _portrait_picker_agent_id: String = ""
 var _portrait_file_dialog: FileDialog = null
+var _fitting_viewport: bool = false
+
+const PANEL_DESIGN_SIZE := Vector2(1440, 780)
+const VIEWPORT_MARGIN := 16.0
+const TOP_BAR_RESERVE := 56.0
 
 const AGENT_HEADER_SPECS: Array[Dictionary] = [
 	{"text": "Name", "width": 130},
@@ -136,6 +141,9 @@ func _ready() -> void:
 	roster_filter.item_selected.connect(_on_roster_filter_changed)
 	mission_category_filter.item_selected.connect(_on_mission_category_changed)
 	_connect_agent_signals()
+	var vp := get_viewport()
+	if vp != null and not vp.size_changed.is_connected(_on_viewport_size_changed):
+		vp.size_changed.connect(_on_viewport_size_changed)
 	_center_on_viewport()
 	refresh_screen()
 	call_deferred("_center_on_viewport")
@@ -151,19 +159,46 @@ func _apply_content_margins() -> void:
 	margin.add_theme_constant_override("margin_bottom", 14)
 
 
+func _on_viewport_size_changed() -> void:
+	_center_on_viewport()
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_SIZE_CHANGED or what == NOTIFICATION_RESIZED:
+		_center_on_viewport()
+	if what == NOTIFICATION_VISIBILITY_CHANGED and visible:
+		_center_on_viewport()
+
+
 func _center_on_viewport() -> void:
+	## Clamp the 1440×780 design panel into the live viewport so Close stays on-screen
+	## at 1280×800 (playtester) and larger sizes. Left/top-only centering overflowed right.
+	if _fitting_viewport:
+		return
 	var vp := get_viewport()
 	if vp == null:
 		return
-	var sz: Vector2 = vp.get_visible_rect().size
-	var panel_sz := size
-	if panel_sz.x < 8.0 or panel_sz.y < 8.0:
-		panel_sz = Vector2(1400, 760)
-		custom_minimum_size = panel_sz
-		size = panel_sz
-	global_position = (sz - panel_sz) * 0.5
-	global_position.x = maxf(8.0, global_position.x)
-	global_position.y = maxf(56.0, global_position.y)
+	_fitting_viewport = true
+	var avail: Vector2 = vp.get_visible_rect().size
+	if avail.x < 8.0 or avail.y < 8.0:
+		_fitting_viewport = false
+		return
+	var max_w: float = maxf(avail.x - VIEWPORT_MARGIN * 2.0, 320.0)
+	var max_h: float = maxf(avail.y - TOP_BAR_RESERVE - VIEWPORT_MARGIN, 240.0)
+	var w: float = minf(PANEL_DESIGN_SIZE.x, max_w)
+	var h: float = minf(PANEL_DESIGN_SIZE.y, max_h)
+	custom_minimum_size = Vector2(w, h)
+	size = Vector2(w, h)
+	set_anchors_preset(Control.PRESET_TOP_LEFT)
+	var x: float = maxf(VIEWPORT_MARGIN, (avail.x - w) * 0.5)
+	if x + w > avail.x - VIEWPORT_MARGIN:
+		x = maxf(VIEWPORT_MARGIN, avail.x - w - VIEWPORT_MARGIN)
+	var y: float = TOP_BAR_RESERVE
+	if y + h > avail.y - VIEWPORT_MARGIN:
+		y = maxf(VIEWPORT_MARGIN, avail.y - h - VIEWPORT_MARGIN)
+	global_position = Vector2(x, y)
+	clip_contents = true
+	_fitting_viewport = false
 
 
 func _on_close_pressed() -> void:

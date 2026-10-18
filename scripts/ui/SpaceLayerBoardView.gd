@@ -8,6 +8,7 @@ const PLAYER_FALLBACK := "USA"
 
 var _player_tag: String = PLAYER_FALLBACK
 var _title: Label
+var _title_close_btn: Button
 var _body: RichTextLabel
 var _discovery_box: VBoxContainer
 var _choice_box: VBoxContainer
@@ -24,6 +25,10 @@ func _ready() -> void:
 	title = "Space Layer Board"
 	size = Vector2i(780, 560)
 	unresizable = false
+	# Native/embedded title × uses button-up; leftover MapRenderer left-up swallow
+	# (Begin-release / pan skip-pick) eats the first click. Own × fires on press.
+	if not close_requested.is_connected(_on_title_close_pressed):
+		close_requested.connect(_on_title_close_pressed)
 	_resolve_player()
 	_build_ui()
 	refresh_board()
@@ -52,10 +57,24 @@ func _build_ui() -> void:
 	vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	vbox.add_theme_constant_override("separation", 8)
 	margin.add_child(vbox)
+	var title_row := HBoxContainer.new()
+	title_row.name = "TitleRow"
+	title_row.add_theme_constant_override("separation", 8)
+	vbox.add_child(title_row)
 	_title = Label.new()
 	_title.text = "Space Layer — %s" % _player_tag
 	_title.add_theme_font_size_override("font_size", 18)
-	vbox.add_child(_title)
+	_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title_row.add_child(_title)
+	_title_close_btn = Button.new()
+	_title_close_btn.name = "TitleCloseButton"
+	_title_close_btn.text = "×"
+	_title_close_btn.tooltip_text = "Close"
+	_title_close_btn.focus_mode = Control.FOCUS_NONE
+	_title_close_btn.mouse_filter = Control.MOUSE_FILTER_STOP
+	_title_close_btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
+	_title_close_btn.pressed.connect(_on_title_close_pressed)
+	title_row.add_child(_title_close_btn)
 	_layer_btns = HBoxContainer.new()
 	_layer_btns.add_theme_constant_override("separation", 6)
 	vbox.add_child(_layer_btns)
@@ -97,9 +116,37 @@ func _build_ui() -> void:
 	_refresh_btn.pressed.connect(refresh_board)
 	row.add_child(_refresh_btn)
 	_close_btn = Button.new()
+	_close_btn.name = "CloseButton"
 	_close_btn.text = "Close"
-	_close_btn.pressed.connect(hide)
+	_close_btn.mouse_filter = Control.MOUSE_FILTER_STOP
+	_close_btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
+	_close_btn.pressed.connect(_on_title_close_pressed)
 	row.add_child(_close_btn)
+
+
+func _on_title_close_pressed() -> void:
+	## Hide on press (not release) so leftover left-up swallow cannot eat the first ×.
+	## Swallow the matching release on the parent viewport so hide-on-press cannot
+	## click-through to the map (INPUT-1 / CLOSE-1 class).
+	_arm_close_release_swallow()
+	var vp := get_viewport()
+	if vp != null:
+		vp.gui_release_focus()
+		vp.set_input_as_handled()
+	hide()
+
+
+func _arm_close_release_swallow() -> void:
+	var host: Node = get_parent()
+	if host == null:
+		host = get_tree().root if get_tree() != null else null
+	if host == null:
+		return
+	if host.get_node_or_null("SpaceTitleCloseReleaseSwallow") != null:
+		return
+	var swallow := _SpaceTitleCloseReleaseSwallow.new()
+	swallow.name = "SpaceTitleCloseReleaseSwallow"
+	host.add_child(swallow)
 
 
 func _on_layer_pressed(layer_id: String) -> void:
@@ -253,3 +300,28 @@ func show_board(tag: String = "") -> void:
 		_player_tag = tag.strip_edges().to_upper()
 	popup_centered()
 	refresh_board()
+
+
+class _SpaceTitleCloseReleaseSwallow extends Node:
+	## One-shot leftover left-up swallow after ×/Close press-to-hide.
+	var _armed: bool = true
+
+	func _ready() -> void:
+		process_mode = Node.PROCESS_MODE_ALWAYS
+		set_process_input(true)
+
+	func _input(event: InputEvent) -> void:
+		if not _armed:
+			return
+		if not (event is InputEventMouseButton):
+			return
+		var mb := event as InputEventMouseButton
+		if mb.button_index != MOUSE_BUTTON_LEFT:
+			return
+		if mb.pressed:
+			return
+		_armed = false
+		var vp := get_viewport()
+		if vp != null:
+			vp.set_input_as_handled()
+		queue_free()

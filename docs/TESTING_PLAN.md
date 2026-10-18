@@ -19,6 +19,17 @@ tools/run_godot.sh --headless --path . --resolution 1280x800 \
 
 Wired as `launch_prod1_button_open` on the full gate script. `--quick` stays the same 14 known `unit_board_play_path` reds.
 
+### 0b. UI-POLISH-1 Agents Close / Space × / Trade signal
+
+Playtester 1280×800 after Begin: Agents Close sat off the right edge (1440-wide panel, left/top clamp only). Space title × used button-up so leftover MapRenderer left-up swallow ate the first click (Close already worked). Opening Trade connected `deal_rejected` twice (copy-paste under `trade_flow_created`). Agents panel now clamps into the viewport; Space × is `ACTION_MODE_BUTTON_PRESS`; Trade guards `is_connected`.
+
+```bash
+tools/run_godot.sh --headless --path . --resolution 1280x800 \
+  -s res://scripts/core/HeadlessUiPolish1Test.gd
+```
+
+Wired as `launch_ui_polish1` on the full gate script (not `--quick`).
+
 ### 1. Core Time System Tests
 
 - Load a scenario and verify the top bar date matches `start_date`.
