@@ -16832,6 +16832,7 @@ func player_path_wheel_toward_world(world: Vector2, target_zoom: float) -> float
 
 func player_path_wheel_toward_screen(screen: Vector2, target_zoom: float) -> float:
 	# Playtester path: keep this screen pixel as the wheel anchor.
+	# Main WHEELDRIFT-1 / EDGE-2 only — no second zoom helper, no overshoot clamp.
 	var cam := get_node_or_null("MapCamera") as Camera2D
 	if cam == null and get_viewport():
 		cam = get_viewport().get_camera_2d()
@@ -16847,6 +16848,20 @@ func player_path_wheel_toward_screen(screen: Vector2, target_zoom: float) -> flo
 		_zoom_toward_mouse(factor_in if z < target_zoom else factor_out, screen)
 		guard += 1
 	return maxf(absf(cam.zoom.x), absf(cam.zoom.y))
+
+
+func player_path_place_world_at_screen(world: Vector2, screen: Vector2) -> void:
+	# Pan only. Zoom stays. Used so the playtester wheel pixel (455,455) sits
+	# on the Ruhr after Europe Home (that Home otherwise parks Essen under
+	# the Map Mode / notice strip).
+	var cam := get_node_or_null("MapCamera") as Camera2D
+	if cam == null and get_viewport():
+		cam = get_viewport().get_camera_2d()
+	if cam == null:
+		return
+	var here: Vector2 = _screen_to_world(screen)
+	cam.global_position += world - here
+	_clamp_camera_to_theater()
 
 
 func center_europe_in_world_view() -> void:
@@ -22889,6 +22904,7 @@ func _setup_atlas1_layers() -> void:
 			if cities.has_method("set_map_mode"):
 				cities.call("set_map_mode", current_map_mode)
 			_hide_legacy_province_name_labels()
+			_hide_hwy3_hub_city_labels()
 
 
 func _atlas1_city_labels_active() -> bool:
@@ -22900,6 +22916,19 @@ func _hide_legacy_province_name_labels() -> void:
 		var lbl: Variant = _province_name_labels[id]
 		if lbl is Label and is_instance_valid(lbl):
 			(lbl as Label).visible = false
+	_hide_hwy3_hub_city_labels()
+
+
+func _hide_hwy3_hub_city_labels() -> void:
+	# ATLAS-1 CityLabelsLayer is the single city-name owner. HWY-3's screen
+	# Labels (Duisburg / Dortmund / Essen / Düsseldorf / Köln) stay in the
+	# tree for HWY-3 tests that boot the overlay alone, but they must not
+	# paint on top of ATLAS-1 while this layer is live.
+	if not _atlas1_city_labels_active():
+		return
+	var ol := get_overlay_layer("InfrastructureOverlayLayer")
+	if ol != null and ol.has_method("set_suppress_hub_city_labels"):
+		ol.call("set_suppress_hub_city_labels", true)
 
 
 func count_visible_province_name_labels() -> int:

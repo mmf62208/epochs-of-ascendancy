@@ -428,25 +428,29 @@ func _sync_live_after_camera(zoom: float) -> void:
 
 
 func _apply_live_wheel(target_zoom: float) -> void:
-	# Playtester: Home ~0.787 then wheel. Do not lock_pixel_guard onto Essen.
+	# Playtester: Home, then wheel at (455,455). Main _zoom_toward_mouse only.
 	if root != null:
 		root.set_meta("eoa_rx1_pixel_lock_camera", false)
 	var mr := _map_renderer()
 	if mr != null:
 		mr.set("_close_camera_locked", false)
 		mr.set("_hold_camera_until_msec", 0)
+		if mr.has_method("player_path_europe_home"):
+			mr.call("player_path_europe_home")
 	var cam := _camera()
 	if cam == null:
 		return
-	var home := _home_pos if _home_pos != Vector2.ZERO else HOME_CAM
 	cam.position_smoothing_enabled = false
-	cam.zoom = Vector2(0.787, 0.787)
-	cam.global_position = home
 	cam.reset_smoothing()
 	cam.enabled = true
 	cam.make_current()
+	var wheel := Vector2(455, 455)
 	var essen := _world_for("essen")
-	if mr != null and mr.has_method("player_path_wheel_toward_world") and essen != Vector2.ZERO:
+	if mr != null and mr.has_method("player_path_place_world_at_screen") and essen != Vector2.ZERO:
+		mr.call("player_path_place_world_at_screen", essen, wheel)
+	if mr != null and mr.has_method("player_path_wheel_toward_screen"):
+		mr.call("player_path_wheel_toward_screen", wheel, target_zoom)
+	elif mr != null and mr.has_method("player_path_wheel_toward_world") and essen != Vector2.ZERO:
 		mr.call("player_path_wheel_toward_world", essen, target_zoom)
 	else:
 		cam.zoom = Vector2(target_zoom, target_zoom)

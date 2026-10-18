@@ -32,7 +32,7 @@ const MUENCHEN_LAND := 710220
 const MANCHESTER := 711344
 const MANCHESTER_SW := 711345
 const HOME_CAM := Vector2(7449.6456, 1795.9165)
-const ANCHOR_MAX_PX := 64.0
+const ANCHOR_MAX_PX := 30.0
 
 var _failures := 0
 
@@ -589,6 +589,23 @@ func _test_no_doubled_draws(layer: Node) -> void:
 				_fail("pid %d drawn twice at z%.3f" % [pid, z])
 				return
 			pids[pid] = true
+	var fake := Label.new()
+	fake.name = "Hwy3HubLabel_Essen"
+	fake.text = "Essen"
+	fake.visible = true
+	root.add_child(fake)
+	layer.call("set_view", 1.512, essen, vp, [])
+	var hwy_dups: PackedStringArray = layer.call("duplicate_drawn_names")
+	fake.queue_free()
+	var saw_essen := false
+	for d in hwy_dups:
+		if str(d) == "Essen":
+			saw_essen = true
+			break
+	if not saw_essen:
+		_fail("doubled-name check missed a visible HWY-3 Essen Label")
+	else:
+		_pass("doubled-name check sees HWY-3 / screen-space Labels")
 	_pass("no doubled city names or pids at live zooms")
 
 
@@ -634,24 +651,24 @@ func _test_air_wing_cover_essen(layer: Node) -> void:
 	if not names.has("Essen"):
 		_fail("Essen missing under air-wing counter at z1.09")
 		return
-	var rect: Rect2 = (names["Essen"] as Dictionary).get("screen_rect", Rect2())
-	if rect.intersects(cover):
-		_fail("Essen still under air-wing AABB at z1.09")
+	var dist := _anchor_dist_px(names["Essen"], essen, zoom, essen, vp)
+	if dist > ANCHOR_MAX_PX:
+		_fail("Essen %.1f px from its dot under air-wing at z1.09" % dist)
 	else:
-		_pass("Essen nudged off air-wing counter at z1.09")
+		_pass("Essen stays by its dot above the air-wing (%.1f px)" % dist)
 	layer.call("set_view", 1.35, essen, vp, [], [cover])
 	placed = layer.call("placed")
 	names = _names(placed)
 	if not names.has("Essen"):
 		_fail("Essen missing under air-wing counter at z1.35")
 		return
-	rect = (names["Essen"] as Dictionary).get("screen_rect", Rect2())
-	if rect.intersects(cover):
-		_fail("Essen still under air-wing AABB at z1.35")
+	dist = _anchor_dist_px(names["Essen"], essen, 1.35, essen, vp)
+	if dist > ANCHOR_MAX_PX:
+		_fail("Essen %.1f px from its dot under air-wing at z1.35" % dist)
 	elif bool(layer.call("has_visual_overlap")):
 		_fail("air-wing cover at z1.35 caused label/dot overlap")
 	else:
-		_pass("Essen clear of air-wing counter at z1.35")
+		_pass("Essen by its dot above the air-wing at z1.35 (%.1f px)" % dist)
 
 
 func _test_label_set_stable(layer: Node) -> void:

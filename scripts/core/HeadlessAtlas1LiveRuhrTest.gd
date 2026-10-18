@@ -13,8 +13,9 @@ const SETTLE_FRAMES := 30
 const LIVE_ZOOMS: Array[float] = [1.217, 1.512, 2.904]
 const VP := Vector2(1280, 800)
 const ZOOM_SLACK := 0.05
-const PLAY_HOME_ZOOM := 0.787
 const PLAY_WHEEL_SCREEN := Vector2(455, 455)
+const ANCHOR_MAX_PX := 30.0
+const RUHR_CORE := ["Essen", "Duisburg", "Düsseldorf", "Dortmund", "Köln"]
 
 var _failures := 0
 var _phase := 0
@@ -92,18 +93,20 @@ func _tick_wait_map() -> void:
 		_home_pos = cam.global_position
 	_ensure_units_on()
 	_quiet_boot_fighters()
-	_apply_home_play_zoom()
-	# Playtester wheeled at (455,455) because that pixel sat on the Ruhr at
-	# their Home frame. Ours may not; keep Essen under the wheel so z2.9
-	# does not fly into France.
-	var under := _world_under_screen(PLAY_WHEEL_SCREEN)
+	# Playtester: 1280x800, Home, wheel at (455,455) with Map Mode + notice
+	# open. Europe Home parks the Ruhr under that HUD; place Essen on the
+	# playtester pixel, then wheel that pixel through main's _zoom_toward_mouse.
 	var essen_w := _essen_world()
-	if essen_w != Vector2.ZERO and (under == Vector2.ZERO or under.distance_to(essen_w) > 180.0):
-		_focus_world = essen_w
-	else:
-		_focus_world = under
-	print("ATLAS1 live map_ready home=%.1f,%.1f home_z=%.3f focus=%.1f,%.1f units=%d layers=%d" % [
-		_home_pos.x, _home_pos.y, _camera_zoom(), _focus_world.x, _focus_world.y,
+	var mr := _map_renderer()
+	if mr != null and mr.has_method("player_path_place_world_at_screen") and essen_w != Vector2.ZERO:
+		mr.call("player_path_place_world_at_screen", essen_w, PLAY_WHEEL_SCREEN)
+		cam = _camera()
+		if cam != null:
+			_home_pos = cam.global_position
+	_focus_world = _world_under_screen(PLAY_WHEEL_SCREEN)
+	print("ATLAS1 live map_ready home=%.1f,%.1f home_z=%.3f wheel=%s under=%.1f,%.1f essen=%.1f,%.1f units=%d layers=%d" % [
+		_home_pos.x, _home_pos.y, _camera_zoom(), str(PLAY_WHEEL_SCREEN),
+		_focus_world.x, _focus_world.y, essen_w.x, essen_w.y,
 		_visible_unit_count(), _city_layer_count(),
 	])
 	if _city_layer_count() != 1:
@@ -111,7 +114,7 @@ func _tick_wait_map() -> void:
 	if _visible_unit_count() < 1:
 		_fail("no live unit/air counters after Begin")
 	if _focus_world == Vector2.ZERO:
-		_fail("wheel focus world under (455,455) is zero")
+		_fail("world under playtester wheel (455,455) is zero")
 	_zoom_i = 0
 	_begin_zoom()
 
@@ -121,8 +124,7 @@ func _begin_zoom() -> void:
 		_finish()
 		return
 	var z: float = LIVE_ZOOMS[_zoom_i]
-	# Playtester: Home 0.787 then wheel at (455,455). Do not lock_pixel_guard
-	# onto Essen — that recentres the Ruhr and is not the live view.
+	# Playtester: Home, then wheel at screen (455,455). Main zoom path only.
 	_wheel_to(z)
 	var cam := _camera()
 	var pos := cam.global_position if cam != null else _home_pos
@@ -172,19 +174,19 @@ func _check_zoom() -> void:
 		_fail("Essen world not on screen at live wheel z%.3f" % z)
 	else:
 		_pass("Essen on screen at live wheel z%.3f" % z)
-	if not _has_name(placed, "Köln") and not _has_name(placed, "Cologne"):
-		_fail("Köln missing at live wheel z%.3f" % z)
-	if z < 2.0:
-		if not _has_name(placed, "Duisburg"):
-			_fail("Duisburg missing at live wheel z%.3f" % z)
-		if not _has_name(placed, "Düsseldorf"):
-			_fail("Düsseldorf missing at live wheel z%.3f" % z)
-		if not _has_name(placed, "Dortmund"):
-			_fail("Dortmund missing at live wheel z%.3f" % z)
+	if z >= 2.3:
+		for core in RUHR_CORE:
+			if core == "Köln":
+				if not _has_name(placed, "Köln") and not _has_name(placed, "Cologne"):
+					_fail("Köln missing at live wheel z%.3f" % z)
+			elif not _has_name(placed, core):
+				_fail("%s missing at live wheel z%.3f" % [core, z])
+		_check_ruhr_north_south(placed, z)
 	if _has_name(placed, "Hamm") and not _has_name(placed, "Essen"):
 		_fail("Hamm kept over Essen at live wheel z%.3f" % z)
 	if _has_name(placed, "Münster") and not _has_name(placed, "Essen"):
 		_fail("Münster kept over Essen at live wheel z%.3f" % z)
+	_check_anchor_and_chrome(layer, placed, z)
 	if bool(layer.call("has_visual_overlap")):
 		_fail("live label overlap at z%.3f" % z)
 	else:
@@ -194,6 +196,11 @@ func _check_zoom() -> void:
 		_fail("doubled draws at z%.3f: %s" % [z, ", ".join(dups)])
 	else:
 		_pass("no doubled names at z%.3f" % z)
+	var hwy3 := _hwy3_visible_names()
+	if not hwy3.is_empty():
+		_fail("HWY-3 hub Labels still visible at z%.3f: %s" % [z, ", ".join(hwy3)])
+	else:
+		_pass("HWY-3 hub Labels hidden at z%.3f" % z)
 	if _city_layer_count() != 1:
 		_fail("CityLabelsLayer count %d at z%.3f" % [_city_layer_count(), z])
 	var legacy := _legacy_province_name_count()
@@ -284,24 +291,11 @@ func _ensure_units_on() -> void:
 		mr.call("_sync_unit_counter_paint")
 
 
-func _apply_home_play_zoom() -> void:
-	var cam := _camera()
-	if cam == null:
-		return
-	cam.position_smoothing_enabled = false
-	cam.zoom = Vector2(PLAY_HOME_ZOOM, PLAY_HOME_ZOOM)
-	if _home_pos != Vector2.ZERO:
-		cam.global_position = _home_pos
-	cam.reset_smoothing()
-	cam.enabled = true
-	cam.make_current()
-	_sync_live_counters(PLAY_HOME_ZOOM)
-	_sync_layer_from_camera()
-
-
 func _wheel_to(target_zoom: float) -> void:
 	var mr := _map_renderer()
-	if mr != null and mr.has_method("player_path_wheel_toward_world") and _focus_world != Vector2.ZERO:
+	if mr != null and mr.has_method("player_path_wheel_toward_screen"):
+		mr.call("player_path_wheel_toward_screen", PLAY_WHEEL_SCREEN, target_zoom)
+	elif mr != null and mr.has_method("player_path_wheel_toward_world") and _focus_world != Vector2.ZERO:
 		mr.call("player_path_wheel_toward_world", _focus_world, target_zoom)
 	else:
 		var cam := _camera()
@@ -321,7 +315,85 @@ func _essen_on_screen() -> bool:
 	if layer == null or not layer.has_method("screen_of"):
 		return false
 	var s: Vector2 = layer.call("screen_of", ESSEN)
-	return s.x >= -40.0 and s.y >= -40.0 and s.x <= VP.x + 40.0 and s.y <= VP.y + 40.0
+	return s.x >= 8.0 and s.y >= 8.0 and s.x <= VP.x - 8.0 and s.y <= VP.y - 8.0
+
+
+func _check_anchor_and_chrome(layer: Node, placed: Array, z: float) -> void:
+	var required: Dictionary = {"Essen": true}
+	if z >= 2.3:
+		for core in RUHR_CORE:
+			required[core] = true
+		required["Cologne"] = true
+	var chrome: Array = []
+	if layer.has_method("chrome_screen_rects"):
+		chrome = layer.call("chrome_screen_rects")
+	var hits: PackedStringArray = PackedStringArray()
+	if layer.has_method("labels_hit_chrome"):
+		hits = layer.call("labels_hit_chrome", chrome)
+	for h in hits:
+		var nm := str(h)
+		if required.has(nm):
+			_fail("%s hidden under UI/tooltip at live wheel z%.3f" % [nm, z])
+	for p in placed:
+		if float(p.get("alpha", 0.0)) < 0.04:
+			continue
+		var nm2 := str(p.get("name", ""))
+		if not required.has(nm2):
+			continue
+		var dist := 0.0
+		if layer.has_method("anchor_distance_px"):
+			dist = float(layer.call("anchor_distance_px", p))
+		else:
+			var off: Vector2 = p.get("screen_offset", Vector2.ZERO)
+			dist = off.length()
+		if dist > ANCHOR_MAX_PX:
+			_fail("%s is %.1f px from its dot at live wheel z%.3f" % [nm2, dist, z])
+
+
+func _check_ruhr_north_south(placed: Array, z: float) -> void:
+	var rows: Array = []
+	for p in placed:
+		if float(p.get("alpha", 0.0)) < 0.04:
+			continue
+		var nm := str(p.get("name", ""))
+		if nm == "Cologne":
+			nm = "Köln"
+		if not (nm in RUHR_CORE):
+			continue
+		var world: Vector2 = p.get("world", Vector2.ZERO)
+		var rect: Rect2 = p.get("screen_rect", Rect2())
+		rows.append({"name": nm, "world_y": world.y, "screen_y": rect.get_center().y})
+	if rows.size() < 5:
+		return
+	rows.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return float(a.get("world_y", 0.0)) < float(b.get("world_y", 0.0))
+	)
+	for i in range(rows.size() - 1):
+		var a: Dictionary = rows[i]
+		var b: Dictionary = rows[i + 1]
+		if float(a.get("screen_y", 0.0)) > float(b.get("screen_y", 0.0)) + 8.0:
+			_fail(
+				"%s drawn south of %s at live wheel z%.3f (world N→S broken)"
+				% [str(a.get("name", "")), str(b.get("name", "")), z]
+			)
+			return
+	_pass("Ruhr N/S order at live wheel z%.3f" % z)
+
+
+func _hwy3_visible_names() -> PackedStringArray:
+	var out := PackedStringArray()
+	var mr := _map_renderer()
+	if mr == null:
+		return out
+	var ol: Node = null
+	if mr.has_method("get_overlay_layer"):
+		ol = mr.call("get_overlay_layer", "InfrastructureOverlayLayer")
+	if ol != null and ol.has_method("get_hub_city_label_names"):
+		var raw: Variant = ol.call("get_hub_city_label_names")
+		if raw is Array:
+			for n in raw:
+				out.append(str(n))
+	return out
 
 
 func _apply_camera(pos: Vector2, zoom: float) -> void:

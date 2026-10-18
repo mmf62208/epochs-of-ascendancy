@@ -19,8 +19,9 @@ const DOT_Z := 29
 const MAX_ON_SCREEN := 60
 const MID_TIER2_SCORE_FLOOR := 400.0
 const LABEL_SHIFT_PX := 22.0
-const CLOSE_SHIFT_PX := 36.0
-const COUNTER_SHIFT_PX := 120.0
+const CLOSE_SHIFT_PX := 22.0
+const ANCHOR_MAX_PX := 30.0
+const CLOSE_FONT_MIN_PX := 14
 const COUNTER_MAX_SCREEN := Vector2(128.0, 160.0)
 const OUTLINE_PAD_PX := 4.0
 const ZOOM_REBUILD := 0.03
@@ -167,6 +168,14 @@ func fade_alpha(zoom: float, enter_zoom: float) -> float:
 	return _LOD.city_label_fade_alpha(zoom, enter_zoom)
 
 
+func _draw_alpha(zoom: float, enter_zoom: float) -> float:
+	# Close-zoom names are full-opacity. The enter ramp is only for the
+	# band edge so a city does not pop in at mid.
+	if zoom > _LOD.CITY_LABEL_MID_MAX:
+		return 1.0
+	return _LOD.city_label_fade_alpha(zoom, enter_zoom)
+
+
 func score_of(pid: int) -> float:
 	ensure_candidates()
 	if not _by_pid.has(pid):
@@ -262,13 +271,128 @@ func duplicate_drawn_names() -> PackedStringArray:
 		if float(p.get("alpha", 0.0)) < 0.04:
 			continue
 		var nm := str(p.get("name", ""))
-		if nm.is_empty():
+		var fold := _fold_drawn_name(nm)
+		if fold.is_empty():
 			continue
-		if seen.has(nm):
+		if seen.has(fold):
 			dups.append(nm)
 		else:
-			seen[nm] = true
+			seen[fold] = true
+	for row in _visible_screen_city_labels():
+		var nm2 := str(row.get("text", ""))
+		var fold2 := _fold_drawn_name(nm2)
+		if fold2.is_empty():
+			continue
+		var is_hub := str(row.get("name", "")).begins_with("Hwy3Hub") or bool(row.get("hub", false))
+		if not is_hub and not seen.has(fold2):
+			continue
+		if seen.has(fold2):
+			dups.append(nm2)
+		else:
+			seen[fold2] = true
 	return dups
+
+
+func _fold_drawn_name(nm: String) -> String:
+	var key := nm.strip_edges().to_lower()
+	key = key.replace("ü", "u").replace("ö", "o").replace("ä", "a").replace("ß", "ss")
+	if _ALIAS_FOLD.has(key):
+		return str(_ALIAS_FOLD[key])
+	return key
+
+
+func _visible_screen_city_labels() -> Array:
+	var out: Array = []
+	if not is_inside_tree():
+		return out
+	var tree := get_tree()
+	if tree == null or tree.root == null:
+		return out
+	var stack: Array = [tree.root]
+	while not stack.is_empty():
+		var node: Node = stack.pop_back()
+		if node == null:
+			continue
+		if node is Label:
+			var lbl := node as Label
+			if lbl.visible and is_instance_valid(lbl) and lbl.modulate.a >= 0.05:
+				var text := str(lbl.text).strip_edges()
+				if _is_citylike_label_text(text):
+					var hub := str(lbl.name).begins_with("Hwy3Hub")
+					var walk: Node = lbl.get_parent()
+					while walk != null and not hub:
+						if str(walk.name) == "Hwy3HubCityLabels" or str(walk.name) == "Ix1GoldSpineLabels":
+							hub = true
+							break
+						walk = walk.get_parent()
+					out.append({
+						"text": text,
+						"rect": _control_screen_rect(lbl),
+						"name": str(lbl.name),
+						"hub": hub,
+					})
+		for ch in node.get_children():
+			stack.append(ch)
+	return out
+
+
+func _is_citylike_label_text(text: String) -> bool:
+	if text.length() < 3 or text.length() > 24:
+		return false
+	if text.begins_with("Select") or text.begins_with("NEXT"):
+		return false
+	if " " in text and text.length() > 18:
+		return false
+	if text.contains("%") or text.contains(":") or text.contains("/"):
+		return false
+	return true
+
+
+func chrome_screen_rects() -> Array:
+	var out: Array = []
+	if not is_inside_tree():
+		return out
+	var tree := get_tree()
+	if tree == null or tree.root == null:
+		return out
+	var names: Array[String] = [
+		"TopInfoBar", "MapModeToolbar", "FirstSessionTipStrip", "MapMinimap",
+		"ProvinceHoverTooltip", "UnitDetailPopup", "LabelSpineStartNotice",
+	]
+	for nm in names:
+		var n: Node = tree.root.find_child(nm, true, false)
+		if n is Control:
+			var c := n as Control
+			if c.visible:
+				var r := c.get_global_rect()
+				if r.size.x > 2.0 and r.size.y > 2.0:
+					out.append(r)
+	return out
+
+
+func labels_hit_chrome(chrome_rects: Array = []) -> PackedStringArray:
+	var rects: Array = chrome_rects
+	if rects.is_empty():
+		rects = chrome_screen_rects()
+	var hits := PackedStringArray()
+	for p in _placed:
+		if float(p.get("alpha", 0.0)) < 0.04:
+			continue
+		var r: Rect2 = p.get("screen_rect", Rect2())
+		for c in rects:
+			if c is Rect2 and r.intersects(c as Rect2):
+				hits.append(str(p.get("name", "")))
+				break
+	return hits
+
+
+func anchor_distance_px(item: Dictionary) -> float:
+	var off: Vector2 = item.get("screen_offset", Vector2.ZERO)
+	if off != Vector2.ZERO:
+		return off.length()
+	var world: Vector2 = item.get("world", Vector2.ZERO)
+	var rect: Rect2 = item.get("screen_rect", Rect2())
+	return rect.position.distance_to(_world_to_label_screen(world))
 
 
 func labels_hit_counters(counter_rects: Array = []) -> PackedStringArray:
@@ -371,7 +495,7 @@ func place_competing(cands: Array, zoom: float, cam: Vector2, vp: Vector2, natio
 		var pid := int(c.get("pid", 0))
 		var ruhr_keep := float(_RUHR_CORE.get(pid, 0.0)) > 0.05
 		var enter := float(c.get("enter", 0.0))
-		var alpha := _LOD.city_label_fade_alpha(zoom, enter)
+		var alpha := _draw_alpha(zoom, enter)
 		if alpha < 0.04 and not must_keep:
 			continue
 		if must_keep and alpha < 0.04:
@@ -382,6 +506,8 @@ func place_competing(cands: Array, zoom: float, cam: Vector2, vp: Vector2, natio
 			continue
 		var tier := int(c.get("tier", 1))
 		var px := _LOD.city_label_font_px(tier)
+		if close:
+			px = maxi(px, CLOSE_FONT_MIN_PX)
 		var text := str(c.get("name", ""))
 		var size := _measure(font, text, px)
 		var ascent := size.y * 0.78
@@ -390,7 +516,6 @@ func place_competing(cands: Array, zoom: float, cam: Vector2, vp: Vector2, natio
 			base = Vector2(14.0, -2.0)
 		# Capitals and Ruhr cores stay by their dots (chips draw under labels).
 		# Everyone still misses already-placed city labels and those cities' dots.
-		var city_only: Array = []
 		var accepted := false
 		var chosen := Rect2()
 		var chosen_off := base
@@ -406,6 +531,8 @@ func place_competing(cands: Array, zoom: float, cam: Vector2, vp: Vector2, natio
 			continue
 		for off_v in _slot_offsets(base, shift_px):
 			var off: Vector2 = off_v as Vector2
+			if off.length() > ANCHOR_MAX_PX:
+				continue
 			var baseline_s: Vector2 = anchor_s + off
 			var rect := Rect2(baseline_s + Vector2(0.0, -ascent), size)
 			if _rects_clear(rect, placed, try_blockers, vp):
@@ -413,42 +540,13 @@ func place_competing(cands: Array, zoom: float, cam: Vector2, vp: Vector2, natio
 				chosen_off = off
 				accepted = true
 				break
-		if not accepted and not ignore_chips and not obstacles.is_empty() and not close:
-			for off_v2 in _slot_offsets(base, COUNTER_SHIFT_PX):
-				var off2: Vector2 = off_v2 as Vector2
-				if off2.length() <= shift_px + 0.01:
-					continue
-				var rect2 := Rect2(anchor_s + off2 + Vector2(0.0, -ascent), size)
-				if not _rects_clear(rect2, placed, city_only, vp):
-					continue
-				if _rects_clear(rect2, placed, try_blockers, vp):
-					chosen = rect2
-					chosen_off = off2
-					accepted = true
-					break
 		if not accepted and is_cap:
 			var cap_base: Vector2 = anchor_s + base
 			chosen = Rect2(cap_base + Vector2(0.0, -ascent), size)
 			chosen_off = base
 			accepted = true
-		# Close zoom: cull rather than last-resort 120px, which stacked Ruhr names.
-		if not accepted and bool(c.get("hub", false)) and not close:
-			var city_and_nations: Array = []
-			for n in nation_rects:
-				city_and_nations.append(n)
-			for prev in placed:
-				city_and_nations.append(prev.get("dot_rect", Rect2()))
-			var hub_shift := 48.0
-			if not obstacles.is_empty():
-				hub_shift = COUNTER_SHIFT_PX
-			for off_v3 in _slot_offsets(base, hub_shift):
-				var off3: Vector2 = off_v3 as Vector2
-				var rect3 := Rect2(anchor_s + off3 + Vector2(0.0, -ascent), size)
-				if _rects_clear(rect3, placed, city_and_nations, vp):
-					chosen = rect3
-					chosen_off = off3
-					accepted = true
-					break
+		# Never last-resort 48/120px: that put Duisburg south of Köln and
+		# names ~75px east of their dots. Cull if it will not sit by the mark.
 		if not accepted:
 			continue
 		if placed.size() >= MAX_ON_SCREEN and not must_keep:
@@ -504,8 +602,12 @@ func _nudge_keep_off_counters(placed: Array, obstacles: Array, vp: Vector2) -> A
 				continue
 			if _is_keep_item(placed[j]):
 				keep_others.append(placed[j])
-		for off_v in _slot_offsets(Vector2(8.0, -2.0), COUNTER_SHIFT_PX):
+		# Names draw at z 30 above chips (z 28). Stay by the dot — a 120px
+		# last-resort put Duisburg south of Köln and ~75px east of its mark.
+		for off_v in _slot_offsets(Vector2(8.0, -2.0), LABEL_SHIFT_PX):
 			var off: Vector2 = off_v as Vector2
+			if off.length() > ANCHOR_MAX_PX:
+				continue
 			var cand := Rect2(anchor_s + off + Vector2(0.0, -ascent), size)
 			if not _rects_clear(cand, keep_others, obstacles, vp):
 				continue
@@ -676,7 +778,10 @@ func _resolve_layout() -> void:
 func _nation_rects_for_layout() -> Array:
 	if _use_nation_override:
 		return _nation_override
-	return _live_nation_rects()
+	var out: Array = _live_nation_rects()
+	for r in chrome_screen_rects():
+		out.append(r)
+	return out
 
 
 func _counter_rects_for_layout() -> Array:
@@ -988,22 +1093,31 @@ func _draw() -> void:
 		if cam != null:
 			zoom = maxf(absf(cam.zoom.x), absf(cam.zoom.y))
 	var z := maxf(zoom, 0.04)
+	var close := zoom > _LOD.CITY_LABEL_MID_MAX
 	for item in _placed:
 		var enter := float(item.get("enter", 0.0))
-		var alpha := _LOD.city_label_fade_alpha(zoom, enter)
+		var alpha := _draw_alpha(zoom, enter)
 		if alpha < 0.04:
 			continue
 		var world: Vector2 = item.get("world", Vector2.ZERO)
 		var off: Vector2 = item.get("screen_offset", Vector2(8, -2))
-		var world_text := world + off / z
 		var px := maxi(int(item.get("font_px", 11)), 8)
-		# Keep the glyph at `px` screen pixels. A world-space floor of 8 made
-		# close-zoom labels ~8*z screen px while collision still used `px`.
-		var world_px := maxi(int(round(float(px) / z)), 1)
-		var outline_px := maxi(int(round(3.0 / z)), 1)
+		if close:
+			px = maxi(px, CLOSE_FONT_MIN_PX)
+		# Rasterize at screen pixels, then cancel Camera2D zoom so close
+		# names stay sharp (world-space 11/z px was blurry at z 2.9).
+		var outline_px := 3
 		var text := str(item.get("name", ""))
-		draw_string_outline(font, world_text, text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, world_px, outline_px, Color(OUTLINE_COLOR.r, OUTLINE_COLOR.g, OUTLINE_COLOR.b, alpha))
-		draw_string(font, world_text, text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, world_px, Color(FILL_COLOR.r, FILL_COLOR.g, FILL_COLOR.b, alpha))
+		draw_set_transform(world, 0.0, Vector2(1.0 / z, 1.0 / z))
+		draw_string_outline(
+			font, off, text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, px, outline_px,
+			Color(OUTLINE_COLOR.r, OUTLINE_COLOR.g, OUTLINE_COLOR.b, alpha)
+		)
+		draw_string(
+			font, off, text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, px,
+			Color(FILL_COLOR.r, FILL_COLOR.g, FILL_COLOR.b, alpha)
+		)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
 func _rects_clear(rect: Rect2, placed: Array, blockers: Array, vp: Vector2) -> bool:
@@ -1478,9 +1592,13 @@ class _DotMarks extends Node2D:
 		for item in placed:
 			var enter := float(item.get("enter", 0.0))
 			var alpha := 1.0
-			if host.has_method("fade_alpha"):
+			if host.has_method("_draw_alpha"):
+				alpha = float(host.call("_draw_alpha", zoom, enter))
+			elif host.has_method("fade_alpha"):
 				alpha = float(host.call("fade_alpha", zoom, enter))
 			if alpha < 0.04:
 				continue
 			var world: Vector2 = item.get("world", Vector2.ZERO)
-			draw_circle(world, 4.0 / z, Color(1.0, 0.97, 0.88, alpha), true, -1.0, false)
+			draw_set_transform(world, 0.0, Vector2(1.0 / z, 1.0 / z))
+			draw_circle(Vector2.ZERO, 4.0, Color(1.0, 0.97, 0.88, alpha), true, -1.0, false)
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
