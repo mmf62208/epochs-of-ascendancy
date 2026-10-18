@@ -46,7 +46,7 @@ func _pass(msg: String) -> void:
 
 
 func _run_and_quit() -> void:
-	_run()
+	await _run()
 	var ok := _failures == 0
 	print("HeadlessPerf4InteractiveMultiAiTest: ", "PASS" if ok else "FAIL", " (failures=", _failures, ")")
 	print("HeadlessPerf4InteractiveMultiAiTest: RESULT=", "PASS" if ok else "FAIL")
@@ -111,7 +111,7 @@ func _run() -> void:
 	else:
 		_pass("live-weight supply hubs=%d" % hubs)
 	_seed_major_oob_lines(pm)
-	_test_interactive_multi_ai_entry(tm, gd, sm)
+	await _test_interactive_multi_ai_entry(tm, gd, sm)
 	_test_production_cache_measured(pm)
 	_test_ai_infra_outcome_equivalence(idm, mm)
 	_test_live_day_path_includes_multi_ai(tm, idm)
@@ -122,10 +122,8 @@ func _test_source_gates_fail_on_old_tips() -> void:
 	var supply_fn := _slice_func(gd_src, "apply_supply_route_mutation")
 	if "advance_supply_day_interactive_light" in supply_fn:
 		_fail("apply_supply still drops live Play onto the light path")
-	elif "advance_supply_day" in supply_fn:
-		_pass("apply_supply uses full advance_supply_day")
 	else:
-		_fail("apply_supply lost advance_supply_day")
+		_pass("apply_supply stays off the interactive light entry")
 	var live_fn := _slice_func(gd_src, "apply_interactive_multi_ai_day_live")
 	if "country_profile" not in live_fn or "begin_interactive_multi_ai_day_cache" not in live_fn:
 		_fail("apply_interactive_multi_ai_day_live missing per-country profile/cache (289268ed FAIL class)")
@@ -257,6 +255,9 @@ func _test_interactive_multi_ai_entry(tm: Node, gd: Node, sm: Node) -> void:
 	tm.set("paused", false)
 	if "total_days_elapsed" in tm:
 		tm.set("total_days_elapsed", 0)
+	var supply_before := 0
+	if sm != null and "full_supply_day_count" in sm:
+		supply_before = int(sm.get("full_supply_day_count"))
 	var t0 := Time.get_ticks_usec()
 	var live: Dictionary = gd.call("apply_interactive_multi_ai_day_live", 1)
 	var apply_ms := float(Time.get_ticks_usec() - t0) / 1000.0
@@ -285,18 +286,30 @@ func _test_interactive_multi_ai_entry(tm: Node, gd: Node, sm: Node) -> void:
 		_fail("_maybe_run_interactive_multi_ai %.1fms >= %.0f" % [maybe_ms, FRAME_BUDGET_MS])
 	else:
 		_pass("_maybe_run_interactive_multi_ai %.1fms < %.0f" % [maybe_ms, FRAME_BUDGET_MS])
-	# Behaviour mutant: live Play must keep the full supply day.
-	var supply_last: Dictionary = {}
+	# One full supply day completes per soft apply. Queued days finish on
+	# later frames; a synchronous day already counted inside the calls.
+	var supply_target := supply_before + 2
+	var pumped := 0
+	while sm != null and int(sm.get("full_supply_day_count")) < supply_target and pumped < 400:
+		await process_frame
+		pumped += 1
+	var supply_got := 0
+	if sm != null and "full_supply_day_count" in sm:
+		supply_got = int(sm.get("full_supply_day_count")) - supply_before
+	var supply_detail := ""
 	if "peace_state" in gd:
 		var ps: Dictionary = gd.peace_state
 		var raw: Variant = ps.get("supply_last_live_apply", {})
 		if raw is Dictionary:
-			supply_last = raw as Dictionary
-	var detail := str(supply_last.get("detail", ""))
-	if detail != "advance_supply_day":
-		_fail("soft supply skipped full day (detail=%s)" % detail)
+			supply_detail = str((raw as Dictionary).get("detail", ""))
+	print(
+		"HeadlessPerf4InteractiveMultiAiTest: supply_days +%d frames=%d detail=%s"
+		% [supply_got, pumped, supply_detail]
+	)
+	if supply_got != 2:
+		_fail("full supply days +%d for 2 soft applies (want one each, detail=%s)" % [supply_got, supply_detail])
 	else:
-		_pass("soft supply full-day detail=%s" % detail)
+		_pass("one full supply day completes per soft apply (+%d)" % supply_got)
 	var depots := 0
 	if sm != null and "depot_states" in sm:
 		depots = int((sm.depot_states as Dictionary).size())

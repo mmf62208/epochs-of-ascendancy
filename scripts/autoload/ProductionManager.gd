@@ -3820,9 +3820,16 @@ func _on_game_day_advanced(_year: int, _month: int, _day: int) -> void:
 	# Live F5: same cadence, but reinforce stays player-capped (day +5 hitch).
 	if light:
 		advance_days(1.0)
-		if day_n % 5 == 0:
+		# PERF-6: same 5-day cadence, split so one 1x day never runs both.
+		var do_harvest := day_n % 5 == 0
+		var do_reinforce := day_n % 5 == 2
+		if do_harvest:
 			daily_resource_harvest_tick(5.0)
+		elif do_reinforce:
 			daily_formation_reinforce_from_stockpile()
+		set_meta("perf6_light_day_n", day_n)
+		set_meta("perf6_light_harvest", do_harvest)
+		set_meta("perf6_light_reinforce", do_reinforce)
 		return
 	daily_production_tick()
 	daily_formation_reinforce_from_stockpile()
