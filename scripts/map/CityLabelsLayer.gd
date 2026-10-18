@@ -31,6 +31,7 @@ const OUTLINE_COLOR := Color(1.0, 0.97, 0.88, 1.0)
 ## when Home-camera zoom-in ties on economy pop (all 20000).
 const _RUHR_CORE := {
 	710403: 90.0, # Essen
+	710417: 80.0, # Köln
 	710401: 70.0, # Düsseldorf
 	710402: 70.0, # Duisburg
 	710443: 60.0, # Dortmund
