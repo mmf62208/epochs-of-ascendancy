@@ -226,22 +226,16 @@ func screen_count() -> int:
 
 
 func has_visual_overlap() -> bool:
-	var items: Array = []
+	var rects: Array = []
 	for p in _placed:
 		if float(p.get("alpha", 0.0)) < 0.04:
 			continue
-		items.append(p)
-	for i in items.size():
-		var a: Dictionary = items[i]
-		var ar: Rect2 = a.get("screen_rect", Rect2())
-		var a_dot: Rect2 = a.get("dot_rect", Rect2())
-		for j in range(i + 1, items.size()):
-			var b: Dictionary = items[j]
-			var br: Rect2 = b.get("screen_rect", Rect2())
-			var b_dot: Rect2 = b.get("dot_rect", Rect2())
-			if ar.intersects(br):
-				return true
-			if ar.intersects(b_dot) or br.intersects(a_dot):
+		rects.append(p.get("screen_rect", Rect2()))
+	for i in rects.size():
+		for j in range(i + 1, rects.size()):
+			var a: Rect2 = rects[i]
+			var b: Rect2 = rects[j]
+			if a.intersects(b):
 				return true
 	return false
 
@@ -376,7 +370,7 @@ func place_competing(cands: Array, zoom: float, cam: Vector2, vp: Vector2, natio
 		var accepted := false
 		var chosen := Rect2()
 		var chosen_off := base
-		var try_blockers: Array = city_only if is_cap else blockers
+		var try_blockers: Array = city_only if (must_keep or is_cap) else blockers
 		var dot_rect := Rect2(anchor_s - Vector2(DOT_BLOCK_PX, DOT_BLOCK_PX), Vector2(DOT_BLOCK_PX * 2.0, DOT_BLOCK_PX * 2.0))
 		if not must_keep and not is_cap and not bool(c.get("hub", false)) and _dot_hits_placed(dot_rect, placed):
 			continue
@@ -389,7 +383,7 @@ func place_competing(cands: Array, zoom: float, cam: Vector2, vp: Vector2, natio
 				chosen_off = off
 				accepted = true
 				break
-		if not accepted and not is_cap and not obstacles.is_empty():
+		if not accepted and not (must_keep or is_cap) and not obstacles.is_empty():
 			for off_v2 in _slot_offsets(base, COUNTER_SHIFT_PX):
 				var off2: Vector2 = off_v2 as Vector2
 				if off2.length() <= max_shift + 0.01:
@@ -402,7 +396,7 @@ func place_competing(cands: Array, zoom: float, cam: Vector2, vp: Vector2, natio
 					chosen_off = off2
 					accepted = true
 					break
-		if not accepted and (must_keep or is_cap):
+		if not accepted and is_cap:
 			var cap_base: Vector2 = anchor_s + base
 			chosen = Rect2(cap_base + Vector2(0.0, -ascent), size)
 			chosen_off = base
@@ -413,32 +407,17 @@ func place_competing(cands: Array, zoom: float, cam: Vector2, vp: Vector2, natio
 				city_and_nations.append(n)
 			for prev in placed:
 				city_and_nations.append(prev.get("dot_rect", Rect2()))
-			# Always allow a denser-than-22px search so Essen can sit beside
-			# Köln at z1.217. 120px is only when live chips are obstacles.
 			var hub_shift := 48.0
 			if not obstacles.is_empty():
 				hub_shift = COUNTER_SHIFT_PX
-			var has_fallback := false
-			var fallback_off := base
-			var fallback_rect := Rect2()
 			for off_v3 in _slot_offsets(base, hub_shift):
 				var off3: Vector2 = off_v3 as Vector2
 				var rect3 := Rect2(anchor_s + off3 + Vector2(0.0, -ascent), size)
-				if not _rects_clear(rect3, placed, city_and_nations, vp):
-					continue
-				if _rects_clear(rect3, placed, try_blockers, vp):
+				if _rects_clear(rect3, placed, city_and_nations, vp):
 					chosen = rect3
 					chosen_off = off3
 					accepted = true
 					break
-				if not has_fallback:
-					has_fallback = true
-					fallback_off = off3
-					fallback_rect = rect3
-			if not accepted and has_fallback:
-				chosen = fallback_rect
-				chosen_off = fallback_off
-				accepted = true
 		if not accepted:
 			continue
 		if placed.size() >= MAX_ON_SCREEN and not must_keep:
@@ -461,43 +440,46 @@ func place_competing(cands: Array, zoom: float, cam: Vector2, vp: Vector2, natio
 		})
 		if not must_keep and not is_cap:
 			blockers.append(dot_rect)
-	return _cull_labels_covering_dots(placed)
+	return _nudge_keep_off_counters(placed, obstacles, vp)
 
 
-func _cull_labels_covering_dots(placed: Array) -> Array:
-	if placed.size() < 2:
+func _nudge_keep_off_counters(placed: Array, obstacles: Array, vp: Vector2) -> Array:
+	if obstacles.is_empty() or placed.is_empty():
 		return placed
-	var drop: Dictionary = {}
 	for i in placed.size():
-		if drop.has(i):
+		var item: Dictionary = placed[i]
+		if not bool(item.get("must_keep", false)) and not bool(item.get("capital", false)):
 			continue
-		var a: Dictionary = placed[i]
-		var a_rect: Rect2 = a.get("screen_rect", Rect2())
-		var a_dot: Rect2 = a.get("dot_rect", Rect2())
-		for j in range(i + 1, placed.size()):
-			if drop.has(j):
-				continue
-			var b: Dictionary = placed[j]
-			var b_rect: Rect2 = b.get("screen_rect", Rect2())
-			var b_dot: Rect2 = b.get("dot_rect", Rect2())
-			var a_on_b_dot := a_rect.intersects(b_dot.grow(1.0))
-			var b_on_a_dot := b_rect.intersects(a_dot.grow(1.0))
-			if not a_on_b_dot and not b_on_a_dot:
-				continue
-			if bool(a.get("hub", false)) or bool(a.get("must_keep", false)) or bool(a.get("capital", false)):
-				drop[j] = true
-				continue
-			if bool(b.get("must_keep", false)) or bool(b.get("capital", false)):
-				drop[i] = true
+		var rect: Rect2 = item.get("screen_rect", Rect2())
+		var hits := false
+		for o in obstacles:
+			if o is Rect2 and rect.intersects(o as Rect2):
+				hits = true
 				break
-			drop[j] = true
-	if drop.is_empty():
-		return placed
-	var out: Array = []
-	for k in placed.size():
-		if not drop.has(k):
-			out.append(placed[k])
-	return out
+		if not hits:
+			continue
+		var world: Vector2 = item.get("world", Vector2.ZERO)
+		var cam := _cam
+		var zoom := _zoom
+		var anchor_s := (world - cam) * zoom + vp * 0.5
+		var size := rect.size
+		var ascent := float(item.get("ascent", size.y * 0.78))
+		var base: Vector2 = item.get("screen_offset", Vector2(8.0, -2.0))
+		var others: Array = []
+		for j in placed.size():
+			if j == i:
+				continue
+			others.append(placed[j])
+		for off_v in _slot_offsets(Vector2(8.0, -2.0), COUNTER_SHIFT_PX):
+			var off: Vector2 = off_v as Vector2
+			var cand := Rect2(anchor_s + off + Vector2(0.0, -ascent), size)
+			if not _rects_clear(cand, others, obstacles, vp):
+				continue
+			item["screen_rect"] = cand
+			item["screen_offset"] = off
+			placed[i] = item
+			break
+	return placed
 
 
 func _priority_before(a: Dictionary, b: Dictionary) -> bool:
@@ -1116,7 +1098,7 @@ func _load_candidates() -> void:
 			"tier": tier,
 			"score": score,
 			"capital": capital,
-			"must_keep": capital or core_bonus > 0.05,
+			"must_keep": capital or pid == 710403,
 			"hub": hub or core_bonus > 0.05,
 			"world": world,
 			"enter": 0.0,
