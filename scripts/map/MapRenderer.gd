@@ -288,6 +288,9 @@ var _close_suppress_edge := false
 var _wheel_edge_suppress_until_msec: int = 0
 var _wheel_edge_await_dwell: bool = false
 var _wheel_edge_dwell_start_msec: int = 0
+## EDGE-2: continuous rim-contact clock (seconds). Reset when the cursor
+## leaves the rim. Dwell + ramp live in MapViewInput.edge_pan_feel_scale.
+var _edge_rim_contact_sec: float = 0.0
 ## Test counter: frames where edge-dir actually moved the camera (not WASD).
 var _nav_edge_pan_frames: int = 0
 ## CLOSE-1b: true only when the Close *button* was in the 6px north strip.
@@ -3902,8 +3905,11 @@ func _handle_camera_input(delta: float) -> void:
 	# UI-1: true outer 6px of the *window* (screen pixels). The old 64px strip
 	# under the HUD (y≈200–264) and last-64px floor (y>676 @ 740) were wrong.
 	# EDGE-1: far-right ≈x=1270 on 1280×740 uses EDGE_PAN_RIGHT_SCREEN_PX (10).
+	# EDGE-2: 250 ms rim dwell + 600 ms ramp + Home-zoom world-speed cap.
 	# Hovered UI / unfocused / mouse-outside skip. Close-held still suppresses.
+	# WHEELDRIFT-1 350 ms hold + 150 ms dwell is unchanged (_gate_wheel_edge_pan).
 	var edge_dir: Vector2 = Vector2.ZERO
+	var screen_edge: Vector2 = Vector2.ZERO
 	var mouse_pos: Vector2 = get_viewport().get_mouse_position()
 	if _close_suppress_edge:
 		var still_in_north_strip: bool = mouse_pos.y <= MapViewInput.EDGE_PAN_SCREEN_PX
@@ -3916,8 +3922,11 @@ func _handle_camera_input(delta: float) -> void:
 		not _close_suppress_edge
 		and not MapViewInput.edge_pan_blocked_by_gui(get_viewport())
 	):
-		edge_dir = MapViewInput.edge_pan_direction_screen(get_viewport())
-		edge_dir = _gate_wheel_edge_pan(edge_dir)
+		screen_edge = MapViewInput.edge_pan_direction_screen(get_viewport())
+		edge_dir = _gate_wheel_edge_pan(screen_edge)
+	var feel_scale: float = _update_edge_rim_contact(screen_edge != Vector2.ZERO, nav_delta)
+	if edge_dir != Vector2.ZERO and key_dir == Vector2.ZERO and feel_scale <= 0.0:
+		edge_dir = Vector2.ZERO
 	move_dir = key_dir + edge_dir
 
 	# Left-drag pan after slop (click still picks). Middle / right drag too.
@@ -3972,9 +3981,12 @@ func _handle_camera_input(delta: float) -> void:
 			move_dir = move_dir.normalized()
 			# edge_scroll_speed for edge/WASD feel; pan_speed kept as alias baseline
 			var speed: float = maxf(pan_speed, edge_scroll_speed)
+			var zoom_div: float = maxf(cam.zoom.x, 0.0001)
 			if edge_dir != Vector2.ZERO and key_dir == Vector2.ZERO:
 				_nav_edge_pan_frames += 1
-			cam.global_position += move_dir * speed * nav_delta / cam.zoom.x
+				speed *= feel_scale
+				zoom_div = MapViewInput.edge_pan_zoom_divisor(cam.zoom.x)
+			cam.global_position += move_dir * speed * nav_delta / zoom_div
 			moved = true
 
 	# Flush debounced terrain zoom after wheel burst settles.
@@ -4030,6 +4042,14 @@ func _gate_wheel_edge_pan(edge_dir: Vector2) -> Vector2:
 	_wheel_edge_await_dwell = false
 	_wheel_edge_dwell_start_msec = 0
 	return edge_dir
+
+
+func _update_edge_rim_contact(on_rim: bool, nav_delta: float) -> float:
+	if not on_rim:
+		_edge_rim_contact_sec = 0.0
+		return 0.0
+	_edge_rim_contact_sec += maxf(nav_delta, 0.0)
+	return MapViewInput.edge_pan_feel_scale(_edge_rim_contact_sec)
 
 
 func _zoom_toward_mouse(zoom_change: float, screen_pos: Vector2 = Vector2.INF) -> void:
