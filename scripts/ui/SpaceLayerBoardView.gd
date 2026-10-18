@@ -23,6 +23,8 @@ var _last_resolve: Dictionary = {}
 
 func _ready() -> void:
 	title = "Space Layer Board"
+	wrap_controls = false
+	min_size = Vector2i(780, 560)
 	size = Vector2i(780, 560)
 	unresizable = false
 	# Native/embedded title × uses button-up; leftover MapRenderer left-up swallow
@@ -298,7 +300,9 @@ func get_unresolved_from_board() -> Array:
 func show_board(tag: String = "") -> void:
 	if not tag.is_empty():
 		_player_tag = tag.strip_edges().to_upper()
-	popup_centered()
+	min_size = Vector2i(780, 560)
+	size = Vector2i(780, 560)
+	popup_centered(Vector2i(780, 560))
 	refresh_board()
 
 

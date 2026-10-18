@@ -163,14 +163,6 @@ func _title_close_button(win: Window) -> Button:
 	return null
 
 
-func _space_click_point(btn: Control, win: Window) -> Vector2:
-	var screen_origin: Vector2 = btn.get_screen_position() if btn.has_method("get_screen_position") else Vector2.ZERO
-	if screen_origin.x > 1.0 or screen_origin.y > 1.0:
-		return screen_origin + btn.size * 0.5
-	var local_c: Vector2 = btn.get_global_rect().get_center()
-	return Vector2(win.position) + local_c
-
-
 func _test_space_title_close_first_click() -> void:
 	var script: Resource = load("res://scripts/ui/SpaceLayerBoardView.gd")
 	if script == null:
@@ -191,6 +183,9 @@ func _test_space_title_close_first_click() -> void:
 	if not _space_view.visible:
 		_fail("Space board not visible after show_board")
 		return
+	if _space_view.size.x < 64 or _space_view.size.y < 64:
+		_fail("Space board size too small %s" % str(_space_view.size))
+		return
 	var x_btn: Button = _title_close_button(_space_view)
 	if x_btn == null:
 		_fail("Space TitleCloseButton (×) missing")
@@ -201,8 +196,7 @@ func _test_space_title_close_first_click() -> void:
 	if x_btn.get_global_rect().size.x < 8.0:
 		_fail("Space × rect too small %s" % str(x_btn.get_global_rect()))
 		return
-	var pt: Vector2 = _space_click_point(x_btn, _space_view)
-	_click_at(pt, true)
+	_click_window_at(_space_view, x_btn, true)
 	await _flush()
 	if _space_view.visible:
 		_fail("Space × did not close on the first click (leftover release swallowed)")
@@ -210,11 +204,18 @@ func _test_space_title_close_first_click() -> void:
 	_pass("Space × closed on first click via parse_input_event (leftover swallow)")
 
 
+func _trade_manager() -> Object:
+	if root == null:
+		return null
+	return root.get_node_or_null("TradeManager")
+
+
 func _count_deal_rejected_for(view: Object) -> int:
-	if typeof(TradeManager) == TYPE_NIL:
+	var tm: Object = _trade_manager()
+	if tm == null or not tm.has_signal("deal_rejected"):
 		return 0
 	var n := 0
-	for c in TradeManager.deal_rejected.get_connections():
+	for c in tm.get_signal_connection_list("deal_rejected"):
 		var cb: Callable = c.get("callable", Callable())
 		if cb.is_valid() and cb.get_object() == view:
 			n += 1
@@ -278,7 +279,15 @@ func _warp_mouse(screen_pt: Vector2) -> void:
 	DisplayServer.warp_mouse(Vector2i(int(round(screen_pt.x)), int(round(screen_pt.y))))
 
 
-func _click_at(screen_pt: Vector2, swallow_release: bool) -> void:
+func _click_window_at(win: Window, btn: Control, swallow_release: bool) -> void:
+	var local_pt: Vector2 = btn.get_global_rect().get_center()
+	var embed_pt: Vector2 = Vector2(win.position) + local_pt
+	win.grab_focus()
+	# Embedded in the main window (id 0): click in parent coords over the ×.
+	_click_at_window(embed_pt, swallow_release, 0)
+
+
+func _click_at_window(screen_pt: Vector2, swallow_release: bool, window_id: int) -> void:
 	if _leftover != null and _leftover.has_method("arm"):
 		if swallow_release:
 			_leftover.call("arm")
@@ -286,10 +295,12 @@ func _click_at(screen_pt: Vector2, swallow_release: bool) -> void:
 			_leftover.call("disarm")
 	_warp_mouse(screen_pt)
 	var down: InputEventMouseButton = _make_mouse(screen_pt, true)
+	down.window_id = window_id
 	Input.parse_input_event(down)
 	if Input.has_method("flush_buffered_events"):
 		Input.flush_buffered_events()
 	var up: InputEventMouseButton = _make_mouse(screen_pt, false)
+	up.window_id = window_id
 	Input.parse_input_event(up)
 	if Input.has_method("flush_buffered_events"):
 		Input.flush_buffered_events()
