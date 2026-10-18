@@ -126,6 +126,11 @@ func _check_home_cam_mid() -> void:
 	if not _camera_zoom_stuck(1.217):
 		_fail("MapCamera zoom %.3f want 1.217 at Home-cam (tests were injecting layout zoom)" % _camera_zoom())
 	var placed: Array = layer.call("placed")
+	print("ATLAS1 live home_cam z1.217 layout_z=%.3f cam_z=%.3f counters_rect=%d score=%.1f names=%s" % [
+		float(layer.call("last_layout_zoom")), _camera_zoom(),
+		int(layer.call("last_counter_rect_count")), float(layer.call("score_of", ESSEN)),
+		",".join(_names_of(layer.call("placed"))),
+	])
 	if not _has_name(placed, "Essen"):
 		_fail("Essen missing at live Home-cam z1.217")
 	else:
@@ -196,6 +201,16 @@ func _check_zoom() -> void:
 	_maybe_shot("live_ruhr_z%s" % str(z).replace(".", ""))
 	_zoom_i += 1
 	_begin_zoom()
+
+
+func _names_of(placed: Array) -> PackedStringArray:
+	var names := PackedStringArray()
+	for p in placed:
+		if float(p.get("alpha", 0.0)) < 0.04:
+			continue
+		names.append(str(p.get("name", "")))
+	names.sort()
+	return names
 
 
 func _has_name(placed: Array, want: String) -> bool:

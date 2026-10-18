@@ -284,6 +284,10 @@ func last_layout_zoom() -> float:
 	return _last_layout_zoom
 
 
+func last_counter_rect_count() -> int:
+	return _last_counter_count
+
+
 func set_view(zoom: float, camera_world: Vector2, viewport: Vector2, nation_rects: Array = [], counter_rects: Array = []) -> void:
 	_zoom = zoom
 	_cam = camera_world
@@ -408,7 +412,9 @@ func place_competing(cands: Array, zoom: float, cam: Vector2, vp: Vector2, natio
 				city_and_nations.append(n)
 			for prev in placed:
 				city_and_nations.append(prev.get("dot_rect", Rect2()))
-			var hub_shift := max_shift
+			# Always allow a denser-than-22px search so Essen can sit beside
+			# Köln at z1.217. 120px is only when live chips are obstacles.
+			var hub_shift := 48.0
 			if not obstacles.is_empty():
 				hub_shift = COUNTER_SHIFT_PX
 			var has_fallback := false
@@ -477,11 +483,12 @@ func _cull_labels_covering_dots(placed: Array) -> Array:
 			var b_on_a_dot := b_rect.intersects(a_dot.grow(1.0))
 			if not a_on_b_dot and not b_on_a_dot:
 				continue
-			if bool(b.get("must_keep", false)) or bool(b.get("capital", false)):
-				if not bool(a.get("must_keep", false)) and not bool(a.get("capital", false)):
-					drop[i] = true
-					break
+			if bool(a.get("hub", false)) or bool(a.get("must_keep", false)) or bool(a.get("capital", false)):
+				drop[j] = true
 				continue
+			if bool(b.get("must_keep", false)) or bool(b.get("capital", false)):
+				drop[i] = true
+				break
 			drop[j] = true
 	if drop.is_empty():
 		return placed
