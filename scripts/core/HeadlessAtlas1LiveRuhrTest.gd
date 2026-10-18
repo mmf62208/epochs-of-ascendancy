@@ -260,7 +260,13 @@ func _overlap_pairs(placed: Array) -> String:
 			hit = hit or (ad.size.x > 0.5 and br.intersects(ad))
 			hit = hit or (bd.size.x > 0.5 and ar.intersects(bd))
 			if hit:
-				bits.append("%s/%s" % [str(a.get("name", "")), str(b.get("name", ""))])
+				bits.append(
+					"%s@%.0f,%.0f,%.0fx%.0f/%s@%.0f,%.0f,%.0fx%.0f"
+					% [
+						str(a.get("name", "")), ar.position.x, ar.position.y, ar.size.x, ar.size.y,
+						str(b.get("name", "")), br.position.x, br.position.y, br.size.x, br.size.y,
+					]
+				)
 	return ", ".join(bits)
 
 

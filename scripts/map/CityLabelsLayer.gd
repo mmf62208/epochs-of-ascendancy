@@ -542,11 +542,23 @@ func place_competing(cands: Array, zoom: float, cam: Vector2, vp: Vector2, natio
 		var walk_shift := RUHR_ANCHOR_MAX_PX if keep else shift_px
 		var walk_anchor := RUHR_ANCHOR_MAX_PX if keep else ANCHOR_MAX_PX
 		var chip_blockers: Array = _inset_counter_obstacles(obstacles, COUNTER_INSET_PX)
+		var sibling_dots: Array = []
+		for c2 in list:
+			var pid2 := int(c2.get("pid", 0))
+			if pid2 == pid:
+				continue
+			if float(_RUHR_CORE.get(pid2, 0.0)) <= 0.05 and not bool(c2.get("must_keep", false)) and not bool(c2.get("capital", false)):
+				continue
+			var w2: Vector2 = c2.get("world", Vector2.ZERO)
+			var a2 := _world_to_label_screen(w2)
+			sibling_dots.append(Rect2(a2 - Vector2(DOT_BLOCK_PX, DOT_BLOCK_PX), Vector2(DOT_BLOCK_PX * 2.0, DOT_BLOCK_PX * 2.0)))
 		var try_blockers: Array = []
 		for n in nation_rects:
 			try_blockers.append(n)
 		for o in chip_blockers:
 			try_blockers.append(o)
+		for sd in sibling_dots:
+			try_blockers.append(sd)
 		var dot_rect := Rect2(anchor_s - Vector2(DOT_BLOCK_PX, DOT_BLOCK_PX), Vector2(DOT_BLOCK_PX * 2.0, DOT_BLOCK_PX * 2.0))
 		if not must_keep and not is_cap and not ruhr_keep and not bool(c.get("hub", false)) and _dot_hits_placed(dot_rect, placed):
 			continue
@@ -568,6 +580,8 @@ func place_competing(cands: Array, zoom: float, cam: Vector2, vp: Vector2, natio
 			var keep_blockers: Array = []
 			for n2 in nation_rects:
 				keep_blockers.append(n2)
+			for sd2 in sibling_dots:
+				keep_blockers.append(sd2)
 			for off_v2 in _candidate_slots(base, walk_shift, size, ascent, anchor_s, placed, keep):
 				var off2: Vector2 = off_v2 as Vector2
 				if _anchor_gap_px(off2, size, ascent) > walk_anchor + 0.05:
@@ -700,7 +714,11 @@ func _nudge_keep_apart(placed: Array, vp: Vector2) -> Array:
 			if not hit:
 				continue
 			var victim := j
-			if float(a.get("score", 0.0)) < float(b.get("score", 0.0)):
+			if ar.intersects(bd):
+				victim = i
+			elif br.intersects(ad):
+				victim = j
+			elif float(a.get("score", 0.0)) < float(b.get("score", 0.0)):
 				victim = i
 			var item: Dictionary = placed[victim]
 			var world: Vector2 = item.get("world", Vector2.ZERO)
@@ -1363,7 +1381,7 @@ func _keep_to_the_east(anchor_s: Vector2, placed: Array) -> bool:
 		if not _is_keep_item(p):
 			continue
 		var other_s := _world_to_label_screen(p.get("world", Vector2.ZERO) as Vector2)
-		if other_s.x > anchor_s.x + 2.0 and absf(other_s.y - anchor_s.y) < 48.0:
+		if other_s.x > anchor_s.x + 2.0 and absf(other_s.y - anchor_s.y) < 80.0:
 			return true
 	return false
 
@@ -1373,7 +1391,7 @@ func _keep_to_the_west(anchor_s: Vector2, placed: Array) -> bool:
 		if not _is_keep_item(p):
 			continue
 		var other_s := _world_to_label_screen(p.get("world", Vector2.ZERO) as Vector2)
-		if other_s.x < anchor_s.x - 2.0 and absf(other_s.y - anchor_s.y) < 48.0:
+		if other_s.x < anchor_s.x - 2.0 and absf(other_s.y - anchor_s.y) < 80.0:
 			return true
 	return false
 
