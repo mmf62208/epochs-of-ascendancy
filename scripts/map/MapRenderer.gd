@@ -283,6 +283,13 @@ var _unit_card_eaten_frame: int = -1
 var _esc_stack_frame: int = -1
 ## Close button sits in the north edge-pan strip — suppress edge until the mouse leaves that click.
 var _close_suppress_edge := false
+## WHEELDRIFT-1: a wheel notch must not edge-pan. Hold 350 ms, then require a
+## 150 ms strip dwell (or a fresh strip entry) before EDGE-1 pan resumes.
+var _wheel_edge_suppress_until_msec: int = 0
+var _wheel_edge_await_dwell: bool = false
+var _wheel_edge_dwell_start_msec: int = 0
+## Test counter: frames where edge-dir actually moved the camera (not WASD).
+var _nav_edge_pan_frames: int = 0
 ## CLOSE-1b: true only when the Close *button* was in the 6px north strip.
 ## A unit-card Close at ~y=551 must not keep suppress after the cursor reaches
 ## y=0 (Play 008e5c30 SOFT_EDGEPAN_NO_CAM: edgepan≥2, dy=0, cam0==cam1).
@@ -1283,6 +1290,8 @@ func _setup_hover_tooltip() -> void:
 var _wheel_zoom_terrain_at_msec: int = 0
 var _pending_terrain_zoom_refresh: bool = false
 const WHEEL_TERRAIN_REFRESH_MS := 180
+const WHEEL_EDGE_SUPPRESS_MS := 350
+const WHEEL_EDGE_DWELL_MS := 150
 
 
 func _left_live_slop_is_drag() -> bool:
@@ -2922,14 +2931,19 @@ func _input(event: InputEvent) -> void:
 		if event.pressed and (
 			event.button_index == MOUSE_BUTTON_WHEEL_UP or event.button_index == MOUSE_BUTTON_WHEEL_DOWN
 		):
+			# WHEELDRIFT-1: every notch arms edge suppress, even if chrome
+			# swallows zoom (top bar / left HUD). Wheel must never edge-pan.
+			_arm_wheel_edge_suppress()
 			if _wheel_should_zoom_map():
 				_left_ready_for_still_click = true
 				_unlock_close_camera()
 				_close_click_guard = false
 				_close_suppress_edge = false
 				_close_click_was_north_strip = false
-				var factor := (1.0 + zoom_speed * 1.35) if event.button_index == MOUSE_BUTTON_WHEEL_UP else (1.0 - zoom_speed * 1.35)
-				_zoom_toward_mouse(factor)
+				var zoom_in: bool = event.button_index == MOUSE_BUTTON_WHEEL_UP
+				var factor: float = _wheel_zoom_factor(zoom_in)
+				var wheel_screen: Vector2 = event.position
+				_zoom_toward_mouse(factor, wheel_screen)
 				# NEVER call full _refresh_terrain_zoom_aware() / 3520 fill rebuild per notch.
 				_schedule_light_terrain_zoom_refresh()
 				get_viewport().set_input_as_handled()
@@ -3903,6 +3917,7 @@ func _handle_camera_input(delta: float) -> void:
 		and not MapViewInput.edge_pan_blocked_by_gui(get_viewport())
 	):
 		edge_dir = MapViewInput.edge_pan_direction_screen(get_viewport())
+		edge_dir = _gate_wheel_edge_pan(edge_dir)
 	move_dir = key_dir + edge_dir
 
 	# Left-drag pan after slop (click still picks). Middle / right drag too.
@@ -3957,6 +3972,8 @@ func _handle_camera_input(delta: float) -> void:
 			move_dir = move_dir.normalized()
 			# edge_scroll_speed for edge/WASD feel; pan_speed kept as alias baseline
 			var speed: float = maxf(pan_speed, edge_scroll_speed)
+			if edge_dir != Vector2.ZERO and key_dir == Vector2.ZERO:
+				_nav_edge_pan_frames += 1
 			cam.global_position += move_dir * speed * nav_delta / cam.zoom.x
 			moved = true
 
@@ -3979,12 +3996,56 @@ func _handle_camera_input(delta: float) -> void:
 			_mark_left_pan_blocked_pick()
 
 
-func _zoom_toward_mouse(zoom_change: float) -> void:
+func _wheel_zoom_factor(zoom_in: bool) -> float:
+	# In and out must be exact inverses (Play: ×1.243 in / ×0.757 out drifted out).
+	var factor_in: float = 1.0 + zoom_speed * 1.35
+	if zoom_in:
+		return factor_in
+	if factor_in <= 0.0001:
+		return 1.0
+	return 1.0 / factor_in
+
+
+func _arm_wheel_edge_suppress() -> void:
+	_wheel_edge_suppress_until_msec = Time.get_ticks_msec() + WHEEL_EDGE_SUPPRESS_MS
+	_wheel_edge_await_dwell = true
+	_wheel_edge_dwell_start_msec = 0
+
+
+func _gate_wheel_edge_pan(edge_dir: Vector2) -> Vector2:
+	var now: int = Time.get_ticks_msec()
+	if now < _wheel_edge_suppress_until_msec:
+		_wheel_edge_dwell_start_msec = 0
+		return Vector2.ZERO
+	if not _wheel_edge_await_dwell:
+		return edge_dir
+	if edge_dir == Vector2.ZERO:
+		_wheel_edge_await_dwell = false
+		_wheel_edge_dwell_start_msec = 0
+		return Vector2.ZERO
+	if _wheel_edge_dwell_start_msec <= 0:
+		_wheel_edge_dwell_start_msec = now
+	if now - _wheel_edge_dwell_start_msec < WHEEL_EDGE_DWELL_MS:
+		return Vector2.ZERO
+	_wheel_edge_await_dwell = false
+	_wheel_edge_dwell_start_msec = 0
+	return edge_dir
+
+
+func _zoom_toward_mouse(zoom_change: float, screen_pos: Vector2 = Vector2.INF) -> void:
 	var cam := get_viewport().get_camera_2d()
 	if not cam:
 		return
 
-	var mouse_screen := get_viewport().get_mouse_position()
+	var mouse_screen: Vector2 = screen_pos
+	var vp := get_viewport()
+	if not mouse_screen.is_finite():
+		mouse_screen = vp.get_mouse_position() if vp != null else Vector2.ZERO
+	# Clamp the event/screen anchor into the viewport *before* the world correction.
+	var vp_size: Vector2 = vp.get_visible_rect().size if vp != null else Vector2.ZERO
+	if vp_size.x > 1.0 and vp_size.y > 1.0:
+		mouse_screen.x = clampf(mouse_screen.x, 0.0, vp_size.x)
+		mouse_screen.y = clampf(mouse_screen.y, 0.0, vp_size.y)
 	var old_zoom := cam.zoom
 
 	var new_zoom := old_zoom * zoom_change
@@ -3998,13 +4059,23 @@ func _zoom_toward_mouse(zoom_change: float) -> void:
 		"EOA_ZOOM_BEGIN who=MapRenderer._zoom_toward_mouse from=%.3f to=%.3f factor=%.3f"
 		% [old_zoom.x, new_zoom.x, zoom_change]
 	)
-	var world_before := cam.get_canvas_transform().affine_inverse() * mouse_screen
+	var cam_before: Vector2 = cam.global_position
+	var world_before: Vector2 = _screen_to_world(mouse_screen)
+	eoa_log_flush(
+		"EOA_ZOOM_POSE who=MapRenderer._zoom_toward_mouse phase=before z=%.3f cam=%s screen=%s world=%s"
+		% [old_zoom.x, str(cam_before), str(mouse_screen), str(world_before)]
+	)
 	cam.zoom = new_zoom
-	var world_after := cam.get_canvas_transform().affine_inverse() * mouse_screen
+	var world_after: Vector2 = _screen_to_world(mouse_screen)
 	cam.global_position += world_before - world_after
+	# Theater clamp after the anchor. If it binds, accept the slip — do not re-anchor.
 	_clamp_camera_to_theater()
 	# Light LOD only — never full 3520 fill / RoadLayer rebuild on a wheel notch.
 	_refresh_terrain_zoom_light()
+	eoa_log_flush(
+		"EOA_ZOOM_POSE who=MapRenderer._zoom_toward_mouse phase=after z=%.3f cam=%s"
+		% [new_zoom.x, str(cam.global_position)]
+	)
 	eoa_log_flush(
 		"EOA_ZOOM_END who=MapRenderer._zoom_toward_mouse z=%.3f ok=1"
 		% new_zoom.x
@@ -16723,14 +16794,14 @@ func player_path_wheel_toward_world(world: Vector2, target_zoom: float) -> float
 	var screen: Vector2 = cam.get_canvas_transform() * world
 	if DisplayServer.get_name() != "headless":
 		DisplayServer.warp_mouse(Vector2i(int(round(screen.x)), int(round(screen.y))))
-	var factor_in: float = 1.0 + zoom_speed * 1.35
-	var factor_out: float = 1.0 - zoom_speed * 1.35
+	var factor_in: float = _wheel_zoom_factor(true)
+	var factor_out: float = _wheel_zoom_factor(false)
 	var guard: int = 0
 	while guard < 48:
 		var z: float = maxf(absf(cam.zoom.x), absf(cam.zoom.y))
 		if absf(z - target_zoom) <= 0.045:
 			break
-		_zoom_toward_mouse(factor_in if z < target_zoom else factor_out)
+		_zoom_toward_mouse(factor_in if z < target_zoom else factor_out, screen)
 		guard += 1
 	return maxf(absf(cam.zoom.x), absf(cam.zoom.y))
 
