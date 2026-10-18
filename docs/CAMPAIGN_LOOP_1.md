@@ -195,6 +195,23 @@ Each mutant is a temporary local edit. Test A is `HeadlessCampaignLoop1WarGateTe
 | M11 | `include_player_in_ai_land_battles` default true | KILLED. Test A rejected the default. Restored clean. |
 | M12 | `EOA_CAMPAIGN_LOOP=0` ignored | KILLED. POL assault stayed "Not at war with Poland". Restored clean. |
 
+## CL1b capitulation test
+
+`HeadlessCampaignLoop1CapitulationPeaceTest` `RESULT=PASS`. Economy factories applied on 3196 provinces. Thresholds POL 0.62, LUX 0.50, FRA 0.68. POL capital-only progress 0.160000. Daily check 2.055 ms (bar 10, `EOA_SLOW_BOX` unset). `annex_all` of POL 88.557 ms (bar 1500). One settlement row per capitulation. POL and LUX annexed to GER. FRA rump kept. 65 capitals resolve to an owned province. Save keys `campaign_wars`, `campaign_capitulation`, and `campaign_end` are present. No `SCRIPT ERROR`.
+
+The seed hashes above were taken on this same tree (capitulation hooks were already in the CL1a commit). No further sim edit was required for test B.
+
+## CL1b mutants
+
+| Mutant | Edit | Result |
+|---|---|---|
+| M3 | daily hook never calls `check_all` | KILLED. POL, LUX, and FRA did not capitulate. Restored clean. |
+| M4 | capital weight dropped | KILLED. POL capital progress 0.076000 instead of 0.160000. Restored clean. |
+| M5 | `make_peace` does not erase the war pair | KILLED. POL, LUX, and FRA wars stayed open and re-declare was not blocked. Restored clean. |
+| M10 | save whitelist omits `campaign_end` | KILLED. Whitelist missing `campaign_end`. Restored clean. |
+
+Peace sheet: `~/campaign1_evidence/peace_sheet.png` (1280×800, 35 KB). Title "Peace with LUX", buttons "Annex all" and "Keep occupied", news "LUX capitulated. Choose annex or keep occupied." Not copied into `docs/evidence/` because that directory already holds the two chrome shots. Same private gamescope display. `RESULT=PASS`. No `SCRIPT ERROR`.
+
 Chrome shots: `~/campaign1_evidence/war_hud.png` and `declare_button.png` (1280×800, about 21 KB each). `Xvfb` is not installed and sudo is unavailable, so the guard used `gamescope --backend headless` (private Xwayland, no window on the live desktop). The HUD label is one row in the top bar, reading "At war: France". The inspector button reads "Justify war on Poland". `WindowedCampaignLoop1EndScreenGuard` `RESULT=PASS`. No `SCRIPT ERROR`.
 
 ## Pre-existing red on this base

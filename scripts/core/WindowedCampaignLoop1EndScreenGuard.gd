@@ -98,7 +98,41 @@ func _run() -> void:
 	await process_frame
 	RenderingServer.force_draw()
 	_shot("declare_button")
+	await _peace_sheet(mm, sm)
 	_finish()
+
+
+func _peace_sheet(mm: Node, sm: Node) -> void:
+	var cap: GDScript = load("res://scripts/core/CapitulationDomain.gd") as GDScript
+	if cap == null or _war == null:
+		_fail("peace sheet domains missing")
+		return
+	cap.apply_economy_factories_to_map()
+	const LUX_PID := 710977
+	var declared: Dictionary = _war.declare_war("GER", "LUX", "shot")
+	if not bool(declared.get("ok", false)):
+		_fail("declare GER-LUX failed %s" % str(declared))
+		return
+	if sm != null and sm.has_method("begin_control_batch"):
+		sm.call("begin_control_batch")
+	mm.call("update_province_owner", LUX_PID, "LUX", "GER", true, true)
+	if sm != null and sm.has_method("end_control_batch"):
+		sm.call("end_control_batch")
+	cap.check_all(1)
+	await process_frame
+	await process_frame
+	RenderingServer.force_draw()
+	var sheet := root.find_child("CampaignPeaceSheet", true, false)
+	if sheet == null:
+		_fail("peace sheet missing")
+	else:
+		var annex := sheet.find_child("BtnAnnexAll", true, false) as Button
+		var keep := sheet.find_child("BtnKeepOccupied", true, false) as Button
+		if annex == null or keep == null or not annex.visible or not keep.visible:
+			_fail("peace buttons missing")
+		else:
+			_pass("peace sheet %s / %s" % [annex.text, keep.text])
+	_shot("peace_sheet")
 
 
 func _shot(name: String) -> void:
