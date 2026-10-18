@@ -794,10 +794,28 @@ func _test_normal_map_drag_still_pans() -> void:
 	var move_pos := Vector2(80, 40)
 	_warp(press_pos)
 	_mr.call("_input", _lmb(true, press_pos))
+	# Headless warp leaves the viewport pointer at (0, 0). `_input` then
+	# re-origins the gesture there. Pre-EDGE-2 that corner instantly
+	# edge-panned (false "drag" green). Dwell correctly holds (0, 0) for
+	# 250 ms, so re-seed the synthetic press and apply event.relative.
+	_mr.set("_left_btn_down", true)
+	_mr.set("_left_pan_armed", true)
+	_mr.set("_left_button_was_up", false)
+	_mr.set("_left_origin_screen", press_pos)
+	_mr.set("_left_gesture_origin", press_pos)
+	_mr.set("_left_press_screen", press_pos)
+	_mr.set("_left_sticky_origin", press_pos)
+	_mr.set("_left_origin_valid", true)
+	_mr.set("_left_sticky_valid", true)
+	_mr.set("_last_mouse_pos", press_pos)
 	var before: Vector2 = _camera_pos()
 	var mot: InputEventMouseMotion = _motion(press_pos, move_pos, int(MOUSE_BUTTON_MASK_LEFT))
 	_warp(move_pos)
 	_mr.call("_input", mot)
+	# Viewport mouse still (0, 0). Feed the intended drag delta via last-pos.
+	_mr.set("_last_mouse_pos", press_pos)
+	_mr.set("_left_btn_down", true)
+	_mr.set("_left_pan_armed", true)
 	_tick_camera()
 	_tick_camera()
 	var after: Vector2 = _camera_pos()

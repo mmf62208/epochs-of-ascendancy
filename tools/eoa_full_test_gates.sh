@@ -229,6 +229,9 @@ else
   run_step launch_mv1_march_preview \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessMv1MarchPreviewTest.gd || fail
 
+  run_step launch_oridiom1b_march_cost \
+    tools/run_godot.sh --headless -s res://scripts/core/HeadlessOrIdiom1bMarchCostTest.gd || fail
+
   run_step launch_rh1_resource_glyphs \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessRh1ResourceGlyphMapModeTest.gd || fail
 
@@ -255,6 +258,15 @@ else
   run_step launch_perf5_supply_overlay_fresh \
     tools/run_godot.sh --headless --resolution 1280x740 -s res://scripts/core/HeadlessPerf5SupplyOverlayFreshTest.gd || fail
 
+  run_step launch_render1_supply_ring_mesh \
+    tools/run_godot.sh --headless --resolution 1280x740 -s res://scripts/core/HeadlessRender1SupplyRingMeshTest.gd || fail
+  run_step launch_render1_prebuild_roles \
+    tools/eoa_render1_prebuild_role.sh || fail
+  run_step launch_render1_draw_guard \
+    tools/eoa_render1_draw_guard.sh || fail
+  run_step launch_render1_live_cold \
+    tools/eoa_render1_live_cold_guard.sh || fail
+
   run_step launch_mv1b_input_gate \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessMv1bInputGateTest.gd || fail
 
@@ -269,6 +281,15 @@ else
 
   run_step launch_perf4_interactive_multi_ai \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessPerf4InteractiveMultiAiTest.gd || fail
+
+  run_step launch_perf6_day_roll \
+    tools/run_godot.sh --headless -s res://scripts/core/HeadlessPerf6DayRollTest.gd || fail
+
+  run_step launch_perf6_starve \
+    tools/run_godot.sh --headless -s res://scripts/core/HeadlessPerf6StarveTest.gd || fail
+
+  run_step launch_perf6_pace \
+    tools/run_godot.sh --headless -s res://scripts/core/HeadlessPerf6PaceTest.gd || fail
 
   # PERF-4 FIX #11: leftover-queue ×7 on the windowed backup clock + deferred
   # day emit. Isolates the live race (TM self-drive before TIB; mark was
@@ -311,6 +332,14 @@ else
     tools/run_godot.sh --headless --path . --resolution 1280x720 \
     -s res://scripts/core/HeadlessVis2CapitalStarsAfterLTest.gd || fail
 
+  run_step launch_wheeldrift1 \
+    tools/run_godot.sh --headless --path . --resolution 1280x740 \
+    -s res://scripts/core/HeadlessWheelDrift1Test.gd || fail
+
+  run_step launch_edge2_rim_feel \
+    tools/run_godot.sh --headless --path . --resolution 1280x740 \
+    -s res://scripts/core/HeadlessEdge2RimFeelTest.gd || fail
+
   run_step launch_rt1_road_tier \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessRt1RoadTierForEdgeTest.gd || fail
 
@@ -322,6 +351,24 @@ else
 
   run_step launch_roads1_quiet \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessRoads1QuietGuard.gd || fail
+
+  run_step launch_hwy1_highway_chain \
+    tools/run_godot.sh --headless -s res://scripts/core/HeadlessHwy1HighwayChainTest.gd || fail
+
+  run_step launch_hwy3_hub_route \
+    tools/run_godot.sh --headless -s res://scripts/core/HeadlessHwy3HubRouteTest.gd || fail
+
+  run_step launch_hwy3_live_scenario \
+    tools/run_godot.sh --headless -s res://scripts/core/HeadlessHwy3LiveScenarioTest.gd || fail
+
+  run_step launch_hwy3_supply_toggle_cache \
+    tools/run_godot.sh --headless -s res://scripts/core/HeadlessHwy3SupplyToggleCacheTest.gd || fail
+
+  run_step launch_live_lon_probe \
+    tools/run_godot.sh --headless -s res://scripts/core/HeadlessLiveLonProbe.gd || fail
+
+  run_step launch_hwy3_ruhr_legibility \
+    tools/eoa_hwy3_ruhr_legibility_guard.sh || fail
 
   run_step launch_rx1_panel_state \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessRx1RhinePanelStateTest.gd || fail

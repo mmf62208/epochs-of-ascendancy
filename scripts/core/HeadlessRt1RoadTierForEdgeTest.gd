@@ -253,15 +253,23 @@ func _test_trunk_sparsifier() -> void:
 			vis_src = vf.get_as_text()
 			vf.close()
 	if "HIGHWAY_CASING_SCREEN_PX := 12.0" not in vis_src:
-		_fail("highway casing constant must stay (legacy needle); live width is highway_casing_px")
+		_fail("mid highway casing must be 12 px (wider than paved, thinner than mid gold 28)")
 	else:
-		_pass("highway casing constant present")
+		_pass("mid highway casing 12 px")
+	if "HIGHWAY_FAR_CASING_SCREEN_PX := 12.0" not in vis_src:
+		_fail("far highway casing must be 12 px")
+	else:
+		_pass("far highway casing 12 px")
+	if "HIGHWAY_CLOSE_CASING_SCREEN_PX := 16.0" not in vis_src:
+		_fail("close highway casing must be 16 px")
+	else:
+		_pass("close highway casing 16 px")
 	if RoadTierVisualScript.highway_casing_px(0.5) > 0.05:
-		_fail("z0.5 casing must be 0 (no 20 px far floor)")
+		_fail("z0.5 casing table must be 0 (no 20 px far floor on highway_casing_px)")
 	elif absf(RoadTierVisualScript.highway_casing_px(1.0) - 2.6) > 0.05:
-		_fail("z1 casing must be 2.6 px, got %.2f" % RoadTierVisualScript.highway_casing_px(1.0))
+		_fail("z1 casing table must be 2.6 px, got %.2f" % RoadTierVisualScript.highway_casing_px(1.0))
 	elif absf(RoadTierVisualScript.highway_casing_px(4.0) - 8.0) > 0.05:
-		_fail("z4 casing must be 8 px, got %.2f" % RoadTierVisualScript.highway_casing_px(4.0))
+		_fail("z4 casing table must be 8 px, got %.2f" % RoadTierVisualScript.highway_casing_px(4.0))
 	else:
 		_pass("highway casing table 0 / 2.6 / 8")
 	if "_draw_road_quad" not in ol_src:
