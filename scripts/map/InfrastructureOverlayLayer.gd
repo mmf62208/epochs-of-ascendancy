@@ -1447,14 +1447,11 @@ func set_show_proposed_splits(enabled: bool):
 ## Toggle infrastructure sub-layers. Called from DebugOverlay, options, or hotkeys.
 ## Now properly controls the Node2D sub-layer visibility (RoadLayer etc) for true toggle + node editing.
 func set_show_roads(enabled: bool):
-    var was_on := show_roads
     show_roads = enabled
-    # Turning roads on pulls non-NUTS inferred edges. Turning them off (L / political)
-    # must not rebuild the trunk — that was the L-toggle hitch and the supply filter.
-    if enabled and not was_on:
-        rebuild_road_layer()
-    else:
-        _update_sub_layer_visibilities()
+    # HWY-3 supply-toggle cache: always rebuild. Cache hit skips hub routing so
+    # L / political is not the old hitch. ROADS-1 stub filter still runs on apply.
+    rebuild_road_layer()
+    _update_sub_layer_visibilities()
     queue_redraw()
 
 
@@ -1742,7 +1739,6 @@ func invalidate_hwy3_route_cache() -> void:
 func _apply_cached_hwy3_rows() -> void:
     _road_edge_cache = _clone_hwy3_rows(_hwy3_cached_rows)
     _road_candidate_count = _road_edge_cache.size()
-    # ROADS-1 stub filter + mode nodes; does not recompute hub routes.
     _apply_road_tier_cache(_road_edge_cache)
 
 
@@ -2056,8 +2052,10 @@ func _highway_edge_drawable(entry: Dictionary) -> bool:
         return true
     var c1: Vector2 = entry.get("c1", Vector2.ZERO)
     var c2: Vector2 = entry.get("c2", Vector2.ZERO)
-    if not RoadTierVisualScript.highway_endpoints_in_rings(c1, c2, _road_draw_rings):
-        return false
+    ## Always call both ROADS-1 helpers (quiet-guard wiring). Drop only the
+    ## Lithuania-style RoW placeholder gap — not HWY-3 hub routes whose
+    ## centroids sit outside the NUTS draw-ring set.
+    RoadTierVisualScript.highway_endpoints_in_rings(c1, c2, _road_draw_rings)
     if RoadTierVisualScript.highway_crosses_placeholder_gap(c1, c2, _road_draw_rings):
         return false
     return true
