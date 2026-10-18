@@ -16840,6 +16840,8 @@ func player_path_wheel_toward_screen(screen: Vector2, target_zoom: float) -> flo
 		cam = get_viewport().get_camera_2d()
 	if cam == null:
 		return 1.0
+	cam.enabled = true
+	cam.make_current()
 	var factor_in: float = _wheel_zoom_factor(true)
 	var factor_out: float = _wheel_zoom_factor(false)
 	var best_z: float = maxf(absf(cam.zoom.x), absf(cam.zoom.y))
@@ -16870,11 +16872,13 @@ func player_path_place_world_at_screen(world: Vector2, screen: Vector2) -> void:
 	# in toward the city's current on-screen pixel until zoom ≈ 0.75 (the
 	# playtester Home band) so the pan has room — never chase an off-screen
 	# edge (that flew to z 11 on empty ocean).
-	var cam := get_viewport().get_camera_2d() if get_viewport() else null
-	if cam == null:
-		cam = get_node_or_null("MapCamera") as Camera2D
+	var cam := get_node_or_null("MapCamera") as Camera2D
+	if cam == null and get_viewport():
+		cam = get_viewport().get_camera_2d()
 	if cam == null:
 		return
+	cam.enabled = true
+	cam.make_current()
 	var vp := get_viewport()
 	var vp_size: Vector2 = vp.get_visible_rect().size if vp != null else Vector2(1280, 800)
 	var factor_in: float = _wheel_zoom_factor(true)
@@ -16888,11 +16892,12 @@ func player_path_place_world_at_screen(world: Vector2, screen: Vector2) -> void:
 			break
 		_zoom_toward_mouse(factor_in, city_screen)
 		guard += 1
-	var here: Vector2 = _screen_to_world(screen)
+	# Use MapCamera's canvas, not a different viewport Camera2D.
+	var here: Vector2 = cam.get_canvas_transform().affine_inverse() * screen
 	cam.global_position += world - here
-	# Skip theater clamp on this pan. At Europe Home the view still fills the
-	# theater and clamp left Essen ~67 wu off (455,455); later wheel notches
-	# then slipped the Ruhr off the top of the frame. Wheel zoom still clamps.
+	# Skip theater clamp on this pan. Clamp at Home-band zoom left Essen
+	# ~67 wu off (455,455); later wheel notches then slipped the Ruhr off
+	# the top of the frame. Wheel zoom still clamps.
 
 
 func center_europe_in_world_view() -> void:
