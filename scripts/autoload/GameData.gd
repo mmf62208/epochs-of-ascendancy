@@ -360,9 +360,23 @@ func _init_peace_state_if_needed() -> void:
 		update_manpower_from_population(t)
 
 
-func get_peace_state() -> Dictionary:
+## Live peace_state map (no copy). Daily tick / AI invest / battle preview must
+## use this — `duplicate(true)` of the blob was a ~1.7s hitch once per game day.
+func peek_peace_state() -> Dictionary:
+	_init_peace_state_if_needed()
+	return peace_state
+
+
+## Explicit deep snapshot for save/export callers that must detach from live state.
+func get_peace_state_copy() -> Dictionary:
 	_init_peace_state_if_needed()
 	return peace_state.duplicate(true)
+
+
+func get_peace_state() -> Dictionary:
+	# PERF-4: same live map as peek_peace_state. Callers that need a detached
+	# snapshot use get_peace_state_copy(). Outcomes unchanged for reads.
+	return peek_peace_state()
 
 
 ## Helpers for map visuals / overlays (riots, pending research ethics) + culling: cheap queries so overlays only process "active" provinces (player owned + events + border/high pop via caller).
@@ -2251,9 +2265,14 @@ func apply_ascendancy_initiative_player_province_choice(tag: String, branch: Str
 		peace_state[prog_key][tag] = {}
 	var node_key : Variant = branch + "/" + node_name
 	peace_state[prog_key][tag][node_key] = {"completed": true, "chosen_pid": chosen_pid, "geo": {"river": is_river, "coastal": is_coastal, "border": is_border}}
-	# Notify for map visuals (vitality, overlays), combat recalc, supply
+	# Notify for map visuals (vitality, overlays), combat recalc, supply.
+	# Hub capacity is refreshed only via notify_hub_stats_changed (settlement
+	# notify does not retag hubs). Removing that call leaves capacity stale.
 	MapManager.notify_province_changed(chosen_pid, "settlement")
-	MapManager.notify_province_changed(chosen_pid, "infrastructure")
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_signal("province_data_changed"):
+		MapManager.province_data_changed.emit(chosen_pid, "infrastructure")
+	if typeof(SupplyManager) != TYPE_NIL and SupplyManager.has_method("notify_hub_stats_changed"):
+		SupplyManager.notify_hub_stats_changed(chosen_pid)
 	# Pillar nudge based on geo (e.g. coastal/river give Mandate for trade)
 	var mandate_gain : Variant = 6
 	if is_river or is_coastal:
@@ -3108,9 +3127,10 @@ func apply_encourage_relocation(tag: String, target_culture_or_area: String, sca
 			# Prefer MapManager updaters when they exist (they emit province_data_changed for renderer/inspector).
 			if MapManager.has_method("update_province_infrastructure"):
 				MapManager.update_province_infrastructure(pid, p.infrastructure)
-			# Dev has no dedicated updater in all builds; direct + optional notify.
-			if MapManager.has_method("notify_province_changed"):
-				MapManager.notify_province_changed(pid, "development")
+			# Infra was already written above, so the updater is a no-op.
+			# Hub capacity is refreshed only via notify_hub_stats_changed.
+			if typeof(SupplyManager) != TYPE_NIL and SupplyManager.has_method("notify_hub_stats_changed"):
+				SupplyManager.notify_hub_stats_changed(pid)
 			# Explicit emit so MapRenderer tints (settlement cyan-green vitality + welfare strain) and inspector refresh live for playtest.
 			if typeof(MapManager) != TYPE_NIL and MapManager.has_signal("province_data_changed"):
 				MapManager.province_data_changed.emit(pid, "settlement")
@@ -4422,9 +4442,17 @@ func apply_supply_route_mutation(route_id: String = "main", priority: String = "
 			SupplyManager.set_selected_province(province_id)
 		if SupplyManager.has_method("set_routing_mode"):
 			SupplyManager.set_routing_mode(str(priority).to_lower())
-		if province_id > 0 and SupplyManager.has_method("set_player_depot"):
+		# PERF-4 FIX #1: interactive multi-AI passes dummy pid 1. Marking that
+		# as a player depot rebuilt the live 3520 supply network every day.
+		# Only stamp a depot when the province actually exists on the board.
+		var depot_ok := false
+		if province_id > 0 and typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province"):
+			depot_ok = MapManager.get_province(province_id) != null
+		if depot_ok and SupplyManager.has_method("set_player_depot"):
 			SupplyManager.set_player_depot(province_id, true)
 		if SupplyManager.has_method("advance_supply_day"):
+			# The one full supply day per game day (air / naval / shipping).
+			# The daily listener stays on the light path (main's split).
 			SupplyManager.advance_supply_day(1.0)
 			supply_live = true
 			supply_detail = "advance_supply_day"
@@ -5197,13 +5225,17 @@ func apply_peace_conference_settlement_live(
 	var items: Array = []
 	if annex:
 		items.append({"type": "annex", "province_id": province_id})
-		# Live owner flip when map province is available
-		if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province"):
+		# Go through MapManager so the owner index and SupplyManager both see the flip.
+		if typeof(MapManager) != TYPE_NIL and MapManager.has_method("update_province_owner"):
+			MapManager.update_province_owner(province_id, w, w)
+		elif typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province"):
 			var prov = MapManager.get_province(province_id)
 			if prov != null and "owner_tag" in prov:
 				prov.owner_tag = w
 				if "controller_tag" in prov:
 					prov.controller_tag = w
+				if typeof(SupplyManager) != TYPE_NIL and SupplyManager.has_method("notify_province_control_changed"):
+					SupplyManager.notify_province_control_changed(province_id)
 	if puppet:
 		items.append({"type": "puppet", "tag": l})
 	if reparations > 0.05:
@@ -26221,6 +26253,14 @@ func apply_year_multi_ai_campaign_live(days: int = 365, province_id: int = 1, le
 	return result
 
 
+## Last per-country / sub-step profile from apply_interactive_multi_ai_day_live.
+var last_interactive_multi_ai_profile: Dictionary = {}
+
+
+func get_last_interactive_multi_ai_profile() -> Dictionary:
+	return last_interactive_multi_ai_profile.duplicate(true)
+
+
 ## Interactive F5 multi-AI day: budgeted non-player major production applies so multi-day
 ## advances feel alive without full simulate_daily_ai_combat / multi-faction cascade (OOM risk).
 ## Default ON under TimeManager interactive light sim. Killswitch: EOA_INTERACTIVE_MULTI_AI=0.
@@ -26333,6 +26373,11 @@ func apply_interactive_multi_ai_day_live(province_id: int = 1) -> Dictionary:
 	var soft_tag := ""
 	var last_live: Dictionary = {}
 
+	if typeof(ProductionManager) != TYPE_NIL and ProductionManager.has_method("begin_interactive_multi_ai_day_cache"):
+		ProductionManager.call("begin_interactive_multi_ai_day_cache")
+
+	var country_profile: Array = []
+	var t_all := Time.get_ticks_usec()
 	# CRITICAL: use apply_production_for_tag(tag) — never player-scoped apply_production
 	# (order-panel production always mutates LeaderManager player stockpile).
 	for tag_v in ordered:
@@ -26341,7 +26386,9 @@ func apply_interactive_multi_ai_day_live(province_id: int = 1) -> Dictionary:
 		var tag := str(tag_v)
 		if tag == player_tag:
 			continue
+		var t_tag := Time.get_ticks_usec()
 		var live: Dictionary = apply_production_for_tag(tag)
+		var tag_ms := float(Time.get_ticks_usec() - t_tag) / 1000.0
 		last_live = live
 		var ok_apply := bool(live.get("ok", false))
 		var ag := float(aggression.get(tag, 0.5))
@@ -26358,6 +26405,15 @@ func apply_interactive_multi_ai_day_live(province_id: int = 1) -> Dictionary:
 		prod_tags.append(tag)
 		if ok_apply:
 			applied_production += 1
+		country_profile.append({
+			"tag": tag,
+			"step": "production",
+			"ms": tag_ms,
+			"ok": ok_apply,
+			"lines_touched": int(live.get("lines_touched", 0)),
+			"stock_delta": int(live.get("stock_delta", 0)),
+			"soft_stock_credit": int(live.get("soft_stock_credit", 0)),
+		})
 
 	if soft_cap > 0 and queue.size() < budget and not ordered.is_empty():
 		var pick := ""
@@ -26372,6 +26428,7 @@ func apply_interactive_multi_ai_day_live(province_id: int = 1) -> Dictionary:
 					pick = str(tag_v3)
 					break
 		var soft_ok := false
+		var t_soft := Time.get_ticks_usec()
 		if not pick.is_empty() and has_method("apply_order_panel_action"):
 			# Soft tick is theater-wide supply; tag recorded for audit only
 			var live2: Dictionary = apply_order_panel_action("apply_supply", province_id)
@@ -26379,6 +26436,7 @@ func apply_interactive_multi_ai_day_live(province_id: int = 1) -> Dictionary:
 			soft_ok = bool(live2.get("ok", live2.get("success", true)))
 		elif not pick.is_empty():
 			soft_ok = true
+		var soft_ms := float(Time.get_ticks_usec() - t_soft) / 1000.0
 		if not pick.is_empty():
 			queue.append({
 				"tag": pick,
@@ -26390,10 +26448,29 @@ func apply_interactive_multi_ai_day_live(province_id: int = 1) -> Dictionary:
 			soft_tag = pick
 			if soft_ok:
 				soft_applied = 1
+			country_profile.append({
+				"tag": pick,
+				"step": "soft_supply",
+				"ms": soft_ms,
+				"ok": soft_ok,
+			})
+
+	if typeof(ProductionManager) != TYPE_NIL and ProductionManager.has_method("end_interactive_multi_ai_day_cache"):
+		ProductionManager.call("end_interactive_multi_ai_day_cache")
 
 	var ok := applied_production >= 1 or candidates.is_empty()
 	var ticks := int(peace_state.get("interactive_multi_ai_day_ticks", 0)) + 1
 	peace_state["interactive_multi_ai_day_ticks"] = ticks
+	var total_ms := float(Time.get_ticks_usec() - t_all) / 1000.0
+	last_interactive_multi_ai_profile = {
+		"total_ms": total_ms,
+		"countries": country_profile,
+		"prod_tags": prod_tags.duplicate(),
+		"soft_tag": soft_tag,
+		"player_tag": player_tag,
+		"day_index": day_index,
+	}
+	peace_state["interactive_multi_ai_profile"] = last_interactive_multi_ai_profile.duplicate(true)
 	var result := {
 		"ok": ok,
 		"live": true,
@@ -26414,6 +26491,8 @@ func apply_interactive_multi_ai_day_live(province_id: int = 1) -> Dictionary:
 		"interactive_multi_ai_day_ticks": ticks,
 		"province_id": province_id,
 		"last_live": last_live,
+		"country_profile": country_profile,
+		"total_ms": total_ms,
 		"manager": "GameData.interactive_multi_ai_day",
 	}
 	peace_state["interactive_multi_ai_day"] = result.duplicate(true)

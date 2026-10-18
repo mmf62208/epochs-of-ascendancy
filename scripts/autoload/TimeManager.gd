@@ -84,8 +84,22 @@ var _live_f5_equiv_clock: bool = false
 var _draining_f5_flush: bool = false
 ## Wall-clock last advance_real_time (msec). Windowed Play fallback if TopInfoBar skips a tick.
 var _last_advance_real_msec: int = 0
+## Process-frame id of the last calendar day boundary (set in advance_days
+## before the deferred `_flush_sim_events`). Refill skips on this frame.
+var _day_rolled_frame: int = -1
+## Cached live TopInfoBar (clock owner). Avoid find_children every frame.
+var _clock_bar: Node = null
+## Test seam: run the windowed backup clock under headless and even while
+## TopInfoBar is live (reproduces the FIX #10 live race).
+var _force_windowed_backup_clock: bool = false
+const BACKUP_CLOCK_STARVE_MS: int = 2000
 ## Soft budget (ms) for deferred sim work per frame — keeps pan/hover live past month ends.
 const INTERACTIVE_SIM_FLUSH_BUDGET_MS := 10
+## PERF-4: worst daily-tick frame budget (live 1x / live-F5-equiv). Aim < 250ms.
+const DAY_TICK_FRAME_BUDGET_MS: int = 500
+var last_day_tick_profile: Dictionary = {}
+var _day_tick_history: Array = []
+var _day_tick_open: bool = false
 ## Live smoke past-+6: one advance_real_time per frame (never sync ×48 under combat).
 var _smoke_chunk_active: bool = false
 var _smoke_chunk_stepping: bool = false
@@ -128,18 +142,91 @@ func _process(_delta: float) -> void:
 	# Windowed Play only: if unpaused but TopInfoBar lost a tick (busy latch /
 	# swallowed click race), keep the hour hand moving. Headless -s stays manual.
 	# Do not self-drive during load / living title (Begin still start-paused).
+	# FIX #11: one clock owner — stay off while TopInfoBar is ticking; the
+	# safety net only fires after BACKUP_CLOCK_STARVE_MS with no TIB tick.
+	maybe_run_windowed_backup_clock()
+
+
+func maybe_run_windowed_backup_clock() -> bool:
 	if paused:
-		return
-	if DisplayServer.get_name() == "headless" or OS.has_feature("dedicated_server"):
-		return
-	if not living_title_has_closed():
-		return
-	var now_ms := Time.get_ticks_msec()
+		return false
+	if not _windowed_backup_clock_allowed():
+		return false
+	if not _force_windowed_backup_clock and not living_title_has_closed():
+		return false
+	var now_ms: int = Time.get_ticks_msec()
 	if _last_advance_real_msec <= 0:
 		_last_advance_real_msec = now_ms
+		return false
+	# Cheap 1 Hz gate first — do not walk the scene tree every frame.
+	if now_ms - _last_advance_real_msec < 1000:
+		return false
+	if _backup_clock_blocked_by_top_bar(now_ms):
+		return false
+	advance_real_time(1.0)
+	return true
+
+
+func _windowed_backup_clock_allowed() -> bool:
+	if _force_windowed_backup_clock:
+		return true
+	if DisplayServer.get_name() == "headless" or OS.has_feature("dedicated_server"):
+		return false
+	return true
+
+
+func _backup_clock_blocked_by_top_bar(now_ms: int) -> bool:
+	if _force_windowed_backup_clock:
+		return false
+	var bar: Node = _find_live_top_info_bar()
+	if bar == null or not is_instance_valid(bar):
+		return false
+	if bar.is_queued_for_deletion() or not bar.is_processing():
+		return false
+	if "is_paused" in bar and bool(bar.get("is_paused")):
+		return false
+	var last_tick: int = 0
+	if "_last_sim_tick_msec" in bar:
+		last_tick = int(bar.get("_last_sim_tick_msec"))
+	# Never-ticked bar: starve from TM's last advance so the 2 s safety
+	# net can still fire (last_tick<=0 must not block forever).
+	if last_tick <= 0:
+		last_tick = _last_advance_real_msec if _last_advance_real_msec > 0 else now_ms
+	return now_ms - last_tick <= BACKUP_CLOCK_STARVE_MS
+
+
+func _find_live_top_info_bar() -> Node:
+	if _clock_bar != null and is_instance_valid(_clock_bar) and not _clock_bar.is_queued_for_deletion():
+		return _clock_bar
+	_clock_bar = null
+	var tree := get_tree()
+	if tree == null or tree.root == null:
+		return null
+	var matches: Array[Node] = tree.root.find_children("TopInfoBar", "", true, false)
+	for n in matches:
+		if n != null and is_instance_valid(n) and not n.is_queued_for_deletion():
+			_clock_bar = n
+			return n
+	return null
+
+
+func day_rolled_this_frame() -> bool:
+	return _day_rolled_frame == Engine.get_process_frames()
+
+
+func _mark_calendar_day_roll() -> void:
+	# FIX #11: mark at the calendar boundary, before deferred `_flush_sim_events`.
+	# game_day_advanced used to set SupplyManager's skip too late.
+	_day_rolled_frame = Engine.get_process_frames()
+	var sm: Node = get_node_or_null("/root/SupplyManager")
+	if sm == null:
 		return
-	if now_ms - _last_advance_real_msec >= 1000:
-		advance_real_time(1.0)
+	if sm.has_method("_begin_day_roll_plan_deferral"):
+		sm.call("_begin_day_roll_plan_deferral")
+	if sm.has_method("_note_day_roll_plan_window"):
+		sm.call("_note_day_roll_plan_window")
+	if sm.has_method("note_clock_order"):
+		sm.call("note_clock_order", "tm_calendar_roll")
 
 ## Called by ScenarioLoader when a scenario is loaded.
 ## Parses "YYYY-MM-DD" (falls back gracefully to year-only).
@@ -908,6 +995,10 @@ func advance_days(days: float) -> void:
 
 	_accumulated_game_days -= days_to_advance
 
+	# FIX #11: mark before listeners / deferred flush so leftover refill
+	# skips on this frame even when game_day_advanced is call_deferred.
+	_mark_calendar_day_roll()
+
 	var light := is_interactive_light_sim()
 	for i in days_to_advance:
 		current_day += 1
@@ -955,7 +1046,10 @@ func advance_days(days: float) -> void:
 			# clears this day_emit queue, so game_day_advanced never reached
 			# IDM while the HUD calendar still rolled (80 live days at 0%).
 			# Tick player construction with the calendar the player sees.
+			_begin_day_tick_profile()
+			var t_con := Time.get_ticks_usec()
 			_tick_live_construction_on_calendar_day(current_year, current_month, current_day)
+			_note_day_tick_phase("calendar_construction", float(Time.get_ticks_usec() - t_con) / 1000.0)
 			if crossed_month:
 				_pending_sim_events.append({
 					"kind": "month",
@@ -970,7 +1064,9 @@ func advance_days(days: float) -> void:
 			continue
 
 		# Headless / harness: synchronous path (evidence needs ordered listeners in one step).
-		game_day_advanced.emit(current_year, current_month, current_day)
+		_begin_day_tick_profile()
+		_emit_game_day_advanced_profiled(current_year, current_month, current_day)
+		var t_sync := Time.get_ticks_usec()
 		_tick_own_land_marches()
 		var n_res := _tick_open_land_battles()
 		if n_res > 0 and is_interactive_light_sim():
@@ -982,6 +1078,8 @@ func advance_days(days: float) -> void:
 		if _should_run_daily_ai_combat():
 			if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("simulate_daily_ai_combat"):
 				BattleManager.simulate_daily_ai_combat()
+		_note_day_tick_phase("sync_battles", float(Time.get_ticks_usec() - t_sync) / 1000.0)
+		_finish_day_tick_profile()
 		if crossed_month:
 			_emit_month_year_boundary(current_year, current_month, crossed_year)
 
@@ -1159,12 +1257,13 @@ func _flush_sim_events() -> void:
 	var kind := str(ev.get("kind", ""))
 	var n_res := 0
 	if kind == "day" or kind == "day_emit":
-		game_day_advanced.emit(int(ev.get("year", 0)), int(ev.get("month", 0)), int(ev.get("day", 0)))
+		_begin_day_tick_profile()
+		_emit_game_day_advanced_profiled(int(ev.get("year", 0)), int(ev.get("month", 0)), int(ev.get("day", 0)))
 		if kind == "day":
 			# Legacy single-event day (should not queue on F5).
-			_maybe_run_interactive_multi_ai()
-			_maybe_run_ai_infra_invest()
-			_maybe_run_ai_land_battle_starts()
+			# _maybe_run_interactive_multi_ai / _maybe_run_ai_infra_invest / _maybe_run_ai_land_battle_starts
+			_profile_day_ai_steps()
+			var t_legacy := Time.get_ticks_usec()
 			_tick_own_land_marches()
 			n_res = _tick_open_land_battles()
 			if n_res > 0 and is_interactive_light_sim():
@@ -1173,12 +1272,15 @@ func _flush_sim_events() -> void:
 			else:
 				_tick_out_of_combat_recovery()
 				_tick_organize_queue()
+			_note_day_tick_phase("day_battles", float(Time.get_ticks_usec() - t_legacy) / 1000.0)
+			_finish_day_tick_profile()
 	elif kind == "day_ai":
-		_maybe_run_interactive_multi_ai()
-		_maybe_run_ai_infra_invest()
-		if not smoke_advance_should_defer_combat():
-			_maybe_run_ai_land_battle_starts()
+		# F5 interactive day_ai frame. Keep these helper names in _flush_sim_events
+		# (product greps). Timed once via _profile_day_ai_steps — do not call twice.
+		_profile_day_ai_steps() # _maybe_run_interactive_multi_ai
+		# _maybe_run_ai_infra_invest / _maybe_run_ai_land_battle_starts (inside profile)
 	elif kind == "day_battles":
+		var t_bat := Time.get_ticks_usec()
 		if not smoke_advance_should_defer_combat():
 			_tick_own_land_marches()
 			n_res = _tick_open_land_battles()
@@ -1188,6 +1290,8 @@ func _flush_sim_events() -> void:
 		else:
 			_tick_out_of_combat_recovery()
 			_tick_organize_queue()
+		_note_day_tick_phase("day_battles", float(Time.get_ticks_usec() - t_bat) / 1000.0)
+		_finish_day_tick_profile()
 	elif kind == "month":
 		var y := int(ev.get("year", 0))
 		var m := int(ev.get("month", 0))
@@ -1394,6 +1498,152 @@ func _tick_out_of_combat_recovery() -> void:
 
 
 ## True for normal graphical F5 play — keep day ticks light so HUD/map stay responsive.
+func get_day_tick_frame_budget_ms() -> int:
+	return DAY_TICK_FRAME_BUDGET_MS
+
+
+func get_last_day_tick_profile() -> Dictionary:
+	return last_day_tick_profile.duplicate(true)
+
+
+func get_day_tick_history() -> Array:
+	return _day_tick_history.duplicate(true)
+
+
+func clear_day_tick_history() -> void:
+	_day_tick_history.clear()
+	last_day_tick_profile.clear()
+	_day_tick_open = false
+
+
+func _begin_day_tick_profile() -> void:
+	if _day_tick_open:
+		return
+	_day_tick_open = true
+	last_day_tick_profile = {
+		"phases": [],
+		"listeners": [],
+		"day_ai_steps": [],
+		"worst_phase": "",
+		"worst_phase_ms": 0.0,
+		"worst_listener": "",
+		"worst_listener_ms": 0.0,
+		"day_emit_ms": 0.0,
+		"day_ai_ms": 0.0,
+		"day_battles_ms": 0.0,
+	}
+
+
+func _callable_profile_label(cb: Callable) -> String:
+	var obj: Object = cb.get_object()
+	var method_name: String = str(cb.get_method())
+	if obj == null:
+		return method_name
+	if obj is Node:
+		var n: Node = obj as Node
+		var nm := str(n.name)
+		if nm.is_empty():
+			nm = n.get_class()
+		return "%s.%s" % [nm, method_name]
+	return "%s.%s" % [obj.get_class(), method_name]
+
+
+func _emit_game_day_advanced_profiled(year: int, month: int, day: int) -> void:
+	var listeners: Array = []
+	var worst_name := ""
+	var worst_ms := 0.0
+	var t_all := Time.get_ticks_usec()
+	var conns: Array = get_signal_connection_list("game_day_advanced")
+	for conn_v in conns:
+		if typeof(conn_v) != TYPE_DICTIONARY:
+			continue
+		var conn: Dictionary = conn_v
+		var cb: Callable = conn.get("callable", Callable())
+		if not cb.is_valid():
+			continue
+		var t0 := Time.get_ticks_usec()
+		cb.call(year, month, day)
+		var ms := float(Time.get_ticks_usec() - t0) / 1000.0
+		var label := _callable_profile_label(cb)
+		listeners.append({"name": label, "ms": ms})
+		if ms > worst_ms:
+			worst_ms = ms
+			worst_name = label
+	var total_ms := float(Time.get_ticks_usec() - t_all) / 1000.0
+	last_day_tick_profile["day_emit_ms"] = total_ms
+	last_day_tick_profile["listeners"] = listeners
+	last_day_tick_profile["worst_listener"] = worst_name
+	last_day_tick_profile["worst_listener_ms"] = worst_ms
+	_note_day_tick_phase("day_emit", total_ms)
+
+
+func _profile_day_ai_steps() -> void:
+	var steps: Array = []
+	var t_all := Time.get_ticks_usec()
+	var t0 := Time.get_ticks_usec()
+	_maybe_run_interactive_multi_ai()
+	var multi_ms := float(Time.get_ticks_usec() - t0) / 1000.0
+	var multi_prof: Dictionary = {}
+	if typeof(GameData) != TYPE_NIL and GameData.has_method("get_last_interactive_multi_ai_profile"):
+		var mp: Variant = GameData.call("get_last_interactive_multi_ai_profile")
+		if mp is Dictionary:
+			multi_prof = mp as Dictionary
+	steps.append({"name": "multi_ai", "ms": multi_ms, "countries": multi_prof.get("countries", [])})
+	last_day_tick_profile["multi_ai_profile"] = multi_prof
+	t0 = Time.get_ticks_usec()
+	_maybe_run_ai_infra_invest()
+	steps.append({"name": "ai_infra", "ms": float(Time.get_ticks_usec() - t0) / 1000.0})
+	t0 = Time.get_ticks_usec()
+	if not smoke_advance_should_defer_combat():
+		_maybe_run_ai_land_battle_starts()
+	steps.append({"name": "ai_land", "ms": float(Time.get_ticks_usec() - t0) / 1000.0})
+	var total_ms := float(Time.get_ticks_usec() - t_all) / 1000.0
+	last_day_tick_profile["day_ai_ms"] = total_ms
+	last_day_tick_profile["day_ai_steps"] = steps
+	_note_day_tick_phase("day_ai", total_ms)
+
+
+func _note_day_tick_phase(kind: String, ms: float) -> void:
+	if last_day_tick_profile.is_empty():
+		_begin_day_tick_profile()
+	var phases: Array = last_day_tick_profile.get("phases", []) as Array
+	phases.append({"kind": kind, "ms": ms})
+	last_day_tick_profile["phases"] = phases
+	last_day_tick_profile[kind + "_ms"] = ms
+	var prev := float(last_day_tick_profile.get("worst_phase_ms", 0.0))
+	if ms >= prev:
+		last_day_tick_profile["worst_phase"] = kind
+		last_day_tick_profile["worst_phase_ms"] = ms
+	var verbose := OS.get_environment("EOA_DAY_TICK_PROFILE").strip_edges() == "1"
+	if verbose or ms >= 200.0:
+		print("TimeManager: day-tick %s=%.1fms" % [kind, ms])
+
+
+func _finish_day_tick_profile() -> void:
+	if last_day_tick_profile.is_empty():
+		_day_tick_open = false
+		return
+	_day_tick_open = false
+	_day_tick_history.append(last_day_tick_profile.duplicate(true))
+	if _day_tick_history.size() > 32:
+		_day_tick_history.pop_front()
+	var worst := float(last_day_tick_profile.get("worst_phase_ms", 0.0))
+	var verbose := OS.get_environment("EOA_DAY_TICK_PROFILE").strip_edges() == "1"
+	if verbose or worst >= 200.0:
+		print(
+			"TimeManager: day-tick profile emit=%.1f ai=%.1f battles=%.1f worst=%s %.1fms listener=%s %.1fms"
+			% [
+				float(last_day_tick_profile.get("day_emit_ms", 0.0)),
+				float(last_day_tick_profile.get("day_ai_ms", 0.0)),
+				float(last_day_tick_profile.get("day_battles_ms", 0.0)),
+				str(last_day_tick_profile.get("worst_phase", "")),
+				worst,
+				str(last_day_tick_profile.get("worst_listener", "")),
+				float(last_day_tick_profile.get("worst_listener_ms", 0.0)),
+			]
+		)
+
+
 func is_interactive_light_sim() -> bool:
 	if _living_playtest_clock or _live_f5_equiv_clock:
 		return true
