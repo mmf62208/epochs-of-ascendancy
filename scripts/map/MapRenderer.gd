@@ -355,7 +355,7 @@ var _outline_pulse_phase: float = 0.0
 var _last_zoom: float = 1.0
 var _hover_fill_province_id: int = -1
 ## Map-space selection outline (reliable when per-node polys are thin/hidden).
-## S1: stays below Ix1GoldSpineDraw (z=23) so the Köln hex cannot bury the spine.
+## S1: stays below Ix1GoldSpineDraw (z=25) so the Köln hex cannot bury the spine.
 const SELECT_OUTLINE_Z := 22
 var _select_outline_layer: Node2D = null
 var _select_outline_line: Line2D = null
@@ -25820,6 +25820,44 @@ func _setup_weather_overlay_layer() -> void:
 ## Polylines: trade corridors share hue with province `trade_transit` rings; drawn first beneath military routes — see `SupplyMapLayer`.
 func _map_province_name_label_z_index() -> int:
 	return province_name_label_z_index_supply_overlay if supply_mode else province_name_label_z_index
+
+
+func cull_province_labels_for_hubs(keys: Dictionary, rects: Array) -> void:
+	if keys.is_empty() and rects.is_empty():
+		return
+	var xf: Transform2D = Transform2D.IDENTITY
+	if container != null:
+		xf = container.get_global_transform_with_canvas()
+	for id in _province_name_labels:
+		var lbl_v: Variant = _province_name_labels[id]
+		if not (lbl_v is Label):
+			continue
+		var lbl: Label = lbl_v
+		if not is_instance_valid(lbl) or not lbl.visible:
+			continue
+		var nm: String = str(lbl.text).strip_edges()
+		if nm.is_empty() and provinces.has(int(id)):
+			var pv: Variant = provinces[int(id)]
+			if pv is Province:
+				nm = str((pv as Province).name)
+		var key: String = RoadTierVisual.hwy3_label_alias_key(nm)
+		if not key.is_empty() and keys.has(key):
+			lbl.visible = false
+			continue
+		var screen: Vector2 = xf * lbl.position
+		var pr := Rect2(screen, lbl.size)
+		var hit: bool = false
+		for rv in rects:
+			if typeof(rv) != TYPE_RECT2:
+				continue
+			var rr: Rect2 = rv
+			if rr.size.x <= 0.5 or pr.size.x <= 0.5:
+				continue
+			if pr.intersects(rr):
+				hit = true
+				break
+		if hit:
+			lbl.visible = false
 
 
 ## Slows outline pulses while L is on so hover / supply / engineer rings do not compete visually.
