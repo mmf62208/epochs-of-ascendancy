@@ -297,3 +297,22 @@ Killswitch `day_ai` 10.5 ms is above the 9.68 ms bar. The steps are `ai_land` 4.
 ## Open questions still pending
 
 Q1, Q2, and Q6 are implemented as Mike answered them. Q7: if the seed moves, this doc states the new hash, the reason, and the diff summary for Ship to take to Optimus Prime. Q3, Q4, Q5, Q8, Q9, Q10 are closed as in the decisions above.
+
+## Full gates on the rebased tip
+
+Rebased onto `origin/main` `05602912`. Tip `56b31db5`. `tools/eoa_full_test_gates.sh` exited 1. Log `~/campaign1_evidence/cl1c_full_gates_stdout.log`. Wall about 25 minutes. The four campaign steps passed, including the soak and the gamescope end-screen guard. No `SCRIPT ERROR` in those logs.
+
+`map_qc` passed (NE 0.9853). `launch_perf4_live_multi_ai_day` passed on this tip: md5 still `20fe9063de285f19d4f9b8a105abfd31`, worst `day_ai` 4.7 ms, `day_battles` 0.3 ms on all five days. `launch_perf4_daily_sim_tick` passed. `launch_assault` (multi-front) passed. After the gates, `HeadlessCombat1FightResolveTest` and `HeadlessOrders1HaltHoldWithdrawTest` were run again on this tip. Both `RESULT=PASS`, no `SCRIPT ERROR`.
+
+Steps that failed, and why:
+
+| Step | Why |
+|---|---|
+| `unit_board_play_path` | The same 14 known Python reds. No new product name in the failure list. |
+| `launch_unit_order` and the later `missing RESULT=PASS` line | The known Channel icon name `DemoUnitIcon_950001` vs `DemoUnitIcon_950001_<TAG>`. |
+| `launch_perf2_fleet_refresh_budget` | Supply glyph stars at 36 px count is 0. The campaign diff does not edit that draw. This session did not run the step on untouched main. |
+| `launch_vis1_map_readability` | Leftover `SupplyOutline` nodes stay visible when L is off. `_refresh_supply_highlights` is not in the campaign diff. Not run on untouched main here. |
+| `launch_render1_draw_guard`, `launch_render1_live_cold`, `launch_hwy3_ruhr_legibility`, `launch_rx1_pixel`, `launch_mv1_pixel`, `launch_mv1_card_up_input`, `launch_rh1_pixel` | `RESULT=FAIL need xvfb-run`. Xvfb is not installed. |
+| `launch_fac1a_pixel` | `mkdir /opt/cursor/artifacts/fac1a` is permission denied, so the wrapper exits before its `xvfb-run` check. |
+
+Every other gate step passed, including Rhine crossing, production-button open, capital stars, wheel drift, and the road and highway headless checks.
