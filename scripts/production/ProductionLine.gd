@@ -444,8 +444,13 @@ func _complete_unit(state: DesignLineState) -> void:
 	if typeof(GameData) != TYPE_NIL and GameData.has_method("get_military_loyalty_multiplier"):
 		var loyalty: float = GameData.get_military_loyalty_multiplier("player")  # or current owner if tracked
 		var foreign_pct := 0.0
-		if "foreign_military_pct" in GameData.get_peace_state() if GameData.has_method("get_peace_state") else {}:
-			foreign_pct = GameData.get_peace_state().get("foreign_military_pct", {}).get("player", 0.0)
+		var ps_line: Dictionary = {}
+		if GameData.has_method("peek_peace_state"):
+			ps_line = GameData.peek_peace_state()
+		elif GameData.has_method("get_peace_state"):
+			ps_line = GameData.get_peace_state()
+		if "foreign_military_pct" in ps_line:
+			foreign_pct = ps_line.get("foreign_military_pct", {}).get("player", 0.0)
 		var foreign_penalty := 1.0 - (foreign_pct * 0.4) * (1.0 - loyalty)  # scales with both
 		profile.effective_reliability = clampf(profile.effective_reliability * foreign_penalty, 0.5, 1.0)
 	unit_completed.emit(current_template_id, profile.effective_reliability, profile)
