@@ -331,6 +331,10 @@ else
     tools/run_godot.sh --headless --path . --resolution 1280x720 \
     -s res://scripts/core/HeadlessVis2CapitalStarsAfterLTest.gd || fail
 
+  run_step launch_wheeldrift1 \
+    tools/run_godot.sh --headless --path . --resolution 1280x740 \
+    -s res://scripts/core/HeadlessWheelDrift1Test.gd || fail
+
   run_step launch_rt1_road_tier \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessRt1RoadTierForEdgeTest.gd || fail
 
