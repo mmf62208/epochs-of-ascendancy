@@ -44,7 +44,7 @@ func _start() -> void:
 		_fail_reasons.append("headless_display")
 		_finish(false)
 		return
-	DisplayServer.window_set_size(Vector2i(1920, 1080))
+	DisplayServer.window_set_size(Vector2i(1280, 800))
 	_out_dir = OS.get_environment("EOA_ATLAS1_PIXEL_OUT").strip_edges()
 	if _out_dir.is_empty():
 		_out_dir = "/tmp/eoa-atlas1-pixel"
@@ -147,19 +147,20 @@ func _take_shot() -> void:
 
 
 func _assert_label(img: Image, world: Vector2, label: String) -> void:
-	# Cream lives on the glyph box (shift ≤30 px), not a 12 px disc on the
-	# city mark. A live-wheel chip over the mark made essen_label_run_1.
+	# Cream is the 4 px city mark plus the glyph outline (shift ≤30 px).
+	# A 12 px disc on the mark alone was essen_label_run_1 when a chip
+	# sat on the dot; the glyph box alone was paris_label_run_2 because
+	# the AA outline is thinner than the filled mark.
 	var screen := _project(world)
-	var search := Rect2(screen - Vector2(36, 36), Vector2(72, 72))
+	var run := _warm_run(img, screen, 20)
 	var placed_rect := _placed_label_rect(label)
 	if placed_rect.size.x > 1.0 and placed_rect.size.y > 1.0:
-		search = placed_rect.grow(6.0)
+		run = maxi(run, _warm_run_rect(img, placed_rect.grow(6.0)))
 	else:
 		_fail_reasons.append("%s_not_placed" % label.to_lower())
-	var run := _warm_run_rect(img, search)
 	_log(
 		"EOA_ATLAS1_PIXEL_GUARD who=guard.label %s screen=%.1f,%.1f rect=%s run=%d"
-		% [label, screen.x, screen.y, str(search), run]
+		% [label, screen.x, screen.y, str(placed_rect), run]
 	)
 	if run < 3:
 		_fail_reasons.append("%s_label_run_%d" % [label.to_lower(), run])
@@ -457,7 +458,7 @@ func _sync_live_after_camera(zoom: float) -> void:
 	var cam := _camera()
 	if layer != null and cam != null and layer.has_method("sync_view"):
 		var z := maxf(absf(cam.zoom.x), absf(cam.zoom.y))
-		var vp := Vector2(1920, 1080)
+		var vp := Vector2(1280, 800)
 		if root != null and root.get_viewport() != null:
 			vp = root.get_viewport().get_visible_rect().size
 		layer.call("sync_view", z, cam.global_position, vp, true)

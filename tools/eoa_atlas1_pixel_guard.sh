@@ -11,14 +11,14 @@ export EOA_ATLAS1_PIXEL_OUT="$OUT"
 export EOA_SMOKE_AUTO_BEGIN=1
 unset EOA_SKIP_TITLE || true
 echo "EOA_ATLAS1_PIXEL_GUARD who=wrapper out=$OUT (NOT product Begin/Esc/clock PASS)"
-GODOT=("${ROOT}/tools/run_godot.sh" --path . --resolution 1920x1080 -s res://scripts/core/WindowedAtlas1PixelGuard.gd "$@")
+GODOT=("${ROOT}/tools/run_godot.sh" --path . --resolution 1280x800 -s res://scripts/core/WindowedAtlas1PixelGuard.gd "$@")
 if command -v xvfb-run >/dev/null 2>&1; then
   echo "EOA_ATLAS1_PIXEL_GUARD who=wrapper xvfb=1"
-  exec xvfb-run -a -s "-screen 0 1920x1080x24" "${GODOT[@]}"
+  exec xvfb-run -a -s "-screen 0 1280x800x24" "${GODOT[@]}"
 fi
 if [ -n "${DISPLAY:-}" ]; then
   echo "EOA_ATLAS1_PIXEL_GUARD who=wrapper xvfb=0 display=$DISPLAY plain=1"
-  exec "${ROOT}/tools/run_godot.sh" --display-driver x11 --path . --resolution 1920x1080 \
+  exec "${ROOT}/tools/run_godot.sh" --display-driver x11 --path . --resolution 1280x800 \
     -s res://scripts/core/WindowedAtlas1PixelGuard.gd "$@"
 fi
 echo "WindowedAtlas1PixelGuard: RESULT=FAIL need xvfb-run or DISPLAY" >&2
