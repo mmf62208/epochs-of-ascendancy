@@ -482,13 +482,27 @@ func _apply_live_wheel(target_zoom: float) -> void:
 	cam.enabled = true
 	cam.make_current()
 	var essen := _world_for("essen")
-	var wheel := Vector2(455, 455)
-	if essen != Vector2.ZERO:
-		wheel = cam.get_canvas_transform() * essen
-	if mr != null and mr.has_method("player_path_wheel_toward_screen"):
-		mr.call("player_path_wheel_toward_screen", wheel, target_zoom)
-	elif mr != null and mr.has_method("player_path_wheel_toward_world") and essen != Vector2.ZERO:
-		mr.call("player_path_wheel_toward_world", essen, target_zoom)
+	if mr != null and mr.has_method("player_path_wheel_toward_world") and essen != Vector2.ZERO:
+		var guard := 0
+		while guard < 48:
+			var z_now := maxf(absf(cam.zoom.x), absf(cam.zoom.y))
+			if absf(z_now - target_zoom) <= 0.045:
+				break
+			var step := target_zoom
+			if z_now < target_zoom:
+				step = minf(target_zoom, z_now * 1.243)
+			else:
+				step = maxf(target_zoom, z_now / 1.243)
+			mr.call("player_path_wheel_toward_world", essen, step)
+			cam = _camera()
+			if cam == null:
+				break
+			var z2 := maxf(absf(cam.zoom.x), absf(cam.zoom.y))
+			if absf(z2 - z_now) < 0.0005:
+				break
+			guard += 1
+	elif mr != null and mr.has_method("player_path_wheel_toward_screen"):
+		mr.call("player_path_wheel_toward_screen", Vector2(455, 455), target_zoom)
 	else:
 		cam.zoom = Vector2(target_zoom, target_zoom)
 	_cam_pos = cam.global_position

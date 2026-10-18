@@ -295,11 +295,32 @@ func _ensure_units_on() -> void:
 
 
 func _wheel_to(target_zoom: float) -> void:
+	# One Play notch at a time, re-reading Essen each time. Theater clamp
+	# after `_zoom_toward_mouse` slips the Ruhr off the top if we keep the
+	# original Home pixel; a player following Essen does the same re-aim.
 	var mr := _map_renderer()
+	var essen := _focus_world
+	if essen == Vector2.ZERO:
+		essen = _essen_world()
+	if mr != null and mr.has_method("player_path_wheel_toward_world") and essen != Vector2.ZERO:
+		var guard := 0
+		while guard < 48:
+			var z := _camera_zoom()
+			if absf(z - target_zoom) <= 0.045:
+				break
+			var step := target_zoom
+			if z < target_zoom:
+				step = minf(target_zoom, z * 1.243)
+			else:
+				step = maxf(target_zoom, z / 1.243)
+			mr.call("player_path_wheel_toward_world", essen, step)
+			var z2 := _camera_zoom()
+			if absf(z2 - z) < 0.0005:
+				break
+			guard += 1
+		return
 	if mr != null and mr.has_method("player_path_wheel_toward_screen"):
 		mr.call("player_path_wheel_toward_screen", _wheel_screen, target_zoom)
-	elif mr != null and mr.has_method("player_path_wheel_toward_world") and _focus_world != Vector2.ZERO:
-		mr.call("player_path_wheel_toward_world", _focus_world, target_zoom)
 	else:
 		var cam := _camera()
 		if cam != null:
