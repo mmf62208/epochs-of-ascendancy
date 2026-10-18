@@ -260,15 +260,16 @@ func place_competing(cands: Array, zoom: float, cam: Vector2, vp: Vector2, natio
 		if not _in_band(c, zoom):
 			continue
 		var is_cap := bool(c.get("capital", false))
+		var must_keep := bool(c.get("must_keep", false))
 		var enter := float(c.get("enter", 0.0))
 		var alpha := _LOD.city_label_fade_alpha(zoom, enter)
-		if alpha < 0.04 and not is_cap:
+		if alpha < 0.04 and not must_keep:
 			continue
-		if is_cap and alpha < 0.04:
+		if must_keep and alpha < 0.04:
 			alpha = 1.0
 		var world: Vector2 = c.get("world", Vector2.ZERO)
 		var anchor_s := (world - cam) * zoom + vp * 0.5
-		if not is_cap and (anchor_s.x < -120.0 or anchor_s.y < -80.0 or anchor_s.x > vp.x + 120.0 or anchor_s.y > vp.y + 80.0):
+		if anchor_s.x < -120.0 or anchor_s.y < -80.0 or anchor_s.x > vp.x + 120.0 or anchor_s.y > vp.y + 80.0:
 			continue
 		var tier := int(c.get("tier", 1))
 		var px := _LOD.city_label_font_px(tier)
@@ -284,7 +285,7 @@ func place_competing(cands: Array, zoom: float, cam: Vector2, vp: Vector2, natio
 		var accepted := false
 		var chosen := Rect2()
 		var chosen_off := base
-		var try_blockers: Array = city_only if is_cap else blockers
+		var try_blockers: Array = city_only if (must_keep or is_cap) else blockers
 		for off_v in _slot_offsets(base, max_shift):
 			var off: Vector2 = off_v as Vector2
 			var baseline_s: Vector2 = anchor_s + off
@@ -294,14 +295,14 @@ func place_competing(cands: Array, zoom: float, cam: Vector2, vp: Vector2, natio
 				chosen_off = off
 				accepted = true
 				break
-		if not accepted and is_cap:
+		if not accepted and (must_keep or is_cap):
 			var cap_base: Vector2 = anchor_s + base
 			chosen = Rect2(cap_base + Vector2(0.0, -ascent), size)
 			chosen_off = base
 			accepted = true
 		if not accepted:
 			continue
-		if placed.size() >= MAX_ON_SCREEN and not is_cap:
+		if placed.size() >= MAX_ON_SCREEN and not must_keep:
 			break
 		placed.append({
 			"name": text,
@@ -309,6 +310,7 @@ func place_competing(cands: Array, zoom: float, cam: Vector2, vp: Vector2, natio
 			"screen_rect": chosen,
 			"screen_offset": chosen_off,
 			"capital": is_cap,
+			"must_keep": must_keep,
 			"tier": tier,
 			"alpha": alpha,
 			"score": float(c.get("score", 0.0)),
@@ -703,6 +705,7 @@ func _load_candidates() -> void:
 			"tier": tier,
 			"score": score,
 			"capital": capital,
+			"must_keep": capital,
 			"world": world,
 			"enter": 0.0,
 			"tag": str(owners.get(str(pid), owners.get(pid, ""))),
@@ -797,7 +800,7 @@ func _dedupe_same_city() -> void:
 		)
 		for rec_v in recs:
 			var rec: Dictionary = rec_v
-			if bool(rec.get("capital", false)):
+			if bool(rec.get("must_keep", false)):
 				kept.append(rec)
 				continue
 			var world: Vector2 = rec.get("world", Vector2.ZERO) as Vector2
@@ -845,7 +848,7 @@ func _drop_district_satellites() -> void:
 	for rec in _candidates:
 		if not _is_district(rec):
 			continue
-		if bool(rec.get("capital", false)):
+		if bool(rec.get("must_keep", false)):
 			continue
 		var world: Vector2 = rec.get("world", Vector2.ZERO)
 		for core in cores:
@@ -887,6 +890,10 @@ func _better_keep(a: Dictionary, b: Dictionary) -> bool:
 
 
 func _better_capital(a: Dictionary, b: Dictionary) -> bool:
+	var ad := _is_district(a)
+	var bd := _is_district(b)
+	if ad != bd:
+		return not ad
 	if int(a["tier"]) != int(b["tier"]):
 		return int(a["tier"]) > int(b["tier"])
 	if absf(float(a["score"]) - float(b["score"])) > 0.05:
