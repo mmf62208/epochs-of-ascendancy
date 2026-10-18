@@ -81,6 +81,7 @@ func _tick_wait_map() -> void:
 	var cam := _camera()
 	if cam != null:
 		_home_pos = cam.global_position
+	_freeze_boot_fighters()
 	_ensure_units_on()
 	print("ATLAS1 live map_ready home=%.1f,%.1f units=%d layers=%d" % [
 		_home_pos.x, _home_pos.y, _visible_unit_count(), _city_layer_count(),
