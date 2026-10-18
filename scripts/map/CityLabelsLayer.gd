@@ -408,14 +408,30 @@ func place_competing(cands: Array, zoom: float, cam: Vector2, vp: Vector2, natio
 				city_and_nations.append(n)
 			for prev in placed:
 				city_and_nations.append(prev.get("dot_rect", Rect2()))
-			for off_v3 in _slot_offsets(base, max_shift):
+			var hub_shift := max_shift
+			if not obstacles.is_empty():
+				hub_shift = COUNTER_SHIFT_PX
+			var has_fallback := false
+			var fallback_off := base
+			var fallback_rect := Rect2()
+			for off_v3 in _slot_offsets(base, hub_shift):
 				var off3: Vector2 = off_v3 as Vector2
 				var rect3 := Rect2(anchor_s + off3 + Vector2(0.0, -ascent), size)
-				if _rects_clear(rect3, placed, city_and_nations, vp):
+				if not _rects_clear(rect3, placed, city_and_nations, vp):
+					continue
+				if _rects_clear(rect3, placed, try_blockers, vp):
 					chosen = rect3
 					chosen_off = off3
 					accepted = true
 					break
+				if not has_fallback:
+					has_fallback = true
+					fallback_off = off3
+					fallback_rect = rect3
+			if not accepted and has_fallback:
+				chosen = fallback_rect
+				chosen_off = fallback_off
+				accepted = true
 		if not accepted:
 			continue
 		if placed.size() >= MAX_ON_SCREEN and not must_keep:

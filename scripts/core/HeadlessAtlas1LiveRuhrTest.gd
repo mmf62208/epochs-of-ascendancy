@@ -158,7 +158,7 @@ func _check_zoom() -> void:
 	])
 	if z < 2.0:
 		if not _has_name(placed, "Essen"):
-			_fail("Essen missing at live Home-cam z%.3f" % z)
+			_fail("Essen missing at live Ruhr-cam z%.3f" % z)
 		else:
 			_pass("Essen labelled at live z%.3f" % z)
 		if not _has_name(placed, "Köln") and not _has_name(placed, "Cologne"):
