@@ -2128,17 +2128,22 @@ func _pick_ai_infra_province(tag: String) -> int:
 				_ai_infra_provinces_considered += 1
 				if _ai_infra_pid_ok(pid, t):
 					return pid
-	if MapManager.has_method("collect_live_border_assault_targets"):
-		# Always consider the live-border from_ids even if the capital
-		# neighborhood already spent AI_INFRA_PICK_CAP (FRA Maginot 710739).
-		var fronts: Array = MapManager.collect_live_border_assault_targets(t, 2)
-		for raw in fronts:
-			if typeof(raw) != TYPE_DICTIONARY:
-				continue
-			var from_id := int((raw as Dictionary).get("from_province_id", 0))
-			_ai_infra_provinces_considered += 1
-			if _ai_infra_pid_ok(from_id, t):
-				return from_id
+	# Geographic borders, not the war-gated assault list. A peaceful major
+	# still develops the frontier (PERF-4 infra goldens). Assaults stay gated.
+	# Always consider these from_ids even if the capital neighborhood already
+	# spent AI_INFRA_PICK_CAP (FRA Maginot 710739).
+	var fronts: Array = []
+	if MapManager.has_method("collect_owned_border_edges"):
+		fronts = MapManager.collect_owned_border_edges(t, 2)
+	elif MapManager.has_method("collect_live_border_assault_targets"):
+		fronts = MapManager.collect_live_border_assault_targets(t, 2)
+	for raw in fronts:
+		if typeof(raw) != TYPE_DICTIONARY:
+			continue
+		var from_id := int((raw as Dictionary).get("from_province_id", 0))
+		_ai_infra_provinces_considered += 1
+		if _ai_infra_pid_ok(from_id, t):
+			return from_id
 	return 0
 
 

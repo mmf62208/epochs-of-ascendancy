@@ -5,6 +5,9 @@ extends Node
 signal battle_started(context: Dictionary)
 signal battle_resolved(result: Dictionary)
 
+## Harness-only. Live play stays false (campaign-loop mutant M11).
+var include_player_in_ai_land_battles: bool = false
+
 const DEFAULT_GARRISON_TEMPLATE := "german_infantry_division_1943_mixed"
 
 ## Multi-day land battle (mirrors unit_multi_day_battle_product).
@@ -273,6 +276,9 @@ func can_assault_province(
 		return {"ok": false, "reason": "Target has no owner"}
 	if defender_tag == tag:
 		return {"ok": false, "reason": "Cannot attack your own province"}
+	if typeof(WarStateDomain) != TYPE_NIL and WarStateDomain.loop_enabled():
+		if not WarStateDomain.is_at_war(tag, defender_tag):
+			return {"ok": false, "reason": "Not at war with %s" % WarStateDomain.tag_name(defender_tag)}
 
 	var source := find_attack_source(tag, target_province_id, from_province_id)
 	if not bool(source.get("ok", false)):
@@ -599,6 +605,8 @@ func start_land_battle(
 func try_ai_start_land_battles(day_index: int = 0) -> Dictionary:
 	if OS.get_environment("EOA_AI_LAND_BATTLES").strip_edges() == "0":
 		return {"ok": true, "skipped": true, "reason": "killswitch", "started_n": 0}
+	if typeof(WarStateDomain) != TYPE_NIL and WarStateDomain.ai_stopped():
+		return {"ok": true, "skipped": true, "reason": "campaign_end", "started_n": 0}
 	if typeof(LandBattleAi) == TYPE_NIL:
 		return {"ok": false, "reason": "no planner", "started_n": 0}
 	if typeof(MapManager) == TYPE_NIL:
@@ -621,9 +629,15 @@ func try_ai_start_land_battles(day_index: int = 0) -> Dictionary:
 	var candidates: Array = []
 	for raw_tag in majors:
 		var tag := str(raw_tag).to_upper()
-		if tag.is_empty() or tag == player_tag:
+		if tag.is_empty() or (tag == player_tag and not include_player_in_ai_land_battles):
 			continue
 		candidates.append(tag)
+	if typeof(WarStateDomain) != TYPE_NIL and WarStateDomain.loop_enabled():
+		var fighting: Array = []
+		for c in candidates:
+			if not WarStateDomain.enemies_of(str(c)).is_empty():
+				fighting.append(c)
+		candidates = fighting
 	candidates.sort_custom(func(a, b):
 		return LandBattleAi.personality_aggression(str(a)) > LandBattleAi.personality_aggression(str(b))
 	)
@@ -1529,6 +1543,29 @@ func _record_land_aar(battle: Dictionary, winner: String, to_id: int) -> void:
 	_log_unit_combat(fid, int(battle.get("from_id", -1)), to_id, log_result, "attacker")
 	for dfid in _fid_list(battle, "def_fids", "def_fid"):
 		_log_unit_combat(str(dfid), to_id, int(battle.get("from_id", -1)), log_result, "defender")
+
+
+## Capitulation: close every open land battle that names this tag and clear is_in_combat.
+func close_land_battles_for_tag(tag: String) -> int:
+	var t := tag.strip_edges().to_upper()
+	if t.is_empty():
+		return 0
+	var keep: Array = []
+	var closed := 0
+	for raw in _open_land_battles:
+		if typeof(raw) != TYPE_DICTIONARY:
+			keep.append(raw)
+			continue
+		var b: Dictionary = raw
+		var att := str(b.get("att_tag", "")).strip_edges().to_upper()
+		var def := str(b.get("def_tag", "")).strip_edges().to_upper()
+		if att == t or def == t:
+			_finish_land_battle_hold(b)
+			closed += 1
+		else:
+			keep.append(b)
+	_open_land_battles = keep
+	return closed
 
 
 func _finish_land_battle_hold(battle: Dictionary) -> void:

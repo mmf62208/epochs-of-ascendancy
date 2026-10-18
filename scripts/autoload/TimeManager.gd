@@ -984,6 +984,9 @@ func sync_year_from_external(year: int) -> void:
 ## never freezes on Feb 28 while listeners run. Day/month signals are queued and flushed across
 ## frames with a time budget (see _flush_sim_events).
 func advance_days(days: float) -> void:
+	if _campaign_clock_locked():
+		paused = true
+		return
 	if paused or days <= 0.0:
 		return
 
@@ -1067,6 +1070,7 @@ func advance_days(days: float) -> void:
 		_begin_day_tick_profile()
 		_emit_game_day_advanced_profiled(current_year, current_month, current_day)
 		var t_sync := Time.get_ticks_usec()
+		_campaign_before_battles()
 		_tick_own_land_marches()
 		var n_res := _tick_open_land_battles()
 		if n_res > 0 and is_interactive_light_sim():
@@ -1078,8 +1082,11 @@ func advance_days(days: float) -> void:
 		if _should_run_daily_ai_combat():
 			if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("simulate_daily_ai_combat"):
 				BattleManager.simulate_daily_ai_combat()
+		_campaign_after_battles()
 		_note_day_tick_phase("sync_battles", float(Time.get_ticks_usec() - t_sync) / 1000.0)
 		_finish_day_tick_profile()
+		if _campaign_clock_locked():
+			break
 		if crossed_month:
 			_emit_month_year_boundary(current_year, current_month, crossed_year)
 
@@ -1091,6 +1098,20 @@ func advance_days(days: float) -> void:
 ## `_living_playtest_clock` (that skip is why headless day-tick could pass
 ## while softpipe Play still wedged at day +2). day_ai / budgeted AI invest run.
 func advance_live_f5_equivalent_days(days: int = 5) -> Dictionary:
+	if _campaign_clock_locked():
+		paused = true
+		return {
+			"ok": false,
+			"days": 0,
+			"elapsed": total_days_elapsed,
+			"from_day": current_day,
+			"from_month": current_month,
+			"year": current_year,
+			"month": current_month,
+			"day": current_day,
+			"live": true,
+			"locked": true,
+		}
 	var n := clampi(int(days), 1, 20)
 	var start := total_days_elapsed
 	var from_day := current_day
@@ -1264,6 +1285,7 @@ func _flush_sim_events() -> void:
 			# _maybe_run_interactive_multi_ai / _maybe_run_ai_infra_invest / _maybe_run_ai_land_battle_starts
 			_profile_day_ai_steps()
 			var t_legacy := Time.get_ticks_usec()
+			_campaign_before_battles()
 			_tick_own_land_marches()
 			n_res = _tick_open_land_battles()
 			if n_res > 0 and is_interactive_light_sim():
@@ -1272,6 +1294,7 @@ func _flush_sim_events() -> void:
 			else:
 				_tick_out_of_combat_recovery()
 				_tick_organize_queue()
+			_campaign_after_battles()
 			_note_day_tick_phase("day_battles", float(Time.get_ticks_usec() - t_legacy) / 1000.0)
 			_finish_day_tick_profile()
 	elif kind == "day_ai":
@@ -1282,8 +1305,10 @@ func _flush_sim_events() -> void:
 	elif kind == "day_battles":
 		var t_bat := Time.get_ticks_usec()
 		if not smoke_advance_should_defer_combat():
+			_campaign_before_battles()
 			_tick_own_land_marches()
 			n_res = _tick_open_land_battles()
+			_campaign_after_battles()
 		if n_res > 0 and is_interactive_light_sim():
 			call_deferred("_tick_out_of_combat_recovery")
 			call_deferred("_tick_organize_queue")
@@ -1380,11 +1405,43 @@ func _maybe_run_ai_infra_invest() -> void:
 
 ## Budgeted AI start_land_battle (max 1/day). Same F5 light-sim gate as multi-AI.
 ## Killswitch: EOA_AI_LAND_BATTLES=0 (also skipped when interactive multi-AI is off).
+func _campaign_clock_locked() -> bool:
+	return typeof(CampaignEndDomain) != TYPE_NIL and CampaignEndDomain.clock_locked()
+
+
+func _campaign_before_battles() -> void:
+	if typeof(WarStateDomain) == TYPE_NIL or not WarStateDomain.loop_enabled():
+		return
+	if not WarStateDomain.any_war():
+		return
+	if typeof(CapitulationDomain) != TYPE_NIL:
+		CapitulationDomain.ensure_snapshot()
+
+
+func _campaign_after_battles() -> void:
+	if typeof(WarStateDomain) == TYPE_NIL or not WarStateDomain.loop_enabled():
+		return
+	var at_war := WarStateDomain.any_war()
+	if at_war and typeof(CapitulationDomain) != TYPE_NIL:
+		CapitulationDomain.check_all(int(total_days_elapsed))
+	if typeof(CampaignEndDomain) == TYPE_NIL:
+		return
+	if at_war or CampaignEndDomain.latched() or CampaignEndDomain.time_limit_due():
+		CampaignEndDomain.evaluate_and_latch(int(total_days_elapsed))
+
+
 func _maybe_run_ai_land_battle_starts() -> void:
 	if _living_playtest_clock:
 		# Compact 20d Maginot clock ticks open fights only — new AI assaults
 		# were opening extra fronts (and execute-risk on empty hexes).
 		return
+	if typeof(WarStateDomain) != TYPE_NIL and WarStateDomain.loop_enabled():
+		if WarStateDomain.ai_stopped():
+			return
+		var declare_day := 0
+		if has_method("get_total_days_elapsed"):
+			declare_day = int(get_total_days_elapsed())
+		WarStateDomain.try_ai_declare_wars(declare_day)
 	if smoke_advance_should_defer_combat():
 		return
 	if OS.get_environment("EOA_AI_LAND_BATTLES").strip_edges() == "0":

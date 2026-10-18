@@ -24,6 +24,7 @@ var _bm: Node = null
 
 
 func _init() -> void:
+	OS.set_environment("EOA_SCENARIO_EARLY_WARS", "1")
 	call_deferred("_run_and_quit")
 
 
@@ -63,6 +64,12 @@ func _run() -> void:
 		return
 	if not _setup_multi_edge_map():
 		return
+	# Load after autoloads exist. A parse-time class_name reference compiles
+	# the domain before LeaderManager / TimeManager are in scope.
+	var war: GDScript = load("res://scripts/core/WarStateDomain.gd") as GDScript
+	if war != null:
+		war.reload_start_wars()
+		war.declare_war("GER", "POL", "test")
 	var bm_script: Script = load("res://scripts/combat/BattleManager.gd") as Script
 	if bm_script == null:
 		_fail("BattleManager.gd missing")

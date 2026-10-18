@@ -1320,6 +1320,27 @@ func _update_date_time() -> void:
 		pause_button.tooltip_text = "Resume simulation\n\n" + tip if not tip.is_empty() else "Resume simulation"
 	else:
 		date_time_label.modulate = Color.WHITE
+	refresh_campaign_war_readout()
+
+
+func refresh_campaign_war_readout() -> void:
+	var lbl := find_child("CampaignWarReadout", true, false) as Label
+	if lbl == null:
+		lbl = Label.new()
+		lbl.name = "CampaignWarReadout"
+		lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		lbl.add_theme_font_size_override("font_size", 12)
+		lbl.add_theme_color_override("font_color", Color(0.95, 0.75, 0.45))
+		var host := get_node_or_null("ContentRow/LeftContainer")
+		if host == null:
+			add_child(lbl)
+		else:
+			host.add_child(lbl)
+	var line := ""
+	if typeof(WarStateDomain) != TYPE_NIL:
+		line = WarStateDomain.player_enemies_line()
+	lbl.text = line
+	lbl.visible = not line.is_empty()
 
 
 func _update_resources() -> void:
