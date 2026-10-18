@@ -104,6 +104,7 @@ run_step unit_board_play_path \
     tools.map_generation.tests.test_se_england_shire_land_uniformity_product \
     tools.map_generation.tests.test_ix1_road_spine_product \
     tools.map_generation.tests.test_rx1_rhine_crossing_product \
+    tools.map_generation.tests.test_oldmap_turkey_mask_product \
     tools.map_generation.tests.test_world_accurate_capital_pick_product \
     tools.map_generation.tests.test_world_accurate_strategic_and_assault \
     tools.map_generation.tests.test_world_accurate_multi_front_and_deploy \

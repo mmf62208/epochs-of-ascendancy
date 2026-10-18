@@ -223,6 +223,10 @@ var show_terrain_layer: bool = false
 var show_unit_counters: bool = true
 ## Solid deep-ocean plate under provinces so gaps never show void-hex underlay or grey clear color.
 var _ocean_floor: Polygon2D = null
+## OLDMAP_TURKEY: cosmetic cover for the USSR-west / Black Sea hole. Not a province.
+const USSR_WEST_GAP_MASK_Z := -14
+const USSR_WEST_GAP_MASK_PATH := "res://assets/maps/layers/uncovered_land_ussr_west.json"
+var _ussr_west_gap_mask: Node2D = null
 
 var _is_middle_dragging := false
 var _middle_drag_start := Vector2.ZERO
@@ -14541,6 +14545,8 @@ func set_map_mode(mode: String = "political") -> void:
 	if m in INTENSITY_LINKED_MODES and primary_mapmode_intensity.has(m):
 		secondary_tint_intensity[m] = clampf(float(primary_mapmode_intensity[m]), 0.25, 2.0)
 	_sync_road_quiet_mode()
+	_ensure_ussr_west_gap_mask()
+	_apply_legacy_underlay_policy()
 	if not _map_mode_apply_scheduled:
 		_map_mode_apply_scheduled = true
 		call_deferred("_apply_map_mode_visuals")
@@ -16370,6 +16376,10 @@ func load_world_grand_underlay() -> void:
 		if elev and elev is Sprite2D:
 			elev.modulate.a = 0.68
 			print("  Elevation/mountains layer forced visible (NA Rockies, Greenland compact, SA Andes aligned on large view).")
+	_ensure_ussr_west_gap_mask()
+	_apply_legacy_underlay_policy()
+	call_deferred("_ensure_ussr_west_gap_mask")
+	call_deferred("_apply_legacy_underlay_policy")
 
 
 ## Single authoritative world-class bootstrap: ultra world underlay, mountains + lakes layers aligned, Europe framed.
@@ -16422,6 +16432,8 @@ func _apply_world_terrain_layers() -> void:
 		tls.configure_for_world_launch()
 	tls.fit_to_bounds(WORLD_CANONICAL_BOUNDS)
 	tls.visible = true
+	_ensure_ussr_west_gap_mask()
+	_apply_legacy_underlay_policy()
 
 ## Reset camera + bounds to Europe grand theater (for quick return after world/NA pan or chunk loads).
 ## Keeps Europe polys and data as the testable focus.
@@ -17935,6 +17947,139 @@ func _ensure_ocean_floor() -> void:
 		var bi := bg.get_index()
 		if _ocean_floor.get_index() > bi:
 			container.move_child(_ocean_floor, 0)
+
+
+## Cosmetic USSR-west / Black Sea hole cover. Canvas JSON × THEATER_SCALE.
+## Above WorldBackground (-20) and the terrain stack (-15); below province fills.
+func _ensure_ussr_west_gap_mask() -> void:
+	if not _is_gis_board_active():
+		return
+	if container == null:
+		container = get_node_or_null("ProvinceContainers") as Node2D
+	if container == null:
+		return
+	if _ussr_west_gap_mask != null and is_instance_valid(_ussr_west_gap_mask):
+		if _ussr_west_gap_mask.get_parent() != container:
+			_ussr_west_gap_mask.reparent(container)
+		_ussr_west_gap_mask.z_index = USSR_WEST_GAP_MASK_Z
+		_ussr_west_gap_mask.z_as_relative = false
+		_recolor_ussr_west_gap_mask()
+		return
+	if not FileAccess.file_exists(USSR_WEST_GAP_MASK_PATH):
+		return
+	var f := FileAccess.open(USSR_WEST_GAP_MASK_PATH, FileAccess.READ)
+	if f == null:
+		return
+	var parsed: Variant = JSON.parse_string(f.get_as_text())
+	f.close()
+	if not (parsed is Dictionary):
+		return
+	var doc: Dictionary = parsed
+	var root := Node2D.new()
+	root.name = "UssrWestGapMask"
+	root.z_index = USSR_WEST_GAP_MASK_Z
+	root.z_as_relative = false
+	root.set_meta("gap_mask", true)
+	var scale := MapCanvasConfig.THEATER_SCALE
+	_add_ussr_west_gap_rings(root, doc.get("land", []), "land", scale)
+	_add_ussr_west_gap_rings(root, doc.get("sea", []), "sea", scale)
+	container.add_child(root)
+	_ussr_west_gap_mask = root
+	_recolor_ussr_west_gap_mask()
+
+
+func _add_ussr_west_gap_rings(root: Node2D, raw: Variant, kind: String, scale: float) -> void:
+	if not (raw is Array):
+		return
+	for ring_v in raw:
+		if not (ring_v is Array):
+			continue
+		var pts := PackedVector2Array()
+		for p in ring_v:
+			if p is Array and (p as Array).size() >= 2:
+				pts.append(Vector2(float(p[0]), float(p[1])) * scale)
+		if pts.size() < 3:
+			continue
+		if kind == "land":
+			var plate := Polygon2D.new()
+			plate.name = "UssrWestGapLand"
+			plate.polygon = pts
+			plate.z_index = 0
+			plate.antialiased = false
+			plate.set_meta("gap_kind", "land_plate")
+			root.add_child(plate)
+			var tint := Polygon2D.new()
+			tint.name = "UssrWestGapLand"
+			tint.polygon = pts
+			tint.z_index = 1
+			tint.antialiased = false
+			tint.set_meta("gap_kind", "land_tint")
+			root.add_child(tint)
+		else:
+			var sea := Polygon2D.new()
+			sea.name = "UssrWestGapSea"
+			sea.polygon = pts
+			sea.z_index = 0
+			sea.antialiased = false
+			sea.set_meta("gap_kind", "sea")
+			root.add_child(sea)
+
+
+func _ussr_west_sov_rgb() -> Color:
+	# data/scenarios/world_accurate.json SOV "#5C1A1A". Live country color wins once MapManager has loaded.
+	var c := Color(0.360784, 0.101961, 0.101961, 1.0)
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_country_color"):
+		var got: Variant = MapManager.get_country_color("SOV")
+		if got is Color:
+			var gc: Color = got
+			# MapManager's empty-table fallback is Color(0.5, 0.5, 0.6). Keep #5C1A1A until SOV is loaded.
+			var fallback := gc.r > 0.48 and gc.r < 0.52 and gc.g > 0.48 and gc.g < 0.52 and gc.b > 0.58 and gc.b < 0.62
+			if gc.a > 0.01 and not fallback:
+				c = Color(gc.r, gc.g, gc.b, 1.0)
+	return c
+
+
+func _recolor_ussr_west_gap_mask() -> void:
+	if _ussr_west_gap_mask == null or not is_instance_valid(_ussr_west_gap_mask):
+		return
+	var terrain := current_map_mode == "terrain"
+	var land := Color(0.55, 0.68, 0.38, 1.0) if terrain else _ussr_west_sov_rgb()
+	var sea := continuous_sea_fill_color()
+	sea.a = 1.0
+	for ch in _ussr_west_gap_mask.get_children():
+		if not (ch is Polygon2D):
+			continue
+		var poly := ch as Polygon2D
+		var gap_kind := str(poly.get_meta("gap_kind", ""))
+		if gap_kind == "land_plate":
+			poly.color = land
+		elif gap_kind == "land_tint":
+			var tint := land
+			tint.a = 0.85
+			poly.color = tint
+		elif gap_kind == "sea":
+			poly.color = sea
+
+
+## world_accurate: legacy theater art stays available in terrain mode only.
+## Political and the other map modes read holes as the mask / ocean floor.
+func _apply_legacy_underlay_policy() -> void:
+	if not _is_gis_board_active():
+		return
+	var show_legacy := current_map_mode == "terrain"
+	var bg := find_child("WorldBackground", true, false) as Sprite2D
+	if bg:
+		bg.visible = show_legacy
+	var tls := terrain_layer_stack
+	if tls == null:
+		tls = find_child("TerrainLayerStack", true, false) as TerrainLayerStack
+	if tls == null:
+		return
+	if show_legacy:
+		tls.visible = true
+	if tls.has_method("set_layer_visible"):
+		tls.call("set_layer_visible", "rivers", show_legacy)
+		tls.call("set_layer_visible", "elevation", show_legacy)
 
 
 func _overlay_base_character_blend() -> float:
@@ -25672,6 +25817,8 @@ func _setup_terrain_layer_stack() -> void:
 				_position_terrain_above_background()
 				_apply_terrain_layer_visibility()
 				_mount_peak_snow_overlay()
+				_ensure_ussr_west_gap_mask()
+				_apply_legacy_underlay_policy()
 		return
 	var stack_script := load("res://scripts/map/TerrainLayerStack.gd") as GDScript
 	if stack_script == null:
@@ -25701,6 +25848,8 @@ func _setup_terrain_layer_stack() -> void:
 	if loaded:
 		_apply_terrain_layer_visibility()
 		_mount_peak_snow_overlay()
+		_ensure_ussr_west_gap_mask()
+		_apply_legacy_underlay_policy()
 		print("MapRenderer: TerrainLayerStack active (U=rivers/lakes, H=elevation/mountains, V=vegetation, S=snow ref).")
 		if terrain_layer_stack and terrain_layer_stack.has_method("set_layer_alphas"):
 			terrain_layer_stack.call("set_layer_alphas", 0.9, 0.85)
@@ -30691,6 +30840,8 @@ func _fit_background_to_bounds() -> void:
 		]
 	)
 	_refresh_terrain_zoom_aware()
+	_ensure_ussr_west_gap_mask()
+	_apply_legacy_underlay_policy()
 
 
 ## Underlay fit rect: GIS world = fixed equirect 2:1 canvas. Europe-local = grand theater.
@@ -31139,6 +31290,7 @@ func _apply_terrain_layer_visibility() -> void:
 	_apply_clean_political_clear_color()
 	# Force repaint of fills with correct alpha (low for terrain visible, higher for clean political)
 	_fill_color_zoom_bucket = -999999999
+	_apply_legacy_underlay_policy()
 
 func _refresh_terrain_zoom_aware() -> void:
 	## Full/expensive path — prefer _refresh_terrain_zoom_light for wheel input.
