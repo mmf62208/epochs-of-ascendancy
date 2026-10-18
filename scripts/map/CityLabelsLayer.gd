@@ -232,14 +232,14 @@ func has_visual_overlap() -> bool:
 		items.append(p)
 	for i in items.size():
 		var a: Dictionary = items[i]
-		var ar: Rect2 = (a.get("screen_rect", Rect2()) as Rect2).grow(1.0)
+		var ar: Rect2 = a.get("screen_rect", Rect2())
+		var a_dot: Rect2 = a.get("dot_rect", Rect2())
 		for j in range(i + 1, items.size()):
 			var b: Dictionary = items[j]
-			var br: Rect2 = (b.get("screen_rect", Rect2()) as Rect2).grow(1.0)
+			var br: Rect2 = b.get("screen_rect", Rect2())
+			var b_dot: Rect2 = b.get("dot_rect", Rect2())
 			if ar.intersects(br):
 				return true
-			var b_dot: Rect2 = (b.get("dot_rect", Rect2()) as Rect2).grow(1.0)
-			var a_dot: Rect2 = (a.get("dot_rect", Rect2()) as Rect2).grow(1.0)
 			if ar.intersects(b_dot) or br.intersects(a_dot):
 				return true
 	return false

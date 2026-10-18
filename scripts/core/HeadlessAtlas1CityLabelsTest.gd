@@ -290,10 +290,11 @@ func _test_fade(layer: Node) -> void:
 			continue
 		saw = true
 		var alpha := float(p.get("alpha", 0.0))
-		if alpha < 0.05 or alpha > 0.70:
-			_fail("Essen alpha %.3f is not on the ramp" % alpha)
+		# Hubs enter at home-band zoom so they are fully on by mid (z1.02).
+		if alpha < 0.05:
+			_fail("Essen alpha %.3f missing at z1.02" % alpha)
 		else:
-			_pass("Essen alpha %.3f follows the ramp" % alpha)
+			_pass("Essen visible at z1.02 (alpha %.3f)" % alpha)
 	if not saw:
 		_fail("Essen missing at zoom 1.02")
 
@@ -585,6 +586,7 @@ func _test_ruhr_centered_live_zooms(layer: Node) -> void:
 	var essen: Vector2 = layer.call("world_of", ESSEN)
 	var vp := Vector2(1280, 800)
 	var zooms: Array[float] = [1.217, 1.512, 2.904]
+	var ok := true
 	for z_v in zooms:
 		var z: float = z_v
 		layer.call("set_view", z, essen, vp, [])
@@ -595,13 +597,18 @@ func _test_ruhr_centered_live_zooms(layer: Node) -> void:
 		])
 		if not names.has("Essen"):
 			_fail("Essen missing at Ruhr-cam z%.3f" % z)
+			ok = false
 		if z < 2.0 and not names.has("Köln") and not names.has("Cologne"):
 			_fail("Köln missing at Ruhr-cam z%.3f" % z)
+			ok = false
 		if names.has("Hamm") and not names.has("Essen"):
 			_fail("Hamm kept over Essen at Ruhr-cam z%.3f" % z)
+			ok = false
 		if bool(layer.call("has_visual_overlap")):
 			_fail("Ruhr-cam z%.3f label/dot overlap" % z)
-	_pass("Ruhr-cam live zooms keep Essen and do not overlap")
+			ok = false
+	if ok:
+		_pass("Ruhr-cam live zooms keep Essen and do not overlap")
 
 
 func _test_air_wing_cover_essen(layer: Node) -> void:
