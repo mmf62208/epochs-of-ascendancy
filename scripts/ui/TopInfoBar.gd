@@ -925,6 +925,13 @@ func _on_speed_button_pressed(btn: Button) -> void:
 
 
 func _process(_delta: float) -> void:
+	# Clock first, leftover refill last. Skip refill when this frame rolled.
+	# SupplyManager must not predict the tick — that sample goes stale after MapRenderer.
+	_step_live_clock()
+	_refill_supply_after_clock()
+
+
+func _step_live_clock() -> void:
 	# Wall-clock 1 Hz tick — independent of Engine.time_scale so pause/unpause never freezes the bar.
 	var now := Time.get_ticks_msec()
 	# Busy watchdog: if a day handler hung or never cleared, free the clock (was stuck at Feb 28).
@@ -974,6 +981,27 @@ func _process(_delta: float) -> void:
 	_on_tick()
 	# Stamp AFTER work so a multi-second day advance cannot chain into a storm (UI stays dead).
 	_last_sim_tick_msec = Time.get_ticks_msec()
+
+
+func _refill_supply_after_clock() -> void:
+	# FIX #10: leftover refill after this frame's clock decision. Skip when
+	# `_on_tick` rolled the day (SupplyManager roll mark). No call_deferred.
+	var sm: Node = get_node_or_null("/root/SupplyManager")
+	if sm == null:
+		return
+	if sm.has_method("note_clock_order"):
+		sm.call("note_clock_order", "tib_clock")
+	var rolled: bool = false
+	if sm.has_method("is_day_roll_plan_deferred"):
+		rolled = bool(sm.call("is_day_roll_plan_deferred"))
+	if not rolled and typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("day_rolled_this_frame"):
+		rolled = bool(TimeManager.call("day_rolled_this_frame"))
+	if rolled:
+		if sm.has_method("note_clock_order"):
+			sm.call("note_clock_order", "tib_skip_refill")
+		return
+	if sm.has_method("refill_after_clock"):
+		sm.call("refill_after_clock")
 
 
 func _on_tick() -> void:
