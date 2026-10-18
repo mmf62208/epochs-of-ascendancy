@@ -618,7 +618,9 @@ func place_competing(cands: Array, zoom: float, cam: Vector2, vp: Vector2, natio
 			"dot_rect": dot_rect,
 		})
 		blockers.append(dot_rect)
+	placed = _nudge_keep_apart(placed, vp)
 	placed = _nudge_keep_off_counters(placed, obstacles, vp)
+	placed = _nudge_keep_apart(placed, vp)
 	placed = _nudge_labels_off_foreign_dots(placed, vp)
 	return _drop_visual_overlaps(placed, zoom)
 
@@ -653,6 +655,8 @@ func _drop_visual_overlaps(placed: Array, _zoom: float = 1.0) -> Array:
 					continue
 				var ia_keep := _is_keep_item(a)
 				var ib_keep := _is_keep_item(b)
+				if ia_keep and ib_keep:
+					continue
 				var victim := j
 				var vs := float(b.get("score", 0.0))
 				if ia_keep and not ib_keep:
@@ -664,20 +668,63 @@ func _drop_visual_overlaps(placed: Array, _zoom: float = 1.0) -> Array:
 				elif float(a.get("score", 0.0)) < float(b.get("score", 0.0)):
 					victim = i
 					vs = float(a.get("score", 0.0))
-				if not _is_keep_item(out[victim]) or vs < drop_score:
+				if _is_keep_item(out[victim]):
+					continue
+				if vs < drop_score:
 					drop_at = victim
 					drop_score = vs
 		if drop_at < 0:
 			break
-		var victim_rec: Dictionary = out[drop_at]
-		# Essen and the four other Ruhr cores stay at mid and close. Dropping
-		# Dortmund at z1.5 was the live miss.
-		if bool(victim_rec.get("must_keep", false)):
-			break
-		if bool(victim_rec.get("ruhr_keep", false)):
-			break
 		out.remove_at(drop_at)
 	return out
+
+
+func _nudge_keep_apart(placed: Array, vp: Vector2) -> Array:
+	if placed.size() < 2:
+		return placed
+	for i in placed.size():
+		var a: Dictionary = placed[i]
+		if not _is_keep_item(a) or float(a.get("alpha", 0.0)) < 0.04:
+			continue
+		var ar: Rect2 = a.get("screen_rect", Rect2())
+		for j in range(i + 1, placed.size()):
+			var b: Dictionary = placed[j]
+			if not _is_keep_item(b) or float(b.get("alpha", 0.0)) < 0.04:
+				continue
+			var br: Rect2 = b.get("screen_rect", Rect2())
+			if not ar.grow(OUTLINE_PAD_PX).intersects(br.grow(OUTLINE_PAD_PX)):
+				continue
+			var victim := j
+			if float(a.get("score", 0.0)) < float(b.get("score", 0.0)):
+				victim = i
+			var item: Dictionary = placed[victim]
+			var world: Vector2 = item.get("world", Vector2.ZERO)
+			var anchor_s := _world_to_label_screen(world)
+			var size: Vector2 = (item.get("screen_rect", Rect2()) as Rect2).size
+			var ascent := float(item.get("ascent", size.y * 0.78))
+			var others: Array = []
+			for k in placed.size():
+				if k == victim:
+					continue
+				others.append(placed[k])
+			var moved := false
+			for off_v in _candidate_slots(Vector2(8.0, -2.0), RUHR_ANCHOR_MAX_PX, size, ascent, anchor_s, others, true):
+				var off: Vector2 = off_v as Vector2
+				if _anchor_gap_px(off, size, ascent) > RUHR_ANCHOR_MAX_PX + 0.05:
+					continue
+				var cand := Rect2(anchor_s + off + Vector2(0.0, -ascent), size)
+				if not _rects_clear(cand, others, [], vp):
+					continue
+				item["screen_rect"] = cand
+				item["screen_offset"] = off
+				placed[victim] = item
+				if victim == i:
+					ar = cand
+				moved = true
+				break
+			if not moved:
+				continue
+	return placed
 
 
 func _nudge_keep_off_counters(placed: Array, obstacles: Array, vp: Vector2) -> Array:
