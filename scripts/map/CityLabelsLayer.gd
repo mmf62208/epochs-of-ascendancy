@@ -23,8 +23,8 @@ const CLOSE_SHIFT_PX := 22.0
 const ANCHOR_MAX_PX := 30.0
 ## Ruhr cores may walk just past a chip half-width so the name sits beside
 ## the plate instead of on it (COUNTER_HALF.x 36 → ~44 px to the near edge).
-const RUHR_ANCHOR_MAX_PX := 44.0
-const COUNTER_INSET_PX := 10.0
+const RUHR_ANCHOR_MAX_PX := 48.0
+const COUNTER_INSET_PX := 12.0
 const CLOSE_FONT_MIN_PX := 14
 const COUNTER_MAX_SCREEN := Vector2(128.0, 160.0)
 const OUTLINE_PAD_PX := 4.0
@@ -692,7 +692,12 @@ func _nudge_keep_apart(placed: Array, vp: Vector2) -> Array:
 			if not _is_keep_item(b) or float(b.get("alpha", 0.0)) < 0.04:
 				continue
 			var br: Rect2 = b.get("screen_rect", Rect2())
-			if not ar.grow(OUTLINE_PAD_PX).intersects(br.grow(OUTLINE_PAD_PX)):
+			var ad: Rect2 = a.get("dot_rect", Rect2())
+			var bd: Rect2 = b.get("dot_rect", Rect2())
+			var hit := ar.grow(OUTLINE_PAD_PX).intersects(br.grow(OUTLINE_PAD_PX))
+			hit = hit or (ad.size.x > 0.5 and br.intersects(ad))
+			hit = hit or (bd.size.x > 0.5 and ar.intersects(bd))
+			if not hit:
 				continue
 			var victim := j
 			if float(a.get("score", 0.0)) < float(b.get("score", 0.0)):
@@ -1363,6 +1368,16 @@ func _keep_to_the_east(anchor_s: Vector2, placed: Array) -> bool:
 	return false
 
 
+func _keep_to_the_west(anchor_s: Vector2, placed: Array) -> bool:
+	for p in placed:
+		if not _is_keep_item(p):
+			continue
+		var other_s := _world_to_label_screen(p.get("world", Vector2.ZERO) as Vector2)
+		if other_s.x < anchor_s.x - 2.0 and absf(other_s.y - anchor_s.y) < 48.0:
+			return true
+	return false
+
+
 func _candidate_slots(base: Vector2, max_shift: float, size: Vector2, ascent: float, anchor_s: Vector2, placed: Array, _prefer_flush: bool) -> Array:
 	var walk := _slot_offsets(base, max_shift)
 	if max_shift < 1.0:
@@ -1371,12 +1386,24 @@ func _candidate_slots(base: Vector2, max_shift: float, size: Vector2, ascent: fl
 	var flush: Array = _flush_slots(size, ascent)
 	# Essen must stay right of its mark. Only Duisburg (keep to the east)
 	# tries west-of-mark first. Preferring left for every core put Essen
-	# on top of Duisburg at z 2.9.
+	# on top of Duisburg at z 2.9. Dortmund (keep to the west) skips the
+	# short right walk that lands inside Essen's glyph.
 	if _keep_to_the_east(anchor_s, placed) and flush.size() > 0:
 		out.append(flush[0])
 		for fs in flush:
 			out.append(fs)
 		out.append_array(walk)
+		return out
+	if _keep_to_the_west(anchor_s, placed):
+		var far: Array = []
+		for off_v in walk:
+			var off: Vector2 = off_v as Vector2
+			if off.x >= base.x + 16.0:
+				far.append(off)
+		out.append_array(far)
+		out.append_array(walk)
+		for fs in flush:
+			out.append(fs)
 		return out
 	out.append_array(walk)
 	for fs in flush:

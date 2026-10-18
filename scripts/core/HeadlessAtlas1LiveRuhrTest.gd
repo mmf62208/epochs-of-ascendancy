@@ -14,7 +14,7 @@ const LIVE_ZOOMS: Array[float] = [1.217, 1.512, 2.904]
 const VP := Vector2(1280, 800)
 const ZOOM_SLACK := 0.14
 const PLAY_WHEEL_SCREEN := Vector2(455, 455)
-const ANCHOR_MAX_PX := 44.0
+const ANCHOR_MAX_PX := 48.0
 const RUHR_CORE := ["Essen", "Duisburg", "Düsseldorf", "Dortmund", "Köln"]
 var _wheel_screen := PLAY_WHEEL_SCREEN
 
@@ -190,7 +190,7 @@ func _check_zoom() -> void:
 		_fail("Münster kept over Essen at live wheel z%.3f" % z)
 	_check_anchor_and_chrome(layer, placed, z)
 	if bool(layer.call("has_visual_overlap")):
-		_fail("live label overlap at z%.3f" % z)
+		_fail("live label overlap at z%.3f: %s" % [z, _overlap_pairs(placed)])
 	else:
 		_pass("no live label overlap at z%.3f" % z)
 	var dups: PackedStringArray = layer.call("duplicate_drawn_names")
@@ -240,6 +240,28 @@ func _names_of(placed: Array) -> PackedStringArray:
 		names.append(str(p.get("name", "")))
 	names.sort()
 	return names
+
+
+func _overlap_pairs(placed: Array) -> String:
+	var bits: PackedStringArray = PackedStringArray()
+	for i in placed.size():
+		var a: Dictionary = placed[i]
+		if float(a.get("alpha", 0.0)) < 0.04:
+			continue
+		var ar: Rect2 = a.get("screen_rect", Rect2())
+		var ad: Rect2 = a.get("dot_rect", Rect2())
+		for j in range(i + 1, placed.size()):
+			var b: Dictionary = placed[j]
+			if float(b.get("alpha", 0.0)) < 0.04:
+				continue
+			var br: Rect2 = b.get("screen_rect", Rect2())
+			var bd: Rect2 = b.get("dot_rect", Rect2())
+			var hit := ar.grow(4.0).intersects(br.grow(4.0))
+			hit = hit or (ad.size.x > 0.5 and br.intersects(ad))
+			hit = hit or (bd.size.x > 0.5 and ar.intersects(bd))
+			if hit:
+				bits.append("%s/%s" % [str(a.get("name", "")), str(b.get("name", ""))])
+	return ", ".join(bits)
 
 
 func _has_name(placed: Array, want: String) -> bool:
