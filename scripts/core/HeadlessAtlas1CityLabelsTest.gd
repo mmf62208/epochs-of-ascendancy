@@ -420,11 +420,11 @@ func _test_anchor_distance(layer: Node) -> void:
 			var dist := _anchor_dist_px(p, world, z, essen, vp)
 			if dist > worst:
 				worst = dist
-			if dist > ANCHOR_MAX_PX:
+			if dist > RUHR_ANCHOR_MAX_PX:
 				_fail("label %s at z%.2f is %.1f px from its dot" % [str(p.get("name", "")), z, dist])
 				return
 	print("ATLAS1 city max_anchor_px=%.1f" % worst)
-	_pass("label anchors stay within %.0f px at mid/close zooms (worst %.1f)" % [ANCHOR_MAX_PX, worst])
+	_pass("label anchors stay within %.0f px at mid/close zooms (worst %.1f)" % [RUHR_ANCHOR_MAX_PX, worst])
 
 
 func _test_close_no_overlap(layer: Node) -> void:

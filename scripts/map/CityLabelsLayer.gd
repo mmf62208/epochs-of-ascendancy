@@ -578,11 +578,22 @@ func place_competing(cands: Array, zoom: float, cam: Vector2, vp: Vector2, natio
 					chosen_off = off2
 					accepted = true
 					break
-		if not accepted and keep:
+		if not accepted and (is_cap or must_keep):
 			var cap_base: Vector2 = anchor_s + base
 			chosen = Rect2(cap_base + Vector2(0.0, -ascent), size)
 			chosen_off = base
 			accepted = true
+		elif not accepted and ruhr_keep:
+			# Chips may cover the mark; a nation label still owns the screen.
+			var nation_only: Array = []
+			for n3 in nation_rects:
+				nation_only.append(n3)
+			var ruhr_base: Vector2 = anchor_s + base
+			var ruhr_rect := Rect2(ruhr_base + Vector2(0.0, -ascent), size)
+			if _rects_clear(ruhr_rect, placed, nation_only, vp):
+				chosen = ruhr_rect
+				chosen_off = base
+				accepted = true
 		# Never last-resort 48/120px: that put Duisburg south of Köln and
 		# names ~75px east of their dots. Cull if it will not sit by the mark.
 		if not accepted:
