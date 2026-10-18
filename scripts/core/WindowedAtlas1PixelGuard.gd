@@ -147,11 +147,36 @@ func _take_shot() -> void:
 
 
 func _assert_label(img: Image, world: Vector2, label: String) -> void:
+	# Cream lives on the glyph box (shift ≤30 px), not a 12 px disc on the
+	# city mark. A live-wheel chip over the mark made essen_label_run_1.
 	var screen := _project(world)
-	var run := _warm_run(img, screen, 12)
-	_log("EOA_ATLAS1_PIXEL_GUARD who=guard.label %s screen=%.1f,%.1f run=%d" % [label, screen.x, screen.y, run])
+	var search := Rect2(screen - Vector2(36, 36), Vector2(72, 72))
+	var placed_rect := _placed_label_rect(label)
+	if placed_rect.size.x > 1.0 and placed_rect.size.y > 1.0:
+		search = placed_rect.grow(6.0)
+	else:
+		_fail_reasons.append("%s_not_placed" % label.to_lower())
+	var run := _warm_run_rect(img, search)
+	_log(
+		"EOA_ATLAS1_PIXEL_GUARD who=guard.label %s screen=%.1f,%.1f rect=%s run=%d"
+		% [label, screen.x, screen.y, str(search), run]
+	)
 	if run < 3:
 		_fail_reasons.append("%s_label_run_%d" % [label.to_lower(), run])
+
+
+func _placed_label_rect(label: String) -> Rect2:
+	var layer := _find_named("CityLabelsLayer")
+	if layer == null or not layer.has_method("placed"):
+		return Rect2()
+	var placed: Array = layer.call("placed")
+	for p in placed:
+		if float(p.get("alpha", 0.0)) < 0.04:
+			continue
+		if str(p.get("name", "")) != label:
+			continue
+		return p.get("screen_rect", Rect2()) as Rect2
+	return Rect2()
 
 
 func _assert_danube(img: Image, world: Vector2) -> void:
@@ -163,19 +188,30 @@ func _assert_danube(img: Image, world: Vector2) -> void:
 
 
 func _project(world: Vector2) -> Vector2:
-	var vp := root.get_viewport()
+	# MapCamera canvas, not SceneTree.root — those disagreed after the
+	# WHEELDRIFT-1 camera make_current, so cream was sampled off the glyph.
+	var cam := _camera()
+	if cam != null:
+		return cam.get_canvas_transform() * world
+	var vp := root.get_viewport() if root != null else null
 	if vp != null:
-		var xf := vp.get_canvas_transform()
-		return xf * world
+		return vp.get_canvas_transform() * world
 	return world
 
 
 func _warm_run(img: Image, center: Vector2, radius: int) -> int:
+	return _warm_run_rect(
+		img,
+		Rect2(center - Vector2(float(radius), float(radius)), Vector2(float(radius * 2 + 1), float(radius * 2 + 1)))
+	)
+
+
+func _warm_run_rect(img: Image, rect: Rect2) -> int:
 	var best := 0
-	var x0 := int(center.x) - radius
-	var x1 := int(center.x) + radius
-	var y0 := int(center.y) - radius
-	var y1 := int(center.y) + radius
+	var x0 := int(floor(rect.position.x))
+	var x1 := int(ceil(rect.end.x))
+	var y0 := int(floor(rect.position.y))
+	var y1 := int(ceil(rect.end.y))
 	for y in range(y0, y1 + 1):
 		var run := 0
 		for x in range(x0, x1 + 1):
@@ -477,6 +513,21 @@ func _apply_camera(pos: Vector2, zoom: float) -> void:
 
 func _reassert_camera() -> void:
 	if _cam_pos == Vector2.ZERO:
+		return
+	var live := false
+	if _shot >= 0 and _shot < _shots.size():
+		live = str(_shots[_shot].get("name", "")).begins_with("live_ruhr")
+	if live:
+		# Keep the wheeled MapCamera. lock_pixel_guard_camera is not the
+		# playtester path and re-clamps the Essen-on-(455,455) pan.
+		var cam := _camera()
+		if cam != null:
+			cam.position_smoothing_enabled = false
+			cam.zoom = Vector2(_cam_zoom, _cam_zoom)
+			cam.global_position = _cam_pos
+			cam.reset_smoothing()
+			cam.enabled = true
+			cam.make_current()
 		return
 	_apply_camera(_cam_pos, _cam_zoom)
 
