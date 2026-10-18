@@ -16890,7 +16890,9 @@ func player_path_place_world_at_screen(world: Vector2, screen: Vector2) -> void:
 		guard += 1
 	var here: Vector2 = _screen_to_world(screen)
 	cam.global_position += world - here
-	_clamp_camera_to_theater()
+	# Skip theater clamp on this pan. At Europe Home the view still fills the
+	# theater and clamp left Essen ~67 wu off (455,455); later wheel notches
+	# then slipped the Ruhr off the top of the frame. Wheel zoom still clamps.
 
 
 func center_europe_in_world_view() -> void:
