@@ -316,6 +316,13 @@ FIX #1 evidence on tip `c4280e38`:
 - Seed `multi_ai_decisions` md5 `20fe9063de285f19d4f9b8a105abfd31` default and `EOA_CAMPAIGN_LOOP=0`.
 - `--quick` exit 1 with the same 14 `unit_board_play_path` reds. map_qc NE **0.9853** (3148/3195).
 
+Diplomatic-only Declare (item 4) on tip `b677890f`:
+
+- `HeadlessCampaignLoop1DeclareClickTest` `RESULT=PASS`: same inspector checks, leftover-swallow click starts GER–POL, then 3 live F5-equivalent days with 2 stationed GER units (front `711057`, interior `710300`) — no new player march, no player attack order, no station change.
+- Existing CL1: WarGate, CapitulationPeace, Soak all `RESULT=PASS`.
+- Seed `multi_ai_decisions` md5 `20fe9063de285f19d4f9b8a105abfd31` default and `EOA_CAMPAIGN_LOOP=0`.
+- `--quick` same 14 `unit_board_play_path` reds. map_qc NE **0.9853** (3148/3195).
+
 ## Full gates on the rebased tip
 
 Rebased onto `origin/main` `05602912`. Tip `56b31db5`. `tools/eoa_full_test_gates.sh` exited 1. Log `~/campaign1_evidence/cl1c_full_gates_stdout.log`. Wall about 25 minutes. The four campaign steps passed, including the soak and the gamescope end-screen guard. No `SCRIPT ERROR` in those logs.
