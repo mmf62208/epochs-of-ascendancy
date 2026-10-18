@@ -23,7 +23,7 @@ const CLOSE_SHIFT_PX := 22.0
 const ANCHOR_MAX_PX := 30.0
 ## Ruhr cores may walk just past a chip half-width so the name sits beside
 ## the plate instead of on it (COUNTER_HALF.x 36 → ~44 px to the near edge).
-const RUHR_ANCHOR_MAX_PX := 48.0
+const RUHR_ANCHOR_MAX_PX := 64.0
 const COUNTER_INSET_PX := 12.0
 const CLOSE_FONT_MIN_PX := 14
 const COUNTER_MAX_SCREEN := Vector2(128.0, 160.0)
