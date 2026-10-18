@@ -319,6 +319,9 @@ else
   run_step launch_rt1_no_rebuild \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessRt1RoadNoRebuildTest.gd || fail
 
+  run_step launch_roads1_quiet \
+    tools/run_godot.sh --headless -s res://scripts/core/HeadlessRoads1QuietGuard.gd || fail
+
   run_step launch_rx1_panel_state \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessRx1RhinePanelStateTest.gd || fail
 

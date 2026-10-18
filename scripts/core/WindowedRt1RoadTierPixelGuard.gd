@@ -176,6 +176,7 @@ func _begin_matrix_band() -> void:
 		return
 	var row: Dictionary = zooms[_matrix_i]
 	_force_political_clean()
+	_force_logistics_roads()
 	_set_units_view(false)
 	_frame_over_koln(float(row["z"]), true)
 	_settle_left = SETTLE_FRAMES
@@ -261,6 +262,7 @@ func _resolve_sample_pair(kind: String, fallback_a: int, fallback_b: int) -> Vec
 
 func _do_soft() -> void:
 	_phase = Phase.DONE
+	_restore_political_roads()
 	_frame_over_koln(MID_ZOOM, false)
 	_select_koln()
 	_reassert_camera()
@@ -308,7 +310,9 @@ func _do_soft() -> void:
 func _judge_widths() -> void:
 	var bands: PackedStringArray = PackedStringArray(["far", "default", "close"])
 	var kinds: PackedStringArray = PackedStringArray(["dirt", "paved", "highway"])
-	var targets := {"dirt": 2.6, "paved": 4.0, "highway": 12.0}
+	# Screen px from the ROADS-1 table at far 0.32 / mid 1.80 / close 3.20.
+	# Upper bound stays a log: a perpendicular run can include a neighbour.
+	var targets := {"dirt": 1.5, "paved": 2.6, "highway": 4.6}
 	for kind in kinds:
 		var sigs: PackedStringArray = PackedStringArray()
 		for band in bands:
@@ -708,6 +712,19 @@ func _force_political_clean() -> void:
 		mr.call("set_map_mode", "political")
 	if mr != null and "current_map_mode" in mr:
 		mr.set("current_map_mode", "political")
+
+
+func _force_logistics_roads() -> void:
+	# Width matrix needs every tier at full alpha. Map fills stay political.
+	var ol := _overlay()
+	if ol != null and ol.has_method("apply_road_map_mode"):
+		ol.call("apply_road_map_mode", "infra", false)
+
+
+func _restore_political_roads() -> void:
+	var ol := _overlay()
+	if ol != null and ol.has_method("apply_road_map_mode"):
+		ol.call("apply_road_map_mode", "political", false)
 
 
 func _ensure_spine_built() -> void:

@@ -86,22 +86,22 @@ func _test_z_order() -> void:
 		_fail("UNIT_COUNTER_Z must stay 28 (DemoUnitIcon)")
 		return
 	if label_z != 18:
-		_fail("NATION_LABEL_Z must stay 18 (labels must not bury river/road)")
+		_fail("NATION_LABEL_Z must stay 18")
 		return
-	if rhine_z >= unit_z:
-		_fail("Rhine MAP_BELOW_UNITS_Z=%d must sit below unit %d" % [rhine_z, unit_z])
+	var casing_z := _const_int(infra, "ROAD_CASING_Z")
+	if rhine_z >= unit_z or road_z >= unit_z:
+		_fail("Rhine z=%d road z=%d must sit below unit %d" % [rhine_z, road_z, unit_z])
 		return
-	if rhine_z <= label_z:
-		_fail("Rhine z=%d must sit above nation Labels z=%d" % [rhine_z, label_z])
+	if not (rhine_z > 0 and rhine_z < road_z and road_z < 15):
+		_fail("want river < highway < BorderLayer 15, got rhine=%d road=%d" % [rhine_z, road_z])
 		return
-	if road_z >= 28:
-		_fail("RoadLayer ROAD_BELOW_UNITS_Z=%d must sit below units 28" % road_z)
+	if casing_z != 10:
+		_fail("ROAD_CASING_Z=%d must be 10" % casing_z)
 		return
-	if road_z <= 18:
-		_fail("RoadLayer z=%d must sit above nation Labels 18" % road_z)
-		return
-	if "add_overlay_layer(\"Rx1RhineLayer\"" in ren and ", 22)" not in ren:
-		_fail("MapRenderer must spawn Rx1RhineLayer at z=22 (below units)")
+	var setup_i := ren.find("func _setup_rx1_rhine_layer")
+	var setup := ren.substr(setup_i, 900) if setup_i >= 0 else ""
+	if "add_overlay_layer(\"Rx1RhineLayer\"" not in setup or ", 9)" not in setup or "z_index = 22" in setup:
+		_fail("MapRenderer must spawn Rx1RhineLayer at z=9 (below roads)")
 		return
 	if "ABOVE_UNIT_COUNTERS_Z" in layer or "ROAD_ABOVE_UNIT_COUNTERS_Z" in infra:
 		_fail("FIX1 raise-above-units constants must be gone")
@@ -129,7 +129,7 @@ func _test_z_order() -> void:
 	if "_sample_spine_continuity" not in guard:
 		_fail("pixel guard must sample spine continuity along Bonn–Köln–Leverkusen")
 		return
-	_pass("Rhine z=%d Road z=%d gold z=%d sit above labels 18 and below units 28" % [rhine_z, road_z, gold_z])
+	_pass("Rhine z=%d < road z=%d < 15; gold z=%d above labels 18 and below units 28" % [rhine_z, road_z, gold_z])
 
 
 func _test_spine_chrome_scope() -> void:

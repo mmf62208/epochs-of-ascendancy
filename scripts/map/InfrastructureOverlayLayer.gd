@@ -97,13 +97,14 @@ var _layer_provs_cache_msec: int = 0
 const LAYER_PROV_CACHE_MS := 400
 
 ## DemoUnitIcon_* is z=28 z_as_relative=false. Owner: units stay on top.
-## Roads sit above nation labels (18) and below counters. Gold stroke is
-## distinct from GER red fill and tan land so the pixel guard can fail 816cdc9.
+## ROADS-1: road casings z=10 and fills z=11, under BorderLayer 15 and labels.
+## Gold spine (23) and spine preview (21) stay above borders (build mode).
 const UNIT_COUNTER_Z := 28
-const ROAD_BELOW_UNITS_Z := 21
+const ROAD_CASING_Z := 10
+const ROAD_FILL_Z := 11
+const ROAD_BELOW_UNITS_Z := 11
 const SPINE_BELOW_UNITS_Z := 21
-## Joined gold spine sits above the Rhine (22) and below DemoUnitIcon (28).
-## Generic RoadLayer Line2Ds stay at ROAD_BELOW_UNITS_Z so RX-1 order is unchanged.
+## Joined gold spine stays above country borders and below DemoUnitIcon (28).
 const GOLD_SPINE_Z := 23
 const ROAD_EXPLICIT_SCREEN_PX := 7.0
 const ROAD_INFERRED_SCREEN_PX := 4.0
@@ -122,6 +123,10 @@ var _road_shared_border_keys: Dictionary = {}
 var _road_shared_border_ready: bool = false
 var _road_cache_rebuild_count: int = 0
 var _road_tier_draw: Dictionary = {}
+var _road_casing_draw: Node2D = null
+var _road_bucket: String = "political"
+var _road_draw_rings: Array = []
+var _road_stub_dropped: Array = []
 
 func _ready():
     infrastructure_manager = get_node_or_null("/root/InfrastructureDevelopmentManager")
@@ -161,11 +166,11 @@ func _ensure_sub_layers():
             road_layer = Node2D.new()
             road_layer.name = "RoadLayer"
             road_layer.z_as_relative = false
-            road_layer.z_index = ROAD_BELOW_UNITS_Z
+            road_layer.z_index = ROAD_FILL_Z
             add_child(road_layer)
     if road_layer != null:
         road_layer.z_as_relative = false
-        road_layer.z_index = ROAD_BELOW_UNITS_Z
+        road_layer.z_index = ROAD_FILL_Z
     if rail_layer == null:
         rail_layer = get_node_or_null("RailLayer")
         if rail_layer == null:
@@ -610,8 +615,8 @@ func _rebuild_road_layer_inner() -> void:
                 if not show_roads and not RoadTierVisualScript.is_nuts3_pid(int(nid)):
                     continue
             var on_corridor := _edge_on_supply_corridor(int(pid), int(nid), mr)
-            if supply_on and not on_corridor:
-                continue
+            # ROADS-1: L-on keeps the full trunk under the supply fill. Do not
+            # drop non-corridor edges (that was the old hide-under-supply filter).
             var tier: int = RoadTierVisualScript.road_tier_for_edge(avg_infra, era, has_explicit)
             var w1: float = RoadTierVisualScript.province_weight(
                 float(p.infrastructure), float(p.development_level), float(p.population)
@@ -1370,10 +1375,14 @@ func set_show_proposed_splits(enabled: bool):
 ## Toggle infrastructure sub-layers. Called from DebugOverlay, options, or hotkeys.
 ## Now properly controls the Node2D sub-layer visibility (RoadLayer etc) for true toggle + node editing.
 func set_show_roads(enabled: bool):
+    var was_on := show_roads
     show_roads = enabled
-    # Always rebuild: inferred mesh only when enabled; explicit IX-1 spines stay.
-    rebuild_road_layer()
-    _update_sub_layer_visibilities()
+    # Turning roads on pulls non-NUTS inferred edges. Turning them off (L / political)
+    # must not rebuild the trunk — that was the L-toggle hitch and the supply filter.
+    if enabled and not was_on:
+        rebuild_road_layer()
+    else:
+        _update_sub_layer_visibilities()
     queue_redraw()
 
 
@@ -1393,7 +1402,7 @@ func _clear_road_layer_children() -> void:
         return
     var kids = road_layer.get_children()
     for k in kids:
-        if k is RoadTierDraw:
+        if k is RoadTierDraw or k is RoadCasingDraw:
             continue
         road_layer.remove_child(k)
         k.queue_free()
@@ -1423,10 +1432,28 @@ func _ensure_road_tier_draw_nodes() -> void:
             node.name = nm
             node.tier = tier
             node.z_as_relative = false
-            node.z_index = ROAD_BELOW_UNITS_Z
+            node.z_index = ROAD_FILL_Z
             road_layer.add_child(node)
             existing = node
+        else:
+            existing.z_as_relative = false
+            existing.z_index = ROAD_FILL_Z
         _road_tier_draw[tier] = existing
+    var casing: Node = road_layer.get_node_or_null("RoadCasingDraw")
+    if casing == null or not (casing is RoadCasingDraw):
+        if casing != null:
+            road_layer.remove_child(casing)
+            casing.queue_free()
+        var casing_node := RoadCasingDraw.new()
+        casing_node.name = "RoadCasingDraw"
+        casing_node.z_as_relative = false
+        casing_node.z_index = ROAD_CASING_Z
+        road_layer.add_child(casing_node)
+        casing = casing_node
+    else:
+        casing.z_as_relative = false
+        casing.z_index = ROAD_CASING_Z
+    _road_casing_draw = casing as Node2D
 
 
 func _get_provinces_for_road_cache() -> Dictionary:
@@ -1472,6 +1499,7 @@ func _ensure_road_shared_border_keys(provinces: Dictionary) -> void:
                 rings[pid] = ring
     _road_shared_border_keys = RoadTierVisualScript.shared_border_keys_from_rings(rings, 4.0)
     _road_shared_border_ready = not _road_shared_border_keys.is_empty()
+    _road_draw_rings = _road_ring_records(rings)
 
 
 func _road_edge_passes_filter(p1: int, p2: int, c1: Vector2, c2: Vector2) -> bool:
@@ -1530,19 +1558,104 @@ func get_road_trunk_stats() -> Dictionary:
     }
 
 
+func _road_ring_records(rings: Dictionary) -> Array:
+    var out: Array = []
+    for pid_v in rings.keys():
+        var ring_v: Variant = rings[pid_v]
+        if typeof(ring_v) != TYPE_PACKED_VECTOR2_ARRAY:
+            continue
+        var ring: PackedVector2Array = ring_v
+        if ring.size() < 3:
+            continue
+        var min_v: Vector2 = ring[0]
+        var max_v: Vector2 = ring[0]
+        for pt in ring:
+            min_v = min_v.min(pt)
+            max_v = max_v.max(pt)
+        out.append({"bb": Rect2(min_v, max_v - min_v), "pts": ring, "pid": int(pid_v)})
+    return out
+
+
+func _highway_edge_drawable(entry: Dictionary) -> bool:
+    var tier: int = int(entry.get("display_tier", entry.get("tier", 0)))
+    if tier != RoadTierVisualScript.TIER_HIGHWAY:
+        return true
+    var c1: Vector2 = entry.get("c1", Vector2.ZERO)
+    var c2: Vector2 = entry.get("c2", Vector2.ZERO)
+    return RoadTierVisualScript.highway_endpoints_in_rings(c1, c2, _road_draw_rings)
+
+
+func apply_road_map_mode(mode: String, supply_on: bool) -> void:
+    _road_bucket = RoadTierVisualScript.road_mode_bucket(mode, supply_on)
+    var logistics := _road_bucket == "logistics"
+    for tier in _road_tier_draw.keys():
+        var node: Variant = _road_tier_draw[tier]
+        if node != null and node is RoadTierDraw:
+            (node as RoadTierDraw).apply_bucket(_road_bucket)
+    if _road_casing_draw != null and is_instance_valid(_road_casing_draw):
+        _road_casing_draw.visible = logistics
+        _road_casing_draw.modulate = Color(1, 1, 1, 1 if logistics else 0)
+        if _road_casing_draw.has_method("redraw_roads"):
+            _road_casing_draw.call("redraw_roads")
+    # Rail is logistics-only. Show the existing layer; rebuild only if it was never built.
+    if rail_layer != null:
+        if logistics:
+            if rail_layer.get_child_count() == 0:
+                show_rails = true
+                rebuild_rail_layer()
+            else:
+                show_rails = true
+                rail_layer.visible = true
+        else:
+            show_rails = false
+            rail_layer.visible = false
+
+
+func get_highway_stub_report() -> Dictionary:
+    return {
+        "dropped": _road_stub_dropped.duplicate(),
+        "dropped_n": _road_stub_dropped.size(),
+        "rings": _road_draw_rings.size(),
+    }
+
+
+func get_road_bucket() -> String:
+    return _road_bucket
+
+
 func _apply_road_tier_cache(cache: Array[Dictionary]) -> void:
     _road_edge_cache = cache
     _ensure_road_tier_draw_nodes()
+    _road_stub_dropped.clear()
+    var drawable: Array = []
     var by_tier: Dictionary = {0: [], 1: [], 2: []}
     for entry in cache:
         var t: int = clampi(int(entry.get("display_tier", entry.get("tier", 0))), 0, 2)
+        if t == RoadTierVisualScript.TIER_HIGHWAY and not _highway_edge_drawable(entry):
+            _road_stub_dropped.append(RoadTierVisualScript.edge_key(int(entry.get("p1", 0)), int(entry.get("p2", 0))))
+            continue
+        drawable.append(entry)
         var bucket: Array = by_tier[t]
         bucket.append(entry)
         by_tier[t] = bucket
+    var chains: Array = RoadTierVisualScript.build_road_chains(drawable)
+    var chains_by_tier: Dictionary = {0: [], 1: [], 2: []}
+    for chain_v in chains:
+        if typeof(chain_v) != TYPE_DICTIONARY:
+            continue
+        var ct: int = clampi(int((chain_v as Dictionary).get("tier", 0)), 0, 2)
+        var clist: Array = chains_by_tier[ct]
+        clist.append(chain_v)
+        chains_by_tier[ct] = clist
     for tier in [0, 1, 2]:
         var node: Variant = _road_tier_draw.get(tier, null)
         if node != null and node is RoadTierDraw:
             (node as RoadTierDraw).setup_edges(by_tier[tier])
+            (node as RoadTierDraw).setup_chains(chains_by_tier[tier])
+            (node as RoadTierDraw).apply_bucket(_road_bucket)
+    if _road_casing_draw != null and _road_casing_draw is RoadCasingDraw:
+        (_road_casing_draw as RoadCasingDraw).setup_chains(chains)
+        _road_casing_draw.visible = _road_bucket == "logistics"
 
 
 func _add_explicit_lookup_line(c1: Vector2, c2: Vector2, p1: int, p2: int, tier: int, on_corridor: bool) -> void:
@@ -1578,7 +1691,8 @@ func _add_supply_corridor_line(c1: Vector2, c2: Vector2, p1: int, p2: int) -> vo
     glow.end_cap_mode = Line2D.LINE_CAP_ROUND
     glow.default_color = Color(1.00, 0.78, 0.12, 0.28)
     glow.width = 5.0
-    glow.z_index = 3
+    glow.z_as_relative = false
+    glow.z_index = 24
     glow.set_meta("p1", p1)
     glow.set_meta("p2", p2)
     glow.set_meta("glow", true)
@@ -1588,7 +1702,8 @@ func _add_supply_corridor_line(c1: Vector2, c2: Vector2, p1: int, p2: int) -> vo
     line.antialiased = true
     line.default_color = Color(1.00, 0.92, 0.28, 0.88)
     line.width = 2.8
-    line.z_index = 4
+    line.z_as_relative = false
+    line.z_index = 25
     line.begin_cap_mode = Line2D.LINE_CAP_ROUND
     line.end_cap_mode = Line2D.LINE_CAP_ROUND
     line.set_meta("p1", p1)
@@ -1604,6 +1719,8 @@ func _sync_road_tier_draw_zoom(_z: float) -> void:
         var node: Variant = _road_tier_draw[tier]
         if node != null and node is RoadTierDraw:
             (node as RoadTierDraw).redraw_roads()
+    if _road_casing_draw != null and is_instance_valid(_road_casing_draw) and _road_casing_draw.has_method("redraw_roads"):
+        _road_casing_draw.call("redraw_roads")
 
 
 func get_road_cache_rebuild_count() -> int:
@@ -2570,19 +2687,19 @@ class Ix1SpinePreviewDraw extends Node2D:
 
 ## RT-1 batched intact roads: one node per tier, screen-pixel widths from zoom.
 ## Cache lives on the overlay; this node only redraws. Never creates Line2Ds.
-class RoadTierDraw extends Node2D:
-    var tier: int = 0
-    var edges: Array = []
+class RoadCasingDraw extends Node2D:
+    var chains: Array = []
     var _last_zoom: float = -1.0
     var _in_draw: bool = false
 
     func _ready() -> void:
         z_as_relative = false
-        z_index = ROAD_BELOW_UNITS_Z
+        z_index = ROAD_CASING_Z
+        visible = false
         set_process(true)
 
-    func setup_edges(new_edges: Array) -> void:
-        edges = new_edges.duplicate()
+    func setup_chains(new_chains: Array) -> void:
+        chains = new_chains.duplicate()
         if not _in_draw:
             queue_redraw()
 
@@ -2597,133 +2714,83 @@ class RoadTierDraw extends Node2D:
             queue_redraw()
 
     func _canvas_zoom() -> float:
-        var tree := get_tree()
-        if tree != null:
-            var nodes: Array = tree.get_nodes_in_group("map_renderer")
-            if nodes.size() > 0:
-                var mr: Node = nodes[0]
-                var named := mr.get_node_or_null("MapCamera") as Camera2D
-                if named != null:
-                    return maxf(absf(named.zoom.x), absf(named.zoom.y))
-        var vp := get_viewport()
-        if vp != null:
-            return MapZoomLOD.read_camera_zoom(vp)
-        return 1.0
-
-    func _world_width(screen_px: float) -> float:
-        return screen_px / maxf(_canvas_zoom(), 0.04)
-
-    func _edge_visible(entry: Dictionary, zoom: float) -> bool:
-        return RoadTierVisualScript.tier_visible_at_zoom(
-            int(entry.get("tier", 0)),
-            bool(entry.get("explicit", false)),
-            int(entry.get("display_tier", entry.get("tier", 0))),
-            zoom
-        )
-
-    func _draw() -> void:
-        if _in_draw:
-            return
-        _in_draw = true
-        var z := _canvas_zoom()
-        var lod: int = RoadTierVisualScript.lod_band_for_zoom(z)
-        match tier:
-            1:
-                _draw_paved(lod, z)
-            2:
-                _draw_highway(lod, z)
-            _:
-                _draw_dirt(lod, z)
-        _in_draw = false
-
-    func _draw_dirt(_lod: int, zoom: float) -> void:
-        if RoadTierVisualScript.dirt_hidden_at_zoom(zoom):
-            return
-        var w := _world_width(RoadTierVisualScript.DIRT_SCREEN_PX)
-        var col := RoadTierVisualScript.DIRT_COLOR
-        for entry in edges:
-            if not _edge_visible(entry, zoom):
-                continue
-            var a: Vector2 = entry.get("c1", Vector2.ZERO)
-            var b: Vector2 = entry.get("c2", Vector2.ZERO)
-            if a == Vector2.ZERO or b == Vector2.ZERO:
-                continue
-            _draw_dashed(a, b, col, w, zoom)
-
-    func _draw_paved(_lod: int, zoom: float) -> void:
-        var core_w := _world_width(RoadTierVisualScript.PAVED_SCREEN_PX)
-        var edge_w := _world_width(RoadTierVisualScript.PAVED_SCREEN_PX + RoadTierVisualScript.PAVED_EDGE_SCREEN_PX)
-        var core := RoadTierVisualScript.PAVED_COLOR
-        var edge := RoadTierVisualScript.PAVED_EDGE_COLOR
-        for entry in edges:
-            if not _edge_visible(entry, zoom):
-                continue
-            var a: Vector2 = entry.get("c1", Vector2.ZERO)
-            var b: Vector2 = entry.get("c2", Vector2.ZERO)
-            if a == Vector2.ZERO or b == Vector2.ZERO:
-                continue
-            draw_line(a, b, edge, edge_w, false)
-            draw_line(a, b, core, core_w, false)
-
-    func _draw_highway(_lod: int, zoom: float) -> void:
-        ## Non-AA quads so the player-seen width matches HIGHWAY_*_SCREEN_PX.
-        ## Never antialiased draw_line (IX-1 windowed OOM).
-        var far: bool = _lod <= 0
-        var case_px: float = (
-            RoadTierVisualScript.HIGHWAY_FAR_CASING_SCREEN_PX if far
-            else RoadTierVisualScript.HIGHWAY_CASING_SCREEN_PX
-        )
-        var core_px: float = (
-            RoadTierVisualScript.HIGHWAY_FAR_CORE_SCREEN_PX if far
-            else RoadTierVisualScript.HIGHWAY_SCREEN_PX
-        )
-        var case_w := _world_width(case_px)
-        var core_w := _world_width(core_px)
-        var stripe_w := _world_width(RoadTierVisualScript.HIGHWAY_STRIPE_SCREEN_PX)
-        var casing := RoadTierVisualScript.HIGHWAY_CASING_COLOR
-        var stripe := RoadTierVisualScript.HIGHWAY_STRIPE_COLOR
-        var core := RoadTierVisualScript.HIGHWAY_CORE_COLOR
-        for entry in edges:
-            if not _edge_visible(entry, zoom):
-                continue
-            var a: Vector2 = entry.get("c1", Vector2.ZERO)
-            var b: Vector2 = entry.get("c2", Vector2.ZERO)
-            if a == Vector2.ZERO or b == Vector2.ZERO:
-                continue
-            _draw_road_quad(a, b, casing, case_w)
-            _draw_road_quad(a, b, core, core_w)
-            if not far:
-                _draw_road_quad(a, b, stripe, stripe_w)
+        return RoadTierVisualScript.canvas_zoom_of(self)
 
     func _draw_road_quad(from: Vector2, to: Vector2, col: Color, world_w: float) -> void:
-        var delta: Vector2 = to - from
-        var length := delta.length()
-        if not is_finite(length) or length < 0.05:
-            return
-        var dir: Vector2 = delta / length
-        var half: float = world_w * 0.5
-        var perp := Vector2(-dir.y, dir.x) * half
-        var poly := PackedVector2Array([from + perp, to + perp, to - perp, from - perp])
-        draw_colored_polygon(poly, col)
+        RoadTierVisualScript.paint_road_quad(self, from, to, col, world_w)
 
-    func _draw_dashed(from: Vector2, to: Vector2, col: Color, width: float, zoom: float) -> void:
-        var delta: Vector2 = to - from
-        var length := delta.length()
-        if not is_finite(length) or length < 0.75:
+    func _draw() -> void:
+        if _in_draw or not visible:
             return
-        var dir: Vector2 = delta / length
-        var z := maxf(zoom, 0.04)
-        var dash := RoadTierVisualScript.DIRT_DASH_SCREEN_PX / z
-        var gap := RoadTierVisualScript.DIRT_GAP_SCREEN_PX / z
-        var step := maxf(dash + gap, 0.35)
-        var walked := 0.0
-        var n := 0
-        while walked < length and n < 64:
-            var a: Vector2 = from + dir * walked
-            var b: Vector2 = from + dir * minf(walked + dash, length)
-            draw_line(a, b, col, width, false)
-            walked += step
-            n += 1
+        _in_draw = true
+        var zoom := _canvas_zoom()
+        var plan: Array = RoadTierVisualScript.build_road_draw_plan(chains, zoom, true)
+        RoadTierVisualScript.paint_road_plan(self, plan, "casing", zoom)
+        _in_draw = false
+
+
+class RoadTierDraw extends Node2D:
+    var tier: int = 0
+    var edges: Array = []
+    var chains: Array = []
+    var _bucket: String = "political"
+    var _last_zoom: float = -1.0
+    var _in_draw: bool = false
+
+    func _ready() -> void:
+        z_as_relative = false
+        z_index = ROAD_FILL_Z
+        set_process(true)
+        _apply_bucket_visual()
+
+    func setup_edges(new_edges: Array) -> void:
+        edges = new_edges.duplicate()
+        if not _in_draw:
+            queue_redraw()
+
+    func setup_chains(new_chains: Array) -> void:
+        chains = new_chains.duplicate()
+        if not _in_draw:
+            queue_redraw()
+
+    func apply_bucket(bucket: String) -> void:
+        _bucket = bucket
+        _apply_bucket_visual()
+        if not _in_draw:
+            queue_redraw()
+
+    func _apply_bucket_visual() -> void:
+        var a: float = RoadTierVisualScript.road_tier_mode_alpha(_bucket, tier, _canvas_zoom())
+        visible = a > 0.001
+        modulate = Color(1, 1, 1, a if visible else 0.0)
+
+    func redraw_roads() -> void:
+        if not _in_draw:
+            queue_redraw()
+
+    func _process(_delta: float) -> void:
+        var z := _canvas_zoom()
+        if absf(z - _last_zoom) > 0.008:
+            _last_zoom = z
+            _apply_bucket_visual()
+            queue_redraw()
+
+    func _canvas_zoom() -> float:
+        return RoadTierVisualScript.canvas_zoom_of(self)
+
+    func _draw_road_quad(from: Vector2, to: Vector2, col: Color, world_w: float) -> void:
+        RoadTierVisualScript.paint_road_quad(self, from, to, col, world_w)
+
+    func _draw() -> void:
+        if _in_draw or not visible:
+            return
+        _in_draw = true
+        var logistics := _bucket == "logistics"
+        var zoom := _canvas_zoom()
+        var plan: Array = RoadTierVisualScript.build_road_draw_plan(chains, zoom, logistics)
+        RoadTierVisualScript.paint_road_plan(self, plan, "fill", zoom)
+        RoadTierVisualScript.paint_road_plan(self, plan, "stripe", zoom)
+        _in_draw = false
 
 
 ## Built IX-1 gold spine: ONE joined Bonn→Köln→Leverkusen polyline.

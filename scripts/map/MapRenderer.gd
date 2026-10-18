@@ -14540,6 +14540,7 @@ func set_map_mode(mode: String = "political") -> void:
 	# Pass 22: restore remembered primary intensity for linked modes.
 	if m in INTENSITY_LINKED_MODES and primary_mapmode_intensity.has(m):
 		secondary_tint_intensity[m] = clampf(float(primary_mapmode_intensity[m]), 0.25, 2.0)
+	_sync_road_quiet_mode()
 	if not _map_mode_apply_scheduled:
 		_map_mode_apply_scheduled = true
 		call_deferred("_apply_map_mode_visuals")
@@ -22716,7 +22717,7 @@ func _setup_rx1_rhine_layer() -> void:
 	if existing != null and is_instance_valid(existing):
 		_rx1_rhine_layer = existing
 		existing.z_as_relative = false
-		existing.z_index = 22
+		existing.z_index = 9
 		if existing.has_method("refresh"):
 			existing.call("refresh")
 		return
@@ -22726,12 +22727,12 @@ func _setup_rx1_rhine_layer() -> void:
 	var layer: Node = LayerScript.new() if LayerScript is GDScript else null
 	if layer == null:
 		return
-	# z=22: above nation labels 18, below DemoUnitIcon 28. Layer also sets this in _ready.
-	add_overlay_layer("Rx1RhineLayer", layer as Node2D, 22)
+	# z=9: below road casings (10) and BorderLayer 15. Layer also sets this in _ready.
+	add_overlay_layer("Rx1RhineLayer", layer as Node2D, 9)
 	_rx1_rhine_layer = layer as Node2D
 	if _rx1_rhine_layer != null:
 		_rx1_rhine_layer.z_as_relative = false
-		_rx1_rhine_layer.z_index = 22
+		_rx1_rhine_layer.z_index = 9
 	Rx1RhineCrossing.ensure_loaded()
 
 
@@ -26096,7 +26097,15 @@ func _toggle_supply_overlay() -> void:
 		if not supply_mode:
 			supply_overlay_panel.hide_panel()
 	_sync_supply_route_canvas_stack()
+	_sync_road_quiet_mode()
 	_supply_toggle_in_progress = false
+
+
+func _sync_road_quiet_mode() -> void:
+	# ROADS-1: one call. Logistics bucket while L is on, including political.
+	var ol_roads := get_overlay_layer("InfrastructureOverlayLayer")
+	if ol_roads != null and ol_roads.has_method("apply_road_map_mode"):
+		ol_roads.call("apply_road_map_mode", current_map_mode, supply_mode)
 
 
 func _refresh_supply_routes() -> void:
