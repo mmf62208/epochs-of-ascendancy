@@ -374,9 +374,14 @@ func execute_province_assault(
 			coh = GameData.get_pillar(tag, "cohesion")  # proxy for public will
 		var culture_match: float = 1.0
 		# Simple flavor: if primary culture matches settlement vibe (high settled_areas for "our people")
-		var ps: Dictionary = GameData.get_peace_state() if GameData.has_method("get_peace_state") else {}
-		if ps.has("settled_areas") and ps["settled_areas"].size() > 0:
-			culture_match = 1.1  # slight extra for cultural cohesion
+		if typeof(GameData) != TYPE_NIL:
+			var ps: Dictionary = {}
+			if GameData.has_method("peek_peace_state"):
+				ps = GameData.peek_peace_state()
+			elif GameData.has_method("get_peace_state"):
+				ps = GameData.get_peace_state()
+			if ps.has("settled_areas") and ps["settled_areas"].size() > 0:
+				culture_match = 1.1  # slight extra for cultural cohesion
 		var conditional: float = 1.0 + (max(0, coh - 50) * 0.001) * culture_match  # cohesion/culture amplifier
 		settlement_def_bonus = clampf(1.0 + (base_bonus * conditional), 1.0, 1.25)  # max 25% flavorful uplift
 		if "defense_power" in preview:

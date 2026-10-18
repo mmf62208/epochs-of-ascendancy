@@ -42,6 +42,12 @@ var _is_initialized: bool = false
 var _centroids: Dictionary[int, Vector2] = {}   # id -> Vector2 (world/map space)
 var _province_bounds: Dictionary[int, Rect2] = {}  # id -> AABB in map space
 var _world_bounds: Rect2 = Rect2()        # rough axis-aligned bounds of all provinces
+## PERF-4: owner/controller lists. Same membership as a full walk; rebuilt on owner flips.
+var _owner_index: Dictionary = {}
+var _controller_index: Dictionary = {}
+var _owner_index_dirty: bool = true
+var _regional_bonus_cache: Dictionary = {}
+var owner_index_build_count: int = 0
 
 # Optional high-performance picker (created on demand or by MapRenderer)
 var pick_grid: MapPickGrid = null
@@ -403,26 +409,58 @@ func force_initialize(provinces: Dictionary, geometry: Dictionary, adjacency: Ad
 func get_provinces_by_owner(owner_tag: String) -> Array[int]:
 	if owner_tag.is_empty():
 		return []
-	var result: Array[int] = []
 	var tag := owner_tag.strip_edges().to_upper()
-	for pid in _provinces.keys():
-		var p: Province = _provinces[pid]
-		if p != null and p.owner_tag.strip_edges().to_upper() == tag:
-			result.append(int(pid))
+	_ensure_owner_index()
+	var cached: Variant = _owner_index.get(tag, [])
+	var result: Array[int] = []
+	if cached is Array:
+		for pid_v in cached:
+			result.append(int(pid_v))
 	return result
 
 func get_provinces_by_controller(controller_tag: String) -> Array[int]:
 	if controller_tag.is_empty():
 		return []
-	var result: Array[int] = []
 	var tag := controller_tag.strip_edges().to_upper()
-	for pid in _provinces.keys():
-		var p: Province = _provinces[pid]
-		if p != null:
-			var ctrl := p.controller_tag.strip_edges().to_upper()
-			if ctrl == tag or (ctrl.is_empty() and p.owner_tag.strip_edges().to_upper() == tag):
-				result.append(int(pid))
+	_ensure_owner_index()
+	var cached: Variant = _controller_index.get(tag, [])
+	var result: Array[int] = []
+	if cached is Array:
+		for pid_v in cached:
+			result.append(int(pid_v))
 	return result
+
+
+func _invalidate_owner_index() -> void:
+	_owner_index_dirty = true
+	_regional_bonus_cache.clear()
+
+
+func _ensure_owner_index() -> void:
+	if not _owner_index_dirty:
+		return
+	owner_index_build_count += 1
+	_owner_index.clear()
+	_controller_index.clear()
+	for pid_v in _provinces.keys():
+		var p: Province = _provinces[pid_v]
+		if p == null:
+			continue
+		var pid := int(pid_v)
+		var owner := str(p.owner_tag).strip_edges().to_upper()
+		if not owner.is_empty():
+			if not _owner_index.has(owner):
+				_owner_index[owner] = []
+			(_owner_index[owner] as Array).append(pid)
+		var ctrl := str(p.controller_tag).strip_edges().to_upper()
+		if ctrl.is_empty():
+			ctrl = owner
+		if not ctrl.is_empty():
+			if not _controller_index.has(ctrl):
+				_controller_index[ctrl] = []
+			(_controller_index[ctrl] as Array).append(pid)
+	_owner_index_dirty = false
+
 
 ## Convenience query for AgentManager / events / conditional triggers (e.g. Paris-specific events require owner of pid 4).
 ## Returns the owner_tag for a province id, or "" if invalid.
@@ -847,56 +885,42 @@ func set_strategic_regions(regions: Dictionary) -> void:
 
 ## Returns list of region_ids that the given tag FULLY owns (all provinces in the region have owner_tag == tag).
 ## "Full control" is a powerful, desirable state — used for special regional rewards/bonuses.
+func _owned_or_controlled_pid_set(tag: String) -> Dictionary:
+	_ensure_owner_index()
+	var owned: Dictionary = {}
+	var raw_own: Variant = _owner_index.get(tag, [])
+	if raw_own is Array:
+		for pid_v in raw_own:
+			owned[int(pid_v)] = true
+	var raw_ctrl: Variant = _controller_index.get(tag, [])
+	if raw_ctrl is Array:
+		for pid_v2 in raw_ctrl:
+			owned[int(pid_v2)] = true
+	return owned
+
+
 func get_fully_controlled_strategic_regions(tag: String) -> Array[int]:
 	if tag.is_empty():
 		return []
+	var t := tag.strip_edges().to_upper()
+	var owned: Dictionary = _owned_or_controlled_pid_set(t)
 	var loader := get_node_or_null("/root/ScenarioLoader") as ScenarioLoader
-	if loader != null and loader.strategic_regions.size() > 0 and loader.provinces.size() > 0:
-		# Always direct from loader for scenario fidelity (post-remap + owner align from improved connections). This makes full control counts reliable.
-		var t := tag.strip_edges().to_upper()
-		var controlled: Array[int] = []
-		for rid in loader.strategic_regions.keys():
-			var r = loader.strategic_regions[rid]
-			var pids = r.get("province_ids", [])
-			if pids.is_empty(): continue
-			var fully := true
-			for pv in pids:
-				var ppid = int(pv)
-				if loader.provinces.has(ppid):
-					var pp: Province = loader.provinces[ppid]
-					var ot = str(pp.owner_tag).strip_edges().to_upper()
-					var ct = str(pp.controller_tag).strip_edges().to_upper()
-					if ot != t and ct != t:
-						fully = false
-						break
-				else:
-					fully = false
-					break
-			if fully:
-				controlled.append(int(rid))
-		return controlled
-	# Fallback to internal if loader not ready yet
 	var strategic_src: Dictionary = _strategic_regions
-	var prov_src: Dictionary = _provinces
-	if strategic_src.is_empty() or prov_src.is_empty():
+	if loader != null and loader.strategic_regions.size() > 0:
+		strategic_src = loader.strategic_regions
+	if strategic_src.is_empty():
 		return []
 	var controlled: Array[int] = []
 	for rid in strategic_src.keys():
-		var r: Dictionary = strategic_src[rid]
-		var pids: Array = r.get("province_ids", [])
+		var r: Variant = strategic_src[rid]
+		var pids: Array = []
+		if r is Dictionary:
+			pids = (r as Dictionary).get("province_ids", []) as Array
 		if pids.is_empty():
 			continue
 		var fully := true
 		for pidv in pids:
-			var pid := int(pidv)
-			var p: Province = prov_src.get(pid)
-			if p == null:
-				fully = false
-				break
-			var ot := p.owner_tag.strip_edges().to_upper()
-			var ct := p.controller_tag.strip_edges().to_upper()
-			var t := tag.strip_edges().to_upper()
-			if ot != t and ct != t:
+			if not owned.has(int(pidv)):
 				fully = false
 				break
 		if fully:
@@ -942,30 +966,14 @@ func get_strategic_region_control_summary(tag: String = "") -> Dictionary:
 ## Systems (Supply, Trade, Combat, NationalSpirit, Production) can query this and apply the relevant keys.
 ## This is the core "reward for full control" hook — makes capturing and holding whole regions *meaningful and desirable*.
 func get_active_regional_control_bonuses(tag: String) -> Dictionary:
+	var t_cache := tag.strip_edges().to_upper()
+	if not _owner_index_dirty and _regional_bonus_cache.has(t_cache):
+		var hit: Variant = _regional_bonus_cache[t_cache]
+		if hit is Dictionary:
+			return (hit as Dictionary).duplicate(true)
 	var controlled := get_fully_controlled_strategic_regions(tag)
-	var loader := get_node_or_null("/root/ScenarioLoader") as ScenarioLoader
-	if loader != null and loader.strategic_regions.size() > 0 and loader.provinces.size() > 0:
-		# Always prefer direct compute from loader for scenario connection (post-remap/owner align + timing safe)
-		controlled = []
-		var t := tag.strip_edges().to_upper()
-		for rid in loader.strategic_regions.keys():
-			var r = loader.strategic_regions[rid]
-			var pids = r.get("province_ids", [])
-			if pids.is_empty(): continue
-			var fully := true
-			for pv in pids:
-				var ppid = int(pv)
-				if loader.provinces.has(ppid):
-					var pp: Province = loader.provinces[ppid]
-					var ot = str(pp.owner_tag).strip_edges().to_upper()
-					var ct = str(pp.controller_tag).strip_edges().to_upper()
-					if ot != t and ct != t:
-						fully=false; break
-				else:
-					fully=false; break
-			if fully:
-				controlled.append(int(rid))
 	if controlled.is_empty():
+		_regional_bonus_cache[t_cache] = {}
 		return {}
 	var merged: Dictionary = {}
 	for rid in controlled:
@@ -1001,7 +1009,8 @@ func get_active_regional_control_bonuses(tag: String) -> Dictionary:
 						merged[k] = v  # replace complex
 				else:
 					merged[k] = v
-	return merged
+	_regional_bonus_cache[t_cache] = merged
+	return merged.duplicate(true)
 
 ## Delegates to AdjacencySystem (preferred source of truth)
 func get_adjacent_provinces(province_id: int, only_land: bool = true) -> Array[int]:
@@ -1550,6 +1559,9 @@ func update_province_owner(
 		p.controller_tag = new_controller
 		changed = true
 	if changed:
+		_invalidate_owner_index()
+		if typeof(SupplyManager) != TYPE_NIL and SupplyManager.has_method("notify_province_control_changed"):
+			SupplyManager.notify_province_control_changed(province_id)
 		if not skip_emit:
 			province_data_changed.emit(province_id, "owner")
 
@@ -1565,6 +1577,8 @@ func update_province_development(province_id: int, new_dev: int) -> bool:
 		return false
 	if p.development_level != new_dev:
 		p.development_level = max(0, new_dev)
+		if typeof(SupplyManager) != TYPE_NIL and SupplyManager.has_method("notify_hub_stats_changed"):
+			SupplyManager.notify_hub_stats_changed(province_id)
 		province_data_changed.emit(province_id, "development")
 		return true
 	return false
@@ -1575,6 +1589,8 @@ func update_province_infrastructure(province_id: int, new_infra: int) -> bool:
 		return false
 	if p.infrastructure != new_infra:
 		p.infrastructure = max(0, new_infra)
+		if typeof(SupplyManager) != TYPE_NIL and SupplyManager.has_method("notify_hub_stats_changed"):
+			SupplyManager.notify_hub_stats_changed(province_id)
 		province_data_changed.emit(province_id, "infrastructure")
 		return true
 	return false
@@ -1595,6 +1611,13 @@ func update_province_settlement(province_id: int, new_level: float) -> bool:
 
 ## Legacy compatibility helper
 func notify_province_changed(province_id: int, what: String) -> void:
+	if what in ["owner", "controller", "all"]:
+		_invalidate_owner_index()
+		if typeof(SupplyManager) != TYPE_NIL and SupplyManager.has_method("notify_province_control_changed"):
+			SupplyManager.notify_province_control_changed(province_id)
+	if what in ["infrastructure", "development"]:
+		if typeof(SupplyManager) != TYPE_NIL and SupplyManager.has_method("notify_hub_stats_changed"):
+			SupplyManager.notify_hub_stats_changed(province_id)
 	if _provinces.has(province_id):
 		province_data_changed.emit(province_id, what)
 
@@ -1717,6 +1740,9 @@ func _on_game_day_advanced(_year: int, _month: int, _day: int) -> void:
 func _should_run_heavy_daily_theater() -> bool:
 	# Compact Maginot playtest clock uses the same light daily path as graphical F5.
 	if typeof(TimeManager) != TYPE_NIL and bool(TimeManager.get("_living_playtest_clock")):
+		return false
+	# Headless live-F5-equiv must match Play 1x (heavy duals stay off; DisplayServer is headless).
+	if typeof(TimeManager) != TYPE_NIL and bool(TimeManager.get("_live_f5_equiv_clock")):
 		return false
 	# UI smoke must stay light even under headless (otherwise 1x freezes the smoke harness).
 	if OS.get_environment("EOA_UI_SMOKE").strip_edges() == "1":
@@ -2014,6 +2040,7 @@ func _clear_internal_caches() -> void:
 	_strategic_regions.clear()
 	_province_terrain.clear()
 	_live_fronts_precompute.clear()
+	_invalidate_owner_index()
 	if pick_grid != null:
 		pick_grid.clear()
 	_is_initialized = false
