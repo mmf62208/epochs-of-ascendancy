@@ -41,6 +41,7 @@ var _support_row: HBoxContainer
 var _support2_row: HBoxContainer
 var _inf_bn_row: HBoxContainer
 var _tank_bn_row: HBoxContainer
+var _physics_btn: Button
 
 const DOMAIN_SYMBOLS := {
 	"land": ["infantry", "light_tank", "medium_tank", "heavy_tank", "artillery"],
@@ -73,12 +74,44 @@ const DOMAIN_DOCTRINES := {
 
 func _ready() -> void:
 	title = "Unit Designer"
-	size = Vector2i(560, 880)
 	transient = true
 	exclusive = true
+	wrap_controls = false
+	min_size = Vector2i(560, 720)
+	size = Vector2i(560, 720)
 	close_requested.connect(queue_free)
 	_build_ui()
+	_clamp_to_viewport()
 	_refresh_for_domain()
+
+
+## Keep the window inside a 1280×800 Play viewport (title/chrome allowance 48 px).
+## Use the root/DisplayServer size, not this Window's own 1×1 sub-viewport.
+func _clamp_to_viewport() -> void:
+	var vh := 800
+	var vw := 1280
+	var ds := DisplayServer.window_get_size()
+	if ds.x >= 200 and ds.y >= 200:
+		vw = ds.x
+		vh = ds.y
+	else:
+		var t := get_tree()
+		if t != null and t.root != null:
+			var r := t.root.get_visible_rect()
+			if r.size.x >= 200.0 and r.size.y >= 200.0:
+				vw = int(r.size.x)
+				vh = int(r.size.y)
+	var max_h: int = maxi(vh - 48, 480)
+	var want := Vector2i(mini(560, maxi(vw - 40, 360)), mini(720, max_h))
+	min_size = want
+	size = want
+
+
+func _autoload(n: String) -> Node:
+	var t := get_tree()
+	if t == null or t.root == null:
+		return null
+	return t.root.get_node_or_null("/root/" + n)
 
 
 func set_player_tag(tag: String) -> void:
@@ -102,19 +135,27 @@ func set_domain(domain: String) -> void:
 func _build_ui() -> void:
 	var root := VBoxContainer.new()
 	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	root.add_theme_constant_override("separation", 8)
+	root.add_theme_constant_override("separation", 0)
 	add_child(root)
+
+	var outer := ScrollContainer.new()
+	outer.name = "DesignerScroll"
+	outer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	outer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	outer.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	root.add_child(outer)
 
 	var pad := MarginContainer.new()
 	pad.add_theme_constant_override("margin_left", 12)
 	pad.add_theme_constant_override("margin_right", 12)
 	pad.add_theme_constant_override("margin_top", 12)
 	pad.add_theme_constant_override("margin_bottom", 12)
-	pad.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	root.add_child(pad)
+	pad.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	outer.add_child(pad)
 
 	var col := VBoxContainer.new()
 	col.add_theme_constant_override("separation", 8)
+	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	pad.add_child(col)
 
 	var hdr := Label.new()
@@ -130,6 +171,12 @@ func _build_ui() -> void:
 	_domain_option.select(0)
 	_domain_option.item_selected.connect(_on_domain_selected)
 	row_dom.add_child(_domain_option)
+	_physics_btn = Button.new()
+	_physics_btn.name = "PhysicsReadoutP1Btn"
+	_physics_btn.text = "Physics readout (P1)"
+	_physics_btn.visible = false
+	_physics_btn.pressed.connect(_on_physics_readout_pressed)
+	row_dom.add_child(_physics_btn)
 	col.add_child(row_dom)
 
 	var row_base := HBoxContainer.new()
@@ -319,7 +366,7 @@ func _build_ui() -> void:
 
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	scroll.custom_minimum_size = Vector2(0, 220)
+	scroll.custom_minimum_size = Vector2(0, 80)
 	col.add_child(scroll)
 	_modules_container = VBoxContainer.new()
 	_modules_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -332,10 +379,12 @@ func _build_ui() -> void:
 	var btns := HBoxContainer.new()
 	btns.alignment = BoxContainer.ALIGNMENT_END
 	var cancel := Button.new()
+	cancel.name = "CancelBtn"
 	cancel.text = "Cancel"
 	cancel.pressed.connect(queue_free)
 	btns.add_child(cancel)
 	var finalize_btn := Button.new()
+	finalize_btn.name = "FieldOnMapBtn"
 	finalize_btn.text = "Field on map"
 	finalize_btn.pressed.connect(_on_finalize)
 	btns.add_child(finalize_btn)
@@ -409,8 +458,9 @@ func _apply_stored_template() -> void:
 	if did.is_empty():
 		return
 	var blob: Dictionary = {}
-	if typeof(DesignManager) != TYPE_NIL:
-		blob = DesignManager.composition_from_design(_current_tag, did)
+	var dm: Node = _autoload("DesignManager")
+	if dm != null and dm.has_method("composition_from_design"):
+		blob = dm.call("composition_from_design", _current_tag, did) as Dictionary
 	if blob.is_empty():
 		return
 	var vis := str(blob.get("visual_archetype", "")).strip_edges()
@@ -439,10 +489,11 @@ func _refresh_organize_options() -> void:
 	if _template_option:
 		_template_option.clear()
 		var ids: Array = []
-		if typeof(DesignManager) != TYPE_NIL and DesignManager.has_method("get_active_designs"):
-			ids = DesignManager.get_active_designs(_current_tag, _domain)
-		if ids.is_empty() and typeof(DesignManager) != TYPE_NIL and DesignManager.has_method("get_custom_design_ids"):
-			ids = DesignManager.get_custom_design_ids(_current_tag, _domain)
+		var dm: Node = _autoload("DesignManager")
+		if dm != null and dm.has_method("get_active_designs"):
+			ids = dm.call("get_active_designs", _current_tag, _domain)
+		if ids.is_empty() and dm != null and dm.has_method("get_custom_design_ids"):
+			ids = dm.call("get_custom_design_ids", _current_tag, _domain)
 		if ids.is_empty():
 			match _domain:
 				"naval":
@@ -466,15 +517,17 @@ func _refresh_organize_options() -> void:
 	if _deploy_option:
 		_deploy_option.clear()
 		var cores: Array = []
-		if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("list_core_deploy_pids"):
-			cores = LeaderManager.list_core_deploy_pids(_current_tag)
+		var lm: Node = _autoload("LeaderManager")
+		if lm != null and lm.has_method("list_core_deploy_pids"):
+			cores = lm.call("list_core_deploy_pids", _current_tag)
 		if cores.is_empty() and _current_tag.to_upper() == "GER":
 			cores = [710173, 710300]
+		var mm: Node = _autoload("MapManager")
 		for pid_v in cores:
 			var pid := int(pid_v)
 			var label := str(pid)
-			if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province"):
-				var p = MapManager.get_province(pid)
+			if mm != null and mm.has_method("get_province"):
+				var p = mm.call("get_province", pid)
 				if p != null:
 					var nm := str(p.name) if "name" in p else ""
 					if not nm.is_empty():
@@ -619,6 +672,10 @@ func _refresh_for_domain() -> void:
 		_inf_bn_row.visible = _domain == "land"
 	if _tank_bn_row:
 		_tank_bn_row.visible = _domain == "land"
+	if _physics_btn:
+		_physics_btn.visible = DesignCalculator.p1_readout_visible(
+			_domain, OS.get_environment("EOA_AIR_PHYSICS_P1")
+		)
 	_refresh_organize_options()
 	_update_stats()
 
@@ -630,6 +687,22 @@ func _make_module_toggler(mid: String) -> Callable:
 		else:
 			_selected_modules.erase(mid)
 		_update_stats()
+
+
+func _on_physics_readout_pressed() -> void:
+	var scr: GDScript = load("res://scripts/ui/AirPhysicsReadoutPanel.gd") as GDScript
+	if scr == null:
+		return
+	var panel: Window = scr.new() as Window
+	if panel == null:
+		return
+	panel.min_size = Vector2i(600, 480)
+	panel.size = Vector2i(600, 480)
+	get_tree().root.add_child(panel)
+	if panel.has_method("_clamp_to_viewport"):
+		panel.call("_clamp_to_viewport")
+	if panel.has_method("popup_centered"):
+		panel.popup_centered()
 
 
 func _update_stats() -> void:
@@ -661,7 +734,10 @@ func _update_stats() -> void:
 	var sup := _support_id()
 	var inf_n := _infantry_bns()
 	var tank_n := _tank_bns()
-	var comp: Dictionary = LandCombatPower.composition_stats(mob, arm, "infantry", sup, inf_n, tank_n)
+	var comp: Dictionary = {}
+	var lcp: GDScript = load("res://scripts/combat/LandCombatPower.gd") as GDScript
+	if lcp != null and lcp.has_method("composition_stats"):
+		comp = lcp.call("composition_stats", mob, arm, "infantry", sup, inf_n, tank_n) as Dictionary
 	text += "Speed %.1f (slowest) · Armor %.0f%% · Width %.0f · Fuel use %.2f\n" % [
 		float(comp.get("speed", 1.0)),
 		float(comp.get("armor", 0.0)) * 100.0,
@@ -676,7 +752,9 @@ func _update_stats() -> void:
 		inf_n,
 		tank_n,
 	]
-	var toe: Dictionary = LandCombatPower.equipment_toe(comp)
+	var toe: Dictionary = {}
+	if lcp != null and lcp.has_method("equipment_toe"):
+		toe = lcp.call("equipment_toe", comp) as Dictionary
 	if not toe.is_empty():
 		var bits: PackedStringArray = PackedStringArray()
 		var keys: Array = toe.keys()
@@ -731,21 +809,24 @@ func _on_finalize() -> void:
 	}
 
 	var reg_ok := existing
-	if not existing and typeof(DesignManager) != TYPE_NIL and DesignManager.has_method("register_custom_design"):
-		var res: Dictionary = DesignManager.register_custom_design(_current_tag, design_data)
+	var dm: Node = _autoload("DesignManager")
+	if not existing and dm != null and dm.has_method("register_custom_design"):
+		var res: Dictionary = dm.call("register_custom_design", _current_tag, design_data) as Dictionary
 		reg_ok = bool(res.get("ok", false))
 		if reg_ok:
 			design_id = str(res.get("design_id", design_id))
 
-	if typeof(GameData) != TYPE_NIL and GameData.has_method("apply_designer_duties_live"):
-		GameData.apply_designer_duties_live("register", 1, _domain, _current_tag, design_id)
+	var gd: Node = _autoload("GameData")
+	if gd != null and gd.has_method("apply_designer_duties_live"):
+		gd.call("apply_designer_duties_live", "register", 1, _domain, _current_tag, design_id)
 
 	var deploy_pid := 710173 if _current_tag.to_upper() == "GER" else -1
 	if _deploy_option and _deploy_option.item_count > 0:
 		deploy_pid = int(_deploy_option.get_item_metadata(_deploy_option.selected))
-	if deploy_pid <= 0 and typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_provinces_by_owner"):
-		for pv in MapManager.get_provinces_by_owner(_current_tag):
-			var pp = MapManager.get_province(int(pv)) if MapManager.has_method("get_province") else null
+	var mm: Node = _autoload("MapManager")
+	if deploy_pid <= 0 and mm != null and mm.has_method("get_provinces_by_owner"):
+		for pv in mm.call("get_provinces_by_owner", _current_tag):
+			var pp = mm.call("get_province", int(pv)) if mm.has_method("get_province") else null
 			if pp != null and not bool(pp.is_sea):
 				deploy_pid = int(pp.id)
 				break
@@ -779,22 +860,25 @@ func _on_finalize() -> void:
 
 	var fielded_fid := ""
 	var orged: Dictionary = {}
-	if typeof(DesignManager) != TYPE_NIL and DesignManager.has_method("enqueue_organize_on_map"):
-		orged = DesignManager.enqueue_organize_on_map(plan)
-	elif typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("enqueue_organize"):
-		orged = LeaderManager.enqueue_organize(plan)
-	elif reg_ok and typeof(DesignManager) != TYPE_NIL and DesignManager.has_method("field_design_on_map") and deploy_pid > 0:
-		orged = DesignManager.field_design_on_map(
+	var lm: Node = _autoload("LeaderManager")
+	if dm != null and dm.has_method("enqueue_organize_on_map"):
+		orged = dm.call("enqueue_organize_on_map", plan) as Dictionary
+	elif lm != null and lm.has_method("enqueue_organize"):
+		orged = lm.call("enqueue_organize", plan) as Dictionary
+	elif reg_ok and dm != null and dm.has_method("field_design_on_map") and deploy_pid > 0:
+		orged = dm.call(
+			"field_design_on_map",
 			_current_tag, design_id, deploy_pid, _domain,
 			{"strength": 0.50, "organization": 0.40, "visual_archetype": _symbol_id, "force_new": true},
-		)
+		) as Dictionary
 	if bool(orged.get("ok", false)):
 		var jobs: Array = orged.get("jobs", []) as Array
 		if not jobs.is_empty() and jobs[0] is Dictionary:
 			fielded_fid = str((jobs[0] as Dictionary).get("formation_id", orged.get("formation_id", "")))
 		else:
 			fielded_fid = str(orged.get("formation_id", ""))
-	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
+	var evui: Node = _autoload("LeaderEventUI")
+	if evui != null and evui.has_method("show_toast"):
 		var suffix := " - registered" if reg_ok else " - saved locally"
 		if not fielded_fid.is_empty():
 			suffix += " · organizing %d · %d days · click chip when trained" % [
@@ -802,7 +886,8 @@ func _on_finalize() -> void:
 			]
 		elif str(orged.get("error", "")) == "not_core":
 			suffix += " · deploy must be a core province"
-		LeaderEventUI.show_toast(
+		evui.call(
+			"show_toast",
 			"Design finalized: %s (%s, %d modules)%s" % [design_id, _domain, _selected_modules.size(), suffix],
 			5.0,
 			true,
