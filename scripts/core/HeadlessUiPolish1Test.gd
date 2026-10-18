@@ -23,6 +23,8 @@ var _leftover: Node = null
 var _agent_screen: Control = null
 var _space_view: Window = null
 var _trade_views: Array[Node] = []
+var _probe_fired: int = 0
+var _map_probe: Node = null
 
 
 func _init() -> void:
@@ -83,6 +85,9 @@ func _run() -> void:
 	await _flush()
 	await _test_agents_close_inside_viewport()
 	await _test_space_title_close_first_click()
+	await _test_space_frame_x_then_unrelated_button()
+	await _test_space_keyboard_close_then_click()
+	await _test_space_close_then_map_select()
 	await _test_trade_open_twice_no_already_connected()
 	_cleanup()
 
@@ -99,6 +104,12 @@ func _test_source_needles() -> void:
 		return
 	if "ACTION_MODE_BUTTON_PRESS" not in space_src or "TitleCloseButton" not in space_src:
 		_fail("Space × must ACTION_MODE_BUTTON_PRESS TitleCloseButton")
+		return
+	if "is_mouse_button_pressed(MOUSE_BUTTON_LEFT)" not in space_src:
+		_fail("Space swallow must arm only while LMB is down")
+		return
+	if "250" not in space_src:
+		_fail("Space swallow must expire after ~250 ms")
 		return
 	var idx := 0
 	var guarded := 0
@@ -152,6 +163,10 @@ func _test_agents_close_inside_viewport() -> void:
 		_fail("Agents screen rect %s not inside 1280x800 viewport" % str(panel_r))
 		return
 	_pass("Agents Close inside 1280x800 at %s (panel %s)" % [str(r), str(panel_r)])
+	if _agent_screen != null and is_instance_valid(_agent_screen):
+		_agent_screen.hide()
+		_agent_screen.queue_free()
+		_agent_screen = null
 
 
 func _title_close_button(win: Window) -> Button:
@@ -202,6 +217,169 @@ func _test_space_title_close_first_click() -> void:
 		_fail("Space × did not close on the first click (leftover release swallowed)")
 		return
 	_pass("Space × closed on first click via parse_input_event (leftover swallow)")
+
+
+func _close_button(win: Window) -> Button:
+	if win == null:
+		return null
+	var n: Node = win.find_child("CloseButton", true, false)
+	if n is Button:
+		return n as Button
+	return null
+
+
+func _free_space_view() -> void:
+	if _space_view != null and is_instance_valid(_space_view):
+		_space_view.hide()
+		_space_view.queue_free()
+	_space_view = null
+	var leftover_sw: Node = root.get_node_or_null("SpaceTitleCloseReleaseSwallow")
+	if leftover_sw != null:
+		leftover_sw.queue_free()
+
+
+func _open_space_board() -> bool:
+	_free_space_view()
+	var script: Resource = load("res://scripts/ui/SpaceLayerBoardView.gd")
+	if script == null:
+		_fail("SpaceLayerBoardView.gd missing")
+		return false
+	var view: Object = script.new()
+	if view == null or not (view is Window):
+		_fail("SpaceLayerBoardView instantiate failed")
+		return false
+	_space_view = view as Window
+	_space_view.name = "SpaceLayerBoardView"
+	root.add_child(_space_view)
+	if _space_view.has_method("show_board"):
+		_space_view.call("show_board", "GER")
+	else:
+		_space_view.popup_centered()
+	return true
+
+
+func _ensure_mouse_up() -> void:
+	if _leftover != null and _leftover.has_method("disarm"):
+		_leftover.call("disarm")
+	var up: InputEventMouseButton = _make_mouse(Vector2(8.0, 8.0), false)
+	Input.parse_input_event(up)
+	if Input.has_method("flush_buffered_events"):
+		Input.flush_buffered_events()
+
+
+func _make_probe_button() -> Button:
+	var btn := Button.new()
+	btn.name = "UiPolish1ProbeButton"
+	btn.text = "Probe"
+	btn.focus_mode = Control.FOCUS_NONE
+	btn.mouse_filter = Control.MOUSE_FILTER_STOP
+	btn.action_mode = BaseButton.ACTION_MODE_BUTTON_RELEASE
+	btn.position = Vector2(24.0, 720.0)
+	btn.custom_minimum_size = Vector2(96.0, 32.0)
+	btn.size = Vector2(96.0, 32.0)
+	_probe_fired = 0
+	if not btn.pressed.is_connected(_on_probe_pressed):
+		btn.pressed.connect(_on_probe_pressed)
+	_ui.add_child(btn)
+	return btn
+
+
+func _on_probe_pressed() -> void:
+	_probe_fired += 1
+
+
+func _click_control_main(ctrl: Control) -> bool:
+	if ctrl == null or not is_instance_valid(ctrl):
+		return false
+	var r: Rect2 = ctrl.get_global_rect()
+	if r.size.x < 4.0 or r.size.y < 4.0:
+		return false
+	_click_at_window(r.get_center(), false, 0)
+	return true
+
+
+func _test_space_frame_x_then_unrelated_button() -> void:
+	## Native/embedded frame × emits close_requested after the mouse is already up.
+	if not _open_space_board():
+		return
+	await _flush()
+	_ensure_mouse_up()
+	if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+		_fail("LMB still down before frame × close_requested")
+		return
+	_space_view.close_requested.emit()
+	await _flush()
+	if _space_view != null and is_instance_valid(_space_view) and _space_view.visible:
+		_fail("Space frame × close_requested did not hide the board")
+		return
+	var probe: Button = _make_probe_button()
+	await _flush()
+	if not _click_control_main(probe):
+		_fail("could not click unrelated probe after frame ×")
+		probe.queue_free()
+		return
+	await _flush()
+	if _probe_fired != 1:
+		_fail("unrelated button did not fire after frame × (swallow ate release, fired=%d)" % _probe_fired)
+		probe.queue_free()
+		return
+	probe.queue_free()
+	_pass("Space frame × then unrelated button fired")
+
+
+func _test_space_keyboard_close_then_click() -> void:
+	## Bottom Close from the keyboard: no mouse release at close time.
+	if not _open_space_board():
+		return
+	await _flush()
+	_ensure_mouse_up()
+	var close_btn: Button = _close_button(_space_view)
+	if close_btn == null:
+		_fail("Space CloseButton missing")
+		return
+	close_btn.pressed.emit()
+	await _flush()
+	if _space_view != null and is_instance_valid(_space_view) and _space_view.visible:
+		_fail("Space keyboard Close did not hide the board")
+		return
+	var probe: Button = _make_probe_button()
+	await _flush()
+	if not _click_control_main(probe):
+		_fail("could not click after keyboard Close")
+		probe.queue_free()
+		return
+	await _flush()
+	if _probe_fired != 1:
+		_fail("click after keyboard Close did not fire (swallow ate release, fired=%d)" % _probe_fired)
+		probe.queue_free()
+		return
+	probe.queue_free()
+	_pass("Space keyboard Close then click fired")
+
+
+func _test_space_close_then_map_select() -> void:
+	## After Space is gone, a map press-release must select (not a stuck leftover swallow).
+	if _space_view != null and is_instance_valid(_space_view) and _space_view.visible:
+		_ensure_mouse_up()
+		_space_view.close_requested.emit()
+		await _flush()
+	_ensure_mouse_up()
+	if _map_probe != null and is_instance_valid(_map_probe):
+		_map_probe.queue_free()
+	_map_probe = _MapPickProbe.new()
+	_map_probe.name = "UiPolish1MapPickProbe"
+	root.add_child(_map_probe)
+	await _flush()
+	var map_pt := Vector2(640.0, 400.0)
+	_click_at_window(map_pt, false, 0)
+	await _flush()
+	var selected := false
+	if _map_probe != null and _map_probe.has_method("was_selected"):
+		selected = bool(_map_probe.call("was_selected"))
+	if not selected:
+		_fail("map press-release after Space close did not select")
+		return
+	_pass("map press-release after Space close selected")
 
 
 func _trade_manager() -> Object:
@@ -314,10 +492,41 @@ func _cleanup() -> void:
 	for v in _trade_views:
 		if v != null and is_instance_valid(v):
 			v.queue_free()
+	if _map_probe != null and is_instance_valid(_map_probe):
+		_map_probe.queue_free()
 	if _ui != null and is_instance_valid(_ui):
 		_ui.queue_free()
 	if _leftover != null and is_instance_valid(_leftover):
 		_leftover.queue_free()
+	var leftover_sw: Node = root.get_node_or_null("SpaceTitleCloseReleaseSwallow")
+	if leftover_sw != null:
+		leftover_sw.queue_free()
+
+
+class _MapPickProbe extends Node:
+	## Map pick-on-release (MapRenderer leftover class): an eaten up = missed select.
+	var _down: bool = false
+	var _selected: bool = false
+
+	func _ready() -> void:
+		process_mode = Node.PROCESS_MODE_ALWAYS
+		set_process_unhandled_input(true)
+
+	func was_selected() -> bool:
+		return _selected
+
+	func _unhandled_input(event: InputEvent) -> void:
+		if not (event is InputEventMouseButton):
+			return
+		var mb := event as InputEventMouseButton
+		if mb.button_index != MOUSE_BUTTON_LEFT:
+			return
+		if mb.pressed:
+			_down = true
+			return
+		if _down:
+			_down = false
+			_selected = true
 
 
 class _LeftoverReleaseSwallow extends Node:

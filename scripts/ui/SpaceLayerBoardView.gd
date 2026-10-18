@@ -5,6 +5,7 @@ class_name SpaceLayerBoardView
 extends Window
 
 const PLAYER_FALLBACK := "USA"
+const CLOSE_RELEASE_SWALLOW_MS := 250
 
 var _player_tag: String = PLAYER_FALLBACK
 var _title: Label
@@ -128,8 +129,8 @@ func _build_ui() -> void:
 
 func _on_title_close_pressed() -> void:
 	## Hide on press (not release) so leftover left-up swallow cannot eat the first ×.
-	## Swallow the matching release on the parent viewport so hide-on-press cannot
-	## click-through to the map (INPUT-1 / CLOSE-1 class).
+	## Swallow the matching release only when LMB is still down (never frame × after
+	## release, never keyboard Close). Expire / new-press drop so a later click selects.
 	_arm_close_release_swallow()
 	var vp := get_viewport()
 	if vp != null:
@@ -139,6 +140,10 @@ func _on_title_close_pressed() -> void:
 
 
 func _arm_close_release_swallow() -> void:
+	# Frame × emits close_requested after the release; keyboard Close has no mouse.
+	# Arming then would eat the next unrelated button-up / map select.
+	if not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+		return
 	var host: Node = get_parent()
 	if host == null:
 		host = get_tree().root if get_tree() != null else null
@@ -308,11 +313,26 @@ func show_board(tag: String = "") -> void:
 
 class _SpaceTitleCloseReleaseSwallow extends Node:
 	## One-shot leftover left-up swallow after ×/Close press-to-hide.
+	## New left press clears without consuming. Expires after ~250 ms.
+	const EXPIRE_MS := 250
 	var _armed: bool = true
+	var _armed_msec: int = 0
 
 	func _ready() -> void:
 		process_mode = Node.PROCESS_MODE_ALWAYS
 		set_process_input(true)
+		set_process(true)
+		_armed_msec = Time.get_ticks_msec()
+
+	func _process(_delta: float) -> void:
+		if not _armed:
+			return
+		if Time.get_ticks_msec() - _armed_msec >= EXPIRE_MS:
+			_disarm()
+
+	func _disarm() -> void:
+		_armed = false
+		queue_free()
 
 	func _input(event: InputEvent) -> void:
 		if not _armed:
@@ -323,6 +343,8 @@ class _SpaceTitleCloseReleaseSwallow extends Node:
 		if mb.button_index != MOUSE_BUTTON_LEFT:
 			return
 		if mb.pressed:
+			# Fresh press is a new gesture — drop leftover, do not eat this event.
+			_disarm()
 			return
 		_armed = false
 		var vp := get_viewport()

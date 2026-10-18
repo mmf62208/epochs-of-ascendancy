@@ -30,6 +30,8 @@ tools/run_godot.sh --headless --path . --resolution 1280x800 \
 
 Wired as `launch_ui_polish1` on the full gate script (not `--quick`).
 
+FIX #1: Space close-release swallow arms only while LMB is down (`Input.is_mouse_button_pressed`), drops on a new left press without consuming it, and expires at ~250 ms. Frame × (`close_requested` after release) and keyboard Close must not eat the next button/map click.
+
 ### 1. Core Time System Tests
 
 - Load a scenario and verify the top bar date matches `start_date`.
