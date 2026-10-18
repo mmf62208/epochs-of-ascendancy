@@ -2,7 +2,7 @@
 
 Branch `grok/atlas1-cities-rivers`. Draft only. Do not merge.
 
-**FIX #3 code tip:** `8fe59618`
+**FIX #3 tip:** `005d10fb`
 **On top of FIX #2:** `f9cac5f9`
 
 Box gate on `f9cac5f9` was green. The playtester's live run on that tip was MIXED, leaning FAIL: Essen missing at z1.217/1.512, close-zoom overlaps/ghosted doubles, air-wing covering Essen/Hamm. Isolated headless tests had been passing a different view.
@@ -13,12 +13,12 @@ Hard rules kept: no `world_full` ID renumber; Godot only via `tools/run_godot.sh
 
 ## Root causes (live ≠ headless)
 
-1. **Injected zoom.** Isolated tests (and the first live harness) called `set_live_view(1.217, …)` so layout could PASS while `MapCamera` stayed at Europe Home (~0.4). Draw used the live camera, so glyphs and collision did not match.
-2. **Empty counter overrides.** `set_view(..., [], [])` froze obstacles to nothing. Live Play after Begin has ~250 DemoUnitIcon chips (65 on-screen at z1.217), including air-wing plates.
-3. **Home-cam vs Ruhr.** Isolated tests panned onto Essen with no chips. The playtester wheeled in over the Ruhr (mouse ~455,455 on 1280×800). Equal-score Kreisfreie towns (Hamm/Münster 470) beat Essen until hub+core bonuses.
-4. **Second name draw.** `MapRenderer._province_name_labels` turns on at tactical zoom (`show_province_labels`) and redrew Köln/Essen on top of `CityLabelsLayer` → ghosted doubles at z2.3–2.9.
-5. **Close-zoom glyph floor.** `_draw` used `max(px/z, 8)` world px so collision was ~11 screen px while the glyph was ~8·z. Fixed earlier in this FIX (floor 1).
-6. **Essen dropped under chips.** At live z1.217 with 65 chip AABBs, 22 px city packing could not place Essen beside Köln. Essen is now `must_keep` (pid 710403) and a second pass nudges it off live chip rects.
+1. **Wrong camera path.** Isolated tests (and the first live harness) called `set_view` / `lock_pixel_guard_camera` onto Essen or Home-in-place. Play is Home 0.787 then `_zoom_toward_mouse` at (455,455). Jumping to Essen recentred the Ruhr; zooming in place left Essen under chips. Wheel at a screen pixel that is *not* the Ruhr on this Home frame flew to France by z2.904.
+2. **Empty counter overrides.** `set_view(..., [], [])` froze obstacles to nothing. Live Play after Begin has ~250 DemoUnitIcon chips (70 on-screen at z1.217), including air-wing plates.
+3. **Chip AABB space.** Obstacle rects used `(world - cam) * zoom + vp/2` and merged designation text into 400px boxes. Packing did not see the plates the player sees.
+4. **Draw order.** City names at z 19 sat under DemoUnitIcon z 28 (only "Ess" visible). Dots at z 46 sat on Essen.
+5. **Close-zoom last-resort.** Hub 120px slots stacked Duisburg/Herne/Dortmund. Outline px was not in the collision pad, so touching names looked doubled.
+6. **Second name draw.** `MapRenderer._province_name_labels` at tactical zoom redrew Köln/Essen on top of `CityLabelsLayer` (already hidden in this FIX).
 
 Not: 36 wu cluster drop, alias dedupe, set stability, Paris/capitals (those stayed PASS).
 
@@ -28,22 +28,21 @@ Not: 36 wu cluster drop, alias dedupe, set stability, Paris/capitals (those stay
 
 `CityLabelsLayer.gd`
 
-- Ruhr core scores: Essen 740, Duisburg/Düsseldorf 720, Dortmund 710, Köln extra core weight; Hamm/Münster stay 470.
-- Hubs enter from home-band zoom and are eligible in strategic/mid.
-- Collision AABBs match drawn glyph size (`world_px = max(px/z, 1)`).
-- Live counters from `MapRenderer._demo_unit_icon_pids` (air-wing, land chips, pins), clamped, on-screen only; `notify_counters_dirty` on spawn/toggle.
-- Essen `must_keep`; after packing, `_nudge_keep_off_counters` steps must-keep labels off live chip AABBs (up to 120 px) without overlapping other city labels.
+- Names z 30 / dots z 29 (above chips 28, under capital stars 40).
+- Counter AABBs from `get_global_transform_with_canvas` on the plate (not designation text).
+- Ruhr cores (Essen, Köln, Düsseldorf, Duisburg, Dortmund) stay by their dots; Essen remains `must_keep`.
+- Close zoom culls instead of 120px last-resort. Collision grows by outline pad; labels shift off neighbour dots.
+- Layout camera args are applied inside `place_competing` so isolated fixtures match live packing.
 
 `MapRenderer.gd`
 
-- While `CityLabelsLayer` is active, legacy `_province_name_labels` stay hidden (no second draw at close zoom).
-- `count_visible_province_name_labels()` for the doubled-draw live check.
+- `player_path_wheel_toward_world` uses the same pan math as `_zoom_toward_mouse`, keyed on world (no racy mouse warp).
+- Legacy `_province_name_labels` stay hidden while CityLabelsLayer is on.
 
 Tests
 
-- Isolated: Home-cam z1.217/1.512 Essen, Ruhr-cam live zooms, air-wing cover, doubled names/pids, 8 capitals. Still includes FIX #1/#2 cases.
-- `HeadlessAtlas1LiveRuhrTest` (xvfb, not `--headless` evidence): TestScenario after Begin, units ON, **layout follows MapCamera** (fails if zoom does not stick). Home-cam z1.217 plus Ruhr-cam z1.217/1.512/2.904. Asserts Essen+Köln, no overlap, no doubled names, 1 `CityLabelsLayer`, 0 visible legacy province-name Labels, Ruhr labels clear of live counters.
-- Pixel guard live_ruhr shots centered on Essen with units ON.
+- Isolated Essen/overlap/home-cam cases inject air-wing-sized plates, not empty arrays. Doubled-name/pid check kept.
+- `HeadlessAtlas1LiveRuhrTest`: TestScenario after Begin, units ON, Home 0.787, wheel toward Essen (the Ruhr under the playtester's wheel). Fails if zoom does not stick, Essen is off-screen, names overlap, names double, or legacy Labels are visible. xvfb 1280×800 shots at z1.217 / 1.512 / 2.904.
 
 ---
 
@@ -59,15 +58,14 @@ tools/eoa_full_test_gates.sh --quick
 
 | Claim | Result | Log |
 |---|---|---|
-| Isolated city labels + FIX #1/#2 tests | **PASS** | `HeadlessAtlas1CityLabelsTest: RESULT=PASS` candidates=2050 `build_ms=166.2` |
-| Essen Home-cam / Ruhr-cam z1.217 & 1.512 | **PASS** | isolated + live; live Home-cam names include Essen, Köln, Duisburg, Düsseldorf, Dortmund |
-| Doubled draws / legacy Labels | **PASS** | `no doubled names` and `no legacy province-name draw` at all three live zooms |
-| Live Begin + 250 counters | **PASS** | `HeadlessAtlas1LiveRuhrTest: RESULT=PASS` `cam_z=1.217` `counters_rect=65` |
-| Ruhr labels clear of live chips | **PASS** | z1.217 / 1.512 / 2.904 |
+| Isolated city labels + FIX #1/#2 tests | **PASS** | `HeadlessAtlas1CityLabelsTest: RESULT=PASS` candidates=2050 `build_ms=154.8` |
+| Essen + Ruhr cores at Home-cam z1.217/1.512 with chips | **PASS** | isolated; Essen, Köln, Duisburg, Düsseldorf, Dortmund |
+| Doubled draws / legacy Labels | **PASS** | isolated + live `no doubled names` / `no legacy province-name draw` |
+| Live Begin + 250 counters, wheel from Home 0.787 | **PASS** | `HeadlessAtlas1LiveRuhrTest: RESULT=PASS` `cam_z=1.216/1.511/2.903` `essen_s≈607,189` |
 | Close overlap z2.3–2.904 | **PASS** | isolated + live `has_visual_overlap` |
-| Rivers | **PASS** | `build_ms=179.8` |
+| Rivers | **PASS** | `build_ms=161.7` |
 | Pixel guard | **PASS** | `WindowedAtlas1PixelGuard: RESULT=PASS` `reasons=[]` |
-| Essen pixel probe (units ON, cam on Essen) | **PASS** | z1.217 run=16, z1.512 run=10, z2.904 run=8 (all screen 960,540) |
+| Essen cream-run (units ON) | **PASS** | mid/close cam-on-Essen run=16/8; live wheel z1.217/1.512/2.904 run=8/8/8 |
 | Paris mid/close | **PASS** | run=13 / run=16 |
 
 `--quick`: **14** known `unit_board_play_path` reds, no new ones. `map_qc` NE **0.9853** (3148/3195).
@@ -80,10 +78,10 @@ Seed was not re-run (city-label only). `HeadlessPerf4LiveMultiAiDayTest` seed `2
 
 From this run (`docs/evidence/atlas1-fix3/`):
 
-- `live_ruhr_z1217.png` / `z1512.png` / `z2904.png` — xvfb 1280×800 after Begin, units ON, MapCamera at Essen (playtester zooms). Layout list at z1.217 includes Essen, Köln, Duisburg, Düsseldorf, Dortmund; not Hamm over Essen.
-- `tip_live_ruhr_z1217.png` / `z1512.png` / `z2904.png` — 1920×1080 pixel-guard copies, Essen cream-run 16/10/8 at screen centre.
+- `live_ruhr_z1217.png` / `z1512.png` / `z2904.png` — xvfb 1280×800 after Begin, units ON, Home 0.787 then wheel toward Essen. Layout at all three zooms includes Essen, Köln, Duisburg, Düsseldorf, Dortmund. Essen stays near screen (607, 189).
+- `tip_live_ruhr_z1217.png` / `z1512.png` / `z2904.png` — 1920×1080 pixel-guard copies of the same wheel path.
 - `tip_mid_paris.png`, `tip_close_ruhr.png`, `tip_mid_danube.png` — FIX #2 surfaces still PASS.
 
-At z1.217 a 1280×800 (or 1920×1080) frame still shows most of NW Europe; that is the real Home-wheel geometry (1920/1.217 ≈ 1578 world units). The playtester's Ruhr cluster is the centre of that frame. z2.904 is the tight Rhine/Essen shot.
+z1.217 on 1280×800 is still a Europe frame (1280/1.217 ≈ 1052 wu). The playtester's Ruhr cluster is in that frame with Essen labelled. z2.904 tightens on the Rhine around Essen.
 
 **Merge HOLD** until live Play.

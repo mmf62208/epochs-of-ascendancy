@@ -851,9 +851,9 @@ func _world_to_label_screen(world: Vector2) -> Vector2:
 func _counter_label_screen_rect(icon: Node2D) -> Rect2:
 	if icon == null or not is_instance_valid(icon):
 		return Rect2()
-	var local := _icon_local_aabb(icon)
-	if local.size.x <= 0.5 or local.size.y <= 0.5:
-		local = Rect2(-COUNTER_HALF, COUNTER_HALF * 2.0)
+	# Plate + bars only. Merging designation text made 400px AABBs that
+	# swallowed the whole Ruhr and hid Essen from packing.
+	var local := Rect2(-COUNTER_HALF, COUNTER_HALF * 2.0)
 	var xf := icon.get_global_transform_with_canvas()
 	var corners: Array[Vector2] = [
 		local.position,
