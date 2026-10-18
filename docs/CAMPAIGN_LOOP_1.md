@@ -310,6 +310,13 @@ Bugs that were not:
 
 **HOLD, do not change:** Declare still also issues an attack order through the old war-goal path. `CampaignWarChrome._on_pressed` calls `WarStateDomain.player_declare_from_province` then `GameData.apply_war_goal_live("execute", pid)`, which is `apply_order_panel_action("apply_assault", pid)` plus `_campaign_note_war_goal`. Waiting on a decision.
 
+FIX #1 evidence on tip `c4280e38`:
+
+- `HeadlessCampaignLoop1DeclareClickTest` `RESULT=PASS`: day 15 GER–POL not at war; POL inspector `Declare war on Poland`; FRA inspector `Justify (14 days)` disabled; leftover-swallow Declare click started the war.
+- Existing CL1: WarGate, CapitulationPeace, Soak, EndScreenGuard all `RESULT=PASS`.
+- Seed `multi_ai_decisions` md5 `20fe9063de285f19d4f9b8a105abfd31` default and `EOA_CAMPAIGN_LOOP=0`.
+- `--quick` exit 1 with the same 14 `unit_board_play_path` reds. map_qc NE **0.9853** (3148/3195).
+
 ## Full gates on the rebased tip
 
 Rebased onto `origin/main` `05602912`. Tip `56b31db5`. `tools/eoa_full_test_gates.sh` exited 1. Log `~/campaign1_evidence/cl1c_full_gates_stdout.log`. Wall about 25 minutes. The four campaign steps passed, including the soak and the gamescope end-screen guard. No `SCRIPT ERROR` in those logs.
