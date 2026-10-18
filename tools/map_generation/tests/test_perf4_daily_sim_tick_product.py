@@ -151,8 +151,11 @@ class TestPerf4DailySimTickProduct(unittest.TestCase):
         self.assertIn("_advance_supply_day_light", listen)
         self.assertIn("is_interactive_light_sim", listen)
         adv = extract_gd_func_body(src, "advance_supply_day")
-        self.assertIn("_process_air_missions", adv)
-        self.assertIn("_process_naval_recon", adv)
+        runner = adv
+        if "_run_supply_day_job" in adv:
+            runner = extract_gd_func_body(src, "_run_supply_day_job")
+        self.assertIn("_process_air_missions", runner)
+        self.assertIn("_process_naval_recon", runner)
         self.assertNotIn("is_live_f5_play_path", adv)
         gd = (ROOT / "scripts" / "autoload" / "GameData.gd").read_text(encoding="utf-8")
         mut = extract_gd_func_body(gd, "apply_supply_route_mutation")

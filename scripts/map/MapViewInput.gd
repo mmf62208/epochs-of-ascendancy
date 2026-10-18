@@ -17,6 +17,14 @@ const EDGE_PAN_SCREEN_PX := 6.0
 ## component — missed. Left / top / bottom stay 6px so UI-1 rest (97,731)
 ## still does not pan.
 const EDGE_PAN_RIGHT_SCREEN_PX := 10.0
+## EDGE-2: 250 ms of continuous rim contact before any edge pan starts.
+const EDGE_PAN_RIM_DWELL_SEC := 0.250
+## EDGE-2: after dwell, speed rises 0→full over this many seconds of contact.
+const EDGE_PAN_RAMP_SEC := 0.600
+## EDGE-2: below Home zoom, world speed must not scale by 1/zoom past this floor.
+const EDGE_PAN_HOME_ZOOM := 0.33
+
+static var _left_rim_debug_msec: int = 0
 
 ## Known autoload singletons that appear as direct children of the viewport root.
 ## These are plain Nodes (with scripts like GameData.gd) and MUST NEVER have .visible (or other CanvasItem-only props) accessed.
@@ -44,13 +52,17 @@ static func motion_delta(scaled_delta: float) -> float:
 ## Pure strip math: window client pixels, independent of zoom / stretch / HUD offset.
 ## `top_bar_only`: hovered UI is TopInfoBar (not a toast/panel). Exempt only when
 ## y is inside the north strip so the full-width bar cannot swallow north pan.
+## `left_hud_only`: hovered UI is left chrome (toolbar / legend / InfoPanel /
+## minimap). Exempt only when x is inside the 6px left strip — same shape as
+## the TopInfoBar north exemption. Toasts / unit cards / Leaders still block.
 static func edge_pan_direction_at(
 	mouse_window: Vector2,
 	window_size: Vector2,
 	hovered_blocks: bool,
 	window_focused: bool = true,
 	mouse_inside_window: bool = true,
-	top_bar_only: bool = false
+	top_bar_only: bool = false,
+	left_hud_only: bool = false
 ) -> Vector2:
 	if not window_focused or not mouse_inside_window:
 		return Vector2.ZERO
@@ -63,8 +75,11 @@ static func edge_pan_direction_at(
 	var strip: float = EDGE_PAN_SCREEN_PX
 	var right_strip: float = maxf(strip, EDGE_PAN_RIGHT_SCREEN_PX)
 	var in_north_strip: bool = mouse_window.y <= strip
+	var in_left_strip: bool = mouse_window.x <= strip
 	var blocks: bool = hovered_blocks
 	if blocks and top_bar_only and in_north_strip:
+		blocks = false
+	if blocks and left_hud_only and in_left_strip:
 		blocks = false
 	if blocks:
 		return Vector2.ZERO
@@ -78,6 +93,18 @@ static func edge_pan_direction_at(
 	elif mouse_window.y >= window_size.y - strip:
 		dir.y += 1.0
 	return dir
+
+
+## EDGE-2: 0 until 250 ms of contact, then lerp 0→1 over the next 600 ms.
+static func edge_pan_feel_scale(contact_sec: float) -> float:
+	if contact_sec < EDGE_PAN_RIM_DWELL_SEC:
+		return 0.0
+	return clampf((contact_sec - EDGE_PAN_RIM_DWELL_SEC) / EDGE_PAN_RAMP_SEC, 0.0, 1.0)
+
+
+## EDGE-2: world-speed divisor. At zoom below Home, keep the Home 1/zoom floor.
+static func edge_pan_zoom_divisor(zoom: float) -> float:
+	return maxf(maxf(zoom, 0.0001), EDGE_PAN_HOME_ZOOM)
 
 
 static func window_allows_edge_pan(viewport: Viewport) -> bool:
@@ -136,6 +163,36 @@ static func hovered_is_top_info_bar_only(hovered: Control) -> bool:
 			return false
 		walk = walk.get_parent()
 	return found_bar
+
+
+## True when the hovered control is left map chrome (toolbar / legend /
+## left-docked InfoPanel / minimap) and no toast / unit card / Leaders /
+## pause menu sits in the ancestor walk.
+static func hovered_is_left_hud_only(hovered: Control) -> bool:
+	if hovered == null:
+		return false
+	var walk: Node = hovered
+	var found_hud: bool = false
+	while walk != null:
+		if _node_is_left_hud_chrome(walk):
+			found_hud = true
+		elif _node_is_non_topbar_edge_blocker(walk) and not _node_is_left_hud_chrome(walk):
+			return false
+		walk = walk.get_parent()
+	return found_hud
+
+
+static func _node_is_left_hud_chrome(n: Node) -> bool:
+	if n == null:
+		return false
+	var nn := str(n.name)
+	if nn == "MapModeToolbar" or nn == "MapMinimap" or nn == "Minimap" or nn == "StrategicMinimap":
+		return true
+	if nn == "InfoPanel" or nn == "MapLegendPanel" or nn == "SupplyOverlayLegend":
+		return true
+	if nn == "Legend" or (nn.ends_with("Legend") and "Toast" not in nn):
+		return true
+	return false
 
 
 static func _node_is_non_topbar_edge_blocker(n: Node) -> bool:
@@ -198,6 +255,42 @@ static func north_strip_top_bar_exempt(viewport: Viewport) -> bool:
 	return not non_topbar_overlay_contains_mouse(viewport)
 
 
+## Left HUD in the true left strip (x 0..EDGE_PAN_SCREEN_PX) does not block.
+## Other UI on that strip still blocks. Unfocused window never pans.
+static func left_strip_hud_exempt(viewport: Viewport) -> bool:
+	if viewport == null:
+		return false
+	if not window_allows_edge_pan(viewport):
+		return false
+	var win: Window = viewport.get_window()
+	if win == null:
+		return false
+	var mouse: Vector2 = win.get_mouse_position()
+	if mouse.x < 0.0 or mouse.x > EDGE_PAN_SCREEN_PX:
+		return false
+	if not hovered_is_left_hud_only(viewport.gui_get_hovered_control()):
+		return false
+	return not _left_strip_has_hard_overlay(viewport)
+
+
+static func _left_strip_has_hard_overlay(viewport: Viewport) -> bool:
+	if viewport == null:
+		return false
+	var hovered: Control = viewport.gui_get_hovered_control()
+	if hovered == null:
+		return false
+	if hovered_is_left_hud_only(hovered):
+		return false
+	if hovered.mouse_filter == Control.MOUSE_FILTER_IGNORE:
+		return false
+	if _dead_or_hidden_unit_card_in_ancestry(hovered):
+		return false
+	var hname := str(hovered.name)
+	if hname == "WorldMap" or hname == "MapRenderer" or hname.begins_with("Province"):
+		return false
+	return true
+
+
 ## Screen-pixel edge direction, or ZERO when blocked / not on the true rim.
 static func edge_pan_direction_screen(viewport: Viewport) -> Vector2:
 	if viewport == null:
@@ -208,18 +301,45 @@ static func edge_pan_direction_screen(viewport: Viewport) -> Vector2:
 	var mouse: Vector2 = win.get_mouse_position()
 	var sz := Vector2(win.size)
 	var inside: bool = mouse.x >= 0.0 and mouse.y >= 0.0 and mouse.x <= sz.x and mouse.y <= sz.y
+	var hovered: Control = viewport.gui_get_hovered_control()
 	var hovered_blocks: bool = hovered_ui_blocks_edge_pan(viewport)
-	var top_bar_only: bool = hovered_is_top_info_bar_only(viewport.gui_get_hovered_control())
-	if non_topbar_overlay_contains_mouse(viewport):
+	var top_bar_only: bool = hovered_is_top_info_bar_only(hovered)
+	var left_hud_only: bool = hovered_is_left_hud_only(hovered)
+	if mouse.x <= EDGE_PAN_SCREEN_PX:
+		_debug_left_rim_hover(mouse, hovered, hovered_blocks, left_hud_only)
+	if non_topbar_overlay_contains_mouse(viewport) and not left_hud_only:
 		hovered_blocks = true
 		top_bar_only = false
+		left_hud_only = false
 	return edge_pan_direction_at(
 		mouse,
 		sz,
 		hovered_blocks,
 		window_allows_edge_pan(viewport),
 		inside,
-		top_bar_only
+		top_bar_only,
+		left_hud_only
+	)
+
+
+static func _debug_left_rim_hover(
+	mouse: Vector2,
+	hovered: Control,
+	hovered_blocks: bool,
+	left_hud_only: bool
+) -> void:
+	if OS.get_environment("EOA_EDGE2_DEBUG") != "1":
+		return
+	var now: int = Time.get_ticks_msec()
+	if now - _left_rim_debug_msec < 250:
+		return
+	_left_rim_debug_msec = now
+	var hname := "<null>"
+	if hovered != null:
+		hname = "%s filter=%d" % [str(hovered.name), int(hovered.mouse_filter)]
+	print(
+		"EDGE2_LEFT_RIM x=%.1f y=%.1f hovered=%s blocks=%s left_hud=%s"
+		% [mouse.x, mouse.y, hname, str(hovered_blocks), str(left_hud_only)]
 	)
 
 
@@ -332,7 +452,11 @@ static func _mouse_over_map_chrome_blocks_edge_pan(viewport: Viewport) -> bool:
 	# true north 6px rim (Play SOFT_EDGEPAN_NO_CAM after restore-province).
 	# TopInfoBar hover is still exempt via north_strip_top_bar_exempt; other
 	# overlays on that strip still block through hover.
+	# EDGE-2: the same 6px left rim must not be swallowed by left-docked
+	# InfoPanel / toolbar / minimap (Play: left rim never panned).
 	if mouse.y >= 0.0 and mouse.y <= EDGE_PAN_SCREEN_PX:
+		return false
+	if mouse.x >= 0.0 and mouse.x <= EDGE_PAN_SCREEN_PX:
 		return false
 	var mrs: Array = viewport.get_tree().get_nodes_in_group("map_renderer")
 	for mr_v in mrs:
@@ -374,8 +498,11 @@ static func edge_pan_blocked_by_gui(viewport: Viewport) -> bool:
 	if viewport == null:
 		return false
 	# UI-1 FIX #1: full-width TopInfoBar must not swallow the north 6px strip.
-	# Toasts / Leaders / unit card / pause menu still block, including on that strip.
+	# EDGE-2: left HUD (toolbar / legend / InfoPanel / minimap) must not swallow
+	# the 6px left strip. Toasts / Leaders / unit card / pause menu still block.
 	if north_strip_top_bar_exempt(viewport):
+		return false
+	if left_strip_hud_exempt(viewport):
 		return false
 	var hovered: Control = viewport.gui_get_hovered_control()
 	# First pass: only block when hovering real HUD/modals — NOT every STOP Control

@@ -270,6 +270,9 @@ const UNIT_CARD_LATCH_SAFETY_SEC := 0.5
 ## press clears it unless that press is the poll-path Begin click itself
 ## (begin_press_pending). Lost leftover up cannot eat the first map click.
 const BEGIN_TITLE_SWALLOW_EXPIRE_MS: int = 750
+## INPUT-1: notice/toast × and Command Center CloseX leftover swallow.
+## Same clock as BEGIN-1 so a lost up cannot eat the next map click.
+const UI_CLOSE_SWALLOW_EXPIRE_MS: int = 750
 ## Fighting card (stance + cmd) must stay on-screen at Play 1280×740.
 ## Old reserve 252 clipped Press/Hold below Halt/Assign (card grows past 220).
 const UNIT_CARD_DOCK_RESERVE := 348.0
@@ -282,6 +285,16 @@ var _unit_card_eaten_frame: int = -1
 var _esc_stack_frame: int = -1
 ## Close button sits in the north edge-pan strip — suppress edge until the mouse leaves that click.
 var _close_suppress_edge := false
+## WHEELDRIFT-1: a wheel notch must not edge-pan. Hold 350 ms, then require a
+## 150 ms strip dwell (or a fresh strip entry) before EDGE-1 pan resumes.
+var _wheel_edge_suppress_until_msec: int = 0
+var _wheel_edge_await_dwell: bool = false
+var _wheel_edge_dwell_start_msec: int = 0
+## EDGE-2: continuous rim-contact clock (seconds). Reset when the cursor
+## leaves the rim. Dwell + ramp live in MapViewInput.edge_pan_feel_scale.
+var _edge_rim_contact_sec: float = 0.0
+## Test counter: frames where edge-dir actually moved the camera (not WASD).
+var _nav_edge_pan_frames: int = 0
 ## CLOSE-1b: true only when the Close *button* was in the 6px north strip.
 ## A unit-card Close at ~y=551 must not keep suppress after the cursor reaches
 ## y=0 (Play 008e5c30 SOFT_EDGEPAN_NO_CAM: edgepan≥2, dy=0, cam0==cam1).
@@ -354,7 +367,7 @@ var _outline_pulse_phase: float = 0.0
 var _last_zoom: float = 1.0
 var _hover_fill_province_id: int = -1
 ## Map-space selection outline (reliable when per-node polys are thin/hidden).
-## S1: stays below Ix1GoldSpineDraw (z=23) so the Köln hex cannot bury the spine.
+## S1: stays below Ix1GoldSpineDraw (z=25) so the Köln hex cannot bury the spine.
 const SELECT_OUTLINE_Z := 22
 var _select_outline_layer: Node2D = null
 var _select_outline_line: Line2D = null
@@ -406,6 +419,10 @@ const _AGENT_FILL_TINT := ProvinceMapVisuals.FILL_AGENT
 
 var _supply_role_by_province: Dictionary[int, String] = {}
 var _supply_roles_cache: Dictionary[int, String] = {}
+var _supply_roles_cache_fingerprint: String = ""
+var _supply_cache_route_pids: Dictionary = {}
+var _supply_cache_depot_pids: Dictionary = {}
+var _supply_overlay_dirty_pids: Dictionary = {}
 var _supply_poly_cache: Dictionary[int, PackedVector2Array] = {}
 var _supply_outline_batch: Node2D = null
 var _supply_outline_rebuild_count: int = 0
@@ -415,12 +432,69 @@ var _supply_toggle_in_progress: bool = false
 var _supply_toggle_role_computes: int = 0
 var _supply_toggle_setups: int = 0
 var _supply_toggle_glyph_layouts: int = 0
+var _supply_full_role_recomputes: int = 0
+var _supply_batch_patches: int = 0
+var _supply_last_reconcile_ms: float = 0.0
+var _last_refresh_supply_highlights_ms: float = 0.0
+var _last_supply_toggle_profile: Dictionary = {}
+const SUPPLY_RING_IDLE_BUDGET_MS := 8.0
+const SUPPLY_RING_IDLE_WORK_MS := 5.5
+const SUPPLY_PREBUILD_WARM_FRAMES := 3
+const SUPPLY_PREBUILD_IDLE := 0
+const SUPPLY_PREBUILD_ROLES := 1
+const SUPPLY_PREBUILD_ITEMS := 2
+const SUPPLY_PREBUILD_MESH := 3
+const SUPPLY_PREBUILD_WARM := 4
+const SUPPLY_PREBUILD_WARM_WAIT := 5
+const SUPPLY_PREBUILD_DONE := 6
+var _supply_prebuild_phase: int = SUPPLY_PREBUILD_IDLE
+var _supply_prebuild_cursor: int = 0
+var _supply_prebuild_pids: Array = []
+var _supply_prebuild_roles: Dictionary[int, String] = {}
+var _supply_prebuild_items: Array[Dictionary] = []
+var _supply_prebuild_ctx: Dictionary = {}
+var _supply_prebuild_total_ms: float = 0.0
+var _supply_prebuild_step_ms: float = 0.0
+var _supply_prebuild_frames: int = 0
+var _supply_prebuild_max_step_ms: float = 0.0
+var _supply_prebuild_setup_ms: float = 0.0
+var _supply_first_lon_role_credited: bool = false
+var _supply_ring_prebuild_done: bool = false
+var _supply_prebuild_seen_n: int = 0
+var _supply_prebuild_stable_frames: int = 0
+var _supply_prebuild_warm_frames: int = 0
+var _supply_prebuild_mesh_begun: bool = false
+var _supply_prebuild_fp: String = ""
+var _supply_prebuild_role_fp: String = ""
+var _supply_prebuild_route_pids: Dictionary = {}
+var _supply_prebuild_depot_pids: Dictionary = {}
+var _supply_prebuild_seen_depots: int = 0
+var _supply_roles_cache_role_fp: String = ""
+var _supply_role_lon_semantics: bool = false
+var _supply_lon_input_t0_usec: int = 0
 var _compare_candidate_ids: Array[int] = []
 var _supply_legend_panel: PanelContainer = null
+var _supply_legend_pulse_border: Control = null
+var _legend_pulse_last_active: bool = false
+var _legend_pulse_last_kind: String = ""
 var _compare_hint_label: Label = null
+var _compare_hint_last_color: Color = Color(1.0, 0.75, 0.45)
 var _legend_tracked_year: int = -1
 var _legend_tracked_month: int = -1
 var _legend_tracked_day: int = -1
+var _legend_stat_cache_year: int = -1
+var _legend_stat_cache_month: int = -1
+var _legend_stat_cache_day: int = -1
+var _legend_stat_cache_dirty: bool = true
+var _legend_cached_contested: int = 0
+var _legend_cached_agent: int = 0
+var _legend_cached_dual: int = 0
+var _legend_board_walks: int = 0
+var _legend_text_writes: int = 0
+var _legend_style_writes: int = 0
+var _legend_hover_flushed: int = 0
+var _hover_tooltip_coalesce_pending: bool = false
+var _hover_tooltip_coalesce_key: String = ""
 var _map_time_pulse_bbcode: String = ""
 var _map_time_pulse_kind: String = ""
 var _map_time_pulse_until_msec: int = 0
@@ -768,12 +842,40 @@ func _connect_map_manager_signals() -> void:
 		return
 	if not MapManager.province_data_changed.is_connected(_on_map_province_data_changed):
 		MapManager.province_data_changed.connect(_on_map_province_data_changed)
+	_connect_supply_manager_signals()
+
+
+func _connect_supply_manager_signals() -> void:
+	var sm := _supply_manager()
+	if sm == null:
+		return
+	if sm.has_signal("network_rebuilt") and not sm.network_rebuilt.is_connected(_on_supply_network_rebuilt_overlay):
+		sm.network_rebuilt.connect(_on_supply_network_rebuilt_overlay)
+	if sm.has_signal("route_updated") and not sm.route_updated.is_connected(_on_supply_route_updated_overlay):
+		sm.route_updated.connect(_on_supply_route_updated_overlay)
+
+
+func _on_supply_network_rebuilt_overlay(_hub_count: int = 0) -> void:
+	## Accelerator only — #88 mutation paths emit nothing, so the per-frame fingerprint poll is required.
+	_supply_overlay_dirty_pids[-1] = true
+
+
+func _on_supply_route_updated_overlay(_route_id: String = "", _plan: Variant = null) -> void:
+	_supply_overlay_dirty_pids[-1] = true
+
+
+func _mark_supply_overlay_pid_dirty(province_id: int) -> void:
+	_supply_overlay_dirty_pids[province_id] = true
 
 
 func _on_map_province_data_changed(province_id: int, what: String) -> void:
 	if what not in ["effects", "development", "infrastructure", "owner", "controller", "all", "infrastructure_project", "settlement", "welfare", "policy", "burden"]:
 		return
 	var owner_flip := what in ["owner", "controller", "all"]
+	if what in ["owner", "controller", "infrastructure", "development", "effects", "all"]:
+		_mark_supply_overlay_pid_dirty(province_id)
+		if owner_flip:
+			_invalidate_legend_board_stats()
 	if provinces.has(province_id):
 		_refresh_single_province_fill(province_id)
 		# Inspector rebuild is heavy; skip on capture/resolve owner flips.
@@ -909,6 +1011,12 @@ func _connect_time_manager_signals() -> void:
 
 
 func _on_game_day_advanced_legend(year: int, month: int, day: int) -> void:
+	var _legend_prof := OS.get_environment("EOA_LEGEND_PROFILE").strip_edges() == "1"
+	var _legend_t0 := Time.get_ticks_usec() if _legend_prof else 0
+	var _walks0 := _legend_board_walks
+	var _style0 := _legend_style_writes
+	var _text0 := _legend_text_writes
+	var _hover0 := _legend_hover_flushed
 	if _legend_tracked_day < 0:
 		_legend_tracked_day = day
 		_legend_tracked_month = month
@@ -972,6 +1080,13 @@ func _on_game_day_advanced_legend(year: int, month: int, day: int) -> void:
 	# Live F5 / softpipe: skip path-risk walks on the hour/day emit (clock at 00:00).
 	if not live_or_light:
 		_sample_route_risk_day_history()
+	if _legend_prof:
+		var ms := float(Time.get_ticks_usec() - _legend_t0) / 1000.0
+		var hover_n := 1 if _legend_hover_flushed > _hover0 else 0
+		print(
+			"EOA_LEGEND_DAY ms=%.3f style_writes=%d walks=%d text_writes=%d hover=%d"
+			% [ms, _legend_style_writes - _style0, _legend_board_walks - _walks0, _legend_text_writes - _text0, hover_n]
+		)
 
 
 func _on_time_advanced_refresh_legend(_a: Variant = null, _b: Variant = null) -> void:
@@ -1036,7 +1151,35 @@ func _refresh_map_time_ui() -> void:
 	if supply_mode:
 		_update_supply_legend_text()
 	if _hover_province != null and hover_tooltip != null and hover_tooltip.visible:
-		_refresh_hover_tooltip(_hover_province)
+		_queue_day_hover_tooltip_refresh()
+
+
+func _queue_day_hover_tooltip_refresh() -> void:
+	if _hover_province == null or hover_tooltip == null or not hover_tooltip.visible:
+		return
+	var key := "%d:%d:%d:%d" % [
+		_hover_province.id, _legend_tracked_year, _legend_tracked_month, _legend_tracked_day,
+	]
+	if key == _hover_tooltip_coalesce_key:
+		return
+	if _hover_tooltip_coalesce_pending:
+		return
+	_hover_tooltip_coalesce_pending = true
+	call_deferred("_flush_day_hover_tooltip_refresh")
+
+
+func _flush_day_hover_tooltip_refresh() -> void:
+	_hover_tooltip_coalesce_pending = false
+	if _hover_province == null or hover_tooltip == null or not hover_tooltip.visible:
+		return
+	var key := "%d:%d:%d:%d" % [
+		_hover_province.id, _legend_tracked_year, _legend_tracked_month, _legend_tracked_day,
+	]
+	if key == _hover_tooltip_coalesce_key:
+		return
+	_hover_tooltip_coalesce_key = key
+	_legend_hover_flushed += 1
+	_refresh_hover_tooltip(_hover_province)
 
 
 func _get_active_map_time_pulse_bbcode() -> String:
@@ -1055,7 +1198,8 @@ func _expire_map_time_pulse_if_needed() -> void:
 	_map_time_pulse_bbcode = ""
 	_map_time_pulse_kind = ""
 	if supply_mode:
-		_update_supply_legend_text()
+		_apply_supply_legend_time_pulse_style(false, "")
+		_update_supply_legend_text(false)
 
 
 func _is_info_panel_visible() -> bool:
@@ -1151,6 +1295,8 @@ func _setup_hover_tooltip() -> void:
 var _wheel_zoom_terrain_at_msec: int = 0
 var _pending_terrain_zoom_refresh: bool = false
 const WHEEL_TERRAIN_REFRESH_MS := 180
+const WHEEL_EDGE_SUPPRESS_MS := 350
+const WHEEL_EDGE_DWELL_MS := 150
 
 
 func _left_live_slop_is_drag() -> bool:
@@ -2682,6 +2828,10 @@ func _input(event: InputEvent) -> void:
 			_request_hang_safe_supply_corridor()
 			get_viewport().set_input_as_handled()
 			return
+		if event.keycode == KEY_L and not event.ctrl_pressed and not event.alt_pressed:
+			_handle_supply_overlay_key()
+			get_viewport().set_input_as_handled()
+			return
 		# U = view-only unit counters (default shown). Search LineEdit already
 		# returned above, so typing in Search cannot fire this.
 		if event.keycode == KEY_U and not event.ctrl_pressed and not event.alt_pressed:
@@ -2786,14 +2936,19 @@ func _input(event: InputEvent) -> void:
 		if event.pressed and (
 			event.button_index == MOUSE_BUTTON_WHEEL_UP or event.button_index == MOUSE_BUTTON_WHEEL_DOWN
 		):
+			# WHEELDRIFT-1: every notch arms edge suppress, even if chrome
+			# swallows zoom (top bar / left HUD). Wheel must never edge-pan.
+			_arm_wheel_edge_suppress()
 			if _wheel_should_zoom_map():
 				_left_ready_for_still_click = true
 				_unlock_close_camera()
 				_close_click_guard = false
 				_close_suppress_edge = false
 				_close_click_was_north_strip = false
-				var factor := (1.0 + zoom_speed * 1.35) if event.button_index == MOUSE_BUTTON_WHEEL_UP else (1.0 - zoom_speed * 1.35)
-				_zoom_toward_mouse(factor)
+				var zoom_in: bool = event.button_index == MOUSE_BUTTON_WHEEL_UP
+				var factor: float = _wheel_zoom_factor(zoom_in)
+				var wheel_screen: Vector2 = event.position
+				_zoom_toward_mouse(factor, wheel_screen)
 				# NEVER call full _refresh_terrain_zoom_aware() / 3520 fill rebuild per notch.
 				_schedule_light_terrain_zoom_refresh()
 				get_viewport().set_input_as_handled()
@@ -2820,10 +2975,15 @@ func _input(event: InputEvent) -> void:
 				call_deferred("_clear_begin_title_release_swallow")
 				get_viewport().set_input_as_handled()
 				return
+			# INPUT-1: do not swallow leftover in `_input` (GUI must see the
+			# close release so `pressed` fires). `_unhandled_input` eats the
+			# leftover after the Control closes. `_input` skip-still-click
+			# survived mutants — it is not a consume point.
 			if event.pressed:
 				_skip_inspector_after_march = false
 				_clear_unit_card_press_consume_on_new_left_press()
 				_clear_begin_title_release_swallow_on_new_left_press()
+				_clear_ui_close_release_swallow_on_new_left_press()
 			if _living_title_boot_is_up():
 				# Play 5adb38e: never swallow title-up presses. Route by event
 				# coords (computerUse may not update get_mouse_position first).
@@ -2985,6 +3145,7 @@ func _refresh_terrain_zoom_light() -> void:
 	_sync_capital_star_scales(z)
 	# Camera-space G stroke: keep ~26 screen px after Home wheel-zoom (no path rebuild).
 	_refresh_visible_supply_route_polyline_width()
+	_feed_supply_outline_batch_view()
 	# Do not rebuild 3520 fills on a wheel notch — LOD/counters only. Fill bucket
 	# updates happen on mapmode change / boot, not per zoom tick (Rhine chip carpet hang).
 
@@ -3038,11 +3199,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				get_viewport().set_input_as_handled()
 				return
 		if event.keycode == KEY_L:
-			_toggle_supply_overlay()
-			if supply_mode:
-				_show_map_layer_toast("Supply legend ON — Close button, L, or Esc to hide")
-			else:
-				_show_map_layer_toast("Supply legend OFF")
+			_handle_supply_overlay_key()
 			get_viewport().set_input_as_handled()
 			return
 		if event.keycode == KEY_O and not event.ctrl_pressed and not event.alt_pressed:
@@ -3238,6 +3395,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if use_spatial_picking and event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed:
 			_clear_begin_title_release_swallow_on_new_left_press()
+			_clear_ui_close_release_swallow_on_new_left_press()
 		if not event.pressed and _consume_unit_card_press_release_if_armed():
 			return
 		if not event.pressed and _first_session_tip_dismiss_blocks_map_pick():
@@ -3246,6 +3404,10 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 		if not event.pressed and _begin_title_release_blocks_map_pick():
 			call_deferred("_clear_begin_title_release_swallow")
+			get_viewport().set_input_as_handled()
+			return
+		if not event.pressed and _ui_close_click_blocks_map_pick(event):
+			call_deferred("_clear_ui_close_release_swallow")
 			get_viewport().set_input_as_handled()
 			return
 		if _living_title_boot_is_up():
@@ -3589,6 +3751,7 @@ func _process(delta: float) -> void:
 	_expire_map_time_pulse_if_needed()
 	_tick_unit_card_press_consume_latch(delta)
 	_tick_begin_title_release_swallow()
+	_tick_ui_close_release_swallow()
 
 	# When sim is paused, skip heavy LOD/fill/theater work — pan/zoom/UI stay responsive for playtest.
 	var sim_paused := false
@@ -3672,6 +3835,7 @@ func _process(delta: float) -> void:
 		# Paused: light hover only (camera already handled above every frame).
 		if use_spatial_picking and Engine.get_process_frames() % 4 == 0:
 			_update_spatial_hover()
+	_tick_supply_ring_idle_prebuild()
 	if _perf != null and _perf.enabled:
 		_perf.end("process_total")
 		var frame_ms := float(Time.get_ticks_usec() - _perf_frame_start_usec) / 1000.0
@@ -3743,8 +3907,11 @@ func _handle_camera_input(delta: float) -> void:
 	# UI-1: true outer 6px of the *window* (screen pixels). The old 64px strip
 	# under the HUD (y≈200–264) and last-64px floor (y>676 @ 740) were wrong.
 	# EDGE-1: far-right ≈x=1270 on 1280×740 uses EDGE_PAN_RIGHT_SCREEN_PX (10).
+	# EDGE-2: 250 ms rim dwell + 600 ms ramp + Home-zoom world-speed cap.
 	# Hovered UI / unfocused / mouse-outside skip. Close-held still suppresses.
+	# WHEELDRIFT-1 350 ms hold + 150 ms dwell is unchanged (_gate_wheel_edge_pan).
 	var edge_dir: Vector2 = Vector2.ZERO
+	var screen_edge: Vector2 = Vector2.ZERO
 	var mouse_pos: Vector2 = get_viewport().get_mouse_position()
 	if _close_suppress_edge:
 		var still_in_north_strip: bool = mouse_pos.y <= MapViewInput.EDGE_PAN_SCREEN_PX
@@ -3757,7 +3924,11 @@ func _handle_camera_input(delta: float) -> void:
 		not _close_suppress_edge
 		and not MapViewInput.edge_pan_blocked_by_gui(get_viewport())
 	):
-		edge_dir = MapViewInput.edge_pan_direction_screen(get_viewport())
+		screen_edge = MapViewInput.edge_pan_direction_screen(get_viewport())
+		edge_dir = _gate_wheel_edge_pan(screen_edge)
+	var feel_scale: float = _update_edge_rim_contact(screen_edge != Vector2.ZERO, nav_delta)
+	if edge_dir != Vector2.ZERO and key_dir == Vector2.ZERO and feel_scale <= 0.0:
+		edge_dir = Vector2.ZERO
 	move_dir = key_dir + edge_dir
 
 	# Left-drag pan after slop (click still picks). Middle / right drag too.
@@ -3812,7 +3983,12 @@ func _handle_camera_input(delta: float) -> void:
 			move_dir = move_dir.normalized()
 			# edge_scroll_speed for edge/WASD feel; pan_speed kept as alias baseline
 			var speed: float = maxf(pan_speed, edge_scroll_speed)
-			cam.global_position += move_dir * speed * nav_delta / cam.zoom.x
+			var zoom_div: float = maxf(cam.zoom.x, 0.0001)
+			if edge_dir != Vector2.ZERO and key_dir == Vector2.ZERO:
+				_nav_edge_pan_frames += 1
+				speed *= feel_scale
+				zoom_div = MapViewInput.edge_pan_zoom_divisor(cam.zoom.x)
+			cam.global_position += move_dir * speed * nav_delta / zoom_div
 			moved = true
 
 	# Flush debounced terrain zoom after wheel burst settles.
@@ -3834,18 +4010,64 @@ func _handle_camera_input(delta: float) -> void:
 			_mark_left_pan_blocked_pick()
 
 
-func _zoom_toward_mouse(zoom_change: float) -> void:
-	var vp := get_viewport()
-	if vp == null:
-		return
-	_zoom_toward_screen(vp.get_mouse_position(), zoom_change)
+func _wheel_zoom_factor(zoom_in: bool) -> float:
+	# In and out must be exact inverses (Play: ×1.243 in / ×0.757 out drifted out).
+	var factor_in: float = 1.0 + zoom_speed * 1.35
+	if zoom_in:
+		return factor_in
+	if factor_in <= 0.0001:
+		return 1.0
+	return 1.0 / factor_in
 
 
-func _zoom_toward_screen(screen: Vector2, zoom_change: float) -> void:
-	var cam := get_viewport().get_camera_2d() if get_viewport() else null
+func _arm_wheel_edge_suppress() -> void:
+	_wheel_edge_suppress_until_msec = Time.get_ticks_msec() + WHEEL_EDGE_SUPPRESS_MS
+	_wheel_edge_await_dwell = true
+	_wheel_edge_dwell_start_msec = 0
+
+
+func _gate_wheel_edge_pan(edge_dir: Vector2) -> Vector2:
+	var now: int = Time.get_ticks_msec()
+	if now < _wheel_edge_suppress_until_msec:
+		_wheel_edge_dwell_start_msec = 0
+		return Vector2.ZERO
+	if not _wheel_edge_await_dwell:
+		return edge_dir
+	if edge_dir == Vector2.ZERO:
+		_wheel_edge_await_dwell = false
+		_wheel_edge_dwell_start_msec = 0
+		return Vector2.ZERO
+	if _wheel_edge_dwell_start_msec <= 0:
+		_wheel_edge_dwell_start_msec = now
+	if now - _wheel_edge_dwell_start_msec < WHEEL_EDGE_DWELL_MS:
+		return Vector2.ZERO
+	_wheel_edge_await_dwell = false
+	_wheel_edge_dwell_start_msec = 0
+	return edge_dir
+
+
+func _update_edge_rim_contact(on_rim: bool, nav_delta: float) -> float:
+	if not on_rim:
+		_edge_rim_contact_sec = 0.0
+		return 0.0
+	_edge_rim_contact_sec += maxf(nav_delta, 0.0)
+	return MapViewInput.edge_pan_feel_scale(_edge_rim_contact_sec)
+
+
+func _zoom_toward_mouse(zoom_change: float, screen_pos: Vector2 = Vector2.INF) -> void:
+	var cam := get_viewport().get_camera_2d()
 	if not cam:
 		return
 
+	var mouse_screen: Vector2 = screen_pos
+	var vp := get_viewport()
+	if not mouse_screen.is_finite():
+		mouse_screen = vp.get_mouse_position() if vp != null else Vector2.ZERO
+	# Clamp the event/screen anchor into the viewport *before* the world correction.
+	var vp_size: Vector2 = vp.get_visible_rect().size if vp != null else Vector2.ZERO
+	if vp_size.x > 1.0 and vp_size.y > 1.0:
+		mouse_screen.x = clampf(mouse_screen.x, 0.0, vp_size.x)
+		mouse_screen.y = clampf(mouse_screen.y, 0.0, vp_size.y)
 	var old_zoom := cam.zoom
 
 	var new_zoom := old_zoom * zoom_change
@@ -3856,18 +4078,28 @@ func _zoom_toward_screen(screen: Vector2, zoom_change: float) -> void:
 		return
 
 	eoa_log_flush(
-		"EOA_ZOOM_BEGIN who=MapRenderer._zoom_toward_screen from=%.3f to=%.3f factor=%.3f"
+		"EOA_ZOOM_BEGIN who=MapRenderer._zoom_toward_mouse from=%.3f to=%.3f factor=%.3f"
 		% [old_zoom.x, new_zoom.x, zoom_change]
 	)
-	var world_before := cam.get_canvas_transform().affine_inverse() * screen
+	var cam_before: Vector2 = cam.global_position
+	var world_before: Vector2 = _screen_to_world(mouse_screen)
+	eoa_log_flush(
+		"EOA_ZOOM_POSE who=MapRenderer._zoom_toward_mouse phase=before z=%.3f cam=%s screen=%s world=%s"
+		% [old_zoom.x, str(cam_before), str(mouse_screen), str(world_before)]
+	)
 	cam.zoom = new_zoom
-	var world_after := cam.get_canvas_transform().affine_inverse() * screen
+	var world_after: Vector2 = _screen_to_world(mouse_screen)
 	cam.global_position += world_before - world_after
+	# Theater clamp after the anchor. If it binds, accept the slip — do not re-anchor.
 	_clamp_camera_to_theater()
 	# Light LOD only — never full 3520 fill / RoadLayer rebuild on a wheel notch.
 	_refresh_terrain_zoom_light()
 	eoa_log_flush(
-		"EOA_ZOOM_END who=MapRenderer._zoom_toward_screen z=%.3f ok=1"
+		"EOA_ZOOM_POSE who=MapRenderer._zoom_toward_mouse phase=after z=%.3f cam=%s"
+		% [new_zoom.x, str(cam.global_position)]
+	)
+	eoa_log_flush(
+		"EOA_ZOOM_END who=MapRenderer._zoom_toward_mouse z=%.3f ok=1"
 		% new_zoom.x
 	)
 
@@ -16585,37 +16817,36 @@ func player_path_search_go(province_id: int) -> bool:
 
 
 func player_path_wheel_toward_world(world: Vector2, target_zoom: float) -> float:
-	# Same pan math as `_zoom_toward_mouse`, keyed on `world` rather than a
-	# mouse warp (warp is a frame late in xvfb, so tests used to zoom in place).
+	# Warp the cursor over `world` then run the same `_zoom_toward_mouse` the
+	# wheel handler calls. No lock_pixel_guard_camera.
 	var cam := get_node_or_null("MapCamera") as Camera2D
 	if cam == null and get_viewport():
 		cam = get_viewport().get_camera_2d()
 	if cam == null:
 		return 1.0
-	var factor_in: float = 1.0 + zoom_speed * 1.35
-	var factor_out: float = 1.0 - zoom_speed * 1.35
-	var guard: int = 0
-	while guard < 64:
-		var z: float = maxf(absf(cam.zoom.x), absf(cam.zoom.y))
-		if absf(z - target_zoom) <= 0.02:
-			break
-		var factor: float = factor_in if z < target_zoom else factor_out
-		var next_z := clampf(z * factor, min_zoom, max_zoom)
-		if (z < target_zoom and next_z > target_zoom) or (z > target_zoom and next_z < target_zoom):
-			factor = target_zoom / maxf(z, 0.04)
-		_zoom_toward_screen(cam.get_canvas_transform() * world, factor)
-		guard += 1
-	return maxf(absf(cam.zoom.x), absf(cam.zoom.y))
+	var screen: Vector2 = cam.get_canvas_transform() * world
+	if DisplayServer.get_name() != "headless":
+		DisplayServer.warp_mouse(Vector2i(int(round(screen.x)), int(round(screen.y))))
+	return player_path_wheel_toward_screen(screen, target_zoom)
 
 
 func player_path_wheel_toward_screen(screen: Vector2, target_zoom: float) -> float:
+	# Playtester path: keep this screen pixel as the wheel anchor.
 	var cam := get_node_or_null("MapCamera") as Camera2D
 	if cam == null and get_viewport():
 		cam = get_viewport().get_camera_2d()
 	if cam == null:
 		return 1.0
-	var world: Vector2 = cam.get_canvas_transform().affine_inverse() * screen
-	return player_path_wheel_toward_world(world, target_zoom)
+	var factor_in: float = _wheel_zoom_factor(true)
+	var factor_out: float = _wheel_zoom_factor(false)
+	var guard: int = 0
+	while guard < 48:
+		var z: float = maxf(absf(cam.zoom.x), absf(cam.zoom.y))
+		if absf(z - target_zoom) <= 0.045:
+			break
+		_zoom_toward_mouse(factor_in if z < target_zoom else factor_out, screen)
+		guard += 1
+	return maxf(absf(cam.zoom.x), absf(cam.zoom.y))
 
 
 func center_europe_in_world_view() -> void:
@@ -18947,10 +19178,11 @@ func _is_mouse_over_blocking_ui() -> bool:
 		if n is DraggablePanel and (n as CanvasItem).visible:
 			return true
 		var nn := str(n.name)
+		if nn == "MainMenu":
+			return true
 		if nn in [
 			"TechnologyScreen",
 			"InfoPanel",
-			"MainMenu",
 			"DebugOverlay",
 			"OrderCommandPanel",
 			"DiplomacyView",
@@ -19534,14 +19766,14 @@ func _resolve_map_pick_pid(world_pos: Vector2) -> int:
 	return pid
 
 
-## FIX #5: a facility icon at the click point overrides a stale hover / cache dest.
-## Miss of every facility rect keeps the MV-1 cache-dest / GIS path as on base.
+## FIX #8: a facility icon at the click point wins. A miss commits to the
+## province under this world (event.position). Stale hover / cache dest never does.
 func _still_click_province_pid(world_pos: Vector2, mv1_commit: bool) -> int:
 	var fac_click: int = _facility_icon_pid_at(world_pos)
 	if fac_click > 0:
 		return fac_click
-	if mv1_commit and _march_preview_cache_dest > 0:
-		return _march_preview_cache_dest
+	if mv1_commit:
+		return _resolve_hex_pick_pid(world_pos)
 	var pid := _resolve_map_pick_pid(world_pos)
 	if pid <= 0 and typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_at_world_pos"):
 		pid = MapManager.get_province_at_world_pos(world_pos, true)
@@ -20009,15 +20241,17 @@ func _mv1_event_province_pid(world_pos: Vector2) -> int:
 
 
 func _mv1_re_resolve_commit_pid(world_pos: Vector2, picked_pid: int, mv1_commit: bool) -> int:
-	# Cached-dest still-click can return the stale hover dest. Re-resolve at
-	# the release world (same pick as dest_matches). Facility hits keep
-	# still_click's icon pid. GIS miss keeps the cache dest (FAC-1a miss-path).
+	# FIX #8: the commit is whatever is under event.position. A stale
+	# `_march_preview_cache_dest` passed in as picked_pid never wins.
 	if not mv1_commit:
 		return picked_pid
-	if _facility_icon_pid_at(world_pos) > 0:
-		return picked_pid
+	var fac_pid: int = _facility_icon_pid_at(world_pos)
+	if fac_pid > 0:
+		return fac_pid
 	var event_pid: int = _resolve_hex_pick_pid(world_pos)
 	if event_pid > 0:
+		return event_pid
+	if picked_pid == _march_preview_cache_dest and _march_preview_cache_dest > 0:
 		return event_pid
 	return picked_pid
 
@@ -20037,8 +20271,9 @@ func _mv1_preview_dest_matches_world(world_pos: Vector2) -> bool:
 	# must not match (MV-1e: Bad Kreuznach vs stale Hildesheim).
 	if click_pid > 0:
 		return false
+	# FIX #8: a GIS miss must not fall through to the stale hover province.
 	if _hover_province != null and int(_hover_province.id) == dest:
-		return true
+		return false
 	return false
 
 
@@ -24945,6 +25180,99 @@ func _clear_begin_title_release_swallow() -> void:
 		remove_meta("eoa_begin_swallow_press_seen_frame")
 
 
+func arm_ui_close_release_swallow(pending_press: bool = false) -> void:
+	# Notice × / Command Center CloseX (button_down / poll handle_live_close).
+	# One leftover left-release is eaten. Clock restamps on the first _process
+	# after this frame. A later-frame left press or expiry drops it. Poll-path
+	# arms set press_pending so the click's own N+1 press keeps the arm.
+	set_meta("eoa_ui_close_swallow_release", true)
+	set_meta("eoa_ui_close_swallow_arm_msec", Time.get_ticks_msec())
+	set_meta("eoa_ui_close_swallow_arm_frame", Engine.get_process_frames())
+	if has_meta("eoa_ui_close_swallow_clock_ready"):
+		remove_meta("eoa_ui_close_swallow_clock_ready")
+	if has_meta("eoa_ui_close_swallow_press_seen_frame"):
+		remove_meta("eoa_ui_close_swallow_press_seen_frame")
+	if pending_press:
+		set_meta("eoa_ui_close_swallow_press_pending", true)
+	elif has_meta("eoa_ui_close_swallow_press_pending"):
+		remove_meta("eoa_ui_close_swallow_press_pending")
+
+
+func _ui_close_release_swallow_expired() -> bool:
+	if not has_meta("eoa_ui_close_swallow_release"):
+		return false
+	if not has_meta("eoa_ui_close_swallow_clock_ready"):
+		return false
+	var arm_frame: int = int(get_meta("eoa_ui_close_swallow_arm_frame", -1))
+	if Engine.get_process_frames() < arm_frame + 2:
+		return false
+	var arm_ms: int = int(get_meta("eoa_ui_close_swallow_arm_msec", 0))
+	if arm_ms > 0 and Time.get_ticks_msec() - arm_ms >= UI_CLOSE_SWALLOW_EXPIRE_MS:
+		return true
+	return false
+
+
+func _ui_close_release_blocks_map_pick() -> bool:
+	if not has_meta("eoa_ui_close_swallow_release"):
+		return false
+	if _ui_close_release_swallow_expired():
+		_clear_ui_close_release_swallow()
+		return false
+	return true
+
+
+func _ui_close_click_blocks_map_pick(_event: InputEvent = null) -> bool:
+	# Armed swallow only. Geometric × ownership must not hide a missing arm
+	# (poll / button_down mutants survived while the × rect was still up).
+	return _ui_close_release_blocks_map_pick()
+
+
+func _clear_ui_close_release_swallow_on_new_left_press() -> void:
+	# Same-frame close press must keep the arm so the matching leftover up is eaten.
+	# Poll-path: the close click's own press arrives in N+1 — eat that one only.
+	# A later-frame left press drops the one-shot so the same spot can select.
+	if not has_meta("eoa_ui_close_swallow_release"):
+		return
+	var now_frame: int = Engine.get_process_frames()
+	if has_meta("eoa_ui_close_swallow_press_pending"):
+		remove_meta("eoa_ui_close_swallow_press_pending")
+		set_meta("eoa_ui_close_swallow_press_seen_frame", now_frame)
+		return
+	if int(get_meta("eoa_ui_close_swallow_press_seen_frame", -1)) == now_frame:
+		return
+	var arm_frame: int = int(get_meta("eoa_ui_close_swallow_arm_frame", -1))
+	if now_frame > arm_frame:
+		_clear_ui_close_release_swallow()
+
+
+func _tick_ui_close_release_swallow() -> void:
+	if not has_meta("eoa_ui_close_swallow_release"):
+		return
+	if not has_meta("eoa_ui_close_swallow_clock_ready"):
+		var arm_frame: int = int(get_meta("eoa_ui_close_swallow_arm_frame", -1))
+		if Engine.get_process_frames() > arm_frame:
+			set_meta("eoa_ui_close_swallow_arm_msec", Time.get_ticks_msec())
+			set_meta("eoa_ui_close_swallow_clock_ready", true)
+		return
+	if _ui_close_release_swallow_expired():
+		_clear_ui_close_release_swallow()
+
+
+func _clear_ui_close_release_swallow() -> void:
+	if has_meta("eoa_ui_close_swallow_release"):
+		remove_meta("eoa_ui_close_swallow_release")
+	if has_meta("eoa_ui_close_swallow_arm_msec"):
+		remove_meta("eoa_ui_close_swallow_arm_msec")
+	if has_meta("eoa_ui_close_swallow_arm_frame"):
+		remove_meta("eoa_ui_close_swallow_arm_frame")
+	if has_meta("eoa_ui_close_swallow_clock_ready"):
+		remove_meta("eoa_ui_close_swallow_clock_ready")
+	if has_meta("eoa_ui_close_swallow_press_pending"):
+		remove_meta("eoa_ui_close_swallow_press_pending")
+	if has_meta("eoa_ui_close_swallow_press_seen_frame"):
+		remove_meta("eoa_ui_close_swallow_press_seen_frame")
+
+
 func dismiss_first_session_action_tip() -> void:
 	# Must not take the inspector Close path (that locks the camera).
 	# Button.pressed runs on release. Freeing the strip inside that signal
@@ -25658,6 +25986,44 @@ func _map_province_name_label_z_index() -> int:
 	return province_name_label_z_index_supply_overlay if supply_mode else province_name_label_z_index
 
 
+func cull_province_labels_for_hubs(keys: Dictionary, rects: Array) -> void:
+	if keys.is_empty() and rects.is_empty():
+		return
+	var xf: Transform2D = Transform2D.IDENTITY
+	if container != null:
+		xf = container.get_global_transform_with_canvas()
+	for id in _province_name_labels:
+		var lbl_v: Variant = _province_name_labels[id]
+		if not (lbl_v is Label):
+			continue
+		var lbl: Label = lbl_v
+		if not is_instance_valid(lbl) or not lbl.visible:
+			continue
+		var nm: String = str(lbl.text).strip_edges()
+		if nm.is_empty() and provinces.has(int(id)):
+			var pv: Variant = provinces[int(id)]
+			if pv is Province:
+				nm = str((pv as Province).name)
+		var key: String = RoadTierVisual.hwy3_label_alias_key(nm)
+		if not key.is_empty() and keys.has(key):
+			lbl.visible = false
+			continue
+		var screen: Vector2 = xf * lbl.position
+		var pr := Rect2(screen, lbl.size)
+		var hit: bool = false
+		for rv in rects:
+			if typeof(rv) != TYPE_RECT2:
+				continue
+			var rr: Rect2 = rv
+			if rr.size.x <= 0.5 or pr.size.x <= 0.5:
+				continue
+			if pr.intersects(rr):
+				hit = true
+				break
+		if hit:
+			lbl.visible = false
+
+
 ## Slows outline pulses while L is on so hover / supply / engineer rings do not compete visually.
 func _map_overlay_pulse_speed_scale() -> float:
 	return 0.82 if supply_mode else 1.0
@@ -25929,12 +26295,28 @@ func _dismiss_map_overlays_esc() -> bool:
 	return dismissed
 
 
+func _handle_supply_overlay_key() -> void:
+	_supply_lon_input_t0_usec = Time.get_ticks_usec()
+	_toggle_supply_overlay()
+	if supply_mode:
+		_show_map_layer_toast("Supply legend ON — Close button, L, or Esc to hide")
+	else:
+		_show_map_layer_toast("Supply legend OFF")
+
+
+func get_supply_lon_input_t0_usec() -> int:
+	return _supply_lon_input_t0_usec
+
+
 func _toggle_supply_overlay() -> void:
 	var sm := _supply_manager()
 	if sm == null:
 		return
+	var t_all := Time.get_ticks_usec()
 	_supply_toggle_in_progress = true
+	var t0 := t_all
 	sm.toggle_overlay()
+	var sm_ms := float(Time.get_ticks_usec() - t0) / 1000.0
 	supply_mode = sm.overlay_visible
 	if supply_map_layer:
 		supply_map_layer.visible = supply_mode
@@ -25951,27 +26333,52 @@ func _toggle_supply_overlay() -> void:
 			ol_infra.call("clear_supply_corridor_path")
 		if ol_infra.has_method("queue_redraw"):
 			ol_infra.queue_redraw()
+	t0 = Time.get_ticks_usec()
 	if supply_mode:
 		# Boot already called `_setup_supply_layer`. Re-entering it on every L-on
 		# restacked 3k glyph Labels + recomputed roles (live ~4.5 s after batch cache).
 		if supply_map_layer == null or not is_instance_valid(supply_map_layer):
 			_setup_supply_layer()
 		# Hang-class: do not BFS a 3520-board corridor on the L/G frame.
-		_show_inspector_toast("Supply legend ON · click a unit chip to order (march / Ctrl+click assault)", 4.0)
+		call_deferred(
+			"_show_inspector_toast",
+			"Supply legend ON · click a unit chip to order (march / Ctrl+click assault)",
+			4.0,
+		)
 		_refresh_supply_highlights(true)
 	else:
 		_end_supply_reroute()
 		if supply_map_layer != null and supply_map_layer.has_method("clear_route_highlight"):
 			supply_map_layer.call("clear_route_highlight")
 		_refresh_supply_highlights()
+	var refresh_ms := float(Time.get_ticks_usec() - t0) / 1000.0
+	t0 = Time.get_ticks_usec()
 	_update_supply_overlay_legend()
+	var legend_ms := float(Time.get_ticks_usec() - t0) / 1000.0
 	if _hover_province != null:
 		_refresh_hover_tooltip(_hover_province)
 	if supply_overlay_panel:
 		if not supply_mode:
 			supply_overlay_panel.hide_panel()
+	t0 = Time.get_ticks_usec()
 	_sync_supply_route_canvas_stack()
+	var sync_ms := float(Time.get_ticks_usec() - t0) / 1000.0
 	_supply_toggle_in_progress = false
+	var batch_ms := 0.0
+	if _supply_outline_batch_is_ready() and _supply_outline_batch.has_method("get_last_mesh_build_ms"):
+		batch_ms = float(_supply_outline_batch.call("get_last_mesh_build_ms"))
+	_last_supply_toggle_profile = {
+		"sm_toggle_ms": sm_ms,
+		"refresh_highlights_ms": refresh_ms,
+		"batch_mesh_build_ms": batch_ms,
+		"legend_ms": legend_ms,
+		"sync_stack_ms": sync_ms,
+		"total_ms": float(Time.get_ticks_usec() - t_all) / 1000.0,
+		"prebuild_total_ms": _supply_prebuild_total_ms,
+		"prebuild_frames": _supply_prebuild_frames,
+		"prebuild_max_step_ms": _supply_prebuild_max_step_ms,
+		"prebuild_done": _supply_ring_prebuild_done,
+	}
 
 
 func _refresh_supply_routes() -> void:
@@ -29277,114 +29684,205 @@ func _set_compare_preview_outline(province_id: int, visible: bool) -> void:
 		ProvinceMapVisuals.hide_polished_outline(node, ProvinceMapVisuals.NODE_COMPARE)
 
 
-func _supply_highlight_roles() -> Dictionary[int, String]:
-	if _supply_toggle_in_progress:
-		_supply_toggle_role_computes += 1
-	var roles: Dictionary[int, String] = {}
-	if not supply_mode:
-		return roles
+func _supply_role_context() -> Dictionary:
+	var ctx: Dictionary = {
+		"has_depot": {},
+		"selected": -1,
+		"preview_pids": {},
+		"route_pids": {},
+		"trade_pids": {},
+	}
 	var sm := _supply_manager()
-	for pid in province_nodes.keys():
-		var depot: Variant = sm.get_depot_state(int(pid)) if sm != null else null
-		if depot != null and float(depot.fill_ratio()) >= 0.0:
-			roles[int(pid)] = "hub"  # overwritten below if on route / preview / selected
+	if sm != null and "depot_states" in sm:
+		for pid_var in sm.depot_states.keys():
+			var depot: Variant = sm.get_depot_state(int(pid_var)) if sm.has_method("get_depot_state") else sm.depot_states[pid_var]
+			if depot != null and depot.has_method("fill_ratio") and float(depot.fill_ratio()) >= 0.0:
+				(ctx["has_depot"] as Dictionary)[int(pid_var)] = true
+	# Player depots are hubs even before a route refill threads them
+	# (#88 queues one dest per frame; the depot_state exists immediately).
+	if sm != null and "player_depot_province_ids" in sm:
+		for pid_var in sm.player_depot_province_ids:
+			(ctx["has_depot"] as Dictionary)[int(pid_var)] = true
+	if sm != null and sm.has_method("get_selected_province_id"):
+		ctx["selected"] = int(sm.get_selected_province_id())
+	if int(ctx["selected"]) < 0:
+		ctx["selected"] = selected_province_id
 	if sm == null:
-		return roles
-	var selected: int = SupplyManager.get_selected_province_id()
-	if selected < 0:
-		selected = selected_province_id
-	if selected >= 0:
-		roles[selected] = "active"
-	var preview_pids: Dictionary[int, bool] = {}
-	if _supply_reroute_active:
+		return ctx
+	if _supply_reroute_active and sm.has_method("preview_player_route"):
 		var preview: SupplyRoutePlan = sm.preview_player_route()
 		if preview != null and preview.path_length() > 0:
 			for pid_var in preview.province_path:
-				preview_pids[int(pid_var)] = true
-	for plan_var in sm.get_all_routes():
-		if not (plan_var is SupplyRoutePlan):
-			continue
-		var plan := plan_var as SupplyRoutePlan
-		if plan.represents_trade_flow:
-			continue
-		for pid_var in plan.province_path:
-			var pid := int(pid_var)
-			if str(roles.get(pid, "")) == "active":
+				(ctx["preview_pids"] as Dictionary)[int(pid_var)] = true
+	if sm.has_method("get_all_routes"):
+		for plan_var in sm.get_all_routes():
+			if not (plan_var is SupplyRoutePlan):
 				continue
-			if preview_pids.has(pid):
-				roles[pid] = "preview"
-			else:
-				roles[pid] = "route"
-	for pid in preview_pids.keys():
-		if str(roles.get(pid, "")) != "active":
-			roles[pid] = "preview"
-	# Trade corridors: soft ring on path provinces that are not already primary logistics / depots.
-	for plan_var in sm.get_all_routes():
-		if not (plan_var is SupplyRoutePlan):
-			continue
-		var tplan := plan_var as SupplyRoutePlan
-		if not tplan.represents_trade_flow or tplan.province_path.size() < 2:
-			continue
-		for pid_var in tplan.province_path:
-			var pid2 := int(pid_var)
-			var cur := str(roles.get(pid2, ""))
-			if cur in ["active", "preview", "route", "hub"]:
+			var plan := plan_var as SupplyRoutePlan
+			if plan.represents_trade_flow:
+				if plan.province_path.size() >= 2:
+					for pid_var in plan.province_path:
+						(ctx["trade_pids"] as Dictionary)[int(pid_var)] = true
 				continue
-			roles[pid2] = "trade_transit"
-	_apply_infra_pressure_overlay_roles(roles)
+			for pid_var in plan.province_path:
+				(ctx["route_pids"] as Dictionary)[int(pid_var)] = true
+	return ctx
+
+
+func _supply_role_for_pid(pid: int, ctx: Dictionary = {}, allow_without_overlay: bool = false) -> String:
+	if ctx.is_empty():
+		ctx = _supply_role_context()
+	var role := ""
+	var has_depot: Dictionary = ctx.get("has_depot", {})
+	if bool(has_depot.get(pid, false)):
+		role = "hub"
+	var selected := int(ctx.get("selected", -1))
+	if selected >= 0 and pid == selected:
+		return "active"
+	var preview_pids: Dictionary = ctx.get("preview_pids", {})
+	var route_pids: Dictionary = ctx.get("route_pids", {})
+	if preview_pids.has(pid):
+		role = "preview"
+	elif route_pids.has(pid):
+		role = "route"
+	if role in ["active", "preview", "route"]:
+		return role
+	var trade_pids: Dictionary = ctx.get("trade_pids", {})
+	if role != "hub" and trade_pids.has(pid):
+		role = "trade_transit"
+	var roles: Dictionary[int, String] = {}
+	if not role.is_empty():
+		roles[pid] = role
+	# Hub (player depot / depot_states) is protected inside the helper
+	# the same way as route/active/preview — infra<45 must not replace it.
+	_apply_infra_pressure_role_for_pid(pid, roles, allow_without_overlay)
+	return str(roles.get(pid, ""))
+
+
+func _supply_highlight_roles() -> Dictionary[int, String]:
+	if _supply_toggle_in_progress:
+		_supply_toggle_role_computes += 1
+		_supply_first_lon_role_credited = true
+	var roles: Dictionary[int, String] = {}
+	if not supply_mode:
+		return roles
+	_supply_full_role_recomputes += 1
+	return _compute_supply_highlight_roles()
+
+
+func _compute_supply_highlight_roles() -> Dictionary[int, String]:
+	# Exact L-on role walk. Prebuild must use this (not allow_without_overlay).
+	var roles: Dictionary[int, String] = {}
+	var saved_sem := _supply_role_lon_semantics
+	_supply_role_lon_semantics = true
+	var ctx := _supply_role_context()
+	for pid in province_nodes.keys():
+		var role := _supply_role_for_pid(int(pid), ctx)
+		if not role.is_empty():
+			roles[int(pid)] = role
+	_supply_role_lon_semantics = saved_sem
 	return roles
+
+
+func get_supply_roles_histogram(roles: Dictionary = {}) -> Dictionary:
+	var src: Dictionary = roles
+	if src.is_empty():
+		src = _supply_role_by_province
+	if src.is_empty():
+		src = _supply_roles_cache
+	var hist: Dictionary = {}
+	for pid_var in src.keys():
+		var role := str(src[pid_var])
+		if role.is_empty():
+			continue
+		hist[role] = int(hist.get(role, 0)) + 1
+	return hist
+
+
+func supply_roles_match_fresh_lon() -> bool:
+	var live: Dictionary = _supply_role_by_province
+	if live.is_empty():
+		live = _supply_roles_cache
+	var saved := supply_mode
+	supply_mode = true
+	var fresh := _compute_supply_highlight_roles()
+	supply_mode = saved
+	if live.size() != fresh.size():
+		return false
+	for pid_var in fresh.keys():
+		if str(live.get(int(pid_var), "")) != str(fresh[pid_var]):
+			return false
+	return true
 
 
 func _apply_infra_pressure_overlay_roles(roles: Dictionary[int, String]) -> void:
 	if not supply_mode:
 		return
 	for pid_var in province_nodes.keys():
-		var pid := int(pid_var)
-		var existing: String = str(roles.get(pid, ""))
-		if existing in ["active", "preview", "route"]:
-			continue
-		if not provinces.has(pid):
-			continue
-		var p: Province = provinces[pid] as Province
-		if p == null:
-			continue
-		var focus := ProvinceInsight.agent_pressure_focus_kind(p)
-		# Mass 1936 path: infra < 45 + owned land → engineers_recommended.
-		# Must not call get_engineer_assignment_snapshot / breakdown per pid
-		# (that was the L-on hang: 3k snapshots + 6k Line2Ds).
-		if focus != "sabotage":
-			var tag := str(p.controller_tag).strip_edges().to_upper()
-			if tag.is_empty():
-				tag = str(p.owner_tag).strip_edges().to_upper()
-			if not tag.is_empty() and ProvinceInsight.province_benefits_country(p, tag):
-				if int(p.infrastructure) < 45:
-					roles[pid] = "engineers_recommended"
-					continue
-				if focus == "disrupt":
-					roles[pid] = "supply_pressure"
-					continue
-				continue
+		_apply_infra_pressure_role_for_pid(int(pid_var), roles)
+
+
+func _apply_infra_pressure_role_for_pid(pid: int, roles: Dictionary[int, String], allow_without_overlay: bool = false) -> void:
+	if not supply_mode and not allow_without_overlay and not _supply_role_lon_semantics:
+		return
+	var existing: String = str(roles.get(pid, ""))
+	if existing in ["active", "preview", "route", "hub"]:
+		return
+	if _pid_is_player_supply_hub(pid):
+		# Same precedence as the full-build path: a player depot keeps hub
+		# even when the caller has not stamped the role yet (infra<45).
+		roles[pid] = "hub"
+		return
+	if not provinces.has(pid):
+		return
+	var p: Province = provinces[pid] as Province
+	if p == null:
+		return
+	var focus := ProvinceInsight.agent_pressure_focus_kind(p)
+	# Mass 1936 path: infra < 45 + owned land → engineers_recommended.
+	# Must not call get_engineer_assignment_snapshot / breakdown per pid
+	# (that was the L-on hang: 3k snapshots + 6k Line2Ds).
+	if focus != "sabotage":
+		var tag := str(p.controller_tag).strip_edges().to_upper()
+		if tag.is_empty():
+			tag = str(p.owner_tag).strip_edges().to_upper()
+		if not tag.is_empty() and ProvinceInsight.province_benefits_country(p, tag):
+			if int(p.infrastructure) < 45:
+				roles[pid] = "engineers_recommended"
+				return
 			if focus == "disrupt":
 				roles[pid] = "supply_pressure"
-				continue
-			continue
-		if typeof(MapManager) == TYPE_NIL:
-			continue
-		var bd: Dictionary = MapManager.get_infrastructure_repair_breakdown(pid)
-		var eng_role := ProvinceInsight.get_engineer_supply_overlay_role(p, bd)
-		if not eng_role.is_empty():
-			roles[pid] = eng_role
-			continue
+				return
+			return
+		# Old allow_without_overlay cheat: stamp infra pressure even when the
+		# overlay is off and the province is outside L-on country match
+		# (unowned / no-benefit land). L-on lon_semantics does not.
+		if allow_without_overlay and (not p.is_sea) and int(p.infrastructure) < 45:
+			roles[pid] = "engineers_recommended"
+			return
 		if focus == "disrupt":
 			roles[pid] = "supply_pressure"
-			continue
-		var depot_sab := float(bd.get("depot_sabotage_level", 0.0))
-		if depot_sab > 0.12:
-			roles[pid] = "depot_sabotage"
-			continue
+			return
+		return
+	if typeof(MapManager) == TYPE_NIL:
+		return
+	var bd: Dictionary = MapManager.get_infrastructure_repair_breakdown(pid)
+	var eng_role := ProvinceInsight.get_engineer_supply_overlay_role(p, bd)
+	if not eng_role.is_empty():
+		roles[pid] = eng_role
+		return
+	if focus == "disrupt":
+		roles[pid] = "supply_pressure"
+		return
+	var depot_sab := float(bd.get("depot_sabotage_level", 0.0))
+	if depot_sab > 0.12:
+		roles[pid] = "depot_sabotage"
+		return
 
 
 func _pulse_supply_outlines() -> void:
+	if supply_mode:
+		_reconcile_supply_overlay_if_needed(false)
 	if _supply_outline_batch != null and is_instance_valid(_supply_outline_batch) and _supply_outline_batch.visible:
 		var skip: Dictionary = {}
 		for flash_pid in _engineer_assign_flash_by_province.keys():
@@ -29463,22 +29961,39 @@ func _pulse_amount_for_supply_role(role: String) -> float:
 
 
 func _refresh_supply_highlights(reuse_cached_roles: bool = false) -> void:
+	var t0 := Time.get_ticks_usec()
 	# Hang-class: L off is hide-only. Never walk 3520 nodes or rebuild Line2Ds.
 	if not supply_mode:
 		_set_supply_outline_batch_visible(false)
 		_supply_role_by_province = {}
+		_last_refresh_supply_highlights_ms = float(Time.get_ticks_usec() - t0) / 1000.0
 		return
-	if reuse_cached_roles and _supply_outline_batch_is_ready() and not _supply_roles_cache.is_empty():
+	_finish_supply_ring_prebuild_if_needed()
+	_reconcile_supply_overlay_if_needed(reuse_cached_roles)
+	if (
+		_supply_outline_batch_is_ready()
+		and not _supply_roles_cache.is_empty()
+		and _supply_roles_cache_is_fresh()
+	):
 		_supply_role_by_province = _supply_roles_cache.duplicate()
+		_maybe_credit_first_toggle_role_compute()
 		_set_supply_outline_batch_visible(true)
+		_supply_ring_prebuild_done = true
+		_last_refresh_supply_highlights_ms = float(Time.get_ticks_usec() - t0) / 1000.0
 		return
 	var roles := _supply_highlight_roles()
 	_supply_role_by_province = roles
 	if _supply_roles_cache_matches(roles) and _supply_outline_batch_is_ready():
 		_set_supply_outline_batch_visible(true)
+		_supply_ring_prebuild_done = true
+		_last_refresh_supply_highlights_ms = float(Time.get_ticks_usec() - t0) / 1000.0
 		return
 	_supply_roles_cache = roles.duplicate()
+	_store_supply_roles_cache_fingerprint()
 	_apply_supply_roles_to_batch(roles)
+	_supply_ring_prebuild_done = true
+	_supply_prebuild_phase = SUPPLY_PREBUILD_DONE
+	_last_refresh_supply_highlights_ms = float(Time.get_ticks_usec() - t0) / 1000.0
 
 
 func get_supply_overlay_outline_visible_count() -> int:
@@ -29514,6 +30029,113 @@ func get_supply_toggle_glyph_layouts() -> int:
 	return _supply_toggle_glyph_layouts
 
 
+func get_supply_full_role_recomputes() -> int:
+	return _supply_full_role_recomputes
+
+
+func get_supply_batch_patches() -> int:
+	return _supply_batch_patches
+
+
+func get_last_supply_reconcile_ms() -> float:
+	return _supply_last_reconcile_ms
+
+
+func get_last_supply_toggle_profile() -> Dictionary:
+	return _last_supply_toggle_profile.duplicate()
+
+
+func get_last_refresh_supply_highlights_ms() -> float:
+	return _last_refresh_supply_highlights_ms
+
+
+func get_supply_ring_prebuild_stats() -> Dictionary:
+	var layer_stats: Dictionary = {}
+	if _supply_outline_batch_is_ready() and _supply_outline_batch.has_method("get_idle_prebuild_stats"):
+		layer_stats = _supply_outline_batch.call("get_idle_prebuild_stats") as Dictionary
+	return {
+		"done": _supply_ring_prebuild_done,
+		"phase": _supply_prebuild_phase,
+		"total_ms": _supply_prebuild_total_ms,
+		"last_step_ms": _supply_prebuild_step_ms,
+		"max_step_ms": _supply_prebuild_max_step_ms,
+		"setup_ms": _supply_prebuild_setup_ms,
+		"frames": _supply_prebuild_frames,
+		"warmed": bool(layer_stats.get("warmed", false)),
+		"item_count": int(layer_stats.get("item_count", 0)),
+		"layer_total_ms": float(layer_stats.get("total_ms", 0.0)),
+		"layer_last_step_ms": float(layer_stats.get("last_step_ms", 0.0)),
+		"budget_ms": SUPPLY_RING_IDLE_BUDGET_MS,
+	}
+
+
+func get_supply_batch_draw_stats() -> Dictionary:
+	if _supply_outline_batch_is_ready() and _supply_outline_batch.has_method("get_last_draw_stats"):
+		return _supply_outline_batch.call("get_last_draw_stats") as Dictionary
+	return {}
+
+
+func supply_in_view_present_complete() -> bool:
+	if not supply_mode or not _supply_outline_batch_is_ready():
+		return false
+	if not bool(_supply_outline_batch.visible):
+		return false
+	if _supply_outline_batch.has_method("in_view_present_complete"):
+		return bool(_supply_outline_batch.call("in_view_present_complete"))
+	return false
+
+
+func get_supply_present_frame_index() -> int:
+	if _supply_outline_batch_is_ready() and _supply_outline_batch.has_method("get_present_frame_index"):
+		return int(_supply_outline_batch.call("get_present_frame_index"))
+	return 0
+
+
+func get_supply_roles_cache_copy() -> Dictionary:
+	return _supply_roles_cache.duplicate()
+
+
+func get_supply_prebuild_roles_copy() -> Dictionary:
+	return _supply_prebuild_roles.duplicate()
+
+
+func is_supply_ring_prebuild_ready() -> bool:
+	return _supply_ring_prebuild_done and _supply_outline_batch_is_ready()
+
+
+func warm_supply_outline_gpu_for_current_view() -> void:
+	if not _supply_outline_batch_is_ready():
+		return
+	_feed_supply_outline_batch_view()
+	if _supply_outline_batch.has_method("upload_meshes_now"):
+		_supply_outline_batch.call("upload_meshes_now")
+
+
+func _maybe_credit_first_toggle_role_compute() -> void:
+	if not _supply_toggle_in_progress or _supply_first_lon_role_credited:
+		return
+	_supply_toggle_role_computes += 1
+	_supply_first_lon_role_credited = true
+
+
+func get_legend_board_walks() -> int:
+	return _legend_board_walks
+
+
+func get_legend_text_writes() -> int:
+	return _legend_text_writes
+
+
+func get_legend_style_writes() -> int:
+	return _legend_style_writes
+
+
+func get_supply_legend_pulse_modulate() -> Color:
+	if _supply_legend_pulse_border != null and is_instance_valid(_supply_legend_pulse_border):
+		return _supply_legend_pulse_border.self_modulate
+	return Color(0, 0, 0, 0)
+
+
 func _supply_outline_batch_is_ready() -> bool:
 	return _supply_outline_batch != null and is_instance_valid(_supply_outline_batch)
 
@@ -29527,10 +30149,257 @@ func _supply_roles_cache_matches(roles: Dictionary[int, String]) -> bool:
 	return true
 
 
+func _supply_topology_fingerprint() -> String:
+	var sm := _supply_manager()
+	if sm == null:
+		return "null"
+	var parts: PackedStringArray = PackedStringArray()
+	var routes_dict: Dictionary = {}
+	if "_routes" in sm:
+		routes_dict = sm._routes as Dictionary
+	var keys: Array = routes_dict.keys()
+	keys.sort()
+	for k in keys:
+		var plan: Variant = routes_dict[k]
+		var iid := 0
+		if plan != null and plan is Object:
+			iid = int((plan as Object).get_instance_id())
+		parts.append("%s:%d" % [str(k), iid])
+	var depot_n := 0
+	if "depot_states" in sm:
+		depot_n = int((sm.depot_states as Dictionary).size())
+	var depot_hash := 0
+	if "player_depot_province_ids" in sm:
+		var ids: Array = (sm.player_depot_province_ids as Array).duplicate()
+		ids.sort()
+		depot_hash = hash(ids)
+	var selected := -1
+	if sm.has_method("get_selected_province_id"):
+		selected = int(sm.get_selected_province_id())
+	if selected < 0:
+		selected = selected_province_id
+	var preview_key := "0"
+	if _supply_reroute_active and sm.has_method("preview_player_route"):
+		var prev: Variant = sm.preview_player_route()
+		if prev != null and prev is Object:
+			preview_key = str((prev as Object).get_instance_id())
+	return "%s|d%d|h%d|s%d|p%s" % ["+".join(parts), depot_n, depot_hash, selected, preview_key]
+
+
+func _collect_supply_route_pids() -> Dictionary:
+	var out := {}
+	var sm := _supply_manager()
+	if sm == null or not sm.has_method("get_all_routes"):
+		return out
+	for plan_var in sm.get_all_routes():
+		if not (plan_var is SupplyRoutePlan):
+			continue
+		var plan := plan_var as SupplyRoutePlan
+		if plan.represents_trade_flow:
+			continue
+		for pid_var in plan.province_path:
+			out[int(pid_var)] = true
+	return out
+
+
+func _collect_supply_depot_pids() -> Dictionary:
+	var out := {}
+	var sm := _supply_manager()
+	if sm == null:
+		return out
+	if "depot_states" in sm:
+		for pid_var in sm.depot_states.keys():
+			out[int(pid_var)] = true
+	if "player_depot_province_ids" in sm:
+		for pid_var in sm.player_depot_province_ids:
+			out[int(pid_var)] = true
+	return out
+
+
+func _pid_is_player_supply_hub(pid: int) -> bool:
+	var sm := _supply_manager()
+	if sm == null:
+		return false
+	if "player_depot_province_ids" in sm:
+		if pid in (sm.player_depot_province_ids as Array):
+			return true
+	if "depot_states" in sm:
+		if (sm.depot_states as Dictionary).has(pid):
+			return true
+	return false
+
+
+func _supply_role_context_fingerprint() -> String:
+	var sm := _supply_manager()
+	var depot_n := 0
+	var depot_hash := 0
+	if sm != null and "depot_states" in sm:
+		var keys: Array = (sm.depot_states as Dictionary).keys()
+		depot_n = keys.size()
+		keys.sort()
+		depot_hash = hash(keys)
+	var route_n := 0
+	if sm != null and sm.has_method("get_all_routes"):
+		route_n = (sm.get_all_routes() as Array).size()
+	var selected := -1
+	if sm != null and sm.has_method("get_selected_province_id"):
+		selected = int(sm.get_selected_province_id())
+	if selected < 0:
+		selected = selected_province_id
+	return "lon|d%d|h%d|r%d|s%d" % [depot_n, depot_hash, route_n, selected]
+
+
+func _supply_depot_count() -> int:
+	var sm := _supply_manager()
+	if sm == null or not ("depot_states" in sm):
+		return 0
+	return int((sm.depot_states as Dictionary).size())
+
+
+func _store_supply_roles_cache_fingerprint() -> void:
+	_supply_roles_cache_fingerprint = _supply_topology_fingerprint()
+	_supply_roles_cache_role_fp = _supply_role_context_fingerprint()
+	_supply_cache_route_pids = _collect_supply_route_pids()
+	_supply_cache_depot_pids = _collect_supply_depot_pids()
+
+
+func _supply_roles_cache_is_fresh() -> bool:
+	if _supply_roles_cache.is_empty():
+		return false
+	if not _supply_overlay_dirty_pids.is_empty():
+		return false
+	if _supply_roles_cache_fingerprint != _supply_topology_fingerprint():
+		return false
+	return _supply_roles_cache_role_fp == _supply_role_context_fingerprint()
+
+
+func _pid_set_symmetric_diff(a: Dictionary, b: Dictionary) -> Dictionary:
+	var out := {}
+	for k in a.keys():
+		if not b.has(k):
+			out[int(k)] = true
+	for k in b.keys():
+		if not a.has(k):
+			out[int(k)] = true
+	return out
+
+
+func _reconcile_supply_overlay_if_needed(from_toggle: bool = false) -> void:
+	if not supply_mode:
+		return
+	var t0 := Time.get_ticks_usec()
+	var fp := _supply_topology_fingerprint()
+	var fp_changed := fp != _supply_roles_cache_fingerprint
+	var dirty: Dictionary = _supply_overlay_dirty_pids.duplicate()
+	if not fp_changed and dirty.is_empty() and not _supply_roles_cache.is_empty() and _supply_outline_batch_is_ready():
+		_supply_last_reconcile_ms = float(Time.get_ticks_usec() - t0) / 1000.0
+		return
+	var force_full := (
+		_supply_roles_cache.is_empty()
+		or not _supply_outline_batch_is_ready()
+		or (from_toggle and dirty.size() > 256)
+	)
+	if force_full:
+		var roles := _supply_highlight_roles()
+		_supply_role_by_province = roles
+		_supply_roles_cache = roles.duplicate()
+		_store_supply_roles_cache_fingerprint()
+		_supply_overlay_dirty_pids.clear()
+		var sm_full := _supply_manager()
+		if supply_map_layer != null and sm_full != null and sm_full.has_method("get_all_routes"):
+			supply_map_layer.set_routes(sm_full.get_all_routes())
+		_apply_supply_roles_to_batch(roles)
+		_supply_last_reconcile_ms = float(Time.get_ticks_usec() - t0) / 1000.0
+		return
+	var sm := _supply_manager()
+	if fp_changed and supply_map_layer != null and sm != null and sm.has_method("get_all_routes"):
+		supply_map_layer.set_routes(sm.get_all_routes())
+	var new_route_pids := _collect_supply_route_pids()
+	var new_depot_pids := _collect_supply_depot_pids()
+	var patch_pids := _pid_set_symmetric_diff(_supply_cache_route_pids, new_route_pids)
+	var depot_diff := _pid_set_symmetric_diff(_supply_cache_depot_pids, new_depot_pids)
+	for k in depot_diff.keys():
+		patch_pids[int(k)] = true
+	for k in dirty.keys():
+		var dpid := int(k)
+		if dpid >= 0:
+			patch_pids[dpid] = true
+	if patch_pids.is_empty():
+		_store_supply_roles_cache_fingerprint()
+		_supply_overlay_dirty_pids.clear()
+		_supply_last_reconcile_ms = float(Time.get_ticks_usec() - t0) / 1000.0
+		return
+	var ctx := _supply_role_context()
+	var upserts: Dictionary = {}
+	var removed: Array[int] = []
+	for pid_var in patch_pids.keys():
+		var pid := int(pid_var)
+		var new_role := _supply_role_for_pid(pid, ctx)
+		var old_role := str(_supply_roles_cache.get(pid, ""))
+		if new_role.is_empty():
+			if _supply_roles_cache.has(pid):
+				_supply_roles_cache.erase(pid)
+				_supply_role_by_province.erase(pid)
+				removed.append(pid)
+		elif new_role != old_role or not _supply_roles_cache.has(pid):
+			_supply_roles_cache[pid] = new_role
+			_supply_role_by_province[pid] = new_role
+			upserts[pid] = new_role
+	_store_supply_roles_cache_fingerprint()
+	_supply_overlay_dirty_pids.clear()
+	if not upserts.is_empty() or not removed.is_empty():
+		_patch_supply_roles_on_batch(upserts, removed)
+	_supply_last_reconcile_ms = float(Time.get_ticks_usec() - t0) / 1000.0
+
+
+func _patch_supply_roles_on_batch(upsert_roles: Dictionary, removed_pids: Array[int]) -> void:
+	var batch := _ensure_supply_outline_batch()
+	if batch == null:
+		return
+	var upserts: Array[Dictionary] = []
+	for pid_var in upsert_roles.keys():
+		var item := _supply_role_batch_item(int(pid_var), str(upsert_roles[pid_var]))
+		if not item.is_empty():
+			upserts.append(item)
+	if batch.has_method("patch_items"):
+		batch.call("patch_items", upserts, removed_pids)
+	else:
+		_apply_supply_roles_to_batch(_supply_roles_cache)
+		return
+	batch.visible = true
+	_supply_batch_patches += 1
+
+
+func _supply_role_batch_item(pid: int, role: String) -> Dictionary:
+	if role.is_empty():
+		return {}
+	if _engineer_assign_flash_by_province.has(pid):
+		return {}
+	var node := _province_node(pid)
+	if node == null:
+		return {}
+	var pts := _cached_supply_polygon(node, pid)
+	if pts.size() < 3:
+		return {}
+	var style: Dictionary = ProvinceMapVisuals.get_supply_outline_style(role)
+	return {
+		"pid": pid,
+		"points": pts,
+		"color": style["color"],
+		"glow": style["glow"],
+		"width": style["width"],
+		"glow_extra": style["glow_extra"],
+		"z_index": style["z_index"],
+		"role": role,
+	}
+
+
 func _set_supply_outline_batch_visible(on: bool) -> void:
 	if not _supply_outline_batch_is_ready():
 		return
 	_supply_outline_batch.visible = on
+	if not on and _supply_outline_batch.has_method("mark_hidden_for_split_present"):
+		_supply_outline_batch.call("mark_hidden_for_split_present")
 
 
 func _cached_supply_polygon(node: Node2D, pid: int) -> PackedVector2Array:
@@ -29556,7 +30425,255 @@ func _ensure_supply_outline_batch() -> Node2D:
 	batch.name = "SupplyOutlineBatch"
 	container.add_child(batch)
 	_supply_outline_batch = batch
+	var env_w := OS.get_environment("EOA_RENDER1_RING_WIDTH_SCALE").strip_edges()
+	if env_w.is_valid_float() and batch.has_method("set_width_scale"):
+		batch.call("set_width_scale", float(env_w))
 	return _supply_outline_batch
+
+
+func _tick_supply_ring_idle_prebuild() -> void:
+	if supply_mode or _supply_toggle_in_progress or _supply_ring_prebuild_done:
+		return
+	if container == null or province_nodes.is_empty():
+		return
+	if _supply_outline_batch_is_ready() and not _supply_roles_cache.is_empty() and _supply_prebuild_phase == SUPPLY_PREBUILD_IDLE:
+		_supply_ring_prebuild_done = true
+		return
+	if _supply_prebuild_phase == SUPPLY_PREBUILD_IDLE:
+		var n_now := province_nodes.size()
+		var depot_n := _supply_depot_count()
+		if n_now != _supply_prebuild_seen_n or depot_n != _supply_prebuild_seen_depots:
+			_supply_prebuild_seen_n = n_now
+			_supply_prebuild_seen_depots = depot_n
+			_supply_prebuild_stable_frames = 0
+			return
+		_supply_prebuild_stable_frames += 1
+		if _supply_prebuild_stable_frames < 3:
+			return
+	var t0 := Time.get_ticks_usec()
+	if _supply_prebuild_phase == SUPPLY_PREBUILD_IDLE:
+		_supply_prebuild_pids = province_nodes.keys()
+		_supply_prebuild_cursor = 0
+		_supply_prebuild_roles.clear()
+		_supply_prebuild_items.clear()
+		_supply_prebuild_fp = ""
+		_supply_prebuild_role_fp = ""
+		_supply_prebuild_mesh_begun = false
+		_supply_prebuild_warm_frames = 0
+		_supply_prebuild_ctx = _supply_role_context()
+		_ensure_supply_outline_batch()
+		_supply_prebuild_phase = SUPPLY_PREBUILD_ROLES
+		_supply_prebuild_setup_ms = float(Time.get_ticks_usec() - t0) / 1000.0
+		_supply_prebuild_step_ms = _supply_prebuild_setup_ms
+		_supply_prebuild_total_ms += _supply_prebuild_step_ms
+		_supply_prebuild_frames += 1
+		return
+	# One phase per idle frame so setup/warm/fingerprint cannot stack over 8 ms.
+	if _supply_prebuild_phase == SUPPLY_PREBUILD_ROLES:
+		_step_supply_prebuild_roles(t0)
+	elif _supply_prebuild_phase == SUPPLY_PREBUILD_ITEMS:
+		_step_supply_prebuild_items(t0)
+	elif _supply_prebuild_phase == SUPPLY_PREBUILD_MESH:
+		_step_supply_prebuild_mesh(t0)
+	elif _supply_prebuild_phase == SUPPLY_PREBUILD_WARM:
+		_begin_supply_prebuild_hidden_warm()
+	elif _supply_prebuild_phase == SUPPLY_PREBUILD_WARM_WAIT:
+		_step_supply_prebuild_hidden_warm()
+	_supply_prebuild_step_ms = float(Time.get_ticks_usec() - t0) / 1000.0
+	_supply_prebuild_total_ms += _supply_prebuild_step_ms
+	if _supply_prebuild_step_ms > _supply_prebuild_max_step_ms:
+		_supply_prebuild_max_step_ms = _supply_prebuild_step_ms
+	_supply_prebuild_frames += 1
+
+
+func _prebuild_role_allow_flag() -> bool:
+	return OS.get_environment("EOA_RENDER1_PREBUILD_MUTANT").strip_edges() == "allow_without_overlay"
+
+
+func _supply_prebuild_usec_left(t0: int) -> int:
+	return int(SUPPLY_RING_IDLE_WORK_MS * 1000.0) - (Time.get_ticks_usec() - t0)
+
+
+func _step_supply_prebuild_roles(t0: int) -> void:
+	var depot_n := _supply_depot_count()
+	if depot_n != _supply_prebuild_seen_depots:
+		_supply_prebuild_seen_depots = depot_n
+		_supply_prebuild_ctx = _supply_role_context()
+		_supply_prebuild_roles.clear()
+		_supply_prebuild_cursor = 0
+		_supply_prebuild_pids = province_nodes.keys()
+	if _supply_prebuild_ctx.is_empty():
+		_supply_prebuild_ctx = _supply_role_context()
+	var saved_sem := _supply_role_lon_semantics
+	_supply_role_lon_semantics = true
+	var mutant := OS.get_environment("EOA_RENDER1_PREBUILD_MUTANT").strip_edges()
+	if mutant == "lon_semantics_off":
+		_supply_role_lon_semantics = false
+	var n := _supply_prebuild_pids.size()
+	while _supply_prebuild_cursor < n and _supply_prebuild_usec_left(t0) > 0:
+		var pid := int(_supply_prebuild_pids[_supply_prebuild_cursor])
+		var role := _supply_role_for_pid(pid, _supply_prebuild_ctx, _prebuild_role_allow_flag())
+		if not role.is_empty():
+			_supply_prebuild_roles[pid] = role
+		_supply_prebuild_cursor += 1
+	_supply_role_lon_semantics = saved_sem
+	if _supply_prebuild_cursor >= n:
+		_supply_prebuild_phase = SUPPLY_PREBUILD_ITEMS
+		_supply_prebuild_cursor = 0
+		_supply_prebuild_pids = _supply_prebuild_roles.keys()
+
+
+func _step_supply_prebuild_items(t0: int) -> void:
+	if _supply_prebuild_fp.is_empty():
+		_supply_prebuild_fp = _supply_topology_fingerprint()
+		_supply_prebuild_role_fp = _supply_role_context_fingerprint()
+		_supply_prebuild_route_pids = _collect_supply_route_pids()
+		_supply_prebuild_depot_pids = _collect_supply_depot_pids()
+		return
+	var n := _supply_prebuild_pids.size()
+	while _supply_prebuild_cursor < n and _supply_prebuild_usec_left(t0) > 0:
+		var pid := int(_supply_prebuild_pids[_supply_prebuild_cursor])
+		var role := str(_supply_prebuild_roles.get(pid, ""))
+		var item := _supply_role_batch_item(pid, role)
+		if not item.is_empty():
+			_supply_prebuild_items.append(item)
+		_supply_prebuild_cursor += 1
+	if _supply_prebuild_cursor >= n:
+		_supply_prebuild_phase = SUPPLY_PREBUILD_MESH
+
+
+func _step_supply_prebuild_mesh(t0: int) -> void:
+	if not _supply_prebuild_mesh_begun:
+		var batch := _ensure_supply_outline_batch()
+		if batch != null and batch.has_method("begin_idle_set_items"):
+			_feed_supply_outline_batch_view()
+			batch.call("begin_idle_set_items", _supply_prebuild_items)
+			_supply_prebuild_mesh_begun = true
+			return
+		if batch != null:
+			_apply_supply_roles_to_batch(_supply_prebuild_roles)
+			_set_supply_outline_batch_visible(false)
+			_supply_prebuild_mesh_begun = true
+			_supply_prebuild_phase = SUPPLY_PREBUILD_WARM
+		else:
+			_supply_prebuild_phase = SUPPLY_PREBUILD_DONE
+			_supply_ring_prebuild_done = true
+		return
+	if not _supply_outline_batch_is_ready() or not _supply_outline_batch.has_method("step_idle_prebuild"):
+		_supply_prebuild_phase = SUPPLY_PREBUILD_WARM
+		return
+	var remain_ms := float(_supply_prebuild_usec_left(t0)) / 1000.0
+	if remain_ms <= 0.0:
+		return
+	var mesh_ready: bool = bool(_supply_outline_batch.call("step_idle_prebuild", remain_ms))
+	if mesh_ready:
+		_supply_prebuild_phase = SUPPLY_PREBUILD_WARM
+
+
+func _begin_supply_prebuild_hidden_warm() -> void:
+	if not _supply_outline_batch_is_ready():
+		_commit_supply_prebuild_cache()
+		return
+	if _supply_outline_batch.has_method("begin_hidden_warm"):
+		_supply_outline_batch.call("begin_hidden_warm")
+	# Do not force_draw or present rings while L is off.
+	_supply_prebuild_warm_frames = 0
+	_supply_prebuild_phase = SUPPLY_PREBUILD_WARM_WAIT
+
+
+func _step_supply_prebuild_hidden_warm() -> void:
+	if _supply_outline_batch_is_ready() and _supply_outline_batch.has_method("step_hidden_warm"):
+		_supply_outline_batch.call("step_hidden_warm")
+	_force_supply_ring_gpu_submit()
+	_supply_prebuild_warm_frames += 1
+	if _supply_prebuild_warm_frames < SUPPLY_PREBUILD_WARM_FRAMES:
+		return
+	if _supply_outline_batch_is_ready() and _supply_outline_batch.has_method("finish_hidden_warm"):
+		_supply_outline_batch.call("finish_hidden_warm")
+	_commit_supply_prebuild_cache()
+
+
+func _force_supply_ring_gpu_submit() -> void:
+	# Queue only. force_draw here would land in the 8 ms idle slice.
+	# The engine presents at end of frame; WARM_WAIT waits three presents.
+	if _supply_outline_batch_is_ready() and _supply_outline_batch is CanvasItem:
+		(_supply_outline_batch as CanvasItem).queue_redraw()
+
+
+func _commit_supply_prebuild_cache() -> void:
+	if not _supply_prebuild_roles.is_empty():
+		_supply_roles_cache = _supply_prebuild_roles.duplicate()
+		if _supply_prebuild_fp.is_empty():
+			_supply_prebuild_fp = _supply_topology_fingerprint()
+			_supply_prebuild_role_fp = _supply_role_context_fingerprint()
+			_supply_prebuild_route_pids = _collect_supply_route_pids()
+			_supply_prebuild_depot_pids = _collect_supply_depot_pids()
+		_supply_roles_cache_fingerprint = _supply_prebuild_fp
+		_supply_roles_cache_role_fp = _supply_prebuild_role_fp
+		_supply_cache_route_pids = _supply_prebuild_route_pids.duplicate()
+		_supply_cache_depot_pids = _supply_prebuild_depot_pids.duplicate()
+	_set_supply_outline_batch_visible(false)
+	_supply_prebuild_phase = SUPPLY_PREBUILD_DONE
+	_supply_ring_prebuild_done = true
+	# Legend panel + board-stat cache after this idle slice (not on L-on).
+	call_deferred("_warm_supply_legend_off_lon")
+
+
+func _warm_supply_legend_off_lon() -> void:
+	_legend_board_stats()
+	_update_supply_overlay_legend()
+
+
+func _finish_supply_ring_prebuild_if_needed() -> void:
+	if _supply_ring_prebuild_done:
+		return
+	if _supply_prebuild_phase == SUPPLY_PREBUILD_IDLE:
+		return
+	while _supply_prebuild_phase == SUPPLY_PREBUILD_ROLES or _supply_prebuild_phase == SUPPLY_PREBUILD_ITEMS:
+		var t0 := Time.get_ticks_usec()
+		if _supply_prebuild_phase == SUPPLY_PREBUILD_ROLES:
+			_step_supply_prebuild_roles(t0)
+		if _supply_prebuild_phase == SUPPLY_PREBUILD_ITEMS:
+			_step_supply_prebuild_items(t0)
+	if _supply_prebuild_phase == SUPPLY_PREBUILD_MESH and not _supply_prebuild_mesh_begun:
+		_step_supply_prebuild_mesh(Time.get_ticks_usec())
+	if _supply_outline_batch_is_ready() and _supply_outline_batch.has_method("finish_idle_prebuild"):
+		_supply_outline_batch.call("finish_idle_prebuild")
+		if _supply_prebuild_phase == SUPPLY_PREBUILD_MESH:
+			_supply_prebuild_phase = SUPPLY_PREBUILD_WARM
+	if _supply_outline_batch_is_ready() and _supply_outline_batch.has_method("finish_hidden_warm"):
+		_supply_outline_batch.call("finish_hidden_warm")
+	if _supply_prebuild_phase != SUPPLY_PREBUILD_DONE:
+		_commit_supply_prebuild_cache()
+
+
+func _feed_supply_outline_batch_view() -> void:
+	if not _supply_outline_batch_is_ready():
+		return
+	if not _supply_outline_batch.has_method("set_view"):
+		return
+	var cam := get_viewport().get_camera_2d() if get_viewport() else null
+	var z := 0.318
+	var view := Rect2(-1.0e7, -1.0e7, 2.0e7, 2.0e7)
+	if cam != null:
+		z = maxf(cam.zoom.x, cam.zoom.y)
+		view = _camera_world_view_rect(cam)
+	elif container != null:
+		var cs := absf(container.scale.x)
+		if cs > 0.0001:
+			z = cs
+	_supply_outline_batch.call("set_view", z, view)
+
+
+func _camera_world_view_rect(cam: Camera2D) -> Rect2:
+	var size := Vector2(1280.0, 740.0)
+	var vp := get_viewport()
+	if vp != null:
+		size = vp.get_visible_rect().size
+	var zx := maxf(cam.zoom.x, 0.001)
+	var zy := maxf(cam.zoom.y, 0.001)
+	var world_size := Vector2(size.x / zx, size.y / zy)
+	return Rect2(cam.global_position - world_size * 0.5, world_size).grow(64.0)
 
 
 func _apply_supply_roles_to_batch(roles: Dictionary[int, String]) -> void:
@@ -29619,6 +30736,31 @@ func _update_supply_overlay_legend() -> void:
 		style.content_margin_top = 6
 		style.content_margin_bottom = 6
 		panel.add_theme_stylebox_override("panel", style)
+		var host := Control.new()
+		host.name = "SupplyOverlayLegendHost"
+		host.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		host.set_anchors_preset(Control.PRESET_TOP_LEFT)
+		host.offset_left = 10.0
+		host.offset_top = 56.0
+		host.custom_minimum_size = Vector2(480, 0)
+		host.z_index = 40
+		var pulse := Panel.new()
+		_supply_legend_pulse_border = pulse
+		pulse.name = "SupplyLegendPulseBorder"
+		pulse.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		pulse.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		var pulse_style := StyleBoxFlat.new()
+		pulse_style.bg_color = Color(0, 0, 0, 0)
+		pulse_style.draw_center = false
+		pulse_style.border_color = Color(1, 1, 1, 1)
+		pulse_style.set_border_width_all(2)
+		pulse_style.set_corner_radius_all(5)
+		pulse.add_theme_stylebox_override("panel", pulse_style)
+		pulse.self_modulate = Color(0.35, 0.55, 0.85, 0.75)
+		host.add_child(pulse)
+		panel.set_anchors_preset(Control.PRESET_TOP_LEFT)
+		panel.offset_left = 0.0
+		panel.offset_top = 0.0
 		var vbox := VBoxContainer.new()
 		vbox.add_theme_constant_override("separation", 4)
 		panel.add_child(vbox)
@@ -29662,7 +30804,10 @@ func _update_supply_overlay_legend() -> void:
 		_supply_overlay_legend.mouse_filter = Control.MOUSE_FILTER_STOP  # allow text scroll; Close still above
 		_supply_overlay_legend.add_theme_font_size_override("normal_font_size", 11)
 		margin.add_child(_supply_overlay_legend)
-		ui.add_child(panel)
+		host.add_child(panel)
+		ui.add_child(host)
+		if not panel.resized.is_connected(_sync_supply_legend_pulse_host):
+			panel.resized.connect(_sync_supply_legend_pulse_host)
 	_update_supply_legend_text()
 
 
@@ -29676,18 +30821,48 @@ func _on_close_supply_legend_pressed() -> void:
 	print("MapRenderer: SupplyOverlayLegend closed by user")
 
 
-func _update_supply_legend_text() -> void:
+func _invalidate_legend_board_stats() -> void:
+	_legend_stat_cache_dirty = true
+
+
+func _legend_board_stats() -> Dictionary:
+	var y := _legend_tracked_year
+	var m := _legend_tracked_month
+	var d := _legend_tracked_day
+	if (
+		_legend_stat_cache_dirty
+		or y != _legend_stat_cache_year
+		or m != _legend_stat_cache_month
+		or d != _legend_stat_cache_day
+	):
+		_legend_board_walks += 1
+		_legend_cached_contested = ProvinceInsight.count_contested_provinces(provinces)
+		_legend_cached_agent = ProvinceInsight.count_agent_networks(provinces, _player_tag())
+		_legend_cached_dual = ProvinceInsight.count_dual_situation_provinces(provinces)
+		_legend_stat_cache_year = y
+		_legend_stat_cache_month = m
+		_legend_stat_cache_day = d
+		_legend_stat_cache_dirty = false
+	return {
+		"contested": _legend_cached_contested,
+		"agent": _legend_cached_agent,
+		"dual": _legend_cached_dual,
+	}
+
+
+func _update_supply_legend_text(update_hint: bool = true) -> void:
 	_set_supply_legend_visible(supply_mode)
 	if _supply_overlay_legend != null and supply_mode:
 		var hover_role := ""
 		if _hover_province != null:
 			hover_role = str(_supply_role_by_province.get(_hover_province.id, ""))
 		var hid := _hover_province.id if _hover_province != null else -1
-		var contested_n := ProvinceInsight.count_contested_provinces(provinces)
-		var agent_n := ProvinceInsight.count_agent_networks(provinces, _player_tag())
-		var dual_n := ProvinceInsight.count_dual_situation_provinces(provinces)
+		var stats := _legend_board_stats()
+		var contested_n := int(stats.get("contested", 0))
+		var agent_n := int(stats.get("agent", 0))
+		var dual_n := int(stats.get("dual", 0))
 		var pulse := _get_active_map_time_pulse_bbcode()
-		_supply_overlay_legend.text = ProvinceInsight.build_supply_legend_bbcode(
+		var new_text := ProvinceInsight.build_supply_legend_bbcode(
 			selected_province_id,
 			_compare_candidate_ids.size(),
 			hid,
@@ -29699,26 +30874,59 @@ func _update_supply_legend_text() -> void:
 			pulse,
 			_map_time_pulse_kind,
 		)
+		if _supply_overlay_legend.text != new_text:
+			_supply_overlay_legend.text = new_text
+			_legend_text_writes += 1
 		_apply_supply_legend_time_pulse_style(not pulse.is_empty(), _map_time_pulse_kind)
-	_update_compare_hint_label()
+	if update_hint:
+		_update_compare_hint_label()
+
+
+func _sync_supply_legend_pulse_host() -> void:
+	if _supply_legend_panel == null or not is_instance_valid(_supply_legend_panel):
+		return
+	var host := _supply_legend_panel.get_parent() as Control
+	if host == null:
+		return
+	var sz: Vector2 = _supply_legend_panel.size
+	host.custom_minimum_size = sz
+	host.size = sz
+	if _supply_legend_pulse_border != null and is_instance_valid(_supply_legend_pulse_border):
+		_supply_legend_pulse_border.size = sz
+
+
+func _legend_pulse_modulate_for(pulse_active: bool, pulse_kind: String) -> Color:
+	if not pulse_active:
+		return Color(0.35, 0.55, 0.85, 0.75)
+	if pulse_kind == "year":
+		return Color(0.45, 0.82, 1.0, 0.95)
+	if pulse_kind == "month":
+		return Color(0.55, 0.72, 0.92, 0.9)
+	if pulse_kind == "day":
+		return Color(0.42, 0.52, 0.68, 0.82)
+	return Color(0.55, 0.72, 0.92, 0.9)
 
 
 func _apply_supply_legend_time_pulse_style(pulse_active: bool, pulse_kind: String = "") -> void:
-	if _supply_legend_panel == null:
+	if _legend_pulse_last_active == pulse_active and _legend_pulse_last_kind == pulse_kind:
 		return
-	var style := _supply_legend_panel.get_theme_stylebox("panel") as StyleBoxFlat
-	if style == null:
+	_legend_pulse_last_active = pulse_active
+	_legend_pulse_last_kind = pulse_kind
+	if _supply_legend_pulse_border == null or not is_instance_valid(_supply_legend_pulse_border):
 		return
-	if not pulse_active:
-		style.border_color = Color(0.35, 0.55, 0.85, 0.75)
-	elif pulse_kind == "year":
-		style.border_color = Color(0.45, 0.82, 1.0, 0.95)
-	elif pulse_kind == "month":
-		style.border_color = Color(0.55, 0.72, 0.92, 0.9)
-	elif pulse_kind == "day":
-		style.border_color = Color(0.42, 0.52, 0.68, 0.82)
-	else:
-		style.border_color = Color(0.55, 0.72, 0.92, 0.9)
+	_sync_supply_legend_pulse_host()
+	_supply_legend_pulse_border.self_modulate = _legend_pulse_modulate_for(pulse_active, pulse_kind)
+	_legend_style_writes += 1
+
+
+func _set_compare_hint_style(new_text: String, new_color: Color) -> void:
+	if _compare_hint_label == null:
+		return
+	if _compare_hint_label.text != new_text:
+		_compare_hint_label.text = new_text
+	if _compare_hint_last_color != new_color:
+		_compare_hint_label.add_theme_color_override("font_color", new_color)
+		_compare_hint_last_color = new_color
 
 
 func _update_compare_hint_label() -> void:
@@ -29731,14 +30939,16 @@ func _update_compare_hint_label() -> void:
 		_compare_hint_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_compare_hint_label.add_theme_font_size_override("font_size", 11)
 		_compare_hint_label.add_theme_color_override("font_color", Color(1.0, 0.75, 0.45))
+		_compare_hint_last_color = Color(1.0, 0.75, 0.45)
 		_compare_hint_label.set_anchors_preset(Control.PRESET_TOP_LEFT)
 		_compare_hint_label.offset_left = 12.0
 		_compare_hint_label.offset_top = 52.0
 		_compare_hint_label.custom_minimum_size = Vector2(480, 0)
 		ui.add_child(_compare_hint_label)
-	var contested_n := ProvinceInsight.count_contested_provinces(provinces)
-	var agent_n := ProvinceInsight.count_agent_networks(provinces, _player_tag())
-	var dual_n := ProvinceInsight.count_dual_situation_provinces(provinces)
+	var stats := _legend_board_stats()
+	var contested_n := int(stats.get("contested", 0))
+	var agent_n := int(stats.get("agent", 0))
+	var dual_n := int(stats.get("dual", 0))
 	var show_compare := selected_province_id >= 0 and not supply_mode
 	var show_conflict := contested_n > 0 and not supply_mode and not show_compare
 	var show_agent := agent_n > 0 and not supply_mode and not show_compare and not show_conflict
@@ -29762,30 +30972,39 @@ func _update_compare_hint_label() -> void:
 		var overlay := ProvinceInsight.build_map_supply_mode_hint_plain(
 			contested_n, agent_n, dual_n, selected_province_id, p_tag,
 		)
-		_compare_hint_label.text = base + "  |  " + overlay if not overlay.is_empty() else base
-		_compare_hint_label.add_theme_color_override("font_color", Color(1.0, 0.75, 0.45))
-	elif show_supply_overlays:
-		_compare_hint_label.text = ProvinceInsight.build_map_supply_mode_hint_plain(
-			contested_n, agent_n, dual_n, -1, p_tag,
+		_set_compare_hint_style(
+			base + "  |  " + overlay if not overlay.is_empty() else base,
+			Color(1.0, 0.75, 0.45),
 		)
-		_compare_hint_label.add_theme_color_override("font_color", Color(0.55, 0.92, 0.78))
+	elif show_supply_overlays:
+		_set_compare_hint_style(
+			ProvinceInsight.build_map_supply_mode_hint_plain(
+				contested_n, agent_n, dual_n, -1, p_tag,
+			),
+			Color(0.55, 0.92, 0.78),
+		)
 	elif show_compare:
-		var hid := _hover_province.id if _hover_province != null else -1
-		var hover_cand := _is_compare_candidate(hid)
-		_compare_hint_label.text = ProvinceInsight.build_map_compare_hint_plain(
-			selected_province_id, _compare_candidate_ids.size(), hid, hover_cand,
+		var hid2 := _hover_province.id if _hover_province != null else -1
+		var hover_cand2 := _is_compare_candidate(hid2)
+		_set_compare_hint_style(
+			ProvinceInsight.build_map_compare_hint_plain(
+				selected_province_id, _compare_candidate_ids.size(), hid2, hover_cand2,
+			),
+			Color(1.0, 0.75, 0.45),
 		)
 	elif show_conflict:
-		_compare_hint_label.text = ProvinceInsight.build_conflict_map_hint_plain(contested_n)
-		_compare_hint_label.add_theme_color_override("font_color", Color(1.0, 0.55, 0.55))
-	elif show_agent:
-		_compare_hint_label.text = (
-			"◎ %d agent network%s — rings pulse daily · hover for strength & today's activity"
-			% [agent_n, "s" if agent_n != 1 else ""]
+		_set_compare_hint_style(
+			ProvinceInsight.build_conflict_map_hint_plain(contested_n),
+			Color(1.0, 0.55, 0.55),
 		)
-		_compare_hint_label.add_theme_color_override("font_color", Color(0.72, 0.55, 1.0))
+	elif show_agent:
+		_set_compare_hint_style(
+			"◎ %d agent network%s — rings pulse daily · hover for strength & today's activity"
+			% [agent_n, "s" if agent_n != 1 else ""],
+			Color(0.72, 0.55, 1.0),
+		)
 	else:
-		_compare_hint_label.add_theme_color_override("font_color", Color(1.0, 0.75, 0.45))
+		_set_compare_hint_style(_compare_hint_label.text, Color(1.0, 0.75, 0.45))
 
 
 func _set_supply_legend_visible(visible: bool) -> void:
@@ -29796,7 +31015,11 @@ func _set_supply_legend_visible(visible: bool) -> void:
 		var margin := _supply_overlay_legend.get_parent()
 		panel = margin.get_parent() if margin else null
 	if panel is CanvasItem:
-		panel.visible = visible
+		var host := (panel as Node).get_parent() as CanvasItem
+		if host != null and host.name == "SupplyOverlayLegendHost":
+			host.visible = visible
+		else:
+			panel.visible = visible
 
 
 func _supply_depot_tint_color(fill_ratio: float) -> Color:

@@ -8,6 +8,17 @@
 
 ## Recommended Testing Approach
 
+### 0. PROD-1 Prod button (top info bar)
+
+Live 1280×800 after Begin: leftover MapRenderer left-up swallow used to eat Prod (`ACTION_MODE_BUTTON_RELEASE`). Guard clicks the real ProductionButton through `Input.parse_input_event` (not `_on_production_pressed`), asserts the production screen is visible, then Close→Prod opens it again.
+
+```bash
+tools/run_godot.sh --headless --path . --resolution 1280x800 \
+  -s res://scripts/core/HeadlessProd1ButtonOpenTest.gd
+```
+
+Wired as `launch_prod1_button_open` on the full gate script. `--quick` stays the same 14 known `unit_board_play_path` reds.
+
 ### 1. Core Time System Tests
 
 - Load a scenario and verify the top bar date matches `start_date`.
@@ -398,6 +409,412 @@ tools/run_godot.sh --headless --path . --resolution 1280x740 \
 
 Wired as `launch_perf3_supply_toggle` in `tools/eoa_full_test_gates.sh` (full path only). `--quick` is unchanged pure-python. Not live Play. Merge **HOLD**.
 
+### PERF-5 legend day tick + supply overlay freshness (draft HOLD)
+
+Off main `61a80433`. Tip `ae88fea5` PR **#90**. Two MapRenderer-only bugs: (a) L-on `_on_game_day_advanced_legend` mutated the legend StyleBox every day (theme + fit_content relayout); (b) PERF-3 cache reuse left stale rings after depot/capture because nothing called `set_routes` and `_supply_roles_cache` had no fingerprint. Fix: pulse via a sibling modulate overlay, per-day count cache, hint write-on-change, expiry restyle-only; overlay fingerprint poll + dirty pids + incremental `patch_items` (signals are accelerators only — #88 mutation paths emit nothing). Headless legend p95 **17.11** / worst **32.03** (ops 0/0/0); overlay B1/B2/B3 PASS; PERF-3 second L-on roles=1. Mutants A1–A6 B1–B8 FAIL by selection. Local #88 merge @ `34d76f21` overlay still PASS. Wired after `launch_perf3_supply_toggle`. `--quick` still the same 14 known `unit_board_play_path` reds. `HeadlessPerf3SupplyToggleTest` unedited. Not live Play. Merge **HOLD**.
+
+```bash
+tools/run_godot.sh --headless --path . --resolution 1280x740 \
+  -s res://scripts/core/HeadlessPerf5LegendDayTickTest.gd
+tools/run_godot.sh --headless --path . --resolution 1280x740 \
+  -s res://scripts/core/HeadlessPerf5SupplyOverlayFreshTest.gd
+```
+
+### PERF-6 day-roll supply slices (draft HOLD, headless; live A/B pending)
+
+Simulated M3 is local `eab3d0c9` (`cursor/m3-sim-88-89-90`: #88 `7529eac9`, #89 `6b1d9cb0`, #90 `2c68a67c`). `ac9926c5` is absent here and on GitHub. `origin/main` remains `61a80433`. Rebase onto the real M3 SHA when it lands. Interactive light sim queues the one full supply day; slices drain through `SupplyManager._process` / `refill_after_clock` at ≤20 ms, in order flush → generate → naval → fuel → air → shipping. Generate walks `depot_states` insertion order with a resumable cursor. A backup tick that would cross midnight finishes the open job on that non-roll frame. Paused frames do no slice work. Light production harvest stays on `day_n % 5 == 0`; reinforce moves to `day_n % 5 == 2`. Non-light callers still run `advance_supply_day` synchronously.
+
+Measured soft-supply split on this machine (Home 1x, player GER, soft USA, 3196 depots), from `last_supply_day_profile`:
+
+| section | ms |
+|---|---:|
+| total | 98.866 |
+| flush | 0.004 |
+| generate | 92.693 |
+| naval | 3.455 |
+| fuel | 2.448 |
+| air | 0.043 |
+| shipping | 0.040 |
+| plans | 0 |
+| rebuilds | 0 |
+
+Generate is the dominant section (92.693 of 98.866 ms).
+
+`HeadlessPerf6DayRollTest` **FAIL on M3 product** / **PASS on the tip**:
+
+| check | M3 product | tip |
+|---|---|---|
+| queue | `queue_full_supply_day` missing | queued |
+| 1× day_ai p95 / max | 107.1 / 112.0 | 12.1 / 14.4 |
+| 4× day_ai p95 / max | 102.3 / 102.5 | 10.7 / 10.9 |
+| slice max | 0.00 (no slicer) | 20.03 |
+| listener max | 1.2 | 1.2 (1×) / 1.3 (4×) |
+| unfinished rolls | 0 | 0 |
+| depot equality | (queue missing; stagger saw 0 days) | diff none, 6 drains |
+| production 10d | — | harvests 2, reinforces 2, diff none |
+| production day 12 | — | harvests 2, reinforces 3, both false |
+| pause mid-slice | — | phase 1 index 608, cursor held |
+| catch-up | — | 7.79 ms, count 0→1 |
+| roll-frame slice | — | 0.00 ms |
+
+ProductionManager's listener on this board is about 1.2 ms. The roll-frame cost that moved is the supply day inside `day_ai`.
+
+Mutants the behaviour test kills: (a) sync supply on the roll frame (M3 day_ai 107–112 vs tip 12–14); (b) unfinished at the next roll (`unfinished_rolls=0`); (c) generate cursor not resumed (depot diff none); (d) harvest and reinforce on the same day (day-12 reinforces 3, harvests 2, `both=false`); (e) slice order / key order (1e-6 depot equality); (f) slicing while paused (cursor held, slice ms 0); (g) atomic phase starting inside the last 2 ms of the 20 ms budget (naval stays at phase 2, `naval_ms=0`); (h) a generate step whose last cost exceeds remaining budget (index stays 0).
+
+**FIX #1 (slice cap on a slower box):** Verification on tip `6471a65e` failed 4/4 **only** on slice max (1× 26.34–36.55, 4× 25.22–27.57). Atomic phases (flush / naval / fuel / air) ran whole once started, so a phase that began near 19.9 ms landed at 23–27 ms; a generate step plus GC reached ~36 ms. Fix: `_run_supply_day_job` does not start an atomic phase unless remaining budget ≥ last measured cost + 2 ms (pessimistic defaults naval 6.0 / fuel 4.5 until measured, stored on the job). Generate/ship loops also stop when remaining < max(last item + 0.5 ms, 5 ms reserve). Deadline 0 (sync `advance_supply_day` / midnight catch-up) still runs the rest. Phase order, one-day-per-day, pause, and depot equality are unchanged — budgets change WHEN work runs, not WHAT. The 25 ms bar stays. `HeadlessPerf6DayRollTest` adds `_test_atomic_phase_defer` and `_test_generate_step_bound` (deadline logic, not wall-clock speed).
+
+`HeadlessPerf6DayRollTest` **3/3 PASS** on tip (plus one 3-busy-loop CPU-load run), slice max ≤25 and 0 frames over:
+
+| run | 1× slice max (over) | 4× slice max (over) |
+|---|---:|---:|
+| 1 | 16.13 (0) | 17.48 (0) |
+| 2 | 15.13 (0) | 17.99 (0) |
+| 3 | 18.14 (0) | 17.82 (0) |
+| CPU load | 16.41 (0) | 17.78 (0) |
+
+Atomic defer + generate-step bound **PASS**. Depot diff none. Seed 193601 two collects identical (md5 `0e7237ac2a2f6feedf5c8032045e866d`): JAP 903951 / FRA 710739 / ITA 710859 / ENG 711481 / POL 711054 / SOV none / JAP 902474. `--quick` same 14 `unit_board_play_path` reds. map_qc NE **0.9853**.
+
+**FIX #2 (progress guarantee + estimate decay):** FIX #1 stored a phase's last cost clamped to 20 ms. Afford is `remaining ≤ estimate + 2`, so a 19 ms spike can never start under the 20 ms budget; the phase is never re-measured and the day stalls until deadline-0 catch-up. Headless harnesses that do not force the windowed backup (LiveMultiAi, Perf6 4× on a slow box) then finish 0 full supply days.
+
+Fix in `_run_supply_day_job` / `_generate_local_supply_range` / `_ship_routes_range`: if this slice has done **no work yet this frame**, always run the next atomic phase or at least one generate/ship item. Only defer after some work in the same frame. Deadline 0 still runs everything. `_supply_slice_note_phase_ms` EMA-blends `0.75·old + 0.25·new` (same as the item EMA) and clamps to `[0.05, 20]`. A deferred phase (or item) decays `×0.8` toward the 0.05 ms floor each frame it is skipped. Phase order, key order, and WHAT are unchanged — budgets still only change WHEN work runs. `_test_atomic_phase_defer` / `_test_generate_step_bound` still assert FIX #1 deferral **after** the frame has already done work.
+
+`HeadlessPerf6StarveTest` (wired `launch_perf6_starve`) forces a 19 ms atomic-phase estimate and, separately, a 20 ms generate-item estimate through the real job path at a 20 ms budget; pumps `_process` frames at 1× and 4× **without** catch-up / deadline-0; asserts `full_supply_day_count +1` within 160 frames and no slice `> 25 ms`; resets `supply_slice_phase_cost_estimate_ms` after each case.
+
+`HeadlessPerf6StarveTest` **FAIL on `d31e3223`** / **PASS on the tip**:
+
+```
+HeadlessPerf6StarveTest: RESULT=FAIL   # d31e3223 (phase/item 1×+4× starved 0→0 left=1 frames=160)
+HeadlessPerf6StarveTest: RESULT=PASS   # tip (phase 1× 10f slice_max=15.03; 4× 8f 15.02; item 1×/4× 5f)
+```
+
+`HeadlessPerf6DayRollTest` **3/3 PASS** (FIX #2 sitting). Paste clock lines:
+
+```
+clock 1x frames=870 full=12 unfinished_rolls=0 slice_max=17.77 slice_over=0 day_ai_n=12 p95=10.9 max=13.0 listener_n=12 listener_max=1.1
+clock 4x frames=221 full=12 unfinished_rolls=0 slice_max=17.98 slice_over=0 day_ai_n=12 p95=8.9 max=8.9 listener_n=12 listener_max=1.0
+clock 1x frames=870 full=12 unfinished_rolls=0 slice_max=17.53 slice_over=0 day_ai_n=12 p95=13.6 max=18.8 listener_n=12 listener_max=1.1
+clock 4x frames=221 full=12 unfinished_rolls=0 slice_max=18.51 slice_over=0 day_ai_n=12 p95=8.6 max=8.7 listener_n=12 listener_max=1.0
+clock 1x frames=870 full=12 unfinished_rolls=0 slice_max=17.49 slice_over=0 day_ai_n=12 p95=12.9 max=15.8 listener_n=12 listener_max=1.2
+clock 4x frames=222 full=12 unfinished_rolls=0 slice_max=17.93 slice_over=0 day_ai_n=12 p95=8.7 max=9.2 listener_n=12 listener_max=1.1
+```
+
+`HeadlessPerf4LiveMultiAiDayTest` **3/3 PASS** (exactly one full supply day per game day). Interactive **PASS** (one full supply day per soft apply). Daily **PASS** (7d wall 33.6 ms). Leftover-queue / MUST1 inside LiveMultiAi: TopInfoBar 6/0, scene-order 7/0, windowed-backup 7/0 `plans_on_roll=0`, refill after the clock, `tm_calendar_roll` → `tib_skip_refill`. Stockpile **PASS**. Perf5 overlay **PASS**. Legend **PASS** p95 5.50 / worst 17.77. Seed 193601 `multi_ai_decisions` identical across 3 OS-process runs and unchanged vs `d31e3223`. Locked infra: JAP 903951 / FRA 710739 / ITA 710859 / POL 711054 / ENG 711481 / USA 800075. `--quick` same 14 `unit_board_play_path` reds (`se_england` fill-toe 1, first-session play surface 1, unit_centric_pick 3, unit_counter_chrome 2, unit_card_fill_toe 3, living_unit_order_loop 4). map_qc NE **0.9853**.
+
+Mutants killed by `HeadlessPerf6StarveTest` behaviour:
+
+| mutant | killing check |
+|---|---|
+| (i) remove the progress guarantee | `progress_first` + queued 19 ms phase 1×/4× starve (`full 0→0 left=1`) |
+| (ii) remove the estimate decay | `defer_decay` (`naval_last_ms` stays 19.000, want ~15.210) |
+| (iii) clamp the estimate to 20 ms again with no decay | `run_ema` (last=actual 2.144, not 0.75·19+0.25·actual) + `defer_decay` |
+
+```bash
+tools/run_godot.sh --headless --path . \
+  -s res://scripts/core/HeadlessPerf6StarveTest.gd
+```
+
+Wired as `launch_perf6_starve` immediately after `launch_perf6_day_roll`. Merge **HOLD**. Headless; live A/B pending.
+
+**FIX #3 (pace + bounded midnight catch-up):** g99c on `5f7d4cc7` kept full=12/12 and killed the FIX #2 starve, but the 25 ms slice cap still broke: quiet 4× **29.6 ms**, loaded 37–146 ms, memory-pressure **1055 ms**. `_should_catch_up_supply_day` switched `_drain_queued_supply_day_slice` to deadline 0 when the backup tick was ≤80 ms away and crossed midnight, so the remainder ran in one frame. Atomic phases (naval ~3.5 / fuel ~2.4 / air <1 ms) and the progress guarantee were not the cause.
+
+Fix: each drain estimates remaining generate/ship items × item EMA + remaining atomic phase estimates, and frames left before the midnight-crossing tick (`_ms_until_backup_tick` / frame time). Budget stays 20 ms and rises to **at most 22 ms** when behind pace. The last 4 non-roll frames drain at ≤22 ms. Unbounded sync finish is last-resort on the final non-roll frame only and is counted in `supply_catch_up_sync_ms` / `supply_catch_up_sync_count` (the 25 ms cap still includes that frame via `last_supply_slice_ms`). Phase order / key order / WHAT unchanged — budgets only change WHEN.
+
+`HeadlessPerf6DayRollTest` logs `catch_up_frames`, `catch_up_sync_count`, and catch-up max ms per clock run; asserts every frame ≤25 ms (catch-up included) and `catch_up_sync_count==0` at 1× and 4× over 12 days.
+
+`HeadlessPerf6PaceTest` (wired `launch_perf6_pace`) pause-skips 10 drain frames of a 4× day (existing pause seam), then drains in the catch-up window; asserts the day finishes before the roll, every frame ≤25 ms, no unbounded sync. Also asserts `_supply_slice_paced_budget_ms` is 22 ms when remaining work / 4 frames would miss a 20 ms budget.
+
+`HeadlessPerf6PaceTest` **FAIL on `5f7d4cc7`** / **PASS on the tip**:
+
+```
+HeadlessPerf6PaceTest: RESULT=FAIL   # 5f7d4cc7 — paced helper missing; lag 4× slice max 81.36ms over 1
+HeadlessPerf6PaceTest: RESULT=PASS   # tip — budget 22.00 remaining 811.5; lag 4× 6f slice_max=17.02 sync=0
+```
+
+`HeadlessPerf6DayRollTest` **3/3 PASS** (+ 2-core busy-loop CPU load). Paste clock lines:
+
+```
+clock 1x frames=871 full=12 unfinished_rolls=0 slice_max=18.82 slice_over=0 catch_up_frames=0 catch_up_sync_count=0 catch_up_max=0.00 day_ai_n=12 p95=13.9 max=14.4 listener_n=12 listener_max=1.5
+clock 4x frames=222 full=12 unfinished_rolls=0 slice_max=17.96 slice_over=0 catch_up_frames=0 catch_up_sync_count=0 catch_up_max=0.00 day_ai_n=12 p95=9.2 max=10.3 listener_n=12 listener_max=1.1
+clock 1x frames=870 full=12 unfinished_rolls=0 slice_max=17.36 slice_over=0 catch_up_frames=0 catch_up_sync_count=0 catch_up_max=0.00 day_ai_n=12 p95=13.5 max=17.0 listener_n=12 listener_max=1.2
+clock 4x frames=221 full=12 unfinished_rolls=0 slice_max=17.73 slice_over=0 catch_up_frames=0 catch_up_sync_count=0 catch_up_max=0.00 day_ai_n=12 p95=8.5 max=8.5 listener_n=12 listener_max=1.0
+clock 1x frames=870 full=12 unfinished_rolls=0 slice_max=17.50 slice_over=0 catch_up_frames=0 catch_up_sync_count=0 catch_up_max=0.00 day_ai_n=12 p95=14.8 max=17.8 listener_n=12 listener_max=1.5
+clock 4x frames=221 full=12 unfinished_rolls=0 slice_max=17.52 slice_over=0 catch_up_frames=0 catch_up_sync_count=0 catch_up_max=0.00 day_ai_n=12 p95=9.0 max=9.6 listener_n=12 listener_max=1.1
+clock 1x frames=870 full=12 unfinished_rolls=0 slice_max=17.56 slice_over=0 catch_up_frames=0 catch_up_sync_count=0 catch_up_max=0.00 day_ai_n=12 p95=14.5 max=18.1 listener_n=12 listener_max=1.3
+clock 4x frames=222 full=12 unfinished_rolls=0 slice_max=18.57 slice_over=0 catch_up_frames=0 catch_up_sync_count=0 catch_up_max=0.00 day_ai_n=12 p95=9.7 max=10.1 listener_n=12 listener_max=1.1
+```
+
+(last pair = 2-core Python busy-loop load.)
+
+`HeadlessPerf6StarveTest` **3/3 PASS**. `HeadlessPerf4LiveMultiAiDayTest` **3/3 PASS** (exactly one full supply day per game day; leftover-queue / MUST1: TopInfoBar 6/0, scene-order 7/0, windowed-backup 7/0 `plans_on_roll=0`, refill after the clock, `tm_calendar_roll` → `tib_skip_refill`). Interactive **PASS** (one full supply day per soft apply, +2). Daily **PASS** (7d wall **32.4 ms**). Stockpile **PASS**. Perf5 overlay **PASS**. Legend **PASS** p95 **5.77** / worst **18.58**. Seed 193601 `multi_ai_decisions` identical across 3 OS-process runs and unchanged vs `5f7d4cc7`. Locked infra: **JAP 903951, FRA 710739, ITA 710859, USA 800075, ENG 711481 (t6, t7), POL 711054, SOV none**. `--quick` same 14 `unit_board_play_path` reds. map_qc NE **0.9853**.
+
+Mutants killed by behaviour:
+
+| mutant | killing check |
+|---|---|
+| (i) remove pacing (fixed 20 ms) | Pace `pace_budget` stayed 20.00 with remaining 811.5 / 4 frames |
+| (ii) restore ≤80 ms unbounded catch-up | Pace lag 4× slice max **82.75 ms** |
+| (iii) FIX #2 no_progress | Starve `progress_first` + queued 19 ms phase 1×/4× starve (`full 0→0 left=1`) |
+| (iii) FIX #2 no_decay | Starve `defer_decay` (`naval_last_ms` stays 19.000, want ~15.210) |
+| (iii) FIX #2 clamp20 no EMA | Starve `run_ema` (last=actual, not 0.75·19+0.25·actual) + `defer_decay` |
+
+```bash
+tools/run_godot.sh --headless --path . \
+  -s res://scripts/core/HeadlessPerf6PaceTest.gd
+```
+
+Wired as `launch_perf6_pace` immediately after `launch_perf6_starve`. Merge **HOLD**. Headless; live A/B pending.
+
+The two `perf4_daily_sim_tick_product.py` edits (and their unit test) stay: `advance_supply_day` now only builds a job and calls `_run_supply_day_job(..., 0)`, so the PERF-4 grep for `_process_air_missions` / `_process_naval_recon` / day-roll deferral has to read the runner body. Without that, `--quick` would fail `supply_day_full_steps_in_live`.
+
+Other headless this sitting: Interactive **PASS** (one full supply day per soft apply, +2, `queued_supply_day`, worst day_ai 14.3 ms). Daily **PASS** (7d wall 33.7 ms, worst day_ai 11.7 ms). Seed 193601, two collects inside that process, identical to the documented sequence JAP 903951 / FRA 710739 / ITA 710859 / ENG 711481 / POL 711054 / SOV none / JAP 902474. A third OS process was not run. Windowed-backup MUST1 **PASS** (7/7 `plans_on_roll=0`, `tm_calendar_roll` → `tib_skip_refill`). Live-equivalent **PASS** (full supply days 3/3; leftover 6/0, scene-order 7/0, windowed 7/0). Legend **PASS** p95 6.45 / worst 18.84. Overlay B1–B4 **PASS**. `HeadlessDailyProductionStockpileTest` **PASS**. `HeadlessProductionTest` does not finish on this tree (see CURRENT_STATE). `--quick` the same 14 `unit_board_play_path` reds (`se_england` fill-toe 1, first-session play surface 1, unit_centric_pick 3, unit_counter_chrome 2, unit_card_fill_toe 3, living_unit_order_loop 4). map_qc NE land hit **0.9853**. Live Play A/B is pending.
+
+```bash
+tools/run_godot.sh --headless --path . \
+  -s res://scripts/core/HeadlessPerf6DayRollTest.gd
+```
+
+Wired as `launch_perf6_day_roll` immediately after `launch_perf4_interactive_multi_ai`. Merge **HOLD**.
+
+### RENDER-1 L-on supply rings (ArrayMesh + Home LOD) (draft HOLD, headless; live A/B pending)
+
+Stack on #99 tip `5df8e7fc` (`cursor/perf6-dayroll-c4e1`). Main `61a80433` does not contain #90's `SupplyOutlineBatchLayer`. PR **#101**. Fence: layer + MapRenderer zoom/view-rect feed (`_refresh_terrain_zoom_light` only; `_ensure` does not force Full LOD) + `HeadlessRender1SupplyRingMeshTest` + gates register. OUT: `draw_polished_ring`, SupplyManager / PERF-6, #90 role logic, GameData, world data.
+
+**Ask 1 — base measure** (`5df8e7fc`, 3196×48-gon, Home z=0.318, headless):
+
+| mode | p50 | p90 | worst | notes |
+|---|---:|---:|---:|---|
+| L-off frame | 6.890 | 6.966 | 7.035 | |
+| L-on frame | 40.851 | 41.346 | 42.926 | |
+| L-on `_draw` CPU | 112.260 | 113.954 | 117.715 | 6392 AA polylines, 313208 polyline verts |
+
+Cold-first L-on on the base (empty role/batch caches, full `_toggle_supply_overlay`):
+
+| step | ms |
+|---|---:|
+| sm.toggle_overlay | 0.007 |
+| `_refresh_supply_highlights` | 45.955 |
+| legend | 18.466 |
+| sync | 0.012 |
+| total_incl_frame | 159.508 |
+
+Tip cold-first (`HeadlessRender1` (e′)): sm **0.005** / refresh **79.118** / batch **47.125** / legend **15.108** / sync **0.011** / toggle total **94.254** / frame_total **146.659**.
+
+`HeadlessRender1SupplyRingMeshTest` **FAIL on `5df8e7fc`** (polyline/AA `_draw`; mesh/LOD API missing) / **PASS on the tip** (≥3000 items):
+
+| bar | base `5df8e7fc` | tip |
+|---|---|---|
+| (a) 0 polyline/multiline and 0 AA in steady `_draw` | FAIL 6392 AA polylines | PASS mesh_calls=392 line=0 aa=0 |
+| (b) Home verts ≤25% of full; cull above threshold | FAIL (no LOD) | PASS 230112/1840896=**0.125**; culled=193 |
+| (c) 0 rebuilds across 60 idle frames | FAIL (per-frame polyline) | PASS |
+| (d) 1-depot `patch_items` p50≤1 ms, worst<50, touched chunks only | n/a polyline | PASS p50 **0.319** worst **0.376** touched **2/196** |
+| (e) warm L toggle first frame <100 ms | n/a | PASS **5.3** ms |
+| (e′) cold first L-on after boot <250 ms | polyline path | PASS **146.7** ms |
+| (f) pulse 0 rebuilds | n/a | PASS modulate-only |
+| (g) colour/width parity; every role present | n/a | PASS 15 roles |
+
+Mutants killed by named asserts:
+
+| mutant | killing assert |
+|---|---|
+| aa_on | (a) source `antialiased` hits=0 + runtime aa_calls=0 |
+| polyline_loop | (a) 0 line calls / mesh path |
+| lod_off | (b) Home/full=0.125 |
+| rebuild_in_draw | (c) rebuild count unchanged across 60 idle frames |
+| patch_full_rebuild | (d) touched=2/196 |
+| pulse_rebuild | (f) pulse leaves rebuild count unchanged |
+| counter_lie | sink mesh_calls/verts match real `draw_mesh` arrays |
+| cull_off | (b) culled_chunks=193, drawn < built |
+| skip_ignored | vis 3196→3194, built 230112→229968 |
+| cold_full_build | (e′) 146.7 ms < 250 |
+
+Regression: OverlayFresh B1–B4 **PASS**; Legend p95 **5.66** / worst **18.60** (≤60); Perf3 **PASS** (MAX_TOGGLE_MS=1000 unedited; Home 156.5 / 4.0 / 137.5; z0.760 5.8 / 4.0 / 5.6); Perf6 DayRoll **PASS** (1× slice_max 17.79 / 4× 17.89, full=12 sync=0); Starve **PASS**; Pace **PASS** (budget 22.00, lag 4× slice_max 17.03 sync=0). Seed 193601: `grep -o 'multi_ai_decisions=.*' log | md5sum` → `20fe9063de285f19d4f9b8a105abfd31` (reads **`20fe9063`**; do not carry PERF-6 FIX #1's private digest `0e7237ac`). `--quick` same 14 `unit_board_play_path` reds. map_qc NE **0.9853**. Headless; live A/B pending.
+
+**FIX #1 (cold first L-on + independent draw + seed digest):** Ship g101 NOT READY on two items. (e′) **334 / 293 / 296** ms vs 250 on Ship (this box **146.7**; base **295** — no cold-path gain). Breakdown: refresh ~95–102, batch ~55–60, legend ~27–30, **~160–200 ms first frame after toggle**. `counter_lie` survived: `draw_mesh(...)` removed from `_ci_draw_mesh`, counters kept, every assert except (e′) still passed. Seed write-up used `0e7237ac`.
+
+Fix (250 ms bar stays; target ≤180; Perf3 `MAX_TOGGLE_MS=1000` unedited):
+
+- Idle Home-LOD prebuild after map-ready, ≤8 ms/frame (`SUPPLY_RING_IDLE_BUDGET_MS=8`; setup on its own frame). Hidden warm (`begin_hidden_warm` / `modulate.a=0`) so the GPU upload is not on the L frame. Cold `_refresh_supply_highlights` skips the role walk when #90 roles are already cached. Fingerprint / route / depot snapshotted at role-collect so a later capture still trips `fp_changed`. Do not restart idle after a live batch or after first L-on.
+- `independent_draw_info`: RenderingServer / Viewport draw-info delta L-on vs L-off. Dummy headless reports 0; then a source scan requires a live `draw_mesh(` in `_ci_draw_mesh` (comments / `if false` do not count). Named assert; kills the exact `counter_lie` mutant.
+- Seed method (Ship): `grep -o 'multi_ai_decisions=.*' log | md5sum` → `20fe9063de285f19d4f9b8a105abfd31` (reads **`20fe9063`**). Tip is byte-identical to `5df8e7fc` on that line.
+
+`HeadlessRender1SupplyRingMeshTest` **PASS** on the FIX #1 tip (3196 items):
+
+| bar | original tip `3397d28c` | FIX #1 |
+|---|---|---|
+| (a) 0 polyline/AA; mesh_calls=392 | PASS | PASS |
+| (b) Home/full=0.125; culled=193 | PASS | PASS |
+| (c) 0 idle rebuilds | PASS | PASS |
+| (d) 1-depot patch | p50 0.319 / 0.376 | p50 **0.306** worst **0.427** touched 2/196 |
+| (e) warm L first frame <100 | 5.3 | **5.1** |
+| (e′) cold first L-on (target ≤180, bar 250) | 146.7 | **72.5** (toggle 15.4 / first_frame 57.0) |
+| (f) pulse 0 rebuilds | PASS | PASS |
+| (g) 15 roles | PASS | PASS |
+| `independent_draw_info` | wrapper only (mutant survived) | **PASS** dummy delta=0 `src_live=true` |
+
+Cold-first breakdown on FIX #1:
+
+| step | ms |
+|---|---:|
+| idle Home-LOD prebuild (off L) | 84.149 (12 frames, max_step 8.243, setup 7.402, warmed) |
+| sm.toggle_overlay | 0.004 |
+| `_refresh_supply_highlights` | **0.295** (cache hit) |
+| batch apply | 48.513 |
+| legend | 15.078 |
+| sync | 0.010 |
+| toggle wall | 15.409 |
+| first frame after toggle | 57.041 |
+| **frame_total (e′)** | **72.450** |
+
+`independent_draw_info` log: engine off/on all zeros; `src_live=true`; **killed `counter_lie`**. Removing `draw_mesh(...)` from `_ci_draw_mesh` while leaving counters FAILS this assert.
+
+Regression after FIX #1: OverlayFresh B1–B4 **PASS**; Legend p95 **5.92** / worst **18.62** (≤60); Perf3 **PASS** (MAX_TOGGLE_MS=1000 unedited; Home **138.8 / 4.1 / 132.1**; z0.760 **5.8 / 5.3 / 5.4**; roles=1 setups=0 glyphs=0); Perf6 DayRoll **PASS** (1× slice_max **17.40** / 4× **15.48**, full=12 sync=0); Starve **PASS**; Pace **PASS** (budget 22.00, lag 4× slice_max **17.02** sync=0). Seed 193601 ×3 OS processes identical:
+
+```
+grep -o 'multi_ai_decisions=.*' /tmp/render1-seed/runN.log | md5sum
+# 20fe9063de285f19d4f9b8a105abfd31  -
+```
+
+day0 JAP/SOV/ITA soft USA; d1 SOV/ITA/USA soft POL; d2 ITA/USA/POL soft ENG; d3 USA/POL/ENG soft FRA; d4 POL/ENG/FRA soft JAP. `--quick` same 14 `unit_board_play_path` reds. map_qc NE **0.9853**. Headless; live A/B pending.
+
+**FIX #2 (windowed draw gate + 8 ms idle + real GPU warm):** Ship g101b NOT READY. (e′) **198–209** ms headless / **246** windowed — this box's own 180 target failed on `a065eb49`. Idle max_step **8.2–10.0** vs 8.0 (105–111 ms / 14–15 frames). `counter_lie` survived: grep started at `func _ci_draw_mesh(` (the header contains `draw_mesh(`), so dummy delta=0 always passed.
+
+Fix:
+
+- Windowed `tools/eoa_render1_draw_guard.sh` (xvfb, like `eoa_rt1_pixel_guard.sh`). DisplayServer must not be headless. Engine L-on vs L-off delta **< mesh_calls is FAIL**. **0 is FAIL**. No grep fallback. `skip_engine_draw` (draw_mesh removed, counters kept) must produce delta 0. Headless `independent_draw_info` no longer PASSes on a source scan.
+- Idle: one phase per frame; 5.5 ms work cap so one last chunk cannot push **max_step > 8.0** (assert is `> 8.0` fail, no 12 ms slack). Fingerprint / `begin_idle` / warm each get their own frame.
+- Hidden warm submits at **a=1** for 3 presents (a=0 was culled — GPU upload stayed on L). `_draw` uses cached chunk vert counts (no `surface_get_arrays` on the L frame). Early L-on (`_finish_supply_ring_prebuild_if_needed`) drains mesh ingest so an empty ready batch cannot show visible=0 (Perf3).
+
+`HeadlessRender1SupplyRingMeshTest` **3/3 PASS** (not best-of):
+
+| run | (e′) cold ms | toggle | first_frame | max_step | refresh | legend | batch |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| 1 | **83.5** | 21.0 | 62.5 | **7.992** | 0.48 | 20.4 | 0 |
+| 2 | **78.6** | 18.8 | 59.8 | **5.678** | 0.42 | 18.3 | 0 |
+| 3 | **72.5** | 16.8 | 55.7 | **5.518** | 0.36 | 16.4 | 0 |
+
+Target ≤180, bar 250 kept. (a)–(g) hold. (e) warm 4.3–5.1.
+
+`tools/eoa_render1_draw_guard.sh` **PASS** (xvfb, DisplayServer=X11, RSS **2614** MB):
+
+```
+skip_engine_draw delta=0  → would FAIL (0 count is FAIL)
+live engine on={ draws: 392, prims: 76704, can_d: 392 }
+independent_draw_info killed mutant_counter_lie: engine delta=76704 >= mesh_calls=392
+```
+
+Regression: OverlayFresh B1–B4 **PASS**; Legend p95 **6.32** / worst **18.97**; Perf3 **PASS** (MAX_TOGGLE_MS=1000; Home **160.5 / 5.3 / 132.4**; z0.760 **6.0 / 4.9 / 5.9**; roles=1 setups=0 glyphs=0); Perf6 DayRoll **PASS** (1× slice_max **16.99** / 4× **16.12**, full=12 sync=0); Starve **PASS**; Pace **PASS** (budget 22.00, lag 4× **17.02** sync=0). Seed 193601 ×3:
+
+```
+grep -o 'multi_ai_decisions=.*' log | md5sum
+# 20fe9063de285f19d4f9b8a105abfd31  -
+```
+
+`--quick` same 14 `unit_board_play_path` reds. map_qc NE **0.9853**. Wired as `launch_render1_draw_guard` after `launch_render1_supply_ring_mesh`. Headless; live A/B pending.
+
+**FINAL cleanup (cap the cold-L chase; honest 250 bar):** Ship measured cold first L-on **188–210** ms headless / **208–246** ms windowed. That passes the project bar of **250**. This box's 72–84 / 180 target is not the gate. Do not chase further.
+
+- Product: `skip_engine_draw` removed from `SupplyOutlineBatchLayer`. `draw_mesh` always submits.
+- `counter_lie` mutant is a **source edit** in `WindowedRender1DrawGuard`: the test reloads the layer with `draw_mesh(...)` stripped and counters kept. Engine delta **0**. No product flag.
+- Leftover `_ci_draw_mesh_has_live_submit` / `ci_draw_mesh_live` grep deleted.
+- Cold assert is **250** only (`MAX_COLD_MS`). Each run prints `cold_raw display=… ms=…`. Never best-of.
+
+Six raw `cold_raw` on this box (3 headless + 3 windowed):
+
+| run | display | ms |
+|---|---|---:|
+| 1 | headless | **79.140** |
+| 2 | headless | **75.984** |
+| 3 | headless | **65.587** |
+| 1 | X11 | **90.655** |
+| 2 | X11 | **83.494** |
+| 3 | X11 | **80.322** |
+
+Windowed guard **3/3 PASS**: source-edit probe delta **0** (counters=392); live engine delta **76704** ≥ mesh_calls **392**. Seed 193601 ×3:
+
+```
+grep -o 'multi_ai_decisions=.*' log | md5sum
+# 20fe9063de285f19d4f9b8a105abfd31  -
+```
+
+`--quick` same 14 `unit_board_play_path` reds. map_qc NE **0.9853**. Headless; live A/B pending.
+
+**FIX #4 (ring colour + honest live-boot cold L-on):** Play MIXED on `9ddeecc3`: L-on roles were `engineers_recommended` 1678 / hub 1517 vs A's hub 3157 / route 38. Cause: idle prebuild called `_supply_role_for_pid(..., allow_without_overlay=true)` and L-on reused that cache. Fixture `cold_ms` also measured a synthetic 3196-gon grid, not Play's KEY_L / frame2 / full TestScenario.
+
+Fix:
+
+- Prebuild uses the exact L-on role walk (`_supply_role_lon_semantics`, no `allow_without_overlay=true`), waits until province+depot counts are stable, and fingerprints role-context inputs. L-on show/hide only when both topology and role fps match; otherwise recompute.
+- Fixture metric renamed **fixture L-on** (250 bar kept). `max_step ≤ 8.0` unchanged.
+- Live-boot windowed gate `WindowedRender1LiveColdGuard` / `tools/eoa_render1_live_cold_guard.sh`: real TestScenario, `Input.parse_input_event(KEY_L)`, t0 in `_input`, stop at `RenderingServer.frame_post_draw` of first `mesh_calls > 0`. Report frame2 and same-run L-off frame2. Bar: Δ(L-on − L-off frame2) ≤ 250 ms and frame2 B/A ≤ 0.75, 3/3 not best-of. Pin Köln `710417` at z=3.2 with the RX-1 `lock_pixel_guard_camera` + `eoa_rx1_pixel_lock_camera` (TestRunner +6d grand visuals otherwise steal Asia).
+- Colour: L-on histogram == fresh `_supply_highlight_roles()`; close-zoom hue buckets (sat>0.4, val>0.5, map area below the toolbar; teal on outline edges so mesh interiors cannot 3× A's polyline stroke; orange excludes neon political fills) within ±10% of `5df8e7fc` (teal 37–45k / olive ≤9k+10% / orange 4–7k).
+- Mutant: prebuild with `allow_without_overlay=true` → FAIL (source body of `_step_supply_prebuild_roles`).
+
+Keep: windowed draw guard + counter_lie source edit, 9 mutants, Perf3/5/6, seed 193601 `grep -o 'multi_ai_decisions=.*' log | md5sum` → `20fe9063` ×3, `--quick` 14, map_qc NE 0.9853. Wired as `launch_render1_live_cold` after `launch_render1_draw_guard`. Stay DRAFT / HOLD.
+
+Tip `d0107744` live-boot **3/3 PASS** (not best-of). Roles `{hub: 3158, route: 38}` == fresh compute (A was hub 3157 / route 38 / active 1). Hue vs `5df8e7fc`: teal **46608 / 46606 / 46605** · olive **3386** · orange **6504**. Live-boot:
+
+| run | L-on frame1 | L-on frame2 | L-off frame2 | Δ | B/A |
+|---|---:|---:|---:|---:|---:|
+| 1 | 245.101 | 296.609 | 253.583 | 43.026 | 0.485 |
+| 2 | 244.425 | 298.210 | 270.885 | 27.325 | 0.488 |
+| 3 | 214.620 | 262.789 | 252.267 | 10.522 | 0.430 |
+
+`allow_without_overlay` mutant killed. Fixture L-on 82.3 ms. max_step **5.647 / 5.559 / 6.38**. Seed ×3 `20fe9063de285f19d4f9b8a105abfd31`. `--quick` 14 reds. map_qc NE **0.9853**.
+
+**FIX #5 (test honesty):** `A_FRAME2_DEFAULT_MS` deleted. Measure A's frame2 on `5df8e7fc` (`tools/eoa_render1_measure_a.sh` → `docs/evidence/render1/a_live_5df8e7fc.json`). Wait until LoadingScreen is gone (first capture was title art). L-off uses a fresh KEY_L t0 (parse_input_event is deferred; do not reuse L-on's stamp). L-on frame1 is the first `frame_post_draw` whose batch `_draw` ran *after* that t0 (`get_last_draw_usec`; stale idle-warm `mesh_calls` read as presented and produced the 10–43 ms lie). Report real L-on minus L-off frame2 (Ship GPU ~155 ms). `HeadlessRender1PrebuildRoleTest` / `tools/eoa_render1_prebuild_role.sh`: per-pid prebuild vs fresh `_compute_supply_highlight_roles()` at L-on — tip green, `lon_semantics_off` red, `allow_without_overlay` red. Ring-edge hue is teal *share* of ring-core pixels (sat>0.52, val>0.58; olive sat≥0.55 so Line2D AA fringe cannot dilute vs mesh) ±10% vs measured A. Mesh extrusion reads thinner than Line2D AA; `SupplyOutlineBatchLayer.width_scale` / `EOA_RENDER1_RING_WIDTH_SCALE` (default 1.0).
+
+Measured A `5df8e7fc`: L-on frame2 **422.000** / L-off **223.252** / Δ **198.748**; teal share **0.8190** (edge 41434 / olive 239 / orange 8916); width_proxy **3.689**.
+
+Tip live-boot **3/3 PASS** (xvfb llvmpipe, not product Play / not Ship GPU):
+
+| run | L-on frame1 | L-on frame2 | L-off frame2 | Δ | B/A | teal share |
+|---|---:|---:|---:|---:|---:|---:|
+| 1 | 200.882 | 256.898 | 233.106 | 23.792 | 0.609 | 0.8041 |
+| 2 | 202.587 | 261.071 | 226.081 | 34.990 | 0.619 | 0.8041 |
+| 3 | 193.314 | 253.600 | 229.584 | 24.016 | 0.601 | 0.8041 |
+
+This box's Δ is 24–35 ms because close-zoom fills make L-off ~230 ms too; Ship GPU ~155 ms. B/A vs measured A 422 ms. Prebuild roles: tip PASS n=208 (hub 48 + engineers 160); `lon_semantics_off` FAIL mismatch=160; `allow_without_overlay` FAIL used_allow. Mesh test **PASS**. `--quick` 14 reds. map_qc NE **0.9853**. Display-only; seed 193601 **`20fe9063`**. Stay DRAFT / HOLD.
+
+**FIX #6 (same-run A/B + fixture headroom + behavioural allow mutant):** Live guard boots A `5df8e7fc` and B in the same wrapper run. Report each raw L-on frame2 and L-off frame2. Δ = L-on − L-off. B/A = B frame2 / A frame2. Never read A from a JSON file. Ship measures B's Δ at 129–254 ms, not 24–35; B/A 0.61 does not follow from 24–35 / 198.7.
+
+Same-run 3/3 PASS (xvfb llvmpipe, load 1.5–2.1; not product Play / not Ship GPU):
+
+| run | A lon2 | A loff2 | A Δ | B lon2 | B loff2 | B Δ | B/A | load |
+|---|---:|---:|---:|---:|---:|---:|---:|---|
+| 1 | 463.493 | 231.993 | 231.500 | 263.846 | 250.399 | 13.447 | 0.569 | 1.84 |
+| 2 | 434.059 | 225.647 | 208.412 | 236.606 | 232.952 | 3.654 | 0.545 | 1.49 |
+| 3 | 435.990 | 229.816 | 206.174 | 251.753 | 251.388 | 0.365 | 0.577 | 1.52 |
+
+Hue B **0.8045** vs same-run A **0.8190** (ring-edge share). Fixture L-on ×5 **50.500 / 53.246 / 51.041 / 50.367 / 51.560** ms at load **1.49 / 1.41 / 1.35 / 1.29 / 1.25** (≤200; bar 250). `allow_without_overlay` killed by behaviour: pids 710240–710247 pre=`engineers_recommended` fresh=empty mismatch=8 (flag deleted). `lon_semantics_off` mismatch=160. Tip n=208 hub 48 + engineers 160. Seed ×3 `20fe9063de285f19d4f9b8a105abfd31`. `--quick` 14 reds. map_qc NE **0.9853**. `width_scale` default 1.0. Stay DRAFT / HOLD.
+
+**FIX #7 (drain in-view rings + honest complete-frame timing):** Ship g101g: `FIRST_PRESENT_MESH_BUDGET=32` only redrew the deferred slice, so Godot `_draw` dropped already-submitted rings (teal 0.04 vs A's 0.57 over Köln; `WindowedRender1DrawGuard` mesh_calls=32 want ≥300). Idle `upload_meshes_now()` `force_draw()` with the layer visible while L was off (~80 ms hitch + pre-L flash). Headless `counter_lie` survived on `38d66d92`.
+
+Fix:
+
+- Product `_keys_for_present` submits the **full in-view set** on the first L-on `_draw` (Godot replaces the canvas item). `FIRST_PRESENT_MESH_BUDGET` remains only for mutant `never_drain`. Assert: within 3 presented frames after L, drawn mesh set == built chunk set in view. `never_drain` (budget-only, no accumulate) → FAIL.
+- Timing is real KEY_L → `frame_post_draw` of the first frame with **all in-view rings** (`in_view_present_complete`). Report that number and `complete_frame`. Same-run A still uses the two-presented-frame protocol on `5df8e7fc`.
+- `upload_meshes_now` / hidden warm / idle prebuild queue only — no `RenderingServer.force_draw()` while L is off. Idle max_step ≤ 8 ms.
+- Headless `independent_draw_info` requires a live `draw_mesh(` in the `_ci_draw_mesh` **body** (not the function name). Source-edit that strips `draw_mesh` FAILS.
+
+Keep: per-pid role test (both mutants killed), colour fix, deferred toast, `width_scale` default 1.0.
+
+Same-run 3/3 PASS (xvfb llvmpipe, load 1.89–2.06; not product Play / not Ship GPU). B Δ is negative because L-on complete (all rings, frame 1) is cheaper than L-off frame2 on this close-zoom llvmpipe box; bar is Δ ≤ 250. Ship GPU L-on−L-off at frame2 is 182–245 ms.
+
+| run | A lon2 | A loff2 | A Δ | A cf | B lon complete | B loff2 | B Δ | B/A | B cf | load |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
+| 1 | 424.974 | 220.721 | 204.253 | 2 | 175.175 | 227.225 | −52.050 | 0.412 | 1 | 2.02 |
+| 2 | 429.289 | 224.169 | 205.120 | 2 | 175.062 | 225.627 | −50.565 | 0.408 | 1 | 2.06 |
+| 3 | 430.972 | 239.949 | 191.023 | 2 | 175.055 | 225.537 | −50.482 | 0.406 | 1 | 1.89 |
+
+Hue B **0.8045 / 0.8046 / 0.8045** vs same-run A **0.8190** (ring-edge share; teal 41195–41211 vs 41412–41433). Fixture L-on ×5 **50.419 / 49.287 / 49.386 / 49.358 / 49.149** ms at load **1.32 / 1.58 / 1.80 / 1.98 / 2.14** (complete_frame=1; ≤200; bar 250). Windowed fixture **69.954** ms complete_frame=1 drain n=196. Idle max_step **5.508 / 5.506 / 5.506 / 5.505 / 5.506** (fixture) · live **6.039 / 6.728 / 6.734**. `never_drain` killed drawn=16 < view=196 after 3 frames. `counter_lie` killed (headless source-edit; windowed engine delta=76704). `allow_without_overlay` killed: pids 710240–710247 pre=`engineers_recommended` fresh=empty mismatch=8. `lon_semantics_off` mismatch=160. Tip n=208 hub 48 + engineers 160. Live roles `{hub: 3158, route: 38}`. Seed ×3 `20fe9063de285f19d4f9b8a105abfd31` (`grep -o 'multi_ai_decisions=.*' log | md5sum`). `--quick` same 14 `unit_board_play_path` reds (`se_england` fill-toe 1, first-session play surface 1, unit_centric_pick 3, unit_counter_chrome 2, unit_card_fill_toe 3, living_unit_order_loop 4). map_qc NE **0.9853**. Stay DRAFT / HOLD.
+
+```bash
+tools/run_godot.sh --headless --path . --resolution 1280x740 \
+  -s res://scripts/core/HeadlessRender1SupplyRingMeshTest.gd
+tools/eoa_render1_live_cold_guard.sh
+```
+
+Wired as `launch_render1_supply_ring_mesh` immediately after `launch_perf5_supply_overlay_fresh`. Merge **HOLD**.
+
 xvfb screenshots go to `/opt/cursor/artifacts/fac1a/`, `/opt/cursor/artifacts/fac1a_fix2/`, `/opt/cursor/artifacts/fac1a_fix2b/`, `/opt/cursor/artifacts/fac1a_fix2c/`, `/opt/cursor/artifacts/fac1a_fix3/`, and `/opt/cursor/artifacts/fac1a_fix4/` and are **NOT live Play**. Peak RSS must stay under 3 GB (isolated process tree — do not sum leftover Godot). Merge **HOLD**.
 
 **FIX #4 (Play MIXED `76fb4808`):** click ownership + badge-in-footprint + cluster digit + lone min size + split guard 1.53. Seeds unchanged. Isolated keep-green:
@@ -453,6 +870,29 @@ Screenshots FIX #6 (xvfb **NOT live Play**): `/opt/cursor/artifacts/fac1a_fix6/0
 | hd_mv1 / hd_mv1b / hd_rh1 | headless | PASS (unedited) | **1194.1 / 1194.1 / 1195.0** |
 | hd_ix1 (6) / hd_rx1 (4) / hd_rt1 (3) | headless | PASS | ~1194–1195 |
 | xvfb_mv1 / xvfb_mv1_card / xvfb_rh1 | xvfb | PASS | **2031.4 / 2033.0 / 2030.1** |
+
+**FIX #8 (Play MIXED `5d42888a`, headless + xvfb, NOT live Play):** L2 cluster hit is the drawn oval (`OVAL_W_FRAC` 0.88 / `OVAL_H_FRAC` 0.58 / `OVAL_TOP_FRAC` 0.26), not the 34 px `CLUSTER_MID_MIN_PX` circle. L4 stays round. For L1–L4 lone icons and clusters, only drawn art (icon body, badge, count disc) owns a click. `HALO_PX` is paint (`halo_px` still ≥2 when zoom ≥ 1). `CHROME_GAP_PX` and `CLEAR_MARGIN_PX` are not hit pads. A zero-gap MV-1 commit goes to the province under `event.position`. `_still_click_province_pid` and `_mv1_re_resolve_commit_pid` return the facility under the point, else the hex pick. A GIS miss does not keep `_march_preview_cache_dest` or the hover province. `_map_pick_world_from_event` already used `InputEventMouse.position`. Seeds, split/merge, pips, units-first order, MV-1/MV-1b preview + slop, P/F9 hide, art, and positions stay. Guard `HeadlessFac1aHitGeometryTest` calls `hit_test_world` and `_still_click_province_pid` at computed edge points (2 px in/out, plus 1 px outside the art and the old circle top). **FAIL** on main `61a80433` (`failures=107`) / **PASS** on the tip (`failures=0`). Wired as `launch_fac1a_hit_geometry` after `launch_fac1a_airfield_icons`.
+
+| mutant | killed by |
+|---|---|
+| L2 hit back to the circle | `L2 oval rejects circle overshoot` (top of the old square). Passed on main's oval and on the tip; a circle body fails it. |
+| Halo counted as a hit | main **FAIL** `halo owns click` and `2px outside art still facility` at z 1.30 / 2.25. Tip **PASS**. |
+| Stale dest kept in `_mv1_re_resolve_commit_pid` | main **FAIL** `re_resolve kept stale dest 710368`, `re_resolve on L2 centre want 710434 got 710368`, `still_click GIS miss kept stale 710368`. Tip **PASS**. |
+| Pick from the mouse instead of `event.position` | event world and mouse world differ by ≥1 px; `_map_pick_world_from_event` matches the event. Passed on main and on the tip. |
+
+Measured on this machine (NOT live Play):
+
+| gate | kind | result |
+|---|---|---|
+| HitGeometry | headless | main `RESULT=FAIL (failures=107)` · tip `RESULT=PASS (failures=0)` |
+| AirfieldIcon, MV-1, MV-1b, FLEET-1 | headless | `RESULT=PASS` |
+| CH-1 / MV-1e | hd + xvfb | `15/15 commit Y=Leverkusen` · rss **1212.0 / 1657.1** |
+| xvfb_fac1a | xvfb | stale=true stale_lag=true clustervar=true sil_fail=0 click_fail=0 noop_fail=0 rx1_mid 0.843/0.843 · wrapper peak **2638.7 MB** |
+| Seeded RX-1 ON / OFF | xvfb | mid_river **0.749 / 0.749** close 0.775 / 0.775 spine 1.000 |
+| `--quick` | py | exactly **14** `unit_board_play_path` reds (se_england fill-toe 1, first_session play surface 1, unit_centric_pick 3, unit_counter_chrome 2, unit_card_fill_toe 3, living_unit_order_loop 4). No new red. |
+| map_qc | py | NE land hit **0.9853** (3148/3195) |
+
+This checkout has no Seed 193601 runner (`/workspace/gfac1a-out/chain.sh` is not on this machine). That triple-run was not executed here.
 
 **FIX #3 (Play MIXED `234e12b8`):** Rhine/spine/border clearance + cluster L4 tag. Split expected ~1.59. Isolated keep-green (`637ca02e`):
 
@@ -934,9 +1374,43 @@ Play soft on CLOSE-1 tip `008e5c30`: after some unit-card Closes the first top-e
 
 Halt / Press / Hold / Withdraw / Assign must not `free()` `UnitDetailPopup` while `pressed` is emitting. Detach + rename `UnitDetailPopup_dying` + `queue_free()`. Same-dest still click is a no-op re-issue. **FIX #1 (Play live MIXED `80b0b542`):** press-mode rebuild dropped the card so the mouse-up still-clicked the map (inspector + camera jump; twice switched/cleared selection). Latch `_unit_card_consumed_press` on those five buttons; `_input` / `_unhandled_input` / `_left_release_must_skip_pick` / land-chip still-click swallow the matching release. Open card refreshes Halt on march start / re-target / arrival. **CRASH-1b (CH-1):** that latch must eat **one** matching left release then clear (new left press anywhere, 1 frame after the eaten release, 0.5s safety) so later top-bar / UI clicks register. Guard: Halt still no click-through; ≥4 UI press+release after swallow; following map still-click commits. Headless `HeadlessCrash1HaltMarchPopupTest` + `tools/eoa_crash1_halt_march_guard.sh` 10× hd + 10× xvfb — **NOT live Play**. MV-1 / MV-1b gates **unedited**.
 
+### INPUT-1 close × must not click through to map (draft HOLD)
+
+Notice/toast **×** and Command Center **✕** fire close on `pressed` (release) through the real Control. Leftover after overlay free is swallowed in `_unhandled_input` only. Armed on CC `button_down`, notice `button_down` (`show_toast` and `post_news` / `_show_toast`), and poll `handle_live_close_pointer` (`pending_press` for N+1). **FIX #2:** dropped dead `_unstick` / dying-× / MainMenu `_closing` hover exception / press-over-× early-return. Notice `button_down` arm kept — T3/T5 leftover after free **KILLS** M7b by Köln. **FIX #3 (tests only; product `977c9a84` unedited):** T1/T3/T5 also run on `post_news` News × (M7b-news); T6/T7 drive real `_process` poll; T10 leftover after CC free (fails main by Köln); T11 750 ms expiry must select (M9 stuck tick → pid=-1). Fixture NoticeClose so pure main fails by Köln, not setup. **FIX #4 (LeaderEventUI only):** after a user ×, the stacked survivor reflows under the cursor (Play MIXED `b64b98f3` at z0.9). `_user_close_toast` dismisses then IGNORE-passthroughs the stack until the pointer moves ≥6 px; poll skips IGNORE ×. T12a–c FAIL main/`b64b98f3` same-spot pid=-1 / PASS tip. T12d PASSes on main. Mutants M12a–d KILLED by selection. **FAIL** main `61a80433` T1–T7 + news T1/T3/T5 + T10/T11 leftover Köln / unit + T12a–c pid=-1 / **PASS** tip failures=0. Mutants **KILLED** by selection: M1, M2, M4b, M5, M5b, M5c, M6a, M7b, M7b-news, M9, M10, M12a–d. Wired `launch_input1_close_click` (no `EOA_HEADLESS_TOAST_UI`; no new gates line). `--quick` same 14 known reds. Recipe `docs/evidence/input1/CLICKS.md` step 5b. Headless + xvfb **NOT live Play**.
+
 ### BEGIN-1 Begin leftover release (draft HOLD)
 
 Title **Begin** fires on press and `queue_free()`s the overlay. A normal ~80–150 ms mouse-up then still-clicked the map (Loir-et-Cher after Home at 1280×740 ~284,580): inspector + soft click-zoom ~0.776→0.900. Instant 0 ms release did not. Product: TipDismiss-style one-shot swallow of the leftover left release, armed on pointer Begin only (keyboard Enter/Space/B must not eat the next map click). **FIX #2 (code SHA `f18a341a`; later commits test/docs only):** clock starts on the first `_process` after the Begin frame (restamp); expiry only after that restamp and frames >= arm_frame + 2. Poll-path `handle_live_pointer(null)` sets `begin_press_pending` so the click's own N+1 press keeps the arm. Event-path keeps the same-frame rule. **FIX #3 (test-only):** leftover / follow-up go through `_title._input` + same-frame `Input.parse_input_event` + `flush_buffered_events` (direct `_mr._input` leftover does not pick on main). T1 FAIL on main (Loir `710671`) / PASS on tip. T2 later click picks (M2). T3 poll 1000 ms + 3 frames then first click (M1). T4 same-frame 900 ms release N+2 swallowed (M7). T5 keeps (b); M3 outside-button leftover; M9 no T1–T5 behavior difference. Guard `HeadlessBegin1TitleReleaseFallthroughTest` + `tools/eoa_begin1_guard.sh`. **FIX #4 (gate wiring only):** `tools/eoa_full_test_gates.sh` `run_step launch_begin1_title_release` after `launch_ix1_title_esc_begin`. Code SHA remains `f18a341a`; later commits are test / docs / gates only. TipDismiss / camera / edge-pan / labels / fleet / unit pick **unedited**. Recipe `docs/evidence/begin1/CLICKS.md` (pre-step `timeout 1500 tools/run_godot.sh --headless --path . --import --quit`). Headless + xvfb **NOT live Play**.
+
+### WHEELDRIFT-1 wheel zoom + rim edge-pan (draft HOLD)
+
+Play (`d4a3a1ff`): wheel-only kept the point under the cursor (0 px), but in ×1.243 / out ×0.757 so 5 in + 5 out left the view ~26% further out. A cursor on the right/top/bottom rim (~3–4 px) edge-scrolled at ~1000 px/s; a wheel notch cleared `_close_suppress_edge` so zoom-at-the-edge flew the camera. Left rim at Home did not pan (theater clamp / 6 px strip). 15 px in did not pan (UI-1 strip, not the unused 64 px `edge_margin` export).
+
+Product (MapRenderer only, off main `61a80433`): `_zoom_toward_mouse(factor, event.position)` — clamp zoom, correct the world point under the event, then `_clamp_camera_to_theater` (no re-anchor). In/out are `factor_in` / `1/factor_in`. Every wheel notch arms a 350 ms edge hold + 150 ms strip dwell so EDGE-1 pan cannot run during the wheel. MapViewInput 6/10 px strips and edge speed **unedited**.
+
+Guard `HeadlessWheelDrift1Test` (fixture, not WorldMap.tscn / 3520):
+
+- **T1** BR rim, 10 in + 10 out: `_nav_edge_pan_frames` during wheel + 350 ms = 0 (`no_wheel_suppress`, `edge_ignores_hold`). After the hold, a strip dwell still pans (`suppress_forever`).
+- **T2** off-center (960,555), 10 in + 10 out: ≤2 px per notch after a process frame (`no_anchor_correction`); zoom+camera round-trip; clamp-bind zoom-out must not runaway (`clamp_before_anchor`).
+- **T3** event.position ≠ warped viewport mouse: anchor follows the event (`anchor_from_viewport_mouse`).
+- **T4** UI-1 rest (97,731), EDGE-1 L/R/T/B helpers, CLOSE-1b `_close_suppress_edge`, FAC-1a `event.position` pick, Vis1 harness present.
+
+Must **FAIL** on main MapRenderer and **PASS** on this tip. Recipe `docs/evidence/wheeldrift1/CLICKS.md`. CameraController / GameData / TipDismiss / ORDERS **unedited**. Headless + xvfb **NOT live Play**.
+
+### EDGE-2 calm rim pan (draft HOLD, stacked on #105)
+
+Probe on WHEELDRIFT-1 `b7affe58`: cursor on the right rim starts pan ~0.5 s after the last wheel notch then runs at full speed instantly (~2200–2600 screen px/s ÷ zoom; ~3× world at Home ~0.33). No dwell outside the post-wheel window, no ramp, no far-zoom cap. Left rim never pans: `edge_pan_direction_at` is symmetric, but `edge_pan_blocked_by_gui` / `hovered_ui_blocks_edge_pan` treat MapModeToolbar / legend / left-docked InfoPanel / minimap as blockers (UI-1 TopInfoBar exemption is north-only), and `_mouse_over_map_chrome_blocks_edge_pan` skipped only the north 6px strip.
+
+Product (MapRenderer nav block + MapViewInput HUD exemption; off `b7affe58`): 250 ms continuous rim contact before any pan; speed ramps 0→full over ~600 ms of contact (reset on leave); below Home zoom 0.33 do not scale world speed by 1/zoom past Home; left HUD exempt **only** in the UI-1 6px left strip (toasts / unit cards / Leaders still block). WHEELDRIFT-1 350+150 and 6/10 px strips **unedited**.
+
+Guard `HeadlessEdge2RimFeelTest` (fixture, not WorldMap.tscn / 3520):
+
+- 0 px panned before 250 ms dwell (`no_dwell`)
+- distance at 0.3 s of contact < 25% of full-speed distance (`no_dwell` / `no_ramp`)
+- far-zoom world speed capped at Home (`no_cap`)
+- left-rim direction non-zero with HUD present (`left_blocked`)
+
+Must **FAIL** on `b7affe58` and **PASS** on this tip. Recipe `docs/evidence/edge2/CLICKS.md`. CameraController / GameData / TipDismiss / ORDERS **unedited**. Headless **NOT live Play**.
 
 ### EDGE-1 first-session edge-pan feel (draft HOLD)
 
@@ -975,11 +1449,27 @@ Isolated keep-green (`eb6544a8`; wrapper `rss_mb` preferred; hd Godot ~1195, sui
 
 ### CH-1 / MV-1e stale hover commit (draft HOLD)
 
-At 4×, a still click on own land **without** a facility icon must commit to the province under `event.position`, not the cached hover/preview dest. `_mv1_preview_dest_matches_world` re-resolves GIS after the FAC-1a facility check; `_mv1_re_resolve_commit_pid` overrides a stale cache dest when GIS hits Y. Hover/preview update logic unchanged. FAC-1a icon override + miss-of-icon cache dest (direct `still_click(..., true)`) stay. Guard `HeadlessCh1Mv1eStaleHoverCommitTest` + `tools/eoa_ch1_mv1e_stale_hover_guard.sh`: same-frame motion X (Köln) then press/release Y (Leverkusen), 15/15, lone unit, hd+xvfb — **NOT live Play**. Live pair was Bad Kreuznach vs Hildesheim. Seeds unchanged: Borken `710430` L1 / Warendorf `710434` L2 / Ober `710423` L3 / Siegen-Wittgenstein `710451` L4.
+At 4×, a still click commits to whatever is under `event.position`. A facility icon at that point wins. A miss uses `_resolve_hex_pick_pid` and does not keep `_march_preview_cache_dest` or the hover province (FIX #8; the old miss-of-icon cache-dest stay is gone). `_mv1_preview_dest_matches_world` still checks the facility before the hover symbol, and a GIS miss does not match the stale hover. Hover/preview update logic unchanged. Guard `HeadlessCh1Mv1eStaleHoverCommitTest` + `tools/eoa_ch1_mv1e_stale_hover_guard.sh`: same-frame motion X (Köln) then press/release Y (Leverkusen), 15/15, lone unit, hd+xvfb. FIX #8 measured hd+xvfb **PASS** rss **1212.0 / 1657.1** — **NOT live Play**. Live pair was Bad Kreuznach vs Hildesheim. Seeds unchanged: Borken `710430` L1 / Warendorf `710434` L2 / Ober `710423` L3 / Siegen-Wittgenstein `710451` L4.
 
 ### RT-1 Readable road tiers (intact, visual only, draft HOLD)
 
 Pure helpers in `scripts/map/RoadTierVisual.gd` (FIX #2 trunk; FIX #3 12 px non-AA highway quads + Köln label). Headless: `HeadlessRt1RoadTierForEdgeTest` (1936 3/6/9 + eras + explicit⇒highway + Europe LOD + trunk forest / 0 triangles + mid highway + Köln label) + `HeadlessRt1RoadEdgeFilterTest` (Bonn–Köln / Köln–Leverkusen must-draw; Köln–Essen / Köln–Düren must-not) + `HeadlessRt1RoadNoRebuildTest` (zoom/pan 0 rebuilds; one `infrastructure` notify → +1). Windowed seeded `tools/eoa_rt1_pixel_guard.sh` (3×3 + S1/S2) uses the player camera path (no `lock_pixel_guard_camera`). Windowed **live-look** `tools/eoa_rt1_live_look_guard.sh` does **not** seed infra: Europe Home → Search/Go Köln → `_zoom_toward_mouse` at **1600×900**; triangle/mesh density; **highway width > paved** at mid+close; **mid gold ≥ 1.8× highway** (close gold 16/20 unchanged); sage-web frac ≤ 0.035 (no `5c60f366` pale-green carpet). `ProvEdge_` hide is **not** in this slice (borders needed for pick; tan cells backlog). S2 Bonn/Köln/Leverkusen at mid+close. xvfb ≠ product Play. Live −12% road move bonus is unchanged.
+
+### HWY-1 / HWY-2 mid-zoom highway corridors (draft HOLD)
+
+Per-edge rank in `assign_rare_display_tiers` painted the top ~4% of trunk edges as isolated stubs. HWY-1 kept the same budget `ceil(n*(1-0.96))` but seeded the heaviest inferred edges and grew along shared-endpoint trunk neighbours. **HWY-2** grows to **max 6** (min 3): blob until length 3 (star spokes), then **endpoints only** so a heavy hub walks a corridor. Continuation may use typical trunk weight (`HWY1_GROW_WEIGHT_FLOOR` 7) so NUTS3 ~10.1 hops can join; dirt tails (~2) stay out. Leftover budget extends existing corridor endpoints (no new stubs). Explicit IX-1 edges stay highway. FIX #1 cost path kept (int-key sort + index adjacency). `select_trunk_edges` / LOD / gold spine **unedited**. Casing: far **12** / mid **12** / close **16** px.
+
+Guard `HeadlessHwy1HighwayChainTest` Part A (5-chain line, star 3-spokes, two 5-clusters, explicit 4-chain, nondet) + Part B live 1936: median **≥4**, **0** singletons, **≤12** components, highway count ±10%, Ruhr ordered pids measured (no assign whitelist). **Must not call `_hwy1_*` statics**. Timing median of ≥5 vs legacy rank. Wired as `launch_hwy1_highway_chain`.
+
+Pixel: `WindowedRt1RoadTierPixelGuard` measures the **fixed** `710412–710424` pair at far/default/close (no `_measure_best_highway` re-pick). Fail if a sample is **<8 px**. Highway mins: far **≥9**, default **≥12**, close **≥16**. Far may Y-flip the same pair when unflip <8 (viewport image vs canvas; cap 8–48 px). Measured tip: far **40** / default **17** / close **20**. Screenshots `docs/evidence/hwy2/`. **Headless + xvfb, live Play pending.**
+
+### HWY-3 hub-route display highways (draft HOLD)
+
+Display highways are **trunk shortest paths between hubs** (capitals, largest cities, significant ports). Urban-district neighbour count is an **optional weight** only. Rank-and-grow stays as a fallback for synthetic Part A (no hub records) and as the `rank_grow_back` mutant. Each accepted route is a **simple path** (no repeated vertex, no >150° hook-back, length ≤1.6× hub chord, zigzag ≤1.5π per 6 edges). FIX #1 paints one tree per large country; budget is **2× of 52** (60–114). 0 singletons, median ≥4. Far highways keep casing/core + 20 px floor so the wide Germany frame shows routes; dirt/paved stay culled.
+
+Guard `HeadlessHwy3HubRouteTest` H1–H6 + named mutants (`rank_grow_back`, `no_capitals`, `urban_required`, `zigzag_ok`, `hook_back`, `not_shortest`, `far_hidden`, `flip_max`, `pid_list`, `overlap_ok`). Those eight product env branches are **deleted**; tests load in-memory source-edits (same pattern as `second_zero`). Wired as `launch_hwy3_hub_route`. FIX #6 tip `b33daba1`: gold spine z=25 above highways 24 so pixel `s1_gold_cover=1.000`; metro casing stays inside far/default ceilings 26/18 (measured far **21** / default **12** / close **21** on `710401–710412`); Ruhr labels place then offset-cull (hub>other, camera-center ties, Cologne/Köln alias). Essen xvfb z2.4 `Düsseldorf, Duisburg, Mülheim an der Ruhr`; z4 those plus Dortmund; no overlapping rects; one Köln; no-cull mutant FAIL. Trim named **Lyon → Isère → Drôme → Vaucluse → Marseille** (kind=1, not a focus trunk). FIX #4: capital connects to the top-2 hubs by score in distinct bearing sectors (≥90°). Live-path guard `HeadlessHwy3LiveScenarioTest` **RESULT=PASS** on ScenarioLoader `world_accurate` (same city layer as TestScenario/Begin): Rome-north `Milan → … → Rome`; Ruhr **3/3** Duisburg/Essen/Dortmund; Paris one north Lille; **THE count** live **drawn=114**. Env `json_layer` / `no_second_sector` **removed**; source-edit on `_hwy3_reachable_sectors` (`second=0`, token `second_zero`) kills Rome-north. Wired as `launch_hwy3_live_scenario`. FIX #5 Ruhr live-legibility: hub labels z≥2.0, metro casing ≥1.3×, highways z=24 above Rhine 22. Guard `WindowedHwy3RuhrLegibilityGuard` / `tools/eoa_hwy3_ruhr_legibility_guard.sh` (wired `launch_hwy3_ruhr_legibility`): Essen `(7356, 1606)` z2.4 casing **272** px / 3 labels (`Düsseldorf, Duisburg, Mülheim an der Ruhr`); z4 **466** px / 4 labels (+ Dortmund); no overlapping rects; labels-off, under-river, and no-cull mutants killed; **RESULT=PASS**. HeadlessHwy3 **RESULT=PASS** **113**/8/0/median **12.00** (same drawn definition; JSON vs ScenarioLoader is the 1-edge gap). Lowest-score non-trunk spans trim first so live count stays ≤114. **FAIL** on d4a3a1ff (5: pid_list / flip_max / H1 rank-grow / H2 empty) / **PASS** on FIX #1 tip (114/9/0/median 8.00, Munich+Essen+GER tree). FIX #2 (g100e) **HeadlessHwy3 RESULT=PASS**: H3 **hook-back trap** (double-back >150°); every major capital connects to its 2nd hub (ITA Rome–Milan `710882–710963`); no two routes share both end regions with Hausdorff cover >45% within 12 wu (one-end forks 75% both-way); Ruhr urban-span **4/5** Duisburg/Essen/Bochum/Dortmund (kreisfreie scoring, no pid whitelist); Munich–Frankfurt on a SPAN. Live **114**/9/0/median **10.00**; `dropped_cap=80` `dropped_parallel=6`. FIX #3: no route pair may have Jaccard ≥0.5 or share an endpoint plus ≥50% of either province set (Paris–Nord / Nord South–Paris j=0.67 dropped; FRA trunk `710707–710734` kept). Independent assert; `overlap_ok` disables the drop and is killed. Routes 20→18. Budget stays **60–114**. Pixel: **one fixed orientation** (`HWY3_FIXED_ORIENTATION=1`), hub-route pair `710401–710412`, far **21** / default **12** / close **21** (mins 9/12/16; ceilings 26/18). `s1_gold_cover=1.000`. Wide-Germany **18** hub-route runs ≥9 px (main/d4a3 → 0). `--quick` 14 known unit_board_play_path reds; map_qc NE **0.9853**. Shots `docs/evidence/hwy3/`. `select_trunk_edges` / `road_tier_for_edge` / GameData == d4a3a1ff **unedited**. **HOLD merge.**
+
+**FIX (L-off supply-toggle cache):** Hub routes do not depend on L / supply mode. `InfrastructureOverlayLayer` caches the HWY-3 result (hubs, routes, marked keys, trimmed_routes, display tiers) on era + owner/infra + built roads + city source. A supply toggle re-applies only the corridor styling pass (no adjacency walk, no routing). Guard `HeadlessHwy3SupplyToggleCacheTest` **RESULT=PASS**: (a) on/off/on left route-compute at 3 and highway keys **114** identical; (b) Köln infra 5→8 recomputed 3→4; (c) glow=1 corridor_flag=true. Source mutants `ignore_infra` (1→1) / `bypass_toggle` (2→4) / `skip_styling` (glow=0) kill (b)/(a)/(c). LiveLonProbe **RESULT=PASS** load_ms=**274.12**: run1 off_frame2=**8.65** on_warm=**11.94**; run2 **8.55** / **11.84** (bars ≤350 / ≤300). Hub3 **PASS** 113/8/0/median 12.00; Hwy1 **PASS** 113 marked; Hwy3LiveScenario **PASS** drawn=114 routes=18 Ruhr 3/3; RT1 trio **PASS**; Perf3 **PASS** Home 146.2/9.2/371.4 z0.760 55.0/9.2/54.9 roles=1 setups=0 line2d=0; pixel **PASS** gold **1.000** far/default/close **21/12/28**. `--quick` 14 known reds; NE **0.9853**. GameData `8c1d5e9f` ×3; live-fn `e6b869f8` ×3; prompt `20fe9063` absent. Wired `launch_hwy3_supply_toggle_cache` + `launch_live_lon_probe`. MapRenderer L toggle / RENDER-1 rings / rivers **unedited**. **HOLD merge.**
 
 ### RX-1 Rhine Crossing (Phase B draft)
 
@@ -988,6 +1478,18 @@ Pure product `test_rx1_rhine_crossing_product` is on `--quick`. Headless: `Headl
 ### VIS-2 capital stars after L supply cycle (draft HOLD)
 
 L on then L off at operational zoom left capital stars in the tree but not drawn: `_layout_zoomed_map_glyphs_for_province_node` (via `_sync_supply_route_canvas_stack` on L toggle) set `z_index = Z_MAP_GLYPH + 2` (10) without restoring the idle capital layer (`z=40`, `z_as_relative=false`). A later map-mode switch re-asserted z=40. Guard `HeadlessVis2CapitalStarsAfterLTest` seeds product stars via `_add_capital_star_to_node` on a small MapRenderer fixture (not WorldMap.tscn / 3520), drives L on/off at z=0.760, and asserts effective draw z≥40 (not merely `visible=true`). Must FAIL on main `425b4448` (stars left at glyph-stack z=10) and PASS on this branch. Wired on the full gate as `launch_vis2_capital_stars_after_l`. L-on glyph look, Home / Shift+Home hide, labels, FacilityIconLayer, pick, TipDismiss, ORDERS, camera, fleet memo **unedited**. Headless **NOT live Play**.
+
+### ORIDIOM-1b march hop_days terrain/kind `or` (draft HOLD)
+
+`FormationMovement.hop_days` must strip/lower the real `terrain` / `template_kind` strings. GDScript `or` returns a bool, so `str(terrain or "plains")` and `str(template_kind or "infantry")` both became `"true"` on main `61a80433` (every terrain cost 1.0; mountain-infantry discount and armour mountain penalty never fired). Empty terrain still falls back to plains; empty kind now falls back to infantry.
+
+Guard `HeadlessOrIdiom1bMarchCostTest` (full gate `launch_oridiom1b_march_cost`):
+
+- **B1** `hop_days(t, 0.5, INFANTRY_SPEED, k)` within 1% of py `unit_own_land_march_product.hop_days` for t ∈ {plains, hills, forest, desert, urban, jungle, marsh, mountain} × k ∈ {infantry, mountain_infantry, armor, motorized}. Mountain/infantry = 1.8× plains. Must FAIL on `61a80433`.
+- **B2** empty terrain/kind default to plains/infantry.
+- Killing asserts: `b1_matrix_within_1pct` · `b1_mountain_infantry_1_8x_plains` · `b1_mountain_infantry_discount` · `b1_armor_mountain_penalty` · `b2_empty_terrain_defaults_plains` · `b2_empty_kind_defaults_infantry` · `src_no_terrain_or` · `src_no_template_kind_or`.
+
+Keep-green: `HeadlessMv1MarchPreviewTest` (ETA-1 preview==commit) · `HeadlessCombat1FightResolveTest` · py `test_unit_own_land_march_product`. `--quick` same 14 known `unit_board_play_path` reds; `map_qc` NE hit 0.9853. Seed 193601 HeadlessPerf4LiveMultiAiDayTest locked infra picks (JAP 903951 / FRA 710739 / ITA 710859 / POL 711054 / ENG 711481 t6+t7 / USA 800075 / SOV none / md5 20fe9063) — STOP and do not re-record if any locked pick changes. Fence: `FormationMovement.gd` hop_days l.52–55 + this guard + docs. No GameData / new duals / world_full ID / Godot bump. Headless **NOT live Play**.
 
 ### VIS-1 first-session map readability (draft HOLD)
 
