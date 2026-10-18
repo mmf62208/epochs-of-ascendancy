@@ -1499,7 +1499,43 @@ func _ensure_road_shared_border_keys(provinces: Dictionary) -> void:
                 rings[pid] = ring
     _road_shared_border_keys = RoadTierVisualScript.shared_border_keys_from_rings(rings, 4.0)
     _road_shared_border_ready = not _road_shared_border_keys.is_empty()
-    _road_draw_rings = _road_ring_records(rings)
+    # Geometry points are canvas units. Live centroids and Polygon2D rings are
+    # canvas × THEATER_SCALE. The stub filter has to use that same space.
+    var draw_scale := _road_ring_draw_scale(rings)
+    var draw_rings: Dictionary = {}
+    for pid_v in rings.keys():
+        var raw: PackedVector2Array = rings[pid_v]
+        if draw_scale == 1.0:
+            draw_rings[pid_v] = raw
+            continue
+        var scaled := PackedVector2Array()
+        scaled.resize(raw.size())
+        for i in raw.size():
+            scaled[i] = raw[i] * draw_scale
+        draw_rings[pid_v] = scaled
+    _road_draw_rings = _road_ring_records(draw_rings)
+
+
+func _road_ring_draw_scale(rings: Dictionary) -> float:
+    if map_manager == null or not map_manager.has_method("get_province_centroid"):
+        return 1.0
+    var scale := MapCanvasConfig.THEATER_SCALE
+    for pid in [710417, 710401, 710412]:
+        if not rings.has(pid):
+            continue
+        var raw: PackedVector2Array = rings[pid]
+        if raw.size() < 3:
+            continue
+        var c: Vector2 = map_manager.get_province_centroid(pid)
+        if Geometry2D.is_point_in_polygon(c, raw):
+            return 1.0
+        var scaled := PackedVector2Array()
+        scaled.resize(raw.size())
+        for i in raw.size():
+            scaled[i] = raw[i] * scale
+        if Geometry2D.is_point_in_polygon(c, scaled):
+            return scale
+    return scale
 
 
 func _road_edge_passes_filter(p1: int, p2: int, c1: Vector2, c2: Vector2) -> bool:
@@ -1572,7 +1608,12 @@ func _road_ring_records(rings: Dictionary) -> Array:
         for pt in ring:
             min_v = min_v.min(pt)
             max_v = max_v.max(pt)
-        out.append({"bb": Rect2(min_v, max_v - min_v), "pts": ring, "pid": int(pid_v)})
+        out.append({
+            "bb": Rect2(min_v, max_v - min_v),
+            "pts": ring,
+            "pid": int(pid_v),
+            "npts": ring.size(),
+        })
     return out
 
 
@@ -1582,7 +1623,11 @@ func _highway_edge_drawable(entry: Dictionary) -> bool:
         return true
     var c1: Vector2 = entry.get("c1", Vector2.ZERO)
     var c2: Vector2 = entry.get("c2", Vector2.ZERO)
-    return RoadTierVisualScript.highway_endpoints_in_rings(c1, c2, _road_draw_rings)
+    if not RoadTierVisualScript.highway_endpoints_in_rings(c1, c2, _road_draw_rings):
+        return false
+    if RoadTierVisualScript.highway_crosses_placeholder_gap(c1, c2, _road_draw_rings):
+        return false
+    return true
 
 
 func apply_road_map_mode(mode: String, supply_on: bool) -> void:
@@ -2724,7 +2769,8 @@ class RoadCasingDraw extends Node2D:
             return
         _in_draw = true
         var zoom := _canvas_zoom()
-        var plan: Array = RoadTierVisualScript.build_road_draw_plan(chains, zoom, true)
+        var logistics_casing := true
+        var plan: Array = RoadTierVisualScript.build_road_draw_plan(chains, zoom, logistics_casing)
         RoadTierVisualScript.paint_road_plan(self, plan, "casing", zoom)
         _in_draw = false
 

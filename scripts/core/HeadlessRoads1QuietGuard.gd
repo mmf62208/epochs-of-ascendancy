@@ -7,6 +7,7 @@ extends SceneTree
 ##   (c) ROAD_BELOW_UNITS_Z back to 21
 ##   (d) road_tier_mode_alpha always 1
 ##   (e) highway_endpoints_in_rings always true, or the overlay stops calling it
+##       (placeholder-gap: highway_crosses_placeholder_gap always false)
 ##
 ##   tools/run_godot.sh --headless -s res://scripts/core/HeadlessRoads1QuietGuard.gd
 
@@ -214,7 +215,53 @@ func _test_stub_filter() -> void:
 	if "highway_endpoints_in_rings" not in ol or "func _highway_edge_drawable" not in ol:
 		_fail("overlay must filter highway edges through highway_endpoints_in_rings")
 		return
+	if "highway_crosses_placeholder_gap" not in ol:
+		_fail("overlay must drop highways that cross a RoW placeholder gap")
+		return
+	if not _test_placeholder_gap():
+		return
 	_pass("highway stub filter drops an endpoint outside drawn rings")
+
+
+func _circle_ring(center: Vector2, radius: float, pid: int) -> Dictionary:
+	var pts := PackedVector2Array()
+	for i in 36:
+		var ang := TAU * float(i) / 36.0
+		pts.append(center + Vector2(cos(ang), sin(ang)) * radius)
+	return {
+		"bb": Rect2(center - Vector2(radius, radius), Vector2(radius, radius) * 2.0),
+		"pts": pts,
+		"pid": pid,
+		"npts": 36,
+	}
+
+
+func _test_placeholder_gap() -> bool:
+	var far: Array = [
+		_circle_ring(Vector2(0, 0), 12.0, 905809),
+		_circle_ring(Vector2(200, 0), 12.0, 903534),
+	]
+	if not RoadTierVisualScript.highway_endpoints_in_rings(Vector2(0, 0), Vector2(200, 0), far):
+		_fail("placeholder centroids are inside their own rings")
+		return false
+	if not RoadTierVisualScript.highway_crosses_placeholder_gap(Vector2(0, 0), Vector2(200, 0), far):
+		_fail("Lithuania-style gap between 36-pt RoW rings must drop")
+		return false
+	var nuts: Array = [
+		_circle_ring(Vector2(0, 0), 12.0, 710967),
+		_circle_ring(Vector2(200, 0), 12.0, 710969),
+	]
+	if RoadTierVisualScript.highway_crosses_placeholder_gap(Vector2(0, 0), Vector2(200, 0), nuts):
+		_fail("a gap between Europe rings must stay (not a RoW placeholder)")
+		return false
+	var one: Array = [_circle_ring(Vector2(0, 0), 40.0, 903534)]
+	if RoadTierVisualScript.highway_crosses_placeholder_gap(Vector2(-5, 0), Vector2(5, 0), one):
+		_fail("an edge that stays inside one placeholder ring must draw")
+		return false
+	if RoadTierVisualScript.highway_crosses_placeholder_gap(Vector2(0, 0), Vector2(200, 0), []):
+		_fail("empty ring list must fail open for the gap filter")
+		return false
+	return true
 
 
 func _test_z_order() -> void:

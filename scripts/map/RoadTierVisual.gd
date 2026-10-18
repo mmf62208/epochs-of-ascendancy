@@ -704,24 +704,74 @@ static func highway_endpoints_in_rings(c1: Vector2, c2: Vector2, rings: Array) -
 	return _point_in_any_ring(c1, rings) and _point_in_any_ring(c2, rings)
 
 
+## Tier-2 edge from a 36-vertex RoW placeholder (pid 900000–949999) whose
+## straight run leaves every drawn ring. That is the Lithuania→Moscow stub:
+## both centroids sit inside their circles, and the segment crosses the hole.
+## A real province ring containing either end keeps the edge. Empty rings fail open.
+static func highway_crosses_placeholder_gap(c1: Vector2, c2: Vector2, rings: Array) -> bool:
+	if rings.is_empty():
+		return false
+	if not _point_in_any_ring(c1, rings) or not _point_in_any_ring(c2, rings):
+		return false
+	if not _endpoint_is_row_placeholder(c1, rings) and not _endpoint_is_row_placeholder(c2, rings):
+		return false
+	for t in [0.25, 0.5, 0.75]:
+		if not _point_in_any_ring(c1.lerp(c2, float(t)), rings):
+			return true
+	return false
+
+
+static func _endpoint_is_row_placeholder(pt: Vector2, rings: Array) -> bool:
+	var saw_placeholder := false
+	var saw_real := false
+	for ring_v in rings:
+		if not _ring_value_contains(ring_v, pt):
+			continue
+		if _record_is_row_placeholder(ring_v):
+			saw_placeholder = true
+		else:
+			saw_real = true
+	return saw_placeholder and not saw_real
+
+
+static func _record_is_row_placeholder(ring_v: Variant) -> bool:
+	if typeof(ring_v) != TYPE_DICTIONARY:
+		return false
+	var rec: Dictionary = ring_v
+	var pid: int = int(rec.get("pid", 0))
+	if pid < 900000 or pid >= 950000:
+		return false
+	var n: int = int(rec.get("npts", 0))
+	if n <= 0:
+		var pts_v: Variant = rec.get("pts", PackedVector2Array())
+		if typeof(pts_v) == TYPE_PACKED_VECTOR2_ARRAY:
+			n = (pts_v as PackedVector2Array).size()
+	return n == 36 or n == 37
+
+
+static func _ring_value_contains(ring_v: Variant, pt: Vector2) -> bool:
+	if not is_finite(pt.x) or not is_finite(pt.y):
+		return false
+	if typeof(ring_v) == TYPE_DICTIONARY:
+		var rec: Dictionary = ring_v
+		var bb_v: Variant = rec.get("bb", null)
+		if bb_v is Rect2 and not (bb_v as Rect2).has_point(pt):
+			return false
+		var pts_v: Variant = rec.get("pts", PackedVector2Array())
+		if typeof(pts_v) == TYPE_PACKED_VECTOR2_ARRAY and (pts_v as PackedVector2Array).size() >= 3:
+			return Geometry2D.is_point_in_polygon(pt, pts_v)
+		return false
+	if typeof(ring_v) == TYPE_PACKED_VECTOR2_ARRAY and (ring_v as PackedVector2Array).size() >= 3:
+		return Geometry2D.is_point_in_polygon(pt, ring_v)
+	return false
+
+
 static func _point_in_any_ring(pt: Vector2, rings: Array) -> bool:
 	if not is_finite(pt.x) or not is_finite(pt.y):
 		return false
 	for ring_v in rings:
-		if typeof(ring_v) != TYPE_PACKED_VECTOR2_ARRAY and typeof(ring_v) != TYPE_ARRAY:
-			if typeof(ring_v) == TYPE_DICTIONARY:
-				var rec: Dictionary = ring_v
-				var bb_v: Variant = rec.get("bb", null)
-				if bb_v is Rect2 and not (bb_v as Rect2).has_point(pt):
-					continue
-				var pts_v: Variant = rec.get("pts", PackedVector2Array())
-				if typeof(pts_v) == TYPE_PACKED_VECTOR2_ARRAY and (pts_v as PackedVector2Array).size() >= 3:
-					if Geometry2D.is_point_in_polygon(pt, pts_v):
-						return true
-			continue
-		if typeof(ring_v) == TYPE_PACKED_VECTOR2_ARRAY and (ring_v as PackedVector2Array).size() >= 3:
-			if Geometry2D.is_point_in_polygon(pt, ring_v):
-				return true
+		if _ring_value_contains(ring_v, pt):
+			return true
 	return false
 
 
