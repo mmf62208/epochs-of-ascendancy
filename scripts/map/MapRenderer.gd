@@ -268,6 +268,9 @@ const UNIT_CARD_LATCH_SAFETY_SEC := 0.5
 ## press clears it unless that press is the poll-path Begin click itself
 ## (begin_press_pending). Lost leftover up cannot eat the first map click.
 const BEGIN_TITLE_SWALLOW_EXPIRE_MS: int = 750
+## INPUT-1: notice/toast × and Command Center CloseX leftover swallow.
+## Same clock as BEGIN-1 so a lost up cannot eat the next map click.
+const UI_CLOSE_SWALLOW_EXPIRE_MS: int = 750
 ## Fighting card (stance + cmd) must stay on-screen at Play 1280×740.
 ## Old reserve 252 clipped Press/Hold below Halt/Assign (card grows past 220).
 const UNIT_CARD_DOCK_RESERVE := 348.0
@@ -2818,10 +2821,15 @@ func _input(event: InputEvent) -> void:
 				call_deferred("_clear_begin_title_release_swallow")
 				get_viewport().set_input_as_handled()
 				return
+			# INPUT-1: do not swallow leftover in `_input` (GUI must see the
+			# close release so `pressed` fires). `_unhandled_input` eats the
+			# leftover after the Control closes. `_input` skip-still-click
+			# survived mutants — it is not a consume point.
 			if event.pressed:
 				_skip_inspector_after_march = false
 				_clear_unit_card_press_consume_on_new_left_press()
 				_clear_begin_title_release_swallow_on_new_left_press()
+				_clear_ui_close_release_swallow_on_new_left_press()
 			if _living_title_boot_is_up():
 				# Play 5adb38e: never swallow title-up presses. Route by event
 				# coords (computerUse may not update get_mouse_position first).
@@ -3236,6 +3244,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if use_spatial_picking and event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed:
 			_clear_begin_title_release_swallow_on_new_left_press()
+			_clear_ui_close_release_swallow_on_new_left_press()
 		if not event.pressed and _consume_unit_card_press_release_if_armed():
 			return
 		if not event.pressed and _first_session_tip_dismiss_blocks_map_pick():
@@ -3244,6 +3253,10 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 		if not event.pressed and _begin_title_release_blocks_map_pick():
 			call_deferred("_clear_begin_title_release_swallow")
+			get_viewport().set_input_as_handled()
+			return
+		if not event.pressed and _ui_close_click_blocks_map_pick(event):
+			call_deferred("_clear_ui_close_release_swallow")
 			get_viewport().set_input_as_handled()
 			return
 		if _living_title_boot_is_up():
@@ -3587,6 +3600,7 @@ func _process(delta: float) -> void:
 	_expire_map_time_pulse_if_needed()
 	_tick_unit_card_press_consume_latch(delta)
 	_tick_begin_title_release_swallow()
+	_tick_ui_close_release_swallow()
 
 	# When sim is paused, skip heavy LOD/fill/theater work — pan/zoom/UI stay responsive for playtest.
 	var sim_paused := false
@@ -18917,10 +18931,11 @@ func _is_mouse_over_blocking_ui() -> bool:
 		if n is DraggablePanel and (n as CanvasItem).visible:
 			return true
 		var nn := str(n.name)
+		if nn == "MainMenu":
+			return true
 		if nn in [
 			"TechnologyScreen",
 			"InfoPanel",
-			"MainMenu",
 			"DebugOverlay",
 			"OrderCommandPanel",
 			"DiplomacyView",
@@ -24863,6 +24878,99 @@ func _clear_begin_title_release_swallow() -> void:
 		remove_meta("eoa_begin_swallow_press_pending")
 	if has_meta("eoa_begin_swallow_press_seen_frame"):
 		remove_meta("eoa_begin_swallow_press_seen_frame")
+
+
+func arm_ui_close_release_swallow(pending_press: bool = false) -> void:
+	# Notice × / Command Center CloseX (button_down / poll handle_live_close).
+	# One leftover left-release is eaten. Clock restamps on the first _process
+	# after this frame. A later-frame left press or expiry drops it. Poll-path
+	# arms set press_pending so the click's own N+1 press keeps the arm.
+	set_meta("eoa_ui_close_swallow_release", true)
+	set_meta("eoa_ui_close_swallow_arm_msec", Time.get_ticks_msec())
+	set_meta("eoa_ui_close_swallow_arm_frame", Engine.get_process_frames())
+	if has_meta("eoa_ui_close_swallow_clock_ready"):
+		remove_meta("eoa_ui_close_swallow_clock_ready")
+	if has_meta("eoa_ui_close_swallow_press_seen_frame"):
+		remove_meta("eoa_ui_close_swallow_press_seen_frame")
+	if pending_press:
+		set_meta("eoa_ui_close_swallow_press_pending", true)
+	elif has_meta("eoa_ui_close_swallow_press_pending"):
+		remove_meta("eoa_ui_close_swallow_press_pending")
+
+
+func _ui_close_release_swallow_expired() -> bool:
+	if not has_meta("eoa_ui_close_swallow_release"):
+		return false
+	if not has_meta("eoa_ui_close_swallow_clock_ready"):
+		return false
+	var arm_frame: int = int(get_meta("eoa_ui_close_swallow_arm_frame", -1))
+	if Engine.get_process_frames() < arm_frame + 2:
+		return false
+	var arm_ms: int = int(get_meta("eoa_ui_close_swallow_arm_msec", 0))
+	if arm_ms > 0 and Time.get_ticks_msec() - arm_ms >= UI_CLOSE_SWALLOW_EXPIRE_MS:
+		return true
+	return false
+
+
+func _ui_close_release_blocks_map_pick() -> bool:
+	if not has_meta("eoa_ui_close_swallow_release"):
+		return false
+	if _ui_close_release_swallow_expired():
+		_clear_ui_close_release_swallow()
+		return false
+	return true
+
+
+func _ui_close_click_blocks_map_pick(_event: InputEvent = null) -> bool:
+	# Armed swallow only. Geometric × ownership must not hide a missing arm
+	# (poll / button_down mutants survived while the × rect was still up).
+	return _ui_close_release_blocks_map_pick()
+
+
+func _clear_ui_close_release_swallow_on_new_left_press() -> void:
+	# Same-frame close press must keep the arm so the matching leftover up is eaten.
+	# Poll-path: the close click's own press arrives in N+1 — eat that one only.
+	# A later-frame left press drops the one-shot so the same spot can select.
+	if not has_meta("eoa_ui_close_swallow_release"):
+		return
+	var now_frame: int = Engine.get_process_frames()
+	if has_meta("eoa_ui_close_swallow_press_pending"):
+		remove_meta("eoa_ui_close_swallow_press_pending")
+		set_meta("eoa_ui_close_swallow_press_seen_frame", now_frame)
+		return
+	if int(get_meta("eoa_ui_close_swallow_press_seen_frame", -1)) == now_frame:
+		return
+	var arm_frame: int = int(get_meta("eoa_ui_close_swallow_arm_frame", -1))
+	if now_frame > arm_frame:
+		_clear_ui_close_release_swallow()
+
+
+func _tick_ui_close_release_swallow() -> void:
+	if not has_meta("eoa_ui_close_swallow_release"):
+		return
+	if not has_meta("eoa_ui_close_swallow_clock_ready"):
+		var arm_frame: int = int(get_meta("eoa_ui_close_swallow_arm_frame", -1))
+		if Engine.get_process_frames() > arm_frame:
+			set_meta("eoa_ui_close_swallow_arm_msec", Time.get_ticks_msec())
+			set_meta("eoa_ui_close_swallow_clock_ready", true)
+		return
+	if _ui_close_release_swallow_expired():
+		_clear_ui_close_release_swallow()
+
+
+func _clear_ui_close_release_swallow() -> void:
+	if has_meta("eoa_ui_close_swallow_release"):
+		remove_meta("eoa_ui_close_swallow_release")
+	if has_meta("eoa_ui_close_swallow_arm_msec"):
+		remove_meta("eoa_ui_close_swallow_arm_msec")
+	if has_meta("eoa_ui_close_swallow_arm_frame"):
+		remove_meta("eoa_ui_close_swallow_arm_frame")
+	if has_meta("eoa_ui_close_swallow_clock_ready"):
+		remove_meta("eoa_ui_close_swallow_clock_ready")
+	if has_meta("eoa_ui_close_swallow_press_pending"):
+		remove_meta("eoa_ui_close_swallow_press_pending")
+	if has_meta("eoa_ui_close_swallow_press_seen_frame"):
+		remove_meta("eoa_ui_close_swallow_press_seen_frame")
 
 
 func dismiss_first_session_action_tip() -> void:
