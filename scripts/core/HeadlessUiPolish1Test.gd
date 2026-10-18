@@ -1,6 +1,7 @@
 extends SceneTree
 
-## UI-POLISH-1: Agents Close in view, Space × first click, Trade signal guard.
+## UI-POLISH-1: Agents Close in view, Space × first click, Trade signal guard,
+## held Close swallow, Space Esc.
 ##
 ## Does not load WorldMap / 3520 polygons.
 ##
@@ -12,9 +13,14 @@ extends SceneTree
 const SRC_AGENTS := "res://scripts/ui/AgentAssignmentScreen.gd"
 const SRC_SPACE := "res://scripts/ui/SpaceLayerBoardView.gd"
 const SRC_TRADE := "res://scripts/ui/TradeMarketView.gd"
+const SRC_PROD := "res://scripts/ui/ProductionAssignmentScreen.gd"
+const SRC_LEAD := "res://scripts/ui/LeaderAssignmentScreen.gd"
+const SRC_SWALLOW := "res://scripts/ui/CloseReleaseSwallow.gd"
+const SRC_REN := "res://scripts/map/MapRenderer.gd"
 const PLAY_SIZE := Vector2i(1280, 800)
 const VIEWPORT_RECT := Rect2(0.0, 0.0, 1280.0, 800.0)
 const FLUSH_FRAMES := 8
+const HELD_CLOSE_SEC := 0.075
 
 var _failures: int = 0
 var _event_seq: int = 0
@@ -25,6 +31,8 @@ var _space_view: Window = null
 var _trade_views: Array[Node] = []
 var _probe_fired: int = 0
 var _map_probe: Node = null
+var _map_catcher: Node = null
+var _cc_probe: Node = null
 
 
 func _init() -> void:
@@ -82,12 +90,26 @@ func _run() -> void:
 	_ui.name = "UILayer"
 	_ui.layer = 110
 	root.add_child(_ui)
+	_map_catcher = _MapReleaseCatcher.new()
+	_map_catcher.name = "UiPolish1MapReleaseCatcher"
+	root.add_child(_map_catcher)
+	_cc_probe = _CcPathProbe.new()
+	_cc_probe.name = "UiPolish1CcPathProbe"
+	root.add_child(_cc_probe)
 	await _flush()
+	await _test_empty_map_click_counts_one_release()
 	await _test_agents_close_inside_viewport()
+	await _test_agents_title_vs_show_no_overlap()
+	await _test_agents_close_held_not_covered()
+	await _test_prod_close_held_no_map_up()
+	await _test_mutant_prod_held_close_without_swallow()
+	await _test_leaders_close_held_no_map_up()
 	await _test_space_title_close_first_click()
 	await _test_space_frame_x_then_unrelated_button()
 	await _test_space_keyboard_close_then_click()
 	await _test_space_close_then_map_select()
+	await _test_space_esc_closes()
+	await _test_idle_esc_reaches_command_center_path()
 	await _test_trade_open_twice_no_already_connected()
 	_cleanup()
 
@@ -96,8 +118,15 @@ func _test_source_needles() -> void:
 	var agents_src := _read(SRC_AGENTS)
 	var space_src := _read(SRC_SPACE)
 	var trade_src := _read(SRC_TRADE)
+	var prod_src := _read(SRC_PROD)
+	var lead_src := _read(SRC_LEAD)
+	var swallow_src := _read(SRC_SWALLOW)
+	var ren_src := _read(SRC_REN)
 	if agents_src.is_empty() or space_src.is_empty() or trade_src.is_empty():
 		_fail("Agents / Space / Trade source missing")
+		return
+	if swallow_src.is_empty():
+		_fail("CloseReleaseSwallow.gd missing")
 		return
 	if "PANEL_DESIGN_SIZE" not in agents_src:
 		_fail("AgentAssignmentScreen must clamp design size to the viewport")
@@ -105,11 +134,38 @@ func _test_source_needles() -> void:
 	if "ACTION_MODE_BUTTON_PRESS" not in space_src or "TitleCloseButton" not in space_src:
 		_fail("Space × must ACTION_MODE_BUTTON_PRESS TitleCloseButton")
 		return
-	if "is_mouse_button_pressed(MOUSE_BUTTON_LEFT)" not in space_src:
-		_fail("Space swallow must arm only while LMB is down")
+	if "is_mouse_button_pressed(MOUSE_BUTTON_LEFT)" not in swallow_src:
+		_fail("shared swallow must arm only while LMB is down")
 		return
-	if "250" not in space_src:
-		_fail("Space swallow must expire after ~250 ms")
+	if "250" not in swallow_src:
+		_fail("shared swallow must expire after ~250 ms")
+		return
+	if "mb.pressed" not in swallow_src or "_disarm()" not in swallow_src:
+		_fail("shared swallow must clear on a new left press")
+		return
+	if "arm_from" not in prod_src or "CloseReleaseSwallow" not in prod_src:
+		_fail("Prod Close must use shared CloseReleaseSwallow")
+		return
+	if "ACTION_MODE_BUTTON_PRESS" not in lead_src or "CloseReleaseSwallow" not in lead_src:
+		_fail("Leaders Close must ACTION_MODE_BUTTON_PRESS with CloseReleaseSwallow")
+		return
+	if "ACTION_MODE_BUTTON_PRESS" not in agents_src or "CloseReleaseSwallow" not in agents_src:
+		_fail("Agents Close must ACTION_MODE_BUTTON_PRESS with CloseReleaseSwallow")
+		return
+	if "CloseReleaseSwallow" not in space_src or "_SpaceTitleCloseReleaseSwallow" in space_src:
+		_fail("Space must use shared CloseReleaseSwallow (not the private class)")
+		return
+	if "_is_live_escape_event" not in space_src:
+		_fail("Space must handle live Esc (keycode / physical / key_label / ui_cancel)")
+		return
+	if "_dismiss_space_layer_board_esc" not in ren_src or "SpaceLayerBoardView" not in ren_src:
+		_fail("MapRenderer Esc chain must dismiss SpaceLayerBoardView")
+		return
+	if "_esc_open_command_center" not in ren_src:
+		_fail("idle Esc must still open Command Center")
+		return
+	if "_raise_title_chrome" not in agents_src or "TITLE_BAR_HEIGHT" not in agents_src:
+		_fail("Agents must raise TitleBar above content overflow")
 		return
 	var idx := 0
 	var guarded := 0
@@ -126,18 +182,68 @@ func _test_source_needles() -> void:
 	if guarded < 1:
 		_fail("TradeMarketView must connect deal_rejected behind is_connected")
 		return
-	_pass("source needles: Agents clamp + Space press-on-down × + Trade deal_rejected guard")
+	_pass("source needles: shared CloseReleaseSwallow + Agents chrome + Space Esc + Trade guard")
 
 
-func _test_agents_close_inside_viewport() -> void:
+func _catcher_ups() -> int:
+	if _map_catcher != null and _map_catcher.has_method("left_ups"):
+		return int(_map_catcher.call("left_ups"))
+	return -1
+
+
+func _reset_catcher() -> void:
+	if _map_catcher != null and _map_catcher.has_method("reset"):
+		_map_catcher.call("reset")
+
+
+func _cc_opens() -> int:
+	if _cc_probe != null and _cc_probe.has_method("opens"):
+		return int(_cc_probe.call("opens"))
+	return -1
+
+
+func _reset_cc() -> void:
+	if _cc_probe != null and _cc_probe.has_method("reset"):
+		_cc_probe.call("reset")
+
+
+func _drop_swallow_nodes() -> void:
+	if root == null:
+		return
+	var sw: Node = root.get_node_or_null("CloseReleaseSwallow")
+	if sw != null:
+		sw.queue_free()
+	var old: Node = root.get_node_or_null("SpaceTitleCloseReleaseSwallow")
+	if old != null:
+		old.queue_free()
+
+
+func _test_empty_map_click_counts_one_release() -> void:
+	_ensure_mouse_up()
+	_reset_catcher()
+	var map_pt := Vector2(640.0, 400.0)
+	await _held_click_at(map_pt, false, 0)
+	await _flush()
+	if _catcher_ups() != 1:
+		_fail("empty-map held click must count 1 unhandled mouse-up (got %d)" % _catcher_ups())
+		return
+	_pass("empty-map held click counted 1 unhandled mouse-up")
+
+
+func _open_agents() -> bool:
+	if _agent_screen != null and is_instance_valid(_agent_screen):
+		_agent_screen.hide()
+		_agent_screen.queue_free()
+		_agent_screen = null
+		await _flush()
 	var packed: PackedScene = load("res://scenes/ui/AgentAssignmentScreen.tscn") as PackedScene
 	if packed == null:
 		_fail("AgentAssignmentScreen.tscn missing")
-		return
+		return false
 	var inst: Node = packed.instantiate()
 	if inst == null or not (inst is Control):
 		_fail("AgentAssignmentScreen instantiate failed")
-		return
+		return false
 	_agent_screen = inst as Control
 	_agent_screen.name = "AgentAssignmentScreen"
 	if "country_tag" in _agent_screen:
@@ -147,6 +253,12 @@ func _test_agents_close_inside_viewport() -> void:
 	if _agent_screen.has_method("_center_on_viewport"):
 		_agent_screen.call("_center_on_viewport")
 	await _flush()
+	return true
+
+
+func _test_agents_close_inside_viewport() -> void:
+	if not await _open_agents():
+		return
 	var close_btn: Button = _agent_screen.get_node_or_null("TitleBar/CloseButton") as Button
 	if close_btn == null:
 		_fail("Agents CloseButton missing")
@@ -162,11 +274,216 @@ func _test_agents_close_inside_viewport() -> void:
 	if not VIEWPORT_RECT.encloses(panel_r):
 		_fail("Agents screen rect %s not inside 1280x800 viewport" % str(panel_r))
 		return
+	if close_btn.action_mode != BaseButton.ACTION_MODE_BUTTON_PRESS:
+		_fail("Agents Close action_mode=%s want BUTTON_PRESS" % str(close_btn.action_mode))
+		return
 	_pass("Agents Close inside 1280x800 at %s (panel %s)" % [str(r), str(panel_r)])
-	if _agent_screen != null and is_instance_valid(_agent_screen):
-		_agent_screen.hide()
-		_agent_screen.queue_free()
-		_agent_screen = null
+
+
+func _test_agents_title_vs_show_no_overlap() -> void:
+	if _agent_screen == null or not is_instance_valid(_agent_screen):
+		if not await _open_agents():
+			return
+	var title: Control = _agent_screen.get_node_or_null("TitleBar/TitleLabel") as Control
+	var filter_row: Control = _agent_screen.get_node_or_null(
+		"MarginContainer/VBoxContainer/MainArea/ListsColumn/AgentsColumn/RosterFilterRow"
+	) as Control
+	if title == null or filter_row == null:
+		_fail("Agents TitleLabel / RosterFilterRow missing")
+		return
+	var tr: Rect2 = title.get_global_rect()
+	var fr: Rect2 = filter_row.get_global_rect()
+	if tr.intersects(fr):
+		_fail("Agents title %s overlaps Show: filter %s" % [str(tr), str(fr)])
+		return
+	_pass("Agents title vs Show: filter rects do not intersect")
+
+
+func _test_agents_close_held_not_covered() -> void:
+	if _agent_screen == null or not is_instance_valid(_agent_screen):
+		if not await _open_agents():
+			return
+	var close_btn: Button = _agent_screen.get_node_or_null("TitleBar/CloseButton") as Button
+	if close_btn == null:
+		_fail("Agents CloseButton missing for held click")
+		return
+	var pt: Vector2 = close_btn.get_global_rect().get_center()
+	_warp_mouse(pt)
+	var motion := InputEventMouseMotion.new()
+	motion.position = pt
+	motion.global_position = pt
+	Input.parse_input_event(motion)
+	if Input.has_method("flush_buffered_events"):
+		Input.flush_buffered_events()
+	await _flush()
+	var vp: Viewport = root.get_viewport()
+	var hovered: Control = vp.gui_get_hovered_control() if vp != null else null
+	var covered := true
+	var walk: Node = hovered
+	while walk != null:
+		if walk == close_btn:
+			covered = false
+			break
+		walk = walk.get_parent()
+	if covered:
+		_fail(
+			"Agents Close covered by %s at %s (want CloseButton hover)"
+			% [str(hovered), str(pt)]
+		)
+		return
+	_ensure_mouse_up()
+	_reset_catcher()
+	await _held_click_control(close_btn, false)
+	await _flush()
+	var still_up := (
+		_agent_screen != null
+		and is_instance_valid(_agent_screen)
+		and not _agent_screen.is_queued_for_deletion()
+		and _agent_screen.visible
+	)
+	if still_up:
+		_fail("Agents held Close did not close the screen")
+		return
+	if _catcher_ups() != 0:
+		_fail("Agents held Close leaked %d map mouse-up(s)" % _catcher_ups())
+		return
+	_pass("Agents Close fully hoverable and held-click closed with 0 map mouse-ups")
+	_agent_screen = null
+	_drop_swallow_nodes()
+	await _flush()
+
+
+func _instantiate_named_screen(scene_path: String, node_name: String) -> Control:
+	var packed: PackedScene = load(scene_path) as PackedScene
+	if packed == null:
+		_fail("%s missing" % scene_path)
+		return null
+	var inst: Node = packed.instantiate()
+	if inst == null or not (inst is Control):
+		_fail("%s instantiate failed" % scene_path)
+		return null
+	var screen := inst as Control
+	screen.name = node_name
+	_ui.add_child(screen)
+	return screen
+
+
+func _test_prod_close_held_no_map_up() -> void:
+	_ensure_mouse_up()
+	_drop_swallow_nodes()
+	var screen: Control = _instantiate_named_screen(
+		"res://scenes/ui/ProductionAssignmentScreen.tscn", "ProductionAssignmentScreen"
+	)
+	if screen == null:
+		return
+	await _flush()
+	var close_btn: Button = screen.get_node_or_null("TitleBar/CloseButton") as Button
+	if close_btn == null:
+		_fail("Prod CloseButton missing")
+		screen.queue_free()
+		return
+	if close_btn.action_mode != BaseButton.ACTION_MODE_BUTTON_PRESS:
+		_fail("Prod Close action_mode=%s want BUTTON_PRESS" % str(close_btn.action_mode))
+		screen.queue_free()
+		return
+	_reset_catcher()
+	await _held_click_control(close_btn, false)
+	await _flush()
+	var still_up := (
+		is_instance_valid(screen)
+		and not screen.is_queued_for_deletion()
+		and screen.visible
+	)
+	if still_up:
+		_fail("Prod held Close did not close the screen")
+		screen.queue_free()
+		return
+	if _catcher_ups() != 0:
+		_fail("Prod held Close leaked %d map mouse-up(s)" % _catcher_ups())
+		return
+	_pass("Prod held Close closed with 0 map mouse-ups")
+	_drop_swallow_nodes()
+	await _flush()
+
+
+func _test_mutant_prod_held_close_without_swallow() -> void:
+	## Removing the shared swallow must make the Prod held-close case FAIL:
+	## the matching mouse-up reaches the map catcher.
+	_ensure_mouse_up()
+	_drop_swallow_nodes()
+	var screen: Control = _instantiate_named_screen(
+		"res://scenes/ui/ProductionAssignmentScreen.tscn", "ProductionAssignmentScreen"
+	)
+	if screen == null:
+		return
+	await _flush()
+	var close_btn: Button = screen.get_node_or_null("TitleBar/CloseButton") as Button
+	if close_btn == null:
+		_fail("Prod CloseButton missing for mutant")
+		screen.queue_free()
+		return
+	for c in close_btn.pressed.get_connections():
+		var cb: Callable = c.get("callable", Callable())
+		if cb.is_valid() and close_btn.pressed.is_connected(cb):
+			close_btn.pressed.disconnect(cb)
+	close_btn.pressed.connect(screen.queue_free)
+	_reset_catcher()
+	await _held_click_control(close_btn, false)
+	await _flush()
+	if _catcher_ups() != 1:
+		_fail(
+			"mutant: Prod held-close without swallow must leak 1 map mouse-up (got %d)"
+			% _catcher_ups()
+		)
+		if is_instance_valid(screen):
+			screen.queue_free()
+		return
+	_pass("mutant: removing CloseReleaseSwallow makes Prod held-close leak 1 map mouse-up")
+	if is_instance_valid(screen) and not screen.is_queued_for_deletion():
+		screen.queue_free()
+	_drop_swallow_nodes()
+	await _flush()
+
+
+func _test_leaders_close_held_no_map_up() -> void:
+	_ensure_mouse_up()
+	_drop_swallow_nodes()
+	var screen: Control = _instantiate_named_screen(
+		"res://scenes/ui/LeaderAssignmentScreen.tscn", "LeaderAssignmentScreen"
+	)
+	if screen == null:
+		return
+	await _flush()
+	if screen.has_method("_fit_to_viewport"):
+		screen.call("_fit_to_viewport")
+	await _flush()
+	var close_btn: Button = screen.get_node_or_null("CloseButton") as Button
+	if close_btn == null:
+		_fail("Leaders CloseButton missing")
+		screen.queue_free()
+		return
+	if close_btn.action_mode != BaseButton.ACTION_MODE_BUTTON_PRESS:
+		_fail("Leaders Close action_mode=%s want BUTTON_PRESS" % str(close_btn.action_mode))
+		screen.queue_free()
+		return
+	_reset_catcher()
+	await _held_click_control(close_btn, false)
+	await _flush()
+	var still_up := (
+		is_instance_valid(screen)
+		and not screen.is_queued_for_deletion()
+		and screen.visible
+	)
+	if still_up:
+		_fail("Leaders held Close did not close the screen")
+		screen.queue_free()
+		return
+	if _catcher_ups() != 0:
+		_fail("Leaders held Close leaked %d map mouse-up(s)" % _catcher_ups())
+		return
+	_pass("Leaders held Close closed with 0 map mouse-ups")
+	_drop_swallow_nodes()
+	await _flush()
 
 
 func _title_close_button(win: Window) -> Button:
@@ -211,6 +528,7 @@ func _test_space_title_close_first_click() -> void:
 	if x_btn.get_global_rect().size.x < 8.0:
 		_fail("Space × rect too small %s" % str(x_btn.get_global_rect()))
 		return
+	_reset_catcher()
 	_click_window_at(_space_view, x_btn, true)
 	await _flush()
 	if _space_view.visible:
@@ -233,9 +551,7 @@ func _free_space_view() -> void:
 		_space_view.hide()
 		_space_view.queue_free()
 	_space_view = null
-	var leftover_sw: Node = root.get_node_or_null("SpaceTitleCloseReleaseSwallow")
-	if leftover_sw != null:
-		leftover_sw.queue_free()
+	_drop_swallow_nodes()
 
 
 func _open_space_board() -> bool:
@@ -265,6 +581,7 @@ func _ensure_mouse_up() -> void:
 	Input.parse_input_event(up)
 	if Input.has_method("flush_buffered_events"):
 		Input.flush_buffered_events()
+	_drop_swallow_nodes()
 
 
 func _make_probe_button() -> Button:
@@ -382,6 +699,70 @@ func _test_space_close_then_map_select() -> void:
 	_pass("map press-release after Space close selected")
 
 
+func _make_esc() -> InputEventKey:
+	var ev := InputEventKey.new()
+	ev.device = 0
+	ev.pressed = true
+	ev.echo = false
+	ev.keycode = KEY_ESCAPE
+	ev.physical_keycode = KEY_ESCAPE
+	ev.key_label = KEY_ESCAPE
+	ev.unicode = 27
+	return ev
+
+
+func _send_esc_to_space() -> void:
+	if _space_view == null or not is_instance_valid(_space_view):
+		return
+	_space_view.grab_focus()
+	var esc: InputEventKey = _make_esc()
+	# Live Window keeps Esc in its own viewport (Play: MapRenderer never logged).
+	if _space_view.has_method("push_input"):
+		_space_view.push_input(esc, true)
+	else:
+		Input.parse_input_event(esc)
+		if Input.has_method("flush_buffered_events"):
+			Input.flush_buffered_events()
+
+
+func _test_space_esc_closes() -> void:
+	if not _open_space_board():
+		return
+	await _flush()
+	_ensure_mouse_up()
+	_reset_cc()
+	if not _space_view.visible:
+		_fail("Space board not visible before Esc")
+		return
+	_send_esc_to_space()
+	await _flush()
+	if _space_view != null and is_instance_valid(_space_view) and _space_view.visible:
+		_fail("Esc with Space open did not close Space")
+		return
+	if _cc_opens() != 0:
+		_fail("Esc with Space open also reached Command Center path (opens=%d)" % _cc_opens())
+		return
+	_pass("Esc closed Space without opening Command Center")
+
+
+func _test_idle_esc_reaches_command_center_path() -> void:
+	_free_space_view()
+	await _flush()
+	_ensure_mouse_up()
+	_reset_cc()
+	if root is Window:
+		(root as Window).grab_focus()
+	var esc: InputEventKey = _make_esc()
+	Input.parse_input_event(esc)
+	if Input.has_method("flush_buffered_events"):
+		Input.flush_buffered_events()
+	await _flush()
+	if _cc_opens() != 1:
+		_fail("Esc with nothing open did not reach Command Center path (opens=%d)" % _cc_opens())
+		return
+	_pass("Esc with nothing open reached Command Center path")
+
+
 func _trade_manager() -> Object:
 	if root == null:
 		return null
@@ -457,6 +838,34 @@ func _warp_mouse(screen_pt: Vector2) -> void:
 	DisplayServer.warp_mouse(Vector2i(int(round(screen_pt.x)), int(round(screen_pt.y))))
 
 
+func _held_click_at(screen_pt: Vector2, leftover_swallow: bool, window_id: int) -> void:
+	if _leftover != null and _leftover.has_method("arm"):
+		if leftover_swallow:
+			_leftover.call("arm")
+		else:
+			_leftover.call("disarm")
+	_warp_mouse(screen_pt)
+	var down: InputEventMouseButton = _make_mouse(screen_pt, true)
+	down.window_id = window_id
+	Input.parse_input_event(down)
+	if Input.has_method("flush_buffered_events"):
+		Input.flush_buffered_events()
+	await process_frame
+	await create_timer(HELD_CLOSE_SEC).timeout
+	var up: InputEventMouseButton = _make_mouse(screen_pt, false)
+	up.window_id = window_id
+	Input.parse_input_event(up)
+	if Input.has_method("flush_buffered_events"):
+		Input.flush_buffered_events()
+
+
+func _held_click_control(ctrl: Control, leftover_swallow: bool) -> void:
+	if ctrl == null or not is_instance_valid(ctrl):
+		return
+	var r: Rect2 = ctrl.get_global_rect()
+	await _held_click_at(r.get_center(), leftover_swallow, 0)
+
+
 func _click_window_at(win: Window, btn: Control, swallow_release: bool) -> void:
 	var local_pt: Vector2 = btn.get_global_rect().get_center()
 	var embed_pt: Vector2 = Vector2(win.position) + local_pt
@@ -494,13 +903,69 @@ func _cleanup() -> void:
 			v.queue_free()
 	if _map_probe != null and is_instance_valid(_map_probe):
 		_map_probe.queue_free()
+	if _map_catcher != null and is_instance_valid(_map_catcher):
+		_map_catcher.queue_free()
+	if _cc_probe != null and is_instance_valid(_cc_probe):
+		_cc_probe.queue_free()
 	if _ui != null and is_instance_valid(_ui):
 		_ui.queue_free()
 	if _leftover != null and is_instance_valid(_leftover):
 		_leftover.queue_free()
-	var leftover_sw: Node = root.get_node_or_null("SpaceTitleCloseReleaseSwallow")
-	if leftover_sw != null:
-		leftover_sw.queue_free()
+	_drop_swallow_nodes()
+
+
+class _MapReleaseCatcher extends Node:
+	## Counts left button-ups that reach `_unhandled_input` (map stand-in).
+	var _left_ups: int = 0
+
+	func _ready() -> void:
+		process_mode = Node.PROCESS_MODE_ALWAYS
+		set_process_unhandled_input(true)
+
+	func reset() -> void:
+		_left_ups = 0
+
+	func left_ups() -> int:
+		return _left_ups
+
+	func _unhandled_input(event: InputEvent) -> void:
+		if not (event is InputEventMouseButton):
+			return
+		var mb := event as InputEventMouseButton
+		if mb.button_index != MOUSE_BUTTON_LEFT:
+			return
+		if mb.pressed:
+			return
+		_left_ups += 1
+
+
+class _CcPathProbe extends Node:
+	## Idle Esc with nothing open must still reach this unhandled path (CC).
+	var _opens: int = 0
+
+	func _ready() -> void:
+		process_mode = Node.PROCESS_MODE_ALWAYS
+		set_process_unhandled_input(true)
+
+	func reset() -> void:
+		_opens = 0
+
+	func opens() -> int:
+		return _opens
+
+	func _unhandled_input(event: InputEvent) -> void:
+		if not (event is InputEventKey):
+			return
+		var key := event as InputEventKey
+		if not key.pressed or key.echo:
+			return
+		if (
+			key.keycode == KEY_ESCAPE
+			or key.physical_keycode == KEY_ESCAPE
+			or key.key_label == KEY_ESCAPE
+			or int(key.unicode) == 27
+		):
+			_opens += 1
 
 
 class _MapPickProbe extends Node:

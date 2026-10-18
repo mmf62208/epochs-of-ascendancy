@@ -5,7 +5,8 @@ class_name SpaceLayerBoardView
 extends Window
 
 const PLAYER_FALLBACK := "USA"
-const CLOSE_RELEASE_SWALLOW_MS := 250
+
+const _CloseReleaseSwallow := preload("res://scripts/ui/CloseReleaseSwallow.gd")
 
 var _player_tag: String = PLAYER_FALLBACK
 var _title: Label
@@ -127,33 +128,55 @@ func _build_ui() -> void:
 	row.add_child(_close_btn)
 
 
+func _is_live_escape_event(event: InputEvent) -> bool:
+	# Live DisplayServer: keycode, physical_keycode, key_label, or ui_cancel.
+	if event is InputEventAction:
+		var act: InputEventAction = event
+		return bool(act.pressed) and str(act.action) == "ui_cancel"
+	if event is InputEventKey:
+		var key: InputEventKey = event
+		if not key.pressed or key.echo:
+			return false
+		if key.keycode == KEY_ESCAPE or key.physical_keycode == KEY_ESCAPE:
+			return true
+		if key.key_label == KEY_ESCAPE:
+			return true
+		if int(key.unicode) == 27:
+			return true
+	if event != null and event.is_action_pressed("ui_cancel"):
+		return true
+	return false
+
+
+func _input(event: InputEvent) -> void:
+	# Native/embedded Window keeps Esc in this viewport; MapRenderer never sees it.
+	if not visible:
+		return
+	if not _is_live_escape_event(event):
+		return
+	_on_title_close_pressed()
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if not visible:
+		return
+	if not _is_live_escape_event(event):
+		return
+	_on_title_close_pressed()
+
+
 func _on_title_close_pressed() -> void:
 	## Hide on press (not release) so leftover left-up swallow cannot eat the first ×.
 	## Swallow the matching release only when LMB is still down (never frame × after
 	## release, never keyboard Close). Expire / new-press drop so a later click selects.
-	_arm_close_release_swallow()
+	if not visible:
+		return
+	_CloseReleaseSwallow.arm_from(self)
 	var vp := get_viewport()
 	if vp != null:
 		vp.gui_release_focus()
 		vp.set_input_as_handled()
 	hide()
-
-
-func _arm_close_release_swallow() -> void:
-	# Frame × emits close_requested after the release; keyboard Close has no mouse.
-	# Arming then would eat the next unrelated button-up / map select.
-	if not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
-		return
-	var host: Node = get_parent()
-	if host == null:
-		host = get_tree().root if get_tree() != null else null
-	if host == null:
-		return
-	if host.get_node_or_null("SpaceTitleCloseReleaseSwallow") != null:
-		return
-	var swallow := _SpaceTitleCloseReleaseSwallow.new()
-	swallow.name = "SpaceTitleCloseReleaseSwallow"
-	host.add_child(swallow)
 
 
 func _on_layer_pressed(layer_id: String) -> void:
@@ -309,45 +332,3 @@ func show_board(tag: String = "") -> void:
 	size = Vector2i(780, 560)
 	popup_centered(Vector2i(780, 560))
 	refresh_board()
-
-
-class _SpaceTitleCloseReleaseSwallow extends Node:
-	## One-shot leftover left-up swallow after ×/Close press-to-hide.
-	## New left press clears without consuming. Expires after ~250 ms.
-	const EXPIRE_MS := 250
-	var _armed: bool = true
-	var _armed_msec: int = 0
-
-	func _ready() -> void:
-		process_mode = Node.PROCESS_MODE_ALWAYS
-		set_process_input(true)
-		set_process(true)
-		_armed_msec = Time.get_ticks_msec()
-
-	func _process(_delta: float) -> void:
-		if not _armed:
-			return
-		if Time.get_ticks_msec() - _armed_msec >= EXPIRE_MS:
-			_disarm()
-
-	func _disarm() -> void:
-		_armed = false
-		queue_free()
-
-	func _input(event: InputEvent) -> void:
-		if not _armed:
-			return
-		if not (event is InputEventMouseButton):
-			return
-		var mb := event as InputEventMouseButton
-		if mb.button_index != MOUSE_BUTTON_LEFT:
-			return
-		if mb.pressed:
-			# Fresh press is a new gesture — drop leftover, do not eat this event.
-			_disarm()
-			return
-		_armed = false
-		var vp := get_viewport()
-		if vp != null:
-			vp.set_input_as_handled()
-		queue_free()

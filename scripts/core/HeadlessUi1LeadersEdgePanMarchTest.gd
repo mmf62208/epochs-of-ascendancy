@@ -150,8 +150,8 @@ func _test_source_needles() -> void:
 	if "top_bar_only" not in _slice_func(inp, "edge_pan_direction_at"):
 		_fail("edge_pan_direction_at must take top_bar_only")
 		return
-	if "ACTION_MODE_BUTTON_RELEASE" not in lead or "_close_press_armed" not in lead:
-		_fail("Leaders Close must act on release and swallow the mouse-up")
+	if "ACTION_MODE_BUTTON_PRESS" not in lead or "CloseReleaseSwallow" not in lead:
+		_fail("Leaders Close must ACTION_MODE_BUTTON_PRESS with CloseReleaseSwallow")
 		return
 	if "edge_pan_direction_screen" not in _slice_func(ren, "_handle_camera_input"):
 		_fail("MapRenderer edge pan must use screen-pixel helper")
@@ -672,24 +672,22 @@ func _test_leaders_close_release_no_map_click() -> void:
 	_warp_mouse_window(cpos)
 	await process_frame
 	var down: InputEventMouseButton = _left_mouse(cpos, true)
-	var up: InputEventMouseButton = _left_mouse(cpos, false)
-	if screen.has_method("_on_close_gui_input"):
-		screen.call("_on_close_gui_input", down)
-	if _mr.has_method("_input"):
-		_mr.call("_input", down)
+	Input.parse_input_event(down)
+	if Input.has_method("flush_buffered_events"):
+		Input.flush_buffered_events()
 	await process_frame
-	if not is_instance_valid(screen) or screen.is_queued_for_deletion():
-		_fail("Leaders Close closed on press (must wait for release)")
-		return
-	if screen.has_method("_on_close_gui_input"):
-		screen.call("_on_close_gui_input", up)
+	await create_timer(0.075).timeout
+	var up: InputEventMouseButton = _left_mouse(cpos, false)
+	Input.parse_input_event(up)
+	if Input.has_method("flush_buffered_events"):
+		Input.flush_buffered_events()
 	if _mr.has_method("_input"):
 		_mr.call("_input", up)
 	if _mr.has_method("_unhandled_input"):
 		_mr.call("_unhandled_input", up)
 	await _flush()
 	if is_instance_valid(screen) and not screen.is_queued_for_deletion():
-		_fail("Leaders Close release did not close the panel")
+		_fail("Leaders Close press did not close the panel")
 		screen.queue_free()
 		return
 	if _info != null and _info.visible:

@@ -26150,6 +26150,20 @@ func _dismiss_named_overlay_screen(screen_name: String) -> bool:
 	return true
 
 
+func _dismiss_space_layer_board_esc() -> bool:
+	# Space is a Window: Esc stays in its viewport (Play: MapRenderer never logged).
+	# Hide like Close (do not queue_free — TopInfoBar reuses the node).
+	var n: Node = _find_named_overlay_screen("SpaceLayerBoardView")
+	if not _overlay_node_is_up(n):
+		return false
+	if n is Window:
+		(n as Window).hide()
+	elif n.has_method("hide"):
+		n.hide()
+	_show_map_layer_toast("Space closed (Esc)")
+	return true
+
+
 func _dismiss_map_overlays_esc() -> bool:
 	# Snapshot before hide. Idle Esc still falls through to the CC open helper.
 	var pre_cam: Dictionary = _snapshot_pre_dismiss_camera()
@@ -26157,6 +26171,8 @@ func _dismiss_map_overlays_esc() -> bool:
 	if supply_mode:
 		_toggle_supply_overlay()
 		_show_map_layer_toast("Supply legend closed (Esc)")
+		dismissed = true
+	if _dismiss_space_layer_board_esc():
 		dismissed = true
 	# Unit detail card (map navy/armor icons) closes first.
 	var ui_layer := get_node_or_null("UI") as CanvasLayer

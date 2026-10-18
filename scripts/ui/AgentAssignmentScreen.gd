@@ -2,6 +2,8 @@
 class_name AgentAssignmentScreen
 extends DraggablePanel
 
+const _CloseReleaseSwallow := preload("res://scripts/ui/CloseReleaseSwallow.gd")
+
 @export var country_tag: String = "USA"
 
 @onready var title_label: Label = $TitleBar/TitleLabel
@@ -84,6 +86,7 @@ var _fitting_viewport: bool = false
 const PANEL_DESIGN_SIZE := Vector2(1440, 780)
 const VIEWPORT_MARGIN := 16.0
 const TOP_BAR_RESERVE := 56.0
+const TITLE_BAR_HEIGHT := 40.0
 
 const AGENT_HEADER_SPECS: Array[Dictionary] = [
 	{"text": "Name", "width": 130},
@@ -127,10 +130,16 @@ func _ready() -> void:
 	z_index = 80
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_apply_content_margins()
+	_raise_title_chrome()
 	_apply_screen_theme()
 	_setup_agent_headers()
 	_setup_roster_filter()
-	close_button.pressed.connect(_on_close_pressed)
+	if close_button != null:
+		close_button.mouse_filter = Control.MOUSE_FILTER_STOP
+		close_button.focus_mode = Control.FOCUS_NONE
+		close_button.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
+		if not close_button.pressed.is_connected(_on_close_pressed):
+			close_button.pressed.connect(_on_close_pressed)
 	recruit_button.pressed.connect(_on_recruit_pressed)
 	recruit_button.tooltip_text = "Recruit a new operative into your intelligence service."
 	assign_mission_button.pressed.connect(_on_assign_mission_pressed)
@@ -153,10 +162,42 @@ func _apply_content_margins() -> void:
 	var margin := get_node_or_null("MarginContainer") as MarginContainer
 	if margin == null:
 		return
+	margin.offset_top = TITLE_BAR_HEIGHT
+	margin.clip_contents = true
+	margin.mouse_filter = Control.MOUSE_FILTER_STOP
 	margin.add_theme_constant_override("margin_left", 26)
 	margin.add_theme_constant_override("margin_right", 22)
 	margin.add_theme_constant_override("margin_top", 16)
 	margin.add_theme_constant_override("margin_bottom", 14)
+	var main_area := get_node_or_null("MarginContainer/VBoxContainer/MainArea") as Control
+	if main_area != null:
+		main_area.clip_contents = true
+	var detail := get_node_or_null("MarginContainer/VBoxContainer/MainArea/DetailPanel") as Control
+	if detail != null:
+		detail.clip_contents = true
+		detail.custom_minimum_size = Vector2(220.0, 0.0)
+	var intel := get_node_or_null("MarginContainer/VBoxContainer/MainArea/IntelColumn") as Control
+	if intel != null:
+		intel.clip_contents = true
+		intel.custom_minimum_size = Vector2(180.0, 0.0)
+
+
+func _raise_title_chrome() -> void:
+	## TitleBar is drawn after MarginContainer so Close / title stay above content
+	## overflow (Play 1280×800: DetailPanel covered Close; Show: overlapped title).
+	var title_bar := get_node_or_null("TitleBar") as Control
+	var margin := get_node_or_null("MarginContainer") as Control
+	if margin != null:
+		margin.offset_top = TITLE_BAR_HEIGHT
+		margin.clip_contents = true
+	if title_bar != null:
+		title_bar.z_index = 20
+		title_bar.mouse_filter = Control.MOUSE_FILTER_STOP
+		title_bar.offset_bottom = TITLE_BAR_HEIGHT
+		move_child(title_bar, get_child_count() - 1)
+	if close_button != null:
+		close_button.z_index = 21
+		close_button.mouse_filter = Control.MOUSE_FILTER_STOP
 
 
 func _on_viewport_size_changed() -> void:
@@ -198,10 +239,12 @@ func _center_on_viewport() -> void:
 		y = maxf(VIEWPORT_MARGIN, avail.y - h - VIEWPORT_MARGIN)
 	global_position = Vector2(x, y)
 	clip_contents = true
+	_raise_title_chrome()
 	_fitting_viewport = false
 
 
 func _on_close_pressed() -> void:
+	_CloseReleaseSwallow.arm_from(self)
 	queue_free()
 
 
