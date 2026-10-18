@@ -16892,9 +16892,12 @@ func player_path_place_world_at_screen(world: Vector2, screen: Vector2) -> void:
 			break
 		_zoom_toward_mouse(factor_in, city_screen)
 		guard += 1
-	# Use MapCamera's canvas, not a different viewport Camera2D.
-	var here: Vector2 = cam.get_canvas_transform().affine_inverse() * screen
-	cam.global_position += world - here
+	# Camera2D formula (canvas stretch made affine_inverse disagree with
+	# the live test's screen_of, leaving Essen 60–290 wu off the pixel).
+	var z_now: float = maxf(absf(cam.zoom.x), absf(cam.zoom.y))
+	if z_now < 0.04:
+		return
+	cam.global_position = world - (screen - vp_size * 0.5) / z_now
 	# Skip theater clamp on this pan. Clamp at Home-band zoom left Essen
 	# ~67 wu off (455,455); later wheel notches then slipped the Ruhr off
 	# the top of the frame. Wheel zoom still clamps.

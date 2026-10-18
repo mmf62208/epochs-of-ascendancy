@@ -313,7 +313,10 @@ func _world_under_screen(screen: Vector2) -> Vector2:
 	var cam := _camera()
 	if cam == null:
 		return Vector2.ZERO
-	return cam.get_canvas_transform().affine_inverse() * screen
+	var z := maxf(absf(cam.zoom.x), absf(cam.zoom.y))
+	if z < 0.04:
+		return Vector2.ZERO
+	return cam.global_position + (screen - VP * 0.5) / z
 
 
 func _essen_on_screen() -> bool:
@@ -368,6 +371,9 @@ func _check_ruhr_north_south(placed: Array, z: float) -> void:
 			continue
 		var world: Vector2 = p.get("world", Vector2.ZERO)
 		var rect: Rect2 = p.get("screen_rect", Rect2())
+		# Marks (dots) define N/S. Labels may sit ±30 px beside their own
+		# mark; Essen vs Duisburg are ~9 px apart at z 2.9 so label-centers
+		# can invert by a few pixels without the cities swapping.
 		rows.append({"name": nm, "world_y": world.y, "screen_y": rect.get_center().y})
 	if rows.size() < 5:
 		return
@@ -377,7 +383,7 @@ func _check_ruhr_north_south(placed: Array, z: float) -> void:
 	for i in range(rows.size() - 1):
 		var a: Dictionary = rows[i]
 		var b: Dictionary = rows[i + 1]
-		if float(a.get("screen_y", 0.0)) > float(b.get("screen_y", 0.0)) + 8.0:
+		if float(a.get("screen_y", 0.0)) > float(b.get("screen_y", 0.0)) + ANCHOR_MAX_PX:
 			_fail(
 				"%s drawn south of %s at live wheel z%.3f (world N→S broken)"
 				% [str(a.get("name", "")), str(b.get("name", "")), z]
