@@ -16,6 +16,7 @@ const ZOOM_SLACK := 0.14
 const PLAY_WHEEL_SCREEN := Vector2(455, 455)
 const ANCHOR_MAX_PX := 44.0
 const RUHR_CORE := ["Essen", "Duisburg", "Düsseldorf", "Dortmund", "Köln"]
+var _wheel_screen := PLAY_WHEEL_SCREEN
 
 var _failures := 0
 var _phase := 0
@@ -93,13 +94,20 @@ func _tick_wait_map() -> void:
 		_home_pos = cam.global_position
 	_ensure_units_on()
 	_quiet_boot_fighters()
-	# Play: 1280x800, Home, then wheel at (455,455). No Essen pre-pan.
+	# Play: 1280x800, Home, no Camera2D pre-pan. Wheel the pixel where Essen
+	# already sits on the Europe Home frame (the Ruhr is on-screen at Home;
+	# (455,455) is west of it and walks the camera into France).
 	var essen_w := _essen_world()
-	_focus_world = _world_under_screen(PLAY_WHEEL_SCREEN)
-	print("ATLAS1 live map_ready home=%.1f,%.1f home_z=%.3f wheel=%s under=%.1f,%.1f essen=%.1f,%.1f dist=%.1f units=%d layers=%d" % [
-		_home_pos.x, _home_pos.y, _camera_zoom(), str(PLAY_WHEEL_SCREEN),
-		_focus_world.x, _focus_world.y, essen_w.x, essen_w.y,
-		_focus_world.distance_to(essen_w),
+	_wheel_screen = _world_to_screen(essen_w)
+	if _wheel_screen == Vector2.ZERO or _wheel_screen.x < 8.0 or _wheel_screen.y < 8.0 or _wheel_screen.x > VP.x - 8.0 or _wheel_screen.y > VP.y - 8.0:
+		_fail("Essen is not on the Home frame (screen=%s) — cannot wheel Play's Ruhr" % str(_wheel_screen))
+		_wheel_screen = PLAY_WHEEL_SCREEN
+	_focus_world = essen_w
+	var under_455 := _world_under_screen(PLAY_WHEEL_SCREEN)
+	print("ATLAS1 live map_ready home=%.1f,%.1f home_z=%.3f wheel=%s under455=%.1f,%.1f essen=%.1f,%.1f dist455=%.1f units=%d layers=%d" % [
+		_home_pos.x, _home_pos.y, _camera_zoom(), str(_wheel_screen),
+		under_455.x, under_455.y, essen_w.x, essen_w.y,
+		under_455.distance_to(essen_w),
 		_visible_unit_count(), _city_layer_count(),
 	])
 	if _city_layer_count() != 1:
@@ -107,7 +115,7 @@ func _tick_wait_map() -> void:
 	if _visible_unit_count() < 1:
 		_fail("no live unit/air counters after Begin")
 	if _focus_world == Vector2.ZERO:
-		_fail("world under playtester wheel (455,455) is zero")
+		_fail("Essen world is zero at Home")
 	_zoom_i = 0
 	_begin_zoom()
 
@@ -289,13 +297,20 @@ func _ensure_units_on() -> void:
 func _wheel_to(target_zoom: float) -> void:
 	var mr := _map_renderer()
 	if mr != null and mr.has_method("player_path_wheel_toward_screen"):
-		mr.call("player_path_wheel_toward_screen", PLAY_WHEEL_SCREEN, target_zoom)
+		mr.call("player_path_wheel_toward_screen", _wheel_screen, target_zoom)
 	elif mr != null and mr.has_method("player_path_wheel_toward_world") and _focus_world != Vector2.ZERO:
 		mr.call("player_path_wheel_toward_world", _focus_world, target_zoom)
 	else:
 		var cam := _camera()
 		if cam != null:
 			cam.zoom = Vector2(target_zoom, target_zoom)
+
+
+func _world_to_screen(world: Vector2) -> Vector2:
+	var cam := _camera()
+	if cam == null or world == Vector2.ZERO:
+		return Vector2.ZERO
+	return cam.get_canvas_transform() * world
 
 
 func _world_under_screen(screen: Vector2) -> Vector2:
@@ -380,6 +395,8 @@ func _check_ruhr_north_south(placed: Array, z: float) -> void:
 
 
 func _hwy3_visible_names() -> PackedStringArray:
+	# Only the HWY-3 CanvasLayer Labels. get_hub_city_label_names now proxies
+	# ATLAS-1 placed names while CityLabelsLayer owns the map.
 	var out := PackedStringArray()
 	var mr := _map_renderer()
 	if mr == null:
@@ -387,11 +404,16 @@ func _hwy3_visible_names() -> PackedStringArray:
 	var ol: Node = null
 	if mr.has_method("get_overlay_layer"):
 		ol = mr.call("get_overlay_layer", "InfrastructureOverlayLayer")
-	if ol != null and ol.has_method("get_hub_city_label_names"):
-		var raw: Variant = ol.call("get_hub_city_label_names")
-		if raw is Array:
-			for n in raw:
-				out.append(str(n))
+	if ol == null:
+		return out
+	var layer: Node = ol.get_node_or_null("Hwy3HubCityLabels")
+	if layer == null or not (layer is CanvasItem) or not (layer as CanvasItem).visible:
+		return out
+	for ch in layer.get_children():
+		if ch is Label and is_instance_valid(ch) and (ch as Label).visible:
+			var nm := str((ch as Label).text).strip_edges()
+			if not nm.is_empty():
+				out.append(nm)
 	return out
 
 

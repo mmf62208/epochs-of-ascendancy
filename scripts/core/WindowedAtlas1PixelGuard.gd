@@ -481,8 +481,10 @@ func _apply_live_wheel(target_zoom: float) -> void:
 	cam.reset_smoothing()
 	cam.enabled = true
 	cam.make_current()
-	var wheel := Vector2(455, 455)
 	var essen := _world_for("essen")
+	var wheel := Vector2(455, 455)
+	if essen != Vector2.ZERO:
+		wheel = cam.get_canvas_transform() * essen
 	if mr != null and mr.has_method("player_path_wheel_toward_screen"):
 		mr.call("player_path_wheel_toward_screen", wheel, target_zoom)
 	elif mr != null and mr.has_method("player_path_wheel_toward_world") and essen != Vector2.ZERO:
