@@ -36,6 +36,13 @@ func _pass(msg: String) -> void:
 	print("  [PASS] HeadlessAtlas1CityLabelsTest: ", msg)
 
 
+func _build_bar_ms() -> float:
+	var raw: String = OS.get_environment("EOA_ATLAS1_BUILD_BAR_MS").strip_edges()
+	if raw.is_empty() or not raw.is_valid_float():
+		return 150.0
+	return raw.to_float()
+
+
 func _run_and_quit() -> void:
 	if not ResourceLoader.exists(LAYER_PATH):
 		_fail("CityLabelsLayer.gd missing")
@@ -99,9 +106,10 @@ func _test_bands(layer: Node) -> void:
 		_fail("close eligible %d < candidates %d" % [close, total])
 	else:
 		_pass("close eligible %d" % close)
+	var bar_ms: float = _build_bar_ms()
 	var build_ms := float(layer.call("build_ms"))
-	if build_ms > 150.0:
-		_fail("city build %.1f ms > 150" % build_ms)
+	if build_ms > bar_ms:
+		_fail("city build %.1f ms > %.0f" % [build_ms, bar_ms])
 	else:
 		_pass("city build %.1f ms" % build_ms)
 	if layer.call("is_eligible", METTMANN, "mid"):

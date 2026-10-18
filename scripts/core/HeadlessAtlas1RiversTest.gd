@@ -26,6 +26,13 @@ func _pass(msg: String) -> void:
 	print("  [PASS] HeadlessAtlas1RiversTest: ", msg)
 
 
+func _build_bar_ms() -> float:
+	var raw: String = OS.get_environment("EOA_ATLAS1_BUILD_BAR_MS").strip_edges()
+	if raw.is_empty() or not raw.is_valid_float():
+		return 150.0
+	return raw.to_float()
+
+
 func _run_and_quit() -> void:
 	if not ResourceLoader.exists(LAYER_PATH):
 		_fail("MajorRiversLayer.gd missing")
@@ -81,8 +88,9 @@ func _test_budget(layer: Node, build_ms: float) -> void:
 		_fail("vertex count %d looks empty" % verts)
 	else:
 		_pass("vertices %d <= 20000" % verts)
-	if build_ms > 150.0:
-		_fail("river build %.1f ms > 150" % build_ms)
+	var bar_ms: float = _build_bar_ms()
+	if build_ms > bar_ms:
+		_fail("river build %.1f ms > %.0f" % [build_ms, bar_ms])
 	else:
 		_pass("river build %.1f ms" % build_ms)
 
