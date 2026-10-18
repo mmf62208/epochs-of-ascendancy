@@ -33,6 +33,7 @@ const MANCHESTER := 711344
 const MANCHESTER_SW := 711345
 const HOME_CAM := Vector2(7449.6456, 1795.9165)
 const ANCHOR_MAX_PX := 30.0
+const RUHR_ANCHOR_MAX_PX := 44.0
 
 var _failures := 0
 
@@ -198,6 +199,11 @@ func _test_ruhr(layer: Node) -> void:
 		_fail("mid Ruhr missing Essen")
 	else:
 		_pass("mid Ruhr has Essen")
+	for core in ["Duisburg", "Düsseldorf", "Dortmund"]:
+		if not names.has(core):
+			_fail("mid Ruhr missing %s" % core)
+		else:
+			_pass("mid Ruhr has %s" % core)
 	if not names.has("Köln") and not names.has("Cologne"):
 		_fail("mid Ruhr missing Köln")
 	else:
@@ -538,8 +544,11 @@ func _test_home_cam_ruhr_mid(layer: Node) -> void:
 			_fail("Essen missing at Home-cam z%.3f (live zoom-in path)" % z)
 		else:
 			_pass("Essen labelled at Home-cam z%.3f" % z)
+		for core in ["Duisburg", "Düsseldorf", "Dortmund"]:
+			if not names.has(core):
+				print("ATLAS1 city home_cam z%.3f %s absent (Europe-wide frame)" % [z, core])
 		if not names.has("Köln") and not names.has("Cologne"):
-			print("ATLAS1 city home_cam z%.3f Köln absent (allowed at mid Europe frame)" % z)
+			print("ATLAS1 city home_cam z%.3f Köln absent (Europe-wide frame)" % z)
 		if names.has("Hamm") and not names.has("Essen"):
 			_fail("Hamm labelled at Home-cam z%.3f while Essen is missing" % z)
 		if bool(layer.call("has_visual_overlap")):
@@ -633,19 +642,18 @@ func _test_ruhr_centered_live_zooms(layer: Node) -> void:
 		if not names.has("Essen"):
 			_fail("Essen missing at Ruhr-cam z%.3f" % z)
 			ok = false
-		if z >= 2.3:
-			if not names.has("Duisburg"):
-				_fail("Duisburg missing at Ruhr-cam z%.3f" % z)
-				ok = false
-			if not names.has("Düsseldorf"):
-				_fail("Düsseldorf missing at Ruhr-cam z%.3f" % z)
-				ok = false
-			if not names.has("Dortmund"):
-				_fail("Dortmund missing at Ruhr-cam z%.3f" % z)
-				ok = false
-			if not names.has("Köln") and not names.has("Cologne"):
-				_fail("Köln missing at Ruhr-cam z%.3f" % z)
-				ok = false
+		if not names.has("Duisburg"):
+			_fail("Duisburg missing at Ruhr-cam z%.3f" % z)
+			ok = false
+		if not names.has("Düsseldorf"):
+			_fail("Düsseldorf missing at Ruhr-cam z%.3f" % z)
+			ok = false
+		if not names.has("Dortmund"):
+			_fail("Dortmund missing at Ruhr-cam z%.3f" % z)
+			ok = false
+		if not names.has("Köln") and not names.has("Cologne"):
+			_fail("Köln missing at Ruhr-cam z%.3f" % z)
+			ok = false
 		if names.has("Hamm") and not names.has("Essen"):
 			_fail("Hamm kept over Essen at Ruhr-cam z%.3f" % z)
 			ok = false
@@ -668,7 +676,7 @@ func _test_air_wing_cover_essen(layer: Node) -> void:
 		_fail("Essen missing under air-wing counter at z1.09")
 		return
 	var dist := _anchor_dist_px(names["Essen"], essen, zoom, essen, vp)
-	if dist > ANCHOR_MAX_PX:
+	if dist > RUHR_ANCHOR_MAX_PX:
 		_fail("Essen %.1f px from its dot under air-wing at z1.09" % dist)
 	else:
 		_pass("Essen stays by its dot above the air-wing (%.1f px)" % dist)
@@ -679,7 +687,7 @@ func _test_air_wing_cover_essen(layer: Node) -> void:
 		_fail("Essen missing under air-wing counter at z1.35")
 		return
 	dist = _anchor_dist_px(names["Essen"], essen, 1.35, essen, vp)
-	if dist > ANCHOR_MAX_PX:
+	if dist > RUHR_ANCHOR_MAX_PX:
 		_fail("Essen %.1f px from its dot under air-wing at z1.35" % dist)
 	else:
 		_pass("Essen by its dot above the air-wing at z1.35 (%.1f px)" % dist)
@@ -723,7 +731,7 @@ func _test_counter_avoidance(layer: Node) -> void:
 		_fail("Essen culled instead of nudging off the counter")
 		return
 	var dist := _anchor_dist_px(names["Essen"], essen, zoom, essen, vp)
-	if dist > ANCHOR_MAX_PX:
+	if dist > RUHR_ANCHOR_MAX_PX:
 		_fail("counter nudge moved Essen %.1f px from its dot" % dist)
 	else:
 		_pass("Essen stays by its dot above the counter (%.1f px)" % dist)

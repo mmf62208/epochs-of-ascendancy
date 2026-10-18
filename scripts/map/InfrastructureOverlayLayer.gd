@@ -2128,6 +2128,8 @@ func _hide_all_hub_city_labels() -> void:
 
 
 func get_hub_city_label_names() -> Array:
+    if _atlas1_owns_city_names():
+        return _atlas1_placed_city_names()
     _ensure_hub_city_labels()
     var names: Array = []
     for key_v in _hub_labels.keys():
@@ -2144,26 +2146,73 @@ func get_hub_city_label_names() -> Array:
 
 
 func get_visible_hub_label_rects() -> Array:
-    _ensure_hub_city_labels()
     var out: Array = []
-    for key_v in _hub_labels.keys():
-        var lbl_v: Variant = _hub_labels[key_v]
-        if lbl_v == null or not (lbl_v is Label):
-            continue
-        var lbl: Label = lbl_v
-        if not is_instance_valid(lbl) or not lbl.visible:
-            continue
-        out.append({
-            "text": str(lbl.text),
-            "key": RoadTierVisualScript.hwy3_label_alias_key(str(lbl.text)),
-            "rect": Rect2(lbl.position, lbl.size),
-            "priority": 80,
-            "source": "hub",
-        })
+    if _atlas1_owns_city_names():
+        out.append_array(_atlas1_placed_city_rects())
+    else:
+        _ensure_hub_city_labels()
+        for key_v in _hub_labels.keys():
+            var lbl_v: Variant = _hub_labels[key_v]
+            if lbl_v == null or not (lbl_v is Label):
+                continue
+            var lbl: Label = lbl_v
+            if not is_instance_valid(lbl) or not lbl.visible:
+                continue
+            out.append({
+                "text": str(lbl.text),
+                "key": RoadTierVisualScript.hwy3_label_alias_key(str(lbl.text)),
+                "rect": Rect2(lbl.position, lbl.size),
+                "priority": 80,
+                "source": "hub",
+            })
     for sp_v in _gold_spine_visible_labels():
         if typeof(sp_v) == TYPE_DICTIONARY:
             out.append(sp_v)
     return RoadTierVisualScript.hwy3_cull_label_candidates(out)
+
+
+func _atlas1_city_labels_layer() -> Node:
+    var tree := get_tree()
+    if tree == null or tree.root == null:
+        return null
+    return tree.root.find_child("CityLabelsLayer", true, false)
+
+
+func _atlas1_placed_city_names() -> Array:
+    var names: Array = []
+    var layer := _atlas1_city_labels_layer()
+    if layer == null or not layer.has_method("placed"):
+        return names
+    var placed: Array = layer.call("placed")
+    for p in placed:
+        if float(p.get("alpha", 0.0)) < 0.04:
+            continue
+        var nm := str(p.get("name", "")).strip_edges()
+        if not nm.is_empty():
+            names.append(nm)
+    return names
+
+
+func _atlas1_placed_city_rects() -> Array:
+    var out: Array = []
+    var layer := _atlas1_city_labels_layer()
+    if layer == null or not layer.has_method("placed"):
+        return out
+    var placed: Array = layer.call("placed")
+    for p in placed:
+        if float(p.get("alpha", 0.0)) < 0.04:
+            continue
+        var nm := str(p.get("name", "")).strip_edges()
+        if nm.is_empty():
+            continue
+        out.append({
+            "text": nm,
+            "key": RoadTierVisualScript.hwy3_label_alias_key(nm),
+            "rect": p.get("screen_rect", Rect2()) as Rect2,
+            "priority": 80,
+            "source": "atlas1",
+        })
+    return out
 
 
 func get_hub_label_candidates_uncull() -> Array:

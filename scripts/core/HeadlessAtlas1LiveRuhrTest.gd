@@ -14,7 +14,7 @@ const LIVE_ZOOMS: Array[float] = [1.217, 1.512, 2.904]
 const VP := Vector2(1280, 800)
 const ZOOM_SLACK := 0.14
 const PLAY_WHEEL_SCREEN := Vector2(455, 455)
-const ANCHOR_MAX_PX := 30.0
+const ANCHOR_MAX_PX := 44.0
 const RUHR_CORE := ["Essen", "Duisburg", "Düsseldorf", "Dortmund", "Köln"]
 
 var _failures := 0
@@ -93,16 +93,8 @@ func _tick_wait_map() -> void:
 		_home_pos = cam.global_position
 	_ensure_units_on()
 	_quiet_boot_fighters()
-	# Playtester: 1280x800, Home, wheel at (455,455) with Map Mode + notice
-	# open. Europe Home parks the Ruhr under that HUD; place Essen on the
-	# playtester pixel, then wheel that pixel through main's _zoom_toward_mouse.
+	# Play: 1280x800, Home, then wheel at (455,455). No Essen pre-pan.
 	var essen_w := _essen_world()
-	var mr := _map_renderer()
-	if mr != null and mr.has_method("player_path_place_world_at_screen") and essen_w != Vector2.ZERO:
-		mr.call("player_path_place_world_at_screen", essen_w, PLAY_WHEEL_SCREEN)
-		cam = _camera()
-		if cam != null:
-			_home_pos = cam.global_position
 	_focus_world = _world_under_screen(PLAY_WHEEL_SCREEN)
 	print("ATLAS1 live map_ready home=%.1f,%.1f home_z=%.3f wheel=%s under=%.1f,%.1f essen=%.1f,%.1f dist=%.1f units=%d layers=%d" % [
 		_home_pos.x, _home_pos.y, _camera_zoom(), str(PLAY_WHEEL_SCREEN),
@@ -110,8 +102,6 @@ func _tick_wait_map() -> void:
 		_focus_world.distance_to(essen_w),
 		_visible_unit_count(), _city_layer_count(),
 	])
-	if essen_w != Vector2.ZERO and _focus_world.distance_to(essen_w) > 80.0:
-		_fail("playtester wheel (455,455) is %.1f wu from Essen after place" % _focus_world.distance_to(essen_w))
 	if _city_layer_count() != 1:
 		_fail("CityLabelsLayer count %d want 1 (doubled draw path)" % _city_layer_count())
 	if _visible_unit_count() < 1:
@@ -178,13 +168,13 @@ func _check_zoom() -> void:
 		_fail("Essen world not on screen at live wheel z%.3f" % z)
 	else:
 		_pass("Essen on screen at live wheel z%.3f" % z)
+	for core in RUHR_CORE:
+		if core == "Köln":
+			if not _has_name(placed, "Köln") and not _has_name(placed, "Cologne"):
+				_fail("Köln missing at live wheel z%.3f" % z)
+		elif not _has_name(placed, core):
+			_fail("%s missing at live wheel z%.3f" % [core, z])
 	if z >= 2.3:
-		for core in RUHR_CORE:
-			if core == "Köln":
-				if not _has_name(placed, "Köln") and not _has_name(placed, "Cologne"):
-					_fail("Köln missing at live wheel z%.3f" % z)
-			elif not _has_name(placed, core):
-				_fail("%s missing at live wheel z%.3f" % [core, z])
 		_check_ruhr_north_south(placed, z)
 	if _has_name(placed, "Hamm") and not _has_name(placed, "Essen"):
 		_fail("Hamm kept over Essen at live wheel z%.3f" % z)
@@ -214,16 +204,15 @@ func _check_zoom() -> void:
 		_pass("no legacy province-name draw at z%.3f" % z)
 	var hits: PackedStringArray = layer.call("labels_hit_counters")
 	var ruhr_hits := PackedStringArray()
+	var covered := PackedStringArray()
 	for h in hits:
 		var nm := str(h)
 		if nm in ["Essen", "Hamm", "Münster", "Dortmund", "Duisburg", "Düsseldorf", "Herne", "Gelsenkirchen", "Köln", "Cologne", "Krefeld", "Mönchengladbach", "Remscheid"]:
 			ruhr_hits.append(nm)
-	var covered := PackedStringArray()
-	for h in ruhr_hits:
-		# Cores stay by their dots (z 30, above chips). Fail only if a
-		# lower-priority Ruhr name is trapped under a plate.
-		if str(h) in ["Hamm", "Münster", "Herne", "Gelsenkirchen", "Krefeld", "Mönchengladbach", "Remscheid"]:
-			covered.append(str(h))
+		if nm in RUHR_CORE or nm == "Cologne":
+			covered.append(nm)
+		elif nm in ["Hamm", "Münster", "Herne", "Gelsenkirchen", "Krefeld", "Mönchengladbach", "Remscheid"]:
+			covered.append(nm)
 	if not covered.is_empty():
 		_fail("Ruhr labels under live counters at z%.3f: %s" % [z, ", ".join(covered)])
 	elif not ruhr_hits.is_empty():
@@ -328,11 +317,9 @@ func _essen_on_screen() -> bool:
 
 
 func _check_anchor_and_chrome(layer: Node, placed: Array, z: float) -> void:
-	var required: Dictionary = {"Essen": true}
-	if z >= 2.3:
-		for core in RUHR_CORE:
-			required[core] = true
-		required["Cologne"] = true
+	var required: Dictionary = {"Essen": true, "Cologne": true}
+	for core in RUHR_CORE:
+		required[core] = true
 	var chrome: Array = []
 	if layer.has_method("chrome_screen_rects"):
 		chrome = layer.call("chrome_screen_rects")

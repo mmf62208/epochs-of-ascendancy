@@ -21,6 +21,10 @@ const MID_TIER2_SCORE_FLOOR := 400.0
 const LABEL_SHIFT_PX := 22.0
 const CLOSE_SHIFT_PX := 22.0
 const ANCHOR_MAX_PX := 30.0
+## Ruhr cores may walk just past a chip half-width so the name sits beside
+## the plate instead of on it (COUNTER_HALF.x 36 → ~44 px to the near edge).
+const RUHR_ANCHOR_MAX_PX := 44.0
+const COUNTER_INSET_PX := 10.0
 const CLOSE_FONT_MIN_PX := 14
 const COUNTER_MAX_SCREEN := Vector2(128.0, 160.0)
 const OUTLINE_PAD_PX := 4.0
@@ -122,6 +126,16 @@ func bind_centroids(cents: Dictionary) -> void:
 				c["world"] = w
 				_by_pid[pid] = c
 	_layout_ready = false
+
+
+func set_labels_visible(on: bool) -> void:
+	if _show_labels == on:
+		return
+	_show_labels = on
+	_layout_ready = false
+	if _candidates_ready:
+		_resolve_layout()
+	_queue_paint()
 
 
 func set_map_mode(mode: String) -> void:
@@ -401,12 +415,15 @@ func labels_hit_counters(counter_rects: Array = []) -> PackedStringArray:
 			rects = _counter_override
 		else:
 			rects = _live_counter_rects()
+	# Match packing: COUNTER_HALF is plate+bars with empty margin. A name
+	# sitting beside the painted chip still clips that oversized AABB.
+	var hit_rects: Array = _inset_counter_obstacles(rects, COUNTER_INSET_PX)
 	var hits := PackedStringArray()
 	for p in _placed:
 		if float(p.get("alpha", 0.0)) < 0.04:
 			continue
 		var r: Rect2 = p.get("screen_rect", Rect2())
-		for c in rects:
+		for c in hit_rects:
 			if c is Rect2 and r.intersects(c as Rect2):
 				hits.append(str(p.get("name", "")))
 				break
@@ -518,22 +535,27 @@ func place_competing(cands: Array, zoom: float, cam: Vector2, vp: Vector2, natio
 		var accepted := false
 		var chosen := Rect2()
 		var chosen_off := base
-		var ignore_chips := must_keep or is_cap or ruhr_keep
+		# Ruhr cores still collide with unit plates — try chip-clear slots
+		# first (inset so a 44 px walk can sit beside the plate). Last
+		# resort keeps the name by the mark so Dortmund cannot vanish at mid.
+		var keep := ruhr_keep or must_keep or is_cap
+		var walk_shift := RUHR_ANCHOR_MAX_PX if keep else shift_px
+		var walk_anchor := RUHR_ANCHOR_MAX_PX if keep else ANCHOR_MAX_PX
+		var chip_blockers: Array = _inset_counter_obstacles(obstacles, COUNTER_INSET_PX)
 		var try_blockers: Array = []
-		if ignore_chips:
-			for n in nation_rects:
-				try_blockers.append(n)
-		else:
-			try_blockers = blockers
+		for n in nation_rects:
+			try_blockers.append(n)
+		for o in chip_blockers:
+			try_blockers.append(o)
 		var dot_rect := Rect2(anchor_s - Vector2(DOT_BLOCK_PX, DOT_BLOCK_PX), Vector2(DOT_BLOCK_PX * 2.0, DOT_BLOCK_PX * 2.0))
-		if not must_keep and not is_cap and not bool(c.get("hub", false)) and _dot_hits_placed(dot_rect, placed):
+		if not must_keep and not is_cap and not ruhr_keep and not bool(c.get("hub", false)) and _dot_hits_placed(dot_rect, placed):
 			continue
 		# Duisburg is ~30 px west of Essen at z 2.9; a right-growing 22 px
 		# walk always hits Essen. Flush-left (glyph east-edge by the mark)
-		# keeps the nearest edge inside ANCHOR_MAX_PX.
-		for off_v in _candidate_slots(base, shift_px, size, ascent, anchor_s, placed, ruhr_keep or must_keep or is_cap):
+		# keeps the nearest edge inside the keep/anchor cap.
+		for off_v in _candidate_slots(base, walk_shift, size, ascent, anchor_s, placed, keep):
 			var off: Vector2 = off_v as Vector2
-			if _anchor_gap_px(off, size, ascent) > ANCHOR_MAX_PX + 0.05:
+			if _anchor_gap_px(off, size, ascent) > walk_anchor + 0.05:
 				continue
 			var baseline_s: Vector2 = anchor_s + off
 			var rect := Rect2(baseline_s + Vector2(0.0, -ascent), size)
@@ -542,7 +564,21 @@ func place_competing(cands: Array, zoom: float, cam: Vector2, vp: Vector2, natio
 				chosen_off = off
 				accepted = true
 				break
-		if not accepted and is_cap:
+		if not accepted and keep:
+			var keep_blockers: Array = []
+			for n2 in nation_rects:
+				keep_blockers.append(n2)
+			for off_v2 in _candidate_slots(base, walk_shift, size, ascent, anchor_s, placed, keep):
+				var off2: Vector2 = off_v2 as Vector2
+				if _anchor_gap_px(off2, size, ascent) > walk_anchor + 0.05:
+					continue
+				var rect2 := Rect2(anchor_s + off2 + Vector2(0.0, -ascent), size)
+				if _rects_clear(rect2, placed, keep_blockers, vp):
+					chosen = rect2
+					chosen_off = off2
+					accepted = true
+					break
+		if not accepted and keep:
 			var cap_base: Vector2 = anchor_s + base
 			chosen = Rect2(cap_base + Vector2(0.0, -ascent), size)
 			chosen_off = base
@@ -580,8 +616,7 @@ func _is_keep_item(item: Dictionary) -> bool:
 	return bool(item.get("must_keep", false)) or bool(item.get("capital", false)) or bool(item.get("ruhr_keep", false))
 
 
-func _drop_visual_overlaps(placed: Array, zoom: float = 1.0) -> Array:
-	var close := zoom > _LOD.CITY_LABEL_MID_MAX
+func _drop_visual_overlaps(placed: Array, _zoom: float = 1.0) -> Array:
 	var out: Array = placed.duplicate()
 	var guard := 0
 	while guard < 24:
@@ -624,11 +659,11 @@ func _drop_visual_overlaps(placed: Array, zoom: float = 1.0) -> Array:
 		if drop_at < 0:
 			break
 		var victim_rec: Dictionary = out[drop_at]
-		# Essen (must_keep) never drops. Other Ruhr cores may drop at mid
-		# (they sit 12 px apart at z1.2) but must stay at close.
+		# Essen and the four other Ruhr cores stay at mid and close. Dropping
+		# Dortmund at z1.5 was the live miss.
 		if bool(victim_rec.get("must_keep", false)):
 			break
-		if close and bool(victim_rec.get("ruhr_keep", false)):
+		if bool(victim_rec.get("ruhr_keep", false)):
 			break
 		out.remove_at(drop_at)
 	return out
@@ -637,13 +672,14 @@ func _drop_visual_overlaps(placed: Array, zoom: float = 1.0) -> Array:
 func _nudge_keep_off_counters(placed: Array, obstacles: Array, vp: Vector2) -> Array:
 	if obstacles.is_empty() or placed.is_empty():
 		return placed
+	var chip_blockers: Array = _inset_counter_obstacles(obstacles, COUNTER_INSET_PX)
 	for i in placed.size():
 		var item: Dictionary = placed[i]
 		if not _is_keep_item(item):
 			continue
 		var rect: Rect2 = item.get("screen_rect", Rect2())
 		var hits := false
-		for o in obstacles:
+		for o in chip_blockers:
 			if o is Rect2 and rect.intersects(o as Rect2):
 				hits = true
 				break
@@ -661,12 +697,12 @@ func _nudge_keep_off_counters(placed: Array, obstacles: Array, vp: Vector2) -> A
 				keep_others.append(placed[j])
 		# Names draw at z 30 above chips (z 28). Stay by the dot — a 120px
 		# last-resort put Duisburg south of Köln and ~75px east of its mark.
-		for off_v in _candidate_slots(Vector2(8.0, -2.0), LABEL_SHIFT_PX, size, ascent, anchor_s, keep_others, true):
+		for off_v in _candidate_slots(Vector2(8.0, -2.0), RUHR_ANCHOR_MAX_PX, size, ascent, anchor_s, keep_others, true):
 			var off: Vector2 = off_v as Vector2
-			if _anchor_gap_px(off, size, ascent) > ANCHOR_MAX_PX + 0.05:
+			if _anchor_gap_px(off, size, ascent) > RUHR_ANCHOR_MAX_PX + 0.05:
 				continue
 			var cand := Rect2(anchor_s + off + Vector2(0.0, -ascent), size)
-			if not _rects_clear(cand, keep_others, obstacles, vp):
+			if not _rects_clear(cand, keep_others, chip_blockers, vp):
 				continue
 			item["screen_rect"] = cand
 			item["screen_offset"] = off
@@ -1187,6 +1223,19 @@ func _draw() -> void:
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
+func _inset_counter_obstacles(obstacles: Array, pad: float) -> Array:
+	var out: Array = []
+	for o in obstacles:
+		if not (o is Rect2):
+			continue
+		var r: Rect2 = o as Rect2
+		if pad > 0.05:
+			r = r.grow(-pad)
+		if r.size.x > 4.0 and r.size.y > 4.0:
+			out.append(r)
+	return out
+
+
 func _rects_clear(rect: Rect2, placed: Array, blockers: Array, vp: Vector2) -> bool:
 	var view := Rect2(Vector2.ZERO, vp).grow(8.0)
 	if not rect.intersects(view):
@@ -1427,8 +1476,8 @@ func _load_candidates() -> void:
 		var pname := str(names.get(pid, ""))
 		var kreis := pname.ends_with(", Kreisfreie Stadt") or pname.ends_with(", Stadtkreis")
 		var port := bool(ports.get(pid, false)) or str(row.get("city_name", "")).to_lower().find("port") >= 0
-		var hub := bool(row.get("hub", false)) or bool(row.get("industrial_hub", false))
 		var core_bonus := float(_RUHR_CORE.get(pid, 0.0))
+		var hub := bool(row.get("hub", false)) or bool(row.get("industrial_hub", false)) or core_bonus > 0.05
 		var score := _score_city(tier, pop, kreis, port, hub, core_bonus)
 		var raw_name := str(row.get("city_name", pname))
 		var display := _canonical_display(raw_name, pname, kreis)

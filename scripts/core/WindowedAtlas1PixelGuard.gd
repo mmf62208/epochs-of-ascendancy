@@ -483,8 +483,6 @@ func _apply_live_wheel(target_zoom: float) -> void:
 	cam.make_current()
 	var wheel := Vector2(455, 455)
 	var essen := _world_for("essen")
-	if mr != null and mr.has_method("player_path_place_world_at_screen") and essen != Vector2.ZERO:
-		mr.call("player_path_place_world_at_screen", essen, wheel)
 	if mr != null and mr.has_method("player_path_wheel_toward_screen"):
 		mr.call("player_path_wheel_toward_screen", wheel, target_zoom)
 	elif mr != null and mr.has_method("player_path_wheel_toward_world") and essen != Vector2.ZERO:
