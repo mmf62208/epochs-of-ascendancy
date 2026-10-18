@@ -74,6 +74,8 @@ var _rename_field: LineEdit
 var _pending_rename_slot := ""
 var _save_as_dialog: AcceptDialog
 var _save_as_field: LineEdit
+var _overwrite_confirm: ConfirmationDialog
+var _pending_overwrite_slot := ""
 var _nation_btns: Dictionary = {}
 var _era_btns: Dictionary = {}
 ## Edge-trigger for `_process` pointer poll (computerUse leftover on CloseX).
@@ -680,7 +682,8 @@ func _make_save_row(info: Dictionary) -> Control:
 	save_b.custom_minimum_size = Vector2(80, 32)
 	save_b.tooltip_text = "Write current game into this slot"
 	save_b.mouse_filter = Control.MOUSE_FILTER_STOP
-	save_b.pressed.connect(_save_to_slot.bind(slot))
+	save_b.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
+	save_b.pressed.connect(_request_save_slot.bind(slot))
 	RetrowaveTheme.style_secondary_button(save_b)
 	actions.add_child(save_b)
 
@@ -789,6 +792,18 @@ func _ensure_dialogs() -> void:
 	_save_as_dialog.add_child(_save_as_field)
 	add_child(_save_as_dialog)
 
+	_overwrite_confirm = ConfirmationDialog.new()
+	_overwrite_confirm.title = "Overwrite save"
+	_overwrite_confirm.ok_button_text = "Overwrite"
+	_overwrite_confirm.confirmed.connect(_on_overwrite_confirmed)
+	add_child(_overwrite_confirm)
+	var overwrite_ok := _overwrite_confirm.get_ok_button()
+	if overwrite_ok != null:
+		overwrite_ok.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
+	var overwrite_cancel := _overwrite_confirm.get_cancel_button()
+	if overwrite_cancel != null:
+		overwrite_cancel.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
+
 
 func _open_save_as_dialog() -> void:
 	_save_as_field.text = ""
@@ -796,12 +811,37 @@ func _open_save_as_dialog() -> void:
 	_save_as_field.grab_focus()
 
 
+func _request_save_slot(slot: String) -> void:
+	var slm := _slm()
+	if slm == null or not slm.has_method("slot_status"):
+		_save_to_slot(slot)
+		return
+	var status: Dictionary = slm.call("slot_status", slot)
+	if bool(status.get("missing", true)):
+		_save_to_slot(slot)
+		return
+	var meta: Dictionary = status.get("metadata", {}) if status.get("metadata") is Dictionary else {}
+	var when := str(meta.get("game_date", meta.get("timestamp", "")))
+	var nation := str(meta.get("nation_name", meta.get("player_tag", "")))
+	_pending_overwrite_slot = slot
+	_overwrite_confirm.dialog_text = "Overwrite %s (%s, %s)?" % [slot, when, nation]
+	_overwrite_confirm.popup_centered()
+
+
+func _on_overwrite_confirmed() -> void:
+	var slot := _pending_overwrite_slot
+	_pending_overwrite_slot = ""
+	if slot.is_empty():
+		return
+	_save_to_slot(slot)
+
+
 func _on_save_as_confirmed() -> void:
 	var slot := _sanitize_slot_name(_save_as_field.text)
 	if slot.is_empty():
 		_toast("Enter letters, numbers, underscore.", 2.5, true)
 		return
-	_save_to_slot(slot)
+	_request_save_slot(slot)
 
 
 func _open_delete(slot: String) -> void:

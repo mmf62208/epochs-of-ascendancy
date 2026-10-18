@@ -316,13 +316,12 @@ func _test_slot_saveload_three() -> void:
 	if int(save_res.get("bytes", 0)) < 100:
 		_fail("e1: save payload too small")
 		return
-	# Payload must include map + production + leaders keys
-	var raw := FileAccess.get_file_as_string(path)
-	var parsed: Variant = JSON.parse_string(raw)
-	if typeof(parsed) != TYPE_DICTIONARY:
-		_fail("e1: save JSON not object")
+	# Payload must include map + production + leaders keys.
+	# v2 bodies are binary; read_save_body returns the gathered dictionary.
+	var data: Dictionary = _sl.read_save_body(SLOT) if _sl.has_method("read_save_body") else {}
+	if data.has("ok") and not bool(data.get("ok", false)):
+		_fail("e1: read_save_body failed: %s" % str(data.get("error", data)))
 		return
-	var data: Dictionary = parsed
 	if not data.has("map") or not data.has("production") or not data.has("leaders"):
 		_fail("e1: save missing map/production/leaders sections")
 		return

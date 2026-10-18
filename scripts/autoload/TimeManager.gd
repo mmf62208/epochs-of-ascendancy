@@ -67,6 +67,10 @@ var time_scale: float = 1.0   # Interactive: multipliers on hours/wall-sec (1×,
 
 ## Monotonic day counter since scenario start (incremented in advance_days).
 var total_days_elapsed: int = 0
+## Per-campaign RNG root. 0 means legacy unseeded days (no reseed).
+var run_seed: int = 0
+var _reseed_usec_total: int = 0
+var _reseed_calls: int = 0
 
 # Internal accumulator for real-time driven simulation (in game days)
 var _accumulated_game_days: float = 0.0
@@ -1031,6 +1035,7 @@ func advance_days(days: float) -> void:
 				crossed_year = true
 
 		total_days_elapsed += 1
+		_reseed_sim_day(total_days_elapsed)
 
 		if light:
 			# Calendar already on the new day — split sim across frames so a 6h-cap
@@ -1040,6 +1045,7 @@ func advance_days(days: float) -> void:
 				"year": current_year,
 				"month": current_month,
 				"day": current_day,
+				"elapsed": total_days_elapsed,
 			})
 			_pending_sim_events.append({
 				"kind": "day_ai",
@@ -1293,6 +1299,7 @@ func _flush_sim_events() -> void:
 	var kind := str(ev.get("kind", ""))
 	var n_res := 0
 	if kind == "day" or kind == "day_emit":
+		_reseed_sim_day(int(ev.get("elapsed", total_days_elapsed)))
 		_begin_day_tick_profile()
 		_emit_game_day_advanced_profiled(int(ev.get("year", 0)), int(ev.get("month", 0)), int(ev.get("day", 0)))
 		if kind == "day":
@@ -1830,7 +1837,31 @@ func get_save_data() -> Dictionary:
 		"time_scale": time_scale,
 		"total_days_elapsed": total_days_elapsed,
 		"current_hour": current_hour,
+		"run_seed": run_seed,
+		"accumulated_days": _accumulated_game_days,
+		"accumulated_hours": _accumulated_game_hours,
 	}
+
+
+func sim_is_quiescent() -> bool:
+	return _pending_sim_events.is_empty() and not _draining_f5_flush
+
+
+func reseed_cost_ms() -> float:
+	if _reseed_calls <= 0:
+		return 0.0
+	return (float(_reseed_usec_total) / float(_reseed_calls)) / 1000.0
+
+
+func _reseed_sim_day(day_index: int) -> void:
+	if run_seed == 0:
+		return
+	if OS.get_environment("EOA_SIM_DAY_RESEED").strip_edges() == "0":
+		return
+	var t0 := Time.get_ticks_usec()
+	seed(int(hash([run_seed, int(day_index)])))
+	_reseed_usec_total += int(Time.get_ticks_usec() - t0)
+	_reseed_calls += 1
 
 ## Applies previously saved calendar state. Does NOT emit day/month/year signals
 ## (we are restoring, not simulating forward).
@@ -1852,3 +1883,9 @@ func apply_save_data(data: Dictionary) -> void:
 		set_time_scale(float(data.get("time_scale", 1.0)))
 	if data.has("total_days_elapsed"):
 		total_days_elapsed = maxi(0, int(data.get("total_days_elapsed", 0)))
+	if data.has("run_seed"):
+		run_seed = int(data.get("run_seed", 0))
+	if data.has("accumulated_days"):
+		_accumulated_game_days = float(data.get("accumulated_days", 0.0))
+	if data.has("accumulated_hours"):
+		_accumulated_game_hours = float(data.get("accumulated_hours", 0.0))

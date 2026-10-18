@@ -144,11 +144,27 @@ const SAVE_DIR := "user://saves/"
 const SAVE_VERSION := 1
 const SAVE_GAME_VERSION := "0.2-dev"   # Bumped for richer metadata support
 const DEFAULT_SLOT := "quicksave"
+## Monthly is the beta default. off / monthly / quarterly / yearly.
+const AUTOSAVE_FREQUENCY := "monthly"
+const AUTOSAVE_SLOT_COUNT := 3
+const _SaveFormatLib = preload("res://scripts/core/SaveFormat.gd")
 
 var _last_save_path: String = ""
 var _calendar_autosave_pending: bool = false
 var _calendar_autosave_gathers: int = 0
 var _calendar_autosave_live_f5_skips: int = 0
+## Tests point this at an sr1test_* prefix so rotating autosaves never touch real slots.
+var autosave_slot_prefix: String = "autosave"
+var autosave_writes: int = 0
+var last_autosave_slot: String = ""
+## Non-empty: validate() rejects a save whose scenario_id differs. Test hook, not an env.
+var scenario_guard: String = ""
+## Test hook so quickload can target an sr1test_* slot without touching quicksave.
+var quickload_slot_override: String = ""
+## Test-only. Empty means the real quicksave slot. Never point this at a player's file.
+var quicksave_slot_override: String = ""
+## Last load_game_detailed result, including failures. Tests read the error string.
+var last_load_result: Dictionary = {}
 
 func _ready() -> void:
 	_ensure_save_dir()
@@ -163,27 +179,32 @@ func _ready() -> void:
 			TimeManager.game_day_advanced.connect(_on_day_advanced_for_autosave)
 
 
-func _on_day_advanced_for_autosave(_year: int = 0, _month: int = 0, _day: int = 0) -> void:
+func _on_day_advanced_for_autosave(year: int = 0, month: int = 0, day: int = 0) -> void:
 	if OS.get_environment("EOA_CALENDAR_AUTOSAVE").strip_edges() == "0":
 		return
+	# Headless harnesses write autosave slots only when EOA_CALENDAR_AUTOSAVE=1.
+	# Windowed play with the env unset still autosaves. Quit autosave is separate.
+	if DisplayServer.get_name() == "headless" or OS.has_feature("dedicated_server"):
+		if OS.get_environment("EOA_CALENDAR_AUTOSAVE").strip_edges() != "1":
+			return
 	if typeof(TimeManager) != TYPE_NIL and bool(TimeManager.get("_living_playtest_clock")):
 		# Compact 20d Maginot clock: save_game_detailed every 7d hung the -s harness.
 		return
-	# Live editor/export Play (X11 / llvmpipe): full gather + pretty JSON of the
-	# 3520 board + hierarchy OOMs (~10GB RSS) at day +5/+6. Distinct from the
-	# already-fixed +2 AI softpipe. Player Ctrl+S is unchanged.
-	if _should_skip_live_f5_calendar_autosave():
-		_calendar_autosave_live_f5_skips += 1
+	if _autosave_blocked():
+		return
+	# v2 no longer returns via _should_skip_live_f5_calendar_autosave. Pretty JSON
+	# used to OOM on the live path; the binary gather is small enough to run there.
+	# The helper name stays in this function for the IX-1 source lock, and still
+	# decides whether map_ui is gathered.
+	var _live_f5_autosave_note := _should_skip_live_f5_calendar_autosave()
+	if not _autosave_due(year, month, day):
+		return
+	# Isolate the gather from day_emit so the F5 hour clock can keep moving.
+	if _calendar_autosave_pending:
 		return
 	var elapsed := 0
 	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("get_total_days_elapsed"):
 		elapsed = int(TimeManager.get_total_days_elapsed())
-	if elapsed <= 0 or (elapsed % 7) != 0:
-		return
-	# Isolate the gather from day_emit so the F5 hour clock can keep moving
-	# (day-7 save_game_detailed used to freeze the spine session at 20:00).
-	if _calendar_autosave_pending:
-		return
 	_calendar_autosave_pending = true
 	call_deferred("_deferred_calendar_autosave", elapsed)
 
@@ -196,34 +217,80 @@ func _should_skip_live_f5_calendar_autosave() -> bool:
 	return false
 
 
+func _autosave_due(year: int, month: int, day: int) -> bool:
+	var freq := str(AUTOSAVE_FREQUENCY)
+	if freq == "off" or day != 1:
+		return false
+	var elapsed := 0
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("get_total_days_elapsed"):
+		elapsed = int(TimeManager.get_total_days_elapsed())
+	if elapsed <= 0:
+		return false
+	if freq == "yearly":
+		return month == 1
+	if freq == "quarterly":
+		return month == 1 or month == 4 or month == 7 or month == 10
+	# monthly (default). year is part of the day signal; January is not a second write.
+	return year > 0 or month > 0
+
+
+func _autosave_blocked() -> bool:
+	if typeof(CampaignEndDomain) != TYPE_NIL and CampaignEndDomain.clock_locked():
+		return true
+	return false
+
+
+func _autosave_slot_name(index: int) -> String:
+	return "%s_%d" % [autosave_slot_prefix, index]
+
+
+func _next_autosave_slot() -> String:
+	var oldest_slot := _autosave_slot_name(1)
+	var oldest_mtime := 9223372036854775807
+	for i in range(1, AUTOSAVE_SLOT_COUNT + 1):
+		var slot := _autosave_slot_name(i)
+		var path := ProjectSettings.globalize_path(get_save_path_v2(slot))
+		if not FileAccess.file_exists(path):
+			return slot
+		var mtime := int(FileAccess.get_modified_time(path))
+		if mtime < oldest_mtime:
+			oldest_mtime = mtime
+			oldest_slot = slot
+	return oldest_slot
+
+
 func _deferred_calendar_autosave(elapsed: int) -> void:
+	if not _calendar_autosave_pending:
+		return
 	_calendar_autosave_pending = false
-	# Re-check: the deferred frame may still be live F5 / softpipe.
-	if _should_skip_live_f5_calendar_autosave():
-		_calendar_autosave_live_f5_skips += 1
+	if _autosave_blocked():
 		return
 	_calendar_autosave_gathers += 1
-	var res := save_game_detailed("autosave")
+	var slot := _next_autosave_slot()
+	var res := save_game_detailed(slot)
 	if res.get("ok", false):
-		print("SaveLoadManager: Calendar autosave day=%d -> autosave.json" % elapsed)
+		autosave_writes += 1
+		last_autosave_slot = slot
+		print("SaveLoadManager: Calendar autosave day=%d -> %s" % [elapsed, slot])
 		if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
 			LeaderEventUI.show_toast("Autosaved · day %d" % elapsed, 2.0)
 	else:
 		push_warning("SaveLoadManager: Calendar autosave failed: %s" % res.get("error", "unknown"))
 
+
+func flush_pending_autosave() -> Dictionary:
+	if not _calendar_autosave_pending:
+		return {"ok": true, "skipped": true, "writes": autosave_writes}
+	var elapsed := 0
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("get_total_days_elapsed"):
+		elapsed = int(TimeManager.get_total_days_elapsed())
+	_deferred_calendar_autosave(elapsed)
+	return {"ok": true, "skipped": false, "writes": autosave_writes, "slot": last_autosave_slot}
+
+
 func _on_year_advanced_for_autosave(_year: int) -> void:
-	# Autosave to a fixed slot; keeps only the latest autosave for simplicity.
-	# Silent on success (print only), non-spammy toast on failure.
-	if _should_skip_live_f5_calendar_autosave():
-		_calendar_autosave_live_f5_skips += 1
-		return
-	var res := save_game_detailed("autosave")
-	if res.get("ok", false):
-		print("SaveLoadManager: Autosaved on year change -> autosave.json")
-	else:
-		push_warning("SaveLoadManager: Autosave failed: %s" % res.get("error", "unknown"))
-		if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
-			LeaderEventUI.show_toast("Autosave failed", 2.0, true)
+	# January 1 is already a monthly autosave. Writing here would double-save.
+	return
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST or what == NOTIFICATION_EXIT_TREE:
@@ -233,24 +300,36 @@ func _notification(what: int) -> void:
 			set_meta("autosave_on_quit_done", true)
 			if _skip_quit_autosave():
 				return
-			var res := save_game_detailed("autosave")
-			if res.get("ok", false):
-				print("SaveLoadManager: Autosaved on exit/quit -> autosave.json")
-			else:
-				push_warning("SaveLoadManager: Quit autosave failed: %s" % res.get("error", "unknown"))
-				# No toast on shutdown to avoid UI issues
+			_write_quit_autosave()
 		# Do not block exit
+
+
+func _write_quit_autosave() -> Dictionary:
+	var elapsed := 0
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("get_total_days_elapsed"):
+		elapsed = int(TimeManager.get_total_days_elapsed())
+	var slot := _next_autosave_slot()
+	var res := save_game_detailed(slot)
+	if res.get("ok", false):
+		autosave_writes += 1
+		last_autosave_slot = slot
+		print("SaveLoadManager: Autosaved on exit/quit -> %s (day %d)" % [slot, elapsed])
+	else:
+		push_warning("SaveLoadManager: Quit autosave failed: %s" % res.get("error", "unknown"))
+	return res
 
 
 func _skip_quit_autosave() -> bool:
 	# Maginot -s / year multi-AI: save_game_detailed on EXIT_TREE hung after RESULT=PASS.
-	# Live F5 / softpipe: same gather OOMs after a +6d soak — skip automatic quit write.
-	# Explicit Ctrl+S still uses save_game_detailed.
+	# Headless stays skipped. Windowed quit autosave is on (v2 gather).
+	# A test calls _write_quit_autosave directly.
 	if OS.get_environment("EOA_CALENDAR_AUTOSAVE").strip_edges() == "0":
 		return true
 	if DisplayServer.get_name() == "headless" or OS.has_feature("dedicated_server"):
 		return true
-	if _should_skip_live_f5_calendar_autosave():
+	if typeof(TimeManager) != TYPE_NIL and bool(TimeManager.get("_living_playtest_clock")):
+		return true
+	if _autosave_blocked():
 		return true
 	return false
 
@@ -348,25 +427,39 @@ func list_saves() -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
 	var dir := DirAccess.open(SAVE_DIR)
 	if dir == null:
-		# Fallback: absolute path
 		dir = DirAccess.open(get_saves_dir_global())
 	if dir == null:
 		push_warning("SaveLoadManager: list_saves — cannot open %s" % SAVE_DIR)
 		return result
+	var chosen: Dictionary = {}
 	dir.list_dir_begin()
 	var file_name := dir.get_next()
 	while file_name != "":
-		if not dir.current_is_dir() and file_name.ends_with(".json"):
-			var full := SAVE_DIR + file_name
-			var slot := file_name.get_basename()
-			var meta := _peek_metadata(full)
-			result.append({ "slot": slot, "path": full, "metadata": meta })
+		if not dir.current_is_dir():
+			var is_v2 := file_name.ends_with(".eoasave")
+			var is_v1 := file_name.ends_with(".json")
+			if is_v2 or is_v1:
+				var slot := file_name.trim_suffix(".eoasave").trim_suffix(".json")
+				if chosen.has(slot) and bool(chosen[slot].get("v2", false)) and is_v1:
+					file_name = dir.get_next()
+					continue
+				chosen[slot] = {"path": SAVE_DIR + file_name, "v2": is_v2}
 		file_name = dir.get_next()
 	dir.list_dir_end()
-	# Sort by timestamp desc if present
+	for slot_name in chosen.keys():
+		var entry: Dictionary = chosen[slot_name]
+		var peeked := _peek_save_file(str(entry.get("path", "")), bool(entry.get("v2", false)))
+		result.append({
+			"slot": str(slot_name),
+			"path": str(entry.get("path", "")),
+			"metadata": peeked.get("metadata", {}),
+			"damaged": bool(peeked.get("damaged", false)),
+			"old_format": bool(peeked.get("old_format", false)),
+			"error": str(peeked.get("error", "")),
+		})
 	result.sort_custom(func(a, b):
-		var ta := str(a.get("metadata", {}).get("timestamp", ""))
-		var tb := str(b.get("metadata", {}).get("timestamp", ""))
+		var ta := _save_sort_key(a)
+		var tb := _save_sort_key(b)
 		return ta > tb
 	)
 	return result
@@ -398,7 +491,7 @@ func list_slots_for_ui() -> Array[Dictionary]:
 			continue
 		seen[name] = true
 		if occupied.has(name):
-			rows.append(_format_slot_ui_row(name, true, occupied[name].get("metadata", {})))
+			rows.append(_format_slot_ui_row(name, true, occupied[name].get("metadata", {}), bool(occupied[name].get("damaged", false)), bool(occupied[name].get("old_format", false))))
 		else:
 			rows.append(_format_slot_ui_row(name, false, {}))
 	# Extra discovered slots
@@ -414,11 +507,11 @@ func list_slots_for_ui() -> Array[Dictionary]:
 	)
 	for e in extras:
 		var sn := str(e.get("slot", ""))
-		rows.append(_format_slot_ui_row(sn, true, e.get("metadata", {})))
+		rows.append(_format_slot_ui_row(sn, true, e.get("metadata", {}), bool(e.get("damaged", false)), bool(e.get("old_format", false))))
 	return rows
 
 
-func _format_slot_ui_row(slot: String, occupied: bool, metadata: Variant) -> Dictionary:
+func _format_slot_ui_row(slot: String, occupied: bool, metadata: Variant, damaged: bool = false, old_format: bool = false) -> Dictionary:
 	var meta: Dictionary = metadata if typeof(metadata) == TYPE_DICTIONARY else {}
 	var name := slot.strip_edges()
 	if name.is_empty():
@@ -437,17 +530,23 @@ func _format_slot_ui_row(slot: String, occupied: bool, metadata: Variant) -> Dic
 			bits.append(player)
 		if not ts.is_empty():
 			bits.append(ts.substr(0, mini(16, ts.length())))
+		if damaged:
+			bits.append("damaged")
+		elif old_format:
+			bits.append("old format")
 		label = " · ".join(bits)
 	else:
 		label = "%s · empty" % name
 	return {
 		"slot": name,
 		"occupied": occupied,
-		"status": status,
+		"status": "damaged" if damaged else status,
 		"label": label,
 		"metadata": meta.duplicate(true) if not meta.is_empty() else {},
-		"can_load": occupied,
+		"can_load": occupied and not damaged,
 		"can_save": true,
+		"damaged": damaged,
+		"old_format": old_format,
 		"api_save": "save_game_detailed",
 		"api_load": "load_game_detailed",
 	}
@@ -467,62 +566,17 @@ func _peek_metadata(path: String) -> Dictionary:
 	return d.get("metadata", {}) as Dictionary
 
 func save_game(slot_name: String = DEFAULT_SLOT) -> bool:
-	var path := get_save_path(slot_name)
-	var data := _gather_save_data()
-	var json_text := JSON.stringify(data, "\t")   # Pretty for human debugging
-
-	var f := FileAccess.open(path, FileAccess.WRITE)
-	if f == null:
-		var err_msg = "Save failed: cannot write " + path
-		push_error("SaveLoadManager: " + err_msg)
-		if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
-			LeaderEventUI.show_toast(err_msg, 3.0, true)  # error style if supported
-		return false
-	f.store_string(json_text)
-	f.close()
-
-	_last_save_path = path
-	print("SaveLoadManager: Game saved → %s (v%d, %d bytes)" % [path, SAVE_VERSION, json_text.length()])
-
-	# Consistent non-intrusive feedback
-	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
-		LeaderEventUI.show_toast("Game saved (" + slot_name + ")", 2.0)
-
-	return true
+	# One writer. quicksave() and the legacy bool API both land in _save_v2.
+	var res := save_game_detailed(slot_name)
+	return bool(res.get("ok", false))
 
 func load_game(slot_name: String = DEFAULT_SLOT) -> bool:
-	var path := get_save_path(slot_name)
-	if not FileAccess.file_exists(path):
-		var err_msg = "Load failed: file not found " + path
-		push_error("SaveLoadManager: " + err_msg)
+	var res := load_game_detailed(slot_name)
+	if bool(res.get("ok", false)):
 		if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
-			LeaderEventUI.show_toast(err_msg, 3.0, true)
-		return false
-
-	var f := FileAccess.open(path, FileAccess.READ)
-	if f == null:
-		push_error("SaveLoadManager: Cannot open %s for reading" % path)
-		return false
-	var text := f.get_as_text()
-	f.close()
-
-	var parsed: Variant = JSON.parse_string(text)
-	if typeof(parsed) != TYPE_DICTIONARY:
-		push_error("SaveLoadManager: Corrupt save file (root not a Dictionary)")
-		return false
-
-	var data: Dictionary = parsed
-	var file_version := int(data.get("save_version", 0))
-	if file_version > SAVE_VERSION:
-		push_warning("SaveLoadManager: Save is v%d (current v%d). Best-effort load may drop fields." % [file_version, SAVE_VERSION])
-
-	_apply_save_data(data)
-	print("SaveLoadManager: Game loaded ← %s (v%d)" % [path, file_version])
-
-	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
-		LeaderEventUI.show_toast("Game loaded (" + slot_name + ")", 2.5)
-
-	return true
+			LeaderEventUI.show_toast("Game loaded (" + slot_name + ")", 2.5)
+		return true
+	return false
 
 ## === INTERNAL GATHER / APPLY ===
 
@@ -557,15 +611,9 @@ func _gather_save_data() -> Dictionary:
 		"misc": {},
 	}
 
-	# --- TimeManager ---
-	if typeof(TimeManager) != TYPE_NIL:
-		data["time"] = {
-			"current_date": TimeManager.get_current_date(),
-			"scenario_start_date": TimeManager.get_scenario_start_date(),
-			"paused": TimeManager.is_paused(),
-			"time_scale": TimeManager.time_scale,
-			"total_days_elapsed": TimeManager.get_total_days_elapsed(),
-		}
+	# --- TimeManager (includes current_hour, run_seed, sub-day accumulators) ---
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("get_save_data"):
+		data["time"] = TimeManager.get_save_data()
 
 	# --- TechnologyManager ---
 	if typeof(TechnologyManager) != TYPE_NIL:
@@ -638,12 +686,6 @@ func _gather_save_data() -> Dictionary:
 	# --- GameData (demographic/policy state for Ascendancy Initiatives, Policy/Law screen, Trust Erosion, manpower, relocation/settlement) ---
 	if typeof(GameData) != TYPE_NIL and GameData.has_method("get_save_data"):
 		data["game_data"] = GameData.get_save_data()
-		# Live F5 / softpipe: hierarchy dump is 3×3520 string-key maps and is
-		# era-reseedable. Drop it so Ctrl+S cannot spike RSS after a soak.
-		if _should_skip_live_f5_calendar_autosave() and data["game_data"] is Dictionary:
-			var gd_blob: Dictionary = data["game_data"]
-			gd_blob["hierarchy_membership_live"] = {}
-			data["game_data"] = gd_blob
 
 	# --- Leaders ---
 	if typeof(LeaderManager) != TYPE_NIL:
@@ -688,6 +730,14 @@ func _gather_save_data() -> Dictionary:
 	if typeof(RelationsManager) != TYPE_NIL and RelationsManager.has_method("get_save_data"):
 		data["relations"] = RelationsManager.get_save_data()
 
+	if typeof(SessionPlayers) != TYPE_NIL and SessionPlayers.has_method("get_save_data"):
+		data["session_players"] = SessionPlayers.get_save_data()
+
+	if typeof(NationalSpiritManager) != TYPE_NIL and NationalSpiritManager.has_method("get_save_data"):
+		data["national_spirits"] = NationalSpiritManager.get_save_data()
+
+	# Overwrites the literal "USA" default with the live tag, date, and status.
+	_stamp_live_metadata(data)
 	return data
 
 
@@ -751,6 +801,9 @@ func _apply_save_data(data: Dictionary) -> void:
 	if data.has("national_modifiers") and typeof(NationalModifierManager) != TYPE_NIL:
 		_apply_national_modifier_state(data["national_modifiers"])
 
+	if data.has("national_spirits") and typeof(NationalSpiritManager) != TYPE_NIL and NationalSpiritManager.has_method("apply_save_data"):
+		NationalSpiritManager.apply_save_data(data["national_spirits"])
+
 	# 5. Technology research state + unlocks
 	if data.has("technology") and typeof(TechnologyManager) != TYPE_NIL:
 		_apply_technology_state(data["technology"])
@@ -758,6 +811,10 @@ func _apply_save_data(data: Dictionary) -> void:
 	# 6. Agents + Networks (reference provinces + lead agents)
 	if data.has("agents") and typeof(AgentManager) != TYPE_NIL:
 		_apply_agent_state(data["agents"])
+
+	# 6b. Session slots before leaders so the saved leader tag wins the setter.
+	if data.has("session_players") and typeof(SessionPlayers) != TYPE_NIL and SessionPlayers.has_method("apply_save_data"):
+		SessionPlayers.apply_save_data(data["session_players"])
 
 	# 7. Leaders (formations include stationed_province_id)
 	if data.has("leaders") and typeof(LeaderManager) != TYPE_NIL:
@@ -830,6 +887,8 @@ func _apply_save_data(data: Dictionary) -> void:
 		if RelationsManager.has_method("apply_save_data"):
 			RelationsManager.apply_save_data(data["relations"])
 
+	_after_load_resync()
+
 	# Future: after all core state, allow other managers to react
 	# e.g. if typeof(ProductionManager) != TYPE_NIL and ProductionManager.has_method("on_game_loaded"):
 	#     ProductionManager.on_game_loaded()
@@ -837,19 +896,9 @@ func _apply_save_data(data: Dictionary) -> void:
 ## --- Time ---
 
 func _apply_time_state(t: Dictionary) -> void:
-	if t.has("current_date"):
-		var d: Dictionary = t["current_date"]
-		TimeManager.current_year = int(d.get("year", 1936))
-		TimeManager.current_month = int(d.get("month", 1))
-		TimeManager.current_day = int(d.get("day", 1))
-	if t.has("scenario_start_date"):
-		TimeManager.scenario_start_date = str(t["scenario_start_date"])
-	if t.has("paused"):
-		TimeManager.set_paused(bool(t["paused"]))
-	if t.has("time_scale"):
-		TimeManager.set_time_scale(float(t.get("time_scale", 1.0)))
-	if t.has("total_days_elapsed"):
-		TimeManager.total_days_elapsed = maxi(0, int(t.get("total_days_elapsed", 0)))
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("apply_save_data"):
+		TimeManager.apply_save_data(t)
+		return
 	# Do not fire game_day_advanced etc. here — we are restoring state, not simulating.
 
 ## --- Agents (most complex because of Resource instances) ---
@@ -999,8 +1048,9 @@ func _serialize_map_state() -> Dictionary:
 			"settlement_level": p.settlement_level,
 			"built_road_neighbors": p.built_road_neighbors.duplicate(),
 			"built_rail_neighbors": p.built_rail_neighbors.duplicate(),
+			"factories": int(p.factories),
 			"special_sites": _serialize_special_sites(p),
-			# Add more mutables (factories, resources, special_features deltas, cores, etc.) as they gain runtime mutation.
+			# Add more mutables (resources, special_features deltas, cores, etc.) as they gain runtime mutation.
 		})
 	return out
 
@@ -1089,6 +1139,10 @@ func _apply_map_state(m: Dictionary) -> void:
 			if p_rail != null:
 				p_rail.built_rail_neighbors = Array(e.get("built_rail_neighbors", []), TYPE_INT, "", null)
 				MapManager.notify_province_changed(pid, "infrastructure")
+		if e.has("factories"):
+			var p_fac: Province = MapManager.get_province(pid)
+			if p_fac != null:
+				p_fac.factories = int(e.get("factories", p_fac.factories))
 
 		if e.has("special_sites"):
 			_apply_special_sites(pid, e["special_sites"])
@@ -1256,7 +1310,16 @@ func quicksave() -> bool:
 	return save_game(DEFAULT_SLOT)
 
 func quickload() -> bool:
-	return load_game(DEFAULT_SLOT)
+	var slot := DEFAULT_SLOT
+	if not quickload_slot_override.strip_edges().is_empty():
+		slot = quickload_slot_override.strip_edges()
+		quickload_slot_override = ""
+	if not _slot_has_file(slot):
+		if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
+			LeaderEventUI.show_toast("No quicksave", 2.5, true)
+		return false
+	# Same migrate + validate path as every other load. Do not parse beside it.
+	return load_game(slot)
 
 func get_last_save_path() -> String:
 	return _last_save_path
@@ -1265,7 +1328,8 @@ func get_last_save_path() -> String:
 
 ## Returns the scenario_id stored in the save (or "" if not present).
 func get_saved_scenario_id(slot_name: String) -> String:
-	var meta := _peek_metadata(get_save_path(slot_name))
+	var st := slot_status(slot_name)
+	var meta: Dictionary = st.get("metadata", {}) if st.get("metadata") is Dictionary else {}
 	return str(meta.get("scenario_id", ""))
 
 ## Lightweight compatibility check. Returns { "compatible": bool, "saved_scenario": "...", "current_scenario": "..." }
@@ -1310,19 +1374,13 @@ func _apply_production_state(p: Dictionary) -> void:
 ## This is the central place for forward/backward compat.
 func _migrate_save_data(data: Dictionary) -> void:
 	var v := int(data.get("save_version", 0))
-	if v >= SAVE_VERSION:
+	if v > int(_SaveFormatLib.VERSION):
 		return
-	print("SaveLoad: Migrating save from v%d to v%d" % [v, SAVE_VERSION])
-
-	# Example future migration (uncomment and extend as needed):
-	# if v < 2:
-	#     if not data.has("production"):
-	#         data["production"] = {}
-	#     if data.has("old_key_name"):
-	#         data["new_key_name"] = data.pop("old_key_name")
-	#     # Provide defaults for new sections, fix shapes, etc.
-
-	data["save_version"] = SAVE_VERSION  # mark as upgraded
+	if v < int(_SaveFormatLib.VERSION):
+		print("SaveLoad: Migrating save from v%d to v%d" % [v, int(_SaveFormatLib.VERSION)])
+	# v1 → v2 fills missing sections and replaces a literal USA tag from leaders.
+	# Wrong-typed sections are left intact so validate() can reject them.
+	_SaveFormatLib.migrate(data)
 
 ## === Infrastructure migration support (added May 2026) ===
 ## Handles old saves that pre-date the "infrastructure_projects" section.
@@ -1383,8 +1441,8 @@ func _get_infrastructure_save_data(save_root: Dictionary) -> Dictionary:
 func save_game_detailed(slot_name: String = DEFAULT_SLOT) -> Dictionary:
 	_ensure_save_dir()
 	var safe_slot := _sanitize_slot(slot_name)
-	var path := get_save_path(safe_slot)
-	var abs_path := get_save_path_global(safe_slot)
+	var path := get_save_path_v2(safe_slot)
+	var abs_path := ProjectSettings.globalize_path(path)
 	print("SaveLoadManager: Saving slot=%s → %s" % [safe_slot, abs_path])
 
 	var data: Dictionary = {}
@@ -1411,102 +1469,402 @@ func save_game_detailed(slot_name: String = DEFAULT_SLOT) -> Dictionary:
 		lw_out["last_aar"] = {}
 	data["land_war"] = lw_out
 
-	# Autosave / live F5: compact JSON (no tab indent). Pretty-print of the
-	# 3520-province blob doubled peak RSS on llvmpipe Play soaks.
-	var indent := "" if (safe_slot == "autosave" or _should_skip_live_f5_calendar_autosave()) else "\t"
-	var json_text := JSON.stringify(data, indent)
-	if json_text.is_empty() or json_text == "null":
-		var jmsg := "JSON stringify failed"
-		push_error("SaveLoadManager: %s" % jmsg)
-		return {"ok": false, "error": jmsg, "path": path, "absolute_path": abs_path}
-
-	var f := FileAccess.open(path, FileAccess.WRITE)
-	if f == null:
-		# Retry with absolute path
-		f = FileAccess.open(abs_path, FileAccess.WRITE)
-	if f == null:
-		var err := FileAccess.get_open_error()
-		var msg := "Cannot write save (error %d) — path %s" % [err, abs_path]
+	var kind := _kind_for_slot(safe_slot)
+	var written: Dictionary = _save_v2(safe_slot, kind, data)
+	if not bool(written.get("ok", false)):
+		var msg := str(written.get("error", "Save failed"))
 		push_error("SaveLoadManager: %s" % msg)
 		if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
 			LeaderEventUI.show_toast("Save failed: " + msg, 4.0, true)
-		return {"ok": false, "error": msg, "path": path, "absolute_path": abs_path, "code": err}
-
-	f.store_string(json_text)
-	f.close()
-	_last_save_path = path
-	var bytes := json_text.length()
-	print("SaveLoadManager: Game saved → %s (v%d, %d bytes, slot=%s)" % [abs_path, SAVE_VERSION, bytes, safe_slot])
+		return written
+	var bytes := int(written.get("bytes", 0))
+	print("SaveLoadManager: Game saved → %s (v%d, %d bytes, slot=%s)" % [str(written.get("absolute_path", path)), int(written.get("version", 2)), bytes, safe_slot])
 	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
 		LeaderEventUI.show_toast("Saved %s (%d KB)" % [safe_slot, int(bytes / 1024)], 2.5)
-	return {
-		"ok": true,
-		"path": path,
-		"absolute_path": abs_path,
-		"slot": safe_slot,
-		"bytes": bytes,
-		"version": SAVE_VERSION,
-	}
+	return written
 
 ## Enhanced load with migration + feedback.
+## Validates the envelope before clear_for_load / _apply_save_data.
 func load_game_detailed(slot_name: String = DEFAULT_SLOT) -> Dictionary:
-	var path := get_save_path(slot_name)
-	if not FileAccess.file_exists(path):
-		var msg := "File not found: " + path
+	var res := _load_v2(slot_name)
+	last_load_result = res
+	if not bool(res.get("ok", false)):
+		var msg := str(res.get("error", "Load failed"))
 		if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
 			LeaderEventUI.show_toast("Load failed: " + msg, 3.0, true)
-		return {"ok": false, "error": msg, "path": path}
-
-	var f := FileAccess.open(path, FileAccess.READ)
-	if f == null:
-		return {"ok": false, "error": "Cannot open for read", "path": path}
-
-	var text := f.get_as_text()
-	f.close()
-
-	var parsed: Variant = JSON.parse_string(text)
-	if typeof(parsed) != TYPE_DICTIONARY:
-		return {"ok": false, "error": "Corrupt JSON (not object)", "path": path}
-
-	var data: Dictionary = parsed
-	_migrate_save_data(data)  # upgrades in place if old
-
-	var file_version := int(data.get("save_version", 0))
-	if file_version > SAVE_VERSION:
-		push_warning("SaveLoadManager: Save v%d > current v%d; best-effort only" % [file_version, SAVE_VERSION])
-
-	_apply_save_data(data)
-	return {"ok": true, "path": path, "version": file_version}
+	return res
 
 ## === UX helpers (delete, rename) for save menu ===
 
 func delete_save(slot_name: String) -> bool:
-	var path := get_save_path(slot_name)
-	if not FileAccess.file_exists(path):
-		return false
-	var err := DirAccess.remove_absolute(path)
-	if err != OK:
-		push_error("SaveLoadManager: Failed to delete %s (err %d)" % [path, err])
-		return false
-	print("SaveLoadManager: Deleted save %s" % slot_name)
-	return true
+	# Explicit player delete. Load/migrate never removes a v1 .json.
+	var safe := _sanitize_slot(slot_name)
+	var removed := false
+	for path in _slot_artifact_paths(safe):
+		if FileAccess.file_exists(path):
+			var err := DirAccess.remove_absolute(path)
+			if err == OK:
+				removed = true
+			else:
+				push_error("SaveLoadManager: Failed to delete %s (err %d)" % [path, err])
+				return false
+	if removed:
+		print("SaveLoadManager: Deleted save %s" % safe)
+	return removed
+
 
 func rename_save(old_slot: String, new_slot: String) -> bool:
-	var old_path := get_save_path(old_slot)
-	var new_path := get_save_path(new_slot)
-	if not FileAccess.file_exists(old_path):
+	var old_safe := _sanitize_slot(old_slot)
+	var new_safe := _sanitize_slot(new_slot)
+	if old_safe == new_safe:
+		return true
+	var located := _locate_save(old_safe)
+	if bool(located.get("missing", false)):
 		return false
-	if FileAccess.file_exists(new_path):
+	if not bool(_locate_save(new_safe).get("missing", true)):
 		push_warning("SaveLoadManager: Target name already exists: %s" % new_slot)
 		return false
-
-	var content := FileAccess.get_file_as_string(old_path)
-	var f := FileAccess.open(new_path, FileAccess.WRITE)
-	if f == null:
+	var src := ProjectSettings.globalize_path(str(located.get("path", "")))
+	var bytes := FileAccess.get_file_as_bytes(src)
+	if bytes.is_empty():
 		return false
-	f.store_string(content)
-	f.close()
-
-	DirAccess.remove_absolute(old_path)
-	print("SaveLoadManager: Renamed %s -> %s" % [old_slot, new_slot])
+	var dest_user := get_save_path_v2(new_safe) if bool(located.get("v2", false)) else get_save_path(new_safe)
+	var written: Dictionary = _SaveFormatLib.atomic_write(dest_user, bytes) if bool(located.get("v2", false)) else _write_bytes_direct(dest_user, bytes)
+	if not bool(written.get("ok", false)):
+		return false
+	DirAccess.remove_absolute(src)
+	print("SaveLoadManager: Renamed %s -> %s" % [old_safe, new_safe])
 	return true
+
+
+func get_save_path_v2(slot_name: String) -> String:
+	return SAVE_DIR + _sanitize_slot(slot_name) + ".eoasave"
+
+
+## Gathered dictionary for a slot. Does not apply it. Failure returns {ok:false, error}.
+func read_save_body(slot_name: String) -> Dictionary:
+	var located := _locate_save(_sanitize_slot(slot_name))
+	if bool(located.get("missing", false)):
+		return {"ok": false, "error": "File not found: %s" % slot_name, "missing": true}
+	var path := str(located.get("path", ""))
+	var data: Dictionary = {}
+	if bool(located.get("v2", false)):
+		var decoded: Dictionary = _SaveFormatLib.decode_file(path, true)
+		if not bool(decoded.get("ok", false)):
+			return {
+				"ok": false,
+				"error": str(decoded.get("error", "damaged save")),
+				"damaged": true,
+				"path": path,
+			}
+		data = decoded.get("body", {})
+	else:
+		var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
+		if typeof(parsed) != TYPE_DICTIONARY:
+			return {"ok": false, "error": "Corrupt JSON (not object)", "damaged": true, "path": path}
+		data = parsed
+	_migrate_save_data(data)
+	return data
+
+
+func slot_status(slot_name: String) -> Dictionary:
+	var safe := _sanitize_slot(slot_name)
+	var located := _locate_save(safe)
+	if bool(located.get("missing", false)):
+		return {
+			"slot": safe,
+			"missing": true,
+			"damaged": false,
+			"old_format": false,
+			"can_load": false,
+			"error": "missing",
+			"metadata": {},
+			"path": "",
+		}
+	var peeked := _peek_save_file(str(located.get("path", "")), bool(located.get("v2", false)))
+	return {
+		"slot": safe,
+		"missing": false,
+		"damaged": bool(peeked.get("damaged", false)),
+		"old_format": bool(peeked.get("old_format", false)),
+		"can_load": not bool(peeked.get("damaged", false)),
+		"error": str(peeked.get("error", "")),
+		"metadata": peeked.get("metadata", {}),
+		"path": str(located.get("path", "")),
+	}
+
+
+func _load_v2(slot_name: String) -> Dictionary:
+	var safe := _sanitize_slot(slot_name)
+	var located := _locate_save(safe)
+	var path := str(located.get("path", get_save_path_v2(safe)))
+	if bool(located.get("missing", false)):
+		return {"ok": false, "error": "File not found: %s" % safe, "path": path, "slot": safe, "missing": true}
+	var body := read_save_body(safe)
+	if body.has("ok") and not bool(body.get("ok", false)):
+		return {
+			"ok": false,
+			"error": str(body.get("error", "unreadable save")),
+			"path": path,
+			"slot": safe,
+			"damaged": true,
+		}
+	var verdict: Dictionary = _SaveFormatLib.validate(body, scenario_guard)
+	if not bool(verdict.get("ok", false)):
+		var errors: Array = verdict.get("errors", [])
+		var msg := "Invalid save"
+		if not errors.is_empty():
+			msg = str(errors[0])
+		return {"ok": false, "error": msg, "path": path, "slot": safe, "damaged": true}
+	_apply_save_data(body)
+	if typeof(TimeManager) != TYPE_NIL:
+		TimeManager.set_paused(true)
+	print("SaveLoadManager: Game loaded ← %s (v%d)" % [path, int(body.get("save_version", 0))])
+	return {
+		"ok": true,
+		"path": path,
+		"slot": safe,
+		"version": int(body.get("save_version", 0)),
+		"old_format": bool(located.get("old_format", false)),
+	}
+
+
+func _save_v2(slot_name: String, kind: String, data: Dictionary) -> Dictionary:
+	var safe := _sanitize_slot(slot_name)
+	var path := get_save_path_v2(safe)
+	var abs_path := ProjectSettings.globalize_path(path)
+	if not _ensure_quiescent():
+		return {"ok": false, "error": "sim busy", "path": path, "absolute_path": abs_path, "slot": safe}
+	var encoded: Dictionary = _SaveFormatLib.encode(data, _header_fields(data, kind))
+	if not bool(encoded.get("ok", false)):
+		return {"ok": false, "error": str(encoded.get("error", "encode failed")), "path": path, "absolute_path": abs_path, "slot": safe}
+	var written: Dictionary = _SaveFormatLib.atomic_write(path, encoded.get("bytes", PackedByteArray()))
+	if not bool(written.get("ok", false)):
+		return {
+			"ok": false,
+			"error": str(written.get("error", "write failed")),
+			"path": path,
+			"absolute_path": abs_path,
+			"slot": safe,
+			"crashed_after_tmp": bool(written.get("crashed_after_tmp", false)),
+		}
+	_last_save_path = path
+	return {
+		"ok": true,
+		"path": path,
+		"absolute_path": abs_path,
+		"slot": safe,
+		"bytes": int(written.get("bytes", 0)),
+		"version": int(_SaveFormatLib.VERSION),
+		"kind": kind,
+	}
+
+
+func _ensure_quiescent() -> bool:
+	if typeof(TimeManager) == TYPE_NIL or not TimeManager.has_method("sim_is_quiescent"):
+		return true
+	if TimeManager.sim_is_quiescent():
+		return true
+	if bool(TimeManager.get("_draining_f5_flush")):
+		return false
+	if TimeManager.has_method("_drain_living_f5_flush"):
+		TimeManager._drain_living_f5_flush(4)
+	return bool(TimeManager.sim_is_quiescent())
+
+
+func _kind_for_slot(slot_name: String) -> String:
+	var safe := _sanitize_slot(slot_name)
+	if safe == "quicksave":
+		return "quick"
+	if safe == "autosave" or safe.begins_with("autosave"):
+		return "auto"
+	return "manual"
+
+
+func _live_player_tag() -> String:
+	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_player_country_tag"):
+		var tag := str(LeaderManager.get_player_country_tag()).strip_edges().to_upper()
+		if not tag.is_empty():
+			return tag
+	return "USA"
+
+
+func _campaign_status_text() -> String:
+	# Read the war blob directly. player_enemies_line() calls ensure_booted(),
+	# which would mutate campaign_wars during a gather.
+	if typeof(CampaignEndDomain) != TYPE_NIL and CampaignEndDomain.latched():
+		var model: Dictionary = CampaignEndDomain.view_model()
+		var outcome := str(model.get("outcome", "")).strip_edges().to_lower()
+		if outcome == "victory" or outcome == "decisive":
+			return "Victory"
+		if outcome == "defeat":
+			return "Defeat"
+		if outcome.is_empty():
+			return "Campaign over"
+		return outcome.capitalize()
+	var line := _player_war_line_no_boot()
+	if not line.is_empty():
+		return line
+	return "Peace"
+
+
+func _player_war_line_no_boot() -> String:
+	if typeof(GameData) == TYPE_NIL:
+		return ""
+	var raw: Variant = GameData.peace_state.get("campaign_wars", {})
+	if not (raw is Dictionary):
+		return ""
+	var wars: Variant = (raw as Dictionary).get("wars", {})
+	if not (wars is Dictionary) or (wars as Dictionary).is_empty():
+		return ""
+	var player := _live_player_tag()
+	var names: PackedStringArray = []
+	var keys: Array = (wars as Dictionary).keys()
+	keys.sort()
+	for k in keys:
+		var row: Variant = (wars as Dictionary)[k]
+		if not (row is Dictionary):
+			continue
+		var a := str((row as Dictionary).get("a", "")).strip_edges().to_upper()
+		var b := str((row as Dictionary).get("b", "")).strip_edges().to_upper()
+		var other := ""
+		if a == player:
+			other = b
+		elif b == player:
+			other = a
+		if other.is_empty():
+			continue
+		var label := other
+		if typeof(WarStateDomain) != TYPE_NIL:
+			label = str(WarStateDomain.tag_name(other))
+		names.append(label)
+	if names.is_empty():
+		return ""
+	return "At war: " + ", ".join(names)
+
+
+func _game_date_text() -> String:
+	if typeof(TimeManager) == TYPE_NIL:
+		return "1936-01-01 00:00"
+	return "%04d-%02d-%02d %02d:00" % [
+		int(TimeManager.current_year),
+		int(TimeManager.current_month),
+		int(TimeManager.current_day),
+		int(TimeManager.current_hour),
+	]
+
+
+func _nation_name(tag: String) -> String:
+	if typeof(WarStateDomain) != TYPE_NIL:
+		return str(WarStateDomain.tag_name(tag))
+	return tag
+
+
+func _header_fields(data: Dictionary, kind: String) -> Dictionary:
+	var meta: Dictionary = data.get("metadata", {}) if data.get("metadata") is Dictionary else {}
+	var time_block: Dictionary = data.get("time", {}) if data.get("time") is Dictionary else {}
+	var tag := str(meta.get("player_tag", _live_player_tag())).strip_edges().to_upper()
+	if tag.is_empty():
+		tag = _live_player_tag()
+	return {
+		"game_version": str(meta.get("game_version", SAVE_GAME_VERSION)),
+		"scenario_id": str(meta.get("scenario_id", "")),
+		"player_tag": tag,
+		"nation_name": str(meta.get("nation_name", _nation_name(tag))),
+		"game_date": str(meta.get("game_date", _game_date_text())),
+		"days_elapsed": int(time_block.get("total_days_elapsed", 0)),
+		"campaign_status": str(meta.get("campaign_status", _campaign_status_text())),
+		"wall_time": Time.get_datetime_string_from_system(true),
+		"kind": kind,
+	}
+
+
+func _stamp_live_metadata(data: Dictionary) -> void:
+	if typeof(data.get("metadata", null)) != TYPE_DICTIONARY:
+		data["metadata"] = {}
+	var meta: Dictionary = data["metadata"]
+	var tag := _live_player_tag()
+	meta["player_tag"] = tag
+	meta["nation_name"] = _nation_name(tag)
+	meta["game_date"] = _game_date_text()
+	meta["campaign_status"] = _campaign_status_text()
+	data["metadata"] = meta
+
+
+func _after_load_resync() -> void:
+	if typeof(WarStateDomain) != TYPE_NIL:
+		WarStateDomain.invalidate_fronts()
+	if typeof(ProductionManager) != TYPE_NIL and ProductionManager.has_method("end_interactive_multi_ai_day_cache"):
+		ProductionManager.end_interactive_multi_ai_day_cache()
+	if typeof(TechnologyManager) != TYPE_NIL and TechnologyManager.has_method("_rebuild_unlock_indices"):
+		TechnologyManager._rebuild_unlock_indices()
+
+
+func _locate_save(safe: String) -> Dictionary:
+	var v2 := get_save_path_v2(safe)
+	var v1 := SAVE_DIR + safe + ".json"
+	if FileAccess.file_exists(v2):
+		return {"path": v2, "v2": true, "old_format": false, "missing": false}
+	if FileAccess.file_exists(v1):
+		return {"path": v1, "v2": false, "old_format": true, "missing": false}
+	return {"path": v2, "v2": false, "old_format": false, "missing": true}
+
+
+func _slot_has_file(slot_name: String) -> bool:
+	return not bool(_locate_save(_sanitize_slot(slot_name)).get("missing", true))
+
+
+func _slot_artifact_paths(safe: String) -> PackedStringArray:
+	var v2 := ProjectSettings.globalize_path(get_save_path_v2(safe))
+	return PackedStringArray([
+		v2,
+		v2 + ".bak",
+		v2 + ".tmp",
+		ProjectSettings.globalize_path(SAVE_DIR + safe + ".json"),
+	])
+
+
+func _write_bytes_direct(user_path: String, bytes: PackedByteArray) -> Dictionary:
+	var path := ProjectSettings.globalize_path(user_path)
+	var f := FileAccess.open(path, FileAccess.WRITE)
+	if f == null:
+		return {"ok": false, "error": "Cannot open %s" % path}
+	f.store_buffer(bytes)
+	f.close()
+	return {"ok": true, "path": user_path}
+
+
+func _peek_save_file(path: String, is_v2: bool) -> Dictionary:
+	if is_v2:
+		var decoded: Dictionary = _SaveFormatLib.decode_file(path, true)
+		var header: Dictionary = decoded.get("header", {}) if decoded.get("header") is Dictionary else {}
+		if not bool(decoded.get("ok", false)):
+			return {"damaged": true, "old_format": false, "error": str(decoded.get("error", "damaged")), "metadata": header}
+		var body: Dictionary = decoded.get("body", {})
+		_migrate_save_data(body)
+		var verdict: Dictionary = _SaveFormatLib.validate(body, scenario_guard)
+		if not bool(verdict.get("ok", false)):
+			var errors: Array = verdict.get("errors", [])
+			var why := "Invalid save"
+			if not errors.is_empty():
+				why = str(errors[0])
+			return {"damaged": true, "old_format": false, "error": why, "metadata": header}
+		return {"damaged": false, "old_format": false, "error": "", "metadata": header}
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
+	if typeof(parsed) != TYPE_DICTIONARY:
+		return {"damaged": true, "old_format": true, "error": "Corrupt JSON (not object)", "metadata": {}}
+	var root: Dictionary = parsed
+	var meta: Dictionary = root.get("metadata", {}) if root.get("metadata") is Dictionary else {}
+	meta["old_format"] = true
+	return {"damaged": false, "old_format": true, "error": "", "metadata": meta}
+
+
+func _save_sort_key(entry: Dictionary) -> String:
+	var meta: Dictionary = entry.get("metadata", {}) if entry.get("metadata") is Dictionary else {}
+	var wall := str(meta.get("wall_time", ""))
+	if not wall.is_empty():
+		return wall
+	var ts := str(meta.get("timestamp", ""))
+	if not ts.is_empty():
+		return ts
+	return str(meta.get("last_played", ""))

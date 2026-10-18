@@ -40,6 +40,22 @@ func _load_spirit_definitions() -> void:
 		push_error("NationalSpiritManager: Failed to parse spirit_definitions.json")
 
 
+func get_save_data() -> Dictionary:
+	return {"country_spirits": country_spirits.duplicate(true)}
+
+
+func apply_save_data(data: Dictionary) -> void:
+	if data.get("country_spirits") is Dictionary:
+		country_spirits.clear()
+		var src: Dictionary = data["country_spirits"]
+		for k in src.keys():
+			var ids: Array = src[k] if src[k] is Array else []
+			var copy: Array[String] = []
+			for id in ids:
+				copy.append(str(id))
+			country_spirits[str(k)] = copy
+
+
 func ensure_country_spirits(country_tag: String) -> void:
 	var tag := country_tag.strip_edges().to_upper()
 	if country_spirits.has(tag):

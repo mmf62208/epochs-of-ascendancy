@@ -12327,12 +12327,52 @@ func simulate_failed_state_pressure(low_cohesion_tag: String, high_ascendancy_ne
 # Implements the SaveLoadManager contract. Persists the new policy, erosion, manpower, settlement, and pillar-adjacent state.
 # This allows resuming long campaigns where demographic choices (immigration vs pro-natal, printing vs sound money, foreign legions) have compounded effects.
 
+func _sr1_merge_peace(blob: Dictionary) -> Dictionary:
+	var manifest = load("res://scripts/core/SaveCoverageManifest.gd")
+	if manifest == null:
+		return blob
+	for key in manifest.saved_peace_keys():
+		var ks := str(key)
+		if blob.has(ks) or not peace_state.has(ks):
+			continue
+		var v: Variant = peace_state[ks]
+		if v is Object:
+			continue
+		blob[ks] = v.duplicate(true) if (v is Dictionary or v is Array) else v
+	return blob
+
+
+func _sr1_apply_peace(data: Dictionary) -> void:
+	var manifest = load("res://scripts/core/SaveCoverageManifest.gd")
+	if manifest == null:
+		return
+	for key in manifest.saved_peace_keys():
+		var ks := str(key)
+		if not data.has(ks):
+			continue
+		var v: Variant = data[ks]
+		if v is Object:
+			continue
+		peace_state[ks] = v.duplicate(true) if (v is Dictionary or v is Array) else v
+
+
+func _sr1_clear_peace() -> void:
+	var manifest = load("res://scripts/core/SaveCoverageManifest.gd")
+	if manifest == null:
+		return
+	for key in manifest.saved_peace_keys():
+		var ks := str(key)
+		if ks == "campaign_wars" or ks == "campaign_capitulation" or ks == "campaign_end":
+			peace_state[ks] = {}
+			continue
+		# Drop the key. An empty leftover would still hash as present when the
+		# save was taken before the sim created it.
+		peace_state.erase(ks)
+
+
 func get_save_data() -> Dictionary:
 	_init_peace_state_if_needed()
-	var skip_hier := false
-	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("is_live_f5_play_path"):
-		skip_hier = bool(TimeManager.is_live_f5_play_path())
-	return {
+	var blob := {
 		"demographic_policies": peace_state.get("demographic_policies", {}).duplicate(true),
 		"non_citizen_ratio": peace_state.get("non_citizen_ratio", {}).duplicate(true),
 		"foreign_military_pct": peace_state.get("foreign_military_pct", {}).duplicate(true),
@@ -12384,8 +12424,7 @@ func get_save_data() -> Dictionary:
 		"biotech_sabotage_log": peace_state.get("biotech_sabotage_log", {}).duplicate(true),
 		"scanner_intel_flags": peace_state.get("scanner_intel_flags", {}).duplicate(true),
 		# Live hierarchy membership (post-seed player/peace mutations) — not era re-seed.
-		# Live F5 / softpipe: skip the 3×3520 string-key dump (era-reseedable).
-		"hierarchy_membership_live": {} if skip_hier else _export_hierarchy_membership_live(),
+		"hierarchy_membership_live": _export_hierarchy_membership_live(),
 		"membership_live_mutation_count": int(peace_state.get("membership_live_mutation_count", 0)),
 		"membership_live_log": peace_state.get("membership_live_log", []).duplicate(true) if peace_state.get("membership_live_log") is Array else [],
 		"rx1_bridged": _Rx1Rhine.export_bridged(),
@@ -12394,6 +12433,7 @@ func get_save_data() -> Dictionary:
 		"campaign_end": peace_state["campaign_end"].duplicate(true) if peace_state.get("campaign_end") is Dictionary else {},
 		"version": 1
 	}
+	return _sr1_merge_peace(blob)
 
 
 func _export_hierarchy_membership_live() -> Dictionary:
@@ -12535,10 +12575,15 @@ func apply_save_data(data: Dictionary) -> void:
 	if data.has("rx1_bridged") and data["rx1_bridged"] is Dictionary:
 		_Rx1Rhine.apply_bridged(data["rx1_bridged"])
 		peace_state["rx1_bridged"] = data["rx1_bridged"].duplicate(true)
+	_sr1_apply_peace(data)
+	if not data.has("membership_reapply_on_year_tick"):
+		peace_state.erase("membership_reapply_on_year_tick")
 	print("GameData: Demographic/policy state (policies, erosion, manpower, settlements) restored from save.")
 
 func clear_for_load() -> void:
 	# Optional reset before apply (SaveLoad calls if present).
+	# Erase saved extras first so the typed defaults below put core dicts back.
+	_sr1_clear_peace()
 	peace_state["demographic_policies"] = {}
 	peace_state["non_citizen_ratio"] = {}
 	peace_state["foreign_military_pct"] = {}

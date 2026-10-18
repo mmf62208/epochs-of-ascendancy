@@ -1856,6 +1856,11 @@ func set_player_country_tag(tag: String) -> void:
 	player_country_tag = tag.strip_edges().to_upper()
 	if typeof(SupplyManager) != TYPE_NIL:
 		SupplyManager.player_tag = player_country_tag
+	var tree := get_tree()
+	if tree != null:
+		var bar: Node = tree.get_first_node_in_group("top_info_bar")
+		if bar != null and "player_country_tag" in bar:
+			bar.player_country_tag = player_country_tag
 
 
 ## Living nation pick. Default first-session stays GER Maginot when tag is empty/unknown.
@@ -1866,6 +1871,13 @@ func boot_living_player(tag: String) -> Dictionary:
 		t = "GER"
 		defaulted = true
 	set_player_country_tag(t)
+	# One draw per new campaign, outside sim math. Harnesses that only call
+	# set_player_country_tag keep run_seed 0 (no day reseed).
+	if typeof(TimeManager) != TYPE_NIL and int(TimeManager.run_seed) == 0:
+		var drawn := int(Time.get_ticks_usec() % 2147483647)
+		if drawn <= 0:
+			drawn = 1
+		TimeManager.run_seed = drawn
 	var tree := get_tree()
 	if tree != null:
 		var bar: Node = tree.get_first_node_in_group("top_info_bar")
@@ -3710,6 +3722,8 @@ func apply_save_data(data: Dictionary) -> void:
 			l.is_deceased = bool(ld.get("is_deceased", false))
 			l.assigned_army_id = str(ld.get("assigned_army_id", ""))
 			l.birth_year = int(ld.get("birth_year", 1900))
+			l.start_year = int(ld.get("start_year", l.start_year))
+			l.end_year = int(ld.get("end_year", l.end_year))
 			l.health = float(ld.get("health", 1.0))
 			l.duty_post = str(ld.get("duty_post", "active"))
 			l.stayed_past_retirement = bool(ld.get("stayed_past_retirement", false))
@@ -3738,7 +3752,7 @@ func apply_save_data(data: Dictionary) -> void:
 		for x in (data["pending_leader_replacements"] as Array):
 			pending_leader_replacements.append(x if x is Dictionary else {})
 	if data.has("player_country_tag"):
-		player_country_tag = str(data["player_country_tag"])
+		set_player_country_tag(str(data["player_country_tag"]))
 	if data.has("organize_priority"):
 		organize_priority = "new" if str(data.get("organize_priority")).strip_edges().to_lower() == "new" else "field"
 
