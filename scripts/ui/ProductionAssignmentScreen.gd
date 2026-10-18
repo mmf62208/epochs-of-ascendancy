@@ -68,7 +68,11 @@ func _ready() -> void:
 	super._ready()
 	z_index = 80
 	process_mode = Node.PROCESS_MODE_ALWAYS
-	close_button.pressed.connect(_on_close_pressed)
+	mouse_filter = Control.MOUSE_FILTER_STOP
+	if close_button != null:
+		close_button.mouse_filter = Control.MOUSE_FILTER_STOP
+		close_button.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
+		close_button.pressed.connect(_on_close_pressed)
 	_apply_screen_theme()
 	_setup_filters()
 	_setup_headers()
@@ -78,8 +82,17 @@ func _ready() -> void:
 	if not ProductionManager.day_advanced.is_connected(_on_day_advanced):
 		ProductionManager.day_advanced.connect(_on_day_advanced)
 	_center_on_viewport()
+	# First visible frame, then load factory rows. Sync refresh in `_ready`
+	# could stall the live click for minutes (TechnologyScreen same class).
+	call_deferred("_deferred_first_refresh")
+
+
+func _deferred_first_refresh() -> void:
+	if not is_inside_tree() or is_queued_for_deletion():
+		return
 	refresh_screen()
-	call_deferred("_center_on_viewport")
+	_center_on_viewport()
+	print("ProductionAssignmentScreen: opened for %s" % country_tag)
 
 
 func _center_on_viewport() -> void:
@@ -90,8 +103,11 @@ func _center_on_viewport() -> void:
 	var panel_sz := size
 	if panel_sz.x < 8.0 or panel_sz.y < 8.0:
 		panel_sz = Vector2(1280, 760)
-		custom_minimum_size = panel_sz
-		size = panel_sz
+	var max_w := maxf(sz.x - 16.0, 320.0)
+	var max_h := maxf(sz.y - 64.0, 240.0)
+	panel_sz = Vector2(minf(panel_sz.x, max_w), minf(panel_sz.y, max_h))
+	custom_minimum_size = panel_sz
+	size = panel_sz
 	global_position = (sz - panel_sz) * 0.5
 	global_position.x = maxf(8.0, global_position.x)
 	global_position.y = maxf(56.0, global_position.y)
@@ -103,6 +119,10 @@ func _exit_tree() -> void:
 
 
 func _on_close_pressed() -> void:
+	if is_queued_for_deletion():
+		return
+	# Rename before queue_free so Close→Prod does not toggle-close the dying node.
+	name = "ProductionAssignmentScreen_dying"
 	queue_free()
 
 

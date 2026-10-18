@@ -890,6 +890,10 @@ func _connect_once(btn: Button, handler: Callable) -> void:
 	btn.process_mode = Node.PROCESS_MODE_ALWAYS
 	btn.mouse_filter = Control.MOUSE_FILTER_STOP
 	btn.disabled = false
+	# Press-on-down: leftover map-pan / Begin-release swallow cannot eat button-up
+	# (same class as Search Go / 1x–4x). Prod defaulted to RELEASE so the live
+	# click never fired `_on_production_pressed`.
+	btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
 	if not btn.pressed.is_connected(handler):
 		btn.pressed.connect(handler)
 
@@ -1664,28 +1668,46 @@ func _on_matchmaking_pressed() -> void:
 		(view as Window).call_deferred("popup_centered")
 
 
+func _screen_node_is_live(n: Node) -> bool:
+	if n == null or not is_instance_valid(n):
+		return false
+	if n.is_queued_for_deletion():
+		return false
+	if str(n.name).ends_with("_dying"):
+		return false
+	return true
+
+
 func _find_named_screen(screen_name: String) -> Node:
 	var tree := get_tree()
 	if tree == null:
 		return null
 	var existing: Node = tree.root.get_node_or_null(screen_name)
-	if existing != null:
+	if _screen_node_is_live(existing):
 		return existing
 	if tree.current_scene != null:
 		var layer: Node = tree.current_scene.get_node_or_null("UILayer")
 		if layer != null:
 			var uin: Node = layer.get_node_or_null(screen_name)
-			if uin != null:
+			if _screen_node_is_live(uin):
 				return uin
-	return tree.root.find_child(screen_name, true, false)
+	var found: Node = tree.root.find_child(screen_name, true, false)
+	if _screen_node_is_live(found):
+		return found
+	return null
+
+
+func _retire_named_screen(existing: Node) -> void:
+	if not _screen_node_is_live(existing):
+		return
+	if existing is Window:
+		existing.hide()
+	existing.name = "%s_dying" % str(existing.name)
+	existing.call_deferred("queue_free")
 
 
 func _close_screen(screen_name: String) -> void:
-	var existing := _find_named_screen(screen_name)
-	if existing != null:
-		if existing is Window:
-			existing.hide()
-		existing.call_deferred("queue_free")
+	_retire_named_screen(_find_named_screen(screen_name))
 
 
 func _toggle_root_popup(scene_name: String, scene_path: String, configure: Callable = Callable()) -> void:
@@ -1711,9 +1733,7 @@ func _toggle_root_popup(scene_name: String, scene_path: String, configure: Calla
 func _toggle_screen(screen_name: String, scene_path: String, configure: Callable) -> void:
 	var existing := _find_named_screen(screen_name)
 	if existing != null:
-		if existing is Window:
-			existing.hide()
-		existing.call_deferred("queue_free")
+		_retire_named_screen(existing)
 		return
 
 	var packed: PackedScene = load(scene_path)
@@ -1737,7 +1757,12 @@ func _toggle_screen(screen_name: String, scene_path: String, configure: Callable
 		else:
 			ctl.z_index = 100
 	# Prefer UILayer so panel sits above map canvas (root child can render under map).
-	var ui_layer := get_tree().current_scene.get_node_or_null("UILayer") as CanvasLayer if get_tree().current_scene else null
+	var ui_layer: CanvasLayer = null
+	var scene_n: Node = get_tree().current_scene if get_tree() != null else null
+	if scene_n != null:
+		ui_layer = scene_n.get_node_or_null("UILayer") as CanvasLayer
+	if ui_layer == null and get_tree() != null:
+		ui_layer = get_tree().root.get_node_or_null("UILayer") as CanvasLayer
 	if ui_layer:
 		ui_layer.add_child(scene)
 	else:
