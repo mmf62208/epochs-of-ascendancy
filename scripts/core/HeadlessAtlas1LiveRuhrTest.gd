@@ -13,6 +13,8 @@ const SETTLE_FRAMES := 30
 const LIVE_ZOOMS: Array[float] = [1.217, 1.512, 2.904]
 const VP := Vector2(1280, 800)
 const ZOOM_SLACK := 0.05
+const PLAY_HOME_ZOOM := 0.787
+const PLAY_WHEEL_SCREEN := Vector2(455, 455)
 
 var _failures := 0
 var _phase := 0
@@ -22,6 +24,8 @@ var _settle_left := 0
 var _zoom_i := 0
 var _home_pos := Vector2.ZERO
 var _lock_pos := Vector2.ZERO
+var _lock_zoom := 0.0
+var _focus_world := Vector2.ZERO
 var _out_dir := ""
 
 
@@ -87,15 +91,19 @@ func _tick_wait_map() -> void:
 	if cam != null:
 		_home_pos = cam.global_position
 	_ensure_units_on()
-	_freeze_boot_fighters()
-	print("ATLAS1 live map_ready home=%.1f,%.1f units=%d layers=%d" % [
-		_home_pos.x, _home_pos.y, _visible_unit_count(), _city_layer_count(),
+	_quiet_boot_fighters()
+	_apply_home_play_zoom()
+	_focus_world = _world_under_screen(PLAY_WHEEL_SCREEN)
+	print("ATLAS1 live map_ready home=%.1f,%.1f home_z=%.3f focus=%.1f,%.1f units=%d layers=%d" % [
+		_home_pos.x, _home_pos.y, _camera_zoom(), _focus_world.x, _focus_world.y,
+		_visible_unit_count(), _city_layer_count(),
 	])
 	if _city_layer_count() != 1:
 		_fail("CityLabelsLayer count %d want 1 (doubled draw path)" % _city_layer_count())
 	if _visible_unit_count() < 1:
 		_fail("no live unit/air counters after Begin")
-	_check_home_cam_mid()
+	if _focus_world == Vector2.ZERO:
+		_fail("wheel focus world under (455,455) is zero")
 	_zoom_i = 0
 	_begin_zoom()
 
@@ -105,36 +113,18 @@ func _begin_zoom() -> void:
 		_finish()
 		return
 	var z: float = LIVE_ZOOMS[_zoom_i]
-	# Playtester wheeled in over the Ruhr (mouse ~455,455 on 1280x800), not
-	# Europe-Home centre. Isolated tests used to inject set_live_view so the
-	# layout could pass while MapCamera stayed at Home zoom.
-	var pos := _essen_world()
-	if pos == Vector2.ZERO:
-		pos = _home_pos
-	_apply_camera(pos, z)
+	# Playtester: Home 0.787 then wheel at (455,455). Do not lock_pixel_guard
+	# onto Essen — that recentres the Ruhr and is not the live view.
+	_wheel_to(z)
+	var cam := _camera()
+	var pos := cam.global_position if cam != null else _home_pos
+	_lock_pos = pos
+	_lock_zoom = _camera_zoom()
+	_sync_live_counters(_lock_zoom)
+	_sync_layer_from_camera()
 	_settle_left = SETTLE_FRAMES
 	_phase = 2
-	print("ATLAS1 live frame z=%.3f cam=%.1f,%.1f" % [z, pos.x, pos.y])
-
-
-func _check_home_cam_mid() -> void:
-	_apply_camera(_home_pos, 1.217)
-	var layer := _city_layer()
-	if layer == null:
-		_fail("CityLabelsLayer missing at Home-cam z1.217")
-		return
-	if not _camera_zoom_stuck(1.217):
-		_fail("MapCamera zoom %.3f want 1.217 at Home-cam (tests were injecting layout zoom)" % _camera_zoom())
-	var placed: Array = layer.call("placed")
-	print("ATLAS1 live home_cam z1.217 layout_z=%.3f cam_z=%.3f counters_rect=%d score=%.1f names=%s" % [
-		float(layer.call("last_layout_zoom")), _camera_zoom(),
-		int(layer.call("last_counter_rect_count")), float(layer.call("score_of", ESSEN)),
-		",".join(_names_of(layer.call("placed"))),
-	])
-	if not _has_name(placed, "Essen"):
-		_fail("Essen missing at live Home-cam z1.217")
-	else:
-		_pass("Essen labelled at live Home-cam z1.217")
+	print("ATLAS1 live frame want_z=%.3f cam_z=%.3f cam=%.1f,%.1f" % [z, _lock_zoom, pos.x, pos.y])
 
 
 func _check_zoom() -> void:
@@ -158,20 +148,35 @@ func _check_zoom() -> void:
 			continue
 		names.append(str(p.get("name", "")))
 	names.sort()
-	print("ATLAS1 live z%.3f n=%d counters=%d names=%s" % [
-		z, names.size(), _visible_unit_count(), ",".join(names),
+	var essen_s := Vector2.ZERO
+	if layer.has_method("screen_of"):
+		essen_s = layer.call("screen_of", ESSEN)
+	print("ATLAS1 live z%.3f n=%d counters=%d counters_rect=%d essen_s=%.1f,%.1f names=%s" % [
+		z, names.size(), _visible_unit_count(),
+		int(layer.call("last_counter_rect_count")) if layer.has_method("last_counter_rect_count") else 0,
+		essen_s.x, essen_s.y, ",".join(names),
 	])
+	if not _has_name(placed, "Essen"):
+		_fail("Essen missing at live wheel z%.3f" % z)
+	else:
+		_pass("Essen labelled at live wheel z%.3f" % z)
+	if not _essen_on_screen():
+		_fail("Essen world not on screen at live wheel z%.3f" % z)
+	else:
+		_pass("Essen on screen at live wheel z%.3f" % z)
+	if not _has_name(placed, "Köln") and not _has_name(placed, "Cologne"):
+		_fail("Köln missing at live wheel z%.3f" % z)
 	if z < 2.0:
-		if not _has_name(placed, "Essen"):
-			_fail("Essen missing at live Ruhr-cam z%.3f" % z)
-		else:
-			_pass("Essen labelled at live z%.3f" % z)
-		if not _has_name(placed, "Köln") and not _has_name(placed, "Cologne"):
-			_fail("Köln missing at live z%.3f" % z)
-		if _has_name(placed, "Hamm") and not _has_name(placed, "Essen"):
-			_fail("Hamm kept over Essen at live z%.3f" % z)
-		if _has_name(placed, "Münster") and not _has_name(placed, "Essen"):
-			_fail("Münster kept over Essen at live z%.3f" % z)
+		if not _has_name(placed, "Duisburg"):
+			_fail("Duisburg missing at live wheel z%.3f" % z)
+		if not _has_name(placed, "Düsseldorf"):
+			_fail("Düsseldorf missing at live wheel z%.3f" % z)
+		if not _has_name(placed, "Dortmund"):
+			_fail("Dortmund missing at live wheel z%.3f" % z)
+	if _has_name(placed, "Hamm") and not _has_name(placed, "Essen"):
+		_fail("Hamm kept over Essen at live wheel z%.3f" % z)
+	if _has_name(placed, "Münster") and not _has_name(placed, "Essen"):
+		_fail("Münster kept over Essen at live wheel z%.3f" % z)
 	if bool(layer.call("has_visual_overlap")):
 		_fail("live label overlap at z%.3f" % z)
 	else:
@@ -232,9 +237,11 @@ func _frame_europe_home() -> void:
 		mr.call("center_europe_in_world_view")
 
 
-func _freeze_boot_fighters() -> void:
+func _quiet_boot_fighters() -> void:
+	# Stop TestRunner / CameraController fighting the view, but do NOT pin
+	# lock_pixel_guard_camera yet — the play path is wheel-toward-mouse.
 	if root != null:
-		root.set_meta("eoa_rx1_pixel_lock_camera", true)
+		root.set_meta("eoa_rx1_pixel_lock_camera", false)
 	var tr := _find_named("TestRunner")
 	if tr != null and tr.has_method("set_process"):
 		tr.set_process(false)
@@ -246,8 +253,11 @@ func _freeze_boot_fighters() -> void:
 			cc.set("enable_zoom", false)
 		cc.set_process(false)
 	var mr := _map_renderer()
-	if mr != null and mr.has_method("set_process"):
-		mr.set_process(false)
+	if mr != null:
+		mr.set("_europe_focus_retry", 99)
+		mr.set("_hold_camera_until_msec", 0)
+		if mr.has_method("_unlock_close_camera"):
+			mr.call("_unlock_close_camera")
 
 
 func _ensure_units_on() -> void:
@@ -258,20 +268,57 @@ func _ensure_units_on() -> void:
 		mr.call("_sync_unit_counter_paint")
 
 
-func _apply_camera(pos: Vector2, zoom: float) -> void:
-	_lock_pos = pos
+func _apply_home_play_zoom() -> void:
+	var cam := _camera()
+	if cam == null:
+		return
+	cam.position_smoothing_enabled = false
+	cam.zoom = Vector2(PLAY_HOME_ZOOM, PLAY_HOME_ZOOM)
+	if _home_pos != Vector2.ZERO:
+		cam.global_position = _home_pos
+	cam.reset_smoothing()
+	cam.enabled = true
+	cam.make_current()
+	_sync_live_counters(PLAY_HOME_ZOOM)
+	_sync_layer_from_camera()
+
+
+func _wheel_to(target_zoom: float) -> void:
 	var mr := _map_renderer()
-	if mr != null and mr.has_method("lock_pixel_guard_camera"):
-		mr.call("lock_pixel_guard_camera", pos, zoom)
+	if mr != null and mr.has_method("player_path_wheel_toward_world") and _focus_world != Vector2.ZERO:
+		mr.call("player_path_wheel_toward_world", _focus_world, target_zoom)
 	else:
 		var cam := _camera()
 		if cam != null:
-			cam.position_smoothing_enabled = false
-			cam.zoom = Vector2(zoom, zoom)
-			cam.global_position = pos
-			cam.reset_smoothing()
-			cam.enabled = true
-			cam.make_current()
+			cam.zoom = Vector2(target_zoom, target_zoom)
+
+
+func _world_under_screen(screen: Vector2) -> Vector2:
+	var cam := _camera()
+	if cam == null:
+		return Vector2.ZERO
+	return cam.get_canvas_transform().affine_inverse() * screen
+
+
+func _essen_on_screen() -> bool:
+	var layer := _city_layer()
+	if layer == null or not layer.has_method("screen_of"):
+		return false
+	var s: Vector2 = layer.call("screen_of", ESSEN)
+	return s.x >= -40.0 and s.y >= -40.0 and s.x <= VP.x + 40.0 and s.y <= VP.y + 40.0
+
+
+func _apply_camera(pos: Vector2, zoom: float) -> void:
+	_lock_pos = pos
+	_lock_zoom = zoom
+	var cam := _camera()
+	if cam != null:
+		cam.position_smoothing_enabled = false
+		cam.zoom = Vector2(zoom, zoom)
+		cam.global_position = pos
+		cam.reset_smoothing()
+		cam.enabled = true
+		cam.make_current()
 	_sync_live_counters(zoom)
 	_sync_layer_from_camera()
 
@@ -279,10 +326,9 @@ func _apply_camera(pos: Vector2, zoom: float) -> void:
 func _reassert_locked_zoom(zoom: float) -> void:
 	var pos := _lock_pos
 	if pos == Vector2.ZERO:
-		pos = _essen_world()
-	if pos == Vector2.ZERO:
 		pos = _home_pos
-	_apply_camera(pos, zoom)
+	var z := _lock_zoom if _lock_zoom > 0.04 else zoom
+	_apply_camera(pos, z)
 
 
 func _sync_live_counters(zoom: float) -> void:

@@ -3835,11 +3835,17 @@ func _handle_camera_input(delta: float) -> void:
 
 
 func _zoom_toward_mouse(zoom_change: float) -> void:
-	var cam := get_viewport().get_camera_2d()
+	var vp := get_viewport()
+	if vp == null:
+		return
+	_zoom_toward_screen(vp.get_mouse_position(), zoom_change)
+
+
+func _zoom_toward_screen(screen: Vector2, zoom_change: float) -> void:
+	var cam := get_viewport().get_camera_2d() if get_viewport() else null
 	if not cam:
 		return
 
-	var mouse_screen := get_viewport().get_mouse_position()
 	var old_zoom := cam.zoom
 
 	var new_zoom := old_zoom * zoom_change
@@ -3850,18 +3856,18 @@ func _zoom_toward_mouse(zoom_change: float) -> void:
 		return
 
 	eoa_log_flush(
-		"EOA_ZOOM_BEGIN who=MapRenderer._zoom_toward_mouse from=%.3f to=%.3f factor=%.3f"
+		"EOA_ZOOM_BEGIN who=MapRenderer._zoom_toward_screen from=%.3f to=%.3f factor=%.3f"
 		% [old_zoom.x, new_zoom.x, zoom_change]
 	)
-	var world_before := cam.get_canvas_transform().affine_inverse() * mouse_screen
+	var world_before := cam.get_canvas_transform().affine_inverse() * screen
 	cam.zoom = new_zoom
-	var world_after := cam.get_canvas_transform().affine_inverse() * mouse_screen
+	var world_after := cam.get_canvas_transform().affine_inverse() * screen
 	cam.global_position += world_before - world_after
 	_clamp_camera_to_theater()
 	# Light LOD only — never full 3520 fill / RoadLayer rebuild on a wheel notch.
 	_refresh_terrain_zoom_light()
 	eoa_log_flush(
-		"EOA_ZOOM_END who=MapRenderer._zoom_toward_mouse z=%.3f ok=1"
+		"EOA_ZOOM_END who=MapRenderer._zoom_toward_screen z=%.3f ok=1"
 		% new_zoom.x
 	)
 
@@ -16579,26 +16585,37 @@ func player_path_search_go(province_id: int) -> bool:
 
 
 func player_path_wheel_toward_world(world: Vector2, target_zoom: float) -> float:
-	# Warp the cursor over `world` then run the same `_zoom_toward_mouse` the
-	# wheel handler calls. No lock_pixel_guard_camera.
+	# Same pan math as `_zoom_toward_mouse`, keyed on `world` rather than a
+	# mouse warp (warp is a frame late in xvfb, so tests used to zoom in place).
 	var cam := get_node_or_null("MapCamera") as Camera2D
 	if cam == null and get_viewport():
 		cam = get_viewport().get_camera_2d()
 	if cam == null:
 		return 1.0
-	var screen: Vector2 = cam.get_canvas_transform() * world
-	if DisplayServer.get_name() != "headless":
-		DisplayServer.warp_mouse(Vector2i(int(round(screen.x)), int(round(screen.y))))
 	var factor_in: float = 1.0 + zoom_speed * 1.35
 	var factor_out: float = 1.0 - zoom_speed * 1.35
 	var guard: int = 0
-	while guard < 48:
+	while guard < 64:
 		var z: float = maxf(absf(cam.zoom.x), absf(cam.zoom.y))
-		if absf(z - target_zoom) <= 0.045:
+		if absf(z - target_zoom) <= 0.02:
 			break
-		_zoom_toward_mouse(factor_in if z < target_zoom else factor_out)
+		var factor: float = factor_in if z < target_zoom else factor_out
+		var next_z := clampf(z * factor, min_zoom, max_zoom)
+		if (z < target_zoom and next_z > target_zoom) or (z > target_zoom and next_z < target_zoom):
+			factor = target_zoom / maxf(z, 0.04)
+		_zoom_toward_screen(cam.get_canvas_transform() * world, factor)
 		guard += 1
 	return maxf(absf(cam.zoom.x), absf(cam.zoom.y))
+
+
+func player_path_wheel_toward_screen(screen: Vector2, target_zoom: float) -> float:
+	var cam := get_node_or_null("MapCamera") as Camera2D
+	if cam == null and get_viewport():
+		cam = get_viewport().get_camera_2d()
+	if cam == null:
+		return 1.0
+	var world: Vector2 = cam.get_canvas_transform().affine_inverse() * screen
+	return player_path_wheel_toward_world(world, target_zoom)
 
 
 func center_europe_in_world_view() -> void:
@@ -22630,7 +22647,7 @@ func _setup_atlas1_layers() -> void:
 			cities.name = "CityLabelsLayer"
 			container.add_child(cities)
 			cities.z_as_relative = false
-			cities.z_index = 19
+			cities.z_index = 30
 			_city_labels_layer = cities
 			if cities.has_method("bind_centroids"):
 				cities.call("bind_centroids", province_centroids)

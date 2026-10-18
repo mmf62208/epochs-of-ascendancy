@@ -417,7 +417,8 @@ func _test_close_no_overlap(layer: Node) -> void:
 	var zooms: Array[float] = [2.30, 2.60, 2.90, 2.904]
 	for z_v in zooms:
 		var z: float = z_v
-		layer.call("set_view", z, essen, vp, [])
+		var chips: Array = _ruhr_chip_rects(layer, essen, vp, z)
+		layer.call("set_view", z, essen, vp, [], chips)
 		var placed: Array = layer.call("placed")
 		if _placed_overlap(placed) or bool(layer.call("has_visual_overlap")):
 			_fail("drawn label rects overlap at z%.2f Ruhr view" % z)
@@ -510,22 +511,31 @@ func _test_essen_at_mid_z15(layer: Node) -> void:
 
 
 func _test_home_cam_ruhr_mid(layer: Node) -> void:
-	## Live Play zooms Home in place. Centering the camera on Essen hid the miss.
+	## Live Play zooms Home in place. Empty counter arrays hid the chip miss.
 	var vp := Vector2(1280, 800)
 	var zooms: Array[float] = [1.217, 1.512]
 	for z_v in zooms:
 		var z: float = z_v
-		layer.call("set_view", z, HOME_CAM, vp, [])
+		var chips: Array = _ruhr_chip_rects(layer, HOME_CAM, vp, z)
+		layer.call("set_view", z, HOME_CAM, vp, [], chips)
 		var placed: Array = layer.call("placed")
 		var names := _names(placed)
 		var shown := ",".join(_name_list(placed))
-		print("ATLAS1 city home_cam z%.3f n=%d names=%s" % [z, int(layer.call("screen_count")), shown])
+		print("ATLAS1 city home_cam z%.3f n=%d chips=%d names=%s" % [
+			z, int(layer.call("screen_count")), chips.size(), shown,
+		])
 		if not names.has("Essen"):
 			_fail("Essen missing at Home-cam z%.3f (live zoom-in path)" % z)
 		else:
 			_pass("Essen labelled at Home-cam z%.3f" % z)
 		if not names.has("Köln") and not names.has("Cologne"):
 			_fail("Köln missing at Home-cam z%.3f" % z)
+		if not names.has("Duisburg"):
+			_fail("Duisburg missing at Home-cam z%.3f" % z)
+		if not names.has("Düsseldorf"):
+			_fail("Düsseldorf missing at Home-cam z%.3f" % z)
+		if names.has("Hamm") and not names.has("Essen"):
+			_fail("Hamm labelled at Home-cam z%.3f while Essen is missing" % z)
 		if bool(layer.call("has_visual_overlap")):
 			_fail("Home-cam z%.3f label rects overlap" % z)
 
@@ -547,7 +557,8 @@ func _test_ruhr_priority_over_hamm(layer: Node) -> void:
 	else:
 		_pass("Ruhr cores beat Hamm/Münster on score")
 	var vp := Vector2(1280, 800)
-	layer.call("set_view", 1.217, HOME_CAM, vp, [])
+	var chips: Array = _ruhr_chip_rects(layer, HOME_CAM, vp, 1.217)
+	layer.call("set_view", 1.217, HOME_CAM, vp, [], chips)
 	var names := _names(layer.call("placed"))
 	if names.has("Hamm") and not names.has("Essen"):
 		_fail("Hamm labelled at Home-cam z1.217 while Essen is missing")
@@ -589,11 +600,12 @@ func _test_ruhr_centered_live_zooms(layer: Node) -> void:
 	var ok := true
 	for z_v in zooms:
 		var z: float = z_v
-		layer.call("set_view", z, essen, vp, [])
+		var chips: Array = _ruhr_chip_rects(layer, essen, vp, z)
+		layer.call("set_view", z, essen, vp, [], chips)
 		var placed: Array = layer.call("placed")
 		var names := _names(placed)
-		print("ATLAS1 city ruhr_cam z%.3f n=%d names=%s" % [
-			z, int(layer.call("screen_count")), ",".join(_name_list(placed)),
+		print("ATLAS1 city ruhr_cam z%.3f n=%d chips=%d names=%s" % [
+			z, int(layer.call("screen_count")), chips.size(), ",".join(_name_list(placed)),
 		])
 		if not names.has("Essen"):
 			_fail("Essen missing at Ruhr-cam z%.3f" % z)
@@ -689,6 +701,18 @@ func _test_counter_avoidance(layer: Node) -> void:
 		_fail("counter nudge moved Essen %.1f px from its dot" % dist)
 	else:
 		_pass("counter nudge kept Essen within 120 px (%.1f)" % dist)
+
+
+func _ruhr_chip_rects(layer: Node, cam: Vector2, vp: Vector2, zoom: float) -> Array:
+	## Air-wing sized plates on Essen / Dortmund / Hamm — the live miss.
+	var out: Array = []
+	for pid in [ESSEN, DORTMUND, HAMM, DUISBURG]:
+		var w: Vector2 = layer.call("world_of", pid)
+		if w == Vector2.ZERO:
+			continue
+		var s := (w - cam) * zoom + vp * 0.5
+		out.append(Rect2(s + Vector2(-44.0, -50.0), Vector2(88.0, 100.0)))
+	return out
 
 
 func _placed_has_pid(placed: Array, pid: int, want_name: String) -> bool:

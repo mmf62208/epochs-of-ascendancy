@@ -120,9 +120,13 @@ func _begin_shot() -> void:
 		return
 	var spec: Dictionary = _shots[_shot]
 	_set_units_visible(bool(spec.get("units", false)))
-	var pos := _world_for(str(spec.get("at", "essen")))
-	_apply_camera(pos, float(spec.get("zoom", 1.0)))
-	_sync_live_after_camera(float(spec.get("zoom", 1.0)))
+	var z := float(spec.get("zoom", 1.0))
+	if str(spec.get("name", "")).begins_with("live_ruhr"):
+		_apply_live_wheel(z)
+	else:
+		var pos := _world_for(str(spec.get("at", "essen")))
+		_apply_camera(pos, z)
+		_sync_live_after_camera(z)
 	_settle_left = SETTLE_FRAMES
 	_phase = 2
 	_log("EOA_ATLAS1_PIXEL_GUARD who=guard.frame shot=%s zoom=%.2f" % [str(spec.get("name", "")), _cam_zoom])
@@ -421,6 +425,34 @@ func _sync_live_after_camera(zoom: float) -> void:
 		if root != null and root.get_viewport() != null:
 			vp = root.get_viewport().get_visible_rect().size
 		layer.call("sync_view", z, cam.global_position, vp, true)
+
+
+func _apply_live_wheel(target_zoom: float) -> void:
+	# Playtester: Home ~0.787 then wheel. Do not lock_pixel_guard onto Essen.
+	if root != null:
+		root.set_meta("eoa_rx1_pixel_lock_camera", false)
+	var mr := _map_renderer()
+	if mr != null:
+		mr.set("_close_camera_locked", false)
+		mr.set("_hold_camera_until_msec", 0)
+	var cam := _camera()
+	if cam == null:
+		return
+	var home := _home_pos if _home_pos != Vector2.ZERO else HOME_CAM
+	cam.position_smoothing_enabled = false
+	cam.zoom = Vector2(0.787, 0.787)
+	cam.global_position = home
+	cam.reset_smoothing()
+	cam.enabled = true
+	cam.make_current()
+	var essen := _world_for("essen")
+	if mr != null and mr.has_method("player_path_wheel_toward_world") and essen != Vector2.ZERO:
+		mr.call("player_path_wheel_toward_world", essen, target_zoom)
+	else:
+		cam.zoom = Vector2(target_zoom, target_zoom)
+	_cam_pos = cam.global_position
+	_cam_zoom = maxf(absf(cam.zoom.x), absf(cam.zoom.y))
+	_sync_live_after_camera(_cam_zoom)
 
 
 func _apply_camera(pos: Vector2, zoom: float) -> void:

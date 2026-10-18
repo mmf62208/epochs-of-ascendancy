@@ -13,12 +13,16 @@ extends Node2D
 const _LOD := preload("res://scripts/map/MapZoomLOD.gd")
 const _Canvas := preload("res://scripts/map/MapCanvasConfig.gd")
 
-const CITY_Z := 19
+## Above DemoUnitIcon (z 28) so a chip cannot hide Essen; dots sit just under text.
+const CITY_Z := 30
+const DOT_Z := 29
 const MAX_ON_SCREEN := 60
 const MID_TIER2_SCORE_FLOOR := 400.0
 const LABEL_SHIFT_PX := 22.0
+const CLOSE_SHIFT_PX := 36.0
 const COUNTER_SHIFT_PX := 120.0
-const COUNTER_MAX_SCREEN := Vector2(88.0, 100.0)
+const COUNTER_MAX_SCREEN := Vector2(128.0, 160.0)
+const OUTLINE_PAD_PX := 4.0
 const ZOOM_REBUILD := 0.03
 const PAN_REBUILD_FRAC := 0.15
 const DEDUPE_WORLD := 36.0
@@ -99,7 +103,7 @@ func _ready() -> void:
 	dots.name = "CityLabelDots"
 	dots.host = self
 	dots.z_as_relative = false
-	dots.z_index = 46
+	dots.z_index = DOT_Z
 	dots.process_mode = Node.PROCESS_MODE_ALWAYS
 	add_child(dots)
 	_dots = dots
@@ -177,6 +181,10 @@ func world_of(pid: int) -> Vector2:
 	return (_by_pid[pid] as Dictionary).get("world", Vector2.ZERO) as Vector2
 
 
+func screen_of(pid: int) -> Vector2:
+	return _world_to_label_screen(world_of(pid))
+
+
 func display_name_of(pid: int) -> String:
 	ensure_candidates()
 	if not _by_pid.has(pid):
@@ -226,16 +234,23 @@ func screen_count() -> int:
 
 
 func has_visual_overlap() -> bool:
-	var rects: Array = []
+	var items: Array = []
 	for p in _placed:
 		if float(p.get("alpha", 0.0)) < 0.04:
 			continue
-		rects.append(p.get("screen_rect", Rect2()))
-	for i in rects.size():
-		for j in range(i + 1, rects.size()):
-			var a: Rect2 = rects[i]
-			var b: Rect2 = rects[j]
-			if a.intersects(b):
+		items.append(p)
+	for i in items.size():
+		var a: Rect2 = (items[i] as Dictionary).get("screen_rect", Rect2())
+		var a_pad := a.grow(OUTLINE_PAD_PX)
+		for j in range(i + 1, items.size()):
+			var b: Rect2 = (items[j] as Dictionary).get("screen_rect", Rect2())
+			if a_pad.intersects(b.grow(OUTLINE_PAD_PX)):
+				return true
+			var other_dot: Rect2 = (items[j] as Dictionary).get("dot_rect", Rect2())
+			if a.intersects(other_dot):
+				return true
+			var own_dot: Rect2 = (items[i] as Dictionary).get("dot_rect", Rect2())
+			if own_dot.intersects(b):
 				return true
 	return false
 
@@ -327,6 +342,9 @@ func sync_view(zoom: float, camera_world: Vector2, viewport: Vector2, force: boo
 
 
 func place_competing(cands: Array, zoom: float, cam: Vector2, vp: Vector2, nation_rects: Array, max_shift: float, obstacles: Array = []) -> Array:
+	_cam = cam
+	_zoom = zoom
+	_vp = vp
 	var list: Array = cands.duplicate(true)
 	for c in list:
 		var world: Vector2 = c.get("world", Vector2.ZERO)
@@ -341,11 +359,17 @@ func place_competing(cands: Array, zoom: float, cam: Vector2, vp: Vector2, natio
 		blockers.append(n)
 	for o in obstacles:
 		blockers.append(o)
+	var close := zoom > _LOD.CITY_LABEL_MID_MAX
+	var shift_px := max_shift
+	if close and max_shift >= LABEL_SHIFT_PX:
+		shift_px = CLOSE_SHIFT_PX
 	for c in list:
 		if not _in_band(c, zoom):
 			continue
 		var is_cap := bool(c.get("capital", false))
 		var must_keep := bool(c.get("must_keep", false))
+		var pid := int(c.get("pid", 0))
+		var ruhr_keep := float(_RUHR_CORE.get(pid, 0.0)) > 0.05
 		var enter := float(c.get("enter", 0.0))
 		var alpha := _LOD.city_label_fade_alpha(zoom, enter)
 		if alpha < 0.04 and not must_keep:
@@ -353,7 +377,7 @@ func place_competing(cands: Array, zoom: float, cam: Vector2, vp: Vector2, natio
 		if must_keep and alpha < 0.04:
 			alpha = 1.0
 		var world: Vector2 = c.get("world", Vector2.ZERO)
-		var anchor_s := (world - cam) * zoom + vp * 0.5
+		var anchor_s := _world_to_label_screen(world)
 		if anchor_s.x < -120.0 or anchor_s.y < -80.0 or anchor_s.x > vp.x + 120.0 or anchor_s.y > vp.y + 80.0:
 			continue
 		var tier := int(c.get("tier", 1))
@@ -364,17 +388,23 @@ func place_competing(cands: Array, zoom: float, cam: Vector2, vp: Vector2, natio
 		var base := Vector2(8.0, -2.0)
 		if is_cap:
 			base = Vector2(14.0, -2.0)
-		# Capitals ignore nation/counter obstacles. They still prefer a slot
-		# that misses other city labels; if none exists they take the base offset.
+		# Capitals and Ruhr cores stay by their dots (chips draw under labels).
+		# Everyone still misses already-placed city labels and those cities' dots.
 		var city_only: Array = []
 		var accepted := false
 		var chosen := Rect2()
 		var chosen_off := base
-		var try_blockers: Array = city_only if (must_keep or is_cap) else blockers
+		var ignore_chips := must_keep or is_cap or ruhr_keep
+		var try_blockers: Array = []
+		if ignore_chips:
+			for n in nation_rects:
+				try_blockers.append(n)
+		else:
+			try_blockers = blockers
 		var dot_rect := Rect2(anchor_s - Vector2(DOT_BLOCK_PX, DOT_BLOCK_PX), Vector2(DOT_BLOCK_PX * 2.0, DOT_BLOCK_PX * 2.0))
 		if not must_keep and not is_cap and not bool(c.get("hub", false)) and _dot_hits_placed(dot_rect, placed):
 			continue
-		for off_v in _slot_offsets(base, max_shift):
+		for off_v in _slot_offsets(base, shift_px):
 			var off: Vector2 = off_v as Vector2
 			var baseline_s: Vector2 = anchor_s + off
 			var rect := Rect2(baseline_s + Vector2(0.0, -ascent), size)
@@ -383,10 +413,10 @@ func place_competing(cands: Array, zoom: float, cam: Vector2, vp: Vector2, natio
 				chosen_off = off
 				accepted = true
 				break
-		if not accepted and not (must_keep or is_cap) and not obstacles.is_empty():
+		if not accepted and not ignore_chips and not obstacles.is_empty() and not close:
 			for off_v2 in _slot_offsets(base, COUNTER_SHIFT_PX):
 				var off2: Vector2 = off_v2 as Vector2
-				if off2.length() <= max_shift + 0.01:
+				if off2.length() <= shift_px + 0.01:
 					continue
 				var rect2 := Rect2(anchor_s + off2 + Vector2(0.0, -ascent), size)
 				if not _rects_clear(rect2, placed, city_only, vp):
@@ -401,7 +431,8 @@ func place_competing(cands: Array, zoom: float, cam: Vector2, vp: Vector2, natio
 			chosen = Rect2(cap_base + Vector2(0.0, -ascent), size)
 			chosen_off = base
 			accepted = true
-		if not accepted and bool(c.get("hub", false)):
+		# Close zoom: cull rather than last-resort 120px, which stacked Ruhr names.
+		if not accepted and bool(c.get("hub", false)) and not close:
 			var city_and_nations: Array = []
 			for n in nation_rects:
 				city_and_nations.append(n)
@@ -424,11 +455,12 @@ func place_competing(cands: Array, zoom: float, cam: Vector2, vp: Vector2, natio
 			break
 		placed.append({
 			"name": text,
-			"pid": int(c.get("pid", 0)),
+			"pid": pid,
 			"screen_rect": chosen,
 			"screen_offset": chosen_off,
 			"capital": is_cap,
 			"must_keep": must_keep,
+			"ruhr_keep": ruhr_keep,
 			"tier": tier,
 			"alpha": alpha,
 			"score": float(c.get("score", 0.0)),
@@ -438,9 +470,13 @@ func place_competing(cands: Array, zoom: float, cam: Vector2, vp: Vector2, natio
 			"ascent": ascent,
 			"dot_rect": dot_rect,
 		})
-		if not must_keep and not is_cap:
-			blockers.append(dot_rect)
-	return _nudge_keep_off_counters(placed, obstacles, vp)
+		blockers.append(dot_rect)
+	placed = _nudge_keep_off_counters(placed, obstacles, vp)
+	return _nudge_labels_off_foreign_dots(placed, vp)
+
+
+func _is_keep_item(item: Dictionary) -> bool:
+	return bool(item.get("must_keep", false)) or bool(item.get("capital", false)) or bool(item.get("ruhr_keep", false))
 
 
 func _nudge_keep_off_counters(placed: Array, obstacles: Array, vp: Vector2) -> Array:
@@ -448,7 +484,7 @@ func _nudge_keep_off_counters(placed: Array, obstacles: Array, vp: Vector2) -> A
 		return placed
 	for i in placed.size():
 		var item: Dictionary = placed[i]
-		if not bool(item.get("must_keep", false)) and not bool(item.get("capital", false)):
+		if not _is_keep_item(item):
 			continue
 		var rect: Rect2 = item.get("screen_rect", Rect2())
 		var hits := false
@@ -459,21 +495,75 @@ func _nudge_keep_off_counters(placed: Array, obstacles: Array, vp: Vector2) -> A
 		if not hits:
 			continue
 		var world: Vector2 = item.get("world", Vector2.ZERO)
-		var cam := _cam
-		var zoom := _zoom
-		var anchor_s := (world - cam) * zoom + vp * 0.5
+		var anchor_s := _world_to_label_screen(world)
 		var size := rect.size
 		var ascent := float(item.get("ascent", size.y * 0.78))
-		var base: Vector2 = item.get("screen_offset", Vector2(8.0, -2.0))
-		var others: Array = []
+		var keep_others: Array = []
 		for j in placed.size():
 			if j == i:
 				continue
-			others.append(placed[j])
+			if _is_keep_item(placed[j]):
+				keep_others.append(placed[j])
 		for off_v in _slot_offsets(Vector2(8.0, -2.0), COUNTER_SHIFT_PX):
 			var off: Vector2 = off_v as Vector2
 			var cand := Rect2(anchor_s + off + Vector2(0.0, -ascent), size)
-			if not _rects_clear(cand, others, obstacles, vp):
+			if not _rects_clear(cand, keep_others, obstacles, vp):
+				continue
+			item["screen_rect"] = cand
+			item["screen_offset"] = off
+			placed[i] = item
+			break
+	var kept_list: Array = []
+	for i2 in placed.size():
+		var rec: Dictionary = placed[i2]
+		if _is_keep_item(rec):
+			kept_list.append(rec)
+			continue
+		var orect: Rect2 = rec.get("screen_rect", Rect2())
+		var clash := false
+		for k in placed.size():
+			if not _is_keep_item(placed[k]):
+				continue
+			var krect: Rect2 = (placed[k] as Dictionary).get("screen_rect", Rect2())
+			if orect.grow(OUTLINE_PAD_PX).intersects(krect.grow(OUTLINE_PAD_PX)):
+				clash = true
+				break
+		if not clash:
+			kept_list.append(rec)
+	return kept_list
+
+
+func _nudge_labels_off_foreign_dots(placed: Array, vp: Vector2) -> Array:
+	if placed.size() < 2:
+		return placed
+	for i in placed.size():
+		var item: Dictionary = placed[i]
+		var rect: Rect2 = item.get("screen_rect", Rect2())
+		var hits := false
+		for j in placed.size():
+			if i == j:
+				continue
+			var other_dot: Rect2 = (placed[j] as Dictionary).get("dot_rect", Rect2())
+			if rect.intersects(other_dot):
+				hits = true
+				break
+		if not hits:
+			continue
+		var world: Vector2 = item.get("world", Vector2.ZERO)
+		var anchor_s := _world_to_label_screen(world)
+		var size := rect.size
+		var ascent := float(item.get("ascent", size.y * 0.78))
+		var others: Array = []
+		var extra: Array = []
+		for j2 in placed.size():
+			if j2 == i:
+				continue
+			others.append(placed[j2])
+			extra.append((placed[j2] as Dictionary).get("dot_rect", Rect2()))
+		for off_v in _slot_offsets(Vector2(8.0, -2.0), LABEL_SHIFT_PX):
+			var off: Vector2 = off_v as Vector2
+			var cand := Rect2(anchor_s + off + Vector2(0.0, -ascent), size)
+			if not _rects_clear(cand, others, extra, vp):
 				continue
 			item["screen_rect"] = cand
 			item["screen_offset"] = off
@@ -749,19 +839,34 @@ func _signature_of_rects(rects: Array) -> int:
 
 
 func _world_to_label_screen(world: Vector2) -> Vector2:
+	# Isolated set_view injects cam/zoom with no Camera2D. Live Play uses the
+	# canvas transform so chip AABBs match what the player sees.
+	if not _use_counter_override and not _use_nation_override and is_inside_tree():
+		var viewport := get_viewport()
+		if viewport != null and viewport.get_camera_2d() != null:
+			return get_global_transform_with_canvas() * world
 	return (world - _cam) * _zoom + _vp * 0.5
 
 
 func _counter_label_screen_rect(icon: Node2D) -> Rect2:
 	if icon == null or not is_instance_valid(icon):
 		return Rect2()
-	var origin_w := icon.global_position
 	var local := _icon_local_aabb(icon)
-	var sc := maxf(absf(icon.scale.x), absf(icon.scale.y))
-	if sc < 0.05:
-		sc = 1.0
-	var p0 := _world_to_label_screen(origin_w + local.position * sc)
-	var p1 := _world_to_label_screen(origin_w + local.end * sc)
+	if local.size.x <= 0.5 or local.size.y <= 0.5:
+		local = Rect2(-COUNTER_HALF, COUNTER_HALF * 2.0)
+	var xf := icon.get_global_transform_with_canvas()
+	var corners: Array[Vector2] = [
+		local.position,
+		local.position + Vector2(local.size.x, 0.0),
+		local.end,
+		local.position + Vector2(0.0, local.size.y),
+	]
+	var p0: Vector2 = xf * corners[0]
+	var p1: Vector2 = p0
+	for c in corners:
+		var p: Vector2 = xf * c
+		p0 = Vector2(minf(p0.x, p.x), minf(p0.y, p.y))
+		p1 = Vector2(maxf(p1.x, p.x), maxf(p1.y, p.y))
 	var rect := Rect2(p0, p1 - p0).abs().grow(2.0)
 	if rect.size.x > COUNTER_MAX_SCREEN.x or rect.size.y > COUNTER_MAX_SCREEN.y:
 		var mid := rect.get_center()
@@ -905,9 +1010,13 @@ func _rects_clear(rect: Rect2, placed: Array, blockers: Array, vp: Vector2) -> b
 	var view := Rect2(Vector2.ZERO, vp).grow(8.0)
 	if not rect.intersects(view):
 		return false
+	var pad := OUTLINE_PAD_PX
 	for p in placed:
 		var other: Rect2 = p.get("screen_rect", Rect2())
-		if rect.intersects(other.grow(2.0)):
+		if rect.grow(pad).intersects(other.grow(pad)):
+			return false
+		var other_dot: Rect2 = p.get("dot_rect", Rect2())
+		if other_dot.size.x > 0.5 and rect.intersects(other_dot):
 			return false
 	for n in blockers:
 		if n is Rect2 and rect.intersects((n as Rect2).grow(2.0)):
@@ -1350,8 +1459,8 @@ func _queue_paint() -> void:
 		_dots.queue_redraw()
 
 
-## Anchor dots sit above capital stars (z 40) and roads (z 21) so the
-## cream mark stays on the city when those glyphs cover z 19.
+## Anchor dots sit under the name (DOT_Z 29 / CITY_Z 30) and above chips (28)
+## so a neighbour's mark cannot cover Essen. Capital stars stay at z 40.
 class _DotMarks extends Node2D:
 	var host: Node = null
 
