@@ -228,6 +228,9 @@ else
   run_step launch_mv1_march_preview \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessMv1MarchPreviewTest.gd || fail
 
+  run_step launch_oridiom1b_march_cost \
+    tools/run_godot.sh --headless -s res://scripts/core/HeadlessOrIdiom1bMarchCostTest.gd || fail
+
   run_step launch_rh1_resource_glyphs \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessRh1ResourceGlyphMapModeTest.gd || fail
 
