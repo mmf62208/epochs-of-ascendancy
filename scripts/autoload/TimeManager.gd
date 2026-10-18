@@ -1830,8 +1830,13 @@ func _get_days_in_month(month: int, year: int) -> int:
 ## === Save/Load support (SaveLoadManager contract) ===
 ## Returns a compact snapshot of mutable runtime calendar state.
 func get_save_data() -> Dictionary:
+	# Hour lives only in current_hour. current_date.hour would restore it
+	# even if that key were dropped, so the round-trip could not see the loss.
+	var date := get_current_date()
+	date.erase("hour")
+	date.erase("date_string")
 	return {
-		"current_date": get_current_date(),
+		"current_date": date,
 		"scenario_start_date": scenario_start_date,
 		"paused": paused,
 		"time_scale": time_scale,

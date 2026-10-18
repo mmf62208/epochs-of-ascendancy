@@ -107,6 +107,8 @@ func _mode_inproc() -> void:
 	if not bool(adv.get("ok", false)):
 		_fail("inproc 3-day detour failed %s" % str(adv))
 		return
+	# A fresh process boots with run_seed 0. Drop it so this load has to restore it.
+	_tm.run_seed = 0
 	var loaded: Dictionary = _sl.load_game_detailed("sr1test_b_mid")
 	if not bool(loaded.get("ok", false)):
 		_fail("inproc load failed: %s" % str(loaded.get("error", "")))

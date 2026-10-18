@@ -121,6 +121,9 @@ func _roundtrip(slot: String, label: String) -> String:
 	if not bool(loaded.get("ok", false)):
 		_fail("%s load failed: %s" % [label, str(loaded.get("error", ""))])
 		return ""
+	if int(_tm.current_hour) != 7:
+		_fail("%s current_hour=%s want 7" % [label, str(_tm.current_hour)])
+		return ""
 	var h1 := _hash()
 	var bytes := int(saved.get("bytes", 0))
 	print("PERF %s save_ms=%.1f load_ms=%.1f bytes=%d" % [label, save_ms, load_ms, bytes])
