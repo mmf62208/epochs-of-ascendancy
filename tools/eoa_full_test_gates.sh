@@ -422,6 +422,9 @@ else
   run_step launch_campaign_loop1_war_gate \
     tools/run_godot.sh --headless --path . -s res://scripts/core/HeadlessCampaignLoop1WarGateTest.gd || fail
 
+  run_step launch_campaign_loop1_declare_click \
+    tools/run_godot.sh --headless --path . --resolution 1280x800 -s res://scripts/core/HeadlessCampaignLoop1DeclareClickTest.gd || fail
+
   run_step launch_campaign_loop1_capitulation \
     tools/run_godot.sh --headless --path . -s res://scripts/core/HeadlessCampaignLoop1CapitulationPeaceTest.gd || fail
 

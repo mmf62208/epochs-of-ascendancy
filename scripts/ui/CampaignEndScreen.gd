@@ -12,6 +12,7 @@ var _btn_menu: Button
 var _btn_load: Button
 var _btn_keep: Button
 var _btn_continue: Button
+var _keep_reason: Label
 var _panel: Panel
 
 
@@ -21,6 +22,7 @@ static func present(model: Dictionary) -> Node:
 	var tree := Engine.get_main_loop() as SceneTree
 	if tree == null or tree.root == null:
 		return null
+	_dismiss_overlays(tree)
 	for n in tree.get_nodes_in_group("campaign_end_screen"):
 		if is_instance_valid(n):
 			n.queue_free()
@@ -32,13 +34,26 @@ static func present(model: Dictionary) -> Node:
 	return layer
 
 
+static func _dismiss_overlays(tree: SceneTree) -> void:
+	for n in tree.get_nodes_in_group("campaign_peace_sheet"):
+		if is_instance_valid(n):
+			if n is CanvasLayer:
+				(n as CanvasLayer).visible = false
+			n.queue_free()
+	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("hide_for_campaign_end"):
+		LeaderEventUI.hide_for_campaign_end()
+	var bar := tree.get_first_node_in_group("top_info_bar")
+	if bar != null and bar.has_method("refresh_campaign_war_readout"):
+		bar.call("refresh_campaign_war_readout")
+
+
 func _ready() -> void:
 	layer = 125
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	add_to_group("campaign_end_screen")
 	var blocker := ColorRect.new()
 	blocker.name = "Blocker"
-	blocker.color = Color(0.02, 0.03, 0.06, 0.72)
+	blocker.color = Color(0.02, 0.03, 0.06, 0.92)
 	blocker.set_anchors_preset(Control.PRESET_FULL_RECT)
 	blocker.mouse_filter = Control.MOUSE_FILTER_STOP
 	blocker.gui_input.connect(_on_blocker_input)
@@ -48,6 +63,16 @@ func _ready() -> void:
 	_panel.custom_minimum_size = Vector2(560, 360)
 	_panel.position = Vector2(360, 180)
 	_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	var panel_style := StyleBoxFlat.new()
+	panel_style.bg_color = Color(0.07, 0.08, 0.12, 1.0)
+	panel_style.border_color = Color(0.95, 0.86, 0.55, 1.0)
+	panel_style.set_border_width_all(2)
+	panel_style.set_corner_radius_all(6)
+	panel_style.content_margin_left = 8
+	panel_style.content_margin_right = 8
+	panel_style.content_margin_top = 8
+	panel_style.content_margin_bottom = 8
+	_panel.add_theme_stylebox_override("panel", panel_style)
 	add_child(_panel)
 	var box := VBoxContainer.new()
 	box.position = Vector2(24, 20)
@@ -86,12 +111,22 @@ func _ready() -> void:
 	row.add_child(_btn_load)
 	_btn_keep = _button("Keep playing", _on_keep)
 	_btn_keep.name = "BtnKeepPlaying"
-	_btn_keep.visible = bool(_model.get("allow_keep_playing", false))
+	var allow_keep := bool(_model.get("allow_keep_playing", false))
+	_btn_keep.visible = allow_keep
+	_btn_keep.disabled = not allow_keep
 	row.add_child(_btn_keep)
 	_btn_continue = _button("Continue as another nation", _on_continue)
 	_btn_continue.name = "BtnContinue"
 	_btn_continue.visible = bool(_model.get("allow_continuation", false))
 	row.add_child(_btn_continue)
+	_keep_reason = Label.new()
+	_keep_reason.name = "KeepPlayingReason"
+	var keep_reason := str(_model.get("keep_playing_reason", ""))
+	_keep_reason.text = keep_reason
+	_keep_reason.visible = not allow_keep and not keep_reason.is_empty()
+	_keep_reason.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_keep_reason.custom_minimum_size = Vector2(500, 24)
+	box.add_child(_keep_reason)
 
 
 func _button(text: String, cb: Callable) -> Button:
@@ -104,12 +139,16 @@ func _button(text: String, cb: Callable) -> Button:
 
 func _stats_line() -> String:
 	var stats: Dictionary = _model.get("stats", {}) if _model.get("stats") is Dictionary else {}
-	return "Days %d. Provinces %d → %d. Wars %d. Nations capitulated %d. Factory share %.1f%%." % [
+	var cap_n := int(stats.get("capitulated_by_side", 0))
+	var cap_phrase := "%d nations capitulated" % cap_n
+	if typeof(CampaignEndDomain) != TYPE_NIL:
+		cap_phrase = CampaignEndDomain.nation_capitulated_phrase(cap_n)
+	return "Days %d. Provinces (controlled) %d → %d. Wars %d. %s. Factory share %.1f%%." % [
 		int(stats.get("days", 0)),
 		int(stats.get("provinces_start", 0)),
 		int(stats.get("provinces_end", 0)),
 		int(stats.get("wars_fought", 0)),
-		int(stats.get("capitulated_by_side", 0)),
+		cap_phrase,
 		float(stats.get("factory_share", 0.0)) * 100.0,
 	]
 
@@ -132,7 +171,7 @@ func handle_pointer(event: InputEvent) -> String:
 	if _hit(_btn_load, pos):
 		_on_load()
 		return "load"
-	if _btn_keep != null and _btn_keep.visible and _hit(_btn_keep, pos):
+	if _btn_keep != null and _btn_keep.visible and not _btn_keep.disabled and _hit(_btn_keep, pos):
 		_on_keep()
 		return "keep"
 	if _btn_continue != null and _btn_continue.visible and _hit(_btn_continue, pos):
@@ -178,8 +217,12 @@ func _on_load() -> void:
 
 
 func _on_keep() -> void:
+	if not bool(_model.get("allow_keep_playing", false)):
+		return
 	if typeof(CampaignEndDomain) != TYPE_NIL:
 		CampaignEndDomain.set_keep_playing()
+	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("restore_after_campaign_end"):
+		LeaderEventUI.restore_after_campaign_end()
 	visible = false
 	queue_free()
 

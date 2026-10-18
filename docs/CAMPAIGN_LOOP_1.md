@@ -298,6 +298,18 @@ Killswitch `day_ai` 10.5 ms is above the 9.68 ms bar. The steps are `ai_land` 4.
 
 Q1, Q2, and Q6 are implemented as Mike answered them. Q7: if the seed moves, this doc states the new hash, the reason, and the diff summary for Ship to take to Optimus Prime. Q3, Q4, Q5, Q8, Q9, Q10 are closed as in the decisions above.
 
+## FIX #1 (player Declare, inspector target, end-screen polish)
+
+Box rules were already right: 2 majors, minors don't count; default start is peace; early wars only behind `EOA_SCENARIO_EARLY_WARS=1`; player 14 days, AI not before day 180 and 30 days to declare.
+
+Bugs that were not:
+
+1. **Player war auto-declared.** `WarStateDomain.try_ai_declare_wars` → `_complete_ready_justifies` completed every ready pair, including the player's. On day 14 GER was at war with Poland with no Declare click, so the inspector never showed the button. Fix: skip the player tag and any `SessionPlayers` human slot. Ready player claims stay pending until Declare. Guard `HeadlessCampaignLoop1DeclareClickTest`: justify POL, day 15 not at war, Declare enabled, leftover-release-swallow click via `Input.parse_input_event` (same class as `HeadlessProd1ButtonOpenTest`) starts the war.
+2. **Inspector Declare on every neighbour.** `player_justify_is_ready()` is global, so a ready POL claim relabelled FRA/CZE/… as Declare, and those clicks failed. Declare is only for `player_justify_is_ready_for(owner)`. Others show `Justify (N days)` disabled. Same headless test mounts POL + FRA inspectors.
+3. **End-screen polish** (checked in `WindowedCampaignLoop1EndScreenGuard`): opaque `EndPanel`; hide capitulation toast layer + peace sheet; `1 nation capitulated` / `N nations`; refresh `CampaignWarReadout` so a paused end frame is not still `At war:` with the nation that just made peace; province line is **controlled** (captures + annex, not only legal owner); Defeat with 0 provinces hides Keep playing and shows why.
+
+**HOLD, do not change:** Declare still also issues an attack order through the old war-goal path. `CampaignWarChrome._on_pressed` calls `WarStateDomain.player_declare_from_province` then `GameData.apply_war_goal_live("execute", pid)`, which is `apply_order_panel_action("apply_assault", pid)` plus `_campaign_note_war_goal`. Waiting on a decision.
+
 ## Full gates on the rebased tip
 
 Rebased onto `origin/main` `05602912`. Tip `56b31db5`. `tools/eoa_full_test_gates.sh` exited 1. Log `~/campaign1_evidence/cl1c_full_gates_stdout.log`. Wall about 25 minutes. The four campaign steps passed, including the soak and the gamescope end-screen guard. No `SCRIPT ERROR` in those logs.

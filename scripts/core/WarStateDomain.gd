@@ -416,7 +416,12 @@ static func player_declare_from_province(province_id: int) -> Dictionary:
 		return {"ok": true, "already": true}
 	if not _justify_ready(attacker, defender, _day()):
 		return {"ok": false, "reason": "justifying", "defender": defender}
-	return declare_war(attacker, defender, "player")
+	var res: Dictionary = declare_war(attacker, defender, "player")
+	if bool(res.get("ok", false)):
+		var just := _justifies()
+		just.erase("%s>%s" % [attacker, defender])
+		_state()["justifies"] = just
+	return res
 
 
 static func player_justify_is_ready() -> bool:
@@ -439,6 +444,18 @@ static func player_justify_is_ready() -> bool:
 			if not defender.is_empty() and not is_at_war(attacker, defender):
 				return true
 	return false
+
+
+static func player_justify_is_ready_for(defender: String) -> bool:
+	if not loop_enabled():
+		return false
+	var d := _tag(defender)
+	if d.is_empty():
+		return false
+	var attacker := _player()
+	if is_at_war(attacker, d):
+		return false
+	return _justify_ready(attacker, d, _day())
 
 
 static func player_has_justify(defender: String) -> bool:
@@ -666,6 +683,22 @@ static func _any_justify() -> bool:
 	return not _justifies().is_empty()
 
 
+static func _is_player_or_human_nation(tag: String) -> bool:
+	var t := _tag(tag)
+	if t.is_empty():
+		return false
+	if t == _player():
+		return true
+	if typeof(SessionPlayers) == TYPE_NIL:
+		return false
+	if not SessionPlayers.has_method("get_human_tags"):
+		return false
+	for h in SessionPlayers.get_human_tags():
+		if _tag(str(h)) == t:
+			return true
+	return false
+
+
 static func _complete_ready_justifies(day: int) -> Array:
 	var events: Array = []
 	var just := _justifies()
@@ -681,9 +714,15 @@ static func _complete_ready_justifies(day: int) -> Array:
 			continue
 		var attacker := _tag(str(row.get("attacker", "")))
 		var defender := _tag(str(row.get("defender", "")))
-		done.append(str(k))
 		if attacker.is_empty() or defender.is_empty():
+			done.append(str(k))
 			continue
+		# Player / human slots stay at "ready" until they click Declare.
+		if _is_player_or_human_nation(attacker):
+			if is_at_war(attacker, defender) or in_truce(attacker, defender):
+				done.append(str(k))
+			continue
+		done.append(str(k))
 		if is_at_war(attacker, defender) or in_truce(attacker, defender):
 			continue
 		var res: Dictionary = declare_war(attacker, defender, str(row.get("kind", "ai")))

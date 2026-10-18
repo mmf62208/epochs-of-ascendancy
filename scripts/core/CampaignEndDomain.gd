@@ -138,8 +138,14 @@ static func _victory_model(player: String, day_index: int) -> Dictionary:
 		return {}
 	if beaten.is_empty():
 		return {}
-	var reason := "Decisive victory. %d nations capitulated." % scored
+	var reason := "Decisive victory. %s." % nation_capitulated_phrase(scored)
 	return _pack("victory", "decisive", player, day_index, "Victory", reason, reason)
+
+
+static func nation_capitulated_phrase(count: int) -> String:
+	if count == 1:
+		return "1 nation capitulated"
+	return "%d nations capitulated" % count
 
 
 static func _at_war_with_uncapitulated_major(player: String) -> bool:
@@ -272,6 +278,11 @@ static func _factory_totals() -> Dictionary:
 
 static func _pack(outcome: String, kind: String, player: String, day_index: int, title: String, reason: String, summary: String) -> Dictionary:
 	var stats := _stats(player)
+	var keep := bool(WarStateDomain.rules().get("allow_keep_playing", true))
+	var keep_reason := ""
+	if outcome == "defeat" and int(stats.get("provinces_end", 0)) <= 0:
+		keep = false
+		keep_reason = "Keep playing is unavailable: no remaining provinces."
 	return {
 		"outcome": outcome,
 		"kind": kind,
@@ -283,7 +294,8 @@ static func _pack(outcome: String, kind: String, player: String, day_index: int,
 		"reason": reason,
 		"stats": stats,
 		"allow_continuation": bool(WarStateDomain.rules().get("allow_continuation", false)) and outcome == "defeat" and kind == "defeat",
-		"allow_keep_playing": bool(WarStateDomain.rules().get("allow_keep_playing", true)),
+		"allow_keep_playing": keep,
+		"keep_playing_reason": keep_reason,
 	}
 
 
@@ -298,8 +310,11 @@ static func _stats(player: String) -> Dictionary:
 				var row: Variant = (owned as Dictionary).get(player, [])
 				if row is Array:
 					start_n = row.size()
-	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_provinces_by_owner"):
-		end_n = MapManager.get_provinces_by_owner(player).size()
+	if typeof(MapManager) != TYPE_NIL:
+		if MapManager.has_method("get_provinces_by_controller"):
+			end_n = MapManager.get_provinces_by_controller(player).size()
+		elif MapManager.has_method("get_provinces_by_owner"):
+			end_n = MapManager.get_provinces_by_owner(player).size()
 	var wars := 0
 	if typeof(GameData) != TYPE_NIL:
 		var ws: Variant = GameData.peace_state.get("campaign_wars", {})

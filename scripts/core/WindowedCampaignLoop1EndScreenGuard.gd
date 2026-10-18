@@ -258,9 +258,59 @@ func _latch_shot(mm: Node, sm: Node, kind: String, player: String) -> void:
 	if str(date_l.text).is_empty():
 		_fail("%s date empty" % kind)
 		return
-	if keep == null or not keep.visible or cont == null or cont.visible:
-		_fail("%s keep/continue visibility" % kind)
+	if cont == null or cont.visible:
+		_fail("%s Continue should stay hidden" % kind)
 		return
+	var stats_l := screen.find_child("Stats", true, false) as Label
+	if stats_l == null or str(stats_l.text).find("controlled") < 0:
+		_fail("%s stats missing controlled provinces %s" % [kind, str(stats_l.text) if stats_l != null else "null"])
+		return
+	var panel := screen.find_child("EndPanel", true, false) as Panel
+	if panel == null:
+		_fail("%s EndPanel missing" % kind)
+		return
+	var st: StyleBox = panel.get_theme_stylebox("panel")
+	if not (st is StyleBoxFlat) or float((st as StyleBoxFlat).bg_color.a) < 0.99:
+		_fail("%s EndPanel not opaque" % kind)
+		return
+	var sheet := root.find_child("CampaignPeaceSheet", true, false)
+	if sheet != null and is_instance_valid(sheet) and bool(sheet.visible):
+		_fail("%s peace sheet still visible behind end screen" % kind)
+		return
+	var toast_ui := root.get_node_or_null("LeaderEventUI")
+	if toast_ui != null:
+		var toast_layer := toast_ui.get_node_or_null("LeaderNewsLayer") as CanvasLayer
+		if toast_layer != null and toast_layer.visible:
+			_fail("%s capitulation toast layer still visible" % kind)
+			return
+	var bar: Node = get_first_node_in_group("top_info_bar")
+	if bar != null:
+		var hud := bar.find_child("CampaignWarReadout", true, false) as Label
+		if hud != null and str(hud.text).find("At war:") >= 0:
+			_fail("%s At war readout stale text=%s" % [kind, hud.text])
+			return
+	if kind == "defeat":
+		if keep == null or keep.visible:
+			_fail("%s Keep playing should be hidden at 0 provinces" % kind)
+			return
+		var keep_reason := screen.find_child("KeepPlayingReason", true, false) as Label
+		if keep_reason == null or not keep_reason.visible or str(keep_reason.text).find("no remaining provinces") < 0:
+			_fail("%s Keep playing reason missing" % kind)
+			return
+		if str(stats_l.text).find("→ 0") < 0 and str(stats_l.text).find("→0") < 0:
+			_fail("%s defeat provinces_end not 0 got %s" % [kind, stats_l.text])
+			return
+	else:
+		if keep == null or not keep.visible:
+			_fail("%s Keep playing should stay visible" % kind)
+			return
+	if kind == "victory":
+		if str(reason.text).find("1 nation capitulated") < 0:
+			_fail("%s pluralization want 1 nation capitulated got %s" % [kind, reason.text])
+			return
+		if str(reason.text).find("1 nations") >= 0:
+			_fail("%s leftover 1 nations %s" % [kind, reason.text])
+			return
 	_pass("%s screen %s" % [kind, title.text])
 	_shot("end_%s" % kind)
 

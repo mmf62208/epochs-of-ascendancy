@@ -1,5 +1,17 @@
 # scripts/ui/CampaignWarChrome.gd
 ## Inspector "Declare war" button. Mounted from MapRenderer with one call.
+##
+## Declare is only for the nation whose justification is ready. Other
+## neighbours stay on Justify (N days) or a disabled state — a ready POL
+## claim must not relabel every border inspector as Declare.
+##
+## Press-on-down matches Prod-1: leftover MapRenderer left-up swallow must
+## not eat ACTION_MODE_BUTTON_RELEASE.
+##
+## HOLD: Declare still also issues an attack order through the old war-goal
+## path. CampaignWarChrome._on_pressed → GameData.apply_war_goal_live("execute",
+## pid) → apply_order_panel_action("apply_assault", pid). Waiting on a
+## decision; do not change that here.
 class_name CampaignWarChrome
 extends RefCounted
 
@@ -12,6 +24,7 @@ static func mount(host: Node, province: Province) -> void:
 		btn = Button.new()
 		btn.name = "BtnDeclareWar"
 		btn.focus_mode = Control.FOCUS_NONE
+		btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
 		btn.set_anchors_preset(Control.PRESET_TOP_LEFT)
 		btn.offset_left = 8.0
 		btn.offset_top = 96.0
@@ -19,6 +32,7 @@ static func mount(host: Node, province: Province) -> void:
 		btn.offset_bottom = 120.0
 		btn.pressed.connect(_on_pressed.bind(host))
 		host.add_child(btn)
+	btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
 	if province == null or bool(province.is_sea):
 		btn.visible = false
 		return
@@ -41,18 +55,22 @@ static func mount(host: Node, province: Province) -> void:
 		btn.text = "Truce with %s" % WarStateDomain.tag_name(owner)
 		btn.set_meta("declare_pid", int(province.id))
 		return
-	btn.disabled = false
+	btn.visible = true
 	btn.set_meta("declare_pid", int(province.id))
 	var left := WarStateDomain.player_justify_days_left(owner)
-	var ready := WarStateDomain.player_justify_is_ready()
 	var name := WarStateDomain.tag_name(owner)
-	if ready:
+	if WarStateDomain.player_justify_is_ready_for(owner):
+		btn.disabled = false
 		btn.text = "Declare war on %s" % name
 	elif WarStateDomain.player_has_justify(owner):
-		btn.text = "Justifying war on %s (%d)" % [name, left]
+		btn.disabled = true
+		btn.text = "Justify (%d days)" % left
+	elif WarStateDomain.player_justify_is_ready():
+		btn.disabled = true
+		btn.text = "Justify (%d days)" % left
 	else:
+		btn.disabled = false
 		btn.text = "Justify war on %s" % name
-	btn.visible = true
 
 
 static func _on_pressed(host: Node) -> void:
@@ -62,7 +80,11 @@ static func _on_pressed(host: Node) -> void:
 	var pid := int(btn.get_meta("declare_pid", -1))
 	if pid <= 0 or typeof(WarStateDomain) == TYPE_NIL:
 		return
-	if WarStateDomain.player_justify_is_ready():
+	var p: Province = MapManager.get_province(pid) if typeof(MapManager) != TYPE_NIL else null
+	var owner := ""
+	if p != null:
+		owner = str(p.owner_tag).strip_edges().to_upper()
+	if WarStateDomain.player_justify_is_ready_for(owner):
 		var declared: Dictionary = WarStateDomain.player_declare_from_province(pid)
 		if typeof(GameData) != TYPE_NIL and GameData.has_method("apply_war_goal_live"):
 			GameData.apply_war_goal_live("execute", pid)
@@ -72,7 +94,6 @@ static func _on_pressed(host: Node) -> void:
 		if typeof(GameData) != TYPE_NIL and GameData.has_method("apply_war_goal_live"):
 			GameData.apply_war_goal_live("justify", pid)
 		_toast("Justification started")
-	var p: Province = MapManager.get_province(pid) if typeof(MapManager) != TYPE_NIL else null
 	mount(host, p)
 
 
