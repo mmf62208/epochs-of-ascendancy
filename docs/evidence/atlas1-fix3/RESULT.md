@@ -2,7 +2,7 @@
 
 Branch `grok/atlas1-cities-rivers`. Draft only. Do not merge.
 
-**FIX #3 tip:** `005d10fb`
+**FIX #3 tip:** `8c07e6a1`
 **On top of FIX #2:** `f9cac5f9`
 
 Box gate on `f9cac5f9` was green. The playtester's live run on that tip was MIXED, leaning FAIL: Essen missing at z1.217/1.512, close-zoom overlaps/ghosted doubles, air-wing covering Essen/Hamm. Isolated headless tests had been passing a different view.
