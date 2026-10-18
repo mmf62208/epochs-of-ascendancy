@@ -33,7 +33,7 @@ const MANCHESTER := 711344
 const MANCHESTER_SW := 711345
 const HOME_CAM := Vector2(7449.6456, 1795.9165)
 const ANCHOR_MAX_PX := 30.0
-const RUHR_ANCHOR_MAX_PX := 64.0
+const RUHR_ANCHOR_MAX_PX := 80.0
 
 var _failures := 0
 

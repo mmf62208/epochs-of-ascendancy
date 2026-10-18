@@ -22,8 +22,9 @@ const LABEL_SHIFT_PX := 22.0
 const CLOSE_SHIFT_PX := 22.0
 const ANCHOR_MAX_PX := 30.0
 ## Ruhr cores may walk just past a chip half-width so the name sits beside
-## the plate instead of on it (COUNTER_HALF.x 36 → ~44 px to the near edge).
-const RUHR_ANCHOR_MAX_PX := 64.0
+## the plate instead of on it (COUNTER_HALF.x 36 → ~44 px to the near edge;
+## Dutch L100 / air-wing stacks at mid-zoom need ~80 px).
+const RUHR_ANCHOR_MAX_PX := 80.0
 const COUNTER_INSET_PX := 12.0
 const CLOSE_FONT_MIN_PX := 14
 const COUNTER_MAX_SCREEN := Vector2(128.0, 160.0)
@@ -577,34 +578,47 @@ func place_competing(cands: Array, zoom: float, cam: Vector2, vp: Vector2, natio
 				accepted = true
 				break
 		if not accepted and keep:
+			# Ignore chips only for capitals/must-keep. Ruhr cores sitting
+			# on a plate (flush-left Duisburg into the Dutch stack) is the
+			# live miss — keep searching chip-clear slots a bit further.
 			var keep_blockers: Array = []
 			for n2 in nation_rects:
 				keep_blockers.append(n2)
 			for sd2 in sibling_dots:
 				keep_blockers.append(sd2)
-			for off_v2 in _candidate_slots(base, walk_shift, size, ascent, anchor_s, placed, keep):
-				var off2: Vector2 = off_v2 as Vector2
-				if _anchor_gap_px(off2, size, ascent) > walk_anchor + 0.05:
-					continue
-				var rect2 := Rect2(anchor_s + off2 + Vector2(0.0, -ascent), size)
-				if _rects_clear(rect2, placed, keep_blockers, vp):
-					chosen = rect2
-					chosen_off = off2
-					accepted = true
-					break
+			if is_cap or must_keep:
+				for off_v2 in _candidate_slots(base, walk_shift, size, ascent, anchor_s, placed, keep):
+					var off2: Vector2 = off_v2 as Vector2
+					if _anchor_gap_px(off2, size, ascent) > walk_anchor + 0.05:
+						continue
+					var rect2 := Rect2(anchor_s + off2 + Vector2(0.0, -ascent), size)
+					if _rects_clear(rect2, placed, keep_blockers, vp):
+						chosen = rect2
+						chosen_off = off2
+						accepted = true
+						break
+			if not accepted and ruhr_keep:
+				for off_v3 in _candidate_slots(base, RUHR_ANCHOR_MAX_PX, size, ascent, anchor_s, placed, keep):
+					var off3: Vector2 = off_v3 as Vector2
+					if _anchor_gap_px(off3, size, ascent) > RUHR_ANCHOR_MAX_PX + 0.05:
+						continue
+					var rect3 := Rect2(anchor_s + off3 + Vector2(0.0, -ascent), size)
+					if _rects_clear(rect3, placed, try_blockers, vp):
+						chosen = rect3
+						chosen_off = off3
+						accepted = true
+						break
 		if not accepted and (is_cap or must_keep):
 			var cap_base: Vector2 = anchor_s + base
 			chosen = Rect2(cap_base + Vector2(0.0, -ascent), size)
 			chosen_off = base
 			accepted = true
 		elif not accepted and ruhr_keep:
-			# Chips may cover the mark; a nation label still owns the screen.
-			var nation_only: Array = []
-			for n3 in nation_rects:
-				nation_only.append(n3)
+			# Never last-resort onto a plate. On-mark under the Dutch
+			# L100 / Air Wing stack is the live Duisburg miss at 1.217.
 			var ruhr_base: Vector2 = anchor_s + base
 			var ruhr_rect := Rect2(ruhr_base + Vector2(0.0, -ascent), size)
-			if _rects_clear(ruhr_rect, placed, nation_only, vp):
+			if _rects_clear(ruhr_rect, placed, try_blockers, vp):
 				chosen = ruhr_rect
 				chosen_off = base
 				accepted = true

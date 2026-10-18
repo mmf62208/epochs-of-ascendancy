@@ -14,7 +14,7 @@ const LIVE_ZOOMS: Array[float] = [1.217, 1.512, 2.904]
 const VP := Vector2(1280, 800)
 const ZOOM_SLACK := 0.14
 const PLAY_WHEEL_SCREEN := Vector2(455, 455)
-const ANCHOR_MAX_PX := 64.0
+const ANCHOR_MAX_PX := 80.0
 const RUHR_CORE := ["Essen", "Duisburg", "Düsseldorf", "Dortmund", "Köln"]
 var _wheel_screen := PLAY_WHEEL_SCREEN
 
