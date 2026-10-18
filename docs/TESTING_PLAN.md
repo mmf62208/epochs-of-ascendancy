@@ -465,6 +465,29 @@ Screenshots FIX #6 (xvfb **NOT live Play**): `/opt/cursor/artifacts/fac1a_fix6/0
 | hd_ix1 (6) / hd_rx1 (4) / hd_rt1 (3) | headless | PASS | ~1194–1195 |
 | xvfb_mv1 / xvfb_mv1_card / xvfb_rh1 | xvfb | PASS | **2031.4 / 2033.0 / 2030.1** |
 
+**FIX #8 (Play MIXED `5d42888a`, headless + xvfb, NOT live Play):** L2 cluster hit is the drawn oval (`OVAL_W_FRAC` 0.88 / `OVAL_H_FRAC` 0.58 / `OVAL_TOP_FRAC` 0.26), not the 34 px `CLUSTER_MID_MIN_PX` circle. L4 stays round. For L1–L4 lone icons and clusters, only drawn art (icon body, badge, count disc) owns a click. `HALO_PX` is paint (`halo_px` still ≥2 when zoom ≥ 1). `CHROME_GAP_PX` and `CLEAR_MARGIN_PX` are not hit pads. A zero-gap MV-1 commit goes to the province under `event.position`. `_still_click_province_pid` and `_mv1_re_resolve_commit_pid` return the facility under the point, else the hex pick. A GIS miss does not keep `_march_preview_cache_dest` or the hover province. `_map_pick_world_from_event` already used `InputEventMouse.position`. Seeds, split/merge, pips, units-first order, MV-1/MV-1b preview + slop, P/F9 hide, art, and positions stay. Guard `HeadlessFac1aHitGeometryTest` calls `hit_test_world` and `_still_click_province_pid` at computed edge points (2 px in/out, plus 1 px outside the art and the old circle top). **FAIL** on main `61a80433` (`failures=107`) / **PASS** on the tip (`failures=0`). Wired as `launch_fac1a_hit_geometry` after `launch_fac1a_airfield_icons`.
+
+| mutant | killed by |
+|---|---|
+| L2 hit back to the circle | `L2 oval rejects circle overshoot` (top of the old square). Passed on main's oval and on the tip; a circle body fails it. |
+| Halo counted as a hit | main **FAIL** `halo owns click` and `2px outside art still facility` at z 1.30 / 2.25. Tip **PASS**. |
+| Stale dest kept in `_mv1_re_resolve_commit_pid` | main **FAIL** `re_resolve kept stale dest 710368`, `re_resolve on L2 centre want 710434 got 710368`, `still_click GIS miss kept stale 710368`. Tip **PASS**. |
+| Pick from the mouse instead of `event.position` | event world and mouse world differ by ≥1 px; `_map_pick_world_from_event` matches the event. Passed on main and on the tip. |
+
+Measured on this machine (NOT live Play):
+
+| gate | kind | result |
+|---|---|---|
+| HitGeometry | headless | main `RESULT=FAIL (failures=107)` · tip `RESULT=PASS (failures=0)` |
+| AirfieldIcon, MV-1, MV-1b, FLEET-1 | headless | `RESULT=PASS` |
+| CH-1 / MV-1e | hd + xvfb | `15/15 commit Y=Leverkusen` · rss **1212.0 / 1657.1** |
+| xvfb_fac1a | xvfb | stale=true stale_lag=true clustervar=true sil_fail=0 click_fail=0 noop_fail=0 rx1_mid 0.843/0.843 · wrapper peak **2638.7 MB** |
+| Seeded RX-1 ON / OFF | xvfb | mid_river **0.749 / 0.749** close 0.775 / 0.775 spine 1.000 |
+| `--quick` | py | exactly **14** `unit_board_play_path` reds (se_england fill-toe 1, first_session play surface 1, unit_centric_pick 3, unit_counter_chrome 2, unit_card_fill_toe 3, living_unit_order_loop 4). No new red. |
+| map_qc | py | NE land hit **0.9853** (3148/3195) |
+
+This checkout has no Seed 193601 runner (`/workspace/gfac1a-out/chain.sh` is not on this machine). That triple-run was not executed here.
+
 **FIX #3 (Play MIXED `234e12b8`):** Rhine/spine/border clearance + cluster L4 tag. Split expected ~1.59. Isolated keep-green (`637ca02e`):
 
 | gate | kind | result | peak MB isolated |
@@ -990,7 +1013,7 @@ Isolated keep-green (`eb6544a8`; wrapper `rss_mb` preferred; hd Godot ~1195, sui
 
 ### CH-1 / MV-1e stale hover commit (draft HOLD)
 
-At 4×, a still click on own land **without** a facility icon must commit to the province under `event.position`, not the cached hover/preview dest. `_mv1_preview_dest_matches_world` re-resolves GIS after the FAC-1a facility check; `_mv1_re_resolve_commit_pid` overrides a stale cache dest when GIS hits Y. Hover/preview update logic unchanged. FAC-1a icon override + miss-of-icon cache dest (direct `still_click(..., true)`) stay. Guard `HeadlessCh1Mv1eStaleHoverCommitTest` + `tools/eoa_ch1_mv1e_stale_hover_guard.sh`: same-frame motion X (Köln) then press/release Y (Leverkusen), 15/15, lone unit, hd+xvfb — **NOT live Play**. Live pair was Bad Kreuznach vs Hildesheim. Seeds unchanged: Borken `710430` L1 / Warendorf `710434` L2 / Ober `710423` L3 / Siegen-Wittgenstein `710451` L4.
+At 4×, a still click commits to whatever is under `event.position`. A facility icon at that point wins. A miss uses `_resolve_hex_pick_pid` and does not keep `_march_preview_cache_dest` or the hover province (FIX #8; the old miss-of-icon cache-dest stay is gone). `_mv1_preview_dest_matches_world` still checks the facility before the hover symbol, and a GIS miss does not match the stale hover. Hover/preview update logic unchanged. Guard `HeadlessCh1Mv1eStaleHoverCommitTest` + `tools/eoa_ch1_mv1e_stale_hover_guard.sh`: same-frame motion X (Köln) then press/release Y (Leverkusen), 15/15, lone unit, hd+xvfb. FIX #8 measured hd+xvfb **PASS** rss **1212.0 / 1657.1** — **NOT live Play**. Live pair was Bad Kreuznach vs Hildesheim. Seeds unchanged: Borken `710430` L1 / Warendorf `710434` L2 / Ober `710423` L3 / Siegen-Wittgenstein `710451` L4.
 
 ### RT-1 Readable road tiers (intact, visual only, draft HOLD)
 
