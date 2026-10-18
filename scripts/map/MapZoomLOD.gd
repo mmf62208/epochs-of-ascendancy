@@ -508,3 +508,60 @@ static func overlay_draw_stride(t: Tier, province_count: int) -> int:
 	if province_count >= WORLD_BOARD_CULL_THRESHOLD:
 		return 4 if t == Tier.STRATEGIC else 3
 	return 2
+
+
+## ATLAS-1 city-name bands. Helpers only — existing tier thresholds stay.
+## Wide/Home ≤ 0.45, strategic until 1.0, operational/mid through 2.0, then close.
+const CITY_LABEL_HOME_MAX := 0.45
+const CITY_LABEL_STRATEGIC_MAX := 1.0
+const CITY_LABEL_MID_MAX := 2.0
+const CITY_LABEL_FADE_SPAN := 0.08
+const CITY_BAND_HOME := 0
+const CITY_BAND_STRATEGIC := 1
+const CITY_BAND_MID := 2
+const CITY_BAND_CLOSE := 3
+
+
+static func city_label_band_for_zoom(z: float) -> int:
+	if z <= CITY_LABEL_HOME_MAX:
+		return CITY_BAND_HOME
+	if z < CITY_LABEL_STRATEGIC_MAX:
+		return CITY_BAND_STRATEGIC
+	if z <= CITY_LABEL_MID_MAX:
+		return CITY_BAND_MID
+	return CITY_BAND_CLOSE
+
+
+static func city_label_band_name(band: int) -> String:
+	match band:
+		CITY_BAND_HOME:
+			return "home"
+		CITY_BAND_STRATEGIC:
+			return "strategic"
+		CITY_BAND_MID:
+			return "mid"
+		_:
+			return "close"
+
+
+## Screen px. Capitals read larger; tier-2 stays compact so a dense cluster can separate.
+static func city_label_font_px(tier: int) -> int:
+	match tier:
+		4:
+			return 15
+		3:
+			return 13
+		2:
+			return 11
+		_:
+			return 10
+
+
+## Alpha ramps across the zoom where a band's labels enter. A step here pops.
+static func city_label_fade_alpha(zoom: float, enter_zoom: float) -> float:
+	if zoom < enter_zoom:
+		return 0.0
+	var span := CITY_LABEL_FADE_SPAN
+	if span <= 0.001:
+		return 1.0
+	return clampf((zoom - enter_zoom) / span, 0.0, 1.0)
