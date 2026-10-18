@@ -17,7 +17,7 @@ const CITY_Z := 19
 const MAX_ON_SCREEN := 60
 const MID_TIER2_SCORE_FLOOR := 400.0
 const LABEL_SHIFT_PX := 22.0
-const COUNTER_SHIFT_PX := 56.0
+const COUNTER_SHIFT_PX := 80.0
 const COUNTER_MAX_SCREEN := Vector2(88.0, 100.0)
 const ZOOM_REBUILD := 0.03
 const PAN_REBUILD_FRAC := 0.15
@@ -866,7 +866,7 @@ func _slot_offsets(base: Vector2, max_shift: float) -> Array:
 	var out: Array = [base]
 	if max_shift < 1.0:
 		return out
-	var radii: Array[float] = [8.0, 12.0, 16.0, 22.0, 28.0, 36.0, 48.0, 56.0]
+	var radii: Array[float] = [8.0, 12.0, 16.0, 22.0, 28.0, 36.0, 48.0, 56.0, 64.0, 72.0, 80.0]
 	var dirs: Array[Vector2] = [
 		Vector2.RIGHT, Vector2.LEFT, Vector2.UP, Vector2.DOWN,
 		Vector2(0.7071, -0.7071), Vector2(-0.7071, -0.7071),
