@@ -17,6 +17,8 @@ const CITY_Z := 19
 const MAX_ON_SCREEN := 60
 const MID_TIER2_SCORE_FLOOR := 400.0
 const LABEL_SHIFT_PX := 22.0
+const COUNTER_SHIFT_PX := 56.0
+const COUNTER_MAX_SCREEN := Vector2(88.0, 100.0)
 const ZOOM_REBUILD := 0.03
 const PAN_REBUILD_FRAC := 0.15
 const DEDUPE_WORLD := 36.0
@@ -376,6 +378,19 @@ func place_competing(cands: Array, zoom: float, cam: Vector2, vp: Vector2, natio
 				chosen_off = off
 				accepted = true
 				break
+		if not accepted and not (must_keep or is_cap) and not obstacles.is_empty():
+			for off_v2 in _slot_offsets(base, COUNTER_SHIFT_PX):
+				var off2: Vector2 = off_v2 as Vector2
+				if off2.length() <= max_shift + 0.01:
+					continue
+				var rect2 := Rect2(anchor_s + off2 + Vector2(0.0, -ascent), size)
+				if not _rects_clear(rect2, placed, city_only, vp):
+					continue
+				if _rects_clear(rect2, placed, try_blockers, vp):
+					chosen = rect2
+					chosen_off = off2
+					accepted = true
+					break
 		if not accepted and (must_keep or is_cap):
 			var cap_base: Vector2 = anchor_s + base
 			chosen = Rect2(cap_base + Vector2(0.0, -ascent), size)
@@ -638,7 +653,9 @@ func _maybe_append_counter(node: Node, out: Array, seen: Dictionary) -> void:
 	if seen.has(iid):
 		return
 	seen[iid] = true
-	out.append(_counter_label_screen_rect(icon))
+	var crect := _counter_label_screen_rect(icon)
+	if crect.size.x > 1.0 and crect.size.y > 1.0:
+		out.append(crect)
 
 
 func _maybe_append_pin(node: Node, out: Array, seen: Dictionary) -> void:
@@ -654,7 +671,9 @@ func _maybe_append_pin(node: Node, out: Array, seen: Dictionary) -> void:
 	if seen.has(iid):
 		return
 	seen[iid] = true
-	out.append(_counter_label_screen_rect(icon))
+	var prect := _counter_label_screen_rect(icon)
+	if prect.size.x > 1.0 and prect.size.y > 1.0:
+		out.append(prect)
 
 
 func _signature_of_rects(rects: Array) -> int:
@@ -682,7 +701,14 @@ func _counter_label_screen_rect(icon: Node2D) -> Rect2:
 		sc = 1.0
 	var p0 := _world_to_label_screen(origin_w + local.position * sc)
 	var p1 := _world_to_label_screen(origin_w + local.end * sc)
-	return Rect2(p0, p1 - p0).abs().grow(2.0)
+	var rect := Rect2(p0, p1 - p0).abs().grow(2.0)
+	if rect.size.x > COUNTER_MAX_SCREEN.x or rect.size.y > COUNTER_MAX_SCREEN.y:
+		var mid := rect.get_center()
+		rect = Rect2(mid - COUNTER_MAX_SCREEN * 0.5, COUNTER_MAX_SCREEN)
+	var view := Rect2(Vector2.ZERO, _vp).grow(32.0)
+	if not rect.intersects(view):
+		return Rect2()
+	return rect
 
 
 func _control_screen_rect(lbl: Control) -> Rect2:
@@ -840,7 +866,7 @@ func _slot_offsets(base: Vector2, max_shift: float) -> Array:
 	var out: Array = [base]
 	if max_shift < 1.0:
 		return out
-	var radii: Array[float] = [8.0, 12.0, 16.0, 22.0]
+	var radii: Array[float] = [8.0, 12.0, 16.0, 22.0, 28.0, 36.0, 48.0, 56.0]
 	var dirs: Array[Vector2] = [
 		Vector2.RIGHT, Vector2.LEFT, Vector2.UP, Vector2.DOWN,
 		Vector2(0.7071, -0.7071), Vector2(-0.7071, -0.7071),
@@ -1009,6 +1035,7 @@ func _load_candidates() -> void:
 			"score": score,
 			"capital": capital,
 			"must_keep": capital,
+			"hub": hub or core_bonus > 0.05,
 			"world": world,
 			"enter": 0.0,
 			"tag": str(owners.get(str(pid), owners.get(pid, ""))),

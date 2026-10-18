@@ -78,11 +78,12 @@ func _tick_wait_map() -> void:
 	_dismiss_title_if_needed()
 	if not _map_is_ready():
 		return
+	_frame_europe_home()
 	var cam := _camera()
 	if cam != null:
 		_home_pos = cam.global_position
-	_freeze_boot_fighters()
 	_ensure_units_on()
+	_freeze_boot_fighters()
 	print("ATLAS1 live map_ready home=%.1f,%.1f units=%d layers=%d" % [
 		_home_pos.x, _home_pos.y, _visible_unit_count(), _city_layer_count(),
 	])
@@ -180,6 +181,34 @@ func _has_name(placed: Array, want: String) -> bool:
 		if str(p.get("name", "")) == want:
 			return true
 	return false
+
+
+func _frame_europe_home() -> void:
+	if root != null:
+		root.set_meta("eoa_rx1_pixel_lock_camera", false)
+	var mr := _map_renderer()
+	if mr != null and mr.has_method("player_path_europe_home"):
+		mr.call("player_path_europe_home")
+	elif mr != null and mr.has_method("center_europe_in_world_view"):
+		mr.call("center_europe_in_world_view")
+
+
+func _freeze_boot_fighters() -> void:
+	if root != null:
+		root.set_meta("eoa_rx1_pixel_lock_camera", true)
+	var tr := _find_named("TestRunner")
+	if tr != null and tr.has_method("set_process"):
+		tr.set_process(false)
+	var cc := _find_named("CameraController")
+	if cc != null:
+		if "enable_pan" in cc:
+			cc.set("enable_pan", false)
+		if "enable_zoom" in cc:
+			cc.set("enable_zoom", false)
+		cc.set_process(false)
+	var mr := _map_renderer()
+	if mr != null and mr.has_method("set_process"):
+		mr.set_process(false)
 
 
 func _ensure_units_on() -> void:
