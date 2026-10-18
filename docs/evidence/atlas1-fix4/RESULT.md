@@ -2,7 +2,7 @@
 
 Branch `grok/atlas1-cities-rivers`. Draft only. **Merge HOLD** until live Play.
 
-**FIX #4 tip:** `e8d647e9`
+**FIX #4 tip:** `5245c23e`
 **Merge parent:** `f5f502fe` (`origin/main` `05602912`, plain merge, no force-push)
 
 Box gate on `a28af75d` was NOT READY: conflict vs main, hand-merge failed pixel guard `essen_label_run_1` at live-wheel z2.904, HWY-3 `#104` drew a second crisp name layer, and the FIX #3 shots did not match the summary.
