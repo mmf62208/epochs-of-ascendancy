@@ -8,6 +8,17 @@
 
 ## Recommended Testing Approach
 
+### 0. PROD-1 Prod button (top info bar)
+
+Live 1280×800 after Begin: leftover MapRenderer left-up swallow used to eat Prod (`ACTION_MODE_BUTTON_RELEASE`). Guard clicks the real ProductionButton through `Input.parse_input_event` (not `_on_production_pressed`), asserts the production screen is visible, then Close→Prod opens it again.
+
+```bash
+tools/run_godot.sh --headless --path . --resolution 1280x800 \
+  -s res://scripts/core/HeadlessProd1ButtonOpenTest.gd
+```
+
+Wired as `launch_prod1_button_open` on the full gate script. `--quick` stays the same 14 known `unit_board_play_path` reds.
+
 ### 1. Core Time System Tests
 
 - Load a scenario and verify the top bar date matches `start_date`.
