@@ -387,12 +387,11 @@ func labels_hit_chrome(chrome_rects: Array = []) -> PackedStringArray:
 
 
 func anchor_distance_px(item: Dictionary) -> float:
-	var off: Vector2 = item.get("screen_offset", Vector2.ZERO)
-	if off != Vector2.ZERO:
-		return off.length()
+	# Nearest edge of the glyph box to the city mark — a left-of-dot
+	# "Duisburg" is still by its own dot even when the baseline is ~70 px west.
 	var world: Vector2 = item.get("world", Vector2.ZERO)
 	var rect: Rect2 = item.get("screen_rect", Rect2())
-	return rect.position.distance_to(_world_to_label_screen(world))
+	return _rect_gap_from_point(rect, _world_to_label_screen(world))
 
 
 func labels_hit_counters(counter_rects: Array = []) -> PackedStringArray:
@@ -529,9 +528,12 @@ func place_competing(cands: Array, zoom: float, cam: Vector2, vp: Vector2, natio
 		var dot_rect := Rect2(anchor_s - Vector2(DOT_BLOCK_PX, DOT_BLOCK_PX), Vector2(DOT_BLOCK_PX * 2.0, DOT_BLOCK_PX * 2.0))
 		if not must_keep and not is_cap and not bool(c.get("hub", false)) and _dot_hits_placed(dot_rect, placed):
 			continue
-		for off_v in _slot_offsets(base, shift_px):
+		# Duisburg is ~30 px west of Essen at z 2.9; a right-growing 22 px
+		# walk always hits Essen. Flush-left (glyph east-edge by the mark)
+		# keeps the nearest edge inside ANCHOR_MAX_PX.
+		for off_v in _candidate_slots(base, shift_px, size, ascent, anchor_s, placed, ruhr_keep or must_keep or is_cap):
 			var off: Vector2 = off_v as Vector2
-			if off.length() > ANCHOR_MAX_PX:
+			if _anchor_gap_px(off, size, ascent) > ANCHOR_MAX_PX + 0.05:
 				continue
 			var baseline_s: Vector2 = anchor_s + off
 			var rect := Rect2(baseline_s + Vector2(0.0, -ascent), size)
@@ -549,7 +551,7 @@ func place_competing(cands: Array, zoom: float, cam: Vector2, vp: Vector2, natio
 		# names ~75px east of their dots. Cull if it will not sit by the mark.
 		if not accepted:
 			continue
-		if placed.size() >= MAX_ON_SCREEN and not must_keep:
+		if placed.size() >= MAX_ON_SCREEN and not must_keep and not ruhr_keep:
 			break
 		placed.append({
 			"name": text,
@@ -570,11 +572,66 @@ func place_competing(cands: Array, zoom: float, cam: Vector2, vp: Vector2, natio
 		})
 		blockers.append(dot_rect)
 	placed = _nudge_keep_off_counters(placed, obstacles, vp)
-	return _nudge_labels_off_foreign_dots(placed, vp)
+	placed = _nudge_labels_off_foreign_dots(placed, vp)
+	return _drop_visual_overlaps(placed, zoom)
 
 
 func _is_keep_item(item: Dictionary) -> bool:
 	return bool(item.get("must_keep", false)) or bool(item.get("capital", false)) or bool(item.get("ruhr_keep", false))
+
+
+func _drop_visual_overlaps(placed: Array, zoom: float = 1.0) -> Array:
+	var close := zoom > _LOD.CITY_LABEL_MID_MAX
+	var out: Array = placed.duplicate()
+	var guard := 0
+	while guard < 24:
+		guard += 1
+		var drop_at := -1
+		var drop_score := 1.0e12
+		for i in out.size():
+			var a: Dictionary = out[i]
+			if float(a.get("alpha", 0.0)) < 0.04:
+				continue
+			var ar: Rect2 = a.get("screen_rect", Rect2())
+			var ad: Rect2 = a.get("dot_rect", Rect2())
+			for j in range(i + 1, out.size()):
+				var b: Dictionary = out[j]
+				if float(b.get("alpha", 0.0)) < 0.04:
+					continue
+				var br: Rect2 = b.get("screen_rect", Rect2())
+				var bd: Rect2 = b.get("dot_rect", Rect2())
+				var hit := ar.grow(OUTLINE_PAD_PX).intersects(br.grow(OUTLINE_PAD_PX))
+				hit = hit or (ad.size.x > 0.5 and br.intersects(ad))
+				hit = hit or (bd.size.x > 0.5 and ar.intersects(bd))
+				if not hit:
+					continue
+				var ia_keep := _is_keep_item(a)
+				var ib_keep := _is_keep_item(b)
+				var victim := j
+				var vs := float(b.get("score", 0.0))
+				if ia_keep and not ib_keep:
+					victim = j
+					vs = float(b.get("score", 0.0))
+				elif ib_keep and not ia_keep:
+					victim = i
+					vs = float(a.get("score", 0.0))
+				elif float(a.get("score", 0.0)) < float(b.get("score", 0.0)):
+					victim = i
+					vs = float(a.get("score", 0.0))
+				if not _is_keep_item(out[victim]) or vs < drop_score:
+					drop_at = victim
+					drop_score = vs
+		if drop_at < 0:
+			break
+		var victim_rec: Dictionary = out[drop_at]
+		# Essen (must_keep) never drops. Other Ruhr cores may drop at mid
+		# (they sit 12 px apart at z1.2) but must stay at close.
+		if bool(victim_rec.get("must_keep", false)):
+			break
+		if close and bool(victim_rec.get("ruhr_keep", false)):
+			break
+		out.remove_at(drop_at)
+	return out
 
 
 func _nudge_keep_off_counters(placed: Array, obstacles: Array, vp: Vector2) -> Array:
@@ -604,9 +661,9 @@ func _nudge_keep_off_counters(placed: Array, obstacles: Array, vp: Vector2) -> A
 				keep_others.append(placed[j])
 		# Names draw at z 30 above chips (z 28). Stay by the dot — a 120px
 		# last-resort put Duisburg south of Köln and ~75px east of its mark.
-		for off_v in _slot_offsets(Vector2(8.0, -2.0), LABEL_SHIFT_PX):
+		for off_v in _candidate_slots(Vector2(8.0, -2.0), LABEL_SHIFT_PX, size, ascent, anchor_s, keep_others, true):
 			var off: Vector2 = off_v as Vector2
-			if off.length() > ANCHOR_MAX_PX:
+			if _anchor_gap_px(off, size, ascent) > ANCHOR_MAX_PX + 0.05:
 				continue
 			var cand := Rect2(anchor_s + off + Vector2(0.0, -ascent), size)
 			if not _rects_clear(cand, keep_others, obstacles, vp):
@@ -662,8 +719,10 @@ func _nudge_labels_off_foreign_dots(placed: Array, vp: Vector2) -> Array:
 				continue
 			others.append(placed[j2])
 			extra.append((placed[j2] as Dictionary).get("dot_rect", Rect2()))
-		for off_v in _slot_offsets(Vector2(8.0, -2.0), LABEL_SHIFT_PX):
+		for off_v in _candidate_slots(Vector2(8.0, -2.0), LABEL_SHIFT_PX, size, ascent, anchor_s, others, _is_keep_item(item)):
 			var off: Vector2 = off_v as Vector2
+			if _anchor_gap_px(off, size, ascent) > ANCHOR_MAX_PX + 0.05:
+				continue
 			var cand := Rect2(anchor_s + off + Vector2(0.0, -ascent), size)
 			if not _rects_clear(cand, others, extra, vp):
 				continue
@@ -675,8 +734,16 @@ func _nudge_labels_off_foreign_dots(placed: Array, vp: Vector2) -> Array:
 
 
 func _priority_before(a: Dictionary, b: Dictionary) -> bool:
-	var ac := bool(a.get("capital", false))
-	var bc := bool(b.get("capital", false))
+	# Ruhr cores before generic capitals (Paris is must_keep). Otherwise
+	# tier-4 Paris sorts ahead of Duisburg and Essen takes the west slot.
+	var apid := int(a.get("pid", 0))
+	var bpid := int(b.get("pid", 0))
+	var ar := float(_RUHR_CORE.get(apid, 0.0)) > 0.05 or apid == 710403
+	var br := float(_RUHR_CORE.get(bpid, 0.0)) > 0.05 or bpid == 710403
+	if ar != br:
+		return ar
+	var ac := bool(a.get("capital", false)) or bool(a.get("must_keep", false))
+	var bc := bool(b.get("capital", false)) or bool(b.get("must_keep", false))
 	if ac != bc:
 		return ac
 	var at := int(a.get("tier", 0))
@@ -1144,6 +1211,70 @@ func _dot_hits_placed(dot_rect: Rect2, placed: Array) -> bool:
 		if dot_rect.intersects(other.grow(1.0)):
 			return true
 	return false
+
+
+func _rect_gap_from_point(rect: Rect2, p: Vector2) -> float:
+	var dx := 0.0
+	if p.x < rect.position.x:
+		dx = rect.position.x - p.x
+	elif p.x > rect.end.x:
+		dx = p.x - rect.end.x
+	var dy := 0.0
+	if p.y < rect.position.y:
+		dy = rect.position.y - p.y
+	elif p.y > rect.end.y:
+		dy = p.y - rect.end.y
+	return Vector2(dx, dy).length()
+
+
+func _anchor_gap_px(off: Vector2, size: Vector2, ascent: float) -> float:
+	return _rect_gap_from_point(Rect2(off + Vector2(0.0, -ascent), size), Vector2.ZERO)
+
+
+func _flush_slots(size: Vector2, ascent: float) -> Array:
+	var gap := 8.0
+	if size.x < 1.0:
+		return []
+	var left := Vector2(-size.x - gap, -2.0)
+	var right := Vector2(gap + 2.0, -2.0)
+	var above := Vector2(-size.x * 0.35, -ascent - gap)
+	var below := Vector2(-size.x * 0.35, size.y - ascent + gap)
+	var above_l := Vector2(-size.x - gap, -ascent - gap)
+	var above_r := Vector2(gap + 2.0, -ascent - gap)
+	var below_l := Vector2(-size.x - gap, size.y - ascent + gap)
+	var below_r := Vector2(gap + 2.0, size.y - ascent + gap)
+	return [left, above, below, right, above_l, above_r, below_l, below_r]
+
+
+func _keep_to_the_east(anchor_s: Vector2, placed: Array) -> bool:
+	for p in placed:
+		if not _is_keep_item(p):
+			continue
+		var other_s := _world_to_label_screen(p.get("world", Vector2.ZERO) as Vector2)
+		if other_s.x > anchor_s.x + 2.0 and absf(other_s.y - anchor_s.y) < 48.0:
+			return true
+	return false
+
+
+func _candidate_slots(base: Vector2, max_shift: float, size: Vector2, ascent: float, anchor_s: Vector2, placed: Array, _prefer_flush: bool) -> Array:
+	var walk := _slot_offsets(base, max_shift)
+	if max_shift < 1.0:
+		return walk
+	var out: Array = []
+	var flush: Array = _flush_slots(size, ascent)
+	# Essen must stay right of its mark. Only Duisburg (keep to the east)
+	# tries west-of-mark first. Preferring left for every core put Essen
+	# on top of Duisburg at z 2.9.
+	if _keep_to_the_east(anchor_s, placed) and flush.size() > 0:
+		out.append(flush[0])
+		for fs in flush:
+			out.append(fs)
+		out.append_array(walk)
+		return out
+	out.append_array(walk)
+	for fs in flush:
+		out.append(fs)
+	return out
 
 
 func _slot_offsets(base: Vector2, max_shift: float) -> Array:
