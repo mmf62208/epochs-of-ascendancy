@@ -108,7 +108,7 @@ const GOLD_SPINE_Z := 23
 const ROAD_EXPLICIT_SCREEN_PX := 7.0
 const ROAD_INFERRED_SCREEN_PX := 4.0
 ## Non-AA filled quads. Close/far stay 16/20 (Play PASS). Mid only is 28/34
-## so on-screen gold ≥ 1.8× the 12 px highway casing.
+## so on-screen gold ≥ 1.8× the mid 12 px highway casing (close gold 16/20; close highway casing 16).
 const GOLD_SPINE_SCREEN_PX := 16.0
 const GOLD_SPINE_HALO_SCREEN_PX := 20.0
 const GOLD_SPINE_MID_SCREEN_PX := 28.0
@@ -648,8 +648,9 @@ func _rebuild_road_layer_inner() -> void:
     _assign_display_tiers(cache)
     var deg: Dictionary = RoadTierVisualScript.degree_stats(cache)
     var tri: int = RoadTierVisualScript.count_undirected_triangles(cache)
+    var hwy_st: Dictionary = RoadTierVisualScript._hwy1_component_stats(cache)
     print(
-        "EOA_RT1_TRUNK who=overlay candidates=%d trunk=%d triangles=%d max_deg=%d avg_deg=%.2f highways=%d"
+        "EOA_RT1_TRUNK who=overlay candidates=%d trunk=%d triangles=%d max_deg=%d avg_deg=%.2f highways=%d hwy_components=%d hwy_singletons=%d"
         % [
             _road_candidate_count,
             cache.size(),
@@ -657,6 +658,8 @@ func _rebuild_road_layer_inner() -> void:
             int(deg.get("max", 0)),
             float(deg.get("avg", 0.0)),
             _count_display_highways(cache),
+            int(hwy_st.get("components", 0)),
+            int(hwy_st.get("singletons", 0)),
         ]
     )
     _apply_road_tier_cache(cache)
@@ -2611,7 +2614,13 @@ class RoadTierDraw extends Node2D:
         return 1.0
 
     func _world_width(screen_px: float) -> float:
-        return screen_px / maxf(_canvas_zoom(), 0.04)
+        ## Convert designed screen px through the live canvas transform, not a
+        ## separately queried Camera2D.zoom. At Europe/Home those can disagree
+        ## (far pair 710412–710424 measured 7 px at both casing 9 and 12).
+        var canvas_s: float = absf(get_global_transform_with_canvas().get_scale().x)
+        if not is_finite(canvas_s) or canvas_s < 0.04:
+            canvas_s = _canvas_zoom()
+        return screen_px / maxf(canvas_s, 0.04)
 
     func _edge_visible(entry: Dictionary, zoom: float) -> bool:
         return RoadTierVisualScript.tier_visible_at_zoom(
@@ -2669,16 +2678,37 @@ class RoadTierDraw extends Node2D:
         ## Non-AA quads so the player-seen width matches HIGHWAY_*_SCREEN_PX.
         ## Never antialiased draw_line (IX-1 windowed OOM).
         var far: bool = _lod <= 0
-        var case_px: float = (
-            RoadTierVisualScript.HIGHWAY_FAR_CASING_SCREEN_PX if far
-            else RoadTierVisualScript.HIGHWAY_CASING_SCREEN_PX
-        )
-        var core_px: float = (
-            RoadTierVisualScript.HIGHWAY_FAR_CORE_SCREEN_PX if far
-            else RoadTierVisualScript.HIGHWAY_SCREEN_PX
-        )
+        var close: bool = _lod >= 2
+        var case_px: float = RoadTierVisualScript.HIGHWAY_CASING_SCREEN_PX
+        var core_px: float = RoadTierVisualScript.HIGHWAY_SCREEN_PX
+        if far:
+            case_px = RoadTierVisualScript.HIGHWAY_FAR_CASING_SCREEN_PX
+            core_px = RoadTierVisualScript.HIGHWAY_FAR_CORE_SCREEN_PX
+        elif close:
+            case_px = RoadTierVisualScript.HIGHWAY_CLOSE_CASING_SCREEN_PX
+            core_px = RoadTierVisualScript.HIGHWAY_CLOSE_CORE_SCREEN_PX
         var case_w := _world_width(case_px)
         var core_w := _world_width(core_px)
+        if far:
+            ## Europe/Home: the fixed pair measured 7 px at casing 9 and 12
+            ## (hairline vs NUTS3 border). Floor the far stroke at 20 screen px
+            ## so the same pair is ≥9 without re-picking.
+            var canvas_s: float = absf(get_global_transform_with_canvas().get_scale().x)
+            if not is_finite(canvas_s) or canvas_s < 0.04:
+                canvas_s = _canvas_zoom()
+            var min_case: float = 20.0 / maxf(canvas_s, 0.04)
+            if case_w + 0.01 < min_case:
+                var boost: float = min_case / maxf(case_w, 0.01)
+                case_w = min_case
+                core_w *= boost
+        if far and not OS.get_environment("EOA_RT1_PIXEL_OUT").strip_edges().is_empty():
+            print("HWY2_FAR_WIDTH zoom=%.3f canvas_s=%.3f case_px=%.1f case_w=%.2f screen_est=%.2f" % [
+                _canvas_zoom(),
+                absf(get_global_transform_with_canvas().get_scale().x),
+                case_px,
+                case_w,
+                case_w * maxf(absf(get_global_transform_with_canvas().get_scale().x), 0.04),
+            ])
         var stripe_w := _world_width(RoadTierVisualScript.HIGHWAY_STRIPE_SCREEN_PX)
         var casing := RoadTierVisualScript.HIGHWAY_CASING_COLOR
         var stripe := RoadTierVisualScript.HIGHWAY_STRIPE_COLOR

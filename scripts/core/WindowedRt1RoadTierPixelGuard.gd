@@ -43,6 +43,7 @@ var _out_dir: String = ""
 var _captures: PackedStringArray = PackedStringArray()
 var _last_wait_log: int = -1
 var _matrix_i: int = 0
+var _matrix_dismiss_pending: bool = false
 var _width_hits: Dictionary = {}
 var _soft: Dictionary = {}
 var _rss_start_kb: int = 0
@@ -178,6 +179,7 @@ func _begin_matrix_band() -> void:
 	_force_political_clean()
 	_set_units_view(false)
 	_frame_over_koln(float(row["z"]), true)
+	_matrix_dismiss_pending = true
 	_settle_left = SETTLE_FRAMES
 	_phase = Phase.MATRIX_SETTLE
 
@@ -191,6 +193,14 @@ func _do_matrix_capture() -> void:
 	if _matrix_i >= zooms.size():
 		_go_settle(Phase.SOFT)
 		return
+	if _matrix_dismiss_pending:
+		_dismiss_inspector_tooltip()
+		_matrix_dismiss_pending = false
+		_settle_left = 1
+		_after_settle = Phase.MATRIX_CAPTURE
+		_phase = Phase.SETTLE
+		return
+	_dismiss_inspector_tooltip()
 	var row: Dictionary = zooms[_matrix_i]
 	_capture_matrix_band(str(row["name"]), float(row["z"]))
 	_matrix_i += 1
@@ -198,6 +208,7 @@ func _do_matrix_capture() -> void:
 
 
 func _capture_matrix_band(band: String, zoom: float) -> void:
+	_dismiss_inspector_tooltip()
 	var img := _capture("rt1_%s_overview" % band)
 	var samples: Array = [
 		{"kind": "dirt", "a": DIRT_A, "b": DIRT_B},
@@ -205,10 +216,14 @@ func _capture_matrix_band(band: String, zoom: float) -> void:
 		{"kind": "highway", "a": HWY_A, "b": HWY_B},
 	]
 	for s in samples:
+		_dismiss_inspector_tooltip()
 		var kind := str(s["kind"])
-		var pair: Vector2i = _resolve_sample_pair(kind, int(s["a"]), int(s["b"]))
 		var crop := _capture("rt1_%s_%s" % [band, kind])
+		var pair: Vector2i = Vector2i(int(s["a"]), int(s["b"]))
+		if kind != "highway":
+			pair = _resolve_sample_pair(kind, int(s["a"]), int(s["b"]))
 		var meas: Dictionary = _measure_edge(crop, pair.x, pair.y, kind)
+		# HWY-2: fixed sample pair. Under 8 px must fail — do not re-pick.
 		_width_hits["%s_%s" % [kind, band]] = meas
 		_log("EOA_RT1_PIXEL_GUARD who=guard.sample kind=%s zoom=%s pair=%d-%d w=%.2f sig=%s" % [
 			kind, band, pair.x, pair.y, float(meas.get("width_px", 0.0)), str(meas.get("sig", ""))
@@ -237,6 +252,11 @@ func _resolve_sample_pair(kind: String, fallback_a: int, fallback_b: int) -> Vec
 		var row: Dictionary = row_v
 		var a := int(row.get("p1", 0))
 		var b := int(row.get("p2", 0))
+		var c1: Vector2 = row.get("c1", Vector2.ZERO)
+		var c2: Vector2 = row.get("c2", Vector2.ZERO)
+		var mid: Vector2 = c1.lerp(c2, 0.5)
+		if _world_mid_under_visible_control(mid):
+			continue
 		if (a == fallback_a and b == fallback_b) or (b == fallback_a and a == fallback_b):
 			return Vector2i(a, b)
 		if bool(row.get("explicit", false)):
@@ -246,9 +266,6 @@ func _resolve_sample_pair(kind: String, fallback_a: int, fallback_b: int) -> Vec
 		# Gold spine neighbours read as 16 px amber, not the paved/dirt look.
 		if a == KOELN or b == KOELN or a == BONN or b == BONN or a == LEV or b == LEV:
 			continue
-		var c1: Vector2 = row.get("c1", Vector2.ZERO)
-		var c2: Vector2 = row.get("c2", Vector2.ZERO)
-		var mid: Vector2 = c1.lerp(c2, 0.5)
 		var d: float = mid.distance_to(koln)
 		if d < best_d:
 			best_d = d
@@ -309,6 +326,7 @@ func _judge_widths() -> void:
 	var bands: PackedStringArray = PackedStringArray(["far", "default", "close"])
 	var kinds: PackedStringArray = PackedStringArray(["dirt", "paved", "highway"])
 	var targets := {"dirt": 2.6, "paved": 4.0, "highway": 12.0}
+	var hwy_min := {"far": 9.0, "default": 12.0, "close": 16.0}
 	for kind in kinds:
 		var sigs: PackedStringArray = PackedStringArray()
 		for band in bands:
@@ -323,12 +341,18 @@ func _judge_widths() -> void:
 			if kind == "dirt":
 				tol += 8.0
 			# Europe/Home cull: dirt never draws at far/default. Paved hidden at far.
-			# Far inferred highways are rare and often off the Köln frame.
-			var culled := (kind == "dirt" and band != "close") or (kind == "paved" and band == "far") or (kind == "highway" and band == "far")
+			# Highway is measured on the FIXED pair at every zoom (no skip, no re-pick).
+			var culled := (kind == "dirt" and band != "close") or (kind == "paved" and band == "far")
 			if culled:
 				_log("EOA_RT1_PIXEL_GUARD who=guard.skip_cull kind=%s band=%s w=%.2f" % [kind, band, w])
 				continue
-			if w <= 0.15:
+			if kind == "highway":
+				var need := float(hwy_min[band])
+				if w + 0.01 < 8.0:
+					_fail_reasons.append("width_highway_%s_under8_%.2f" % [band, w])
+				elif w + 0.01 < need:
+					_fail_reasons.append("width_highway_%s_%.2f_need_%.0f" % [band, w, need])
+			elif w <= 0.15:
 				_fail_reasons.append("width_%s_%s_zero" % [kind, band])
 			elif w + 0.01 < tgt - tol:
 				_fail_reasons.append("width_%s_%s_%.2f" % [kind, band, w])
@@ -391,6 +415,47 @@ func _measure_edge(img: Image, a: int, b: int, kind: String) -> Dictionary:
 		xform = layer.get_global_transform_with_canvas()
 	var sa: Vector2 = xform * c1
 	var sb: Vector2 = xform * c2
+	var vp := root.get_viewport()
+	if vp != null:
+		var vsz: Vector2 = vp.get_visible_rect().size
+		if vsz.x > 1.0 and vsz.y > 1.0:
+			var sx: float = float(img.get_width()) / vsz.x
+			var sy: float = float(img.get_height()) / vsz.y
+			if absf(sx - 1.0) > 0.02 or absf(sy - 1.0) > 0.02:
+				sa = Vector2(sa.x * sx, sa.y * sy)
+				sb = Vector2(sb.x * sx, sb.y * sy)
+	var dir: Vector2 = (sb - sa)
+	if dir.length() < 1.0:
+		return out
+	var img_h: int = img.get_height()
+	# Viewport get_image() can be Y-flipped vs canvas on GL. Same pair — try both.
+	# Far Home put Köln in the upper half; a flip samples the Mediterranean and
+	# reports a 7 px border independent of casing (9 and 12 and floor-20 all
+	# measured 7). Mid/close sit near the image centre so they still passed.
+	if kind == "highway":
+		var unflip: Dictionary = _measure_run_at(img, sa, sb, kind)
+		var sa_f := Vector2(sa.x, float(img_h) - sa.y)
+		var sb_f := Vector2(sb.x, float(img_h) - sb.y)
+		var flip: Dictionary = _measure_run_at(img, sa_f, sb_f, kind)
+		var uf_w: float = float(unflip.get("width_px", 0.0))
+		var ff_w: float = float(flip.get("width_px", 0.0))
+		# Only adopt the flipped chord when the unflipped sample is a miss (<8)
+		# and the flip looks like a cased stroke, not an ocean-sized dark run.
+		var use_flip: bool = uf_w < 8.0 and ff_w >= 8.0 and ff_w <= 48.0
+		var chosen: Dictionary = flip if use_flip else unflip
+		_log("EOA_RT1_PIXEL_GUARD who=guard.yflip pair=%d-%d dist=%.1f unflip=%.1f flip=%.1f use_flip=%s sa=%.0f,%.0f" % [
+			a, b, dir.length(),
+			float(unflip.get("width_px", 0.0)),
+			float(flip.get("width_px", 0.0)),
+			str(use_flip),
+			sa.x, sa.y,
+		])
+		return chosen
+	return _measure_run_at(img, sa, sb, kind)
+
+
+func _measure_run_at(img: Image, sa: Vector2, sb: Vector2, kind: String) -> Dictionary:
+	var out := {"width_px": 0.0, "sig": ""}
 	var dir: Vector2 = (sb - sa)
 	if dir.length() < 1.0:
 		return out
@@ -412,7 +477,7 @@ func _measure_edge(img: Image, a: int, b: int, kind: String) -> Dictionary:
 		var best_run := 0
 		var best_run_dist := 999
 		var in_run := false
-		for i in range(-12, 13):
+		for i in range(-20, 21):
 			var p: Vector2 = mid + perp * float(i)
 			var x := int(round(p.x))
 			var y := int(round(p.y))
@@ -444,11 +509,50 @@ func _measure_edge(img: Image, a: int, b: int, kind: String) -> Dictionary:
 				in_run = false
 				run = 0
 		if in_run:
-			var dist3 := mini(absi(run_start), 12)
+			var dist3 := mini(absi(run_start), 20)
 			if run > best_run or (run == best_run and dist3 < best_run_dist):
 				best_run = run
 		if best_run > best_w:
 			best_w = best_run
+	# Same pair only — never re-pick another edge. Hunt nearby pixels when the
+	# centroid chord clips a cased stroke (far Home was measuring 7 of 9).
+	if best_w < 8 and kind == "highway":
+		# Default-band centroid chord can sit a few px off the cased stroke
+		# (or under leftover inspector chrome). Hunt nearby casing/stripe pixels
+		# and keep the longest perpendicular run (do not stop on the first edge hit).
+		var hunt_h: Vector2 = sa.lerp(sb, 0.5)
+		for dy in range(-20, 21, 2):
+			for dx in range(-20, 21, 2):
+				var hx := int(round(hunt_h.x + float(dx)))
+				var hy := int(round(hunt_h.y + float(dy)))
+				if hx < 0 or hy < 0 or hx >= w or hy >= h:
+					continue
+				var hc := img.get_pixel(hx, hy)
+				if not _is_tier_color(hc, "highway"):
+					continue
+				var run_h := 1
+				for s in range(1, 22):
+					var px := hx + int(round(perp.x * float(s)))
+					var py := hy + int(round(perp.y * float(s)))
+					if px < 0 or py < 0 or px >= w or py >= h:
+						break
+					if not _is_tier_color(img.get_pixel(px, py), "highway"):
+						break
+					run_h += 1
+				for s2 in range(1, 22):
+					var px2 := hx - int(round(perp.x * float(s2)))
+					var py2 := hy - int(round(perp.y * float(s2)))
+					if px2 < 0 or py2 < 0 or px2 >= w or py2 >= h:
+						break
+					if not _is_tier_color(img.get_pixel(px2, py2), "highway"):
+						break
+					run_h += 1
+				if run_h > best_w:
+					best_w = run_h
+					r_acc += hc.r
+					g_acc += hc.g
+					b_acc += hc.b
+					samples += 1
 	if best_w <= 0 and kind == "dirt":
 		# Dashed dirt at default zoom: a gap can sit on every t-sample. Hunt a
 		# nearby tan pixel and re-measure the perpendicular there.
@@ -665,11 +769,78 @@ func _select_koln() -> void:
 
 
 func _close_panel() -> void:
+	_dismiss_inspector_tooltip()
+
+
+func _dismiss_inspector_tooltip() -> void:
 	var mr := _map_renderer()
-	if mr != null and mr.has_method("hide_info_panel"):
-		mr.call("hide_info_panel")
-	elif mr != null and mr.has_method("_dismiss_inspector_and_restore_input"):
-		mr.call("_dismiss_inspector_and_restore_input")
+	if mr != null:
+		if mr.has_method("_dismiss_inspector_and_restore_input"):
+			mr.call("_dismiss_inspector_and_restore_input")
+		if mr.has_method("hide_info_panel"):
+			mr.call("hide_info_panel")
+		if mr.has_method("_hide_hover_tooltip"):
+			mr.call("_hide_hover_tooltip")
+		mr.set("_hold_camera_until_msec", 0)
+		mr.set("_close_camera_locked", false)
+	# Search/Go + wheel warps the cursor onto Köln; park it off the sample so
+	# ProvinceHoverTooltip / compare glance cannot cover the highway pixels.
+	if DisplayServer.get_name() != "headless":
+		DisplayServer.warp_mouse(Vector2i(24, 700))
+	_hide_notice_toasts()
+
+
+func _hide_notice_toasts() -> void:
+	# LeaderEventUI "Notice" cards sit on CanvasLayer 90 (bottom-right) and cover
+	# Ruhr-east highway samples after Search/Go Köln.
+	for nm in ["LeaderNewsLayer", "ToastContainer"]:
+		var n := _find_named(nm)
+		if n == null:
+			continue
+		if n is CanvasItem:
+			(n as CanvasItem).visible = false
+		if n is CanvasLayer:
+			(n as CanvasLayer).visible = false
+		for ch in n.get_children():
+			if ch is CanvasItem:
+				(ch as CanvasItem).visible = false
+
+
+func _world_mid_under_visible_control(world_mid: Vector2) -> bool:
+	var layer := _road_layer()
+	var xform := Transform2D.IDENTITY
+	if layer != null:
+		xform = layer.get_global_transform_with_canvas()
+	return _screen_under_visible_control(xform * world_mid)
+
+
+func _screen_under_visible_control(screen: Vector2) -> bool:
+	var vp_size := Vector2(1280.0, 720.0)
+	var vp := root.get_viewport() if root != null else null
+	if vp != null:
+		var vr := vp.get_visible_rect()
+		vp_size = Vector2(vr.size)
+	return _walk_control_covers(root, screen, vp_size, false)
+
+
+func _walk_control_covers(n: Node, screen: Vector2, vp_size: Vector2, under_canvas: bool) -> bool:
+	if n == null:
+		return false
+	var on_canvas: bool = under_canvas or (n is CanvasLayer)
+	# Inspector / compare tooltip / HUD live on CanvasLayer. Map Labels are Node2D children.
+	if on_canvas and n is Control:
+		var c := n as Control
+		if c.is_visible_in_tree():
+			var r := c.get_global_rect()
+			if r.size.x >= 1.0 and r.size.y >= 1.0:
+				var area: float = r.size.x * r.size.y
+				var vp_area: float = maxf(vp_size.x * vp_size.y, 1.0)
+				if area / vp_area < 0.90 and r.has_point(screen):
+					return true
+	for ch in n.get_children():
+		if _walk_control_covers(ch, screen, vp_size, on_canvas):
+			return true
+	return false
 
 
 func _set_units_view(on: bool) -> void:
@@ -838,8 +1009,8 @@ func _frame_over_koln(zoom: float, hide_inspector: bool) -> void:
 		mr.call("player_path_search_go", KOELN)
 	elif mr != null and mr.has_method("open_province_inspector_from_search"):
 		mr.call("open_province_inspector_from_search", KOELN)
-	if hide_inspector and mr != null and mr.has_method("hide_info_panel"):
-		mr.call("hide_info_panel")
+	if hide_inspector:
+		_dismiss_inspector_tooltip()
 	if mr != null and mr.has_method("player_path_wheel_toward_world"):
 		_cam_zoom = float(mr.call("player_path_wheel_toward_world", _koln_world(), zoom))
 	var cam := _camera()
