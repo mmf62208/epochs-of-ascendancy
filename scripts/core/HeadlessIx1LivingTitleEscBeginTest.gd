@@ -682,6 +682,10 @@ func _test_runtime_esc_opens_cc() -> void:
 		title.queue_free()
 		return
 	# Drive _input with physical-only Esc (the live DisplayServer shape).
+	# A leftover MainMenu from the first Esc would make this close, not open.
+	var leftover_cc: Node = root.get_node_or_null("MainMenu")
+	if leftover_cc != null:
+		leftover_cc.free()
 	var title3: CanvasLayer = title_scr.new() as CanvasLayer
 	title3.name = "LivingTitleBootEsc"
 	root.add_child(title3)
@@ -693,6 +697,9 @@ func _test_runtime_esc_opens_cc() -> void:
 		title3.queue_free()
 		title.queue_free()
 		return
+	var leftover_cc2: Node = root.get_node_or_null("MainMenu")
+	if leftover_cc2 != null:
+		leftover_cc2.free()
 	var act: InputEvent = _make_escape("ui_cancel")
 	var title4: CanvasLayer = title_scr.new() as CanvasLayer
 	root.add_child(title4)
