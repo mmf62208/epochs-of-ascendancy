@@ -450,6 +450,9 @@ else
   run_step launch_save_reload1_corrupt \
     flock "${HOME}/.eoa_godot.lock" tools/run_godot.sh --headless --path . -s res://scripts/core/HeadlessSaveReload1CorruptTest.gd || fail
 
+  run_step launch_save_reload1_title_list \
+    flock "${HOME}/.eoa_godot.lock" tools/run_godot.sh --headless --path . --resolution 1280x800 -s res://scripts/core/HeadlessSaveReload1TitleListTest.gd || fail
+
   run_step launch_save_reload1_determinism \
     tools/eoa_save_reload1_determinism.sh || fail
 

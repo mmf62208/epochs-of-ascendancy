@@ -10,6 +10,8 @@ const LIVING_TITLE_NATIONS := ["GER", "ENG", "FRA", "JAP", "USA", "SOV", "ITA", 
 const LIVING_TITLE_ERAS := [1918, 1936, 2026]
 ## Above UILayer HUD (110) and toasts (90) so Begin is not covered; below Command Center (130).
 const LIVING_TITLE_LAYER := 120
+const PANEL_MAX_H := 760.0
+const SAVE_LIST_MAX_H := 168.0
 const NATION_LABELS := {
 	"GER": "Germany",
 	"ENG": "United Kingdom",
@@ -30,6 +32,10 @@ var _cc_btn: Button
 var _esc_chip: Button
 var _panel: PanelContainer
 var _status: Label
+var _save_scroll: ScrollContainer
+var _save_list: VBoxContainer
+var _save_rows: Array[Dictionary] = []
+var _last_ptr_pts: Array[Vector2] = []
 var _closed := false
 ## Set when live Esc is accepted on this overlay (headless + Play proof).
 var _esc_routed_to_cc := false
@@ -243,9 +249,10 @@ func _build_ui() -> void:
 
 	var panel := PanelContainer.new()
 	panel.name = "LivingTitlePanel"
-	panel.custom_minimum_size = Vector2(420, 610)
+	panel.custom_minimum_size = Vector2(420, 520)
 	panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	panel.process_mode = Node.PROCESS_MODE_ALWAYS
+	panel.clip_contents = true
 	RetrowaveTheme.style_menu_panel(panel)
 	root.add_child(panel)
 	_panel = panel
@@ -370,6 +377,7 @@ func _build_ui() -> void:
 
 	_build_esc_chip(root)
 	_refresh_choice_buttons()
+	call_deferred("_fit_panel_to_viewport")
 
 
 func _build_esc_chip(root: Control) -> void:
@@ -400,35 +408,106 @@ func _build_esc_chip(root: Control) -> void:
 
 
 func _fill_save_rows(col: VBoxContainer) -> void:
+	_save_rows.clear()
+	_save_scroll = ScrollContainer.new()
+	_save_scroll.name = "LivingTitleSaveScroll"
+	_save_scroll.custom_minimum_size = Vector2(0, 36)
+	_save_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_save_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_save_scroll.mouse_filter = Control.MOUSE_FILTER_STOP
+	col.add_child(_save_scroll)
+	_save_list = VBoxContainer.new()
+	_save_list.name = "LivingTitleSaveList"
+	_save_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_save_list.add_theme_constant_override("separation", 4)
+	_save_scroll.add_child(_save_list)
 	var n := 0
-	if typeof(SaveLoadManager) != TYPE_NIL and SaveLoadManager.has_method("list_slots_for_ui"):
-		var rows: Array = SaveLoadManager.list_slots_for_ui()
+	if typeof(SaveLoadManager) != TYPE_NIL and SaveLoadManager.has_method("list_saves"):
+		var rows: Array = SaveLoadManager.list_saves()
 		for raw in rows:
-			if n >= 8:
-				break
 			if typeof(raw) != TYPE_DICTIONARY:
 				continue
 			var row: Dictionary = raw
-			if not bool(row.get("can_load", row.get("occupied", false))):
-				continue
 			var slot := str(row.get("slot", "")).strip_edges()
 			if slot.is_empty():
 				continue
+			var damaged := bool(row.get("damaged", false))
+			var meta: Dictionary = row.get("metadata", {}) if row.get("metadata") is Dictionary else {}
 			var btn := Button.new()
-			btn.text = "Load · %s" % str(row.get("label", slot))
+			btn.name = "LivingTitleSaveRow_%s" % slot
+			btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
 			btn.custom_minimum_size = Vector2(0, 30)
 			btn.mouse_filter = Control.MOUSE_FILTER_STOP
+			btn.focus_mode = Control.FOCUS_NONE
 			btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
-			btn.pressed.connect(_on_load.bind(slot))
+			var when := str(meta.get("game_date", ""))
+			var nation := str(meta.get("nation_name", meta.get("player_tag", "")))
+			var wall := ""
+			if SaveLoadManager.has_method("format_wall_time_local"):
+				wall = str(SaveLoadManager.format_wall_time_local(str(meta.get("wall_time", meta.get("timestamp", "")))))
+			var flags := "  damaged" if damaged else ""
+			if bool(row.get("old_format", false)) and not damaged:
+				flags += "  old format"
+			btn.text = "Load · %s   %s   %s   %s%s" % [slot, when, nation, wall, flags]
+			if damaged:
+				btn.modulate = Color(0.55, 0.55, 0.55, 1)
+			btn.pressed.connect(_on_title_save_pressed.bind(slot, damaged))
 			RetrowaveTheme.style_secondary_button(btn)
-			col.add_child(btn)
+			_save_list.add_child(btn)
+			_save_rows.append({"btn": btn, "slot": slot, "damaged": damaged})
 			n += 1
 	if n == 0:
 		var empty := Label.new()
+		empty.name = "LivingTitleSaveEmpty"
 		empty.text = "No saves yet — start a new campaign."
 		empty.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		RetrowaveTheme.style_body_label(empty)
-		col.add_child(empty)
+		_save_list.add_child(empty)
+	var row_h := 34.0
+	var want := float(n) * row_h + float(maxi(0, n - 1)) * 4.0
+	if n == 0:
+		want = 36.0
+	_save_scroll.custom_minimum_size.y = minf(SAVE_LIST_MAX_H, maxf(36.0, want))
+
+
+func _on_title_save_pressed(slot: String, damaged: bool) -> void:
+	if damaged:
+		_show_damaged_save_message()
+		return
+	_on_load(slot)
+
+
+func _show_damaged_save_message() -> void:
+	var msg := SaveLoadManager.DAMAGED_SAVE_MESSAGE if typeof(SaveLoadManager) != TYPE_NIL else "Save file is damaged and can't be loaded"
+	if _status != null:
+		_status.text = msg
+	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
+		LeaderEventUI.show_toast(msg, 3.0, true)
+
+
+func _fit_panel_to_viewport() -> void:
+	if _panel == null or not is_instance_valid(_panel):
+		return
+	var limit := 800.0
+	var vp: Viewport = get_viewport()
+	if vp != null:
+		var vs: Vector2 = vp.get_visible_rect().size
+		if vs.y > 8.0:
+			limit = vs.y
+	var max_h := minf(PANEL_MAX_H, limit - 40.0)
+	if _panel.size.y > max_h:
+		_panel.custom_minimum_size.y = max_h
+		_panel.size.y = max_h
+	var r: Rect2 = _panel.get_global_rect()
+	if r.position.y < 8.0:
+		var up := 8.0 - r.position.y
+		_panel.offset_top += up
+		_panel.offset_bottom += up
+		r = _panel.get_global_rect()
+	if r.end.y > limit - 8.0:
+		var dy := r.end.y - (limit - 8.0)
+		_panel.offset_top -= dy
+		_panel.offset_bottom -= dy
 
 
 func select_from_province(province_id: int) -> Dictionary:
@@ -601,14 +680,32 @@ func panel_owns_screen_point(screen: Vector2) -> bool:
 	return _panel.get_global_rect().grow(PANEL_HIT_GROW).has_point(screen)
 
 
-func begin_owns_screen_point(screen: Vector2) -> bool:
+func save_row_owns_screen_point(screen: Vector2) -> bool:
+	for raw in _save_rows:
+		if typeof(raw) != TYPE_DICTIONARY:
+			continue
+		var btn: Button = raw.get("btn") as Button
+		if btn != null and is_instance_valid(btn) and btn.visible:
+			if btn.get_global_rect().has_point(screen):
+				return true
+	return false
+
+
+func begin_button_owns_screen_point(screen: Vector2) -> bool:
 	if _begin_btn != null and is_instance_valid(_begin_btn) and _begin_btn.visible:
 		if _begin_btn.get_global_rect().grow(BEGIN_HIT_GROW).has_point(screen):
 			return true
-	# Status line sits under Begin — Play computerUse often clicks the caption, not the plate.
 	if _status != null and is_instance_valid(_status) and _status.visible:
 		if _status.get_global_rect().grow(16.0).has_point(screen):
 			return true
+	return false
+
+
+func begin_owns_screen_point(screen: Vector2) -> bool:
+	if begin_button_owns_screen_point(screen):
+		return true
+	if save_row_owns_screen_point(screen):
+		return false
 	# Lower panel slab below Command Center (layout / title-bar offset class).
 	if _panel != null and is_instance_valid(_panel) and _panel.visible:
 		var pr: Rect2 = _panel.get_global_rect()
@@ -752,6 +849,8 @@ func collect_pointer_points(event: InputEvent) -> Array[Vector2]:
 
 func _any_point_matches(pts: Array[Vector2], kind: String) -> bool:
 	for p in pts:
+		if kind == "save" and save_row_owns_screen_point(p):
+			return true
 		if kind == "begin" and begin_owns_screen_point(p):
 			return true
 		if kind == "cc" and cc_owns_screen_point(p):
@@ -798,8 +897,11 @@ func handle_live_pointer(event: InputEvent) -> String:
 	var ev_hit: String = _classify_points(ev_pts)
 	var pending_press: bool = event == null
 	if ev_hit != "map":
+		_last_ptr_pts = ev_pts
 		return _apply_pointer_hit(ev_hit, pending_press)
-	var fb_hit: String = _classify_points(collect_pointer_points(null))
+	var fb_pts: Array[Vector2] = collect_pointer_points(null)
+	var fb_hit: String = _classify_points(fb_pts)
+	_last_ptr_pts = fb_pts
 	return _apply_pointer_hit(fb_hit, pending_press)
 
 
@@ -807,6 +909,13 @@ func _classify_points(pts: Array[Vector2]) -> String:
 	# CC first so Command Center · Esc / Esc · Menu are never stolen by the Begin slab.
 	if _any_point_matches(pts, "cc"):
 		return "cc"
+	# The real Begin plate wins if a test / computerUse parks it over a save row.
+	for p in pts:
+		if begin_button_owns_screen_point(p):
+			return "begin"
+	# Save rows beat the leftover Begin slab / left-column so a tall list stays clickable.
+	if _any_point_matches(pts, "save"):
+		return "save"
 	if _any_point_matches(pts, "begin"):
 		return "begin"
 	if _any_point_matches(pts, "panel"):
@@ -818,6 +927,10 @@ func _classify_points(pts: Array[Vector2]) -> String:
 
 
 func _apply_pointer_hit(hit: String, pending_press: bool = false) -> String:
+	if hit == "save":
+		print("EOA_LIVE_PTR who=title.handle_live_pointer action=save")
+		_activate_save_at_pointer()
+		return "save"
 	if hit == "begin":
 		print("EOA_LIVE_PTR who=title.handle_live_pointer action=begin")
 		_on_begin_new(pending_press, true)
@@ -830,6 +943,22 @@ func _apply_pointer_hit(hit: String, pending_press: bool = false) -> String:
 		print("EOA_LIVE_PTR who=title.handle_live_pointer action=panel")
 		return "panel"
 	return "map"
+
+
+func _activate_save_at_pointer() -> void:
+	var pts: Array[Vector2] = _last_ptr_pts
+	if pts.is_empty():
+		pts = collect_pointer_points(null)
+	for p in pts:
+		for raw in _save_rows:
+			if typeof(raw) != TYPE_DICTIONARY:
+				continue
+			var btn: Button = raw.get("btn") as Button
+			if btn == null or not is_instance_valid(btn):
+				continue
+			if btn.get_global_rect().has_point(p):
+				_on_title_save_pressed(str(raw.get("slot", "")), bool(raw.get("damaged", false)))
+				return
 
 
 func handle_live_begin() -> Dictionary:
@@ -1401,7 +1530,19 @@ func _on_begin_new(pending_press: bool = false, from_pointer: bool = false) -> v
 
 
 func _on_load(slot: String) -> void:
-	var out: Dictionary = apply_living_title_boot(_tag, _year, slot)
+	if _closed:
+		return
+	var name := slot.strip_edges()
+	if name.is_empty():
+		return
+	var out: Dictionary = apply_living_title_boot(_tag, _year, name)
+	if not bool(out.get("ok", false)):
+		if bool(out.get("damaged", false)):
+			_show_damaged_save_message()
+			return
+		if _status != null:
+			_status.text = str(out.get("error", out.get("reason", "Load failed")))
+		return
 	_finish(out)
 
 

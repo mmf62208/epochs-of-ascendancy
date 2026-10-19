@@ -1110,8 +1110,6 @@ func _input(event: InputEvent) -> void:
 			_update_date_time()
 			_update_resources()
 			print("Ctrl+L QuickLoad triggered ok=%s" % str(loaded))
-			if loaded and typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
-				LeaderEventUI.show_toast("Quickload OK", 2.5)
 		get_viewport().set_input_as_handled()
 		return
 	if key.keycode == KEY_SPACE or key.keycode == KEY_PERIOD:
@@ -1184,12 +1182,9 @@ func _unhandled_input(event: InputEvent) -> void:
 				kb = int(int(res.get("bytes", 0)) / 1024)
 			elif SaveLoadManager.has_method("quicksave"):
 				ok = bool(SaveLoadManager.quicksave())
-			print("Ctrl+S QuickSave triggered ok=%s path=%s" % [str(ok), abs_p])
-			if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
-				if ok:
-					LeaderEventUI.show_toast("Quicksave OK · %d KB (slot: quicksave)" % kb, 2.8)
-				else:
-					LeaderEventUI.show_toast("Quicksave FAILED — see console", 3.5)
+			print("Ctrl+S QuickSave triggered ok=%s path=%s kb=%s" % [str(ok), abs_p, str(kb)])
+			if not ok and typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
+				LeaderEventUI.show_toast("Quicksave FAILED — see console", 3.5)
 			# Refresh Command Center list if open.
 			var mm: Node = get_tree().root.find_child("MainMenu", true, false) if get_tree() else null
 			if mm != null and mm.has_method("_refresh_save_list"):

@@ -166,8 +166,11 @@ func _pass_flow(swallow: bool, slot: String, shots: bool) -> void:
 	if not _row_before("sr1test_ui_old", slot):
 		_fail("%s: newest save is not listed before the old fixture" % tag)
 		return
-	if bad == null or not bad.disabled or str(bad.text).find("damaged") < 0:
-		_fail("%s: damaged row not greyed out" % tag)
+	if bad == null or str(bad.text).find("damaged") < 0:
+		_fail("%s: damaged row missing text=%s" % [tag, str(bad.text) if bad != null else "null"])
+		return
+	if bad.modulate.r > 0.7:
+		_fail("%s: damaged row not greyed modulate=%s" % [tag, str(bad.modulate)])
 		return
 	_pass("%s: load list shows date, nation, and a damaged row" % tag)
 	if shots:
@@ -180,12 +183,19 @@ func _pass_flow(swallow: bool, slot: String, shots: bool) -> void:
 		await _shot("load_damaged_row")
 	var hash_before_bad := _hash_now()
 	_select_row(bad)
+	await process_frame
+	if not _toast_has("Save file is damaged and can't be loaded"):
+		_fail("%s: selecting a damaged save did not show the damaged message" % tag)
+		return
 	if not await _click_named("BtnLoad", swallow):
 		_fail("%s: load button missing" % tag)
 		return
 	await process_frame
 	if _hash_now() != hash_before_bad:
 		_fail("%s: damaged row loaded" % tag)
+		return
+	if not _toast_has("Save file is damaged and can't be loaded"):
+		_fail("%s: Load on a damaged save said something else" % tag)
 		return
 	_pass("%s: damaged row cannot be loaded" % tag)
 	_close_dialog()
@@ -209,6 +219,13 @@ func _pass_flow(swallow: bool, slot: String, shots: bool) -> void:
 	var load_confirm := _dialog_node("ConfirmText")
 	if load_confirm == null or str(load_confirm.text).find("will be lost") < 0:
 		_fail("%s: unsaved-progress confirm missing" % tag)
+		return
+	if load_confirm.autowrap_mode == TextServer.AUTOWRAP_OFF:
+		_fail("%s: will-be-lost confirm does not wrap" % tag)
+		return
+	var confirm_panel := _dialog_node("ConfirmPanel") as Control
+	if confirm_panel != null and load_confirm.get_minimum_size().y > confirm_panel.size.y - 40.0:
+		_fail("%s: will-be-lost confirm overflows the frame" % tag)
 		return
 	if not await _click_named("BtnConfirm", swallow):
 		return
@@ -437,7 +454,10 @@ func _quick_roundtrip(swallow: bool, tag: String) -> void:
 	if not FileAccess.file_exists(_abs_save("sr1test_ui_qs")):
 		_fail("%s: Ctrl+S did not write the test quick slot" % tag)
 		return
-	if not _toast_has("Quicksave") and not _toast_has("Saved"):
+	if _toast_has("Quicksave OK"):
+		_fail("%s: Ctrl+S showed a second Quicksave OK toast" % tag)
+		return
+	if not _toast_has("Saved"):
 		_fail("%s: Ctrl+S toast missing" % tag)
 		return
 	var qs_date := _clock_text()
@@ -452,7 +472,7 @@ func _quick_roundtrip(swallow: bool, tag: String) -> void:
 	if _clock_text() != qs_date or _hash_now() != qs_hash:
 		_fail("%s: Ctrl+L did not restore %s/%s" % [tag, _clock_text(), qs_date])
 		return
-	if not _toast_has("Quickload") and not _toast_has("loaded"):
+	if not _toast_has("Loaded"):
 		_fail("%s: Ctrl+L toast missing" % tag)
 		return
 	_pass("%s: Ctrl+S / Ctrl+L round-trip" % tag)
@@ -790,10 +810,7 @@ func _dialog_node(node_name: String) -> Node:
 func _select_row(row: Button) -> void:
 	if row == null:
 		return
-	row.disabled = false
 	row.pressed.emit()
-	if row.name == "Row_sr1test_ui_bad":
-		row.disabled = true
 
 
 func _row_before(older: String, newer: String) -> bool:

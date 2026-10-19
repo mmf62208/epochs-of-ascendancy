@@ -712,14 +712,18 @@ func _format_detail(meta: Dictionary) -> String:
 	var parts: PackedStringArray = []
 	var sc := str(meta.get("scenario_id", "")).strip_edges()
 	var tag := str(meta.get("player_tag", "")).strip_edges()
-	var ts := str(meta.get("timestamp", meta.get("last_played", ""))).strip_edges()
+	var ts := str(meta.get("wall_time", meta.get("timestamp", meta.get("last_played", "")))).strip_edges()
 	var ver := str(meta.get("game_version", "")).strip_edges()
 	if not sc.is_empty():
 		parts.append(sc.replace("_", " "))
 	if not tag.is_empty():
 		parts.append(tag)
 	if not ts.is_empty():
-		parts.append(ts.substr(0, mini(19, ts.length())))
+		var shown := ts
+		var slm := _slm()
+		if slm != null and slm.has_method("format_wall_time_local"):
+			shown = str(slm.call("format_wall_time_local", ts))
+		parts.append(shown.substr(0, mini(19, shown.length())))
 	if not ver.is_empty():
 		parts.append("v%s" % ver)
 	return " · ".join(parts) if parts.size() > 0 else "Occupied"

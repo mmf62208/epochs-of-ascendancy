@@ -42,6 +42,8 @@ func _ready() -> void:
 	layer = LAYER
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	add_to_group("save_load_dialog")
+	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("raise_toasts_above_dialogs"):
+		LeaderEventUI.raise_toasts_above_dialogs()
 	set_process_input(true)
 	var blocker := ColorRect.new()
 	blocker.name = "Blocker"
@@ -129,22 +131,25 @@ func _build_confirm(panel: Panel) -> void:
 	_confirm_panel = Panel.new()
 	_confirm_panel.name = "ConfirmPanel"
 	_confirm_panel.visible = false
-	_confirm_panel.position = Vector2(80, 160)
-	_confirm_panel.custom_minimum_size = Vector2(600, 180)
-	_confirm_panel.size = Vector2(600, 180)
+	_confirm_panel.position = Vector2(80, 140)
+	_confirm_panel.custom_minimum_size = Vector2(600, 220)
+	_confirm_panel.size = Vector2(600, 220)
 	_confirm_panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	RetrowaveTheme.style_menu_panel(_confirm_panel)
 	panel.add_child(_confirm_panel)
 	var box := VBoxContainer.new()
 	box.position = Vector2(16, 16)
-	box.custom_minimum_size = Vector2(568, 148)
-	box.size = Vector2(568, 148)
+	box.custom_minimum_size = Vector2(568, 188)
+	box.size = Vector2(568, 188)
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	box.add_theme_constant_override("separation", 12)
 	_confirm_panel.add_child(box)
 	_confirm_label = Label.new()
 	_confirm_label.name = "ConfirmText"
 	_confirm_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_confirm_label.custom_minimum_size = Vector2(540, 64)
+	_confirm_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_confirm_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_confirm_label.custom_minimum_size = Vector2(540, 80)
 	RetrowaveTheme.style_body_label(_confirm_label)
 	box.add_child(_confirm_label)
 	var row := HBoxContainer.new()
@@ -220,6 +225,8 @@ func _make_row(index: int) -> Control:
 	var when := str(meta.get("game_date", ""))
 	var status := str(meta.get("campaign_status", ""))
 	var wall := str(meta.get("wall_time", meta.get("timestamp", "")))
+	if typeof(SaveLoadManager) != TYPE_NIL and SaveLoadManager.has_method("format_wall_time_local"):
+		wall = str(SaveLoadManager.format_wall_time_local(wall))
 	var flags := ""
 	if old:
 		flags += "  old format"
@@ -227,10 +234,8 @@ func _make_row(index: int) -> Control:
 		flags += "  damaged"
 	btn.text = "%s   %s   %s   %s   %s%s" % [slot, when, nation, status, wall, flags]
 	if damaged:
-		btn.disabled = true
 		btn.modulate = Color(0.55, 0.55, 0.55, 1)
-	else:
-		btn.pressed.connect(_select_row.bind(index))
+	btn.pressed.connect(_select_row.bind(index))
 	var swatch := ColorRect.new()
 	swatch.custom_minimum_size = Vector2(14, 14)
 	swatch.color = _flag_color(tag if not tag.is_empty() else slot)
@@ -247,8 +252,12 @@ func _flag_color(tag: String) -> Color:
 
 func _select_row(index: int) -> void:
 	_selected = index
-	if _mode == "save" and _name_field != null and index >= 0 and index < _rows.size():
+	if index < 0 or index >= _rows.size():
+		return
+	if _mode == "save" and _name_field != null:
 		_name_field.text = str(_rows[index].get("slot", ""))
+	if bool(_rows[index].get("damaged", false)):
+		_toast(SaveLoadManager.DAMAGED_SAVE_MESSAGE, true)
 
 
 func _on_save_pressed() -> void:
@@ -275,7 +284,7 @@ func _on_load_pressed() -> void:
 		_toast("Select a save.", true)
 		return
 	if bool(info.get("damaged", false)):
-		_toast("That save is damaged.", true)
+		_toast(SaveLoadManager.DAMAGED_SAVE_MESSAGE, true)
 		return
 	var slot := str(info.get("slot", ""))
 	var running := false
@@ -285,6 +294,8 @@ func _on_load_pressed() -> void:
 		var since := _newest_wall_time()
 		if since.is_empty():
 			since = "the start of this session"
+		elif typeof(SaveLoadManager) != TYPE_NIL and SaveLoadManager.has_method("format_wall_time_local"):
+			since = str(SaveLoadManager.format_wall_time_local(since))
 		_show_confirm("load", slot, "Unsaved progress since %s will be lost. Load?" % since, "Load")
 		return
 	_read(slot)
@@ -307,6 +318,11 @@ func _show_confirm(kind: String, slot: String, text: String, ok_label: String) -
 	_pending_slot = slot
 	_confirm_label.text = text
 	_confirm_ok.text = ok_label
+	var text_h := maxf(80.0, _confirm_label.get_minimum_size().y)
+	var panel_h := maxf(220.0, text_h + 120.0)
+	_confirm_label.custom_minimum_size = Vector2(540, text_h)
+	_confirm_panel.custom_minimum_size = Vector2(600, panel_h)
+	_confirm_panel.size = Vector2(600, panel_h)
 	_confirm_panel.visible = true
 
 
@@ -345,12 +361,11 @@ func _write(slot: String) -> void:
 func _read(slot: String) -> void:
 	var result: Dictionary = SaveLoadManager.load_game_detailed(slot)
 	if bool(result.get("ok", false)):
-		_toast("Loaded %s" % slot, false)
 		var bar := get_tree().get_first_node_in_group("top_info_bar") if get_tree() != null else null
 		if bar != null and bar.has_method("_update_date_time"):
 			bar.call("_update_date_time")
 		_close()
-	# Failure toast comes from load_game_detailed.
+	# Success and failure toasts come from load_game_detailed.
 
 
 func _typed_slot() -> String:
@@ -376,6 +391,8 @@ func _newest_wall_time() -> String:
 
 
 func _toast(message: String, is_error: bool) -> void:
+	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("raise_toasts_above_dialogs"):
+		LeaderEventUI.raise_toasts_above_dialogs()
 	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
 		LeaderEventUI.show_toast(message, 3.0, is_error)
 

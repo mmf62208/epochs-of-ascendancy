@@ -144,6 +144,7 @@ const SAVE_DIR := "user://saves/"
 const SAVE_VERSION := 1
 const SAVE_GAME_VERSION := "0.2-dev"   # Bumped for richer metadata support
 const DEFAULT_SLOT := "quicksave"
+const DAMAGED_SAVE_MESSAGE := "Save file is damaged and can't be loaded"
 ## Monthly is the beta default. off / monthly / quarterly / yearly.
 const AUTOSAVE_FREQUENCY := "monthly"
 const AUTOSAVE_SLOT_COUNT := 3
@@ -528,7 +529,11 @@ func _format_slot_ui_row(slot: String, occupied: bool, metadata: Variant, damage
 			bits.append(scenario)
 		if not player.is_empty():
 			bits.append(player)
-		if not ts.is_empty():
+		var wall := str(meta.get("wall_time", ts)).strip_edges()
+		if not wall.is_empty():
+			var shown := format_wall_time_local(wall)
+			bits.append(shown.substr(0, mini(19, shown.length())))
+		elif not ts.is_empty():
 			bits.append(ts.substr(0, mini(16, ts.length())))
 		if damaged:
 			bits.append("damaged")
@@ -572,11 +577,7 @@ func save_game(slot_name: String = DEFAULT_SLOT) -> bool:
 
 func load_game(slot_name: String = DEFAULT_SLOT) -> bool:
 	var res := load_game_detailed(slot_name)
-	if bool(res.get("ok", false)):
-		if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
-			LeaderEventUI.show_toast("Game loaded (" + slot_name + ")", 2.5)
-		return true
-	return false
+	return bool(res.get("ok", false))
 
 ## === INTERNAL GATHER / APPLY ===
 
@@ -1492,6 +1493,9 @@ func load_game_detailed(slot_name: String = DEFAULT_SLOT) -> Dictionary:
 		var msg := str(res.get("error", "Load failed"))
 		if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
 			LeaderEventUI.show_toast("Load failed: " + msg, 3.0, true)
+		return res
+	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
+		LeaderEventUI.show_toast("Loaded %s" % _sanitize_slot(slot_name), 2.5)
 	return res
 
 ## === UX helpers (delete, rename) for save menu ===
@@ -1857,6 +1861,25 @@ func _peek_save_file(path: String, is_v2: bool) -> Dictionary:
 	var meta: Dictionary = root.get("metadata", {}) if root.get("metadata") is Dictionary else {}
 	meta["old_format"] = true
 	return {"damaged": false, "old_format": true, "error": "", "metadata": meta}
+
+
+## Display helper. Stored wall_time stays UTC; the list shows the local clock.
+func format_wall_time_local(wall: String) -> String:
+	var raw := wall.strip_edges()
+	if raw.is_empty():
+		return ""
+	var cleaned := raw
+	if cleaned.ends_with("Z") or cleaned.ends_with("z"):
+		cleaned = cleaned.substr(0, cleaned.length() - 1)
+	cleaned = cleaned.replace(" ", "T")
+	if cleaned.length() >= 19:
+		cleaned = cleaned.substr(0, 19)
+	var unix := 0
+	if cleaned.length() >= 19:
+		unix = int(Time.get_unix_time_from_datetime_string(cleaned))
+	if unix <= 0:
+		return raw
+	return Time.get_datetime_string_from_unix_time(unix, false)
 
 
 func _save_sort_key(entry: Dictionary) -> String:
