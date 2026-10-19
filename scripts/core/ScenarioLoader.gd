@@ -1614,6 +1614,7 @@ func _spawn_scenario_formations(scenario_name: String) -> void:
 		)
 		if (idx % yield_n) == 0:
 			await get_tree().process_frame
+	_apply_start_garrisons()
 	LeaderManager.clear_all_leader_caches()
 	_print_formation_station_evidence()
 	# Historical leaders → formations (after roster load + spawn; real assign API).
@@ -1641,6 +1642,13 @@ func _spawn_scenario_formations(scenario_name: String) -> void:
 		% countries_to_spawn.size()
 	)
 	await _report_load_progress(0.40, "Spawned formations for all countries...")
+
+
+func _apply_start_garrisons() -> void:
+	if typeof(AiStartGarrisonDomain) == TYPE_NIL:
+		return
+	var rep: Dictionary = AiStartGarrisonDomain.apply()
+	print("ScenarioLoader: start garrisons %s" % str(rep.get("summary", "")))
 
 
 func _get_formation_spawn_countries(_scenario_name: String) -> Array[String]:

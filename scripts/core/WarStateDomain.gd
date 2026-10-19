@@ -257,6 +257,69 @@ static func _formal_allies(a: String, b: String) -> bool:
 	return bool(RelationsManager.is_allied(a, b))
 
 
+static func are_allied(a: String, b: String) -> bool:
+	return _formal_allies(a, b)
+
+
+static func is_human_nation(tag: String) -> bool:
+	return _is_player_or_human_nation(tag)
+
+
+static func relation_tags() -> Array:
+	return _relation_tags()
+
+
+static func justify_rows() -> Array:
+	var out: Array = []
+	var just := _justifies()
+	var keys: Array = just.keys()
+	keys.sort()
+	for k in keys:
+		var row_v: Variant = just[k]
+		if not (row_v is Dictionary):
+			continue
+		var row: Dictionary = (row_v as Dictionary).duplicate()
+		row["key"] = str(k)
+		out.append(row)
+	return out
+
+
+static func cancel_ai_justify(attacker: String, defender: String, reason: String, day: int = -1) -> Dictionary:
+	var a := _tag(attacker)
+	var b := _tag(defender)
+	var key := "%s>%s" % [a, b]
+	var just := _justifies()
+	if not just.has(key):
+		return {"ok": false, "reason": "missing"}
+	if _is_player_or_human_nation(a):
+		return {"ok": false, "reason": "human"}
+	just.erase(key)
+	_state()["justifies"] = just
+	var when := day if day >= 0 else _day()
+	_append_log("cancel_justify", a, b, when, reason)
+	return {"ok": true, "attacker": a, "defender": b, "reason": reason, "day": when}
+
+
+static func war_rows() -> Array:
+	var wars := _wars()
+	var keys: Array = wars.keys()
+	keys.sort()
+	var out: Array = []
+	for k in keys:
+		var row_v: Variant = wars[k]
+		if not (row_v is Dictionary):
+			continue
+		var row: Dictionary = (row_v as Dictionary).duplicate()
+		row["pair"] = str(k)
+		out.append(row)
+	return out
+
+
+static func event_log() -> Array:
+	var log: Variant = _state().get("log", [])
+	return (log as Array).duplicate(true) if log is Array else []
+
+
 static func _relation_tags() -> Array:
 	var found: Dictionary = {}
 	if typeof(RelationsManager) != TYPE_NIL and "_pairs" in RelationsManager:
@@ -645,7 +708,10 @@ static func try_ai_declare_wars(day_index: int) -> Array:
 	var min_day := int(r["ai_declare_min_day"])
 	if day < min_day and not _any_justify():
 		return []
-	var events: Array = _complete_ready_justifies(day)
+	var events: Array = []
+	if typeof(AiCredibleDomain) != TYPE_NIL and AiCredibleDomain.enabled():
+		events.append_array(AiWarPlannerDomain.cancel_stale(day))
+	events.append_array(_complete_ready_justifies(day))
 	if day < min_day:
 		return events
 	var checks := int(r["ai_declare_checks_per_day"])
@@ -661,6 +727,7 @@ static func try_ai_declare_wars(day_index: int) -> Array:
 	var may_player := bool(r["ai_may_declare_on_player"])
 	var justify_days := int(r["ai_justify_days"])
 	var player := _player()
+	var credible := typeof(AiCredibleDomain) != TYPE_NIL and AiCredibleDomain.enabled()
 	for i in range(checks):
 		var m := str(majors[(rot + i) % majors.size()])
 		if war_count(m) >= max_wars:
@@ -671,10 +738,23 @@ static func try_ai_declare_wars(day_index: int) -> Array:
 			continue
 		if _has_pending_justify(m):
 			continue
-		var target := _pick_declare_target(m, player, may_player, min_ratio)
+		var target := ""
+		var picked: Dictionary = {}
+		if credible:
+			picked = AiWarPlannerDomain.pick_target(m, player, may_player, min_ratio, day)
+			target = str(picked.get("target", ""))
+		else:
+			target = _pick_declare_target(m, player, may_player, min_ratio)
 		if target.is_empty():
 			continue
 		_begin_justify(m, target, day + justify_days, "ai")
+		if credible:
+			var terms := str(picked.get("terms", ""))
+			print("AiCredible: justify %s -> %s day=%d score=%.2f %s" % [m, target, day, float(picked.get("score", 0.0)), terms])
+			AiCredibleDomain.trace_line(
+				"JUSTIFY day=%d att=%s def=%s score=%.2f ratio=%.3f %s"
+				% [day, m, target, float(picked.get("score", 0.0)), float(picked.get("ratio", 0.0)), terms]
+			)
 		events.append({"action": "justify", "attacker": m, "defender": target, "day": day, "ready_day": day + justify_days})
 	return events
 
@@ -726,6 +806,10 @@ static func _complete_ready_justifies(day: int) -> Array:
 		if is_at_war(attacker, defender) or in_truce(attacker, defender):
 			continue
 		var res: Dictionary = declare_war(attacker, defender, str(row.get("kind", "ai")))
+		if typeof(AiCredibleDomain) != TYPE_NIL and AiCredibleDomain.enabled() and str(row.get("kind", "")) != "player":
+			var line := "DECLARE day=%d att=%s def=%s ok=%s" % [day, attacker, defender, str(bool(res.get("ok", false)))]
+			print("AiCredible: declare %s -> %s day=%d ok=%s" % [attacker, defender, day, str(bool(res.get("ok", false)))])
+			AiCredibleDomain.trace_line(line)
 		events.append({
 			"action": "declare",
 			"attacker": attacker,
