@@ -294,14 +294,14 @@ func _assert_legend_height_and_minimap_at_war(wh: Vector2i) -> void:
 	gs.source_code = """
 extends Control
 func get_bar_height() -> float:
-	return 72.0
+	return 96.0
 """
 	if gs.reload() != OK:
 		_fail("war TopInfoBar stub failed to parse")
 		stub.queue_free()
 		return
 	stub.set_script(gs)
-	stub.size = Vector2(1280, 72)
+	stub.size = Vector2(1280, 96)
 	root.add_child(stub)
 	_mr.call("_layout_map_ui")
 	await _flush()
@@ -350,6 +350,9 @@ func _test_highway_hint_live() -> void:
 	if tb == null:
 		_fail("toolbar missing for highway hint")
 		return
+	_mr.set("current_map_mode", "political")
+	_mr.set("supply_mode", false)
+	_mr.call("_sync_mapmode_toolbar")
 	var hints = tb.get("MODE_HINTS")
 	if not (hints is Dictionary):
 		_fail("MODE_HINTS missing")
