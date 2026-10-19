@@ -337,6 +337,7 @@ Play MIXED on main `d00dc8ed`: right after GER Declare on POL, a notice `Provinc
 **Fix:** interactive light sim skips AI empty-hex vs the human player's land (stops the flip). Capture toasts log `MAIN_FIX1_CAPTURE_SRC` and require an owner flip to the attacker. Controller-only flips are logged and not toasted. Peace sheet buttons are Retrowave `ACTION_MODE_BUTTON_PRESS`, apply+log+close.
 
 Guards: DeclareClick stations a POL border division and asserts the GER hex stays GER; xvfb `WindowedMainFix1DeclareToastGuard` watches the toast layer 10 in-game days; `HeadlessMainFix1PeaceClickTest` clicks Annex all and Keep occupied.
+- FIX #1 measured: ProdEsc **PASS** (0 SCRIPT ERROR). PeaceClick **PASS** (Annex all moved=1, Keep occupied moved=0). xvfb DeclareToast **PASS** (10 days, toast cards=0, Elbląski/Słupski stayed GER). DeclareClick / WarGate / CapitulationPeace **PASS**. Toast root `BattleManager._post_battle_news` :3008.
 - Existing CL1: WarGate, CapitulationPeace, Soak all `RESULT=PASS`.
 - Seed `multi_ai_decisions` md5 `20fe9063de285f19d4f9b8a105abfd31` default and `EOA_CAMPAIGN_LOOP=0`.
 - `--quick` same 14 `unit_board_play_path` reds. map_qc NE **0.9853** (3148/3195).

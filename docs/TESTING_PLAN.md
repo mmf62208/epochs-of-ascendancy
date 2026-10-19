@@ -57,6 +57,8 @@ tools/eoa_main_fix1_declare_toast_guard.sh
 
 Wired as `launch_main_fix1_prod_esc`, `launch_main_fix1_peace_click`, `launch_main_fix1_declare_toast` on the full gate script (not `--quick`). `--quick` stays the same 14 known `unit_board_play_path` reds.
 
+FIX #1 measured: ProdEsc **RESULT=PASS** (0 SCRIPT ERROR). PeaceClick **RESULT=PASS** (Annex all moved=1, Keep occupied moved=0). xvfb DeclareToast **RESULT=PASS** (10 days, Elbląski/Słupski stayed GER, toast cards=0). DeclareClick / WarGate / CapitulationPeace **PASS**. UI-POLISH-1 + PROD-1 keep-green **PASS**. `--quick` `FAILED (failures=14)`. map_qc NE **0.9853**. Toast root: `BattleManager._post_battle_news` line 3008.
+
 ### 1. Core Time System Tests
 
 - Load a scenario and verify the top bar date matches `start_date`.
