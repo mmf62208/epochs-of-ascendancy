@@ -897,7 +897,7 @@ func get_formations_for_country(country_tag: String) -> Array[Formation]:
 	var result: Array[Formation] = []
 	for formation_id in formations:
 		var formation: Formation = formations[formation_id] as Formation
-		if formation != null and formation.country_tag == country_tag:
+		if formation != null and formation.country_tag == country_tag and not formation.campaign_inactive:
 			result.append(formation)
 	return result
 

@@ -282,6 +282,18 @@ func show_toast(message: String, duration_sec: float = 3.0, is_error: bool = fal
 	_eoa_flush("EOA_SMOKE_SPINE_BISECT who=LeaderEventUI.show_toast.exit")
 
 
+func hide_for_campaign_end() -> void:
+	_ensure_toast_layer()
+	if _toast_layer != null:
+		_toast_layer.visible = false
+	_trim_toast_stack_to(0)
+
+
+func restore_after_campaign_end() -> void:
+	if _toast_layer != null:
+		_toast_layer.visible = true
+
+
 func post_news(title: String, body: String, category: String = "general") -> void:
 	var year := 1936
 	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_current_year"):

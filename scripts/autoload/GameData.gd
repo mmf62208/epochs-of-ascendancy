@@ -5854,19 +5854,32 @@ func apply_war_goal_live(step: String = "board", province_id: int = 1) -> Dictio
 			apply_order_panel_action("apply_focus", province_id)
 	elif s.begins_with("execute") or s.begins_with("push"):
 		pushes += 1
-		if has_method("apply_order_panel_action"):
+		# Campaign loop: this leaf is the old Declare path. Player war is
+		# diplomatic only (WarStateDomain). AI offensives are
+		# BattleManager.try_ai_start_land_battles, not this assault.
+		var skip_player_assault: bool = typeof(WarStateDomain) != TYPE_NIL and WarStateDomain.loop_enabled()
+		if not skip_player_assault and has_method("apply_order_panel_action"):
 			apply_order_panel_action("apply_assault", province_id)
 	st["pushes"] = pushes
 	st["tick_count"] = int(st.get("tick_count", 0)) + 1
 	peace_state["war_goals"] = st.duplicate(true)
 	var ticks := int(peace_state.get("war_goal_tick_count", 0)) + 1
 	peace_state["war_goal_tick_count"] = ticks
+	_campaign_note_war_goal(s, province_id)
 	return {
 		"ok": true, "live": true, "step": s, "province_id": province_id,
 		"top_id": str(st.get("top_id", "")), "goal_n": int(st.get("goal_n", 0)),
 		"justified": bool(st.get("justified", false)), "pushes": pushes,
 		"war_goal_tick_count": ticks, "manager": "GameData.war_goals",
 	}
+
+func _campaign_note_war_goal(step: String, province_id: int) -> void:
+	if typeof(WarStateDomain) == TYPE_NIL or not WarStateDomain.loop_enabled():
+		return
+	if step.begins_with("justify") or step.begins_with("select") or step.begins_with("pick"):
+		WarStateDomain.begin_player_justify_from_province(province_id)
+	elif step.begins_with("execute") or step.begins_with("push"):
+		WarStateDomain.player_declare_from_province(province_id)
 
 func get_multi_front_state() -> Dictionary:
 	if not peace_state.has("multi_front") or not (peace_state["multi_front"] is Dictionary):
@@ -12376,6 +12389,9 @@ func get_save_data() -> Dictionary:
 		"membership_live_mutation_count": int(peace_state.get("membership_live_mutation_count", 0)),
 		"membership_live_log": peace_state.get("membership_live_log", []).duplicate(true) if peace_state.get("membership_live_log") is Array else [],
 		"rx1_bridged": _Rx1Rhine.export_bridged(),
+		"campaign_wars": peace_state["campaign_wars"].duplicate(true) if peace_state.get("campaign_wars") is Dictionary else {},
+		"campaign_capitulation": peace_state["campaign_capitulation"].duplicate(true) if peace_state.get("campaign_capitulation") is Dictionary else {},
+		"campaign_end": peace_state["campaign_end"].duplicate(true) if peace_state.get("campaign_end") is Dictionary else {},
 		"version": 1
 	}
 
@@ -12435,6 +12451,12 @@ func apply_save_data(data: Dictionary) -> void:
 		peace_state["crisis_responses"] = data["crisis_responses"].duplicate(true)
 	if data.has("pending_continuation"):
 		peace_state["pending_continuation"] = data.get("pending_continuation", {}).duplicate(true)
+	if data.has("campaign_wars") and data["campaign_wars"] is Dictionary:
+		peace_state["campaign_wars"] = data["campaign_wars"].duplicate(true)
+	if data.has("campaign_capitulation") and data["campaign_capitulation"] is Dictionary:
+		peace_state["campaign_capitulation"] = data["campaign_capitulation"].duplicate(true)
+	if data.has("campaign_end") and data["campaign_end"] is Dictionary:
+		peace_state["campaign_end"] = data["campaign_end"].duplicate(true)
 	# Pillar state for peace ripples/follow-ons
 	if data.has("ascendancy"):
 		peace_state["ascendancy"] = data["ascendancy"].duplicate(true)

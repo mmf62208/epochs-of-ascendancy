@@ -1560,6 +1560,8 @@ func update_province_owner(
 		changed = true
 	if changed:
 		_invalidate_owner_index()
+		if typeof(WarStateDomain) != TYPE_NIL:
+			WarStateDomain.note_province_owner_changed()
 		if typeof(SupplyManager) != TYPE_NIL and SupplyManager.has_method("notify_province_control_changed"):
 			SupplyManager.notify_province_control_changed(province_id)
 		if not skip_emit:
@@ -4671,16 +4673,45 @@ func collect_live_border_assault_targets(country_tag: String = "", max_count: in
 		tag = "GER"
 	var cap := maxi(max_count, 1)
 	if _live_fronts_precompute.has(tag):
-		var cached: Array = _live_fronts_precompute[tag]
-		if not cached.is_empty():
+		var stored: Array = _live_fronts_precompute[tag]
+		if not stored.is_empty():
+			var cached: Array = _campaign_filter_assault_targets(tag, stored)
 			var out_c: Array = []
 			for i in range(mini(cached.size(), cap)):
 				out_c.append(cached[i])
 			return out_c
-	return _collect_live_border_assault_targets_impl(tag, cap)
+	return _campaign_filter_assault_targets(tag, _collect_live_border_assault_targets_impl(tag, cap))
 
 
-func _collect_live_border_assault_targets_impl(tag: String, cap: int) -> Array:
+## Owned land touching a foreign owner. Peacetime infrastructure uses this.
+## Assaults stay on collect_live_border_assault_targets (war-gated).
+## Does not write _live_fronts_precompute, so a peaceful scan cannot leak into attacks.
+func collect_owned_border_edges(country_tag: String = "", max_count: int = 8) -> Array:
+	var tag := country_tag.strip_edges().to_upper()
+	if tag.is_empty():
+		tag = "GER"
+	var cap := maxi(max_count, 1)
+	return _collect_live_border_assault_targets_impl(tag, cap, false)
+
+
+## Campaign loop: drop defenders this tag is not at war with. Legacy (loop off) is unchanged.
+func _campaign_filter_assault_targets(tag: String, rows: Array) -> Array:
+	if typeof(WarStateDomain) == TYPE_NIL or not WarStateDomain.loop_enabled():
+		return rows
+	var enemies: Dictionary = {}
+	for e in WarStateDomain.enemies_of(tag):
+		enemies[str(e)] = true
+	var out: Array = []
+	for row in rows:
+		if typeof(row) != TYPE_DICTIONARY:
+			continue
+		var d := str((row as Dictionary).get("defender_tag", "")).strip_edges().to_upper()
+		if enemies.has(d):
+			out.append(row)
+	return out
+
+
+func _collect_live_border_assault_targets_impl(tag: String, cap: int, war_gate: bool = true) -> Array:
 	var preferred: Array[String] = []
 	match tag:
 		"GER":
@@ -4740,6 +4771,8 @@ func _collect_live_border_assault_targets_impl(tag: String, cap: int) -> Array:
 			var ot := str(ep.owner_tag).strip_edges().to_upper()
 			if ot.is_empty() or ot == tag:
 				continue
+			if war_gate and typeof(WarStateDomain) != TYPE_NIL and WarStateDomain.loop_enabled() and not WarStateDomain.is_at_war(tag, ot):
+				continue
 			if seen.has(eid):
 				continue
 			seen[eid] = true
@@ -4790,12 +4823,27 @@ func _collect_live_border_assault_targets_impl(tag: String, cap: int) -> Array:
 				out.append(row3)
 				if out.size() >= cap:
 					break
-	# Emergency Maginot/Polish seeds if budget expired with nothing (must never return empty for GER).
-	if out.is_empty() and tag == "GER":
-		out = _emergency_ger_front_seeds()
-	if out.is_empty() and tag == "JAP":
-		out = _emergency_jap_front_seeds()
-	return out
+	# Emergency seeds cover Maginot / Silesia / CHI–JAP when the budgeted scan
+	# fills the cap with one foe. The war filter below drops non-enemies.
+	var seeds: Array = []
+	if tag == "GER":
+		seeds = _emergency_ger_front_seeds()
+	elif tag == "JAP":
+		seeds = _emergency_jap_front_seeds()
+	if not seeds.is_empty():
+		var seen_pid: Dictionary = {}
+		for row_s in out:
+			if row_s is Dictionary:
+				seen_pid[int(row_s.get("province_id", -1))] = true
+		for s in seeds:
+			var spid := int(s.get("province_id", -1))
+			if seen_pid.has(spid):
+				continue
+			out.append(s)
+			seen_pid[spid] = true
+	if not war_gate:
+		return out
+	return _campaign_filter_assault_targets(tag, out)
 
 
 ## CHI–JAP living edge when RoW scan misses (903981 → 902598). Hang-safe: no board walk.

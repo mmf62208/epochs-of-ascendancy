@@ -2807,6 +2807,44 @@ func _esc_open_command_center() -> void:
 		tib.call_deferred("_on_menu_pressed")
 
 
+func _campaign_modal_consumes_pointer(event: InputEventMouseButton) -> bool:
+	var tree := get_tree()
+	if tree == null:
+		return false
+	for n in tree.get_nodes_in_group("campaign_end_screen"):
+		if n == null or not is_instance_valid(n) or not n.visible:
+			continue
+		if n.has_method("handle_pointer"):
+			n.call("handle_pointer", event)
+		return true
+	for layer in tree.get_nodes_in_group("campaign_peace_sheet"):
+		if layer == null or not is_instance_valid(layer) or not layer.visible:
+			continue
+		if event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+			_press_campaign_peace_button(layer, event.position)
+		return true
+	return false
+
+
+func _press_campaign_peace_button(layer: Node, pos: Vector2) -> void:
+	var buttons: Array = []
+	_collect_campaign_buttons(layer, buttons)
+	for b in buttons:
+		var btn := b as Button
+		if btn == null or not btn.visible or btn.disabled:
+			continue
+		if btn.get_global_rect().has_point(pos):
+			btn.pressed.emit()
+			return
+
+
+func _collect_campaign_buttons(n: Node, out: Array) -> void:
+	if n is Button:
+		out.append(n)
+	for c in n.get_children():
+		_collect_campaign_buttons(c, out)
+
+
 func _input(event: InputEvent) -> void:
 	# Esc / I / Home must beat GUI focus (search LineEdit) so a stuck inspector cannot eat keys.
 	if event is InputEventKey and event.pressed and not event.echo:
@@ -2966,6 +3004,9 @@ func _input(event: InputEvent) -> void:
 			else:
 				_is_middle_dragging = false
 		elif event.button_index == MOUSE_BUTTON_LEFT:
+			if _campaign_modal_consumes_pointer(event):
+				get_viewport().set_input_as_handled()
+				return
 			# TipDismiss arms this on press. Clear after the release frame so
 			# the same click cannot open the unit under the ×, and the next click can.
 			if not event.pressed and has_meta("eoa_tip_dismiss_swallow_release"):
@@ -19865,6 +19906,8 @@ func _collect_formations_at_province(province_id: int) -> Array:
 			if f == null or not (f is Object):
 				continue
 			var fo: Object = f as Object
+			if "campaign_inactive" in fo and bool(fo.campaign_inactive):
+				continue
 			if "stationed_province_id" in fo and int(fo.stationed_province_id) == province_id:
 				out.append(fo)
 	return out
@@ -24257,6 +24300,8 @@ func _update_settle_button(province: Province) -> void:
 		return
 	if province == null or province.is_sea:
 		_btn_settle.visible = false
+		if typeof(CampaignWarChrome) != TYPE_NIL and _btn_settle.get_parent() != null:
+			CampaignWarChrome.mount(_btn_settle.get_parent(), province)
 		return
 	_btn_settle.visible = true
 	var settle_nm := str(province.name).strip_edges()
@@ -24264,6 +24309,8 @@ func _update_settle_button(province: Province) -> void:
 		settle_nm = "#%d" % province.id
 	_btn_settle.text = "🏠 Settle %s (+0.35, now %.2f)" % [settle_nm, province.settlement_level]
 	_btn_settle.tooltip_text = "Settle %s (#%d) now (real data). After click: vitality tint strengthens (cyan-green via characterize), inspector shows updated bonuses, combat def +2.5%%/lev. Use with map modes (F3 vitality)." % [settle_nm, province.id]
+	if typeof(CampaignWarChrome) != TYPE_NIL and _btn_settle.get_parent() != null:
+		CampaignWarChrome.mount(_btn_settle.get_parent(), province)
 
 
 func _on_settle_province_pressed() -> void:
@@ -26325,6 +26372,20 @@ func _dismiss_named_overlay_screen(screen_name: String) -> bool:
 	return true
 
 
+func _dismiss_space_layer_board_esc() -> bool:
+	# Space is a Window: Esc stays in its viewport (Play: MapRenderer never logged).
+	# Hide like Close (do not queue_free — TopInfoBar reuses the node).
+	var n: Node = _find_named_overlay_screen("SpaceLayerBoardView")
+	if not _overlay_node_is_up(n):
+		return false
+	if n is Window:
+		(n as Window).hide()
+	elif n.has_method("hide"):
+		n.hide()
+	_show_map_layer_toast("Space closed (Esc)")
+	return true
+
+
 func _dismiss_map_overlays_esc() -> bool:
 	# Snapshot before hide. Idle Esc still falls through to the CC open helper.
 	var pre_cam: Dictionary = _snapshot_pre_dismiss_camera()
@@ -26332,6 +26393,8 @@ func _dismiss_map_overlays_esc() -> bool:
 	if supply_mode:
 		_toggle_supply_overlay()
 		_show_map_layer_toast("Supply legend closed (Esc)")
+		dismissed = true
+	if _dismiss_space_layer_board_esc():
 		dismissed = true
 	# Unit detail card (map navy/armor icons) closes first.
 	var ui_layer := get_node_or_null("UI") as CanvasLayer

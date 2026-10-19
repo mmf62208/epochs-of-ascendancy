@@ -6,8 +6,11 @@ extends Window
 
 const PLAYER_FALLBACK := "USA"
 
+const _CloseReleaseSwallow := preload("res://scripts/ui/CloseReleaseSwallow.gd")
+
 var _player_tag: String = PLAYER_FALLBACK
 var _title: Label
+var _title_close_btn: Button
 var _body: RichTextLabel
 var _discovery_box: VBoxContainer
 var _choice_box: VBoxContainer
@@ -22,8 +25,14 @@ var _last_resolve: Dictionary = {}
 
 func _ready() -> void:
 	title = "Space Layer Board"
+	wrap_controls = false
+	min_size = Vector2i(780, 560)
 	size = Vector2i(780, 560)
 	unresizable = false
+	# Native/embedded title × uses button-up; leftover MapRenderer left-up swallow
+	# (Begin-release / pan skip-pick) eats the first click. Own × fires on press.
+	if not close_requested.is_connected(_on_title_close_pressed):
+		close_requested.connect(_on_title_close_pressed)
 	_resolve_player()
 	_build_ui()
 	refresh_board()
@@ -52,10 +61,24 @@ func _build_ui() -> void:
 	vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	vbox.add_theme_constant_override("separation", 8)
 	margin.add_child(vbox)
+	var title_row := HBoxContainer.new()
+	title_row.name = "TitleRow"
+	title_row.add_theme_constant_override("separation", 8)
+	vbox.add_child(title_row)
 	_title = Label.new()
 	_title.text = "Space Layer — %s" % _player_tag
 	_title.add_theme_font_size_override("font_size", 18)
-	vbox.add_child(_title)
+	_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title_row.add_child(_title)
+	_title_close_btn = Button.new()
+	_title_close_btn.name = "TitleCloseButton"
+	_title_close_btn.text = "×"
+	_title_close_btn.tooltip_text = "Close"
+	_title_close_btn.focus_mode = Control.FOCUS_NONE
+	_title_close_btn.mouse_filter = Control.MOUSE_FILTER_STOP
+	_title_close_btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
+	_title_close_btn.pressed.connect(_on_title_close_pressed)
+	title_row.add_child(_title_close_btn)
 	_layer_btns = HBoxContainer.new()
 	_layer_btns.add_theme_constant_override("separation", 6)
 	vbox.add_child(_layer_btns)
@@ -97,9 +120,63 @@ func _build_ui() -> void:
 	_refresh_btn.pressed.connect(refresh_board)
 	row.add_child(_refresh_btn)
 	_close_btn = Button.new()
+	_close_btn.name = "CloseButton"
 	_close_btn.text = "Close"
-	_close_btn.pressed.connect(hide)
+	_close_btn.mouse_filter = Control.MOUSE_FILTER_STOP
+	_close_btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
+	_close_btn.pressed.connect(_on_title_close_pressed)
 	row.add_child(_close_btn)
+
+
+func _is_live_escape_event(event: InputEvent) -> bool:
+	# Live DisplayServer: keycode, physical_keycode, key_label, or ui_cancel.
+	if event is InputEventAction:
+		var act: InputEventAction = event
+		return bool(act.pressed) and str(act.action) == "ui_cancel"
+	if event is InputEventKey:
+		var key: InputEventKey = event
+		if not key.pressed or key.echo:
+			return false
+		if key.keycode == KEY_ESCAPE or key.physical_keycode == KEY_ESCAPE:
+			return true
+		if key.key_label == KEY_ESCAPE:
+			return true
+		if int(key.unicode) == 27:
+			return true
+	if event != null and event.is_action_pressed("ui_cancel"):
+		return true
+	return false
+
+
+func _input(event: InputEvent) -> void:
+	# Native/embedded Window keeps Esc in this viewport; MapRenderer never sees it.
+	if not visible:
+		return
+	if not _is_live_escape_event(event):
+		return
+	_on_title_close_pressed()
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if not visible:
+		return
+	if not _is_live_escape_event(event):
+		return
+	_on_title_close_pressed()
+
+
+func _on_title_close_pressed() -> void:
+	## Hide on press (not release) so leftover left-up swallow cannot eat the first ×.
+	## Swallow the matching release only when LMB is still down (never frame × after
+	## release, never keyboard Close). Expire / new-press drop so a later click selects.
+	if not visible:
+		return
+	_CloseReleaseSwallow.arm_from(self)
+	var vp := get_viewport()
+	if vp != null:
+		vp.gui_release_focus()
+		vp.set_input_as_handled()
+	hide()
 
 
 func _on_layer_pressed(layer_id: String) -> void:
@@ -251,5 +328,7 @@ func get_unresolved_from_board() -> Array:
 func show_board(tag: String = "") -> void:
 	if not tag.is_empty():
 		_player_tag = tag.strip_edges().to_upper()
-	popup_centered()
+	min_size = Vector2i(780, 560)
+	size = Vector2i(780, 560)
+	popup_centered(Vector2i(780, 560))
 	refresh_board()

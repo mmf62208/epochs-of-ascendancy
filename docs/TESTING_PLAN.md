@@ -8,6 +8,32 @@
 
 ## Recommended Testing Approach
 
+### 0. PROD-1 Prod button (top info bar)
+
+Live 1280×800 after Begin: leftover MapRenderer left-up swallow used to eat Prod (`ACTION_MODE_BUTTON_RELEASE`). Guard clicks the real ProductionButton through `Input.parse_input_event` (not `_on_production_pressed`), asserts the production screen is visible, then Close→Prod opens it again.
+
+```bash
+tools/run_godot.sh --headless --path . --resolution 1280x800 \
+  -s res://scripts/core/HeadlessProd1ButtonOpenTest.gd
+```
+
+Wired as `launch_prod1_button_open` on the full gate script. `--quick` stays the same 14 known `unit_board_play_path` reds.
+
+### 0b. UI-POLISH-1 Agents Close / Space × / Trade signal
+
+Playtester 1280×800 after Begin: Agents Close sat off the right edge (1440-wide panel, left/top clamp only). Space title × used button-up so leftover MapRenderer left-up swallow ate the first click (Close already worked). Opening Trade connected `deal_rejected` twice (copy-paste under `trade_flow_created`). Agents panel now clamps into the viewport; Space × is `ACTION_MODE_BUTTON_PRESS`; Trade guards `is_connected`.
+
+```bash
+tools/run_godot.sh --headless --path . --resolution 1280x800 \
+  -s res://scripts/core/HeadlessUiPolish1Test.gd
+```
+
+Wired as `launch_ui_polish1` on the full gate script (not `--quick`).
+
+FIX #1: Space close-release swallow arms only while LMB is down (`Input.is_mouse_button_pressed`), drops on a new left press without consuming it, and expires at ~250 ms. Frame × (`close_requested` after release) and keyboard Close must not eat the next button/map click. Guard **RESULT=PASS** (failures=0): frame × then unrelated button fired; keyboard Close then click fired; map press-release after Space close selected. `HeadlessProd1ButtonOpenTest` still **PASS**.
+
+FIX #2: Agents Close must be fully visible/clickable (TitleBar after MarginContainer, content clipped to 1248×728, title vs Show: rects do not intersect). Esc closes Space; Esc with nothing open still reaches Command Center. Shared `scripts/ui/CloseReleaseSwallow.gd` on every press-mode Close (Prod, Leaders, Agents, Space). Held-click cases use press → 50–100 ms wait → release; map stand-in counts unhandled left-ups (0 after Close, 1 on empty map). Mutant: disconnect swallow on Prod held-close → 1 map mouse-up. Guard **RESULT=PASS** (failures=0). `HeadlessProd1ButtonOpenTest` **PASS**. `HeadlessUi1LeadersEdgePanMarchTest` **PASS**. `--quick` same 14 known reds. map_qc NE **0.9853**. 0 SCRIPT ERROR.
+
 ### 1. Core Time System Tests
 
 - Load a scenario and verify the top bar date matches `start_date`.

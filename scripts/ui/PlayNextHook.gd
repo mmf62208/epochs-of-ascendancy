@@ -22,6 +22,16 @@ static func recommend(player_tag: String = "") -> Dictionary:
 ## Same ranker as tools/map_generation/lib/play_next_hook_product.rank_next_beat.
 static func rank_from_snapshot(facts: Dictionary = {}) -> Dictionary:
 	var f: Dictionary = facts
+	if bool(f.get("campaign_over", false)):
+		return {
+			"ok": true,
+			"action": "campaign_over",
+			"label": "Campaign over",
+			"hint": "The campaign has ended",
+			"fid": "",
+			"to_id": -1,
+			"source": "campaign_end",
+		}
 	var aar_pid := int(f.get("aar_next_pid", -1))
 	if aar_pid > 0:
 		var place := str(f.get("aar_place", "")).strip_edges()
@@ -207,21 +217,31 @@ static func rank_from_snapshot(facts: Dictionary = {}) -> Dictionary:
 		}
 	var wpid := int(f.get("war_goal_pid", -1))
 	if wpid > 0:
+		var wtag := str(f.get("war_goal_tag", "")).strip_edges()
+		var wname := wtag
+		if not wtag.is_empty() and typeof(WarStateDomain) != TYPE_NIL:
+			wname = WarStateDomain.tag_name(wtag)
 		if not bool(f.get("war_justified", false)):
+			var jlabel := "Justify the war goal"
+			if not wname.is_empty():
+				jlabel = "Justify war on %s" % wname
 			return {
 				"ok": true,
 				"action": "justify",
-				"label": "Justify the war goal",
+				"label": jlabel,
 				"hint": "Justify a claim before declaring war",
 				"fid": "",
 				"to_id": wpid,
 				"source": "war_goal",
 			}
 		if not bool(f.get("war_declared", false)):
+			var dlabel := "Declare war"
+			if not wname.is_empty():
+				dlabel = "Declare war on %s" % wname
 			return {
 				"ok": true,
 				"action": "declare",
-				"label": "Declare war",
+				"label": dlabel,
 				"hint": "War goal justified — declare",
 				"fid": "",
 				"to_id": wpid,
@@ -496,13 +516,26 @@ static func apply(rec: Dictionary = {}) -> Dictionary:
 			"action": "justify",
 			"summary": str(justified.get("summary", r.get("hint", "Justify the war goal"))),
 		}
-	if action == "declare" and typeof(GameData) != TYPE_NIL and GameData.has_method("apply_war_goal_execute"):
+	if action == "declare":
 		var dpid := int(r.get("to_id", 1))
-		var declared: Dictionary = GameData.apply_war_goal_execute(dpid)
+		if typeof(WarStateDomain) != TYPE_NIL and WarStateDomain.loop_enabled():
+			var loop_declared: Dictionary = WarStateDomain.player_declare_from_province(dpid)
+			return {
+				"ok": bool(loop_declared.get("ok", false)) or bool(loop_declared.get("already", false)),
+				"action": "declare",
+				"summary": str(loop_declared.get("reason", r.get("hint", "Declare war"))),
+			}
+		if typeof(GameData) != TYPE_NIL and GameData.has_method("apply_war_goal_execute"):
+			var declared: Dictionary = GameData.apply_war_goal_execute(dpid)
+			return {
+				"ok": bool(declared.get("ok", false)),
+				"action": "declare",
+				"summary": str(declared.get("summary", r.get("hint", "Declare war"))),
+			}
 		return {
-			"ok": bool(declared.get("ok", false)),
+			"ok": false,
 			"action": "declare",
-			"summary": str(declared.get("summary", r.get("hint", "Declare war"))),
+			"summary": str(r.get("hint", "Declare war")),
 		}
 	if action == "settle_peace":
 		var pid := int(r.get("to_id", r.get("province_id", -1)))
@@ -729,6 +762,22 @@ static func _gather_facts(player_tag: String) -> Dictionary:
 	facts["war_goal_pid"] = int(wg.get("pid", -1))
 	facts["war_justified"] = bool(wg.get("justified", false))
 	facts["war_declared"] = bool(wg.get("declared", false))
+	if typeof(WarStateDomain) != TYPE_NIL and WarStateDomain.loop_enabled():
+		var player := tag
+		if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_player_country_tag"):
+			var pt := str(LeaderManager.get_player_country_tag()).strip_edges().to_upper()
+			if not pt.is_empty():
+				player = pt
+		if tag == player:
+			facts["war_declared"] = not WarStateDomain.enemies_of(tag).is_empty()
+			facts["war_justified"] = WarStateDomain.player_justify_is_ready()
+			var suggested: Dictionary = WarStateDomain.suggest_player_target()
+			var spid := int(suggested.get("pid", -1))
+			if spid > 0:
+				facts["war_goal_pid"] = spid
+				facts["war_goal_tag"] = str(suggested.get("tag", ""))
+			if typeof(CampaignEndDomain) != TYPE_NIL and CampaignEndDomain.latched():
+				facts["campaign_over"] = true
 	facts["vacant_chief"] = _vacant_chief(tag)
 	if typeof(TechnologyManager) != TYPE_NIL and TechnologyManager.has_method("completing_snapshot"):
 		var queued := str(facts.get("research_id", "")).strip_edges()
