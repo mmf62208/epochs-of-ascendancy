@@ -138,12 +138,19 @@ func _build_confirm(panel: Panel) -> void:
 	RetrowaveTheme.style_menu_panel(_confirm_panel)
 	panel.add_child(_confirm_panel)
 	var box := VBoxContainer.new()
-	box.position = Vector2(16, 16)
-	box.custom_minimum_size = Vector2(568, 188)
-	box.size = Vector2(568, 188)
+	box.custom_minimum_size = Vector2(548, 172)
 	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	box.add_theme_constant_override("separation", 12)
-	_confirm_panel.add_child(box)
+	var margin := MarginContainer.new()
+	margin.name = "ConfirmMargin"
+	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	margin.add_theme_constant_override("margin_left", 20)
+	margin.add_theme_constant_override("margin_right", 20)
+	margin.add_theme_constant_override("margin_top", 32)
+	margin.add_theme_constant_override("margin_bottom", 16)
+	_confirm_panel.add_child(margin)
+	margin.add_child(box)
 	_confirm_label = Label.new()
 	_confirm_label.name = "ConfirmText"
 	_confirm_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -291,7 +298,9 @@ func _on_load_pressed() -> void:
 	if typeof(TimeManager) != TYPE_NIL:
 		running = int(TimeManager.get_total_days_elapsed()) > 0
 	if running:
-		var since := _newest_wall_time()
+		var since := ""
+		if typeof(SaveLoadManager) != TYPE_NIL:
+			since = str(SaveLoadManager.session_wall_time).strip_edges()
 		if since.is_empty():
 			since = "the start of this session"
 		elif typeof(SaveLoadManager) != TYPE_NIL and SaveLoadManager.has_method("format_wall_time_local"):

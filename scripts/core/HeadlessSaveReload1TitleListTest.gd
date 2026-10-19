@@ -54,7 +54,14 @@ func _run() -> void:
 	if not _write_twelve_saves():
 		_finish()
 		return
+	_assert_v2_does_not_log_v1_migrate()
+	await _assert_confirm_top_pad()
+	await _assert_session_wall_confirm()
+	await _assert_camera_restore()
 	_plant_damaged()
+	var toast := get_root().get_node_or_null("LeaderEventUI")
+	if toast != null:
+		toast.set("force_toast_ui", true)
 	var title_scr: GDScript = load("res://scripts/ui/LivingTitleBoot.gd") as GDScript
 	if title_scr == null:
 		_fail("LivingTitleBoot missing")
@@ -233,6 +240,10 @@ func _assert_damaged_row(title: Node) -> void:
 	if msg.find(DAMAGED_MSG) < 0:
 		_fail("damaged title row pointer miss (action=%s status=%s)" % [action, msg])
 		return
+	var toast_n := _count_toast_labels(DAMAGED_MSG)
+	if toast_n > 1:
+		_fail("damaged title row showed %d identical Error toasts" % toast_n)
+		return
 	_pass("damaged title row is greyed and refuses the load")
 
 
@@ -307,7 +318,8 @@ func _assert_visible_row_centres_never_cc(title: Node) -> void:
 			elif kind != "load":
 				_fail("visible row centre %s did not classify as load (kind=%s)" % [str(hit.get("slot", "")), kind])
 				continue
-	title.remove_meta("eoa_sr1_hit_probe")
+	if is_instance_valid(title) and title.has_meta("eoa_sr1_hit_probe"):
+		title.remove_meta("eoa_sr1_hit_probe")
 	if clicked < 8:
 		_fail("row-centre sweep only clicked %d visible centres (need several scroll positions)" % clicked)
 		return
@@ -348,6 +360,128 @@ func _assert_click_loads(title: Node) -> bool:
 		return false
 	_pass("clicking title row %s loaded it" % slot)
 	return true
+
+
+func _count_toast_labels(fragment: String) -> int:
+	var lui := get_root().get_node_or_null("LeaderEventUI")
+	if lui == null:
+		return 0
+	return _count_labels(lui, fragment)
+
+
+func _count_labels(n: Node, fragment: String) -> int:
+	var c := 0
+	if n is Label and str((n as Label).text).find(fragment) >= 0:
+		c += 1
+	for child in n.get_children():
+		c += _count_labels(child, fragment)
+	return c
+
+
+func _assert_v2_does_not_log_v1_migrate() -> void:
+	if _sl == null:
+		return
+	if bool(_sl.get("last_migrate_was_v1")):
+		_fail("fresh v2 save set last_migrate_was_v1")
+		return
+	if _sl.has_method("list_saves"):
+		_sl.call("list_saves")
+	if bool(_sl.get("last_migrate_was_v1")):
+		_fail("listing v2 saves set last_migrate_was_v1")
+		return
+	_pass("fresh v2 save / list does not treat the file as v1")
+
+
+func _assert_confirm_top_pad() -> void:
+	var dlg_scr: GDScript = load("res://scripts/ui/SaveLoadDialog.gd") as GDScript
+	if dlg_scr == null:
+		_fail("SaveLoadDialog missing")
+		return
+	var dlg: Node = dlg_scr.new()
+	root.add_child(dlg)
+	await process_frame
+	var margin := dlg.find_child("ConfirmMargin", true, false) as MarginContainer
+	if margin == null:
+		_fail("ConfirmMargin missing")
+		dlg.queue_free()
+		return
+	var top := int(margin.get_theme_constant("margin_top"))
+	if top < 24:
+		_fail("confirm top margin %d is under the frame art" % top)
+	else:
+		_pass("confirm top margin %d clears the frame art" % top)
+	dlg.queue_free()
+
+
+func _assert_session_wall_confirm() -> void:
+	if _sl == null:
+		return
+	_sl.session_wall_time = "1936-06-15T08:00:00"
+	var dlg_scr: GDScript = load("res://scripts/ui/SaveLoadDialog.gd") as GDScript
+	if dlg_scr == null:
+		_fail("SaveLoadDialog missing for session wall")
+		return
+	var dlg: Node = dlg_scr.new()
+	root.add_child(dlg)
+	await process_frame
+	dlg.set("_selected", 0)
+	if dlg.has_method("_on_load_pressed"):
+		if _tm != null:
+			_tm.paused = false
+			_tm.advance_live_f5_equivalent_days(1)
+		dlg.call("_on_load_pressed")
+	await process_frame
+	var confirm := dlg.find_child("ConfirmText", true, false) as Label
+	var text := str(confirm.text) if confirm != null else ""
+	var want := "1936-06-15T08:00:00"
+	if _sl.has_method("format_wall_time_local"):
+		want = str(_sl.format_wall_time_local("1936-06-15T08:00:00"))
+	if text.find("will be lost") < 0:
+		_fail("session-wall confirm missing text=%s" % text)
+	elif text.find(want) < 0 and text.find("the start of this session") < 0:
+		_fail("unsaved-progress used the newest file time instead of the session (text=%s want=%s)" % [text, want])
+	else:
+		_pass("unsaved-progress uses this session's last save/load time")
+	if _tm != null:
+		_tm.paused = true
+	dlg.queue_free()
+
+
+func _assert_camera_restore() -> void:
+	var mr_scr: Script = load("res://scripts/map/MapRenderer.gd") as Script
+	if mr_scr == null:
+		_fail("MapRenderer missing")
+		return
+	var mr: Node = mr_scr.new()
+	mr.name = "MapRendererCam"
+	var cam := Camera2D.new()
+	cam.name = "MapCamera"
+	cam.enabled = true
+	cam.global_position = Vector2(1234.0, 567.0)
+	cam.zoom = Vector2(1.25, 1.25)
+	mr.add_child(cam)
+	if not mr.has_method("get_save_data") or not mr.has_method("apply_save_data"):
+		_fail("MapRenderer camera save hooks missing")
+		mr.free()
+		return
+	var snap: Dictionary = mr.call("get_save_data")
+	if not bool(snap.get("camera_saved", false)):
+		_fail("get_save_data did not record the camera")
+		mr.free()
+		return
+	cam.global_position = Vector2(8000.0, 4200.0)
+	cam.zoom = Vector2(0.28, 0.28)
+	mr.call("apply_save_data", snap)
+	if mr.has_method("restore_view_after_load"):
+		mr.call("restore_view_after_load")
+	var back: Vector2 = cam.global_position
+	if back.distance_to(Vector2(1234.0, 567.0)) > 8.0:
+		_fail("restore_view_after_load left camera at %s (Brazil-class jump)" % str(back))
+	elif absf(cam.zoom.x - 1.25) > 0.05:
+		_fail("restore_view_after_load zoom=%s" % str(cam.zoom))
+	else:
+		_pass("saved camera restored after load (not a Brazil jump)")
+	mr.free()
 
 
 func _wipe_prefix(prefix: String) -> void:

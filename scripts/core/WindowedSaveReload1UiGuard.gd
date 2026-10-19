@@ -182,10 +182,15 @@ func _pass_flow(swallow: bool, slot: String, shots: bool) -> void:
 			await process_frame
 		await _shot("load_damaged_row")
 	var hash_before_bad := _hash_now()
+	var toast_before_bad := _count_toast_labels("Save file is damaged and can't be loaded")
 	_select_row(bad)
 	await process_frame
 	if not _toast_has("Save file is damaged and can't be loaded"):
 		_fail("%s: selecting a damaged save did not show the damaged message" % tag)
+		return
+	var toast_after_bad := _count_toast_labels("Save file is damaged and can't be loaded")
+	if toast_after_bad - toast_before_bad > 1:
+		_fail("%s: selecting a damaged save showed %d Error toasts" % [tag, toast_after_bad - toast_before_bad])
 		return
 	if not await _click_named("BtnLoad", swallow):
 		_fail("%s: load button missing" % tag)
@@ -227,6 +232,23 @@ func _pass_flow(swallow: bool, slot: String, shots: bool) -> void:
 	if confirm_panel != null and load_confirm.get_minimum_size().y > confirm_panel.size.y - 40.0:
 		_fail("%s: will-be-lost confirm overflows the frame" % tag)
 		return
+	var confirm_margin := _dialog_node("ConfirmMargin") as MarginContainer
+	if confirm_margin == null or int(confirm_margin.get_theme_constant("margin_top")) < 24:
+		_fail("%s: will-be-lost confirm has no top padding" % tag)
+		return
+	var sl_sess := get_root().get_node_or_null("SaveLoadManager")
+	var sess := str(sl_sess.session_wall_time).strip_edges() if sl_sess != null else ""
+	if sess.is_empty():
+		if str(load_confirm.text).find("the start of this session") < 0:
+			_fail("%s: empty session wall did not say start of this session" % tag)
+			return
+	else:
+		var sess_local := sess
+		if sl_sess != null and sl_sess.has_method("format_wall_time_local"):
+			sess_local = str(sl_sess.format_wall_time_local(sess))
+		if str(load_confirm.text).find(sess_local) < 0 and str(load_confirm.text).find(sess) < 0:
+			_fail("%s: unsaved-progress used a file time, not this session (%s)" % [tag, str(load_confirm.text)])
+			return
 	if not await _click_named("BtnConfirm", swallow):
 		return
 	await process_frame
@@ -842,6 +864,19 @@ func _close_dialog() -> void:
 
 func _toast_has(fragment: String) -> bool:
 	return _label_has(get_root(), fragment)
+
+
+func _count_toast_labels(fragment: String) -> int:
+	return _count_labels(get_root(), fragment)
+
+
+func _count_labels(n: Node, fragment: String) -> int:
+	var c := 0
+	if n is Label and str((n as Label).text).find(fragment) >= 0:
+		c += 1
+	for child in n.get_children():
+		c += _count_labels(child, fragment)
+	return c
 
 
 func _label_has(n: Node, fragment: String) -> bool:

@@ -166,6 +166,10 @@ var quickload_slot_override: String = ""
 var quicksave_slot_override: String = ""
 ## Last load_game_detailed result, including failures. Tests read the error string.
 var last_load_result: Dictionary = {}
+## Wall clock of the last successful save or load in this process. Empty = none yet.
+var session_wall_time := ""
+## Last migrate print was a real v1 file (not a v2 body that still carries SAVE_VERSION 1).
+var last_migrate_was_v1 := false
 
 func _ready() -> void:
 	_ensure_save_dir()
@@ -1373,11 +1377,12 @@ func _apply_production_state(p: Dictionary) -> void:
 ## Called for old save versions to upgrade data in-place before _apply.
 ## Add cases here as SAVE_VERSION increases (e.g. key renames, default sections, data shape fixes).
 ## This is the central place for forward/backward compat.
-func _migrate_save_data(data: Dictionary) -> void:
+func _migrate_save_data(data: Dictionary, from_v1_file: bool = false) -> void:
 	var v := int(data.get("save_version", 0))
 	if v > int(_SaveFormatLib.VERSION):
 		return
-	if v < int(_SaveFormatLib.VERSION):
+	last_migrate_was_v1 = from_v1_file
+	if from_v1_file and v < int(_SaveFormatLib.VERSION):
 		print("SaveLoad: Migrating save from v%d to v%d" % [v, int(_SaveFormatLib.VERSION)])
 	# v1 → v2 fills missing sections and replaces a literal USA tag from leaders.
 	# Wrong-typed sections are left intact so validate() can reject them.
@@ -1482,6 +1487,7 @@ func save_game_detailed(slot_name: String = DEFAULT_SLOT) -> Dictionary:
 	print("SaveLoadManager: Game saved → %s (v%d, %d bytes, slot=%s)" % [str(written.get("absolute_path", path)), int(written.get("version", 2)), bytes, safe_slot])
 	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
 		LeaderEventUI.show_toast("Saved %s (%d KB)" % [safe_slot, int(bytes / 1024)], 2.5)
+	_stamp_session_wall()
 	return written
 
 ## Enhanced load with migration + feedback.
@@ -1496,6 +1502,7 @@ func load_game_detailed(slot_name: String = DEFAULT_SLOT) -> Dictionary:
 		return res
 	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
 		LeaderEventUI.show_toast("Loaded %s" % _sanitize_slot(slot_name), 2.5)
+	_stamp_session_wall()
 	return res
 
 ## === UX helpers (delete, rename) for save menu ===
@@ -1567,7 +1574,7 @@ func read_save_body(slot_name: String) -> Dictionary:
 		if typeof(parsed) != TYPE_DICTIONARY:
 			return {"ok": false, "error": "Corrupt JSON (not object)", "damaged": true, "path": path}
 		data = parsed
-	_migrate_save_data(data)
+	_migrate_save_data(data, not bool(located.get("v2", false)))
 	return data
 
 
@@ -1802,6 +1809,11 @@ func _after_load_resync() -> void:
 		ProductionManager.end_interactive_multi_ai_day_cache()
 	if typeof(TechnologyManager) != TYPE_NIL and TechnologyManager.has_method("_rebuild_unlock_indices"):
 		TechnologyManager._rebuild_unlock_indices()
+	var mr: Node = get_tree().get_first_node_in_group("map_renderer") if get_tree() != null else null
+	if mr == null:
+		mr = get_node_or_null("/root/WorldMap")
+	if mr != null and mr.has_method("restore_view_after_load"):
+		mr.call_deferred("restore_view_after_load")
 
 
 func _locate_save(safe: String) -> Dictionary:
@@ -1845,7 +1857,7 @@ func _peek_save_file(path: String, is_v2: bool) -> Dictionary:
 		if not bool(decoded.get("ok", false)):
 			return {"damaged": true, "old_format": false, "error": str(decoded.get("error", "damaged")), "metadata": header}
 		var body: Dictionary = decoded.get("body", {})
-		_migrate_save_data(body)
+		_migrate_save_data(body, false)
 		var verdict: Dictionary = _SaveFormatLib.validate(body, scenario_guard)
 		if not bool(verdict.get("ok", false)):
 			var errors: Array = verdict.get("errors", [])
@@ -1866,6 +1878,10 @@ func _peek_save_file(path: String, is_v2: bool) -> Dictionary:
 ## Display helper. Stored wall_time stays UTC. The list applies the zone
 ## bias (minutes, including DST as the OS reports it) before formatting.
 ## `bias_override` is minutes east of UTC for tests; null uses the system bias.
+func _stamp_session_wall() -> void:
+	session_wall_time = Time.get_datetime_string_from_system(true)
+
+
 func format_wall_time_local(wall: String, bias_override: Variant = null) -> String:
 	var raw := wall.strip_edges()
 	if raw.is_empty():

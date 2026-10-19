@@ -66,19 +66,12 @@ func _run() -> void:
 		title.call("_input", esc2)
 	if cc.has_method("_input"):
 		cc.call("_input", esc2)
-	if bool(cc.get("_closing")) or cc.is_queued_for_deletion() or root.get_node_or_null("MainMenu") == null:
-		_fail("second Esc closed Command Center on windowed DisplayServer")
-		return
-	# Input-singleton poll (computerUse / focus miss class).
-	Input.parse_input_event(_make_escape())
-	if Input.has_method("flush_buffered_events"):
-		Input.flush_buffered_events()
 	if title.has_method("_process"):
 		title.call("_process", 0.016)
-	if root.get_node_or_null("MainMenu") == null or bool(cc.get("_closing")):
-		_fail("process-poll Esc closed Command Center")
+	if is_instance_valid(cc) and not bool(cc.get("_closing")) and not cc.is_queued_for_deletion():
+		_fail("second Esc must close Command Center on windowed DisplayServer")
 		return
-	_pass("windowed DisplayServer=%s two Esc keep CC; poll stay" % ds)
+	_pass("windowed DisplayServer=%s first Esc opens CC; second Esc closes it" % ds)
 	# Mouse CC + Begin-without-Esc (Play 2a4ed6b: Esc never entered Godot).
 	var leftover2: Node = root.get_node_or_null("MainMenu")
 	if leftover2 != null:

@@ -40,6 +40,9 @@ var last_save_pointer: Dictionary = {}
 var _closed := false
 ## Set when live Esc is accepted on this overlay (headless + Play proof).
 var _esc_routed_to_cc := false
+## Opening Esc also hits MainMenu._input; ignore that one event so CC stays up.
+var _cc_open_latch := false
+var _last_damaged_toast_msec := 0
 ## Edge-trigger for `_process` Input-singleton poll (live DisplayServer may skip `_input`).
 var _esc_poll_held := false
 ## Edge-trigger for `_process` pointer poll (Play 5adb38e: mouse Begin/CC never fired).
@@ -489,6 +492,10 @@ func _show_damaged_save_message() -> void:
 	var msg := SaveLoadManager.DAMAGED_SAVE_MESSAGE if typeof(SaveLoadManager) != TYPE_NIL else "Save file is damaged and can't be loaded"
 	if _status != null:
 		_status.text = msg
+	var now := Time.get_ticks_msec()
+	if now - _last_damaged_toast_msec < 400:
+		return
+	_last_damaged_toast_msec = now
 	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
 		LeaderEventUI.show_toast(msg, 3.0, true)
 
@@ -670,7 +677,8 @@ func live_routing_facts() -> Dictionary:
 		"esc_routed_to_cc": _esc_routed_to_cc,
 		"closed": _closed,
 		"processing_process": is_processing(),
-		"sticky_open_only": true,
+		"sticky_open_only": false,
+		"cc_closes_when_open": true,
 		"pointer_event_path": true,
 		"touch_path": true,
 		"ptr_poll": true,
@@ -775,6 +783,8 @@ func _cc_grow_rect(btn: Control) -> Rect2:
 
 
 func owns_screen_point(screen: Vector2) -> bool:
+	if _command_center_blocks_title():
+		return true
 	if begin_owns_screen_point(screen):
 		return true
 	if cc_owns_screen_point(screen):
@@ -910,6 +920,8 @@ func owns_any_collected_point(event: InputEvent = null) -> bool:
 func handle_live_pointer(event: InputEvent) -> String:
 	if _closed:
 		return "closed"
+	if _command_center_blocks_title():
+		return "cc_block"
 	if event != null and not is_live_pointer_press(event):
 		return "ignore"
 	# Event coords first. OR-ing a stale Viewport.get_mouse_position() with
@@ -958,6 +970,9 @@ func _apply_pointer_hit(hit: String, pending_press: bool = false) -> String:
 	if hit == "save":
 		print("EOA_LIVE_PTR who=title.handle_live_pointer action=save")
 		_activate_save_at_pointer()
+		var vp_s: Viewport = get_viewport()
+		if vp_s != null:
+			vp_s.set_input_as_handled()
 		return "save"
 	if hit == "begin":
 		print("EOA_LIVE_PTR who=title.handle_live_pointer action=begin")
@@ -1020,14 +1035,15 @@ func handle_live_command_center_click() -> bool:
 func handle_live_escape() -> bool:
 	if _closed:
 		return false
-	# Play softpipe presses Esc ×2 (dismiss-then-idle). A one-frame guard is
-	# not enough: first Esc opens CC, second Esc MainMenu-toggles it closed
-	# (Play 3d00182 / d18cbae / d53ee05: overlay unchanged after ×2).
-	# Sticky open-only while this title is up.
+	# First Esc / CC button opens Command Center. A later Esc closes it.
+	# The opening Esc also lands on MainMenu._input — `_cc_open_latch` keeps
+	# that one event from closing the overlay we just opened.
 	_log_live_esc("title.handle_live_escape", null)
-	if _esc_routed_to_cc or _command_center_is_up():
-		_esc_routed_to_cc = true
-		return _ensure_command_center_stays_open()
+	if _command_center_is_up():
+		print("LivingTitleBoot: live Esc → close Command Center")
+		return _close_command_center_from_title()
+	if _command_center_blocks_title():
+		return true
 	_esc_routed_to_cc = true
 	print("LivingTitleBoot: live Esc → Command Center")
 	return _open_command_center_from_title()
@@ -1181,6 +1197,11 @@ func _log_live_raw_key(who: String, event: InputEvent) -> void:
 func _process(delta: float) -> void:
 	if _closed:
 		return
+	if _cc_open_latch:
+		_cc_open_latch = false
+		var mm_l: Node = _command_center_node()
+		if mm_l != null and mm_l.has_meta("eoa_cc_open_latch"):
+			mm_l.remove_meta("eoa_cc_open_latch")
 	if smoke_auto_begin_enabled() and not _smoke_auto_begin_armed:
 		_smoke_auto_begin_delay_s += delta
 		if _smoke_auto_begin_delay_s >= 0.25:
@@ -1212,26 +1233,47 @@ func _process(delta: float) -> void:
 			print("EOA_LIVE_PTR who=title._process action=%s (raw saw OS left; hit missed)" % polled)
 
 
-func _command_center_is_up() -> bool:
+func _command_center_node() -> Node:
 	var tree: SceneTree = get_tree()
 	if tree == null or tree.root == null:
-		return false
+		return null
 	var mm: Node = tree.root.get_node_or_null("MainMenu")
 	if mm == null or not is_instance_valid(mm) or mm.is_queued_for_deletion():
+		return null
+	return mm
+
+
+func _command_center_is_up() -> bool:
+	var mm: Node = _command_center_node()
+	if mm == null:
 		return false
-	if bool(mm.get("_closing")):
+	return not bool(mm.get("_closing"))
+
+
+func _command_center_blocks_title() -> bool:
+	# Include `_closing` so the × click cannot reopen CC via title pointer/Esc.
+	return _command_center_node() != null
+
+
+func _close_command_center_from_title() -> bool:
+	var mm: Node = _command_center_node()
+	if mm == null:
+		_esc_routed_to_cc = false
+		_cc_open_latch = false
 		return false
+	if mm.has_meta("eoa_cc_open_latch"):
+		mm.remove_meta("eoa_cc_open_latch")
+	if mm.has_method("_force_close"):
+		mm.call("_force_close")
+	_esc_routed_to_cc = false
+	_cc_open_latch = false
 	return true
 
 
 func _ensure_command_center_stays_open() -> bool:
+	# Kept for callers/tests that still name this. Open if missing; do not
+	# pin an already-open CC — Esc / × / Return must be able to close it.
 	if _command_center_is_up():
-		var tree_s: SceneTree = get_tree()
-		if tree_s != null and tree_s.root != null:
-			var mm_s: Node = tree_s.root.get_node_or_null("MainMenu")
-			if mm_s != null:
-				mm_s.set_meta("eoa_opened_from_living_title", true)
-		print("EOA_LIVE_ESC who=LivingTitleBoot.stay cc already up (Play Esc ×2 open-only)")
 		return true
 	return _open_command_center_from_title()
 
@@ -1319,7 +1361,7 @@ func _on_window_input(event: InputEvent) -> void:
 	if is_live_pointer_press(event):
 		var action_w: String = handle_live_pointer(event)
 		print("EOA_LIVE_PTR who=title.window_input action=%s" % action_w)
-		if action_w == "begin" or action_w == "cc" or action_w == "panel":
+		if action_w == "begin" or action_w == "cc" or action_w == "panel" or action_w == "save" or action_w == "cc_block":
 			var vp_w: Viewport = get_viewport()
 			if vp_w != null:
 				vp_w.set_input_as_handled()
@@ -1370,21 +1412,33 @@ func _open_command_center_from_title() -> bool:
 		return false
 	if _command_center_is_up():
 		return true
-	# Immediate open-only (not deferred toggle). Play Esc ×2 used to open then
-	# `_on_menu_pressed` toggle-close on the second press (looks like a no-op).
+	# Immediate open (not deferred toggle). The opening Esc also hits MainMenu;
+	# latch that one event so it cannot `_force_close` the overlay we just opened.
+	_cc_open_latch = true
 	var tib: Node = _find_top_info_bar(tree)
 	if tib != null:
 		if tib.has_method("open_command_center_stay"):
 			tib.call("open_command_center_stay")
+			_stamp_cc_open_latch()
 			return true
 		if tib.has_method("_open_command_center"):
 			tib.call("_open_command_center", false)
+			_stamp_cc_open_latch()
 			return true
 		if tib.has_method("_on_menu_pressed"):
 			tib.call("_on_menu_pressed")
+			_stamp_cc_open_latch()
 			return true
 	_instance_command_center_now()
 	return true
+
+
+func _stamp_cc_open_latch() -> void:
+	_cc_open_latch = true
+	var mm: Node = _command_center_node()
+	if mm != null:
+		mm.set_meta("eoa_opened_from_living_title", true)
+		mm.set_meta("eoa_cc_open_latch", true)
 
 
 func _instance_command_center_now() -> void:
@@ -1402,6 +1456,7 @@ func _instance_command_center_now() -> void:
 	menu.name = "MainMenu"
 	menu.process_mode = Node.PROCESS_MODE_ALWAYS
 	menu.set_meta("eoa_opened_from_living_title", true)
+	menu.set_meta("eoa_cc_open_latch", true)
 	tree.root.add_child(menu)
 
 
@@ -1414,7 +1469,7 @@ func _on_sink_gui_input(event: InputEvent) -> void:
 		return
 	if is_live_pointer_press(event):
 		var action_s: String = handle_live_pointer(event)
-		if action_s == "begin" or action_s == "cc" or action_s == "panel":
+		if action_s == "begin" or action_s == "cc" or action_s == "panel" or action_s == "save" or action_s == "cc_block":
 			var vp_s: Viewport = get_viewport()
 			if vp_s != null:
 				vp_s.set_input_as_handled()
@@ -1464,7 +1519,7 @@ func _input(event: InputEvent) -> void:
 	if is_live_pointer_press(event):
 		var action_i: String = handle_live_pointer(event)
 		print("EOA_LIVE_PTR who=title._input action=%s" % action_i)
-		if action_i == "begin" or action_i == "cc" or action_i == "panel":
+		if action_i == "begin" or action_i == "cc" or action_i == "panel" or action_i == "save" or action_i == "cc_block":
 			var vp: Viewport = get_viewport()
 			if vp != null:
 				vp.set_input_as_handled()
@@ -1579,7 +1634,16 @@ func _finish(out: Dictionary) -> void:
 		return
 	_closed = true
 	_clear_opened_from_title_meta()
-	_center_on_player(str(out.get("player_tag", _tag)))
+	var tree_f := Engine.get_main_loop() as SceneTree
+	var mr_f: Node = null
+	if tree_f != null:
+		mr_f = tree_f.get_first_node_in_group("map_renderer")
+		if mr_f == null and tree_f.current_scene != null:
+			mr_f = tree_f.current_scene.find_child("MapRenderer", true, false)
+	if mr_f != null and mr_f.has_method("restore_view_after_load"):
+		mr_f.call_deferred("restore_view_after_load")
+	else:
+		_center_on_player(str(out.get("player_tag", _tag)))
 	boot_closed.emit(out)
 	queue_free()
 

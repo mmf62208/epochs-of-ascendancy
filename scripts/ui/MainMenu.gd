@@ -156,11 +156,9 @@ func _input(event: InputEvent) -> void:
 		"EOA_LIVE_ESC who=MainMenu._input process_mode=%s title_up=%s closing=%s tree=%s"
 		% [str(process_mode), str(title_up_now), str(_closing), str(get_tree() != null)]
 	)
-	if _living_title_is_up() or has_meta("eoa_opened_from_living_title"):
-		# Open-only while the title overlay is up (Play 3d00182 Esc ×2 toggle-close).
-		print("EOA_LIVE_ESC who=MainMenu.keep_cc title_up=%s from_title_meta=%s (do not _force_close)" % [
-			str(_living_title_is_up()), str(has_meta("eoa_opened_from_living_title"))
-		])
+	if has_meta("eoa_cc_open_latch") and bool(get_meta("eoa_cc_open_latch")):
+		# Same Esc that opened us from the title — do not close on that event.
+		print("EOA_LIVE_ESC who=MainMenu.open_latch title_up=%s (opening Esc)" % str(_living_title_is_up()))
 		get_viewport().set_input_as_handled()
 		return
 	_force_close()
@@ -176,10 +174,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		"EOA_LIVE_ESC who=MainMenu._unhandled_input process_mode=%s title_up=%s"
 		% [str(process_mode), str(_living_title_is_up())]
 	)
-	if _living_title_is_up() or has_meta("eoa_opened_from_living_title"):
-		print("EOA_LIVE_ESC who=MainMenu.keep_cc title_up=%s from_title_meta=%s (do not _force_close)" % [
-			str(_living_title_is_up()), str(has_meta("eoa_opened_from_living_title"))
-		])
+	if has_meta("eoa_cc_open_latch") and bool(get_meta("eoa_cc_open_latch")):
+		print("EOA_LIVE_ESC who=MainMenu.open_latch title_up=%s (opening Esc)" % str(_living_title_is_up()))
 		get_viewport().set_input_as_handled()
 		return
 	_force_close()
@@ -532,6 +528,9 @@ func _on_action(id: String) -> void:
 		"return_to_main":
 			_return_to_title()
 		"exit":
+			if has_meta("eoa_sr1_block_quit") and bool(get_meta("eoa_sr1_block_quit")):
+				set_meta("eoa_sr1_exit_fired", true)
+				return
 			_closing = true
 			_pause_game(false)
 			menu_closed.emit()
@@ -952,6 +951,10 @@ func _show_help() -> void:
 
 
 func _return_to_title() -> void:
+	# Title-opened CC: the living title is already up. Just dismiss CC.
+	if _living_title_is_up() or has_meta("eoa_opened_from_living_title"):
+		_force_close()
+		return
 	_closing = true
 	_set_status("Reloading…")
 	_pause_game(false)

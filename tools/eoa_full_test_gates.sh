@@ -459,6 +459,9 @@ else
   run_step launch_save_reload1_ui \
     tools/eoa_save_reload1_ui_guard.sh || fail
 
+  run_step launch_save_reload1_title_cc \
+    tools/eoa_save_reload1_title_cc.sh || fail
+
   if [[ "$WITH_PERF" -eq 1 ]]; then
     # Perf sample is evidence only — soft 30fps FAIL is OK
     run_step map_perf \

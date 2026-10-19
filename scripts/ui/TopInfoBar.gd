@@ -1997,6 +1997,7 @@ func _instance_command_center_now(refresh_list: bool = true) -> void:
 		)
 	if _living_title_boot_is_up():
 		menu.set_meta("eoa_opened_from_living_title", true)
+		menu.set_meta("eoa_cc_open_latch", true)
 	get_tree().root.add_child(menu)
 	if refresh_list and menu.has_method("_refresh_save_list"):
 		menu.call_deferred("_refresh_save_list")
