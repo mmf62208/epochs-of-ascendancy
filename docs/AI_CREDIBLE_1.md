@@ -257,3 +257,140 @@ The run rewrote `tools/map_generation/output/year_multi_ai_campaign_evidence.jso
 ## Play
 
 Not run by Build. No Play verdict. Steps for Play are in the launch brief §9. Xvfb only, never display `:0`.
+
+## Addendum A: start garrisons and border defence
+
+Shipped on `grok/ai-credible-1` after `cb206260`. FIX1a is `5a0b30a5`. FIX1b is `7bfe6daf`. FIX1c records this section, the full gate, and the 1461-day soak. No Play verdict.
+
+The 1936 start puts each nation's existing land divisions and garrisons on its capital and on land borders. No new units. No `world_full` id change. `data/provinces_*` is untouched (`provinces_base.json` still `3f1622a720b6d5a5ce806d7b58626af4`). NE land hit stays 0.9853 (3148/3195). GameData added lines vs base `9c2a9760` stay 0. `project.godot` is untouched.
+
+### Deployment plan
+
+Policy file `data/scenarios/ai_start_garrisons_1936.json`. `AiStartGarrisonDomain` loads it with `FileAccess` from `res://data/scenarios/ai_start_garrisons_1936.json` and caches the dictionary. `ScenarioLoader._apply_start_garrisons` calls `AiStartGarrisonDomain.apply()` once, after `spawn_test_formations_for_country` and before leader assignment.
+
+`EOA_AI_CREDIBLE=0` makes `apply()` return immediately (`reason=killswitch`) and leaves the spawned stations alone.
+
+Placement is a pure function of the policy, the map, and the land formations already spawned. No `randf`, `randi`, or `randomize`. Tag keys and formation ids are sorted. Tie-breaks are tag string and province id.
+
+Passes, in order, when the policy flag is true:
+
+1. Capital first (`capital_first`). The capital id comes from the policy `capitals` table, then from owned land.
+2. Border hexes facing neighbours, strongest first (`neighbour_rank`: `goal_weight`, `factory_strength`, `tag`). Hex choice uses `assigned_count`, `fewest_enemy_contacts`, `province_id`.
+3. Cover enemy stations (`cover_enemy_stations`): a friendly hex that touches an enemy unit and is still empty.
+4. One-hop reserve (`reserve_one_hop`).
+5. Core gate (`core_gate`). For GER the name tokens are Berlin, Brandenburg, and Saxony (the `core_name_tokens.GER` list). `core_hops` is 0.
+
+A major with few divisions does not cover every land-border hex. The plan spends units on the capital, then the strongest neighbour borders, then enemy-station contacts and the core gate. `border=covered/total` counts distinct owned land hexes that touch foreign land. `open` counts friendly land hexes that have no unit and touch an enemy unit's station.
+
+B10G boot (`HeadlessAiCredible1GarrisonHoldTest`, `~/ai1_evidence/fix1/b10g_both.log`) prints the same row on seeds 193601, 193602, and 193603, and on both the player-GER and AI-GER variants. 0 `SCRIPT ERROR`.
+
+| Tag | Capital garrisoned | Units | Border covered | Open contacts |
+|---|---|---|---|---|
+| ENG | y `711414` | 6 | 5/177 | 9 |
+| FRA | y `710707` | 6 | 5/120 | 4 |
+| GER | y `710300` (Berlin) | 6 | 5/97 | 2 (`711087`, `711091`) |
+| ITA | y `710963` | 6 | 5/28 | 0 |
+| JAP | y `903995` | 6 | 5/13 | 5 |
+| POL | y `711112` | 3 | 2/27 | 8 |
+| SOV | y `903534` | 7 | 4/29 | 0 |
+| USA | y `800792` | 7 | 5/31 | 0 |
+
+GER stations: `GER_formation_0` at `710300`, `GER_formation_1` at `711069`, `GER_formation_4` at `710234`, `GER_formation_5` at `711070`, `GER_formation_6` at `711057`, `GER_formation_7` at `711086`. The policy also names capitals for CHI `902487`, CZE `710146`, and AUS `710020`. This boot's placement report lists only tags that already had a land division or garrison.
+
+### Border defence
+
+`AiBorderFillDomain.tick` runs from `AiCredibleDomain.tick_day` after `AiDefenceDomain` and before economy, peace, and fronts. It runs when the campaign loop is on and a neighbour is at war or justifying. It fills empty friendly hexes that already touch an enemy land unit, before `AiFrontPlanDomain` spends units on an attack. Quiet border hexes with no adjacent enemy unit are not locked.
+
+`may_leave` is false when the unit is the last one on a core gate that touches a threatened neighbour. `AiFrontPlanDomain` calls `may_leave` before stepping off a core gate, and `retain_attacks` drops an attack that would empty a contact hex. Marches are capped by `defence_marches_per_day` (2), by count. Each march appends `BORDER day=… tag=… dest=…` to the credible trace. The killswitch skips the tick (`skipped=true`).
+
+No new `GameData.peace_state["ai_credible_state"]` subkey. Garrison state is `Formation.stationed_province_id`. Border fill is recomputed each day.
+
+### Seed
+
+Still `20fe9063de285f19d4f9b8a105abfd31`. No new hash. The expected value was not edited.
+
+Hash is md5 of the text after `HeadlessPerf4LiveMultiAiDayTest: ` on the `multi_ai_decisions=` line, plus a trailing newline. 0 `SCRIPT ERROR` in each log. Evidence under `~/ai1_evidence/fix1/`.
+
+| Slice | Run | Hash | `worst_day_ai` |
+|---|---|---|---|
+| FIX1a | `seed_a_1.log` | `20fe9063de285f19d4f9b8a105abfd31` | 4.9ms |
+| FIX1a | `seed_a_2.log` | same | 4.9ms |
+| FIX1a | `seed_a_3.log` | same | 5.1ms |
+| FIX1b | `seed_b_1.log` | same | 5.6ms |
+| FIX1b | `seed_b_2.log` | same | 5.3ms |
+| FIX1b | `seed_b_3.log` | same | 5.1ms |
+| FIX1b | `EOA_AI_CREDIBLE=0` `seed_kill.log` | same | 4.7ms |
+| FIX1b | `EOA_CAMPAIGN_LOOP=0` `seed_loop0.log` | same | 8.3ms |
+
+The pre-hook baseline in the Seed section above is `worst_day_ai=5.2ms`. +15% is 5.98ms. The six feature-on samples are at or under 5.6ms. On `seed_b_1.log` the `ai_credible` step is 0.6ms beside `ai_infra` about 3.9–4.1ms. Killswitch `ai_credible` is 0.0ms. The 8.3ms campaign-loop-off sample is the `ai_land` path (4.3ms in the worst row) with `ai_credible` at 0.3ms. The test budget is 500ms. `EOA_SLOW_BOX` was not set on these runs.
+
+### B10G and air B10
+
+The new test is `HeadlessAiCredible1GarrisonHoldTest`, wired in `tools/eoa_full_test_gates.sh` as `launch_ai_credible1_b10g_hold`. The air test stays B10 inside `HeadlessAiCredible1BehaviorTest`. Default seeds are 193601, 193602, 193603. `EOA_B10G_ONLY=player|ai` and `EOA_B10G_SEEDS` limit a run. POL declares on GER. Player-GER gives no orders. AI-GER is the campaign AI with the player on USA. The bar is Berlin held and at least 90% of the weighted Brandenburg/Saxony core for 60 days.
+
+`~/ai1_evidence/fix1/b10g_both.log`: `RESULT=PASS`, failures=0, 0 `SCRIPT ERROR`.
+
+| Variant | Seed | Days Berlin stayed GER | Min weighted core % | Day-60 core % | Empty-hex core captures |
+|---|---|---|---|---|---|
+| player-GER idle | 193601 | 60 | 100.0 | 100.0 | 0 |
+| player-GER idle | 193602 | 60 | 100.0 | 100.0 | 0 |
+| player-GER idle | 193603 | 60 | 100.0 | 100.0 | 0 |
+| AI-GER | 193601 | 60 | 100.0 | 100.0 | 0 |
+| AI-GER | 193602 | 60 | 100.0 | 100.0 | 0 |
+| AI-GER | 193603 | 60 | 100.0 | 100.0 | 0 |
+
+Air B10 on this tip (`~/ai1_evidence/fix1/behavior_b.log`): PASS, wing on axis `POL:77`. The same log re-ran B1–B9, both goldens, and both B8 paths. `RESULT=PASS`, failures=0, 0 `SCRIPT ERROR`.
+
+### Mutants M9 and M10
+
+Temporary local edits, reverted before `7bfe6daf`. M1–M8 stay the table in the Mutants section above. They were measured on the pre-Addendum tip and were not re-run after the garrison commits.
+
+| Mutant | Edit | Result |
+|---|---|---|
+| M9 | start-garrison deployment disabled | B10G player-GER idle FAIL, seed 193601. Berlin days 60, min core 72.4, day-60 72.4, 8 empty-hex core captures. Longest holds are 58 days (Frankfurt (Oder) `710303`, Märkisch-Oderland `710309`). `~/ai1_evidence/fix1/m9.log`. |
+| M10 | border fill disabled | B10G AI-GER FAIL, seed 193601. Berlin days 60, min core 82.8, day-60 82.8, 5 empty-hex core captures lasting 10, 10, 6, 4, and 1 days (Bautzen `710497`, Görlitz `710498`, Spree-Neiße `710316`, Cottbus `710302`, Frankfurt (Oder) `710303`). `~/ai1_evidence/fix1/m10.log`. |
+
+### `--quick` and map on this tip
+
+`~/ai1_evidence/fix1/quick.log`: exactly the 14 known reds, `FAILED (failures=14)`. `~/ai1_evidence/fix1/ne.log`: NE land hit rate 0.9853 (3148/3195), exit 0.
+
+### Full gate and soak (FIX1c)
+
+`bash tools/eoa_full_test_gates.sh --log ~/ai1_evidence/fix1/full_gate_c_steps` on `7bfe6daf`, foreground, 11:02:59–11:35:11 EDT. Summary `~/ai1_evidence/fix1/full_gate_c.log`. Exit 1. `--with-perf` was not passed. 0 `SCRIPT ERROR` in every step log. An earlier partial gate (`~/ai1_evidence/fix1/full_gate.log`) was killed at `launch_hwy3_live_scenario` and is not this result.
+
+In-gate `HeadlessPerf4LiveMultiAiDayTest`: RESULT=PASS, `worst_day_ai=4.8ms`, decision-line md5 `20fe9063de285f19d4f9b8a105abfd31`.
+
+`launch_ai_credible1_behavior` PASS. B1–B10, both goldens, both B8 paths. Air B10 wing on axis `POL:77`.
+
+`launch_ai_credible1_b10g_hold` PASS. Both variants, three seeds: Berlin 60 days, min core 100.0, day-60 100.0, empty-hex core captures 0.
+
+`launch_ai_credible1_soak` PASS, 1461 days, Q4 did not fire (first seed 54s). The soak script writes its per-seed logs to `~/ai1_evidence/soak_*.log` (rewritten 11:29–11:34). Copies are `~/ai1_evidence/fix1/soak_c/`. The cb206260 pair is `~/ai1_evidence/fix1/pre_fix1_soak/`. `~/ai1_evidence/soak_harness.log` is still the cb206260 harness. This run's harness lines are in the step log.
+
+Trace md5 `3d3cc06ae166f35b5263663c52edb986` on all six credible runs, each seed twice. Killswitch pair both `d41d8cd98f00b204e9800998ecf8427e`. Same trace as `cb206260`. Same declares (GER–POL 214, JAP–CHI 215, ITA–AUS 217, SOV–LIT 832), same event-log wars (220, 220, 220, 840), 0 peaces, 0 capitulations, 0 capital-empty days, 0 idle breaches, nonsense empty, same history flags. No `BORDER` line, because this harness spawns no divisions. 0 `SCRIPT ERROR`.
+
+| Seed | Wall sec (pair) | Sim `wall_ms` | max chunk ms | Trace md5 (both runs) |
+|---|---|---|---|---|
+| 193601 | 54 and 53 | 45194 and 44316 | 803 and 761 | `3d3cc06ae166f35b5263663c52edb986` |
+| 193602 | 53 and 54 | 44437 and 45064 | 791 and 774 | same |
+| 193603 | 53 and 53 | 44207 and 44694 | 752 and 764 | same |
+| killswitch 193601 | 33 and 33 | 23904 and 24129 | 424 and 444 | `d41d8cd98f00b204e9800998ecf8427e` |
+
+Against the cb206260 soak, the trace and the war, peace, capitulation, and history counts are the same. Sim `wall_ms` on this pass is about 44–45s (cb206260 log about 33–34s) and max chunk ms is about 752–803 (cb206260 log about 569–591). Killswitch sim `wall_ms` is 23904 and 24129 (cb206260 log 24561 and 25274).
+
+All six CL1 steps passed, including the soak and the end screen. 0 `SCRIPT ERROR` in the CL1 soak log.
+
+Steps that failed:
+
+| Step | What failed | Also red on `cb206260` |
+|---|---|---|
+| `unit_board_play_path` | the 14 known `--quick` reds, `FAILED (failures=14)` | Yes. Same test names. |
+| `launch_unit_order` | no Channel `DemoUnitIcon` on fleet `950001`; war-goal `pushes` stayed 0; AI did not open CHI–JAP to `902598` (`eligible_n=0`, `start_cap=2`) | The first two are the `cb206260` failure (`~/ai1_evidence/full_gate_steps/launch_unit_order.log`). The CHI–JAP assertion is new on this tip. The test re-stations JAP onto `903981` and CHI onto `902598`, then `try_ai_start_land_battles` goes through `AiFrontPlanDomain.filter_opportunities`, which now ends in `AiBorderFillDomain.retain_attacks`. That drop refuses an attack that would leave the last land unit on a hex already touching an enemy unit. The gate also prints `launch_unit_order missing RESULT=PASS` for the same log. 0 `SCRIPT ERROR`. |
+| `launch_perf2_fleet_refresh_budget` | 36 px star count 0 | Yes. |
+| `launch_vis1_map_readability` | `_refresh_supply_highlights` left SupplyOutline visible after L off (2 nodes) | Yes. `launch_vis2_capital_stars_after_l` passed. |
+| `launch_render1_draw_guard`, `launch_render1_live_cold`, `launch_hwy3_ruhr_legibility`, `launch_rx1_pixel`, `launch_mv1_pixel`, `launch_mv1_card_up_input`, `launch_rh1_pixel` | `RESULT=FAIL need xvfb-run` | Yes. This PC has no `xvfb-run`. |
+| `launch_fac1a_pixel` | `mkdir: cannot create directory '/opt/cursor': Permission denied` | Yes. |
+
+`launch_campaign_loop1_war_gate`, `launch_campaign_loop1_declare_click`, `launch_campaign_loop1_topbar_fit`, `launch_campaign_loop1_capitulation`, `launch_campaign_loop1_soak`, `launch_campaign_loop1_end_screen`, `launch_input1_close_click`, and `launch_prod1_button_open` passed.
+
+The year multi-AI harness was not re-run on this slice. Its last result is the Year multi-AI section above, from the pre-Addendum tip.
+
