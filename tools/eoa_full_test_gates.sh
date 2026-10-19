@@ -441,6 +441,12 @@ else
   run_step launch_campaign_loop1_end_screen \
     tools/eoa_campaign_loop1_end_screen_guard.sh || fail
 
+  run_step launch_ai_credible1_behavior \
+    tools/run_godot.sh --headless --path . --resolution 1280x800 -s res://scripts/core/HeadlessAiCredible1BehaviorTest.gd || fail
+
+  run_step launch_ai_credible1_soak \
+    tools/eoa_ai_credible1_soak.sh || fail
+
   if [[ "$WITH_PERF" -eq 1 ]]; then
     # Perf sample is evidence only — soft 30fps FAIL is OK
     run_step map_perf \

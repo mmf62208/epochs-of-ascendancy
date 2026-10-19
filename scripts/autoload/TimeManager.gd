@@ -1046,6 +1046,7 @@ func advance_days(days: float) -> void:
 				"year": current_year,
 				"month": current_month,
 				"day": current_day,
+				"elapsed": total_days_elapsed,
 			})
 			# Live smoke past-+6: defer combat load so sync/chunk ticks cannot
 			# open AI land battles under the Play F5 softpipe map.
@@ -1315,7 +1316,13 @@ func _flush_sim_events() -> void:
 	elif kind == "day_ai":
 		# F5 interactive day_ai frame. Keep these helper names in _flush_sim_events
 		# (product greps). Timed once via _profile_day_ai_steps — do not call twice.
-		_profile_day_ai_steps() # _maybe_run_interactive_multi_ai
+		# A 20-day live-F5 flush runs after the clock has already moved to the
+		# chunk end. Credible AI must still decide on the day that was queued.
+		# Killswitch off keeps the chunk-end clock (base behaviour).
+		var ai_day := int(total_days_elapsed)
+		if OS.get_environment("EOA_AI_CREDIBLE").strip_edges() != "0" and ev.has("elapsed"):
+			ai_day = int(ev.get("elapsed", ai_day))
+		_profile_day_ai_steps(ai_day) # _maybe_run_interactive_multi_ai
 		# _maybe_run_ai_infra_invest / _maybe_run_ai_land_battle_starts (inside profile)
 	elif kind == "day_battles":
 		var t_bat := Time.get_ticks_usec()
@@ -1452,7 +1459,16 @@ func _campaign_after_battles() -> void:
 	CampaignEndDomain.evaluate_and_latch(int(total_days_elapsed))
 
 
-func _maybe_run_ai_land_battle_starts() -> void:
+func _maybe_run_ai_credible(day_index: int = -1) -> void:
+	if OS.get_environment("EOA_AI_CREDIBLE").strip_edges() == "0":
+		return
+	if typeof(AiCredibleDomain) == TYPE_NIL:
+		return
+	var day := day_index if day_index >= 0 else int(total_days_elapsed)
+	AiCredibleDomain.tick_day(day)
+
+
+func _maybe_run_ai_land_battle_starts(day_index: int = -1) -> void:
 	if _living_playtest_clock:
 		# Compact 20d Maginot clock ticks open fights only — new AI assaults
 		# were opening extra fronts (and execute-risk on empty hexes).
@@ -1460,8 +1476,8 @@ func _maybe_run_ai_land_battle_starts() -> void:
 	if typeof(WarStateDomain) != TYPE_NIL and WarStateDomain.loop_enabled():
 		if WarStateDomain.ai_stopped():
 			return
-		var declare_day := 0
-		if has_method("get_total_days_elapsed"):
+		var declare_day := day_index if day_index >= 0 else 0
+		if day_index < 0 and has_method("get_total_days_elapsed"):
 			declare_day = int(get_total_days_elapsed())
 		WarStateDomain.try_ai_declare_wars(declare_day)
 	if smoke_advance_should_defer_combat():
@@ -1474,8 +1490,8 @@ func _maybe_run_ai_land_battle_starts() -> void:
 		return
 	if not BattleManager.has_method("try_ai_start_land_battles"):
 		return
-	var day_i := 0
-	if has_method("get_total_days_elapsed"):
+	var day_i := day_index if day_index >= 0 else 0
+	if day_index < 0 and has_method("get_total_days_elapsed"):
 		day_i = int(get_total_days_elapsed())
 	BattleManager.try_ai_start_land_battles(day_i)
 
@@ -1656,7 +1672,7 @@ func _emit_game_day_advanced_profiled(year: int, month: int, day: int) -> void:
 	_note_day_tick_phase("day_emit", total_ms)
 
 
-func _profile_day_ai_steps() -> void:
+func _profile_day_ai_steps(ai_day: int = -1) -> void:
 	var steps: Array = []
 	var t_all := Time.get_ticks_usec()
 	var t0 := Time.get_ticks_usec()
@@ -1674,8 +1690,11 @@ func _profile_day_ai_steps() -> void:
 	steps.append({"name": "ai_infra", "ms": float(Time.get_ticks_usec() - t0) / 1000.0})
 	t0 = Time.get_ticks_usec()
 	if not smoke_advance_should_defer_combat():
-		_maybe_run_ai_land_battle_starts()
+		_maybe_run_ai_land_battle_starts(ai_day)
 	steps.append({"name": "ai_land", "ms": float(Time.get_ticks_usec() - t0) / 1000.0})
+	t0 = Time.get_ticks_usec()
+	_maybe_run_ai_credible(ai_day)
+	steps.append({"name": "ai_credible", "ms": float(Time.get_ticks_usec() - t0) / 1000.0})
 	var total_ms := float(Time.get_ticks_usec() - t_all) / 1000.0
 	last_day_tick_profile["day_ai_ms"] = total_ms
 	last_day_tick_profile["day_ai_steps"] = steps

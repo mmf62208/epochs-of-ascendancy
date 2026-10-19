@@ -768,8 +768,18 @@ func try_ai_start_land_battles(day_index: int = 0) -> Dictionary:
 	var plan_player := player_tag
 	if include_player_in_ai_land_battles:
 		plan_player = "OBS"
+	var start_cap := 1
+	if typeof(AiCredibleDomain) != TYPE_NIL and AiCredibleDomain.enabled():
+		var any_fight := false
+		for fight_tag in candidates:
+			if typeof(WarStateDomain) != TYPE_NIL and not WarStateDomain.enemies_of(str(fight_tag)).is_empty():
+				any_fight = true
+				break
+		if any_fight and typeof(AiFrontPlanDomain) != TYPE_NIL:
+			start_cap = AiFrontPlanDomain.war_start_cap()
+			opportunities = AiFrontPlanDomain.filter_opportunities(opportunities, int(day_index))
 	var plan: Dictionary = LandBattleAi.plan_day(
-		opportunities, plan_player, int(day_index), open_hexes, open_per_tag, 1
+		opportunities, plan_player, int(day_index), open_hexes, open_per_tag, start_cap
 	)
 	var started: Array = []
 	for raw_pick in plan.get("picks", []):
@@ -783,12 +793,16 @@ func try_ai_start_land_battles(day_index: int = 0) -> Dictionary:
 			str(pick.get("formation_id", "")),
 		)
 		if bool(opened.get("success", false)) and bool(opened.get("opened", false)):
-			started.append({
+			var started_row := {
 				"tag": str(pick.get("tag", "")),
 				"to_id": int(pick.get("to_id", -1)),
 				"from_id": int(pick.get("from_id", -1)),
 				"defender_tag": str(pick.get("defender_tag", "")),
-			})
+			}
+			started.append(started_row)
+			if typeof(AiCredibleDomain) != TYPE_NIL and AiCredibleDomain.enabled() and typeof(AiFrontPlanDomain) != TYPE_NIL:
+				var seg := AiFrontPlanDomain.segment_of(started_row)
+				AiFrontPlanDomain.note_start(str(started_row.get("tag", "")), seg, seg == AiFrontPlanDomain.axis_segment(str(started_row.get("tag", ""))))
 	if not started.is_empty():
 		print("BattleManager: AI opened %d land battle(s) (start_land_battle, day=%d)" % [started.size(), int(day_index)])
 
@@ -828,6 +842,7 @@ func try_ai_start_land_battles(day_index: int = 0) -> Dictionary:
 		"follow_on_n": int(follow.get("started_n", 0)),
 		"player_tag": player_tag,
 		"eligible_n": int(plan.get("eligible_n", 0)),
+		"start_cap": start_cap,
 	}
 
 
