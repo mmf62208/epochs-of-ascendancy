@@ -7,9 +7,10 @@ Mid-campaign save, quit, and load. A named slot written on day 200 reloads to th
 - Work clone: `~/Projects/epochs-of-ascendancy-save1`
 - Branch: `grok/save-reload-1`
 - Rebased feature commit: `180e3dba63be7dc3dcc882126bc296fb7b276d07` (was `1a894de4` before the rebase)
-- Rebased hour / `run_seed` guard, current tip: `fd7cbd72127df4282961d27e6449e731e2d7cf5f` (was `630a8599`)
+- Rebased hour / `run_seed` guard, the code tip the gates ran on: `fd7cbd72127df4282961d27e6449e731e2d7cf5f` (was `630a8599`)
+- This status file is a later commit on the same branch. It does not change scripts, so the gates were not re-run for it.
 - Base: `2a7da052f77fe938f2c246236a90d519c13981cd` (`origin/grok/campaign-loop-1`, CL1 FIX #1 evidence). #113 was not in `origin/main` (`0560291280cf7a3642bd551cc0211042a573c9fc`).
-- Brief pin `25599270` is an ancestor. The rebase replayed the two SR1 commits onto `2a7da052` with no conflicts. `git diff --stat 2a7da052 HEAD` is 27 files, +5159 / −274.
+- Brief pin `25599270` is an ancestor. The rebase replayed the two SR1 commits onto `2a7da052` with no conflicts. Against `2a7da052`, the code diff is 27 files, +5159 / −274. This status file is the 28th.
 
 ## Format
 
