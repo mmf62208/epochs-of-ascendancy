@@ -125,7 +125,7 @@ That component **is** SOV’s HWY-3 hub route into Moscow (`Moscow → Haradok a
 - `903534_905809` Moscow – Haradok area
 - `905807_905809` Polotsk area – Haradok area
 
-FIX #3: demoted Moscow legs stay in the **drawn paved set** at Infra z1.8 (`903534_905809`, `905807_905809`). They are marked `demoted_stub` and cannot ride the highway drop. Supply legend height is capped to content (≤200 px) so it no longer stretches to the screen bottom or covers the minimap; the pulse-host layout no longer sets `size` on stretch anchors. Map Mode highlight follows Supply/Infra while the legend is open (L-on political highlights Supply). Hint adds `Toggle highways: L`. L toggle on the cached path stays ~5 ms (was 280–355 ms when connectivity rebuilt per edge).
+FIX #3 tip `cf510890` (merge `3c592102` onto main `d00dc8ed`): demoted Moscow legs stay in the **drawn paved set** at Infra z1.8 (`903534_905809`, `905807_905809`, `ROADS1_PAVED_Z18 n=643`). They are marked `demoted_stub` and cannot ride the highway drop. Supply legend is pinned TOP_LEFT to content **480×145** at peace `(10,178)` / war `(10,194)` — height ≤200, no minimap overlap; pulse-host no longer assigns `size` on stretch anchors. Map Mode highlight follows Supply/Infra while the legend is open (L-on political highlights Supply). Hint adds `Toggle highways: L`. L toggle on_warm **4.57 / 4.58 ms** (geom/info stayed 3). Seed **20fe9063** ×3. `--quick` same 14 known reds. NE **0.9853**. 0 SCRIPT ERROR. Hwy1 / Hwy3 / Rt1 / Rx1 PASS. Drawn highways 112 / used 114.
 
 Geometry points are canvas units. Live centroids and Polygon2D rings are canvas × `THEATER_SCALE` 1.728. Draw rings are scaled. Shared-border keys stay unscaled.
 
