@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Live ATLAS-1 Ruhr labels after Begin, with unit/air counters ON.
+# Live ATLAS-1 Ruhr labels after Begin. Play path: Begin, U (counters OFF), Home, wheel.
 # Same boot as Play (TestScenario + EOA_SMOKE_AUTO_BEGIN). Not --headless:
 # TestRunner treats DisplayServer=headless as the 50T evidence path.
 #   tools/eoa_atlas1_live_ruhr.sh

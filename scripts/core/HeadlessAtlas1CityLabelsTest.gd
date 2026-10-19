@@ -91,6 +91,7 @@ func _run_and_quit() -> void:
 	_test_counter_avoidance(layer)
 	_test_no_doubled_draws(layer)
 	_test_ruhr_centered_live_zooms(layer)
+	_test_ruhr_in_out_slots(layer)
 	_test_air_wing_cover_essen(layer)
 	_test_mid_scenario_capitals(layer)
 	_finish()
@@ -732,8 +733,96 @@ func _test_ruhr_centered_live_zooms(layer: Node) -> void:
 		if bool(layer.call("has_visual_overlap")):
 			_fail("Ruhr-cam z%.3f label/dot overlap" % z)
 			ok = false
+		if layer.has_method("ruhr_dot_cover_names"):
+			var covers: PackedStringArray = layer.call("ruhr_dot_cover_names")
+			if not covers.is_empty():
+				_fail("Ruhr-cam z%.3f label covers a Ruhr dot: %s" % [z, ", ".join(covers)])
+				ok = false
 	if ok:
 		_pass("Ruhr-cam live zooms keep Essen and do not overlap")
+
+
+func _test_ruhr_in_out_slots(layer: Node) -> void:
+	## Same Play cameras as the live wheel, counters off. Slots must not
+	## depend on zoom direction; labels must not bury Ruhr discs.
+	var vp := Vector2(1280, 800)
+	var zooms: Array[float] = [1.270, 1.578, 1.962, 2.439, 3.031]
+	var cams: Array[Vector2] = [
+		Vector2(7521.68, 1557.15),
+		Vector2(7493.04, 1565.78),
+		Vector2(7468.15, 1572.60),
+		Vector2(7448.15, 1578.08),
+		Vector2(7432.08, 1582.48),
+	]
+	var inn: Dictionary = {}
+	var ok := true
+	for i in zooms.size():
+		var z: float = zooms[i]
+		layer.call("set_view", z, cams[i], vp, [], [])
+		if not _assert_ruhr_slots_at(layer, z, inn, false):
+			ok = false
+	for j in range(zooms.size() - 2, -1, -1):
+		var z2: float = zooms[j]
+		layer.call("set_view", z2, cams[j], vp, [], [])
+		if not _assert_ruhr_slots_at(layer, z2, inn, true):
+			ok = false
+	if ok:
+		_pass("Ruhr Play-cam in/out slots match and miss Ruhr dots")
+
+
+func _assert_ruhr_slots_at(layer: Node, z: float, inn: Dictionary, going_out: bool) -> bool:
+	var placed: Array = layer.call("placed")
+	var names := _names(placed)
+	var ok := true
+	for core in ["Essen", "Duisburg", "Düsseldorf", "Dortmund"]:
+		if not names.has(core):
+			_fail("%s missing at Play-cam z%.3f %s" % [core, z, "out" if going_out else "in"])
+			ok = false
+	if not names.has("Köln") and not names.has("Cologne"):
+		_fail("Köln missing at Play-cam z%.3f %s" % [z, "out" if going_out else "in"])
+		ok = false
+	if layer.has_method("ruhr_dot_cover_names"):
+		var covers: PackedStringArray = layer.call("ruhr_dot_cover_names")
+		if not covers.is_empty():
+			_fail("Play-cam z%.3f %s label covers a Ruhr dot: %s" % [
+				z, "out" if going_out else "in", ", ".join(covers),
+			])
+			ok = false
+	var key_z := "%.3f" % z
+	var now: Dictionary = {}
+	for p in placed:
+		if float(p.get("alpha", 0.0)) < 0.04:
+			continue
+		var nm := str(p.get("name", ""))
+		if not _is_ruhr_item(p) and nm != "Köln" and nm != "Cologne":
+			continue
+		var off := Vector2.ZERO
+		if layer.has_method("play_label_offset_px"):
+			off = layer.call("play_label_offset_px", p) as Vector2
+		else:
+			off = p.get("screen_offset", Vector2.ZERO) as Vector2
+		now[nm] = off
+		print("ATLAS1 city SLOT %s z%.3f %s=%.1f,%.1f" % [
+			"out" if going_out else "in", z, nm, off.x, off.y,
+		])
+	if not going_out:
+		inn[key_z] = now
+		return ok
+	if not inn.has(key_z):
+		return ok
+	var prev: Dictionary = inn[key_z]
+	for nm2 in now.keys():
+		if not prev.has(nm2):
+			continue
+		var a: Vector2 = prev[nm2]
+		var b: Vector2 = now[nm2]
+		var d := a.distance_to(b)
+		if d > 3.0:
+			_fail("%s Play-cam in/out z%s delta %.1f px (in %.1f,%.1f out %.1f,%.1f)" % [
+				str(nm2), key_z, d, a.x, a.y, b.x, b.y,
+			])
+			ok = false
+	return ok
 
 
 func _test_air_wing_cover_essen(layer: Node) -> void:

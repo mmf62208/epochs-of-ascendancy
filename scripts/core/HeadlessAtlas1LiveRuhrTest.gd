@@ -1,8 +1,8 @@
 extends SceneTree
 
-## ATLAS-1 live Ruhr labels after Begin, with real unit/air counters on.
-## Isolated CityLabelsLayer tests pan onto Essen and pass empty counter
-## overrides — that is not the live Home zoom-in path. This boots TestScenario.
+## ATLAS-1 live Ruhr labels after Begin. Play path: Begin, U (counters OFF),
+## Home, then wheel in and back out. Isolated CityLabelsLayer tests pan onto
+## Essen — that is not the live Home zoom-in path. This boots TestScenario.
 ##
 ##   EOA_SMOKE_AUTO_BEGIN=1 tools/run_godot.sh --headless --path . \
 ##     --resolution 1280x800 -s res://scripts/core/HeadlessAtlas1LiveRuhrTest.gd
@@ -10,11 +10,13 @@ extends SceneTree
 const ESSEN := 710403
 const WAIT_MAP_SECS := 420
 const SETTLE_FRAMES := 30
-## Play 59c85d54 cameras (RESULT_6702). Wheel-notch stand-ins for 1.264/1.572/3.019.
-const LIVE_ZOOMS: Array[float] = [1.270, 1.578, 3.031]
+## Play 59c85d54 cameras (RESULT_6702). 1.962 / 2.439 interpolated in 1/z.
+const LIVE_ZOOMS: Array[float] = [1.270, 1.578, 1.962, 2.439, 3.031]
 const PLAY_Z_LABEL := 1.022
 const PLAY_CAM_LABEL := Vector2(7557.27, 1546.63)
-const PLAY_CAMS: Array[Vector2] = [
+const PLAY_Z_KNOWN: Array[float] = [1.022, 1.270, 1.578, 3.031]
+const PLAY_CAM_KNOWN: Array[Vector2] = [
+	Vector2(7557.27, 1546.63),
 	Vector2(7521.68, 1557.15),
 	Vector2(7493.04, 1565.78),
 	Vector2(7432.08, 1582.48),
@@ -31,6 +33,7 @@ const RUHR_CORE := ["Essen", "Duisburg", "Düsseldorf", "Dortmund", "Köln"]
 var _wheel_screen := PLAY_WHEEL_SCREEN
 var _home_zoom := 0.0
 var _in_offsets: Dictionary = {}
+var _out_offsets: Dictionary = {}
 var _phase_out := false
 var _did_z1 := false
 
@@ -133,8 +136,16 @@ func _tick_wait_map() -> void:
 		_fail("CityLabelsLayer count %d want 1 (doubled draw path)" % _city_layer_count())
 	if _visible_unit_count() < 1:
 		_fail("no live unit/air counters after Begin")
+	_ensure_units_off()
+	if _visible_unit_count() > 0:
+		_fail("U did not hide unit/air counters (Play path is counters off)")
+	else:
+		_pass("unit/air counters off after U")
 	if _focus_world == Vector2.ZERO:
 		_fail("Essen world is zero at Home")
+	for z_cam in LIVE_ZOOMS:
+		var pc := _play_cam_at(z_cam)
+		print("ATLAS1 live play_cam z%.3f=%.2f,%.2f" % [z_cam, pc.x, pc.y])
 	_zoom_i = 0
 	_begin_z1_check()
 
@@ -170,10 +181,11 @@ func _begin_zoom() -> void:
 	_park_mouse()
 	# zstep from Home toward Play's camera, mouse then parked off-map.
 	_wheel_from_home_to_play(_zoom_i)
-	_apply_camera(PLAY_CAMS[_zoom_i], z)
+	var want_pos := _play_cam_at(z)
+	_apply_camera(want_pos, z)
 	_park_mouse()
 	var cam := _camera()
-	var pos := cam.global_position if cam != null else PLAY_CAMS[_zoom_i]
+	var pos := cam.global_position if cam != null else want_pos
 	_lock_pos = pos
 	_lock_zoom = _camera_zoom()
 	_sync_live_counters(_lock_zoom)
@@ -187,10 +199,11 @@ func _begin_zoom() -> void:
 
 func _begin_zoom_out() -> void:
 	var z: float = LIVE_ZOOMS[_zoom_i]
+	var want_pos := _play_cam_at(z)
 	_park_mouse()
-	_apply_camera(PLAY_CAMS[_zoom_i], z)
+	_apply_camera(want_pos, z)
 	_park_mouse()
-	_lock_pos = PLAY_CAMS[_zoom_i]
+	_lock_pos = want_pos
 	_lock_zoom = z
 	_sync_live_counters(z)
 	_sync_layer_from_camera()
@@ -251,6 +264,7 @@ func _check_zoom() -> void:
 	if _has_name(placed, "Münster") and not _has_name(placed, "Essen"):
 		_fail("Münster kept over Essen at live wheel z%.3f" % z)
 	_check_anchor_and_chrome(layer, placed, z)
+	_check_ruhr_dot_cover(layer, z)
 	if bool(layer.call("has_visual_overlap")):
 		_fail("live label overlap at z%.3f: %s" % [z, _overlap_pairs(placed)])
 	else:
@@ -407,6 +421,14 @@ func _ensure_units_on() -> void:
 		mr.call("_sync_unit_counter_paint")
 
 
+func _ensure_units_off() -> void:
+	var mr := _map_renderer()
+	if mr != null and mr.has_method("set_unit_counters_visible"):
+		mr.call("set_unit_counters_visible", false)
+	if mr != null and mr.has_method("_sync_unit_counter_paint"):
+		mr.call("_sync_unit_counter_paint")
+
+
 func _wheel_to(target_zoom: float) -> void:
 	# Fixed off-map mouse. Never re-aim at Essen (that packed a different cam).
 	_wheel_to_screen(_wheel_screen, target_zoom)
@@ -439,11 +461,33 @@ func _park_mouse() -> void:
 	DisplayServer.warp_mouse(Vector2i(int(PLAY_WHEEL_SCREEN.x), int(PLAY_WHEEL_SCREEN.y)))
 
 
+func _play_cam_at(z: float) -> Vector2:
+	# Play cameras lie on a 1/z wheel. Known stops are exact; 1.962 / 2.439
+	# interpolate between the bracketing Play cameras.
+	for i in PLAY_Z_KNOWN.size():
+		if absf(PLAY_Z_KNOWN[i] - z) < 0.0005:
+			return PLAY_CAM_KNOWN[i]
+	var lo := 0
+	while lo + 1 < PLAY_Z_KNOWN.size() and PLAY_Z_KNOWN[lo + 1] < z - 0.0005:
+		lo += 1
+	var hi := mini(lo + 1, PLAY_Z_KNOWN.size() - 1)
+	if lo == hi:
+		return PLAY_CAM_KNOWN[lo]
+	var inv := 1.0 / maxf(z, 0.04)
+	var inv_a := 1.0 / maxf(PLAY_Z_KNOWN[lo], 0.04)
+	var inv_b := 1.0 / maxf(PLAY_Z_KNOWN[hi], 0.04)
+	var t := 0.0
+	if absf(inv_a - inv_b) > 0.0001:
+		t = (inv_a - inv) / (inv_a - inv_b)
+	t = clampf(t, 0.0, 1.0)
+	return PLAY_CAM_KNOWN[lo].lerp(PLAY_CAM_KNOWN[hi], t)
+
+
 func _wheel_from_home_to_play(idx: int) -> void:
-	if idx < 0 or idx >= PLAY_CAMS.size():
+	if idx < 0 or idx >= LIVE_ZOOMS.size():
 		return
 	var target_z: float = LIVE_ZOOMS[idx]
-	var target_pos: Vector2 = PLAY_CAMS[idx]
+	var target_pos: Vector2 = _play_cam_at(target_z)
 	var z0 := _camera_zoom()
 	if z0 < 0.04:
 		z0 = _home_zoom
@@ -488,6 +532,8 @@ func _check_z1() -> void:
 		_fail("Düsseldorf missing at live wheel z%.3f (must label at z1.0)" % PLAY_Z_LABEL)
 	else:
 		_pass("Düsseldorf labelled at live wheel z%.3f" % PLAY_Z_LABEL)
+	_check_anchor_and_chrome(layer, placed, PLAY_Z_LABEL)
+	_check_ruhr_dot_cover(layer, PLAY_Z_LABEL)
 	_maybe_shot("live_ruhr_z1022")
 	_did_z1 = true
 	_begin_zoom()
@@ -508,9 +554,11 @@ func _record_or_check_stable(layer: Node, placed: Array, z: float) -> void:
 		else:
 			off = p.get("screen_offset", Vector2.ZERO) as Vector2
 		now[nm] = off
+	_print_slot_row(z, now, "in" if not _phase_out else "out")
 	if not _phase_out:
 		_in_offsets[key_z] = now
 		return
+	_out_offsets[key_z] = now
 	if not _in_offsets.has(key_z):
 		return
 	var prev: Dictionary = _in_offsets[key_z]
@@ -526,6 +574,65 @@ func _record_or_check_stable(layer: Node, placed: Array, z: float) -> void:
 			])
 		else:
 			_pass("%s stable in/out at z%s (delta %.1f)" % [str(nm2), key_z, d])
+
+
+func _print_slot_row(z: float, offs: Dictionary, side: String) -> void:
+	var bits: PackedStringArray = PackedStringArray()
+	for nm in RUHR_CORE:
+		var key := nm
+		if not offs.has(key) and nm == "Köln" and offs.has("Cologne"):
+			key = "Cologne"
+		if not offs.has(key):
+			bits.append("%s=—" % nm)
+			continue
+		var off: Vector2 = offs[key]
+		bits.append("%s=%.1f,%.1f %s" % [nm, off.x, off.y, _compass(off)])
+	print("ATLAS1 live SLOT %s z%.3f %s" % [side, z, " | ".join(bits)])
+
+
+func _print_slot_table() -> void:
+	print("ATLAS1 live SLOT TABLE in/out (Play-centre px)")
+	print("city        z      in_xy            in   out_xy           out  dpx")
+	for z_v in LIVE_ZOOMS:
+		var z: float = z_v
+		var key_z := "%.3f" % z
+		var inn: Dictionary = _in_offsets.get(key_z, {}) as Dictionary
+		var outt: Dictionary = _out_offsets.get(key_z, {}) as Dictionary
+		for nm in RUHR_CORE:
+			var in_key := nm
+			var out_key := nm
+			if not inn.has(in_key) and nm == "Köln" and inn.has("Cologne"):
+				in_key = "Cologne"
+			if not outt.has(out_key) and nm == "Köln" and outt.has("Cologne"):
+				out_key = "Cologne"
+			var a := Vector2.ZERO
+			var b := Vector2.ZERO
+			var has_in := inn.has(in_key)
+			var has_out := outt.has(out_key)
+			if has_in:
+				a = inn[in_key]
+			if has_out:
+				b = outt[out_key]
+			var d := a.distance_to(b) if has_in and has_out else -1.0
+			print("  %-10s z%-5s %-16s %-3s %-16s %-3s %s" % [
+				nm, key_z,
+				("%.1f,%.1f" % [a.x, a.y]) if has_in else "—",
+				_compass(a) if has_in else "—",
+				("%.1f,%.1f" % [b.x, b.y]) if has_out else "—",
+				_compass(b) if has_out else "—",
+				("%.1f" % d) if d >= 0.0 else "—",
+			])
+
+
+func _check_ruhr_dot_cover(layer: Node, z: float) -> void:
+	if not layer.has_method("ruhr_dot_cover_names"):
+		_fail("CityLabelsLayer.ruhr_dot_cover_names missing at z%.3f" % z)
+		return
+	var hits: PackedStringArray = layer.call("ruhr_dot_cover_names")
+	if not hits.is_empty():
+		_fail("Ruhr label covers a Ruhr dot at z%.3f: %s" % [z, ", ".join(hits)])
+	else:
+		_pass("no Ruhr label on a Ruhr dot at z%.3f" % z)
 
 
 func _world_to_screen(world: Vector2) -> Vector2:
@@ -673,6 +780,7 @@ func _apply_camera(pos: Vector2, zoom: float) -> void:
 		cam.reset_smoothing()
 		cam.enabled = true
 		cam.make_current()
+	_ensure_units_off()
 	_sync_live_counters(zoom)
 	_sync_layer_from_camera()
 
@@ -873,6 +981,7 @@ func _find_named(nm: String) -> Node:
 
 func _finish() -> void:
 	_phase = 3
+	_print_slot_table()
 	var ok := _failures == 0
 	print("HeadlessAtlas1LiveRuhrTest: ", "PASS" if ok else "FAIL", " (failures=", _failures, ")")
 	print("HeadlessAtlas1LiveRuhrTest: RESULT=", "PASS" if ok else "FAIL")
