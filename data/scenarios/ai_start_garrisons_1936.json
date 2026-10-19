@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "capital_first": true,
+  "cover_enemy_stations": true,
+  "reserve_one_hop": true,
+  "neighbour_rank": ["goal_weight", "factory_strength", "tag"],
+  "hex_rank": ["assigned_count", "fewest_enemy_contacts", "province_id"],
+  "core_hops": 0,
+  "core_name_tokens": {
+    "GER": [
+      "berlin",
+      "brandenburg",
+      "potsdam",
+      "barnim",
+      "havelland",
+      "oder",
+      "spree",
+      "cottbus",
+      "uckermark",
+      "prignitz",
+      "teltow",
+      "dahme",
+      "sachsen",
+      "chemnitz",
+      "dresden",
+      "leipzig",
+      "zwickau",
+      "erzgebirg",
+      "bautzen",
+      "gorlitz",
+      "görlitz",
+      "meissen",
+      "meißen",
+      "nordsachsen"
+    ]
+  },
+  "capitals": {
+    "GER": 710300,
+    "POL": 711112,
+    "FRA": 710707,
+    "ENG": 711414,
+    "USA": 800792,
+    "SOV": 903534,
+    "ITA": 710963,
+    "JAP": 903995,
+    "CHI": 902487,
+    "CZE": 710146,
+    "AUS": 710020
+  }
+}
