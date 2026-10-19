@@ -1863,8 +1863,10 @@ func _peek_save_file(path: String, is_v2: bool) -> Dictionary:
 	return {"damaged": false, "old_format": true, "error": "", "metadata": meta}
 
 
-## Display helper. Stored wall_time stays UTC; the list shows the local clock.
-func format_wall_time_local(wall: String) -> String:
+## Display helper. Stored wall_time stays UTC. The list applies the zone
+## bias (minutes, including DST as the OS reports it) before formatting.
+## `bias_override` is minutes east of UTC for tests; null uses the system bias.
+func format_wall_time_local(wall: String, bias_override: Variant = null) -> String:
 	var raw := wall.strip_edges()
 	if raw.is_empty():
 		return ""
@@ -1874,12 +1876,32 @@ func format_wall_time_local(wall: String) -> String:
 	cleaned = cleaned.replace(" ", "T")
 	if cleaned.length() >= 19:
 		cleaned = cleaned.substr(0, 19)
-	var unix := 0
-	if cleaned.length() >= 19:
-		unix = int(Time.get_unix_time_from_datetime_string(cleaned))
-	if unix <= 0:
+	if cleaned.length() < 19:
 		return raw
-	return Time.get_datetime_string_from_unix_time(unix, false)
+	var unix_utc := _utc_unix_from_iso(cleaned)
+	# Campaign wall_times are 1936-era: unix is negative. Still apply bias.
+	var bias := 0
+	if bias_override == null:
+		var tz: Dictionary = Time.get_time_zone_from_system()
+		bias = int(tz.get("bias", 0))
+	else:
+		bias = int(bias_override)
+	var local_unix := unix_utc + bias * 60
+	return Time.get_datetime_string_from_unix_time(local_unix, true)
+
+
+func _utc_unix_from_iso(cleaned: String) -> int:
+	if cleaned.length() < 19:
+		return 0
+	var d := {
+		"year": int(cleaned.substr(0, 4)),
+		"month": int(cleaned.substr(5, 2)),
+		"day": int(cleaned.substr(8, 2)),
+		"hour": int(cleaned.substr(11, 2)),
+		"minute": int(cleaned.substr(14, 2)),
+		"second": int(cleaned.substr(17, 2)),
+	}
+	return int(Time.get_unix_time_from_datetime_dict(d))
 
 
 func _save_sort_key(entry: Dictionary) -> String:

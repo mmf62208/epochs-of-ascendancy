@@ -1,12 +1,15 @@
 extends SceneTree
 
-## SR1 FIX #2: 12 title-screen saves stay inside 1280×800, Begin stays on-screen,
-## and a row click loads. Damaged rows are greyed and refuse the load.
+## SR1 FIX #2/#3: 12 title-screen saves stay inside 1280×800, Begin stays on-screen,
+## a row pointer click loads, local time applies zone bias, and CC never steals
+## a visible save-row centre. Damaged rows are greyed and refuse the load.
 const _Io = preload("res://scripts/core/SaveReload1Io.gd")
 
 const PLAY := Vector2i(1280, 800)
 const SLOT_PREFIX := "sr1fix2_"
 const DAMAGED_SLOT := "sr1fix2_bad"
+const UTC_FIXED := "1936-06-15T08:00:00"
+const DAMAGED_MSG := "Save file is damaged and can't be loaded"
 
 var _failures := 0
 var _created: Array[String] = []
@@ -66,8 +69,10 @@ func _run() -> void:
 	if title.has_method("_fit_panel_to_viewport"):
 		title.call("_fit_panel_to_viewport")
 	await process_frame
+	_assert_local_time_bias()
 	_assert_panel_fits(title)
 	await _assert_damaged_row(title)
+	await _assert_visible_row_centres_never_cc(title)
 	var loaded_ok := await _assert_click_loads(title)
 	if is_instance_valid(title):
 		_cleanup(title)
@@ -153,6 +158,58 @@ func _assert_panel_fits(title: Node) -> void:
 		_pass("title listed all 12 written saves")
 
 
+func _iso_norm(s: String) -> String:
+	return s.strip_edges().replace(" ", "T")
+
+
+func _assert_local_time_bias() -> void:
+	if _sl == null or not _sl.has_method("format_wall_time_local"):
+		_fail("format_wall_time_local missing")
+		return
+	var west := _iso_norm(str(_sl.format_wall_time_local(UTC_FIXED, -240)))
+	var east := _iso_norm(str(_sl.format_wall_time_local(UTC_FIXED, 240)))
+	if west != "1936-06-15T04:00:00":
+		_fail("UTC−4 bias did not shift 08:00 → 04:00 (got %s)" % west)
+	else:
+		_pass("injected bias −240 maps 08:00 UTC to 04:00 local")
+	if east != "1936-06-15T12:00:00":
+		_fail("UTC+4 bias did not shift 08:00 → 12:00 (got %s)" % east)
+	else:
+		_pass("injected bias +240 maps 08:00 UTC to 12:00 local")
+	var tz: Dictionary = Time.get_time_zone_from_system()
+	var sys_bias := int(tz.get("bias", 0))
+	var via_system := _iso_norm(str(_sl.format_wall_time_local(UTC_FIXED)))
+	var via_inject := _iso_norm(str(_sl.format_wall_time_local(UTC_FIXED, sys_bias)))
+	if via_system != via_inject:
+		_fail("system bias %d disagrees (system=%s inject=%s)" % [sys_bias, via_system, via_inject])
+	else:
+		_pass("system bias %d matches an injected call (%s)" % [sys_bias, via_system])
+
+
+func _status_text(title: Node) -> String:
+	var status: Variant = title.get("_status")
+	if status is Label:
+		return str((status as Label).text)
+	return ""
+
+
+func _pointer_press(title: Node, pos: Vector2) -> String:
+	var ev := InputEventMouseButton.new()
+	ev.button_index = MOUSE_BUTTON_LEFT
+	ev.pressed = true
+	ev.position = pos
+	ev.global_position = pos
+	if not title.has_method("handle_live_pointer"):
+		return ""
+	return str(title.call("handle_live_pointer", ev))
+
+
+func _scroll_row_into_view(title: Node, row: Control) -> void:
+	var scroll := title.find_child("LivingTitleSaveScroll", true, false) as ScrollContainer
+	if scroll != null and row != null:
+		scroll.ensure_control_visible(row)
+
+
 func _assert_damaged_row(title: Node) -> void:
 	var bad := title.find_child("LivingTitleSaveRow_%s" % DAMAGED_SLOT, true, false) as Button
 	if bad == null:
@@ -164,27 +221,104 @@ func _assert_damaged_row(title: Node) -> void:
 	if bad.modulate.r > 0.7:
 		_fail("damaged title row not greyed")
 		return
-	var ev := InputEventMouseButton.new()
-	ev.button_index = MOUSE_BUTTON_LEFT
-	ev.pressed = true
-	ev.position = bad.get_global_rect().get_center()
-	ev.global_position = ev.position
-	if title.has_method("handle_live_pointer"):
-		title.call("handle_live_pointer", ev)
-	if not bool(title.get("_closed")):
-		bad.pressed.emit()
+	_scroll_row_into_view(title, bad)
 	await process_frame
+	title.set("last_save_pointer", {})
+	var action := _pointer_press(title, bad.get_global_rect().get_center())
+	await process_frame
+	if action == "cc":
+		_fail("damaged row centre opened Command Center (action=cc)")
+		return
 	if title.is_queued_for_deletion() or bool(title.get("_closed")):
 		_fail("clicking the damaged title row dismissed the title")
 		return
-	var msg := ""
-	var status: Variant = title.get("_status")
-	if status is Label:
-		msg = str((status as Label).text)
-	if msg.find("Save file is damaged and can't be loaded") < 0:
-		_fail("damaged title row did not show the damaged message (status=%s)" % msg)
+	var msg := _status_text(title)
+	if msg.find(DAMAGED_MSG) < 0:
+		_fail("damaged title row pointer miss (action=%s status=%s)" % [action, msg])
 		return
 	_pass("damaged title row is greyed and refuses the load")
+
+
+func _visible_row_centres(title: Node) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var scroll := title.find_child("LivingTitleSaveScroll", true, false) as ScrollContainer
+	if scroll == null:
+		return out
+	var sr: Rect2 = scroll.get_global_rect()
+	var rows: Variant = title.get("_save_rows")
+	if typeof(rows) != TYPE_ARRAY:
+		return out
+	for raw in rows:
+		if typeof(raw) != TYPE_DICTIONARY:
+			continue
+		var btn: Button = (raw as Dictionary).get("btn") as Button
+		if btn == null or not is_instance_valid(btn):
+			continue
+		var centre: Vector2 = btn.get_global_rect().get_center()
+		if not sr.has_point(centre):
+			continue
+		out.append({
+			"btn": btn,
+			"slot": str((raw as Dictionary).get("slot", "")),
+			"damaged": bool((raw as Dictionary).get("damaged", false)),
+			"centre": centre,
+		})
+	return out
+
+
+func _assert_visible_row_centres_never_cc(title: Node) -> void:
+	var scroll := title.find_child("LivingTitleSaveScroll", true, false) as ScrollContainer
+	if scroll == null:
+		_fail("save scroll missing for row-centre sweep")
+		return
+	title.set_meta("eoa_sr1_hit_probe", true)
+	var bar: ScrollBar = scroll.get_v_scroll_bar()
+	var max_scroll := 0
+	if bar != null:
+		max_scroll = maxi(0, int(round(float(bar.max_value) - float(bar.page))))
+	var fracs: Array[float] = [0.0, 0.25, 0.5, 0.75, 1.0]
+	var clicked := 0
+	var cc_hits := 0
+	for frac in fracs:
+		scroll.scroll_vertical = int(round(float(max_scroll) * frac))
+		await process_frame
+		await process_frame
+		var vis: Array[Dictionary] = _visible_row_centres(title)
+		for hit in vis:
+			var centre: Vector2 = hit["centre"] as Vector2
+			title.set("last_save_pointer", {})
+			var action := _pointer_press(title, centre)
+			clicked += 1
+			if action == "cc":
+				cc_hits += 1
+				_fail("visible row centre %s at scroll=%d opened CC" % [str(hit.get("slot", "")), scroll.scroll_vertical])
+				continue
+			if title.is_queued_for_deletion() or bool(title.get("_closed")):
+				_fail("visible row centre %s closed the title during probe" % str(hit.get("slot", "")))
+				title.remove_meta("eoa_sr1_hit_probe")
+				return
+			var ptr_raw: Variant = title.get("last_save_pointer")
+			var ptr: Dictionary = ptr_raw if typeof(ptr_raw) == TYPE_DICTIONARY else {}
+			var kind := str(ptr.get("kind", ""))
+			var damaged := bool(hit.get("damaged", false))
+			if action != "save":
+				_fail("visible row centre %s action=%s (want save, never cc)" % [str(hit.get("slot", "")), action])
+				continue
+			if damaged:
+				if kind != "damaged" or _status_text(title).find(DAMAGED_MSG) < 0:
+					_fail("visible damaged centre %s did not show damaged message (kind=%s)" % [str(hit.get("slot", "")), kind])
+					continue
+			elif kind != "load":
+				_fail("visible row centre %s did not classify as load (kind=%s)" % [str(hit.get("slot", "")), kind])
+				continue
+	title.remove_meta("eoa_sr1_hit_probe")
+	if clicked < 8:
+		_fail("row-centre sweep only clicked %d visible centres (need several scroll positions)" % clicked)
+		return
+	if cc_hits > 0:
+		_fail("row-centre sweep opened CC %d time(s) across %d centres" % [cc_hits, clicked])
+		return
+	_pass("clicked %d visible row centres across 5 scroll positions; never CC" % clicked)
 
 
 func _assert_click_loads(title: Node) -> bool:
@@ -193,22 +327,20 @@ func _assert_click_loads(title: Node) -> bool:
 	if row == null:
 		_fail("loadable title row %s missing" % slot)
 		return false
-	var scroll := title.find_child("LivingTitleSaveScroll", true, false) as ScrollContainer
-	if scroll != null:
-		scroll.ensure_control_visible(row)
+	_scroll_row_into_view(title, row)
 	await process_frame
+	if _sl != null:
+		_sl.last_load_result = {}
 	if _tm != null:
 		_tm.paused = false
 		_tm.advance_live_f5_equivalent_days(2)
-	var ev := InputEventMouseButton.new()
-	ev.button_index = MOUSE_BUTTON_LEFT
-	ev.pressed = true
-	ev.position = row.get_global_rect().get_center()
-	ev.global_position = ev.position
-	if title.has_method("handle_live_pointer"):
-		title.call("handle_live_pointer", ev)
-	if is_instance_valid(title) and not bool(title.get("_closed")):
-		row.pressed.emit()
+	var action := _pointer_press(title, row.get_global_rect().get_center())
+	if action == "cc":
+		_fail("loadable row centre opened Command Center (action=cc)")
+		return false
+	if action != "save":
+		_fail("pointer click on %s missed the row (action=%s; no button fallback)" % [slot, action])
+		return false
 	await process_frame
 	await process_frame
 	var loaded: Dictionary = _sl.last_load_result if _sl != null else {}

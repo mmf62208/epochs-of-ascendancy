@@ -36,6 +36,7 @@ var _save_scroll: ScrollContainer
 var _save_list: VBoxContainer
 var _save_rows: Array[Dictionary] = []
 var _last_ptr_pts: Array[Vector2] = []
+var last_save_pointer: Dictionary = {}
 var _closed := false
 ## Set when live Esc is accepted on this overlay (headless + Play proof).
 var _esc_routed_to_cc := false
@@ -471,8 +472,15 @@ func _fill_save_rows(col: VBoxContainer) -> void:
 
 
 func _on_title_save_pressed(slot: String, damaged: bool) -> void:
+	last_save_pointer = {
+		"slot": slot,
+		"damaged": damaged,
+		"kind": "damaged" if damaged else "load",
+	}
 	if damaged:
 		_show_damaged_save_message()
+		return
+	if has_meta("eoa_sr1_hit_probe") and bool(get_meta("eoa_sr1_hit_probe")):
 		return
 	_on_load(slot)
 
@@ -740,13 +748,30 @@ func left_column_is_begin(screen: Vector2) -> bool:
 
 
 func cc_owns_screen_point(screen: Vector2) -> bool:
+	# Visible save-row ink owns the click, including the strip the CC grow overlaps.
+	if save_row_owns_screen_point(screen):
+		return false
 	if _cc_btn != null and is_instance_valid(_cc_btn) and _cc_btn.visible:
-		if _cc_btn.get_global_rect().grow(CC_HIT_GROW).has_point(screen):
+		if _cc_grow_rect(_cc_btn).has_point(screen):
 			return true
 	if _esc_chip != null and is_instance_valid(_esc_chip) and _esc_chip.visible:
 		if _esc_chip.get_global_rect().grow(CC_HIT_GROW).has_point(screen):
 			return true
 	return false
+
+
+func _cc_grow_rect(btn: Control) -> Rect2:
+	var grown: Rect2 = btn.get_global_rect().grow(CC_HIT_GROW)
+	if _save_scroll == null or not is_instance_valid(_save_scroll):
+		return grown
+	var sr: Rect2 = _save_scroll.get_global_rect()
+	if not grown.intersects(sr):
+		return grown
+	var top := maxf(grown.position.y, sr.end.y)
+	var bottom := grown.end.y
+	if bottom <= top:
+		return Rect2(grown.position, Vector2.ZERO)
+	return Rect2(Vector2(grown.position.x, top), Vector2(grown.size.x, bottom - top))
 
 
 func owns_screen_point(screen: Vector2) -> bool:
@@ -909,16 +934,16 @@ func handle_live_pointer(event: InputEvent) -> String:
 
 
 func _classify_points(pts: Array[Vector2]) -> String:
-	# CC first so Command Center · Esc / Esc · Menu are never stolen by the Begin slab.
+	# Visible save rows beat the CC grow pad (list bottom overlaps CC +28 px).
+	if _any_point_matches(pts, "save"):
+		return "save"
+	# CC next so Command Center · Esc / Esc · Menu are never stolen by the Begin slab.
 	if _any_point_matches(pts, "cc"):
 		return "cc"
 	# The real Begin plate wins if a test / computerUse parks it over a save row.
 	for p in pts:
 		if begin_button_owns_screen_point(p):
 			return "begin"
-	# Save rows beat the leftover Begin slab / left-column so a tall list stays clickable.
-	if _any_point_matches(pts, "save"):
-		return "save"
 	if _any_point_matches(pts, "begin"):
 		return "begin"
 	if _any_point_matches(pts, "panel"):
