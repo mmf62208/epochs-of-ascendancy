@@ -2,6 +2,8 @@
 class_name ProductionAssignmentScreen
 extends DraggablePanel
 
+const _CloseReleaseSwallow := preload("res://scripts/ui/CloseReleaseSwallow.gd")
+
 @export var country_tag: String = "GER"
 
 @onready var title_label: Label = $TitleBar/TitleLabel
@@ -121,6 +123,8 @@ func _exit_tree() -> void:
 func _on_close_pressed() -> void:
 	if is_queued_for_deletion():
 		return
+	# Press-mode Close: swallow the matching mouse-up so it cannot map-pick.
+	_CloseReleaseSwallow.arm_from(self)
 	# Rename before queue_free so Close→Prod does not toggle-close the dying node.
 	name = "ProductionAssignmentScreen_dying"
 	queue_free()

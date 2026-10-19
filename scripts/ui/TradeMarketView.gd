@@ -122,7 +122,6 @@ func _ready() -> void:
 			TradeManager.trade_flow_interdicted.connect(_on_trade_manager_changed)
 		if not TradeManager.trade_flow_created.is_connected(_on_trade_manager_changed):
 			TradeManager.trade_flow_created.connect(_on_trade_manager_changed)
-			TradeManager.deal_rejected.connect(_on_trade_manager_changed)
 		if not TradeManager.counter_offer_requested.is_connected(_on_counter_created):
 			TradeManager.counter_offer_requested.connect(_on_counter_created)
 
