@@ -681,6 +681,9 @@ func panel_owns_screen_point(screen: Vector2) -> bool:
 
 
 func save_row_owns_screen_point(screen: Vector2) -> bool:
+	if _save_scroll != null and is_instance_valid(_save_scroll):
+		if not _save_scroll.get_global_rect().has_point(screen):
+			return false
 	for raw in _save_rows:
 		if typeof(raw) != TYPE_DICTIONARY:
 			continue
@@ -956,7 +959,7 @@ func _activate_save_at_pointer() -> void:
 			var btn: Button = raw.get("btn") as Button
 			if btn == null or not is_instance_valid(btn):
 				continue
-			if btn.get_global_rect().has_point(p):
+			if save_row_owns_screen_point(p) and btn.get_global_rect().has_point(p):
 				_on_title_save_pressed(str(raw.get("slot", "")), bool(raw.get("damaged", false)))
 				return
 

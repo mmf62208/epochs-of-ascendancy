@@ -47,6 +47,7 @@ func _run() -> void:
 		_fail("boot failed")
 		_finish()
 		return
+	_wipe_prefix(SLOT_PREFIX)
 	if not _write_twelve_saves():
 		_finish()
 		return
@@ -67,11 +68,14 @@ func _run() -> void:
 	await process_frame
 	_assert_panel_fits(title)
 	await _assert_damaged_row(title)
-	if not await _assert_click_loads(title):
+	var loaded_ok := await _assert_click_loads(title)
+	if is_instance_valid(title):
 		_cleanup(title)
+	else:
+		_cleanup(null)
+	if not loaded_ok:
 		_finish()
 		return
-	_cleanup(null)
 	_finish()
 
 
@@ -207,11 +211,22 @@ func _assert_click_loads(title: Node) -> bool:
 	if not bool(loaded.get("ok", false)):
 		_fail("clicking title row did not load (%s)" % str(loaded.get("error", "")))
 		return false
-	if not title.is_queued_for_deletion() and not bool(title.get("_closed")):
+	if is_instance_valid(title) and not bool(title.get("_closed")):
 		_fail("title stayed up after a successful row load")
 		return false
 	_pass("clicking title row %s loaded it" % slot)
 	return true
+
+
+func _wipe_prefix(prefix: String) -> void:
+	if _sl == null or not _sl.has_method("list_saves"):
+		return
+	for raw in _sl.list_saves():
+		if typeof(raw) != TYPE_DICTIONARY:
+			continue
+		var slot := str(raw.get("slot", ""))
+		if slot.begins_with(prefix) and _sl.has_method("delete_save"):
+			_sl.call("delete_save", slot)
 
 
 func _track(slot: String) -> void:
@@ -220,7 +235,7 @@ func _track(slot: String) -> void:
 
 
 func _cleanup(title: Node) -> void:
-	if title != null and is_instance_valid(title) and not title.is_queued_for_deletion():
+	if title != null and is_instance_valid(title):
 		title.queue_free()
 	if _sl != null and _sl.has_method("delete_save"):
 		for slot in _created:
