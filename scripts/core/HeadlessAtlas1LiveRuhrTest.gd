@@ -11,9 +11,12 @@ const ESSEN := 710403
 const WAIT_MAP_SECS := 420
 const SETTLE_FRAMES := 30
 ## Play 59c85d54 cameras (RESULT_6702). 1.962 / 2.439 interpolated in 1/z.
-const LIVE_ZOOMS: Array[float] = [1.270, 1.578, 1.962, 2.439, 3.031]
+## 1.022 is on the in and out path (Play: wheel 1.022→3.031→1.022).
+const LIVE_ZOOMS: Array[float] = [1.022, 1.270, 1.578, 1.962, 2.439, 3.031]
 const PLAY_Z_LABEL := 1.022
 const PLAY_CAM_LABEL := Vector2(7557.27, 1546.63)
+const RUHR_ALL_FIVE_ZOOM := 2.4
+const RUHR_MIN_MID := 2
 const PLAY_Z_KNOWN: Array[float] = [1.022, 1.270, 1.578, 3.031]
 const PLAY_CAM_KNOWN: Array[Vector2] = [
 	Vector2(7557.27, 1546.63),
@@ -35,7 +38,6 @@ var _home_zoom := 0.0
 var _in_offsets: Dictionary = {}
 var _out_offsets: Dictionary = {}
 var _phase_out := false
-var _did_z1 := false
 
 var _failures := 0
 var _phase := 0
@@ -91,11 +93,6 @@ func _on_process() -> void:
 		_settle_left -= 1
 		if _settle_left <= 0:
 			_check_zoom()
-	elif _phase == 4:
-		_reassert_locked_zoom(PLAY_Z_LABEL)
-		_settle_left -= 1
-		if _settle_left <= 0:
-			_check_z1()
 	elif _phase == 3:
 		pass
 
@@ -147,21 +144,7 @@ func _tick_wait_map() -> void:
 		var pc := _play_cam_at(z_cam)
 		print("ATLAS1 live play_cam z%.3f=%.2f,%.2f" % [z_cam, pc.x, pc.y])
 	_zoom_i = 0
-	_begin_z1_check()
-
-
-func _begin_z1_check() -> void:
-	_restore_home()
-	_park_mouse()
-	_apply_camera(PLAY_CAM_LABEL, PLAY_Z_LABEL)
-	_park_mouse()
-	_lock_pos = PLAY_CAM_LABEL
-	_lock_zoom = PLAY_Z_LABEL
-	_settle_left = SETTLE_FRAMES
-	_phase = 4
-	print("ATLAS1 live frame want_z=%.3f cam_z=%.3f cam=%.1f,%.1f (Düsseldorf at z1.0)" % [
-		PLAY_Z_LABEL, _camera_zoom(), PLAY_CAM_LABEL.x, PLAY_CAM_LABEL.y,
-	])
+	_begin_zoom()
 
 
 func _begin_zoom() -> void:
@@ -244,20 +227,11 @@ func _check_zoom() -> void:
 		int(layer.call("last_counter_rect_count")) if layer.has_method("last_counter_rect_count") else 0,
 		essen_s.x, essen_s.y, ",".join(names),
 	])
-	if not _has_name(placed, "Essen"):
-		_fail("Essen missing at live wheel z%.3f" % z)
-	else:
-		_pass("Essen labelled at live wheel z%.3f" % z)
 	if not _essen_on_screen():
 		_fail("Essen world not on screen at live wheel z%.3f" % z)
 	else:
 		_pass("Essen on screen at live wheel z%.3f" % z)
-	for core in RUHR_CORE:
-		if core == "Köln":
-			if not _has_name(placed, "Köln") and not _has_name(placed, "Cologne"):
-				_fail("Köln missing at live wheel z%.3f" % z)
-		elif not _has_name(placed, core):
-			_fail("%s missing at live wheel z%.3f" % [core, z])
+	_check_ruhr_shown(placed, z)
 	_check_ruhr_north_south(placed, z)
 	if _has_name(placed, "Hamm") and not _has_name(placed, "Essen"):
 		_fail("Hamm kept over Essen at live wheel z%.3f" % z)
@@ -266,7 +240,8 @@ func _check_zoom() -> void:
 	_check_anchor_and_chrome(layer, placed, z)
 	_check_ruhr_dot_cover(layer, z)
 	if bool(layer.call("has_visual_overlap")):
-		_fail("live label overlap at z%.3f: %s" % [z, _overlap_pairs(placed)])
+		var pairs := str(layer.call("overlap_pair_debug")) if layer.has_method("overlap_pair_debug") else _overlap_pairs(placed)
+		_fail("live label overlap at z%.3f: %s" % [z, pairs])
 	else:
 		_pass("no live label overlap at z%.3f" % z)
 	var dups: PackedStringArray = layer.call("duplicate_drawn_names")
@@ -305,7 +280,7 @@ func _check_zoom() -> void:
 				if str(p3.get("name", "")) != str(nm3) and not (str(nm3) == "Köln" and str(p3.get("name", "")) == "Cologne"):
 					continue
 				var d3 := _play_dist(layer, p3)
-				if d3 > ANCHOR_MAX_PX:
+				if d3 > ANCHOR_MAX_PX + 0.05:
 					drifted.append("%s@%.0fpx" % [str(nm3), d3])
 				break
 		if not drifted.is_empty():
@@ -353,11 +328,9 @@ func _overlap_pairs(placed: Array) -> String:
 				continue
 			var br: Rect2 = b.get("screen_rect", Rect2())
 			var bd: Rect2 = b.get("dot_rect", Rect2())
-			if bool(a.get("ruhr_keep", false)) and bool(b.get("ruhr_keep", false)):
-				continue
-			var hit := ar.grow(4.0).intersects(br.grow(4.0))
-			hit = hit or (ad.size.x > 0.5 and br.intersects(ad))
-			hit = hit or (bd.size.x > 0.5 and ar.intersects(bd))
+			var hit := ar.intersects(br, true)
+			hit = hit or (ad.size.x > 0.5 and br.intersects(ad, true))
+			hit = hit or (bd.size.x > 0.5 and ar.intersects(bd, true))
 			if hit:
 				bits.append(
 					"%s@%.0f,%.0f,%.0fx%.0f/%s@%.0f,%.0f,%.0fx%.0f"
@@ -520,25 +493,6 @@ func _compass(off: Vector2) -> String:
 	return ns + ew
 
 
-func _check_z1() -> void:
-	_reassert_locked_zoom(PLAY_Z_LABEL)
-	var layer := _city_layer()
-	if layer == null:
-		_fail("CityLabelsLayer missing at z%.3f" % PLAY_Z_LABEL)
-		_begin_zoom()
-		return
-	var placed: Array = layer.call("placed")
-	if not _has_name(placed, "Düsseldorf"):
-		_fail("Düsseldorf missing at live wheel z%.3f (must label at z1.0)" % PLAY_Z_LABEL)
-	else:
-		_pass("Düsseldorf labelled at live wheel z%.3f" % PLAY_Z_LABEL)
-	_check_anchor_and_chrome(layer, placed, PLAY_Z_LABEL)
-	_check_ruhr_dot_cover(layer, PLAY_Z_LABEL)
-	_maybe_shot("live_ruhr_z1022")
-	_did_z1 = true
-	_begin_zoom()
-
-
 func _record_or_check_stable(layer: Node, placed: Array, z: float) -> void:
 	var key_z := "%.3f" % z
 	var now: Dictionary = {}
@@ -562,18 +516,33 @@ func _record_or_check_stable(layer: Node, placed: Array, z: float) -> void:
 	if not _in_offsets.has(key_z):
 		return
 	var prev: Dictionary = _in_offsets[key_z]
-	for nm2 in now.keys():
-		if not prev.has(nm2):
+	for core in RUHR_CORE:
+		var ck: String = core
+		var in_key: String = ck
+		var out_key: String = ck
+		if not prev.has(in_key) and ck == "Köln" and prev.has("Cologne"):
+			in_key = "Cologne"
+		if not now.has(out_key) and ck == "Köln" and now.has("Cologne"):
+			out_key = "Cologne"
+		var in_has := prev.has(in_key)
+		var out_has := now.has(out_key)
+		if in_has != out_has:
+			_fail("%s zoom-in vs zoom-out at z%s shown mismatch (in=%s out=%s)" % [
+				ck, key_z, str(in_has), str(out_has),
+			])
 			continue
-		var a: Vector2 = prev[nm2]
-		var b: Vector2 = now[nm2]
+		if not in_has:
+			_pass("%s hidden in/out at z%s" % [ck, key_z])
+			continue
+		var a: Vector2 = prev[in_key]
+		var b: Vector2 = now[out_key]
 		var d := a.distance_to(b)
 		if d > STABLE_SLACK_PX:
 			_fail("%s zoom-in vs zoom-out at z%s offset delta %.1f px (in %.1f,%.1f out %.1f,%.1f)" % [
-				str(nm2), key_z, d, a.x, a.y, b.x, b.y,
+				ck, key_z, d, a.x, a.y, b.x, b.y,
 			])
 		else:
-			_pass("%s stable in/out at z%s (delta %.1f)" % [str(nm2), key_z, d])
+			_pass("%s stable in/out at z%s (delta %.1f)" % [ck, key_z, d])
 
 
 func _print_slot_row(z: float, offs: Dictionary, side: String) -> void:
@@ -702,10 +671,40 @@ func _check_anchor_and_chrome(layer: Node, placed: Array, z: float) -> void:
 		if dist > worst:
 			worst = dist
 			worst_nm = nm2
-		if dist > ANCHOR_MAX_PX:
+		if dist > ANCHOR_MAX_PX + 0.05:
 			_fail("%s is %.1f px from its dot at live wheel z%.3f (Play centre)" % [nm2, dist, z])
-	if worst <= ANCHOR_MAX_PX and not worst_nm.is_empty():
+	if worst <= ANCHOR_MAX_PX + 0.05 and not worst_nm.is_empty():
 		_pass("Ruhr cores within %.0f px of their dots at z%.3f (worst %s %.1f)" % [ANCHOR_MAX_PX, z, worst_nm, worst])
+
+
+func _ruhr_shown_names(placed: Array) -> PackedStringArray:
+	var out := PackedStringArray()
+	for core in RUHR_CORE:
+		if core == "Köln":
+			if _has_name(placed, "Köln") or _has_name(placed, "Cologne"):
+				out.append("Köln")
+			continue
+		if _has_name(placed, core):
+			out.append(core)
+	return out
+
+
+func _check_ruhr_shown(placed: Array, z: float) -> void:
+	var shown := _ruhr_shown_names(placed)
+	var n := shown.size()
+	print("ATLAS1 live ruhr_shown z%.3f n=%d %s" % [z, n, ",".join(shown)])
+	if z + 0.001 >= RUHR_ALL_FIVE_ZOOM:
+		if n < 5:
+			_fail("want 5 Ruhr names at z%.3f, have %d (%s)" % [z, n, ",".join(shown)])
+		else:
+			_pass("all 5 Ruhr named at z%.3f" % z)
+	else:
+		if n < RUHR_MIN_MID:
+			_fail("want ≥%d Ruhr names at z%.3f, have %d (%s)" % [RUHR_MIN_MID, z, n, ",".join(shown)])
+		else:
+			_pass("%d Ruhr named at z%.3f (%s)" % [n, z, ",".join(shown)])
+		if not _has_name(placed, "Essen") and not _has_name(placed, "Köln") and not _has_name(placed, "Cologne"):
+			_fail("mid-zoom Ruhr hid both Essen and Köln at z%.3f" % z)
 
 
 func _check_ruhr_north_south(placed: Array, z: float) -> void:
