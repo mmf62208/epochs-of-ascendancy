@@ -15,9 +15,13 @@ const FLUSH_FRAMES := 4
 
 var _failures: int = 0
 var _mr: Node = null
+var _top_bar: Control = null
+var _war: GDScript = null
 
 
 func _init() -> void:
+	OS.set_environment("EOA_CAMPAIGN_LOOP", "1")
+	OS.set_environment("EOA_SCENARIO_EARLY_WARS", "0")
 	call_deferred("_start")
 
 
@@ -77,11 +81,16 @@ func _run() -> void:
 	_test_source_layout_and_hints()
 	if not await _boot_renderer():
 		return
+	if not await _boot_top_bar():
+		return
+	_fill_live_legend_text()
+	await _flush()
 	await _assert_no_overlap_at(PLAY_SIZE)
 	await _assert_no_overlap_at(WIDE_SIZE)
 	await _assert_legend_height_and_minimap(PLAY_SIZE)
 	await _assert_legend_height_and_minimap_at_war(PLAY_SIZE)
 	_test_toolbar_highlight_tracks_mode()
+	_test_mode_chip_toggled_while_legend_open()
 	_test_highway_hint_live()
 	if _mr != null and is_instance_valid(_mr):
 		_mr.queue_free()
@@ -111,11 +120,32 @@ func _test_source_layout_and_hints() -> void:
 	if "offset_top = chrome_top" not in layout_leg and "chrome_top, sz" not in layout_leg:
 		_fail("Supply legend must pin offset_top to chrome_top (below Map Mode)")
 		return
-	if "200" not in layout_leg and "_supply_legend_content_size" not in layout_leg:
-		_fail("Supply legend must cap height to content (~200)")
+	if "200" not in layout_leg and "_supply_legend_host_size" not in layout_leg and "SUPPLY_LEGEND_HOST_SIZE" not in layout_leg:
+		_fail("Supply legend must use a fixed ~200 px host")
+		return
+	if "get_content_height" in layout_leg or "get_combined_minimum_size" in layout_leg:
+		_fail("Supply legend host size must not come from content")
+		return
+	var host_sz: String = _slice_func(ren, "_supply_legend_host_size")
+	if "get_content_height" in host_sz or "get_combined_minimum_size" in host_sz:
+		_fail("_supply_legend_host_size must return a fixed size, not content height")
+		return
+	var frame_fn: String = _slice_func(ren, "_apply_supply_legend_fixed_frame")
+	if "fit_content = false" not in frame_fn or "scroll_active = true" not in frame_fn:
+		_fail("legend RTL must scroll inside a fixed height (fit_content off, scroll_active on)")
+		return
+	if "clip_contents = true" not in frame_fn:
+		_fail("legend panel/host must clip_contents so the visible rect stays 200 px")
+		return
+	if "fit_content = true" in update_leg and "fit_content = false" not in update_leg:
+		_fail("Supply overlay legend must not enable fit_content")
 		return
 	if "offset_top = 56" in update_leg or "offset_top = 56.0" in update_leg:
 		_fail("Supply legend must not pin at y=56 over the mode chips")
+		return
+	var set_fn: String = _slice_func(tb, "set_mode")
+	if "not notify_renderer" in set_fn and 'm = "supply"' in set_fn:
+		_fail("set_mode must not remap a chip click back to Supply while L is on")
 		return
 	if "Highways: Supply/Infra view" not in tb:
 		_fail("MapModeToolbar must hint that highways live in Supply/Infra view")
@@ -190,7 +220,9 @@ func _boot_renderer() -> bool:
 		_fail("MapModeToolbar was not created")
 		return false
 	_mr.call("_update_supply_overlay_legend")
+	_mr.set("supply_mode", true)
 	_mr.call("_set_supply_legend_visible", true)
+	_fill_live_legend_text()
 	_mr.call("_layout_map_ui")
 	await _flush()
 	if _mr.get("_supply_legend_panel") == null:
@@ -198,6 +230,78 @@ func _boot_renderer() -> bool:
 		return false
 	_pass("booted MapRenderer + toolbar + Supply legend")
 	return true
+
+
+func _boot_top_bar() -> bool:
+	var tm: Node = root.get_node_or_null("TimeManager")
+	if tm != null:
+		tm.set("scenario_start_year", 1936)
+		tm.set("current_year", 1936)
+		tm.set("current_month", 1)
+		tm.set("current_day", 1)
+		tm.set("paused", true)
+	var lm: Node = root.get_node_or_null("LeaderManager")
+	if lm != null and lm.has_method("set_player_country_tag"):
+		lm.call("set_player_country_tag", "GER")
+	_war = load("res://scripts/core/WarStateDomain.gd") as GDScript
+	if _war == null:
+		_fail("WarStateDomain missing")
+		return false
+	_war.reset_for_test()
+	if _war.has_method("clear_rule_overrides"):
+		_war.clear_rule_overrides()
+	if not bool(_war.loop_enabled()):
+		_fail("campaign loop inactive — cannot declare a real war")
+		return false
+	var packed: PackedScene = load("res://scenes/ui/TopInfoBar.tscn") as PackedScene
+	if packed == null:
+		_fail("TopInfoBar.tscn missing")
+		return false
+	var inst: Node = packed.instantiate()
+	if inst == null or not (inst is Control):
+		_fail("TopInfoBar instantiate failed")
+		return false
+	_top_bar = inst as Control
+	_top_bar.name = "TopInfoBar"
+	if "player_country_tag" in _top_bar:
+		_top_bar.set("player_country_tag", "GER")
+	_top_bar.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	_top_bar.offset_left = 0.0
+	_top_bar.offset_top = 0.0
+	_top_bar.offset_right = 0.0
+	_top_bar.offset_bottom = 52.0
+	root.add_child(_top_bar)
+	await _flush()
+	var bar_h: float = 0.0
+	if _top_bar.has_method("get_bar_height"):
+		bar_h = float(_top_bar.call("get_bar_height"))
+	if bar_h > 60.0:
+		_fail("peace TopInfoBar height %.1f (live bar stays ~52)" % bar_h)
+		return false
+	_pass("TopInfoBar booted height=%.1f (live ~52)" % bar_h)
+	return true
+
+
+func _fill_live_legend_text() -> void:
+	if _mr == null:
+		return
+	_mr.set("supply_mode", true)
+	_mr.call("_set_supply_legend_visible", true)
+	var rtl: RichTextLabel = _mr.get("_supply_overlay_legend") as RichTextLabel
+	var live: String = str(
+		ProvinceInsight.build_supply_legend_bbcode(-1, 0, -1, "", 12, 4, "GER", 2, "", "")
+	)
+	if live.length() < 200:
+		_mr.call("_update_supply_legend_text")
+		if rtl != null:
+			live = str(rtl.text)
+	elif rtl != null:
+		rtl.text = live
+	if live.length() < 400:
+		_fail("live Supply legend text is too short (%d chars) — need real bbcode" % live.length())
+		return
+	_mr.call("_layout_supply_legend")
+	_info("live legend text chars=%d" % live.length())
 
 
 func _legend_rect() -> Rect2:
@@ -268,6 +372,9 @@ func _assert_legend_fits(wh: Vector2i, label: String) -> void:
 	if legend.size.x < 8.0 or legend.size.y < 8.0:
 		_fail("%s legend rect is empty at %dx%d (%s)" % [label, wh.x, wh.y, str(legend)])
 		return
+	if legend.size.x > 480.0 + 1.0:
+		_fail("%s legend width %.1f > 480 at %dx%d (%s)" % [label, legend.size.x, wh.x, wh.y, str(legend)])
+		return
 	if legend.size.y > 200.0:
 		_fail("%s legend height %.1f > 200 at %dx%d (%s)" % [label, legend.size.y, wh.x, wh.y, str(legend)])
 		return
@@ -275,11 +382,13 @@ func _assert_legend_fits(wh: Vector2i, label: String) -> void:
 	if mm.size.x >= 8.0 and mm.size.y >= 8.0 and legend.intersects(mm):
 		_fail("%s legend %s overlaps minimap %s at %dx%d" % [label, str(legend), str(mm), wh.x, wh.y])
 		return
+	_info("MEASURE %s legend=%s" % [label, str(legend)])
 	_pass("%s legend %s height<=200 and misses minimap at %dx%d" % [label, str(legend), wh.x, wh.y])
 
 
 func _assert_legend_height_and_minimap(wh: Vector2i) -> void:
 	_set_window_size(wh)
+	_fill_live_legend_text()
 	_mr.call("_layout_map_ui")
 	await _flush()
 	_assert_legend_fits(wh, "peace")
@@ -287,26 +396,29 @@ func _assert_legend_height_and_minimap(wh: Vector2i) -> void:
 
 func _assert_legend_height_and_minimap_at_war(wh: Vector2i) -> void:
 	_set_window_size(wh)
-	var stub := Control.new()
-	stub.name = "TopInfoBarWarStub"
-	stub.add_to_group("top_info_bar")
-	var gs := GDScript.new()
-	gs.source_code = """
-extends Control
-func get_bar_height() -> float:
-	return 96.0
-"""
-	if gs.reload() != OK:
-		_fail("war TopInfoBar stub failed to parse")
-		stub.queue_free()
+	if _war == null:
+		_fail("WarStateDomain was not booted")
 		return
-	stub.set_script(gs)
-	stub.size = Vector2(1280, 96)
-	root.add_child(stub)
+	_war.reset_for_test()
+	var declared: Dictionary = _war.declare_war("GER", "POL", "call_to_arms")
+	if not bool(declared.get("ok", false)):
+		_fail("declare_war GER-POL failed %s" % str(declared))
+		return
+	if _top_bar != null and _top_bar.has_method("refresh_campaign_war_readout"):
+		_top_bar.call("refresh_campaign_war_readout")
+	await _flush()
+	var bar_h: float = 0.0
+	if _top_bar != null and _top_bar.has_method("get_bar_height"):
+		bar_h = float(_top_bar.call("get_bar_height"))
+	if bar_h > 60.0:
+		_fail("war TopInfoBar height %.1f (live bar stays ~52)" % bar_h)
+		return
+	_info("MEASURE war TopInfoBar height=%.1f" % bar_h)
+	_fill_live_legend_text()
 	_mr.call("_layout_map_ui")
 	await _flush()
 	_assert_legend_fits(wh, "war")
-	stub.queue_free()
+	_pass("real declare_war GER-POL; live top bar %.1f px" % bar_h)
 
 
 func _test_toolbar_highlight_tracks_mode() -> void:
@@ -328,21 +440,58 @@ func _test_toolbar_highlight_tracks_mode() -> void:
 		return
 	_mr.set("current_map_mode", "political")
 	_mr.set("supply_mode", true)
-	_mr.call("_sync_mapmode_toolbar")
+	_mr.call("_apply_l_key_legend_toolbar_highlight")
 	if str(tb.call("get_current_mode")) != "supply":
-		_fail("L-on political must highlight Supply (got %s)" % str(tb.call("get_current_mode")))
+		_fail("L-key must highlight Supply (got %s)" % str(tb.call("get_current_mode")))
 		return
 	var buttons = tb.get("_buttons")
 	if buttons is Dictionary:
 		var sup: Button = (buttons as Dictionary).get("supply") as Button
 		var pol: Button = (buttons as Dictionary).get("political") as Button
 		if sup == null or not sup.button_pressed:
-			_fail("Supply chip must be pressed while legend is open from L")
+			_fail("Supply chip must be pressed after L-key highlight")
 			return
 		if pol != null and pol.button_pressed:
-			_fail("Political chip must not stay pressed while legend is open")
+			_fail("Political chip must not stay pressed after L-key highlight")
 			return
-	_pass("toolbar highlight tracks Supply/Infra while legend is open")
+	_pass("toolbar highlight tracks Supply/Infra; L-key highlights Supply")
+
+
+func _test_mode_chip_toggled_while_legend_open() -> void:
+	var tb: Node = _mr.get("_map_mode_toolbar") as Node
+	if tb == null or not tb.has_method("get_current_mode"):
+		_fail("toolbar missing for toggled chip test")
+		return
+	_mr.set("current_map_mode", "political")
+	_mr.set("supply_mode", true)
+	_mr.call("_set_supply_legend_visible", true)
+	_mr.call("_apply_l_key_legend_toolbar_highlight")
+	if str(tb.call("get_current_mode")) != "supply":
+		_fail("precondition: L-on should highlight Supply before chip click (got %s)" % str(tb.call("get_current_mode")))
+		return
+	var buttons = tb.get("_buttons")
+	if not (buttons is Dictionary):
+		_fail("toolbar _buttons missing")
+		return
+	var pol: Button = (buttons as Dictionary).get("political") as Button
+	if pol == null:
+		_fail("Political chip missing")
+		return
+	pol.emit_signal("toggled", true)
+	if str(tb.call("get_current_mode")) != "political":
+		_fail(
+			"Political toggled while L-on must highlight Political (got %s)"
+			% str(tb.call("get_current_mode"))
+		)
+		return
+	if not pol.button_pressed:
+		_fail("Political chip must stay pressed after toggled")
+		return
+	var sup: Button = (buttons as Dictionary).get("supply") as Button
+	if sup != null and sup.button_pressed:
+		_fail("Supply chip must not stay pressed after Political toggled")
+		return
+	_pass("Political toggled while L-on highlights Political")
 
 
 func _test_highway_hint_live() -> void:

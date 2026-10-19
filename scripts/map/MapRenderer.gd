@@ -202,6 +202,8 @@ const GRAND_THEATER_CANONICAL_BOUNDS: Rect2 = MapCanvasConfig.GRAND_THEATER_BOUN
 const WORLD_CANONICAL_BOUNDS: Rect2 = MapCanvasConfig.WORLD_CANONICAL_BOUNDS  # Full world canvas scaled to match theater (8192×4096 @ 1.2).
 const UI_TOP_BAR_CLEARANCE := 84.0
 const UI_MAP_TOOLBAR_HEIGHT := 56.0
+## Fixed Supply-legend frame. Host size must not come from RTL content height.
+const SUPPLY_LEGEND_HOST_SIZE := Vector2(480.0, 200.0)
 
 ## HOI4/EU4-style: international frontiers are near-black (fills carry nation color).
 ## Never stroke every unmatched GIS edge in owner color — that creates the NUTS spiderweb.
@@ -4288,7 +4290,7 @@ func _layout_map_ui() -> void:
 
 
 ## Sit the Supply legend under Map Mode (not over the chips) at 1280x800+.
-## Height hugs content (~185) so it cannot stretch to the bottom / cover the minimap.
+## Host is a fixed 480×200 clip frame. Inner RTL scrolls; size is never content-driven.
 func _layout_supply_legend() -> void:
 	if _supply_legend_panel == null or not is_instance_valid(_supply_legend_panel):
 		return
@@ -4300,30 +4302,62 @@ func _layout_supply_legend() -> void:
 	if _map_mode_toolbar != null and _map_mode_toolbar.has_method("get_panel_height"):
 		toolbar_h = float(_map_mode_toolbar.call("get_panel_height"))
 	var chrome_top := top_clearance + toolbar_h + 6.0
-	var sz: Vector2 = _supply_legend_content_size()
+	_apply_supply_legend_fixed_frame()
+	var sz: Vector2 = _supply_legend_host_size()
 	_pin_control_top_left(host, 10.0, chrome_top, sz)
 	_pin_control_top_left(_supply_legend_panel, 0.0, 0.0, sz)
 	_sync_supply_legend_pulse_host()
 
 
-func _supply_legend_content_size() -> Vector2:
-	const WIDTH := 480.0
-	const MAX_H := 200.0
-	const MIN_H := 140.0
-	var h: float = MIN_H
+func _supply_legend_host_size() -> Vector2:
+	return SUPPLY_LEGEND_HOST_SIZE
+
+
+func _apply_supply_legend_fixed_frame() -> void:
+	var sz: Vector2 = _supply_legend_host_size()
 	if _supply_legend_panel != null and is_instance_valid(_supply_legend_panel):
-		var min_sz: Vector2 = _supply_legend_panel.get_combined_minimum_size()
-		h = maxf(h, min_sz.y)
+		var panel: Control = _supply_legend_panel
+		panel.clip_contents = true
+		panel.custom_minimum_size = sz
+		panel.size = sz
+		panel.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+		panel.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+		for child_v in panel.get_children():
+			var child: Node = child_v as Node
+			if child is VBoxContainer:
+				var vb: VBoxContainer = child
+				vb.clip_contents = true
+				vb.size_flags_vertical = Control.SIZE_EXPAND_FILL
+				vb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+				for sub_v in vb.get_children():
+					if sub_v is MarginContainer:
+						var margin: MarginContainer = sub_v
+						margin.clip_contents = true
+						margin.size_flags_vertical = Control.SIZE_EXPAND_FILL
+						margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	if _supply_overlay_legend != null and is_instance_valid(_supply_overlay_legend):
-		var text_h: float = float(_supply_overlay_legend.get_content_height())
-		# Header + hint + margins + body. Cap so the panel cannot eat the map.
-		h = maxf(h, 36.0 + 18.0 + 20.0 + text_h)
-	return Vector2(WIDTH, clampf(h, MIN_H, MAX_H))
+		var rtl: RichTextLabel = _supply_overlay_legend
+		rtl.fit_content = false
+		rtl.scroll_active = true
+		rtl.clip_contents = true
+		rtl.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		rtl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		rtl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		rtl.custom_minimum_size = Vector2(460.0, 80.0)
+	if _supply_legend_panel != null and is_instance_valid(_supply_legend_panel):
+		var host: Control = _supply_legend_panel.get_parent() as Control
+		if host != null and host.name == "SupplyOverlayLegendHost":
+			host.clip_contents = true
+			host.custom_minimum_size = sz
+			host.size = sz
+			host.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+			host.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 
 
 func _pin_control_top_left(ctrl: Control, left: float, top: float, sz: Vector2) -> void:
 	if ctrl == null or not is_instance_valid(ctrl):
 		return
+	ctrl.clip_contents = true
 	ctrl.anchor_left = 0.0
 	ctrl.anchor_top = 0.0
 	ctrl.anchor_right = 0.0
@@ -4333,6 +4367,7 @@ func _pin_control_top_left(ctrl: Control, left: float, top: float, sz: Vector2) 
 	ctrl.offset_right = left + sz.x
 	ctrl.offset_bottom = top + sz.y
 	ctrl.custom_minimum_size = sz
+	ctrl.size = sz
 	ctrl.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	ctrl.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 
@@ -14854,6 +14889,21 @@ func _sync_mapmode_toolbar() -> void:
 		return
 	if _map_mode_toolbar.has_method("set_mode"):
 		_map_mode_toolbar.call("set_mode", current_map_mode, false)
+
+
+## L-key only: while the legend is open, highlight Supply (or Infra). Chip clicks
+## use set_mode(notify=true) and must keep that mode — do not remap here.
+func _apply_l_key_legend_toolbar_highlight() -> void:
+	if not supply_mode:
+		return
+	if _map_mode_toolbar == null or not is_instance_valid(_map_mode_toolbar):
+		return
+	if not _map_mode_toolbar.has_method("set_mode"):
+		return
+	var highlight := _toolbar_highlight_mode()
+	if highlight.is_empty():
+		return
+	_map_mode_toolbar.call("set_mode", highlight, false)
 
 
 ## Mapmode / F1: every province node visible (undo viewport cull holes).
@@ -26573,6 +26623,7 @@ func _toggle_supply_overlay() -> void:
 	_sync_road_quiet_mode()
 	var sync_ms := float(Time.get_ticks_usec() - t0) / 1000.0
 	_sync_mapmode_toolbar()
+	_apply_l_key_legend_toolbar_highlight()
 	_supply_toggle_in_progress = false
 	var batch_ms := 0.0
 	if _supply_outline_batch_is_ready() and _supply_outline_batch.has_method("get_last_mesh_build_ms"):
@@ -30936,10 +30987,12 @@ func _update_supply_overlay_legend() -> void:
 		panel.name = "SupplyOverlayLegend"
 		# STOP so Close is clickable; body text stays IGNORE so wheel passes to map when over text.
 		panel.mouse_filter = Control.MOUSE_FILTER_STOP
+		panel.clip_contents = true
 		panel.set_anchors_preset(Control.PRESET_TOP_LEFT)
 		panel.offset_left = 10.0
 		panel.offset_top = 0.0
-		panel.custom_minimum_size = Vector2(480, 0)
+		panel.custom_minimum_size = SUPPLY_LEGEND_HOST_SIZE
+		panel.size = SUPPLY_LEGEND_HOST_SIZE
 		panel.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 		panel.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 		panel.z_index = 40
@@ -30956,10 +31009,12 @@ func _update_supply_overlay_legend() -> void:
 		var host := Control.new()
 		host.name = "SupplyOverlayLegendHost"
 		host.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		host.clip_contents = true
 		host.set_anchors_preset(Control.PRESET_TOP_LEFT)
 		host.offset_left = 10.0
 		host.offset_top = 0.0
-		host.custom_minimum_size = Vector2(480, 0)
+		host.custom_minimum_size = SUPPLY_LEGEND_HOST_SIZE
+		host.size = SUPPLY_LEGEND_HOST_SIZE
 		host.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 		host.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 		host.z_index = 40
@@ -30982,6 +31037,9 @@ func _update_supply_overlay_legend() -> void:
 		panel.offset_top = 0.0
 		var vbox := VBoxContainer.new()
 		vbox.add_theme_constant_override("separation", 4)
+		vbox.clip_contents = true
+		vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		panel.add_child(vbox)
 		# Header: title + Close (user reported no way out of this panel)
 		var header := HBoxContainer.new()
@@ -31011,13 +31069,19 @@ func _update_supply_overlay_legend() -> void:
 		vbox.add_child(hint)
 		var margin := MarginContainer.new()
 		margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		margin.clip_contents = true
+		margin.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		vbox.add_child(margin)
 		_supply_overlay_legend = RichTextLabel.new()
 		_supply_overlay_legend.bbcode_enabled = true
-		_supply_overlay_legend.fit_content = true
-		_supply_overlay_legend.scroll_active = false
+		_supply_overlay_legend.fit_content = false
+		_supply_overlay_legend.scroll_active = true
+		_supply_overlay_legend.clip_contents = true
+		_supply_overlay_legend.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		_supply_overlay_legend.custom_minimum_size = Vector2(460, 80)
-		_supply_overlay_legend.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+		_supply_overlay_legend.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		_supply_overlay_legend.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		_supply_overlay_legend.mouse_filter = Control.MOUSE_FILTER_STOP  # allow text scroll; Close still above
 		_supply_overlay_legend.add_theme_font_size_override("normal_font_size", 11)
 		margin.add_child(_supply_overlay_legend)
@@ -31100,7 +31164,6 @@ func _update_supply_legend_text(update_hint: bool = true) -> void:
 		_update_compare_hint_label()
 	if supply_mode:
 		_layout_supply_legend()
-	_sync_mapmode_toolbar()
 
 
 func _sync_supply_legend_pulse_host() -> void:
@@ -31109,7 +31172,7 @@ func _sync_supply_legend_pulse_host() -> void:
 	var host := _supply_legend_panel.get_parent() as Control
 	if host == null:
 		return
-	var sz: Vector2 = _supply_legend_content_size()
+	var sz: Vector2 = _supply_legend_host_size()
 	var left: float = host.offset_left
 	var top: float = host.offset_top
 	_pin_control_top_left(host, left, top, sz)
