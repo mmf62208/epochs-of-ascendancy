@@ -441,6 +441,27 @@ else
   run_step launch_campaign_loop1_end_screen \
     tools/eoa_campaign_loop1_end_screen_guard.sh || fail
 
+  run_step launch_save_reload1_roundtrip \
+    flock "${HOME}/.eoa_godot.lock" tools/run_godot.sh --headless --path . -s res://scripts/core/HeadlessSaveReload1RoundTripTest.gd || fail
+
+  run_step launch_save_reload1_midwar \
+    flock "${HOME}/.eoa_godot.lock" tools/run_godot.sh --headless --path . -s res://scripts/core/HeadlessSaveReload1MidWarTest.gd || fail
+
+  run_step launch_save_reload1_corrupt \
+    flock "${HOME}/.eoa_godot.lock" tools/run_godot.sh --headless --path . -s res://scripts/core/HeadlessSaveReload1CorruptTest.gd || fail
+
+  run_step launch_save_reload1_title_list \
+    flock "${HOME}/.eoa_godot.lock" tools/run_godot.sh --headless --path . --resolution 1280x800 -s res://scripts/core/HeadlessSaveReload1TitleListTest.gd || fail
+
+  run_step launch_save_reload1_determinism \
+    tools/eoa_save_reload1_determinism.sh || fail
+
+  run_step launch_save_reload1_ui \
+    tools/eoa_save_reload1_ui_guard.sh || fail
+
+  run_step launch_save_reload1_title_cc \
+    tools/eoa_save_reload1_title_cc.sh || fail
+
   if [[ "$WITH_PERF" -eq 1 ]]; then
     # Perf sample is evidence only — soft 30fps FAIL is OK
     run_step map_perf \

@@ -37,7 +37,7 @@ func _run() -> void:
 			print("SAVE_SMOKE: list_slots_for_ui marks occupied label=", row.get("label", ""))
 			break
 	print("SAVE_SMOKE: listed_n=", listed.size(), " found_occupied=", found_occupied)
-	var file_ok := FileAccess.file_exists("user://saves/%s.json" % slot)
+	var file_ok := (not abs_p.is_empty()) and FileAccess.file_exists(abs_p)
 	print("SAVE_SMOKE: file_exists=", file_ok)
 	if ok and found_occupied and file_ok and bytes > 100:
 		print("SAVE_SMOKE PASS")

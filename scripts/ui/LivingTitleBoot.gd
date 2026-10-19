@@ -10,6 +10,8 @@ const LIVING_TITLE_NATIONS := ["GER", "ENG", "FRA", "JAP", "USA", "SOV", "ITA", 
 const LIVING_TITLE_ERAS := [1918, 1936, 2026]
 ## Above UILayer HUD (110) and toasts (90) so Begin is not covered; below Command Center (130).
 const LIVING_TITLE_LAYER := 120
+const PANEL_MAX_H := 760.0
+const SAVE_LIST_MAX_H := 168.0
 const NATION_LABELS := {
 	"GER": "Germany",
 	"ENG": "United Kingdom",
@@ -30,9 +32,17 @@ var _cc_btn: Button
 var _esc_chip: Button
 var _panel: PanelContainer
 var _status: Label
+var _save_scroll: ScrollContainer
+var _save_list: VBoxContainer
+var _save_rows: Array[Dictionary] = []
+var _last_ptr_pts: Array[Vector2] = []
+var last_save_pointer: Dictionary = {}
 var _closed := false
 ## Set when live Esc is accepted on this overlay (headless + Play proof).
 var _esc_routed_to_cc := false
+## Opening Esc also hits MainMenu._input; ignore that one event so CC stays up.
+var _cc_open_latch := false
+var _last_damaged_toast_msec := 0
 ## Edge-trigger for `_process` Input-singleton poll (live DisplayServer may skip `_input`).
 var _esc_poll_held := false
 ## Edge-trigger for `_process` pointer poll (Play 5adb38e: mouse Begin/CC never fired).
@@ -243,9 +253,10 @@ func _build_ui() -> void:
 
 	var panel := PanelContainer.new()
 	panel.name = "LivingTitlePanel"
-	panel.custom_minimum_size = Vector2(420, 610)
+	panel.custom_minimum_size = Vector2(420, 520)
 	panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	panel.process_mode = Node.PROCESS_MODE_ALWAYS
+	panel.clip_contents = true
 	RetrowaveTheme.style_menu_panel(panel)
 	root.add_child(panel)
 	_panel = panel
@@ -370,6 +381,7 @@ func _build_ui() -> void:
 
 	_build_esc_chip(root)
 	_refresh_choice_buttons()
+	call_deferred("_fit_panel_to_viewport")
 
 
 func _build_esc_chip(root: Control) -> void:
@@ -400,35 +412,117 @@ func _build_esc_chip(root: Control) -> void:
 
 
 func _fill_save_rows(col: VBoxContainer) -> void:
+	_save_rows.clear()
+	_save_scroll = ScrollContainer.new()
+	_save_scroll.name = "LivingTitleSaveScroll"
+	_save_scroll.custom_minimum_size = Vector2(0, 36)
+	_save_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_save_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_save_scroll.mouse_filter = Control.MOUSE_FILTER_STOP
+	col.add_child(_save_scroll)
+	_save_list = VBoxContainer.new()
+	_save_list.name = "LivingTitleSaveList"
+	_save_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_save_list.add_theme_constant_override("separation", 4)
+	_save_scroll.add_child(_save_list)
 	var n := 0
-	if typeof(SaveLoadManager) != TYPE_NIL and SaveLoadManager.has_method("list_slots_for_ui"):
-		var rows: Array = SaveLoadManager.list_slots_for_ui()
+	if typeof(SaveLoadManager) != TYPE_NIL and SaveLoadManager.has_method("list_saves"):
+		var rows: Array = SaveLoadManager.list_saves()
 		for raw in rows:
-			if n >= 8:
-				break
 			if typeof(raw) != TYPE_DICTIONARY:
 				continue
 			var row: Dictionary = raw
-			if not bool(row.get("can_load", row.get("occupied", false))):
-				continue
 			var slot := str(row.get("slot", "")).strip_edges()
 			if slot.is_empty():
 				continue
+			var damaged := bool(row.get("damaged", false))
+			var meta: Dictionary = row.get("metadata", {}) if row.get("metadata") is Dictionary else {}
 			var btn := Button.new()
-			btn.text = "Load · %s" % str(row.get("label", slot))
+			btn.name = "LivingTitleSaveRow_%s" % slot
+			btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
 			btn.custom_minimum_size = Vector2(0, 30)
 			btn.mouse_filter = Control.MOUSE_FILTER_STOP
+			btn.focus_mode = Control.FOCUS_NONE
 			btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
-			btn.pressed.connect(_on_load.bind(slot))
+			var when := str(meta.get("game_date", ""))
+			var nation := str(meta.get("nation_name", meta.get("player_tag", "")))
+			var wall := ""
+			if SaveLoadManager.has_method("format_wall_time_local"):
+				wall = str(SaveLoadManager.format_wall_time_local(str(meta.get("wall_time", meta.get("timestamp", "")))))
+			var flags := "  damaged" if damaged else ""
+			if bool(row.get("old_format", false)) and not damaged:
+				flags += "  old format"
+			btn.text = "Load · %s   %s   %s   %s%s" % [slot, when, nation, wall, flags]
+			if damaged:
+				btn.modulate = Color(0.55, 0.55, 0.55, 1)
+			btn.pressed.connect(_on_title_save_pressed.bind(slot, damaged))
 			RetrowaveTheme.style_secondary_button(btn)
-			col.add_child(btn)
+			_save_list.add_child(btn)
+			_save_rows.append({"btn": btn, "slot": slot, "damaged": damaged})
 			n += 1
 	if n == 0:
 		var empty := Label.new()
+		empty.name = "LivingTitleSaveEmpty"
 		empty.text = "No saves yet — start a new campaign."
 		empty.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		RetrowaveTheme.style_body_label(empty)
-		col.add_child(empty)
+		_save_list.add_child(empty)
+	var row_h := 34.0
+	var want := float(n) * row_h + float(maxi(0, n - 1)) * 4.0
+	if n == 0:
+		want = 36.0
+	_save_scroll.custom_minimum_size.y = minf(SAVE_LIST_MAX_H, maxf(36.0, want))
+
+
+func _on_title_save_pressed(slot: String, damaged: bool) -> void:
+	last_save_pointer = {
+		"slot": slot,
+		"damaged": damaged,
+		"kind": "damaged" if damaged else "load",
+	}
+	if damaged:
+		_show_damaged_save_message()
+		return
+	if has_meta("eoa_sr1_hit_probe") and bool(get_meta("eoa_sr1_hit_probe")):
+		return
+	_on_load(slot)
+
+
+func _show_damaged_save_message() -> void:
+	var msg := SaveLoadManager.DAMAGED_SAVE_MESSAGE if typeof(SaveLoadManager) != TYPE_NIL else "Save file is damaged and can't be loaded"
+	if _status != null:
+		_status.text = msg
+	var now := Time.get_ticks_msec()
+	if now - _last_damaged_toast_msec < 400:
+		return
+	_last_damaged_toast_msec = now
+	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
+		LeaderEventUI.show_toast(msg, 3.0, true)
+
+
+func _fit_panel_to_viewport() -> void:
+	if _panel == null or not is_instance_valid(_panel):
+		return
+	var limit := 800.0
+	var vp: Viewport = get_viewport()
+	if vp != null:
+		var vs: Vector2 = vp.get_visible_rect().size
+		if vs.y > 8.0:
+			limit = vs.y
+	var max_h := minf(PANEL_MAX_H, limit - 40.0)
+	if _panel.size.y > max_h:
+		_panel.custom_minimum_size.y = max_h
+		_panel.size.y = max_h
+	var r: Rect2 = _panel.get_global_rect()
+	if r.position.y < 8.0:
+		var up := 8.0 - r.position.y
+		_panel.offset_top += up
+		_panel.offset_bottom += up
+		r = _panel.get_global_rect()
+	if r.end.y > limit - 8.0:
+		var dy := r.end.y - (limit - 8.0)
+		_panel.offset_top -= dy
+		_panel.offset_bottom -= dy
 
 
 func select_from_province(province_id: int) -> Dictionary:
@@ -583,7 +677,8 @@ func live_routing_facts() -> Dictionary:
 		"esc_routed_to_cc": _esc_routed_to_cc,
 		"closed": _closed,
 		"processing_process": is_processing(),
-		"sticky_open_only": true,
+		"sticky_open_only": false,
+		"cc_closes_when_open": true,
 		"pointer_event_path": true,
 		"touch_path": true,
 		"ptr_poll": true,
@@ -601,14 +696,35 @@ func panel_owns_screen_point(screen: Vector2) -> bool:
 	return _panel.get_global_rect().grow(PANEL_HIT_GROW).has_point(screen)
 
 
-func begin_owns_screen_point(screen: Vector2) -> bool:
+func save_row_owns_screen_point(screen: Vector2) -> bool:
+	if _save_scroll != null and is_instance_valid(_save_scroll):
+		if not _save_scroll.get_global_rect().has_point(screen):
+			return false
+	for raw in _save_rows:
+		if typeof(raw) != TYPE_DICTIONARY:
+			continue
+		var btn: Button = raw.get("btn") as Button
+		if btn != null and is_instance_valid(btn) and btn.visible:
+			if btn.get_global_rect().has_point(screen):
+				return true
+	return false
+
+
+func begin_button_owns_screen_point(screen: Vector2) -> bool:
 	if _begin_btn != null and is_instance_valid(_begin_btn) and _begin_btn.visible:
 		if _begin_btn.get_global_rect().grow(BEGIN_HIT_GROW).has_point(screen):
 			return true
-	# Status line sits under Begin — Play computerUse often clicks the caption, not the plate.
 	if _status != null and is_instance_valid(_status) and _status.visible:
 		if _status.get_global_rect().grow(16.0).has_point(screen):
 			return true
+	return false
+
+
+func begin_owns_screen_point(screen: Vector2) -> bool:
+	if begin_button_owns_screen_point(screen):
+		return true
+	if save_row_owns_screen_point(screen):
+		return false
 	# Lower panel slab below Command Center (layout / title-bar offset class).
 	if _panel != null and is_instance_valid(_panel) and _panel.visible:
 		var pr: Rect2 = _panel.get_global_rect()
@@ -640,8 +756,11 @@ func left_column_is_begin(screen: Vector2) -> bool:
 
 
 func cc_owns_screen_point(screen: Vector2) -> bool:
+	# Visible save-row ink owns the click, including the strip the CC grow overlaps.
+	if save_row_owns_screen_point(screen):
+		return false
 	if _cc_btn != null and is_instance_valid(_cc_btn) and _cc_btn.visible:
-		if _cc_btn.get_global_rect().grow(CC_HIT_GROW).has_point(screen):
+		if _cc_grow_rect(_cc_btn).has_point(screen):
 			return true
 	if _esc_chip != null and is_instance_valid(_esc_chip) and _esc_chip.visible:
 		if _esc_chip.get_global_rect().grow(CC_HIT_GROW).has_point(screen):
@@ -649,7 +768,23 @@ func cc_owns_screen_point(screen: Vector2) -> bool:
 	return false
 
 
+func _cc_grow_rect(btn: Control) -> Rect2:
+	var grown: Rect2 = btn.get_global_rect().grow(CC_HIT_GROW)
+	if _save_scroll == null or not is_instance_valid(_save_scroll):
+		return grown
+	var sr: Rect2 = _save_scroll.get_global_rect()
+	if not grown.intersects(sr):
+		return grown
+	var top := maxf(grown.position.y, sr.end.y)
+	var bottom := grown.end.y
+	if bottom <= top:
+		return Rect2(grown.position, Vector2.ZERO)
+	return Rect2(Vector2(grown.position.x, top), Vector2(grown.size.x, bottom - top))
+
+
 func owns_screen_point(screen: Vector2) -> bool:
+	if _command_center_blocks_title():
+		return true
 	if begin_owns_screen_point(screen):
 		return true
 	if cc_owns_screen_point(screen):
@@ -752,6 +887,8 @@ func collect_pointer_points(event: InputEvent) -> Array[Vector2]:
 
 func _any_point_matches(pts: Array[Vector2], kind: String) -> bool:
 	for p in pts:
+		if kind == "save" and save_row_owns_screen_point(p):
+			return true
 		if kind == "begin" and begin_owns_screen_point(p):
 			return true
 		if kind == "cc" and cc_owns_screen_point(p):
@@ -783,6 +920,8 @@ func owns_any_collected_point(event: InputEvent = null) -> bool:
 func handle_live_pointer(event: InputEvent) -> String:
 	if _closed:
 		return "closed"
+	if _command_center_blocks_title():
+		return "cc_block"
 	if event != null and not is_live_pointer_press(event):
 		return "ignore"
 	# Event coords first. OR-ing a stale Viewport.get_mouse_position() with
@@ -798,15 +937,25 @@ func handle_live_pointer(event: InputEvent) -> String:
 	var ev_hit: String = _classify_points(ev_pts)
 	var pending_press: bool = event == null
 	if ev_hit != "map":
+		_last_ptr_pts = ev_pts
 		return _apply_pointer_hit(ev_hit, pending_press)
-	var fb_hit: String = _classify_points(collect_pointer_points(null))
+	var fb_pts: Array[Vector2] = collect_pointer_points(null)
+	var fb_hit: String = _classify_points(fb_pts)
+	_last_ptr_pts = fb_pts
 	return _apply_pointer_hit(fb_hit, pending_press)
 
 
 func _classify_points(pts: Array[Vector2]) -> String:
-	# CC first so Command Center · Esc / Esc · Menu are never stolen by the Begin slab.
+	# Visible save rows beat the CC grow pad (list bottom overlaps CC +28 px).
+	if _any_point_matches(pts, "save"):
+		return "save"
+	# CC next so Command Center · Esc / Esc · Menu are never stolen by the Begin slab.
 	if _any_point_matches(pts, "cc"):
 		return "cc"
+	# The real Begin plate wins if a test / computerUse parks it over a save row.
+	for p in pts:
+		if begin_button_owns_screen_point(p):
+			return "begin"
 	if _any_point_matches(pts, "begin"):
 		return "begin"
 	if _any_point_matches(pts, "panel"):
@@ -818,6 +967,13 @@ func _classify_points(pts: Array[Vector2]) -> String:
 
 
 func _apply_pointer_hit(hit: String, pending_press: bool = false) -> String:
+	if hit == "save":
+		print("EOA_LIVE_PTR who=title.handle_live_pointer action=save")
+		_activate_save_at_pointer()
+		var vp_s: Viewport = get_viewport()
+		if vp_s != null:
+			vp_s.set_input_as_handled()
+		return "save"
 	if hit == "begin":
 		print("EOA_LIVE_PTR who=title.handle_live_pointer action=begin")
 		_on_begin_new(pending_press, true)
@@ -830,6 +986,22 @@ func _apply_pointer_hit(hit: String, pending_press: bool = false) -> String:
 		print("EOA_LIVE_PTR who=title.handle_live_pointer action=panel")
 		return "panel"
 	return "map"
+
+
+func _activate_save_at_pointer() -> void:
+	var pts: Array[Vector2] = _last_ptr_pts
+	if pts.is_empty():
+		pts = collect_pointer_points(null)
+	for p in pts:
+		for raw in _save_rows:
+			if typeof(raw) != TYPE_DICTIONARY:
+				continue
+			var btn: Button = raw.get("btn") as Button
+			if btn == null or not is_instance_valid(btn):
+				continue
+			if save_row_owns_screen_point(p) and btn.get_global_rect().has_point(p):
+				_on_title_save_pressed(str(raw.get("slot", "")), bool(raw.get("damaged", false)))
+				return
 
 
 func handle_live_begin() -> Dictionary:
@@ -863,14 +1035,15 @@ func handle_live_command_center_click() -> bool:
 func handle_live_escape() -> bool:
 	if _closed:
 		return false
-	# Play softpipe presses Esc ×2 (dismiss-then-idle). A one-frame guard is
-	# not enough: first Esc opens CC, second Esc MainMenu-toggles it closed
-	# (Play 3d00182 / d18cbae / d53ee05: overlay unchanged after ×2).
-	# Sticky open-only while this title is up.
+	# First Esc / CC button opens Command Center. A later Esc closes it.
+	# The opening Esc also lands on MainMenu._input — `_cc_open_latch` keeps
+	# that one event from closing the overlay we just opened.
 	_log_live_esc("title.handle_live_escape", null)
-	if _esc_routed_to_cc or _command_center_is_up():
-		_esc_routed_to_cc = true
-		return _ensure_command_center_stays_open()
+	if _command_center_is_up():
+		print("LivingTitleBoot: live Esc → close Command Center")
+		return _close_command_center_from_title()
+	if _command_center_blocks_title():
+		return true
 	_esc_routed_to_cc = true
 	print("LivingTitleBoot: live Esc → Command Center")
 	return _open_command_center_from_title()
@@ -1024,6 +1197,11 @@ func _log_live_raw_key(who: String, event: InputEvent) -> void:
 func _process(delta: float) -> void:
 	if _closed:
 		return
+	if _cc_open_latch:
+		_cc_open_latch = false
+		var mm_l: Node = _command_center_node()
+		if mm_l != null and mm_l.has_meta("eoa_cc_open_latch"):
+			mm_l.remove_meta("eoa_cc_open_latch")
 	if smoke_auto_begin_enabled() and not _smoke_auto_begin_armed:
 		_smoke_auto_begin_delay_s += delta
 		if _smoke_auto_begin_delay_s >= 0.25:
@@ -1055,26 +1233,47 @@ func _process(delta: float) -> void:
 			print("EOA_LIVE_PTR who=title._process action=%s (raw saw OS left; hit missed)" % polled)
 
 
-func _command_center_is_up() -> bool:
+func _command_center_node() -> Node:
 	var tree: SceneTree = get_tree()
 	if tree == null or tree.root == null:
-		return false
+		return null
 	var mm: Node = tree.root.get_node_or_null("MainMenu")
 	if mm == null or not is_instance_valid(mm) or mm.is_queued_for_deletion():
+		return null
+	return mm
+
+
+func _command_center_is_up() -> bool:
+	var mm: Node = _command_center_node()
+	if mm == null:
 		return false
-	if bool(mm.get("_closing")):
+	return not bool(mm.get("_closing"))
+
+
+func _command_center_blocks_title() -> bool:
+	# Include `_closing` so the × click cannot reopen CC via title pointer/Esc.
+	return _command_center_node() != null
+
+
+func _close_command_center_from_title() -> bool:
+	var mm: Node = _command_center_node()
+	if mm == null:
+		_esc_routed_to_cc = false
+		_cc_open_latch = false
 		return false
+	if mm.has_meta("eoa_cc_open_latch"):
+		mm.remove_meta("eoa_cc_open_latch")
+	if mm.has_method("_force_close"):
+		mm.call("_force_close")
+	_esc_routed_to_cc = false
+	_cc_open_latch = false
 	return true
 
 
 func _ensure_command_center_stays_open() -> bool:
+	# Kept for callers/tests that still name this. Open if missing; do not
+	# pin an already-open CC — Esc / × / Return must be able to close it.
 	if _command_center_is_up():
-		var tree_s: SceneTree = get_tree()
-		if tree_s != null and tree_s.root != null:
-			var mm_s: Node = tree_s.root.get_node_or_null("MainMenu")
-			if mm_s != null:
-				mm_s.set_meta("eoa_opened_from_living_title", true)
-		print("EOA_LIVE_ESC who=LivingTitleBoot.stay cc already up (Play Esc ×2 open-only)")
 		return true
 	return _open_command_center_from_title()
 
@@ -1162,7 +1361,7 @@ func _on_window_input(event: InputEvent) -> void:
 	if is_live_pointer_press(event):
 		var action_w: String = handle_live_pointer(event)
 		print("EOA_LIVE_PTR who=title.window_input action=%s" % action_w)
-		if action_w == "begin" or action_w == "cc" or action_w == "panel":
+		if action_w == "begin" or action_w == "cc" or action_w == "panel" or action_w == "save" or action_w == "cc_block":
 			var vp_w: Viewport = get_viewport()
 			if vp_w != null:
 				vp_w.set_input_as_handled()
@@ -1213,21 +1412,33 @@ func _open_command_center_from_title() -> bool:
 		return false
 	if _command_center_is_up():
 		return true
-	# Immediate open-only (not deferred toggle). Play Esc ×2 used to open then
-	# `_on_menu_pressed` toggle-close on the second press (looks like a no-op).
+	# Immediate open (not deferred toggle). The opening Esc also hits MainMenu;
+	# latch that one event so it cannot `_force_close` the overlay we just opened.
+	_cc_open_latch = true
 	var tib: Node = _find_top_info_bar(tree)
 	if tib != null:
 		if tib.has_method("open_command_center_stay"):
 			tib.call("open_command_center_stay")
+			_stamp_cc_open_latch()
 			return true
 		if tib.has_method("_open_command_center"):
 			tib.call("_open_command_center", false)
+			_stamp_cc_open_latch()
 			return true
 		if tib.has_method("_on_menu_pressed"):
 			tib.call("_on_menu_pressed")
+			_stamp_cc_open_latch()
 			return true
 	_instance_command_center_now()
 	return true
+
+
+func _stamp_cc_open_latch() -> void:
+	_cc_open_latch = true
+	var mm: Node = _command_center_node()
+	if mm != null:
+		mm.set_meta("eoa_opened_from_living_title", true)
+		mm.set_meta("eoa_cc_open_latch", true)
 
 
 func _instance_command_center_now() -> void:
@@ -1245,6 +1456,7 @@ func _instance_command_center_now() -> void:
 	menu.name = "MainMenu"
 	menu.process_mode = Node.PROCESS_MODE_ALWAYS
 	menu.set_meta("eoa_opened_from_living_title", true)
+	menu.set_meta("eoa_cc_open_latch", true)
 	tree.root.add_child(menu)
 
 
@@ -1257,7 +1469,7 @@ func _on_sink_gui_input(event: InputEvent) -> void:
 		return
 	if is_live_pointer_press(event):
 		var action_s: String = handle_live_pointer(event)
-		if action_s == "begin" or action_s == "cc" or action_s == "panel":
+		if action_s == "begin" or action_s == "cc" or action_s == "panel" or action_s == "save" or action_s == "cc_block":
 			var vp_s: Viewport = get_viewport()
 			if vp_s != null:
 				vp_s.set_input_as_handled()
@@ -1307,7 +1519,7 @@ func _input(event: InputEvent) -> void:
 	if is_live_pointer_press(event):
 		var action_i: String = handle_live_pointer(event)
 		print("EOA_LIVE_PTR who=title._input action=%s" % action_i)
-		if action_i == "begin" or action_i == "cc" or action_i == "panel":
+		if action_i == "begin" or action_i == "cc" or action_i == "panel" or action_i == "save" or action_i == "cc_block":
 			var vp: Viewport = get_viewport()
 			if vp != null:
 				vp.set_input_as_handled()
@@ -1401,7 +1613,19 @@ func _on_begin_new(pending_press: bool = false, from_pointer: bool = false) -> v
 
 
 func _on_load(slot: String) -> void:
-	var out: Dictionary = apply_living_title_boot(_tag, _year, slot)
+	if _closed:
+		return
+	var name := slot.strip_edges()
+	if name.is_empty():
+		return
+	var out: Dictionary = apply_living_title_boot(_tag, _year, name)
+	if not bool(out.get("ok", false)):
+		if bool(out.get("damaged", false)):
+			_show_damaged_save_message()
+			return
+		if _status != null:
+			_status.text = str(out.get("error", out.get("reason", "Load failed")))
+		return
 	_finish(out)
 
 
@@ -1410,7 +1634,16 @@ func _finish(out: Dictionary) -> void:
 		return
 	_closed = true
 	_clear_opened_from_title_meta()
-	_center_on_player(str(out.get("player_tag", _tag)))
+	var tree_f := Engine.get_main_loop() as SceneTree
+	var mr_f: Node = null
+	if tree_f != null:
+		mr_f = tree_f.get_first_node_in_group("map_renderer")
+		if mr_f == null and tree_f.current_scene != null:
+			mr_f = tree_f.current_scene.find_child("MapRenderer", true, false)
+	if mr_f != null and mr_f.has_method("restore_view_after_load"):
+		mr_f.call_deferred("restore_view_after_load")
+	else:
+		_center_on_player(str(out.get("player_tag", _tag)))
 	boot_closed.emit(out)
 	queue_free()
 

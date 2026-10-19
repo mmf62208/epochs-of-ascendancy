@@ -43,8 +43,8 @@ func _run() -> void:
 				print("CC_SMOKE: calling MainMenu._save_to_slot(slot_cc_ui)")
 				menu.call("_save_to_slot", "slot_cc_ui")
 				await process_frame
-				if not FileAccess.file_exists("user://saves/slot_cc_ui.json"):
-					fails.append("MainMenu._save_to_slot did not create slot_cc_ui.json")
+				if not FileAccess.file_exists("user://saves/slot_cc_ui.eoasave"):
+					fails.append("MainMenu._save_to_slot did not create slot_cc_ui.eoasave")
 				else:
 					print("CC_SMOKE: MainMenu._save_to_slot wrote file")
 			else:
@@ -71,7 +71,8 @@ func _run() -> void:
 	var bytes := int(save_res.get("bytes", 0))
 	if bytes < 100:
 		fails.append("save bytes too small: %d" % bytes)
-	if not FileAccess.file_exists("user://saves/%s.json" % slot):
+	var wrote := str(save_res.get("absolute_path", save_res.get("path", "")))
+	if wrote.is_empty() or not FileAccess.file_exists(wrote):
 		fails.append("save file missing on disk")
 
 	var listed: Array = slm.call("list_slots_for_ui") if slm.has_method("list_slots_for_ui") else []

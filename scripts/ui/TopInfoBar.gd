@@ -718,7 +718,10 @@ func _setup_compact_menu() -> void:
 	if menu_button == null or not is_instance_valid(menu_button):
 		mb = MenuButton.new()
 		mb.text = "Menu"
+		mb.name = "MenuButton"
 		mb.custom_minimum_size = Vector2(70, 28)
+		mb.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
+		mb.focus_mode = Control.FOCUS_NONE
 		menu_container.add_child(mb)
 		menu_button = mb
 	else:
@@ -1099,6 +1102,16 @@ func _input(event: InputEvent) -> void:
 	if not (event is InputEventKey and event.pressed and not event.echo):
 		return
 	var key: InputEventKey = event
+	# Ctrl+L must run here. MapRenderer's unhandled L is the supply overlay and
+	# marks the event handled, so a later sibling never sees the quickload.
+	if key.ctrl_pressed and not key.shift_pressed and (key.keycode == KEY_L or key.physical_keycode == KEY_L):
+		if typeof(SaveLoadManager) != TYPE_NIL:
+			var loaded := SaveLoadManager.quickload()
+			_update_date_time()
+			_update_resources()
+			print("Ctrl+L QuickLoad triggered ok=%s" % str(loaded))
+		get_viewport().set_input_as_handled()
+		return
 	if key.keycode == KEY_SPACE or key.keycode == KEY_PERIOD:
 		if _search_line_owns_typed_keys():
 			return
@@ -1159,30 +1172,23 @@ func _unhandled_input(event: InputEvent) -> void:
 			var abs_p := ""
 			var kb := 0
 			if SaveLoadManager.has_method("save_game_detailed"):
-				var res: Dictionary = SaveLoadManager.save_game_detailed("quicksave")
+				var qslot := "quicksave"
+				var qov := str(SaveLoadManager.get("quicksave_slot_override")).strip_edges()
+				if not qov.is_empty():
+					qslot = qov
+				var res: Dictionary = SaveLoadManager.save_game_detailed(qslot)
 				ok = bool(res.get("ok", false))
 				abs_p = str(res.get("absolute_path", res.get("path", "")))
 				kb = int(int(res.get("bytes", 0)) / 1024)
 			elif SaveLoadManager.has_method("quicksave"):
 				ok = bool(SaveLoadManager.quicksave())
-			print("Ctrl+S QuickSave triggered ok=%s path=%s" % [str(ok), abs_p])
-			if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
-				if ok:
-					LeaderEventUI.show_toast("Quicksave OK · %d KB (slot: quicksave)" % kb, 2.8)
-				else:
-					LeaderEventUI.show_toast("Quicksave FAILED — see console", 3.5)
+			print("Ctrl+S QuickSave triggered ok=%s path=%s kb=%s" % [str(ok), abs_p, str(kb)])
+			if not ok and typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
+				LeaderEventUI.show_toast("Quicksave FAILED — see console", 3.5)
 			# Refresh Command Center list if open.
 			var mm: Node = get_tree().root.find_child("MainMenu", true, false) if get_tree() else null
 			if mm != null and mm.has_method("_refresh_save_list"):
 				mm.call_deferred("_refresh_save_list")
-		get_viewport().set_input_as_handled()
-		return
-	if event.ctrl_pressed and not event.shift_pressed and event.keycode == KEY_L:
-		if typeof(SaveLoadManager) != TYPE_NIL:
-			SaveLoadManager.quickload()
-			_update_date_time()
-			_update_resources()
-			print("Ctrl+L QuickLoad triggered")
 		get_viewport().set_input_as_handled()
 		return
 	if _is_live_escape_event(event) or event.keycode == KEY_ESCAPE:
@@ -1908,29 +1914,24 @@ func _toggle_screen(screen_name: String, scene_path: String, configure: Callable
 	print("TopInfoBar: opened %s (multi-window OK — drag title, Esc closes front)" % screen_name)
 
 
+func _open_save_load_dialog(mode: String) -> void:
+	# load() avoids a parse-time class_name dependency before the global class cache is warm.
+	var script: GDScript = load("res://scripts/ui/SaveLoadDialog.gd") as GDScript
+	if script == null:
+		push_error("TopInfoBar: SaveLoadDialog missing")
+		return
+	script.call("open", mode)
+
+
 func _on_save_pressed() -> void:
-	# Immediate quicksave (user expectation: Menu→Save writes a file), then open Command Center.
-	print("TopInfoBar: Menu Save → quicksave + open Command Center")
-	if typeof(SaveLoadManager) != TYPE_NIL and SaveLoadManager.has_method("save_game_detailed"):
-		var res: Dictionary = SaveLoadManager.save_game_detailed("quicksave")
-		if bool(res.get("ok", false)):
-			var kb := int(int(res.get("bytes", 0)) / 1024)
-			print("TopInfoBar: quicksave ok %d KB → %s" % [kb, str(res.get("absolute_path", ""))])
-			if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
-				LeaderEventUI.show_toast("Saved quicksave (%d KB)" % kb, 2.5)
-		else:
-			push_error("TopInfoBar: quicksave failed: %s" % str(res.get("error", "?")))
-			if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
-				LeaderEventUI.show_toast("Save failed: %s" % str(res.get("error", "?")), 3.5, true)
-	elif typeof(SaveLoadManager) != TYPE_NIL and SaveLoadManager.has_method("quicksave"):
-		SaveLoadManager.quicksave()
-	_open_command_center(true)
+	# Named-slot dialog. Do not write quicksave from the menu.
+	print("TopInfoBar: Menu Save → Save dialog")
+	_open_save_load_dialog("save")
 
 
 func _on_load_pressed() -> void:
-	# Open Command Center focused on the save list (Load buttons on each slot).
-	print("TopInfoBar: Menu Load → open Command Center")
-	_open_command_center(true)
+	print("TopInfoBar: Menu Load → Load dialog")
+	_open_save_load_dialog("load")
 
 
 func _living_title_boot_is_up() -> bool:
@@ -1996,6 +1997,7 @@ func _instance_command_center_now(refresh_list: bool = true) -> void:
 		)
 	if _living_title_boot_is_up():
 		menu.set_meta("eoa_opened_from_living_title", true)
+		menu.set_meta("eoa_cc_open_latch", true)
 	get_tree().root.add_child(menu)
 	if refresh_list and menu.has_method("_refresh_save_list"):
 		menu.call_deferred("_refresh_save_list")

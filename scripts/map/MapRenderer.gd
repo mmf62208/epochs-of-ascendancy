@@ -335,6 +335,8 @@ var _left_button_was_up: bool = true
 ## Last left-release classification (still-click vs drag). Guard-readable.
 var _mv1_last_release_was_drag: bool = false
 var _camera_nudge_gen := 0
+## Camera to restore after load (map_ui). Applied in restore_view_after_load.
+var _pending_saved_camera: Dictionary = {}
 ## Close/Esc: do not re-cull fills until the camera actually moves (Play: dark-blue void).
 var _viewport_cull_suspend_until_msec: int = 0
 var _viewport_cull_hold_after_close: bool = false
@@ -3034,17 +3036,25 @@ func _input(event: InputEvent) -> void:
 					)
 					var title_act: String = _route_living_title_pointer(event)
 					print("EOA_LIVE_PTR who=MapRenderer._input action=%s" % title_act)
-					if title_act == "begin" or title_act == "cc" or title_act == "panel":
+					if (
+						title_act == "begin"
+						or title_act == "cc"
+						or title_act == "panel"
+						or title_act == "save"
+						or title_act == "cc_block"
+					):
 						if title_act == "begin":
 							arm_begin_title_release_swallow()
 						get_viewport().set_input_as_handled()
 						return
 					if _living_title_owns_event(event) or _top_bar_owns_click():
+						get_viewport().set_input_as_handled()
 						return
 					# Map-area press: do not mark handled — GUI / window_input
 					# / title _input must still see the event.
 					return
 				if _living_title_owns_event(event) or _top_bar_owns_click():
+					get_viewport().set_input_as_handled()
 					return
 				var title_world: Vector2 = _screen_to_world(get_viewport().get_mouse_position())
 				var title_pid: int = _resolve_map_pick_pid(title_world)
@@ -3452,15 +3462,23 @@ func _unhandled_input(event: InputEvent) -> void:
 		if _living_title_boot_is_up():
 			if event.pressed:
 				var un_act: String = _route_living_title_pointer(event)
-				if un_act == "begin" or un_act == "cc" or un_act == "panel":
+				if (
+					un_act == "begin"
+					or un_act == "cc"
+					or un_act == "panel"
+					or un_act == "save"
+					or un_act == "cc_block"
+				):
 					if un_act == "begin":
 						arm_begin_title_release_swallow()
 					get_viewport().set_input_as_handled()
 					return
 				if _living_title_owns_event(event) or _top_bar_owns_click():
+					get_viewport().set_input_as_handled()
 					return
 				return
 			if _living_title_owns_event(event) or _top_bar_owns_click():
+				get_viewport().set_input_as_handled()
 				return
 			var un_world: Vector2 = _screen_to_world(get_viewport().get_mouse_position())
 			var un_pid: int = _resolve_map_pick_pid(un_world)
@@ -3559,12 +3577,18 @@ func _unhandled_input(event: InputEvent) -> void:
 		var world_pos := _map_pick_world_from_event(event)
 		# Living title owns map clicks: never open inspector / chips / assault (window-exit class).
 		if _living_title_boot_is_up():
+			if _living_title_owns_event(event):
+				get_viewport().set_input_as_handled()
+				return
 			var title_pid := _resolve_map_pick_pid(world_pos)
 			if title_pid <= 0:
 				title_pid = _resolve_hex_pick_pid(world_pos)
 			if _try_living_title_map_pick(title_pid):
 				get_viewport().set_input_as_handled()
 				return
+			# Title is up: a map-area miss still must not open a unit card.
+			get_viewport().set_input_as_handled()
+			return
 		# Land division chips beat capital stars (Play: chips opened Praha inspector).
 		# Air/fleet still lose to stars (Berlin star vs Air Wing PASS).
 		# Alt-click / infra empty-terrain prefers province (IX-1 Köln under garrison).
@@ -5458,7 +5482,7 @@ func get_save_data() -> Dictionary:
 		if _map_minimap.has_method("get_pack_heat_hot"):
 			hot_hex = (_map_minimap.call("get_pack_heat_hot") as Color).to_html(false)
 	var lib_layout := str(load_pack_risk_heat_prefs().get("library_layout", "standard"))
-	return {
+	var out := {
 		"route_compare_slots": slots_out,
 		"route_compare_slot_labels": labels_out,
 		"secondary_tint_intensity": secondary_tint_intensity.duplicate(true),
@@ -5473,7 +5497,22 @@ func get_save_data() -> Dictionary:
 		"pack_heat_cool": cool_hex,
 		"pack_heat_hot": hot_hex,
 		"pack_library_layout": lib_layout,
+		"camera_pos_x": 0.0,
+		"camera_pos_y": 0.0,
+		"camera_zoom_x": 1.0,
+		"camera_zoom_y": 1.0,
+		"camera_saved": false,
 	}
+	var cam_s: Camera2D = get_viewport().get_camera_2d() if get_viewport() else null
+	if cam_s == null:
+		cam_s = get_node_or_null("MapCamera") as Camera2D
+	if cam_s != null:
+		out["camera_pos_x"] = cam_s.global_position.x
+		out["camera_pos_y"] = cam_s.global_position.y
+		out["camera_zoom_x"] = cam_s.zoom.x
+		out["camera_zoom_y"] = cam_s.zoom.y
+		out["camera_saved"] = true
+	return out
 
 
 ## Pass 22/29: restore map UI from save.
@@ -5548,6 +5587,69 @@ func apply_save_data(data: Dictionary) -> void:
 		save_pack_risk_heat_prefs(hs, hi, lo, hr, ll, cool_h, hot_h)
 	call_deferred("_refresh_province_fill_colors", true)
 	call_deferred("_notify_minimap_pack_pins")
+	if bool(data.get("camera_saved", false)):
+		_pending_saved_camera = {
+			"x": float(data.get("camera_pos_x", 0.0)),
+			"y": float(data.get("camera_pos_y", 0.0)),
+			"zx": float(data.get("camera_zoom_x", 1.0)),
+			"zy": float(data.get("camera_zoom_y", 1.0)),
+		}
+
+
+## After a load, put the camera back where the save left it. Old saves without
+## camera_saved centre on the player's capital instead of a world/Brazil jump.
+func restore_view_after_load() -> void:
+	_close_camera_locked = false
+	_close_click_guard = false
+	_close_suppress_edge = false
+	_hold_camera_until_msec = 0
+	_map_pick_block_until_msec = 0
+	var cam: Camera2D = get_node_or_null("MapCamera") as Camera2D
+	if cam == null and get_viewport():
+		cam = get_viewport().get_camera_2d()
+	if cam != null and not _pending_saved_camera.is_empty():
+		var x := float(_pending_saved_camera.get("x", cam.global_position.x))
+		var y := float(_pending_saved_camera.get("y", cam.global_position.y))
+		var zx := float(_pending_saved_camera.get("zx", cam.zoom.x))
+		var zy := float(_pending_saved_camera.get("zy", cam.zoom.y))
+		if absf(zx) < 0.01:
+			zx = 1.0
+		if absf(zy) < 0.01:
+			zy = zx
+		cam.global_position = _apply_camera_bounds(Vector2(x, y))
+		cam.zoom = Vector2(zx, zy)
+		_pending_saved_camera = {}
+		if is_inside_tree():
+			_sync_unit_counter_paint()
+		print("MapRenderer: restored saved camera after load")
+		return
+	_pending_saved_camera = {}
+	_center_on_player_capital_after_load()
+
+
+func _center_on_player_capital_after_load() -> void:
+	var tag := ""
+	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_player_country_tag"):
+		tag = str(LeaderManager.get_player_country_tag()).strip_edges().to_upper()
+	if tag.is_empty():
+		tag = "GER"
+	var pid := 710300 if tag == "GER" else -1
+	if tag == "FRA":
+		pid = 710739
+	elif tag == "ENG":
+		pid = 711414
+	elif tag == "JAP":
+		pid = 903981
+	var tree := get_tree()
+	if tree != null:
+		var loader: Node = tree.root.find_child("ScenarioLoader", true, false)
+		if loader != null and loader.has_method("_get_capital_province_id_for_tag"):
+			var cap := int(loader.call("_get_capital_province_id_for_tag", tag))
+			if cap > 0:
+				pid = cap
+	if pid > 0:
+		_center_camera_on_province(pid, "soft")
+		print("MapRenderer: centred on player capital %s pid=%d after load" % [tag, pid])
 
 
 const ROUTE_PACK_MAP_PREFS_PATH := "user://route_packs/_map_prefs.json"
@@ -19899,6 +20001,8 @@ func _try_open_land_chip_from_input(ctrl_click: bool = false, event: InputEvent 
 	if _first_session_tip_dismiss_blocks_map_pick():
 		return false
 	if _begin_title_release_blocks_map_pick():
+		return false
+	if _living_title_boot_is_up():
 		return false
 	if _top_bar_owns_click() or _mouse_over_search_control() or _search_ui_owns_click() or _mouse_over_close_control() or _road_spine_btn_owns_click():
 		return false

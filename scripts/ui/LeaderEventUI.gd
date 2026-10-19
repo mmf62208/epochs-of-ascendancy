@@ -120,6 +120,29 @@ func _eoa_flush(msg: String) -> void:
 		OS.call("flush_stdout")
 
 
+func raise_toasts_above_dialogs() -> void:
+	_ensure_toast_layer()
+	if _toast_layer != null:
+		_toast_layer.layer = 140
+
+
+func restore_toast_layer() -> void:
+	if _toast_layer != null:
+		_toast_layer.layer = 90
+
+
+func _sync_toast_layer_for_dialogs() -> void:
+	var tree := get_tree()
+	if tree == null or _toast_layer == null:
+		return
+	var bump := false
+	for n in tree.get_nodes_in_group("save_load_dialog"):
+		if is_instance_valid(n):
+			bump = true
+			break
+	_toast_layer.layer = 140 if bump else 90
+
+
 func show_toast(message: String, duration_sec: float = 3.0, is_error: bool = false, is_important: bool = false, on_respond: Callable = Callable()) -> void:
 	# Same skip as post_news: headless -s toast timers + CanvasLayer hung
 	# CompleteTest after spine 91% (and Maginot after RESULT=PASS).
@@ -128,6 +151,7 @@ func show_toast(message: String, duration_sec: float = 3.0, is_error: bool = fal
 		_eoa_flush("EOA_SMOKE_SPINE_BISECT who=LeaderEventUI.show_toast.skip")
 		return
 	_ensure_toast_layer()
+	_sync_toast_layer_for_dialogs()
 	_eoa_flush("EOA_SMOKE_SPINE_BISECT who=LeaderEventUI.show_toast.after_ensure")
 	var entry := {
 		"title": "Notice" if not is_error else "Error",

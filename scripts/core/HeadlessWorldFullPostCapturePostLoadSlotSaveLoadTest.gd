@@ -30,6 +30,7 @@ var _bm: Node = null
 
 
 func _init() -> void:
+	OS.set_environment("EOA_CAMPAIGN_LOOP", "1")
 	call_deferred("_run_and_quit")
 
 
@@ -85,6 +86,11 @@ func _run() -> void:
 		return
 	_bm = bm_script.new()
 	root.add_child(_bm)
+	var war_fx: GDScript = load("res://scripts/core/Cl1WarFixture.gd") as GDScript
+	var war_res: Dictionary = war_fx.declare_pairs([[ATT_TAG, DEF_TAG]]) if war_fx != null else {"ok": false, "reason": "missing"}
+	if not bool(war_res.get("ok", false)):
+		_fail("WarStateDomain.declare_war GER/FRA failed: %s" % str(war_res))
+		return
 	_test_invalid_assault_no_crash()
 	_test_slot_saveload_three()
 	_cleanup()
@@ -316,13 +322,12 @@ func _test_slot_saveload_three() -> void:
 	if int(save_res.get("bytes", 0)) < 100:
 		_fail("e1: save payload too small")
 		return
-	# Payload must include map + production + leaders keys
-	var raw := FileAccess.get_file_as_string(path)
-	var parsed: Variant = JSON.parse_string(raw)
-	if typeof(parsed) != TYPE_DICTIONARY:
-		_fail("e1: save JSON not object")
+	# Payload must include map + production + leaders keys.
+	# v2 bodies are binary; read_save_body returns the gathered dictionary.
+	var data: Dictionary = _sl.read_save_body(SLOT) if _sl.has_method("read_save_body") else {}
+	if data.has("ok") and not bool(data.get("ok", false)):
+		_fail("e1: read_save_body failed: %s" % str(data.get("error", data)))
 		return
-	var data: Dictionary = parsed
 	if not data.has("map") or not data.has("production") or not data.has("leaders"):
 		_fail("e1: save missing map/production/leaders sections")
 		return

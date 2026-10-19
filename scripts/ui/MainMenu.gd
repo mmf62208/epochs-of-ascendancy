@@ -74,6 +74,8 @@ var _rename_field: LineEdit
 var _pending_rename_slot := ""
 var _save_as_dialog: AcceptDialog
 var _save_as_field: LineEdit
+var _overwrite_confirm: ConfirmationDialog
+var _pending_overwrite_slot := ""
 var _nation_btns: Dictionary = {}
 var _era_btns: Dictionary = {}
 ## Edge-trigger for `_process` pointer poll (computerUse leftover on CloseX).
@@ -154,11 +156,9 @@ func _input(event: InputEvent) -> void:
 		"EOA_LIVE_ESC who=MainMenu._input process_mode=%s title_up=%s closing=%s tree=%s"
 		% [str(process_mode), str(title_up_now), str(_closing), str(get_tree() != null)]
 	)
-	if _living_title_is_up() or has_meta("eoa_opened_from_living_title"):
-		# Open-only while the title overlay is up (Play 3d00182 Esc ×2 toggle-close).
-		print("EOA_LIVE_ESC who=MainMenu.keep_cc title_up=%s from_title_meta=%s (do not _force_close)" % [
-			str(_living_title_is_up()), str(has_meta("eoa_opened_from_living_title"))
-		])
+	if has_meta("eoa_cc_open_latch") and bool(get_meta("eoa_cc_open_latch")):
+		# Same Esc that opened us from the title — do not close on that event.
+		print("EOA_LIVE_ESC who=MainMenu.open_latch title_up=%s (opening Esc)" % str(_living_title_is_up()))
 		get_viewport().set_input_as_handled()
 		return
 	_force_close()
@@ -174,10 +174,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		"EOA_LIVE_ESC who=MainMenu._unhandled_input process_mode=%s title_up=%s"
 		% [str(process_mode), str(_living_title_is_up())]
 	)
-	if _living_title_is_up() or has_meta("eoa_opened_from_living_title"):
-		print("EOA_LIVE_ESC who=MainMenu.keep_cc title_up=%s from_title_meta=%s (do not _force_close)" % [
-			str(_living_title_is_up()), str(has_meta("eoa_opened_from_living_title"))
-		])
+	if has_meta("eoa_cc_open_latch") and bool(get_meta("eoa_cc_open_latch")):
+		print("EOA_LIVE_ESC who=MainMenu.open_latch title_up=%s (opening Esc)" % str(_living_title_is_up()))
 		get_viewport().set_input_as_handled()
 		return
 	_force_close()
@@ -530,6 +528,9 @@ func _on_action(id: String) -> void:
 		"return_to_main":
 			_return_to_title()
 		"exit":
+			if has_meta("eoa_sr1_block_quit") and bool(get_meta("eoa_sr1_block_quit")):
+				set_meta("eoa_sr1_exit_fired", true)
+				return
 			_closing = true
 			_pause_game(false)
 			menu_closed.emit()
@@ -680,7 +681,8 @@ func _make_save_row(info: Dictionary) -> Control:
 	save_b.custom_minimum_size = Vector2(80, 32)
 	save_b.tooltip_text = "Write current game into this slot"
 	save_b.mouse_filter = Control.MOUSE_FILTER_STOP
-	save_b.pressed.connect(_save_to_slot.bind(slot))
+	save_b.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
+	save_b.pressed.connect(_request_save_slot.bind(slot))
 	RetrowaveTheme.style_secondary_button(save_b)
 	actions.add_child(save_b)
 
@@ -709,14 +711,18 @@ func _format_detail(meta: Dictionary) -> String:
 	var parts: PackedStringArray = []
 	var sc := str(meta.get("scenario_id", "")).strip_edges()
 	var tag := str(meta.get("player_tag", "")).strip_edges()
-	var ts := str(meta.get("timestamp", meta.get("last_played", ""))).strip_edges()
+	var ts := str(meta.get("wall_time", meta.get("timestamp", meta.get("last_played", "")))).strip_edges()
 	var ver := str(meta.get("game_version", "")).strip_edges()
 	if not sc.is_empty():
 		parts.append(sc.replace("_", " "))
 	if not tag.is_empty():
 		parts.append(tag)
 	if not ts.is_empty():
-		parts.append(ts.substr(0, mini(19, ts.length())))
+		var shown := ts
+		var slm := _slm()
+		if slm != null and slm.has_method("format_wall_time_local"):
+			shown = str(slm.call("format_wall_time_local", ts))
+		parts.append(shown.substr(0, mini(19, shown.length())))
 	if not ver.is_empty():
 		parts.append("v%s" % ver)
 	return " · ".join(parts) if parts.size() > 0 else "Occupied"
@@ -789,6 +795,18 @@ func _ensure_dialogs() -> void:
 	_save_as_dialog.add_child(_save_as_field)
 	add_child(_save_as_dialog)
 
+	_overwrite_confirm = ConfirmationDialog.new()
+	_overwrite_confirm.title = "Overwrite save"
+	_overwrite_confirm.ok_button_text = "Overwrite"
+	_overwrite_confirm.confirmed.connect(_on_overwrite_confirmed)
+	add_child(_overwrite_confirm)
+	var overwrite_ok := _overwrite_confirm.get_ok_button()
+	if overwrite_ok != null:
+		overwrite_ok.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
+	var overwrite_cancel := _overwrite_confirm.get_cancel_button()
+	if overwrite_cancel != null:
+		overwrite_cancel.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
+
 
 func _open_save_as_dialog() -> void:
 	_save_as_field.text = ""
@@ -796,12 +814,37 @@ func _open_save_as_dialog() -> void:
 	_save_as_field.grab_focus()
 
 
+func _request_save_slot(slot: String) -> void:
+	var slm := _slm()
+	if slm == null or not slm.has_method("slot_status"):
+		_save_to_slot(slot)
+		return
+	var status: Dictionary = slm.call("slot_status", slot)
+	if bool(status.get("missing", true)):
+		_save_to_slot(slot)
+		return
+	var meta: Dictionary = status.get("metadata", {}) if status.get("metadata") is Dictionary else {}
+	var when := str(meta.get("game_date", meta.get("timestamp", "")))
+	var nation := str(meta.get("nation_name", meta.get("player_tag", "")))
+	_pending_overwrite_slot = slot
+	_overwrite_confirm.dialog_text = "Overwrite %s (%s, %s)?" % [slot, when, nation]
+	_overwrite_confirm.popup_centered()
+
+
+func _on_overwrite_confirmed() -> void:
+	var slot := _pending_overwrite_slot
+	_pending_overwrite_slot = ""
+	if slot.is_empty():
+		return
+	_save_to_slot(slot)
+
+
 func _on_save_as_confirmed() -> void:
 	var slot := _sanitize_slot_name(_save_as_field.text)
 	if slot.is_empty():
 		_toast("Enter letters, numbers, underscore.", 2.5, true)
 		return
-	_save_to_slot(slot)
+	_request_save_slot(slot)
 
 
 func _open_delete(slot: String) -> void:
@@ -908,6 +951,10 @@ func _show_help() -> void:
 
 
 func _return_to_title() -> void:
+	# Title-opened CC: the living title is already up. Just dismiss CC.
+	if _living_title_is_up() or has_meta("eoa_opened_from_living_title"):
+		_force_close()
+		return
 	_closing = true
 	_set_status("Reloading…")
 	_pause_game(false)
