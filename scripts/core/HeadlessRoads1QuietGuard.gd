@@ -6,7 +6,7 @@ extends SceneTree
 ##   (b) casing and fill interleaved per edge in build_road_draw_plan
 ##   (c) ROAD_BELOW_UNITS_Z back to 21
 ##   (d) road_tier_mode_alpha always 1
-##   (e) highway_endpoints_in_rings always true, or the overlay stops calling it
+##   (e) highway_endpoints_in_rings always true, or the overlay discards the bool
 ##       (placeholder-gap: highway_crosses_placeholder_gap always false)
 ##
 ##   tools/run_godot.sh --headless -s res://scripts/core/HeadlessRoads1QuietGuard.gd
@@ -215,10 +215,18 @@ func _test_stub_filter() -> void:
 	if "highway_endpoints_in_rings" not in ol or "func _highway_edge_drawable" not in ol:
 		_fail("overlay must filter highway edges through highway_endpoints_in_rings")
 		return
+	if "if in_rings" not in ol and "if not in_rings" not in ol:
+		_fail("overlay must honor highway_endpoints_in_rings (not discard the bool)")
+		return
 	if "highway_crosses_placeholder_gap" not in ol:
 		_fail("overlay must drop highways that cross a RoW placeholder gap")
 		return
+	if "highway_edge_on_connected_network" not in ol:
+		_fail("overlay must keep out-of-ring edges only on a connected network")
+		return
 	if not _test_placeholder_gap():
+		return
+	if not _test_connected_network():
 		return
 	_pass("highway stub filter drops an endpoint outside drawn rings")
 
@@ -260,6 +268,30 @@ func _test_placeholder_gap() -> bool:
 		return false
 	if RoadTierVisualScript.highway_crosses_placeholder_gap(Vector2(0, 0), Vector2(200, 0), []):
 		_fail("empty ring list must fail open for the gap filter")
+		return false
+	return true
+
+
+func _test_connected_network() -> bool:
+	var stub: Array = [
+		{"p1": 903534, "p2": 905809, "display_tier": 2, "c1": Vector2(0, 0), "c2": Vector2(200, 0)},
+		{"p1": 905807, "p2": 905809, "display_tier": 2, "c1": Vector2(-40, 0), "c2": Vector2(0, 0)},
+	]
+	if RoadTierVisualScript.highway_edge_on_connected_network(stub, 903534, 905809):
+		_fail("2-edge RoW stub must not count as a connected network")
+		return false
+	var cluster: Array = stub.duplicate()
+	cluster.append({
+		"p1": 905807, "p2": 905810, "display_tier": 2, "c1": Vector2(-40, 0), "c2": Vector2(-80, 0)
+	})
+	if not RoadTierVisualScript.highway_edge_on_connected_network(cluster, 903534, 905809):
+		_fail("3-edge RoW cluster must count as a connected network")
+		return false
+	var nuts: Array = [
+		{"p1": 710967, "p2": 710968, "display_tier": 2, "c1": Vector2(0, 0), "c2": Vector2(10, 0)},
+	]
+	if not RoadTierVisualScript.highway_edge_on_connected_network(nuts, 710967, 710968):
+		_fail("a NUTS highway must count as a connected network")
 		return false
 	return true
 

@@ -716,6 +716,7 @@ func _rebuild_road_layer_inner() -> void:
         if typeof(trunk_v) == TYPE_DICTIONARY:
             cache.append(trunk_v)
     _assign_display_tiers(cache, graph_rows)
+    _demote_orphan_highway_stubs(cache)
     _hwy3_cached_input_key = hwy3_key
     _hwy3_cached_rows = _clone_hwy3_rows(cache)
     var deg: Dictionary = RoadTierVisualScript.degree_stats(cache)
@@ -2052,13 +2053,39 @@ func _highway_edge_drawable(entry: Dictionary) -> bool:
         return true
     var c1: Vector2 = entry.get("c1", Vector2.ZERO)
     var c2: Vector2 = entry.get("c2", Vector2.ZERO)
-    ## Always call both ROADS-1 helpers (quiet-guard wiring). Drop only the
-    ## Lithuania-style RoW placeholder gap — not HWY-3 hub routes whose
-    ## centroids sit outside the NUTS draw-ring set.
-    RoadTierVisualScript.highway_endpoints_in_rings(c1, c2, _road_draw_rings)
+    ## Honor both ROADS-1 helpers. An endpoint outside drawn rings drops the
+    ## edge unless it belongs to a connected highway network (NUTS land or a
+    ## 3+ edge RoW/Japan cluster). That keeps HWY-3 hub routes and drops the
+    ## isolated Lithuania→Moscow placeholder stub.
+    var in_rings: bool = RoadTierVisualScript.highway_endpoints_in_rings(c1, c2, _road_draw_rings)
     if RoadTierVisualScript.highway_crosses_placeholder_gap(c1, c2, _road_draw_rings):
         return false
-    return true
+    if in_rings:
+        return true
+    return RoadTierVisualScript.highway_edge_on_connected_network(
+        _road_edge_cache, int(entry.get("p1", 0)), int(entry.get("p2", 0))
+    )
+
+
+func _demote_orphan_highway_stubs(cache: Array[Dictionary]) -> void:
+    _road_stub_dropped.clear()
+    var snapshot: Array = []
+    for row_v in cache:
+        if typeof(row_v) == TYPE_DICTIONARY:
+            snapshot.append(row_v)
+    var drop: Dictionary = {}
+    for entry in cache:
+        if int(entry.get("display_tier", 0)) != RoadTierVisualScript.TIER_HIGHWAY:
+            continue
+        if RoadTierVisualScript.highway_should_draw_edge(entry, snapshot, _road_draw_rings):
+            continue
+        drop[RoadTierVisualScript.edge_key(int(entry.get("p1", 0)), int(entry.get("p2", 0)))] = true
+    for entry2 in cache:
+        var key: String = RoadTierVisualScript.edge_key(int(entry2.get("p1", 0)), int(entry2.get("p2", 0)))
+        if not drop.has(key):
+            continue
+        entry2["display_tier"] = RoadTierVisualScript.TIER_PAVED
+        _road_stub_dropped.append(key)
 
 
 func apply_road_map_mode(mode: String, supply_on: bool) -> void:

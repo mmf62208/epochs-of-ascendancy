@@ -4467,6 +4467,78 @@ static func highway_crosses_placeholder_gap(c1: Vector2, c2: Vector2, rings: Arr
 	return false
 
 
+## A highway component is a real network when it touches NUTS land or has
+## enough edges to be a RoW/Japan cluster. The 2-edge Lithuania→Moscow stub
+## is neither: both ends sit outside drawn rings and the component is tiny.
+const HWY_CONNECTED_NETWORK_MIN_EDGES := 3
+
+
+static func highway_network_component_info(cache: Array) -> Dictionary:
+	var parent: Dictionary = {}
+	for row_v in cache:
+		if typeof(row_v) != TYPE_DICTIONARY:
+			continue
+		var row: Dictionary = row_v
+		if int(row.get("display_tier", 0)) != TIER_HIGHWAY:
+			continue
+		var a: int = int(row.get("p1", 0))
+		var b: int = int(row.get("p2", 0))
+		if a <= 0 or b <= 0:
+			continue
+		_uf_union(parent, a, b)
+	var edges_by_root: Dictionary = {}
+	var nuts_by_root: Dictionary = {}
+	for row2_v in cache:
+		if typeof(row2_v) != TYPE_DICTIONARY:
+			continue
+		var row2: Dictionary = row2_v
+		if int(row2.get("display_tier", 0)) != TIER_HIGHWAY:
+			continue
+		var a2: int = int(row2.get("p1", 0))
+		var b2: int = int(row2.get("p2", 0))
+		if a2 <= 0 or b2 <= 0:
+			continue
+		var root: int = _uf_find(parent, a2)
+		edges_by_root[root] = int(edges_by_root.get(root, 0)) + 1
+		if is_nuts3_pid(a2) or is_nuts3_pid(b2):
+			nuts_by_root[root] = true
+	return {
+		"parent": parent,
+		"edges_by_root": edges_by_root,
+		"nuts_by_root": nuts_by_root,
+	}
+
+
+static func highway_edge_on_connected_network(cache: Array, p1: int, p2: int) -> bool:
+	if p1 <= 0 or p2 <= 0:
+		return false
+	var info: Dictionary = highway_network_component_info(cache)
+	var parent_v: Variant = info.get("parent", {})
+	var parent: Dictionary = parent_v if typeof(parent_v) == TYPE_DICTIONARY else {}
+	if parent.is_empty() or not parent.has(p1):
+		return false
+	var root: int = _uf_find(parent, p1)
+	var n: int = int((info.get("edges_by_root", {}) as Dictionary).get(root, 0))
+	var nuts: bool = bool((info.get("nuts_by_root", {}) as Dictionary).get(root, false))
+	return nuts or n >= HWY_CONNECTED_NETWORK_MIN_EDGES
+
+
+static func highway_should_draw_edge(entry: Dictionary, cache: Array, rings: Array) -> bool:
+	var tier: int = int(entry.get("display_tier", entry.get("tier", 0)))
+	if tier != TIER_HIGHWAY:
+		return true
+	var c1: Vector2 = entry.get("c1", Vector2.ZERO)
+	var c2: Vector2 = entry.get("c2", Vector2.ZERO)
+	if highway_crosses_placeholder_gap(c1, c2, rings):
+		return false
+	var in_rings: bool = highway_endpoints_in_rings(c1, c2, rings)
+	if in_rings:
+		return true
+	return highway_edge_on_connected_network(
+		cache, int(entry.get("p1", 0)), int(entry.get("p2", 0))
+	)
+
+
 static func _endpoint_is_row_placeholder(pt: Vector2, rings: Array) -> bool:
 	var saw_placeholder := false
 	var saw_real := false
