@@ -267,6 +267,9 @@ func _pass_flow(swallow: bool, slot: String, shots: bool) -> void:
 
 
 func _begin_ger(swallow: bool) -> bool:
+	# A leftover Command Center from the previous pass's Esc close makes the
+	# new title swallow Begin (cc_block). Dismiss it first.
+	_dismiss_unexpected()
 	var existing := _find_title()
 	if existing != null:
 		existing.queue_free()
@@ -285,6 +288,11 @@ func _begin_ger(swallow: bool) -> bool:
 		return false
 	await process_frame
 	await process_frame
+	var leftover_title := _find_title()
+	if leftover_title != null and leftover_title.has_method("handle_live_begin"):
+		leftover_title.call("handle_live_begin")
+		await process_frame
+		await process_frame
 	var tag := ""
 	var lm := get_root().get_node_or_null("LeaderManager")
 	if lm != null and lm.has_method("get_player_country_tag"):
