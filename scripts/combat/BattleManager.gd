@@ -1444,7 +1444,7 @@ func _human_player_tag() -> String:
 	return player_tag
 
 
-## Live F5: AI must not instantly occupy the human player's land on an empty hex
+## Live F5: AI cannot instant-occupy the human player's land on an empty hex
 ## (Play: GER declare POL → POL empty-hex "captures" GER Elbląski / Słupski).
 func _is_ai_empty_hex_vs_human_player(attacker_tag: String, target_pid: int) -> bool:
 	if include_player_in_ai_land_battles:
