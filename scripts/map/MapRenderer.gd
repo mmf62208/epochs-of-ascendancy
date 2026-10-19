@@ -3902,14 +3902,24 @@ func _sync_peak_snow_overlay() -> void:
 		terrain_layer_stack.sync_peak_snow_transform()
 
 
+## Live TopInfoBar height (peace ~52, CL1 war chips can grow the strip).
+func _top_bar_clearance() -> float:
+	var top: float = UI_TOP_BAR_CLEARANCE
+	var tree := get_tree()
+	if tree == null:
+		return top
+	var tib: Node = TopInfoBar.find_in_tree(tree)
+	if tib == null:
+		tib = tree.get_first_node_in_group("top_info_bar")
+	if tib != null and tib.has_method("get_bar_height"):
+		top = maxf(top, float(tib.call("get_bar_height")) + 4.0)
+	return top
+
+
 ## Top HUD height (TopInfoBar + map mode toolbar). Edge pan-north starts just *below* this strip
 ## so the bar never thrash-pans, but players can still scroll the map upward.
 func _map_nav_top_clearance() -> float:
-	var top_clearance := UI_TOP_BAR_CLEARANCE
-	if get_tree():
-		var tib := TopInfoBar.find_in_tree(get_tree())
-		if tib != null and tib.has_method("get_bar_height"):
-			top_clearance = maxf(top_clearance, float(tib.call("get_bar_height")) + 4.0)
+	var top_clearance := _top_bar_clearance()
 	var toolbar_h := UI_MAP_TOOLBAR_HEIGHT
 	if _map_mode_toolbar != null and _map_mode_toolbar.has_method("get_panel_height"):
 		toolbar_h = float(_map_mode_toolbar.call("get_panel_height"))
@@ -4236,11 +4246,7 @@ func _layout_map_ui() -> void:
 	var ui := get_node_or_null("UI") as CanvasLayer
 	if ui == null:
 		return
-	var top_clearance := UI_TOP_BAR_CLEARANCE
-	if get_tree():
-		var tib := TopInfoBar.find_in_tree(get_tree())
-		if tib != null and tib.has_method("get_bar_height"):
-			top_clearance = maxf(top_clearance, float(tib.call("get_bar_height")) + 4.0)
+	var top_clearance := _top_bar_clearance()
 	var toolbar_h := UI_MAP_TOOLBAR_HEIGHT
 	if _map_mode_toolbar != null and _map_mode_toolbar.has_method("get_panel_height"):
 		toolbar_h = float(_map_mode_toolbar.call("get_panel_height"))
@@ -4282,27 +4288,53 @@ func _layout_map_ui() -> void:
 
 
 ## Sit the Supply legend under Map Mode (not over the chips) at 1280x800+.
+## Height hugs content (~185) so it cannot stretch to the bottom / cover the minimap.
 func _layout_supply_legend() -> void:
 	if _supply_legend_panel == null or not is_instance_valid(_supply_legend_panel):
 		return
 	var host := _supply_legend_panel.get_parent() as Control
 	if host == null or host.name != "SupplyOverlayLegendHost":
 		return
-	var top_clearance := UI_TOP_BAR_CLEARANCE
-	if get_tree():
-		var tib := TopInfoBar.find_in_tree(get_tree())
-		if tib != null and tib.has_method("get_bar_height"):
-			top_clearance = maxf(top_clearance, float(tib.call("get_bar_height")) + 4.0)
+	var top_clearance := _top_bar_clearance()
 	var toolbar_h := UI_MAP_TOOLBAR_HEIGHT
 	if _map_mode_toolbar != null and _map_mode_toolbar.has_method("get_panel_height"):
 		toolbar_h = float(_map_mode_toolbar.call("get_panel_height"))
 	var chrome_top := top_clearance + toolbar_h + 6.0
-	host.set_anchors_preset(Control.PRESET_TOP_LEFT)
-	host.offset_left = 10.0
-	host.offset_top = chrome_top
-	host.offset_right = 10.0 + 480.0
-	host.custom_minimum_size = Vector2(480, 0)
+	var sz: Vector2 = _supply_legend_content_size()
+	_pin_control_top_left(host, 10.0, chrome_top, sz)
+	_pin_control_top_left(_supply_legend_panel, 0.0, 0.0, sz)
 	_sync_supply_legend_pulse_host()
+
+
+func _supply_legend_content_size() -> Vector2:
+	const WIDTH := 480.0
+	const MAX_H := 200.0
+	const MIN_H := 140.0
+	var h: float = MIN_H
+	if _supply_legend_panel != null and is_instance_valid(_supply_legend_panel):
+		var min_sz: Vector2 = _supply_legend_panel.get_combined_minimum_size()
+		h = maxf(h, min_sz.y)
+	if _supply_overlay_legend != null and is_instance_valid(_supply_overlay_legend):
+		var text_h: float = float(_supply_overlay_legend.get_content_height())
+		# Header + hint + margins + body. Cap so the panel cannot eat the map.
+		h = maxf(h, 36.0 + 18.0 + 20.0 + text_h)
+	return Vector2(WIDTH, clampf(h, MIN_H, MAX_H))
+
+
+func _pin_control_top_left(ctrl: Control, left: float, top: float, sz: Vector2) -> void:
+	if ctrl == null or not is_instance_valid(ctrl):
+		return
+	ctrl.anchor_left = 0.0
+	ctrl.anchor_top = 0.0
+	ctrl.anchor_right = 0.0
+	ctrl.anchor_bottom = 0.0
+	ctrl.offset_left = left
+	ctrl.offset_top = top
+	ctrl.offset_right = left + sz.x
+	ctrl.offset_bottom = top + sz.y
+	ctrl.custom_minimum_size = sz
+	ctrl.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	ctrl.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 
 
 ## Keep InfoPanel text fully inside the cyan box.
@@ -14806,11 +14838,22 @@ func _apply_map_mode_visuals() -> void:
 		call_deferred("_ensure_capital_stars_visible")
 
 
+func _toolbar_highlight_mode() -> String:
+	var m := str(current_map_mode).strip_edges().to_lower()
+	if m == "supply" or m == "infra":
+		return m
+	if supply_mode:
+		return "supply"
+	if m.is_empty():
+		return "political"
+	return m
+
+
 func _sync_mapmode_toolbar() -> void:
 	if _map_mode_toolbar == null or not is_instance_valid(_map_mode_toolbar):
 		return
 	if _map_mode_toolbar.has_method("set_mode"):
-		_map_mode_toolbar.call("set_mode", current_map_mode, false)
+		_map_mode_toolbar.call("set_mode", _toolbar_highlight_mode(), false)
 
 
 ## Mapmode / F1: every province node visible (undo viewport cull holes).
@@ -26529,6 +26572,7 @@ func _toggle_supply_overlay() -> void:
 	_sync_supply_route_canvas_stack()
 	_sync_road_quiet_mode()
 	var sync_ms := float(Time.get_ticks_usec() - t0) / 1000.0
+	_sync_mapmode_toolbar()
 	_supply_toggle_in_progress = false
 	var batch_ms := 0.0
 	if _supply_outline_batch_is_ready() and _supply_outline_batch.has_method("get_last_mesh_build_ms"):
@@ -30896,6 +30940,8 @@ func _update_supply_overlay_legend() -> void:
 		panel.offset_left = 10.0
 		panel.offset_top = 0.0
 		panel.custom_minimum_size = Vector2(480, 0)
+		panel.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+		panel.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 		panel.z_index = 40
 		var style := StyleBoxFlat.new()
 		style.bg_color = Color(0.06, 0.08, 0.14, 0.92)
@@ -30914,6 +30960,8 @@ func _update_supply_overlay_legend() -> void:
 		host.offset_left = 10.0
 		host.offset_top = 0.0
 		host.custom_minimum_size = Vector2(480, 0)
+		host.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+		host.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 		host.z_index = 40
 		var pulse := Panel.new()
 		_supply_legend_pulse_border = pulse
@@ -30967,11 +31015,9 @@ func _update_supply_overlay_legend() -> void:
 		_supply_overlay_legend = RichTextLabel.new()
 		_supply_overlay_legend.bbcode_enabled = true
 		_supply_overlay_legend.fit_content = true
-		_supply_overlay_legend.scroll_active = true
-		_supply_overlay_legend.custom_minimum_size = Vector2(460, 0)
-		_supply_overlay_legend.size_flags_vertical = Control.SIZE_EXPAND_FILL
-		# Cap height so it doesn't eat the whole screen with no close affordance.
-		_supply_overlay_legend.custom_minimum_size.y = 120
+		_supply_overlay_legend.scroll_active = false
+		_supply_overlay_legend.custom_minimum_size = Vector2(460, 80)
+		_supply_overlay_legend.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 		_supply_overlay_legend.mouse_filter = Control.MOUSE_FILTER_STOP  # allow text scroll; Close still above
 		_supply_overlay_legend.add_theme_font_size_override("normal_font_size", 11)
 		margin.add_child(_supply_overlay_legend)
@@ -31052,6 +31098,9 @@ func _update_supply_legend_text(update_hint: bool = true) -> void:
 		_apply_supply_legend_time_pulse_style(not pulse.is_empty(), _map_time_pulse_kind)
 	if update_hint:
 		_update_compare_hint_label()
+	if supply_mode:
+		_layout_supply_legend()
+	_sync_mapmode_toolbar()
 
 
 func _sync_supply_legend_pulse_host() -> void:
@@ -31060,11 +31109,21 @@ func _sync_supply_legend_pulse_host() -> void:
 	var host := _supply_legend_panel.get_parent() as Control
 	if host == null:
 		return
-	var sz: Vector2 = _supply_legend_panel.size
-	host.custom_minimum_size = sz
-	host.size = sz
+	var sz: Vector2 = _supply_legend_content_size()
+	var left: float = host.offset_left
+	var top: float = host.offset_top
+	_pin_control_top_left(host, left, top, sz)
+	_pin_control_top_left(_supply_legend_panel, 0.0, 0.0, sz)
 	if _supply_legend_pulse_border != null and is_instance_valid(_supply_legend_pulse_border):
-		_supply_legend_pulse_border.size = sz
+		var pulse: Control = _supply_legend_pulse_border
+		pulse.anchor_left = 0.0
+		pulse.anchor_top = 0.0
+		pulse.anchor_right = 1.0
+		pulse.anchor_bottom = 1.0
+		pulse.offset_left = 0.0
+		pulse.offset_top = 0.0
+		pulse.offset_right = 0.0
+		pulse.offset_bottom = 0.0
 
 
 func _legend_pulse_modulate_for(pulse_active: bool, pulse_kind: String) -> Color:

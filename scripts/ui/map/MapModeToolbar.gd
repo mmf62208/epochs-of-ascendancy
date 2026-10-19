@@ -29,19 +29,19 @@ const MODE_LABELS: Dictionary = {
 }
 
 const MODE_HINTS: Dictionary = {
-	"political": "Clean country colors (default) · Highways: Supply/Infra view",
+	"political": "Clean country colors (default) · Highways: Supply/Infra view · Toggle highways: L",
 	"strain": "Welfare / cultural strain (red-gray)",
 	"vitality": "Settlement vitality (cyan-green)",
 	"development": "Development level lighten",
-	"supply": "Supply routes overlay",
+	"supply": "Supply routes overlay · Toggle highways: L",
 	"munitions": "Per-depot munitions stockpile heatmap (blue full → red empty)",
 	"loyalty": "Foreign military loyalty tint",
-	"infra": "Roads, rails, built infrastructure",
+	"infra": "Roads, rails, built infrastructure · Toggle highways: L",
 	"naval": "Sea-zone theaters, chokepoints, coastal rims",
 	"weather": "Ground state: dry / mud / snow / storm fills",
 	"resources": "Strategic goods: oil / rubber / steel / coal (F9)",
 	"states": "V3-style state fills from hierarchy membership (Shift+F9)",
-	"terrain": "Clean terrain fills: plains / forest / mountains / desert (Ctrl+F9) · Highways: Supply/Infra view",
+	"terrain": "Clean terrain fills: plains / forest / mountains / desert (Ctrl+F9) · Highways: Supply/Infra view · Toggle highways: L",
 }
 
 ## Weather legend hint appended for naval/supply mapmodes (weather expand surface).
@@ -118,7 +118,14 @@ func live_f5_cannot_steal_top_bar() -> bool:
 
 func bind_map_renderer(renderer: Node) -> void:
 	_map_renderer = renderer
-	set_mode("political", false)
+	var live := "political"
+	if renderer != null and "current_map_mode" in renderer:
+		live = str(renderer.get("current_map_mode")).strip_edges().to_lower()
+		if live.is_empty():
+			live = "political"
+		if bool(renderer.get("supply_mode")) and live != "infra":
+			live = "supply"
+	set_mode(live, false)
 
 
 func get_panel_height() -> float:

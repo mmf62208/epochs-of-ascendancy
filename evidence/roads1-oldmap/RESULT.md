@@ -125,7 +125,7 @@ That component **is** SOV’s HWY-3 hub route into Moscow (`Moscow → Haradok a
 - `903534_905809` Moscow – Haradok area
 - `905807_905809` Polotsk area – Haradok area
 
-The paved line can still show at Infra z≥1.3 across the gap. L toggle on the cached path is ~5 ms (was 280–355 ms when connectivity rebuilt per edge).
+FIX #3: demoted Moscow legs stay in the **drawn paved set** at Infra z1.8 (`903534_905809`, `905807_905809`). They are marked `demoted_stub` and cannot ride the highway drop. Supply legend height is capped to content (≤200 px) so it no longer stretches to the screen bottom or covers the minimap; the pulse-host layout no longer sets `size` on stretch anchors. Map Mode highlight follows Supply/Infra while the legend is open (L-on political highlights Supply). Hint adds `Toggle highways: L`. L toggle on the cached path stays ~5 ms (was 280–355 ms when connectivity rebuilt per edge).
 
 Geometry points are canvas units. Live centroids and Polygon2D rings are canvas × `THEATER_SCALE` 1.728. Draw rings are scaled. Shared-border keys stay unscaled.
 

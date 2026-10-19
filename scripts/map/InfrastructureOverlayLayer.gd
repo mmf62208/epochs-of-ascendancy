@@ -2121,6 +2121,8 @@ func _demote_orphan_highway_stubs(cache: Array[Dictionary]) -> void:
         var p1: int = int(entry.get("p1", 0))
         var p2: int = int(entry.get("p2", 0))
         entry["display_tier"] = RoadTierVisualScript.TIER_PAVED
+        entry["tier"] = maxi(int(entry.get("tier", 0)), RoadTierVisualScript.TIER_PAVED)
+        entry["demoted_stub"] = true
         _record_stub_drop(p1, p2)
     if not _road_stub_dropped.is_empty():
         var parts: PackedStringArray = PackedStringArray()
@@ -2189,14 +2191,25 @@ func _apply_road_tier_cache(cache: Array[Dictionary]) -> void:
     _road_geom_apply_count += 1
     ## Trust display_tier from _demote_orphan_highway_stubs. Do not re-filter
     ## or clear the demoted-edge list (that made dropped_n=0 after a real drop).
+    ## Demoted Moscow/RoW stubs must stay in the paved draw set — they are
+    ## grown from the hub graph, not the NUTS paint list, and used to vanish
+    ## with the highway bucket.
     var drawable: Array = []
     var by_tier: Dictionary = {0: [], 1: [], 2: []}
+    var paved_keys: Dictionary = {}
     for entry in cache:
         var t: int = clampi(int(entry.get("display_tier", entry.get("tier", 0))), 0, 2)
+        if bool(entry.get("demoted_stub", false)):
+            t = RoadTierVisualScript.TIER_PAVED
+            entry["display_tier"] = t
+            entry["tier"] = maxi(int(entry.get("tier", 0)), t)
         drawable.append(entry)
         var bucket: Array = by_tier[t]
         bucket.append(entry)
         by_tier[t] = bucket
+        if t == RoadTierVisualScript.TIER_PAVED:
+            paved_keys[RoadTierVisualScript.edge_key(int(entry.get("p1", 0)), int(entry.get("p2", 0)))] = true
+    _ensure_demoted_stubs_in_paved(cache, drawable, by_tier, paved_keys)
     var chains: Array = RoadTierVisualScript.build_road_chains(drawable)
     var chains_by_tier: Dictionary = {0: [], 1: [], 2: []}
     for chain_v in chains:
@@ -2216,6 +2229,59 @@ func _apply_road_tier_cache(cache: Array[Dictionary]) -> void:
         (_road_casing_draw as RoadCasingDraw).setup_chains(chains)
         _road_casing_draw.visible = _road_bucket == "logistics"
     _road_geom_ready = true
+
+
+func _ensure_demoted_stubs_in_paved(
+    cache: Array[Dictionary],
+    drawable: Array,
+    by_tier: Dictionary,
+    paved_keys: Dictionary
+) -> void:
+    var paved_bucket: Array = by_tier.get(RoadTierVisualScript.TIER_PAVED, [])
+    for stub_v in _road_stub_dropped:
+        if typeof(stub_v) != TYPE_DICTIONARY:
+            continue
+        var stub: Dictionary = stub_v
+        var key: String = str(stub.get("key", ""))
+        if key.is_empty():
+            key = RoadTierVisualScript.edge_key(int(stub.get("p1", 0)), int(stub.get("p2", 0)))
+        if key.is_empty() or paved_keys.has(key):
+            continue
+        var found: Dictionary = {}
+        for entry in cache:
+            if RoadTierVisualScript.edge_key(int(entry.get("p1", 0)), int(entry.get("p2", 0))) != key:
+                continue
+            found = entry
+            break
+        if found.is_empty():
+            var p1: int = int(stub.get("p1", 0))
+            var p2: int = int(stub.get("p2", 0))
+            if p1 <= 0 or p2 <= 0 or map_manager == null:
+                continue
+            var c1: Vector2 = map_manager.get_province_centroid(p1)
+            var c2: Vector2 = map_manager.get_province_centroid(p2)
+            if c1 == Vector2.ZERO or c2 == Vector2.ZERO:
+                continue
+            found = {
+                "p1": p1,
+                "p2": p2,
+                "c1": c1,
+                "c2": c2,
+                "tier": RoadTierVisualScript.TIER_PAVED,
+                "display_tier": RoadTierVisualScript.TIER_PAVED,
+                "avg_infra": 1.0,
+                "explicit": false,
+                "corridor": false,
+                "demoted_stub": true,
+            }
+            cache.append(found)
+        found["display_tier"] = RoadTierVisualScript.TIER_PAVED
+        found["tier"] = maxi(int(found.get("tier", 0)), RoadTierVisualScript.TIER_PAVED)
+        found["demoted_stub"] = true
+        drawable.append(found)
+        paved_bucket.append(found)
+        paved_keys[key] = true
+    by_tier[RoadTierVisualScript.TIER_PAVED] = paved_bucket
 
 
 func _add_explicit_lookup_line(c1: Vector2, c2: Vector2, p1: int, p2: int, tier: int, on_corridor: bool) -> void:
@@ -2327,6 +2393,37 @@ func get_road_tier_draw(tier: int) -> Node:
     if node_v != null and node_v is Node and is_instance_valid(node_v):
         return node_v as Node
     return null
+
+
+func paved_edge_visible_at_zoom(entry: Dictionary, zoom: float) -> bool:
+    if bool(entry.get("demoted_stub", false)):
+        return zoom + 0.001 >= RoadTierVisualScript.PAVED_RAMP_START
+    return RoadTierVisualScript.tier_visible_at_zoom(
+        int(entry.get("tier", 0)),
+        bool(entry.get("explicit", false)),
+        int(entry.get("display_tier", entry.get("tier", 0))),
+        zoom
+    )
+
+
+func get_drawn_paved_keys_at_zoom(zoom: float) -> Array:
+    var keys: Array = []
+    var seen: Dictionary = {}
+    var node: Node = get_road_tier_draw(1)
+    var edges_v: Variant = node.get("edges") if node != null and "edges" in node else []
+    var edges: Array = edges_v if typeof(edges_v) == TYPE_ARRAY else []
+    for row_v in edges:
+        if typeof(row_v) != TYPE_DICTIONARY:
+            continue
+        var row: Dictionary = row_v
+        if not paved_edge_visible_at_zoom(row, zoom):
+            continue
+        var key: String = RoadTierVisualScript.edge_key(int(row.get("p1", 0)), int(row.get("p2", 0)))
+        if key.is_empty() or seen.has(key):
+            continue
+        seen[key] = true
+        keys.append(key)
+    return keys
 
 
 func get_drawn_highway_count() -> int:
@@ -3668,6 +3765,8 @@ class RoadTierDraw extends Node2D:
         return screen_px / maxf(canvas_s, 0.04)
 
     func _edge_visible(entry: Dictionary, zoom: float) -> bool:
+        if bool(entry.get("demoted_stub", false)):
+            return zoom + 0.001 >= RoadTierVisualScript.PAVED_RAMP_START
         return RoadTierVisualScript.tier_visible_at_zoom(
             int(entry.get("tier", 0)),
             bool(entry.get("explicit", false)),

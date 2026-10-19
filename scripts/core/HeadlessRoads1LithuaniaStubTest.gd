@@ -57,6 +57,7 @@ func _run() -> void:
 		return
 	_test_no_east_lithuania_orphan()
 	_test_stub_report_lists_demoted()
+	_test_demoted_moscow_paved_at_zoom()
 	_test_hub_routes_kept()
 	if _ol != null:
 		_ol.queue_free()
@@ -381,6 +382,45 @@ func _test_stub_report_lists_demoted() -> void:
 		_fail("stub report must name the demoted provinces")
 	else:
 		_pass("stub report lists demoted Belarus→Moscow edges by pid + name")
+
+
+func _test_demoted_moscow_paved_at_zoom() -> void:
+	if _ol == null:
+		_fail("overlay missing for paved-set check")
+		return
+	if _ol.has_method("apply_road_map_mode"):
+		_ol.call("apply_road_map_mode", "infra", false)
+	var want_a: String = RoadTierVisualScript.edge_key(MOSCOW, BLR_EAST)
+	var want_b: String = RoadTierVisualScript.edge_key(905807, BLR_EAST)
+	var keys: Array = []
+	if _ol.has_method("get_drawn_paved_keys_at_zoom"):
+		var keys_v: Variant = _ol.call("get_drawn_paved_keys_at_zoom", 1.8)
+		if typeof(keys_v) == TYPE_ARRAY:
+			keys = keys_v
+	if keys.is_empty():
+		var node_v: Variant = _ol.call("get_road_tier_draw", 1) if _ol.has_method("get_road_tier_draw") else null
+		if node_v is Node2D and "edges" in node_v:
+			var ev: Variant = node_v.get("edges")
+			if typeof(ev) == TYPE_ARRAY:
+				for row_v in ev:
+					if typeof(row_v) != TYPE_DICTIONARY:
+						continue
+					var row: Dictionary = row_v
+					if not RoadTierVisualScript.tier_visible_at_zoom(
+						int(row.get("tier", 0)),
+						bool(row.get("explicit", false)),
+						int(row.get("display_tier", row.get("tier", 0))),
+						1.8
+					) and not bool(row.get("demoted_stub", false)):
+						continue
+					keys.append(RoadTierVisualScript.edge_key(int(row.get("p1", 0)), int(row.get("p2", 0))))
+	var have_a: bool = keys.has(want_a)
+	var have_b: bool = keys.has(want_b)
+	print("ROADS1_PAVED_Z18 n=%d moscow=%s polotsk=%s" % [keys.size(), str(have_a), str(have_b)])
+	if not have_a or not have_b:
+		_fail("demoted Moscow legs must be in the drawn paved set at z1.8 (a=%s b=%s)" % [str(have_a), str(have_b)])
+	else:
+		_pass("demoted Moscow legs are in the drawn paved set at z1.8")
 
 
 func _test_hub_routes_kept() -> void:

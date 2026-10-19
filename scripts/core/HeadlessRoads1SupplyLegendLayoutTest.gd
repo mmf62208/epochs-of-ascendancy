@@ -79,6 +79,9 @@ func _run() -> void:
 		return
 	await _assert_no_overlap_at(PLAY_SIZE)
 	await _assert_no_overlap_at(WIDE_SIZE)
+	await _assert_legend_height_and_minimap(PLAY_SIZE)
+	await _assert_legend_height_and_minimap_at_war(PLAY_SIZE)
+	_test_toolbar_highlight_tracks_mode()
 	_test_highway_hint_live()
 	if _mr != null and is_instance_valid(_mr):
 		_mr.queue_free()
@@ -102,8 +105,14 @@ func _test_source_layout_and_hints() -> void:
 	if "_layout_supply_legend()" not in update_leg:
 		_fail("_update_supply_overlay_legend must call _layout_supply_legend")
 		return
-	if "chrome_top" not in layout_leg or "offset_top = chrome_top" not in layout_leg:
+	if "chrome_top" not in layout_leg:
 		_fail("Supply legend must sit at chrome_top (below Map Mode)")
+		return
+	if "offset_top = chrome_top" not in layout_leg and "chrome_top, sz" not in layout_leg:
+		_fail("Supply legend must pin offset_top to chrome_top (below Map Mode)")
+		return
+	if "200" not in layout_leg and "_supply_legend_content_size" not in layout_leg:
+		_fail("Supply legend must cap height to content (~200)")
 		return
 	if "offset_top = 56" in update_leg or "offset_top = 56.0" in update_leg:
 		_fail("Supply legend must not pin at y=56 over the mode chips")
@@ -115,14 +124,17 @@ func _test_source_layout_and_hints() -> void:
 	if hints.is_empty():
 		_fail("MODE_HINTS block missing")
 		return
-	if '"political": "Clean country colors (default) · Highways: Supply/Infra view"' not in hints:
+	if "Clean country colors (default) · Highways: Supply/Infra view" not in hints:
 		_fail("Political mode tooltip must mention Highways: Supply/Infra view")
+		return
+	if "Toggle highways: L" not in hints:
+		_fail("MODE_HINTS must mention Toggle highways: L")
 		return
 	if "Highways: Supply/Infra view" not in hints or '"terrain":' not in hints:
 		_fail("Terrain mode tooltip must mention Highways: Supply/Infra view")
 		return
 	var ter_i: int = hints.find('"terrain":')
-	var ter: String = hints.substr(ter_i, 220) if ter_i >= 0 else ""
+	var ter: String = hints.substr(ter_i, 280) if ter_i >= 0 else ""
 	if "Highways: Supply/Infra view" not in ter:
 		_fail("Terrain mode tooltip must mention Highways: Supply/Infra view")
 		return
@@ -240,6 +252,97 @@ func _assert_no_overlap_at(wh: Vector2i) -> void:
 			"legend %s misses %d mode buttons at %dx%d"
 			% [str(legend), buttons.size(), wh.x, wh.y]
 		)
+	if legend.size.y > 200.0:
+		_fail("legend height %.1f > 200 at %dx%d" % [legend.size.y, wh.x, wh.y])
+
+
+func _minimap_rect() -> Rect2:
+	var mm: Control = _mr.get("_map_minimap") as Control
+	if mm == null or not mm.is_visible_in_tree():
+		return Rect2()
+	return mm.get_global_rect()
+
+
+func _assert_legend_fits(wh: Vector2i, label: String) -> void:
+	var legend: Rect2 = _legend_rect()
+	if legend.size.x < 8.0 or legend.size.y < 8.0:
+		_fail("%s legend rect is empty at %dx%d (%s)" % [label, wh.x, wh.y, str(legend)])
+		return
+	if legend.size.y > 200.0:
+		_fail("%s legend height %.1f > 200 at %dx%d (%s)" % [label, legend.size.y, wh.x, wh.y, str(legend)])
+		return
+	var mm: Rect2 = _minimap_rect()
+	if mm.size.x >= 8.0 and mm.size.y >= 8.0 and legend.intersects(mm):
+		_fail("%s legend %s overlaps minimap %s at %dx%d" % [label, str(legend), str(mm), wh.x, wh.y])
+		return
+	_pass("%s legend %s height<=200 and misses minimap at %dx%d" % [label, str(legend), wh.x, wh.y])
+
+
+func _assert_legend_height_and_minimap(wh: Vector2i) -> void:
+	_set_window_size(wh)
+	_mr.call("_layout_map_ui")
+	await _flush()
+	_assert_legend_fits(wh, "peace")
+
+
+func _assert_legend_height_and_minimap_at_war(wh: Vector2i) -> void:
+	_set_window_size(wh)
+	var stub := Control.new()
+	stub.name = "TopInfoBarWarStub"
+	stub.add_to_group("top_info_bar")
+	var gs := GDScript.new()
+	gs.source_code = """
+extends Control
+func get_bar_height() -> float:
+	return 72.0
+"""
+	if gs.reload() != OK:
+		_fail("war TopInfoBar stub failed to parse")
+		stub.queue_free()
+		return
+	stub.set_script(gs)
+	stub.size = Vector2(1280, 72)
+	root.add_child(stub)
+	_mr.call("_layout_map_ui")
+	await _flush()
+	_assert_legend_fits(wh, "war")
+	stub.queue_free()
+
+
+func _test_toolbar_highlight_tracks_mode() -> void:
+	var tb: Node = _mr.get("_map_mode_toolbar") as Node
+	if tb == null or not tb.has_method("get_current_mode"):
+		_fail("toolbar missing get_current_mode")
+		return
+	_mr.set("current_map_mode", "supply")
+	_mr.set("supply_mode", true)
+	_mr.call("_set_supply_legend_visible", true)
+	_mr.call("_sync_mapmode_toolbar")
+	if str(tb.call("get_current_mode")) != "supply":
+		_fail("legend-open Supply must highlight Supply (got %s)" % str(tb.call("get_current_mode")))
+		return
+	_mr.set("current_map_mode", "infra")
+	_mr.call("_sync_mapmode_toolbar")
+	if str(tb.call("get_current_mode")) != "infra":
+		_fail("legend-open Infra must highlight Infra (got %s)" % str(tb.call("get_current_mode")))
+		return
+	_mr.set("current_map_mode", "political")
+	_mr.set("supply_mode", true)
+	_mr.call("_sync_mapmode_toolbar")
+	if str(tb.call("get_current_mode")) != "supply":
+		_fail("L-on political must highlight Supply (got %s)" % str(tb.call("get_current_mode")))
+		return
+	var buttons = tb.get("_buttons")
+	if buttons is Dictionary:
+		var sup: Button = (buttons as Dictionary).get("supply") as Button
+		var pol: Button = (buttons as Dictionary).get("political") as Button
+		if sup == null or not sup.button_pressed:
+			_fail("Supply chip must be pressed while legend is open from L")
+			return
+		if pol != null and pol.button_pressed:
+			_fail("Political chip must not stay pressed while legend is open")
+			return
+	_pass("toolbar highlight tracks Supply/Infra while legend is open")
 
 
 func _test_highway_hint_live() -> void:
@@ -255,6 +358,9 @@ func _test_highway_hint_live() -> void:
 	var ter: String = str((hints as Dictionary).get("terrain", ""))
 	if "Highways: Supply/Infra view" not in pol or "Highways: Supply/Infra view" not in ter:
 		_fail("live MODE_HINTS political/terrain missing highway note")
+		return
+	if "Toggle highways: L" not in pol or "Toggle highways: L" not in ter:
+		_fail("live MODE_HINTS political/terrain missing Toggle highways: L")
 		return
 	var buttons = tb.get("_buttons")
 	if buttons is Dictionary:
