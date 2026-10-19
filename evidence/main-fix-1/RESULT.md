@@ -3,7 +3,7 @@
 **Branch:** `cursor/main-fix1-toast-peace-9624` (off `grok/main-fix-1`)  
 **PR:** https://github.com/mmf62208/epochs-of-ascendancy/pull/117  
 **Base:** https://github.com/mmf62208/epochs-of-ascendancy/pull/116 (`grok/main-fix-1` @ `f60a6d39`)  
-**Tip:** `556e617a` (this file is committed on top)  
+**Tip:** `6e5af5ef`  
 **Merge:** HOLD until live Play re-runs GER Declare + peace click  
 **Date:** 2026-10-19
 
