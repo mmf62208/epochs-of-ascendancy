@@ -73,6 +73,9 @@ func _run() -> void:
 	_test_h4_no_near_parallel()
 	_test_h4_no_duplicate_corridor()
 	_test_h5_budget()
+	_test_hwy4_peri_kept()
+	_test_hwy4_count_definition()
+	_test_hwy4_labels()
 	_test_h6_determinism()
 	_test_mutants()
 	if _ol != null:
@@ -231,6 +234,25 @@ func _boot_live_1936() -> bool:
 	for tr_v in trimmed:
 		if typeof(tr_v) == TYPE_DICTIONARY:
 			print("HWY3_TRIMMED %s kind=%d" % [_route_name_chain(tr_v as Dictionary, rec_by_t), int((tr_v as Dictionary).get("kind", 0))])
+	var explicit_n: int = 0
+	for ex_v in _cache:
+		if typeof(ex_v) != TYPE_DICTIONARY:
+			continue
+		var ex: Dictionary = ex_v
+		if int(ex.get("display_tier", 0)) == RoadTierVisualScript.TIER_HIGHWAY and bool(ex.get("explicit", false)):
+			explicit_n += 1
+	print(
+		"HWY4_ROUTE_MS route_ms=%.3f total_ms=%.3f marked=%s used=%s drawn=%s cap_const=%d explicit_hwy=%d"
+		% [
+			float(dbg.get("route_ms", -1.0)),
+			float(dbg.get("total_ms", -1.0)),
+			str(dbg.get("marked", "")),
+			str(dbg.get("used", "")),
+			str(dbg.get("drawn", "")),
+			int(dbg.get("cap", RoadTierVisualScript.HWY3_BUDGET_CAP)),
+			int(dbg.get("explicit", explicit_n)),
+		]
+	)
 	return true
 
 
@@ -1166,10 +1188,13 @@ func _test_h5_budget() -> void:
 	)
 	if drawn != hwy:
 		_fail("H5: drawn %d != component highway count %d (one definition)" % [drawn, hwy])
-	if hwy < 60 or hwy > 114:
-		_fail("H5: highway count %d not within 60–114 (2× of 52)" % hwy)
+	var cap_hi: int = RoadTierVisualScript.HWY4_DRAWN_CEILING
+	if hwy < 60 or hwy > cap_hi:
+		_fail("H5: highway count %d not within 60–%d" % [hwy, cap_hi])
 	else:
-		_pass("H5: highway count %d within 60–114 (2× of 52)" % hwy)
+		_pass("H5: highway count %d within 60–%d (trim cap %d)" % [
+			hwy, cap_hi, RoadTierVisualScript.HWY3_BUDGET_CAP
+		])
 	if sings != 0:
 		_fail("H5: singletons=%d want 0" % sings)
 	else:
@@ -1178,6 +1203,242 @@ func _test_h5_budget() -> void:
 		_fail("H5: median chain %.2f < 4" % median)
 	else:
 		_pass("H5: median chain %.2f ≥ 4" % median)
+
+
+const HWY4_HAMBURG := 710321
+const HWY4_GLASGOW := 711495
+
+
+func _hwy4_pid_on_highway(cache: Array, pid: int) -> bool:
+	for row_v in cache:
+		if typeof(row_v) != TYPE_DICTIONARY:
+			continue
+		var row: Dictionary = row_v
+		if int(row.get("display_tier", 0)) != RoadTierVisualScript.TIER_HIGHWAY:
+			continue
+		if int(row.get("p1", 0)) == pid or int(row.get("p2", 0)) == pid:
+			return true
+	return false
+
+
+func _hwy4_trimmed_has_endpoint(pid: int) -> bool:
+	var trimmed_v: Variant = _debug().get("trimmed_routes", [])
+	var trimmed: Array = trimmed_v if typeof(trimmed_v) == TYPE_ARRAY else []
+	for tr_v in trimmed:
+		if typeof(tr_v) != TYPE_DICTIONARY:
+			continue
+		var tr: Dictionary = tr_v
+		if int(tr.get("a", 0)) == pid or int(tr.get("b", 0)) == pid:
+			return true
+	return false
+
+
+func _test_hwy4_peri_kept() -> void:
+	var rec_by: Dictionary = {}
+	for rec_v in _records():
+		if typeof(rec_v) == TYPE_DICTIONARY:
+			rec_by[int((rec_v as Dictionary).get("pid", 0))] = rec_v
+	var trimmed_v: Variant = _debug().get("trimmed_routes", [])
+	var trimmed: Array = trimmed_v if typeof(trimmed_v) == TYPE_ARRAY else []
+	var remain: Array = []
+	for tr_v in trimmed:
+		if typeof(tr_v) != TYPE_DICTIONARY:
+			continue
+		var tr: Dictionary = tr_v
+		remain.append("%s a=%d b=%d" % [
+			_route_name_chain(tr, rec_by), int(tr.get("a", 0)), int(tr.get("b", 0))
+		])
+	print("HWY4_TRIMMED_REMAINING n=%d %s" % [remain.size(), str(remain)])
+	if not _hwy4_pid_on_highway(_cache, HWY4_HAMBURG):
+		_fail("Hamburg not on any highway route")
+	elif _hwy4_trimmed_has_endpoint(HWY4_HAMBURG):
+		_fail("Hamburg not on any highway route")
+	else:
+		_pass("HWY4: Hamburg 710321 is on a drawn highway")
+	if not _hwy4_pid_on_highway(_cache, HWY4_GLASGOW):
+		_fail("Glasgow not on any highway route")
+	elif _hwy4_trimmed_has_endpoint(HWY4_GLASGOW):
+		_fail("Glasgow not on any highway route")
+	else:
+		_pass("HWY4: Glasgow 711495 is on a drawn highway")
+
+
+func _test_hwy4_count_definition() -> void:
+	var dbg: Dictionary = _debug()
+	var drawn: int = int(dbg.get("drawn", -1))
+	var marked: int = int(dbg.get("marked", -1))
+	var explicit_n: int = int(dbg.get("explicit", -1))
+	var cap: int = int(dbg.get("cap", RoadTierVisualScript.HWY3_BUDGET_CAP))
+	var gap: int = drawn - marked
+	var nonexplicit: int = drawn - explicit_n
+	var route_ms: float = float(dbg.get("route_ms", -1.0))
+	print(
+		"HWY4_COUNT drawn=%d marked=%d explicit=%d cap=%d gap=%d nonexplicit=%d route_ms=%.3f"
+		% [drawn, marked, explicit_n, cap, gap, nonexplicit, route_ms]
+	)
+	if gap != explicit_n:
+		_fail("HWY4 count: drawn %d - marked %d = %d, explicit %d" % [drawn, marked, gap, explicit_n])
+	else:
+		_pass("HWY4 count: drawn - marked == explicit (%d)" % explicit_n)
+	var ceiling: int = RoadTierVisualScript.HWY4_DRAWN_CEILING
+	if drawn > ceiling:
+		_fail("HWY4 count: drawn %d over ceiling %d (trim cap %d)" % [drawn, ceiling, cap])
+	else:
+		_pass("HWY4 count: drawn %d ≤ ceiling %d (trim cap %d, nonexplicit %d)" % [
+			drawn, ceiling, cap, nonexplicit
+		])
+	## Safety net only. The +10% bar is this PC's remeasured 394.645 ms (≤434.1).
+	if route_ms < 0.0 or route_ms >= 500.0:
+		_fail("HWY4 route_ms %.3f outside 0–500" % route_ms)
+	else:
+		_pass("HWY4 route_ms %.3f < 500" % route_ms)
+	var trim_n: int = _hwy4_synthetic_trim_count(RoadTierVisualScript)
+	print("HWY4_SYNTH_TRIM count=%d want=5" % trim_n)
+	if trim_n != 5:
+		_fail("HWY4 trim fixture kept %d highways, want 5" % trim_n)
+	else:
+		_pass("HWY4 trim fixture stops at cap 5")
+
+
+func _hwy4_synthetic_trim_count(gs: GDScript) -> int:
+	var cache: Array = []
+	var cache_by_key: Dictionary = {}
+	var marked: Dictionary = {}
+	var routes: Array = []
+	for i in range(8):
+		var a: int = 1000 + i * 2
+		var b: int = a + 1
+		var k: int = mini(a, b) * 1000000 + maxi(a, b)
+		cache.append({
+			"p1": a,
+			"p2": b,
+			"display_tier": RoadTierVisualScript.TIER_HIGHWAY,
+			"explicit": false,
+		})
+		cache_by_key[k] = i
+		marked[k] = true
+		routes.append({
+			"a": a,
+			"b": b,
+			"kind": 0,
+			"score": float(i),
+			"pids": [a, b],
+			"keys": [k],
+		})
+	var trimmed: Array = []
+	gs.call("_hwy3_trim_over_cap", cache, cache_by_key, marked, routes, 8, 5, trimmed)
+	return int(gs.call("_hwy3_count_highways", cache))
+
+
+func _hwy4_obstacle_label_hits(gs: GDScript) -> bool:
+	var essen: Dictionary = {
+		"text": "Essen",
+		"key": "essen",
+		"rect": Rect2(0, 0, 40, 16),
+		"priority": 80,
+	}
+	var a := Vector2(-10, 8)
+	var b := Vector2(50, 8)
+	var obstacles: Array = [{
+		"kind": "segment",
+		"a": a,
+		"b": b,
+		"pad": 2.0,
+		"source": "highway",
+	}]
+	var kept_v: Variant = gs.call("hwy3_resolve_label_positions", [essen], obstacles)
+	var kept: Array = kept_v if typeof(kept_v) == TYPE_ARRAY else []
+	for k_v in kept:
+		if typeof(k_v) != TYPE_DICTIONARY:
+			continue
+		var rect: Rect2 = (k_v as Dictionary).get("rect", Rect2())
+		if RoadTierVisualScript.hwy3_segment_hits_rect(a, b, rect, 2.0):
+			return true
+	return false
+
+
+func _test_hwy4_labels() -> void:
+	var forbidden: Array = [
+		"Ennepe-Ruhr-Kreis",
+		"Oost-Groningen",
+		"Delfzijl en omgeving",
+		"Overig Groningen",
+		"Nord East",
+		"Nord South",
+		"Hauts-de-Seine",
+		"Suffolk",
+		"Groot-Rijnmond",
+		"Innviertel",
+	]
+	var allowed: Array = [
+		"Essen", "Dortmund", "Duisburg", "Köln", "Hamburg", "Glasgow",
+		"Paris", "Lille", "Berlin", "Frankfurt", "Essen, Kreisfreie Stadt",
+	]
+	for text_v in forbidden:
+		var text: String = str(text_v)
+		if not RoadTierVisualScript.hwy3_label_is_forbidden(text):
+			_fail("HWY4 label allowed admin name %s" % text)
+		else:
+			_pass("HWY4 label forbids %s" % text)
+	for text2_v in allowed:
+		var text2: String = str(text2_v)
+		if RoadTierVisualScript.hwy3_label_is_forbidden(text2):
+			_fail("HWY4 label forbade city %s" % text2)
+		else:
+			_pass("HWY4 label keeps %s" % text2)
+	var recs: Array = _records()
+	var bad_live: Array = []
+	for rec_v in recs:
+		if typeof(rec_v) != TYPE_DICTIONARY:
+			continue
+		var rec: Dictionary = rec_v
+		var shown: String = RoadTierVisualScript.hwy3_real_city_label(rec, recs)
+		if shown.is_empty():
+			continue
+		if RoadTierVisualScript.hwy3_label_is_forbidden(shown):
+			bad_live.append("%s→%s" % [str(rec.get("city_name", rec.get("name", ""))), shown])
+	if not bad_live.is_empty():
+		_fail("HWY4 live labels still admin %s" % str(bad_live))
+	else:
+		_pass("HWY4 live hub labels are real cities or dropped")
+	if not RoadTierVisualScript.hwy4_label_visible_at_zoom("Essen", 2.4):
+		_fail("HWY4 Essen hidden at zoom 2.4")
+	else:
+		_pass("HWY4 Essen visible at zoom 2.4")
+	if RoadTierVisualScript.hwy4_label_visible_at_zoom("Dortmund", 2.4):
+		_fail("HWY4 Dortmund visible at zoom 2.4")
+	else:
+		_pass("HWY4 Dortmund hidden at zoom 2.4")
+	if RoadTierVisualScript.hwy4_label_visible_at_zoom("Duisburg", 2.4):
+		_fail("HWY4 Duisburg visible at zoom 2.4")
+	else:
+		_pass("HWY4 Duisburg hidden at zoom 2.4")
+	if not RoadTierVisualScript.hwy4_label_visible_at_zoom("Dortmund", 4.0):
+		_fail("HWY4 Dortmund hidden at zoom 4")
+	else:
+		_pass("HWY4 Dortmund visible at zoom 4")
+	if not RoadTierVisualScript.hwy4_label_visible_at_zoom("Duisburg", 4.0):
+		_fail("HWY4 Duisburg hidden at zoom 4")
+	else:
+		_pass("HWY4 Duisburg visible at zoom 4")
+	var dortmund_ok: bool = false
+	for rec2_v in recs:
+		if typeof(rec2_v) != TYPE_DICTIONARY:
+			continue
+		var rec2: Dictionary = rec2_v
+		var blob: String = ("%s %s" % [str(rec2.get("city_name", "")), str(rec2.get("name", ""))]).to_lower()
+		if not blob.contains("dortmund"):
+			continue
+		if RoadTierVisualScript.should_label_hub_city(rec2, 2.4, 4):
+			dortmund_ok = true
+	if not dortmund_ok:
+		_fail("HWY4 should_label_hub_city dropped Dortmund at zoom 2.4")
+	else:
+		_pass("HWY4 should_label_hub_city still labels Dortmund at zoom 2.4")
+	if _hwy4_obstacle_label_hits(RoadTierVisualScript):
+		_fail("HWY4 Essen label still sits on the highway segment")
+	else:
+		_pass("HWY4 Essen label clears the highway segment")
 
 
 func _uf_find_local(parent: Dictionary, x: int) -> int:
@@ -1580,6 +1841,26 @@ func _mutant_replacements(name: String) -> Array:
 		]
 	if name == "far_hidden":
 		return [{"old": "const HIGHWAY_FAR_CASING_SCREEN_PX := 12.0", "new": "const HIGHWAY_FAR_CASING_SCREEN_PX := 5.5"}]
+	if name == "drop_peri_keep":
+		return [{
+			"old": "static func _hwy4_route_keeps_peri_hub(rt: Dictionary) -> bool:\n	var a: int = int(rt.get(\"a\", 0))",
+			"new": "static func _hwy4_route_keeps_peri_hub(rt: Dictionary) -> bool:\n	return false\n	var a: int = int(rt.get(\"a\", 0))",
+		}]
+	if name == "trim_off_by_one":
+		return [{
+			"old": "if hwy <= cap:",
+			"new": "if hwy < cap - 2:",
+		}]
+	if name == "admin_labels":
+		return [{
+			"old": "static func hwy3_label_is_forbidden(text: String) -> bool:\n	var n: String = text.strip_edges().to_lower()",
+			"new": "static func hwy3_label_is_forbidden(text: String) -> bool:\n	return false\n	var n: String = text.strip_edges().to_lower()",
+		}]
+	if name == "ignore_obstacles":
+		return [{
+			"old": "static func _hwy4_rect_hits_obstacles(rect: Rect2, obstacles: Array) -> bool:\n	for ob_v in obstacles:",
+			"new": "static func _hwy4_rect_hits_obstacles(rect: Rect2, obstacles: Array) -> bool:\n	return false\n	for ob_v in obstacles:",
+		}]
 	return []
 
 
@@ -1609,6 +1890,10 @@ func _test_mutants() -> void:
 	_mutant_expect("hook_back", ctx, "H3")
 	_mutant_expect("not_shortest", ctx, "H2")
 	_mutant_expect("overlap_ok", ctx, "H4c")
+	_mutant_expect("drop_peri_keep", ctx, "H4peri")
+	_mutant_expect("trim_off_by_one", ctx, "H5trim")
+	_mutant_expect("admin_labels", ctx, "H4lab")
+	_mutant_expect("ignore_obstacles", ctx, "H4obs")
 	_vis_call("hwy3_clear_memos", [])
 
 
@@ -1761,6 +2046,29 @@ func _mutant_expect(name: String, ctx: Dictionary, bar: String) -> void:
 					"HWY3_OVERLAP_OK fixture j=%.2f share=%s"
 					% [float(ind_fx.get("jaccard", 0.0)), str(mut_share)]
 				)
+	elif bar == "H4peri":
+		if not _hwy4_pid_on_highway(clone, 710321):
+			killed = true
+			print("HWY4_MUTANT Hamburg not on any highway route")
+		if not _hwy4_pid_on_highway(clone, 711495):
+			killed = true
+			print("HWY4_MUTANT Glasgow not on any highway route")
+	elif bar == "H5trim":
+		var trimmed_n: int = _hwy4_synthetic_trim_count(gs)
+		print("HWY4_MUTANT trim_count=%d want=%d" % [trimmed_n, 5])
+		if trimmed_n != 5:
+			killed = true
+	elif bar == "H4lab":
+		var admin: String = str(gs.call(
+			"hwy3_real_city_label",
+			{"pid": 1, "city_name": "Ennepe-Ruhr-Kreis", "name": "Ennepe-Ruhr-Kreis", "centroid": Vector2.ZERO},
+			[]
+		))
+		if admin == "Ennepe-Ruhr-Kreis":
+			killed = true
+	elif bar == "H4obs":
+		if _hwy4_obstacle_label_hits(gs):
+			killed = true
 	if killed:
 		_pass("mutant %s killed by %s" % [name, bar])
 	else:

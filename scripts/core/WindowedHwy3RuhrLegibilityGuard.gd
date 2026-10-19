@@ -167,6 +167,7 @@ func _do_capture() -> void:
 		_fail_reasons.append("label_overlap_%s" % str(row["name"]))
 	if _koln_label_count() > 1:
 		_fail_reasons.append("koln_dup_%s_%d" % [str(row["name"]), _koln_label_count()])
+	_assert_hwy4_label_bars(str(row["name"]))
 	_capture_i += 1
 	root.set_meta("hwy3_ruhr_band", -1)
 	_phase = Phase.CAPTURE
@@ -175,8 +176,7 @@ func _do_capture() -> void:
 func _do_mutants() -> void:
 	var ol := _overlay()
 	_frame_essen(Z_MID)
-	if ol != null and ol.has_method("_sync_hub_city_labels"):
-		ol.call("_sync_hub_city_labels")
+	_refresh_gold_then_sync(ol)
 	var before: int = _ruhr_label_names().size()
 	_hide_hub_labels()
 	var after_off: int = _ruhr_label_names().size()
@@ -185,8 +185,7 @@ func _do_mutants() -> void:
 		_fail_reasons.append("labels_off_survived")
 	else:
 		_log("HWY3_RUHR who=mutant_labels_off killed")
-	if ol != null and ol.has_method("_sync_hub_city_labels"):
-		ol.call("_sync_hub_city_labels")
+	_refresh_gold_then_sync(ol)
 	var hwy_z: int = 0
 	if ol != null and ol.has_method("get_highway_draw_z_index"):
 		hwy_z = int(ol.call("get_highway_draw_z_index"))
@@ -246,11 +245,106 @@ func _frame_essen(zoom: float) -> void:
 	var ol := _overlay()
 	if ol != null and ol.has_method("_apply_screen_space_road_widths"):
 		ol.call("_apply_screen_space_road_widths")
-	if ol != null and ol.has_method("_sync_hub_city_labels"):
-		ol.call("_sync_hub_city_labels")
-	if ol != null and ol.has_method("refresh_ix1_gold_spine"):
-		ol.call("refresh_ix1_gold_spine", true)
+	_refresh_gold_then_sync(ol)
 	_log("HWY3_RUHR who=frame zoom=%.2f pos=%.1f,%.1f" % [zoom, pos.x, pos.y])
+
+
+func _refresh_gold_then_sync(ol: Node) -> void:
+	if ol == null:
+		return
+	if ol.has_method("refresh_ix1_gold_spine"):
+		ol.call("refresh_ix1_gold_spine", true)
+	if ol.has_method("_sync_hub_city_labels"):
+		ol.call("_sync_hub_city_labels")
+
+
+func _assert_hwy4_label_bars(band: String) -> void:
+	var ol := _overlay()
+	if ol == null:
+		return
+	if ol.has_method("get_hub_label_collision_report"):
+		var rep_v: Variant = ol.call("get_hub_label_collision_report")
+		var rep: Dictionary = rep_v if typeof(rep_v) == TYPE_DICTIONARY else {}
+		var hub_hub: int = int(rep.get("hub_hub", -1))
+		var hub_base: int = int(rep.get("hub_base", -1))
+		var hub_seg: int = int(rep.get("hub_seg", -1))
+		_log(
+			"HWY4_RUHR who=collision band=%s hub_hub=%d hub_base=%d hub_seg=%d labels=%s"
+			% [band, hub_hub, hub_base, hub_seg, str(rep.get("labels", 0))]
+		)
+		if hub_hub != 0 or hub_base != 0 or hub_seg != 0:
+			_fail_reasons.append("collision_%s_%d_%d_%d" % [band, hub_hub, hub_base, hub_seg])
+	else:
+		_fail_reasons.append("collision_missing_%s" % band)
+	var names: Array = []
+	if ol.has_method("get_hub_city_label_names"):
+		var raw_v: Variant = ol.call("get_hub_city_label_names")
+		if typeof(raw_v) == TYPE_ARRAY:
+			names = raw_v
+	var forbidden_hit: Array = []
+	var has_essen: bool = false
+	var has_dortmund: bool = false
+	var has_duisburg: bool = false
+	for n_v in names:
+		var n: String = str(n_v).strip_edges()
+		var low: String = n.to_lower()
+		if RoadTierVisualScript.hwy3_label_is_forbidden(n):
+			forbidden_hit.append(n)
+		if low.contains("essen"):
+			has_essen = true
+		if low.contains("dortmund"):
+			has_dortmund = true
+		if low.contains("duisburg"):
+			has_duisburg = true
+	_log("HWY4_RUHR who=names band=%s essen=%s dortmund=%s duisburg=%s forbidden=%s all=%s" % [
+		band, str(has_essen), str(has_dortmund), str(has_duisburg), str(forbidden_hit), str(names)
+	])
+	if not forbidden_hit.is_empty():
+		_fail_reasons.append("forbidden_%s" % band)
+	if band == "z24":
+		if not has_essen:
+			_fail_reasons.append("essen_missing_z24")
+		if has_dortmund:
+			_fail_reasons.append("dortmund_at_z24")
+		if has_duisburg:
+			_fail_reasons.append("duisburg_at_z24")
+	elif band == "z4":
+		if _hub_centroid_on_screen("dortmund") and not has_dortmund:
+			_fail_reasons.append("dortmund_missing_z4")
+		elif not _hub_centroid_on_screen("dortmund"):
+			_log("HWY4_RUHR who=crop band=z4 city=dortmund")
+		if _hub_centroid_on_screen("duisburg") and not has_duisburg:
+			_fail_reasons.append("duisburg_missing_z4")
+		elif not _hub_centroid_on_screen("duisburg"):
+			_log("HWY4_RUHR who=crop band=z4 city=duisburg")
+
+
+func _hub_centroid_on_screen(needle: String) -> bool:
+	var cam := _camera()
+	if cam == null:
+		return false
+	var dbg: Dictionary = RoadTierVisualScript.hwy3_debug()
+	var recs_v: Variant = dbg.get("records", [])
+	var recs: Array = recs_v if typeof(recs_v) == TYPE_ARRAY else []
+	var world := Vector2.ZERO
+	var found: bool = false
+	for rec_v in recs:
+		if typeof(rec_v) != TYPE_DICTIONARY:
+			continue
+		var rec: Dictionary = rec_v
+		var blob: String = ("%s %s" % [str(rec.get("city_name", "")), str(rec.get("name", ""))]).to_lower()
+		if not blob.contains(needle):
+			continue
+		world = rec.get("centroid", Vector2.ZERO)
+		found = world != Vector2.ZERO
+		break
+	if not found:
+		return false
+	var z: float = maxf(cam.zoom.x, 0.001)
+	var vp := Vector2(1280, 720)
+	var half := vp / (2.0 * z)
+	var view := Rect2(cam.global_position - half, half * 2.0)
+	return view.grow(8.0).has_point(world)
 
 
 func _hub_labels_overlap() -> bool:

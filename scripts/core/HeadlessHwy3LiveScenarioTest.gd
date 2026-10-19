@@ -54,6 +54,7 @@ func _run() -> void:
 	_test_ruhr_label_rule()
 	_test_env_mutants_removed()
 	_test_trimmed_route()
+	_test_hwy4_kept_peri()
 	_test_label_cull()
 	_test_rome_north_source_mutant()
 	if _ol != null:
@@ -417,11 +418,12 @@ func _test_highway_count() -> void:
 		_fail("live drawn %d != RoadTierDraw edges %d" % [drawn, draw_n])
 	if drawn != cache_n:
 		_fail("live drawn %d != cache display_tier==2 %d" % [drawn, cache_n])
-	if drawn < 60 or drawn > 114:
-		_fail("live drawn highway count %d not within 60–114" % drawn)
+	var cap_hi: int = RoadTierVisualScript.HWY4_DRAWN_CEILING
+	if drawn < 60 or drawn > cap_hi:
+		_fail("live drawn highway count %d not within 60–%d" % [drawn, cap_hi])
 	else:
-		_pass("live drawn highway count %d within 60–114 (used=%d explicit_gap=%d)" % [
-			drawn, used, drawn - used
+		_pass("live drawn highway count %d within 60–%d (used=%d explicit_gap=%d)" % [
+			drawn, cap_hi, used, drawn - used
 		])
 
 
@@ -528,7 +530,7 @@ func _test_trimmed_route() -> void:
 	var trimmed_v: Variant = dbg.get("trimmed_routes", [])
 	var trimmed: Array = trimmed_v if typeof(trimmed_v) == TYPE_ARRAY else []
 	if trimmed.is_empty():
-		_pass("trim: no leftover over-cap OTHER/SPAN (count already ≤114)")
+		_pass("trim: no leftover over-cap OTHER/SPAN (count already ≤ cap)")
 		return
 	var names: Array = []
 	var protected_hit: bool = false
@@ -548,6 +550,39 @@ func _test_trimmed_route() -> void:
 		_pass("trim removed non-trunk %s" % str(names))
 
 
+func _hwy4_pid_on_drawn_highway(pid: int) -> bool:
+	for row_v in _cache:
+		if typeof(row_v) != TYPE_DICTIONARY:
+			continue
+		var row: Dictionary = row_v
+		if int(row.get("display_tier", 0)) != RoadTierVisualScript.TIER_HIGHWAY:
+			continue
+		if int(row.get("p1", 0)) == pid or int(row.get("p2", 0)) == pid:
+			return true
+	return false
+
+
+func _test_hwy4_kept_peri() -> void:
+	var dbg: Dictionary = _debug()
+	var trimmed_v: Variant = dbg.get("trimmed_routes", [])
+	var trimmed: Array = trimmed_v if typeof(trimmed_v) == TYPE_ARRAY else []
+	var trimmed_end: Dictionary = {}
+	for tr_v in trimmed:
+		if typeof(tr_v) != TYPE_DICTIONARY:
+			continue
+		var tr: Dictionary = tr_v
+		trimmed_end[int(tr.get("a", 0))] = true
+		trimmed_end[int(tr.get("b", 0))] = true
+	if not _hwy4_pid_on_drawn_highway(710321) or trimmed_end.has(710321):
+		_fail("Hamburg not on any highway route")
+	else:
+		_pass("HWY4 live: Hamburg 710321 drawn")
+	if not _hwy4_pid_on_drawn_highway(711495) or trimmed_end.has(711495):
+		_fail("Glasgow not on any highway route")
+	else:
+		_pass("HWY4 live: Glasgow 711495 drawn")
+
+
 func _test_label_cull() -> void:
 	var essen: Dictionary = {
 		"text": "Essen", "key": "essen", "rect": Rect2(0, 0, 80, 20), "priority": 80
@@ -562,6 +597,12 @@ func _test_label_cull() -> void:
 	if not RoadTierVisualScript.hwy3_labels_have_overlap(raw):
 		_fail("label cull: fixture must overlap before cull")
 		return
+	## Resolve writes nudged rects back into the candidate dicts. The mutant
+	## must see the original overlap, not those already-moved rects.
+	var raw_for_mutant: Array = []
+	for row_m_v in raw:
+		if typeof(row_m_v) == TYPE_DICTIONARY:
+			raw_for_mutant.append((row_m_v as Dictionary).duplicate())
 	var kept: Array = RoadTierVisualScript.hwy3_cull_label_candidates(raw)
 	if RoadTierVisualScript.hwy3_labels_have_overlap(kept):
 		_fail("label cull: kept rects still overlap")
@@ -590,7 +631,8 @@ func _test_label_cull() -> void:
 	if gs.reload() != OK:
 		_fail("label cull mutant: mutated script failed to parse")
 		return
-	var raw2: Array = gs.call("hwy3_cull_label_candidates", raw)
+	var raw2_v: Variant = gs.call("hwy3_cull_label_candidates", raw_for_mutant, [])
+	var raw2: Array = raw2_v if typeof(raw2_v) == TYPE_ARRAY else []
 	if bool(gs.call("hwy3_labels_have_overlap", raw2)):
 		_pass("label cull mutant without culling killed")
 	else:
