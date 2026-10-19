@@ -421,9 +421,12 @@ static func hwy3_resolve_label_positions(cands: Array, obstacles: Array = []) ->
 	for c_v in cands:
 		if typeof(c_v) == TYPE_DICTIONARY:
 			ordered.append(c_v)
+	_hwy4_boost_view_anchor(ordered)
 	ordered.sort_custom(_hwy3_label_cand_more)
 	var kept: Array = []
 	var seen: Dictionary = {}
+	## Small steps first. The outer ring separates the Ruhr at zoom 2.4, where
+	## Essen, Mülheim, Bochum and Düsseldorf are only a few dozen pixels apart.
 	var offs: Array = [
 		Vector2(0.0, 0.0),
 		Vector2(0.0, -18.0),
@@ -436,6 +439,20 @@ static func hwy3_resolve_label_positions(cands: Array, obstacles: Array = []) ->
 		Vector2(0.0, 36.0),
 		Vector2(-56.0, -22.0),
 		Vector2(56.0, -22.0),
+		Vector2(0.0, -78.0),
+		Vector2(0.0, 72.0),
+		Vector2(-88.0, -20.0),
+		Vector2(88.0, -20.0),
+		Vector2(-96.0, 36.0),
+		Vector2(96.0, 36.0),
+		Vector2(-24.0, -96.0),
+		Vector2(24.0, -96.0),
+		Vector2(0.0, -128.0),
+		Vector2(0.0, 116.0),
+		Vector2(-132.0, 8.0),
+		Vector2(132.0, 8.0),
+		Vector2(-70.0, -70.0),
+		Vector2(70.0, -70.0),
 	]
 	for c2_v in ordered:
 		var c2: Dictionary = c2_v
@@ -532,6 +549,31 @@ static func _hwy4_segments_cross(a: Vector2, b: Vector2, c: Vector2, d: Vector2)
 	)
 
 
+## The label under the camera is the anchor. Callers stamp view_mid (viewport
+## center). Without that stamp, headless fixtures keep the old 1280x720 tie-break.
+static func _hwy4_boost_view_anchor(ordered: Array) -> void:
+	var mid := Vector2(640.0, 360.0)
+	var have: bool = false
+	var best_i: int = -1
+	var best_d: float = 200.0 * 200.0
+	for i in range(ordered.size()):
+		var c: Dictionary = ordered[i]
+		if not c.has("view_mid"):
+			continue
+		have = true
+		mid = c.get("view_mid", mid)
+		var screen: Vector2 = c.get("screen", Vector2.ZERO)
+		var d: float = screen.distance_squared_to(mid)
+		if d < best_d:
+			best_d = d
+			best_i = i
+	if not have or best_i < 0:
+		return
+	var win: Dictionary = ordered[best_i]
+	win["priority"] = maxi(int(win.get("priority", 0)), 1000)
+	win["anchor"] = true
+
+
 static func _hwy3_label_cand_more(a: Dictionary, b: Dictionary) -> bool:
 	var pa: int = int(a.get("priority", 0))
 	var pb: int = int(b.get("priority", 0))
@@ -541,7 +583,7 @@ static func _hwy3_label_cand_more(a: Dictionary, b: Dictionary) -> bool:
 	var rb: Rect2 = b.get("rect", Rect2())
 	var ca: Vector2 = a.get("screen", ra.position + ra.size * 0.5)
 	var cb: Vector2 = b.get("screen", rb.position + rb.size * 0.5)
-	var mid := Vector2(640.0, 360.0)
+	var mid: Vector2 = a.get("view_mid", b.get("view_mid", Vector2(640.0, 360.0)))
 	var da: float = ca.distance_squared_to(mid)
 	var db: float = cb.distance_squared_to(mid)
 	if absf(da - db) > 0.01:

@@ -2655,6 +2655,7 @@ func _collect_hub_label_candidates() -> Array:
         var sk: String = str((sp_v as Dictionary).get("key", ""))
         if not sk.is_empty():
             spine_keys[sk] = true
+    var view_mid: Vector2 = vr.size * 0.5
     for rec2_v in hub_recs:
         if typeof(rec2_v) != TYPE_DICTIONARY:
             continue
@@ -2686,6 +2687,7 @@ func _collect_hub_label_candidates() -> Array:
             "rect": Rect2(pos, est),
             "priority": RoadTierVisualScript.hwy3_label_priority(rec2),
             "screen": screen,
+            "view_mid": view_mid,
             "source": "hub",
         })
     return out
