@@ -90,7 +90,7 @@ class TestSeasCoarsenFeed4Product(unittest.TestCase):
             for p in json.loads((D / "provinces_base.json").read_text(encoding="utf-8"))["provinces"]
         }
         sea_block = sum(1 for pid in base if int(pid) >= 950000)
-        self.assertEqual(sea_block, 341)
+        self.assertEqual(sea_block, 343)
         for pid in GREAT_LAKE_IDS:
             self.assertEqual(str(base[pid].get("domain")), "lake")
         adj = json.loads((D / "province_adjacency.json").read_text(encoding="utf-8")).get("adjacency") or {}

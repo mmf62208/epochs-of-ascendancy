@@ -330,6 +330,13 @@ def _gap2(
     return dx * dx + dy * dy
 
 
+# GAP-IBS placed Marianas Waters and Saipan closer, by canvas bbox, to the
+# Coral Sea orphan 950244 than its pinned partner 950245. That orphan is not
+# degree-0 on the shipped graph. Skipping these ids keeps a v2 rebuild on
+# the same repair instead of retargeting it.
+_REPAIR_SKIP = {905852, 905853, 905854, 950341, 950342}
+
+
 def choose_repair_target(
     pid: int,
     adj: Mapping[str, Sequence[int]],
@@ -341,7 +348,7 @@ def choose_repair_target(
     best: Optional[Tuple[Tuple[float, int], int]] = None
     for other_s in adj:
         other = int(other_s)
-        if other == pid or other in banned:
+        if other == pid or other in banned or other in _REPAIR_SKIP:
             continue
         ob = boxes.get(other)
         gap = _gap2(bb, ob) if bb is not None and ob is not None else 1e99

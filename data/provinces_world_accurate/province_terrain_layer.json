@@ -14159,6 +14159,26 @@
     "950340": {
       "terrain": "sea",
       "domain": "sea"
+    },
+    "905852": {
+      "terrain": "plains",
+      "domain": "land"
+    },
+    "905853": {
+      "terrain": "plains",
+      "domain": "land"
+    },
+    "905854": {
+      "terrain": "plains",
+      "domain": "land"
+    },
+    "950341": {
+      "terrain": "sea",
+      "domain": "sea"
+    },
+    "950342": {
+      "terrain": "sea",
+      "domain": "sea"
     }
   }
 }

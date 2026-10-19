@@ -33,7 +33,8 @@ FAR = (
     950190, 950197, 950205, 950206, 950213,
     902396, 902397,
 )
-RESERVED = set(range(905852, 905889)) | {950341, 950342}
+# GAP-IBS uses 905852-905854 and 950341-950342. China 905855-905888 stays free.
+RESERVED = set(range(905855, 905889))
 LAYER_NAMES = (
     "province_ownership_1910.json",
     "province_ownership_1918.json",

@@ -24,16 +24,15 @@ V2_INTERNAL = (
 ORIGINAL = SCRIPT.read_text(encoding="utf-8")
 
 # Edges outside the pilot, minus the 16 bogus links. Repair 950244-950245 is
-# excluded by the audit. Re-pinned on GAP-HAWAII: Oahu's neighbours are the
-# local chain (905849, 905850, 950340) plus each island-to-water link and the
-# 950340-950198 ocean exit. That is 8186 edges, five more than the ADJ-V3 pin
-# (dropped 800094-902396 and 800094-902397, added the seven Hawaii edges).
-_LOCKED_HASH = "77352c867fad7c7f0cf700c51a6f0bf171082903dcf3bfefa11e8367a200701a"
+# excluded by the audit. Re-pinned on GAP-HAWAII (8186) then GAP-IBS: six new
+# edges (905852-950341, 905853-950341, 905854-950342, 950341-950046,
+# 950341-950048, 902485-950342). That is 8192 edges.
+_LOCKED_HASH = "35390d9e8b345747be855dd98f32913b41de15351fdf2d827ead4f6f5bf8d837"
 _REPAIR = (950244, 950245)
 _HAWAII = 800094
 _GUAM = 902485
 _HAWAII_KEEP = (905849, 905850, 950340)
-_GUAM_KEEP = (902474,)
+_GUAM_KEEP = (902474, 950342)
 
 _ADD = """
 710048-711027
