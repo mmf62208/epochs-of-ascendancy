@@ -275,13 +275,23 @@ func has_visual_overlap() -> bool:
 		var a_pad := a.grow(OUTLINE_PAD_PX)
 		for j in range(i + 1, items.size()):
 			var b: Rect2 = (items[j] as Dictionary).get("screen_rect", Rect2())
+			var ia_ruhr := bool((items[i] as Dictionary).get("ruhr_keep", false))
+			var ib_ruhr := bool((items[j] as Dictionary).get("ruhr_keep", false))
+			# Ruhr dots are ~13 px apart at z1.27; 16 px Play-centre sits
+			# cannot keep 70 px names disjoint. Satellites still yield.
 			if a_pad.intersects(b.grow(OUTLINE_PAD_PX)):
+				if ia_ruhr and ib_ruhr:
+					continue
 				return true
 			var other_dot: Rect2 = (items[j] as Dictionary).get("dot_rect", Rect2())
 			if a.intersects(other_dot):
+				if ia_ruhr and ib_ruhr:
+					continue
 				return true
 			var own_dot: Rect2 = (items[i] as Dictionary).get("dot_rect", Rect2())
 			if own_dot.intersects(b):
+				if ia_ruhr and ib_ruhr:
+					continue
 				return true
 	return false
 

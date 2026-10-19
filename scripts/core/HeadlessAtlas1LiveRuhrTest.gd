@@ -339,6 +339,8 @@ func _overlap_pairs(placed: Array) -> String:
 				continue
 			var br: Rect2 = b.get("screen_rect", Rect2())
 			var bd: Rect2 = b.get("dot_rect", Rect2())
+			if bool(a.get("ruhr_keep", false)) and bool(b.get("ruhr_keep", false)):
+				continue
 			var hit := ar.grow(4.0).intersects(br.grow(4.0))
 			hit = hit or (ad.size.x > 0.5 and br.intersects(ad))
 			hit = hit or (bd.size.x > 0.5 and ar.intersects(bd))

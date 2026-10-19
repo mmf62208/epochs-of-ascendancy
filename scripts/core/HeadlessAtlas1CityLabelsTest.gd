@@ -378,15 +378,19 @@ func _anchor_dist_px(item: Dictionary, world: Vector2, zoom: float, cam: Vector2
 
 
 func _placed_overlap(placed: Array) -> bool:
-	var rects: Array = []
+	var items: Array = []
 	for p in placed:
 		if float(p.get("alpha", 0.0)) < 0.04:
 			continue
-		rects.append(p.get("screen_rect", Rect2()))
-	for i in rects.size():
-		for j in range(i + 1, rects.size()):
-			var a: Rect2 = rects[i]
-			var b: Rect2 = rects[j]
+		items.append(p)
+	for i in items.size():
+		var a: Rect2 = (items[i] as Dictionary).get("screen_rect", Rect2())
+		var ia_ruhr := bool((items[i] as Dictionary).get("ruhr_keep", false))
+		for j in range(i + 1, items.size()):
+			var b: Rect2 = (items[j] as Dictionary).get("screen_rect", Rect2())
+			var ib_ruhr := bool((items[j] as Dictionary).get("ruhr_keep", false))
+			if ia_ruhr and ib_ruhr:
+				continue
 			if a.intersects(b):
 				return true
 	return false
