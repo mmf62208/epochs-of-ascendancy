@@ -578,8 +578,9 @@ func _record_or_check_stable(layer: Node, placed: Array, z: float) -> void:
 
 func _print_slot_row(z: float, offs: Dictionary, side: String) -> void:
 	var bits: PackedStringArray = PackedStringArray()
-	for nm in RUHR_CORE:
-		var key := nm
+	for nm_v in RUHR_CORE:
+		var nm: String = str(nm_v)
+		var key: String = nm
 		if not offs.has(key) and nm == "Köln" and offs.has("Cologne"):
 			key = "Cologne"
 		if not offs.has(key):
@@ -598,9 +599,10 @@ func _print_slot_table() -> void:
 		var key_z := "%.3f" % z
 		var inn: Dictionary = _in_offsets.get(key_z, {}) as Dictionary
 		var outt: Dictionary = _out_offsets.get(key_z, {}) as Dictionary
-		for nm in RUHR_CORE:
-			var in_key := nm
-			var out_key := nm
+		for nm_v in RUHR_CORE:
+			var nm: String = str(nm_v)
+			var in_key: String = nm
+			var out_key: String = nm
 			if not inn.has(in_key) and nm == "Köln" and inn.has("Cologne"):
 				in_key = "Cologne"
 			if not outt.has(out_key) and nm == "Köln" and outt.has("Cologne"):
