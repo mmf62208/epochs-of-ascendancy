@@ -188,11 +188,15 @@ func _assert_damaged_row(title: Node) -> void:
 
 
 func _assert_click_loads(title: Node) -> bool:
-	var slot := "sr1fix2_03"
+	var slot := "sr1fix2_00"
 	var row := title.find_child("LivingTitleSaveRow_%s" % slot, true, false) as Button
 	if row == null:
 		_fail("loadable title row %s missing" % slot)
 		return false
+	var scroll := title.find_child("LivingTitleSaveScroll", true, false) as ScrollContainer
+	if scroll != null:
+		scroll.ensure_control_visible(row)
+	await process_frame
 	if _tm != null:
 		_tm.paused = false
 		_tm.advance_live_f5_equivalent_days(2)
@@ -203,7 +207,7 @@ func _assert_click_loads(title: Node) -> bool:
 	ev.global_position = ev.position
 	if title.has_method("handle_live_pointer"):
 		title.call("handle_live_pointer", ev)
-	else:
+	if is_instance_valid(title) and not bool(title.get("_closed")):
 		row.pressed.emit()
 	await process_frame
 	await process_frame
