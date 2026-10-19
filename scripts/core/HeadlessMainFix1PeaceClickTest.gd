@@ -76,7 +76,7 @@ func _run() -> void:
 		_fail("declare GER-LUX failed %s" % str(declared))
 		return
 	_pass("declared GER-LUX")
-	if not await _click_outcome(peace, mm, "annex_all"):
+	if not await _click_outcome(mm, "annex_all"):
 		return
 	if _owner_is(mm, LUX_PID, "LUX"):
 		_fail("Annex all left LUX owning %d" % LUX_PID)
@@ -87,7 +87,7 @@ func _run() -> void:
 	_cap.reset_for_test()
 	_war.reset_for_test()
 	_war.declare_war("GER", "LUX", "test")
-	if not await _click_outcome(peace, mm, "keep_occupied"):
+	if not await _click_outcome(mm, "keep_occupied"):
 		return
 	if not _owner_is(mm, LUX_PID, "LUX"):
 		_fail("Keep occupied changed LUX owner of %d" % LUX_PID)
@@ -95,10 +95,9 @@ func _run() -> void:
 	_pass("Keep occupied left LUX owner")
 
 
-func _click_outcome(peace: GDScript, mm: Node, outcome: String) -> bool:
+func _click_outcome(mm: Node, outcome: String) -> bool:
 	var btn_name := "BtnAnnexAll" if outcome == "annex_all" else "BtnKeepOccupied"
-	var opened: Dictionary = peace.call(
-		"open_living_sheet",
+	var opened: Dictionary = PeaceConferenceWindow.open_living_sheet(
 		"GER",
 		"LUX",
 		LUX_PID,

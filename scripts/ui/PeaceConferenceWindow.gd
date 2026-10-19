@@ -114,7 +114,7 @@ static func _open_campaign_peace_sheet(winner_tag: String, loser_tag: String, ca
 	for n in tree.get_nodes_in_group("campaign_peace_sheet"):
 		if is_instance_valid(n):
 			n.queue_free()
-	if typeof(CapitulationDomain) != TYPE_NIL and CapitulationDomain.has_method("arm_pending_sheet"):
+	if typeof(CapitulationDomain) != TYPE_NIL:
 		CapitulationDomain.arm_pending_sheet(w, l, outcome)
 	var layer := CanvasLayer.new()
 	layer.name = "CampaignPeaceSheet"
@@ -198,9 +198,8 @@ static func _campaign_peace_choose(layer: Node, outcome: String) -> void:
 	if layer.has_meta("campaign_sheet") and layer.get_meta("campaign_sheet") is Dictionary:
 		sheet = layer.get_meta("campaign_sheet")
 	if typeof(CapitulationDomain) != TYPE_NIL:
-		if CapitulationDomain.has_method("apply_player_choice"):
-			result = CapitulationDomain.apply_player_choice(outcome)
-		if not bool(result.get("ok", false)) and CapitulationDomain.has_method("apply_outcome"):
+		result = CapitulationDomain.apply_player_choice(outcome)
+		if not bool(result.get("ok", false)):
 			var loser := str(sheet.get("loser", "")).strip_edges().to_upper()
 			var leader := str(sheet.get("winner", sheet.get("leader", ""))).strip_edges().to_upper()
 			result = CapitulationDomain.apply_outcome(loser, leader, outcome)
