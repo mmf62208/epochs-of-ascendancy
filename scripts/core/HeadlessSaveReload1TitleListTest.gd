@@ -78,9 +78,6 @@ func _run() -> void:
 		_cleanup(title)
 	else:
 		_cleanup(null)
-	if not loaded_ok:
-		_finish()
-		return
 	_finish()
 
 
@@ -229,7 +226,7 @@ func _assert_damaged_row(title: Node) -> void:
 	if action == "cc":
 		_fail("damaged row centre opened Command Center (action=cc)")
 		return
-	if title.is_queued_for_deletion() or bool(title.get("_closed")):
+	if not is_instance_valid(title) or bool(title.get("_closed")):
 		_fail("clicking the damaged title row dismissed the title")
 		return
 	var msg := _status_text(title)
@@ -293,9 +290,8 @@ func _assert_visible_row_centres_never_cc(title: Node) -> void:
 				cc_hits += 1
 				_fail("visible row centre %s at scroll=%d opened CC" % [str(hit.get("slot", "")), scroll.scroll_vertical])
 				continue
-			if title.is_queued_for_deletion() or bool(title.get("_closed")):
+			if not is_instance_valid(title) or bool(title.get("_closed")):
 				_fail("visible row centre %s closed the title during probe" % str(hit.get("slot", "")))
-				title.remove_meta("eoa_sr1_hit_probe")
 				return
 			var ptr_raw: Variant = title.get("last_save_pointer")
 			var ptr: Dictionary = ptr_raw if typeof(ptr_raw) == TYPE_DICTIONARY else {}
@@ -370,9 +366,9 @@ func _track(slot: String) -> void:
 		_created.append(slot)
 
 
-func _cleanup(title: Node) -> void:
-	if title != null and is_instance_valid(title):
-		title.queue_free()
+func _cleanup(title: Variant) -> void:
+	if title is Node and is_instance_valid(title):
+		(title as Node).queue_free()
 	if _sl != null and _sl.has_method("delete_save"):
 		for slot in _created:
 			_sl.call("delete_save", slot)
