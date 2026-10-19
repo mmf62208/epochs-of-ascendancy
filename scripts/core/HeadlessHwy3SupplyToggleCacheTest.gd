@@ -14,6 +14,8 @@ const SRC_OL := "res://scripts/map/InfrastructureOverlayLayer.gd"
 const SRC_LOADER := "res://scripts/core/ScenarioLoader.gd"
 const OFF_FRAME2_LIMIT_MS := 350.0
 const ON_WARM_LIMIT_MS := 300.0
+## Cached L-toggle path (no ring walk / no chain rebuild). Main is ~15–35 ms.
+const ON_WARM_CACHED_LIMIT_MS := 100.0
 
 var _failures: int = 0
 var _ol: Node2D = null
@@ -55,6 +57,8 @@ func _run() -> void:
 	if not await _boot_live_scenario():
 		return
 	_test_a_toggle_reuses_cache()
+	_test_cached_path_skips_geom()
+	_test_stub_report_lists_demoted()
 	_test_live_lon_probe()
 	_test_c_corridor_styling()
 	_test_b_infra_change_recomputes()
@@ -80,6 +84,17 @@ func _read_text(path: String) -> String:
 	return t
 
 
+func _slice_func(src: String, func_name: String) -> String:
+	var needle := "func %s" % func_name
+	var i := src.find(needle)
+	if i < 0:
+		return ""
+	var nxt := src.find("\nfunc ", i + needle.length())
+	if nxt < 0:
+		return src.substr(i)
+	return src.substr(i, nxt - i)
+
+
 func _test_no_env_switches() -> void:
 	var src: String = _read_text(SRC_OL)
 	if "EOA_HWY3" in src or "hwy3_mutant_name" in src:
@@ -92,6 +107,17 @@ func _test_no_env_switches() -> void:
 		_fail("overlay missing hwy3_cache_hit needle")
 	if "if supply_on and on_corridor:" not in src:
 		_fail("overlay missing corridor styling needle")
+	if "highway_network_component_info" not in src:
+		_fail("overlay must compute highway connectivity once per rebuild")
+	var apply_fn: String = _slice_func(src, "_apply_road_tier_cache")
+	if apply_fn.is_empty() or "_road_stub_dropped.clear()" in apply_fn:
+		_fail("_apply_road_tier_cache must not clear the demoted-stub list")
+	var rebuild_fn: String = _slice_func(src, "_rebuild_road_layer_inner")
+	var hit_i: int = rebuild_fn.find("if hwy3_cache_hit:")
+	var ret_i: int = rebuild_fn.find("return", hit_i) if hit_i >= 0 else -1
+	var hit_block: String = rebuild_fn.substr(hit_i, ret_i - hit_i) if hit_i >= 0 and ret_i > hit_i else ""
+	if hit_block.is_empty() or "_apply_road_tier_cache" in hit_block:
+		_fail("L-toggle cache hit must not re-apply road-tier chains")
 
 
 func _boot_live_scenario() -> bool:
@@ -278,6 +304,72 @@ func _test_a_toggle_reuses_cache() -> void:
 		_pass("(a) highway key set identical across on/off/on (%d)" % keys0.size())
 
 
+func _count_of(ol: Node, method_name: String) -> int:
+	if ol != null and ol.has_method(method_name):
+		return int(ol.call(method_name))
+	return -1
+
+
+func _test_cached_path_skips_geom() -> void:
+	var geom0: int = _count_of(_ol, "get_road_geom_apply_count")
+	var comp0: int = _count_of(_ol, "get_road_component_info_count")
+	if geom0 < 1 or comp0 < 1:
+		_fail("cached-path counters missing after boot geom=%d info=%d" % [geom0, comp0])
+		return
+	_toggle_like_l(true)
+	_toggle_like_l(false)
+	_toggle_like_l(true)
+	var geom1: int = _count_of(_ol, "get_road_geom_apply_count")
+	var comp1: int = _count_of(_ol, "get_road_component_info_count")
+	print("HWY3_CACHE_PATH geom=%d→%d info=%d→%d" % [geom0, geom1, comp0, comp1])
+	if geom1 != geom0:
+		_fail("L toggle re-applied road chains (%d → %d)" % [geom0, geom1])
+	else:
+		_pass("L toggle reused drawable/chains (geom apply stayed %d)" % geom0)
+	if comp1 != comp0:
+		_fail("L toggle rebuilt highway connectivity (%d → %d)" % [comp0, comp1])
+	else:
+		_pass("L toggle reused highway connectivity (info stayed %d)" % comp0)
+
+
+func _test_stub_report_lists_demoted() -> void:
+	if _ol == null or not _ol.has_method("get_highway_stub_report"):
+		_fail("get_highway_stub_report missing")
+		return
+	var report_v: Variant = _ol.call("get_highway_stub_report")
+	if typeof(report_v) != TYPE_DICTIONARY:
+		_fail("stub report is not a Dictionary")
+		return
+	var report: Dictionary = report_v
+	var n: int = int(report.get("dropped_n", -1))
+	var keys_v: Variant = report.get("dropped", [])
+	var keys: Array = keys_v if typeof(keys_v) == TYPE_ARRAY else []
+	var edges_v: Variant = report.get("edges", [])
+	var edges: Array = edges_v if typeof(edges_v) == TYPE_ARRAY else []
+	var want_a: String = RoadTierVisualScript.edge_key(903534, 905809)
+	var want_b: String = RoadTierVisualScript.edge_key(905807, 905809)
+	var have_a: bool = keys.has(want_a)
+	var have_b: bool = keys.has(want_b)
+	var named: int = 0
+	for ev in edges:
+		if typeof(ev) != TYPE_DICTIONARY:
+			continue
+		var e: Dictionary = ev
+		if str(e.get("n1", "")).is_empty() or str(e.get("n2", "")).is_empty():
+			continue
+		named += 1
+	print(
+		"HWY3_STUB_REPORT n=%d keys=%s named=%d"
+		% [n, str(keys), named]
+	)
+	if n < 2 or not have_a or not have_b:
+		_fail("stub report must list demoted 903534–905809 and 905807–905809 (n=%d)" % n)
+	elif named < 2:
+		_fail("stub report edges must include province names")
+	else:
+		_pass("stub report lists demoted Moscow stub by pid + name")
+
+
 func _test_live_lon_probe() -> void:
 	for run_i in range(2):
 		var off_ms: float = _toggle_like_l(false)
@@ -292,6 +384,8 @@ func _test_live_lon_probe() -> void:
 			_pass("LiveLonProbe run %d off frame2 %.2f ms" % [run_i + 1, off_ms])
 		if on_ms > ON_WARM_LIMIT_MS:
 			_fail("LiveLonProbe run %d on_warm %.2f ms > %.0f" % [run_i + 1, on_ms, ON_WARM_LIMIT_MS])
+		elif on_ms > ON_WARM_CACHED_LIMIT_MS:
+			_fail("LiveLonProbe run %d on_warm %.2f ms > cached-path %.0f" % [run_i + 1, on_ms, ON_WARM_CACHED_LIMIT_MS])
 		else:
 			_pass("LiveLonProbe run %d on_warm %.2f ms" % [run_i + 1, on_ms])
 

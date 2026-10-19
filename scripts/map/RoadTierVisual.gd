@@ -4509,21 +4509,27 @@ static func highway_network_component_info(cache: Array) -> Dictionary:
 	}
 
 
-static func highway_edge_on_connected_network(cache: Array, p1: int, p2: int) -> bool:
+static func highway_edge_on_connected_network(
+	cache: Array, p1: int, p2: int, info: Dictionary = {}
+) -> bool:
 	if p1 <= 0 or p2 <= 0:
 		return false
-	var info: Dictionary = highway_network_component_info(cache)
-	var parent_v: Variant = info.get("parent", {})
+	var use: Dictionary = info
+	if use.is_empty():
+		use = highway_network_component_info(cache)
+	var parent_v: Variant = use.get("parent", {})
 	var parent: Dictionary = parent_v if typeof(parent_v) == TYPE_DICTIONARY else {}
 	if parent.is_empty() or not parent.has(p1):
 		return false
 	var root: int = _uf_find(parent, p1)
-	var n: int = int((info.get("edges_by_root", {}) as Dictionary).get(root, 0))
-	var nuts: bool = bool((info.get("nuts_by_root", {}) as Dictionary).get(root, false))
+	var n: int = int((use.get("edges_by_root", {}) as Dictionary).get(root, 0))
+	var nuts: bool = bool((use.get("nuts_by_root", {}) as Dictionary).get(root, false))
 	return nuts or n >= HWY_CONNECTED_NETWORK_MIN_EDGES
 
 
-static func highway_should_draw_edge(entry: Dictionary, cache: Array, rings: Array) -> bool:
+static func highway_should_draw_edge(
+	entry: Dictionary, cache: Array, rings: Array, info: Dictionary = {}
+) -> bool:
 	var tier: int = int(entry.get("display_tier", entry.get("tier", 0)))
 	if tier != TIER_HIGHWAY:
 		return true
@@ -4535,7 +4541,7 @@ static func highway_should_draw_edge(entry: Dictionary, cache: Array, rings: Arr
 	if in_rings:
 		return true
 	return highway_edge_on_connected_network(
-		cache, int(entry.get("p1", 0)), int(entry.get("p2", 0))
+		cache, int(entry.get("p1", 0)), int(entry.get("p2", 0)), info
 	)
 
 

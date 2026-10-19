@@ -116,13 +116,18 @@ Live literal offset `fill/2 + 1 px` (`run2.log`):
 
 The 98% bar is **not** met. Casing colour is drawn at alpha 0.85, so an unblended casing key misses blended pixels.
 
-## Lithuania stub
+## Lithuania stub / SOV Moscow highway
 
-Geometry points are canvas units. Live centroids and Polygon2D rings are canvas × `THEATER_SCALE` 1.728. The first filter compared world centroids to raw rings and dropped 53 edges, including real Ruhr pairs `710401_710412`, `710416_710417`, `710417_710418` (`roads1_after/run.log`). That list is a coordinate bug, not the Lithuania stub. Draw rings are now scaled. Shared-border keys stay unscaled.
+The 2-edge RoW component `905807 → 905809 → 903534` (Polotsk-area placeholder → Belarus placeholder → Moscow) is **demoted to paved**, not deleted. Both ends sit outside the 1525 NUTS draw rings and the component is too small to count as a connected highway network (NUTS or ≥3 edges). Japan’s 13-edge RoW cluster stays highway.
 
-AFTER (`roads1_after/stub3_run.log`): `dropped_n=0` `rings=1525`. No tier-2 edge has an endpoint outside a drawn ring.
+That component **is** SOV’s HWY-3 hub route into Moscow (`Moscow → Haradok area → Polotsk area`). After the demote, **hub routes fully drawn are 17/18** (18/18 on main / `c5590af7`). The 18 route objects still exist; the Moscow legs are paved. `get_highway_stub_report()` lists both edges by province id and name (`dropped_n=2`):
 
-The gap filter drops a tier-2 edge when an endpoint is a 36- or 37-vertex RoW placeholder (pid 900000–949999) and the segment leaves every drawn ring. Headless synthetic circles at that pattern fail closed. An edge that stays inside one ring, a gap between Europe pids, and an empty ring list stay open. Live `dropped_n` is still 0: those RoW blobs are not in the 1525 draw rings unless the road cache loaded them, and no drawn highway crosses one.
+- `903534_905809` Moscow – Haradok area
+- `905807_905809` Polotsk area – Haradok area
+
+The paved line can still show at Infra z≥1.3 across the gap. L toggle on the cached path is ~5 ms (was 280–355 ms when connectivity rebuilt per edge).
+
+Geometry points are canvas units. Live centroids and Polygon2D rings are canvas × `THEATER_SCALE` 1.728. Draw rings are scaled. Shared-border keys stay unscaled.
 
 Offline adjacency (not the drawn-highway list) that matches the old description:
 

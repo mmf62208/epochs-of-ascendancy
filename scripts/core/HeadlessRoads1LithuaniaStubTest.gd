@@ -56,6 +56,7 @@ func _run() -> void:
 	if not _boot_live_1936():
 		return
 	_test_no_east_lithuania_orphan()
+	_test_stub_report_lists_demoted()
 	_test_hub_routes_kept()
 	if _ol != null:
 		_ol.queue_free()
@@ -342,6 +343,44 @@ func _test_no_east_lithuania_orphan() -> void:
 		_fail("drawn highway east of Lithuania lacks a connected route: %s" % str(orphans))
 	elif not moscow_drawn:
 		_pass("no east-of-Lithuania highway lacks a connected route")
+
+
+func _test_stub_report_lists_demoted() -> void:
+	if _ol == null or not _ol.has_method("get_highway_stub_report"):
+		_fail("get_highway_stub_report missing")
+		return
+	var report_v: Variant = _ol.call("get_highway_stub_report")
+	if typeof(report_v) != TYPE_DICTIONARY:
+		_fail("stub report is not a Dictionary")
+		return
+	var report: Dictionary = report_v
+	var n: int = int(report.get("dropped_n", -1))
+	var keys_v: Variant = report.get("dropped", [])
+	var keys: Array = keys_v if typeof(keys_v) == TYPE_ARRAY else []
+	var edges_v: Variant = report.get("edges", [])
+	var edges: Array = edges_v if typeof(edges_v) == TYPE_ARRAY else []
+	var want_a: String = RoadTierVisualScript.edge_key(MOSCOW, BLR_EAST)
+	var want_b: String = RoadTierVisualScript.edge_key(905807, BLR_EAST)
+	var have_a: bool = keys.has(want_a)
+	var have_b: bool = keys.has(want_b)
+	var named: int = 0
+	for ev in edges:
+		if typeof(ev) != TYPE_DICTIONARY:
+			continue
+		var e: Dictionary = ev
+		print(
+			"ROADS1_STUB_EDGE %s %d %s — %d %s"
+			% [str(e.get("key", "")), int(e.get("p1", 0)), str(e.get("n1", "")), int(e.get("p2", 0)), str(e.get("n2", ""))]
+		)
+		if not str(e.get("n1", "")).is_empty() and not str(e.get("n2", "")).is_empty():
+			named += 1
+	print("ROADS1_STUB_REPORT n=%d keys=%s named=%d" % [n, str(keys), named])
+	if n < 2 or not have_a or not have_b:
+		_fail("stub report must list demoted Moscow stub edges (n=%d)" % n)
+	elif named < 2:
+		_fail("stub report must name the demoted provinces")
+	else:
+		_pass("stub report lists demoted Belarus→Moscow edges by pid + name")
 
 
 func _test_hub_routes_kept() -> void:

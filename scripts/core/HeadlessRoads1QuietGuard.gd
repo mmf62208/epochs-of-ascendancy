@@ -224,6 +224,14 @@ func _test_stub_filter() -> void:
 	if "highway_edge_on_connected_network" not in ol:
 		_fail("overlay must keep out-of-ring edges only on a connected network")
 		return
+	if "highway_network_component_info" not in ol:
+		_fail("overlay must compute highway connectivity once per rebuild")
+		return
+	var apply_i := ol.find("func _apply_road_tier_cache")
+	var apply := ol.substr(apply_i, 900) if apply_i >= 0 else ""
+	if apply.is_empty() or "_road_stub_dropped.clear()" in apply:
+		_fail("_apply_road_tier_cache must not clear the demoted-stub list")
+		return
 	if not _test_placeholder_gap():
 		return
 	if not _test_connected_network():

@@ -132,6 +132,9 @@ var _road_casing_draw: Node2D = null
 var _road_bucket: String = "political"
 var _road_draw_rings: Array = []
 var _road_stub_dropped: Array = []
+var _road_component_info_count: int = 0
+var _road_geom_apply_count: int = 0
+var _road_geom_ready: bool = false
 var _hwy3_city_layer: Dictionary = {}
 var _hwy3_econ_layer: Dictionary = {}
 var _hwy3_layers_ready: bool = false
@@ -593,7 +596,10 @@ func _rebuild_road_layer_inner() -> void:
         and not _hwy3_cached_rows.is_empty()
     )
     if hwy3_cache_hit:
-        _apply_cached_hwy3_rows()
+        ## L toggle: reuse the demoted snapshot + already-built chains. Do not
+        ## re-walk rings or rebuild the highway graph.
+        _road_edge_cache = _hwy3_cached_rows
+        _road_candidate_count = _road_edge_cache.size()
         _apply_hwy3_corridor_styling(supply_on)
         refresh_ix1_gold_spine()
         if (not _road_edge_cache.is_empty() or road_layer.get_child_count() > 0) and _get_current_zoom() > 0.10:
@@ -1735,11 +1741,14 @@ func _hwy3_route_input_key() -> String:
 func invalidate_hwy3_route_cache() -> void:
     _hwy3_cached_input_key = ""
     _hwy3_cached_rows.clear()
+    _road_geom_ready = false
 
 
 func _apply_cached_hwy3_rows() -> void:
-    _road_edge_cache = _clone_hwy3_rows(_hwy3_cached_rows)
+    _road_edge_cache = _hwy3_cached_rows
     _road_candidate_count = _road_edge_cache.size()
+    if _road_geom_ready:
+        return
     _apply_road_tier_cache(_road_edge_cache)
 
 
@@ -1779,6 +1788,14 @@ func get_hwy3_route_compute_count() -> int:
 
 func get_hwy3_styling_pass_count() -> int:
     return _hwy3_styling_pass_count
+
+
+func get_road_geom_apply_count() -> int:
+    return _road_geom_apply_count
+
+
+func get_road_component_info_count() -> int:
+    return _road_component_info_count
 
 
 func get_hwy3_route_input_key() -> String:
@@ -2047,7 +2064,7 @@ func _road_ring_records(rings: Dictionary) -> Array:
     return out
 
 
-func _highway_edge_drawable(entry: Dictionary) -> bool:
+func _highway_edge_drawable(entry: Dictionary, info: Dictionary = {}) -> bool:
     var tier: int = int(entry.get("display_tier", entry.get("tier", 0)))
     if tier != RoadTierVisualScript.TIER_HIGHWAY:
         return true
@@ -2063,8 +2080,28 @@ func _highway_edge_drawable(entry: Dictionary) -> bool:
     if in_rings:
         return true
     return RoadTierVisualScript.highway_edge_on_connected_network(
-        _road_edge_cache, int(entry.get("p1", 0)), int(entry.get("p2", 0))
+        _road_edge_cache, int(entry.get("p1", 0)), int(entry.get("p2", 0)), info
     )
+
+
+func _province_display_name(pid: int) -> String:
+    if map_manager != null and map_manager.has_method("get_province"):
+        var p: Variant = map_manager.get_province(pid)
+        if p != null and p is Object and "name" in p:
+            var nm: String = str(p.get("name")).strip_edges()
+            if not nm.is_empty():
+                return nm
+    return "Province %d" % pid
+
+
+func _record_stub_drop(p1: int, p2: int) -> void:
+    _road_stub_dropped.append({
+        "key": RoadTierVisualScript.edge_key(p1, p2),
+        "p1": p1,
+        "p2": p2,
+        "n1": _province_display_name(p1),
+        "n2": _province_display_name(p2),
+    })
 
 
 func _demote_orphan_highway_stubs(cache: Array[Dictionary]) -> void:
@@ -2073,19 +2110,29 @@ func _demote_orphan_highway_stubs(cache: Array[Dictionary]) -> void:
     for row_v in cache:
         if typeof(row_v) == TYPE_DICTIONARY:
             snapshot.append(row_v)
-    var drop: Dictionary = {}
+    ## One union-find for the whole highway graph — not once per out-of-ring edge.
+    _road_component_info_count += 1
+    var info: Dictionary = RoadTierVisualScript.highway_network_component_info(snapshot)
     for entry in cache:
         if int(entry.get("display_tier", 0)) != RoadTierVisualScript.TIER_HIGHWAY:
             continue
-        if RoadTierVisualScript.highway_should_draw_edge(entry, snapshot, _road_draw_rings):
+        if RoadTierVisualScript.highway_should_draw_edge(entry, snapshot, _road_draw_rings, info):
             continue
-        drop[RoadTierVisualScript.edge_key(int(entry.get("p1", 0)), int(entry.get("p2", 0)))] = true
-    for entry2 in cache:
-        var key: String = RoadTierVisualScript.edge_key(int(entry2.get("p1", 0)), int(entry2.get("p2", 0)))
-        if not drop.has(key):
-            continue
-        entry2["display_tier"] = RoadTierVisualScript.TIER_PAVED
-        _road_stub_dropped.append(key)
+        var p1: int = int(entry.get("p1", 0))
+        var p2: int = int(entry.get("p2", 0))
+        entry["display_tier"] = RoadTierVisualScript.TIER_PAVED
+        _record_stub_drop(p1, p2)
+    if not _road_stub_dropped.is_empty():
+        var parts: PackedStringArray = PackedStringArray()
+        for row2_v in _road_stub_dropped:
+            if typeof(row2_v) != TYPE_DICTIONARY:
+                continue
+            var row2: Dictionary = row2_v
+            parts.append(
+                "%s %s–%s"
+                % [str(row2.get("key", "")), str(row2.get("n1", "")), str(row2.get("n2", ""))]
+            )
+        print("ROADS1_STUB_DEMOTE n=%d %s" % [_road_stub_dropped.size(), ", ".join(parts)])
 
 
 func apply_road_map_mode(mode: String, supply_on: bool) -> void:
@@ -2115,9 +2162,19 @@ func apply_road_map_mode(mode: String, supply_on: bool) -> void:
 
 
 func get_highway_stub_report() -> Dictionary:
+    var keys: Array = []
+    var edges: Array = []
+    for row_v in _road_stub_dropped:
+        if typeof(row_v) == TYPE_DICTIONARY:
+            var row: Dictionary = row_v
+            keys.append(str(row.get("key", "")))
+            edges.append(row.duplicate())
+        else:
+            keys.append(str(row_v))
     return {
-        "dropped": _road_stub_dropped.duplicate(),
-        "dropped_n": _road_stub_dropped.size(),
+        "dropped": keys,
+        "dropped_n": keys.size(),
+        "edges": edges,
         "rings": _road_draw_rings.size(),
     }
 
@@ -2129,14 +2186,13 @@ func get_road_bucket() -> String:
 func _apply_road_tier_cache(cache: Array[Dictionary]) -> void:
     _road_edge_cache = cache
     _ensure_road_tier_draw_nodes()
-    _road_stub_dropped.clear()
+    _road_geom_apply_count += 1
+    ## Trust display_tier from _demote_orphan_highway_stubs. Do not re-filter
+    ## or clear the demoted-edge list (that made dropped_n=0 after a real drop).
     var drawable: Array = []
     var by_tier: Dictionary = {0: [], 1: [], 2: []}
     for entry in cache:
         var t: int = clampi(int(entry.get("display_tier", entry.get("tier", 0))), 0, 2)
-        if t == RoadTierVisualScript.TIER_HIGHWAY and not _highway_edge_drawable(entry):
-            _road_stub_dropped.append(RoadTierVisualScript.edge_key(int(entry.get("p1", 0)), int(entry.get("p2", 0))))
-            continue
         drawable.append(entry)
         var bucket: Array = by_tier[t]
         bucket.append(entry)
@@ -2159,6 +2215,7 @@ func _apply_road_tier_cache(cache: Array[Dictionary]) -> void:
     if _road_casing_draw != null and _road_casing_draw is RoadCasingDraw:
         (_road_casing_draw as RoadCasingDraw).setup_chains(chains)
         _road_casing_draw.visible = _road_bucket == "logistics"
+    _road_geom_ready = true
 
 
 func _add_explicit_lookup_line(c1: Vector2, c2: Vector2, p1: int, p2: int, tier: int, on_corridor: bool) -> void:
