@@ -93,15 +93,15 @@
       "domain": "land"
     },
     "710023": {
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land"
     },
     "710024": {
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land"
     },
     "710025": {
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land"
     },
     "710026": {
@@ -109,11 +109,11 @@
       "domain": "land"
     },
     "710027": {
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land"
     },
     "710028": {
-      "terrain": "plains",
+      "terrain": "hills",
       "domain": "land"
     },
     "710029": {
@@ -125,7 +125,7 @@
       "domain": "land"
     },
     "710031": {
-      "terrain": "plains",
+      "terrain": "hills",
       "domain": "land"
     },
     "710032": {
@@ -149,23 +149,23 @@
       "domain": "land"
     },
     "710037": {
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land"
     },
     "710038": {
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land"
     },
     "710039": {
-      "terrain": "plains",
+      "terrain": "hills",
       "domain": "land"
     },
     "710040": {
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land"
     },
     "710041": {
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land"
     },
     "710042": {
@@ -181,11 +181,11 @@
       "domain": "land"
     },
     "710045": {
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land"
     },
     "710046": {
-      "terrain": "plains",
+      "terrain": "hills",
       "domain": "land"
     },
     "710047": {
@@ -525,7 +525,7 @@
       "domain": "land"
     },
     "710131": {
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land"
     },
     "710132": {
@@ -533,11 +533,11 @@
       "domain": "land"
     },
     "710133": {
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land"
     },
     "710134": {
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land"
     },
     "710135": {
@@ -557,19 +557,19 @@
       "domain": "land"
     },
     "710139": {
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land"
     },
     "710140": {
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land"
     },
     "710141": {
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land"
     },
     "710142": {
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land"
     },
     "710143": {
@@ -577,7 +577,7 @@
       "domain": "land"
     },
     "710144": {
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land"
     },
     "710145": {
@@ -709,7 +709,7 @@
       "domain": "land"
     },
     "710177": {
-      "terrain": "mountains",
+      "terrain": "plains",
       "domain": "land"
     },
     "710178": {
@@ -825,7 +825,7 @@
       "domain": "land"
     },
     "710206": {
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land"
     },
     "710207": {
@@ -833,11 +833,11 @@
       "domain": "land"
     },
     "710208": {
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land"
     },
     "710209": {
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land"
     },
     "710210": {
@@ -845,7 +845,7 @@
       "domain": "land"
     },
     "710211": {
-      "terrain": "mountains",
+      "terrain": "plains",
       "domain": "land"
     },
     "710212": {
@@ -865,15 +865,15 @@
       "domain": "land"
     },
     "710216": {
-      "terrain": "plains",
-      "domain": "land"
-    },
-    "710217": {
       "terrain": "mountains",
       "domain": "land"
     },
-    "710218": {
+    "710217": {
       "terrain": "plains",
+      "domain": "land"
+    },
+    "710218": {
+      "terrain": "mountains",
       "domain": "land"
     },
     "710219": {
@@ -893,19 +893,19 @@
       "domain": "land"
     },
     "710223": {
-      "terrain": "plains",
-      "domain": "land"
-    },
-    "710224": {
       "terrain": "mountains",
       "domain": "land"
     },
-    "710225": {
+    "710224": {
       "terrain": "plains",
       "domain": "land"
     },
+    "710225": {
+      "terrain": "mountains",
+      "domain": "land"
+    },
     "710226": {
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land"
     },
     "710227": {
@@ -957,7 +957,7 @@
       "domain": "land"
     },
     "710239": {
-      "terrain": "mountains",
+      "terrain": "plains",
       "domain": "land"
     },
     "710240": {
@@ -969,7 +969,7 @@
       "domain": "land"
     },
     "710242": {
-      "terrain": "mountains",
+      "terrain": "plains",
       "domain": "land"
     },
     "710243": {
@@ -997,7 +997,7 @@
       "domain": "land"
     },
     "710249": {
-      "terrain": "mountains",
+      "terrain": "plains",
       "domain": "land"
     },
     "710250": {
@@ -1013,7 +1013,7 @@
       "domain": "land"
     },
     "710253": {
-      "terrain": "mountains",
+      "terrain": "plains",
       "domain": "land"
     },
     "710254": {
@@ -1061,7 +1061,7 @@
       "domain": "land"
     },
     "710265": {
-      "terrain": "mountains",
+      "terrain": "plains",
       "domain": "land"
     },
     "710266": {
@@ -1081,7 +1081,7 @@
       "domain": "land"
     },
     "710270": {
-      "terrain": "mountains",
+      "terrain": "plains",
       "domain": "land"
     },
     "710271": {
@@ -1121,7 +1121,7 @@
       "domain": "land"
     },
     "710280": {
-      "terrain": "mountains",
+      "terrain": "plains",
       "domain": "land"
     },
     "710281": {
@@ -1129,7 +1129,7 @@
       "domain": "land"
     },
     "710282": {
-      "terrain": "mountains",
+      "terrain": "plains",
       "domain": "land"
     },
     "710283": {
@@ -1149,11 +1149,11 @@
       "domain": "land"
     },
     "710287": {
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land"
     },
     "710288": {
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land"
     },
     "710289": {
@@ -1161,7 +1161,7 @@
       "domain": "land"
     },
     "710290": {
-      "terrain": "mountains",
+      "terrain": "plains",
       "domain": "land"
     },
     "710291": {
@@ -1181,11 +1181,11 @@
       "domain": "land"
     },
     "710295": {
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land"
     },
     "710296": {
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land"
     },
     "710297": {
@@ -1197,7 +1197,7 @@
       "domain": "land"
     },
     "710299": {
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land"
     },
     "710300": {
@@ -1305,7 +1305,7 @@
       "domain": "land"
     },
     "710326": {
-      "terrain": "mountains",
+      "terrain": "plains",
       "domain": "land"
     },
     "710327": {
@@ -1361,7 +1361,7 @@
       "domain": "land"
     },
     "710340": {
-      "terrain": "mountains",
+      "terrain": "plains",
       "domain": "land"
     },
     "710341": {
@@ -1385,7 +1385,7 @@
       "domain": "land"
     },
     "710346": {
-      "terrain": "mountains",
+      "terrain": "plains",
       "domain": "land"
     },
     "710347": {
@@ -1469,7 +1469,7 @@
       "domain": "land"
     },
     "710367": {
-      "terrain": "mountains",
+      "terrain": "plains",
       "domain": "land"
     },
     "710368": {
@@ -1505,7 +1505,7 @@
       "domain": "land"
     },
     "710376": {
-      "terrain": "mountains",
+      "terrain": "plains",
       "domain": "land"
     },
     "710377": {
@@ -1689,15 +1689,15 @@
       "domain": "land"
     },
     "710422": {
-      "terrain": "mountains",
+      "terrain": "plains",
       "domain": "land"
     },
     "710423": {
-      "terrain": "mountains",
+      "terrain": "plains",
       "domain": "land"
     },
     "710424": {
-      "terrain": "mountains",
+      "terrain": "plains",
       "domain": "land"
     },
     "710425": {
@@ -1929,7 +1929,7 @@
       "domain": "land"
     },
     "710482": {
-      "terrain": "mountains",
+      "terrain": "plains",
       "domain": "land"
     },
     "710483": {
@@ -2089,7 +2089,7 @@
       "domain": "land"
     },
     "710522": {
-      "terrain": "mountains",
+      "terrain": "plains",
       "domain": "land"
     },
     "710523": {
@@ -2125,7 +2125,7 @@
       "domain": "land"
     },
     "710531": {
-      "terrain": "mountains",
+      "terrain": "plains",
       "domain": "land"
     },
     "710532": {
@@ -2141,7 +2141,7 @@
       "domain": "land"
     },
     "710535": {
-      "terrain": "mountains",
+      "terrain": "plains",
       "domain": "land"
     },
     "710536": {
@@ -2213,7 +2213,7 @@
       "domain": "land"
     },
     "710553": {
-      "terrain": "mountains",
+      "terrain": "plains",
       "domain": "land"
     },
     "710554": {
@@ -2689,7 +2689,7 @@
       "domain": "land"
     },
     "711520": {
-      "terrain": "mountains",
+      "terrain": "plains",
       "domain": "land"
     },
     "710672": {
@@ -3077,7 +3077,7 @@
       "domain": "land"
     },
     "710760": {
-      "terrain": "mountains",
+      "terrain": "plains",
       "domain": "land"
     },
     "710761": {
@@ -3217,15 +3217,15 @@
       "domain": "land"
     },
     "710795": {
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land"
     },
     "710796": {
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land"
     },
     "710797": {
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land"
     },
     "710798": {
@@ -3485,7 +3485,7 @@
       "domain": "land"
     },
     "710862": {
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land"
     },
     "710863": {
@@ -3505,7 +3505,7 @@
       "domain": "land"
     },
     "710867": {
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land"
     },
     "710868": {
@@ -3537,11 +3537,11 @@
       "domain": "land"
     },
     "710875": {
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land"
     },
     "710876": {
-      "terrain": "mountains",
+      "terrain": "plains",
       "domain": "land"
     },
     "710877": {
@@ -3725,11 +3725,11 @@
       "domain": "land"
     },
     "710922": {
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land"
     },
     "710923": {
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land"
     },
     "710924": {
@@ -3741,7 +3741,7 @@
       "domain": "land"
     },
     "710926": {
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land"
     },
     "710927": {
@@ -3901,7 +3901,7 @@
       "domain": "land"
     },
     "710966": {
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land"
     },
     "710967": {
@@ -4549,7 +4549,7 @@
       "domain": "land"
     },
     "711128": {
-      "terrain": "mountains",
+      "terrain": "plains",
       "domain": "land"
     },
     "711129": {
@@ -4917,7 +4917,7 @@
       "domain": "land"
     },
     "711220": {
-      "terrain": "mountains",
+      "terrain": "forest",
       "domain": "land"
     },
     "711221": {
@@ -4981,7 +4981,7 @@
       "domain": "land"
     },
     "711236": {
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land"
     },
     "711237": {
@@ -5009,11 +5009,11 @@
       "domain": "land"
     },
     "711243": {
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land"
     },
     "711244": {
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land"
     },
     "711245": {
@@ -7253,7 +7253,7 @@
       "domain": "land"
     },
     "905844": {
-      "terrain": "mountains",
+      "terrain": "plains",
       "domain": "land"
     },
     "902487": {

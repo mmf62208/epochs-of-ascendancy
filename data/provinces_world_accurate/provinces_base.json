@@ -417,7 +417,7 @@
     {
       "id": 710023,
       "name": "Klagenfurt-Villach",
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Central Europe",
@@ -435,7 +435,7 @@
     {
       "id": 710024,
       "name": "Oberkärnten",
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Central Europe",
@@ -453,7 +453,7 @@
     {
       "id": 710025,
       "name": "Unterkärnten",
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Central Europe",
@@ -489,7 +489,7 @@
     {
       "id": 710027,
       "name": "Liezen",
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Central Europe",
@@ -507,7 +507,7 @@
     {
       "id": 710028,
       "name": "Östliche Obersteiermark",
-      "terrain": "plains",
+      "terrain": "hills",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Central Europe",
@@ -561,7 +561,7 @@
     {
       "id": 710031,
       "name": "Westliche Obersteiermark",
-      "terrain": "plains",
+      "terrain": "hills",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Central Europe",
@@ -669,7 +669,7 @@
     {
       "id": 710037,
       "name": "Lungau",
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Central Europe",
@@ -687,7 +687,7 @@
     {
       "id": 710038,
       "name": "Pinzgau-Pongau",
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Central Europe",
@@ -705,7 +705,7 @@
     {
       "id": 710039,
       "name": "Salzburg und Umgebung",
-      "terrain": "plains",
+      "terrain": "hills",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Central Europe",
@@ -723,7 +723,7 @@
     {
       "id": 710040,
       "name": "Außerfern",
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Central Europe",
@@ -741,7 +741,7 @@
     {
       "id": 710041,
       "name": "Innsbruck",
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Central Europe",
@@ -813,7 +813,7 @@
     {
       "id": 710045,
       "name": "Bludenz-Bregenzer Wald",
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Central Europe",
@@ -831,7 +831,7 @@
     {
       "id": 710046,
       "name": "Rheintal-Bodenseegebiet",
-      "terrain": "plains",
+      "terrain": "hills",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Central Europe",
@@ -2361,7 +2361,7 @@
     {
       "id": 710131,
       "name": "Glarus",
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Central Europe",
@@ -2397,7 +2397,7 @@
     {
       "id": 710133,
       "name": "Appenzell Ausserrhoden",
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Central Europe",
@@ -2415,7 +2415,7 @@
     {
       "id": 710134,
       "name": "Appenzell Innerrhoden",
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Central Europe",
@@ -2505,7 +2505,7 @@
     {
       "id": 710139,
       "name": "Uri",
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Central Europe",
@@ -2523,7 +2523,7 @@
     {
       "id": 710140,
       "name": "Schwyz",
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Central Europe",
@@ -2541,7 +2541,7 @@
     {
       "id": 710141,
       "name": "Obwalden",
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Central Europe",
@@ -2559,7 +2559,7 @@
     {
       "id": 710142,
       "name": "Nidwalden",
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Central Europe",
@@ -2595,7 +2595,7 @@
     {
       "id": 710144,
       "name": "Ticino",
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Central Europe",
@@ -3189,7 +3189,7 @@
     {
       "id": 710177,
       "name": "Heidelberg, Stadtkreis",
-      "terrain": "mountains",
+      "terrain": "plains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Germany",
@@ -3711,7 +3711,7 @@
     {
       "id": 710206,
       "name": "Rosenheim, Kreisfreie Stadt",
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Germany",
@@ -3747,7 +3747,7 @@
     {
       "id": 710208,
       "name": "Berchtesgadener Land",
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Germany",
@@ -3765,7 +3765,7 @@
     {
       "id": 710209,
       "name": "Bad Tölz-Wolfratshausen",
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Germany",
@@ -3801,7 +3801,7 @@
     {
       "id": 710211,
       "name": "Ebersberg",
-      "terrain": "mountains",
+      "terrain": "plains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Germany",
@@ -3891,7 +3891,7 @@
     {
       "id": 710216,
       "name": "Garmisch-Partenkirchen",
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Germany",
@@ -3909,7 +3909,7 @@
     {
       "id": 710217,
       "name": "Landsberg am Lech",
-      "terrain": "mountains",
+      "terrain": "plains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Germany",
@@ -3927,7 +3927,7 @@
     {
       "id": 710218,
       "name": "Miesbach",
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Germany",
@@ -4017,7 +4017,7 @@
     {
       "id": 710223,
       "name": "Rosenheim, Landkreis",
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Germany",
@@ -4035,7 +4035,7 @@
     {
       "id": 710224,
       "name": "Starnberg",
-      "terrain": "mountains",
+      "terrain": "plains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Germany",
@@ -4053,7 +4053,7 @@
     {
       "id": 710225,
       "name": "Traunstein",
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Germany",
@@ -4071,7 +4071,7 @@
     {
       "id": 710226,
       "name": "Weilheim-Schongau",
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Germany",
@@ -4305,7 +4305,7 @@
     {
       "id": 710239,
       "name": "Amberg, Kreisfreie Stadt",
-      "terrain": "mountains",
+      "terrain": "plains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Germany",
@@ -4359,7 +4359,7 @@
     {
       "id": 710242,
       "name": "Amberg-Sulzbach",
-      "terrain": "mountains",
+      "terrain": "plains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Germany",
@@ -4485,7 +4485,7 @@
     {
       "id": 710249,
       "name": "Bamberg, Kreisfreie Stadt",
-      "terrain": "mountains",
+      "terrain": "plains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Germany",
@@ -4557,7 +4557,7 @@
     {
       "id": 710253,
       "name": "Bamberg, Landkreis",
-      "terrain": "mountains",
+      "terrain": "plains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Germany",
@@ -4773,7 +4773,7 @@
     {
       "id": 710265,
       "name": "Nürnberg, Kreisfreie Stadt",
-      "terrain": "mountains",
+      "terrain": "plains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Germany",
@@ -4863,7 +4863,7 @@
     {
       "id": 710270,
       "name": "Nürnberger Land",
-      "terrain": "mountains",
+      "terrain": "plains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Germany",
@@ -5043,7 +5043,7 @@
     {
       "id": 710280,
       "name": "Haßberge",
-      "terrain": "mountains",
+      "terrain": "plains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Germany",
@@ -5079,7 +5079,7 @@
     {
       "id": 710282,
       "name": "Miltenberg",
-      "terrain": "mountains",
+      "terrain": "plains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Germany",
@@ -5169,7 +5169,7 @@
     {
       "id": 710287,
       "name": "Kaufbeuren, Kreisfreie Stadt",
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Germany",
@@ -5187,7 +5187,7 @@
     {
       "id": 710288,
       "name": "Kempten (Allgäu), Kreisfreie Stadt",
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Germany",
@@ -5223,7 +5223,7 @@
     {
       "id": 710290,
       "name": "Aichach-Friedberg",
-      "terrain": "mountains",
+      "terrain": "plains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Germany",
@@ -5313,7 +5313,7 @@
     {
       "id": 710295,
       "name": "Lindau (Bodensee)",
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Germany",
@@ -5331,7 +5331,7 @@
     {
       "id": 710296,
       "name": "Ostallgäu",
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Germany",
@@ -5385,7 +5385,7 @@
     {
       "id": 710299,
       "name": "Oberallgäu",
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Germany",
@@ -5871,7 +5871,7 @@
     {
       "id": 710326,
       "name": "Bergstraße",
-      "terrain": "mountains",
+      "terrain": "plains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Germany",
@@ -6123,7 +6123,7 @@
     {
       "id": 710340,
       "name": "Vogelsbergkreis",
-      "terrain": "mountains",
+      "terrain": "plains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Germany",
@@ -6231,7 +6231,7 @@
     {
       "id": 710346,
       "name": "Waldeck-Frankenberg",
-      "terrain": "mountains",
+      "terrain": "plains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Germany",
@@ -6609,7 +6609,7 @@
     {
       "id": 710367,
       "name": "Hameln-Pyrmont",
-      "terrain": "mountains",
+      "terrain": "plains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Germany",
@@ -6771,7 +6771,7 @@
     {
       "id": 710376,
       "name": "Lüchow-Dannenberg",
-      "terrain": "mountains",
+      "terrain": "plains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Germany",
@@ -7599,7 +7599,7 @@
     {
       "id": 710422,
       "name": "Heinsberg",
-      "terrain": "mountains",
+      "terrain": "plains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Germany",
@@ -7617,7 +7617,7 @@
     {
       "id": 710423,
       "name": "Oberbergischer Kreis",
-      "terrain": "mountains",
+      "terrain": "plains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Germany",
@@ -7635,7 +7635,7 @@
     {
       "id": 710424,
       "name": "Rheinisch-Bergischer Kreis",
-      "terrain": "mountains",
+      "terrain": "plains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Germany",
@@ -8679,7 +8679,7 @@
     {
       "id": 710482,
       "name": "Donnersbergkreis",
-      "terrain": "mountains",
+      "terrain": "plains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Germany",
@@ -9399,7 +9399,7 @@
     {
       "id": 710522,
       "name": "Wittenberg",
-      "terrain": "mountains",
+      "terrain": "plains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Germany",
@@ -9561,7 +9561,7 @@
     {
       "id": 710531,
       "name": "Pinneberg",
-      "terrain": "mountains",
+      "terrain": "plains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Germany",
@@ -9633,7 +9633,7 @@
     {
       "id": 710535,
       "name": "Segeberg",
-      "terrain": "mountains",
+      "terrain": "plains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Germany",
@@ -9957,7 +9957,7 @@
     {
       "id": 710553,
       "name": "Sonneberg",
-      "terrain": "mountains",
+      "terrain": "plains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Germany",
@@ -13683,7 +13683,7 @@
     {
       "id": 710760,
       "name": "Landes",
-      "terrain": "mountains",
+      "terrain": "plains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "France",
@@ -14313,7 +14313,7 @@
     {
       "id": 710795,
       "name": "Alpes-de-Haute-Provence",
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "France",
@@ -14331,7 +14331,7 @@
     {
       "id": 710796,
       "name": "Hautes-Alpes",
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "France",
@@ -14349,7 +14349,7 @@
     {
       "id": 710797,
       "name": "Alpes-Maritimes",
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "France",
@@ -15519,7 +15519,7 @@
     {
       "id": 710862,
       "name": "Verbano-Cusio-Ossola",
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Italy",
@@ -15609,7 +15609,7 @@
     {
       "id": 710867,
       "name": "Valle d’Aosta/Vallée d’Aoste",
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Italy",
@@ -15753,7 +15753,7 @@
     {
       "id": 710875,
       "name": "Sondrio",
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Italy",
@@ -15771,7 +15771,7 @@
     {
       "id": 710876,
       "name": "Bergamo",
-      "terrain": "mountains",
+      "terrain": "plains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Italy",
@@ -16599,7 +16599,7 @@
     {
       "id": 710922,
       "name": "Bolzano-Bozen",
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Italy",
@@ -16617,7 +16617,7 @@
     {
       "id": 710923,
       "name": "Trento",
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Italy",
@@ -16671,7 +16671,7 @@
     {
       "id": 710926,
       "name": "Belluno",
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Italy",
@@ -17391,7 +17391,7 @@
     {
       "id": 710966,
       "name": "Liechtenstein",
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Central Europe",
@@ -20307,7 +20307,7 @@
     {
       "id": 711128,
       "name": "Terras de Trás-os-Montes",
-      "terrain": "mountains",
+      "terrain": "plains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Iberia",
@@ -21963,7 +21963,7 @@
     {
       "id": 711220,
       "name": "Kronobergs län",
-      "terrain": "mountains",
+      "terrain": "forest",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Nordic",
@@ -22251,7 +22251,7 @@
     {
       "id": 711236,
       "name": "Koroška",
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Balkans",
@@ -22377,7 +22377,7 @@
     {
       "id": 711243,
       "name": "Gorenjska",
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Balkans",
@@ -22395,7 +22395,7 @@
     {
       "id": 711244,
       "name": "Goriška",
-      "terrain": "plains",
+      "terrain": "mountains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Balkans",
@@ -68228,7 +68228,7 @@
     {
       "id": 711520,
       "name": "Gibraltar",
-      "terrain": "mountains",
+      "terrain": "plains",
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "Iberia",
@@ -68249,7 +68249,7 @@
     {
       "id": 905844,
       "name": "Hong Kong",
-      "terrain": "mountains",
+      "terrain": "plains",
       "domain": "land",
       "core_for_tags": [
         "ENG"
