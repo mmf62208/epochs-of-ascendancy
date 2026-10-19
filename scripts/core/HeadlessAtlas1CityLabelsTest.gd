@@ -33,7 +33,7 @@ const MANCHESTER := 711344
 const MANCHESTER_SW := 711345
 const HOME_CAM := Vector2(7449.6456, 1795.9165)
 const ANCHOR_MAX_PX := 30.0
-const RUHR_ANCHOR_MAX_PX := 45.0
+const RUHR_ANCHOR_MAX_PX := 16.0
 
 var _failures := 0
 
@@ -81,6 +81,7 @@ func _run_and_quit() -> void:
 	_test_score(layer)
 	_test_states(layer)
 	_test_anchor_distance(layer)
+	_test_play_metric_vs_pack_edge(layer)
 	_test_close_no_overlap(layer)
 	_test_no_duplicate_names(layer)
 	_test_essen_at_mid_z15(layer)
@@ -220,8 +221,8 @@ func _test_ruhr(layer: Node) -> void:
 		_pass("mid screen count %d <= 60" % screen_n)
 	var essen_row: Dictionary = names.get("Essen", {})
 	if not essen_row.is_empty():
-		var dist := _anchor_dist_px(essen_row, essen, zoom, essen, vp)
-		if dist > ANCHOR_MAX_PX:
+		var dist := _play_dist(layer, essen_row)
+		if dist > RUHR_ANCHOR_MAX_PX:
 			_fail("Essen label drifted %.1f px from its dot" % dist)
 		else:
 			_pass("Essen label stays on its Ruhr dot (%.1f px)" % dist)
@@ -404,6 +405,66 @@ func _count_name(placed: Array, options: Array) -> int:
 	return n
 
 
+func _play_dist(layer: Node, item: Dictionary) -> float:
+	if layer.has_method("play_label_distance_px"):
+		return float(layer.call("play_label_distance_px", item))
+	var world: Vector2 = item.get("world", Vector2.ZERO)
+	return _anchor_dist_px(item, world, 1.0, Vector2.ZERO, Vector2(1280, 800))
+
+
+func _is_ruhr_item(item: Dictionary) -> bool:
+	var pid := int(item.get("pid", 0))
+	return RUHR.has(pid) or bool(item.get("ruhr_keep", false))
+
+
+func _test_play_metric_vs_pack_edge(layer: Node) -> void:
+	# FIX #6 packing used a +4 px AABB whose near edge sat ~8 px from the
+	# mark while Play's colour-mask centre of flush-left "Düsseldorf" was 44 W.
+	var dues: Vector2 = layer.call("world_of", DUESSELDORF)
+	var vp := Vector2(1280, 800)
+	var z := 1.270
+	var fake := {
+		"name": "Düsseldorf",
+		"world": dues,
+		"font_px": 11,
+		"pid": DUESSELDORF,
+	}
+	layer.call("set_view", z, dues, vp, [])
+	var font: Font = ThemeDB.fallback_font
+	var sz := Vector2(72.0, 14.0)
+	var ascent := 11.0
+	if font != null:
+		sz = font.get_string_size("Düsseldorf", HORIZONTAL_ALIGNMENT_LEFT, -1, 11)
+		ascent = font.get_ascent(11)
+	# Flush-left as _flush_slots: (-size-8, -2) using packed size (+4).
+	var pack_size := Vector2(sz.x + 4.0, sz.y + 2.0)
+	fake["screen_offset"] = Vector2(-pack_size.x - 8.0, -2.0)
+	fake["glyph_size"] = sz
+	fake["glyph_ascent"] = ascent
+	var center := 0.0
+	var edge := 0.0
+	var pack := 0.0
+	if layer.has_method("play_label_distance_px"):
+		center = float(layer.call("play_label_distance_px", fake))
+	if layer.has_method("drawn_nearest_edge_px"):
+		edge = float(layer.call("drawn_nearest_edge_px", fake))
+	if layer.has_method("anchor_distance_px"):
+		var origin: Vector2 = layer.call("screen_of", DUESSELDORF)
+		fake["screen_rect"] = Rect2(origin + fake["screen_offset"] + Vector2(0.0, -pack_size.y * 0.78), pack_size)
+		pack = float(layer.call("anchor_distance_px", fake))
+	print("ATLAS1 city play_metric Düsseldorf flush-left center=%.1f edge=%.1f pack_edge=%.1f (Play 44 W vs FIX6 pack 8)" % [
+		center, edge, pack,
+	])
+	if center < 32.0 or center > 56.0:
+		_fail("flush-left Düsseldorf Play-centre %.1f want ~44 (32-56)" % center)
+	else:
+		_pass("flush-left Düsseldorf Play-centre %.1f reproduces Play ~44 W" % center)
+	if pack > 14.0:
+		_fail("flush-left packing nearest-edge %.1f should be ~8" % pack)
+	else:
+		_pass("flush-left packing nearest-edge %.1f is the old 8 px metric" % pack)
+
+
 func _test_anchor_distance(layer: Node) -> void:
 	var essen: Vector2 = layer.call("world_of", ESSEN)
 	var vp := Vector2(1280, 800)
@@ -417,14 +478,21 @@ func _test_anchor_distance(layer: Node) -> void:
 			if float(p.get("alpha", 0.0)) < 0.04:
 				continue
 			var world: Vector2 = p.get("world", Vector2.ZERO) as Vector2
-			var dist := _anchor_dist_px(p, world, z, essen, vp)
-			if dist > worst:
-				worst = dist
-			if dist > RUHR_ANCHOR_MAX_PX:
-				_fail("label %s at z%.2f is %.1f px from its dot" % [str(p.get("name", "")), z, dist])
-				return
+			var dist := 0.0
+			if _is_ruhr_item(p):
+				dist = _play_dist(layer, p)
+				if dist > worst:
+					worst = dist
+				if dist > RUHR_ANCHOR_MAX_PX:
+					_fail("label %s at z%.2f is %.1f px from its dot (Play centre)" % [str(p.get("name", "")), z, dist])
+					return
+			else:
+				dist = _anchor_dist_px(p, world, z, essen, vp)
+				if dist > ANCHOR_MAX_PX + 16.0:
+					_fail("label %s at z%.2f is %.1f px from its dot" % [str(p.get("name", "")), z, dist])
+					return
 	print("ATLAS1 city max_anchor_px=%.1f" % worst)
-	_pass("label anchors stay within %.0f px at mid/close zooms (worst %.1f)" % [RUHR_ANCHOR_MAX_PX, worst])
+	_pass("Ruhr Play-centres stay within %.0f px at mid/close zooms (worst %.1f)" % [RUHR_ANCHOR_MAX_PX, worst])
 
 
 func _test_close_no_overlap(layer: Node) -> void:
@@ -628,7 +696,7 @@ func _test_ruhr_centered_live_zooms(layer: Node) -> void:
 	## Playtester wheeled in over the Ruhr (Essen under the cursor), 1280x800.
 	var essen: Vector2 = layer.call("world_of", ESSEN)
 	var vp := Vector2(1280, 800)
-	var zooms: Array[float] = [1.217, 1.512, 2.904]
+	var zooms: Array[float] = [1.022, 1.217, 1.512, 2.904]
 	var ok := true
 	for z_v in zooms:
 		var z: float = z_v
@@ -675,7 +743,7 @@ func _test_air_wing_cover_essen(layer: Node) -> void:
 	if not names.has("Essen"):
 		_fail("Essen missing under air-wing counter at z1.09")
 		return
-	var dist := _anchor_dist_px(names["Essen"], essen, zoom, essen, vp)
+	var dist := _play_dist(layer, names["Essen"])
 	if dist > RUHR_ANCHOR_MAX_PX:
 		_fail("Essen %.1f px from its dot under air-wing at z1.09" % dist)
 	else:
@@ -686,7 +754,7 @@ func _test_air_wing_cover_essen(layer: Node) -> void:
 	if not names.has("Essen"):
 		_fail("Essen missing under air-wing counter at z1.35")
 		return
-	dist = _anchor_dist_px(names["Essen"], essen, 1.35, essen, vp)
+	dist = _play_dist(layer, names["Essen"])
 	if dist > RUHR_ANCHOR_MAX_PX:
 		_fail("Essen %.1f px from its dot under air-wing at z1.35" % dist)
 	else:
@@ -730,7 +798,7 @@ func _test_counter_avoidance(layer: Node) -> void:
 	if not names.has("Essen"):
 		_fail("Essen culled instead of nudging off the counter")
 		return
-	var dist := _anchor_dist_px(names["Essen"], essen, zoom, essen, vp)
+	var dist := _play_dist(layer, names["Essen"])
 	if dist > RUHR_ANCHOR_MAX_PX:
 		_fail("counter nudge moved Essen %.1f px from its dot" % dist)
 	else:

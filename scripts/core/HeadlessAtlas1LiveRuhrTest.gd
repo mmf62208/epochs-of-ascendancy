@@ -10,14 +10,29 @@ extends SceneTree
 const ESSEN := 710403
 const WAIT_MAP_SECS := 420
 const SETTLE_FRAMES := 30
-const LIVE_ZOOMS: Array[float] = [1.217, 1.512, 2.904]
+## Play 59c85d54 cameras (RESULT_6702). Wheel-notch stand-ins for 1.264/1.572/3.019.
+const LIVE_ZOOMS: Array[float] = [1.270, 1.578, 3.031]
+const PLAY_Z_LABEL := 1.022
+const PLAY_CAM_LABEL := Vector2(7557.27, 1546.63)
+const PLAY_CAMS: Array[Vector2] = [
+	Vector2(7521.68, 1557.15),
+	Vector2(7493.04, 1565.78),
+	Vector2(7432.08, 1582.48),
+]
 const VP := Vector2(1280, 800)
 const ZOOM_SLACK := 0.14
-const PLAY_WHEEL_SCREEN := Vector2(455, 455)
-const ANCHOR_MAX_PX := 45.0
+## Play parked the mouse off-map so no tooltip; wheel is not re-aimed at Essen.
+const PLAY_WHEEL_SCREEN := Vector2(500, 85)
+## Play lbl.py: |label-centre − dot|. About 15 px after compact sit.
+const ANCHOR_MAX_PX := 16.0
 const ORDER_SLACK_PX := 8.0
+const STABLE_SLACK_PX := 3.0
 const RUHR_CORE := ["Essen", "Duisburg", "Düsseldorf", "Dortmund", "Köln"]
 var _wheel_screen := PLAY_WHEEL_SCREEN
+var _home_zoom := 0.0
+var _in_offsets: Dictionary = {}
+var _phase_out := false
+var _did_z1 := false
 
 var _failures := 0
 var _phase := 0
@@ -68,11 +83,16 @@ func _on_process() -> void:
 	if _phase == 1:
 		_tick_wait_map()
 	elif _phase == 2:
-		if _zoom_i < LIVE_ZOOMS.size():
+		if _zoom_i >= 0 and _zoom_i < LIVE_ZOOMS.size():
 			_reassert_locked_zoom(LIVE_ZOOMS[_zoom_i])
 		_settle_left -= 1
 		if _settle_left <= 0:
 			_check_zoom()
+	elif _phase == 4:
+		_reassert_locked_zoom(PLAY_Z_LABEL)
+		_settle_left -= 1
+		if _settle_left <= 0:
+			_check_z1()
 	elif _phase == 3:
 		pass
 
@@ -93,22 +113,20 @@ func _tick_wait_map() -> void:
 	var cam := _camera()
 	if cam != null:
 		_home_pos = cam.global_position
+		_home_zoom = maxf(absf(cam.zoom.x), absf(cam.zoom.y))
 	_ensure_units_on()
 	_quiet_boot_fighters()
-	# Play: 1280x800, Home, no Camera2D pre-pan. Wheel the pixel where Essen
-	# already sits on the Europe Home frame (the Ruhr is on-screen at Home;
-	# (455,455) is west of it and walks the camera into France).
+	# Play RESULT_6702: Home z0.344, mouse parked at (500,85) off-map, then
+	# wheel toward the Ruhr. Do NOT re-aim at Essen each notch (that was
+	# the old test — cam ~7345,1664 vs Play 7521,1557 at z1.270).
 	var essen_w := _essen_world()
-	_wheel_screen = _world_to_screen(essen_w)
-	if _wheel_screen == Vector2.ZERO or _wheel_screen.x < 8.0 or _wheel_screen.y < 8.0 or _wheel_screen.x > VP.x - 8.0 or _wheel_screen.y > VP.y - 8.0:
-		_fail("Essen is not on the Home frame (screen=%s) — cannot wheel Play's Ruhr" % str(_wheel_screen))
-		_wheel_screen = PLAY_WHEEL_SCREEN
+	_wheel_screen = PLAY_WHEEL_SCREEN
 	_focus_world = essen_w
-	var under_455 := _world_under_screen(PLAY_WHEEL_SCREEN)
-	print("ATLAS1 live map_ready home=%.1f,%.1f home_z=%.3f wheel=%s under455=%.1f,%.1f essen=%.1f,%.1f dist455=%.1f units=%d layers=%d" % [
+	var under_mouse := _world_under_screen(PLAY_WHEEL_SCREEN)
+	print("ATLAS1 live map_ready home=%.1f,%.1f home_z=%.3f wheel=%s under_mouse=%.1f,%.1f essen=%.1f,%.1f dist_mouse=%.1f units=%d layers=%d" % [
 		_home_pos.x, _home_pos.y, _camera_zoom(), str(_wheel_screen),
-		under_455.x, under_455.y, essen_w.x, essen_w.y,
-		under_455.distance_to(essen_w),
+		under_mouse.x, under_mouse.y, essen_w.x, essen_w.y,
+		under_mouse.distance_to(essen_w),
 		_visible_unit_count(), _city_layer_count(),
 	])
 	if _city_layer_count() != 1:
@@ -118,25 +136,69 @@ func _tick_wait_map() -> void:
 	if _focus_world == Vector2.ZERO:
 		_fail("Essen world is zero at Home")
 	_zoom_i = 0
-	_begin_zoom()
+	_begin_z1_check()
+
+
+func _begin_z1_check() -> void:
+	_restore_home()
+	_park_mouse()
+	_apply_camera(PLAY_CAM_LABEL, PLAY_Z_LABEL)
+	_park_mouse()
+	_lock_pos = PLAY_CAM_LABEL
+	_lock_zoom = PLAY_Z_LABEL
+	_settle_left = SETTLE_FRAMES
+	_phase = 4
+	print("ATLAS1 live frame want_z=%.3f cam_z=%.3f cam=%.1f,%.1f (Düsseldorf at z1.0)" % [
+		PLAY_Z_LABEL, _camera_zoom(), PLAY_CAM_LABEL.x, PLAY_CAM_LABEL.y,
+	])
 
 
 func _begin_zoom() -> void:
 	if _zoom_i >= LIVE_ZOOMS.size():
+		if not _phase_out:
+			_phase_out = true
+			_zoom_i = LIVE_ZOOMS.size() - 2
+			if _zoom_i < 0:
+				_finish()
+				return
+			_begin_zoom_out()
+			return
 		_finish()
 		return
 	var z: float = LIVE_ZOOMS[_zoom_i]
-	# Playtester: Home, then wheel at screen (455,455). Main zoom path only.
-	_wheel_to(z)
+	_restore_home()
+	_park_mouse()
+	# zstep from Home toward Play's camera, mouse then parked off-map.
+	_wheel_from_home_to_play(_zoom_i)
+	_apply_camera(PLAY_CAMS[_zoom_i], z)
+	_park_mouse()
 	var cam := _camera()
-	var pos := cam.global_position if cam != null else _home_pos
+	var pos := cam.global_position if cam != null else PLAY_CAMS[_zoom_i]
 	_lock_pos = pos
 	_lock_zoom = _camera_zoom()
 	_sync_live_counters(_lock_zoom)
 	_sync_layer_from_camera()
 	_settle_left = SETTLE_FRAMES
 	_phase = 2
-	print("ATLAS1 live frame want_z=%.3f cam_z=%.3f cam=%.1f,%.1f" % [z, _lock_zoom, pos.x, pos.y])
+	print("ATLAS1 live frame want_z=%.3f cam_z=%.3f cam=%.1f,%.1f out=%s" % [
+		z, _lock_zoom, pos.x, pos.y, str(_phase_out),
+	])
+
+
+func _begin_zoom_out() -> void:
+	var z: float = LIVE_ZOOMS[_zoom_i]
+	_park_mouse()
+	_apply_camera(PLAY_CAMS[_zoom_i], z)
+	_park_mouse()
+	_lock_pos = PLAY_CAMS[_zoom_i]
+	_lock_zoom = z
+	_sync_live_counters(z)
+	_sync_layer_from_camera()
+	_settle_left = SETTLE_FRAMES
+	_phase = 2
+	print("ATLAS1 live frame want_z=%.3f cam_z=%.3f cam=%.1f,%.1f out=true" % [
+		z, _camera_zoom(), _lock_pos.x, _lock_pos.y,
+	])
 
 
 func _check_zoom() -> void:
@@ -228,9 +290,7 @@ func _check_zoom() -> void:
 			for p3 in placed:
 				if str(p3.get("name", "")) != str(nm3) and not (str(nm3) == "Köln" and str(p3.get("name", "")) == "Cologne"):
 					continue
-				var d3 := 0.0
-				if layer.has_method("anchor_distance_px"):
-					d3 = float(layer.call("anchor_distance_px", p3))
+				var d3 := _play_dist(layer, p3)
 				if d3 > ANCHOR_MAX_PX:
 					drifted.append("%s@%.0fpx" % [str(nm3), d3])
 				break
@@ -243,6 +303,14 @@ func _check_zoom() -> void:
 	else:
 		_pass("Ruhr labels clear of live counters at z%.3f" % z)
 	_maybe_shot("live_ruhr_z%s" % str(z).replace(".", ""))
+	_record_or_check_stable(layer, placed, z)
+	if _phase_out:
+		_zoom_i -= 1
+		if _zoom_i < 0:
+			_finish()
+			return
+		_begin_zoom_out()
+		return
 	_zoom_i += 1
 	_begin_zoom()
 
@@ -338,36 +406,124 @@ func _ensure_units_on() -> void:
 
 
 func _wheel_to(target_zoom: float) -> void:
-	# One Play notch at a time, re-reading Essen each time. Theater clamp
-	# after `_zoom_toward_mouse` slips the Ruhr off the top if we keep the
-	# original Home pixel; a player following Essen does the same re-aim.
+	# Fixed off-map mouse. Never re-aim at Essen (that packed a different cam).
+	_wheel_to_screen(_wheel_screen, target_zoom)
+
+
+func _wheel_to_screen(screen: Vector2, target_zoom: float) -> void:
 	var mr := _map_renderer()
-	var essen := _focus_world
-	if essen == Vector2.ZERO:
-		essen = _essen_world()
-	if mr != null and mr.has_method("player_path_wheel_toward_world") and essen != Vector2.ZERO:
-		var guard := 0
-		while guard < 48:
-			var z := _camera_zoom()
-			if absf(z - target_zoom) <= 0.045:
-				break
-			var step := target_zoom
-			if z < target_zoom:
-				step = minf(target_zoom, z * 1.243)
-			else:
-				step = maxf(target_zoom, z / 1.243)
-			mr.call("player_path_wheel_toward_world", essen, step)
-			var z2 := _camera_zoom()
-			if absf(z2 - z) < 0.0005:
-				break
-			guard += 1
-		return
 	if mr != null and mr.has_method("player_path_wheel_toward_screen"):
-		mr.call("player_path_wheel_toward_screen", _wheel_screen, target_zoom)
+		mr.call("player_path_wheel_toward_screen", screen, target_zoom)
+		return
+	var cam := _camera()
+	if cam != null:
+		cam.zoom = Vector2(target_zoom, target_zoom)
+
+
+func _restore_home() -> void:
+	_frame_europe_home()
+	var cam := _camera()
+	if cam != null and _home_pos != Vector2.ZERO and _home_zoom > 0.04:
+		cam.position_smoothing_enabled = false
+		cam.zoom = Vector2(_home_zoom, _home_zoom)
+		cam.global_position = _home_pos
+		cam.reset_smoothing()
+
+
+func _park_mouse() -> void:
+	_wheel_screen = PLAY_WHEEL_SCREEN
+	if DisplayServer.get_name() == "headless":
+		return
+	DisplayServer.warp_mouse(Vector2i(int(PLAY_WHEEL_SCREEN.x), int(PLAY_WHEEL_SCREEN.y)))
+
+
+func _wheel_from_home_to_play(idx: int) -> void:
+	if idx < 0 or idx >= PLAY_CAMS.size():
+		return
+	var target_z: float = LIVE_ZOOMS[idx]
+	var target_pos: Vector2 = PLAY_CAMS[idx]
+	var z0 := _camera_zoom()
+	if z0 < 0.04:
+		z0 = _home_zoom
+	var c0 := _home_pos
+	var vp_c := VP * 0.5
+	var denom := (1.0 / maxf(z0, 0.04)) - (1.0 / maxf(target_z, 0.04))
+	var mouse := PLAY_WHEEL_SCREEN
+	if absf(denom) > 0.0001:
+		mouse = vp_c + (target_pos - c0) / denom
+	_wheel_to_screen(mouse, target_z)
+
+
+func _play_dist(layer: Node, p: Dictionary) -> float:
+	if layer.has_method("play_label_distance_px"):
+		return float(layer.call("play_label_distance_px", p))
+	if layer.has_method("anchor_distance_px"):
+		return float(layer.call("anchor_distance_px", p))
+	return (p.get("screen_offset", Vector2.ZERO) as Vector2).length()
+
+
+func _compass(off: Vector2) -> String:
+	if off.length() < 2.0:
+		return "on"
+	if absf(off.x) >= absf(off.y) * 1.4:
+		return "W" if off.x < 0.0 else "E"
+	if absf(off.y) >= absf(off.x) * 1.4:
+		return "N" if off.y < 0.0 else "S"
+	var ew := "W" if off.x < 0.0 else "E"
+	var ns := "N" if off.y < 0.0 else "S"
+	return ns + ew
+
+
+func _check_z1() -> void:
+	_reassert_locked_zoom(PLAY_Z_LABEL)
+	var layer := _city_layer()
+	if layer == null:
+		_fail("CityLabelsLayer missing at z%.3f" % PLAY_Z_LABEL)
+		_begin_zoom()
+		return
+	var placed: Array = layer.call("placed")
+	if not _has_name(placed, "Düsseldorf"):
+		_fail("Düsseldorf missing at live wheel z%.3f (must label at z1.0)" % PLAY_Z_LABEL)
 	else:
-		var cam := _camera()
-		if cam != null:
-			cam.zoom = Vector2(target_zoom, target_zoom)
+		_pass("Düsseldorf labelled at live wheel z%.3f" % PLAY_Z_LABEL)
+	_maybe_shot("live_ruhr_z1022")
+	_did_z1 = true
+	_begin_zoom()
+
+
+func _record_or_check_stable(layer: Node, placed: Array, z: float) -> void:
+	var key_z := "%.3f" % z
+	var now: Dictionary = {}
+	for p in placed:
+		if float(p.get("alpha", 0.0)) < 0.04:
+			continue
+		var nm := str(p.get("name", ""))
+		if nm != "Köln" and nm != "Cologne" and nm != "Herne" and not (nm in RUHR_CORE):
+			continue
+		var off := Vector2.ZERO
+		if layer.has_method("play_label_offset_px"):
+			off = layer.call("play_label_offset_px", p) as Vector2
+		else:
+			off = p.get("screen_offset", Vector2.ZERO) as Vector2
+		now[nm] = off
+	if not _phase_out:
+		_in_offsets[key_z] = now
+		return
+	if not _in_offsets.has(key_z):
+		return
+	var prev: Dictionary = _in_offsets[key_z]
+	for nm2 in now.keys():
+		if not prev.has(nm2):
+			continue
+		var a: Vector2 = prev[nm2]
+		var b: Vector2 = now[nm2]
+		var d := a.distance_to(b)
+		if d > STABLE_SLACK_PX:
+			_fail("%s zoom-in vs zoom-out at z%s offset delta %.1f px (in %.1f,%.1f out %.1f,%.1f)" % [
+				str(nm2), key_z, d, a.x, a.y, b.x, b.y,
+			])
+		else:
+			_pass("%s stable in/out at z%s (delta %.1f)" % [str(nm2), key_z, d])
 
 
 func _world_to_screen(world: Vector2) -> Vector2:
@@ -417,18 +573,26 @@ func _check_anchor_and_chrome(layer: Node, placed: Array, z: float) -> void:
 		var nm2 := str(p.get("name", ""))
 		if not required.has(nm2):
 			continue
-		var dist := 0.0
+		var dist := _play_dist(layer, p)
+		var edge := 0.0
+		var off := Vector2.ZERO
+		if layer.has_method("play_label_offset_px"):
+			off = layer.call("play_label_offset_px", p) as Vector2
+		if layer.has_method("drawn_nearest_edge_px"):
+			edge = float(layer.call("drawn_nearest_edge_px", p))
+		var pack := 0.0
 		if layer.has_method("anchor_distance_px"):
-			dist = float(layer.call("anchor_distance_px", p))
-		else:
-			var off: Vector2 = p.get("screen_offset", Vector2.ZERO)
-			dist = off.length()
-		print("ATLAS1 live anchor %s z%.3f dist=%.1f" % [nm2, z, dist])
+			pack = float(layer.call("anchor_distance_px", p))
+		print("ATLAS1 live play %s z%.3f center=%.1f edge=%.1f pack_edge=%.1f offset=%.1f,%.1f %s" % [
+			nm2, z, dist, edge, pack, off.x, off.y, _compass(off),
+		])
+		if nm2 == "Düsseldorf" and off.x < -20.0:
+			_fail("Düsseldorf %.0f W at z%.3f — flush-left into NL" % [absf(off.x), z])
 		if dist > worst:
 			worst = dist
 			worst_nm = nm2
 		if dist > ANCHOR_MAX_PX:
-			_fail("%s is %.1f px from its dot at live wheel z%.3f" % [nm2, dist, z])
+			_fail("%s is %.1f px from its dot at live wheel z%.3f (Play centre)" % [nm2, dist, z])
 	if worst <= ANCHOR_MAX_PX and not worst_nm.is_empty():
 		_pass("Ruhr cores within %.0f px of their dots at z%.3f (worst %s %.1f)" % [ANCHOR_MAX_PX, z, worst_nm, worst])
 
@@ -573,11 +737,11 @@ func _essen_world() -> Vector2:
 func _maybe_shot(name: String) -> void:
 	if DisplayServer.get_name() == "headless":
 		return
-	if _zoom_i < LIVE_ZOOMS.size():
-		_reassert_locked_zoom(LIVE_ZOOMS[_zoom_i])
+	if _lock_zoom > 0.04:
+		_reassert_locked_zoom(_lock_zoom)
 	RenderingServer.force_draw()
-	if _zoom_i < LIVE_ZOOMS.size():
-		_reassert_locked_zoom(LIVE_ZOOMS[_zoom_i])
+	if _lock_zoom > 0.04:
+		_reassert_locked_zoom(_lock_zoom)
 	RenderingServer.force_draw()
 	var vp := root.get_viewport()
 	if vp == null:

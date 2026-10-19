@@ -24,7 +24,11 @@ const ANCHOR_MAX_PX := 30.0
 ## Ruhr cores may sit beside a plate, but never far enough that the name
 ## reads as another city (Play: Düsseldorf 62 px north of its mark). Labels
 ## draw at z 30 above chips (z 28); if no slot fits, keep the default sit.
-const RUHR_ANCHOR_MAX_PX := 40.0
+## Play measures colour-mask label-centre minus the dot (FIX #6 packing
+## reported nearest-edge 8 px while Play saw Düsseldorf 44 W). Cap that
+## centre distance so the glyph sits by its own mark.
+const RUHR_ANCHOR_MAX_PX := 18.0
+const RUHR_PLAY_CENTER_MAX_PX := 16.0
 const CHIP_DIM_ALPHA := 0.72
 const COUNTER_INSET_PX := 12.0
 const CLOSE_FONT_MIN_PX := 14
@@ -99,6 +103,8 @@ var _dots: Node2D = null
 var _counters_dirty: bool = false
 var _last_counter_sig: int = 0
 var _last_counter_count: int = 0
+## pid:band → screen_offset. Zoom in and out to the same band reuse the sit.
+var _stable_off: Dictionary = {}
 
 
 func _ready() -> void:
@@ -403,11 +409,52 @@ func labels_hit_chrome(chrome_rects: Array = []) -> PackedStringArray:
 
 
 func anchor_distance_px(item: Dictionary) -> float:
-	# Nearest edge of the glyph box to the city mark — a left-of-dot
-	# "Duisburg" is still by its own dot even when the baseline is ~70 px west.
+	# Planned packing AABB nearest-edge. FIX #6 used this and reported
+	# Düsseldorf 8 px; Play's colour-mask centre was 44 W. Prefer
+	# play_label_distance_px for anything compared to a screenshot.
 	var world: Vector2 = item.get("world", Vector2.ZERO)
 	var rect: Rect2 = item.get("screen_rect", Rect2())
 	return _rect_gap_from_point(rect, _world_to_label_screen(world))
+
+
+func drawn_label_rect(item: Dictionary) -> Rect2:
+	# Glyph box actually rasterized this frame: font metrics + 3 px outline,
+	# after the camera transform. Not the packing AABB (_measure adds +4).
+	var world: Vector2 = item.get("world", Vector2.ZERO)
+	var off: Vector2 = item.get("screen_offset", Vector2(8, -2))
+	var origin := _world_to_label_screen(world)
+	var baseline := origin + off
+	var px := maxi(int(item.get("font_px", 11)), 8)
+	var text := str(item.get("name", ""))
+	var glyph: Vector2 = item.get("glyph_size", Vector2.ZERO) as Vector2
+	var ascent := float(item.get("glyph_ascent", 0.0))
+	if glyph.x < 1.0 or ascent < 1.0:
+		var metrics := _glyph_metrics(_font_or_null(), text, px)
+		glyph = metrics["size"] as Vector2
+		ascent = float(metrics["ascent"])
+	var outline := 3.0
+	return Rect2(
+		Vector2(baseline.x - outline, baseline.y - ascent - outline),
+		Vector2(glyph.x + outline * 2.0, glyph.y + outline * 2.0)
+	)
+
+
+func play_label_offset_px(item: Dictionary) -> Vector2:
+	# Play lbl.py: colour-mask label centre − city-dot centre, screen px.
+	var world: Vector2 = item.get("world", Vector2.ZERO)
+	var rect := drawn_label_rect(item)
+	if rect.size.x < 1.0:
+		return Vector2.ZERO
+	return rect.get_center() - _world_to_label_screen(world)
+
+
+func play_label_distance_px(item: Dictionary) -> float:
+	return play_label_offset_px(item).length()
+
+
+func drawn_nearest_edge_px(item: Dictionary) -> float:
+	var world: Vector2 = item.get("world", Vector2.ZERO)
+	return _rect_gap_from_point(drawn_label_rect(item), _world_to_label_screen(world))
 
 
 func labels_hit_counters(counter_rects: Array = []) -> PackedStringArray:
@@ -505,13 +552,26 @@ func place_competing(cands: Array, zoom: float, cam: Vector2, vp: Vector2, natio
 	var shift_px := max_shift
 	if close and max_shift >= LABEL_SHIFT_PX:
 		shift_px = CLOSE_SHIFT_PX
+	# Pin Ruhr cores first so MAX_ON_SCREEN / satellite order cannot drop
+	# Düsseldorf at z1.0, and so in vs out reuse the same compact sit.
+	var ruhr_pids: Dictionary = {}
+	for c0 in list:
+		var pid0 := int(c0.get("pid", 0))
+		if float(_RUHR_CORE.get(pid0, 0.0)) <= 0.05:
+			continue
+		if not _in_band(c0, zoom):
+			continue
+		_place_ruhr_core(c0, placed, nation_rects, obstacles, vp, zoom)
+		ruhr_pids[pid0] = true
 	for c in list:
+		if ruhr_pids.has(int(c.get("pid", 0))):
+			continue
 		if not _in_band(c, zoom):
 			continue
 		var is_cap := bool(c.get("capital", false))
 		var must_keep := bool(c.get("must_keep", false))
 		var pid := int(c.get("pid", 0))
-		var ruhr_keep := float(_RUHR_CORE.get(pid, 0.0)) > 0.05
+		var ruhr_keep := false
 		var enter := float(c.get("enter", 0.0))
 		var alpha := _draw_alpha(zoom, enter)
 		if alpha < 0.04 and not must_keep:
@@ -527,6 +587,9 @@ func place_competing(cands: Array, zoom: float, cam: Vector2, vp: Vector2, natio
 		if close:
 			px = maxi(px, CLOSE_FONT_MIN_PX)
 		var text := str(c.get("name", ""))
+		var metrics := _glyph_metrics(font, text, px)
+		var glyph: Vector2 = metrics["size"] as Vector2
+		var glyph_ascent := float(metrics["ascent"])
 		var size := _measure(font, text, px)
 		var ascent := size.y * 0.78
 		var base := Vector2(8.0, -2.0)
@@ -645,6 +708,8 @@ func place_competing(cands: Array, zoom: float, cam: Vector2, vp: Vector2, natio
 			"enter": enter,
 			"font_px": px,
 			"ascent": ascent,
+			"glyph_size": glyph,
+			"glyph_ascent": glyph_ascent,
 			"dot_rect": dot_rect,
 		})
 		blockers.append(dot_rect)
@@ -737,6 +802,8 @@ func _nudge_keep_apart(placed: Array, vp: Vector2) -> Array:
 			elif float(a.get("score", 0.0)) < float(b.get("score", 0.0)):
 				victim = i
 			var item: Dictionary = placed[victim]
+			if bool(item.get("ruhr_keep", false)):
+				continue
 			var world: Vector2 = item.get("world", Vector2.ZERO)
 			var anchor_s := _world_to_label_screen(world)
 			var size: Vector2 = (item.get("screen_rect", Rect2()) as Rect2).size
@@ -785,6 +852,12 @@ func _nudge_keep_off_counters(placed: Array, obstacles: Array, vp: Vector2) -> A
 				break
 		if not hits:
 			continue
+		if bool(item.get("ruhr_keep", false)):
+			# Compact sit stays. Labels draw at z 30 above chips (z 28).
+			item["over_chip"] = true
+			item["alpha"] = minf(float(item.get("alpha", 1.0)), CHIP_DIM_ALPHA)
+			placed[i] = item
+			continue
 		var world: Vector2 = item.get("world", Vector2.ZERO)
 		var anchor_s := _world_to_label_screen(world)
 		var size := rect.size
@@ -803,8 +876,6 @@ func _nudge_keep_off_counters(placed: Array, obstacles: Array, vp: Vector2) -> A
 			if _anchor_gap_px(off, size, ascent) > RUHR_ANCHOR_MAX_PX + 0.05:
 				continue
 			var cand := Rect2(anchor_s + off + Vector2(0.0, -ascent), size)
-			if bool(item.get("ruhr_keep", false)) and _ruhr_crosses_sibling(world, anchor_s, cand, keep_others):
-				continue
 			if not _rects_clear(cand, keep_others, chip_blockers, vp):
 				continue
 			item["screen_rect"] = cand
@@ -813,10 +884,6 @@ func _nudge_keep_off_counters(placed: Array, obstacles: Array, vp: Vector2) -> A
 			placed[i] = item
 			moved_off = true
 			break
-		if not moved_off and bool(item.get("ruhr_keep", false)):
-			item["over_chip"] = true
-			item["alpha"] = minf(float(item.get("alpha", 1.0)), CHIP_DIM_ALPHA)
-			placed[i] = item
 	var kept_list: Array = []
 	for i2 in placed.size():
 		var rec: Dictionary = placed[i2]
@@ -852,6 +919,8 @@ func _nudge_labels_off_foreign_dots(placed: Array, vp: Vector2) -> Array:
 				hits = true
 				break
 		if not hits:
+			continue
+		if bool(item.get("ruhr_keep", false)):
 			continue
 		var world: Vector2 = item.get("world", Vector2.ZERO)
 		var anchor_s := _world_to_label_screen(world)
@@ -1531,6 +1600,190 @@ func _slot_offsets(base: Vector2, max_shift: float) -> Array:
 	return out
 
 
+func _glyph_metrics(font: Font, text: String, px: int) -> Dictionary:
+	var sz := Vector2(maxf(float(text.length()) * float(px) * 0.56, float(px)), float(px) + 4.0)
+	var ascent := sz.y * 0.78
+	if font != null:
+		sz = font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, px)
+		ascent = font.get_ascent(px)
+		if ascent < 1.0:
+			ascent = sz.y * 0.78
+	return {"size": sz, "ascent": ascent}
+
+
+func _offset_for_glyph_center(center: Vector2, glyph: Vector2, ascent: float) -> Vector2:
+	return Vector2(center.x - glyph.x * 0.5, center.y + ascent - glyph.y * 0.5)
+
+
+func _ruhr_play_center_ok(off: Vector2, glyph: Vector2, ascent: float) -> bool:
+	var center := off + Vector2(glyph.x * 0.5, -ascent + glyph.y * 0.5)
+	return center.length() <= RUHR_PLAY_CENTER_MAX_PX + 0.05
+
+
+func _ruhr_compact_centers(pid: int) -> Array:
+	# Directional sits so 70 px names on 13 px-apart dots grow away from
+	# each other. |centre| stays inside RUHR_PLAY_CENTER_MAX_PX.
+	# Düsseldorf south/east (NL is west). Dortmund east/south (Bielefeld is
+	# further east). Duisburg west. Essen north. Köln south.
+	match pid:
+		710401: # Düsseldorf
+			return [
+				Vector2(6.0, 12.0), Vector2(0.0, 14.0), Vector2(10.0, 8.0),
+				Vector2(8.0, -6.0), Vector2(-6.0, 12.0),
+			]
+		710443: # Dortmund
+			return [
+				Vector2(12.0, 6.0), Vector2(10.0, 10.0), Vector2(0.0, 14.0),
+				Vector2(14.0, 0.0), Vector2(-6.0, 10.0), Vector2(8.0, -8.0),
+			]
+		710402: # Duisburg
+			return [
+				Vector2(-14.0, 4.0), Vector2(-12.0, 8.0), Vector2(-10.0, 0.0),
+				Vector2(0.0, 14.0), Vector2(-8.0, -8.0), Vector2(6.0, 10.0),
+			]
+		710403: # Essen
+			return [
+				Vector2(0.0, -12.0), Vector2(8.0, -10.0), Vector2(-8.0, -10.0),
+				Vector2(0.0, 14.0), Vector2(12.0, 0.0), Vector2(-10.0, 0.0),
+			]
+		710417: # Köln
+			return [
+				Vector2(8.0, 12.0), Vector2(0.0, 14.0), Vector2(12.0, 6.0),
+				Vector2(-6.0, 12.0), Vector2(8.0, -8.0),
+			]
+		_:
+			return [Vector2(0.0, 12.0), Vector2(8.0, 8.0), Vector2(-8.0, 8.0)]
+
+
+func _ruhr_compact_offsets(pid: int, glyph: Vector2, ascent: float, zoom: float) -> Array:
+	var out: Array = []
+	var skey := "%d:%d" % [pid, _LOD.city_label_band_for_zoom(zoom)]
+	if _stable_off.has(skey):
+		var prev: Vector2 = _stable_off[skey]
+		if _ruhr_play_center_ok(prev, glyph, ascent):
+			out.append(prev)
+	for c_v in _ruhr_compact_centers(pid):
+		var center: Vector2 = c_v as Vector2
+		if center.length() > RUHR_PLAY_CENTER_MAX_PX + 0.05:
+			continue
+		var off := _offset_for_glyph_center(center, glyph, ascent)
+		var dup := false
+		for existing in out:
+			if (existing as Vector2).distance_to(off) < 0.51:
+				dup = true
+				break
+		if not dup:
+			out.append(off)
+	return out
+
+
+func _place_ruhr_core(c: Dictionary, placed: Array, nation_rects: Array, obstacles: Array, vp: Vector2, zoom: float) -> void:
+	var pid := int(c.get("pid", 0))
+	var enter := float(c.get("enter", 0.0))
+	var alpha := _draw_alpha(zoom, enter)
+	if alpha < 0.04:
+		alpha = 1.0
+	var world: Vector2 = c.get("world", Vector2.ZERO)
+	var anchor_s := _world_to_label_screen(world)
+	if anchor_s.x < -160.0 or anchor_s.y < -100.0 or anchor_s.x > vp.x + 160.0 or anchor_s.y > vp.y + 100.0:
+		return
+	var close := zoom > _LOD.CITY_LABEL_MID_MAX
+	var px := _LOD.city_label_font_px(int(c.get("tier", 1)))
+	if close:
+		px = maxi(px, CLOSE_FONT_MIN_PX)
+	var text := str(c.get("name", ""))
+	var font := _font_or_null()
+	var metrics := _glyph_metrics(font, text, px)
+	var glyph: Vector2 = metrics["size"] as Vector2
+	var ascent := float(metrics["ascent"])
+	var chip_blockers: Array = _inset_counter_obstacles(obstacles, COUNTER_INSET_PX)
+	var sibling_dots: Array = []
+	for p in placed:
+		var a2 := _world_to_label_screen(p.get("world", Vector2.ZERO) as Vector2)
+		sibling_dots.append(Rect2(a2 - Vector2(DOT_BLOCK_PX, DOT_BLOCK_PX), Vector2(DOT_BLOCK_PX * 2.0, DOT_BLOCK_PX * 2.0)))
+	var nation_blockers: Array = []
+	for n in nation_rects:
+		nation_blockers.append(n)
+	var try_blockers: Array = []
+	for n2 in nation_blockers:
+		try_blockers.append(n2)
+	for o in chip_blockers:
+		try_blockers.append(o)
+	for sd in sibling_dots:
+		try_blockers.append(sd)
+	var dot_rect := Rect2(anchor_s - Vector2(DOT_BLOCK_PX, DOT_BLOCK_PX), Vector2(DOT_BLOCK_PX * 2.0, DOT_BLOCK_PX * 2.0))
+	var accepted := false
+	var chosen := Rect2()
+	var chosen_off := Vector2.ZERO
+	var over_chip := false
+	var slots: Array = _ruhr_compact_offsets(pid, glyph, ascent, zoom)
+	for off_v in slots:
+		var off: Vector2 = off_v as Vector2
+		if not _ruhr_play_center_ok(off, glyph, ascent):
+			continue
+		var rect := Rect2(anchor_s + off + Vector2(0.0, -ascent), glyph).grow(2.0)
+		if _ruhr_crosses_sibling(world, anchor_s, rect, placed):
+			continue
+		if _rects_clear(rect, placed, try_blockers, vp):
+			chosen = rect
+			chosen_off = off
+			accepted = true
+			break
+	if not accepted:
+		var keep_blockers: Array = []
+		for n3 in nation_blockers:
+			keep_blockers.append(n3)
+		for sd2 in sibling_dots:
+			keep_blockers.append(sd2)
+		for off_v2 in slots:
+			var off2: Vector2 = off_v2 as Vector2
+			if not _ruhr_play_center_ok(off2, glyph, ascent):
+				continue
+			var rect2 := Rect2(anchor_s + off2 + Vector2(0.0, -ascent), glyph).grow(2.0)
+			if _ruhr_crosses_sibling(world, anchor_s, rect2, placed):
+				continue
+			if _rects_clear(rect2, placed, keep_blockers, vp):
+				chosen = rect2
+				chosen_off = off2
+				accepted = true
+				if not _rects_clear(rect2, [], chip_blockers, vp):
+					over_chip = true
+					alpha = minf(alpha, CHIP_DIM_ALPHA)
+				break
+	if not accepted:
+		# Core must draw. First compact slot, even on a plate / sibling pad.
+		if slots.is_empty():
+			return
+		chosen_off = slots[0] as Vector2
+		chosen = Rect2(anchor_s + chosen_off + Vector2(0.0, -ascent), glyph).grow(2.0)
+		accepted = true
+		if not _rects_clear(chosen, [], chip_blockers, vp):
+			over_chip = true
+			alpha = minf(alpha, CHIP_DIM_ALPHA)
+	var skey := "%d:%d" % [pid, _LOD.city_label_band_for_zoom(zoom)]
+	_stable_off[skey] = chosen_off
+	placed.append({
+		"name": text,
+		"pid": pid,
+		"screen_rect": chosen,
+		"screen_offset": chosen_off,
+		"capital": bool(c.get("capital", false)),
+		"must_keep": true,
+		"ruhr_keep": true,
+		"tier": int(c.get("tier", 1)),
+		"alpha": alpha,
+		"over_chip": over_chip,
+		"score": float(c.get("score", 0.0)),
+		"world": world,
+		"enter": enter,
+		"font_px": px,
+		"ascent": ascent,
+		"glyph_size": glyph,
+		"glyph_ascent": ascent,
+		"dot_rect": dot_rect,
+	})
+
+
 func _measure(font: Font, text: String, px: int) -> Vector2:
 	if font != null:
 		var sz := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, px)
@@ -1559,6 +1812,9 @@ func _zoom_for_band(band_name: String) -> float:
 
 func _in_band(c: Dictionary, zoom: float) -> bool:
 	var band := _LOD.city_label_band_for_zoom(zoom)
+	var pid := int(c.get("pid", 0))
+	if float(_RUHR_CORE.get(pid, 0.0)) > 0.05 and band != _LOD.CITY_BAND_HOME:
+		return true
 	var tier := int(c.get("tier", 1))
 	var capital := bool(c.get("capital", false))
 	var score := float(c.get("score", 0.0))
@@ -1688,7 +1944,7 @@ func _load_candidates() -> void:
 			"tier": tier,
 			"score": score,
 			"capital": capital,
-			"must_keep": capital or pid == 710403,
+			"must_keep": capital or pid == 710403 or core_bonus > 0.05,
 			"hub": hub or core_bonus > 0.05,
 			"world": world,
 			"enter": 0.0,
