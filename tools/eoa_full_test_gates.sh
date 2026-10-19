@@ -193,6 +193,9 @@ print('open_p0_n=0 landed=%s' % p.get('landed_n'))
 run_step air_physics_p1 \
   "$PYTHON" -m unittest tools.map_generation.tests.test_air_physics_p1_product -v || fail
 
+run_step bavaria1_terrain \
+  "$PYTHON" -m unittest tools.map_generation.tests.test_bavaria1_terrain_keywords -v || fail
+
 if [[ "$QUICK" -eq 1 ]]; then
   if [[ "$FAILED" -eq 0 ]]; then
     log "ALL PASSED (quick pure-only)"
@@ -386,6 +389,9 @@ else
 
   run_step launch_hwy3_supply_toggle_cache \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessHwy3SupplyToggleCacheTest.gd || fail
+
+  run_step launch_bavaria1_terrain \
+    tools/run_godot.sh --headless -s res://scripts/core/HeadlessBavaria1TerrainTest.gd || fail
 
   run_step launch_live_lon_probe \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessLiveLonProbe.gd || fail
