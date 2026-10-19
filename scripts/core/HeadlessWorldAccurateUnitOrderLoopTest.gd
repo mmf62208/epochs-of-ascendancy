@@ -38,6 +38,7 @@ var _designed_fid: String = ""
 
 
 func _init() -> void:
+	OS.set_environment("EOA_CAMPAIGN_LOOP", "1")
 	OS.set_environment("EOA_SCENARIO_EARLY_WARS", "1")
 	call_deferred("_run_and_quit")
 
@@ -82,6 +83,12 @@ func _run() -> void:
 	if not _setup_maginot_map():
 		return
 	if not _setup_formations():
+		return
+	var war_fx: GDScript = load("res://scripts/core/Cl1WarFixture.gd") as GDScript
+	var ger_fra: Dictionary = war_fx.declare(ATT_TAG, DEF_TAG) if war_fx != null else {"ok": false}
+	var jap_chi: Dictionary = war_fx.declare(JAP_TAG, CHI_TAG) if war_fx != null else {"ok": false}
+	if not bool(ger_fra.get("ok", false)) or not bool(jap_chi.get("ok", false)):
+		_fail("WarStateDomain.declare_war failed GER-FRA=%s JAP-CHI=%s" % [str(ger_fra), str(jap_chi)])
 		return
 	if not _setup_map_renderer_pins():
 		return
@@ -1443,10 +1450,13 @@ func _test_peace_occupation() -> void:
 		_fail("living declare apply not ok: %s" % str(dec_out))
 		return
 	wg = gd.call("get_war_goal_state") as Dictionary
-	if int(wg.get("pushes", 0)) < 1:
-		_fail("war goal not declared (pushes): %s" % str(wg))
+	var war_fx2: GDScript = load("res://scripts/core/Cl1WarFixture.gd") as GDScript
+	var declared_w: Dictionary = war_fx2.declare(ATT_TAG, DEF_TAG) if war_fx2 != null else {"ok": false}
+	var war_dom: GDScript = load("res://scripts/core/WarStateDomain.gd") as GDScript
+	if not bool(declared_w.get("ok", false)) or war_dom == null or not bool(war_dom.is_at_war(ATT_TAG, DEF_TAG)):
+		_fail("war goal not declared (at_war): %s wg=%s" % [str(declared_w), str(wg)])
 		return
-	_pass("living declare pushes=%d" % int(wg.get("pushes", 0)))
+	_pass("living declare at_war GER-FRA via WarStateDomain")
 	var fra_p: Object = _mm.call("get_province", FRA_FRONT) if _mm.has_method("get_province") else null
 	if fra_p == null:
 		_fail("FRA front missing for peace transfer")

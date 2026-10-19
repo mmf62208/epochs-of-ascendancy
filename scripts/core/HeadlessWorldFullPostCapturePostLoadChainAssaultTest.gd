@@ -33,6 +33,7 @@ var _bm: Node = null
 
 
 func _init() -> void:
+	OS.set_environment("EOA_CAMPAIGN_LOOP", "1")
 	call_deferred("_run_and_quit")
 
 
@@ -85,6 +86,11 @@ func _run() -> void:
 		return
 	_bm = bm_script.new()
 	root.add_child(_bm)
+	var war_fx: GDScript = load("res://scripts/core/Cl1WarFixture.gd") as GDScript
+	var war_res: Dictionary = war_fx.declare_pairs([[ATT_TAG, DEF_TAG], [ATT_TAG, NEXT_TAG]]) if war_fx != null else {"ok": false, "reason": "missing"}
+	if not bool(war_res.get("ok", false)):
+		_fail("WarStateDomain.declare_war GER/FRA+BEL failed: %s" % str(war_res))
+		return
 
 	_test_invalid_assault_no_crash()
 	_test_postload_chain_three()
