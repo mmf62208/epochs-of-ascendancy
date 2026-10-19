@@ -526,17 +526,6 @@ func start_land_battle(
 	var def_tag := str(preview.get("defender_tag", "")).strip_edges().to_upper()
 	var def_divs: Array[Dictionary] = get_divisions_at_province(to_id, def_tag)
 	if def_divs.is_empty():
-		if _interactive_light_sim() and _is_ai_empty_hex_vs_human_player(tag, to_id):
-			print(
-				"MAIN_FIX1_CAPTURE_SRC who=BattleManager.start_land_battle skip=ai_empty_hex_vs_player attacker=%s defender=%s pid=%d"
-				% [tag, def_tag, to_id]
-			)
-			return {
-				"success": false,
-				"reason": "ai empty-hex vs player skipped",
-				"instant": false,
-				"opened": false,
-			}
 		if _interactive_light_sim():
 			_apply_attacker_win_capture_light(tag, to_id, from_pid, fid)
 			return {"success": true, "instant": true, "opened": false, "light_capture": true}
@@ -554,17 +543,6 @@ func start_land_battle(
 	var def_pick := _pick_strongest_division(def_divs, target, def_tag)
 	var def_fid := str(def_pick.get("formation_id", "")).strip_edges()
 	if def_fid.is_empty():
-		if _interactive_light_sim() and _is_ai_empty_hex_vs_human_player(tag, to_id):
-			print(
-				"MAIN_FIX1_CAPTURE_SRC who=BattleManager.start_land_battle skip=ai_empty_hex_vs_player attacker=%s defender=%s pid=%d"
-				% [tag, def_tag, to_id]
-			)
-			return {
-				"success": false,
-				"reason": "ai empty-hex vs player skipped",
-				"instant": false,
-				"opened": false,
-			}
 		if _interactive_light_sim():
 			_apply_attacker_win_capture_light(tag, to_id, from_pid, fid)
 			return {"success": true, "instant": true, "opened": false, "light_capture": true}
@@ -1428,41 +1406,6 @@ func _interactive_light_sim() -> bool:
 	)
 
 
-func _human_player_tag() -> String:
-	var player_tag := "GER"
-	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_player_country_tag"):
-		var pt := str(LeaderManager.call("get_player_country_tag")).strip_edges().to_upper()
-		if not pt.is_empty():
-			player_tag = pt
-	elif typeof(SessionPlayers) != TYPE_NIL:
-		for slot in SessionPlayers.slots:
-			if slot is Dictionary and str((slot as Dictionary).get("control", "")).to_lower() == "human":
-				var ht := str((slot as Dictionary).get("tag", "")).strip_edges().to_upper()
-				if not ht.is_empty():
-					player_tag = ht
-				break
-	return player_tag
-
-
-## Live F5: AI cannot instant-occupy the human player's land on an empty hex
-## (Play: GER declare POL → POL empty-hex "captures" GER Elbląski / Słupski).
-func _is_ai_empty_hex_vs_human_player(attacker_tag: String, target_pid: int) -> bool:
-	if include_player_in_ai_land_battles:
-		return false
-	var att := attacker_tag.strip_edges().to_upper()
-	var player := _human_player_tag()
-	if att.is_empty() or player.is_empty() or att == player:
-		return false
-	if typeof(MapManager) == TYPE_NIL or target_pid < 0:
-		return false
-	var live: Province = MapManager.get_province(target_pid) if MapManager.has_method("get_province") else null
-	if live == null:
-		return false
-	var owner := str(live.owner_tag).strip_edges().to_upper()
-	var ctrl := _province_controller_tag(live)
-	return owner == player or ctrl == player
-
-
 func _deferred_resolve_attacker_win(att_tag: String, to_id: int, from_id: int, att_fid: String) -> void:
 	# Hang-class: F5 capture is data-only (no second resolve, no owner signal).
 	_apply_attacker_win_capture_light(att_tag, to_id, from_id, att_fid)
@@ -1519,6 +1462,7 @@ func _apply_attacker_win_capture_light(att_tag: String, to_id: int, from_id: int
 		"from_province_id": from_id,
 		"previous_owner_tag": previous_owner,
 		"previous_controller_tag": previous_controller,
+		"undefended": true,
 		"outcome": "attacker",
 		"winner": "attacker",
 	}
@@ -3021,8 +2965,8 @@ func _post_battle_news(result: Dictionary, captured: bool) -> void:
 			target_name = p.name
 			owner_now = str(p.owner_tag).strip_edges().to_upper()
 			ctrl_now = _province_controller_tag(p)
-	# MAIN-FIX-1: diplomatic declare / empty-hex vs the player must not toast a
-	# capture unless owner_tag (or controller) actually became the attacker.
+	# MAIN-FIX-1: toast a capture only when owner_tag actually became the attacker.
+	# Wording is "Poland captured Elbląski from Germany" (+ " (undefended)" on empty hex).
 	if captured:
 		var previous_owner := str(result.get("previous_owner_tag", defender)).strip_edges().to_upper()
 		var previous_ctrl := str(result.get("previous_controller_tag", previous_owner)).strip_edges().to_upper()
@@ -3044,13 +2988,51 @@ func _post_battle_news(result: Dictionary, captured: bool) -> void:
 				% pid
 			)
 			return
-	var title := "Province captured" if captured else "Battle: %s" % outcome
-	var body := "%s vs %s at %s" % [attacker, defender, target_name if not target_name.is_empty() else str(pid)]
+		var from_tag := previous_owner if not previous_owner.is_empty() else defender
+		var pname := target_name if not target_name.is_empty() else str(pid)
+		var title := "%s captured %s from %s" % [
+			_country_display_name(attacker),
+			pname,
+			_country_display_name(from_tag),
+		]
+		if bool(result.get("undefended", false)):
+			title += " (undefended)"
+		print(
+			"MAIN_FIX1_CAPTURE_SRC who=BattleManager._post_battle_news post title=%s body=%s"
+			% [title, "Province captured"]
+		)
+		LeaderEventUI.post_news(title, "Province captured", "combat")
+		return
+	var title_b := "Battle: %s" % outcome
+	var body_b := "%s vs %s at %s" % [attacker, defender, target_name if not target_name.is_empty() else str(pid)]
 	print(
 		"MAIN_FIX1_CAPTURE_SRC who=BattleManager._post_battle_news post title=%s body=%s"
-		% [title, body]
+		% [title_b, body_b]
 	)
-	LeaderEventUI.post_news(title, body, "combat")
+	LeaderEventUI.post_news(title_b, body_b, "combat")
+
+
+func _country_display_name(tag: String) -> String:
+	var t := tag.strip_edges().to_upper()
+	if t.is_empty():
+		return "?"
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_country"):
+		var c: Variant = MapManager.get_country(t)
+		if c is Dictionary:
+			var nm := str((c as Dictionary).get("name", "")).strip_edges()
+			if not nm.is_empty() and nm.to_upper() != t:
+				return nm
+	if t == "GER":
+		return "Germany"
+	if t == "POL":
+		return "Poland"
+	if t == "FRA":
+		return "France"
+	if t == "ENG":
+		return "United Kingdom"
+	if t == "LUX":
+		return "Luxembourg"
+	return t
 
 ## === HISTORICAL OOB (TestRunner / harness) ===
 func force_historical_oob_for_battle(battle_key: String, year: int = 1942, custom_pids: Dictionary = {}) -> Dictionary:

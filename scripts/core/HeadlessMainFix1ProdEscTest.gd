@@ -140,11 +140,20 @@ func _test_source_needles() -> void:
 	if "no_owner_or_control_flip_to_attacker" not in news:
 		_fail("_post_battle_news must skip capture toast unless owner/control flipped to attacker")
 		return
+	if "captured %s from %s" not in news:
+		_fail("_post_battle_news must word captures as attacker captured X from owner")
+		return
+	if "(undefended)" not in news:
+		_fail("_post_battle_news must mark undefended empty-hex captures")
+		return
 	if "previous_owner_tag" not in _slice_func(bm, "_apply_attacker_win_capture_light"):
 		_fail("light capture must record previous_owner_tag")
 		return
-	if "ai_empty_hex_vs_player" not in bm:
-		_fail("start_land_battle must skip AI empty-hex vs the human player")
+	if "undefended" not in _slice_func(bm, "_apply_attacker_win_capture_light"):
+		_fail("light capture must flag undefended empty hexes")
+		return
+	if "_is_ai_empty_hex_vs_human_player" in bm:
+		_fail("AI empty-hex vs the human player must not be skipped")
 		return
 	if not peace.is_empty():
 		var sheet := _slice_func(peace, "_open_campaign_peace_sheet")

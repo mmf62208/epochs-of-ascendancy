@@ -40,7 +40,7 @@ Play MIXED on main `d00dc8ed`: Esc with Production open opened Command Center on
 
 **Esc:** `MapRenderer._handle_escape_key` dismisses `ProductionAssignmentScreen` (via `close_screen`) before `_esc_open_command_center`. Idle Esc still opens Command Center.
 
-**Capture (FIX #1):** Live toast `Province captured · POL vs GER at Elbląski` was `BattleManager._post_battle_news` after POL AI empty-hex of GER-owned Elbląski (`711086`, Polish name + POL core, 1936 owner GER). Declare is still diplomatic-only. Interactive light sim now skips AI empty-hex vs the human player's land; capture toasts log `MAIN_FIX1_CAPTURE_SRC` and require owner (not controller-only) to become the attacker. Peace sheet buttons use Retrowave press-mode chrome, apply, log `MAIN_FIX1_PEACE_BTN`, and close.
+**Capture (FIX #1):** Live toast at Elbląski was a **true** POL empty-hex of GER-owned 1936 land (`711086`, Polish name + POL core). AI empty-hex vs the human player is **not** skipped. Capture toasts log `MAIN_FIX1_CAPTURE_SRC`, fire only on a real owner flip, and read `Poland captured Elbląski from Germany (undefended)`. Peace sheet buttons use Retrowave press-mode chrome, apply, log `MAIN_FIX1_PEACE_BTN`, and close.
 
 ```bash
 tools/run_godot.sh --headless --path . --resolution 1280x800 \
@@ -57,7 +57,7 @@ tools/eoa_main_fix1_declare_toast_guard.sh
 
 Wired as `launch_main_fix1_prod_esc`, `launch_main_fix1_peace_click`, `launch_main_fix1_declare_toast` on the full gate script (not `--quick`). `--quick` stays the same 14 known `unit_board_play_path` reds.
 
-FIX #1 measured: ProdEsc **RESULT=PASS** (0 SCRIPT ERROR). PeaceClick **RESULT=PASS** (Annex all moved=1, Keep occupied moved=0). xvfb DeclareToast **RESULT=PASS** (10 days, Elbląski/Słupski stayed GER, toast cards=0). DeclareClick / WarGate / CapitulationPeace **PASS**. UI-POLISH-1 + PROD-1 keep-green **PASS**. `--quick` `FAILED (failures=14)`. map_qc NE **0.9853**. Toast root: `BattleManager._post_battle_news` line 3008.
+FIX #1: toast wording + AI empty-hex restored. Work is on `grok/main-fix-1` (PR #116). PR #117 closed without merge.
 
 ### 1. Core Time System Tests
 

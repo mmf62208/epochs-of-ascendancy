@@ -9,8 +9,9 @@ extends SceneTree
 ## Declare is diplomatic only: after the click, 3 live days must not issue
 ## a new order to any player unit or move any player unit.
 ##
-## MAIN-FIX-1: diplomatic Declare must not toast "Province captured" when
-## no owner_tag actually flips (Play MIXED: POL vs GER at Słupski).
+## MAIN-FIX-1: diplomatic Declare must not toast a capture when no owner_tag
+## actually flips. A real AI empty-hex of GER land may toast
+## "Poland captured X from Germany (undefended)".
 
 const PLAY_SIZE := Vector2i(1280, 800)
 const FLUSH_FRAMES := 8
@@ -201,11 +202,11 @@ func _run() -> void:
 		_cleanup()
 		return
 	var ger_border: Object = mm.call("get_province", _pol_from) if mm.has_method("get_province") else null
-	if ger_border == null or str(ger_border.get("owner_tag")).strip_edges().to_upper() != "GER":
-		_fail("AI empty-hex flipped GER border pid %d" % _pol_from)
-		_cleanup()
-		return
-	_pass("POL empty-hex vs GER pid %d skipped (still GER)" % _pol_from)
+	var border_owner := str(ger_border.get("owner_tag")).strip_edges().to_upper() if ger_border != null else ""
+	if border_owner == "GER":
+		_pass("GER border pid %d still GER after AI start" % _pol_from)
+	else:
+		_pass("POL empty-hex took GER pid %d now %s" % [_pol_from, border_owner])
 	if not _assert_same_owner_light_capture_silent(mm):
 		_cleanup()
 		return
@@ -255,9 +256,13 @@ func _capture_news_entries() -> Array:
 		if typeof(raw) != TYPE_DICTIONARY:
 			continue
 		var row: Dictionary = raw
-		if str(row.get("title", "")).strip_edges() != "Province captured":
+		var title := str(row.get("title", "")).strip_edges()
+		var body := str(row.get("body", "")).strip_edges()
+		if " captured " in title and " from " in title:
+			out.append("%s · %s" % [title, body])
 			continue
-		out.append("%s · %s" % [str(row.get("title", "")), str(row.get("body", ""))])
+		if title == "Province captured":
+			out.append("%s · %s" % [title, body])
 	return out
 
 
@@ -277,8 +282,18 @@ func _assert_no_false_capture_notice(mm: Node, label: String) -> bool:
 			"%s no capture notice (GER %d / POL %d unchanged, news +%d)"
 			% [label, ger_now.size(), pol_now.size(), new_count]
 		)
-	else:
-		_pass("%s ownership changed; capture news allowed (+%d)" % [label, new_count])
+		return true
+	if new_count < 1:
+		_fail("%s owner flipped with no capture toast: GER %d→%d POL %d→%d" % [
+			label, ger_before.size(), ger_now.size(), pol_before.size(), pol_now.size()
+		])
+		return false
+	for item in news.slice(_capture_news_before_declare, news.size()) if news.size() > _capture_news_before_declare else []:
+		var line := str(item)
+		if " captured " not in line or " from " not in line:
+			_fail("%s capture toast not 'attacker captured X from owner': %s" % [label, line])
+			return false
+	_pass("%s ownership changed; capture news allowed (+%d)" % [label, new_count])
 	return true
 
 

@@ -332,12 +332,11 @@ Diplomatic-only Declare (item 4) on tip `b677890f`:
 
 Play MIXED on main `d00dc8ed`: right after GER Declare on POL, a notice `Province captured · POL vs GER at Słupski` appeared with no matching battle/march/assault log and Słupski still POL-owned.
 
-**Root (FIX #1 live):** unique toast format is still `BattleManager._post_battle_news`. After diplomatic Declare, live F5 runs `try_ai_start_land_battles`; POL empty-hex captures GER-owned Elbląski `711086` / Słupski `711091` (1936 GER, Polish names + POL cores). Inspector 10 days later shows Owner POL / Core POL, which looks like “always POL.” `godot.log` had no line because `_post_battle_news` did not print. Headless DeclareClick cleared `LeaderManager.formations`, so POL never started.
+**Root (FIX #1 live):** unique toast path is still `BattleManager._post_battle_news`. After diplomatic Declare, live F5 runs `try_ai_start_land_battles`; POL empty-hex captures GER-owned Elbląski `711086` / Słupski `711091` (1936 GER, Polish names + POL cores). That owner flip is real. `godot.log` had no line because `_post_battle_news` did not print.
 
-**Fix:** interactive light sim skips AI empty-hex vs the human player's land (stops the flip). Capture toasts log `MAIN_FIX1_CAPTURE_SRC` and require an owner flip to the attacker. Controller-only flips are logged and not toasted. Peace sheet buttons are Retrowave `ACTION_MODE_BUTTON_PRESS`, apply+log+close.
+**Fix:** keep AI empty-hex capture (do not make the human immune). Toast only on a real owner flip; word it `Poland captured Elbląski from Germany (undefended)`; log `MAIN_FIX1_CAPTURE_SRC`. Peace sheet buttons are Retrowave `ACTION_MODE_BUTTON_PRESS`, apply+log+close.
 
-Guards: DeclareClick stations a POL border division and asserts the GER hex stays GER; xvfb `WindowedMainFix1DeclareToastGuard` watches the toast layer 10 in-game days; `HeadlessMainFix1PeaceClickTest` clicks Annex all and Keep occupied.
-- FIX #1 measured: ProdEsc **PASS** (0 SCRIPT ERROR). PeaceClick **PASS** (Annex all moved=1, Keep occupied moved=0). xvfb DeclareToast **PASS** (10 days, toast cards=0, Elbląski/Słupski stayed GER). DeclareClick / WarGate / CapitulationPeace **PASS**. Toast root `BattleManager._post_battle_news` :3008.
+Guards: DeclareClick allows a real POL empty-hex of GER land if the toast matches the owner flip; xvfb `WindowedMainFix1DeclareToastGuard` watches 10 in-game days with GER border hexes empty (0 toasts if no flip; 1:1 correctly worded toast per flip); `HeadlessMainFix1PeaceClickTest` clicks Annex all and Keep occupied.
 - Existing CL1: WarGate, CapitulationPeace, Soak all `RESULT=PASS`.
 - Seed `multi_ai_decisions` md5 `20fe9063de285f19d4f9b8a105abfd31` default and `EOA_CAMPAIGN_LOOP=0`.
 - `--quick` same 14 `unit_board_play_path` reds. map_qc NE **0.9853** (3148/3195).

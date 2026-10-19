@@ -1,8 +1,10 @@
 extends SceneTree
 
-## Windowed (xvfb) MAIN-FIX-1 guard: GER declares on POL and the toast layer
-## is watched for 10 in-game days. A "Province captured" notice is only allowed
-## when owner or controller actually became the attacker.
+## Windowed (xvfb) MAIN-FIX-1 guard: GER declares on POL with GER border hexes
+## empty, then the toast layer is watched for 10 in-game days. An AI empty-hex
+## capture may happen. If it does, each toast must be "Poland captured X from
+## Germany (undefended)" and that province must actually change owner. No
+## owner change → 0 toasts.
 ##
 ##   tools/eoa_main_fix1_declare_toast_guard.sh
 ##
@@ -85,13 +87,9 @@ func _run() -> void:
 		_fail("auto-declared before click")
 		_finish()
 		return
-	_owners_before = {
-		"GER": _owned_pids(mm, "GER"),
-		"POL": _owned_pids(mm, "POL"),
-		str(ELBLAG_PID): _owner_of(mm, ELBLAG_PID),
-		str(SLUPSK_PID): _owner_of(mm, SLUPSK_PID),
-		str(pol_from): _owner_of(mm, pol_from),
-	}
+	_owners_before = _owner_map(mm)
+	_owners_before["GER_N"] = _owned_pids(mm, "GER")
+	_owners_before["POL_N"] = _owned_pids(mm, "POL")
 	_news_before = _capture_news().size()
 	var declared: Dictionary = _war.player_declare_from_province(pol_to)
 	if not bool(declared.get("ok", false)):
@@ -129,13 +127,9 @@ func _run() -> void:
 	_log_pid(mm, "after", ELBLAG_PID, "Elbląski")
 	_log_pid(mm, "after", SLUPSK_PID, "Słupski")
 	_log_pid(mm, "after", pol_from, "GER border")
-	if str(_owners_before.get(str(ELBLAG_PID), "")) == "GER" and _owner_of(mm, ELBLAG_PID) == "GER":
-		_pass("Elbląski stayed GER (no AI empty-hex of player land)")
-	elif str(_owners_before.get(str(ELBLAG_PID), "")) == "GER":
-		_pass("Elbląski now %s (capture toast gated)" % _owner_of(mm, ELBLAG_PID))
-	if str(_owners_before.get(str(SLUPSK_PID), "")) == "GER" and _owner_of(mm, SLUPSK_PID) == "GER":
-		_pass("Słupski stayed GER")
-	_scan_toast_layer(lui)
+	if not _assert_toast_owner_match(mm, lui):
+		_finish()
+		return
 	_finish()
 
 
@@ -144,31 +138,74 @@ func _assert_toasts(mm: Node, label: String) -> bool:
 	var new_rows: Array = news.slice(_news_before, news.size()) if news.size() > _news_before else []
 	for raw in new_rows:
 		var row: Dictionary = raw
-		var body := str(row.get("body", ""))
-		var attacker := body.get_slice(" vs ", 0).strip_edges().to_upper()
-		var pid := _pid_from_capture_body(mm, body)
+		var title := str(row.get("title", "")).strip_edges()
+		var parsed: Dictionary = _parse_capture_title(title)
+		if parsed.is_empty():
+			_fail("%s capture toast not 'attacker captured X from owner': %s" % [label, title])
+			return false
+		var pid := _pid_from_province_name(mm, str(parsed.get("province", "")))
 		if pid <= 0:
-			_fail("%s capture news has no province: %s" % [label, body])
+			_fail("%s capture news has no province: %s" % [label, title])
 			return false
 		var owner := _owner_of(mm, pid)
-		var ctrl := _controller_of(mm, pid)
-		if attacker.is_empty() or (owner != attacker and ctrl != attacker):
-			_fail(
-				"%s Province captured but attacker %s does not hold pid=%d owner=%s ctrl=%s body=%s"
-				% [label, attacker, pid, owner, ctrl, body]
-			)
-			return false
-		var prev := str(_owners_before.get(str(pid), owner))
+		var prev := str(_owners_before.get(pid, _owners_before.get(str(pid), owner)))
 		if prev == owner:
 			_fail(
-				"%s Province captured with no owner change pid=%d owner=%s body=%s"
-				% [label, pid, owner, body]
+				"%s capture toast with no owner change pid=%d owner=%s title=%s"
+				% [label, pid, owner, title]
 			)
 			return false
-		_pass("%s real capture pid=%d %s → %s (%s)" % [label, pid, prev, owner, body])
+		var att_name := str(parsed.get("attacker", ""))
+		if att_name == "Poland" and owner != "POL":
+			_fail("%s Poland toast but owner is %s pid=%d" % [label, owner, pid])
+			return false
+		if att_name == "Germany" and owner != "GER":
+			_fail("%s Germany toast but owner is %s pid=%d" % [label, owner, pid])
+			return false
+		_pass("%s real capture pid=%d %s → %s (%s)" % [label, pid, prev, owner, title])
 	if new_rows.is_empty():
-		_pass("%s no Province captured toast" % label)
+		_pass("%s no capture toast" % label)
 	_news_before = news.size()
+	return true
+
+
+func _assert_toast_owner_match(mm: Node, lui: Node) -> bool:
+	var flips: Array = _flipped_pids(mm)
+	var news: Array = _capture_news()
+	if flips.is_empty():
+		if not news.is_empty():
+			_fail("no ownership change but capture toasts=%d %s" % [news.size(), str(news)])
+			return false
+		_pass("no ownership change; toast cards=0")
+		_scan_toast_layer(lui)
+		return true
+	if news.size() != flips.size():
+		_fail(
+			"capture toasts=%d must equal owner flips=%d news=%s flips=%s"
+			% [news.size(), flips.size(), str(news), str(flips)]
+		)
+		return false
+	var named: Dictionary = {}
+	for raw in news:
+		var row: Dictionary = raw
+		var title := str(row.get("title", "")).strip_edges()
+		var parsed: Dictionary = _parse_capture_title(title)
+		if parsed.is_empty():
+			_fail("final capture toast wording: %s" % title)
+			return false
+		var pid := _pid_from_province_name(mm, str(parsed.get("province", "")))
+		if pid not in flips:
+			_fail("toast names pid=%d which did not flip: %s" % [pid, title])
+			return false
+		named[pid] = true
+		if str(parsed.get("from", "")) == "Germany" and bool(parsed.get("undefended", false)) == false:
+			_fail("GER land empty-hex toast missing (undefended): %s" % title)
+			return false
+	if named.size() != flips.size():
+		_fail("toasts named %d pids, flips=%d" % [named.size(), flips.size()])
+		return false
+	_pass("toasts=%d flips=%d 1:1 correctly worded" % [news.size(), flips.size()])
+	_scan_toast_layer(lui)
 	return true
 
 
@@ -183,7 +220,10 @@ func _scan_toast_layer(lui: Node) -> void:
 	var found := 0
 	for child in (tc as Node).get_children():
 		var text := _control_text(child)
-		if "Province captured" in text:
+		if " captured " in text and " from " in text:
+			found += 1
+			print("  [INFO] toast layer: %s" % text)
+		elif "Province captured" in text:
 			found += 1
 			print("  [INFO] toast layer: %s" % text)
 	_pass("toast layer capture cards=%d" % found)
@@ -210,27 +250,76 @@ func _capture_news() -> Array:
 		if typeof(raw) != TYPE_DICTIONARY:
 			continue
 		var row: Dictionary = raw
-		if str(row.get("title", "")).strip_edges() != "Province captured":
+		var title := str(row.get("title", "")).strip_edges()
+		var body := str(row.get("body", "")).strip_edges()
+		if " captured " in title and " from " in title:
+			out.append(row)
 			continue
-		out.append(row)
+		if title == "Province captured":
+			out.append(row)
 	return out
 
 
-func _pid_from_capture_body(mm: Node, body: String) -> int:
-	var at_i := body.find(" at ")
-	if at_i < 0:
-		return -1
-	var name := body.substr(at_i + 4).strip_edges()
-	if mm == null or not mm.has_method("get_all_provinces"):
+func _parse_capture_title(title: String) -> Dictionary:
+	var t := title.strip_edges()
+	var cap := t.find(" captured ")
+	var frm := t.find(" from ")
+	if cap < 0 or frm <= cap:
+		return {}
+	var attacker := t.substr(0, cap).strip_edges()
+	var pname := t.substr(cap + 10, frm - (cap + 10)).strip_edges()
+	var rest := t.substr(frm + 6).strip_edges()
+	var undef := rest.ends_with("(undefended)")
+	if undef:
+		rest = rest.substr(0, rest.length() - 13).strip_edges()
+	return {
+		"attacker": attacker,
+		"province": pname,
+		"from": rest,
+		"undefended": undef,
+	}
+
+
+func _pid_from_province_name(mm: Node, name: String) -> int:
+	var want := name.strip_edges()
+	if want.is_empty() or mm == null or not mm.has_method("get_all_provinces"):
 		return -1
 	var provs: Variant = mm.call("get_all_provinces")
 	if not (provs is Dictionary):
 		return -1
 	for pid_v in (provs as Dictionary).keys():
 		var p: Object = (provs as Dictionary)[pid_v]
-		if p != null and str(p.get("name")) == name:
+		if p != null and str(p.get("name")) == want:
 			return int(pid_v)
 	return -1
+
+
+func _owner_map(mm: Node) -> Dictionary:
+	var out := {}
+	if mm == null or not mm.has_method("get_all_provinces"):
+		return out
+	var provs: Variant = mm.call("get_all_provinces")
+	if not (provs is Dictionary):
+		return out
+	for pid_v in (provs as Dictionary).keys():
+		var pid := int(pid_v)
+		out[pid] = _owner_of(mm, pid)
+	return out
+
+
+func _flipped_pids(mm: Node) -> Array:
+	var out: Array = []
+	var now: Dictionary = _owner_map(mm)
+	for pid_v in now.keys():
+		if typeof(pid_v) != TYPE_INT:
+			continue
+		var pid := int(pid_v)
+		var before := str(_owners_before.get(pid, now[pid]))
+		var after := str(now[pid])
+		if before != after:
+			out.append(pid)
+	out.sort()
+	return out
 
 
 func _owned_pids(mm: Node, tag: String) -> Array:
