@@ -615,6 +615,16 @@ func set_mode(mode: String, notify_renderer: bool = true) -> void:
 	var m := mode.strip_edges().to_lower()
 	if not m in MODES:
 		m = "political"
+	## Renderer sync passes current_map_mode. While L/legend is on, show Supply
+	## unless the primary mode is already Supply or Infra.
+	if (
+		not notify_renderer
+		and _map_renderer != null
+		and bool(_map_renderer.get("supply_mode"))
+		and m != "infra"
+		and m != "supply"
+	):
+		m = "supply"
 	if m == _current_mode and notify_renderer:
 		_sync_mode_chip_pressed()
 		return

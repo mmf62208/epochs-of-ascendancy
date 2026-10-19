@@ -14853,7 +14853,7 @@ func _sync_mapmode_toolbar() -> void:
 	if _map_mode_toolbar == null or not is_instance_valid(_map_mode_toolbar):
 		return
 	if _map_mode_toolbar.has_method("set_mode"):
-		_map_mode_toolbar.call("set_mode", _toolbar_highlight_mode(), false)
+		_map_mode_toolbar.call("set_mode", current_map_mode, false)
 
 
 ## Mapmode / F1: every province node visible (undo viewport cull holes).
