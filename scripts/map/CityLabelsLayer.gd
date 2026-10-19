@@ -582,25 +582,29 @@ func place_competing(cands: Array, zoom: float, cam: Vector2, vp: Vector2, natio
 				accepted = true
 				break
 		if not accepted and keep:
-			# Ignore chips only for capitals/must-keep. Ruhr cores that
-			# cannot sit chip-clear inside the cap stay on the default
-			# slot (drawn above the plate) rather than jumping cities.
+			# Ignore chips for capitals/must-keep, and for Ruhr cores that
+			# still sit on their own side inside the cap (drawn above the
+			# plate). Far walks that jump Essen are never considered.
 			var keep_blockers: Array = []
 			for n2 in nation_rects:
 				keep_blockers.append(n2)
 			for sd2 in sibling_dots:
 				keep_blockers.append(sd2)
-			if is_cap or must_keep:
-				for off_v2 in _candidate_slots(base, walk_shift, size, ascent, anchor_s, placed, keep):
-					var off2: Vector2 = off_v2 as Vector2
-					if _anchor_gap_px(off2, size, ascent) > walk_anchor + 0.05:
-						continue
-					var rect2 := Rect2(anchor_s + off2 + Vector2(0.0, -ascent), size)
-					if _rects_clear(rect2, placed, keep_blockers, vp):
-						chosen = rect2
-						chosen_off = off2
-						accepted = true
-						break
+			for off_v2 in _candidate_slots(base, walk_shift, size, ascent, anchor_s, placed, keep):
+				var off2: Vector2 = off_v2 as Vector2
+				if _anchor_gap_px(off2, size, ascent) > walk_anchor + 0.05:
+					continue
+				var rect2 := Rect2(anchor_s + off2 + Vector2(0.0, -ascent), size)
+				if ruhr_keep and _ruhr_crosses_sibling(world, anchor_s, rect2, placed):
+					continue
+				if _rects_clear(rect2, placed, keep_blockers, vp):
+					chosen = rect2
+					chosen_off = off2
+					accepted = true
+					if ruhr_keep and not _rects_clear(rect2, [], chip_blockers, vp):
+						over_chip = true
+						alpha = minf(alpha, CHIP_DIM_ALPHA)
+					break
 		if not accepted and (is_cap or must_keep):
 			var cap_base: Vector2 = anchor_s + base
 			chosen = Rect2(cap_base + Vector2(0.0, -ascent), size)
