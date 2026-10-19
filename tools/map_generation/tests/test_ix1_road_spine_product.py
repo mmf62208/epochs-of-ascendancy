@@ -32,6 +32,7 @@ from ix1_road_spine_product import (  # noqa: E402
     ix1_search_go_spine_visible,
     ix1_spine_complete_zoom_gate,
     ix1_spine_start_after_press,
+    load_accurate_adjacency,
     load_ix1_spec,
     movement_cost,
     shipped_api_integrity,
@@ -54,6 +55,13 @@ class TestIx1RoadSpineProduct(unittest.TestCase):
         adj = corridor_is_owned_adjacent(spec)
         self.assertTrue(adj.get("ok"), msg=adj)
         self.assertEqual(adj.get("n"), 3)
+        # ADJ-V3 dropped the knn false Bonn–Köln border. The spine stays one
+        # land chain through Rhein-Sieg-Kreis. Köln–Leverkusen is direct.
+        self.assertEqual(adj.get("bridged"), ["710417-710416"])
+        self.assertEqual(adj.get("bridge_id"), 710425)
+        live = load_accurate_adjacency()
+        self.assertIn(710418, live[710417])
+        self.assertNotIn(710416, live[710417])
 
     def test_apply_order_edges_and_cost(self) -> None:
         board = empty_board(infra=4, development_level=2)

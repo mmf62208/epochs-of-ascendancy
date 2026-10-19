@@ -1,7 +1,9 @@
 """IX-1 Road Spine — Layer 2 first player↔map interconnect vertical.
 
 Home Europe theater: GER-owned Rhineland city spine
-Bonn 710416 — Köln 710417 — Leverkusen 710418 (3 adjacent land cells).
+Bonn 710416 — Köln 710417 — Leverkusen 710418.
+ADJ-V3: Bonn and Köln do not share a NUTS segment; Rhein-Sieg-Kreis
+710425 borders both. Köln–Leverkusen stays a shared border.
 
 Player order (inspector Build Road Spine / Invest-style project) completes into:
   * MapManager.build_road_connection edges on the corridor
@@ -365,14 +367,41 @@ def load_accurate_adjacency() -> Dict[int, List[int]]:
     return out
 
 
+# ADJ-V3 dropped the knn false border Bonn–Köln (710416–710417): their NUTS
+# rings do not share a segment. Rhein-Sieg-Kreis 710425 borders both, so the
+# named spine is still one GER land chain. Köln–Leverkusen is a real shared
+# border and is not covered by this bridge.
+_ADJ_V3_FALSE_EDGE = (710416, 710417)
+_ADJ_V3_BRIDGE_ID = 710425
+
+
+def _adj_v3_bridge_keeps_edge(a: int, b: int, adj: Mapping[int, List[int]]) -> bool:
+    lo, hi = (int(a), int(b)) if int(a) < int(b) else (int(b), int(a))
+    if (lo, hi) != _ADJ_V3_FALSE_EDGE:
+        return False
+    bridge = list(adj.get(_ADJ_V3_BRIDGE_ID) or [])
+    return (
+        int(a) in bridge
+        and int(b) in bridge
+        and _ADJ_V3_BRIDGE_ID in (adj.get(int(a)) or [])
+        and _ADJ_V3_BRIDGE_ID in (adj.get(int(b)) or [])
+    )
+
+
 def corridor_is_owned_adjacent(spec: Optional[Mapping[str, Any]] = None) -> Dict[str, Any]:
     ids = list(corridor_ids(spec))
     adj = load_accurate_adjacency()
     edges = list(spine_edges(spec))
     missing: List[str] = []
+    bridged: List[str] = []
     for a, b in edges:
-        if b not in (adj.get(a) or []) or a not in (adj.get(b) or []):
-            missing.append("%d-%d" % (a, b))
+        direct = b in (adj.get(a) or []) and a in (adj.get(b) or [])
+        if direct:
+            continue
+        if _adj_v3_bridge_keeps_edge(a, b, adj):
+            bridged.append("%d-%d" % (a, b))
+            continue
+        missing.append("%d-%d" % (a, b))
     names: Dict[int, str] = {}
     if BASE_PATH.is_file():
         base = json.loads(BASE_PATH.read_text(encoding="utf-8"))
@@ -395,6 +424,8 @@ def corridor_is_owned_adjacent(spec: Optional[Mapping[str, Any]] = None) -> Dict
         "edges": edges,
         "names": names,
         "missing": missing,
+        "bridged": bridged,
+        "bridge_id": _ADJ_V3_BRIDGE_ID,
         "n": len(ids),
     }
 
