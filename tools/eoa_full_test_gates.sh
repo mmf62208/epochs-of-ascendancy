@@ -320,6 +320,10 @@ else
     tools/run_godot.sh --headless --path . --resolution 1280x800 \
     -s res://scripts/core/HeadlessProd1ButtonOpenTest.gd || fail
 
+  run_step launch_ui_polish1 \
+    tools/run_godot.sh --headless --path . --resolution 1280x800 \
+    -s res://scripts/core/HeadlessUiPolish1Test.gd || fail
+
   run_step launch_ix1_spine_complete \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessIx1RoadSpineCompleteTest.gd || fail
 
@@ -424,6 +428,9 @@ else
 
   run_step launch_campaign_loop1_declare_click \
     tools/run_godot.sh --headless --path . --resolution 1280x800 -s res://scripts/core/HeadlessCampaignLoop1DeclareClickTest.gd || fail
+
+  run_step launch_campaign_loop1_topbar_fit \
+    tools/run_godot.sh --headless --path . --resolution 1280x800 -s res://scripts/core/HeadlessCampaignLoop1TopBarFitTest.gd || fail
 
   run_step launch_campaign_loop1_capitulation \
     tools/run_godot.sh --headless --path . -s res://scripts/core/HeadlessCampaignLoop1CapitulationPeaceTest.gd || fail
