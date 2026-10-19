@@ -62,6 +62,8 @@ const WIDTH_COMPACT := 1400
 const WIDTH_NARROW := 1100
 const WIDTH_SHOW_RESOURCES := 1500
 const WIDTH_SHOW_ALL_SPEEDS := 900
+const WAR_CHIP_MAX_COMPACT := 72.0
+const WAR_CHIP_MAX_WIDE := 160.0
 
 @onready var _content_row: HBoxContainer = $ContentRow
 @onready var _resources_container: HBoxContainer = $ContentRow/RightContainer/ResourcesContainer
@@ -114,6 +116,8 @@ func _ready() -> void:
 		cr.offset_top = 6.0
 		cr.offset_bottom = -6.0
 		cr.clip_contents = false
+		cr.grow_horizontal = Control.GROW_DIRECTION_END
+		cr.alignment = BoxContainer.ALIGNMENT_BEGIN
 	if typeof(TimeManager) != TYPE_NIL:
 		if not TimeManager.game_year_advanced.is_connected(_on_game_year_advanced):
 			TimeManager.game_year_advanced.connect(_on_game_year_advanced)
@@ -173,7 +177,10 @@ func host_map_search_chrome(search: Control) -> void:
 	search.modulate = Color(1, 1, 1, 1)
 	search.process_mode = Node.PROCESS_MODE_ALWAYS
 	search.clip_contents = false
-	search.custom_minimum_size = Vector2(308, 32)
+	var compact_search := false
+	if get_viewport() != null:
+		compact_search = get_viewport().get_visible_rect().size.x < WIDTH_COMPACT
+	search.custom_minimum_size = Vector2(240.0 if compact_search else 308.0, 32.0)
 	if slot == _right_container:
 		search.set_anchors_preset(Control.PRESET_TOP_LEFT, false)
 		search.anchor_left = 0.0
@@ -332,13 +339,19 @@ func _apply_responsive_layout() -> void:
 		_content_row.offset_bottom = -6.0
 		_content_row.add_theme_constant_override("separation", 4 if narrow else 6)
 		_content_row.clip_contents = false
+		_content_row.alignment = BoxContainer.ALIGNMENT_BEGIN
+		_content_row.grow_horizontal = Control.GROW_DIRECTION_END
 
 	if _left_container:
 		_left_container.add_theme_constant_override("separation", 4)
 		_left_container.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+		_left_container.clip_contents = false
 		if date_time_label and date_time_label.get_parent() != _left_container:
 			date_time_label.reparent(_left_container)
 			_left_container.move_child(date_time_label, mini(1, _left_container.get_child_count() - 1))
+	if _time_speed_container:
+		_time_speed_container.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+		_time_speed_container.clip_contents = false
 
 	if _right_container:
 		_right_container.add_theme_constant_override("separation", 6)
@@ -370,12 +383,16 @@ func _apply_responsive_layout() -> void:
 
 	if date_time_label:
 		date_time_label.visible = true
-		date_time_label.custom_minimum_size = Vector2(120 if narrow else (136 if compact else 148), 26)
+		date_time_label.custom_minimum_size = Vector2(100 if compact else 148, 26)
 		date_time_label.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 		date_time_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		date_time_label.clip_text = true
 		date_time_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		date_time_label.add_theme_font_size_override("font_size", 12 if compact else 13)
 		date_time_label.tooltip_text = GameDateDisplay.format_top_bar_tooltip()
+	_apply_war_chip_layout(vp_w)
+	_apply_units_compact_label(compact)
+	_apply_search_compact(compact)
 
 	if menu_button and is_instance_valid(menu_button):
 		menu_button.text = "Menu" if not narrow else "M"
@@ -844,10 +861,13 @@ func sync_units_view_button(shown: bool) -> void:
 	if units_view_button == null or not is_instance_valid(units_view_button):
 		return
 	units_view_button.set_pressed_no_signal(shown)
-	units_view_button.text = "Units" if shown else "Units off"
 	units_view_button.tooltip_text = (
 		"Hide unit counters (U). View only." if shown else "Show unit counters (U). View only."
 	)
+	var compact := false
+	if get_viewport() != null:
+		compact = get_viewport().get_visible_rect().size.x < WIDTH_COMPACT
+	_apply_units_compact_label(compact)
 
 
 func _on_units_view_toggled(pressed: bool) -> void:
@@ -1311,7 +1331,20 @@ func _pause_for_menu(pause: bool) -> void:
 
 
 func _update_date_time() -> void:
-	date_time_label.text = GameDateDisplay.format_top_bar_line(true)
+	var vp_w := 1280.0
+	if get_viewport() != null:
+		vp_w = get_viewport().get_visible_rect().size.x
+	var compact := vp_w < WIDTH_COMPACT
+	if compact:
+		var date: Dictionary = GameDateDisplay.get_current_date_dict()
+		date_time_label.text = GameDateDisplay.format_calendar_date(
+			int(date.get("year", 1936)),
+			int(date.get("month", 1)),
+			int(date.get("day", 1)),
+			true,
+		)
+	else:
+		date_time_label.text = GameDateDisplay.format_top_bar_line(true)
 	var tip := GameDateDisplay.format_top_bar_tooltip()
 	date_time_label.tooltip_text = tip
 	pause_button.tooltip_text = "Pause / resume simulation\n\n" + tip if not tip.is_empty() else "Pause / resume simulation"
@@ -1320,6 +1353,106 @@ func _update_date_time() -> void:
 		pause_button.tooltip_text = "Resume simulation\n\n" + tip if not tip.is_empty() else "Resume simulation"
 	else:
 		date_time_label.modulate = Color.WHITE
+	refresh_campaign_war_readout()
+
+
+func refresh_campaign_war_readout() -> void:
+	var lbl := find_child("CampaignWarReadout", true, false) as Label
+	if lbl == null:
+		lbl = Label.new()
+		lbl.name = "CampaignWarReadout"
+		lbl.mouse_filter = Control.MOUSE_FILTER_STOP
+		lbl.clip_text = true
+		lbl.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		lbl.autowrap_mode = TextServer.AUTOWRAP_OFF
+		lbl.add_theme_font_size_override("font_size", 12)
+		lbl.add_theme_color_override("font_color", Color(0.95, 0.75, 0.45))
+		var host := get_node_or_null("ContentRow")
+		if host == null:
+			add_child(lbl)
+		else:
+			host.add_child(lbl)
+			if _left_container != null:
+				var idx := _left_container.get_index() + 1
+				host.move_child(lbl, mini(idx, host.get_child_count() - 1))
+	var line := ""
+	if typeof(WarStateDomain) != TYPE_NIL:
+		line = WarStateDomain.player_enemies_line()
+	lbl.text = _compact_war_chip_text(line)
+	lbl.tooltip_text = _war_chip_tooltip(line)
+	lbl.visible = not line.is_empty()
+	var vp_w := 1280.0
+	if get_viewport() != null:
+		vp_w = get_viewport().get_visible_rect().size.x
+	_apply_war_chip_layout(vp_w)
+
+
+func _compact_war_chip_text(line: String) -> String:
+	var raw := line.strip_edges()
+	if raw.is_empty():
+		return ""
+	var names := raw
+	if names.begins_with("At war:"):
+		names = names.substr(7).strip_edges()
+	var parts: PackedStringArray = names.split(", ", false)
+	if parts.is_empty():
+		return raw
+	if parts.size() == 1:
+		return "At war: %s" % parts[0]
+	return "At war: %s +%d" % [parts[0], parts.size() - 1]
+
+
+func _war_chip_tooltip(line: String) -> String:
+	var raw := line.strip_edges()
+	if raw.is_empty():
+		return ""
+	var names := raw
+	if names.begins_with("At war:"):
+		names = names.substr(7).strip_edges()
+	var parts: PackedStringArray = names.split(", ", false)
+	if parts.is_empty():
+		return raw
+	return "At war with:\n" + "\n".join(parts)
+
+
+func _apply_war_chip_layout(vp_w: float) -> void:
+	var lbl := find_child("CampaignWarReadout", true, false) as Label
+	if lbl == null:
+		return
+	var compact := vp_w < WIDTH_COMPACT
+	var max_w := WAR_CHIP_MAX_COMPACT if compact else WAR_CHIP_MAX_WIDE
+	lbl.clip_text = true
+	lbl.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	lbl.autowrap_mode = TextServer.AUTOWRAP_OFF
+	lbl.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	if lbl.visible and not str(lbl.text).is_empty():
+		lbl.custom_minimum_size = Vector2(max_w, 26.0)
+	else:
+		lbl.custom_minimum_size = Vector2(0.0, 0.0)
+
+
+func _apply_search_compact(compact: bool) -> void:
+	var search: Control = _find_hosted_map_search()
+	if search == null or not is_instance_valid(search):
+		return
+	search.custom_minimum_size = Vector2(240.0 if compact else 308.0, 32.0)
+	var line: Control = search.get_node_or_null("SearchLineEdit") as Control
+	if line != null:
+		line.custom_minimum_size = Vector2(172.0 if compact else 240.0, 28.0)
+
+
+func _apply_units_compact_label(compact: bool) -> void:
+	if units_view_button == null or not is_instance_valid(units_view_button):
+		return
+	if compact:
+		units_view_button.text = "U"
+		units_view_button.custom_minimum_size = Vector2(32, 26)
+	else:
+		var shown := true
+		if units_view_button.toggle_mode:
+			shown = units_view_button.button_pressed
+		units_view_button.text = "Units" if shown else "Units off"
+		units_view_button.custom_minimum_size = Vector2(64, 28)
 
 
 func _update_resources() -> void:

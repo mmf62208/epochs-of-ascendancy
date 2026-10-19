@@ -35,6 +35,7 @@ var _chip: Node2D = null
 
 
 func _init() -> void:
+	OS.set_environment("EOA_SCENARIO_EARLY_WARS", "1")
 	call_deferred("_start")
 
 

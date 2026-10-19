@@ -5,6 +5,9 @@ extends Node
 signal battle_started(context: Dictionary)
 signal battle_resolved(result: Dictionary)
 
+## Harness-only. Live play stays false (campaign-loop mutant M11).
+var include_player_in_ai_land_battles: bool = false
+
 const DEFAULT_GARRISON_TEMPLATE := "german_infantry_division_1943_mixed"
 
 ## Multi-day land battle (mirrors unit_multi_day_battle_product).
@@ -273,6 +276,9 @@ func can_assault_province(
 		return {"ok": false, "reason": "Target has no owner"}
 	if defender_tag == tag:
 		return {"ok": false, "reason": "Cannot attack your own province"}
+	if typeof(WarStateDomain) != TYPE_NIL and WarStateDomain.loop_enabled():
+		if not WarStateDomain.is_at_war(tag, defender_tag):
+			return {"ok": false, "reason": "Not at war with %s" % WarStateDomain.tag_name(defender_tag)}
 
 	var source := find_attack_source(tag, target_province_id, from_province_id)
 	if not bool(source.get("ok", false)):
@@ -599,6 +605,8 @@ func start_land_battle(
 func try_ai_start_land_battles(day_index: int = 0) -> Dictionary:
 	if OS.get_environment("EOA_AI_LAND_BATTLES").strip_edges() == "0":
 		return {"ok": true, "skipped": true, "reason": "killswitch", "started_n": 0}
+	if typeof(WarStateDomain) != TYPE_NIL and WarStateDomain.ai_stopped():
+		return {"ok": true, "skipped": true, "reason": "campaign_end", "started_n": 0}
 	if typeof(LandBattleAi) == TYPE_NIL:
 		return {"ok": false, "reason": "no planner", "started_n": 0}
 	if typeof(MapManager) == TYPE_NIL:
@@ -621,9 +629,15 @@ func try_ai_start_land_battles(day_index: int = 0) -> Dictionary:
 	var candidates: Array = []
 	for raw_tag in majors:
 		var tag := str(raw_tag).to_upper()
-		if tag.is_empty() or tag == player_tag:
+		if tag.is_empty() or (tag == player_tag and not include_player_in_ai_land_battles):
 			continue
 		candidates.append(tag)
+	if typeof(WarStateDomain) != TYPE_NIL and WarStateDomain.loop_enabled():
+		var fighting: Array = []
+		for c in candidates:
+			if not WarStateDomain.enemies_of(str(c)).is_empty():
+				fighting.append(c)
+		candidates = fighting
 	candidates.sort_custom(func(a, b):
 		return LandBattleAi.personality_aggression(str(a)) > LandBattleAi.personality_aggression(str(b))
 	)
@@ -664,7 +678,7 @@ func try_ai_start_land_battles(day_index: int = 0) -> Dictionary:
 		var tag2 := str(candidates[i])
 		if not MapManager.has_method("collect_live_border_assault_targets"):
 			break
-		var targets: Array = MapManager.collect_live_border_assault_targets(tag2, 4)
+		var targets: Array = _ai_border_targets(tag2)
 		for raw_t in targets:
 			if typeof(raw_t) != TYPE_DICTIONARY:
 				continue
@@ -749,8 +763,13 @@ func try_ai_start_land_battles(day_index: int = 0) -> Dictionary:
 			if not best_spare.is_empty():
 				march_opps.append(best_spare)
 
+	# Harness autopilot only. Live play passes the real player so plan_day
+	# will not order the human's divisions.
+	var plan_player := player_tag
+	if include_player_in_ai_land_battles:
+		plan_player = "OBS"
 	var plan: Dictionary = LandBattleAi.plan_day(
-		opportunities, player_tag, int(day_index), open_hexes, open_per_tag, 1
+		opportunities, plan_player, int(day_index), open_hexes, open_per_tag, 1
 	)
 	var started: Array = []
 	for raw_pick in plan.get("picks", []):
@@ -776,7 +795,7 @@ func try_ai_start_land_battles(day_index: int = 0) -> Dictionary:
 	var marched: Array = []
 	if true:
 		var mplan: Dictionary = LandBattleAi.plan_marches(
-			march_opps, player_tag, int(day_index), marching_fids, combat_fids, 1
+			march_opps, plan_player, int(day_index), marching_fids, combat_fids, 1
 		)
 		for raw_mp in mplan.get("picks", []):
 			if typeof(raw_mp) != TYPE_DICTIONARY:
@@ -799,7 +818,7 @@ func try_ai_start_land_battles(day_index: int = 0) -> Dictionary:
 	if not marched.is_empty():
 		print("BattleManager: AI marched %d spare(s) toward front (enqueue_own_land_march, day=%d)" % [marched.size(), int(day_index)])
 
-	var follow: Dictionary = try_ai_follow_on_after_win(player_tag)
+	var follow: Dictionary = try_ai_follow_on_after_win(plan_player)
 	return {
 		"ok": true,
 		"started_n": started.size(),
@@ -810,6 +829,32 @@ func try_ai_start_land_battles(day_index: int = 0) -> Dictionary:
 		"player_tag": player_tag,
 		"eligible_n": int(plan.get("eligible_n", 0)),
 	}
+
+
+## Cap 4 stays the live default so existing harnesses keep today's first targets.
+## A campaign front whose first four staging hexes are empty still has divisions
+## further along the border. Look at those before giving up. No new march planner.
+func _ai_border_targets(tag: String) -> Array:
+	var first: Array = MapManager.collect_live_border_assault_targets(tag, 4)
+	if typeof(WarStateDomain) == TYPE_NIL or not WarStateDomain.loop_enabled():
+		return first
+	if WarStateDomain.enemies_of(tag).is_empty():
+		return first
+	if _border_targets_have_division(tag, first):
+		return first
+	var wide := int(WarStateDomain.rules().get("ai_border_target_cap", 64))
+	return MapManager.collect_live_border_assault_targets(tag, maxi(wide, 4))
+
+
+func _border_targets_have_division(tag: String, targets: Array) -> bool:
+	for raw_t in targets:
+		if typeof(raw_t) != TYPE_DICTIONARY:
+			continue
+		var t: Dictionary = raw_t
+		var preview: Dictionary = can_assault_province(tag, int(t.get("province_id", -1)), int(t.get("from_province_id", -1)))
+		if bool(preview.get("ok", false)) and not str(preview.get("formation_id", "")).is_empty():
+			return true
+	return false
 
 
 func try_ai_follow_on_after_win(player_tag: String = "") -> Dictionary:
@@ -1529,6 +1574,29 @@ func _record_land_aar(battle: Dictionary, winner: String, to_id: int) -> void:
 	_log_unit_combat(fid, int(battle.get("from_id", -1)), to_id, log_result, "attacker")
 	for dfid in _fid_list(battle, "def_fids", "def_fid"):
 		_log_unit_combat(str(dfid), to_id, int(battle.get("from_id", -1)), log_result, "defender")
+
+
+## Capitulation: close every open land battle that names this tag and clear is_in_combat.
+func close_land_battles_for_tag(tag: String) -> int:
+	var t := tag.strip_edges().to_upper()
+	if t.is_empty():
+		return 0
+	var keep: Array = []
+	var closed := 0
+	for raw in _open_land_battles:
+		if typeof(raw) != TYPE_DICTIONARY:
+			keep.append(raw)
+			continue
+		var b: Dictionary = raw
+		var att := str(b.get("att_tag", "")).strip_edges().to_upper()
+		var def := str(b.get("def_tag", "")).strip_edges().to_upper()
+		if att == t or def == t:
+			_finish_land_battle_hold(b)
+			closed += 1
+		else:
+			keep.append(b)
+	_open_land_battles = keep
+	return closed
 
 
 func _finish_land_battle_hold(battle: Dictionary) -> void:

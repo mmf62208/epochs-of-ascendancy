@@ -24,6 +24,8 @@ var division_templates: DivisionTemplateLoader = DivisionTemplateLoader.new()
 var _countries: Dictionary[String, Variant] = {}
 var _city_layer: Dictionary = {}
 var _routes: Dictionary[String, SupplyRoutePlan] = {}
+var _control_batch_depth: int = 0
+var _control_batch_enqueue: bool = false
 var _default_routes: Dictionary[String, SupplyRoutePlan] = {}
 var overlay_visible: bool = false
 var routing_mode_override: String = ""
@@ -394,6 +396,24 @@ func notify_hub_stats_changed(province_id: int) -> void:
 ## that now pass through a hostile or impassable pid, and enqueues affected
 ## dests ONCE. The pid leaves the dirty set immediately. Flush never
 ## re-scans or re-drops. Old friendly routes keep serving until swap.
+## Coalesce the friendly-gain dest enqueue across an annex_all batch.
+func begin_control_batch() -> void:
+	_control_batch_depth += 1
+
+
+func end_control_batch() -> void:
+	if _control_batch_depth <= 0:
+		_control_batch_depth = 0
+		return
+	_control_batch_depth -= 1
+	if _control_batch_depth > 0:
+		return
+	if _control_batch_enqueue:
+		_control_batch_enqueue = false
+		_enqueue_all_current_dests()
+	_defer_day_flush_once()
+
+
 func notify_province_control_changed(province_id: int) -> void:
 	if province_id <= 0:
 		return
@@ -425,9 +445,13 @@ func notify_province_control_changed(province_id: int) -> void:
 		# Friendly gain (recapture / annex-to-us). Detours do not touch this
 		# pid, so "enqueue routes touching pid" keeps the long path. Enqueue
 		# every default dest; old routes serve until each swaps.
-		_enqueue_all_current_dests()
+		if _control_batch_depth > 0:
+			_control_batch_enqueue = true
+		else:
+			_enqueue_all_current_dests()
 	_control_dirty_pids.erase(province_id)
-	_defer_day_flush_once()
+	if _control_batch_depth <= 0:
+		_defer_day_flush_once()
 	if not hub_changed and not is_depot and dropped == 0 and _refill_queue.is_empty():
 		return
 	network_ownership_refresh_count += 1

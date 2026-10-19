@@ -40,6 +40,9 @@ var _chip: Node2D = null
 
 
 func _init() -> void:
+	# Maginot Open fight → Start battle is GER 710173 → FRA 710739.
+	# Peaceful 1936 blocks that unless the harness early-war pair is on.
+	OS.set_environment("EOA_SCENARIO_EARLY_WARS", "1")
 	call_deferred("_start")
 
 
