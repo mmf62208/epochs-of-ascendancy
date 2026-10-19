@@ -14,7 +14,8 @@ const LIVE_ZOOMS: Array[float] = [1.217, 1.512, 2.904]
 const VP := Vector2(1280, 800)
 const ZOOM_SLACK := 0.14
 const PLAY_WHEEL_SCREEN := Vector2(455, 455)
-const ANCHOR_MAX_PX := 80.0
+const ANCHOR_MAX_PX := 45.0
+const ORDER_SLACK_PX := 8.0
 const RUHR_CORE := ["Essen", "Duisburg", "Düsseldorf", "Dortmund", "Köln"]
 var _wheel_screen := PLAY_WHEEL_SCREEN
 
@@ -182,8 +183,7 @@ func _check_zoom() -> void:
 				_fail("Köln missing at live wheel z%.3f" % z)
 		elif not _has_name(placed, core):
 			_fail("%s missing at live wheel z%.3f" % [core, z])
-	if z >= 2.3:
-		_check_ruhr_north_south(placed, z)
+	_check_ruhr_north_south(placed, z)
 	if _has_name(placed, "Hamm") and not _has_name(placed, "Essen"):
 		_fail("Hamm kept over Essen at live wheel z%.3f" % z)
 	if _has_name(placed, "Münster") and not _has_name(placed, "Essen"):
@@ -394,6 +394,8 @@ func _check_anchor_and_chrome(layer: Node, placed: Array, z: float) -> void:
 		var nm := str(h)
 		if required.has(nm):
 			_fail("%s hidden under UI/tooltip at live wheel z%.3f" % [nm, z])
+	var worst := 0.0
+	var worst_nm := ""
 	for p in placed:
 		if float(p.get("alpha", 0.0)) < 0.04:
 			continue
@@ -406,41 +408,54 @@ func _check_anchor_and_chrome(layer: Node, placed: Array, z: float) -> void:
 		else:
 			var off: Vector2 = p.get("screen_offset", Vector2.ZERO)
 			dist = off.length()
+		print("ATLAS1 live anchor %s z%.3f dist=%.1f" % [nm2, z, dist])
+		if dist > worst:
+			worst = dist
+			worst_nm = nm2
 		if dist > ANCHOR_MAX_PX:
 			_fail("%s is %.1f px from its dot at live wheel z%.3f" % [nm2, dist, z])
+	if worst <= ANCHOR_MAX_PX and not worst_nm.is_empty():
+		_pass("Ruhr cores within %.0f px of their dots at z%.3f (worst %s %.1f)" % [ANCHOR_MAX_PX, z, worst_nm, worst])
 
 
 func _check_ruhr_north_south(placed: Array, z: float) -> void:
-	var rows: Array = []
+	# Label centres. Düsseldorf jumping ~60 px north of its mark reads as a
+	# city north of Essen/Duisburg; slack is only a few pixels of beside-dot sit.
+	var ok := true
+	ok = _require_north_of(placed, "Duisburg", "Düsseldorf", z) and ok
+	ok = _require_north_of(placed, "Essen", "Düsseldorf", z) and ok
+	ok = _require_north_of(placed, "Düsseldorf", "Köln", z) and ok
+	if ok:
+		_pass("Ruhr N/S order at live wheel z%.3f" % z)
+
+
+func _core_label_center_y(placed: Array, want: String) -> float:
+	var also := ""
+	if want == "Köln":
+		also = "Cologne"
 	for p in placed:
 		if float(p.get("alpha", 0.0)) < 0.04:
 			continue
 		var nm := str(p.get("name", ""))
-		if nm == "Cologne":
-			nm = "Köln"
-		if not (nm in RUHR_CORE):
+		if nm != want and nm != also:
 			continue
-		var world: Vector2 = p.get("world", Vector2.ZERO)
 		var rect: Rect2 = p.get("screen_rect", Rect2())
-		# Marks (dots) define N/S. Labels may sit ±30 px beside their own
-		# mark; Essen vs Duisburg are ~9 px apart at z 2.9 so label-centers
-		# can invert by a few pixels without the cities swapping.
-		rows.append({"name": nm, "world_y": world.y, "screen_y": rect.get_center().y})
-	if rows.size() < 5:
-		return
-	rows.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
-		return float(a.get("world_y", 0.0)) < float(b.get("world_y", 0.0))
-	)
-	for i in range(rows.size() - 1):
-		var a: Dictionary = rows[i]
-		var b: Dictionary = rows[i + 1]
-		if float(a.get("screen_y", 0.0)) > float(b.get("screen_y", 0.0)) + ANCHOR_MAX_PX:
-			_fail(
-				"%s drawn south of %s at live wheel z%.3f (world N→S broken)"
-				% [str(a.get("name", "")), str(b.get("name", "")), z]
-			)
-			return
-	_pass("Ruhr N/S order at live wheel z%.3f" % z)
+		return rect.get_center().y
+	return -1.0e9
+
+
+func _require_north_of(placed: Array, north_name: String, south_name: String, z: float) -> bool:
+	var ny := _core_label_center_y(placed, north_name)
+	var sy := _core_label_center_y(placed, south_name)
+	if ny < -1.0e8 or sy < -1.0e8:
+		return true
+	if ny > sy + ORDER_SLACK_PX:
+		_fail(
+			"%s drawn south of %s at live wheel z%.3f (label centres %.1f vs %.1f)"
+			% [north_name, south_name, z, ny, sy]
+		)
+		return false
+	return true
 
 
 func _hwy3_visible_names() -> PackedStringArray:
