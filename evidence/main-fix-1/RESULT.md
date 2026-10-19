@@ -2,6 +2,7 @@
 
 **Branch:** `grok/main-fix-1` (PR **#116**)  
 **Cursor PR #117:** closed without merge (commits fast-forwarded here; we do not merge `cursor/*`)  
+**Tip:** `920b411b` (product) / this file on a follow-up docs commit  
 **Merge:** HOLD until live Play re-runs GER Declare + peace click  
 **Date:** 2026-10-19
 
@@ -35,4 +36,16 @@ Camera Baltic jump is not the Esc handler. No change.
 
 ## Tests
 
-See the following commit after the gate run.
+| Guard | Result |
+|---|---|
+| `HeadlessMainFix1ProdEscTest` | **RESULT=PASS** (failures=0) · 0 SCRIPT ERROR |
+| `HeadlessMainFix1PeaceClickTest` | **RESULT=PASS** Annex all moved=1, Keep occupied moved=0 |
+| `WindowedMainFix1DeclareToastGuard` (xvfb, 10 days, GER hexes empty) | **RESULT=PASS** on declare 0 toasts; then `Poland captured Opolski from Germany (undefended)` pid 711080 GER→POL; day 1 Gliwicki 711058 + Bytomski 711057; **toasts=3 flips=3 1:1** |
+| `HeadlessCampaignLoop1DeclareClickTest` | **RESULT=PASS** on declare 0 toasts; GER hold on 711057 stayed GER; same-owner light capture silent |
+| `HeadlessCampaignLoop1WarGateTest` | **RESULT=PASS** |
+| `HeadlessUiPolish1Test` (#114) | **RESULT=PASS** · 0 SCRIPT ERROR |
+| `HeadlessProd1ButtonOpenTest` (#112) | **RESULT=PASS** · 0 SCRIPT ERROR |
+| `tools/eoa_full_test_gates.sh --quick` | EXIT 1 · `Ran 374` · **FAILED (failures=14)** same known set. `land_battle_stance` **ok**. HOI open_p0=0 |
+| `map_qc` | NE **0.9853** (3148/3195) |
+
+Logs: `/tmp/main-fix-1/`.
