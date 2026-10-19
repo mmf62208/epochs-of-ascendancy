@@ -483,10 +483,10 @@ def build_hong_kong_island_land_product(board_dir: str = "") -> Dict[str, Any]:
         passes.append("great_lakes_untouched")
 
     sea_block = sum(1 for pid in base if int(pid) >= 950000)
-    if sea_block != 340:
+    if sea_block != 341:
         fails.append(f"sea_block_changed n={sea_block}")
     else:
-        passes.append("seas_340_unchanged")
+        passes.append("seas_341_unchanged")
 
     n_board = len(base)
     if n_board < 3510 or n_board > 3540:

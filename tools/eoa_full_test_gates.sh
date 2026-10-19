@@ -199,6 +199,9 @@ run_step bavaria1_terrain \
 run_step adjv3_rhineland \
   "$PYTHON" -m unittest tools.map_generation.tests.test_adj_v3_rhineland -v || fail
 
+run_step gap_hawaii \
+  "$PYTHON" -m unittest tools.map_generation.tests.test_gap_hawaii -v || fail
+
 if [[ "$QUICK" -eq 1 ]]; then
   if [[ "$FAILED" -eq 0 ]]; then
     log "ALL PASSED (quick pure-only)"

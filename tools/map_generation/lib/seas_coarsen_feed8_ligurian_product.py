@@ -699,10 +699,10 @@ def build_seas_coarsen_feed8_ligurian_product(board_dir: str = "") -> Dict[str, 
         passes.append("flanders_nord_kept")
 
     sea_block = sum(1 for pid in base if int(pid) >= 950000)
-    if sea_block != 340:
+    if sea_block != 341:
         fails.append(f"sea_block_changed n={sea_block}")
     else:
-        passes.append("seas_340_ids_kept")
+        passes.append("seas_341_ids_kept")
     n_board = len(base)
     if n_board < 3510 or n_board > 3545:
         fails.append(f"board_scale_left_3520_band n={n_board}")

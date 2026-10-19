@@ -175,11 +175,18 @@ def geographic_fallback(p: dict, lat: float) -> str:
     elif lat > 55 or lat < -45:
         new = "forest"
     pid = int(p["id"])
-    if 800000 <= pid < 900000:
+    # 905849-905851 are US islands in the RoW id band. Oahu 800094 stays in the US band.
+    if 800000 <= pid < 900000 or pid in (905849, 905850, 905851):
         st = str(_meta(p).get("statefp") or "")
         nm = str(p.get("name") or "").lower()
         if st == "02":
             new = "tundra" if lat > 60 else "forest"
+        elif st == "15" or pid in (905849, 905850, 905851):
+            # GAP-HAWAII: the volcanic islands are mountains. Oahu stays plains.
+            if pid == 800094:
+                new = "plains"
+            elif pid in (905849, 905850, 905851):
+                new = "mountains"
         elif st in _US_MOUNTAIN_FIPS:
             new = "mountains"
         elif st in _US_SIERRA_FIPS and any(k in nm for k in _US_SIERRA_NAME):

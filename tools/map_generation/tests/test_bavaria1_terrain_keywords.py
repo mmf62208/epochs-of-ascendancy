@@ -28,8 +28,8 @@ _REAL_SUB = (
     "montblanc", "savoie", "valais", "graub", "mountain",
 )
 _WATER = frozenset({"sea", "ocean", "water", "lake", "strait"})
-_ID_HASH = "bf9b6be110fa8c33ea090e1a1d176511851a73b9ce58c8ec547317b007ddafe1"
-_PROVINCE_COUNT = 3536
+_ID_HASH = "7f80004dee0093c56defe77f534a370e6a0ec5353900b17f2e8b681b7e17448c"
+_PROVINCE_COUNT = 3540
 
 # Named bars from the brief.
 _NOT_MOUNTAINS = {
