@@ -333,6 +333,27 @@ else
   run_step launch_rx1_visibility \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessRx1RhineVisibilityTest.gd || fail
 
+  ATLAS1_BUILD_BAR_MS=150
+  if [[ "${EOA_SLOW_BOX:-}" == "1" ]]; then
+    ATLAS1_BUILD_BAR_MS=200
+  fi
+
+  run_step launch_atlas1_city_labels \
+    env EOA_ATLAS1_BUILD_BAR_MS="$ATLAS1_BUILD_BAR_MS" tools/run_godot.sh --headless --path . -s res://scripts/core/HeadlessAtlas1CityLabelsTest.gd || fail
+
+  run_step launch_atlas1_live_ruhr \
+    env EOA_ATLAS1_EVIDENCE="${EOA_ATLAS1_EVIDENCE:-/tmp/eoa-atlas1-live-ruhr}" \
+    tools/eoa_atlas1_live_ruhr.sh || fail
+
+  run_step launch_atlas1_rivers \
+    env EOA_ATLAS1_BUILD_BAR_MS="$ATLAS1_BUILD_BAR_MS" tools/run_godot.sh --headless --path . -s res://scripts/core/HeadlessAtlas1RiversTest.gd || fail
+
+  run_step launch_atlas1_rhine_smooth \
+    tools/run_godot.sh --headless --path . -s res://scripts/core/HeadlessStair1RhineSmoothTest.gd || fail
+
+  run_step launch_atlas1_pixel \
+    tools/eoa_atlas1_pixel_guard.sh || fail
+
   run_step launch_vis1_map_readability tools/run_godot.sh --headless --path . --resolution 1280x720 -s res://scripts/core/HeadlessVis1MapReadabilityTest.gd || fail
 
   run_step launch_vis2_capital_stars_after_l \

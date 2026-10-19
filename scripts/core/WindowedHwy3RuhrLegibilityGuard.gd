@@ -305,11 +305,13 @@ func _hide_hub_labels() -> void:
 	if ol == null:
 		return
 	var layer: Node = ol.get_node_or_null("Hwy3HubCityLabels")
-	if layer == null:
-		return
-	for ch in layer.get_children():
-		if ch is CanvasItem:
-			(ch as CanvasItem).visible = false
+	if layer != null:
+		for ch in layer.get_children():
+			if ch is CanvasItem:
+				(ch as CanvasItem).visible = false
+	var cities: Node = _find_named("CityLabelsLayer")
+	if cities != null and cities.has_method("set_labels_visible"):
+		cities.call("set_labels_visible", false)
 
 
 func _ruhr_highway_edges() -> Array:

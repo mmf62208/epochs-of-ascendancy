@@ -63,6 +63,8 @@ var _ix1_last_spine_press: Dictionary = {}
 var _ix1_last_progress_band: int = -1
 const IX1_SPINE_PRESS_GUARD_MS := 180
 var _rx1_rhine_layer: Node2D = null
+var _city_labels_layer: Node2D = null
+var _major_rivers_layer: Node2D = null
 var _btn_build_rhine_bridge: Button = null
 var _label_rx1_progress: Label = null
 var _rx1_reveal_busy: bool = false
@@ -14708,6 +14710,8 @@ func set_map_mode(mode: String = "political") -> void:
 	if _political_labels_layer != null and is_instance_valid(_political_labels_layer):
 		if _political_labels_layer.has_method("set_map_mode_context"):
 			_political_labels_layer.call("set_map_mode_context", m)
+	if _city_labels_layer != null and is_instance_valid(_city_labels_layer) and _city_labels_layer.has_method("set_map_mode"):
+		_city_labels_layer.call("set_map_mode", m)
 	# Pass 22: restore remembered primary intensity for linked modes.
 	if m in INTENSITY_LINKED_MODES and primary_mapmode_intensity.has(m):
 		secondary_tint_intensity[m] = clampf(float(primary_mapmode_intensity[m]), 0.25, 2.0)
@@ -15156,7 +15160,13 @@ func _refresh_province_detail_visibility() -> void:
 	# when it does run, keep DemoUnitIcon_* in sync with the live zoom band.
 	_sync_unit_counter_paint(current_zoom)
 	var show_details: bool = MapZoomLODScript.show_province_glyphs(tier) or current_zoom > province_detail_min_zoom
-	var show_prov_names: bool = show_province_names and MapZoomLODScript.show_province_labels(tier)
+	# ATLAS-1 CityLabelsLayer owns city names. The old per-province Label
+	# stack at tactical zoom is a second draw of the same words (ghosted Ruhr).
+	var show_prov_names: bool = (
+		show_province_names
+		and MapZoomLODScript.show_province_labels(tier)
+		and not _atlas1_city_labels_active()
+	)
 	_zoom_fill_characterization_scale = current_zoom
 	# Bucket boundaries + drift are in the same space as `container.scale` length.
 	var q := clampf(fill_zoom_bucket_size, 0.028, 0.14)
@@ -15221,6 +15231,8 @@ func _refresh_province_detail_visibility() -> void:
 					if child is Label and not (child as Label).has_meta(META_MAP_GLYPH_PX):
 						(child as Label).visible = show_details
 				_layout_zoomed_map_glyphs_for_province_node(int(pid), current_zoom, show_details)
+	if _atlas1_city_labels_active():
+		_hide_legacy_province_name_labels()
 
 
 ## Smooth 0→1 ramp as map scale enters tactical band (relative to `terrain_zoom_near_thresh`).
@@ -15638,6 +15650,7 @@ func _render_provinces_finish(raster_preserved: Dictionary) -> void:
 	_update_country_borders()
 	_sync_border_lod(_map_lod_tier)
 	_rebuild_political_labels()
+	_setup_atlas1_layers()
 	_rebuild_region_highlight()
 	if _map_minimap != null and is_instance_valid(_map_minimap) and _map_minimap.has_method("invalidate_political_cache"):
 		_map_minimap.call("invalidate_political_cache")
@@ -16855,16 +16868,80 @@ func player_path_wheel_toward_world(world: Vector2, target_zoom: float) -> float
 	var screen: Vector2 = cam.get_canvas_transform() * world
 	if DisplayServer.get_name() != "headless":
 		DisplayServer.warp_mouse(Vector2i(int(round(screen.x)), int(round(screen.y))))
+	return player_path_wheel_toward_screen(screen, target_zoom)
+
+
+func player_path_wheel_toward_screen(screen: Vector2, target_zoom: float) -> float:
+	# Playtester path: keep this screen pixel as the wheel anchor.
+	# Main WHEELDRIFT-1 notches only — in/out are exact inverses, so a tight
+	# target sits between two stops and the loop would oscillate. Keep the
+	# closest discrete notch (no extra zoom helper, no fractional clamp).
+	var cam := get_node_or_null("MapCamera") as Camera2D
+	if cam == null and get_viewport():
+		cam = get_viewport().get_camera_2d()
+	if cam == null:
+		return 1.0
+	cam.enabled = true
+	cam.make_current()
 	var factor_in: float = _wheel_zoom_factor(true)
 	var factor_out: float = _wheel_zoom_factor(false)
+	var best_z: float = maxf(absf(cam.zoom.x), absf(cam.zoom.y))
+	var best_pos: Vector2 = cam.global_position
+	var best_d: float = absf(best_z - target_zoom)
 	var guard: int = 0
 	while guard < 48:
 		var z: float = maxf(absf(cam.zoom.x), absf(cam.zoom.y))
 		if absf(z - target_zoom) <= 0.045:
-			break
+			return z
 		_zoom_toward_mouse(factor_in if z < target_zoom else factor_out, screen)
+		z = maxf(absf(cam.zoom.x), absf(cam.zoom.y))
+		var d: float = absf(z - target_zoom)
+		if d + 0.0005 < best_d:
+			best_d = d
+			best_z = z
+			best_pos = cam.global_position
 		guard += 1
+	cam.zoom = Vector2(best_z, best_z)
+	cam.global_position = best_pos
+	_clamp_camera_to_theater()
 	return maxf(absf(cam.zoom.x), absf(cam.zoom.y))
+
+
+func player_path_place_world_at_screen(world: Vector2, screen: Vector2) -> void:
+	# Pan so `world` sits on the playtester wheel pixel. Europe Home at
+	# 1280x800 fills the theater (z≈0.34) and clamp pins the camera. Wheel
+	# in toward the city's current on-screen pixel until zoom ≈ 0.75 (the
+	# playtester Home band) so the pan has room — never chase an off-screen
+	# edge (that flew to z 11 on empty ocean).
+	var cam := get_node_or_null("MapCamera") as Camera2D
+	if cam == null and get_viewport():
+		cam = get_viewport().get_camera_2d()
+	if cam == null:
+		return
+	cam.enabled = true
+	cam.make_current()
+	var vp := get_viewport()
+	var vp_size: Vector2 = vp.get_visible_rect().size if vp != null else Vector2(1280, 800)
+	var factor_in: float = _wheel_zoom_factor(true)
+	var guard: int = 0
+	while guard < 12:
+		var z: float = maxf(absf(cam.zoom.x), absf(cam.zoom.y))
+		if z >= 0.75:
+			break
+		var city_screen: Vector2 = cam.get_canvas_transform() * world
+		if city_screen.x < 8.0 or city_screen.y < 8.0 or city_screen.x > vp_size.x - 8.0 or city_screen.y > vp_size.y - 8.0:
+			break
+		_zoom_toward_mouse(factor_in, city_screen)
+		guard += 1
+	# Camera2D formula (canvas stretch made affine_inverse disagree with
+	# the live test's screen_of, leaving Essen 60–290 wu off the pixel).
+	var z_now: float = maxf(absf(cam.zoom.x), absf(cam.zoom.y))
+	if z_now < 0.04:
+		return
+	cam.global_position = world - (screen - vp_size * 0.5) / z_now
+	# Skip theater clamp on this pan. Clamp at Home-band zoom left Essen
+	# ~67 wu off (455,455); later wheel notches then slipped the Ruhr off
+	# the top of the frame. Wheel zoom still clamps.
 
 
 func center_europe_in_world_view() -> void:
@@ -17918,7 +17995,7 @@ func _create_or_update_province_name_label(province: Province, center: Vector2) 
 	label.reset_size()
 	var ms := label.get_minimum_size()
 	label.position = center - Vector2(ms.x * 0.5, 8)
-	label.visible = true
+	label.visible = not _atlas1_city_labels_active()
 
 
 func _count_special_icons(province: Province) -> int:
@@ -22879,6 +22956,70 @@ func _layout_spine_start_notice() -> void:
 	_label_spine_start_notice.position = Vector2(8.0, notice_y)
 	_label_spine_start_notice.custom_minimum_size = Vector2(minf(500.0, maxf(280.0, panel_w - 24.0)), 22.0)
 	_label_spine_start_notice.size = _label_spine_start_notice.custom_minimum_size
+
+
+func _setup_atlas1_layers() -> void:
+	if container == null:
+		return
+	if _major_rivers_layer == null:
+		var Rivers := load("res://scripts/map/MajorRiversLayer.gd")
+		if Rivers != null:
+			var rivers: Node2D = Rivers.new()
+			rivers.name = "MajorRiversLayer"
+			container.add_child(rivers)
+			rivers.z_as_relative = false
+			rivers.z_index = 15
+			_major_rivers_layer = rivers
+			if rivers.has_method("refresh"):
+				rivers.call("refresh")
+	if _city_labels_layer == null:
+		var Cities := load("res://scripts/map/CityLabelsLayer.gd")
+		if Cities != null:
+			var cities: Node2D = Cities.new()
+			cities.name = "CityLabelsLayer"
+			container.add_child(cities)
+			cities.z_as_relative = false
+			cities.z_index = 30
+			_city_labels_layer = cities
+			if cities.has_method("bind_centroids"):
+				cities.call("bind_centroids", province_centroids)
+			if cities.has_method("set_map_mode"):
+				cities.call("set_map_mode", current_map_mode)
+			_hide_legacy_province_name_labels()
+			_hide_hwy3_hub_city_labels()
+
+
+func _atlas1_city_labels_active() -> bool:
+	return _city_labels_layer != null and is_instance_valid(_city_labels_layer)
+
+
+func _hide_legacy_province_name_labels() -> void:
+	for id in _province_name_labels:
+		var lbl: Variant = _province_name_labels[id]
+		if lbl is Label and is_instance_valid(lbl):
+			(lbl as Label).visible = false
+	_hide_hwy3_hub_city_labels()
+
+
+func _hide_hwy3_hub_city_labels() -> void:
+	# ATLAS-1 CityLabelsLayer is the single city-name owner. HWY-3's screen
+	# Labels (Duisburg / Dortmund / Essen / Düsseldorf / Köln) stay in the
+	# tree for HWY-3 tests that boot the overlay alone, but they must not
+	# paint on top of ATLAS-1 while this layer is live.
+	if not _atlas1_city_labels_active():
+		return
+	var ol := get_overlay_layer("InfrastructureOverlayLayer")
+	if ol != null and ol.has_method("set_suppress_hub_city_labels"):
+		ol.call("set_suppress_hub_city_labels", true)
+
+
+func count_visible_province_name_labels() -> int:
+	var n := 0
+	for id in _province_name_labels:
+		var lbl: Variant = _province_name_labels[id]
+		if lbl is Label and is_instance_valid(lbl) and (lbl as Label).visible:
+			n += 1
+	return n
 
 
 func _setup_rx1_rhine_layer() -> void:
@@ -28081,6 +28222,8 @@ func _sync_unit_counter_visibility(z: float = -1.0) -> void:
 					(c as Node2D).visible = vis
 	_sync_unit_overlay_visibility(vis)
 	_notify_units_view_hud()
+	if _city_labels_layer != null and is_instance_valid(_city_labels_layer) and _city_labels_layer.has_method("notify_counters_dirty"):
+		_city_labels_layer.call("notify_counters_dirty")
 
 
 ## View-only: stack chips, selection rings, pin pulse, battle bubbles.
@@ -32601,6 +32744,8 @@ func _rebuild_demo_unit_icons(only_pids: Dictionary) -> void:
 	# Re-apply selected-chip chrome after pin rebuild (do not rebuild all pins for selection).
 	if not selected_formation_id.is_empty():
 		_refresh_selected_unit_chip()
+	if _city_labels_layer != null and is_instance_valid(_city_labels_layer) and _city_labels_layer.has_method("notify_counters_dirty"):
+		_city_labels_layer.call("notify_counters_dirty")
 
 
 func _sorted_sea_nation_tags(tags: Array) -> Array:

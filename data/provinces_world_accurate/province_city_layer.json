@@ -81,15 +81,15 @@
       "tier": 2
     },
     "710020": {
-      "city_name": "Vienna",
+      "city_name": "Wiener Umland/Nordteil",
       "tier": 2
     },
     "710021": {
-      "city_name": "Vienna",
+      "city_name": "Wiener Umland/Südteil",
       "tier": 2
     },
     "710022": {
-      "city_name": "Vienna",
+      "city_name": "Wien",
       "tier": 2
     },
     "710023": {
@@ -821,7 +821,7 @@
       "tier": 2
     },
     "710205": {
-      "city_name": "Munich",
+      "city_name": "München",
       "tier": 3,
       "is_capital": false,
       "country_tag": "GER",
@@ -884,7 +884,7 @@
       "tier": 2
     },
     "710220": {
-      "city_name": "Munich",
+      "city_name": "München, Landkreis",
       "tier": 2
     },
     "710221": {
@@ -5485,19 +5485,19 @@
       "hub": true
     },
     "711345": {
-      "city_name": "Manchester",
+      "city_name": "Greater Manchester South West",
       "tier": 2
     },
     "711346": {
-      "city_name": "Manchester",
+      "city_name": "Greater Manchester South East",
       "tier": 2
     },
     "711347": {
-      "city_name": "Manchester",
+      "city_name": "Greater Manchester North West",
       "tier": 2
     },
     "711348": {
-      "city_name": "Manchester",
+      "city_name": "Greater Manchester North East",
       "tier": 2
     },
     "711349": {
