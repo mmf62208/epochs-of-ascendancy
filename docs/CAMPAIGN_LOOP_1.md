@@ -316,6 +316,14 @@ FIX #1 evidence on tip `c4280e38`:
 - Seed `multi_ai_decisions` md5 `20fe9063de285f19d4f9b8a105abfd31` default and `EOA_CAMPAIGN_LOOP=0`.
 - `--quick` exit 1 with the same 14 `unit_board_play_path` reds. map_qc NE **0.9853** (3148/3195).
 
+## FIX #2 (top-bar Pause stays on-screen at 1280)
+
+Live Play on `2a7da052` at 1280×800: once `At war: Poland` appeared, the top-bar row shifted left and Pause went off-screen. The leftmost visible button became `1x`, and the date truncated to `29 Jan 1936 13:00 (+28…`.
+
+**Fix:** war status is a capped chip (`At war: Poland` / `At war: CZE +2`) with a tooltip listing every enemy. Compact 1280 layout keeps Pause + 1x–4x on the left (`ContentRow` ALIGNMENT_BEGIN + GROW_END), shortens the date to `d Mon yyyy` (full line stays on the tooltip), and shortens Units to `U`. Search width is compact-only (240 vs 308) so Menu stays inside 1280. Prod / `_connect_once` / `action_mode` are unedited.
+
+Guard `HeadlessCampaignLoop1TopBarFitTest` at 1280×800: every visible top-bar button rect is inside the viewport and does not overlap, in peace, at war with 1 nation, and at war with 3. Fail on `2a7da052` (Pause x=−38.5 / −75). PASS on this tip: Pause stays at x=8 in peace / war1 / war3; date `1 Jan 1936`; chip `At war: Poland` / `At war: CZE +2`. Prod-1 keep-green `RESULT=PASS`. `--quick` same 14 reds. map_qc NE **0.9853**.
+
 Diplomatic-only Declare (item 4) on tip `b677890f`:
 
 - `HeadlessCampaignLoop1DeclareClickTest` `RESULT=PASS`: same inspector checks, leftover-swallow click starts GER–POL, then 3 live F5-equivalent days with 2 stationed GER units (front `711057`, interior `710300`) — no new player march, no player attack order, no station change.
