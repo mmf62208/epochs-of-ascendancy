@@ -3199,6 +3199,8 @@ func _wheel_should_zoom_map() -> bool:
 	var vp := get_viewport()
 	if vp == null:
 		return true
+	if _pointer_over_supply_legend():
+		return false
 	var hov: Control = vp.gui_get_hovered_control()
 	if hov == null:
 		return true
@@ -3208,6 +3210,12 @@ func _wheel_should_zoom_map() -> bool:
 		# Don't steal wheel from tech list / info scroll / menus.
 		if n is ScrollContainer or n is TextEdit or n is CodeEdit:
 			return false
+		if n is RichTextLabel and bool((n as RichTextLabel).scroll_active):
+			return false
+		if n == _supply_legend_panel or n == _supply_overlay_legend:
+			return false
+		if nn == "SupplyOverlayLegend" or nn == "SupplyOverlayLegendHost":
+			return false
 		if nn in ["TechnologyScreen", "InfoPanel", "MainMenu", "DebugOverlay", "OrderCommandPanel"]:
 			return false
 		if nn.ends_with("Screen") or nn.ends_with("Popup"):
@@ -3216,6 +3224,33 @@ func _wheel_should_zoom_map() -> bool:
 			return false
 		n = n.get_parent()
 	return true
+
+
+func _pointer_over_supply_legend() -> bool:
+	var vp := get_viewport()
+	if vp == null:
+		return false
+	var mouse: Vector2 = vp.get_mouse_position()
+	if _control_contains_point(_supply_legend_panel, mouse):
+		return true
+	if _control_contains_point(_supply_overlay_legend, mouse):
+		return true
+	var hov: Control = vp.gui_get_hovered_control()
+	var n: Node = hov
+	while n != null:
+		if n == _supply_legend_panel or n == _supply_overlay_legend:
+			return true
+		var nn := str(n.name)
+		if nn == "SupplyOverlayLegend" or nn == "SupplyOverlayLegendHost":
+			return true
+		n = n.get_parent()
+	return false
+
+
+func _control_contains_point(ctrl: Control, pt: Vector2) -> bool:
+	if ctrl == null or not is_instance_valid(ctrl) or not ctrl.is_visible_in_tree():
+		return false
+	return ctrl.get_global_rect().has_point(pt)
 
 
 func _unhandled_input(event: InputEvent) -> void:
