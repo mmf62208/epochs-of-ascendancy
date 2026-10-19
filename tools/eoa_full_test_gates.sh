@@ -324,6 +324,14 @@ else
     tools/run_godot.sh --headless --path . --resolution 1280x800 \
     -s res://scripts/core/HeadlessUiPolish1Test.gd || fail
 
+  run_step launch_main_fix1_prod_esc \
+    tools/run_godot.sh --headless --path . --resolution 1280x800 \
+    -s res://scripts/core/HeadlessMainFix1ProdEscTest.gd || fail
+
+  run_step launch_main_fix1_peace_click \
+    tools/run_godot.sh --headless --path . --resolution 1280x800 \
+    -s res://scripts/core/HeadlessMainFix1PeaceClickTest.gd || fail
+
   run_step launch_ix1_spine_complete \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessIx1RoadSpineCompleteTest.gd || fail
 
@@ -440,6 +448,9 @@ else
 
   run_step launch_campaign_loop1_end_screen \
     tools/eoa_campaign_loop1_end_screen_guard.sh || fail
+
+  run_step launch_main_fix1_declare_toast \
+    tools/eoa_main_fix1_declare_toast_guard.sh || fail
 
   if [[ "$WITH_PERF" -eq 1 ]]; then
     # Perf sample is evidence only — soft 30fps FAIL is OK

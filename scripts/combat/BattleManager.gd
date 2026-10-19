@@ -1414,10 +1414,16 @@ func _deferred_resolve_attacker_win(att_tag: String, to_id: int, from_id: int, a
 func _apply_attacker_win_capture_light(att_tag: String, to_id: int, from_id: int, att_fid: String) -> void:
 	var tag := att_tag.strip_edges().to_upper()
 	var def_tag := ""
+	var previous_owner := ""
+	var previous_controller := ""
+	var pname := ""
 	if typeof(MapManager) != TYPE_NIL and to_id >= 0:
 		var live: Province = MapManager.get_province(to_id) if MapManager.has_method("get_province") else null
 		if live != null:
-			def_tag = _province_controller_tag(live)
+			previous_owner = str(live.owner_tag).strip_edges().to_upper()
+			previous_controller = _province_controller_tag(live)
+			def_tag = previous_controller
+			pname = str(live.name)
 		if MapManager.has_method("update_province_owner"):
 			MapManager.update_province_owner(to_id, tag, tag, false, true)
 	if not att_fid.is_empty() and typeof(LeaderManager) != TYPE_NIL:
@@ -1432,18 +1438,44 @@ func _apply_attacker_win_capture_light(att_tag: String, to_id: int, from_id: int
 			"country_tag": tag,
 			"order_type": "move_to_province",
 		}
+	var owner_now := previous_owner
+	var ctrl_now := previous_controller
+	if typeof(MapManager) != TYPE_NIL and to_id >= 0:
+		var after: Province = MapManager.get_province(to_id) if MapManager.has_method("get_province") else null
+		if after != null:
+			owner_now = str(after.owner_tag).strip_edges().to_upper()
+			ctrl_now = _province_controller_tag(after)
+			if pname.is_empty():
+				pname = str(after.name)
+	var owner_flipped := previous_owner != owner_now
+	var ctrl_flipped := previous_controller != ctrl_now
+	var attacker_holds := owner_now == tag or ctrl_now == tag
+	print(
+		"MAIN_FIX1_CAPTURE_SRC who=BattleManager._apply_attacker_win_capture_light pid=%d name=%s attacker=%s prev_owner=%s prev_ctrl=%s now_owner=%s now_ctrl=%s owner_flip=%s ctrl_flip=%s"
+		% [to_id, pname, tag, previous_owner, previous_controller, owner_now, ctrl_now, str(owner_flipped), str(ctrl_flipped)]
+	)
 	var row := {
 		"defender_tag": def_tag,
 		"defender_formation_id": "",
 		"attacker_tag": tag,
 		"target_province_id": to_id,
 		"from_province_id": from_id,
+		"previous_owner_tag": previous_owner,
+		"previous_controller_tag": previous_controller,
+		"undefended": true,
 		"outcome": "attacker",
 		"winner": "attacker",
 	}
 	_displace_defender_from_captured_province(row, to_id)
-	# News history is cheap; toast UI is skipped headless / during compact clock.
-	_post_battle_news(row, true)
+	# Toast only when owner or controller actually became the attacker.
+	# Controller-only flips are logged; they are not a capture notice.
+	if attacker_holds and owner_flipped and previous_owner != tag:
+		_post_battle_news(row, true)
+	elif ctrl_flipped and not owner_flipped:
+		print(
+			"MAIN_FIX1_CAPTURE_SRC who=BattleManager._apply_attacker_win_capture_light skip=controller_only pid=%d attacker=%s"
+			% [to_id, tag]
+		)
 	if typeof(TimeManager) != TYPE_NIL and bool(TimeManager.get("_living_playtest_clock")):
 		# Compact clock: skip deferred map refresh (Maginot quit hung on renderer).
 		return
@@ -2247,7 +2279,25 @@ func apply_combat_outcome(
 			print(dmg_line + (" (prolonged - reduced losses, lasts longer)" if prolonged else ""))
 
 	if captured and target_pid >= 0 and typeof(MapManager) != TYPE_NIL:
+		var previous_owner := ""
+		var previous_controller := ""
+		var live_cap: Province = MapManager.get_province(target_pid) if MapManager.has_method("get_province") else null
+		if live_cap != null:
+			previous_owner = str(live_cap.owner_tag).strip_edges().to_upper()
+			previous_controller = _province_controller_tag(live_cap)
+		result["previous_owner_tag"] = previous_owner
+		result["previous_controller_tag"] = previous_controller
 		MapManager.update_province_owner(target_pid, attacker_tag, attacker_tag, false)
+		var owner_now := previous_owner
+		var ctrl_now := previous_controller
+		var after_cap: Province = MapManager.get_province(target_pid) if MapManager.has_method("get_province") else null
+		if after_cap != null:
+			owner_now = str(after_cap.owner_tag).strip_edges().to_upper()
+			ctrl_now = _province_controller_tag(after_cap)
+		print(
+			"MAIN_FIX1_CAPTURE_SRC who=BattleManager.apply_combat_outcome pid=%d attacker=%s prev_owner=%s prev_ctrl=%s now_owner=%s now_ctrl=%s"
+			% [target_pid, attacker_tag, previous_owner, previous_controller, owner_now, ctrl_now]
+		)
 		# Capture advances the attacker's land station onto the taken province so OOB /
 		# can_assault / get_land_divisions see them on the new border (not still on from_pid).
 		_station_attacker_on_captured_province(attacker_formation_id, target_pid, attacker_tag)
@@ -2258,7 +2308,14 @@ func apply_combat_outcome(
 			int(result.get("from_province_id", from_province_id)),
 			int(result.get("retreat_province_id", -1)),
 		)
-		_post_battle_news(result, true)
+		# MAIN-FIX-1: toast only when owner actually became the attacker.
+		if previous_owner != attacker_tag and owner_now == attacker_tag:
+			_post_battle_news(result, true)
+		elif previous_controller != ctrl_now and previous_owner == owner_now:
+			print(
+				"MAIN_FIX1_CAPTURE_SRC who=BattleManager.apply_combat_outcome skip=controller_only pid=%d"
+				% target_pid
+			)
 	elif winner == "attacker":
 		_post_battle_news(result, false)
 	elif winner == "defender":
@@ -2895,18 +2952,87 @@ func _notify_map_refresh(target_pid: int = -1, from_pid: int = -1, retreat_pid: 
 func _post_battle_news(result: Dictionary, captured: bool) -> void:
 	if typeof(LeaderEventUI) == TYPE_NIL or not LeaderEventUI.has_method("post_news"):
 		return
-	var attacker := str(result.get("attacker_tag", "?"))
-	var defender := str(result.get("defender_tag", "?"))
+	var attacker := str(result.get("attacker_tag", "?")).strip_edges().to_upper()
+	var defender := str(result.get("defender_tag", "?")).strip_edges().to_upper()
 	var outcome := str(result.get("outcome", result.get("winner", "battle")))
 	var target_name := ""
 	var pid := int(result.get("target_province_id", result.get("province_id", -1)))
+	var owner_now := ""
+	var ctrl_now := ""
 	if typeof(MapManager) != TYPE_NIL and pid >= 0:
 		var p: Province = MapManager.get_province(pid)
 		if p != null:
 			target_name = p.name
-	var title := "Province captured" if captured else "Battle: %s" % outcome
-	var body := "%s vs %s at %s" % [attacker, defender, target_name if not target_name.is_empty() else str(pid)]
-	LeaderEventUI.post_news(title, body, "combat")
+			owner_now = str(p.owner_tag).strip_edges().to_upper()
+			ctrl_now = _province_controller_tag(p)
+	# MAIN-FIX-1: toast a capture only when owner_tag actually became the attacker.
+	# Wording is "Poland captured Elbląski from Germany" (+ " (undefended)" on empty hex).
+	if captured:
+		var previous_owner := str(result.get("previous_owner_tag", defender)).strip_edges().to_upper()
+		var previous_ctrl := str(result.get("previous_controller_tag", previous_owner)).strip_edges().to_upper()
+		var attacker_holds := owner_now == attacker or ctrl_now == attacker
+		var flipped := previous_owner != owner_now or previous_ctrl != ctrl_now
+		print(
+			"MAIN_FIX1_CAPTURE_SRC who=BattleManager._post_battle_news captured=1 attacker=%s defender=%s pid=%d name=%s prev_owner=%s now_owner=%s prev_ctrl=%s now_ctrl=%s holds=%s flipped=%s"
+			% [attacker, defender, pid, target_name, previous_owner, owner_now, previous_ctrl, ctrl_now, str(attacker_holds), str(flipped)]
+		)
+		if not attacker_holds or not flipped or previous_owner == attacker:
+			print(
+				"MAIN_FIX1_CAPTURE_SRC who=BattleManager._post_battle_news skip=no_owner_or_control_flip_to_attacker pid=%d"
+				% pid
+			)
+			return
+		if previous_owner == owner_now and previous_ctrl != ctrl_now:
+			print(
+				"MAIN_FIX1_CAPTURE_SRC who=BattleManager._post_battle_news skip=controller_only pid=%d"
+				% pid
+			)
+			return
+		var from_tag := previous_owner if not previous_owner.is_empty() else defender
+		var pname := target_name if not target_name.is_empty() else str(pid)
+		var title := "%s captured %s from %s" % [
+			_country_display_name(attacker),
+			pname,
+			_country_display_name(from_tag),
+		]
+		if bool(result.get("undefended", false)):
+			title += " (undefended)"
+		print(
+			"MAIN_FIX1_CAPTURE_SRC who=BattleManager._post_battle_news post title=%s body=%s"
+			% [title, "Province captured"]
+		)
+		LeaderEventUI.post_news(title, "Province captured", "combat")
+		return
+	var title_b := "Battle: %s" % outcome
+	var body_b := "%s vs %s at %s" % [attacker, defender, target_name if not target_name.is_empty() else str(pid)]
+	print(
+		"MAIN_FIX1_CAPTURE_SRC who=BattleManager._post_battle_news post title=%s body=%s"
+		% [title_b, body_b]
+	)
+	LeaderEventUI.post_news(title_b, body_b, "combat")
+
+
+func _country_display_name(tag: String) -> String:
+	var t := tag.strip_edges().to_upper()
+	if t.is_empty():
+		return "?"
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_country"):
+		var c: Variant = MapManager.get_country(t)
+		if c is Dictionary:
+			var nm := str((c as Dictionary).get("name", "")).strip_edges()
+			if not nm.is_empty() and nm.to_upper() != t:
+				return nm
+	if t == "GER":
+		return "Germany"
+	if t == "POL":
+		return "Poland"
+	if t == "FRA":
+		return "France"
+	if t == "ENG":
+		return "United Kingdom"
+	if t == "LUX":
+		return "Luxembourg"
+	return t
 
 ## === HISTORICAL OOB (TestRunner / harness) ===
 func force_historical_oob_for_battle(battle_key: String, year: int = 1942, custom_pids: Dictionary = {}) -> Dictionary:

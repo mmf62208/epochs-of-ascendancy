@@ -2748,6 +2748,12 @@ func _handle_escape_key() -> void:
 	if _dismiss_named_overlay_screen("LeaderAssignmentScreen"):
 		_close_release_seen = true
 		return
+	# MAIN-FIX-1: Production is a DraggablePanel whose own Esc lives in
+	# `_unhandled_input`. MapRenderer `_input` owns the live Esc stack, so an
+	# open Prod never saw the key and idle Esc opened Command Center on top.
+	if _dismiss_named_overlay_screen("ProductionAssignmentScreen"):
+		_close_release_seen = true
+		return
 	# Garrison / unit card first: Close/Esc restores province inspector (Köln spine)
 	# without GIS lock or a second search.
 	if _unit_detail_popup_is_visible():
@@ -23965,6 +23971,10 @@ func _try_execute_province_attack(target_pid: int, target_province: Province) ->
 	var cap_toast := str(cap_flair.get("toast", "Battle resolved"))
 	if captured:
 		cap_toast += " (def_bonus=%.0f%% used)" % ((s_def_b - 1.0) * 100.0)
+	print(
+		"MAIN_FIX1_CAPTURE_SRC who=MapRenderer.assault_flair captured=%s toast=%s title=%s pid=%d"
+		% [str(captured), cap_toast, str(cap_flair.get("title", "")), target_pid]
+	)
 	_show_inspector_toast(cap_toast, float(cap_flair.get("duration", 3.5)))
 	_play_map_sfx(str(cap_flair.get("sfx", "map")))
 	if provinces.has(target_pid):
@@ -25559,6 +25569,8 @@ func _surface_last_land_aar_toast() -> void:
 	# Headless LeaderEventUI skips toast CanvasLayer; print so a playtester log
 	# still has a readable resolve line.
 	print("Fight resolved · %s" % aar_line)
+	if "captured" in aar_line.to_lower() or "Province captured" in aar_line:
+		print("MAIN_FIX1_CAPTURE_SRC who=MapRenderer._surface_last_land_aar_toast line=%s" % aar_line)
 	_show_inspector_toast(aar_line, 5.5)
 	_play_map_sfx("achievement" if str(aar.get("winner", "")) == "attacker" else "map")
 
@@ -26233,7 +26245,7 @@ func _dismiss_map_overlays_esc() -> bool:
 			return true
 	var tree := get_tree()
 	if tree:
-		for screen_name in ["LeaderAssignmentScreen", "TechnologyScreen", "AgentAssignmentScreen", "NationalSpiritsScreen"]:
+		for screen_name in ["LeaderAssignmentScreen", "ProductionAssignmentScreen", "TechnologyScreen", "AgentAssignmentScreen", "NationalSpiritsScreen"]:
 			var n := tree.root.get_node_or_null(screen_name)
 			if n == null and tree.current_scene:
 				var ui := tree.current_scene.get_node_or_null("UILayer/%s" % screen_name)
@@ -26250,7 +26262,7 @@ func _dismiss_map_overlays_esc() -> bool:
 			if layer:
 				for child in layer.get_children():
 					var cn := str(child.name)
-					if cn in ["LeaderAssignmentScreen", "TechnologyScreen", "AgentAssignmentScreen", "NationalSpiritsScreen"]:
+					if cn in ["LeaderAssignmentScreen", "ProductionAssignmentScreen", "TechnologyScreen", "AgentAssignmentScreen", "NationalSpiritsScreen"]:
 						if _overlay_node_is_up(child):
 							child.queue_free()
 							dismissed = true

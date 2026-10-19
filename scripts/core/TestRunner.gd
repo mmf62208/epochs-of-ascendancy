@@ -662,6 +662,9 @@ func _ensure_game_interactive() -> void:
 					top_bar._update_speed_buttons()
 	print("TestRunner: _ensure_game_interactive() — blockers cleared; camera/map/UI always-on; clock owned by player/Begin after title (no deferred re-pause).")
 	# Automated UI smoke: EOA_UI_SMOKE=1 godot --headless res://scenes/TestScenario.tscn
+	if not has_meta("eoa_main_fix1_hooks_ran"):
+		set_meta("eoa_main_fix1_hooks_ran", true)
+		call_deferred("_maybe_run_main_fix1_play_hooks")
 	if OS.get_environment("EOA_UI_SMOKE").strip_edges() == "1" and not has_meta("eoa_ui_smoke_ran"):
 		set_meta("eoa_ui_smoke_ran", true)
 		call_deferred("_run_ui_smoke_and_quit")
@@ -673,6 +676,19 @@ func _ensure_game_interactive() -> void:
 	if OS.get_environment("EOA_FEB_CLOCK").strip_edges() == "1" and not has_meta("eoa_feb_clock_ran"):
 		set_meta("eoa_feb_clock_ran", true)
 		call_deferred("_run_feb_clock_advance_test")
+
+
+func _maybe_run_main_fix1_play_hooks() -> void:
+	var capture_on := OS.get_environment("EOA_MAIN_FIX1_FORCE_CAPTURE").strip_edges() == "1"
+	var hold_raw := OS.get_environment("EOA_MAIN_FIX1_PEACE_HOLD_S").strip_edges()
+	if not capture_on and (hold_raw.is_empty() or hold_raw == "0"):
+		return
+	var scr: GDScript = load("res://scripts/core/MainFix1PlayHooks.gd") as GDScript
+	if scr == null:
+		print("MAIN_FIX1_HOOK who=TestRunner missing MainFix1PlayHooks.gd")
+		return
+	if scr.has_method("maybe_run"):
+		scr.call("maybe_run", self)
 
 
 func _living_title_boot_script() -> GDScript:

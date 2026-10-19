@@ -104,7 +104,9 @@ static func _open_campaign_peace_sheet(winner_tag: String, loser_tag: String, ca
 		"sheet": true,
 		"headless": DisplayServer.get_name() == "headless",
 	}
-	if DisplayServer.get_name() == "headless" or OS.has_feature("dedicated_server"):
+	# Always instance the layer (including headless click tests). Dedicated
+	# servers still skip drawing.
+	if OS.has_feature("dedicated_server"):
 		return sheet
 	var tree := Engine.get_main_loop() as SceneTree
 	if tree == null or tree.root == null:
@@ -112,6 +114,8 @@ static func _open_campaign_peace_sheet(winner_tag: String, loser_tag: String, ca
 	for n in tree.get_nodes_in_group("campaign_peace_sheet"):
 		if is_instance_valid(n):
 			n.queue_free()
+	if typeof(CapitulationDomain) != TYPE_NIL:
+		CapitulationDomain.arm_pending_sheet(w, l, outcome)
 	var layer := CanvasLayer.new()
 	layer.name = "CampaignPeaceSheet"
 	layer.layer = 124
@@ -120,39 +124,87 @@ static func _open_campaign_peace_sheet(winner_tag: String, loser_tag: String, ca
 	var panel := Panel.new()
 	panel.name = "PeacePanel"
 	panel.position = Vector2(360, 220)
+	panel.size = Vector2(480, 220)
 	panel.custom_minimum_size = Vector2(480, 220)
 	panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	var panel_style := StyleBoxFlat.new()
+	panel_style.bg_color = Color(0.07, 0.08, 0.12, 1.0)
+	panel_style.border_color = Color(0.95, 0.86, 0.55, 1.0)
+	panel_style.set_border_width_all(2)
+	panel_style.set_corner_radius_all(6)
+	panel.add_theme_stylebox_override("panel", panel_style)
 	layer.add_child(panel)
 	var title := Label.new()
 	title.name = "Title"
 	title.position = Vector2(16, 12)
+	title.size = Vector2(448, 32)
 	title.text = "Peace with %s" % l
+	title.add_theme_font_size_override("font_size", 22)
+	title.add_theme_color_override("font_color", Color(0.95, 0.86, 0.55))
 	panel.add_child(title)
-	var annex := Button.new()
-	annex.name = "BtnAnnexAll"
-	annex.position = Vector2(16, 70)
-	annex.text = "Annex all"
+	var annex := _make_campaign_peace_button("BtnAnnexAll", "Annex all", Vector2(16, 70), true)
+	annex.button_down.connect(func():
+		_campaign_peace_choose(layer, "annex_all")
+	)
 	annex.pressed.connect(func():
-		if typeof(CapitulationDomain) != TYPE_NIL:
-			CapitulationDomain.apply_player_choice("annex_all")
-		layer.queue_free()
+		_campaign_peace_choose(layer, "annex_all")
 	)
 	panel.add_child(annex)
-	var keep := Button.new()
-	keep.name = "BtnKeepOccupied"
-	keep.position = Vector2(160, 70)
-	keep.text = "Keep occupied"
+	var keep := _make_campaign_peace_button("BtnKeepOccupied", "Keep occupied", Vector2(176, 70), false)
+	keep.button_down.connect(func():
+		_campaign_peace_choose(layer, "keep_occupied")
+	)
 	keep.pressed.connect(func():
-		if typeof(CapitulationDomain) != TYPE_NIL:
-			CapitulationDomain.apply_player_choice("keep_occupied")
-		layer.queue_free()
+		_campaign_peace_choose(layer, "keep_occupied")
 	)
 	panel.add_child(keep)
 	layer.set_meta("campaign_sheet", sheet)
 	tree.root.add_child(layer)
+	print(
+		"MAIN_FIX1_PEACE_BTN who=PeaceConferenceWindow._open_campaign_peace_sheet winner=%s loser=%s outcome=%s"
+		% [w, l, outcome]
+	)
 	# Pointer routing lives on the group. A small script is not required:
 	# MapRenderer asks the layer's buttons by name.
 	return sheet
+
+
+static func _make_campaign_peace_button(btn_name: String, label: String, pos: Vector2, primary: bool) -> Button:
+	var btn := Button.new()
+	btn.name = btn_name
+	btn.position = pos
+	btn.text = label
+	btn.custom_minimum_size = Vector2(148, 40)
+	btn.size = Vector2(148, 40)
+	btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
+	btn.focus_mode = Control.FOCUS_NONE
+	btn.mouse_filter = Control.MOUSE_FILTER_STOP
+	if primary:
+		RetrowaveTheme.style_primary_button(btn)
+	else:
+		RetrowaveTheme.style_secondary_button(btn)
+	return btn
+
+
+static func _campaign_peace_choose(layer: Node, outcome: String) -> void:
+	if layer == null or not is_instance_valid(layer):
+		return
+	if layer.has_meta("eoa_peace_choice_done") and bool(layer.get_meta("eoa_peace_choice_done")):
+		return
+	layer.set_meta("eoa_peace_choice_done", true)
+	print("MAIN_FIX1_PEACE_BTN who=PeaceConferenceWindow._campaign_peace_choose outcome=%s" % outcome)
+	var result := {"ok": false, "reason": "no domain"}
+	var sheet: Dictionary = {}
+	if layer.has_meta("campaign_sheet") and layer.get_meta("campaign_sheet") is Dictionary:
+		sheet = layer.get_meta("campaign_sheet")
+	if typeof(CapitulationDomain) != TYPE_NIL:
+		result = CapitulationDomain.apply_player_choice(outcome)
+		if not bool(result.get("ok", false)):
+			var loser := str(sheet.get("loser", "")).strip_edges().to_upper()
+			var leader := str(sheet.get("winner", sheet.get("leader", ""))).strip_edges().to_upper()
+			result = CapitulationDomain.apply_outcome(loser, leader, outcome)
+	print("MAIN_FIX1_PEACE_BTN who=PeaceConferenceWindow applied outcome=%s result=%s" % [outcome, str(result)])
+	layer.queue_free()
 
 
 ## Apply annex from an open_living_sheet dict (NEXT apply never calls settlement itself).

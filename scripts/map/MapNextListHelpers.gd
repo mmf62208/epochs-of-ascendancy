@@ -339,6 +339,7 @@ static func format_capture_assault_flair(
 		sfx = "achievement"
 		title = "Province captured"
 		action_kind = "capture"
+		print("MAIN_FIX1_CAPTURE_SRC who=MapNextListHelpers.format_capture_assault_flair toast=%s" % toast)
 		tooltip = "[color=#7dffb2]⚔ Captured[/color] [color=#8899aa]%s[/color]" % pname
 		if not atk.is_empty():
 			tooltip += " [color=#a0c0ff]%s[/color]" % atk
