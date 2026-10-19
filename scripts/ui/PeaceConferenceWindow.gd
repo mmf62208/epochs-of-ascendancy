@@ -45,8 +45,11 @@ static func apply_living_transfer(
 static func open_living_sheet(
 	winner_tag: String = "GER",
 	loser_tag: String = "FRA",
-	province_id: int = 710739
+	province_id: int = 710739,
+	campaign: Dictionary = {}
 ) -> Dictionary:
+	if not campaign.is_empty():
+		return _open_campaign_peace_sheet(winner_tag, loser_tag, campaign)
 	var w := winner_tag.strip_edges().to_upper()
 	var l := loser_tag.strip_edges().to_upper()
 	if w.is_empty():
@@ -83,6 +86,72 @@ static func open_living_sheet(
 	win._living_loser = l
 	win._living_pid = pid
 	tree.root.add_child(win)
+	return sheet
+
+
+static func _open_campaign_peace_sheet(winner_tag: String, loser_tag: String, campaign: Dictionary) -> Dictionary:
+	var w := winner_tag.strip_edges().to_upper()
+	var l := loser_tag.strip_edges().to_upper()
+	var outcome := str(campaign.get("outcome_default", "annex_all"))
+	var sheet := {
+		"ok": true,
+		"title": "Peace with %s" % l,
+		"winner": w,
+		"loser": l,
+		"campaign": true,
+		"outcome_default": outcome,
+		"opened": true,
+		"sheet": true,
+		"headless": DisplayServer.get_name() == "headless",
+	}
+	if DisplayServer.get_name() == "headless" or OS.has_feature("dedicated_server"):
+		return sheet
+	var tree := Engine.get_main_loop() as SceneTree
+	if tree == null or tree.root == null:
+		return sheet
+	for n in tree.get_nodes_in_group("campaign_peace_sheet"):
+		if is_instance_valid(n):
+			n.queue_free()
+	var layer := CanvasLayer.new()
+	layer.name = "CampaignPeaceSheet"
+	layer.layer = 124
+	layer.process_mode = Node.PROCESS_MODE_ALWAYS
+	layer.add_to_group("campaign_peace_sheet")
+	var panel := Panel.new()
+	panel.name = "PeacePanel"
+	panel.position = Vector2(360, 220)
+	panel.custom_minimum_size = Vector2(480, 220)
+	panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	layer.add_child(panel)
+	var title := Label.new()
+	title.name = "Title"
+	title.position = Vector2(16, 12)
+	title.text = "Peace with %s" % l
+	panel.add_child(title)
+	var annex := Button.new()
+	annex.name = "BtnAnnexAll"
+	annex.position = Vector2(16, 70)
+	annex.text = "Annex all"
+	annex.pressed.connect(func():
+		if typeof(CapitulationDomain) != TYPE_NIL:
+			CapitulationDomain.apply_player_choice("annex_all")
+		layer.queue_free()
+	)
+	panel.add_child(annex)
+	var keep := Button.new()
+	keep.name = "BtnKeepOccupied"
+	keep.position = Vector2(160, 70)
+	keep.text = "Keep occupied"
+	keep.pressed.connect(func():
+		if typeof(CapitulationDomain) != TYPE_NIL:
+			CapitulationDomain.apply_player_choice("keep_occupied")
+		layer.queue_free()
+	)
+	panel.add_child(keep)
+	layer.set_meta("campaign_sheet", sheet)
+	tree.root.add_child(layer)
+	# Pointer routing lives on the group. A small script is not required:
+	# MapRenderer asks the layer's buttons by name.
 	return sheet
 
 

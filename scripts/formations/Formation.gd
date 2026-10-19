@@ -69,6 +69,8 @@ const LAND_MISSION_ARTILLERY_PREP := "ARTILLERY_PREP"  # Pre-bombard before assa
 @export var parent_formation_id: String = ""
 @export var is_training: bool = false
 @export var is_in_combat: bool = false
+## Campaign annex_all: out of get_formations_for_country and off the map chips.
+@export var campaign_inactive: bool = false
 @export var training_progress: float = 0.0  # days invested in training (full daily advance per roadmap)
 @export var is_trained: bool = false  # reached threshold for combat bonus (readiness/org/xp)
 @export var combat_log: Array[Dictionary] = []  # per-unit combat history: {date, province_id, result, key_factors: Array[String], leader: String, outcome: String} - follows unit like leader logs

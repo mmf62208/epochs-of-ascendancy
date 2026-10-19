@@ -320,6 +320,10 @@ else
     tools/run_godot.sh --headless --path . --resolution 1280x800 \
     -s res://scripts/core/HeadlessProd1ButtonOpenTest.gd || fail
 
+  run_step launch_ui_polish1 \
+    tools/run_godot.sh --headless --path . --resolution 1280x800 \
+    -s res://scripts/core/HeadlessUiPolish1Test.gd || fail
+
   run_step launch_ix1_spine_complete \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessIx1RoadSpineCompleteTest.gd || fail
 
@@ -439,6 +443,24 @@ else
 
   run_step launch_designer_validation \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessDesignerValidationTest.gd || fail
+
+  run_step launch_campaign_loop1_war_gate \
+    tools/run_godot.sh --headless --path . -s res://scripts/core/HeadlessCampaignLoop1WarGateTest.gd || fail
+
+  run_step launch_campaign_loop1_declare_click \
+    tools/run_godot.sh --headless --path . --resolution 1280x800 -s res://scripts/core/HeadlessCampaignLoop1DeclareClickTest.gd || fail
+
+  run_step launch_campaign_loop1_topbar_fit \
+    tools/run_godot.sh --headless --path . --resolution 1280x800 -s res://scripts/core/HeadlessCampaignLoop1TopBarFitTest.gd || fail
+
+  run_step launch_campaign_loop1_capitulation \
+    tools/run_godot.sh --headless --path . -s res://scripts/core/HeadlessCampaignLoop1CapitulationPeaceTest.gd || fail
+
+  run_step launch_campaign_loop1_soak \
+    tools/eoa_campaign_loop1_soak.sh || fail
+
+  run_step launch_campaign_loop1_end_screen \
+    tools/eoa_campaign_loop1_end_screen_guard.sh || fail
 
   if [[ "$WITH_PERF" -eq 1 ]]; then
     # Perf sample is evidence only — soft 30fps FAIL is OK
