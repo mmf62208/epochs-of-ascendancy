@@ -2,6 +2,7 @@ extends SceneTree
 
 ## SR1 test B. A save/load (and a fresh process) continues the same 60 days.
 const _Hash = preload("res://scripts/core/SaveStateHash.gd")
+const _Io = preload("res://scripts/core/SaveReload1Io.gd")
 const N_DAYS := 60
 
 var _failures := 0
@@ -147,8 +148,8 @@ func _mode_autosave() -> void:
 
 
 func _mode_diag(mode: String) -> void:
-	var d200 := "/home/featherstone/save1_evidence/diag_d200.bin"
-	var d201 := "/home/featherstone/save1_evidence/diag_d201.bin"
+	var d200 := _Io.evidence_file("diag_d200.bin")
+	var d201 := _Io.evidence_file("diag_d201.bin")
 	if mode == "diag_ref":
 		if not _build("sr1test_diag_pristine"):
 			return
@@ -411,7 +412,7 @@ func _hash_now() -> String:
 func _write_trace(text: String) -> void:
 	var path := OS.get_environment("SR1_TRACE").strip_edges()
 	if path.is_empty():
-		path = "/home/featherstone/save1_evidence/det_trace.txt"
+		path = _Io.evidence_file("det_trace.txt")
 	var f := FileAccess.open(path, FileAccess.WRITE)
 	if f == null:
 		_fail("cannot write trace %s" % path)

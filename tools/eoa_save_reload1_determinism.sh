@@ -4,7 +4,11 @@
 set -u
 cd "$(dirname "$0")/.."
 ROOT="$(pwd)"
-EVID="${HOME}/save1_evidence"
+EVID="${EOA_EVIDENCE_DIR:-}"
+if [[ -z "$EVID" ]]; then
+  EVID="/tmp/eoa_sr1_evidence"
+fi
+export EOA_EVIDENCE_DIR="$EVID"
 LOG="${EVID}/logs"
 mkdir -p "$LOG" "$EVID"
 LOCK="${HOME}/.eoa_godot.lock"
@@ -31,9 +35,9 @@ PY
 run_godot() {
   local log="$1"
   shift
-  if ps -ef | grep -q '[/]home/featherstone/Applications/Godot-4.7.1/godot'; then
+  if pgrep -f 'Godot_v4|godot --headless|godot --path' >/dev/null 2>&1; then
     echo "FAIL: a Godot process is already running" >&2
-    ps -ef | grep '[/]home/featherstone/Applications/Godot-4.7.1/godot' >&2 || true
+    pgrep -af 'Godot_v4|godot --headless|godot --path' >&2 || true
     exit 1
   fi
   flock "$LOCK" tools/run_godot.sh --headless --path . "$@" >"$log" 2>&1

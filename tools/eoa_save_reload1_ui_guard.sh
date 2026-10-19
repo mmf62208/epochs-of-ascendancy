@@ -5,13 +5,18 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
-if ps -ef | rg -q '[/]home/featherstone/Applications/Godot-4.7.1/godot|[Ff]lock .*eoa_godot'; then
+if pgrep -f 'Godot_v4|godot --headless|godot --path' >/dev/null 2>&1; then
   echo "GODOT_BUSY" >&2
-  ps -ef | rg '[/]home/featherstone/Applications/Godot-4.7.1/godot|[Ff]lock .*eoa_godot' >&2
+  pgrep -af 'Godot_v4|godot --headless|godot --path' >&2 || true
   exit 2
 fi
-LOG="${HOME}/save1_evidence/logs/sr1_ui_guard.log"
-mkdir -p "${HOME}/save1_evidence/logs" "${HOME}/save1_evidence"
+EVID="${EOA_EVIDENCE_DIR:-}"
+if [[ -z "$EVID" ]]; then
+  EVID="/tmp/eoa_sr1_evidence"
+fi
+export EOA_EVIDENCE_DIR="$EVID"
+LOG="${EVID}/logs/sr1_ui_guard.log"
+mkdir -p "${EVID}/logs" "$EVID"
 GODOT=(flock "${HOME}/.eoa_godot.lock" "${ROOT}/tools/run_godot.sh" --path . --resolution 1280x800 -s res://scripts/core/WindowedSaveReload1UiGuard.gd)
 if command -v Xvfb >/dev/null 2>&1; then
   disp=24

@@ -3,6 +3,7 @@ extends SceneTree
 ## SR1 test A. Full-state hash is unchanged across save, mutate, and load.
 const _Hash = preload("res://scripts/core/SaveStateHash.gd")
 const _Manifest = preload("res://scripts/core/SaveCoverageManifest.gd")
+const _Io = preload("res://scripts/core/SaveReload1Io.gd")
 
 var _failures := 0
 var _sl
@@ -181,7 +182,7 @@ func _check_manifest() -> void:
 
 
 func _load_stripped_v1() -> void:
-	var src := "/home/featherstone/save1_evidence/v1_fixtures/sr1test_v1_day0.json"
+	var src := _Io.V1_DAY0
 	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(src))
 	if typeof(parsed) != TYPE_DICTIONARY:
 		_fail("stripped v1 fixture unreadable")

@@ -3,6 +3,7 @@ extends SceneTree
 ## SR1 test D. Corrupt and missing saves fail closed: hash unchanged, no apply.
 const _Fmt = preload("res://scripts/core/SaveFormat.gd")
 const _Hash = preload("res://scripts/core/SaveStateHash.gd")
+const _Io = preload("res://scripts/core/SaveReload1Io.gd")
 
 var _failures := 0
 var _boot: GDScript
@@ -205,7 +206,7 @@ func _expect_crash_mid_write(good: Dictionary) -> void:
 
 
 func _expect_v1_fixture_loads() -> void:
-	var src := "/home/featherstone/save1_evidence/v1_fixtures/sr1test_v1_day0.json"
+	var src := _Io.V1_DAY0
 	if not FileAccess.file_exists(src):
 		_fail("v1 day0 fixture missing")
 		return

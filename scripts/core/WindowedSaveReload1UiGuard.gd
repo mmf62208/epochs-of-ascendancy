@@ -4,8 +4,8 @@ extends SceneTree
 ## Every dialog click runs plain, then again with the leftover release swallow.
 const _Hash = preload("res://scripts/core/SaveStateHash.gd")
 const _Format = preload("res://scripts/core/SaveFormat.gd")
+const _Io = preload("res://scripts/core/SaveReload1Io.gd")
 const PLAY := Vector2i(1280, 800)
-const EVIDENCE := "/home/featherstone/save1_evidence"
 
 var _failures := 0
 var _event_seq := 0
@@ -895,7 +895,7 @@ func _shot(shot_name: String) -> void:
 	if img == null:
 		_fail("screenshot %s image missing" % shot_name)
 		return
-	var path := "%s/%s.png" % [EVIDENCE, shot_name]
+	var path := _Io.evidence_file("%s.png" % shot_name)
 	var err := img.save_png(path)
 	if err != OK:
 		_fail("screenshot %s save failed %s" % [shot_name, str(err)])
