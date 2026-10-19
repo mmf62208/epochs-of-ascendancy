@@ -27864,14 +27864,14 @@
     },
     {
       "id": 800094,
-      "name": "Hawaii",
+      "name": "Oahu",
       "terrain": "plains",
       "domain": "land",
       "core_for_tags": [],
       "natural_resources": {},
       "population_base": 0,
       "meta": {
-        "tiger_geoid": "15009",
+        "tiger_geoid": "15003",
         "statefp": "15",
         "source": "tiger_county",
         "us_merge": {
@@ -27885,9 +27885,11 @@
             802156,
             802984
           ],
-          "source": "merge_us_counties_to_state_provinces"
+          "source": "merge_us_counties_to_state_provinces",
+          "gap_hawaii_note": "800094 kept as Oahu. merged_from is the pre-split county history. The old survivor geoid 15009 was Maui County."
         },
-        "merged_playable": true
+        "merged_playable": true,
+        "gap_hawaii": "Oahu"
       }
     },
     {
@@ -68428,6 +68430,82 @@
       "special_features": [],
       "island_class": "mainland",
       "facility_tier": 1
+    },
+    {
+      "id": 905849,
+      "name": "Kauai–Niihau",
+      "terrain": "mountains",
+      "domain": "land",
+      "core_for_tags": [],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "source": "ne_10m_land",
+        "statefp": "15",
+        "tiger_geoid": "15007",
+        "gap_hawaii": "Kauai–Niihau",
+        "split_from": 800094
+      }
+    },
+    {
+      "id": 905850,
+      "name": "Maui County",
+      "terrain": "mountains",
+      "domain": "land",
+      "core_for_tags": [],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "source": "ne_10m_land",
+        "statefp": "15",
+        "tiger_geoid": "15009",
+        "gap_hawaii": "Maui County",
+        "split_from": 800094
+      }
+    },
+    {
+      "id": 905851,
+      "name": "Hawaii",
+      "terrain": "mountains",
+      "domain": "land",
+      "core_for_tags": [],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "source": "ne_10m_land",
+        "statefp": "15",
+        "tiger_geoid": "15001",
+        "gap_hawaii": "Hawaii",
+        "split_from": 800094
+      }
+    },
+    {
+      "id": 950340,
+      "name": "Hawaiian Waters",
+      "terrain": "sea",
+      "core_for_tags": [],
+      "natural_resources": {},
+      "population_base": 0,
+      "special_features": [],
+      "special_levels": {},
+      "domain": "sea",
+      "island_class": "none",
+      "facility_tier": "none",
+      "theater": "sea",
+      "naval_importance": 1,
+      "meta": {
+        "source": "ne_10m_land",
+        "gap_hawaii": "Hawaiian Waters",
+        "buffer_km": 150.0,
+        "ocean": {
+          "nearest_sea": 950198,
+          "nearest_sea_km": 420.3,
+          "marquesas_902396": "UNKNOWN",
+          "marquesas_km": 3415.3,
+          "kiribati_902397": "UNKNOWN",
+          "kiribati_km": 1726.0
+        }
+      }
     }
   ]
 }

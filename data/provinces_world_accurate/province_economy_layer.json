@@ -9282,7 +9282,7 @@
       "development_level": 2
     },
     "800094": {
-      "population": 103439,
+      "population": 9630,
       "factories": 10,
       "infrastructure": 3,
       "development_level": 2
@@ -21239,6 +21239,30 @@
       "development_level": 0
     },
     "950339": {
+      "population": 0,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 0
+    },
+    "905849": {
+      "population": 10171,
+      "factories": 0,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "905850": {
+      "population": 18998,
+      "factories": 0,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "905851": {
+      "population": 64640,
+      "factories": 0,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "950340": {
       "population": 0,
       "factories": 0,
       "infrastructure": 1,

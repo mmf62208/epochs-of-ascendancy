@@ -3,8 +3,8 @@
   "created_utc": "2026-07-28T02:52:07.882578+00:00",
   "board": "provinces_world_accurate",
   "counties_n": 3221,
-  "survivors_n": 130,
-  "dead_n": 3091,
+  "survivors_n": 133,
+  "dead_n": 3088,
   "protected": [
     800792,
     801515,
@@ -559,10 +559,10 @@
     "803155": 800047,
     "803156": 800047,
     "803158": 800047,
-    "800094": 800094,
-    "800841": 800094,
-    "800842": 800094,
-    "802156": 800094,
+    "800094": 905850,
+    "800841": 905851,
+    "800842": 905849,
+    "802156": 905850,
     "802984": 800094,
     "800095": 800095,
     "800097": 800095,
@@ -9523,19 +9523,6 @@
       ]
     },
     {
-      "survivor_id": 800094,
-      "state_id": 222,
-      "state_name": "Hawaii",
-      "name": "Hawaii",
-      "member_ids": [
-        800094,
-        800841,
-        800842,
-        802156,
-        802984
-      ]
-    },
-    {
       "survivor_id": 800095,
       "state_id": 223,
       "state_name": "Idaho",
@@ -13035,6 +13022,43 @@
         803059,
         803081,
         803082
+      ]
+    },
+    {
+      "survivor_id": 800094,
+      "state_id": 222,
+      "state_name": "Hawaii",
+      "name": "Oahu",
+      "member_ids": [
+        802984
+      ]
+    },
+    {
+      "survivor_id": 905849,
+      "state_id": 222,
+      "state_name": "Hawaii",
+      "name": "Kauai–Niihau",
+      "member_ids": [
+        800842
+      ]
+    },
+    {
+      "survivor_id": 905850,
+      "state_id": 222,
+      "state_name": "Hawaii",
+      "name": "Maui County",
+      "member_ids": [
+        800094,
+        802156
+      ]
+    },
+    {
+      "survivor_id": 905851,
+      "state_id": 222,
+      "state_name": "Hawaii",
+      "name": "Hawaii",
+      "member_ids": [
+        800841
       ]
     }
   ],

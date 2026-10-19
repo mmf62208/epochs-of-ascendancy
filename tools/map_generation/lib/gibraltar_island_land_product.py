@@ -832,12 +832,12 @@ def build_gibraltar_island_land_product(board_dir: str = "") -> Dict[str, Any]:
         passes.append("gibraltar_id_not_hk")
 
     sea_n = sum(1 for p in base.values() if str(p.get("domain") or "").lower() in ("sea", "strait", "ocean"))
-    # Lakes are domain=lake; seas+straits stay the 340-cell water block plus lakes.
+    # Lakes are domain=lake; seas+straits stay the 341-cell water block plus lakes.
     sea_block = sum(1 for pid in base if int(pid) >= 950000)
-    if sea_block != 340:
+    if sea_block != 341:
         fails.append(f"sea_block_changed n={sea_block}")
     else:
-        passes.append("seas_340_unchanged")
+        passes.append("seas_341_unchanged")
 
     n_board = len(base)
     if n_board < 3510 or n_board > 3545:
