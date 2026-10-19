@@ -57,7 +57,7 @@ tools/eoa_main_fix1_declare_toast_guard.sh
 
 Wired as `launch_main_fix1_prod_esc`, `launch_main_fix1_peace_click`, `launch_main_fix1_declare_toast` on the full gate script (not `--quick`). `--quick` stays the same 14 known `unit_board_play_path` reds.
 
-FIX #1: toast wording + AI empty-hex restored. Work is on `grok/main-fix-1` (PR #116). PR #117 closed without merge.
+FIX #1: toast wording + AI empty-hex restored. Work is on `grok/main-fix-1` (PR #116). PR #117 closed without merge. ProdEsc/PeaceClick/DeclareClick/WarGate/UI-POLISH-1/PROD-1 **PASS** (0 SCRIPT ERROR). xvfb DeclareToast **PASS** (on declare 0 toasts; then 3 empty-hex captures, 3 correctly worded toasts, 3 owner flips). `--quick` `FAILED (failures=14)`. map_qc NE **0.9853**.
 
 ### 1. Core Time System Tests
 
