@@ -2748,6 +2748,12 @@ func _handle_escape_key() -> void:
 	if _dismiss_named_overlay_screen("LeaderAssignmentScreen"):
 		_close_release_seen = true
 		return
+	# MAIN-FIX-1: Production is a DraggablePanel whose own Esc lives in
+	# `_unhandled_input`. MapRenderer `_input` owns the live Esc stack, so an
+	# open Prod never saw the key and idle Esc opened Command Center on top.
+	if _dismiss_named_overlay_screen("ProductionAssignmentScreen"):
+		_close_release_seen = true
+		return
 	# Garrison / unit card first: Close/Esc restores province inspector (Köln spine)
 	# without GIS lock or a second search.
 	if _unit_detail_popup_is_visible():
@@ -26233,7 +26239,7 @@ func _dismiss_map_overlays_esc() -> bool:
 			return true
 	var tree := get_tree()
 	if tree:
-		for screen_name in ["LeaderAssignmentScreen", "TechnologyScreen", "AgentAssignmentScreen", "NationalSpiritsScreen"]:
+		for screen_name in ["LeaderAssignmentScreen", "ProductionAssignmentScreen", "TechnologyScreen", "AgentAssignmentScreen", "NationalSpiritsScreen"]:
 			var n := tree.root.get_node_or_null(screen_name)
 			if n == null and tree.current_scene:
 				var ui := tree.current_scene.get_node_or_null("UILayer/%s" % screen_name)
@@ -26250,7 +26256,7 @@ func _dismiss_map_overlays_esc() -> bool:
 			if layer:
 				for child in layer.get_children():
 					var cn := str(child.name)
-					if cn in ["LeaderAssignmentScreen", "TechnologyScreen", "AgentAssignmentScreen", "NationalSpiritsScreen"]:
+					if cn in ["LeaderAssignmentScreen", "ProductionAssignmentScreen", "TechnologyScreen", "AgentAssignmentScreen", "NationalSpiritsScreen"]:
 						if _overlay_node_is_up(child):
 							child.queue_free()
 							dismissed = true

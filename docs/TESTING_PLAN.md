@@ -34,6 +34,23 @@ FIX #1: Space close-release swallow arms only while LMB is down (`Input.is_mouse
 
 FIX #2: Agents Close must be fully visible/clickable (TitleBar after MarginContainer, content clipped to 1248×728, title vs Show: rects do not intersect). Esc closes Space; Esc with nothing open still reaches Command Center. Shared `scripts/ui/CloseReleaseSwallow.gd` on every press-mode Close (Prod, Leaders, Agents, Space). Held-click cases use press → 50–100 ms wait → release; map stand-in counts unhandled left-ups (0 after Close, 1 on empty map). Mutant: disconnect swallow on Prod held-close → 1 map mouse-up. Guard **RESULT=PASS** (failures=0). `HeadlessProd1ButtonOpenTest` **PASS**. `HeadlessUi1LeadersEdgePanMarchTest` **PASS**. `--quick` same 14 known reds. map_qc NE **0.9853**. 0 SCRIPT ERROR.
 
+### 0c. MAIN-FIX-1 Prod Esc + false capture notice
+
+Play MIXED on main `d00dc8ed`: Esc with Production open opened Command Center on top of Prod (Leaders/Agents/Space already consumed Esc after #114). Diplomatic GER→POL Declare toasted `Province captured · POL vs GER at Słupski` with no owner change.
+
+**Esc:** `MapRenderer._handle_escape_key` dismisses `ProductionAssignmentScreen` (via `close_screen`) before `_esc_open_command_center`. Idle Esc still opens Command Center.
+
+**Capture:** `BattleManager` records `previous_owner_tag` and `_post_battle_news` skips the capture toast unless `owner_tag` actually became the attacker.
+
+```bash
+tools/run_godot.sh --headless --path . --resolution 1280x800 \
+  -s res://scripts/core/HeadlessMainFix1ProdEscTest.gd
+tools/run_godot.sh --headless --path . --resolution 1280x800 \
+  -s res://scripts/core/HeadlessCampaignLoop1DeclareClickTest.gd
+```
+
+Wired as `launch_main_fix1_prod_esc` on the full gate script (not `--quick`). DeclareClick asserts no capture news when GER/POL owners are unchanged. `--quick` stays the same 14 known `unit_board_play_path` reds.
+
 ### 1. Core Time System Tests
 
 - Load a scenario and verify the top bar date matches `start_date`.

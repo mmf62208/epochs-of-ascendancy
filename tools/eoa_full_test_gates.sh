@@ -324,6 +324,10 @@ else
     tools/run_godot.sh --headless --path . --resolution 1280x800 \
     -s res://scripts/core/HeadlessUiPolish1Test.gd || fail
 
+  run_step launch_main_fix1_prod_esc \
+    tools/run_godot.sh --headless --path . --resolution 1280x800 \
+    -s res://scripts/core/HeadlessMainFix1ProdEscTest.gd || fail
+
   run_step launch_ix1_spine_complete \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessIx1RoadSpineCompleteTest.gd || fail
 

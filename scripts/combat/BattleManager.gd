@@ -1414,9 +1414,11 @@ func _deferred_resolve_attacker_win(att_tag: String, to_id: int, from_id: int, a
 func _apply_attacker_win_capture_light(att_tag: String, to_id: int, from_id: int, att_fid: String) -> void:
 	var tag := att_tag.strip_edges().to_upper()
 	var def_tag := ""
+	var previous_owner := ""
 	if typeof(MapManager) != TYPE_NIL and to_id >= 0:
 		var live: Province = MapManager.get_province(to_id) if MapManager.has_method("get_province") else null
 		if live != null:
+			previous_owner = str(live.owner_tag).strip_edges().to_upper()
 			def_tag = _province_controller_tag(live)
 		if MapManager.has_method("update_province_owner"):
 			MapManager.update_province_owner(to_id, tag, tag, false, true)
@@ -1438,12 +1440,16 @@ func _apply_attacker_win_capture_light(att_tag: String, to_id: int, from_id: int
 		"attacker_tag": tag,
 		"target_province_id": to_id,
 		"from_province_id": from_id,
+		"previous_owner_tag": previous_owner,
 		"outcome": "attacker",
 		"winner": "attacker",
 	}
 	_displace_defender_from_captured_province(row, to_id)
 	# News history is cheap; toast UI is skipped headless / during compact clock.
-	_post_battle_news(row, true)
+	# MAIN-FIX-1: a front/controller flip with the same owner is not a capture
+	# and must not fall through to a "Battle:" toast either.
+	if previous_owner != tag:
+		_post_battle_news(row, true)
 	if typeof(TimeManager) != TYPE_NIL and bool(TimeManager.get("_living_playtest_clock")):
 		# Compact clock: skip deferred map refresh (Maginot quit hung on renderer).
 		return
@@ -2247,6 +2253,11 @@ func apply_combat_outcome(
 			print(dmg_line + (" (prolonged - reduced losses, lasts longer)" if prolonged else ""))
 
 	if captured and target_pid >= 0 and typeof(MapManager) != TYPE_NIL:
+		var previous_owner := ""
+		var live_cap: Province = MapManager.get_province(target_pid) if MapManager.has_method("get_province") else null
+		if live_cap != null:
+			previous_owner = str(live_cap.owner_tag).strip_edges().to_upper()
+		result["previous_owner_tag"] = previous_owner
 		MapManager.update_province_owner(target_pid, attacker_tag, attacker_tag, false)
 		# Capture advances the attacker's land station onto the taken province so OOB /
 		# can_assault / get_land_divisions see them on the new border (not still on from_pid).
@@ -2258,7 +2269,9 @@ func apply_combat_outcome(
 			int(result.get("from_province_id", from_province_id)),
 			int(result.get("retreat_province_id", -1)),
 		)
-		_post_battle_news(result, true)
+		# MAIN-FIX-1: only toast "Province captured" when owner_tag actually flipped.
+		if previous_owner != attacker_tag:
+			_post_battle_news(result, true)
 	elif winner == "attacker":
 		_post_battle_news(result, false)
 	elif winner == "defender":
@@ -2895,15 +2908,23 @@ func _notify_map_refresh(target_pid: int = -1, from_pid: int = -1, retreat_pid: 
 func _post_battle_news(result: Dictionary, captured: bool) -> void:
 	if typeof(LeaderEventUI) == TYPE_NIL or not LeaderEventUI.has_method("post_news"):
 		return
-	var attacker := str(result.get("attacker_tag", "?"))
-	var defender := str(result.get("defender_tag", "?"))
+	var attacker := str(result.get("attacker_tag", "?")).strip_edges().to_upper()
+	var defender := str(result.get("defender_tag", "?")).strip_edges().to_upper()
 	var outcome := str(result.get("outcome", result.get("winner", "battle")))
 	var target_name := ""
 	var pid := int(result.get("target_province_id", result.get("province_id", -1)))
+	var owner_now := ""
 	if typeof(MapManager) != TYPE_NIL and pid >= 0:
 		var p: Province = MapManager.get_province(pid)
 		if p != null:
 			target_name = p.name
+			owner_now = str(p.owner_tag).strip_edges().to_upper()
+	# MAIN-FIX-1: diplomatic declare / front-cache invalidation must not toast a
+	# capture when owner_tag did not become the attacker.
+	if captured:
+		var previous_owner := str(result.get("previous_owner_tag", defender)).strip_edges().to_upper()
+		if owner_now != attacker or previous_owner == attacker:
+			return
 	var title := "Province captured" if captured else "Battle: %s" % outcome
 	var body := "%s vs %s at %s" % [attacker, defender, target_name if not target_name.is_empty() else str(pid)]
 	LeaderEventUI.post_news(title, body, "combat")

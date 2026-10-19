@@ -327,6 +327,16 @@ Guard `HeadlessCampaignLoop1TopBarFitTest` at 1280×800: every visible top-bar b
 Diplomatic-only Declare (item 4) on tip `b677890f`:
 
 - `HeadlessCampaignLoop1DeclareClickTest` `RESULT=PASS`: same inspector checks, leftover-swallow click starts GER–POL, then 3 live F5-equivalent days with 2 stationed GER units (front `711057`, interior `710300`) — no new player march, no player attack order, no station change.
+
+## MAIN-FIX-1 (false capture toast on diplomatic Declare)
+
+Play MIXED on main `d00dc8ed`: right after GER Declare on POL, a notice `Province captured · POL vs GER at Słupski` appeared with no matching battle/march/assault log and Słupski still POL-owned.
+
+**Root:** `BattleManager._post_battle_news("Province captured", "%s vs %s at %s")` ran from `_apply_attacker_win_capture_light` / `apply_combat_outcome` whenever the capture path ran, including a same-owner / controller-only flip. Declare itself (`WarStateDomain.player_declare_from_province`) is diplomatic-only; `invalidate_fronts` only clears the front cache. The unique toast format is BattleManager.
+
+**Fix:** record `previous_owner_tag` before `update_province_owner`; post the capture toast only when previous owner ≠ attacker and live `owner_tag` is the attacker. Same-owner light capture posts nothing (not a fallback "Battle:" toast).
+
+Guard: `HeadlessCampaignLoop1DeclareClickTest` snapshots GER/POL owners + `LeaderEventUI.news_history` "Province captured" entries around the leftover-swallow click (and after the 3 live days). Same-owner POL light capture on the POL border pid must not add a capture notice.
 - Existing CL1: WarGate, CapitulationPeace, Soak all `RESULT=PASS`.
 - Seed `multi_ai_decisions` md5 `20fe9063de285f19d4f9b8a105abfd31` default and `EOA_CAMPAIGN_LOOP=0`.
 - `--quick` same 14 `unit_board_play_path` reds. map_qc NE **0.9853** (3148/3195).

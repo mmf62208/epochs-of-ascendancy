@@ -8,6 +8,9 @@ extends SceneTree
 ##
 ## Declare is diplomatic only: after the click, 3 live days must not issue
 ## a new order to any player unit or move any player unit.
+##
+## MAIN-FIX-1: diplomatic Declare must not toast "Province captured" when
+## no owner_tag actually flips (Play MIXED: POL vs GER at Słupski).
 
 const PLAY_SIZE := Vector2i(1280, 800)
 const FLUSH_FRAMES := 8
@@ -31,6 +34,8 @@ var _pol_from := -1
 var _fra_to := -1
 var _hold_interior := -1
 var _hold_before: Dictionary = {}
+var _owners_before_declare: Dictionary = {}
+var _capture_news_before_declare: int = 0
 
 
 func _init() -> void:
@@ -170,6 +175,11 @@ func _run() -> void:
 		_fail("FRA click started a war POL=%s FRA=%s" % [str(_war.is_at_war("GER", "POL")), str(_war.is_at_war("GER", "FRA"))])
 		return
 	_pass("FRA click did not declare")
+	_owners_before_declare = {
+		"GER": _owned_pids(mm, "GER"),
+		"POL": _owned_pids(mm, "POL"),
+	}
+	_capture_news_before_declare = _capture_news_entries().size()
 	if not _click_control(pol_btn, true):
 		_fail("could not click POL Declare")
 		return
@@ -179,6 +189,12 @@ func _run() -> void:
 		_cleanup()
 		return
 	_pass("leftover-swallow Declare click started GER–POL")
+	if not _assert_no_false_capture_notice(mm, "on declare"):
+		_cleanup()
+		return
+	if not _assert_same_owner_light_capture_silent(mm):
+		_cleanup()
+		return
 	if not _assert_player_hold(lm, _hold_before, "on declare"):
 		_cleanup()
 		return
@@ -196,7 +212,90 @@ func _run() -> void:
 		_cleanup()
 		return
 	_pass("player units held: no new order, no move")
+	if not _assert_no_false_capture_notice(mm, "after %d days" % HOLD_DAYS):
+		_cleanup()
+		return
 	_cleanup()
+
+
+func _owned_pids(mm: Node, tag: String) -> Array:
+	if mm == null or not mm.has_method("get_provinces_by_owner"):
+		return []
+	var owned: Array = mm.call("get_provinces_by_owner", tag)
+	var out: Array = []
+	for pid_v in owned:
+		out.append(int(pid_v))
+	out.sort()
+	return out
+
+
+func _capture_news_entries() -> Array:
+	var out: Array = []
+	var lui: Node = get_root().get_node_or_null("LeaderEventUI")
+	if lui == null or not ("news_history" in lui):
+		return out
+	var hist: Variant = lui.get("news_history")
+	if not (hist is Array):
+		return out
+	for raw in hist:
+		if typeof(raw) != TYPE_DICTIONARY:
+			continue
+		var row: Dictionary = raw
+		if str(row.get("title", "")).strip_edges() != "Province captured":
+			continue
+		out.append("%s · %s" % [str(row.get("title", "")), str(row.get("body", ""))])
+	return out
+
+
+func _assert_no_false_capture_notice(mm: Node, label: String) -> bool:
+	var ger_before: Array = _owners_before_declare.get("GER", [])
+	var pol_before: Array = _owners_before_declare.get("POL", [])
+	var ger_now: Array = _owned_pids(mm, "GER")
+	var pol_now: Array = _owned_pids(mm, "POL")
+	var news: Array = _capture_news_entries()
+	var new_count := news.size() - _capture_news_before_declare
+	var owners_unchanged := ger_now == ger_before and pol_now == pol_before
+	if owners_unchanged and new_count > 0:
+		_fail("%s capture notice with no ownership change: %s" % [label, str(news)])
+		return false
+	if owners_unchanged:
+		_pass(
+			"%s no capture notice (GER %d / POL %d unchanged, news +%d)"
+			% [label, ger_now.size(), pol_now.size(), new_count]
+		)
+	else:
+		_pass("%s ownership changed; capture news allowed (+%d)" % [label, new_count])
+	return true
+
+
+func _assert_same_owner_light_capture_silent(mm: Node) -> bool:
+	var bm: Node = get_root().get_node_or_null("BattleManager")
+	if bm == null or not bm.has_method("_apply_attacker_win_capture_light"):
+		_fail("BattleManager._apply_attacker_win_capture_light missing")
+		return false
+	if _pol_to <= 0:
+		_fail("no POL border pid for same-owner capture probe")
+		return false
+	var before_news: Array = _capture_news_entries()
+	var p: Object = mm.call("get_province", _pol_to) if mm.has_method("get_province") else null
+	if p == null:
+		_fail("POL province %d missing" % _pol_to)
+		return false
+	var owner_before := str(p.get("owner_tag")).strip_edges().to_upper()
+	if owner_before != "POL":
+		_fail("same-owner probe want POL owner got %s" % owner_before)
+		return false
+	bm.call("_apply_attacker_win_capture_light", "POL", _pol_to, _pol_from, "")
+	var owner_after := str(p.get("owner_tag")).strip_edges().to_upper()
+	if owner_after != "POL":
+		_fail("same-owner light capture flipped owner %s → %s" % [owner_before, owner_after])
+		return false
+	var after_news: Array = _capture_news_entries()
+	if after_news.size() != before_news.size():
+		_fail("same-owner POL light capture posted Province captured: %s" % str(after_news))
+		return false
+	_pass("same-owner POL light capture at %d posted no capture notice" % _pol_to)
+	return true
 
 
 func _make_host(host_name: String, pos: Vector2) -> Panel:

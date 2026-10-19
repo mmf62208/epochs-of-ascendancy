@@ -120,14 +120,23 @@ func _exit_tree() -> void:
 		ProductionManager.day_advanced.disconnect(_on_day_advanced)
 
 
+func close_screen() -> void:
+	if is_queued_for_deletion():
+		return
+	# Rename before queue_free so Close→Prod does not toggle-close the dying node.
+	name = "ProductionAssignmentScreen_dying"
+	var vp := get_viewport()
+	if vp != null:
+		vp.gui_release_focus()
+	queue_free()
+
+
 func _on_close_pressed() -> void:
 	if is_queued_for_deletion():
 		return
 	# Press-mode Close: swallow the matching mouse-up so it cannot map-pick.
 	_CloseReleaseSwallow.arm_from(self)
-	# Rename before queue_free so Close→Prod does not toggle-close the dying node.
-	name = "ProductionAssignmentScreen_dying"
-	queue_free()
+	close_screen()
 
 
 func _apply_screen_theme() -> void:
