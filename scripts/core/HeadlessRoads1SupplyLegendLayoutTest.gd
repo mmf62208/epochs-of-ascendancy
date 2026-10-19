@@ -288,18 +288,22 @@ func _fill_live_legend_text() -> void:
 	_mr.set("supply_mode", true)
 	_mr.call("_set_supply_legend_visible", true)
 	var rtl: RichTextLabel = _mr.get("_supply_overlay_legend") as RichTextLabel
+	## Load after autoloads. A class_name reference here compiles ProvinceInsight
+	## before MapManager exists and strips the live builder.
+	var insight: GDScript = load("res://scripts/map/ProvinceInsight.gd") as GDScript
+	if insight == null or not insight.has_method("build_supply_legend_bbcode"):
+		_fail("ProvinceInsight.build_supply_legend_bbcode unavailable")
+		return
 	var live: String = str(
-		ProvinceInsight.build_supply_legend_bbcode(-1, 0, -1, "", 12, 4, "GER", 2, "", "")
+		insight.call("build_supply_legend_bbcode", -1, 0, -1, "", 12, 4, "GER", 2, "", "")
 	)
-	if live.length() < 200:
-		_mr.call("_update_supply_legend_text")
-		if rtl != null:
-			live = str(rtl.text)
-	elif rtl != null:
-		rtl.text = live
 	if live.length() < 400:
 		_fail("live Supply legend text is too short (%d chars) — need real bbcode" % live.length())
 		return
+	if rtl != null:
+		rtl.fit_content = false
+		rtl.scroll_active = true
+		rtl.text = live
 	_mr.call("_layout_supply_legend")
 	_info("live legend text chars=%d" % live.length())
 
@@ -377,6 +381,16 @@ func _assert_legend_fits(wh: Vector2i, label: String) -> void:
 		return
 	if legend.size.y > 200.0:
 		_fail("%s legend height %.1f > 200 at %dx%d (%s)" % [label, legend.size.y, wh.x, wh.y, str(legend)])
+		return
+	var rtl: RichTextLabel = _mr.get("_supply_overlay_legend") as RichTextLabel
+	var content_h: float = 0.0
+	if rtl != null and rtl.has_method("get_content_height"):
+		content_h = float(rtl.call("get_content_height"))
+	if str(rtl.text if rtl != null else "").length() < 400:
+		_fail("%s legend text is not the real live bbcode" % label)
+		return
+	if content_h <= 200.0:
+		_fail("%s legend content height %.1f — real text must exceed the 200 px frame" % [label, content_h])
 		return
 	var mm: Rect2 = _minimap_rect()
 	if mm.size.x >= 8.0 and mm.size.y >= 8.0 and legend.intersects(mm):
