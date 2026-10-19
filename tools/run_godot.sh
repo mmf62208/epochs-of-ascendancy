@@ -36,10 +36,14 @@ if [[ "$already_import" -eq 0 ]]; then
     NEED_IMPORT=1
   elif ! grep -q 'Rx1RhineCrossing' "$CACHE" 2>/dev/null; then
     NEED_IMPORT=1
+  elif ! grep -q 'WarStateDomain' "$CACHE" 2>/dev/null; then
+    # CL1 (main d00dc8ed): GameData/MapManager parse-fail until the class cache
+    # picks up WarStateDomain / CapitulationDomain / CampaignEnd*.
+    NEED_IMPORT=1
   fi
 fi
 if [[ "$NEED_IMPORT" -eq 1 ]]; then
-  echo "run_godot: class cache missing Rx1RhineCrossing — one-time --headless --import"
+  echo "run_godot: class cache missing Rx1RhineCrossing/WarStateDomain — one-time --headless --import"
   "$GODOT" --path "$ROOT" --headless --import --quit
 fi
 

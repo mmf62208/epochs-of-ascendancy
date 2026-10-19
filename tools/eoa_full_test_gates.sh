@@ -104,6 +104,7 @@ run_step unit_board_play_path \
     tools.map_generation.tests.test_se_england_shire_land_uniformity_product \
     tools.map_generation.tests.test_ix1_road_spine_product \
     tools.map_generation.tests.test_rx1_rhine_crossing_product \
+    tools.map_generation.tests.test_oldmap_turkey_mask_product \
     tools.map_generation.tests.test_world_accurate_capital_pick_product \
     tools.map_generation.tests.test_world_accurate_strategic_and_assault \
     tools.map_generation.tests.test_world_accurate_multi_front_and_deploy \
@@ -363,6 +364,16 @@ else
 
   run_step launch_rt1_no_rebuild \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessRt1RoadNoRebuildTest.gd || fail
+
+  run_step launch_roads1_quiet \
+    tools/run_godot.sh --headless -s res://scripts/core/HeadlessRoads1QuietGuard.gd || fail
+
+  run_step launch_roads1_lithuania_stub \
+    tools/run_godot.sh --headless -s res://scripts/core/HeadlessRoads1LithuaniaStubTest.gd || fail
+
+  run_step launch_roads1_supply_legend_layout \
+    tools/run_godot.sh --headless --path . --resolution 1280x800 \
+    -s res://scripts/core/HeadlessRoads1SupplyLegendLayoutTest.gd || fail
 
   run_step launch_hwy1_highway_chain \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessHwy1HighwayChainTest.gd || fail

@@ -202,6 +202,8 @@ const GRAND_THEATER_CANONICAL_BOUNDS: Rect2 = MapCanvasConfig.GRAND_THEATER_BOUN
 const WORLD_CANONICAL_BOUNDS: Rect2 = MapCanvasConfig.WORLD_CANONICAL_BOUNDS  # Full world canvas scaled to match theater (8192×4096 @ 1.2).
 const UI_TOP_BAR_CLEARANCE := 84.0
 const UI_MAP_TOOLBAR_HEIGHT := 56.0
+## Fixed Supply-legend frame. Host size must not come from RTL content height.
+const SUPPLY_LEGEND_HOST_SIZE := Vector2(480.0, 200.0)
 
 ## HOI4/EU4-style: international frontiers are near-black (fills carry nation color).
 ## Never stroke every unmatched GIS edge in owner color — that creates the NUTS spiderweb.
@@ -223,6 +225,10 @@ var show_terrain_layer: bool = false
 var show_unit_counters: bool = true
 ## Solid deep-ocean plate under provinces so gaps never show void-hex underlay or grey clear color.
 var _ocean_floor: Polygon2D = null
+## OLDMAP_TURKEY: cosmetic cover for the USSR-west / Black Sea hole. Not a province.
+const USSR_WEST_GAP_MASK_Z := -14
+const USSR_WEST_GAP_MASK_PATH := "res://assets/maps/layers/uncovered_land_ussr_west.json"
+var _ussr_west_gap_mask: Node2D = null
 
 var _is_middle_dragging := false
 var _middle_drag_start := Vector2.ZERO
@@ -3199,6 +3205,8 @@ func _wheel_should_zoom_map() -> bool:
 	var vp := get_viewport()
 	if vp == null:
 		return true
+	if _pointer_over_supply_legend():
+		return false
 	var hov: Control = vp.gui_get_hovered_control()
 	if hov == null:
 		return true
@@ -3208,6 +3216,12 @@ func _wheel_should_zoom_map() -> bool:
 		# Don't steal wheel from tech list / info scroll / menus.
 		if n is ScrollContainer or n is TextEdit or n is CodeEdit:
 			return false
+		if n is RichTextLabel and bool((n as RichTextLabel).scroll_active):
+			return false
+		if n == _supply_legend_panel or n == _supply_overlay_legend:
+			return false
+		if nn == "SupplyOverlayLegend" or nn == "SupplyOverlayLegendHost":
+			return false
 		if nn in ["TechnologyScreen", "InfoPanel", "MainMenu", "DebugOverlay", "OrderCommandPanel"]:
 			return false
 		if nn.ends_with("Screen") or nn.ends_with("Popup"):
@@ -3216,6 +3230,33 @@ func _wheel_should_zoom_map() -> bool:
 			return false
 		n = n.get_parent()
 	return true
+
+
+func _pointer_over_supply_legend() -> bool:
+	var vp := get_viewport()
+	if vp == null:
+		return false
+	var mouse: Vector2 = vp.get_mouse_position()
+	if _control_contains_point(_supply_legend_panel, mouse):
+		return true
+	if _control_contains_point(_supply_overlay_legend, mouse):
+		return true
+	var hov: Control = vp.gui_get_hovered_control()
+	var n: Node = hov
+	while n != null:
+		if n == _supply_legend_panel or n == _supply_overlay_legend:
+			return true
+		var nn := str(n.name)
+		if nn == "SupplyOverlayLegend" or nn == "SupplyOverlayLegendHost":
+			return true
+		n = n.get_parent()
+	return false
+
+
+func _control_contains_point(ctrl: Control, pt: Vector2) -> bool:
+	if ctrl == null or not is_instance_valid(ctrl) or not ctrl.is_visible_in_tree():
+		return false
+	return ctrl.get_global_rect().has_point(pt)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -3904,14 +3945,24 @@ func _sync_peak_snow_overlay() -> void:
 		terrain_layer_stack.sync_peak_snow_transform()
 
 
+## Live TopInfoBar height (peace ~52, CL1 war chips can grow the strip).
+func _top_bar_clearance() -> float:
+	var top: float = UI_TOP_BAR_CLEARANCE
+	var tree := get_tree()
+	if tree == null:
+		return top
+	var tib: Node = TopInfoBar.find_in_tree(tree)
+	if tib == null:
+		tib = tree.get_first_node_in_group("top_info_bar")
+	if tib != null and tib.has_method("get_bar_height"):
+		top = maxf(top, float(tib.call("get_bar_height")) + 4.0)
+	return top
+
+
 ## Top HUD height (TopInfoBar + map mode toolbar). Edge pan-north starts just *below* this strip
 ## so the bar never thrash-pans, but players can still scroll the map upward.
 func _map_nav_top_clearance() -> float:
-	var top_clearance := UI_TOP_BAR_CLEARANCE
-	if get_tree():
-		var tib := TopInfoBar.find_in_tree(get_tree())
-		if tib != null and tib.has_method("get_bar_height"):
-			top_clearance = maxf(top_clearance, float(tib.call("get_bar_height")) + 4.0)
+	var top_clearance := _top_bar_clearance()
 	var toolbar_h := UI_MAP_TOOLBAR_HEIGHT
 	if _map_mode_toolbar != null and _map_mode_toolbar.has_method("get_panel_height"):
 		toolbar_h = float(_map_mode_toolbar.call("get_panel_height"))
@@ -4238,11 +4289,7 @@ func _layout_map_ui() -> void:
 	var ui := get_node_or_null("UI") as CanvasLayer
 	if ui == null:
 		return
-	var top_clearance := UI_TOP_BAR_CLEARANCE
-	if get_tree():
-		var tib := TopInfoBar.find_in_tree(get_tree())
-		if tib != null and tib.has_method("get_bar_height"):
-			top_clearance = maxf(top_clearance, float(tib.call("get_bar_height")) + 4.0)
+	var top_clearance := _top_bar_clearance()
 	var toolbar_h := UI_MAP_TOOLBAR_HEIGHT
 	if _map_mode_toolbar != null and _map_mode_toolbar.has_method("get_panel_height"):
 		toolbar_h = float(_map_mode_toolbar.call("get_panel_height"))
@@ -4280,6 +4327,90 @@ func _layout_map_ui() -> void:
 		else:
 			ip.z_index = 40
 	_layout_info_panel_inner()
+	_layout_supply_legend()
+
+
+## Sit the Supply legend under Map Mode (not over the chips) at 1280x800+.
+## Host is a fixed 480×200 clip frame. Inner RTL scrolls; size is never content-driven.
+func _layout_supply_legend() -> void:
+	if _supply_legend_panel == null or not is_instance_valid(_supply_legend_panel):
+		return
+	var host := _supply_legend_panel.get_parent() as Control
+	if host == null or host.name != "SupplyOverlayLegendHost":
+		return
+	var top_clearance := _top_bar_clearance()
+	var toolbar_h := UI_MAP_TOOLBAR_HEIGHT
+	if _map_mode_toolbar != null and _map_mode_toolbar.has_method("get_panel_height"):
+		toolbar_h = float(_map_mode_toolbar.call("get_panel_height"))
+	var chrome_top := top_clearance + toolbar_h + 6.0
+	_apply_supply_legend_fixed_frame()
+	var sz: Vector2 = _supply_legend_host_size()
+	_pin_control_top_left(host, 10.0, chrome_top, sz)
+	_pin_control_top_left(_supply_legend_panel, 0.0, 0.0, sz)
+	_sync_supply_legend_pulse_host()
+
+
+func _supply_legend_host_size() -> Vector2:
+	return SUPPLY_LEGEND_HOST_SIZE
+
+
+func _apply_supply_legend_fixed_frame() -> void:
+	var sz: Vector2 = _supply_legend_host_size()
+	if _supply_legend_panel != null and is_instance_valid(_supply_legend_panel):
+		var panel: Control = _supply_legend_panel
+		panel.clip_contents = true
+		panel.custom_minimum_size = sz
+		panel.size = sz
+		panel.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+		panel.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+		for child_v in panel.get_children():
+			var child: Node = child_v as Node
+			if child is VBoxContainer:
+				var vb: VBoxContainer = child
+				vb.clip_contents = true
+				vb.size_flags_vertical = Control.SIZE_EXPAND_FILL
+				vb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+				for sub_v in vb.get_children():
+					if sub_v is MarginContainer:
+						var margin: MarginContainer = sub_v
+						margin.clip_contents = true
+						margin.size_flags_vertical = Control.SIZE_EXPAND_FILL
+						margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	if _supply_overlay_legend != null and is_instance_valid(_supply_overlay_legend):
+		var rtl: RichTextLabel = _supply_overlay_legend
+		rtl.fit_content = false
+		rtl.scroll_active = true
+		rtl.clip_contents = true
+		rtl.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		rtl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		rtl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		rtl.custom_minimum_size = Vector2(460.0, 80.0)
+	if _supply_legend_panel != null and is_instance_valid(_supply_legend_panel):
+		var host: Control = _supply_legend_panel.get_parent() as Control
+		if host != null and host.name == "SupplyOverlayLegendHost":
+			host.clip_contents = true
+			host.custom_minimum_size = sz
+			host.size = sz
+			host.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+			host.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+
+
+func _pin_control_top_left(ctrl: Control, left: float, top: float, sz: Vector2) -> void:
+	if ctrl == null or not is_instance_valid(ctrl):
+		return
+	ctrl.clip_contents = true
+	ctrl.anchor_left = 0.0
+	ctrl.anchor_top = 0.0
+	ctrl.anchor_right = 0.0
+	ctrl.anchor_bottom = 0.0
+	ctrl.offset_left = left
+	ctrl.offset_top = top
+	ctrl.offset_right = left + sz.x
+	ctrl.offset_bottom = top + sz.y
+	ctrl.custom_minimum_size = sz
+	ctrl.size = sz
+	ctrl.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	ctrl.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 
 
 ## Keep InfoPanel text fully inside the cyan box.
@@ -14717,6 +14848,9 @@ func set_map_mode(mode: String = "political") -> void:
 	# Pass 22: restore remembered primary intensity for linked modes.
 	if m in INTENSITY_LINKED_MODES and primary_mapmode_intensity.has(m):
 		secondary_tint_intensity[m] = clampf(float(primary_mapmode_intensity[m]), 0.25, 2.0)
+	_sync_road_quiet_mode()
+	_ensure_ussr_west_gap_mask()
+	_apply_legacy_underlay_policy()
 	if not _map_mode_apply_scheduled:
 		_map_mode_apply_scheduled = true
 		call_deferred("_apply_map_mode_visuals")
@@ -14780,11 +14914,37 @@ func _apply_map_mode_visuals() -> void:
 		call_deferred("_ensure_capital_stars_visible")
 
 
+func _toolbar_highlight_mode() -> String:
+	var m := str(current_map_mode).strip_edges().to_lower()
+	if m == "supply" or m == "infra":
+		return m
+	if supply_mode:
+		return "supply"
+	if m.is_empty():
+		return "political"
+	return m
+
+
 func _sync_mapmode_toolbar() -> void:
 	if _map_mode_toolbar == null or not is_instance_valid(_map_mode_toolbar):
 		return
 	if _map_mode_toolbar.has_method("set_mode"):
 		_map_mode_toolbar.call("set_mode", current_map_mode, false)
+
+
+## L-key only: while the legend is open, highlight Supply (or Infra). Chip clicks
+## use set_mode(notify=true) and must keep that mode — do not remap here.
+func _apply_l_key_legend_toolbar_highlight() -> void:
+	if not supply_mode:
+		return
+	if _map_mode_toolbar == null or not is_instance_valid(_map_mode_toolbar):
+		return
+	if not _map_mode_toolbar.has_method("set_mode"):
+		return
+	var highlight := _toolbar_highlight_mode()
+	if highlight.is_empty():
+		return
+	_map_mode_toolbar.call("set_mode", highlight, false)
 
 
 ## Mapmode / F1: every province node visible (undo viewport cull holes).
@@ -16546,6 +16706,10 @@ func load_world_grand_underlay() -> void:
 		if elev and elev is Sprite2D:
 			elev.modulate.a = 0.68
 			print("  Elevation/mountains layer forced visible (NA Rockies, Greenland compact, SA Andes aligned on large view).")
+	_ensure_ussr_west_gap_mask()
+	_apply_legacy_underlay_policy()
+	call_deferred("_ensure_ussr_west_gap_mask")
+	call_deferred("_apply_legacy_underlay_policy")
 
 
 ## Single authoritative world-class bootstrap: ultra world underlay, mountains + lakes layers aligned, Europe framed.
@@ -16598,6 +16762,8 @@ func _apply_world_terrain_layers() -> void:
 		tls.configure_for_world_launch()
 	tls.fit_to_bounds(WORLD_CANONICAL_BOUNDS)
 	tls.visible = true
+	_ensure_ussr_west_gap_mask()
+	_apply_legacy_underlay_policy()
 
 ## Reset camera + bounds to Europe grand theater (for quick return after world/NA pan or chunk loads).
 ## Keeps Europe polys and data as the testable focus.
@@ -18111,6 +18277,139 @@ func _ensure_ocean_floor() -> void:
 		var bi := bg.get_index()
 		if _ocean_floor.get_index() > bi:
 			container.move_child(_ocean_floor, 0)
+
+
+## Cosmetic USSR-west / Black Sea hole cover. Canvas JSON × THEATER_SCALE.
+## Above WorldBackground (-20) and the terrain stack (-15); below province fills.
+func _ensure_ussr_west_gap_mask() -> void:
+	if not _is_gis_board_active():
+		return
+	if container == null:
+		container = get_node_or_null("ProvinceContainers") as Node2D
+	if container == null:
+		return
+	if _ussr_west_gap_mask != null and is_instance_valid(_ussr_west_gap_mask):
+		if _ussr_west_gap_mask.get_parent() != container:
+			_ussr_west_gap_mask.reparent(container)
+		_ussr_west_gap_mask.z_index = USSR_WEST_GAP_MASK_Z
+		_ussr_west_gap_mask.z_as_relative = false
+		_recolor_ussr_west_gap_mask()
+		return
+	if not FileAccess.file_exists(USSR_WEST_GAP_MASK_PATH):
+		return
+	var f := FileAccess.open(USSR_WEST_GAP_MASK_PATH, FileAccess.READ)
+	if f == null:
+		return
+	var parsed: Variant = JSON.parse_string(f.get_as_text())
+	f.close()
+	if not (parsed is Dictionary):
+		return
+	var doc: Dictionary = parsed
+	var root := Node2D.new()
+	root.name = "UssrWestGapMask"
+	root.z_index = USSR_WEST_GAP_MASK_Z
+	root.z_as_relative = false
+	root.set_meta("gap_mask", true)
+	var scale := MapCanvasConfig.THEATER_SCALE
+	_add_ussr_west_gap_rings(root, doc.get("land", []), "land", scale)
+	_add_ussr_west_gap_rings(root, doc.get("sea", []), "sea", scale)
+	container.add_child(root)
+	_ussr_west_gap_mask = root
+	_recolor_ussr_west_gap_mask()
+
+
+func _add_ussr_west_gap_rings(root: Node2D, raw: Variant, kind: String, scale: float) -> void:
+	if not (raw is Array):
+		return
+	for ring_v in raw:
+		if not (ring_v is Array):
+			continue
+		var pts := PackedVector2Array()
+		for p in ring_v:
+			if p is Array and (p as Array).size() >= 2:
+				pts.append(Vector2(float(p[0]), float(p[1])) * scale)
+		if pts.size() < 3:
+			continue
+		if kind == "land":
+			var plate := Polygon2D.new()
+			plate.name = "UssrWestGapLand"
+			plate.polygon = pts
+			plate.z_index = 0
+			plate.antialiased = false
+			plate.set_meta("gap_kind", "land_plate")
+			root.add_child(plate)
+			var tint := Polygon2D.new()
+			tint.name = "UssrWestGapLand"
+			tint.polygon = pts
+			tint.z_index = 1
+			tint.antialiased = false
+			tint.set_meta("gap_kind", "land_tint")
+			root.add_child(tint)
+		else:
+			var sea := Polygon2D.new()
+			sea.name = "UssrWestGapSea"
+			sea.polygon = pts
+			sea.z_index = 0
+			sea.antialiased = false
+			sea.set_meta("gap_kind", "sea")
+			root.add_child(sea)
+
+
+func _ussr_west_sov_rgb() -> Color:
+	# data/scenarios/world_accurate.json SOV "#5C1A1A". Live country color wins once MapManager has loaded.
+	var c := Color(0.360784, 0.101961, 0.101961, 1.0)
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_country_color"):
+		var got: Variant = MapManager.get_country_color("SOV")
+		if got is Color:
+			var gc: Color = got
+			# MapManager's empty-table fallback is Color(0.5, 0.5, 0.6). Keep #5C1A1A until SOV is loaded.
+			var fallback := gc.r > 0.48 and gc.r < 0.52 and gc.g > 0.48 and gc.g < 0.52 and gc.b > 0.58 and gc.b < 0.62
+			if gc.a > 0.01 and not fallback:
+				c = Color(gc.r, gc.g, gc.b, 1.0)
+	return c
+
+
+func _recolor_ussr_west_gap_mask() -> void:
+	if _ussr_west_gap_mask == null or not is_instance_valid(_ussr_west_gap_mask):
+		return
+	var terrain := current_map_mode == "terrain"
+	var land := Color(0.55, 0.68, 0.38, 1.0) if terrain else _ussr_west_sov_rgb()
+	var sea := continuous_sea_fill_color()
+	sea.a = 1.0
+	for ch in _ussr_west_gap_mask.get_children():
+		if not (ch is Polygon2D):
+			continue
+		var poly := ch as Polygon2D
+		var gap_kind := str(poly.get_meta("gap_kind", ""))
+		if gap_kind == "land_plate":
+			poly.color = land
+		elif gap_kind == "land_tint":
+			var tint := land
+			tint.a = 0.85
+			poly.color = tint
+		elif gap_kind == "sea":
+			poly.color = sea
+
+
+## world_accurate: legacy theater art stays available in terrain mode only.
+## Political and the other map modes read holes as the mask / ocean floor.
+func _apply_legacy_underlay_policy() -> void:
+	if not _is_gis_board_active():
+		return
+	var show_legacy := current_map_mode == "terrain"
+	var bg := find_child("WorldBackground", true, false) as Sprite2D
+	if bg:
+		bg.visible = show_legacy
+	var tls := terrain_layer_stack
+	if tls == null:
+		tls = find_child("TerrainLayerStack", true, false) as TerrainLayerStack
+	if tls == null:
+		return
+	if show_legacy:
+		tls.visible = true
+	if tls.has_method("set_layer_visible"):
+		tls.call("set_layer_visible", "rivers", show_legacy)
+		tls.call("set_layer_visible", "elevation", show_legacy)
 
 
 func _overlay_base_character_blend() -> float:
@@ -22895,7 +23194,7 @@ func _setup_rx1_rhine_layer() -> void:
 	if existing != null and is_instance_valid(existing):
 		_rx1_rhine_layer = existing
 		existing.z_as_relative = false
-		existing.z_index = 22
+		existing.z_index = 9
 		if existing.has_method("refresh"):
 			existing.call("refresh")
 		return
@@ -22905,12 +23204,12 @@ func _setup_rx1_rhine_layer() -> void:
 	var layer: Node = LayerScript.new() if LayerScript is GDScript else null
 	if layer == null:
 		return
-	# z=22: above nation labels 18, below DemoUnitIcon 28. Layer also sets this in _ready.
-	add_overlay_layer("Rx1RhineLayer", layer as Node2D, 22)
+	# z=9: below road casings (10) and BorderLayer 15. Layer also sets this in _ready.
+	add_overlay_layer("Rx1RhineLayer", layer as Node2D, 9)
 	_rx1_rhine_layer = layer as Node2D
 	if _rx1_rhine_layer != null:
 		_rx1_rhine_layer.z_as_relative = false
-		_rx1_rhine_layer.z_index = 22
+		_rx1_rhine_layer.z_index = 9
 	Rx1RhineCrossing.ensure_loaded()
 
 
@@ -25860,6 +26159,8 @@ func _setup_terrain_layer_stack() -> void:
 				_position_terrain_above_background()
 				_apply_terrain_layer_visibility()
 				_mount_peak_snow_overlay()
+				_ensure_ussr_west_gap_mask()
+				_apply_legacy_underlay_policy()
 		return
 	var stack_script := load("res://scripts/map/TerrainLayerStack.gd") as GDScript
 	if stack_script == null:
@@ -25889,6 +26190,8 @@ func _setup_terrain_layer_stack() -> void:
 	if loaded:
 		_apply_terrain_layer_visibility()
 		_mount_peak_snow_overlay()
+		_ensure_ussr_west_gap_mask()
+		_apply_legacy_underlay_policy()
 		print("MapRenderer: TerrainLayerStack active (U=rivers/lakes, H=elevation/mountains, V=vegetation, S=snow ref).")
 		if terrain_layer_stack and terrain_layer_stack.has_method("set_layer_alphas"):
 			terrain_layer_stack.call("set_layer_alphas", 0.9, 0.85)
@@ -26364,7 +26667,10 @@ func _toggle_supply_overlay() -> void:
 			supply_overlay_panel.hide_panel()
 	t0 = Time.get_ticks_usec()
 	_sync_supply_route_canvas_stack()
+	_sync_road_quiet_mode()
 	var sync_ms := float(Time.get_ticks_usec() - t0) / 1000.0
+	_sync_mapmode_toolbar()
+	_apply_l_key_legend_toolbar_highlight()
 	_supply_toggle_in_progress = false
 	var batch_ms := 0.0
 	if _supply_outline_batch_is_ready() and _supply_outline_batch.has_method("get_last_mesh_build_ms"):
@@ -26381,6 +26687,13 @@ func _toggle_supply_overlay() -> void:
 		"prebuild_max_step_ms": _supply_prebuild_max_step_ms,
 		"prebuild_done": _supply_ring_prebuild_done,
 	}
+
+
+func _sync_road_quiet_mode() -> void:
+	# ROADS-1: one call. Logistics bucket while L is on, including political.
+	var ol_roads := get_overlay_layer("InfrastructureOverlayLayer")
+	if ol_roads != null and ol_roads.has_method("apply_road_map_mode"):
+		ol_roads.call("apply_road_map_mode", current_map_mode, supply_mode)
 
 
 func _refresh_supply_routes() -> void:
@@ -30721,10 +31034,14 @@ func _update_supply_overlay_legend() -> void:
 		panel.name = "SupplyOverlayLegend"
 		# STOP so Close is clickable; body text stays IGNORE so wheel passes to map when over text.
 		panel.mouse_filter = Control.MOUSE_FILTER_STOP
+		panel.clip_contents = true
 		panel.set_anchors_preset(Control.PRESET_TOP_LEFT)
 		panel.offset_left = 10.0
-		panel.offset_top = 56.0  # below top bar
-		panel.custom_minimum_size = Vector2(480, 0)
+		panel.offset_top = 0.0
+		panel.custom_minimum_size = SUPPLY_LEGEND_HOST_SIZE
+		panel.size = SUPPLY_LEGEND_HOST_SIZE
+		panel.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+		panel.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 		panel.z_index = 40
 		var style := StyleBoxFlat.new()
 		style.bg_color = Color(0.06, 0.08, 0.14, 0.92)
@@ -30739,10 +31056,14 @@ func _update_supply_overlay_legend() -> void:
 		var host := Control.new()
 		host.name = "SupplyOverlayLegendHost"
 		host.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		host.clip_contents = true
 		host.set_anchors_preset(Control.PRESET_TOP_LEFT)
 		host.offset_left = 10.0
-		host.offset_top = 56.0
-		host.custom_minimum_size = Vector2(480, 0)
+		host.offset_top = 0.0
+		host.custom_minimum_size = SUPPLY_LEGEND_HOST_SIZE
+		host.size = SUPPLY_LEGEND_HOST_SIZE
+		host.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+		host.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 		host.z_index = 40
 		var pulse := Panel.new()
 		_supply_legend_pulse_border = pulse
@@ -30763,6 +31084,9 @@ func _update_supply_overlay_legend() -> void:
 		panel.offset_top = 0.0
 		var vbox := VBoxContainer.new()
 		vbox.add_theme_constant_override("separation", 4)
+		vbox.clip_contents = true
+		vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		panel.add_child(vbox)
 		# Header: title + Close (user reported no way out of this panel)
 		var header := HBoxContainer.new()
@@ -30792,15 +31116,19 @@ func _update_supply_overlay_legend() -> void:
 		vbox.add_child(hint)
 		var margin := MarginContainer.new()
 		margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		margin.clip_contents = true
+		margin.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		vbox.add_child(margin)
 		_supply_overlay_legend = RichTextLabel.new()
 		_supply_overlay_legend.bbcode_enabled = true
-		_supply_overlay_legend.fit_content = true
+		_supply_overlay_legend.fit_content = false
 		_supply_overlay_legend.scroll_active = true
-		_supply_overlay_legend.custom_minimum_size = Vector2(460, 0)
+		_supply_overlay_legend.clip_contents = true
+		_supply_overlay_legend.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_supply_overlay_legend.custom_minimum_size = Vector2(460, 80)
 		_supply_overlay_legend.size_flags_vertical = Control.SIZE_EXPAND_FILL
-		# Cap height so it doesn't eat the whole screen with no close affordance.
-		_supply_overlay_legend.custom_minimum_size.y = 120
+		_supply_overlay_legend.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		_supply_overlay_legend.mouse_filter = Control.MOUSE_FILTER_STOP  # allow text scroll; Close still above
 		_supply_overlay_legend.add_theme_font_size_override("normal_font_size", 11)
 		margin.add_child(_supply_overlay_legend)
@@ -30808,6 +31136,7 @@ func _update_supply_overlay_legend() -> void:
 		ui.add_child(host)
 		if not panel.resized.is_connected(_sync_supply_legend_pulse_host):
 			panel.resized.connect(_sync_supply_legend_pulse_host)
+	_layout_supply_legend()
 	_update_supply_legend_text()
 
 
@@ -30880,6 +31209,8 @@ func _update_supply_legend_text(update_hint: bool = true) -> void:
 		_apply_supply_legend_time_pulse_style(not pulse.is_empty(), _map_time_pulse_kind)
 	if update_hint:
 		_update_compare_hint_label()
+	if supply_mode:
+		_layout_supply_legend()
 
 
 func _sync_supply_legend_pulse_host() -> void:
@@ -30888,11 +31219,21 @@ func _sync_supply_legend_pulse_host() -> void:
 	var host := _supply_legend_panel.get_parent() as Control
 	if host == null:
 		return
-	var sz: Vector2 = _supply_legend_panel.size
-	host.custom_minimum_size = sz
-	host.size = sz
+	var sz: Vector2 = _supply_legend_host_size()
+	var left: float = host.offset_left
+	var top: float = host.offset_top
+	_pin_control_top_left(host, left, top, sz)
+	_pin_control_top_left(_supply_legend_panel, 0.0, 0.0, sz)
 	if _supply_legend_pulse_border != null and is_instance_valid(_supply_legend_pulse_border):
-		_supply_legend_pulse_border.size = sz
+		var pulse: Control = _supply_legend_pulse_border
+		pulse.anchor_left = 0.0
+		pulse.anchor_top = 0.0
+		pulse.anchor_right = 1.0
+		pulse.anchor_bottom = 1.0
+		pulse.offset_left = 0.0
+		pulse.offset_top = 0.0
+		pulse.offset_right = 0.0
+		pulse.offset_bottom = 0.0
 
 
 func _legend_pulse_modulate_for(pulse_active: bool, pulse_kind: String) -> Color:
@@ -31376,6 +31717,8 @@ func _fit_background_to_bounds() -> void:
 		]
 	)
 	_refresh_terrain_zoom_aware()
+	_ensure_ussr_west_gap_mask()
+	_apply_legacy_underlay_policy()
 
 
 ## Underlay fit rect: GIS world = fixed equirect 2:1 canvas. Europe-local = grand theater.
@@ -31824,6 +32167,7 @@ func _apply_terrain_layer_visibility() -> void:
 	_apply_clean_political_clear_color()
 	# Force repaint of fills with correct alpha (low for terrain visible, higher for clean political)
 	_fill_color_zoom_bucket = -999999999
+	_apply_legacy_underlay_policy()
 
 func _refresh_terrain_zoom_aware() -> void:
 	## Full/expensive path — prefer _refresh_terrain_zoom_light for wheel input.

@@ -622,7 +622,7 @@ def _const_int(src: str, name: str) -> int:
 
 
 def visibility_order() -> Dict[str, Any]:
-    """FIX2 scope change: labels 18 < river/road < units 28; screen-space; close fade."""
+    """ROADS-1: 0 < river z < road z < BorderLayer 15. Gold spine stays above labels and below units."""
     layer = _read(LAYER_GD)
     infra = _read(INFRA_OVERLAY_GD)
     ren = _read(RENDERER_GD)
@@ -646,12 +646,12 @@ def visibility_order() -> Dict[str, Any]:
         and "ROAD_EXPLICIT_COLOR" in infra
     )
     labels_ok = "CLOSE_HIDE_ZOOM" in labels and "sync_camera_zoom" in labels
+    border_z = 15
     units_on_top = (
         unit_z == 28
         and overlay_unit == 28
         and label_z == 18
-        and 18 < rhine_z < 28
-        and 18 < road_z < 28
+        and 0 < rhine_z < road_z < border_z
         and 18 < gold_z < 28
         and "ABOVE_UNIT_COUNTERS_Z" not in layer
         and "ROAD_ABOVE_UNIT_COUNTERS_Z" not in infra
@@ -664,6 +664,8 @@ def visibility_order() -> Dict[str, Any]:
         "gold_z": gold_z,
         "unit_z": unit_z,
         "label_z": label_z,
+        "border_z": border_z,
+        "roads_under_borders": 0 < rhine_z < road_z < border_z,
         "units_on_top": units_on_top,
         "spine_ok": spine_ok,
         "screen_space": screen_ok,

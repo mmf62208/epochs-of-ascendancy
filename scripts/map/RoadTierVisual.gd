@@ -42,7 +42,32 @@ const HIGHWAY_STRIPE_COLOR := Color(0.98, 0.94, 0.62, 1.0)
 ## first wheel-in still hides paved. Europe/Home = highways only.
 const ZOOM_FAR_MAX := 1.15
 const ZOOM_CLOSE_MIN := 2.60
-const DIRT_ZOOM_FLOOR := 2.60
+## Hard pop replaced by the dirt zoom ramp (0 at 2.40 → 1 at 3.00).
+## Europe/Home (0.55) still returns hidden from dirt_hidden_at_zoom.
+const DIRT_ZOOM_FLOOR := 2.40
+const DIRT_RAMP_START := 2.40
+const DIRT_RAMP_END := 3.00
+const PAVED_RAMP_START := 1.30
+const PAVED_RAMP_END := 1.80
+const RAIL_RAMP_START := 1.30
+const RAIL_RAMP_END := 1.80
+## Screen-px bands. Casing "—" at z0.5 is 0 (no casing). Clamp outside the table.
+## HWY-1/3 still size live strokes from HIGHWAY_*_SCREEN_PX + the overlay floor.
+const _HWY_Z: Array = [0.5, 1.0, 1.5, 2.0, 3.0, 4.0]
+const _HWY_FILL: Array = [1.0, 1.6, 2.4, 3.0, 4.0, 5.0]
+const _HWY_CASE: Array = [0.0, 2.6, 4.0, 5.0, 6.5, 8.0]
+const _HWY_RAMP: Array = [0.45, 0.60, 0.85, 1.0, 1.0, 1.0]
+const _PAVED_Z: Array = [1.5, 2.0, 3.0, 4.0]
+const _PAVED_FILL: Array = [1.2, 1.8, 2.4, 3.0]
+const _PAVED_CASE: Array = [2.0, 3.0, 3.8, 4.6]
+const _DIRT_Z: Array = [3.0, 4.0]
+const _DIRT_FILL: Array = [1.4, 1.8]
+const _RAIL_Z: Array = [1.5, 2.0, 3.0, 4.0]
+const _RAIL_FILL: Array = [1.0, 1.2, 1.4, 1.6]
+const _RAIL_CASE: Array = [2.2, 2.6, 3.0, 3.4]
+const TIER_RAIL := 3
+## No 20 px / 14 px min-casing floor on highway_casing_px. Live HWY strokes
+## still use HIGHWAY_*_SCREEN_PX and the overlay min_case floor.
 ## Bonn / Köln / Leverkusen city labels: mid (1.80) and close. Europe Home stays off.
 const END_LABEL_ZOOM_MIN := 1.50
 const END_LABEL_FONT_PX := 14
@@ -4274,3 +4299,630 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 	_hwy3_route_memo_key = route_key
 	_hwy3_route_memo_marked = marked.duplicate()
 	_hwy3_route_memo_debug = last_hwy3_debug.duplicate()
+
+
+## ROADS-1 quiet table, mode alpha, stub filter, and draw plan.
+## HWY-1/3 selection and HIGHWAY_*_SCREEN_PX stay above.
+static func _lerp_stops(zoom: float, stops: Array, values: Array) -> float:
+	var z: float = zoom
+	if not is_finite(z):
+		z = 1.0
+	if stops.is_empty() or values.is_empty():
+		return 0.0
+	if z <= float(stops[0]):
+		return float(values[0])
+	var last: int = stops.size() - 1
+	if z >= float(stops[last]):
+		return float(values[last])
+	for i in range(last):
+		var z0: float = float(stops[i])
+		var z1: float = float(stops[i + 1])
+		if z <= z1:
+			var span: float = maxf(z1 - z0, 0.0001)
+			return lerpf(float(values[i]), float(values[i + 1]), (z - z0) / span)
+	return float(values[last])
+
+
+static func _unit_ramp(zoom: float, z0: float, z1: float) -> float:
+	var z: float = zoom
+	if not is_finite(z):
+		z = 1.0
+	if z <= z0:
+		return 0.0
+	if z >= z1:
+		return 1.0
+	return (z - z0) / maxf(z1 - z0, 0.0001)
+
+
+static func highway_fill_px(zoom: float) -> float:
+	return _lerp_stops(zoom, _HWY_Z, _HWY_FILL)
+
+
+static func highway_casing_px(zoom: float) -> float:
+	## "—" at z0.5 is 0. There is no 20 px far floor and no 14 px mid floor.
+	return _lerp_stops(zoom, _HWY_Z, _HWY_CASE)
+
+
+static func highway_zoom_ramp(zoom: float) -> float:
+	return _lerp_stops(zoom, _HWY_Z, _HWY_RAMP)
+
+
+static func paved_fill_px(zoom: float) -> float:
+	if zoom < float(_PAVED_Z[0]):
+		return float(_PAVED_FILL[0])
+	return _lerp_stops(zoom, _PAVED_Z, _PAVED_FILL)
+
+
+static func paved_casing_px(zoom: float) -> float:
+	if zoom < float(_PAVED_Z[0]):
+		return float(_PAVED_CASE[0])
+	return _lerp_stops(zoom, _PAVED_Z, _PAVED_CASE)
+
+
+static func dirt_fill_px(zoom: float) -> float:
+	if zoom < float(_DIRT_Z[0]):
+		return float(_DIRT_FILL[0])
+	return _lerp_stops(zoom, _DIRT_Z, _DIRT_FILL)
+
+
+static func rail_fill_px(zoom: float) -> float:
+	if zoom < float(_RAIL_Z[0]):
+		return float(_RAIL_FILL[0])
+	return _lerp_stops(zoom, _RAIL_Z, _RAIL_FILL)
+
+
+static func rail_casing_px(zoom: float) -> float:
+	if zoom < float(_RAIL_Z[0]):
+		return float(_RAIL_CASE[0])
+	return _lerp_stops(zoom, _RAIL_Z, _RAIL_CASE)
+
+
+static func road_zoom_ramp(tier: int, zoom: float) -> float:
+	if tier == TIER_HIGHWAY:
+		return highway_zoom_ramp(zoom)
+	if tier == TIER_PAVED or tier == TIER_RAIL:
+		return _unit_ramp(zoom, PAVED_RAMP_START if tier == TIER_PAVED else RAIL_RAMP_START, PAVED_RAMP_END if tier == TIER_PAVED else RAIL_RAMP_END)
+	return _unit_ramp(zoom, DIRT_RAMP_START, DIRT_RAMP_END)
+
+
+static func tier_fill_px(tier: int, zoom: float) -> float:
+	if tier == TIER_HIGHWAY:
+		return highway_fill_px(zoom)
+	if tier == TIER_PAVED:
+		return paved_fill_px(zoom)
+	if tier == TIER_RAIL:
+		return rail_fill_px(zoom)
+	return dirt_fill_px(zoom)
+
+
+static func tier_casing_px(tier: int, zoom: float) -> float:
+	if tier == TIER_HIGHWAY:
+		return highway_casing_px(zoom)
+	if tier == TIER_PAVED:
+		return paved_casing_px(zoom)
+	if tier == TIER_RAIL:
+		return rail_casing_px(zoom)
+	return 0.0
+
+
+static func tier_outer_px(tier: int, zoom: float) -> float:
+	return maxf(tier_fill_px(tier, zoom), tier_casing_px(tier, zoom))
+
+
+## Mode multiplier only. Zoom ramp is applied at draw time, not on the node.
+## Logistics (supply / infra / resources, or L supply_mode) is 1.
+## political 0.18, terrain 0.25, other 0.12, each 0 at z≤1.0 → target at z≥1.5.
+## Paved, dirt and rail are 0 outside logistics.
+static func road_mode_bucket(mode: String, supply_on: bool) -> String:
+	var m: String = mode.strip_edges().to_lower()
+	if supply_on or m == "supply" or m == "infra" or m == "resources":
+		return "logistics"
+	if m == "political":
+		return "political"
+	if m == "terrain":
+		return "terrain"
+	return "other"
+
+
+static func road_tier_mode_alpha(bucket: String, tier: int, zoom: float) -> float:
+	if bucket == "logistics":
+		return 1.0
+	if tier != TIER_HIGHWAY:
+		return 0.0
+	var target := 0.12
+	if bucket == "political":
+		target = 0.18
+	elif bucket == "terrain":
+		target = 0.25
+	var z: float = zoom
+	if not is_finite(z):
+		z = 1.0
+	if z <= 1.0:
+		return 0.0
+	if z >= 1.5:
+		return target
+	return target * (z - 1.0) / 0.5
+
+
+static func highway_endpoints_in_rings(c1: Vector2, c2: Vector2, rings: Array) -> bool:
+	if rings.is_empty():
+		return true
+	return _point_in_any_ring(c1, rings) and _point_in_any_ring(c2, rings)
+
+
+## Tier-2 edge from a 36-vertex RoW placeholder (pid 900000–949999) whose
+## straight run leaves every drawn ring. That is the Lithuania→Moscow stub:
+## both centroids sit inside their circles, and the segment crosses the hole.
+## A real province ring containing either end keeps the edge. Empty rings fail open.
+static func highway_crosses_placeholder_gap(c1: Vector2, c2: Vector2, rings: Array) -> bool:
+	if rings.is_empty():
+		return false
+	if not _point_in_any_ring(c1, rings) or not _point_in_any_ring(c2, rings):
+		return false
+	if not _endpoint_is_row_placeholder(c1, rings) and not _endpoint_is_row_placeholder(c2, rings):
+		return false
+	for t in [0.25, 0.5, 0.75]:
+		if not _point_in_any_ring(c1.lerp(c2, float(t)), rings):
+			return true
+	return false
+
+
+## A highway component is a real network when it touches NUTS land or has
+## enough edges to be a RoW/Japan cluster. The 2-edge Lithuania→Moscow stub
+## is neither: both ends sit outside drawn rings and the component is tiny.
+const HWY_CONNECTED_NETWORK_MIN_EDGES := 3
+
+
+static func highway_network_component_info(cache: Array) -> Dictionary:
+	var parent: Dictionary = {}
+	for row_v in cache:
+		if typeof(row_v) != TYPE_DICTIONARY:
+			continue
+		var row: Dictionary = row_v
+		if int(row.get("display_tier", 0)) != TIER_HIGHWAY:
+			continue
+		var a: int = int(row.get("p1", 0))
+		var b: int = int(row.get("p2", 0))
+		if a <= 0 or b <= 0:
+			continue
+		_uf_union(parent, a, b)
+	var edges_by_root: Dictionary = {}
+	var nuts_by_root: Dictionary = {}
+	for row2_v in cache:
+		if typeof(row2_v) != TYPE_DICTIONARY:
+			continue
+		var row2: Dictionary = row2_v
+		if int(row2.get("display_tier", 0)) != TIER_HIGHWAY:
+			continue
+		var a2: int = int(row2.get("p1", 0))
+		var b2: int = int(row2.get("p2", 0))
+		if a2 <= 0 or b2 <= 0:
+			continue
+		var root: int = _uf_find(parent, a2)
+		edges_by_root[root] = int(edges_by_root.get(root, 0)) + 1
+		if is_nuts3_pid(a2) or is_nuts3_pid(b2):
+			nuts_by_root[root] = true
+	return {
+		"parent": parent,
+		"edges_by_root": edges_by_root,
+		"nuts_by_root": nuts_by_root,
+	}
+
+
+static func highway_edge_on_connected_network(
+	cache: Array, p1: int, p2: int, info: Dictionary = {}
+) -> bool:
+	if p1 <= 0 or p2 <= 0:
+		return false
+	var use: Dictionary = info
+	if use.is_empty():
+		use = highway_network_component_info(cache)
+	var parent_v: Variant = use.get("parent", {})
+	var parent: Dictionary = parent_v if typeof(parent_v) == TYPE_DICTIONARY else {}
+	if parent.is_empty() or not parent.has(p1):
+		return false
+	var root: int = _uf_find(parent, p1)
+	var n: int = int((use.get("edges_by_root", {}) as Dictionary).get(root, 0))
+	var nuts: bool = bool((use.get("nuts_by_root", {}) as Dictionary).get(root, false))
+	return nuts or n >= HWY_CONNECTED_NETWORK_MIN_EDGES
+
+
+static func highway_should_draw_edge(
+	entry: Dictionary, cache: Array, rings: Array, info: Dictionary = {}
+) -> bool:
+	var tier: int = int(entry.get("display_tier", entry.get("tier", 0)))
+	if tier != TIER_HIGHWAY:
+		return true
+	var c1: Vector2 = entry.get("c1", Vector2.ZERO)
+	var c2: Vector2 = entry.get("c2", Vector2.ZERO)
+	if highway_crosses_placeholder_gap(c1, c2, rings):
+		return false
+	var in_rings: bool = highway_endpoints_in_rings(c1, c2, rings)
+	if in_rings:
+		return true
+	return highway_edge_on_connected_network(
+		cache, int(entry.get("p1", 0)), int(entry.get("p2", 0)), info
+	)
+
+
+static func _endpoint_is_row_placeholder(pt: Vector2, rings: Array) -> bool:
+	var saw_placeholder := false
+	var saw_real := false
+	for ring_v in rings:
+		if not _ring_value_contains(ring_v, pt):
+			continue
+		if _record_is_row_placeholder(ring_v):
+			saw_placeholder = true
+		else:
+			saw_real = true
+	return saw_placeholder and not saw_real
+
+
+static func _record_is_row_placeholder(ring_v: Variant) -> bool:
+	if typeof(ring_v) != TYPE_DICTIONARY:
+		return false
+	var rec: Dictionary = ring_v
+	var pid: int = int(rec.get("pid", 0))
+	if pid < 900000 or pid >= 950000:
+		return false
+	var n: int = int(rec.get("npts", 0))
+	if n <= 0:
+		var pts_v: Variant = rec.get("pts", PackedVector2Array())
+		if typeof(pts_v) == TYPE_PACKED_VECTOR2_ARRAY:
+			n = (pts_v as PackedVector2Array).size()
+	return n == 36 or n == 37
+
+
+static func _ring_value_contains(ring_v: Variant, pt: Vector2) -> bool:
+	if not is_finite(pt.x) or not is_finite(pt.y):
+		return false
+	if typeof(ring_v) == TYPE_DICTIONARY:
+		var rec: Dictionary = ring_v
+		var bb_v: Variant = rec.get("bb", null)
+		if bb_v is Rect2 and not (bb_v as Rect2).has_point(pt):
+			return false
+		var pts_v: Variant = rec.get("pts", PackedVector2Array())
+		if typeof(pts_v) == TYPE_PACKED_VECTOR2_ARRAY and (pts_v as PackedVector2Array).size() >= 3:
+			return Geometry2D.is_point_in_polygon(pt, pts_v)
+		return false
+	if typeof(ring_v) == TYPE_PACKED_VECTOR2_ARRAY and (ring_v as PackedVector2Array).size() >= 3:
+		return Geometry2D.is_point_in_polygon(pt, ring_v)
+	return false
+
+
+static func _point_in_any_ring(pt: Vector2, rings: Array) -> bool:
+	if not is_finite(pt.x) or not is_finite(pt.y):
+		return false
+	for ring_v in rings:
+		if _ring_value_contains(ring_v, pt):
+			return true
+	return false
+
+
+static func _dedupe_road_edges(edges: Array) -> Array:
+	var seen: Dictionary = {}
+	var out: Array = []
+	for row_v in edges:
+		if typeof(row_v) != TYPE_DICTIONARY:
+			continue
+		var row: Dictionary = row_v
+		var a: int = int(row.get("p1", 0))
+		var b: int = int(row.get("p2", 0))
+		if a == 0 or b == 0 or a == b:
+			continue
+		var k: String = edge_key(a, b)
+		if seen.has(k):
+			continue
+		seen[k] = true
+		out.append(row)
+	return out
+
+
+static func _adj_push(adj: Dictionary, pid: int, nb: int, c_here: Vector2, c_nb: Vector2, tier: int, key: String) -> void:
+	if not adj.has(pid):
+		adj[pid] = []
+	var list: Array = adj[pid]
+	list.append({
+		"nb": nb,
+		"c_here": c_here,
+		"c_nb": c_nb,
+		"tier": tier,
+		"key": key,
+	})
+	adj[pid] = list
+
+
+## Merge edges into chains. Split only at degree≠2 nodes and tier changes.
+## Shared edges are deduped first so two routes on one edge draw once.
+static func build_road_chains(edges: Array) -> Array:
+	var deduped: Array = _dedupe_road_edges(edges)
+	var degree: Dictionary = {}
+	var adj: Dictionary = {}
+	for row_v in deduped:
+		var row: Dictionary = row_v
+		var a: int = int(row.get("p1", 0))
+		var b: int = int(row.get("p2", 0))
+		var c1: Vector2 = row.get("c1", Vector2.ZERO)
+		var c2: Vector2 = row.get("c2", Vector2.ZERO)
+		var tier: int = int(row.get("display_tier", row.get("tier", 0)))
+		var k: String = edge_key(a, b)
+		degree[a] = int(degree.get(a, 0)) + 1
+		degree[b] = int(degree.get(b, 0)) + 1
+		_adj_push(adj, a, b, c1, c2, tier, k)
+		_adj_push(adj, b, a, c2, c1, tier, k)
+	var unused: Dictionary = {}
+	for row_v2 in deduped:
+		var row2: Dictionary = row_v2
+		unused[edge_key(int(row2.get("p1", 0)), int(row2.get("p2", 0)))] = true
+	var chains: Array = []
+	var starts: Array = []
+	for pid_v in degree.keys():
+		if int(degree[pid_v]) != 2:
+			starts.append(int(pid_v))
+	starts.sort()
+	for s in starts:
+		_walk_chains_from(int(s), adj, degree, unused, chains)
+	var leftover: Array = unused.keys()
+	leftover.sort()
+	for key_v in leftover:
+		var key: String = str(key_v)
+		if not unused.has(key):
+			continue
+		var parts: PackedStringArray = key.split("_")
+		if parts.size() < 1:
+			unused.erase(key)
+			continue
+		_walk_chains_from(int(parts[0]), adj, degree, unused, chains)
+	return chains
+
+
+static func _walk_chains_from(start: int, adj: Dictionary, degree: Dictionary, unused: Dictionary, chains: Array) -> void:
+	var nbs: Array = adj.get(start, [])
+	var snapshot: Array = nbs.duplicate()
+	for nb_v in snapshot:
+		if typeof(nb_v) != TYPE_DICTIONARY:
+			continue
+		var nb: Dictionary = nb_v
+		var k0: String = str(nb.get("key", ""))
+		if not unused.has(k0):
+			continue
+		var tier: int = int(nb.get("tier", 0))
+		var pts := PackedVector2Array()
+		var pids: Array = []
+		pts.append(nb.get("c_here", Vector2.ZERO))
+		pids.append(start)
+		var prev: int = start
+		var cur: Dictionary = nb
+		var guard := 0
+		while guard < 8000:
+			guard += 1
+			var k: String = str(cur.get("key", ""))
+			if not unused.has(k):
+				break
+			unused.erase(k)
+			var nxt: int = int(cur.get("nb", 0))
+			pts.append(cur.get("c_nb", Vector2.ZERO))
+			pids.append(nxt)
+			if int(degree.get(nxt, 0)) != 2:
+				break
+			var cont: Dictionary = {}
+			var found := false
+			for cand_v in adj.get(nxt, []):
+				if typeof(cand_v) != TYPE_DICTIONARY:
+					continue
+				var cand: Dictionary = cand_v
+				if int(cand.get("nb", -1)) == prev:
+					continue
+				var ck: String = str(cand.get("key", ""))
+				if not unused.has(ck):
+					continue
+				if int(cand.get("tier", -1)) != tier:
+					continue
+				cont = cand
+				found = true
+				break
+			if not found:
+				break
+			prev = nxt
+			cur = cont
+		if pts.size() >= 2:
+			chains.append({"tier": tier, "pts": pts, "pids": pids})
+
+
+static func _append_stroke(out: Array, pts: PackedVector2Array, prefix: String, tier: int, width: float, ramp: float, with_discs: bool) -> void:
+	var n: int = pts.size()
+	if n < 2 or width < 0.35:
+		return
+	var closed: bool = n >= 4 and pts[0].distance_to(pts[n - 1]) <= 0.05
+	for i in range(1, n):
+		out.append({
+			"op": prefix + "_quad",
+			"a": pts[i - 1],
+			"b": pts[i],
+			"tier": tier,
+			"w": width,
+			"ramp": ramp,
+		})
+	if not with_discs:
+		return
+	var limit: int = n - 1 if closed else n
+	for i in range(limit):
+		var interior: bool = i > 0 and i < n - 1
+		if closed:
+			interior = true
+		out.append({
+			"op": prefix + "_disc",
+			"at": pts[i],
+			"tier": tier,
+			"w": width,
+			"ramp": ramp,
+			"interior": interior,
+		})
+
+
+## All casing ops, then all fill ops, then stripes. Never casing+fill per edge.
+static func build_road_draw_plan(chains: Array, zoom: float, logistics: bool) -> Array:
+	var casing_ops: Array = []
+	var fill_ops: Array = []
+	var stripe_ops: Array = []
+	var z: float = zoom
+	if not is_finite(z):
+		z = 1.0
+	for chain_v in chains:
+		if typeof(chain_v) != TYPE_DICTIONARY:
+			continue
+		var chain: Dictionary = chain_v
+		var tier: int = int(chain.get("tier", 0))
+		var pts_v: Variant = chain.get("pts", PackedVector2Array())
+		if typeof(pts_v) != TYPE_PACKED_VECTOR2_ARRAY:
+			continue
+		var pts: PackedVector2Array = pts_v
+		var ramp: float = road_zoom_ramp(tier, z)
+		if ramp <= 0.001:
+			continue
+		var fill_w: float = tier_fill_px(tier, z)
+		var case_w: float = tier_casing_px(tier, z) if logistics else 0.0
+		if logistics and case_w >= 0.4:
+			_append_stroke(casing_ops, pts, "casing", tier, case_w, ramp, true)
+		if fill_w >= 0.4:
+			_append_stroke(fill_ops, pts, "fill", tier, fill_w, ramp, true)
+		# Stripe stays inside the fill. At z2.4 fill is ~3.4 so the 3.2 px
+		# centre line still matches the pre-ROADS-1 stripe pixel mass.
+		if logistics and tier == TIER_HIGHWAY and z >= 1.5 and fill_w >= 0.4:
+			var stripe: float = minf(HIGHWAY_STRIPE_SCREEN_PX, maxf(fill_w - 0.15, 0.8))
+			if stripe >= 0.4:
+				_append_stroke(stripe_ops, pts, "stripe", tier, stripe, ramp, false)
+	var out: Array = []
+	out.append_array(casing_ops)
+	out.append_array(fill_ops)
+	out.append_array(stripe_ops)
+	return out
+
+
+static func road_plan_casing_before_fill(plan: Array) -> bool:
+	var seen_fill := false
+	for op_v in plan:
+		if typeof(op_v) != TYPE_DICTIONARY:
+			continue
+		var kind: String = str((op_v as Dictionary).get("op", ""))
+		if kind.begins_with("fill") or kind.begins_with("stripe"):
+			seen_fill = true
+		elif kind.begins_with("casing") and seen_fill:
+			return false
+	return true
+
+
+static func road_quad_points(from: Vector2, to: Vector2, world_w: float) -> PackedVector2Array:
+	var delta: Vector2 = to - from
+	var length: float = delta.length()
+	if not is_finite(length) or length < 0.05 or world_w <= 0.0:
+		return PackedVector2Array()
+	var dir: Vector2 = delta / length
+	var half: float = world_w * 0.5
+	var perp := Vector2(-dir.y, dir.x) * half
+	return PackedVector2Array([from + perp, to + perp, to - perp, from - perp])
+
+
+static func road_plan_interior_casing_discs(plan: Array) -> int:
+	var n := 0
+	for op_v in plan:
+		if typeof(op_v) != TYPE_DICTIONARY:
+			continue
+		var op: Dictionary = op_v
+		if str(op.get("op", "")) == "casing_disc" and bool(op.get("interior", false)):
+			n += 1
+	return n
+
+
+static func canvas_zoom_of(node: Node) -> float:
+	if node == null:
+		return 1.0
+	var tree := node.get_tree()
+	if tree != null:
+		var nodes: Array = tree.get_nodes_in_group("map_renderer")
+		if nodes.size() > 0:
+			var mr: Node = nodes[0]
+			var named := mr.get_node_or_null("MapCamera") as Camera2D
+			if named != null:
+				return maxf(absf(named.zoom.x), absf(named.zoom.y))
+	var vp := node.get_viewport()
+	if vp != null:
+		return MapZoomLOD.read_camera_zoom(vp)
+	return 1.0
+
+
+## Casing alpha is 0.85 × the op ramp. Mode alpha lives on the tier node modulate.
+static func road_stroke_color(kind: String, tier: int, ramp: float) -> Color:
+	var col := DIRT_COLOR
+	if kind.begins_with("casing"):
+		col = PAVED_EDGE_COLOR if tier == TIER_PAVED else HIGHWAY_CASING_COLOR
+		col.a *= 0.85
+	elif kind.begins_with("stripe"):
+		col = HIGHWAY_STRIPE_COLOR
+	elif tier == TIER_HIGHWAY:
+		col = HIGHWAY_CORE_COLOR
+	elif tier == TIER_PAVED:
+		col = PAVED_COLOR
+	elif tier == TIER_RAIL:
+		col = Color(0.22, 0.20, 0.18, 0.94)
+	col.a *= clampf(ramp, 0.0, 1.0)
+	return col
+
+
+static func paint_road_quad(canvas: CanvasItem, from: Vector2, to: Vector2, col: Color, world_w: float) -> void:
+	var poly := road_quad_points(from, to, world_w)
+	if poly.size() == 4:
+		canvas.draw_colored_polygon(poly, col)
+
+
+static func paint_road_plan(canvas: CanvasItem, plan: Array, prefix: String, zoom: float) -> void:
+	var z: float = zoom
+	if not is_finite(z) or z < 0.04:
+		z = 0.04
+	for op_v in plan:
+		if typeof(op_v) != TYPE_DICTIONARY:
+			continue
+		var op: Dictionary = op_v
+		var kind: String = str(op.get("op", ""))
+		if not kind.begins_with(prefix):
+			continue
+		var tier: int = int(op.get("tier", 0))
+		var ramp: float = float(op.get("ramp", 1.0))
+		var col: Color = road_stroke_color(kind, tier, ramp)
+		var world_w: float = float(op.get("w", 0.0)) / z
+		if world_w < 0.02:
+			continue
+		if kind.ends_with("_disc"):
+			var at: Vector2 = op.get("at", Vector2.ZERO)
+			if is_finite(at.x) and is_finite(at.y):
+				canvas.draw_circle(at, world_w * 0.5, col)
+			continue
+		var a: Vector2 = op.get("a", Vector2.ZERO)
+		var b: Vector2 = op.get("b", Vector2.ZERO)
+		if kind.ends_with("_quad") and tier == TIER_DIRT and prefix == "fill":
+			_paint_dirt_dashes(canvas, a, b, col, world_w, z)
+			continue
+		if canvas.has_method("_draw_road_quad"):
+			canvas.call("_draw_road_quad", a, b, col, world_w)
+		else:
+			paint_road_quad(canvas, a, b, col, world_w)
+
+
+static func _paint_dirt_dashes(canvas: CanvasItem, from: Vector2, to: Vector2, col: Color, world_w: float, zoom: float) -> void:
+	var delta: Vector2 = to - from
+	var length: float = delta.length()
+	if not is_finite(length) or length < 0.75:
+		return
+	var dir: Vector2 = delta / length
+	var z: float = maxf(zoom, 0.04)
+	var dash: float = DIRT_DASH_SCREEN_PX / z
+	var gap: float = DIRT_GAP_SCREEN_PX / z
+	var step: float = maxf(dash + gap, 0.35)
+	var walked := 0.0
+	var n := 0
+	while walked < length and n < 64:
+		var a: Vector2 = from + dir * walked
+		var b: Vector2 = from + dir * minf(walked + dash, length)
+		canvas.draw_line(a, b, col, world_w, false)
+		walked += step
+		n += 1
