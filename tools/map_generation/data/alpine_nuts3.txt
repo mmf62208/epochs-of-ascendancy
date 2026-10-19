@@ -1,0 +1,79 @@
+# Alpine Convention perimeter, keyed by NUTS code (never by province id).
+# Default terrain is mountains. A second column "hills" marks a basin or
+# valley-floor code inside the perimeter.
+#
+# DE annex lists these Landkreise and kreisfreie Städte as Alpine area with
+# no foothill column, so Weilheim-Schongau (DE21N) and Traunstein (DE21M)
+# are mountains. Unterallgäu (DE27C) is not on the annex.
+# Bergamo (ITC46) is left off: the name is a "berg" false hit, and the
+# province is not predominantly alpine. Partial plateau cantons and
+# departments (Bern, Vaud, Isère, Ain, Drôme, Torino, and the rest) are
+# omitted because this board has no sub-province split.
+
+# Germany
+DE213
+DE215
+DE216
+DE21D
+DE21F
+DE21K
+DE21M
+DE21N
+DE272
+DE273
+DE27A
+DE27B
+DE27E
+
+# Austria — high Alps. Fringe basins are hills.
+AT331
+AT332
+AT333
+AT334
+AT335
+AT341
+AT211
+AT212
+AT213
+AT321
+AT322
+AT222
+AT323 hills
+AT342 hills
+AT223 hills
+AT226 hills
+
+# Switzerland — cantons the annex treats as entirely alpine.
+CH012
+CH056
+CH062
+CH063
+CH064
+CH065
+CH051
+CH053
+CH054
+CH070
+
+# France — departments that are essentially alpine.
+FRK27
+FRK28
+FRL01
+FRL02
+FRL03
+
+# Italy — predominantly alpine provinces only.
+ITH10
+ITH20
+ITH33
+ITC20
+ITC44
+ITC14
+
+# Slovenia
+SI042
+SI043
+SI033
+
+# Liechtenstein
+LI000
