@@ -458,9 +458,19 @@ func _test_hub_routes_kept() -> void:
 		"ROADS1_LIT_ROUTES routes=%d route_keys=%d drawn=%d missing_non_stub=%d"
 		% [routes.size(), route_keys.size(), drawn_keys.size(), missing.size()]
 	)
-	if routes.size() != 18:
-		_fail("want 18 HWY-3 hub routes, got %d" % routes.size())
+	## HWY-4 keeps Berlin–Hamburg (710321) and Manchester–Glasgow (711495).
+	## That is two routes above the ROADS-1 count of 18.
+	var ends: Dictionary = {}
+	for rt2_v in routes:
+		if typeof(rt2_v) != TYPE_DICTIONARY:
+			continue
+		var rt2: Dictionary = rt2_v
+		ends[int(rt2.get("a", 0))] = true
+		ends[int(rt2.get("b", 0))] = true
+	var kept_peri: bool = ends.has(710321) and ends.has(711495)
+	if routes.size() != 20 or not kept_peri:
+		_fail("want 20 HWY-3 hub routes including Hamburg and Glasgow, got %d peri=%s" % [routes.size(), str(kept_peri)])
 	elif missing.is_empty():
-		_pass("18 HWY-3 hub routes kept (non-stub route edges drawn)")
+		_pass("20 HWY-3 hub routes kept (Hamburg and Glasgow included; non-stub route edges drawn)")
 	else:
 		_fail("hub-route edges missing from draw: %s" % str(missing))

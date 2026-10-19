@@ -139,6 +139,14 @@ const HWY3_KIND_TRUNK := 2
 const HWY3_KIND_SPAN := 1
 const HWY3_KIND_OTHER := 0
 const HWY3_MAJOR_TAGS := ["GER", "FRA", "ITA", "POL", "ENG", "USA", "JAP", "SOV"]
+## HWY-4: these peri hubs stay on a drawn highway when the cap trim runs.
+## Hamburg 710321, Glasgow 711495. Lyon–Marseille, Manchester–Birmingham,
+## the Lille end hops, and Kyoto–Tokyo may still be trimmed.
+const HWY4_KEEP_PERI_PIDS: Array = [710321, 711495]
+## Trim still targets HWY3_BUDGET_CAP (114) and that clamp still limits `hi`.
+## After the keep, no unprotected route remains, so debug drawn floors at 130
+## (explicit 0; post-demote 128). Tests use this ceiling, not a higher cap.
+const HWY4_DRAWN_CEILING := 130
 ## Last hub-route rebuild (tests / overlay logs). Not gameplay state.
 static var last_hwy3_debug: Dictionary = {}
 
@@ -266,6 +274,85 @@ static func hwy3_city_label_text(rec: Dictionary) -> String:
 	return cn
 
 
+## Admin / province labels are not city names. Real cities pass.
+static func hwy3_label_is_forbidden(text: String) -> bool:
+	var n: String = text.strip_edges().to_lower()
+	if n.is_empty():
+		return false
+	if n.contains("kreisfreie"):
+		n = n.replace("kreisfreie stadt", "").replace(",", " ").strip_edges()
+	if n.contains("kreis"):
+		return true
+	if n.contains("overig") or n.contains("en omgeving"):
+		return true
+	if n.contains("hauts-de-seine") or n.contains("departement") or n.contains("département"):
+		return true
+	if n in [
+		"suffolk", "oost-groningen", "groot-rijnmond", "innviertel",
+		"nord east", "nord south", "nord-east", "nord-south",
+	]:
+		return true
+	return _hwy4_compass_admin(n)
+
+
+static func _hwy4_compass_admin(n: String) -> bool:
+	if n in [
+		"nord east", "nord south", "north east", "north west",
+		"south east", "south west", "north", "south", "east", "west",
+		"nord", "sud", "süd", "ost",
+	]:
+		return true
+	var tails: Array = ["north", "south", "east", "west", "nord", "sud", "ost"]
+	for tail_v in tails:
+		var tail: String = str(tail_v)
+		if n.ends_with(" " + tail):
+			return true
+	return false
+
+
+## Prefer the hub's own city name. Admin names map to the nearest real city
+## within a few NUTS hops, or drop.
+static func hwy3_real_city_label(rec: Dictionary, records: Array) -> String:
+	var raw: String = hwy3_city_label_text(rec)
+	if raw.is_empty() or not hwy3_label_is_forbidden(raw):
+		return raw
+	return _hwy4_nearest_real_city(rec, records)
+
+
+static func _hwy4_nearest_real_city(rec: Dictionary, records: Array) -> String:
+	var c: Vector2 = rec.get("centroid", Vector2.ZERO)
+	if c == Vector2.ZERO:
+		return ""
+	var best_d: float = 36.0
+	var best: String = ""
+	var self_pid: int = int(rec.get("pid", 0))
+	for o_v in records:
+		if typeof(o_v) != TYPE_DICTIONARY:
+			continue
+		var o: Dictionary = o_v
+		if int(o.get("pid", 0)) == self_pid:
+			continue
+		var t: String = hwy3_city_label_text(o)
+		if t.is_empty() or hwy3_label_is_forbidden(t):
+			continue
+		var oc: Vector2 = o.get("centroid", Vector2.ZERO)
+		if oc == Vector2.ZERO:
+			continue
+		var d: float = c.distance_to(oc)
+		if d < best_d:
+			best_d = d
+			best = t
+	return best
+
+
+## Dortmund and Duisburg stay off until close zoom. Essen is the z2.4 anchor.
+static func hwy4_label_visible_at_zoom(text: String, zoom: float) -> bool:
+	var n: String = text.strip_edges().to_lower()
+	if n.contains("dortmund") or n.contains("duisburg"):
+		return zoom + 0.001 >= 4.0
+	return true
+
+
 static func should_label_hub_city(rec: Dictionary, zoom: float, cluster_n: int) -> bool:
 	if not hub_city_labels_visible_at_zoom(zoom):
 		return false
@@ -320,29 +407,52 @@ static func hwy3_cull_labels_enabled() -> bool:
 
 
 ## Keep higher-priority labels; drop alias dupes and overlapping rects.
-static func hwy3_cull_label_candidates(cands: Array) -> Array:
-	return hwy3_resolve_label_positions(cands)
+## obstacles: immovable base-map label rects and highway segments.
+static func hwy3_cull_label_candidates(cands: Array, obstacles: Array = []) -> Array:
+	return hwy3_resolve_label_positions(cands, obstacles)
 
 
 ## Place higher-priority labels first (camera-center wins ties). Nudge a
 ## later label onto a nearby offset before dropping it for overlap.
-static func hwy3_resolve_label_positions(cands: Array) -> Array:
+static func hwy3_resolve_label_positions(cands: Array, obstacles: Array = []) -> Array:
 	if not hwy3_cull_labels_enabled():
 		return cands
 	var ordered: Array = []
 	for c_v in cands:
 		if typeof(c_v) == TYPE_DICTIONARY:
 			ordered.append(c_v)
+	_hwy4_boost_view_anchor(ordered)
 	ordered.sort_custom(_hwy3_label_cand_more)
 	var kept: Array = []
 	var seen: Dictionary = {}
+	## Small steps first. The outer ring separates the Ruhr at zoom 2.4, where
+	## Essen, Mülheim, Bochum and Düsseldorf are only a few dozen pixels apart.
 	var offs: Array = [
 		Vector2(0.0, 0.0),
 		Vector2(0.0, -18.0),
-		Vector2(0.0, 16.0),
-		Vector2(-26.0, -6.0),
-		Vector2(26.0, -6.0),
-		Vector2(0.0, -34.0),
+		Vector2(0.0, 18.0),
+		Vector2(-28.0, -8.0),
+		Vector2(28.0, -8.0),
+		Vector2(-44.0, 12.0),
+		Vector2(44.0, 12.0),
+		Vector2(0.0, -40.0),
+		Vector2(0.0, 36.0),
+		Vector2(-56.0, -22.0),
+		Vector2(56.0, -22.0),
+		Vector2(0.0, -78.0),
+		Vector2(0.0, 72.0),
+		Vector2(-88.0, -20.0),
+		Vector2(88.0, -20.0),
+		Vector2(-96.0, 36.0),
+		Vector2(96.0, 36.0),
+		Vector2(-24.0, -96.0),
+		Vector2(24.0, -96.0),
+		Vector2(0.0, -128.0),
+		Vector2(0.0, 116.0),
+		Vector2(-132.0, 8.0),
+		Vector2(132.0, 8.0),
+		Vector2(-70.0, -70.0),
+		Vector2(70.0, -70.0),
 	]
 	for c2_v in ordered:
 		var c2: Dictionary = c2_v
@@ -360,16 +470,7 @@ static func hwy3_resolve_label_positions(cands: Array) -> Array:
 		for off_v in offs:
 			var off: Vector2 = off_v
 			var rect: Rect2 = Rect2(base.position + off, base.size)
-			var hit: bool = false
-			for k_v in kept:
-				var k: Dictionary = k_v
-				var kr: Rect2 = k.get("rect", Rect2())
-				if kr.size.x <= 0.5:
-					continue
-				if rect.intersects(kr):
-					hit = true
-					break
-			if hit:
+			if _hwy4_rect_blocked(rect, kept, obstacles):
 				continue
 			c2["rect"] = rect
 			seen[key] = true
@@ -381,6 +482,98 @@ static func hwy3_resolve_label_positions(cands: Array) -> Array:
 	return kept
 
 
+static func _hwy4_rect_blocked(rect: Rect2, kept: Array, obstacles: Array) -> bool:
+	if _hwy4_rect_hits_labels(rect, kept):
+		return true
+	if _hwy4_rect_hits_obstacles(rect, obstacles):
+		return true
+	return false
+
+
+static func _hwy4_rect_hits_labels(rect: Rect2, kept: Array) -> bool:
+	for k_v in kept:
+		if typeof(k_v) != TYPE_DICTIONARY:
+			continue
+		var kr: Rect2 = (k_v as Dictionary).get("rect", Rect2())
+		if kr.size.x <= 0.5 or kr.size.y <= 0.5:
+			continue
+		if rect.intersects(kr):
+			return true
+	return false
+
+
+static func _hwy4_rect_hits_obstacles(rect: Rect2, obstacles: Array) -> bool:
+	for ob_v in obstacles:
+		if typeof(ob_v) != TYPE_DICTIONARY:
+			continue
+		var ob: Dictionary = ob_v
+		if str(ob.get("kind", "rect")) == "segment":
+			var a: Vector2 = ob.get("a", Vector2.ZERO)
+			var b: Vector2 = ob.get("b", Vector2.ZERO)
+			if hwy3_segment_hits_rect(a, b, rect, float(ob.get("pad", 2.0))):
+				return true
+		else:
+			var rr: Rect2 = ob.get("rect", Rect2())
+			if rr.size.x > 0.5 and rr.size.y > 0.5 and rect.intersects(rr):
+				return true
+	return false
+
+
+static func hwy3_segment_hits_rect(a: Vector2, b: Vector2, rect: Rect2, pad: float) -> bool:
+	var g: Rect2 = rect.grow(pad)
+	if g.size.x <= 0.5 or g.size.y <= 0.5:
+		return false
+	if g.has_point(a) or g.has_point(b):
+		return true
+	var corners: Array = [
+		g.position,
+		g.position + Vector2(g.size.x, 0.0),
+		g.position + g.size,
+		g.position + Vector2(0.0, g.size.y),
+	]
+	for i in range(4):
+		if _hwy4_segments_cross(a, b, corners[i], corners[(i + 1) % 4]):
+			return true
+	return false
+
+
+static func _hwy4_segments_cross(a: Vector2, b: Vector2, c: Vector2, d: Vector2) -> bool:
+	var ab: Vector2 = b - a
+	var cd: Vector2 = d - c
+	var d1: float = ab.cross(c - a)
+	var d2: float = ab.cross(d - a)
+	var d3: float = cd.cross(a - c)
+	var d4: float = cd.cross(b - c)
+	return ((d1 > 0.0 and d2 < 0.0) or (d1 < 0.0 and d2 > 0.0)) and (
+		(d3 > 0.0 and d4 < 0.0) or (d3 < 0.0 and d4 > 0.0)
+	)
+
+
+## The label under the camera is the anchor. Callers stamp view_mid (viewport
+## center). Without that stamp, headless fixtures keep the old 1280x720 tie-break.
+static func _hwy4_boost_view_anchor(ordered: Array) -> void:
+	var mid := Vector2(640.0, 360.0)
+	var have: bool = false
+	var best_i: int = -1
+	var best_d: float = 200.0 * 200.0
+	for i in range(ordered.size()):
+		var c: Dictionary = ordered[i]
+		if not c.has("view_mid"):
+			continue
+		have = true
+		mid = c.get("view_mid", mid)
+		var screen: Vector2 = c.get("screen", Vector2.ZERO)
+		var d: float = screen.distance_squared_to(mid)
+		if d < best_d:
+			best_d = d
+			best_i = i
+	if not have or best_i < 0:
+		return
+	var win: Dictionary = ordered[best_i]
+	win["priority"] = maxi(int(win.get("priority", 0)), 1000)
+	win["anchor"] = true
+
+
 static func _hwy3_label_cand_more(a: Dictionary, b: Dictionary) -> bool:
 	var pa: int = int(a.get("priority", 0))
 	var pb: int = int(b.get("priority", 0))
@@ -390,7 +583,7 @@ static func _hwy3_label_cand_more(a: Dictionary, b: Dictionary) -> bool:
 	var rb: Rect2 = b.get("rect", Rect2())
 	var ca: Vector2 = a.get("screen", ra.position + ra.size * 0.5)
 	var cb: Vector2 = b.get("screen", rb.position + rb.size * 0.5)
-	var mid := Vector2(640.0, 360.0)
+	var mid: Vector2 = a.get("view_mid", b.get("view_mid", Vector2(640.0, 360.0)))
 	var da: float = ca.distance_squared_to(mid)
 	var db: float = cb.distance_squared_to(mid)
 	if absf(da - db) > 0.01:
@@ -3106,6 +3299,19 @@ static func _hwy3_count_highways(cache: Array) -> int:
 	return n
 
 
+static func _hwy4_count_explicit_highways(cache: Array) -> int:
+	var n: int = 0
+	for row_v in cache:
+		if typeof(row_v) != TYPE_DICTIONARY:
+			continue
+		var row: Dictionary = row_v
+		if int(row.get("display_tier", 0)) != TIER_HIGHWAY:
+			continue
+		if bool(row.get("explicit", false)):
+			n += 1
+	return n
+
+
 static func _hwy3_stamp_metro_edges(cache: Array, hubs: Array) -> void:
 	var metro: Dictionary = hwy3_metro_cluster_pids(hubs)
 	if metro.is_empty():
@@ -3131,6 +3337,18 @@ static func _hwy3_route_is_trim_protected(rt: Dictionary) -> bool:
 		return true
 	if bool(rt.get("peri_keep", false)):
 		return true
+	if _hwy4_route_keeps_peri_hub(rt):
+		return true
+	return false
+
+
+static func _hwy4_route_keeps_peri_hub(rt: Dictionary) -> bool:
+	var a: int = int(rt.get("a", 0))
+	var b: int = int(rt.get("b", 0))
+	for pid_v in HWY4_KEEP_PERI_PIDS:
+		var pid: int = int(pid_v)
+		if pid > 0 and (a == pid or b == pid):
+			return true
 	return false
 
 
@@ -4278,6 +4496,8 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 		"marked": marked.size(),
 		"used": used,
 		"drawn": _hwy3_count_highways(cache),
+		"explicit": _hwy4_count_explicit_highways(cache),
+		"cap": HWY3_BUDGET_CAP,
 		"budget": paint_budget,
 		"dropped_parallel": dropped_parallel,
 		"dropped_cap": dropped_cap,

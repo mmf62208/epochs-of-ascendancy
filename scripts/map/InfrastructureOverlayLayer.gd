@@ -268,7 +268,6 @@ func _update_sub_layer_visibilities() -> void:
         ) and z > 0.10
         _sync_road_tier_draw_zoom(z)
         _apply_screen_space_road_widths()
-        _sync_hub_city_labels()
     if spine_preview_layer:
         # Visibility only — never rebuild/create nodes on zoom (silent-exit class).
         var prev_state := str(spine_preview_layer.get("state"))
@@ -278,6 +277,8 @@ func _update_sub_layer_visibilities() -> void:
         gold_spine_layer.visible = gold_built and z > 0.10
         if gold_spine_layer.has_method("redraw_gold_spine"):
             gold_spine_layer.call("redraw_gold_spine")
+    if road_layer:
+        _sync_hub_city_labels()
     if rail_layer:
         rail_layer.visible = show_rails and z > 0.14
     if city_layer or sites_layer:
@@ -2480,11 +2481,112 @@ func get_visible_hub_label_rects() -> Array:
     for sp_v in _gold_spine_visible_labels():
         if typeof(sp_v) == TYPE_DICTIONARY:
             out.append(sp_v)
-    return RoadTierVisualScript.hwy3_cull_label_candidates(out)
+    ## Gold-spine labels are already in `out`. Segments and province names stay immovable.
+    return RoadTierVisualScript.hwy3_cull_label_candidates(out, _hwy4_label_obstacles(false))
 
 
 func get_hub_label_candidates_uncull() -> Array:
     return _collect_hub_label_candidates()
+
+
+## Live hub labels vs hub labels, base-map labels, and highway segments.
+func get_hub_label_collision_report() -> Dictionary:
+    var labels: Array = get_visible_hub_label_rects()
+    var hub_hub: int = 1 if RoadTierVisualScript.hwy3_labels_have_overlap(labels) else 0
+    var hub_base: int = 0
+    var hub_seg: int = 0
+    var obstacles: Array = _hwy4_label_obstacles(true)
+    for lab_v in labels:
+        if typeof(lab_v) != TYPE_DICTIONARY:
+            continue
+        var lab: Dictionary = lab_v
+        if str(lab.get("source", "")) != "hub":
+            continue
+        var rect: Rect2 = lab.get("rect", Rect2())
+        if rect.size.x <= 0.5:
+            continue
+        for ob_v in obstacles:
+            if typeof(ob_v) != TYPE_DICTIONARY:
+                continue
+            var ob: Dictionary = ob_v
+            var hit: bool = false
+            if str(ob.get("kind", "")) == "segment":
+                hit = RoadTierVisualScript.hwy3_segment_hits_rect(
+                    ob.get("a", Vector2.ZERO),
+                    ob.get("b", Vector2.ZERO),
+                    rect,
+                    float(ob.get("pad", 2.0))
+                )
+            else:
+                var rr: Rect2 = ob.get("rect", Rect2())
+                hit = rr.size.x > 0.5 and rect.intersects(rr)
+            if not hit:
+                continue
+            if str(ob.get("source", "")) == "highway":
+                hub_seg += 1
+            else:
+                hub_base += 1
+    return {
+        "hub_hub": hub_hub,
+        "hub_base": hub_base,
+        "hub_seg": hub_seg,
+        "labels": labels.size(),
+    }
+
+
+func _hwy4_label_obstacles(include_gold: bool = true) -> Array:
+    var out: Array = []
+    if include_gold:
+        for sp_v in _gold_spine_visible_labels():
+            if typeof(sp_v) != TYPE_DICTIONARY:
+                continue
+            var sp: Dictionary = sp_v
+            var gr: Rect2 = sp.get("rect", Rect2())
+            if gr.size.x <= 0.5 or gr.size.y <= 0.5:
+                continue
+            out.append({"kind": "rect", "rect": gr, "source": "base"})
+    var tree := get_tree()
+    if tree != null:
+        var mr: Node = tree.get_first_node_in_group("map_renderer")
+        if mr != null and "_province_name_labels" in mr:
+            var labels_v: Variant = mr.get("_province_name_labels")
+            if typeof(labels_v) == TYPE_DICTIONARY:
+                var xf: Transform2D = get_global_transform_with_canvas()
+                for id_v in (labels_v as Dictionary).keys():
+                    var lbl_v: Variant = (labels_v as Dictionary)[id_v]
+                    if not (lbl_v is Label):
+                        continue
+                    var lbl: Label = lbl_v
+                    if not is_instance_valid(lbl) or not lbl.visible:
+                        continue
+                    if str(lbl.text).strip_edges().is_empty():
+                        continue
+                    out.append({
+                        "kind": "rect",
+                        "rect": Rect2(xf * lbl.position, lbl.size),
+                        "source": "base",
+                    })
+    var xf2: Transform2D = get_global_transform_with_canvas()
+    var vp := get_viewport()
+    var vr := Rect2(Vector2.ZERO, Vector2(1280, 720))
+    if vp != null:
+        vr = Rect2(Vector2.ZERO, vp.get_visible_rect().size)
+    for row_v in _road_edge_cache:
+        if typeof(row_v) != TYPE_DICTIONARY:
+            continue
+        var row: Dictionary = row_v
+        if int(row.get("display_tier", 0)) != RoadTierVisualScript.TIER_HIGHWAY:
+            continue
+        var c1: Vector2 = row.get("c1", Vector2.ZERO)
+        var c2: Vector2 = row.get("c2", Vector2.ZERO)
+        if c1 == Vector2.ZERO or c2 == Vector2.ZERO:
+            continue
+        var a: Vector2 = xf2 * c1
+        var b: Vector2 = xf2 * c2
+        if not vr.grow(64.0).has_point(a) and not vr.grow(64.0).has_point(b):
+            continue
+        out.append({"kind": "segment", "a": a, "b": b, "pad": 2.0, "source": "highway"})
+    return out
 
 
 func _ensure_hub_city_labels() -> void:
@@ -2553,6 +2655,7 @@ func _collect_hub_label_candidates() -> Array:
         var sk: String = str((sp_v as Dictionary).get("key", ""))
         if not sk.is_empty():
             spine_keys[sk] = true
+    var view_mid: Vector2 = vr.size * 0.5
     for rec2_v in hub_recs:
         if typeof(rec2_v) != TYPE_DICTIONARY:
             continue
@@ -2560,8 +2663,10 @@ func _collect_hub_label_candidates() -> Array:
         var cluster_n: int = RoadTierVisualScript.hwy3_metro_cluster_n(hub_recs, rec2)
         if not RoadTierVisualScript.should_label_hub_city(rec2, z, cluster_n):
             continue
-        var text: String = RoadTierVisualScript.hwy3_city_label_text(rec2)
+        var text: String = RoadTierVisualScript.hwy3_real_city_label(rec2, recs)
         if text.is_empty():
+            continue
+        if not RoadTierVisualScript.hwy4_label_visible_at_zoom(text, z):
             continue
         var key: String = RoadTierVisualScript.hwy3_label_alias_key(text)
         if key.is_empty():
@@ -2582,6 +2687,7 @@ func _collect_hub_label_candidates() -> Array:
             "rect": Rect2(pos, est),
             "priority": RoadTierVisualScript.hwy3_label_priority(rec2),
             "screen": screen,
+            "view_mid": view_mid,
             "source": "hub",
         })
     return out
@@ -2699,7 +2805,8 @@ func _sync_hub_city_labels() -> void:
         row["rect"] = Rect2(lbl.position, lbl.size)
         row["text"] = text
         placed.append(row)
-    var kept: Array = RoadTierVisualScript.hwy3_resolve_label_positions(placed)
+    var obstacles: Array = _hwy4_label_obstacles()
+    var kept: Array = RoadTierVisualScript.hwy3_resolve_label_positions(placed, obstacles)
     var keep_keys: Dictionary = {}
     for k_v in kept:
         if typeof(k_v) != TYPE_DICTIONARY:

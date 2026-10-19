@@ -667,11 +667,13 @@ func _test_part_b_live_1936() -> void:
 	var median: float = float(after_st.get("median", 0.0))
 	var target_hwy: int = 104
 	var lo: float = 60.0
-	var hi: float = 114.0
+	## HWY-4 drawn ceiling (130). Trim cap stays 114. Hamburg and Glasgow stay
+	## drawn; nothing unprotected is left to drop.
+	var hi: float = float(RoadTierVisualScript.HWY4_DRAWN_CEILING)
 	if float(after_hwy) < lo or float(after_hwy) > hi:
-		_fail("Part B: highway count %d not within 60–114 (2× of 52, legacy_rank=%d)" % [after_hwy, before_hwy])
+		_fail("Part B: highway count %d not within 60–%d (legacy_rank=%d)" % [after_hwy, int(hi), before_hwy])
 	else:
-		_pass("Part B: highway count %d within 60–114 of 2×52 (legacy_rank=%d target=%d)" % [after_hwy, before_hwy, target_hwy])
+		_pass("Part B: highway count %d within 60–%d (legacy_rank=%d target=%d)" % [after_hwy, int(hi), before_hwy, target_hwy])
 	if sings != 0:
 		_fail("Part B: singletons=%d want 0 (comps=%d)" % [sings, comps])
 	else:
