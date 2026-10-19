@@ -178,6 +178,7 @@ static func tick_day(day_index: int) -> Dictionary:
 		return {"ok": true, "skipped": true, "reason": "killswitch"}
 	var day := int(day_index)
 	var defence: Dictionary = AiDefenceDomain.tick(day)
+	var border: Dictionary = AiBorderFillDomain.tick(day)
 	var economy: Dictionary = AiEconomyDomain.tick(day)
 	var peace: Dictionary = AiWarPlannerDomain.tick_peace(day)
 	var front: Dictionary = AiFrontPlanDomain.tick(day)
@@ -186,6 +187,7 @@ static func tick_day(day_index: int) -> Dictionary:
 		"skipped": false,
 		"day": day,
 		"defence": defence,
+		"border": border,
 		"economy": economy,
 		"peace": peace,
 		"front": front,

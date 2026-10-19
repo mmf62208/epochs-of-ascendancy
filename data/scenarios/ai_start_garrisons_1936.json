@@ -3,6 +3,7 @@
   "capital_first": true,
   "cover_enemy_stations": true,
   "reserve_one_hop": true,
+  "core_gate": true,
   "neighbour_rank": ["goal_weight", "factory_strength", "tag"],
   "hex_rank": ["assigned_count", "fewest_enemy_contacts", "province_id"],
   "core_hops": 0,

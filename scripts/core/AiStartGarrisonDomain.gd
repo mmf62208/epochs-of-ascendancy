@@ -88,6 +88,8 @@ static func apply() -> Dictionary:
 		tops = _pass_cover(tags, forms_by_tag, owned, borders, strength, assign, capital_fid)
 	if bool(policy().get("reserve_one_hop", true)):
 		_pass_reserve(tags, forms_by_tag, owned, borders, strength, assign, capital_fid, tops)
+	if bool(policy().get("core_gate", true)):
+		_pass_core_gate(tags, forms_by_tag, owned, borders, strength, assign, capital_fid)
 	var moved := 0
 	var fid_keys: Array = assign.keys()
 	fid_keys.sort()
@@ -107,6 +109,50 @@ static func apply() -> Dictionary:
 	out["tags"] = rows
 	out["summary"] = _summary(rows)
 	return out
+
+
+## Owned hexes that touch our core and also touch foreign land. Sorted.
+static func core_gates(tag: String) -> Array:
+	var nation := tag.strip_edges().to_upper()
+	var own: Array = _owned_land(nation)
+	var core := _core_set(nation, own)
+	var out: Array = []
+	if core.is_empty():
+		return out
+	var own_set: Dictionary = {}
+	for pid_v in own:
+		own_set[int(pid_v)] = true
+	for pid_v2 in own:
+		var pid := int(pid_v2)
+		if core.has(pid):
+			continue
+		var touch_core := false
+		var touch_foreign := false
+		for nid in _adj(pid):
+			if core.has(nid):
+				touch_core = true
+				continue
+			if own_set.has(nid):
+				continue
+			var prov: Province = MapManager.get_province(nid) if typeof(MapManager) != TYPE_NIL else null
+			if prov == null or bool(prov.is_sea):
+				continue
+			var ot := _prov_tag(prov)
+			if not ot.is_empty() and ot != nation:
+				touch_foreign = true
+		if touch_core and touch_foreign:
+			out.append(pid)
+	out.sort()
+	return out
+
+
+static func is_core_gate(tag: String, pid: int) -> bool:
+	if pid <= 0:
+		return false
+	for g in core_gates(tag):
+		if int(g) == pid:
+			return true
+	return false
 
 
 static func core_snapshot(tag: String) -> Dictionary:
@@ -289,6 +335,166 @@ static func _pass_reserve(
 			continue
 		assign[pick] = dest
 		station[pick] = dest
+
+
+## Staff the hex just in front of the core on the shortest path from the
+## top neighbour's land units. The unit is taken off the forward contact
+## so that hex is the one border-fill has to keep shut.
+static func _pass_core_gate(
+	tags: Array,
+	forms_by_tag: Dictionary,
+	owned: Dictionary,
+	borders: Dictionary,
+	strength: Dictionary,
+	assign: Dictionary,
+	capital_fid: Dictionary,
+) -> void:
+	var station: Dictionary = _stations(tags, forms_by_tag, assign)
+	for tag_v in tags:
+		var tag := str(tag_v)
+		var own: Array = owned.get(tag, [])
+		if _core_tokens(tag).is_empty():
+			continue
+		var core := _core_set(tag, own)
+		if core.is_empty() or not forms_by_tag.has(tag):
+			continue
+		var groups: Dictionary = borders.get(tag, {})
+		var nbs: Array = groups.keys()
+		if nbs.is_empty():
+			continue
+		nbs.sort_custom(func(a, b):
+			return _neigh_before(tag, str(a), str(b), strength)
+		)
+		var enemy := str(nbs[0])
+		if not forms_by_tag.has(enemy):
+			continue
+		var own_set: Dictionary = {}
+		for pid_v in own:
+			own_set[int(pid_v)] = true
+		var starts: Array = []
+		for efid_v in forms_by_tag[enemy]:
+			var epid := int(station.get(str(efid_v), -1))
+			if epid > 0:
+				starts.append(epid)
+		starts.sort()
+		var found: Dictionary = _shortest_core_entry(starts, core, own_set, tag, enemy)
+		if found.is_empty():
+			continue
+		var gate := int(found.get("gate", 0))
+		var forward := int(found.get("forward", 0))
+		if gate <= 0:
+			continue
+		var our_ids: Array = forms_by_tag[tag]
+		if not _fid_at(station, our_ids, gate).is_empty():
+			continue
+		var cap_fid := str(capital_fid.get(tag, ""))
+		var pick := _fid_at(station, our_ids, forward)
+		if pick.is_empty() or pick == cap_fid:
+			var locked: Dictionary = {}
+			if not cap_fid.is_empty():
+				locked[cap_fid] = true
+			pick = _pull_lowest(tag, our_ids, station, groups, strength, locked)
+		if pick.is_empty() or pick == cap_fid:
+			continue
+		assign[pick] = gate
+		station[pick] = gate
+
+
+static func _shortest_core_entry(
+	starts: Array,
+	core: Dictionary,
+	own_set: Dictionary,
+	tag: String,
+	enemy: String,
+) -> Dictionary:
+	var prev: Dictionary = {}
+	var q: Array = []
+	for s in starts:
+		var sid := int(s)
+		if sid <= 0 or prev.has(sid):
+			continue
+		prev[sid] = -1
+		q.append(sid)
+	var qi := 0
+	var hit := -1
+	while qi < q.size():
+		var cur := int(q[qi])
+		qi += 1
+		if core.has(cur) and not _starts_contain(starts, cur):
+			hit = cur
+			break
+		for nid in _adj(cur):
+			if prev.has(nid):
+				continue
+			var prov: Province = MapManager.get_province(nid) if typeof(MapManager) != TYPE_NIL else null
+			if prov == null or bool(prov.is_sea):
+				continue
+			var ot := _prov_tag(prov)
+			if ot != tag and ot != enemy:
+				continue
+			prev[nid] = cur
+			q.append(nid)
+	if hit <= 0:
+		return {}
+	var gate := int(prev.get(hit, -1))
+	if gate <= 0 or not own_set.has(gate) or core.has(gate):
+		return {}
+	var forward := gate
+	var cursor := gate
+	var guard := 0
+	while guard < 64:
+		guard += 1
+		var parent := int(prev.get(cursor, -1))
+		if parent <= 0:
+			break
+		if not own_set.has(parent):
+			forward = cursor
+			break
+		cursor = parent
+		forward = cursor
+	return {"gate": gate, "forward": forward}
+
+
+static func _starts_contain(starts: Array, pid: int) -> bool:
+	for s in starts:
+		if int(s) == pid:
+			return true
+	return false
+
+
+static func _fid_at(station: Dictionary, ids: Array, pid: int) -> String:
+	if pid <= 0:
+		return ""
+	var best := ""
+	for fid_v in ids:
+		var fid := str(fid_v)
+		if int(station.get(fid, -1)) != pid:
+			continue
+		if best.is_empty() or fid < best:
+			best = fid
+	return best
+
+
+static func _core_tokens(tag: String) -> Array:
+	var block: Variant = policy().get("core_name_tokens", {})
+	if block is Dictionary:
+		var raw: Variant = (block as Dictionary).get(tag, [])
+		if raw is Array:
+			return raw
+	return []
+
+
+static func _core_set(tag: String, own: Array) -> Dictionary:
+	var tokens: Array = _core_tokens(tag)
+	var cap := _capital(tag, own)
+	var core: Dictionary = {}
+	for pid_v in own:
+		var pid := int(pid_v)
+		var prov: Province = MapManager.get_province(pid) if typeof(MapManager) != TYPE_NIL else null
+		var nm := str(prov.name) if prov != null else ""
+		if pid == cap or _name_hit(nm, tokens):
+			core[pid] = true
+	return core
 
 
 static func _contact_jobs(

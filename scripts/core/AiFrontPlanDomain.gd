@@ -27,6 +27,7 @@ static func tick(day: int) -> Dictionary:
 			continue
 		if WarStateDomain.enemies_of(tag).is_empty():
 			continue
+		out["gates"] = int(out.get("gates", 0)) + _step_off_core_gate(tag)
 		var prev := _stored_axis(tag)
 		var since := int(prev.get("since_day", -99999))
 		var refresh := prev.is_empty() or day - since >= stable
@@ -40,6 +41,80 @@ static func tick(day: int) -> Dictionary:
 			continue
 		out["air"] = int(out["air"]) + _assign_air(tag, day, axis)
 	return out
+
+
+## Offer one step from a core gate into the lowest adjacent enemy hex.
+## Border fill keeps the last unit on that gate, so this is a no-op while
+## the gate is still the thing between the enemy and the core.
+static func _step_off_core_gate(tag: String) -> int:
+	if typeof(BattleManager) == TYPE_NIL or not BattleManager.has_method("start_land_battle"):
+		return 0
+	if typeof(LeaderManager) == TYPE_NIL or not LeaderManager.has_method("get_formations_for_country"):
+		return 0
+	var gates: Dictionary = {}
+	for g in AiStartGarrisonDomain.core_gates(tag):
+		gates[int(g)] = true
+	if gates.is_empty():
+		return 0
+	var enemies: Dictionary = {}
+	for e in WarStateDomain.enemies_of(tag):
+		var et := str(e).strip_edges().to_upper()
+		if not et.is_empty():
+			enemies[et] = true
+	if enemies.is_empty():
+		return 0
+	var best_fid := ""
+	var best_pid := 0
+	for form in LeaderManager.get_formations_for_country(tag):
+		if form == null:
+			continue
+		var ft := str(form.formation_type) if "formation_type" in form else ""
+		if ft != "division" and ft != "garrison":
+			continue
+		var fid := str(form.formation_id) if "formation_id" in form else ""
+		var pid := int(form.stationed_province_id) if "stationed_province_id" in form else 0
+		if fid.is_empty() or not gates.has(pid):
+			continue
+		if "is_in_combat" in form and bool(form.is_in_combat):
+			continue
+		if typeof(FormationMovement) != TYPE_NIL and FormationMovement.has_march(fid):
+			continue
+		if not AiBorderFillDomain.may_leave(tag, fid, pid):
+			continue
+		if best_fid.is_empty() or fid < best_fid:
+			best_fid = fid
+			best_pid = pid
+	if best_fid.is_empty() or best_pid <= 0:
+		return 0
+	var dest := _lowest_enemy_hex(best_pid, enemies)
+	if dest <= 0:
+		return 0
+	var opened: Dictionary = BattleManager.start_land_battle(tag, dest, best_pid, best_fid)
+	return 1 if bool(opened.get("success", false)) else 0
+
+
+static func _lowest_enemy_hex(pid: int, enemies: Dictionary) -> int:
+	if typeof(MapManager) == TYPE_NIL or not MapManager.has_method("get_adjacent_provinces"):
+		return 0
+	var nids: Array = []
+	var seen: Dictionary = {}
+	for nid_v in MapManager.get_adjacent_provinces(pid, true):
+		var nid := int(nid_v)
+		if nid <= 0 or seen.has(nid):
+			continue
+		seen[nid] = true
+		nids.append(nid)
+	nids.sort()
+	for nid2 in nids:
+		var prov: Province = MapManager.get_province(int(nid2)) if MapManager.has_method("get_province") else null
+		if prov == null or bool(prov.is_sea):
+			continue
+		var ot := str(prov.controller_tag).strip_edges().to_upper()
+		if ot.is_empty():
+			ot = str(prov.owner_tag).strip_edges().to_upper()
+		if enemies.has(ot):
+			return int(nid2)
+	return 0
 
 
 static func choose_axis(tag: String, day: int, targets: Array) -> Dictionary:
@@ -108,7 +183,7 @@ static func filter_opportunities(opps: Array, day: int) -> Array:
 			kept.append_array(rows)
 		else:
 			kept.append_array(matched)
-	return kept
+	return AiBorderFillDomain.retain_attacks(kept)
 
 
 static func segment_of(opp: Dictionary) -> String:

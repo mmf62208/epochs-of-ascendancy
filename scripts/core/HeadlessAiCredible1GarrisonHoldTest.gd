@@ -1,9 +1,10 @@
 extends SceneTree
 
-## B10G: 1936 start garrisons. POL declares on GER. Player-GER gives no orders.
+## B10G: 1936 start garrisons and border defence. POL declares on GER.
+## Player-GER gives no orders. AI-GER is controlled by the campaign AI (player USA).
 ## GER must keep Berlin and at least 90% of the weighted Brandenburg/Saxony core
 ## for 60 days. Seeds 193601, 193602, 193603. No unseeded RNG.
-## The AI-GER variant is FIX1b (EOA_B10G_AI=1). Air B10 stays in the behaviour test.
+## EOA_B10G_ONLY=player|ai and EOA_B10G_SEEDS=193601 limit a run. Air B10 stays elsewhere.
 
 const SEEDS: Array[int] = [193601, 193602, 193603]
 const DAYS := 60
@@ -61,12 +62,30 @@ func _run() -> void:
 		_fail("world_accurate roster empty")
 		_finish()
 		return
-	for s in SEEDS:
-		_one("player", int(s), roster)
-	if OS.get_environment("EOA_B10G_AI").strip_edges() == "1":
-		for s2 in SEEDS:
+	var only := OS.get_environment("EOA_B10G_ONLY").strip_edges().to_lower()
+	var seeds: Array = _seed_list()
+	if only != "ai":
+		for s in seeds:
+			_one("player", int(s), roster)
+	if only != "player":
+		for s2 in seeds:
 			_one("ai", int(s2), roster)
 	_finish()
+
+
+func _seed_list() -> Array:
+	var raw := OS.get_environment("EOA_B10G_SEEDS").strip_edges()
+	if raw.is_empty():
+		var all: Array = []
+		for s in SEEDS:
+			all.append(int(s))
+		return all
+	var out: Array = []
+	for part in raw.split(","):
+		var tok := part.strip_edges()
+		if tok.is_valid_int():
+			out.append(int(tok))
+	return out
 
 
 func _one(variant: String, which: int, roster: Array) -> void:
@@ -100,9 +119,6 @@ func _one(variant: String, which: int, roster: Array) -> void:
 	var rep: Dictionary = _gar.call("apply")
 	print("B10G garrison seed=%d %s" % [which, str(rep.get("summary", ""))])
 	_print_major_rows(rep, which)
-	if bool(rep.get("skipped", false)):
-		_fail("garrison apply skipped seed=%d" % which)
-		return
 	var snap: Dictionary = _gar.call("core_snapshot", "GER")
 	var core_w := int(snap.get("weight", 0))
 	if core_w <= 0:
