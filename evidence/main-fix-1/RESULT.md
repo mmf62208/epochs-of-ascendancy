@@ -1,73 +1,59 @@
-# MAIN-FIX-1 — Prod Esc, false capture notice, CL1 peace sheet
+# MAIN-FIX-1 FIX #1 — live capture toast + peace buttons
 
-**Branch:** `grok/main-fix-1`  
-**Base:** `origin/main` `d00dc8ed` (#114 UI-POLISH-1 + #113 CAMPAIGN-LOOP-1)  
-**Code tip (tests ran on):** `eb4d546faeb7d85a8814072e67e93adc8aa14c57`  
-**Draft PR:** https://github.com/mmf62208/epochs-of-ascendancy/pull/116  
+**Branch:** `cursor/main-fix1-toast-peace-9624` (off `grok/main-fix-1`)  
+**Base PR:** https://github.com/mmf62208/epochs-of-ascendancy/pull/116 (`grok/main-fix-1` @ `f60a6d39`)  
 **Merge:** HOLD  
 **Date:** 2026-10-19
 
-Playtest confirm on main came back MIXED (`uploads/RESULT.md` / `RESULT_01f1.md`).
+Playtest confirm on `f60a6d39` came back MIXED (`uploads/RESULT_0fd4.md`). Esc/Prod **PASS**. Two remaining problems: live false capture toast; peace sheet buttons.
 
 ## Root causes
 
-### 1. Esc with Production open opened Command Center (BUG — fixed)
+### 1. Live `Province captured · POL vs GER at Elbląski` (BUG — fixed)
 
-MapRenderer `_input` owns the live Esc stack (`_handle_escape_key`). After #114, Leaders / Agents / Space were dismissed before `_esc_open_command_center`. Production is a `DraggablePanel` whose Esc lives in `_unhandled_input`, which never ran because MapRenderer already consumed the key. Idle Esc therefore opened Command Center **on top of** the still-open Prod window (reproduced twice: `p3_prod_esc_closed`, `p5_prod_esc2_closed`).
+Unique body `"%s vs %s at %s"` is only `BattleManager._post_battle_news` (`scripts/combat/BattleManager.gd`). Title `Province captured` + that body is what LeaderEventUI paints as `Province captured · POL vs GER at Elbląski`.
 
-**Fix:** `_handle_escape_key` dismisses `ProductionAssignmentScreen` via `_dismiss_named_overlay_screen` → `close_screen()` (rename `_dying` + `queue_free`, same class as Close). Prod is also on `_dismiss_map_overlays_esc`. Idle Esc still calls `_esc_open_command_center` → deferred `TopInfoBar._on_menu_pressed`.
+**Why headless missed it:** `HeadlessCampaignLoop1DeclareClickTest` clears `LeaderManager.formations` then stations only GER hold units, so POL never `start_land_battle`. Live F5 parks POL at Warsaw and runs `TimeManager._maybe_run_ai_land_battle_starts` → `try_ai_start_land_battles` after Declare.
 
-### 2. `Province captured · POL vs GER at Słupski` after diplomatic Declare (likely false notice — fixed)
+**Why it looked false:** Elbląski `711086` (and Słupski `711091` on main) are **GER-owned in 1936** (`province_ownership_1936.json`) with Polish NUTS names and `core_for_tags: POL`. POL AI empty-hex (`start_land_battle` → `_apply_attacker_win_capture_light`) flipped owner GER→POL in ~2–3 s (`call_deferred` / first day tick). Inspector on 30 Jan showed Owner POL / Core POL. `godot.log` had nothing because `_post_battle_news` did not print.
 
-Unique format is `BattleManager._post_battle_news`: title `Province captured`, body `"%s vs %s at %s"`. `WarStateDomain.player_declare_from_province` is diplomatic-only (`declare_war` + `invalidate_fronts` cache clear). Light capture / `apply_combat_outcome` toasted capture whenever that path ran, including a same-owner / controller-only flip (`update_province_owner` with the current owner). Słupski stayed POL-owned; no march/assault/battle log line.
+`WarStateDomain.player_declare_from_province` is still diplomatic-only (`declare_war` + `invalidate_fronts`). Controller does **not** flip on declare. The flip was a real (but wrong) AI empty-hex of the human player's land.
 
-**Fix:** record `previous_owner_tag` before the owner write. Post the capture toast only when previous owner ≠ attacker **and** live `owner_tag` is the attacker. Same-owner light capture posts nothing (not a fallback `Battle:` toast).
+**Fix:**
+- Every `Province captured` path logs `MAIN_FIX1_CAPTURE_SRC` (`_post_battle_news`, `_apply_attacker_win_capture_light`, `apply_combat_outcome`, `start_land_battle` skip, `LeaderEventUI.post_news` / `show_toast` / `_show_toast`, `MapRenderer` assault flair + AAR, `MapNextListHelpers.format_capture_assault_flair`, TimeManager Maginot demo).
+- Toast only when **owner** actually becomes the attacker. Controller-only is logged and not toasted (not a capture).
+- Interactive light sim **skips AI empty-hex vs the human player's land** (`_is_ai_empty_hex_vs_human_player`) — that stop the Elbląski/Słupski flip. Player empty-hex of POL (force-capture hook) still toasts.
 
-### 3. CL1 peace sheet logged but not drawn (investigate; small UI only)
+Other `Province captured` strings: TimeManager Maginot demo (`USA vs ENG at North Coast` — not live F5); MapNextListHelpers `"%s captured %s"` (player assault flair, different format).
 
-`CapitulationDomain._open_sheet` → `PeaceConferenceWindow._open_campaign_peace_sheet` **does** add a `CanvasLayer` 124 `CampaignPeaceSheet`. Two reasons nothing readable showed on the CL1 hook path:
+### 2. Peace sheet buttons darkened but did nothing (BUG — fixed)
 
-1. **Panel size (0,0) + no StyleBox.** `custom_minimum_size` 480×220 was set but `size` stayed (0,0) and the default Panel is unstyled — invisible on the GIS map. **Small fix applied:** explicit `size = Vector2(480, 220)` + opaque `StyleBoxFlat` + title chrome (same class as `CampaignEndScreen` panel).
-2. **Victory dismiss (not rewritten).** `CampaignEndScreen.present` (layer 125) `_dismiss_overlays` queue_frees `campaign_peace_sheet`. The two_majors hook latches Victory on the second major, so the sheet is created then immediately destroyed. That is campaign-end behavior, not a peace-sheet UI bug; left as-is.
+Raw unstyled `Button` at `ACTION_MODE_BUTTON_RELEASE`. MapRenderer `_campaign_modal_consumes_pointer` handles the mouse-up, so `pressed` never fired; only the pressed visual. Hook-opened sheets also had empty `pending_sheet`, so `apply_player_choice` was a no-op even if emit ran.
 
-Headless `_open_campaign_peace_sheet` still returns the dict without drawing (`DisplayServer.get_name() == "headless"`), which is why the log line exists in CL1 tests.
+**Fix:** Retrowave `style_primary_button` / `style_secondary_button`, `ACTION_MODE_BUTTON_PRESS`, `arm_pending_sheet`, `_campaign_peace_choose` applies + logs `MAIN_FIX1_PEACE_BTN` + closes (once).
+
+### 3. Camera jumped to the Baltic during Esc+Prod+Leaders (not Esc)
+
+`MapRenderer._handle_escape_key` does not pan. Home / End / **B** (fronts centroid) / `_center_camera_on_province` do. Not an Esc-handler bug — no code change.
+
+### 4. Play hooks (dev-only, off by default)
+
+- `EOA_MAIN_FIX1_FORCE_CAPTURE=1` — GER takes one POL border province through `_apply_attacker_win_capture_light`.
+- `EOA_MAIN_FIX1_PEACE_HOLD_S=600` — open the campaign peace sheet and hold ≥600 s.
+- Wrapper: `tools/eoa_main_fix1_play_hooks.sh --force-capture` / `--peace-hold`.
 
 ## Constraints held
 
-- Never renumber `world_full` IDs — unedited vs `d00dc8ed`
+- Never renumber `world_full` IDs
 - No new residual dual packages
-- No GameData rewrite — `scripts/autoload/GameData.gd` unedited vs `d00dc8ed` (seed path unchanged; `multi_ai_decisions` md5 stays `20fe9063`)
-- No Godot bump; Godot only via `tools/run_godot.sh` → `4.7.1.rc2.official.d6096250e`
-- `--quick` same 14 known `unit_board_play_path` reds (`Ran 374 tests` / `FAILED (failures=14)`)
-- map_qc NE **0.9853** (3148/3195)
-- 0 SCRIPT ERROR in all Godot logs below
+- No GameData rewrite
+- Godot only via `tools/run_godot.sh`
+- `--quick` same 14 known `unit_board_play_path` reds
+- map_qc NE **0.9853**
+- Seed 193601 `20fe9063` unedited
+- 0 SCRIPT ERROR
 - No force push
 
 ## Tests
 
-Godot: `tools/run_godot.sh` 4.7.1-rc2. Logs under `/tmp/main-fix-1/`.
-
-| Check | Result |
-|-------|--------|
-| Code tip | `eb4d546faeb7d85a8814072e67e93adc8aa14c57` |
-| `HeadlessMainFix1ProdEscTest` | **PASS** (failures=0) — Esc closed Prod without CC; idle Esc opened CC |
-| `HeadlessCampaignLoop1DeclareClickTest` | **PASS** (failures=0) — on declare GER 421 / POL 53 unchanged, capture news +0; same-owner POL light capture at `711054` silent; after 3 days still +0 |
-| `HeadlessCampaignLoop1WarGateTest` | **PASS** (failures=0) |
-| `HeadlessCampaignLoop1CapitulationPeaceTest` | **PASS** (failures=0) |
-| Soak `HeadlessCampaignLoop1SoakTest` | **PASS** (failures=0) S3 victory day 39 |
-| `HeadlessCampaignLoop1TopBarFitTest` | **PASS** (failures=0) |
-| `HeadlessUiPolish1Test` | **PASS** (failures=0) |
-| `HeadlessProd1ButtonOpenTest` | **PASS** (failures=0) |
-| `HeadlessUi1LeadersEdgePanMarchTest` | **PASS** (failures=0) |
-| `--quick` | exit 1 · **14** known `unit_board_play_path` reds · `unit_save_path` OK · `map_qc` OK · `hoi_matrix` OK · `air_physics_p1` OK |
-| map_qc NE | **0.9853** (3148/3195) |
-| SCRIPT ERROR | **0** |
-| Seed 193601 | GameData unedited; prefix **`20fe9063`** |
-
-DeclareClick capture lines:
-
-```
-[PASS] on declare no capture notice (GER 421 / POL 53 unchanged, news +0)
-[PASS] same-owner POL light capture at 711054 posted no capture notice
-[PASS] after 3 days no capture notice (GER 421 / POL 53 unchanged, news +0)
-```
+See the commit / later update of this file after the gate run.

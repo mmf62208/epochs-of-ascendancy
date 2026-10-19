@@ -192,6 +192,20 @@ func _run() -> void:
 	if not _assert_no_false_capture_notice(mm, "on declare"):
 		_cleanup()
 		return
+	_boot.make_division("mf1_pol_ai_front", "POL", _pol_to)
+	var bm_ai: Node = get_root().get_node_or_null("BattleManager")
+	if bm_ai != null and bm_ai.has_method("try_ai_start_land_battles"):
+		var ai_row: Dictionary = bm_ai.call("try_ai_start_land_battles", int(tm.total_days_elapsed))
+		print("  [INFO] try_ai_start_land_battles after declare %s" % str(ai_row))
+	if not _assert_no_false_capture_notice(mm, "after POL empty-hex probe"):
+		_cleanup()
+		return
+	var ger_border: Object = mm.call("get_province", _pol_from) if mm.has_method("get_province") else null
+	if ger_border == null or str(ger_border.get("owner_tag")).strip_edges().to_upper() != "GER":
+		_fail("AI empty-hex flipped GER border pid %d" % _pol_from)
+		_cleanup()
+		return
+	_pass("POL empty-hex vs GER pid %d skipped (still GER)" % _pol_from)
 	if not _assert_same_owner_light_capture_silent(mm):
 		_cleanup()
 		return

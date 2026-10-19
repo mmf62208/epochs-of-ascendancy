@@ -260,6 +260,8 @@ func show_toast(message: String, duration_sec: float = 3.0, is_error: bool = fal
 	panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	if "Road spine started" in message or "Road spine ~" in message:
 		panel.set_meta("eoa_spine_start_toast", true)
+	if "Province captured" in message:
+		print("MAIN_FIX1_CAPTURE_SRC who=LeaderEventUI.show_toast message=%s" % message)
 	_toast_container.add_child(panel)
 	_eoa_flush(
 		"EOA_SMOKE_SPINE_BISECT who=LeaderEventUI.show_toast.before_trim n=%d"
@@ -309,6 +311,17 @@ func post_news(title: String, body: String, category: String = "general") -> voi
 	if news_history.size() > MAX_NEWS_ITEMS:
 		news_history.pop_front()
 	news_posted.emit(entry)
+	if str(title).strip_edges() == "Province captured" or "Province captured" in str(body):
+		print(
+			"MAIN_FIX1_CAPTURE_SRC who=LeaderEventUI.post_news title=%s body=%s cat=%s skip_ui=%s coalesce=%s"
+			% [
+				title,
+				body,
+				category,
+				str(_should_skip_toast_ui()),
+				str(_should_coalesce_live_f5_combat_toast(category)),
+			]
+		)
 	if _should_skip_toast_ui():
 		return
 	if _should_coalesce_live_f5_combat_toast(category):
@@ -532,6 +545,11 @@ func _show_toast(entry: Dictionary) -> void:
 	var title_l := str(entry.get("title", "")).to_lower()
 	if "road spine" in body_l or "road spine" in title_l or "ix-1" in title_l:
 		panel.set_meta("eoa_spine_start_toast", true)
+	if "province captured" in title_l or "province captured" in body_l:
+		print(
+			"MAIN_FIX1_CAPTURE_SRC who=LeaderEventUI._show_toast title=%s body=%s"
+			% [str(entry.get("title", "")), str(entry.get("body", ""))]
+		)
 	_toast_container.add_child(panel)
 	_trim_live_f5_toast_stack()
 	_trim_toast_stack_to(4)

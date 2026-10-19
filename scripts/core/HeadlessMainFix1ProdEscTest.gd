@@ -134,11 +134,17 @@ func _test_source_needles() -> void:
 		_fail("_dismiss_map_overlays_esc must include ProductionAssignmentScreen")
 		return
 	var news := _slice_func(bm, "_post_battle_news")
-	if "owner_now != attacker" not in news and "previous_owner == attacker" not in news:
-		_fail("_post_battle_news must skip capture toast unless owner actually flipped")
+	if "MAIN_FIX1_CAPTURE_SRC who=BattleManager._post_battle_news" not in news:
+		_fail("_post_battle_news must log MAIN_FIX1_CAPTURE_SRC")
+		return
+	if "no_owner_or_control_flip_to_attacker" not in news:
+		_fail("_post_battle_news must skip capture toast unless owner/control flipped to attacker")
 		return
 	if "previous_owner_tag" not in _slice_func(bm, "_apply_attacker_win_capture_light"):
 		_fail("light capture must record previous_owner_tag")
+		return
+	if "ai_empty_hex_vs_player" not in bm:
+		_fail("start_land_battle must skip AI empty-hex vs the human player")
 		return
 	if not peace.is_empty():
 		var sheet := _slice_func(peace, "_open_campaign_peace_sheet")
@@ -148,7 +154,16 @@ func _test_source_needles() -> void:
 		if "add_theme_stylebox_override" not in sheet:
 			_fail("campaign peace sheet must paint an opaque StyleBox")
 			return
-	_pass("source needles: Prod Esc before CC + capture owner-flip + peace sheet size")
+		if "style_primary_button" not in peace:
+			_fail("campaign peace buttons must use RetrowaveTheme.style_primary_button")
+			return
+		if "ACTION_MODE_BUTTON_PRESS" not in peace:
+			_fail("campaign peace buttons must fire on press")
+			return
+		if "_campaign_peace_choose" not in peace:
+			_fail("campaign peace buttons must apply, log, and close")
+			return
+	_pass("source needles: Prod Esc before CC + capture owner-flip + peace buttons")
 
 
 func _setup_map_renderer() -> bool:

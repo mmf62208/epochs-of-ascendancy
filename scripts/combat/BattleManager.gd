@@ -526,6 +526,17 @@ func start_land_battle(
 	var def_tag := str(preview.get("defender_tag", "")).strip_edges().to_upper()
 	var def_divs: Array[Dictionary] = get_divisions_at_province(to_id, def_tag)
 	if def_divs.is_empty():
+		if _interactive_light_sim() and _is_ai_empty_hex_vs_human_player(tag, to_id):
+			print(
+				"MAIN_FIX1_CAPTURE_SRC who=BattleManager.start_land_battle skip=ai_empty_hex_vs_player attacker=%s defender=%s pid=%d"
+				% [tag, def_tag, to_id]
+			)
+			return {
+				"success": false,
+				"reason": "ai empty-hex vs player skipped",
+				"instant": false,
+				"opened": false,
+			}
 		if _interactive_light_sim():
 			_apply_attacker_win_capture_light(tag, to_id, from_pid, fid)
 			return {"success": true, "instant": true, "opened": false, "light_capture": true}
@@ -543,6 +554,17 @@ func start_land_battle(
 	var def_pick := _pick_strongest_division(def_divs, target, def_tag)
 	var def_fid := str(def_pick.get("formation_id", "")).strip_edges()
 	if def_fid.is_empty():
+		if _interactive_light_sim() and _is_ai_empty_hex_vs_human_player(tag, to_id):
+			print(
+				"MAIN_FIX1_CAPTURE_SRC who=BattleManager.start_land_battle skip=ai_empty_hex_vs_player attacker=%s defender=%s pid=%d"
+				% [tag, def_tag, to_id]
+			)
+			return {
+				"success": false,
+				"reason": "ai empty-hex vs player skipped",
+				"instant": false,
+				"opened": false,
+			}
 		if _interactive_light_sim():
 			_apply_attacker_win_capture_light(tag, to_id, from_pid, fid)
 			return {"success": true, "instant": true, "opened": false, "light_capture": true}
@@ -1406,6 +1428,41 @@ func _interactive_light_sim() -> bool:
 	)
 
 
+func _human_player_tag() -> String:
+	var player_tag := "GER"
+	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_player_country_tag"):
+		var pt := str(LeaderManager.call("get_player_country_tag")).strip_edges().to_upper()
+		if not pt.is_empty():
+			player_tag = pt
+	elif typeof(SessionPlayers) != TYPE_NIL:
+		for slot in SessionPlayers.slots:
+			if slot is Dictionary and str((slot as Dictionary).get("control", "")).to_lower() == "human":
+				var ht := str((slot as Dictionary).get("tag", "")).strip_edges().to_upper()
+				if not ht.is_empty():
+					player_tag = ht
+				break
+	return player_tag
+
+
+## Live F5: AI must not instantly occupy the human player's land on an empty hex
+## (Play: GER declare POL → POL empty-hex "captures" GER Elbląski / Słupski).
+func _is_ai_empty_hex_vs_human_player(attacker_tag: String, target_pid: int) -> bool:
+	if include_player_in_ai_land_battles:
+		return false
+	var att := attacker_tag.strip_edges().to_upper()
+	var player := _human_player_tag()
+	if att.is_empty() or player.is_empty() or att == player:
+		return false
+	if typeof(MapManager) == TYPE_NIL or target_pid < 0:
+		return false
+	var live: Province = MapManager.get_province(target_pid) if MapManager.has_method("get_province") else null
+	if live == null:
+		return false
+	var owner := str(live.owner_tag).strip_edges().to_upper()
+	var ctrl := _province_controller_tag(live)
+	return owner == player or ctrl == player
+
+
 func _deferred_resolve_attacker_win(att_tag: String, to_id: int, from_id: int, att_fid: String) -> void:
 	# Hang-class: F5 capture is data-only (no second resolve, no owner signal).
 	_apply_attacker_win_capture_light(att_tag, to_id, from_id, att_fid)
@@ -1415,11 +1472,15 @@ func _apply_attacker_win_capture_light(att_tag: String, to_id: int, from_id: int
 	var tag := att_tag.strip_edges().to_upper()
 	var def_tag := ""
 	var previous_owner := ""
+	var previous_controller := ""
+	var pname := ""
 	if typeof(MapManager) != TYPE_NIL and to_id >= 0:
 		var live: Province = MapManager.get_province(to_id) if MapManager.has_method("get_province") else null
 		if live != null:
 			previous_owner = str(live.owner_tag).strip_edges().to_upper()
-			def_tag = _province_controller_tag(live)
+			previous_controller = _province_controller_tag(live)
+			def_tag = previous_controller
+			pname = str(live.name)
 		if MapManager.has_method("update_province_owner"):
 			MapManager.update_province_owner(to_id, tag, tag, false, true)
 	if not att_fid.is_empty() and typeof(LeaderManager) != TYPE_NIL:
@@ -1434,6 +1495,22 @@ func _apply_attacker_win_capture_light(att_tag: String, to_id: int, from_id: int
 			"country_tag": tag,
 			"order_type": "move_to_province",
 		}
+	var owner_now := previous_owner
+	var ctrl_now := previous_controller
+	if typeof(MapManager) != TYPE_NIL and to_id >= 0:
+		var after: Province = MapManager.get_province(to_id) if MapManager.has_method("get_province") else null
+		if after != null:
+			owner_now = str(after.owner_tag).strip_edges().to_upper()
+			ctrl_now = _province_controller_tag(after)
+			if pname.is_empty():
+				pname = str(after.name)
+	var owner_flipped := previous_owner != owner_now
+	var ctrl_flipped := previous_controller != ctrl_now
+	var attacker_holds := owner_now == tag or ctrl_now == tag
+	print(
+		"MAIN_FIX1_CAPTURE_SRC who=BattleManager._apply_attacker_win_capture_light pid=%d name=%s attacker=%s prev_owner=%s prev_ctrl=%s now_owner=%s now_ctrl=%s owner_flip=%s ctrl_flip=%s"
+		% [to_id, pname, tag, previous_owner, previous_controller, owner_now, ctrl_now, str(owner_flipped), str(ctrl_flipped)]
+	)
 	var row := {
 		"defender_tag": def_tag,
 		"defender_formation_id": "",
@@ -1441,15 +1518,20 @@ func _apply_attacker_win_capture_light(att_tag: String, to_id: int, from_id: int
 		"target_province_id": to_id,
 		"from_province_id": from_id,
 		"previous_owner_tag": previous_owner,
+		"previous_controller_tag": previous_controller,
 		"outcome": "attacker",
 		"winner": "attacker",
 	}
 	_displace_defender_from_captured_province(row, to_id)
-	# News history is cheap; toast UI is skipped headless / during compact clock.
-	# MAIN-FIX-1: a front/controller flip with the same owner is not a capture
-	# and must not fall through to a "Battle:" toast either.
-	if previous_owner != tag:
+	# Toast only when owner or controller actually became the attacker.
+	# Controller-only flips are logged; they are not a capture notice.
+	if attacker_holds and owner_flipped and previous_owner != tag:
 		_post_battle_news(row, true)
+	elif ctrl_flipped and not owner_flipped:
+		print(
+			"MAIN_FIX1_CAPTURE_SRC who=BattleManager._apply_attacker_win_capture_light skip=controller_only pid=%d attacker=%s"
+			% [to_id, tag]
+		)
 	if typeof(TimeManager) != TYPE_NIL and bool(TimeManager.get("_living_playtest_clock")):
 		# Compact clock: skip deferred map refresh (Maginot quit hung on renderer).
 		return
@@ -2254,11 +2336,24 @@ func apply_combat_outcome(
 
 	if captured and target_pid >= 0 and typeof(MapManager) != TYPE_NIL:
 		var previous_owner := ""
+		var previous_controller := ""
 		var live_cap: Province = MapManager.get_province(target_pid) if MapManager.has_method("get_province") else null
 		if live_cap != null:
 			previous_owner = str(live_cap.owner_tag).strip_edges().to_upper()
+			previous_controller = _province_controller_tag(live_cap)
 		result["previous_owner_tag"] = previous_owner
+		result["previous_controller_tag"] = previous_controller
 		MapManager.update_province_owner(target_pid, attacker_tag, attacker_tag, false)
+		var owner_now := previous_owner
+		var ctrl_now := previous_controller
+		var after_cap: Province = MapManager.get_province(target_pid) if MapManager.has_method("get_province") else null
+		if after_cap != null:
+			owner_now = str(after_cap.owner_tag).strip_edges().to_upper()
+			ctrl_now = _province_controller_tag(after_cap)
+		print(
+			"MAIN_FIX1_CAPTURE_SRC who=BattleManager.apply_combat_outcome pid=%d attacker=%s prev_owner=%s prev_ctrl=%s now_owner=%s now_ctrl=%s"
+			% [target_pid, attacker_tag, previous_owner, previous_controller, owner_now, ctrl_now]
+		)
 		# Capture advances the attacker's land station onto the taken province so OOB /
 		# can_assault / get_land_divisions see them on the new border (not still on from_pid).
 		_station_attacker_on_captured_province(attacker_formation_id, target_pid, attacker_tag)
@@ -2269,9 +2364,14 @@ func apply_combat_outcome(
 			int(result.get("from_province_id", from_province_id)),
 			int(result.get("retreat_province_id", -1)),
 		)
-		# MAIN-FIX-1: only toast "Province captured" when owner_tag actually flipped.
-		if previous_owner != attacker_tag:
+		# MAIN-FIX-1: toast only when owner actually became the attacker.
+		if previous_owner != attacker_tag and owner_now == attacker_tag:
 			_post_battle_news(result, true)
+		elif previous_controller != ctrl_now and previous_owner == owner_now:
+			print(
+				"MAIN_FIX1_CAPTURE_SRC who=BattleManager.apply_combat_outcome skip=controller_only pid=%d"
+				% target_pid
+			)
 	elif winner == "attacker":
 		_post_battle_news(result, false)
 	elif winner == "defender":
@@ -2914,19 +3014,42 @@ func _post_battle_news(result: Dictionary, captured: bool) -> void:
 	var target_name := ""
 	var pid := int(result.get("target_province_id", result.get("province_id", -1)))
 	var owner_now := ""
+	var ctrl_now := ""
 	if typeof(MapManager) != TYPE_NIL and pid >= 0:
 		var p: Province = MapManager.get_province(pid)
 		if p != null:
 			target_name = p.name
 			owner_now = str(p.owner_tag).strip_edges().to_upper()
-	# MAIN-FIX-1: diplomatic declare / front-cache invalidation must not toast a
-	# capture when owner_tag did not become the attacker.
+			ctrl_now = _province_controller_tag(p)
+	# MAIN-FIX-1: diplomatic declare / empty-hex vs the player must not toast a
+	# capture unless owner_tag (or controller) actually became the attacker.
 	if captured:
 		var previous_owner := str(result.get("previous_owner_tag", defender)).strip_edges().to_upper()
-		if owner_now != attacker or previous_owner == attacker:
+		var previous_ctrl := str(result.get("previous_controller_tag", previous_owner)).strip_edges().to_upper()
+		var attacker_holds := owner_now == attacker or ctrl_now == attacker
+		var flipped := previous_owner != owner_now or previous_ctrl != ctrl_now
+		print(
+			"MAIN_FIX1_CAPTURE_SRC who=BattleManager._post_battle_news captured=1 attacker=%s defender=%s pid=%d name=%s prev_owner=%s now_owner=%s prev_ctrl=%s now_ctrl=%s holds=%s flipped=%s"
+			% [attacker, defender, pid, target_name, previous_owner, owner_now, previous_ctrl, ctrl_now, str(attacker_holds), str(flipped)]
+		)
+		if not attacker_holds or not flipped or previous_owner == attacker:
+			print(
+				"MAIN_FIX1_CAPTURE_SRC who=BattleManager._post_battle_news skip=no_owner_or_control_flip_to_attacker pid=%d"
+				% pid
+			)
+			return
+		if previous_owner == owner_now and previous_ctrl != ctrl_now:
+			print(
+				"MAIN_FIX1_CAPTURE_SRC who=BattleManager._post_battle_news skip=controller_only pid=%d"
+				% pid
+			)
 			return
 	var title := "Province captured" if captured else "Battle: %s" % outcome
 	var body := "%s vs %s at %s" % [attacker, defender, target_name if not target_name.is_empty() else str(pid)]
+	print(
+		"MAIN_FIX1_CAPTURE_SRC who=BattleManager._post_battle_news post title=%s body=%s"
+		% [title, body]
+	)
 	LeaderEventUI.post_news(title, body, "combat")
 
 ## === HISTORICAL OOB (TestRunner / harness) ===

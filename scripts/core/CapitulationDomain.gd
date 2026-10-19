@@ -478,11 +478,29 @@ static func apply_outcome(loser: String, leader: String, outcome: String) -> Dic
 	var st := _cap()
 	st["pending_sheet"] = {}
 	_cap_store(st)
+	print(
+		"MAIN_FIX1_PEACE_BTN who=CapitulationDomain.apply_outcome outcome=%s leader=%s loser=%s moved=%d"
+		% [outcome, leader, loser, moved.size()]
+	)
 	return {"ok": true, "outcome": outcome, "moved": moved.size(), "leader": leader, "loser": loser}
+
+
+static func arm_pending_sheet(leader: String, loser: String, outcome: String) -> void:
+	var st := _cap()
+	st["pending_sheet"] = {
+		"loser": loser.strip_edges().to_upper(),
+		"leader": leader.strip_edges().to_upper(),
+		"outcome": outcome.strip_edges(),
+	}
+	_cap_store(st)
 
 
 static func apply_player_choice(outcome: String) -> Dictionary:
 	var pending: Dictionary = _cap().get("pending_sheet", {})
+	print(
+		"MAIN_FIX1_PEACE_BTN who=CapitulationDomain.apply_player_choice outcome=%s pending=%s"
+		% [outcome, str(pending)]
+	)
 	if pending.is_empty():
 		return {"ok": false, "reason": "no sheet"}
 	var loser := str(pending.get("loser", ""))

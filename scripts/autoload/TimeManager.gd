@@ -852,6 +852,7 @@ func simulate_live_f5_softpipe_past_plus6() -> Dictionary:
 	var toast_n := 0
 	if typeof(LeaderEventUI) != TYPE_NIL:
 		if LeaderEventUI.has_method("post_news"):
+			print("MAIN_FIX1_CAPTURE_SRC who=TimeManager.simulate_live_f5_softpipe_past_plus6 demo=true")
 			LeaderEventUI.post_news("Province captured", "USA vs ENG at North Coast", "combat")
 			LeaderEventUI.post_news("Province captured", "ENG vs DNK at Estuary", "combat")
 			LeaderEventUI.post_news("Province captured", "GER vs FRA at Maginot", "combat")
