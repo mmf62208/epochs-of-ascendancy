@@ -5619,7 +5619,8 @@ func restore_view_after_load() -> void:
 		cam.global_position = _apply_camera_bounds(Vector2(x, y))
 		cam.zoom = Vector2(zx, zy)
 		_pending_saved_camera = {}
-		_sync_unit_counter_paint()
+		if is_inside_tree():
+			_sync_unit_counter_paint()
 		print("MapRenderer: restored saved camera after load")
 		return
 	_pending_saved_camera = {}
