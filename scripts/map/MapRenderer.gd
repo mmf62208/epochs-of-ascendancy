@@ -5646,10 +5646,6 @@ func _center_on_player_capital_after_load() -> void:
 			var cap := int(loader.call("_get_capital_province_id_for_tag", tag))
 			if cap > 0:
 				pid = cap
-		if typeof(CapitulationDomain) != TYPE_NIL and CapitulationDomain.has_method("resolve_capital"):
-			var resolved := int(CapitulationDomain.resolve_capital(tag))
-			if resolved > 0:
-				pid = resolved
 	if pid > 0:
 		_center_camera_on_province(pid, "soft")
 		print("MapRenderer: centred on player capital %s pid=%d after load" % [tag, pid])
