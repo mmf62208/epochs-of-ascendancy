@@ -4237,6 +4237,31 @@ func _layout_map_ui() -> void:
 		else:
 			ip.z_index = 40
 	_layout_info_panel_inner()
+	_layout_supply_legend()
+
+
+## Sit the Supply legend under Map Mode (not over the chips) at 1280x800+.
+func _layout_supply_legend() -> void:
+	if _supply_legend_panel == null or not is_instance_valid(_supply_legend_panel):
+		return
+	var host := _supply_legend_panel.get_parent() as Control
+	if host == null or host.name != "SupplyOverlayLegendHost":
+		return
+	var top_clearance := UI_TOP_BAR_CLEARANCE
+	if get_tree():
+		var tib := TopInfoBar.find_in_tree(get_tree())
+		if tib != null and tib.has_method("get_bar_height"):
+			top_clearance = maxf(top_clearance, float(tib.call("get_bar_height")) + 4.0)
+	var toolbar_h := UI_MAP_TOOLBAR_HEIGHT
+	if _map_mode_toolbar != null and _map_mode_toolbar.has_method("get_panel_height"):
+		toolbar_h = float(_map_mode_toolbar.call("get_panel_height"))
+	var chrome_top := top_clearance + toolbar_h + 6.0
+	host.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	host.offset_left = 10.0
+	host.offset_top = chrome_top
+	host.offset_right = 10.0 + 480.0
+	host.custom_minimum_size = Vector2(480, 0)
+	_sync_supply_legend_pulse_host()
 
 
 ## Keep InfoPanel text fully inside the cyan box.
@@ -30806,7 +30831,7 @@ func _update_supply_overlay_legend() -> void:
 		panel.mouse_filter = Control.MOUSE_FILTER_STOP
 		panel.set_anchors_preset(Control.PRESET_TOP_LEFT)
 		panel.offset_left = 10.0
-		panel.offset_top = 56.0  # below top bar
+		panel.offset_top = 0.0
 		panel.custom_minimum_size = Vector2(480, 0)
 		panel.z_index = 40
 		var style := StyleBoxFlat.new()
@@ -30824,7 +30849,7 @@ func _update_supply_overlay_legend() -> void:
 		host.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		host.set_anchors_preset(Control.PRESET_TOP_LEFT)
 		host.offset_left = 10.0
-		host.offset_top = 56.0
+		host.offset_top = 0.0
 		host.custom_minimum_size = Vector2(480, 0)
 		host.z_index = 40
 		var pulse := Panel.new()
@@ -30891,6 +30916,7 @@ func _update_supply_overlay_legend() -> void:
 		ui.add_child(host)
 		if not panel.resized.is_connected(_sync_supply_legend_pulse_host):
 			panel.resized.connect(_sync_supply_legend_pulse_host)
+	_layout_supply_legend()
 	_update_supply_legend_text()
 
 

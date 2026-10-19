@@ -29,7 +29,7 @@ const MODE_LABELS: Dictionary = {
 }
 
 const MODE_HINTS: Dictionary = {
-	"political": "Clean country colors (default)",
+	"political": "Clean country colors (default) · Highways: Supply/Infra view",
 	"strain": "Welfare / cultural strain (red-gray)",
 	"vitality": "Settlement vitality (cyan-green)",
 	"development": "Development level lighten",
@@ -41,7 +41,7 @@ const MODE_HINTS: Dictionary = {
 	"weather": "Ground state: dry / mud / snow / storm fills",
 	"resources": "Strategic goods: oil / rubber / steel / coal (F9)",
 	"states": "V3-style state fills from hierarchy membership (Shift+F9)",
-	"terrain": "Clean terrain fills: plains / forest / mountains / desert (Ctrl+F9)",
+	"terrain": "Clean terrain fills: plains / forest / mountains / desert (Ctrl+F9) · Highways: Supply/Infra view",
 }
 
 ## Weather legend hint appended for naval/supply mapmodes (weather expand surface).

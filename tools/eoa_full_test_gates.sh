@@ -355,6 +355,10 @@ else
   run_step launch_roads1_lithuania_stub \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessRoads1LithuaniaStubTest.gd || fail
 
+  run_step launch_roads1_supply_legend_layout \
+    tools/run_godot.sh --headless --path . --resolution 1280x800 \
+    -s res://scripts/core/HeadlessRoads1SupplyLegendLayoutTest.gd || fail
+
   run_step launch_hwy1_highway_chain \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessHwy1HighwayChainTest.gd || fail
 
