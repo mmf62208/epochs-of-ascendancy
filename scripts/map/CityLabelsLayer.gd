@@ -21,10 +21,11 @@ const MID_TIER2_SCORE_FLOOR := 400.0
 const LABEL_SHIFT_PX := 22.0
 const CLOSE_SHIFT_PX := 22.0
 const ANCHOR_MAX_PX := 30.0
-## Ruhr cores may walk just past a chip half-width so the name sits beside
-## the plate instead of on it (COUNTER_HALF.x 36 → ~44 px to the near edge;
-## Dutch L100 / air-wing stacks at mid-zoom need ~80 px).
-const RUHR_ANCHOR_MAX_PX := 80.0
+## Ruhr cores may sit beside a plate, but never far enough that the name
+## reads as another city (Play: Düsseldorf 62 px north of its mark). Labels
+## draw at z 30 above chips (z 28); if no slot fits, keep the default sit.
+const RUHR_ANCHOR_MAX_PX := 40.0
+const CHIP_DIM_ALPHA := 0.72
 const COUNTER_INSET_PX := 12.0
 const CLOSE_FONT_MIN_PX := 14
 const COUNTER_MAX_SCREEN := Vector2(128.0, 160.0)
@@ -536,9 +537,10 @@ func place_competing(cands: Array, zoom: float, cam: Vector2, vp: Vector2, natio
 		var accepted := false
 		var chosen := Rect2()
 		var chosen_off := base
-		# Ruhr cores still collide with unit plates — try chip-clear slots
-		# first (inset so a 44 px walk can sit beside the plate). Last
-		# resort keeps the name by the mark so Dortmund cannot vanish at mid.
+		var over_chip := false
+		# Ruhr cores still collide with unit plates — try nearby chip-clear
+		# slots first. Never walk past RUHR_ANCHOR_MAX or across a sibling
+		# core (Düsseldorf north of Essen reads as the wrong city).
 		var keep := ruhr_keep or must_keep or is_cap
 		var walk_shift := RUHR_ANCHOR_MAX_PX if keep else shift_px
 		var walk_anchor := RUHR_ANCHOR_MAX_PX if keep else ANCHOR_MAX_PX
@@ -572,15 +574,17 @@ func place_competing(cands: Array, zoom: float, cam: Vector2, vp: Vector2, natio
 				continue
 			var baseline_s: Vector2 = anchor_s + off
 			var rect := Rect2(baseline_s + Vector2(0.0, -ascent), size)
+			if ruhr_keep and _ruhr_crosses_sibling(world, anchor_s, rect, placed):
+				continue
 			if _rects_clear(rect, placed, try_blockers, vp):
 				chosen = rect
 				chosen_off = off
 				accepted = true
 				break
 		if not accepted and keep:
-			# Ignore chips only for capitals/must-keep. Ruhr cores sitting
-			# on a plate (flush-left Duisburg into the Dutch stack) is the
-			# live miss — keep searching chip-clear slots a bit further.
+			# Ignore chips only for capitals/must-keep. Ruhr cores that
+			# cannot sit chip-clear inside the cap stay on the default
+			# slot (drawn above the plate) rather than jumping cities.
 			var keep_blockers: Array = []
 			for n2 in nation_rects:
 				keep_blockers.append(n2)
@@ -597,31 +601,24 @@ func place_competing(cands: Array, zoom: float, cam: Vector2, vp: Vector2, natio
 						chosen_off = off2
 						accepted = true
 						break
-			if not accepted and ruhr_keep:
-				for off_v3 in _candidate_slots(base, RUHR_ANCHOR_MAX_PX, size, ascent, anchor_s, placed, keep):
-					var off3: Vector2 = off_v3 as Vector2
-					if _anchor_gap_px(off3, size, ascent) > RUHR_ANCHOR_MAX_PX + 0.05:
-						continue
-					var rect3 := Rect2(anchor_s + off3 + Vector2(0.0, -ascent), size)
-					if _rects_clear(rect3, placed, try_blockers, vp):
-						chosen = rect3
-						chosen_off = off3
-						accepted = true
-						break
 		if not accepted and (is_cap or must_keep):
 			var cap_base: Vector2 = anchor_s + base
 			chosen = Rect2(cap_base + Vector2(0.0, -ascent), size)
 			chosen_off = base
 			accepted = true
 		elif not accepted and ruhr_keep:
-			# Never last-resort onto a plate. On-mark under the Dutch
-			# L100 / Air Wing stack is the live Duisburg miss at 1.217.
 			var ruhr_base: Vector2 = anchor_s + base
 			var ruhr_rect := Rect2(ruhr_base + Vector2(0.0, -ascent), size)
-			if _rects_clear(ruhr_rect, placed, try_blockers, vp):
+			var nation_only: Array = []
+			for n3 in nation_rects:
+				nation_only.append(n3)
+			if _rects_clear(ruhr_rect, placed, nation_only, vp):
 				chosen = ruhr_rect
 				chosen_off = base
 				accepted = true
+				if not _rects_clear(ruhr_rect, [], chip_blockers, vp):
+					over_chip = true
+					alpha = minf(alpha, CHIP_DIM_ALPHA)
 		# Never last-resort 48/120px: that put Duisburg south of Köln and
 		# names ~75px east of their dots. Cull if it will not sit by the mark.
 		if not accepted:
@@ -638,6 +635,7 @@ func place_competing(cands: Array, zoom: float, cam: Vector2, vp: Vector2, natio
 			"ruhr_keep": ruhr_keep,
 			"tier": tier,
 			"alpha": alpha,
+			"over_chip": over_chip,
 			"score": float(c.get("score", 0.0)),
 			"world": world,
 			"enter": enter,
@@ -745,11 +743,14 @@ func _nudge_keep_apart(placed: Array, vp: Vector2) -> Array:
 					continue
 				others.append(placed[k])
 			var moved := false
+			var victim_world: Vector2 = item.get("world", Vector2.ZERO)
 			for off_v in _candidate_slots(Vector2(8.0, -2.0), RUHR_ANCHOR_MAX_PX, size, ascent, anchor_s, others, true):
 				var off: Vector2 = off_v as Vector2
 				if _anchor_gap_px(off, size, ascent) > RUHR_ANCHOR_MAX_PX + 0.05:
 					continue
 				var cand := Rect2(anchor_s + off + Vector2(0.0, -ascent), size)
+				if bool(item.get("ruhr_keep", false)) and _ruhr_crosses_sibling(victim_world, anchor_s, cand, others):
+					continue
 				if not _rects_clear(cand, others, [], vp):
 					continue
 				item["screen_rect"] = cand
@@ -790,19 +791,28 @@ func _nudge_keep_off_counters(placed: Array, obstacles: Array, vp: Vector2) -> A
 				continue
 			if _is_keep_item(placed[j]):
 				keep_others.append(placed[j])
-		# Names draw at z 30 above chips (z 28). Stay by the dot — a 120px
-		# last-resort put Duisburg south of Köln and ~75px east of its mark.
+		# Names draw at z 30 above chips (z 28). If nothing chip-clear
+		# sits inside the cap on this city's own side, leave the default.
+		var moved_off := false
 		for off_v in _candidate_slots(Vector2(8.0, -2.0), RUHR_ANCHOR_MAX_PX, size, ascent, anchor_s, keep_others, true):
 			var off: Vector2 = off_v as Vector2
 			if _anchor_gap_px(off, size, ascent) > RUHR_ANCHOR_MAX_PX + 0.05:
 				continue
 			var cand := Rect2(anchor_s + off + Vector2(0.0, -ascent), size)
+			if bool(item.get("ruhr_keep", false)) and _ruhr_crosses_sibling(world, anchor_s, cand, keep_others):
+				continue
 			if not _rects_clear(cand, keep_others, chip_blockers, vp):
 				continue
 			item["screen_rect"] = cand
 			item["screen_offset"] = off
+			item["over_chip"] = false
 			placed[i] = item
+			moved_off = true
 			break
+		if not moved_off and bool(item.get("ruhr_keep", false)):
+			item["over_chip"] = true
+			item["alpha"] = minf(float(item.get("alpha", 1.0)), CHIP_DIM_ALPHA)
+			placed[i] = item
 	var kept_list: Array = []
 	for i2 in placed.size():
 		var rec: Dictionary = placed[i2]
@@ -1295,6 +1305,8 @@ func _draw() -> void:
 	for item in _placed:
 		var enter := float(item.get("enter", 0.0))
 		var alpha := _draw_alpha(zoom, enter)
+		if bool(item.get("over_chip", false)):
+			alpha = minf(alpha, CHIP_DIM_ALPHA)
 		if alpha < 0.04:
 			continue
 		var world: Vector2 = item.get("world", Vector2.ZERO)
@@ -1410,6 +1422,42 @@ func _keep_to_the_west(anchor_s: Vector2, placed: Array) -> bool:
 	return false
 
 
+func _keep_to_the_south(anchor_s: Vector2, placed: Array) -> bool:
+	for p in placed:
+		if not _is_keep_item(p):
+			continue
+		var other_s := _world_to_label_screen(p.get("world", Vector2.ZERO) as Vector2)
+		if other_s.y < anchor_s.y - 4.0 and absf(other_s.x - anchor_s.x) < 120.0:
+			return true
+	return false
+
+
+func _ruhr_crosses_sibling(world: Vector2, anchor_s: Vector2, rect: Rect2, placed: Array) -> bool:
+	# Own-side: a city south of Essen must not put its glyph north of Essen.
+	var label_c := rect.get_center()
+	for p in placed:
+		if not _is_keep_item(p):
+			continue
+		var other_w: Vector2 = p.get("world", Vector2.ZERO)
+		if other_w.distance_squared_to(world) < 1.0:
+			continue
+		var other_dot := _world_to_label_screen(other_w)
+		var other_rect: Rect2 = p.get("screen_rect", Rect2())
+		var other_c := other_dot
+		if other_rect.size.x > 0.5:
+			other_c = other_rect.get_center()
+		if anchor_s.y > other_dot.y + 4.0 and label_c.y < minf(other_c.y, other_dot.y) - 2.0:
+			return true
+		if anchor_s.y < other_dot.y - 4.0 and label_c.y > maxf(other_c.y, other_dot.y) + 2.0:
+			return true
+		var other_dot_rect: Rect2 = p.get("dot_rect", Rect2())
+		if other_dot_rect.size.x > 0.5 and rect.intersects(other_dot_rect):
+			return true
+		if other_rect.size.x > 0.5 and rect.grow(OUTLINE_PAD_PX).intersects(other_rect.grow(OUTLINE_PAD_PX)):
+			return true
+	return false
+
+
 func _candidate_slots(base: Vector2, max_shift: float, size: Vector2, ascent: float, anchor_s: Vector2, placed: Array, _prefer_flush: bool) -> Array:
 	var walk := _slot_offsets(base, max_shift)
 	if max_shift < 1.0:
@@ -1419,7 +1467,25 @@ func _candidate_slots(base: Vector2, max_shift: float, size: Vector2, ascent: fl
 	# Essen must stay right of its mark. Only Duisburg (keep to the east)
 	# tries west-of-mark first. Preferring left for every core put Essen
 	# on top of Duisburg at z 2.9. Dortmund (keep to the west) skips the
-	# short right walk that lands inside Essen's glyph.
+	# short right walk that lands inside Essen's glyph. Düsseldorf
+	# (keep to the south) prefers south/west so it does not jump Essen.
+	if _keep_to_the_south(anchor_s, placed):
+		var south: Array = []
+		var rest: Array = []
+		for off_v in walk:
+			var off: Vector2 = off_v as Vector2
+			if off.y >= base.y - 2.0:
+				south.append(off)
+			else:
+				rest.append(off)
+		out.append_array(south)
+		if flush.size() > 2:
+			out.append(flush[2])
+			out.append(flush[0])
+		for fs in flush:
+			out.append(fs)
+		out.append_array(rest)
+		return out
 	if _keep_to_the_east(anchor_s, placed) and flush.size() > 0:
 		out.append(flush[0])
 		for fs in flush:
