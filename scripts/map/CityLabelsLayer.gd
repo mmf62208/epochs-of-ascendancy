@@ -1674,20 +1674,21 @@ func _ruhr_compact_centers(pid: int) -> Array:
 	# on its own disc. Duisburg south/east (Germany) before west (NL).
 	# Essen north. Köln south.
 	match pid:
-		710401: # Düsseldorf
+		710401: # Düsseldorf — north/east first so south sits do not swallow Köln.
 			return [
-				Vector2(6.0, 12.0), Vector2(0.0, 14.0), Vector2(10.0, 8.0),
-				Vector2(8.0, -6.0), Vector2(-6.0, 12.0),
+				Vector2(8.0, -6.0), Vector2(10.0, 8.0), Vector2(-6.0, 12.0),
+				Vector2(6.0, 12.0), Vector2(0.0, 14.0),
 			]
 		710443: # Dortmund
 			return [
 				Vector2(12.0, 6.0), Vector2(10.0, 10.0), Vector2(0.0, 14.0),
 				Vector2(8.0, -8.0), Vector2(-6.0, 10.0), Vector2(14.0, 0.0),
 			]
-		710402: # Duisburg
+		710402: # Duisburg — north/east (Germany). South sits on Düsseldorf;
+			# due west sits on the Netherlands.
 			return [
-				Vector2(0.0, 14.0), Vector2(6.0, 10.0), Vector2(10.0, 8.0),
-				Vector2(8.0, -6.0), Vector2(-8.0, 10.0), Vector2(-14.0, 4.0),
+				Vector2(8.0, -6.0), Vector2(-8.0, -8.0), Vector2(10.0, 8.0),
+				Vector2(6.0, 10.0), Vector2(0.0, 14.0), Vector2(-14.0, 4.0),
 			]
 		710403: # Essen
 			return [
@@ -1739,20 +1740,20 @@ func _rect_min_edge_dist(rect: Rect2, p: Vector2) -> float:
 
 func _ruhr_hides_own_mark(drawn: Rect2, origin: Vector2) -> bool:
 	# A 70 px name with Play-centre ≤16 always grazes its 4 px disc. Reject
-	# only when the mark sits in the interior of the word (Dortmund 14,0).
+	# only when the mark sits in the interior of the word (Dortmund 14,0 —
+	# min-edge ~12). (12,6) keeps the disc on the top edge (min-edge ~6).
 	if not drawn.has_point(origin):
 		return false
-	return _rect_min_edge_dist(drawn, origin) > DOT_INK_PX + 0.05
+	return _rect_min_edge_dist(drawn, origin) > 8.0
 
 
 func _ruhr_covers_other_mark(drawn: Rect2, other: Vector2) -> bool:
-	var ink := Rect2(other - Vector2(DOT_INK_PX, DOT_INK_PX), Vector2(DOT_INK_PX * 2.0, DOT_INK_PX * 2.0))
-	if drawn.has_point(other):
-		return true
-	if not drawn.intersects(ink):
+	# Same interior test as own-dot: a 55–70 px AABB always grazes a neighbour
+	# 10–15 px away. Reject when the sibling mark sits in the body of the word
+	# (Play: Düsseldorf over Köln), not a touch on the box edge.
+	if not drawn.has_point(other):
 		return false
-	var inter := drawn.intersection(ink)
-	return inter.get_area() >= ink.get_area() * 0.49
+	return _rect_min_edge_dist(drawn, other) > 8.0
 
 
 func _ruhr_slot_hits_core_dot(drawn: Rect2, origin: Vector2, pid: int, ruhr_dots: Array) -> bool:
@@ -1821,8 +1822,18 @@ func _place_ruhr_core(c: Dictionary, placed: Array, nation_rects: Array, obstacl
 	var chosen_off := Vector2.ZERO
 	var over_chip := false
 	var slots: Array = _ruhr_compact_offsets(pid, glyph, ascent)
+	# Side-jumps only vs already-placed cores (Essen is first; checking every
+	# Ruhr dot here pushed Essen south of Duisburg on the way out).
+	var placed_dots: Array = []
+	for p in placed:
+		placed_dots.append({
+			"pid": int(p.get("pid", 0)),
+			"world": p.get("world", Vector2.ZERO),
+		})
 	# Pass 1: nation + chips, skip own/sibling discs and side-jumps.
 	# Other Ruhr label AABBs are allowed (70 px names on 13 px dots).
+	# Re-check ink after building `drawn` so a south sit on Düsseldorf cannot
+	# sneak through if compact-centre math and the raster box disagree.
 	for off_v in slots:
 		var off: Vector2 = off_v as Vector2
 		if not _ruhr_play_center_ok(off, glyph, ascent):
@@ -1831,7 +1842,7 @@ func _place_ruhr_core(c: Dictionary, placed: Array, nation_rects: Array, obstacl
 		var drawn := _ruhr_candidate_drawn(anchor_s, off, glyph, ascent)
 		if _ruhr_slot_hits_core_dot(drawn, anchor_s, pid, ruhr_dots):
 			continue
-		if _ruhr_label_jumps_sibling(world, anchor_s, drawn.get_center(), pid, ruhr_dots):
+		if _ruhr_label_jumps_sibling(world, anchor_s, drawn.get_center(), pid, placed_dots):
 			continue
 		if _rects_clear(rect, [], try_blockers, vp):
 			chosen = rect
@@ -1847,7 +1858,7 @@ func _place_ruhr_core(c: Dictionary, placed: Array, nation_rects: Array, obstacl
 			var drawn2 := _ruhr_candidate_drawn(anchor_s, off2, glyph, ascent)
 			if _ruhr_slot_hits_core_dot(drawn2, anchor_s, pid, ruhr_dots):
 				continue
-			if _ruhr_label_jumps_sibling(world, anchor_s, drawn2.get_center(), pid, ruhr_dots):
+			if _ruhr_label_jumps_sibling(world, anchor_s, drawn2.get_center(), pid, placed_dots):
 				continue
 			if _rects_clear(rect2, [], keep_blockers, vp):
 				chosen = rect2
@@ -1874,7 +1885,7 @@ func _place_ruhr_core(c: Dictionary, placed: Array, nation_rects: Array, obstacl
 					best_bury = bury
 					have_fb = true
 				continue
-			if _ruhr_label_jumps_sibling(world, anchor_s, drawn3.get_center(), pid, ruhr_dots):
+			if _ruhr_label_jumps_sibling(world, anchor_s, drawn3.get_center(), pid, placed_dots):
 				continue
 			chosen_off = off3
 			chosen = Rect2(anchor_s + chosen_off + Vector2(0.0, -ascent), glyph).grow(2.0)
