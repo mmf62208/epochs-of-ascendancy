@@ -55,7 +55,9 @@ func add_experience(amount: int, source: String = "", count_as_battle: bool = fa
 		return
 	experience += amount
 	total_experience_earned += amount
-	last_xp_gain_time = int(Time.get_unix_time_from_system())
+	last_xp_gain_time = 0
+	if typeof(TimeManager) != TYPE_NIL and "total_days_elapsed" in TimeManager:
+		last_xp_gain_time = int(TimeManager.total_days_elapsed)
 	if not source.is_empty():
 		last_xp_source = source
 	if count_as_battle:

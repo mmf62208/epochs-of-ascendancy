@@ -12392,6 +12392,7 @@ func get_save_data() -> Dictionary:
 		"campaign_wars": peace_state["campaign_wars"].duplicate(true) if peace_state.get("campaign_wars") is Dictionary else {},
 		"campaign_capitulation": peace_state["campaign_capitulation"].duplicate(true) if peace_state.get("campaign_capitulation") is Dictionary else {},
 		"campaign_end": peace_state["campaign_end"].duplicate(true) if peace_state.get("campaign_end") is Dictionary else {},
+		"peace_settlements": peace_state["peace_settlements"].duplicate(true) if peace_state.get("peace_settlements") is Array else [],
 		"version": 1
 	}
 
@@ -12457,6 +12458,8 @@ func apply_save_data(data: Dictionary) -> void:
 		peace_state["campaign_capitulation"] = data["campaign_capitulation"].duplicate(true)
 	if data.has("campaign_end") and data["campaign_end"] is Dictionary:
 		peace_state["campaign_end"] = data["campaign_end"].duplicate(true)
+	if data.has("peace_settlements") and data["peace_settlements"] is Array:
+		peace_state["peace_settlements"] = data["peace_settlements"].duplicate(true)
 	# Pillar state for peace ripples/follow-ons
 	if data.has("ascendancy"):
 		peace_state["ascendancy"] = data["ascendancy"].duplicate(true)
@@ -12585,6 +12588,7 @@ func clear_for_load() -> void:
 	peace_state["biotech_sabotage_log"] = {}
 	peace_state["scanner_intel_flags"] = {}
 	peace_state.erase("rx1_bridged")
+	peace_state["peace_settlements"] = []
 	_Rx1Rhine.reset_to_1936()
 
 

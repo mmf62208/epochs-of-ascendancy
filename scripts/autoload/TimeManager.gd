@@ -67,6 +67,11 @@ var time_scale: float = 1.0   # Interactive: multipliers on hours/wall-sec (1×,
 
 ## Monotonic day counter since scenario start (incremented in advance_days).
 var total_days_elapsed: int = 0
+## 0 keeps the global RNG alone (seed-md5 harness). A non-zero value reseeds
+## each sim day from (run_seed, day) so a short day cannot shift the next day's draws.
+var run_seed: int = 0
+var _reseed_usec_total: int = 0
+var _reseed_calls: int = 0
 
 # Internal accumulator for real-time driven simulation (in game days)
 var _accumulated_game_days: float = 0.0
@@ -1032,6 +1037,7 @@ func advance_days(days: float) -> void:
 				crossed_year = true
 
 		total_days_elapsed += 1
+		_reseed_sim_day(total_days_elapsed)
 
 		if light:
 			# Calendar already on the new day — split sim across frames so a 6h-cap
@@ -1041,12 +1047,14 @@ func advance_days(days: float) -> void:
 				"year": current_year,
 				"month": current_month,
 				"day": current_day,
+				"elapsed": total_days_elapsed,
 			})
 			_pending_sim_events.append({
 				"kind": "day_ai",
 				"year": current_year,
 				"month": current_month,
 				"day": current_day,
+				"elapsed": total_days_elapsed,
 			})
 			# Live smoke past-+6: defer combat load so sync/chunk ticks cannot
 			# open AI land battles under the Play F5 softpipe map.
@@ -1056,6 +1064,7 @@ func advance_days(days: float) -> void:
 					"year": current_year,
 					"month": current_month,
 					"day": current_day,
+					"elapsed": total_days_elapsed,
 				})
 			# Product FIX3 (2bc8f19): stay-alive `_drop_smoke_deferred_load`
 			# clears this day_emit queue, so game_day_advanced never reached
@@ -1246,15 +1255,30 @@ func advance_living_playtest_days(days: int = 5) -> Dictionary:
 
 func _drain_living_f5_flush(days: int) -> int:
 	# Maginot -s has no idle frames we wait on. Drain the same one-event queue F5 uses.
+	# Finish queued sim supply before AI and battles, and once more at the end.
+	# Presentation slices stay on _process. This drain does not yield frames,
+	# so a 20 ms wall slice would otherwise leave the day's supply unfinished.
 	_draining_f5_flush = true
 	var flushed := 0
 	var cap := maxi(8, int(days) * 6 + 16)
 	while flushed < cap and not _pending_sim_events.is_empty():
+		var nxt: Dictionary = _pending_sim_events[0]
+		var nk := str(nxt.get("kind", ""))
+		if nk == "day_ai" or nk == "day_battles":
+			_finish_pending_sim_supply()
 		_flush_sim_events()
 		flushed += 1
+	_finish_pending_sim_supply()
 	_draining_f5_flush = false
 	_sim_flush_scheduled = false
 	return flushed
+
+
+func _finish_pending_sim_supply() -> void:
+	if typeof(SupplyManager) == TYPE_NIL:
+		return
+	if SupplyManager.has_method("finish_pending_sim_supply"):
+		SupplyManager.finish_pending_sim_supply()
 
 
 func _tick_live_construction_on_calendar_day(year: int, month: int, day: int) -> void:
@@ -1294,6 +1318,7 @@ func _flush_sim_events() -> void:
 	var kind := str(ev.get("kind", ""))
 	var n_res := 0
 	if kind == "day" or kind == "day_emit":
+		_reseed_sim_day(int(ev.get("elapsed", total_days_elapsed)))
 		_begin_day_tick_profile()
 		_emit_game_day_advanced_profiled(int(ev.get("year", 0)), int(ev.get("month", 0)), int(ev.get("day", 0)))
 		if kind == "day":
@@ -1314,11 +1339,13 @@ func _flush_sim_events() -> void:
 			_note_day_tick_phase("day_battles", float(Time.get_ticks_usec() - t_legacy) / 1000.0)
 			_finish_day_tick_profile()
 	elif kind == "day_ai":
+		_reseed_sim_day(int(ev.get("elapsed", total_days_elapsed)))
 		# F5 interactive day_ai frame. Keep these helper names in _flush_sim_events
 		# (product greps). Timed once via _profile_day_ai_steps — do not call twice.
 		_profile_day_ai_steps() # _maybe_run_interactive_multi_ai
 		# _maybe_run_ai_infra_invest / _maybe_run_ai_land_battle_starts (inside profile)
 	elif kind == "day_battles":
+		_reseed_sim_day(int(ev.get("elapsed", total_days_elapsed)))
 		var t_bat := Time.get_ticks_usec()
 		if not smoke_advance_should_defer_combat():
 			_campaign_before_battles()
@@ -1824,14 +1851,41 @@ func _get_days_in_month(month: int, year: int) -> int:
 ## === Save/Load support (SaveLoadManager contract) ===
 ## Returns a compact snapshot of mutable runtime calendar state.
 func get_save_data() -> Dictionary:
+	# Hour lives in current_hour. A date.hour copy would restore it even when
+	# current_hour was dropped, so the round-trip could not see the loss.
+	var date := get_current_date()
+	date.erase("hour")
+	date.erase("date_string")
 	return {
-		"current_date": get_current_date(),
+		"current_date": date,
 		"scenario_start_date": scenario_start_date,
 		"paused": paused,
 		"time_scale": time_scale,
 		"total_days_elapsed": total_days_elapsed,
 		"current_hour": current_hour,
+		"run_seed": run_seed,
+		"accumulated_days": _accumulated_game_days,
+		"accumulated_hours": _accumulated_game_hours,
 	}
+
+
+func sim_is_quiescent() -> bool:
+	return _pending_sim_events.is_empty() and not _draining_f5_flush
+
+
+func reseed_cost_ms() -> float:
+	if _reseed_calls <= 0:
+		return 0.0
+	return (float(_reseed_usec_total) / float(_reseed_calls)) / 1000.0
+
+
+func _reseed_sim_day(day_index: int) -> void:
+	if run_seed == 0:
+		return
+	var t0 := Time.get_ticks_usec()
+	seed(int(hash([run_seed, int(day_index)])))
+	_reseed_usec_total += int(Time.get_ticks_usec() - t0)
+	_reseed_calls += 1
 
 ## Applies previously saved calendar state. Does NOT emit day/month/year signals
 ## (we are restoring, not simulating forward).
@@ -1853,3 +1907,9 @@ func apply_save_data(data: Dictionary) -> void:
 		set_time_scale(float(data.get("time_scale", 1.0)))
 	if data.has("total_days_elapsed"):
 		total_days_elapsed = maxi(0, int(data.get("total_days_elapsed", 0)))
+	if data.has("run_seed"):
+		run_seed = int(data.get("run_seed", 0))
+	if data.has("accumulated_days"):
+		_accumulated_game_days = float(data.get("accumulated_days", 0.0))
+	if data.has("accumulated_hours"):
+		_accumulated_game_hours = float(data.get("accumulated_hours", 0.0))

@@ -51,7 +51,7 @@ class ProvincialProject:
 
 	func get_id() -> String:
 		if id.is_empty():
-			id = "proj_%s_%d_%s_%d" % [owner_tag, province_id, axis, Time.get_unix_time_from_system()]
+			id = "proj_%s_%d_%s_d%d" % [owner_tag, province_id, axis, start_day]
 		return id
 
 	func get_current_work_per_day() -> float:
@@ -76,7 +76,7 @@ class ProvincialProject:
 
 	func to_save_dict() -> Dictionary:
 		return {
-			"id": id,
+			"id": get_id(),
 			"province_id": province_id,
 			"pid": province_id,
 			"axis": axis,
