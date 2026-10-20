@@ -14315,6 +14315,50 @@
     "905888": {
       "terrain": "plains",
       "domain": "land"
+    },
+    "905889": {
+      "terrain": "plains",
+      "domain": "land"
+    },
+    "905890": {
+      "terrain": "plains",
+      "domain": "land"
+    },
+    "905891": {
+      "terrain": "forest",
+      "domain": "land"
+    },
+    "905892": {
+      "terrain": "plains",
+      "domain": "land"
+    },
+    "905893": {
+      "terrain": "plains",
+      "domain": "land"
+    },
+    "905894": {
+      "terrain": "plains",
+      "domain": "land"
+    },
+    "905895": {
+      "terrain": "plains",
+      "domain": "land"
+    },
+    "905896": {
+      "terrain": "plains",
+      "domain": "land"
+    },
+    "905897": {
+      "terrain": "forest",
+      "domain": "land"
+    },
+    "905898": {
+      "terrain": "forest",
+      "domain": "land"
+    },
+    "905899": {
+      "terrain": "forest",
+      "domain": "land"
     }
   }
 }

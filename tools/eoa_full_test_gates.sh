@@ -214,6 +214,9 @@ run_step gap_ibs \
 run_step gap_china \
   "$PYTHON" -m unittest tools.map_generation.tests.test_gap_china -v || fail
 
+run_step gap_ussr_west \
+  "$PYTHON" -m unittest tools.map_generation.tests.test_gap_ussr_west -v || fail
+
 if [[ "$QUICK" -eq 1 ]]; then
   if [[ "$FAILED" -eq 0 ]]; then
     log "ALL PASSED (quick pure-only)"

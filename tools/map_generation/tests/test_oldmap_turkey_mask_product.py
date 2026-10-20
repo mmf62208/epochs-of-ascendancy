@@ -27,16 +27,23 @@ class TestOldmapTurkeyMaskProduct(unittest.TestCase):
         self.assertEqual(mask.get("space"), "canvas")
         self.assertTrue(mask.get("subtracted_province_rings"))
         self.assertGreater(len(mask.get("land") or []), 0)
-        self.assertGreater(len(mask.get("sea") or []), 0)
+        # The three Black Sea zones now tile the window's water, so the
+        # cosmetic sea list is empty. Belarus gaps keep the land list.
         provinces = load_province_rings()
         report = witness_report(mask, provinces)
-        self.assertTrue(report["kiev_in_land"], report)
-        self.assertIsNone(report["kiev_in_province"], report)
-        self.assertTrue(report["crimea_in_land"], report)
-        self.assertTrue(report["black_sea_in_sea"], report)
+        # GAP-USSR-WEST filled Kiev, Crimea, and the Black Sea witness.
+        # Belarus holes keep the land mask nonempty.
+        self.assertFalse(report["kiev_in_land"], report)
+        self.assertEqual(report["kiev_in_province"], 905889, report)
+        self.assertFalse(report["crimea_in_land"], report)
+        self.assertEqual(report["crimea_in_province"], 905896, report)
+        self.assertFalse(report["black_sea_in_sea"], report)
         self.assertFalse(report["black_sea_in_land"], report)
+        self.assertIn(report["black_sea_in_province"], (950006, 950123, 950124), report)
         self.assertEqual(report["owned_centroid_hits"], 0, report)
         self.assertEqual(report["overlap_samples"], 0, report)
+        self.assertGreater(report["land_rings"], 0, report)
+        self.assertEqual(report["sea_rings"], 0, report)
 
     def test_unsubtracted_window_fails_overlap_guard(self) -> None:
         """Mutant geometry: the bbox itself, province rings not removed."""

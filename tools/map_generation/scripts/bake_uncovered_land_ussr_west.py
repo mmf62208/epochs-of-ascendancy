@@ -206,14 +206,22 @@ def main() -> None:
     report = witness_report(doc)
     print(json.dumps(report, indent=2))
     if not args.no_subtract:
-        if not report["kiev_in_land"] or report["kiev_in_province"]:
+        # After GAP-USSR-WEST the witnesses are provinces, not mask holes.
+        if report["kiev_in_land"] or report["kiev_in_province"] != 905889:
             raise SystemExit("Kiev witness failed: %s" % report)
-        if not report["crimea_in_land"]:
+        if report["crimea_in_land"] or report["crimea_in_province"] != 905896:
             raise SystemExit("Crimea witness failed: %s" % report)
-        if not report["black_sea_in_sea"] or report["black_sea_in_land"]:
+        if report["black_sea_in_sea"] or report["black_sea_in_land"]:
+            raise SystemExit("Black Sea witness failed: %s" % report)
+        if report["black_sea_in_province"] not in (950006, 950123, 950124):
             raise SystemExit("Black Sea witness failed: %s" % report)
         if report["owned_centroid_hits"] or report["overlap_samples"] > 0:
             raise SystemExit("mask covers province rings: %s" % report)
+        # Land stays (Belarus is out of scope). Sea is empty: the three zones tile it.
+        if not report["land_rings"]:
+            raise SystemExit("land mask empty: %s" % report)
+        if report["sea_rings"]:
+            raise SystemExit("sea mask should be tiled away: %s" % report)
 
 
 if __name__ == "__main__":
