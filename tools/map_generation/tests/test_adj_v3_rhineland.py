@@ -25,10 +25,10 @@ ORIGINAL = SCRIPT.read_text(encoding="utf-8")
 
 # Edges outside the pilot, minus the 16 bogus links. Repair 950244-950245 is
 # excluded by the audit. Re-pinned on GAP-HAWAII (8186), GAP-IBS (8192),
-# GAP-CHINA (8297), then GAP-USSR-WEST (8357). The +60 pairs all touch the
-# Ukraine/Crimea split (905889-905899, 903492, 903493, 903532, 903534,
-# 950006, 950123, 950124). Pairs outside that set are unchanged.
-_LOCKED_HASH = "3349a41e520e9686013e5efc2bc213a93c0937d00902e0255e848f053fe5e798"
+# GAP-CHINA (8297), GAP-USSR-WEST (8357), then GAP-BELARUS (8379). The +22
+# net pairs all touch 905807-905826, 903534, or 905897. Pairs outside that
+# set are unchanged.
+_LOCKED_HASH = "198a496c1f1a491233955281a0a964c8fdcbde67c7ab46b023349bf092eda3be"
 _REPAIR = (950244, 950245)
 _HAWAII = 800094
 _GUAM = 902485

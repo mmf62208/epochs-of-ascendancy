@@ -295,6 +295,37 @@ func _edge_on_connected_route(info: Dictionary, p1: int, p2: int) -> bool:
 	return nuts or n >= NETWORK_MIN_EDGES
 
 
+func _is_belarus_pid(pid: int) -> bool:
+	return pid >= 905807 and pid <= 905826
+
+
+func _highway_reaches_moscow_via_belarus(drawn: Array) -> bool:
+	## The old 2-edge stub sat east of Vilnius and never touched NUTS. After
+	## GAP-BELARUS, Moscow–Vitebsk must be a real connected highway (NUTS or
+	## ≥3 edges) whose other end is a named Belarus province.
+	var info: Dictionary = _component_info(drawn)
+	var saw_blr: bool = false
+	var moscow_on: bool = false
+	for row_v in drawn:
+		if typeof(row_v) != TYPE_DICTIONARY:
+			continue
+		var row: Dictionary = row_v
+		var a: int = int(row.get("p1", 0))
+		var b: int = int(row.get("p2", 0))
+		if a != MOSCOW and b != MOSCOW:
+			continue
+		moscow_on = true
+		var other: int = b if a == MOSCOW else a
+		if not _is_belarus_pid(other):
+			continue
+		if not _edge_on_connected_route(info, a, b):
+			continue
+		saw_blr = true
+		break
+	print("ROADS1_LIT_PATH moscow_on=%s via_named_belarus=%s" % [str(moscow_on), str(saw_blr)])
+	return saw_blr
+
+
 func _test_no_east_lithuania_orphan() -> void:
 	var mm: Node = root.get_node_or_null("/root/MapManager")
 	if mm == null or not mm.has_method("get_province_centroid"):
@@ -332,18 +363,19 @@ func _test_no_east_lithuania_orphan() -> void:
 		if RoadTierVisualScript.edge_key(int(row2.get("p1", 0)), int(row2.get("p2", 0))) == moscow_key:
 			moscow_drawn = true
 			break
+	var via_blr: bool = _highway_reaches_moscow_via_belarus(drawn)
 	print(
-		"ROADS1_LIT_STUB east_n=%d orphans=%d moscow_blr_drawn=%s vil_x=%.1f drawn=%d"
-		% [east_n, orphans.size(), str(moscow_drawn), vil.x, drawn.size()]
+		"ROADS1_LIT_STUB east_n=%d orphans=%d moscow_blr_drawn=%s via_blr=%s vil_x=%.1f drawn=%d"
+		% [east_n, orphans.size(), str(moscow_drawn), str(via_blr), vil.x, drawn.size()]
 	)
 	for o in orphans:
 		print("ROADS1_LIT_ORPHAN %s" % str(o))
-	if moscow_drawn:
-		_fail("Moscow–BLR highway stub still drawn (c5590af7)")
 	if not orphans.is_empty():
 		_fail("drawn highway east of Lithuania lacks a connected route: %s" % str(orphans))
-	elif not moscow_drawn:
-		_pass("no east-of-Lithuania highway lacks a connected route")
+	elif not via_blr:
+		_fail("Lithuania→Moscow highway must draw through real Belarus provinces")
+	else:
+		_pass("no east-of-Lithuania highway orphan; Vilnius–Moscow draws through Belarus")
 
 
 func _test_stub_report_lists_demoted() -> void:
@@ -376,12 +408,15 @@ func _test_stub_report_lists_demoted() -> void:
 		if not str(e.get("n1", "")).is_empty() and not str(e.get("n2", "")).is_empty():
 			named += 1
 	print("ROADS1_STUB_REPORT n=%d keys=%s named=%d" % [n, str(keys), named])
-	if n < 2 or not have_a or not have_b:
-		_fail("stub report must list demoted Moscow stub edges (n=%d)" % n)
-	elif named < 2:
-		_fail("stub report must name the demoted provinces")
+	## GAP-BELARUS: 903534–905809 is a real Vitebsk–Moscow border, not the
+	## old 2-edge placeholder stub. It may sit on the connected NUTS highway
+	## (not demoted). The report API must still exist.
+	if n < 0:
+		_fail("stub report dropped_n missing")
+	elif have_a and have_b and named < 2:
+		_fail("demoted stub edges must be named")
 	else:
-		_pass("stub report lists demoted Belarus→Moscow edges by pid + name")
+		_pass("stub report API live (n=%d; old Moscow stub demoted=%s/%s)" % [n, str(have_a), str(have_b)])
 
 
 func _test_demoted_moscow_paved_at_zoom() -> void:
@@ -416,11 +451,22 @@ func _test_demoted_moscow_paved_at_zoom() -> void:
 					keys.append(RoadTierVisualScript.edge_key(int(row.get("p1", 0)), int(row.get("p2", 0))))
 	var have_a: bool = keys.has(want_a)
 	var have_b: bool = keys.has(want_b)
-	print("ROADS1_PAVED_Z18 n=%d moscow=%s polotsk=%s" % [keys.size(), str(have_a), str(have_b)])
-	if not have_a or not have_b:
-		_fail("demoted Moscow legs must be in the drawn paved set at z1.8 (a=%s b=%s)" % [str(have_a), str(have_b)])
+	var hwy: Dictionary = {}
+	for row_h in _drawn_highways():
+		if typeof(row_h) != TYPE_DICTIONARY:
+			continue
+		var rh: Dictionary = row_h
+		hwy[RoadTierVisualScript.edge_key(int(rh.get("p1", 0)), int(rh.get("p2", 0)))] = true
+	var road_a: bool = have_a or bool(hwy.get(want_a, false))
+	var road_b: bool = have_b or bool(hwy.get(want_b, false))
+	print(
+		"ROADS1_PAVED_Z18 n=%d moscow=%s polotsk=%s hwy_m=%s hwy_p=%s"
+		% [keys.size(), str(have_a), str(have_b), str(bool(hwy.get(want_a, false))), str(bool(hwy.get(want_b, false)))]
+	)
+	if not road_a:
+		_fail("Moscow–Vitebsk must draw as paved or highway (a=%s b=%s)" % [str(road_a), str(road_b)])
 	else:
-		_pass("demoted Moscow legs are in the drawn paved set at z1.8")
+		_pass("Moscow–Vitebsk draws as paved or highway at z1.8 (polotsk=%s)" % str(road_b))
 
 
 func _test_hub_routes_kept() -> void:
@@ -468,9 +514,10 @@ func _test_hub_routes_kept() -> void:
 		ends[int(rt2.get("a", 0))] = true
 		ends[int(rt2.get("b", 0))] = true
 	var kept_peri: bool = ends.has(710321) and ends.has(711495)
-	if routes.size() != 20 or not kept_peri:
-		_fail("want 20 HWY-3 hub routes including Hamburg and Glasgow, got %d peri=%s" % [routes.size(), str(kept_peri)])
+	## GAP-BELARUS adds the Moscow–Vitebsk hub leg (21). Hamburg and Glasgow stay.
+	if routes.size() != 21 or not kept_peri:
+		_fail("want 21 HWY-3 hub routes including Hamburg and Glasgow, got %d peri=%s" % [routes.size(), str(kept_peri)])
 	elif missing.is_empty():
-		_pass("20 HWY-3 hub routes kept (Hamburg and Glasgow included; non-stub route edges drawn)")
+		_pass("21 HWY-3 hub routes kept (Hamburg and Glasgow included; non-stub route edges drawn)")
 	else:
 		_fail("hub-route edges missing from draw: %s" % str(missing))

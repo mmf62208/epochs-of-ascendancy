@@ -42125,7 +42125,8 @@
         "adm0_a3": "RUS",
         "admin": "RUS",
         "level": "ADM1",
-        "area": 231.3
+        "area": 231.3,
+        "gap_belarus": "re-ringed"
       }
     },
     {
@@ -62423,322 +62424,334 @@
     },
     {
       "id": 905807,
-      "name": "Polotsk area",
+      "name": "Polotsk",
       "terrain": "forest",
       "domain": "land",
-      "core_for_tags": [],
+      "core_for_tags": [
+        "SOV"
+      ],
       "natural_resources": {},
-      "population_base": 0,
+      "population_base": 55000,
       "meta": {
-        "source": "geoboundaries",
-        "adm0_a3": "BLR",
-        "admin": "BLR",
-        "level": "ADM2",
-        "area": 311.9
+        "source": "ne_10m_land",
+        "gap_belarus": "Polotsk",
+        "adm0_a3": "BLR"
       }
     },
     {
       "id": 905808,
-      "name": "Pinsk area",
+      "name": "Pinsk",
       "terrain": "plains",
       "domain": "land",
-      "core_for_tags": [],
+      "core_for_tags": [
+        "POL"
+      ],
       "natural_resources": {},
-      "population_base": 0,
+      "population_base": 55000,
       "meta": {
-        "source": "geoboundaries",
-        "adm0_a3": "BLR",
-        "admin": "BLR",
-        "level": "ADM2",
-        "area": 291.7
+        "source": "ne_10m_land",
+        "gap_belarus": "Pinsk",
+        "adm0_a3": "BLR"
       }
     },
     {
       "id": 905809,
-      "name": "Haradok area",
+      "name": "Vitebsk",
       "terrain": "forest",
       "domain": "land",
-      "core_for_tags": [],
-      "natural_resources": {},
-      "population_base": 0,
+      "core_for_tags": [
+        "SOV"
+      ],
+      "natural_resources": {
+        "coal": 1,
+        "steel": 1
+      },
+      "population_base": 90000,
       "meta": {
-        "source": "geoboundaries",
-        "adm0_a3": "BLR",
-        "admin": "BLR",
-        "level": "ADM2",
-        "area": 290.3
+        "source": "ne_10m_land",
+        "gap_belarus": "Vitebsk",
+        "adm0_a3": "BLR"
       }
     },
     {
       "id": 905810,
-      "name": "Lyelchytsy area",
+      "name": "Mozyr",
       "terrain": "plains",
       "domain": "land",
-      "core_for_tags": [],
+      "core_for_tags": [
+        "SOV"
+      ],
       "natural_resources": {},
-      "population_base": 0,
+      "population_base": 40000,
       "meta": {
-        "source": "geoboundaries",
-        "adm0_a3": "BLR",
-        "admin": "BLR",
-        "level": "ADM2",
-        "area": 286.3
+        "source": "ne_10m_land",
+        "gap_belarus": "Mozyr",
+        "adm0_a3": "BLR"
       }
     },
     {
       "id": 905811,
-      "name": "Stolin area",
+      "name": "Stolin",
       "terrain": "plains",
       "domain": "land",
-      "core_for_tags": [],
+      "core_for_tags": [
+        "POL"
+      ],
       "natural_resources": {},
-      "population_base": 0,
+      "population_base": 40000,
       "meta": {
-        "source": "geoboundaries",
-        "adm0_a3": "BLR",
-        "admin": "BLR",
-        "level": "ADM2",
-        "area": 280.3
+        "source": "ne_10m_land",
+        "gap_belarus": "Stolin",
+        "adm0_a3": "BLR"
       }
     },
     {
       "id": 905812,
-      "name": "Barysaw area",
+      "name": "Borisov",
       "terrain": "plains",
       "domain": "land",
-      "core_for_tags": [],
+      "core_for_tags": [
+        "SOV"
+      ],
       "natural_resources": {},
-      "population_base": 0,
+      "population_base": 55000,
       "meta": {
-        "source": "geoboundaries",
-        "adm0_a3": "BLR",
-        "admin": "BLR",
-        "level": "ADM2",
-        "area": 270.8
+        "source": "ne_10m_land",
+        "gap_belarus": "Borisov",
+        "adm0_a3": "BLR"
       }
     },
     {
       "id": 905813,
-      "name": "Pruzhany area",
+      "name": "Brest",
       "terrain": "plains",
       "domain": "land",
-      "core_for_tags": [],
+      "core_for_tags": [
+        "POL"
+      ],
       "natural_resources": {},
-      "population_base": 0,
+      "population_base": 90000,
       "meta": {
-        "source": "geoboundaries",
-        "adm0_a3": "BLR",
-        "admin": "BLR",
-        "level": "ADM2",
-        "area": 255.8
+        "source": "ne_10m_land",
+        "gap_belarus": "Brest",
+        "adm0_a3": "BLR"
       }
     },
     {
       "id": 905814,
-      "name": "Grodno area",
+      "name": "Grodno",
       "terrain": "plains",
       "domain": "land",
-      "core_for_tags": [],
+      "core_for_tags": [
+        "POL"
+      ],
       "natural_resources": {},
-      "population_base": 0,
+      "population_base": 90000,
       "meta": {
-        "source": "geoboundaries",
-        "adm0_a3": "BLR",
-        "admin": "BLR",
-        "level": "ADM2",
-        "area": 253.0
+        "source": "ne_10m_land",
+        "gap_belarus": "Grodno",
+        "adm0_a3": "BLR"
       }
     },
     {
       "id": 905815,
-      "name": "Rechytsa area",
+      "name": "Gomel",
       "terrain": "plains",
       "domain": "land",
-      "core_for_tags": [],
-      "natural_resources": {},
-      "population_base": 0,
+      "core_for_tags": [
+        "SOV"
+      ],
+      "natural_resources": {
+        "coal": 1,
+        "steel": 1
+      },
+      "population_base": 90000,
       "meta": {
-        "source": "geoboundaries",
-        "adm0_a3": "BLR",
-        "admin": "BLR",
-        "level": "ADM2",
-        "area": 238.1
+        "source": "ne_10m_land",
+        "gap_belarus": "Gomel",
+        "adm0_a3": "BLR"
       }
     },
     {
       "id": 905816,
-      "name": "Vileyka area",
+      "name": "Vileyka",
       "terrain": "plains",
       "domain": "land",
-      "core_for_tags": [],
+      "core_for_tags": [
+        "POL"
+      ],
       "natural_resources": {},
-      "population_base": 0,
+      "population_base": 40000,
       "meta": {
-        "source": "geoboundaries",
-        "adm0_a3": "BLR",
-        "admin": "BLR",
-        "level": "ADM2",
-        "area": 222.8
+        "source": "ne_10m_land",
+        "gap_belarus": "Vileyka",
+        "adm0_a3": "BLR"
       }
     },
     {
       "id": 905817,
-      "name": "Braslaw area",
+      "name": "Braslaw",
       "terrain": "forest",
       "domain": "land",
-      "core_for_tags": [],
+      "core_for_tags": [
+        "POL"
+      ],
       "natural_resources": {},
-      "population_base": 0,
+      "population_base": 40000,
       "meta": {
-        "source": "geoboundaries",
-        "adm0_a3": "BLR",
-        "admin": "BLR",
-        "level": "ADM2",
-        "area": 216.4
+        "source": "ne_10m_land",
+        "gap_belarus": "Braslaw",
+        "adm0_a3": "BLR"
       }
     },
     {
       "id": 905818,
-      "name": "Puchavičy area",
+      "name": "Minsk",
       "terrain": "plains",
       "domain": "land",
-      "core_for_tags": [],
-      "natural_resources": {},
-      "population_base": 0,
+      "core_for_tags": [
+        "SOV"
+      ],
+      "natural_resources": {
+        "coal": 1,
+        "steel": 1
+      },
+      "population_base": 180000,
       "meta": {
-        "source": "geoboundaries",
-        "adm0_a3": "BLR",
-        "admin": "BLR",
-        "level": "ADM2",
-        "area": 215.3
+        "source": "ne_10m_land",
+        "gap_belarus": "Minsk",
+        "adm0_a3": "BLR"
       }
     },
     {
       "id": 905819,
-      "name": "Bykhaw area",
+      "name": "Bobruisk",
       "terrain": "plains",
       "domain": "land",
-      "core_for_tags": [],
+      "core_for_tags": [
+        "SOV"
+      ],
       "natural_resources": {},
-      "population_base": 0,
+      "population_base": 55000,
       "meta": {
-        "source": "geoboundaries",
-        "adm0_a3": "BLR",
-        "admin": "BLR",
-        "level": "ADM2",
-        "area": 207.0
+        "source": "ne_10m_land",
+        "gap_belarus": "Bobruisk",
+        "adm0_a3": "BLR"
       }
     },
     {
       "id": 905820,
-      "name": "Mogilev area",
+      "name": "Mogilev",
       "terrain": "plains",
       "domain": "land",
-      "core_for_tags": [],
-      "natural_resources": {},
-      "population_base": 0,
+      "core_for_tags": [
+        "SOV"
+      ],
+      "natural_resources": {
+        "coal": 1,
+        "steel": 1
+      },
+      "population_base": 90000,
       "meta": {
-        "source": "geoboundaries",
-        "adm0_a3": "BLR",
-        "admin": "BLR",
-        "level": "ADM2",
-        "area": 182.4
+        "source": "ne_10m_land",
+        "gap_belarus": "Mogilev",
+        "adm0_a3": "BLR"
       }
     },
     {
       "id": 905821,
-      "name": "Valozhyn area",
+      "name": "Molodechno",
       "terrain": "plains",
       "domain": "land",
-      "core_for_tags": [],
+      "core_for_tags": [
+        "POL"
+      ],
       "natural_resources": {},
-      "population_base": 0,
+      "population_base": 40000,
       "meta": {
-        "source": "geoboundaries",
-        "adm0_a3": "BLR",
-        "admin": "BLR",
-        "level": "ADM2",
-        "area": 180.9
+        "source": "ne_10m_land",
+        "gap_belarus": "Molodechno",
+        "adm0_a3": "BLR"
       }
     },
     {
       "id": 905822,
-      "name": "Asipovichy area",
+      "name": "Slutsk",
       "terrain": "plains",
       "domain": "land",
-      "core_for_tags": [],
+      "core_for_tags": [
+        "SOV"
+      ],
       "natural_resources": {},
-      "population_base": 0,
+      "population_base": 40000,
       "meta": {
-        "source": "geoboundaries",
-        "adm0_a3": "BLR",
-        "admin": "BLR",
-        "level": "ADM2",
-        "area": 175.9
+        "source": "ne_10m_land",
+        "gap_belarus": "Slutsk",
+        "adm0_a3": "BLR"
       }
     },
     {
       "id": 905823,
-      "name": "Baranovichy area",
+      "name": "Baranovichi",
       "terrain": "plains",
       "domain": "land",
-      "core_for_tags": [],
+      "core_for_tags": [
+        "POL"
+      ],
       "natural_resources": {},
-      "population_base": 0,
+      "population_base": 55000,
       "meta": {
-        "source": "geoboundaries",
-        "adm0_a3": "BLR",
-        "admin": "BLR",
-        "level": "ADM2",
-        "area": 173.3
+        "source": "ne_10m_land",
+        "gap_belarus": "Baranovichi",
+        "adm0_a3": "BLR"
       }
     },
     {
       "id": 905824,
-      "name": "Klimavichy area",
+      "name": "Klimovichi",
       "terrain": "plains",
       "domain": "land",
-      "core_for_tags": [],
+      "core_for_tags": [
+        "SOV"
+      ],
       "natural_resources": {},
-      "population_base": 0,
+      "population_base": 40000,
       "meta": {
-        "source": "geoboundaries",
-        "adm0_a3": "BLR",
-        "admin": "BLR",
-        "level": "ADM2",
-        "area": 145.0
+        "source": "ne_10m_land",
+        "gap_belarus": "Klimovichi",
+        "adm0_a3": "BLR"
       }
     },
     {
       "id": 905825,
-      "name": "Voranava",
+      "name": "Lida",
       "terrain": "plains",
       "domain": "land",
-      "core_for_tags": [],
+      "core_for_tags": [
+        "POL"
+      ],
       "natural_resources": {},
-      "population_base": 0,
+      "population_base": 40000,
       "meta": {
-        "source": "geoboundaries",
-        "adm0_a3": "BLR",
-        "admin": "BLR",
-        "level": "ADM2",
-        "area": 130.3
+        "source": "ne_10m_land",
+        "gap_belarus": "Lida",
+        "adm0_a3": "BLR"
       }
     },
     {
       "id": 905826,
-      "name": "Mstsislaw",
+      "name": "Orsha",
       "terrain": "plains",
       "domain": "land",
-      "core_for_tags": [],
+      "core_for_tags": [
+        "SOV"
+      ],
       "natural_resources": {},
-      "population_base": 0,
+      "population_base": 55000,
       "meta": {
-        "source": "geoboundaries",
-        "adm0_a3": "BLR",
-        "admin": "BLR",
-        "level": "ADM2",
-        "area": 127.4
+        "source": "ne_10m_land",
+        "gap_belarus": "Orsha",
+        "adm0_a3": "BLR"
       }
     },
     {
@@ -69249,7 +69262,8 @@
       "meta": {
         "source": "ne_10m_land",
         "gap_ussr_west": "Smolensk",
-        "adm0_a3": "SUN"
+        "adm0_a3": "SUN",
+        "gap_belarus": "re-ringed"
       }
     },
     {
