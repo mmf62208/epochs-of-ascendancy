@@ -575,8 +575,9 @@ def build_caribbean_island_sizing_product(board_dir: str = "") -> Dict[str, Any]
         passes.append("seas_343_unchanged")
 
     n_board = len(base)
-    if n_board < 3510 or n_board > 3579:
-        fails.append(f"board_scale_left_3520_band n={n_board}")
+    # Floor only. Later GAP slices append provinces, so do not pin an upper bound.
+    if n_board < 3510:
+        fails.append(f"board_scale_below_floor n={n_board}")
     else:
         passes.append(f"board_n={n_board}")
 

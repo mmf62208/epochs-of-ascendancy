@@ -8595,6 +8595,50 @@
     "905888": {
       "city_name": "Haikou",
       "tier": 2
+    },
+    "905889": {
+      "city_name": "Kiev",
+      "tier": 2
+    },
+    "905890": {
+      "city_name": "Vinnytsia",
+      "tier": 2
+    },
+    "905891": {
+      "city_name": "Chernihiv",
+      "tier": 2
+    },
+    "905892": {
+      "city_name": "Kharkiv",
+      "tier": 2
+    },
+    "905893": {
+      "city_name": "Dnipropetrovsk",
+      "tier": 2
+    },
+    "905894": {
+      "city_name": "Odessa",
+      "tier": 2
+    },
+    "905895": {
+      "city_name": "Donetsk",
+      "tier": 2
+    },
+    "905896": {
+      "city_name": "Simferopol",
+      "tier": 2
+    },
+    "905897": {
+      "city_name": "Smolensk",
+      "tier": 2
+    },
+    "905898": {
+      "city_name": "Kursk",
+      "tier": 2
+    },
+    "905899": {
+      "city_name": "Tula",
+      "tier": 2
     }
   },
   "meta": {

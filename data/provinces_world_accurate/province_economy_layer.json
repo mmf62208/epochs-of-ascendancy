@@ -12960,14 +12960,14 @@
       "development_level": 2
     },
     "903492": {
-      "population": 4783021,
-      "factories": 27,
+      "population": 4597677,
+      "factories": 26,
       "infrastructure": 3,
       "development_level": 2
     },
     "903493": {
-      "population": 4401621,
-      "factories": 22,
+      "population": 2405587,
+      "factories": 12,
       "infrastructure": 3,
       "development_level": 2
     },
@@ -12996,8 +12996,8 @@
       "development_level": 2
     },
     "903532": {
-      "population": 800000,
-      "factories": 5,
+      "population": 2796034,
+      "factories": 15,
       "infrastructure": 5,
       "development_level": 3,
       "industrial_hub": true
@@ -21500,6 +21500,72 @@
       "population": 38285,
       "factories": 1,
       "infrastructure": 3,
+      "development_level": 2
+    },
+    "905889": {
+      "population": 60000,
+      "factories": 1,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "905890": {
+      "population": 40000,
+      "factories": 1,
+      "infrastructure": 2,
+      "development_level": 2
+    },
+    "905891": {
+      "population": 45000,
+      "factories": 1,
+      "infrastructure": 2,
+      "development_level": 2
+    },
+    "905892": {
+      "population": 50000,
+      "factories": 1,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "905893": {
+      "population": 55000,
+      "factories": 1,
+      "infrastructure": 2,
+      "development_level": 2
+    },
+    "905894": {
+      "population": 60000,
+      "factories": 1,
+      "infrastructure": 2,
+      "development_level": 2
+    },
+    "905895": {
+      "population": 122109,
+      "factories": 1,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "905896": {
+      "population": 45000,
+      "factories": 1,
+      "infrastructure": 2,
+      "development_level": 2
+    },
+    "905897": {
+      "population": 50000,
+      "factories": 1,
+      "infrastructure": 2,
+      "development_level": 2
+    },
+    "905898": {
+      "population": 45617,
+      "factories": 1,
+      "infrastructure": 2,
+      "development_level": 2
+    },
+    "905899": {
+      "population": 60000,
+      "factories": 1,
+      "infrastructure": 2,
       "development_level": 2
     }
   },

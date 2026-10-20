@@ -41885,8 +41885,12 @@
       "terrain": "plains",
       "domain": "land",
       "core_for_tags": [],
-      "natural_resources": {},
-      "population_base": 0,
+      "natural_resources": {
+        "coal": 26,
+        "steel": 52,
+        "oil": 26
+      },
+      "population_base": 4597677,
       "meta": {
         "source": "geoboundaries",
         "adm0_a3": "RUS",
@@ -41915,7 +41919,8 @@
           ],
           "source": "merge_row_sparse_to_playable"
         },
-        "merged_playable": true
+        "merged_playable": true,
+        "gap_ussr_west": "shrunk"
       }
     },
     {
@@ -41924,8 +41929,12 @@
       "terrain": "forest",
       "domain": "land",
       "core_for_tags": [],
-      "natural_resources": {},
-      "population_base": 0,
+      "natural_resources": {
+        "coal": 12,
+        "steel": 24,
+        "oil": 12
+      },
+      "population_base": 2405587,
       "meta": {
         "source": "geoboundaries",
         "adm0_a3": "RUS",
@@ -41954,7 +41963,8 @@
           ],
           "source": "merge_row_sparse_to_playable"
         },
-        "merged_playable": true
+        "merged_playable": true,
+        "gap_ussr_west": "shrunk"
       }
     },
     {
@@ -69092,6 +69102,188 @@
         "gap_china": "Hainan",
         "adm0_a3": "CHN",
         "source": "ne_10m_land"
+      }
+    },
+    {
+      "id": 905889,
+      "name": "Kiev",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [
+        "SOV"
+      ],
+      "natural_resources": {},
+      "population_base": 60000,
+      "meta": {
+        "source": "ne_10m_land",
+        "gap_ussr_west": "Kiev",
+        "adm0_a3": "SUN"
+      }
+    },
+    {
+      "id": 905890,
+      "name": "Vinnytsia",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [
+        "SOV"
+      ],
+      "natural_resources": {},
+      "population_base": 40000,
+      "meta": {
+        "source": "ne_10m_land",
+        "gap_ussr_west": "Vinnytsia",
+        "adm0_a3": "SUN"
+      }
+    },
+    {
+      "id": 905891,
+      "name": "Chernihiv",
+      "terrain": "forest",
+      "domain": "land",
+      "core_for_tags": [
+        "SOV"
+      ],
+      "natural_resources": {},
+      "population_base": 45000,
+      "meta": {
+        "source": "ne_10m_land",
+        "gap_ussr_west": "Chernihiv",
+        "adm0_a3": "SUN"
+      }
+    },
+    {
+      "id": 905892,
+      "name": "Kharkiv",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [
+        "SOV"
+      ],
+      "natural_resources": {},
+      "population_base": 50000,
+      "meta": {
+        "source": "ne_10m_land",
+        "gap_ussr_west": "Kharkiv",
+        "adm0_a3": "SUN"
+      }
+    },
+    {
+      "id": 905893,
+      "name": "Dnipropetrovsk",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [
+        "SOV"
+      ],
+      "natural_resources": {},
+      "population_base": 55000,
+      "meta": {
+        "source": "ne_10m_land",
+        "gap_ussr_west": "Dnipropetrovsk",
+        "adm0_a3": "SUN"
+      }
+    },
+    {
+      "id": 905894,
+      "name": "Odessa",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [
+        "SOV"
+      ],
+      "natural_resources": {},
+      "population_base": 60000,
+      "meta": {
+        "source": "ne_10m_land",
+        "gap_ussr_west": "Odessa",
+        "adm0_a3": "SUN"
+      }
+    },
+    {
+      "id": 905895,
+      "name": "Donetsk",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [
+        "SOV"
+      ],
+      "natural_resources": {
+        "coal": 1,
+        "steel": 1,
+        "oil": 1
+      },
+      "population_base": 122109,
+      "meta": {
+        "source": "ne_10m_land",
+        "gap_ussr_west": "Donetsk",
+        "adm0_a3": "SUN"
+      }
+    },
+    {
+      "id": 905896,
+      "name": "Crimean ASSR",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [
+        "SOV"
+      ],
+      "natural_resources": {},
+      "population_base": 45000,
+      "meta": {
+        "source": "ne_10m_land",
+        "gap_ussr_west": "Crimean ASSR",
+        "adm0_a3": "SUN"
+      }
+    },
+    {
+      "id": 905897,
+      "name": "Smolensk",
+      "terrain": "forest",
+      "domain": "land",
+      "core_for_tags": [
+        "SOV"
+      ],
+      "natural_resources": {},
+      "population_base": 50000,
+      "meta": {
+        "source": "ne_10m_land",
+        "gap_ussr_west": "Smolensk",
+        "adm0_a3": "SUN"
+      }
+    },
+    {
+      "id": 905898,
+      "name": "Kursk",
+      "terrain": "forest",
+      "domain": "land",
+      "core_for_tags": [
+        "SOV"
+      ],
+      "natural_resources": {
+        "steel": 1
+      },
+      "population_base": 45617,
+      "meta": {
+        "source": "ne_10m_land",
+        "gap_ussr_west": "Kursk",
+        "adm0_a3": "SUN"
+      }
+    },
+    {
+      "id": 905899,
+      "name": "Tula",
+      "terrain": "forest",
+      "domain": "land",
+      "core_for_tags": [
+        "SOV"
+      ],
+      "natural_resources": {},
+      "population_base": 60000,
+      "meta": {
+        "source": "ne_10m_land",
+        "gap_ussr_west": "Tula",
+        "adm0_a3": "SUN"
       }
     }
   ]

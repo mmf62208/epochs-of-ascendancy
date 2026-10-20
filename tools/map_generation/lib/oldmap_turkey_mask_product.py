@@ -146,11 +146,19 @@ def witness_report(mask: dict, provinces: Sequence[dict] | None = None) -> dict:
     kx, ky = lonlat_to_canvas(*KIEV_LONLAT)
     cx, cy = lonlat_to_canvas(*CRIMEA_LONLAT)
     sx, sy = lonlat_to_canvas(*BLACK_SEA_LONLAT)
-    kiev_prov = None
-    for p in provinces:
-        if point_in_bbox(kx, ky, p["bbox"]) and point_in_ring(kx, ky, p["points"]):
-            kiev_prov = p["id"]
-            break
+    def _at(x: float, y: float, sea: bool | None = None):
+        for p in provinces:
+            if sea is True and not p["sea"]:
+                continue
+            if sea is False and p["sea"]:
+                continue
+            if point_in_bbox(x, y, p["bbox"]) and point_in_ring(x, y, p["points"]):
+                return p["id"]
+        return None
+
+    kiev_prov = _at(kx, ky, sea=False)
+    crimea_prov = _at(cx, cy, sea=False)
+    black_sea_prov = _at(sx, sy, sea=True)
     owned_centroids_in_mask = []
     for p in provinces:
         if p["sea"]:
@@ -171,8 +179,10 @@ def witness_report(mask: dict, provinces: Sequence[dict] | None = None) -> dict:
         "kiev_in_land": _covered(kx, ky, land),
         "kiev_in_province": kiev_prov,
         "crimea_in_land": _covered(cx, cy, land),
+        "crimea_in_province": crimea_prov,
         "black_sea_in_sea": _covered(sx, sy, sea),
         "black_sea_in_land": _covered(sx, sy, land),
+        "black_sea_in_province": black_sea_prov,
         "owned_centroids_in_mask": owned_centroids_in_mask[:12],
         "owned_centroid_hits": len(owned_centroids_in_mask),
         "overlap_samples": len(overlaps),
