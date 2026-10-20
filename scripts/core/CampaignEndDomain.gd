@@ -45,6 +45,10 @@ static func set_keep_playing() -> void:
 		return
 	end["keep_playing"] = true
 	_store(end)
+	# The end screen frees the peace sheet before this runs, so the sheet
+	# click path never applies the last pending settlement.
+	if typeof(CapitulationDomain) != TYPE_NIL:
+		CapitulationDomain.apply_pending_on_keep_playing()
 	if typeof(TimeManager) != TYPE_NIL:
 		TimeManager.paused = false
 
@@ -330,12 +334,21 @@ static func _stats(player: String) -> Dictionary:
 	var beaten: Array = []
 	if typeof(CapitulationDomain) != TYPE_NIL:
 		beaten = _side_tags(player)
+	var majors := 0
+	var minors := 0
+	for raw_tag in beaten:
+		if CapitulationDomain.is_scenario_major(str(raw_tag)):
+			majors += 1
+		else:
+			minors += 1
 	return {
 		"days": int(TimeManager.total_days_elapsed) if typeof(TimeManager) != TYPE_NIL else 0,
 		"provinces_start": start_n,
 		"provinces_end": end_n,
 		"wars_fought": wars,
 		"capitulated_by_side": beaten.size(),
+		"capitulated_majors": majors,
+		"capitulated_minors": minors,
 		"capitulated_tags": beaten,
 		"factory_share": factory_share(player),
 	}

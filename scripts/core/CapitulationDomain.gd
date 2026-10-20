@@ -495,6 +495,18 @@ static func arm_pending_sheet(leader: String, loser: String, outcome: String) ->
 	_cap_store(st)
 
 
+static func apply_pending_on_keep_playing() -> Dictionary:
+	var pending: Dictionary = _cap().get("pending_sheet", {})
+	if pending.is_empty():
+		return {"ok": false, "reason": "no sheet"}
+	var loser := str(pending.get("loser", "")).strip_edges()
+	var leader := str(pending.get("leader", "")).strip_edges()
+	var outcome := str(pending.get("outcome", "")).strip_edges()
+	if outcome.is_empty():
+		outcome = default_outcome(loser)
+	return apply_outcome(loser, leader, outcome)
+
+
 static func apply_player_choice(outcome: String) -> Dictionary:
 	var pending: Dictionary = _cap().get("pending_sheet", {})
 	print(

@@ -297,7 +297,7 @@ static func rank_from_snapshot(facts: Dictionary = {}) -> Dictionary:
 		var send_pid := int(send_dip.get("pid", -1))
 		var send_label := "Send an agent"
 		if not send_other.is_empty() and send_pid > 0:
-			send_label = "Send an agent to %s" % send_other
+			send_label = "Send an agent to %s" % _tag_label(send_other)
 		return {
 			"ok": true,
 			"action": "send_agent",
@@ -318,7 +318,7 @@ static func rank_from_snapshot(facts: Dictionary = {}) -> Dictionary:
 		if crs > 0.001 and offers <= 0:
 			var trade_line := str(dip.get("sentence", "")).strip_edges()
 			if trade_line.is_empty() or trade_line.to_lower().begins_with("influence"):
-				trade_line = "Trade with %s" % other
+				trade_line = "Trade with %s" % _tag_label(other)
 			return {
 				"ok": true,
 				"action": "trade",
@@ -331,7 +331,7 @@ static func rank_from_snapshot(facts: Dictionary = {}) -> Dictionary:
 			}
 		var sentence := str(dip.get("sentence", "")).strip_edges()
 		if sentence.is_empty():
-			sentence = "Influence %s" % other
+			sentence = "Influence %s" % _tag_label(other)
 		return {
 			"ok": true,
 			"action": "influence",
@@ -769,13 +769,18 @@ static func _gather_facts(player_tag: String) -> Dictionary:
 			if not pt.is_empty():
 				player = pt
 		if tag == player:
-			facts["war_declared"] = not WarStateDomain.enemies_of(tag).is_empty()
-			facts["war_justified"] = WarStateDomain.player_justify_is_ready()
 			var suggested: Dictionary = WarStateDomain.suggest_player_target()
+			var stag := str(suggested.get("tag", "")).strip_edges()
 			var spid := int(suggested.get("pid", -1))
 			if spid > 0:
 				facts["war_goal_pid"] = spid
-				facts["war_goal_tag"] = str(suggested.get("tag", ""))
+				facts["war_goal_tag"] = stag
+			if not stag.is_empty():
+				facts["war_justified"] = WarStateDomain.player_justify_is_ready_for(stag)
+				facts["war_declared"] = WarStateDomain.is_at_war(player, stag)
+			else:
+				facts["war_declared"] = not WarStateDomain.enemies_of(tag).is_empty()
+				facts["war_justified"] = false
 			if typeof(CampaignEndDomain) != TYPE_NIL and CampaignEndDomain.latched():
 				facts["campaign_over"] = true
 	facts["vacant_chief"] = _vacant_chief(tag)
@@ -892,7 +897,7 @@ static func living_diplomacy_from_province(province_id: int, player_tag: String 
 	var place := str(p.get("name")).strip_edges()
 	if place.is_empty():
 		place = other
-	var sentence := "Influence %s · %s · CRS %.0f · trade %d" % [other, band_label, crs, offers]
+	var sentence := "Influence %s · %s · CRS %.0f · trade %d" % [_tag_label(other), band_label, crs, offers]
 	if remember:
 		last_diplomacy_pid = pid
 	return {
@@ -930,7 +935,7 @@ static func apply_living_diplomacy(province_id: int, player_tag: String = "") ->
 	facts["crs_after"] = crs_after
 	facts["applied"] = true
 	facts["sentence"] = "Influence %s · %s · CRS %.0f" % [
-		other, str(facts.get("band_label", "Neutral")), crs_after
+		_tag_label(other), str(facts.get("band_label", "Neutral")), crs_after
 	]
 	return facts
 
@@ -989,7 +994,7 @@ static func send_agent_to_province(province_id: int, player_tag: String = "") ->
 	facts["network"] = net_ok
 	facts["applied"] = planted
 	if planted:
-		facts["sentence"] = "Agent in %s · #%d" % [other, pid]
+		facts["sentence"] = "Agent in %s · #%d" % [_tag_label(other), pid]
 	else:
 		facts["sentence"] = "Send agent failed"
 	return facts
@@ -1015,8 +1020,15 @@ static func apply_living_trade(province_id: int, player_tag: String = "") -> Dic
 	if offer_id.is_empty():
 		facts["sentence"] = "Trade offer failed"
 	else:
-		facts["sentence"] = "Trade with %s · offer %s" % [other, offer_id]
+		facts["sentence"] = "Trade with %s · offer %s" % [_tag_label(other), offer_id]
 	return facts
+
+
+static func _tag_label(tag: String) -> String:
+	var t := tag.strip_edges()
+	if t.is_empty() or typeof(WarStateDomain) == TYPE_NIL:
+		return t
+	return WarStateDomain.tag_name(t)
 
 
 static func _diplomacy_row(tag: String) -> Dictionary:

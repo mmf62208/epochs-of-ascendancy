@@ -93,9 +93,12 @@ static func _open_campaign_peace_sheet(winner_tag: String, loser_tag: String, ca
 	var w := winner_tag.strip_edges().to_upper()
 	var l := loser_tag.strip_edges().to_upper()
 	var outcome := str(campaign.get("outcome_default", "annex_all"))
+	var lname := l
+	if typeof(WarStateDomain) != TYPE_NIL:
+		lname = WarStateDomain.tag_name(l)
 	var sheet := {
 		"ok": true,
-		"title": "Peace with %s" % l,
+		"title": "Peace with %s" % lname,
 		"winner": w,
 		"loser": l,
 		"campaign": true,
@@ -127,20 +130,14 @@ static func _open_campaign_peace_sheet(winner_tag: String, loser_tag: String, ca
 	panel.size = Vector2(480, 220)
 	panel.custom_minimum_size = Vector2(480, 220)
 	panel.mouse_filter = Control.MOUSE_FILTER_STOP
-	var panel_style := StyleBoxFlat.new()
-	panel_style.bg_color = Color(0.07, 0.08, 0.12, 1.0)
-	panel_style.border_color = Color(0.95, 0.86, 0.55, 1.0)
-	panel_style.set_border_width_all(2)
-	panel_style.set_corner_radius_all(6)
-	panel.add_theme_stylebox_override("panel", panel_style)
+	RetrowaveTheme.style_info_panel_flat(panel)
 	layer.add_child(panel)
 	var title := Label.new()
 	title.name = "Title"
 	title.position = Vector2(16, 12)
 	title.size = Vector2(448, 32)
-	title.text = "Peace with %s" % l
-	title.add_theme_font_size_override("font_size", 22)
-	title.add_theme_color_override("font_color", Color(0.95, 0.86, 0.55))
+	title.text = "Peace with %s" % lname
+	RetrowaveTheme.style_title(title)
 	panel.add_child(title)
 	var annex := _make_campaign_peace_button("BtnAnnexAll", "Annex all", Vector2(16, 70), true)
 	annex.button_down.connect(func():
