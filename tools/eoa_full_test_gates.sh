@@ -196,6 +196,12 @@ run_step air_physics_p1 \
 run_step bavaria1_terrain \
   "$PYTHON" -m unittest tools.map_generation.tests.test_bavaria1_terrain_keywords -v || fail
 
+run_step stale_board_counts \
+  "$PYTHON" -m unittest \
+    tools.map_generation.tests.test_world_class_map_review_docs \
+    tools.map_generation.tests.test_seas_coarsen_feed10_tyrrhenian_product \
+    -v || fail
+
 run_step adjv3_rhineland \
   "$PYTHON" -m unittest tools.map_generation.tests.test_adj_v3_rhineland -v || fail
 

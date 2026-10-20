@@ -6,7 +6,7 @@ extends SceneTree
 ##   tools/run_godot.sh --headless --path . --resolution 1280x740 \
 ##     -s res://scripts/core/HeadlessPerf5LegendDayTickTest.gd
 
-const LAND_N := 3196
+const _BoardCounts := preload("res://scripts/core/WorldAccurateBoardCounts.gd")
 const POLY_SIDES := 8
 const CONTESTED_N := 48
 const DAY_TICKS := 20
@@ -16,6 +16,7 @@ const LISTENER_WORST_MS := 100.0
 const HOME_Z := 0.318
 const FLUSH_FRAMES := 3
 
+var land_n: int = 0
 var _failures: int = 0
 var _mr: Node = null
 var _cam: Camera2D = null
@@ -26,6 +27,7 @@ var _hint_theme_changed: int = 0
 
 
 func _init() -> void:
+	land_n = int(_BoardCounts.land_count())
 	call_deferred("_start")
 
 
@@ -143,7 +145,7 @@ func _setup_renderer() -> bool:
 		return false
 	var depot_scr: Script = load("res://scripts/supply/ProvinceDepotState.gd") as Script
 	var i := 0
-	while i < LAND_N:
+	while i < land_n:
 		var pid := 710000 + i
 		var host := Node2D.new()
 		host.name = "Prov_%d" % pid
@@ -167,8 +169,8 @@ func _setup_renderer() -> bool:
 		if depot_scr != null and "depot_states" in sm:
 			sm.depot_states[pid] = depot_scr.new(pid, 100.0)
 		i += 1
-	if int(_mr.province_nodes.size()) < LAND_N:
-		_fail("province_nodes seeded %d want %d" % [int(_mr.province_nodes.size()), LAND_N])
+	if int(_mr.province_nodes.size()) < land_n:
+		_fail("province_nodes seeded %d want %d" % [int(_mr.province_nodes.size()), land_n])
 		return false
 	_seed_boot_supply_layer()
 	if "overlay_visible" in sm:
@@ -178,7 +180,7 @@ func _setup_renderer() -> bool:
 		_mr.call("_connect_map_manager_signals")
 	if _mr.has_method("_connect_time_manager_signals"):
 		_mr.call("_connect_time_manager_signals")
-	_info("seeded land=%d contested=%d" % [LAND_N, CONTESTED_N])
+	_info("seeded land=%d contested=%d" % [land_n, CONTESTED_N])
 	return true
 
 

@@ -6,7 +6,7 @@ extends SceneTree
 ##   tools/run_godot.sh --headless --path . --resolution 1280x740 \
 ##     -s res://scripts/core/HeadlessRender1SupplyRingMeshTest.gd
 
-const LAND_N := 3196
+const _BoardCounts := preload("res://scripts/core/WorldAccurateBoardCounts.gd")
 const POLY_SIDES := 48
 const HOME_Z := 0.318
 const CLOSE_Z := 0.90
@@ -27,6 +27,7 @@ const ROLES: Array[String] = [
 	"depot_sabotage", "supply_pressure", "trade_transit", "hub",
 ]
 
+var land_n: int = 0
 var _failures: int = 0
 var _mr: Node = null
 var _cam: Camera2D = null
@@ -37,6 +38,7 @@ var _sink_idx: int = 0
 
 
 func _init() -> void:
+	land_n = int(_BoardCounts.land_count())
 	call_deferred("_start")
 
 
@@ -231,7 +233,7 @@ func _run() -> void:
 	DisplayServer.window_set_size(Vector2i(1280, 740))
 	if root != null:
 		root.size = Vector2i(1280, 740)
-	var items := _make_items(LAND_N)
+	var items := _make_items(land_n)
 	if items.size() < 3000:
 		_fail("seeded items=%d want >=3000" % items.size())
 		return
@@ -724,7 +726,7 @@ func _setup_renderer() -> bool:
 	var mm: Node = root.get_node_or_null("MapManager")
 	var depot_scr: Script = load("res://scripts/supply/ProvinceDepotState.gd") as Script
 	var i := 0
-	while i < LAND_N:
+	while i < land_n:
 		var pid := 710000 + i
 		var host := Node2D.new()
 		host.name = "Prov_%d" % pid
