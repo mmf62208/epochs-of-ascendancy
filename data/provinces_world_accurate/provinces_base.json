@@ -34590,7 +34590,7 @@
     },
     {
       "id": 902487,
-      "name": "CHN North",
+      "name": "Hebei North (Peiping-Tientsin)",
       "terrain": "plains",
       "domain": "land",
       "core_for_tags": [],
@@ -34617,12 +34617,13 @@
           ],
           "source": "merge_row_sparse_to_playable"
         },
-        "merged_playable": true
+        "merged_playable": true,
+        "gap_china": "Hebei North (Peiping-Tientsin)"
       }
     },
     {
       "id": 902491,
-      "name": "CHN East",
+      "name": "Hebei South (Baoding)",
       "terrain": "plains",
       "domain": "land",
       "core_for_tags": [],
@@ -34654,12 +34655,13 @@
           ],
           "source": "merge_row_sparse_to_playable"
         },
-        "merged_playable": true
+        "merged_playable": true,
+        "gap_china": "Hebei South (Baoding)"
       }
     },
     {
       "id": 902493,
-      "name": "CHN West",
+      "name": "Dzungaria (Ili/Tacheng)",
       "terrain": "plains",
       "domain": "land",
       "core_for_tags": [],
@@ -34686,12 +34688,13 @@
           ],
           "source": "merge_row_sparse_to_playable"
         },
-        "merged_playable": true
+        "merged_playable": true,
+        "gap_china": "Dzungaria (Ili/Tacheng)"
       }
     },
     {
       "id": 902496,
-      "name": "CHN North",
+      "name": "Suiyuan East (Guisui)",
       "terrain": "plains",
       "domain": "land",
       "core_for_tags": [],
@@ -34717,12 +34720,13 @@
           ],
           "source": "merge_row_sparse_to_playable"
         },
-        "merged_playable": true
+        "merged_playable": true,
+        "gap_china": "Suiyuan East (Guisui)"
       }
     },
     {
       "id": 902504,
-      "name": "CHN West",
+      "name": "Aksu-Kucha",
       "terrain": "plains",
       "domain": "land",
       "core_for_tags": [],
@@ -34749,12 +34753,13 @@
           ],
           "source": "merge_row_sparse_to_playable"
         },
-        "merged_playable": true
+        "merged_playable": true,
+        "gap_china": "Aksu-Kucha"
       }
     },
     {
       "id": 902505,
-      "name": "CHN East",
+      "name": "Shandong East (Qingdao)",
       "terrain": "plains",
       "domain": "land",
       "core_for_tags": [],
@@ -34785,12 +34790,13 @@
           ],
           "source": "merge_row_sparse_to_playable"
         },
-        "merged_playable": true
+        "merged_playable": true,
+        "gap_china": "Shandong East (Qingdao)"
       }
     },
     {
       "id": 902514,
-      "name": "CHN West",
+      "name": "Kumul (Hami)",
       "terrain": "plains",
       "domain": "land",
       "core_for_tags": [],
@@ -34817,12 +34823,13 @@
           ],
           "source": "merge_row_sparse_to_playable"
         },
-        "merged_playable": true
+        "merged_playable": true,
+        "gap_china": "Kumul (Hami)"
       }
     },
     {
       "id": 902521,
-      "name": "CHN East",
+      "name": "Chahar",
       "terrain": "plains",
       "domain": "land",
       "core_for_tags": [],
@@ -34853,12 +34860,13 @@
           ],
           "source": "merge_row_sparse_to_playable"
         },
-        "merged_playable": true
+        "merged_playable": true,
+        "gap_china": "Chahar"
       }
     },
     {
       "id": 902523,
-      "name": "CHN West",
+      "name": "Kashgaria",
       "terrain": "plains",
       "domain": "land",
       "core_for_tags": [],
@@ -34888,12 +34896,13 @@
           ],
           "source": "merge_row_sparse_to_playable"
         },
-        "merged_playable": true
+        "merged_playable": true,
+        "gap_china": "Kashgaria"
       }
     },
     {
       "id": 902526,
-      "name": "CHN West",
+      "name": "Gansu Hexi Corridor",
       "terrain": "plains",
       "domain": "land",
       "core_for_tags": [],
@@ -34925,12 +34934,13 @@
           ],
           "source": "merge_row_sparse_to_playable"
         },
-        "merged_playable": true
+        "merged_playable": true,
+        "gap_china": "Gansu Hexi Corridor"
       }
     },
     {
       "id": 902534,
-      "name": "CHN West",
+      "name": "Khotan-Lop",
       "terrain": "plains",
       "domain": "land",
       "core_for_tags": [],
@@ -34956,12 +34966,13 @@
           ],
           "source": "merge_row_sparse_to_playable"
         },
-        "merged_playable": true
+        "merged_playable": true,
+        "gap_china": "Khotan-Lop"
       }
     },
     {
       "id": 902544,
-      "name": "CHN North",
+      "name": "Suiyuan West (Hetao)",
       "terrain": "plains",
       "domain": "land",
       "core_for_tags": [],
@@ -34990,12 +35001,13 @@
           ],
           "source": "merge_row_sparse_to_playable"
         },
-        "merged_playable": true
+        "merged_playable": true,
+        "gap_china": "Suiyuan West (Hetao)"
       }
     },
     {
       "id": 902564,
-      "name": "CHN East",
+      "name": "Shandong West (Jinan)",
       "terrain": "plains",
       "domain": "land",
       "core_for_tags": [],
@@ -35025,12 +35037,13 @@
           ],
           "source": "merge_row_sparse_to_playable"
         },
-        "merged_playable": true
+        "merged_playable": true,
+        "gap_china": "Shandong West (Jinan)"
       }
     },
     {
       "id": 902566,
-      "name": "CHN South",
+      "name": "Gansu East (Lanzhou)",
       "terrain": "plains",
       "domain": "land",
       "core_for_tags": [],
@@ -35063,12 +35076,13 @@
           ],
           "source": "merge_row_sparse_to_playable"
         },
-        "merged_playable": true
+        "merged_playable": true,
+        "gap_china": "Gansu East (Lanzhou)"
       }
     },
     {
       "id": 902568,
-      "name": "CHN West",
+      "name": "Qinghai West (Tsaidam)",
       "terrain": "plains",
       "domain": "land",
       "core_for_tags": [],
@@ -35098,13 +35112,14 @@
           ],
           "source": "merge_row_sparse_to_playable"
         },
-        "merged_playable": true
+        "merged_playable": true,
+        "gap_china": "Qinghai West (Tsaidam)"
       }
     },
     {
       "id": 902569,
-      "name": "CHN West",
-      "terrain": "plains",
+      "name": "Ngari (W. Tibet)",
+      "terrain": "mountains",
       "domain": "land",
       "core_for_tags": [],
       "natural_resources": {},
@@ -35137,12 +35152,13 @@
           ],
           "source": "merge_row_sparse_to_playable"
         },
-        "merged_playable": true
+        "merged_playable": true,
+        "gap_china": "Ngari (W. Tibet)"
       }
     },
     {
       "id": 902590,
-      "name": "CHN East",
+      "name": "Anhui South (Anking)",
       "terrain": "plains",
       "domain": "land",
       "core_for_tags": [],
@@ -35173,12 +35189,13 @@
           ],
           "source": "merge_row_sparse_to_playable"
         },
-        "merged_playable": true
+        "merged_playable": true,
+        "gap_china": "Anhui South (Anking)"
       }
     },
     {
       "id": 902598,
-      "name": "CHN South",
+      "name": "Hunan North (Changsha)",
       "terrain": "plains",
       "domain": "land",
       "core_for_tags": [],
@@ -35211,12 +35228,13 @@
           ],
           "source": "merge_row_sparse_to_playable"
         },
-        "merged_playable": true
+        "merged_playable": true,
+        "gap_china": "Hunan North (Changsha)"
       }
     },
     {
       "id": 902601,
-      "name": "CHN South",
+      "name": "Xikang West (Chamdo)",
       "terrain": "plains",
       "domain": "land",
       "core_for_tags": [],
@@ -35249,12 +35267,13 @@
           ],
           "source": "merge_row_sparse_to_playable"
         },
-        "merged_playable": true
+        "merged_playable": true,
+        "gap_china": "Xikang West (Chamdo)"
       }
     },
     {
       "id": 902633,
-      "name": "CHN South",
+      "name": "Fujian South (Amoy)",
       "terrain": "plains",
       "domain": "land",
       "core_for_tags": [],
@@ -35283,12 +35302,13 @@
           ],
           "source": "merge_row_sparse_to_playable"
         },
-        "merged_playable": true
+        "merged_playable": true,
+        "gap_china": "Fujian South (Amoy)"
       }
     },
     {
       "id": 902634,
-      "name": "CHN South",
+      "name": "Yunnan East (Kunming)",
       "terrain": "plains",
       "domain": "land",
       "core_for_tags": [],
@@ -35317,12 +35337,13 @@
           ],
           "source": "merge_row_sparse_to_playable"
         },
-        "merged_playable": true
+        "merged_playable": true,
+        "gap_china": "Yunnan East (Kunming)"
       }
     },
     {
       "id": 902646,
-      "name": "CHN South",
+      "name": "Guangxi East (Wuzhou)",
       "terrain": "plains",
       "domain": "land",
       "core_for_tags": [],
@@ -35352,7 +35373,8 @@
           ],
           "source": "merge_row_sparse_to_playable"
         },
-        "merged_playable": true
+        "merged_playable": true,
+        "gap_china": "Guangxi East (Wuzhou)"
       }
     },
     {
@@ -68594,6 +68616,482 @@
           13.72,
           16.6
         ]
+      }
+    },
+    {
+      "id": 905855,
+      "name": "Urumqi-Turfan",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "gap_china": "Urumqi-Turfan",
+        "adm0_a3": "CHN",
+        "source": "ne_10m_land"
+      }
+    },
+    {
+      "id": 905856,
+      "name": "U-Tsang (Lhasa)",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "gap_china": "U-Tsang (Lhasa)",
+        "adm0_a3": "CHN",
+        "source": "ne_10m_land"
+      }
+    },
+    {
+      "id": 905857,
+      "name": "Changtang (N. Tibet)",
+      "terrain": "mountains",
+      "domain": "land",
+      "core_for_tags": [],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "gap_china": "Changtang (N. Tibet)",
+        "adm0_a3": "CHN",
+        "source": "ne_10m_land"
+      }
+    },
+    {
+      "id": 905858,
+      "name": "Xikang East (Kangding)",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "gap_china": "Xikang East (Kangding)",
+        "adm0_a3": "CHN",
+        "source": "ne_10m_land"
+      }
+    },
+    {
+      "id": 905859,
+      "name": "Qinghai East (Xining)",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "gap_china": "Qinghai East (Xining)",
+        "adm0_a3": "CHN",
+        "source": "ne_10m_land"
+      }
+    },
+    {
+      "id": 905860,
+      "name": "Ningxia",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "gap_china": "Ningxia",
+        "adm0_a3": "CHN",
+        "source": "ne_10m_land"
+      }
+    },
+    {
+      "id": 905861,
+      "name": "Shanxi North (Datong)",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "gap_china": "Shanxi North (Datong)",
+        "adm0_a3": "CHN",
+        "source": "ne_10m_land"
+      }
+    },
+    {
+      "id": 905862,
+      "name": "Shanxi South (Taiyuan)",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "gap_china": "Shanxi South (Taiyuan)",
+        "adm0_a3": "CHN",
+        "source": "ne_10m_land"
+      }
+    },
+    {
+      "id": 905863,
+      "name": "Shaanbei (Yanan)",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "gap_china": "Shaanbei (Yanan)",
+        "adm0_a3": "CHN",
+        "source": "ne_10m_land"
+      }
+    },
+    {
+      "id": 905864,
+      "name": "Guanzhong (Xian)",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "gap_china": "Guanzhong (Xian)",
+        "adm0_a3": "CHN",
+        "source": "ne_10m_land"
+      }
+    },
+    {
+      "id": 905865,
+      "name": "Shaannan (Hanzhong)",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "gap_china": "Shaannan (Hanzhong)",
+        "adm0_a3": "CHN",
+        "source": "ne_10m_land"
+      }
+    },
+    {
+      "id": 905866,
+      "name": "Henan North (Kaifeng)",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "gap_china": "Henan North (Kaifeng)",
+        "adm0_a3": "CHN",
+        "source": "ne_10m_land"
+      }
+    },
+    {
+      "id": 905867,
+      "name": "Henan South (Xinyang)",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "gap_china": "Henan South (Xinyang)",
+        "adm0_a3": "CHN",
+        "source": "ne_10m_land"
+      }
+    },
+    {
+      "id": 905868,
+      "name": "Jiangsu North (Xuzhou)",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "gap_china": "Jiangsu North (Xuzhou)",
+        "adm0_a3": "CHN",
+        "source": "ne_10m_land"
+      }
+    },
+    {
+      "id": 905869,
+      "name": "Jiangsu South (Shanghai-Nanking)",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "gap_china": "Jiangsu South (Shanghai-Nanking)",
+        "adm0_a3": "CHN",
+        "source": "ne_10m_land"
+      }
+    },
+    {
+      "id": 905870,
+      "name": "Anhui North (Bengbu)",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "gap_china": "Anhui North (Bengbu)",
+        "adm0_a3": "CHN",
+        "source": "ne_10m_land"
+      }
+    },
+    {
+      "id": 905871,
+      "name": "Zhejiang North (Hangzhou)",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "gap_china": "Zhejiang North (Hangzhou)",
+        "adm0_a3": "CHN",
+        "source": "ne_10m_land"
+      }
+    },
+    {
+      "id": 905872,
+      "name": "Zhejiang South (Wenzhou)",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "gap_china": "Zhejiang South (Wenzhou)",
+        "adm0_a3": "CHN",
+        "source": "ne_10m_land"
+      }
+    },
+    {
+      "id": 905873,
+      "name": "Fujian North (Foochow)",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "gap_china": "Fujian North (Foochow)",
+        "adm0_a3": "CHN",
+        "source": "ne_10m_land"
+      }
+    },
+    {
+      "id": 905874,
+      "name": "Jiangxi North (Nanchang)",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "gap_china": "Jiangxi North (Nanchang)",
+        "adm0_a3": "CHN",
+        "source": "ne_10m_land"
+      }
+    },
+    {
+      "id": 905875,
+      "name": "Jiangxi South (Ganzhou)",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "gap_china": "Jiangxi South (Ganzhou)",
+        "adm0_a3": "CHN",
+        "source": "ne_10m_land"
+      }
+    },
+    {
+      "id": 905876,
+      "name": "Hubei East (Wuhan)",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "gap_china": "Hubei East (Wuhan)",
+        "adm0_a3": "CHN",
+        "source": "ne_10m_land"
+      }
+    },
+    {
+      "id": 905877,
+      "name": "Hubei West (Yichang)",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "gap_china": "Hubei West (Yichang)",
+        "adm0_a3": "CHN",
+        "source": "ne_10m_land"
+      }
+    },
+    {
+      "id": 905878,
+      "name": "Hunan South (Hengyang)",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "gap_china": "Hunan South (Hengyang)",
+        "adm0_a3": "CHN",
+        "source": "ne_10m_land"
+      }
+    },
+    {
+      "id": 905879,
+      "name": "Sichuan West (Chengdu)",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "gap_china": "Sichuan West (Chengdu)",
+        "adm0_a3": "CHN",
+        "source": "ne_10m_land"
+      }
+    },
+    {
+      "id": 905880,
+      "name": "Sichuan North (Nanchong)",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "gap_china": "Sichuan North (Nanchong)",
+        "adm0_a3": "CHN",
+        "source": "ne_10m_land"
+      }
+    },
+    {
+      "id": 905881,
+      "name": "Sichuan East (Chungking)",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "gap_china": "Sichuan East (Chungking)",
+        "adm0_a3": "CHN",
+        "source": "ne_10m_land"
+      }
+    },
+    {
+      "id": 905882,
+      "name": "Guizhou",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "gap_china": "Guizhou",
+        "adm0_a3": "CHN",
+        "source": "ne_10m_land"
+      }
+    },
+    {
+      "id": 905883,
+      "name": "Yunnan West (Dali)",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "gap_china": "Yunnan West (Dali)",
+        "adm0_a3": "CHN",
+        "source": "ne_10m_land"
+      }
+    },
+    {
+      "id": 905884,
+      "name": "Guangxi West (Nanning)",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "gap_china": "Guangxi West (Nanning)",
+        "adm0_a3": "CHN",
+        "source": "ne_10m_land"
+      }
+    },
+    {
+      "id": 905885,
+      "name": "Guangdong Central (Canton)",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "gap_china": "Guangdong Central (Canton)",
+        "adm0_a3": "CHN",
+        "source": "ne_10m_land"
+      }
+    },
+    {
+      "id": 905886,
+      "name": "Guangdong East (Swatow)",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "gap_china": "Guangdong East (Swatow)",
+        "adm0_a3": "CHN",
+        "source": "ne_10m_land"
+      }
+    },
+    {
+      "id": 905887,
+      "name": "Guangdong West (Leizhou)",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "gap_china": "Guangdong West (Leizhou)",
+        "adm0_a3": "CHN",
+        "source": "ne_10m_land"
+      }
+    },
+    {
+      "id": 905888,
+      "name": "Hainan",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "gap_china": "Hainan",
+        "adm0_a3": "CHN",
+        "source": "ne_10m_land"
       }
     }
   ]

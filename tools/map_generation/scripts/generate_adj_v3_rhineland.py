@@ -334,7 +334,7 @@ def _gap2(
 # Coral Sea orphan 950244 than its pinned partner 950245. That orphan is not
 # degree-0 on the shipped graph. Skipping these ids keeps a v2 rebuild on
 # the same repair instead of retargeting it.
-_REPAIR_SKIP = {905852, 905853, 905854, 950341, 950342}
+_REPAIR_SKIP = set(range(905852, 905889)) | {950341, 950342}
 
 
 def choose_repair_target(
