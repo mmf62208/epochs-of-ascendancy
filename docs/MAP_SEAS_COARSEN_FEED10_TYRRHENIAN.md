@@ -57,7 +57,7 @@ Write: `tools/map_generation/scripts/apply_seas_coarsen_feed10_tyrrhenian.py`
 
 1. **Reshape** `950120` Tyrrhenian Sea onto a basin ring in the Tyrrhenian void (west of Italian peninsula, east of Corsica/Sardinia as measured, south of Cap Corse / Ligurian `950119`). ID / name / `domain=sea` stay.
 2. **Adjacency** (theater only): `950120` ↔ coastal land that actually touches the new ring (west-Italy / Corsica / Sardinia as measured, 8px). Stale leftover-cluster neighbors (`950003`, `950004`, `950121`) dropped from `950120` and from those seas' lists. No Ligurian / Alboran / strait / Adriatic / Channel **new** edges.
-3. **No land mesh writes.** No Ligurian / Alboran / Adriatic / Channel / Maginot / Flanders / SE England / Great Lakes mesh writes. No `world_full` writes. Sea block stays **340** IDs. Board stays **3536**.
+3. **No land mesh writes.** No Ligurian / Alboran / Adriatic / Channel / Maginot / Flanders / SE England / Great Lakes mesh writes. No `world_full` writes. FEED-10 itself added no IDs. The live sea block (every id ≥ 950000) and board length now come from `provinces_base.json`, not a frozen 340 / 341 / 3536 / 3540.
 
 ## Theater metrics (before → after)
 
@@ -72,7 +72,7 @@ Write: `tools/map_generation/scripts/apply_seas_coarsen_feed10_tyrrhenian.py`
 | Basin samples (12.0,40.5) etc. | VOID | inside `950120` |
 | Leftover (5.48, 37.00) | owned by `950120` | vacated |
 
-Board count stays **3536** (land ~3196 + sea block 340). Seas stay domain water.
+Board length is the live `provinces_base.json` row count (land domain + sea/strait/lake). Seas stay domain water. The old 3536 / 3196 / 340 pins were the board before the GAP slices.
 
 Measured coastal neighbors (8px, coast window): Corse-du-Sud `710801`, Haute-Corse `710802`, Napoli `710892`, Sassari `710917`, Nuoro `710918`, Sud Sardegna `710921`, Grosseto `710953`, Viterbo `710961`, Roma `710963`, Latina `710964`. Sicily / Ligurian / leftover Med seas are not neighbors.
 

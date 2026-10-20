@@ -7,7 +7,7 @@ extends SceneTree
 ##
 ##   tools/eoa_render1_draw_guard.sh
 
-const LAND_N := 3196
+const _BoardCounts := preload("res://scripts/core/WorldAccurateBoardCounts.gd")
 const POLY_SIDES := 48
 const HOME_Z := 0.318
 const MAX_COLD_MS := 250.0
@@ -21,6 +21,7 @@ const ROLES: Array[String] = [
 	"depot_sabotage", "supply_pressure", "trade_transit", "hub",
 ]
 
+var land_n: int = 0
 var _failures: int = 0
 var _mr: Node = null
 var _cam: Camera2D = null
@@ -28,6 +29,7 @@ var _container: Node2D = null
 
 
 func _init() -> void:
+	land_n = int(_BoardCounts.land_count())
 	call_deferred("_start")
 
 
@@ -73,7 +75,7 @@ func _run() -> void:
 	if root != null:
 		root.size = Vector2i(1280, 740)
 
-	var items := _make_items(LAND_N)
+	var items := _make_items(land_n)
 	await _check_counter_lie_source_edit(items)
 	await _check_product_draws(items)
 	await _check_present_drain(items)
@@ -365,7 +367,7 @@ func _setup_renderer() -> bool:
 	var mm: Node = root.get_node_or_null("MapManager")
 	var depot_scr: Script = load("res://scripts/supply/ProvinceDepotState.gd") as Script
 	var i := 0
-	while i < LAND_N:
+	while i < land_n:
 		var pid := 710000 + i
 		var host := Node2D.new()
 		host.name = "Prov_%d" % pid

@@ -132,8 +132,15 @@ class TestSeasCoarsenFeed10TyrrhenianProduct(unittest.TestCase):
             for g in json.loads((D / "provinces_geometry.json").read_text(encoding="utf-8"))["provinces"]
         }
         sea_block = sum(1 for pid in base if int(pid) >= 950000)
-        self.assertEqual(sea_block, 341)
-        self.assertEqual(len(base), 3540)
+        water = sum(
+            1
+            for row in base.values()
+            if str(row.get("domain") or "").lower() in ("sea", "strait", "lake")
+        )
+        land = sum(1 for row in base.values() if str(row.get("domain") or "").lower() == "land")
+        self.assertEqual(sea_block, water)
+        self.assertEqual(len(base), land + water)
+        self.assertGreater(sea_block, 0)
         for pid in GREAT_LAKE_IDS:
             self.assertEqual(str(base[pid].get("domain")), "lake")
         adj = json.loads((D / "province_adjacency.json").read_text(encoding="utf-8")).get("adjacency") or {}

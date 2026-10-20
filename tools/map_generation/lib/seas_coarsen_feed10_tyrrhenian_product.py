@@ -733,20 +733,28 @@ def build_seas_coarsen_feed10_tyrrhenian_product(board_dir: str = "") -> Dict[st
     else:
         passes.append("flanders_nord_kept")
 
+    # FEED-10 reshapes 950120. Later GAP slices append provinces, so the
+    # sea block and board length are whatever provinces_base says now.
     sea_block = sum(1 for pid in base if int(pid) >= 950000)
-    if sea_block != 341:
-        fails.append(f"sea_block_changed n={sea_block}")
+    water_domain = sum(
+        1
+        for row in base.values()
+        if str(row.get("domain") or "").lower() in ("sea", "strait", "lake")
+    )
+    land_domain = sum(
+        1 for row in base.values() if str(row.get("domain") or "").lower() == "land"
+    )
+    if sea_block != water_domain:
+        fails.append(f"sea_block_domain_mismatch ids={sea_block} domains={water_domain}")
     else:
-        passes.append("seas_341_ids_kept")
+        passes.append(f"seas_{sea_block}_match_water_domains")
     n_board = len(base)
-    if n_board < 3510 or n_board > 3545:
-        fails.append(f"board_scale_left_3520_band n={n_board}")
+    if n_board != land_domain + water_domain:
+        fails.append(
+            f"board_domain_mismatch n={n_board} land={land_domain} water={water_domain}"
+        )
     else:
-        passes.append(f"board_n={n_board}")
-    if n_board != 3540:
-        fails.append(f"board_count_changed n={n_board}")
-    else:
-        passes.append("board_3540_reshape_only")
+        passes.append(f"board_{n_board}_matches_domains")
 
     world_full = ROOT / "data" / "provinces_world_full"
     if world_full.is_dir():

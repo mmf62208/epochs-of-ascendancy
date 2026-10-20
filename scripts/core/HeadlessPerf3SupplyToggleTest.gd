@@ -11,7 +11,7 @@ extends SceneTree
 ##   tools/run_godot.sh --headless --path . --resolution 1280x740 \
 ##     -s res://scripts/core/HeadlessPerf3SupplyToggleTest.gd
 
-const LAND_N := 3196
+const _BoardCounts := preload("res://scripts/core/WorldAccurateBoardCounts.gd")
 const POLY_SIDES := 48
 const NAME_LABEL_N := 64
 const MAX_TOGGLE_MS := 1000.0
@@ -21,6 +21,7 @@ const FLUSH_FRAMES := 4
 const META_MAP_GLYPH_PX := &"_map_glyph_px"
 const META_MAP_GLYPH_CAPITAL := &"_map_glyph_capital"
 
+var land_n: int = 0
 var _failures: int = 0
 var _measured: int = 0
 var _first_role_compute_seen: bool = false
@@ -30,6 +31,7 @@ var _container: Node2D = null
 
 
 func _init() -> void:
+	land_n = int(_BoardCounts.land_count())
 	call_deferred("_start")
 
 
@@ -189,7 +191,7 @@ func _setup_renderer() -> bool:
 		return false
 	var depot_scr: Script = load("res://scripts/supply/ProvinceDepotState.gd") as Script
 	var i := 0
-	while i < LAND_N:
+	while i < land_n:
 		var pid := 710000 + i
 		var host := Node2D.new()
 		host.name = "Prov_%d" % pid
@@ -219,8 +221,8 @@ func _setup_renderer() -> bool:
 		if depot_scr != null and "depot_states" in sm:
 			sm.depot_states[pid] = depot_scr.new(pid, 100.0)
 		i += 1
-	if int(_mr.province_nodes.size()) < LAND_N:
-		_fail("province_nodes seeded %d want %d" % [int(_mr.province_nodes.size()), LAND_N])
+	if int(_mr.province_nodes.size()) < land_n:
+		_fail("province_nodes seeded %d want %d" % [int(_mr.province_nodes.size()), land_n])
 		return false
 	_seed_boot_supply_layer()
 	_seed_name_labels(ui)
@@ -231,7 +233,7 @@ func _setup_renderer() -> bool:
 	if "depot_states" in sm:
 		depot_n = int((sm.get("depot_states") as Dictionary).size())
 	_info("seeded land=%d poly_sides=%d depots=%d glyphs=%d names=%d layer=%s" % [
-		LAND_N, POLY_SIDES, depot_n, LAND_N, NAME_LABEL_N,
+		land_n, POLY_SIDES, depot_n, land_n, NAME_LABEL_N,
 		str(_mr.supply_map_layer != null),
 	])
 	return true

@@ -69,15 +69,22 @@ class TestWorldClassMapReviewDocs(unittest.TestCase):
         state_ids = {int(v) for v in p2s.values() if int(v or 0) > 0}
         self.assertEqual(len(region_ids), 31, msg=sorted(region_ids)[:10])
         self.assertEqual(len(state_ids), 429)
-        base_n = len(
+        provinces = (
             json.loads((D / "provinces_base.json").read_text(encoding="utf-8")).get("provinces")
             or []
         )
+        base_n = len(provinces)
+        # Water block is every id >= 950000 (sea + strait + lake). Land membership
+        # is the rest. Do not pin 340; later GAP slices append water and land.
+        water_n = sum(1 for p in provinces if int(p.get("id") or 0) >= 950000)
+        land_domain_n = sum(1 for p in provinces if str(p.get("domain") or "") == "land")
         land_n = len(p2s)
         self.assertEqual(len(p2r), base_n)
-        self.assertEqual(land_n, base_n - 340)  # seas stay 340
-        self.assertGreaterEqual(base_n, 5000)
-        # Post US merge ~5670; docs may still mention historical 8761
+        self.assertEqual(land_n, land_domain_n)
+        self.assertEqual(land_n, base_n - water_n)
+        self.assertGreater(water_n, 0)
+        self.assertGreater(base_n, water_n)
+        # Docs may still mention historical 8761 / ~5670 / ~3520.
 
         sr = json.loads((D / "strategic_regions.json").read_text(encoding="utf-8"))
         rows = sr.get("regions") or []

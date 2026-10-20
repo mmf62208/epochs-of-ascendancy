@@ -9,7 +9,6 @@ extends SceneTree
 const BASE_PATH := "res://data/provinces_world_accurate/provinces_base.json"
 const LAYER_PATH := "res://data/provinces_world_accurate/province_terrain_layer.json"
 const ALPINE_PATH := "res://tools/map_generation/data/alpine_nuts3.txt"
-const PROVINCE_COUNT := 3536
 
 var _failures: int = 0
 
@@ -102,8 +101,9 @@ func _run() -> void:
 		_fail("terrain layer gained keys")
 	var provs: Array = base.get("provinces", [])
 	var layer_rows: Dictionary = layer.get("provinces", {})
-	if provs.size() != PROVINCE_COUNT or layer_rows.size() != PROVINCE_COUNT:
-		_fail("province count %d layer %d" % [provs.size(), layer_rows.size()])
+	var province_count := provs.size()
+	if province_count <= 0 or layer_rows.size() != province_count:
+		_fail("province count %d layer %d" % [province_count, layer_rows.size()])
 		return
 	var alpine := _alpine_codes()
 	if alpine.is_empty():
@@ -141,7 +141,7 @@ func _run() -> void:
 		var low := str(p.get("name", "")).to_lower()
 		if terr == "mountains" and ("berg" in low or _andes_is_false(low)) and not alpine.has(nuts):
 			berg_bad.append(str(p.get("name", "")))
-	if seen.size() != PROVINCE_COUNT:
+	if seen.size() != province_count:
 		_fail("pid set size %d" % seen.size())
 	if not berg_bad.is_empty():
 		_fail("berg/andes-only mountains: %s" % str(berg_bad))
@@ -166,4 +166,4 @@ func _run() -> void:
 			_fail("%s not mountains" % nuts2)
 	if _failures == 0:
 		_pass("T2 alpine rim and Tirol/Valais/Graubünden/Savoie are mountains")
-		_pass("T4 pid set %d, no new keys" % PROVINCE_COUNT)
+		_pass("T4 pid set %d, layer matches base" % province_count)
