@@ -28,12 +28,12 @@ class TestOldmapTurkeyMaskProduct(unittest.TestCase):
         self.assertTrue(mask.get("subtracted_province_rings"))
         self.assertGreater(len(mask.get("land") or []), 0)
         # The three Black Sea zones now tile the window's water, so the
-        # cosmetic sea list is empty. Galicia / Bessarabia keep the land list.
+        # cosmetic sea list is empty. Leftover land holes (Caucasus rim /
+        # window slivers) keep the land list nonempty.
         provinces = load_province_rings()
         report = witness_report(mask, provinces)
         # GAP-USSR-WEST filled Kiev, Crimea, and the Black Sea witness.
-        # GAP-BELARUS filled Minsk and Vitebsk. Galicia / Bessarabia holes
-        # keep the land mask nonempty.
+        # GAP-BELARUS filled Minsk. GAP-WEST-UKR filled Lviv and Chisinau.
         self.assertFalse(report["kiev_in_land"], report)
         self.assertEqual(report["kiev_in_province"], 905889, report)
         self.assertFalse(report["crimea_in_land"], report)

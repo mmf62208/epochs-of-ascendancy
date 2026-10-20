@@ -21567,6 +21567,60 @@
       "factories": 1,
       "infrastructure": 2,
       "development_level": 2
+    },
+    "905900": {
+      "population": 160000,
+      "factories": 3,
+      "infrastructure": 4,
+      "development_level": 3
+    },
+    "905901": {
+      "population": 70000,
+      "factories": 1,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "905902": {
+      "population": 70000,
+      "factories": 1,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "905903": {
+      "population": 70000,
+      "factories": 1,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "905904": {
+      "population": 90000,
+      "factories": 2,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "905905": {
+      "population": 45000,
+      "factories": 1,
+      "infrastructure": 2,
+      "development_level": 2
+    },
+    "905906": {
+      "population": 45000,
+      "factories": 1,
+      "infrastructure": 2,
+      "development_level": 2
+    },
+    "905907": {
+      "population": 45000,
+      "factories": 1,
+      "infrastructure": 2,
+      "development_level": 2
+    },
+    "905908": {
+      "population": 70000,
+      "factories": 1,
+      "infrastructure": 3,
+      "development_level": 2
     }
   },
   "meta": {

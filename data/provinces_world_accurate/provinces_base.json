@@ -69299,6 +69299,154 @@
         "gap_ussr_west": "Tula",
         "adm0_a3": "SUN"
       }
+    },
+    {
+      "id": 905900,
+      "name": "Lviv",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [
+        "POL"
+      ],
+      "natural_resources": {
+        "coal": 1
+      },
+      "population_base": 160000,
+      "meta": {
+        "source": "ne_10m_land",
+        "gap_west_ukr": "Lviv",
+        "adm0_a3": "POL"
+      }
+    },
+    {
+      "id": 905901,
+      "name": "Lutsk",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [
+        "POL"
+      ],
+      "natural_resources": {},
+      "population_base": 70000,
+      "meta": {
+        "source": "ne_10m_land",
+        "gap_west_ukr": "Lutsk",
+        "adm0_a3": "POL"
+      }
+    },
+    {
+      "id": 905902,
+      "name": "Stanislawow",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [
+        "POL"
+      ],
+      "natural_resources": {},
+      "population_base": 70000,
+      "meta": {
+        "source": "ne_10m_land",
+        "gap_west_ukr": "Stanislawow",
+        "adm0_a3": "POL"
+      }
+    },
+    {
+      "id": 905903,
+      "name": "Tarnopol",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [
+        "POL"
+      ],
+      "natural_resources": {},
+      "population_base": 70000,
+      "meta": {
+        "source": "ne_10m_land",
+        "gap_west_ukr": "Tarnopol",
+        "adm0_a3": "POL"
+      }
+    },
+    {
+      "id": 905904,
+      "name": "Chisinau",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [
+        "ROM"
+      ],
+      "natural_resources": {},
+      "population_base": 90000,
+      "meta": {
+        "source": "ne_10m_land",
+        "gap_west_ukr": "Chisinau",
+        "adm0_a3": "ROM"
+      }
+    },
+    {
+      "id": 905905,
+      "name": "Rovno",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [
+        "POL"
+      ],
+      "natural_resources": {},
+      "population_base": 45000,
+      "meta": {
+        "source": "ne_10m_land",
+        "gap_west_ukr": "Rovno",
+        "adm0_a3": "POL"
+      }
+    },
+    {
+      "id": 905906,
+      "name": "Drohobych",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [
+        "POL"
+      ],
+      "natural_resources": {
+        "coal": 1
+      },
+      "population_base": 45000,
+      "meta": {
+        "source": "ne_10m_land",
+        "gap_west_ukr": "Drohobych",
+        "adm0_a3": "POL"
+      }
+    },
+    {
+      "id": 905907,
+      "name": "Kovel",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [
+        "POL"
+      ],
+      "natural_resources": {},
+      "population_base": 45000,
+      "meta": {
+        "source": "ne_10m_land",
+        "gap_west_ukr": "Kovel",
+        "adm0_a3": "POL"
+      }
+    },
+    {
+      "id": 905908,
+      "name": "Chernivtsi",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [
+        "ROM"
+      ],
+      "natural_resources": {},
+      "population_base": 70000,
+      "meta": {
+        "source": "ne_10m_land",
+        "gap_west_ukr": "Chernivtsi",
+        "adm0_a3": "ROM"
+      }
     }
   ]
 }
