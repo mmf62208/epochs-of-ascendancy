@@ -96,7 +96,6 @@ class TestGapBelarus(unittest.TestCase):
 
     def test_kept_ids_and_names(self) -> None:
         self.assertEqual(sorted(i for i in self.base if 905807 <= i <= 905826), BLR_IDS)
-        self.assertNotIn(905900, self.base)
         self.assertEqual(self.base[905818]["name"], "Minsk")
         self.assertEqual(self.base[905815]["name"], "Gomel")
         self.assertEqual(self.base[905809]["name"], "Vitebsk")

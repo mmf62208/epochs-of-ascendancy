@@ -337,7 +337,7 @@ def _gap2(
 # GAP-USSR-WEST land 905889-905899 and GAP-BELARUS 905807-905826 are in
 # Europe. Skipping them keeps a Pacific water-orphan repair from retargeting
 # onto the new oblasts.
-_REPAIR_SKIP = set(range(905807, 905900)) | {950341, 950342}
+_REPAIR_SKIP = set(range(905807, 905909)) | {950341, 950342}
 
 
 def choose_repair_target(

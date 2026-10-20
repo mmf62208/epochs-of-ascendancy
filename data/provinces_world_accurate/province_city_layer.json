@@ -8719,6 +8719,42 @@
     "905826": {
       "city_name": "Orsha",
       "tier": 2
+    },
+    "905900": {
+      "city_name": "Lviv",
+      "tier": 3
+    },
+    "905901": {
+      "city_name": "Lutsk",
+      "tier": 2
+    },
+    "905902": {
+      "city_name": "Stanislawow",
+      "tier": 2
+    },
+    "905903": {
+      "city_name": "Tarnopol",
+      "tier": 2
+    },
+    "905904": {
+      "city_name": "Chisinau",
+      "tier": 2
+    },
+    "905905": {
+      "city_name": "Rovno",
+      "tier": 2
+    },
+    "905906": {
+      "city_name": "Drohobych",
+      "tier": 2
+    },
+    "905907": {
+      "city_name": "Kovel",
+      "tier": 2
+    },
+    "905908": {
+      "city_name": "Chernivtsi",
+      "tier": 2
     }
   },
   "meta": {
