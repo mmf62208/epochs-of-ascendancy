@@ -4649,7 +4649,6 @@ func war_economy_day_for_province(province_id: int) -> Dictionary:
 
 ## Precomputed fronts cache (tag -> Array of target dicts). B must never re-scan board live.
 var _live_fronts_precompute: Dictionary = {}
-const _LIVE_FRONTS_BUDGET_MS: int = 12
 
 
 ## Call once after board+ownership ready (deferred from load). Makes B O(1).
@@ -4664,7 +4663,8 @@ func precompute_live_border_fronts(country_tag: String = "GER", max_count: int =
 
 
 ## Enemy land provinces on our borders — HOI multi-front assault targets.
-## Prefer precompute; live path hard-budgets to ~12ms and aborts early (B freeze fix).
+## Count-capped walk in province insertion order. A wall-clock deadline here
+## dropped borders under CPU load and changed which war or project started.
 func collect_live_border_assault_targets(country_tag: String = "", max_count: int = 8) -> Array:
 	var tag := country_tag.strip_edges().to_upper()
 	if tag.is_empty() and typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_player_country_tag"):
@@ -4736,17 +4736,15 @@ func _collect_live_border_assault_targets_impl(tag: String, cap: int, war_gate: 
 	for f in preferred:
 		preferred_set[f] = true
 
-	# Hard budget — never freeze main thread for fronts.
-	var deadline := Time.get_ticks_msec() + _LIVE_FRONTS_BUDGET_MS
 	var by_foe: Dictionary = {}
 	var seen: Dictionary = {}
 	var pref_hits := 0
 	var scanned := 0
 
 	# Prefer Europe NUTS owned land (Maginot/Polish theater).
+	# Stop on the preferred-foe count, never on wall time, so a loaded CPU
+	# returns the same border set as an idle one.
 	for pid in _provinces.keys():
-		if Time.get_ticks_msec() > deadline:
-			break
 		var own_p: Province = _provinces[pid]
 		if own_p == null or bool(own_p.is_sea):
 			continue
@@ -4823,8 +4821,8 @@ func _collect_live_border_assault_targets_impl(tag: String, cap: int, war_gate: 
 				out.append(row3)
 				if out.size() >= cap:
 					break
-	# Emergency seeds cover Maginot / Silesia / CHI–JAP when the budgeted scan
-	# fills the cap with one foe. The war filter below drops non-enemies.
+	# Emergency seeds cover Maginot / Silesia / CHI–JAP when the count cap
+	# fills with one foe. The war filter below drops non-enemies.
 	var seeds: Array = []
 	if tag == "GER":
 		seeds = _emergency_ger_front_seeds()

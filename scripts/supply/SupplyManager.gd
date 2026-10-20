@@ -80,6 +80,9 @@ const ROUTE_REFRESH_BUDGET_PER_FLUSH: int = DEFAULT_ROUTE_DEST_CAP
 ## Predictive per-frame plan slice. Stop before the next plan would cross 40 ms
 ## so refill frames stay under ~200 ms. First plan is always allowed.
 const ROUTE_REFRESH_MS_BUDGET: float = 40.0
+## Sim finish (live-F5 drain) may refill without the presentation wall budget.
+## _process and refill_after_clock leave this false.
+var sim_route_ignore_wall_budget: bool = false
 ## PERF-6: full supply-day sections spread across later frames. Route planning
 ## keeps the 40 ms budget above. A supply slice stops before 20 ms, or 22 ms
 ## when behind pace / in the last few non-roll frames before midnight.
@@ -666,7 +669,9 @@ func _refill_queued_dests(max_plans: int) -> int:
 			# Removing this check fails the per-frame plan-cap mutant.
 			# `used_ms + next_est` (not `used_ms >= budget`) so a 25 ms seam
 			# plans 1; a reactive used>=budget mutant plans 2.
-			if used_ms + next_est >= ROUTE_REFRESH_MS_BUDGET:
+			# A sim-day finish sets sim_route_ignore_wall_budget so the day's
+			# routes are not cut short because the CPU was busy.
+			if not sim_route_ignore_wall_budget and used_ms + next_est >= ROUTE_REFRESH_MS_BUDGET:
 				break
 		var dest: int = int(_refill_queue.pop_front())
 		_refill_queued.erase(dest)
@@ -1849,6 +1854,24 @@ func _finish_supply_day_job(job: Dictionary) -> void:
 				float(job.get("dijkstra_ms", 0.0)),
 			]
 		)
+
+
+## Finish every queued supply day. Called from the live-F5 drain only.
+## deadline 0 completes generate / naval / fuel / air / shipping. The roll-frame
+## latch still returns 0 route plans. Presentation 20 ms / 40 ms caps stay on
+## _drain_queued_supply_day_slice and _refill_queued_dests.
+func finish_pending_sim_supply() -> void:
+	sim_route_ignore_wall_budget = true
+	var guard := 0
+	while not _supply_day_queue.is_empty() and guard < 64:
+		var job: Dictionary = _supply_day_queue[0]
+		var done := _run_supply_day_job(job, 0)
+		if done:
+			_supply_day_queue.pop_front()
+		else:
+			break
+		guard += 1
+	sim_route_ignore_wall_budget = false
 
 
 func _drain_queued_supply_day_slice() -> void:

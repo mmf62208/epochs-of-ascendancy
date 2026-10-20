@@ -22,7 +22,9 @@ static func arm_from(origin: Node) -> void:
 		return
 	if host.get_node_or_null(NODE_NAME) != null:
 		return
-	var swallow := CloseReleaseSwallow.new()
+	# Global class cache can miss this script on a headless boot. load() does
+	# not need the class_name to be registered, so GameData still compiles.
+	var swallow: Node = (load("res://scripts/ui/CloseReleaseSwallow.gd") as GDScript).new()
 	swallow.name = NODE_NAME
 	host.add_child(swallow)
 

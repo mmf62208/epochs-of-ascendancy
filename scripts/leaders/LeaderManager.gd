@@ -173,6 +173,8 @@ var pending_leader_replacements: Array[Dictionary] = []
 ## Human player country — replacement popups and pending badge only apply here.
 var player_country_tag: String = "USA"
 var formations: Dictionary = {}  # formation_id -> Formation
+## Monotonic suffix for fielded_* ids. Saved so a load does not reuse an id.
+var _fielded_seq: int = 0
 var country_positions: Dictionary = {}  # country_tag -> { position_id -> leader_id }
 var trait_definitions: Dictionary = {}
 var training_path_definitions: Dictionary = {}
@@ -454,6 +456,25 @@ func register_formation(formation: Formation) -> void:
 	invalidate_leader_cache(formation.country_tag)
 
 
+func _alloc_fielded_formation_id(tag: String) -> String:
+	_fielded_seq += 1
+	var day := 0
+	if typeof(TimeManager) != TYPE_NIL and "total_days_elapsed" in TimeManager:
+		day = int(TimeManager.total_days_elapsed)
+	return "fielded_%s_d%d_%d" % [tag.to_lower(), day, _fielded_seq]
+
+
+func _note_fielded_seq(fid: String) -> void:
+	if not fid.begins_with("fielded_"):
+		return
+	var parts := fid.split("_")
+	if parts.is_empty():
+		return
+	var tail := str(parts[parts.size() - 1])
+	if tail.is_valid_int():
+		_fielded_seq = maxi(_fielded_seq, int(tail))
+
+
 ## Field a designer template as a living map unit (selectable chip + orders).
 func field_designed_unit(
 	country_tag: String,
@@ -492,7 +513,7 @@ func field_designed_unit(
 					"country_tag": tag,
 				}
 	var f := Formation.new()
-	f.formation_id = "fielded_%s_%d" % [tag.to_lower(), Time.get_ticks_usec() % 100000000]
+	f.formation_id = _alloc_fielded_formation_id(tag)
 	f.country_tag = tag
 	f.name = "%s %s" % [tag, did]
 	f.organization = clampf(float(extras.get("organization", extras.get("org", 1.0))), 0.2, 1.0)
@@ -3671,6 +3692,7 @@ func get_save_data() -> Dictionary:
 		"player_country_tag": player_country_tag,
 		"service_doctrines": service_doctrines.duplicate(true),
 		"organize_priority": organize_priority,
+		"fielded_seq": _fielded_seq,
 	}
 
 func apply_save_data(data: Dictionary) -> void:
@@ -3710,6 +3732,8 @@ func apply_save_data(data: Dictionary) -> void:
 			l.is_deceased = bool(ld.get("is_deceased", false))
 			l.assigned_army_id = str(ld.get("assigned_army_id", ""))
 			l.birth_year = int(ld.get("birth_year", 1900))
+			l.start_year = int(ld.get("start_year", l.start_year))
+			l.end_year = int(ld.get("end_year", l.end_year))
 			l.health = float(ld.get("health", 1.0))
 			l.duty_post = str(ld.get("duty_post", "active"))
 			l.stayed_past_retirement = bool(ld.get("stayed_past_retirement", false))
@@ -3745,6 +3769,7 @@ func apply_save_data(data: Dictionary) -> void:
 	if data.has("service_doctrines"):
 		service_doctrines = (data["service_doctrines"] as Dictionary).duplicate(true)
 
+	_fielded_seq = int(data.get("fielded_seq", 0))
 	if data.has("formations"):
 		var fdata: Dictionary = data["formations"] as Dictionary
 		for fid in fdata.keys():
@@ -3753,6 +3778,7 @@ func apply_save_data(data: Dictionary) -> void:
 				continue
 			var f := Formation.new()
 			f.formation_id = str(fd.get("formation_id", fid))
+			_note_fielded_seq(f.formation_id)
 			f.name = str(fd.get("name", ""))
 			f.formation_type = str(fd.get("formation_type", Formation.TYPE_DIVISION))
 			f.country_tag = str(fd.get("country_tag", ""))

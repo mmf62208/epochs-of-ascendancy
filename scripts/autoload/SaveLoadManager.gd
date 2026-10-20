@@ -91,7 +91,7 @@
 ## - Time (date, start date, pause/scale)
 ## - Technology (full country research state + active progress)
 ## - Agents + Networks (full resources + daily effect trackers)
-## - Map provinces (owner/controller, development, infrastructure)
+## - Map provinces (owner/controller, development, infrastructure, factories)
 ## - Supply depots (stockpile, throughput, sabotage_level) + division_deployments
 ## - Leader formations (stationed_province_id per division)
 ## - NationalModifierManager temporary effects
@@ -559,12 +559,19 @@ func _gather_save_data() -> Dictionary:
 
 	# --- TimeManager ---
 	if typeof(TimeManager) != TYPE_NIL:
+		var date := TimeManager.get_current_date()
+		date.erase("hour")
+		date.erase("date_string")
 		data["time"] = {
-			"current_date": TimeManager.get_current_date(),
+			"current_date": date,
 			"scenario_start_date": TimeManager.get_scenario_start_date(),
 			"paused": TimeManager.is_paused(),
 			"time_scale": TimeManager.time_scale,
 			"total_days_elapsed": TimeManager.get_total_days_elapsed(),
+			"current_hour": TimeManager.current_hour,
+			"run_seed": int(TimeManager.run_seed) if "run_seed" in TimeManager else 0,
+			"accumulated_days": float(TimeManager._accumulated_game_days),
+			"accumulated_hours": float(TimeManager._accumulated_game_hours),
 		}
 
 	# --- TechnologyManager ---
@@ -842,6 +849,10 @@ func _apply_time_state(t: Dictionary) -> void:
 		TimeManager.current_year = int(d.get("year", 1936))
 		TimeManager.current_month = int(d.get("month", 1))
 		TimeManager.current_day = int(d.get("day", 1))
+		if d.has("hour") and not t.has("current_hour"):
+			TimeManager.current_hour = clampi(int(d.get("hour", 0)), 0, 23)
+	if t.has("current_hour"):
+		TimeManager.current_hour = clampi(int(t.get("current_hour", 0)), 0, 23)
 	if t.has("scenario_start_date"):
 		TimeManager.scenario_start_date = str(t["scenario_start_date"])
 	if t.has("paused"):
@@ -850,6 +861,12 @@ func _apply_time_state(t: Dictionary) -> void:
 		TimeManager.set_time_scale(float(t.get("time_scale", 1.0)))
 	if t.has("total_days_elapsed"):
 		TimeManager.total_days_elapsed = maxi(0, int(t.get("total_days_elapsed", 0)))
+	if t.has("run_seed") and "run_seed" in TimeManager:
+		TimeManager.run_seed = int(t.get("run_seed", 0))
+	if t.has("accumulated_days"):
+		TimeManager._accumulated_game_days = float(t.get("accumulated_days", 0.0))
+	if t.has("accumulated_hours"):
+		TimeManager._accumulated_game_hours = float(t.get("accumulated_hours", 0.0))
 	# Do not fire game_day_advanced etc. here — we are restoring state, not simulating.
 
 ## --- Agents (most complex because of Resource instances) ---
@@ -996,6 +1013,7 @@ func _serialize_map_state() -> Dictionary:
 			"controller_tag": p.controller_tag,
 			"development_level": p.development_level,
 			"infrastructure": p.infrastructure,
+			"factories": int(p.factories),
 			"settlement_level": p.settlement_level,
 			"built_road_neighbors": p.built_road_neighbors.duplicate(),
 			"built_rail_neighbors": p.built_rail_neighbors.duplicate(),
@@ -1067,6 +1085,14 @@ func _apply_map_state(m: Dictionary) -> void:
 
 		if e.has("infrastructure"):
 			MapManager.update_province_infrastructure(pid, int(e["infrastructure"]))
+
+		# Factory counts feed military_strength when a tag has no divisions.
+		# The boot map uses a different count than a mid-war economy, so a
+		# load that skips this field starts wars the uninterrupted run does not.
+		if e.has("factories"):
+			var p_fac: Province = MapManager.get_province(pid)
+			if p_fac != null:
+				p_fac.factories = int(e["factories"])
 
 		if e.has("settlement_level"):
 			var sl := float(e.get("settlement_level", 0.0))
