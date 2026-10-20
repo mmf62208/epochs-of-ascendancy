@@ -704,7 +704,7 @@ def build_seas_coarsen_feed8_ligurian_product(board_dir: str = "") -> Dict[str, 
     else:
         passes.append("seas_343_ids_kept")
     n_board = len(base)
-    if n_board < 3510 or n_board > 3545:
+    if n_board < 3510 or n_board > 3579:
         fails.append(f"board_scale_left_3520_band n={n_board}")
     else:
         passes.append(f"board_n={n_board}")

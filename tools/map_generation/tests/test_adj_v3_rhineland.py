@@ -24,10 +24,9 @@ V2_INTERNAL = (
 ORIGINAL = SCRIPT.read_text(encoding="utf-8")
 
 # Edges outside the pilot, minus the 16 bogus links. Repair 950244-950245 is
-# excluded by the audit. Re-pinned on GAP-HAWAII (8186) then GAP-IBS: six new
-# edges (905852-950341, 905853-950341, 905854-950342, 950341-950046,
-# 950341-950048, 902485-950342). That is 8192 edges.
-_LOCKED_HASH = "35390d9e8b345747be855dd98f32913b41de15351fdf2d827ead4f6f5bf8d837"
+# excluded by the audit. Re-pinned on GAP-HAWAII (8186), GAP-IBS (8192), then
+# GAP-CHINA (8297) after the 56-province split.
+_LOCKED_HASH = "41df9cccc3daf42ffb5939898fe6e40452e606cfa4b9db844278e885fc12eb76"
 _REPAIR = (950244, 950245)
 _HAWAII = 800094
 _GUAM = 902485

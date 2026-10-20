@@ -7628,7 +7628,7 @@
       "tier": 2
     },
     "902487": {
-      "city_name": "CHN North",
+      "city_name": "Peiping",
       "tier": 2
     },
     "905844": {
@@ -7636,7 +7636,7 @@
       "tier": 3
     },
     "902491": {
-      "city_name": "CHN East",
+      "city_name": "Baoding",
       "tier": 2
     },
     "902493": {
@@ -7644,27 +7644,27 @@
       "tier": 2
     },
     "902496": {
-      "city_name": "CHN North",
+      "city_name": "Guisui",
       "tier": 2
     },
     "902504": {
-      "city_name": "CHN West",
+      "city_name": "Aksu",
       "tier": 2
     },
     "902505": {
-      "city_name": "CHN East",
+      "city_name": "Qingdao",
       "tier": 2
     },
     "902514": {
-      "city_name": "CHN West",
+      "city_name": "Hami",
       "tier": 2
     },
     "902521": {
-      "city_name": "CHN East",
+      "city_name": "Kalgan",
       "tier": 2
     },
     "902523": {
-      "city_name": "CHN West",
+      "city_name": "Kashgar",
       "tier": 2
     },
     "902526": {
@@ -7672,7 +7672,7 @@
       "tier": 2
     },
     "902534": {
-      "city_name": "CHN West",
+      "city_name": "Khotan",
       "tier": 2
     },
     "902544": {
@@ -7680,11 +7680,11 @@
       "tier": 2
     },
     "902564": {
-      "city_name": "CHN East",
+      "city_name": "Jinan",
       "tier": 2
     },
     "902566": {
-      "city_name": "CHN South",
+      "city_name": "Lanzhou",
       "tier": 2
     },
     "902568": {
@@ -7696,27 +7696,27 @@
       "tier": 2
     },
     "902590": {
-      "city_name": "Shanghai",
+      "city_name": "Anking",
       "tier": 2
     },
     "902598": {
-      "city_name": "CHN South",
+      "city_name": "Changsha",
       "tier": 2
     },
     "902601": {
-      "city_name": "CHN South",
+      "city_name": "Chamdo",
       "tier": 2
     },
     "902633": {
-      "city_name": "CHN South",
+      "city_name": "Amoy",
       "tier": 2
     },
     "902634": {
-      "city_name": "CHN South",
+      "city_name": "Kunming",
       "tier": 2
     },
     "902646": {
-      "city_name": "CHN South",
+      "city_name": "Wuzhou",
       "tier": 2
     },
     "902660": {
@@ -8462,6 +8462,138 @@
     },
     "905854": {
       "city_name": "Garapan",
+      "tier": 2
+    },
+    "905855": {
+      "city_name": "Urumqi",
+      "tier": 2
+    },
+    "905856": {
+      "city_name": "Lhasa",
+      "tier": 2
+    },
+    "905858": {
+      "city_name": "Kangding",
+      "tier": 2
+    },
+    "905859": {
+      "city_name": "Xining",
+      "tier": 2
+    },
+    "905860": {
+      "city_name": "Yinchuan",
+      "tier": 2
+    },
+    "905861": {
+      "city_name": "Datong",
+      "tier": 2
+    },
+    "905862": {
+      "city_name": "Taiyuan",
+      "tier": 2
+    },
+    "905863": {
+      "city_name": "Yanan",
+      "tier": 2
+    },
+    "905864": {
+      "city_name": "Xian",
+      "tier": 2
+    },
+    "905865": {
+      "city_name": "Hanzhong",
+      "tier": 2
+    },
+    "905866": {
+      "city_name": "Kaifeng",
+      "tier": 2
+    },
+    "905867": {
+      "city_name": "Xinyang",
+      "tier": 2
+    },
+    "905868": {
+      "city_name": "Xuzhou",
+      "tier": 2
+    },
+    "905869": {
+      "city_name": "Shanghai",
+      "tier": 2
+    },
+    "905870": {
+      "city_name": "Bengbu",
+      "tier": 2
+    },
+    "905871": {
+      "city_name": "Hangzhou",
+      "tier": 2
+    },
+    "905872": {
+      "city_name": "Wenzhou",
+      "tier": 2
+    },
+    "905873": {
+      "city_name": "Foochow",
+      "tier": 2
+    },
+    "905874": {
+      "city_name": "Nanchang",
+      "tier": 2
+    },
+    "905875": {
+      "city_name": "Ganzhou",
+      "tier": 2
+    },
+    "905876": {
+      "city_name": "Wuhan",
+      "tier": 2
+    },
+    "905877": {
+      "city_name": "Yichang",
+      "tier": 2
+    },
+    "905878": {
+      "city_name": "Hengyang",
+      "tier": 2
+    },
+    "905879": {
+      "city_name": "Chengdu",
+      "tier": 2
+    },
+    "905880": {
+      "city_name": "Nanchong",
+      "tier": 2
+    },
+    "905881": {
+      "city_name": "Chungking",
+      "tier": 2
+    },
+    "905882": {
+      "city_name": "Kweiyang",
+      "tier": 2
+    },
+    "905883": {
+      "city_name": "Dali",
+      "tier": 2
+    },
+    "905884": {
+      "city_name": "Nanning",
+      "tier": 2
+    },
+    "905885": {
+      "city_name": "Canton",
+      "tier": 2
+    },
+    "905886": {
+      "city_name": "Swatow",
+      "tier": 2
+    },
+    "905887": {
+      "city_name": "Luichow",
+      "tier": 2
+    },
+    "905888": {
+      "city_name": "Haikou",
       "tier": 2
     }
   },

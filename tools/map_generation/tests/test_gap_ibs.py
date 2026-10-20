@@ -49,7 +49,7 @@ NAMES = {
 VOLCANO_RECT = (140.70, 147.60, 24.00, 29.50)
 W_PX = 8192.0
 H_PX = 4096.0
-RESERVED = set(range(905855, 905889))
+RESERVED = set()
 LAYER_NAMES = (
     "province_ownership_1910.json",
     "province_ownership_1918.json",

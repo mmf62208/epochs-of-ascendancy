@@ -367,8 +367,8 @@ def build_hong_kong_island_land_product(board_dir: str = "") -> Dict[str, Any]:
 
     for pid, want_name in (
         (YUEN_LONG_ID, "Yuen Long"),
-        (CHN_SOUTH_A, "CHN South"),
-        (CHN_SOUTH_B, "CHN South"),
+        (CHN_SOUTH_A, "Hunan North (Changsha)"),
+        (CHN_SOUTH_B, "Fujian South (Amoy)"),
         (SEA_ID, "South China Sea Zone"),
         (GIBRALTAR_ID, "Gibraltar"),
         (CADIZ_ID, "Cádiz"),
@@ -489,7 +489,7 @@ def build_hong_kong_island_land_product(board_dir: str = "") -> Dict[str, Any]:
         passes.append("seas_343_unchanged")
 
     n_board = len(base)
-    if n_board < 3510 or n_board > 3545:
+    if n_board < 3510 or n_board > 3579:
         fails.append(f"board_scale_left_3520_band n={n_board}")
     else:
         passes.append(f"board_n={n_board}")

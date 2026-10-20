@@ -7138,60 +7138,57 @@
     },
     "905844": {},
     "902487": {
-      "coal": 5,
-      "tungsten": 10
+      "coal": 2,
+      "tungsten": 3
     },
-    "902491": {
-      "coal": 10,
-      "tungsten": 20
-    },
+    "902491": {},
     "902493": {
-      "coal": 5,
-      "tungsten": 10
+      "coal": 8,
+      "tungsten": 15
     },
     "902496": {
-      "coal": 4,
-      "tungsten": 8
+      "coal": 1,
+      "tungsten": 3
     },
     "902504": {
-      "coal": 5,
-      "tungsten": 10
+      "coal": 4,
+      "tungsten": 7
     },
     "902505": {
-      "coal": 9,
-      "tungsten": 18
+      "coal": 1,
+      "tungsten": 3
     },
     "902514": {
-      "coal": 5,
-      "tungsten": 10
+      "coal": 3,
+      "tungsten": 6
     },
     "902521": {
-      "coal": 9,
-      "tungsten": 18
+      "coal": 39,
+      "tungsten": 79
     },
     "902523": {
-      "coal": 8,
-      "tungsten": 16
+      "coal": 3,
+      "tungsten": 5
     },
     "902526": {
-      "coal": 10,
-      "tungsten": 20
-    },
-    "902534": {
-      "coal": 4,
-      "tungsten": 8
-    },
-    "902544": {
-      "coal": 7,
-      "tungsten": 14
-    },
-    "902564": {
-      "coal": 8,
-      "tungsten": 16
-    },
-    "902566": {
       "coal": 11,
       "tungsten": 22
+    },
+    "902534": {
+      "coal": 12,
+      "tungsten": 25
+    },
+    "902544": {
+      "coal": 3,
+      "tungsten": 5
+    },
+    "902564": {
+      "coal": 2,
+      "tungsten": 4
+    },
+    "902566": {
+      "coal": 3,
+      "tungsten": 7
     },
     "902568": {
       "coal": 8,
@@ -7202,28 +7199,28 @@
       "tungsten": 24
     },
     "902590": {
-      "coal": 9,
-      "tungsten": 18
+      "coal": 1,
+      "tungsten": 2
     },
     "902598": {
-      "coal": 11,
-      "tungsten": 22
+      "coal": 2,
+      "tungsten": 5
     },
     "902601": {
-      "coal": 11,
-      "tungsten": 22
+      "coal": 1,
+      "tungsten": 3
     },
     "902633": {
-      "coal": 7,
-      "tungsten": 14
+      "coal": 1,
+      "tungsten": 1
     },
     "902634": {
-      "coal": 7,
-      "tungsten": 14
+      "coal": 2,
+      "tungsten": 5
     },
     "902646": {
-      "coal": 8,
-      "tungsten": 16
+      "coal": 1,
+      "tungsten": 2
     },
     "902660": {
       "coal": 10,
@@ -13560,7 +13557,129 @@
     "905853": {},
     "905854": {},
     "950341": {},
-    "950342": {}
+    "950342": {},
+    "905855": {
+      "coal": 4,
+      "tungsten": 7
+    },
+    "905856": {
+      "coal": 6,
+      "tungsten": 12
+    },
+    "905857": {
+      "coal": 8,
+      "tungsten": 15
+    },
+    "905858": {
+      "tungsten": 1
+    },
+    "905859": {
+      "coal": 3,
+      "tungsten": 6
+    },
+    "905860": {
+      "coal": 3,
+      "tungsten": 5
+    },
+    "905861": {
+      "coal": 1,
+      "tungsten": 2
+    },
+    "905862": {},
+    "905863": {
+      "coal": 2,
+      "tungsten": 3
+    },
+    "905864": {
+      "coal": 2,
+      "tungsten": 4
+    },
+    "905865": {
+      "coal": 1,
+      "tungsten": 3
+    },
+    "905866": {
+      "tungsten": 1
+    },
+    "905867": {},
+    "905868": {
+      "coal": 1,
+      "tungsten": 1
+    },
+    "905869": {
+      "coal": 1,
+      "tungsten": 3
+    },
+    "905870": {},
+    "905871": {
+      "coal": 1,
+      "tungsten": 3
+    },
+    "905872": {
+      "tungsten": 1
+    },
+    "905873": {
+      "coal": 1,
+      "tungsten": 1
+    },
+    "905874": {
+      "coal": 1,
+      "tungsten": 2
+    },
+    "905875": {
+      "tungsten": 1
+    },
+    "905876": {
+      "coal": 1,
+      "tungsten": 2
+    },
+    "905877": {
+      "coal": 2,
+      "tungsten": 4
+    },
+    "905878": {
+      "coal": 2,
+      "tungsten": 3
+    },
+    "905879": {
+      "coal": 1,
+      "tungsten": 3
+    },
+    "905880": {
+      "coal": 2,
+      "tungsten": 3
+    },
+    "905881": {
+      "coal": 1,
+      "tungsten": 1
+    },
+    "905882": {
+      "coal": 3,
+      "tungsten": 5
+    },
+    "905883": {
+      "tungsten": 1
+    },
+    "905884": {
+      "coal": 2,
+      "tungsten": 3
+    },
+    "905885": {
+      "coal": 1,
+      "tungsten": 2
+    },
+    "905886": {
+      "coal": 1,
+      "tungsten": 2
+    },
+    "905887": {
+      "coal": 1,
+      "tungsten": 3
+    },
+    "905888": {
+      "coal": 1,
+      "tungsten": 1
+    }
   },
   "meta": {
     "source": "paint_world_accurate_strategic_resources.py",

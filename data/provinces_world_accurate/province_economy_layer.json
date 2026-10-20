@@ -10908,134 +10908,134 @@
       "development_level": 3
     },
     "902487": {
-      "population": 557946,
-      "factories": 5,
+      "population": 105042,
+      "factories": 2,
       "infrastructure": 3,
       "development_level": 2
     },
     "902491": {
-      "population": 316304,
-      "factories": 10,
+      "population": 10981,
+      "factories": 0,
       "infrastructure": 3,
       "development_level": 2
     },
     "902493": {
-      "population": 337413,
-      "factories": 5,
+      "population": 483382,
+      "factories": 8,
       "infrastructure": 3,
       "development_level": 2
     },
     "902496": {
-      "population": 360609,
-      "factories": 4,
+      "population": 85222,
+      "factories": 1,
       "infrastructure": 3,
       "development_level": 2
     },
     "902504": {
-      "population": 311314,
-      "factories": 5,
-      "infrastructure": 3,
-      "development_level": 2
-    },
-    "902505": {
-      "population": 247970,
-      "factories": 9,
-      "infrastructure": 3,
-      "development_level": 2
-    },
-    "902514": {
-      "population": 555339,
-      "factories": 5,
-      "infrastructure": 3,
-      "development_level": 2
-    },
-    "902521": {
-      "population": 397641,
-      "factories": 9,
-      "infrastructure": 3,
-      "development_level": 2
-    },
-    "902523": {
-      "population": 819615,
-      "factories": 8,
-      "infrastructure": 3,
-      "development_level": 2
-    },
-    "902526": {
-      "population": 911855,
-      "factories": 10,
-      "infrastructure": 3,
-      "development_level": 2
-    },
-    "902534": {
-      "population": 1380492,
+      "population": 231918,
       "factories": 4,
       "infrastructure": 3,
       "development_level": 2
     },
-    "902544": {
-      "population": 501788,
-      "factories": 7,
+    "902505": {
+      "population": 84736,
+      "factories": 1,
       "infrastructure": 3,
       "development_level": 2
     },
-    "902564": {
-      "population": 160000,
-      "factories": 8,
+    "902514": {
+      "population": 177887,
+      "factories": 3,
       "infrastructure": 3,
       "development_level": 2
     },
-    "902566": {
-      "population": 230707,
+    "902521": {
+      "population": 2471939,
+      "factories": 40,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "902523": {
+      "population": 169405,
+      "factories": 3,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "902526": {
+      "population": 697616,
       "factories": 11,
       "infrastructure": 3,
       "development_level": 2
     },
+    "902534": {
+      "population": 775483,
+      "factories": 12,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "902544": {
+      "population": 166360,
+      "factories": 3,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "902564": {
+      "population": 120490,
+      "factories": 2,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "902566": {
+      "population": 217826,
+      "factories": 4,
+      "infrastructure": 3,
+      "development_level": 2
+    },
     "902568": {
-      "population": 776578,
+      "population": 499290,
       "factories": 8,
       "infrastructure": 3,
       "development_level": 2
     },
     "902569": {
-      "population": 1331903,
+      "population": 748375,
       "factories": 12,
       "infrastructure": 3,
       "development_level": 2
     },
     "902590": {
-      "population": 560000,
-      "factories": 11,
+      "population": 79552,
+      "factories": 1,
       "infrastructure": 3,
       "development_level": 2
     },
     "902598": {
-      "population": 220000,
-      "factories": 11,
+      "population": 146499,
+      "factories": 2,
       "infrastructure": 3,
       "development_level": 2
     },
     "902601": {
-      "population": 448199,
-      "factories": 11,
+      "population": 93080,
+      "factories": 1,
       "infrastructure": 3,
       "development_level": 2
     },
     "902633": {
-      "population": 140000,
-      "factories": 7,
+      "population": 31812,
+      "factories": 1,
       "infrastructure": 3,
       "development_level": 2
     },
     "902634": {
-      "population": 140000,
-      "factories": 7,
+      "population": 148567,
+      "factories": 2,
       "infrastructure": 3,
       "development_level": 2
     },
     "902646": {
-      "population": 160000,
-      "factories": 8,
+      "population": 55268,
+      "factories": 1,
       "infrastructure": 3,
       "development_level": 2
     },
@@ -21297,6 +21297,210 @@
       "factories": 0,
       "infrastructure": 1,
       "development_level": 0
+    },
+    "905855": {
+      "population": 232740,
+      "factories": 4,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "905856": {
+      "population": 371766,
+      "factories": 6,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "905857": {
+      "population": 475346,
+      "factories": 8,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "905858": {
+      "population": 29078,
+      "factories": 0,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "905859": {
+      "population": 200048,
+      "factories": 3,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "905860": {
+      "population": 161922,
+      "factories": 3,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "905861": {
+      "population": 53463,
+      "factories": 1,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "905862": {
+      "population": 8653,
+      "factories": 0,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "905863": {
+      "population": 106014,
+      "factories": 2,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "905864": {
+      "population": 113418,
+      "factories": 2,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "905865": {
+      "population": 79559,
+      "factories": 1,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "905866": {
+      "population": 21416,
+      "factories": 0,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "905867": {
+      "population": 6116,
+      "factories": 0,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "905868": {
+      "population": 41210,
+      "factories": 1,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "905869": {
+      "population": 83253,
+      "factories": 1,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "905870": {
+      "population": 14596,
+      "factories": 0,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "905871": {
+      "population": 89135,
+      "factories": 1,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "905872": {
+      "population": 18219,
+      "factories": 0,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "905873": {
+      "population": 32223,
+      "factories": 1,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "905874": {
+      "population": 48993,
+      "factories": 1,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "905875": {
+      "population": 24697,
+      "factories": 0,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "905876": {
+      "population": 62274,
+      "factories": 1,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "905877": {
+      "population": 126425,
+      "factories": 2,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "905878": {
+      "population": 98125,
+      "factories": 2,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "905879": {
+      "population": 86489,
+      "factories": 1,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "905880": {
+      "population": 99721,
+      "factories": 2,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "905881": {
+      "population": 32493,
+      "factories": 1,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "905882": {
+      "population": 168644,
+      "factories": 3,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "905883": {
+      "population": 28617,
+      "factories": 0,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "905884": {
+      "population": 110685,
+      "factories": 2,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "905885": {
+      "population": 66567,
+      "factories": 1,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "905886": {
+      "population": 50459,
+      "factories": 1,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "905887": {
+      "population": 84294,
+      "factories": 1,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "905888": {
+      "population": 38285,
+      "factories": 1,
+      "infrastructure": 3,
+      "development_level": 2
     }
   },
   "meta": {

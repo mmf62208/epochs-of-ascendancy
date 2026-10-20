@@ -723,7 +723,7 @@ def build_se_england_shire_land_uniformity_product(board_dir: str = "") -> Dict[
         passes.append("ligurian_950119")
 
     n_board = len(base)
-    if n_board < 3510 or n_board > 3545:
+    if n_board < 3510 or n_board > 3579:
         fails.append(f"board_scale_left_3520_band n={n_board}")
     else:
         passes.append(f"board_n={n_board}")
