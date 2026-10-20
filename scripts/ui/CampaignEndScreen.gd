@@ -139,16 +139,13 @@ func _button(text: String, cb: Callable) -> Button:
 
 func _stats_line() -> String:
 	var stats: Dictionary = _model.get("stats", {}) if _model.get("stats") is Dictionary else {}
-	var cap_n := int(stats.get("capitulated_by_side", 0))
-	var cap_phrase := "%d nations capitulated" % cap_n
-	if typeof(CampaignEndDomain) != TYPE_NIL:
-		cap_phrase = CampaignEndDomain.nation_capitulated_phrase(cap_n)
-	return "Days %d. Provinces (controlled) %d → %d. Wars %d. %s. Factory share %.1f%%." % [
+	return "Days %d. Provinces (controlled) %d → %d. Wars %d. Majors defeated %d. Minors capitulated %d. Factory share %.1f%%." % [
 		int(stats.get("days", 0)),
 		int(stats.get("provinces_start", 0)),
 		int(stats.get("provinces_end", 0)),
 		int(stats.get("wars_fought", 0)),
-		cap_phrase,
+		int(stats.get("capitulated_majors", 0)),
+		int(stats.get("capitulated_minors", 0)),
 		float(stats.get("factory_share", 0.0)) * 100.0,
 	]
 

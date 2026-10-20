@@ -116,12 +116,32 @@ static func _player() -> String:
 	return "GER"
 
 
+static var _scenario_names: Dictionary = {}
+static var _scenario_names_ready: bool = false
+
+
 static func tag_name(tag: String) -> String:
 	var names: Variant = rules().get("tag_names", {})
 	var t := _tag(tag)
 	if names is Dictionary and (names as Dictionary).has(t):
 		return str((names as Dictionary)[t])
+	if not _scenario_names_ready:
+		_scenario_names_ready = true
+		var scr: Variant = load("res://scripts/core/ScenarioLoader.gd")
+		if scr is GDScript:
+			var cmap: Dictionary = (scr as GDScript).get_script_constant_map()
+			var raw: Variant = cmap.get("_1936_NATION_NAMES", {})
+			if raw is Dictionary:
+				_scenario_names = raw
+	if _scenario_names.has(t):
+		return str(_scenario_names[t])
 	return t
+
+
+static func day_count_phrase(n: int) -> String:
+	if n == 1:
+		return "1 day"
+	return "%d days" % n
 
 
 static func ensure_booted() -> void:
@@ -471,6 +491,14 @@ static func player_justify_days_left(defender: String) -> int:
 
 
 static func suggest_player_target() -> Dictionary:
+	## A ready player justification wins over preferred foes. An in-progress
+	## player justification is next. Only then suggest a valid land neighbour.
+	var ready := _player_claim_defenders(true)
+	if not ready.is_empty():
+		return _target_row(str(ready[0]))
+	var pending := _player_claim_defenders(false)
+	if not pending.is_empty():
+		return _target_row(str(pending[0]))
 	var tag := _player()
 	var neighbours := land_neighbours(tag)
 	var preferred: Array = []
@@ -490,7 +518,50 @@ static func suggest_player_target() -> Dictionary:
 			if not is_at_war(tag, nt) and not in_truce(tag, nt):
 				target = nt
 				break
-	return {"tag": target, "pid": _border_pid(tag, target), "name": tag_name(target)}
+	return _target_row(target)
+
+
+static func _player_claim_defenders(ready_only: bool) -> Array:
+	var attacker := _player()
+	var day := _day()
+	var just := _justifies()
+	var out: Array = []
+	var keys: Array = just.keys()
+	keys.sort()
+	for k in keys:
+		var row_v: Variant = just[k]
+		if not (row_v is Dictionary):
+			continue
+		var row: Dictionary = row_v
+		if _tag(str(row.get("attacker", ""))) != attacker:
+			continue
+		if str(row.get("kind", "")) != "player":
+			continue
+		var defender := _tag(str(row.get("defender", "")))
+		if defender.is_empty() or is_at_war(attacker, defender) or in_truce(attacker, defender):
+			continue
+		var is_ready := int(row.get("ready_day", 999999)) <= day
+		if is_ready != ready_only:
+			continue
+		out.append(defender)
+	return out
+
+
+static func _target_row(foe: String) -> Dictionary:
+	var tag := _player()
+	var ft := _tag(foe)
+	var pid := _border_pid(tag, ft)
+	if pid <= 0 and not ft.is_empty() and typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_provinces_by_owner"):
+		var best := -1
+		for pid_v in MapManager.get_provinces_by_owner(ft):
+			var id := int(pid_v)
+			var prov: Province = MapManager.get_province(id)
+			if prov == null or bool(prov.is_sea):
+				continue
+			if best < 0 or id < best:
+				best = id
+		pid = best
+	return {"tag": ft, "pid": pid, "name": tag_name(ft)}
 
 
 static func _owner_of(province_id: int) -> String:

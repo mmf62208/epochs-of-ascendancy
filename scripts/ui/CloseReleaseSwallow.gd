@@ -22,7 +22,9 @@ static func arm_from(origin: Node) -> void:
 		return
 	if host.get_node_or_null(NODE_NAME) != null:
 		return
-	var swallow := CloseReleaseSwallow.new()
+	# The global class name is unresolved while this script is absent from the
+	# class cache, which prints SCRIPT ERROR and fails every script that preloads it.
+	var swallow: Node = (load("res://scripts/ui/CloseReleaseSwallow.gd") as GDScript).new()
 	swallow.name = NODE_NAME
 	host.add_child(swallow)
 
