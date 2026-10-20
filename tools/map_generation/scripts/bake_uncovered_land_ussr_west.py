@@ -217,7 +217,7 @@ def main() -> None:
             raise SystemExit("Black Sea witness failed: %s" % report)
         if report["owned_centroid_hits"] or report["overlap_samples"] > 0:
             raise SystemExit("mask covers province rings: %s" % report)
-        # Land stays (Belarus is out of scope). Sea is empty: the three zones tile it.
+        # Land stays (Galicia / Bessarabia are still out of scope). Sea is empty.
         if not report["land_rings"]:
             raise SystemExit("land mask empty: %s" % report)
         if report["sea_rings"]:

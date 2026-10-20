@@ -8639,6 +8639,86 @@
     "905899": {
       "city_name": "Tula",
       "tier": 2
+    },
+    "905807": {
+      "city_name": "Polotsk",
+      "tier": 2
+    },
+    "905808": {
+      "city_name": "Pinsk",
+      "tier": 2
+    },
+    "905809": {
+      "city_name": "Vitebsk",
+      "tier": 2
+    },
+    "905810": {
+      "city_name": "Mozyr",
+      "tier": 2
+    },
+    "905811": {
+      "city_name": "Stolin",
+      "tier": 2
+    },
+    "905812": {
+      "city_name": "Borisov",
+      "tier": 2
+    },
+    "905813": {
+      "city_name": "Brest",
+      "tier": 2
+    },
+    "905814": {
+      "city_name": "Grodno",
+      "tier": 2
+    },
+    "905815": {
+      "city_name": "Gomel",
+      "tier": 2
+    },
+    "905816": {
+      "city_name": "Vileyka",
+      "tier": 2
+    },
+    "905817": {
+      "city_name": "Braslaw",
+      "tier": 2
+    },
+    "905818": {
+      "city_name": "Minsk",
+      "tier": 3
+    },
+    "905819": {
+      "city_name": "Bobruisk",
+      "tier": 2
+    },
+    "905820": {
+      "city_name": "Mogilev",
+      "tier": 2
+    },
+    "905821": {
+      "city_name": "Molodechno",
+      "tier": 2
+    },
+    "905822": {
+      "city_name": "Slutsk",
+      "tier": 2
+    },
+    "905823": {
+      "city_name": "Baranovichi",
+      "tier": 2
+    },
+    "905824": {
+      "city_name": "Klimovichi",
+      "tier": 2
+    },
+    "905825": {
+      "city_name": "Lida",
+      "tier": 2
+    },
+    "905826": {
+      "city_name": "Orsha",
+      "tier": 2
     }
   },
   "meta": {
