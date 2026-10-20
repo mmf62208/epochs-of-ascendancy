@@ -68506,6 +68506,95 @@
           "kiribati_km": 1726.0
         }
       }
+    },
+    {
+      "id": 905852,
+      "name": "Iwo Jima",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "source": "ne_10m_land",
+        "gap_ibs": "Iwo Jima"
+      }
+    },
+    {
+      "id": 905853,
+      "name": "Bonin Islands",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "source": "ne_10m_land",
+        "gap_ibs": "Bonin Islands"
+      }
+    },
+    {
+      "id": 905854,
+      "name": "Saipan",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "source": "ne_10m_land",
+        "gap_ibs": "Saipan"
+      }
+    },
+    {
+      "id": 950341,
+      "name": "Volcano-Bonin Waters",
+      "terrain": "sea",
+      "core_for_tags": [],
+      "natural_resources": {},
+      "population_base": 0,
+      "special_features": [],
+      "special_levels": {},
+      "domain": "sea",
+      "island_class": "none",
+      "facility_tier": "none",
+      "theater": "sea",
+      "naval_importance": 1,
+      "meta": {
+        "source": "ne_10m_land",
+        "gap_ibs": "Volcano-Bonin Waters",
+        "rect": [
+          140.7,
+          147.6,
+          24.0,
+          29.5
+        ]
+      }
+    },
+    {
+      "id": 950342,
+      "name": "Marianas Waters",
+      "terrain": "sea",
+      "core_for_tags": [],
+      "natural_resources": {},
+      "population_base": 0,
+      "special_features": [],
+      "special_levels": {},
+      "domain": "sea",
+      "island_class": "none",
+      "facility_tier": "none",
+      "theater": "sea",
+      "naval_importance": 1,
+      "meta": {
+        "source": "ne_10m_land",
+        "gap_ibs": "Marianas Waters",
+        "rect": [
+          144.35,
+          146.45,
+          13.72,
+          16.6
+        ]
+      }
     }
   ]
 }

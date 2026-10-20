@@ -3199,7 +3199,12 @@
     "905849": "USA",
     "905850": "USA",
     "905851": "USA",
-    "950340": "USA"
+    "950340": "USA",
+    "905852": "JAP",
+    "905853": "JAP",
+    "905854": "USA",
+    "950341": "JAP",
+    "950342": "USA"
   },
   "meta": {
     "source": "assign_world_accurate_ownership_eras",
