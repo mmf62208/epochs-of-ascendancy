@@ -45,6 +45,10 @@ var _resolver: CombatResolver
 var _open_land_battles: Array = []
 var _next_land_battle_seq: int = 1
 var _last_land_aar: Dictionary = {}
+## Set when a light capture posts a notice. Empty when the capture does not run.
+var last_capture_notice: String = ""
+## Cover an empty own hex the day an enemy division stands next to it.
+const COVER_WITHIN_DAYS := 1
 
 
 func _ready() -> void:
@@ -600,6 +604,175 @@ func start_land_battle(
 	return {"success": true, "instant": false, "opened": true, "battle": battle.duplicate()}
 
 
+## Fill empty own land that touches an enemy division. N = COVER_WITHIN_DAYS (same day).
+## No-op unless a 1936 garrison exists, so scripted soaks do not scan the map.
+func try_ai_cover_threatened_borders() -> Dictionary:
+	var result := {
+		"ok": true,
+		"within_days": COVER_WITHIN_DAYS,
+		"moved": 0,
+		"raised": 0,
+		"reason": "",
+	}
+	if typeof(LeaderManager) == TYPE_NIL or not LeaderManager.has_method("get_formations_for_country"):
+		result["reason"] = "no_leaders"
+		return result
+	if typeof(WarStateDomain) == TYPE_NIL or not WarStateDomain.loop_enabled():
+		result["reason"] = "no_war_loop"
+		return result
+	var tags: Array[String] = ["GER", "FRA", "ENG", "SOV", "ITA", "JAP", "USA", "POL", "CZE"]
+	var active: Array[String] = []
+	for raw_tag in tags:
+		var tag := str(raw_tag)
+		var has_garrison := false
+		for f in LeaderManager.get_formations_for_country(tag):
+			if f != null and bool(f.get_meta("garrison_1936", false)):
+				has_garrison = true
+				break
+		if not has_garrison:
+			continue
+		if WarStateDomain.enemies_of(tag).is_empty():
+			continue
+		active.append(tag)
+	if active.is_empty():
+		result["reason"] = "no_garrisons"
+		return result
+	if typeof(MapManager) == TYPE_NIL or not MapManager.has_method("get_adjacent_provinces"):
+		result["reason"] = "no_map"
+		return result
+	for tag2 in active:
+		var enemies: Array = WarStateDomain.enemies_of(tag2)
+		var enemy_pids: Array[int] = []
+		for enemy_v in enemies:
+			var enemy := str(enemy_v).strip_edges().to_upper()
+			for ef in LeaderManager.get_formations_for_country(enemy):
+				if ef == null:
+					continue
+				var eft := str(ef.formation_type) if "formation_type" in ef else ""
+				if eft != Formation.TYPE_DIVISION and eft != Formation.TYPE_GARRISON:
+					continue
+				var esid := int(ef.stationed_province_id) if "stationed_province_id" in ef else -1
+				if esid > 0:
+					enemy_pids.append(esid)
+		if enemy_pids.is_empty():
+			continue
+		var friendly: Dictionary = {}
+		var pool: Array = []
+		var capitals: Dictionary = {}
+		if LeaderManager.has_method("garrison_1936_capital_pids"):
+			for cap_v in LeaderManager.garrison_1936_capital_pids(tag2):
+				capitals[int(cap_v)] = true
+		for f2 in LeaderManager.get_formations_for_country(tag2):
+			if f2 == null:
+				continue
+			var ft2 := str(f2.formation_type) if "formation_type" in f2 else ""
+			if ft2 != Formation.TYPE_DIVISION and ft2 != Formation.TYPE_GARRISON:
+				continue
+			var sid := int(f2.stationed_province_id) if "stationed_province_id" in f2 else -1
+			if sid > 0:
+				friendly[sid] = true
+			if not bool(f2.get_meta("garrison_1936", false)):
+				continue
+			if "is_in_combat" in f2 and bool(f2.is_in_combat):
+				continue
+			var sfid := str(f2.formation_id) if "formation_id" in f2 else ""
+			if sfid.is_empty():
+				continue
+			if typeof(FormationMovement) != TYPE_NIL and FormationMovement.has_march(sfid):
+				continue
+			if sid <= 0 or bool(capitals.get(sid, false)):
+				continue
+			pool.append(f2)
+		var threatened: Array[int] = []
+		var seen_th: Dictionary = {}
+		for epid in enemy_pids:
+			for nid_v in MapManager.get_adjacent_provinces(epid, true):
+				var nid := int(nid_v)
+				if nid <= 0 or nid >= 950000 or seen_th.has(nid) or friendly.has(nid):
+					continue
+				var np = MapManager.get_province(nid) if MapManager.has_method("get_province") else null
+				if np == null or bool(np.is_sea):
+					continue
+				if str(np.owner_tag).strip_edges().to_upper() != tag2:
+					continue
+				seen_th[nid] = true
+				threatened.append(nid)
+		if threatened.is_empty():
+			continue
+		threatened.sort()
+		pool.sort_custom(func(a, b):
+			var sa := int(a.stationed_province_id)
+			var sb := int(b.stationed_province_id)
+			if sa == sb:
+				return str(a.formation_id) < str(b.formation_id)
+			return sa < sb
+		)
+		for hole in threatened:
+			if not pool.is_empty():
+				var spare = pool.pop_front()
+				var from_pid := int(spare.stationed_province_id)
+				spare.stationed_province_id = hole
+				friendly[hole] = true
+				_note_garrison_station(str(spare.formation_id), tag2, hole)
+				result["moved"] = int(result["moved"]) + 1
+				print("GARRISON_COVER move %s %d -> %d" % [str(spare.formation_id), from_pid, hole])
+				continue
+			if _raise_garrison_at(tag2, hole):
+				friendly[hole] = true
+				result["raised"] = int(result["raised"]) + 1
+	return result
+
+
+func _note_garrison_station(fid: String, tag: String, pid: int) -> void:
+	if typeof(SupplyManager) == TYPE_NIL or not ("division_deployments" in SupplyManager):
+		return
+	var deps: Variant = SupplyManager.division_deployments
+	if deps is Dictionary and (deps as Dictionary).has(fid):
+		(deps as Dictionary)[fid] = {
+			"province_id": pid,
+			"country_tag": tag,
+			"order_type": "move_to_province",
+		}
+
+
+func _raise_garrison_at(tag: String, pid: int) -> bool:
+	if typeof(LeaderManager) == TYPE_NIL or not LeaderManager.has_method("field_designed_unit"):
+		return false
+	var fid := "garr1936_%s_%d" % [tag, pid]
+	var n := 2
+	while LeaderManager.formations.has(fid):
+		fid = "garr1936_%s_%d_%d" % [tag, pid, n]
+		n += 1
+		if n > 8:
+			return false
+	var fielded: Dictionary = LeaderManager.field_designed_unit(tag, "german_infantry_division_1943", pid, "land", {
+		"formation_id": fid,
+		"skip_leader": true,
+		"quiet": true,
+		"garrison_1936": true,
+		"force_new": true,
+	})
+	if bool(fielded.get("ok", false)):
+		print("GARRISON_COVER raise %s @ %d" % [fid, pid])
+		return true
+	return false
+
+
+func campaign_province_display_name(pid: int, fallback: String = "") -> String:
+	if pid == 711086:
+		return "Elbing"
+	if pid == 711091:
+		return "Stolp"
+	var name := fallback.strip_edges()
+	if not name.is_empty():
+		return name
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province"):
+		var p = MapManager.get_province(pid)
+		if p != null:
+			return str(p.name)
+	return str(pid)
+
+
 ## Interactive F5: at most one AI start_land_battle per day + 1 spare march + 1 follow-on.
 ## Never execute_province_assault from this initiator (resolve-only stays on battle end).
 func try_ai_start_land_battles(day_index: int = 0) -> Dictionary:
@@ -607,6 +780,7 @@ func try_ai_start_land_battles(day_index: int = 0) -> Dictionary:
 		return {"ok": true, "skipped": true, "reason": "killswitch", "started_n": 0}
 	if typeof(WarStateDomain) != TYPE_NIL and WarStateDomain.ai_stopped():
 		return {"ok": true, "skipped": true, "reason": "campaign_end", "started_n": 0}
+	try_ai_cover_threatened_borders()
 	if typeof(LandBattleAi) == TYPE_NIL:
 		return {"ok": false, "reason": "no planner", "started_n": 0}
 	if typeof(MapManager) == TYPE_NIL:
@@ -1412,6 +1586,7 @@ func _deferred_resolve_attacker_win(att_tag: String, to_id: int, from_id: int, a
 
 
 func _apply_attacker_win_capture_light(att_tag: String, to_id: int, from_id: int, att_fid: String) -> void:
+	last_capture_notice = ""
 	var tag := att_tag.strip_edges().to_upper()
 	var def_tag := ""
 	var previous_owner := ""
@@ -1423,7 +1598,14 @@ func _apply_attacker_win_capture_light(att_tag: String, to_id: int, from_id: int
 			previous_owner = str(live.owner_tag).strip_edges().to_upper()
 			previous_controller = _province_controller_tag(live)
 			def_tag = previous_controller
-			pname = str(live.name)
+			pname = campaign_province_display_name(to_id, str(live.name))
+		# Already ours in full: do not enter the capture path (MAIN-FIX-1).
+		if previous_owner == tag and previous_controller == tag:
+			print(
+				"MAIN_FIX1_CAPTURE_SRC who=BattleManager._apply_attacker_win_capture_light skip=same_owner pid=%d attacker=%s"
+				% [to_id, tag]
+			)
+			return
 		if MapManager.has_method("update_province_owner"):
 			MapManager.update_province_owner(to_id, tag, tag, false, true)
 	if not att_fid.is_empty() and typeof(LeaderManager) != TYPE_NIL:
@@ -1446,10 +1628,12 @@ func _apply_attacker_win_capture_light(att_tag: String, to_id: int, from_id: int
 			owner_now = str(after.owner_tag).strip_edges().to_upper()
 			ctrl_now = _province_controller_tag(after)
 			if pname.is_empty():
-				pname = str(after.name)
+				pname = campaign_province_display_name(to_id, str(after.name))
+	pname = campaign_province_display_name(to_id, pname)
 	var owner_flipped := previous_owner != owner_now
 	var ctrl_flipped := previous_controller != ctrl_now
 	var attacker_holds := owner_now == tag or ctrl_now == tag
+	var liberation := previous_owner == tag and previous_controller != "" and previous_controller != tag and ctrl_now == tag
 	print(
 		"MAIN_FIX1_CAPTURE_SRC who=BattleManager._apply_attacker_win_capture_light pid=%d name=%s attacker=%s prev_owner=%s prev_ctrl=%s now_owner=%s now_ctrl=%s owner_flip=%s ctrl_flip=%s"
 		% [to_id, pname, tag, previous_owner, previous_controller, owner_now, ctrl_now, str(owner_flipped), str(ctrl_flipped)]
@@ -1467,9 +1651,16 @@ func _apply_attacker_win_capture_light(att_tag: String, to_id: int, from_id: int
 		"winner": "attacker",
 	}
 	_displace_defender_from_captured_province(row, to_id)
-	# Toast only when owner or controller actually became the attacker.
-	# Controller-only flips are logged; they are not a capture notice.
-	if attacker_holds and owner_flipped and previous_owner != tag:
+	# Toast when the owner flips, or when we liberate our own land from an enemy controller.
+	# Other controller-only flips stay silent.
+	if liberation:
+		row["liberation"] = true
+		row["from_tag"] = previous_controller
+		last_capture_notice = _capture_notice_title(tag, pname, previous_controller, true)
+		_post_battle_news(row, true)
+	elif attacker_holds and owner_flipped and previous_owner != tag:
+		var from_tag := previous_owner if not previous_owner.is_empty() else def_tag
+		last_capture_notice = _capture_notice_title(tag, pname, from_tag, true)
 		_post_battle_news(row, true)
 	elif ctrl_flipped and not owner_flipped:
 		print(
@@ -2962,11 +3153,14 @@ func _post_battle_news(result: Dictionary, captured: bool) -> void:
 	if typeof(MapManager) != TYPE_NIL and pid >= 0:
 		var p: Province = MapManager.get_province(pid)
 		if p != null:
-			target_name = p.name
+			target_name = campaign_province_display_name(pid, p.name)
 			owner_now = str(p.owner_tag).strip_edges().to_upper()
 			ctrl_now = _province_controller_tag(p)
+	else:
+		target_name = campaign_province_display_name(pid, target_name)
 	# MAIN-FIX-1: toast a capture only when owner_tag actually became the attacker.
-	# Wording is "Poland captured Elbląski from Germany" (+ " (undefended)" on empty hex).
+	# Liberation (we own it, the enemy still controls it) is the controller exception.
+	# Wording is "Poland captured Elbing from Germany" (+ " (undefended)" on empty hex).
 	if captured:
 		var previous_owner := str(result.get("previous_owner_tag", defender)).strip_edges().to_upper()
 		var previous_ctrl := str(result.get("previous_controller_tag", previous_owner)).strip_edges().to_upper()
@@ -2976,6 +3170,16 @@ func _post_battle_news(result: Dictionary, captured: bool) -> void:
 			"MAIN_FIX1_CAPTURE_SRC who=BattleManager._post_battle_news captured=1 attacker=%s defender=%s pid=%d name=%s prev_owner=%s now_owner=%s prev_ctrl=%s now_ctrl=%s holds=%s flipped=%s"
 			% [attacker, defender, pid, target_name, previous_owner, owner_now, previous_ctrl, ctrl_now, str(attacker_holds), str(flipped)]
 		)
+		if bool(result.get("liberation", false)) and attacker_holds:
+			var from_lib := str(result.get("from_tag", previous_ctrl)).strip_edges().to_upper()
+			var title_lib := _capture_notice_title(attacker, target_name, from_lib, bool(result.get("undefended", false)))
+			last_capture_notice = title_lib
+			print(
+				"MAIN_FIX1_CAPTURE_SRC who=BattleManager._post_battle_news post title=%s body=%s"
+				% [title_lib, "Province captured"]
+			)
+			LeaderEventUI.post_news(title_lib, "Province captured", "combat")
+			return
 		if not attacker_holds or not flipped or previous_owner == attacker:
 			print(
 				"MAIN_FIX1_CAPTURE_SRC who=BattleManager._post_battle_news skip=no_owner_or_control_flip_to_attacker pid=%d"
@@ -2989,14 +3193,9 @@ func _post_battle_news(result: Dictionary, captured: bool) -> void:
 			)
 			return
 		var from_tag := previous_owner if not previous_owner.is_empty() else defender
-		var pname := target_name if not target_name.is_empty() else str(pid)
-		var title := "%s captured %s from %s" % [
-			_country_display_name(attacker),
-			pname,
-			_country_display_name(from_tag),
-		]
-		if bool(result.get("undefended", false)):
-			title += " (undefended)"
+		var pname := target_name if not target_name.is_empty() else campaign_province_display_name(pid, str(pid))
+		var title := _capture_notice_title(attacker, pname, from_tag, bool(result.get("undefended", false)))
+		last_capture_notice = title
 		print(
 			"MAIN_FIX1_CAPTURE_SRC who=BattleManager._post_battle_news post title=%s body=%s"
 			% [title, "Province captured"]
@@ -3010,6 +3209,17 @@ func _post_battle_news(result: Dictionary, captured: bool) -> void:
 		% [title_b, body_b]
 	)
 	LeaderEventUI.post_news(title_b, body_b, "combat")
+
+
+func _capture_notice_title(attacker: String, place: String, from_tag: String, undefended: bool) -> String:
+	var title := "%s captured %s from %s" % [
+		_country_display_name(attacker),
+		place,
+		_country_display_name(from_tag),
+	]
+	if undefended:
+		title += " (undefended)"
+	return title
 
 
 func _country_display_name(tag: String) -> String:

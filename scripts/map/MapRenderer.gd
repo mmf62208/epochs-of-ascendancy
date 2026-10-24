@@ -32276,7 +32276,7 @@ func ensure_playable_front_chips(focus_camera: bool = true) -> Dictionary:
 		return result
 	var ger_land: Array = []
 	for f in LeaderManager.get_formations_for_country("GER"):
-		if f == null:
+		if f == null or bool(f.get_meta("garrison_1936", false)):
 			continue
 		var ft := str(f.formation_type) if "formation_type" in f else ""
 		if ft == Formation.TYPE_DIVISION or ft == Formation.TYPE_GARRISON:
@@ -32285,14 +32285,14 @@ func ensure_playable_front_chips(focus_camera: bool = true) -> Dictionary:
 		LeaderManager.field_designed_unit("GER", "panzer_iii_j_medium", GER_FRONT, "land")
 		ger_land.clear()
 		for f3 in LeaderManager.get_formations_for_country("GER"):
-			if f3 == null:
+			if f3 == null or bool(f3.get_meta("garrison_1936", false)):
 				continue
 			var ft3 := str(f3.formation_type) if "formation_type" in f3 else ""
 			if ft3 == Formation.TYPE_DIVISION or ft3 == Formation.TYPE_GARRISON:
 				ger_land.append(f3)
 	var fra_land: Array = []
 	for f2 in LeaderManager.get_formations_for_country("FRA"):
-		if f2 == null:
+		if f2 == null or bool(f2.get_meta("garrison_1936", false)):
 			continue
 		var ft2 := str(f2.formation_type) if "formation_type" in f2 else ""
 		if ft2 == Formation.TYPE_DIVISION or ft2 == Formation.TYPE_GARRISON:
@@ -32354,6 +32354,9 @@ func ensure_playable_front_chips(focus_camera: bool = true) -> Dictionary:
 	if graphical and bool(result["ok"]) and focus_camera:
 		_center_camera_on_province(GER_FRONT, "soft")
 		_toast_easy_unit_orders()
+	if LeaderManager.has_method("seed_1936_start_garrisons"):
+		var garrisons: Dictionary = LeaderManager.seed_1936_start_garrisons(false)
+		result["garrisons"] = garrisons.get("counts", {})
 	print(
 		"MapRenderer: playable front chips GER=%d FRA=%d pid=%d jap=%d fleet=%d wing_r=%d"
 		% [
