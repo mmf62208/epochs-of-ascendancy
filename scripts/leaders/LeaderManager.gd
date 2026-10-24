@@ -173,6 +173,7 @@ var pending_leader_replacements: Array[Dictionary] = []
 ## Human player country — replacement popups and pending badge only apply here.
 var player_country_tag: String = "USA"
 var formations: Dictionary = {}  # formation_id -> Formation
+var _garrisons_1936_seeded: bool = false
 var country_positions: Dictionary = {}  # country_tag -> { position_id -> leader_id }
 var trait_definitions: Dictionary = {}
 var training_path_definitions: Dictionary = {}
@@ -468,6 +469,17 @@ func field_designed_unit(
 	var dom := domain.strip_edges().to_lower()
 	if tag.is_empty() or did.is_empty() or pid <= 0:
 		return {"ok": false, "error": "bad_args"}
+	var want_id := str(extras.get("formation_id", "")).strip_edges()
+	if not want_id.is_empty() and formations.has(want_id):
+		var prev: Formation = formations[want_id] as Formation
+		return {
+			"ok": true,
+			"already": true,
+			"formation_id": want_id,
+			"design_id": did,
+			"province_id": int(prev.stationed_province_id) if prev != null else pid,
+			"country_tag": tag,
+		}
 	if pid < 1000:
 		pid = 710173 if tag == "GER" else pid
 		if pid <= 0:
@@ -492,7 +504,10 @@ func field_designed_unit(
 					"country_tag": tag,
 				}
 	var f := Formation.new()
-	f.formation_id = "fielded_%s_%d" % [tag.to_lower(), Time.get_ticks_usec() % 100000000]
+	if not want_id.is_empty():
+		f.formation_id = want_id
+	else:
+		f.formation_id = "fielded_%s_%d" % [tag.to_lower(), Time.get_ticks_usec() % 100000000]
 	f.country_tag = tag
 	f.name = "%s %s" % [tag, did]
 	f.organization = clampf(float(extras.get("organization", extras.get("org", 1.0))), 0.2, 1.0)
@@ -507,6 +522,8 @@ func field_designed_unit(
 			if cur.is_empty() and from_design.has(k):
 				stamped[k] = from_design[k]
 	_stamp_formation_composition(f, stamped)
+	if bool(extras.get("garrison_1936", false)):
+		f.set_meta("garrison_1936", true)
 	if "fuel_level" in f:
 		f.fuel_level = 1.0
 	match dom:
@@ -524,16 +541,17 @@ func field_designed_unit(
 			f.design_id = did
 			f.current_land_mission = Formation.LAND_MISSION_ASSAULT
 	register_formation(f)
-	if str(f.leader_id).strip_edges().is_empty() and has_method("pick_leader_id_for_formation"):
+	if not bool(extras.get("skip_leader", false)) and str(f.leader_id).strip_edges().is_empty() and has_method("pick_leader_id_for_formation"):
 		var used: Dictionary = _seed_used_leader_ids() if has_method("_seed_used_leader_ids") else {}
 		var pick := pick_leader_id_for_formation(tag, f.formation_type, used, ["general", "field_marshal"])
 		if not pick.is_empty() and has_method("assign_leader_to_formation"):
 			assign_leader_to_formation(pick, f.formation_id)
 	_notify_map_icon_pid(pid)
-	print(
-		"LeaderManager: fielded designer unit %s design=%s @%d"
-		% [f.formation_id, did, pid]
-	)
+	if not bool(extras.get("quiet", false)):
+		print(
+			"LeaderManager: fielded designer unit %s design=%s @%d"
+			% [f.formation_id, did, pid]
+		)
 	return {
 		"ok": true,
 		"already": false,
@@ -545,6 +563,138 @@ func field_designed_unit(
 		"strength": f.strength,
 		"visual_archetype": str(stamped.get("visual_archetype", "")),
 	}
+
+
+const GARRISON_1936_DESIGN := "german_infantry_division_1943"
+const GARRISON_1936_TAGS: Array[String] = ["GER", "FRA", "ENG", "SOV", "ITA", "JAP", "USA", "POL", "CZE"]
+const GARRISON_1936_CAPITALS := {
+	"GER": 710300,
+	"FRA": 710707,
+	"ENG": 711414,
+	"USA": 800792,
+	"SOV": 903534,
+	"ITA": 710963,
+	"JAP": 903995,
+	"POL": 711112,
+	"CZE": 710146,
+}
+const GARRISON_1936_EXTRA_CAPITALS := {
+	"POL": 711054,
+}
+
+
+## Idempotent 1936 border + capital garrisons. Ids are garr1936_{TAG}_{pid}.
+## No leader draw, so the multi-AI decision seed stays on the unseeded path.
+func seed_1936_start_garrisons(force: bool = false) -> Dictionary:
+	if _garrisons_1936_seeded and not force:
+		return {"ok": true, "already": true, "counts": _garrison_1936_counts(), "placed": 0}
+	if typeof(MapManager) == TYPE_NIL or not MapManager.has_method("get_provinces_by_owner"):
+		return {"ok": false, "reason": "no_board", "counts": {}, "placed": 0}
+	if MapManager.get_provinces_by_owner("GER").size() < 20:
+		return {"ok": false, "reason": "no_board", "counts": {}, "placed": 0}
+	var placed := 0
+	for tag in GARRISON_1936_TAGS:
+		var occupied := _land_pids_occupied(tag)
+		var targets: Array[int] = []
+		var seen: Dictionary = {}
+		for pid_v in MapManager.get_provinces_by_owner(tag):
+			var pid := int(pid_v)
+			if not _garrison_1936_border(tag, pid):
+				continue
+			seen[pid] = true
+			targets.append(pid)
+		for cap in garrison_1936_capital_pids(tag):
+			if seen.has(cap):
+				continue
+			if not _garrison_1936_own_land(tag, cap):
+				continue
+			seen[cap] = true
+			targets.append(cap)
+		targets.sort()
+		for pid2 in targets:
+			if bool(occupied.get(pid2, false)):
+				continue
+			var fid := "garr1936_%s_%d" % [tag, pid2]
+			if formations.has(fid):
+				continue
+			var fielded: Dictionary = field_designed_unit(tag, GARRISON_1936_DESIGN, pid2, "land", {
+				"formation_id": fid,
+				"skip_leader": true,
+				"quiet": true,
+				"garrison_1936": true,
+				"force_new": true,
+			})
+			if bool(fielded.get("ok", false)):
+				placed += 1
+				occupied[pid2] = true
+	_garrisons_1936_seeded = true
+	var counts := _garrison_1936_counts()
+	print("LeaderManager: 1936 garrisons placed=%d %s" % [placed, str(counts)])
+	return {"ok": true, "already": false, "counts": counts, "placed": placed}
+
+
+func garrison_1936_capital_pids(tag: String) -> Array[int]:
+	var out: Array[int] = []
+	var t := tag.strip_edges().to_upper()
+	var cap := int(GARRISON_1936_CAPITALS.get(t, 0))
+	if cap > 0:
+		out.append(cap)
+	var extra := int(GARRISON_1936_EXTRA_CAPITALS.get(t, 0))
+	if extra > 0:
+		out.append(extra)
+	return out
+
+
+func _garrison_1936_counts() -> Dictionary:
+	var counts: Dictionary = {}
+	for tag in GARRISON_1936_TAGS:
+		var n := 0
+		for f in get_formations_for_country(tag):
+			if f != null and bool(f.get_meta("garrison_1936", false)):
+				n += 1
+		counts[tag] = n
+	return counts
+
+
+func _land_pids_occupied(tag: String) -> Dictionary:
+	var occ: Dictionary = {}
+	for f in get_formations_for_country(tag):
+		if f == null:
+			continue
+		var ft := str(f.formation_type) if "formation_type" in f else ""
+		if ft != Formation.TYPE_DIVISION and ft != Formation.TYPE_GARRISON:
+			continue
+		var sid := int(f.stationed_province_id) if "stationed_province_id" in f else -1
+		if sid > 0:
+			occ[sid] = true
+	return occ
+
+
+func _garrison_1936_own_land(tag: String, pid: int) -> bool:
+	if pid <= 0 or pid >= 950000 or typeof(MapManager) == TYPE_NIL:
+		return false
+	var p = MapManager.get_province(pid) if MapManager.has_method("get_province") else null
+	if p == null or bool(p.is_sea):
+		return false
+	return str(p.owner_tag).strip_edges().to_upper() == tag
+
+
+func _garrison_1936_border(tag: String, pid: int) -> bool:
+	if not _garrison_1936_own_land(tag, pid):
+		return false
+	if not MapManager.has_method("get_adjacent_provinces"):
+		return false
+	for nid_v in MapManager.get_adjacent_provinces(pid, true):
+		var nid := int(nid_v)
+		if nid <= 0 or nid >= 950000:
+			continue
+		var np = MapManager.get_province(nid) if MapManager.has_method("get_province") else null
+		if np == null or bool(np.is_sea):
+			continue
+		var o := str(np.owner_tag).strip_edges().to_upper()
+		if not o.is_empty() and o != tag:
+			return true
+	return false
 
 
 ## Player-assign an air wing to a strategic region and a CAS-class mission.
@@ -3621,7 +3771,7 @@ func get_save_data() -> Dictionary:
 		var f: Formation = formations[fid] as Formation
 		if f == null:
 			continue
-		formations_data[str(fid)] = {
+		var formation_blob := {
 			"formation_id": f.formation_id,
 			"name": f.name,
 			"formation_type": f.formation_type,
@@ -3660,6 +3810,9 @@ func get_save_data() -> Dictionary:
 			"air_range_config": str(f.air_range_config) if "air_range_config" in f else "",
 			"last_manpower_loss": int(f.last_manpower_loss) if "last_manpower_loss" in f else 0,
 		}
+		if f.has_meta("garrison_1936") and bool(f.get_meta("garrison_1936", false)):
+			formation_blob["garrison_1936"] = true
+		formations_data[str(fid)] = formation_blob
 
 	return {
 		"leaders": leaders_data,
@@ -3796,6 +3949,8 @@ func apply_save_data(data: Dictionary) -> void:
 				f.set_meta("infantry_bns", clampi(int(fd.get("infantry_bns", 1)), 1, 6))
 			if fd.has("tank_bns"):
 				f.set_meta("tank_bns", clampi(int(fd.get("tank_bns", 0)), 0, 3))
+			if bool(fd.get("garrison_1936", false)):
+				f.set_meta("garrison_1936", true)
 			if "fuel_level" in f:
 				f.fuel_level = clampf(float(fd.get("fuel_level", 1.0)), 0.0, 1.0)
 			if "assigned_region_id" in f:
