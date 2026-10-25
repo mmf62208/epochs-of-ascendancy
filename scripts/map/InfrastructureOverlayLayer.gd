@@ -1168,6 +1168,15 @@ func rebuild_roads_rails_sites_only() -> void:
     _last_infra_rebuild_msec = Time.get_ticks_msec()
 
 
+func mode_switch_roads_are_warm() -> bool:
+    var key := _hwy3_route_input_key()
+    return (
+        not key.is_empty()
+        and key == _hwy3_cached_input_key
+        and not _hwy3_cached_rows.is_empty()
+    )
+
+
 func _schedule_rebuild_all_infra_layers() -> void:
     _queue_infra_rebuild(false)
 
@@ -1454,8 +1463,12 @@ func set_show_proposed_splits(enabled: bool):
 ## Toggle infrastructure sub-layers. Called from DebugOverlay, options, or hotkeys.
 ## Now properly controls the Node2D sub-layer visibility (RoadLayer etc) for true toggle + node editing.
 func set_show_roads(enabled: bool):
+    # Mode switches call this on the way in and out. Rebuilding when the flag
+    # is already correct walked the road cache again (~50 ms) for no visual change.
+    if show_roads == enabled:
+        return
     show_roads = enabled
-    # HWY-3 supply-toggle cache: always rebuild. Cache hit skips hub routing so
+    # HWY-3 supply-toggle cache: rebuild on an actual toggle. Cache hit skips hub routing so
     # L / political is not the old hitch. ROADS-1 stub filter still runs on apply.
     rebuild_road_layer()
     _update_sub_layer_visibilities()
@@ -2772,7 +2785,8 @@ func set_show_rails(enabled: bool):
     if rail_layer:
         rail_layer.visible = show_rails
     if show_rails and not was_on:
-        rebuild_rail_layer()
+        if rail_layer == null or rail_layer.get_child_count() == 0:
+            rebuild_rail_layer()
     queue_redraw()
 
 func set_show_cities(enabled: bool):
@@ -2790,7 +2804,8 @@ func set_show_sites(enabled: bool):
     if sites_layer:
         sites_layer.visible = show_sites
     if show_sites and not was_on:
-        rebuild_sites_layer()
+        if sites_layer == null or sites_layer.get_child_count() == 0:
+            rebuild_sites_layer()
     queue_redraw()
 
 func toggle_roads():

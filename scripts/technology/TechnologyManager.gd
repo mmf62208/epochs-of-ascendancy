@@ -1019,6 +1019,7 @@ func get_technology_screen_data(
 	domain_filter: String = "all",
 	selected_tech_id: String = "",
 	era_epoch_filter: String = "all",
+	include_graph: bool = true,
 ) -> TechnologyScreenData:
 	var tag := country_tag.strip_edges().to_upper()
 	_ensure_country(tag)
@@ -1077,9 +1078,15 @@ func get_technology_screen_data(
 	if selected_tech_id.is_empty() and not nodes.is_empty():
 		data.selected_tech_id = str(nodes[0].get("tech_id", ""))
 	data.inspector = _build_inspector(tag, data.selected_tech_id)
-	var graph := _build_graph_layout(tag, nodes)
-	data.graph_nodes = graph.get("nodes", []) as Array[Dictionary]
-	data.graph_edges = graph.get("edges", []) as Array[Dictionary]
+	if include_graph:
+		var graph := _build_graph_layout(tag, nodes)
+		data.graph_nodes = graph.get("nodes", []) as Array[Dictionary]
+		data.graph_edges = graph.get("edges", []) as Array[Dictionary]
+	else:
+		var no_nodes: Array[Dictionary] = []
+		var no_edges: Array[Dictionary] = []
+		data.graph_nodes = no_nodes
+		data.graph_edges = no_edges
 	if typeof(MapTechnologyContext) != TYPE_NIL:
 		data.map_integration_note = MapTechnologyContext.get_map_integration_note(tag)
 		var preview: Dictionary = MapTechnologyContext.get_build_mode_preview(tag)
