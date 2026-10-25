@@ -1035,7 +1035,9 @@ func _notify_map_icon_pid(pid: int) -> void:
 	var mr: Node = tree.get_first_node_in_group("map_renderer")
 	if mr == null:
 		mr = tree.root.find_child("WorldMap", true, false)
-	if mr != null and mr.has_method("_update_unit_icons_for_pids"):
+	if mr != null and mr.has_method("queue_unit_icon_rebuild"):
+		mr.queue_unit_icon_rebuild([pid])
+	elif mr != null and mr.has_method("_update_unit_icons_for_pids"):
 		mr.call_deferred("_update_unit_icons_for_pids", [pid])
 
 

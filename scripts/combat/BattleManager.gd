@@ -49,12 +49,30 @@ var _last_land_aar: Dictionary = {}
 var last_capture_notice: String = ""
 ## Cover an empty own hex the day an enemy division stands next to it.
 const COVER_WITHIN_DAYS := 1
+## Light captures apply from _process, not the message queue.
+## Godot 4.7 flushes that queue and then still runs _process before it
+## returns quit(), so the first _process only arms. The apply is the next one.
+var _pending_light_captures: Array = []
+var _capture_flush_armed: bool = false
 
 
 func _ready() -> void:
 	_resolver = CombatResolver.new()
 	_resolver.name = "CombatResolver"
 	add_child(_resolver)
+	set_process(false)
+
+
+func _process(_delta: float) -> void:
+	if not _capture_flush_armed:
+		_capture_flush_armed = not _pending_light_captures.is_empty()
+		if not _capture_flush_armed:
+			set_process(false)
+		return
+	_capture_flush_armed = false
+	_flush_pending_light_captures()
+	if _pending_light_captures.is_empty():
+		set_process(false)
 
 
 ## Multi-phase combat estimate pilot (approach/engage/disengage) — pure via MapPolishFormatters.
@@ -1555,7 +1573,7 @@ func _tick_one_open_land_battle(battle: Dictionary) -> Dictionary:
 				ev["success"] = true
 				ev["deferred_capture"] = false
 			else:
-				call_deferred("_deferred_resolve_attacker_win", att_tag, to_id, from_id, att_fid)
+				_queue_light_capture(att_tag, to_id, from_id, att_fid)
 				ev["success"] = true
 				ev["deferred_capture"] = true
 		else:
@@ -1580,8 +1598,61 @@ func _interactive_light_sim() -> bool:
 	)
 
 
+func _capture_session_closed() -> bool:
+	if has_meta("eoa_capture_session_closed") and bool(get_meta("eoa_capture_session_closed")):
+		return true
+	var tree := get_tree()
+	if tree != null:
+		if tree.has_meta("eoa_capture_session_closed") and bool(tree.get_meta("eoa_capture_session_closed")):
+			return true
+		if tree.root != null and tree.root.has_meta("eoa_capture_session_closed") and bool(tree.root.get_meta("eoa_capture_session_closed")):
+			return true
+	if typeof(WarStateDomain) != TYPE_NIL and bool(WarStateDomain.ai_stopped()):
+		return true
+	return false
+
+
+func _queue_light_capture(att_tag: String, to_id: int, from_id: int, att_fid: String) -> void:
+	if _capture_session_closed():
+		print(
+			"MAIN_FIX1_CAPTURE_SRC who=BattleManager._queue_light_capture skip=session_closed pid=%d attacker=%s"
+			% [to_id, att_tag]
+		)
+		return
+	_pending_light_captures.append([att_tag, to_id, from_id, att_fid])
+	set_process(true)
+
+
+func _flush_pending_light_captures() -> void:
+	if _pending_light_captures.is_empty():
+		return
+	var batch: Array = _pending_light_captures.duplicate()
+	_pending_light_captures.clear()
+	if _capture_session_closed():
+		print(
+			"MAIN_FIX1_CAPTURE_SRC who=BattleManager._flush_pending_light_captures skip=session_closed n=%d"
+			% batch.size()
+		)
+		return
+	for item in batch:
+		if _capture_session_closed():
+			print(
+				"MAIN_FIX1_CAPTURE_SRC who=BattleManager._flush_pending_light_captures skip=session_closed pid=%d"
+				% int(item[1])
+			)
+			return
+		_apply_attacker_win_capture_light(str(item[0]), int(item[1]), int(item[2]), str(item[3]))
+
+
 func _deferred_resolve_attacker_win(att_tag: String, to_id: int, from_id: int, att_fid: String) -> void:
 	# Hang-class: F5 capture is data-only (no second resolve, no owner signal).
+	# A leftover deferred call after quit or campaign end must not apply.
+	if _capture_session_closed():
+		print(
+			"MAIN_FIX1_CAPTURE_SRC who=BattleManager._deferred_resolve_attacker_win skip=session_closed pid=%d attacker=%s"
+			% [to_id, att_tag]
+		)
+		return
 	_apply_attacker_win_capture_light(att_tag, to_id, from_id, att_fid)
 
 
@@ -1651,16 +1722,19 @@ func _apply_attacker_win_capture_light(att_tag: String, to_id: int, from_id: int
 		"winner": "attacker",
 	}
 	_displace_defender_from_captured_province(row, to_id)
+	# A hex that still had a formation is not undefended. Empty hexes stay "(undefended)".
+	var undefended := not bool(row.get("defender_retreated", false))
+	row["undefended"] = undefended
 	# Toast when the owner flips, or when we liberate our own land from an enemy controller.
 	# Other controller-only flips stay silent.
 	if liberation:
 		row["liberation"] = true
 		row["from_tag"] = previous_controller
-		last_capture_notice = _capture_notice_title(tag, pname, previous_controller, true)
+		last_capture_notice = _capture_notice_title(tag, pname, previous_controller, undefended)
 		_post_battle_news(row, true)
 	elif attacker_holds and owner_flipped and previous_owner != tag:
 		var from_tag := previous_owner if not previous_owner.is_empty() else def_tag
-		last_capture_notice = _capture_notice_title(tag, pname, from_tag, true)
+		last_capture_notice = _capture_notice_title(tag, pname, from_tag, undefended)
 		_post_battle_news(row, true)
 	elif ctrl_flipped and not owner_flipped:
 		print(
@@ -2610,6 +2684,7 @@ func _displace_defender_from_captured_province(result: Dictionary, captured_pid:
 				f2.stationed_province_id = retreat_pid
 		elif typeof(SupplyManager) != TYPE_NIL and SupplyManager.division_deployments.has(move_fid):
 			SupplyManager.division_deployments.erase(move_fid)
+		result["defender_retreated"] = true
 		print(
 			"[CAPTURE RETREAT] %s (%s) leaves province %d → station=%d"
 			% [move_fid, def_tag, captured_pid, retreat_pid]
