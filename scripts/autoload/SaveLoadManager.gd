@@ -8,7 +8,7 @@
 ## === SAVE FORMAT (JSON, human-readable for debugging) ===
 ## Root dictionary:
 ## {
-##   "save_version": 1,                    # Integer. Bump on breaking changes.
+##   "save_version": 2,                    # Integer. Bump on breaking changes.
 ##   "metadata": {
 ##     "timestamp": "2026-05-18T14:30:00", # ISO-ish from Time.get_datetime_string_from_system
 ##     "scenario_id": "1936",              # Future: ScenarioLoader scenario identifier
@@ -141,7 +141,7 @@
 extends Node
 
 const SAVE_DIR := "user://saves/"
-const SAVE_VERSION := 1
+const SAVE_VERSION := 2
 const SAVE_GAME_VERSION := "0.2-dev"   # Bumped for richer metadata support
 const DEFAULT_SLOT := "quicksave"
 
@@ -605,8 +605,12 @@ func _gather_save_data() -> Dictionary:
 	# --- NationalModifierManager ---
 	if typeof(NationalModifierManager) != TYPE_NIL:
 		data["national_modifiers"] = {
-			"country_modifiers": NationalModifierManager.country_modifiers.duplicate(true)
+			"country_modifiers": NationalModifierManager.country_modifiers.duplicate(true),
+			"effect_seq": int(NationalModifierManager._effect_seq),
 		}
+
+	if typeof(NationalSpiritManager) != TYPE_NIL and NationalSpiritManager.has_method("get_save_data"):
+		data["national_spirits"] = NationalSpiritManager.get_save_data()
 
 	# --- Scenario metadata ---
 	var scenario_name := ""
@@ -758,6 +762,9 @@ func _apply_save_data(data: Dictionary) -> void:
 	if data.has("national_modifiers") and typeof(NationalModifierManager) != TYPE_NIL:
 		_apply_national_modifier_state(data["national_modifiers"])
 
+	if data.has("national_spirits") and typeof(NationalSpiritManager) != TYPE_NIL and NationalSpiritManager.has_method("apply_save_data"):
+		NationalSpiritManager.apply_save_data(data["national_spirits"])
+
 	# 5. Technology research state + unlocks
 	if data.has("technology") and typeof(TechnologyManager) != TYPE_NIL:
 		_apply_technology_state(data["technology"])
@@ -837,6 +844,10 @@ func _apply_save_data(data: Dictionary) -> void:
 		if RelationsManager.has_method("apply_save_data"):
 			RelationsManager.apply_save_data(data["relations"])
 
+	# Leader / agent / modifier years are not their own calendar. The next
+	# year boundary increments them, so a load must leave them on the restored clock.
+	_sync_sim_years_from_clock()
+
 	# Future: after all core state, allow other managers to react
 	# e.g. if typeof(ProductionManager) != TYPE_NIL and ProductionManager.has_method("on_game_loaded"):
 	#     ProductionManager.on_game_loaded()
@@ -869,10 +880,28 @@ func _apply_time_state(t: Dictionary) -> void:
 		TimeManager._accumulated_game_hours = float(t.get("accumulated_hours", 0.0))
 	# Do not fire game_day_advanced etc. here — we are restoring state, not simulating.
 
+
+## Leader, agent, and modifier years follow TimeManager during play via year
+## signals. They are not stored on their own. Restoring only the clock leaves
+## them at the boot year, so the next 1 January increments a stale counter.
+func _sync_sim_years_from_clock() -> void:
+	if typeof(TimeManager) == TYPE_NIL:
+		return
+	var year := int(TimeManager.get_current_year())
+	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("set_current_year"):
+		LeaderManager.set_current_year(year)
+	if typeof(AgentManager) != TYPE_NIL and AgentManager.has_method("set_current_year"):
+		AgentManager.set_current_year(year)
+		AgentManager._last_year_ticked = year
+	if typeof(NationalModifierManager) != TYPE_NIL and NationalModifierManager.has_method("set_current_year"):
+		NationalModifierManager.set_current_year(year)
+		NationalModifierManager._last_year_ticked = year
+
+
 ## --- Agents (most complex because of Resource instances) ---
 
 func _serialize_agent_state() -> Dictionary:
-	var out := { "agents": {}, "networks": {} }
+	var out := { "agents": {}, "networks": {}, "agent_seq": int(AgentManager._agent_seq) }
 
 	# Agents
 	for ctag in AgentManager.agents.keys():
@@ -992,6 +1021,13 @@ func _apply_agent_state(a: Dictionary) -> void:
 
 	# Note: We do not re-emit every signal here; UI that cares can refresh on demand
 	# or we can emit a single "agents_state_restored" if we add the signal later.
+	AgentManager._agent_seq = int(a.get("agent_seq", 0))
+	for ctag2 in AgentManager.agents.keys():
+		var restored: Variant = AgentManager.agents[ctag2]
+		if restored is Array:
+			for agent_v in restored as Array:
+				if agent_v is Agent:
+					AgentManager.note_agent_id((agent_v as Agent).agent_id)
 	print("SaveLoad: Restored %d agent countries + %d networks" % [agents_by_country.size(), nets.size()])
 
 ## --- Map (provinces) ---
@@ -1253,6 +1289,8 @@ func _apply_national_modifier_state(n: Dictionary) -> void:
 		return
 	# Replace wholesale — tick_modifiers will continue decaying on next monthly tick
 	NationalModifierManager.country_modifiers = (n.get("country_modifiers", {}) as Dictionary).duplicate(true)
+	if NationalModifierManager.has_method("apply_saved_effect_seq"):
+		NationalModifierManager.apply_saved_effect_seq(int(n.get("effect_seq", 0)))
 	print("SaveLoad: National modifier effects restored")
 
 ## --- Technology ---
@@ -1261,20 +1299,30 @@ func _apply_technology_state(t: Dictionary) -> void:
 	if typeof(TechnologyManager) == TYPE_NIL:
 		return
 
-	var cs: Dictionary = t.get("country_state", {}) as Dictionary
-	if not cs.is_empty():
-		TechnologyManager.country_state = cs.duplicate(true)
+	if TechnologyManager.has_method("apply_save_data"):
+		var payload := t.duplicate(true)
+		# A stub or empty country_state must not wipe scenario research.
+		var cs: Variant = payload.get("country_state", {})
+		if not (cs is Dictionary) or (cs as Dictionary).is_empty():
+			payload.erase("country_state")
+		TechnologyManager.apply_save_data(payload)
+	else:
+		var legacy: Dictionary = t.get("country_state", {}) as Dictionary
+		if not legacy.is_empty():
+			TechnologyManager.country_state = legacy.duplicate(true)
+		if TechnologyManager.has_method("_rebuild_unlock_indices"):
+			TechnologyManager._rebuild_unlock_indices()
 
-	# Rebuild any derived indices that depend on the restored state
-	if TechnologyManager.has_method("_rebuild_unlock_indices"):
-		TechnologyManager._rebuild_unlock_indices()
+	# Old blobs omit the year. Follow the clock already restored above.
+	if not t.has("current_year") and typeof(TimeManager) != TYPE_NIL and TechnologyManager.has_method("set_current_year"):
+		TechnologyManager.set_current_year(int(TimeManager.get_current_year()))
+	if TechnologyManager.has_method("get_current_year"):
+		TechnologyManager._last_year_ticked = int(TechnologyManager.get_current_year())
 
-	# Let screens / UI that listen to research_state_changed refresh
-	for tag in TechnologyManager.country_state.keys():
-		if TechnologyManager.has_signal("research_state_changed"):
-			TechnologyManager.research_state_changed.emit(str(tag))
-
-	print("SaveLoad: Technology country_state restored for %d countries" % TechnologyManager.country_state.size())
+	print("SaveLoad: Technology country_state restored for %d countries (year %d)" % [
+		TechnologyManager.country_state.size(),
+		int(TechnologyManager.get_current_year()) if TechnologyManager.has_method("get_current_year") else 0,
+	])
 
 ## Convenience / debug helpers
 
@@ -1339,16 +1387,64 @@ func _migrate_save_data(data: Dictionary) -> void:
 	if v >= SAVE_VERSION:
 		return
 	print("SaveLoad: Migrating save from v%d to v%d" % [v, SAVE_VERSION])
+	if v < 2:
+		_migrate_save_v1_to_v2(data)
+	data["save_version"] = SAVE_VERSION
 
-	# Example future migration (uncomment and extend as needed):
-	# if v < 2:
-	#     if not data.has("production"):
-	#         data["production"] = {}
-	#     if data.has("old_key_name"):
-	#         data["new_key_name"] = data.pop("old_key_name")
-	#     # Provide defaults for new sections, fix shapes, etc.
 
-	data["save_version"] = SAVE_VERSION  # mark as upgraded
+## v1 blobs omitted depot fuel/munitions, id counters, and the supply cursors.
+## Missing keys get defaults. National spirits are left untouched so a missing
+## section still reloads the definition list.
+func _migrate_save_v1_to_v2(data: Dictionary) -> void:
+	var supply: Variant = data.get("supply", {})
+	if supply is Dictionary:
+		var depots: Variant = (supply as Dictionary).get("depots", {})
+		if depots is Dictionary:
+			for pid_str in (depots as Dictionary).keys():
+				var entry: Variant = (depots as Dictionary)[pid_str]
+				if typeof(entry) != TYPE_DICTIONARY:
+					continue
+				var row: Dictionary = entry
+				if not row.has("fuel_stockpile"):
+					row["fuel_stockpile"] = 0.0
+				if not row.has("munitions_stockpile"):
+					row["munitions_stockpile"] = float(row.get("stockpile", 0.0)) * 0.35
+				(depots as Dictionary)[pid_str] = row
+			(supply as Dictionary)["depots"] = depots
+		if not (supply as Dictionary).has("refill_queue"):
+			(supply as Dictionary)["refill_queue"] = []
+		if not (supply as Dictionary).has("supply_day_jobs"):
+			(supply as Dictionary)["supply_day_jobs"] = []
+		if not (supply as Dictionary).has("attrition"):
+			(supply as Dictionary)["attrition"] = {"losses": {}, "leaders": {}}
+		data["supply"] = supply
+	var leaders: Variant = data.get("leaders", {})
+	if leaders is Dictionary:
+		if not (leaders as Dictionary).has("replacement_seq"):
+			(leaders as Dictionary)["replacement_seq"] = 0
+		if not (leaders as Dictionary).has("leader_id_seq"):
+			(leaders as Dictionary)["leader_id_seq"] = 0
+		if not (leaders as Dictionary).has("fielded_seq"):
+			(leaders as Dictionary)["fielded_seq"] = 0
+		if not (leaders as Dictionary).has("officer_training_quality"):
+			(leaders as Dictionary)["officer_training_quality"] = {}
+		if not (leaders as Dictionary).has("months_in_training"):
+			(leaders as Dictionary)["months_in_training"] = {}
+		if not (leaders as Dictionary).has("officer_training_debuff_months"):
+			(leaders as Dictionary)["officer_training_debuff_months"] = {}
+		data["leaders"] = leaders
+	var production: Variant = data.get("production", {})
+	if production is Dictionary and not (production as Dictionary).has("family_units_produced"):
+		(production as Dictionary)["family_units_produced"] = {}
+		data["production"] = production
+	var agents: Variant = data.get("agents", {})
+	if agents is Dictionary and not (agents as Dictionary).has("agent_seq"):
+		(agents as Dictionary)["agent_seq"] = 0
+		data["agents"] = agents
+	var modifiers: Variant = data.get("national_modifiers", {})
+	if modifiers is Dictionary and not (modifiers as Dictionary).has("effect_seq"):
+		(modifiers as Dictionary)["effect_seq"] = 0
+		data["national_modifiers"] = modifiers
 
 ## === Infrastructure migration support (added May 2026) ===
 ## Handles old saves that pre-date the "infrastructure_projects" section.

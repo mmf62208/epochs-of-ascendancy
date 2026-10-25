@@ -16,6 +16,8 @@ var player_tag: String = "USA"
 
 var player_depot_province_ids: Array[int] = []
 var force_registry: CombatPresenceRegistry = CombatPresenceRegistry.new()
+## Set when a save restored combat presence, so the deployment resync does not add it twice.
+var _presence_restored_from_save: bool = false
 ## formation_id -> {province_id, country_tag} — source of truth for player division map presence.
 var division_deployments: Dictionary = {}
 var attrition_ledger: AttritionReplenishmentLedger = AttritionReplenishmentLedger.new()
@@ -3006,8 +3008,12 @@ func seed_demo_engineer_presence(country_tag: String = "") -> void:
 
 func resync_division_deployments_to_registry() -> void:
 	## Rebuild engineer totals and division presence from division_deployments (after load).
+	## A save that already restored the presence registry must not add those totals again.
 	if division_deployments.is_empty():
+		_presence_restored_from_save = false
 		return
+	var skip_presence := _presence_restored_from_save
+	_presence_restored_from_save = false
 	var tags_seen: Dictionary = {}
 	var provinces_seen: Dictionary = {}
 	for fid in division_deployments.keys():
@@ -3026,7 +3032,10 @@ func resync_division_deployments_to_registry() -> void:
 			var formation: Formation = LeaderManager.get_formation(str(fid))
 			if formation != null:
 				formation.stationed_province_id = pid
-		register_division_presence(pid, tag, template, 1.0)
+		if not skip_presence:
+			register_division_presence(pid, tag, template, 1.0)
+	if skip_presence:
+		return
 	for pid in provinces_seen.keys():
 		for tag in tags_seen.keys():
 			_recalculate_engineers_at_province(int(pid), str(tag))
@@ -3043,14 +3052,30 @@ func get_save_data() -> Dictionary:
 			"stockpile": depot.stockpile,
 			"throughput_capacity": depot.throughput_capacity,
 			"sabotage_level": depot.sabotage_level,
+			"storage_capacity": depot.storage_capacity,
+			"fuel_stockpile": depot.fuel_stockpile,
+			"munitions_stockpile": depot.munitions_stockpile,
 		}
 	var deployments := {}
 	for fid in division_deployments.keys():
 		deployments[str(fid)] = (division_deployments[fid] as Dictionary).duplicate(true)
+	var jobs: Array = []
+	for job_v in _supply_day_queue:
+		if job_v is Dictionary:
+			jobs.append(_supply_job_to_save(job_v))
+	var refill: Array[int] = []
+	for dest_v in _refill_queue:
+		refill.append(int(dest_v))
 	return {
-		"version": 1,
+		"version": 2,
 		"depots": depots,
 		"division_deployments": deployments,
+		"refill_queue": refill,
+		"supply_day_jobs": jobs,
+		"attrition": attrition_ledger.to_save_dict(),
+		"player_depot_province_ids": player_depot_province_ids.duplicate(),
+		"presence": force_registry.to_save_dict(),
+		"active_cargo": active_cargo.to_save_dict() if active_cargo != null else {},
 	}
 
 
@@ -3073,6 +3098,22 @@ func apply_save_data(
 					depot.throughput_capacity = float(entry["throughput_capacity"])
 				if entry.has("sabotage_level"):
 					depot.sabotage_level = float(entry["sabotage_level"])
+				if entry.has("storage_capacity"):
+					depot.storage_capacity = float(entry["storage_capacity"])
+				if entry.has("fuel_stockpile"):
+					depot.fuel_stockpile = float(entry["fuel_stockpile"])
+				else:
+					depot.fuel_stockpile = 0.0
+				if entry.has("munitions_stockpile"):
+					depot.munitions_stockpile = float(entry["munitions_stockpile"])
+				else:
+					depot.munitions_stockpile = depot.stockpile * 0.35
+		_apply_refill_queue(data)
+		_apply_supply_day_jobs(data)
+		_apply_attrition_save(data)
+		_apply_player_depots(data)
+		_apply_cargo_save(data)
+		_apply_presence_save(data)
 	if restore_deployments and data.has("division_deployments"):
 		division_deployments.clear()
 		var saved_deps: Dictionary = data.get("division_deployments", {}) as Dictionary
@@ -3083,6 +3124,97 @@ func apply_save_data(
 			division_deployments[str(fid)] = dep.duplicate(true)
 		resync_division_deployments_to_registry()
 		print("SupplyManager: restored %d division deployments" % division_deployments.size())
+
+
+func _supply_job_to_save(job: Dictionary) -> Dictionary:
+	var keys: Array = job.get("keys", []) if job.get("keys") is Array else []
+	var route_keys: Array = job.get("route_keys", []) if job.get("route_keys") is Array else []
+	return {
+		"days": float(job.get("days", 1.0)),
+		"phase": int(job.get("phase", 0)),
+		"defer_flush": bool(job.get("defer_flush", false)),
+		"finished": bool(job.get("finished", false)),
+		"builds0": int(job.get("builds0", 0)),
+		"gen_ready": bool(job.get("gen_ready", false)),
+		"keys": keys.duplicate(),
+		"index": int(job.get("index", 0)),
+		"ship_ready": bool(job.get("ship_ready", false)),
+		"route_keys": route_keys.duplicate(),
+		"route_index": int(job.get("route_index", 0)),
+		"plans": int(job.get("plans", 0)),
+		"attrition_tons": float(job.get("attrition_tons", 0.0)),
+	}
+
+
+func _supply_job_from_save(saved: Dictionary) -> Dictionary:
+	var job := _make_supply_day_job(float(saved.get("days", 1.0)))
+	for k in ["phase", "defer_flush", "finished", "builds0", "gen_ready", "index", "ship_ready", "route_index", "plans", "attrition_tons"]:
+		if saved.has(k):
+			job[k] = saved[k]
+	if saved.get("keys") is Array:
+		job["keys"] = (saved["keys"] as Array).duplicate()
+	if saved.get("route_keys") is Array:
+		job["route_keys"] = (saved["route_keys"] as Array).duplicate()
+	return job
+
+
+func _apply_refill_queue(data: Dictionary) -> void:
+	_clear_refill_queue()
+	var raw: Variant = data.get("refill_queue", [])
+	if not raw is Array:
+		return
+	for item in raw as Array:
+		var dest := int(item)
+		if dest <= 0 or _refill_queued.has(dest):
+			continue
+		_refill_queued[dest] = true
+		_refill_queue.append(dest)
+
+
+func _apply_supply_day_jobs(data: Dictionary) -> void:
+	_supply_day_queue.clear()
+	var raw: Variant = data.get("supply_day_jobs", [])
+	if not raw is Array:
+		return
+	for item in raw as Array:
+		if item is Dictionary:
+			_supply_day_queue.append(_supply_job_from_save(item))
+
+
+func _apply_attrition_save(data: Dictionary) -> void:
+	if data.get("attrition") is Dictionary:
+		attrition_ledger.apply_save_dict(data["attrition"])
+	else:
+		attrition_ledger.clear()
+
+
+func _apply_player_depots(data: Dictionary) -> void:
+	player_depot_province_ids.clear()
+	var raw: Variant = data.get("player_depot_province_ids", [])
+	if not raw is Array:
+		return
+	for item in raw as Array:
+		var pid := int(item)
+		if pid > 0 and pid not in player_depot_province_ids:
+			player_depot_province_ids.append(pid)
+
+
+func _apply_cargo_save(data: Dictionary) -> void:
+	if data.get("active_cargo") is Dictionary:
+		var cargo_row: Dictionary = data["active_cargo"]
+		if not cargo_row.is_empty():
+			active_cargo = SupplyCargoProfile.from_save_dict(cargo_row)
+
+
+func _apply_presence_save(data: Dictionary) -> void:
+	if not data.has("presence"):
+		_presence_restored_from_save = false
+		return
+	var raw: Variant = data.get("presence", {})
+	force_registry.clear()
+	if raw is Dictionary:
+		force_registry.apply_save_dict(raw)
+	_presence_restored_from_save = true
 
 
 func seed_demo_enemy_forces(sample_tags: Array[String] = []) -> void:

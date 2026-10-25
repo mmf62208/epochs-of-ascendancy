@@ -175,6 +175,10 @@ var player_country_tag: String = "USA"
 var formations: Dictionary = {}  # formation_id -> Formation
 ## Monotonic suffix for fielded_* ids. Saved so a load does not reuse an id.
 var _fielded_seq: int = 0
+## Monotonic suffixes for generated leader ids and replacement request ids.
+## Saved so a load does not reuse an id and so two processes match.
+var _leader_id_seq: int = 0
+var _replacement_seq: int = 0
 var country_positions: Dictionary = {}  # country_tag -> { position_id -> leader_id }
 var trait_definitions: Dictionary = {}
 var training_path_definitions: Dictionary = {}
@@ -473,6 +477,55 @@ func _note_fielded_seq(fid: String) -> void:
 	var tail := str(parts[parts.size() - 1])
 	if tail.is_valid_int():
 		_fielded_seq = maxi(_fielded_seq, int(tail))
+
+
+func _sim_day() -> int:
+	if typeof(TimeManager) != TYPE_NIL and "total_days_elapsed" in TimeManager:
+		return int(TimeManager.total_days_elapsed)
+	return 0
+
+
+func alloc_generated_leader_id(country_tag: String, kind: String) -> String:
+	_leader_id_seq += 1
+	var k := kind.strip_edges().to_lower()
+	if k.is_empty():
+		k = "gen"
+	return "%s_%s_d%d_%d" % [country_tag.strip_edges().to_lower(), k, _sim_day(), _leader_id_seq]
+
+
+func _note_seq_tail(seq_name: String, id_text: String) -> void:
+	var parts := id_text.split("_")
+	if parts.size() < 2:
+		return
+	var day_tok := str(parts[parts.size() - 2])
+	var tail := str(parts[parts.size() - 1])
+	if not day_tok.begins_with("d") or not day_tok.substr(1).is_valid_int():
+		return
+	if not tail.is_valid_int():
+		return
+	var n := int(tail)
+	if seq_name == "leader":
+		_leader_id_seq = maxi(_leader_id_seq, n)
+	elif seq_name == "replacement":
+		_replacement_seq = maxi(_replacement_seq, n)
+
+
+func _alloc_replacement_request_id(context: String, target_id: String) -> String:
+	_replacement_seq += 1
+	return "%s_%s_d%d_%d" % [context, target_id, _sim_day(), _replacement_seq]
+
+
+## Append a replacement request without the player/AI auto-resolve path.
+## The long-war trace calls this inside the compared window.
+func open_traced_replacement(country_tag: String, target_id: String) -> String:
+	var tag := country_tag.strip_edges().to_upper()
+	var tid := target_id.strip_edges()
+	var types: Array[String] = ["general"]
+	var request := _build_replacement_request(tag, "formation", tid, tid, "", "", "traced", types)
+	if request.is_empty():
+		return ""
+	pending_leader_replacements.append(request)
+	return str(request.get("request_id", ""))
 
 
 ## Field a designer template as a living map unit (selectable chip + orders).
@@ -2102,7 +2155,7 @@ func _build_replacement_request(
 	valid_leader_types: Array[String],
 ) -> Dictionary:
 	var draft := {
-		"request_id": "%s_%s_%d" % [context, target_id, Time.get_unix_time_from_system()],
+		"request_id": _alloc_replacement_request_id(context, target_id),
 		"country_tag": country_tag,
 		"context": context,
 		"target_id": target_id,
@@ -3679,6 +3732,11 @@ func get_save_data() -> Dictionary:
 			"assigned_region_id": int(f.assigned_region_id) if "assigned_region_id" in f else 0,
 			"current_air_mission": str(f.current_air_mission) if "current_air_mission" in f else "",
 			"air_range_config": str(f.air_range_config) if "air_range_config" in f else "",
+			"current_naval_order": str(f.current_naval_order) if "current_naval_order" in f else "",
+			"mission_intensity": float(f.mission_intensity) if "mission_intensity" in f else 1.0,
+			"parent_formation_id": str(f.parent_formation_id) if "parent_formation_id" in f else "",
+			"attached_air_formation_id": str(f.attached_air_formation_id) if "attached_air_formation_id" in f else "",
+			"campaign_inactive": bool(f.campaign_inactive) if "campaign_inactive" in f else false,
 			"last_manpower_loss": int(f.last_manpower_loss) if "last_manpower_loss" in f else 0,
 		}
 
@@ -3693,12 +3751,20 @@ func get_save_data() -> Dictionary:
 		"service_doctrines": service_doctrines.duplicate(true),
 		"organize_priority": organize_priority,
 		"fielded_seq": _fielded_seq,
+		"leader_id_seq": _leader_id_seq,
+		"replacement_seq": _replacement_seq,
+		"officer_training_quality": officer_training_quality.duplicate(true),
+		"months_in_training": months_in_training.duplicate(true),
+		"officer_training_debuff_months": officer_training_debuff_months.duplicate(true),
 	}
 
 func apply_save_data(data: Dictionary) -> void:
 	leaders.clear()
 	country_positions.clear()
 	officer_training_leader_id.clear()
+	officer_training_quality.clear()
+	months_in_training.clear()
+	officer_training_debuff_months.clear()
 	pending_retirements.clear()
 	pending_leader_replacements.clear()
 
@@ -3770,6 +3836,19 @@ func apply_save_data(data: Dictionary) -> void:
 		service_doctrines = (data["service_doctrines"] as Dictionary).duplicate(true)
 
 	_fielded_seq = int(data.get("fielded_seq", 0))
+	_leader_id_seq = int(data.get("leader_id_seq", 0))
+	_replacement_seq = int(data.get("replacement_seq", 0))
+	for lid_key in leaders.keys():
+		_note_seq_tail("leader", str(lid_key))
+	for req_row in pending_leader_replacements:
+		if req_row is Dictionary:
+			_note_seq_tail("replacement", str(req_row.get("request_id", "")))
+	if data.get("officer_training_quality") is Dictionary:
+		officer_training_quality = (data["officer_training_quality"] as Dictionary).duplicate(true)
+	if data.get("months_in_training") is Dictionary:
+		months_in_training = (data["months_in_training"] as Dictionary).duplicate(true)
+	if data.get("officer_training_debuff_months") is Dictionary:
+		officer_training_debuff_months = (data["officer_training_debuff_months"] as Dictionary).duplicate(true)
 	if data.has("formations"):
 		var fdata: Dictionary = data["formations"] as Dictionary
 		for fid in fdata.keys():
@@ -3830,6 +3909,16 @@ func apply_save_data(data: Dictionary) -> void:
 				f.current_air_mission = str(fd.get("current_air_mission"))
 			if "air_range_config" in f and str(fd.get("air_range_config", "")).strip_edges() != "":
 				f.air_range_config = str(fd.get("air_range_config"))
+			if "current_naval_order" in f and fd.has("current_naval_order"):
+				f.current_naval_order = str(fd.get("current_naval_order", f.current_naval_order))
+			if "mission_intensity" in f and fd.has("mission_intensity"):
+				f.mission_intensity = float(fd.get("mission_intensity", f.mission_intensity))
+			if "parent_formation_id" in f and fd.has("parent_formation_id"):
+				f.parent_formation_id = str(fd.get("parent_formation_id", ""))
+			if "attached_air_formation_id" in f and fd.has("attached_air_formation_id"):
+				f.attached_air_formation_id = str(fd.get("attached_air_formation_id", ""))
+			if "campaign_inactive" in f and fd.has("campaign_inactive"):
+				f.campaign_inactive = bool(fd.get("campaign_inactive", false))
 			if "last_manpower_loss" in f:
 				f.last_manpower_loss = int(fd.get("last_manpower_loss", 0))
 			if fd.get("combat_log") is Array:
@@ -4072,7 +4161,7 @@ func generate_new_leader_from_training(
 	var effective_quality := _get_effective_officer_training_quality(tag, training_leader)
 
 	var new_leader := Leader.new()
-	new_leader.leader_id = "%s_officer_%d" % [tag.to_lower(), Time.get_unix_time_from_system()]
+	new_leader.leader_id = alloc_generated_leader_id(tag, "officer")
 	new_leader.country_tag = tag
 	new_leader.leader_type = _pick_officer_cadet_leader_type(tag, leader_type)
 	new_leader.birth_year = get_current_year() - randi_range(27, 35)

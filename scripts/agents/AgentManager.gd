@@ -35,6 +35,8 @@ var networks: Dictionary[int, AgentNetwork] = {}                    # province_i
 var mission_definitions: Dictionary = {}
 
 var _current_year: int = 1936
+## Monotonic suffix for recruited agent ids. Saved so a load does not reuse one.
+var _agent_seq: int = 0
 var _last_year_ticked: int = -1              # Dedup guard: both TM and Leader year signals may fire during clock migration
 var _agent_screen_cache: Dictionary = {}       # country_tag -> AgentScreenData
 
@@ -131,6 +133,7 @@ func get_agent(agent_id: String) -> Agent:
 func recruit_agent(country_tag: String) -> Agent:
 	var tag := country_tag.strip_edges().to_upper()
 	var new_agent := AgentGenerator.generate_agent(tag, _current_year)
+	new_agent.agent_id = alloc_agent_id(tag)
 
 	if not agents.has(tag):
 		agents[tag] = [] as Array[Agent]
@@ -140,6 +143,26 @@ func recruit_agent(country_tag: String) -> Agent:
 	agent_recruited.emit(new_agent.agent_id, tag)
 	print("AgentManager: Recruited %s for %s" % [new_agent.name, tag])
 	return new_agent
+
+
+func alloc_agent_id(country_tag: String) -> String:
+	_agent_seq += 1
+	var day := 0
+	if typeof(TimeManager) != TYPE_NIL and "total_days_elapsed" in TimeManager:
+		day = int(TimeManager.total_days_elapsed)
+	return "%s_agent_d%d_%d" % [country_tag.strip_edges().to_lower(), day, _agent_seq]
+
+
+func note_agent_id(agent_id: String) -> void:
+	var parts := agent_id.split("_")
+	if parts.size() < 2:
+		return
+	var day_tok := str(parts[parts.size() - 2])
+	var tail := str(parts[parts.size() - 1])
+	if not day_tok.begins_with("d") or not day_tok.substr(1).is_valid_int():
+		return
+	if tail.is_valid_int():
+		_agent_seq = maxi(_agent_seq, int(tail))
 
 
 func assign_agent_to_mission(
@@ -423,7 +446,6 @@ func _apply_inclusion_leverage(agent: Agent, magnitude: float) -> void:
 	# Also give a small direct prestige/stability bump via NMM for the owning country
 	if typeof(NationalModifierManager) != TYPE_NIL:
 		var mod := {
-			"effect_id": "peace_inclusion_%s_%d" % [agent.country_tag, Time.get_unix_time_from_system()],
 			"source": "agent_mission",
 			"source_detail": "Diplomatic success — peace table leverage",
 			"modifiers": {"prestige": 4.0, "stability": 2.0},

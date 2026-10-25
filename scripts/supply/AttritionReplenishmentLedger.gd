@@ -28,6 +28,26 @@ func clear() -> void:
 	_division_leader_ids.clear()
 
 
+func to_save_dict() -> Dictionary:
+	return {
+		"losses": _losses.duplicate(true),
+		"leaders": _division_leader_ids.duplicate(true),
+	}
+
+
+func apply_save_dict(data: Dictionary) -> void:
+	_losses.clear()
+	_division_leader_ids.clear()
+	var losses: Variant = data.get("losses", {})
+	if losses is Dictionary:
+		for key in (losses as Dictionary).keys():
+			_losses[str(key)] = (losses as Dictionary)[key]
+	var leaders: Variant = data.get("leaders", {})
+	if leaders is Dictionary:
+		for key2 in (leaders as Dictionary).keys():
+			_division_leader_ids[str(key2)] = str((leaders as Dictionary)[key2])
+
+
 func get_primary_leader_id() -> String:
 	for leader_id in _division_leader_ids.values():
 		var lid := str(leader_id)

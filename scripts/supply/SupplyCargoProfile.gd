@@ -62,6 +62,28 @@ static func munitions(tons: float) -> SupplyCargoProfile:
 	return p
 
 
+func to_save_dict() -> Dictionary:
+	return {
+		"cargo_tons": cargo_tons,
+		"prefers_air": prefers_air,
+		"prefers_sea": prefers_sea,
+		"land_ok": land_ok,
+		"cargo_kind": cargo_kind,
+		"munitions_fraction": munitions_fraction,
+	}
+
+
+static func from_save_dict(data: Dictionary) -> SupplyCargoProfile:
+	var profile := SupplyCargoProfile.new()
+	profile.cargo_tons = float(data.get("cargo_tons", 0.0))
+	profile.prefers_air = bool(data.get("prefers_air", false))
+	profile.prefers_sea = bool(data.get("prefers_sea", false))
+	profile.land_ok = bool(data.get("land_ok", true))
+	profile.cargo_kind = str(data.get("cargo_kind", "general"))
+	profile.munitions_fraction = float(data.get("munitions_fraction", 0.35))
+	return profile
+
+
 ## Effective munitions tons in this cargo shipment.
 func munitions_tons() -> float:
 	return maxf(0.0, cargo_tons * clampf(munitions_fraction, 0.0, 1.0))

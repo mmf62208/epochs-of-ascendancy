@@ -102,6 +102,61 @@ func all_province_ids() -> Array:
 	return _by_province.keys()
 
 
+func to_save_dict() -> Dictionary:
+	var out := {}
+	for pid in _by_province.keys():
+		var report: ProvinceForceReport = _by_province[pid]
+		if report == null or _report_empty(report):
+			continue
+		out[str(pid)] = {
+			"land": report.land_by_tag.duplicate(),
+			"air": report.air_by_tag.duplicate(),
+			"naval": report.naval_by_tag.duplicate(),
+			"port": report.naval_at_port_by_tag.duplicate(),
+			"engineers": report.engineers_by_tag.duplicate(),
+			"recon": report.air_recon_by_tag.duplicate(),
+		}
+	return out
+
+
+func apply_save_dict(data: Dictionary) -> void:
+	clear()
+	for pid_str in data.keys():
+		var row: Variant = data[pid_str]
+		if typeof(row) != TYPE_DICTIONARY:
+			continue
+		var report := ProvinceForceReport.new(int(pid_str))
+		var src: Dictionary = row
+		report.land_by_tag = _float_dict(src.get("land", {}))
+		report.air_by_tag = _float_dict(src.get("air", {}))
+		report.naval_by_tag = _float_dict(src.get("naval", {}))
+		report.naval_at_port_by_tag = _float_dict(src.get("port", {}))
+		report.engineers_by_tag = _float_dict(src.get("engineers", {}))
+		report.air_recon_by_tag = _float_dict(src.get("recon", {}))
+		if not _report_empty(report):
+			set_report(int(pid_str), report)
+
+
+func _float_dict(raw: Variant) -> Dictionary:
+	var out := {}
+	if typeof(raw) != TYPE_DICTIONARY:
+		return out
+	for key in (raw as Dictionary).keys():
+		out[str(key)] = float((raw as Dictionary)[key])
+	return out
+
+
+func _report_empty(report: ProvinceForceReport) -> bool:
+	return (
+		report.land_by_tag.is_empty()
+		and report.air_by_tag.is_empty()
+		and report.naval_by_tag.is_empty()
+		and report.naval_at_port_by_tag.is_empty()
+		and report.engineers_by_tag.is_empty()
+		and report.air_recon_by_tag.is_empty()
+	)
+
+
 # === Naval Recon Support ===
 # Naval presence in sea zones provides recon rolls on adjacent land provinces.
 # Strength contributes to detection chance.
