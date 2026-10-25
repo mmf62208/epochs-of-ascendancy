@@ -599,6 +599,31 @@ var _btn_station_engineers: Button = null
 # Demo map tint mode for strain (welfare) / vitality (settlement) / development re-tint layers (wired from DebugOverlay / hotkeys F1-F4).
 # "supply" handled via the L overlay toggle (existing supply layer) but exposable as mode.
 var debug_tint_mode: String = ""  # "", "vitality", "strain", "development", "loyalty", "infra"  -- boosts the corresponding tint/characterize layer for basic mapmode-style views. Use set_map_mode().
+## UI-PERF-1: last set_map_mode phase times (microseconds). Read by the probe; no sim effect.
+var map_mode_switch_profile: Dictionary = {}
+var map_mode_apply_gen: int = 0
+var _fill_profile_color_usec: int = 0
+var _fill_profile_assign_usec: int = 0
+## Mode-switch fill cache. Epoch bumps on non-mode refreshes (day, zoom, owner).
+var _mode_fill_cache: Dictionary = {}
+var _fill_cache_epoch: int = 0
+var _fill_cache_from_mode_switch: bool = false
+var _fill_cache_warm_quiet: bool = false
+## True until the first real map-mode switch. A boot refresh bumps the cache
+## epoch; while this holds, that refresh queues another warm so the first chip
+## is still a hit.
+var _fill_cache_hold_warm: bool = true
+var _fill_cache_rewarm_queued: bool = false
+## Chip-click split for the windowed probe. Not gameplay.
+var ui_perf_toolbar_skips: int = 0
+var ui_perf_owns_us: int = 0
+var ui_perf_legend_us: int = 0
+var _fill_modulate_ready: bool = false
+var _terrain_edge_mix_cache: Dictionary = {}
+var _fill_riot_ids: Dictionary = {}
+var _fill_cache_store: Dictionary = {}
+var _fill_cache_storing: bool = false
+const _FILL_VERTEX_WHITE := Color(1.0, 1.0, 1.0, 1.0)
 ## Pass 16/17: secondary stacked tints (e.g. vitality primary + strain + loyalty).
 var debug_tint_mode_secondary: String = ""  # first secondary (compat)
 var debug_tint_mode_secondaries: Array = []  # Pass 17: full secondary list
@@ -2151,6 +2176,35 @@ func _search_ui_owns_click() -> bool:
 	return sr.get_global_rect().grow(6.0).has_point(vp_r.get_mouse_position())
 
 
+func _map_mode_toolbar_owns_click(screen_pos: Vector2) -> bool:
+	# Chip clicks arrive with event.position. gamescope warp_mouse can leave
+	# get_mouse_position() on the map, so a rect test against that point still
+	# ran the 3520 pick (~200 ms) under every chip. Do not mark the event
+	# handled — the Button still has to toggle.
+	if _map_mode_toolbar == null or not is_instance_valid(_map_mode_toolbar) or not (_map_mode_toolbar is Control):
+		return false
+	var tb := _map_mode_toolbar as Control
+	if not tb.visible:
+		return false
+	if tb.get_global_rect().grow(6.0).has_point(screen_pos):
+		return true
+	return _control_tree_owns_point(tb, screen_pos)
+
+
+func _control_tree_owns_point(root_c: Control, screen_pos: Vector2) -> bool:
+	for ch_v in root_c.get_children():
+		if not (ch_v is Control):
+			continue
+		var ch := ch_v as Control
+		if not ch.visible:
+			continue
+		if ch.mouse_filter != Control.MOUSE_FILTER_IGNORE and ch.get_global_rect().grow(4.0).has_point(screen_pos):
+			return true
+		if _control_tree_owns_point(ch, screen_pos):
+			return true
+	return false
+
+
 func _road_spine_btn_owns_click() -> bool:
 	# Play MIXED d0b1587d: leftover map pan / pick-block swallowed inspector
 	# button-up (same class as Search Go). Rect first — hover can miss.
@@ -2284,20 +2338,24 @@ func _route_living_title_escape() -> void:
 	_esc_open_command_center()
 
 
-func _top_bar_owns_click() -> bool:
+func _top_bar_owns_click(screen_pos: Vector2 = Vector2(-100000, -100000)) -> bool:
 	# Softpipe / living-title: gui_get_hovered_control() can miss TopInfoBar
 	# 4x / pause (same class as Search Go). Rect first so leftover pick-block
 	# cannot set_input_as_handled over the live clock chrome.
+	# Pass event.position from _input. gamescope warp_mouse leaves
+	# get_mouse_position() on the map, so a Tech/Prod click paid the unit scan.
 	var tree: SceneTree = get_tree()
 	if tree == null:
 		return false
 	var tib: Control = TopInfoBar.find_in_tree(tree) as Control
 	if tib == null or not is_instance_valid(tib) or not tib.visible:
 		return false
-	var vp_t: Viewport = get_viewport()
-	if vp_t == null:
-		return false
-	var mouse_t: Vector2 = vp_t.get_mouse_position()
+	var mouse_t: Vector2 = screen_pos
+	if mouse_t.x < -50000.0:
+		var vp_t: Viewport = get_viewport()
+		if vp_t == null:
+			return false
+		mouse_t = vp_t.get_mouse_position()
 	if tib.get_global_rect().grow(4.0).has_point(mouse_t):
 		return true
 	var speed_row: Control = tib.get_node_or_null("ContentRow/LeftContainer/TimeSpeedContainer") as Control
@@ -3015,6 +3073,16 @@ func _input(event: InputEvent) -> void:
 			if _campaign_modal_consumes_pointer(event):
 				get_viewport().set_input_as_handled()
 				return
+			# The title node stays in the tree after Begin, so "boot is up" is
+			# the wrong guard. A chip or top-bar click must not run the unit
+			# scan. Do not mark handled — the Button still toggles.
+			var own0 := Time.get_ticks_usec()
+			var toolbar_hit := _map_mode_toolbar_owns_click(event.position)
+			var top_hit := false if toolbar_hit else _top_bar_owns_click(event.position)
+			ui_perf_owns_us += int(Time.get_ticks_usec() - own0)
+			if toolbar_hit or top_hit:
+				ui_perf_toolbar_skips += 1
+				return
 			# TipDismiss arms this on press. Clear after the release frame so
 			# the same click cannot open the unit under the ×, and the next click can.
 			if not event.pressed and has_meta("eoa_tip_dismiss_swallow_release"):
@@ -3479,6 +3547,11 @@ func _unhandled_input(event: InputEvent) -> void:
 	# Spatial picking click handling — this path makes the system fully functional
 	# even when create_area_nodes_for_fallback=false (pure MapPickGrid mode, zero Area2D nodes).
 	if use_spatial_picking and event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		# Chip / top-bar: do not walk the title tree or hex-pick. The Button
+		# already saw this event in the GUI pass.
+		var chip_at := _map_pick_screen_pos(event)
+		if _map_mode_toolbar_owns_click(chip_at) or _top_bar_owns_click(chip_at):
+			return
 		if event.pressed:
 			_clear_begin_title_release_swallow_on_new_left_press()
 			_clear_ui_close_release_swallow_on_new_left_press()
@@ -3521,7 +3594,9 @@ func _unhandled_input(event: InputEvent) -> void:
 				_dismiss_close_control_from_input()
 			get_viewport().set_input_as_handled()
 			return
-		if _top_bar_owns_click() or _mouse_over_search_control() or _search_ui_owns_click() or _living_title_owns_click() or _road_spine_btn_owns_click():
+		if _top_bar_owns_click() or _mouse_over_search_control() or _search_ui_owns_click() or _living_title_owns_click() or _road_spine_btn_owns_click() or _map_mode_toolbar_owns_click(event.position):
+			# Toolbar owns the chip. Do not hex-pick under it, and do not mark
+			# the click handled — the Button still has to toggle the mode.
 			return
 		if not event.ctrl_pressed and not event.shift_pressed:
 			if event.pressed:
@@ -4343,8 +4418,17 @@ func _layout_supply_legend() -> void:
 	if _map_mode_toolbar != null and _map_mode_toolbar.has_method("get_panel_height"):
 		toolbar_h = float(_map_mode_toolbar.call("get_panel_height"))
 	var chrome_top := top_clearance + toolbar_h + 6.0
-	_apply_supply_legend_fixed_frame()
 	var sz: Vector2 = _supply_legend_host_size()
+	# Supply enter used to re-pin this host on every toggle (~20 ms) after it
+	# was already sitting on the chrome row.
+	if (
+		is_equal_approx(host.offset_left, 10.0)
+		and is_equal_approx(host.offset_top, chrome_top)
+		and host.size.is_equal_approx(sz)
+		and _supply_legend_panel.size.is_equal_approx(sz)
+	):
+		return
+	_apply_supply_legend_fixed_frame()
 	_pin_control_top_left(host, 10.0, chrome_top, sz)
 	_pin_control_top_left(_supply_legend_panel, 0.0, 0.0, sz)
 	_sync_supply_legend_pulse_host()
@@ -14746,6 +14830,9 @@ func apply_mapmode_preset_stack(primary_mode: String, stack: Array = []) -> void
 
 
 func set_map_mode(mode: String = "political") -> void:
+	var sync_t0 := Time.get_ticks_usec()
+	var ph_t := sync_t0
+	var ph := {}
 	var m := mode.strip_edges().to_lower()
 	if m == "chokepoints":
 		m = "naval"
@@ -14753,8 +14840,12 @@ func set_map_mode(mode: String = "political") -> void:
 		m = "political"
 	if m == current_map_mode and m != "infra" and m != "naval":
 		return
+	# Boot refreshes may rewarm the fill cache. A real switch must not.
+	_fill_cache_hold_warm = false
 	current_map_mode = m
 	_sync_mapmode_toolbar()
+	ph["toolbar_us"] = Time.get_ticks_usec() - ph_t
+	ph_t = Time.get_ticks_usec()
 	# Clear secondary stack tints unless re-applied by preset.
 	debug_tint_mode_secondary = ""
 	debug_tint_mode_secondaries.clear()
@@ -14778,14 +14869,22 @@ func set_map_mode(mode: String = "political") -> void:
 	set_munitions_desk_visible(m == "supply" or m == "munitions" or supply_mode)
 	# Pass 22: repair queue chip for infra / munitions / supply ops.
 	set_repair_queue_visible(m in ["infra", "munitions", "supply"] or supply_mode)
+	ph["supply_us"] = Time.get_ticks_usec() - ph_t
+	ph_t = Time.get_ticks_usec()
 	# Infra mode: show roads/rails + numbers. Supply: sparse muted roads (not full spiderweb).
 	# Political (default): hide for clean fills.
 	var ol_infra := get_overlay_layer("InfrastructureOverlayLayer")
 	if m == "infra":
-		if ol_infra and ol_infra.has_method("_schedule_rebuild_all_infra_layers"):
-			ol_infra.call("_schedule_rebuild_all_infra_layers")
-		elif ol_infra and ol_infra.has_method("rebuild_all_infra_layers"):
-			ol_infra.call_deferred("rebuild_all_infra_layers")
+		# Roads are built at boot. Rebuilding here invalidated the HWY-3 cache
+		# and walked every land edge (~0.7 s) on each Infra chip.
+		var roads_warm := false
+		if ol_infra and ol_infra.has_method("mode_switch_roads_are_warm"):
+			roads_warm = bool(ol_infra.call("mode_switch_roads_are_warm"))
+		if not roads_warm:
+			if ol_infra and ol_infra.has_method("_schedule_rebuild_all_infra_layers"):
+				ol_infra.call("_schedule_rebuild_all_infra_layers")
+			elif ol_infra and ol_infra.has_method("rebuild_all_infra_layers"):
+				ol_infra.call_deferred("rebuild_all_infra_layers")
 		if ol_infra and ol_infra.has_method("set_show_roads"):
 			ol_infra.set_show_roads(true)
 			ol_infra.set_show_rails(true)
@@ -14815,6 +14914,8 @@ func set_map_mode(mode: String = "political") -> void:
 				supply_map_layer.call("clear_route_highlight")
 		if ol_infra.has_method("queue_redraw"):
 			ol_infra.queue_redraw()
+	ph["roads_us"] = Time.get_ticks_usec() - ph_t
+	ph_t = Time.get_ticks_usec()
 	if m == "naval":
 		var ol_n := get_overlay_layer("InfrastructureOverlayLayer")
 		if ol_n and ol_n.has_method("queue_redraw"):
@@ -14827,6 +14928,8 @@ func set_map_mode(mode: String = "political") -> void:
 			ol_res.set("show_resource_icons", m == "resources")
 			if ol_res.has_method("queue_redraw"):
 				ol_res.queue_redraw()
+	ph["glyphs_us"] = Time.get_ticks_usec() - ph_t
+	ph_t = Time.get_ticks_usec()
 	if m == "weather":
 		debug_tint_mode = "weather"
 	elif m == "munitions":
@@ -14840,17 +14943,40 @@ func set_map_mode(mode: String = "political") -> void:
 	else:
 		debug_tint_mode = "strain" if m == "strain" else ("vitality" if m == "vitality" else ("development" if m == "development" else ("loyalty" if m == "loyalty" else ("infra" if m == "infra" else ("region_control" if m == "region_control" else ("naval" if m == "naval" else ""))))))
 	# Stream 2: state name labels on states mapmode (operational zoom).
+	# Boot already built the layer. Rebuilding on every States chip freed and
+	# recreated every nation/state label (~400 ms).
 	if m == "states":
-		_schedule_political_labels_rebuild()
+		var labels := _ensure_political_labels_layer()
+		if labels != null and labels.has_method("labels_are_built") and bool(labels.call("labels_are_built")):
+			if labels.has_method("set_map_mode_context"):
+				labels.call("set_map_mode_context", m)
+			if labels.has_method("sync_tier"):
+				labels.call("sync_tier", _map_lod_tier)
+		else:
+			_schedule_political_labels_rebuild()
 	if _political_labels_layer != null and is_instance_valid(_political_labels_layer):
 		if _political_labels_layer.has_method("set_map_mode_context"):
 			_political_labels_layer.call("set_map_mode_context", m)
+	ph["labels_us"] = Time.get_ticks_usec() - ph_t
+	ph_t = Time.get_ticks_usec()
 	# Pass 22: restore remembered primary intensity for linked modes.
 	if m in INTENSITY_LINKED_MODES and primary_mapmode_intensity.has(m):
 		secondary_tint_intensity[m] = clampf(float(primary_mapmode_intensity[m]), 0.25, 2.0)
 	_sync_road_quiet_mode()
+	ph["quiet_us"] = Time.get_ticks_usec() - ph_t
+	ph_t = Time.get_ticks_usec()
 	_ensure_ussr_west_gap_mask()
+	ph["mask_us"] = Time.get_ticks_usec() - ph_t
+	ph_t = Time.get_ticks_usec()
 	_apply_legacy_underlay_policy()
+	ph["underlay_us"] = Time.get_ticks_usec() - ph_t
+	map_mode_switch_profile = {
+		"mode": m,
+		"sync_us": Time.get_ticks_usec() - sync_t0,
+		"phases": ph,
+	}
+	if not _last_supply_toggle_profile.is_empty():
+		map_mode_switch_profile["supply_toggle"] = _last_supply_toggle_profile.duplicate()
 	if not _map_mode_apply_scheduled:
 		_map_mode_apply_scheduled = true
 		call_deferred("_apply_map_mode_visuals")
@@ -14858,6 +14984,7 @@ func set_map_mode(mode: String = "political") -> void:
 
 func _apply_map_mode_visuals() -> void:
 	_map_mode_apply_scheduled = false
+	var apply_t0 := Time.get_ticks_usec()
 	var m := current_map_mode
 	# Nuclear: kill batched mesh on every mapmode switch. Mesh is owner-only and used to
 	# leave land polys at a≈0.02 → F2–F4 looked like Europe vanished when mesh went off.
@@ -14868,11 +14995,31 @@ func _apply_map_mode_visuals() -> void:
 			_province_mesh_layer.call("set_enabled", false)
 		_province_mesh_layer.visible = false
 	# Viewport cull can leave most of Europe node.visible=false; mapmode must not inherit holes.
+	var phase_t := Time.get_ticks_usec()
 	_force_all_province_nodes_visible()
+	var force_us := Time.get_ticks_usec() - phase_t
+	phase_t = Time.get_ticks_usec()
+	_fill_cache_from_mode_switch = true
 	_refresh_province_fill_colors(true)
+	_fill_cache_from_mode_switch = false
+	var fill_us := Time.get_ticks_usec() - phase_t
+	phase_t = Time.get_ticks_usec()
 	_restore_land_poly_visibility()
+	var restore_us := Time.get_ticks_usec() - phase_t
+	phase_t = Time.get_ticks_usec()
 	# Capitals on every mode; F1 especially must show full star set.
 	_ensure_capital_stars_visible()
+	var stars_us := Time.get_ticks_usec() - phase_t
+	map_mode_apply_gen += 1
+	map_mode_switch_profile["force_us"] = force_us
+	map_mode_switch_profile["fill_us"] = fill_us
+	map_mode_switch_profile["fill_color_us"] = _fill_profile_color_usec
+	map_mode_switch_profile["fill_assign_us"] = _fill_profile_assign_usec
+	map_mode_switch_profile["restore_us"] = restore_us
+	map_mode_switch_profile["stars_us"] = stars_us
+	map_mode_switch_profile["supply_highlight_ms"] = _last_refresh_supply_highlights_ms
+	map_mode_switch_profile["apply_us"] = Time.get_ticks_usec() - apply_t0
+	map_mode_switch_profile["gen"] = map_mode_apply_gen
 	# Choke diamonds redraw so Danish/English Channel stay at correct sea centroids.
 	var ol_infra2 := get_overlay_layer("InfrastructureOverlayLayer")
 	if ol_infra2 != null and ol_infra2.has_method("queue_redraw"):
@@ -14907,11 +15054,8 @@ func _apply_map_mode_visuals() -> void:
 		elif m == "states": mode_label = "States · colored fills by state · names @ operational zoom (Shift+F9)"
 		elif m == "terrain": mode_label = "Terrain · plains/forest/mtn/desert · sea blue (Ctrl+F9)"
 		DebugOverlay.toast_map_debug("Map mode: %s — %s" % [m, mode_label])
-	call_deferred("_ensure_capital_stars_visible")
-	if m == "political":
-		# F1: always re-assert full capital star set after any mesh/cull path.
-		call_deferred("_force_all_province_nodes_visible")
-		call_deferred("_ensure_capital_stars_visible")
+	# Stars were ensured once above. A deferred second/third pass re-walked
+	# every province and pushed the chip frame past 1 s.
 
 
 func _toolbar_highlight_mode() -> String:
@@ -14961,10 +15105,21 @@ func _force_all_province_nodes_visible() -> void:
 			_political_labels_layer.call("sync_viewport", Rect2(), false)
 
 
+var _land_poly_visibility_ready: bool = false
+
+
 ## After mapmode / mesh toggles: land polys must be opaque; sea below land z.
 func _restore_land_poly_visibility() -> void:
-	# Restore forces capital-star visibility; do not trust the last-px skip.
-	_invalidate_capital_star_scale_cache()
+	# Invalidate only when the star px notch changed. Unconditional invalidate
+	# forced a full font walk on every chip (~200 ms) even at a stable zoom.
+	var star_px := _capital_star_font_px()
+	if star_px != _capital_star_last_sync_px or _asia_end_force_star_pids.size() != _capital_star_last_sync_force_n:
+		_invalidate_capital_star_scale_cache()
+	# Boot already stamped z and alpha. Repeating the 3520 walk on every chip
+	# was ~200 ms and did not change mode colors (those live on modulate).
+	if _land_poly_visibility_ready and _fill_modulate_ready:
+		return
+	var touched := 0
 	for pid in province_nodes.keys():
 		var node: Node2D = province_nodes[pid] as Node2D
 		if node == null or not is_instance_valid(node):
@@ -14985,39 +15140,53 @@ func _restore_land_poly_visibility() -> void:
 		# Sea IDs on this board are 950000+
 		if int(pid) >= 950000:
 			is_water = true
-		if _asia_end_hulls_hidden and _asia_end_is_protected_row(int(pid)):
-			node.z_index = 8
+		var z := 8 if (_asia_end_hulls_hidden and _asia_end_is_protected_row(int(pid))) else _province_draw_z_index(int(pid), is_water)
+		if node.z_index != z:
+			node.z_index = z
+		touched += 1
+		# Fills live on modulate after the first mode paint. Rewriting vertex
+		# color here rebuilt every polygon mesh (~200 ms) on top of the fill pass.
+		if _fill_modulate_ready:
+			var m := poly.modulate
+			var changed := false
+			if is_water:
+				if m.a < 0.99:
+					m.a = 1.0
+					changed = true
+			else:
+				if m.a < 0.85:
+					m.a = 0.96
+					changed = true
+				if m.r + m.g + m.b < 0.12:
+					m = Color(0.35, 0.38, 0.42, 0.96)
+					changed = true
+			if changed:
+				poly.modulate = m
 		else:
-			node.z_index = _province_draw_z_index(int(pid), is_water)
-		if is_water:
-			var sc := poly.color
-			sc.a = 1.0
-			poly.color = sc
-		else:
-			var col := poly.color
-			if col.a < 0.85:
-				col.a = 0.96
-			# Never leave land near-black (looks "deleted")
-			if col.r + col.g + col.b < 0.12:
-				col = Color(0.35, 0.38, 0.42, 0.96)
-			poly.color = col
-		# Capital stars: always on top of land (all mapmodes including F2–F4)
-		for child in node.get_children():
-			if child is Label and (child as Label).has_meta(META_MAP_GLYPH_CAPITAL):
-				var lbl := child as Label
-				lbl.visible = true
-				lbl.modulate = Color(1.0, 1.0, 1.0, 1.0)
-				lbl.z_as_relative = false
-				lbl.z_index = 40
-				lbl.add_theme_color_override("font_color", Color(1.0, 0.92, 0.15, 1.0))
-				lbl.add_theme_color_override("font_outline_color", Color(0.02, 0.02, 0.05, 1.0))
-				lbl.add_theme_constant_override("outline_size", 8)
+			if is_water:
+				var sc := poly.color
+				sc.a = 1.0
+				poly.color = sc
+			else:
+				var col := poly.color
+				if col.a < 0.85:
+					col.a = 0.96
+				if col.r + col.g + col.b < 0.12:
+					col = Color(0.35, 0.38, 0.42, 0.96)
+				poly.color = col
+	if _fill_modulate_ready and touched > 100:
+		_land_poly_visibility_ready = true
+
+
+var _capital_star_roster_ready: bool = false
 
 
 func _ensure_capital_stars_visible() -> void:
-	_invalidate_capital_star_scale_cache()
-	_restore_land_poly_visibility()
 	# Re-stamp stars if missing (mapmode / mesh paths must never drop capitals).
+	# Caller restores fills. Walking every child here duplicated that cost.
+	if _capital_star_roster_ready:
+		_sync_capital_star_scales()
+		return
 	var n_stars := 0
 	for pid in province_nodes.keys():
 		var node: Node2D = province_nodes[pid] as Node2D
@@ -15035,6 +15204,7 @@ func _ensure_capital_stars_visible() -> void:
 		if not has_star:
 			_add_capital_star_to_node(node, int(pid))
 			n_stars += 1
+	_capital_star_roster_ready = true
 	_sync_capital_star_scales()
 	if n_stars > 0:
 		print("MapRenderer: capital stars visible n=%d" % n_stars)
@@ -15618,6 +15788,8 @@ func _boot_political_map_complete() -> void:
 	var ol := get_overlay_layer("InfrastructureOverlayLayer")
 	if ol != null and ol.has_method("queue_redraw"):
 		ol.queue_redraw()
+	# First chip used to pay one-time mask/desk setup and the first color walk.
+	_warm_map_mode_switch_path()
 
 
 var _render_restore_pid: int = -1
@@ -16205,14 +16377,19 @@ func _sync_batched_mesh_fills(force: bool = false) -> void:
 			if poly == null:
 				continue
 			var prov: Province = provinces.get(pid) as Province if provinces.has(pid) else null
-			var c := poly.color
 			var is_w := (prov != null and bool(prov.is_sea)) or int(pid) >= 950000
-			if is_w:
-				c.a = 0.85
-			else:
-				c.a = 0.55  # mesh paints solid; poly still shows if mesh gaps
+			var want_a := 0.85 if is_w else 0.55  # mesh paints solid; poly still shows if mesh gaps
 			node.z_index = _province_draw_z_index(int(pid), is_w)
-			poly.color = c
+			# Keep vertex color white. Writing poly.color rebuilds every province mesh.
+			if _fill_modulate_ready and poly.color == _FILL_VERTEX_WHITE:
+				var m := poly.modulate
+				if not is_equal_approx(m.a, want_a):
+					m.a = want_a
+					poly.modulate = m
+			else:
+				var c := poly.color
+				c.a = want_a
+				poly.color = c
 	else:
 		if _province_mesh_layer.has_method("set_enabled"):
 			_province_mesh_layer.call("set_enabled", false)
@@ -17987,14 +18164,15 @@ func _create_province_node(province: Province, geo: Dictionary) -> Node2D:
 
 	var poly := Polygon2D.new()
 	points = ProvincePolygonUtil.assign_polygon2d(poly, points)
-	poly.color = _get_province_color(province)
+	# White vertices once. Later mode chips change modulate and do not rebuild the mesh.
+	_paint_province_fill(poly, _get_province_color(province))
 	poly.antialiased = true
 	if _asia_end_hulls_hidden and _asia_end_should_hide_row_fill(int(province.id), node):
 		poly.visible = false
 		poly.set_meta("asia_sov_hull_hidden", true)
-		var hc: Color = poly.color
-		hc.a = 0.0
-		poly.color = hc
+		var hm := poly.modulate
+		hm.a = 0.0
+		poly.modulate = hm
 
 	# Area2D is now completely optional.
 	# In the recommended production pure-spatial configuration (use_spatial_picking=true AND
@@ -18391,8 +18569,80 @@ func _recolor_ussr_west_gap_mask() -> void:
 			poly.color = sea
 
 
+## Boot: build the lazy map-mode pieces and store fill colors so the first
+## chip is a cache hit. Restores the mode that was current when this started.
+func _warm_map_mode_switch_path() -> void:
+	set_munitions_desk_visible(false)
+	set_repair_queue_visible(false)
+	_sync_road_quiet_mode()
+	var ol := get_overlay_layer("InfrastructureOverlayLayer")
+	if ol != null and ol.has_method("set_map_mode_for_glyphs"):
+		ol.call("set_map_mode_for_glyphs", current_map_mode)
+	_ensure_ussr_west_gap_mask()
+	_warm_terrain_underlay()
+	if _political_labels_layer != null and is_instance_valid(_political_labels_layer):
+		if _political_labels_layer.has_method("set_map_mode_context"):
+			_political_labels_layer.call("set_map_mode_context", "terrain")
+			_political_labels_layer.call("set_map_mode_context", current_map_mode if not str(current_map_mode).is_empty() else "political")
+	_warm_map_mode_fill_cache()
+
+
+func _warm_map_mode_fill_cache() -> void:
+	var saved_mode := current_map_mode
+	var saved_tint := debug_tint_mode
+	var saved_supply := supply_mode
+	var specs: Array = [
+		["political", ""],
+		["terrain", "terrain"],
+		["supply", ""],
+		["resources", "resources"],
+		["states", "states"],
+		["infra", "infra"],
+		["strain", "strain"],
+	]
+	_fill_cache_warm_quiet = true
+	for spec_v in specs:
+		var spec: Array = spec_v
+		var mode := str(spec[0])
+		current_map_mode = mode
+		debug_tint_mode = str(spec[1])
+		supply_mode = mode == "supply"
+		_fill_cache_from_mode_switch = true
+		_refresh_province_fill_colors(true)
+		_fill_cache_from_mode_switch = false
+	current_map_mode = saved_mode
+	debug_tint_mode = saved_tint
+	supply_mode = saved_supply
+	_fill_cache_from_mode_switch = true
+	_refresh_province_fill_colors(true)
+	_fill_cache_from_mode_switch = false
+	_fill_cache_warm_quiet = false
+
+
+func _queue_fill_cache_rewarm() -> void:
+	if not _fill_cache_hold_warm or _fill_cache_rewarm_queued or _fill_cache_warm_quiet:
+		return
+	_fill_cache_rewarm_queued = true
+	call_deferred("_rewarm_fill_cache_if_holding")
+
+
+func _rewarm_fill_cache_if_holding() -> void:
+	_fill_cache_rewarm_queued = false
+	if not _fill_cache_hold_warm or _fill_cache_warm_quiet:
+		return
+	_warm_map_mode_fill_cache()
+
+
 ## world_accurate: legacy theater art stays available in terrain mode only.
 ## Political and the other map modes read holes as the mask / ocean floor.
+func _warm_terrain_underlay() -> void:
+	var prev := current_map_mode
+	current_map_mode = "terrain"
+	_apply_legacy_underlay_policy()
+	current_map_mode = prev
+	_apply_legacy_underlay_policy()
+
+
 func _apply_legacy_underlay_policy() -> void:
 	if not _is_gis_board_active():
 		return
@@ -20205,6 +20455,10 @@ func _try_open_land_chip_from_input(ctrl_click: bool = false, event: InputEvent 
 		return false
 	if _begin_title_release_blocks_map_pick():
 		return false
+	if event != null:
+		var chip_at := _map_pick_screen_pos(event)
+		if _map_mode_toolbar_owns_click(chip_at) or _top_bar_owns_click(chip_at):
+			return false
 	if _top_bar_owns_click() or _mouse_over_search_control() or _search_ui_owns_click() or _mouse_over_close_control() or _road_spine_btn_owns_click():
 		return false
 	if _unit_card_consumed_press or _unit_card_release_eaten:
@@ -26802,6 +27056,8 @@ func _refresh_province_fill_pids(pids: Array) -> void:
 		return
 	if container != null:
 		_zoom_fill_characterization_scale = absf(container.scale.x)
+	_fill_cache_epoch += 1
+	_begin_fill_riot_ids()
 	var seen: Dictionary = {}
 	for v in pids:
 		var pid := int(v)
@@ -26826,14 +27082,55 @@ func _refresh_province_fill_pids(pids: Array) -> void:
 			if fill >= 0.0:
 				col = col.lerp(_supply_depot_tint_color(fill), _supply_depot_mix_amount())
 		col = _apply_agent_pressure_base_tint(col, province)
-		if typeof(GameData) != TYPE_NIL and GameData.has_method("has_active_riot") and GameData.has_active_riot(pid):
+		if _fill_riot_ids.has(pid):
 			col = col.lerp(Color(0.85, 0.25, 0.25, 0.55), 0.40)
-		poly.color = col
+		_paint_province_fill(poly, col)
+		_mode_fill_cache_note(int(pid), col)
+
+
+func _mode_fill_cache_key() -> String:
+	var zq := int(round(_zoom_fill_characterization_scale * 100.0))
+	var inten := 1.0
+	if debug_tint_mode in INTENSITY_LINKED_MODES:
+		inten = float(primary_mapmode_intensity.get(debug_tint_mode, secondary_tint_intensity.get(debug_tint_mode, 1.0)))
+	return "%s|%s|%s|%d|%.3f|%d" % [
+		current_map_mode, str(supply_mode), debug_tint_mode, zq, inten, _fill_cache_epoch,
+	]
+
+
+func _mode_fill_cache_note(pid: int, col: Color) -> void:
+	if not _fill_cache_storing:
+		return
+	_fill_cache_store[pid] = col
+
+
+func _begin_fill_riot_ids() -> void:
+	_fill_riot_ids = {}
+	if typeof(GameData) == TYPE_NIL or not GameData.has_method("get_provinces_with_active_riots"):
+		return
+	for rid in GameData.get_provinces_with_active_riots():
+		_fill_riot_ids[int(rid)] = true
+
+
+## Vertex color stays white so a mode chip only updates modulate.
+## Writing Polygon2D.color rebuilds the mesh for every province.
+func _paint_province_fill(poly: Polygon2D, col: Color) -> void:
+	if poly.color != _FILL_VERTEX_WHITE:
+		poly.color = _FILL_VERTEX_WHITE
+	if poly.modulate != col:
+		poly.modulate = col
+	_fill_modulate_ready = true
 
 
 func _refresh_province_fill_colors(refresh_all: bool = false) -> void:
+	_fill_profile_color_usec = 0
+	_fill_profile_assign_usec = 0
 	if container != null:
 		_zoom_fill_characterization_scale = absf(container.scale.x)
+	if not _fill_cache_from_mode_switch:
+		_fill_cache_epoch += 1
+		# The warm ran at the previous epoch. Rebuild it before the first chip.
+		_queue_fill_cache_rewarm()
 	# Accurate board (~3.5k): ALWAYS paint every province. Lazy "interesting" cull (~180 pids)
 	# left NOR/SWE/FIN/UK-north/Vestjylland unpainted until F2 forced a full repaint.
 	var board_n := maxi(provinces.size(), province_nodes.size())
@@ -26844,6 +27141,20 @@ func _refresh_province_fill_colors(refresh_all: bool = false) -> void:
 		or board_n >= MapZoomLODScript.ACCURATE_BOARD_CULL_THRESHOLD
 	)
 	var interesting := {} if use_all else _get_interesting_province_ids()
+	var cache_key := _mode_fill_cache_key() if _fill_cache_from_mode_switch else ""
+	var cached: Dictionary = {}
+	if _fill_cache_from_mode_switch and _mode_fill_cache.has(cache_key):
+		var slot: Variant = _mode_fill_cache[cache_key]
+		if slot is Dictionary:
+			cached = slot
+	var cache_hit := _fill_cache_from_mode_switch and not cached.is_empty()
+	_fill_cache_storing = _fill_cache_from_mode_switch and not cache_hit
+	if _fill_cache_storing:
+		_fill_cache_store = {}
+	if not cache_hit:
+		_begin_fill_riot_ids()
+	var color_t0 := Time.get_ticks_usec()
+	var assign_t0 := color_t0
 	for pid in province_nodes.keys():
 		if interesting.size() > 0 and not interesting.has(int(pid)):
 			continue  # lazy cull
@@ -26859,17 +27170,32 @@ func _refresh_province_fill_colors(refresh_all: bool = false) -> void:
 		if _asia_end_should_keep_fill_hidden(int(pid), poly):
 			_hide_fill_on_node(node as Node2D)
 			continue
-		var col := _get_province_color(province)
-		if supply_mode:
-			var fill := ProvinceInsight.depot_fill_ratio(int(pid))
-			if fill >= 0.0:
-				col = col.lerp(_supply_depot_tint_color(fill), _supply_depot_mix_amount())
-		col = _apply_agent_pressure_base_tint(col, province)
-		# Riot tint for active_riots provinces (red overlay hint when political or any mode; visible on inspector hover too via single refresh)
-		if typeof(GameData) != TYPE_NIL and GameData.has_method("has_active_riot") and GameData.has_active_riot(int(pid)):
-			col = col.lerp(Color(0.85, 0.25, 0.25, 0.55), 0.40)  # riot red tint
-		poly.color = col
-	_refresh_supply_highlights()
+		var col: Color
+		if cache_hit and cached.has(int(pid)):
+			col = cached[int(pid)]
+		else:
+			col = _get_province_color(province)
+			if supply_mode:
+				var fill := ProvinceInsight.depot_fill_ratio(int(pid))
+				if fill >= 0.0:
+					col = col.lerp(_supply_depot_tint_color(fill), _supply_depot_mix_amount())
+			col = _apply_agent_pressure_base_tint(col, province)
+			if _fill_riot_ids.has(int(pid)):
+				col = col.lerp(Color(0.85, 0.25, 0.25, 0.55), 0.40)
+			_mode_fill_cache_note(int(pid), col)
+		if cache_hit:
+			pass
+		_paint_province_fill(poly, col)
+	if cache_hit:
+		_fill_profile_assign_usec = Time.get_ticks_usec() - assign_t0
+		_fill_profile_color_usec = 0
+	else:
+		_fill_profile_color_usec = Time.get_ticks_usec() - color_t0
+	if _fill_cache_storing and not _fill_cache_store.is_empty():
+		_mode_fill_cache[cache_key] = _fill_cache_store.duplicate()
+	_fill_cache_storing = false
+	if not _fill_cache_warm_quiet:
+		_refresh_supply_highlights()
 	# Drift compares camera zoom. GIS locks container.scale at 1.0 — recording
 	# that scale here made every unpaused Home/operational frame look like a
 	# zoom drift and recolored all ~3520 fills.
@@ -28742,6 +29068,17 @@ func _attach_unit_counter_chrome(counter: Node2D, ff: Object, nation_col: Color)
 func _terrain_transition_edge_mix(province: Province) -> float:
 	if province == null or province.is_sea:
 		return 0.0
+	var pid := int(province.id)
+	if _terrain_edge_mix_cache.has(pid):
+		return float(_terrain_edge_mix_cache[pid])
+	var mix := _terrain_transition_edge_mix_calc(province)
+	_terrain_edge_mix_cache[pid] = mix
+	return mix
+
+
+func _terrain_transition_edge_mix_calc(province: Province) -> float:
+	if province == null or province.is_sea:
+		return 0.0
 	var t := str(province.terrain).strip_edges().to_lower()
 	var is_plains := t in ["plains", "plain", "grass", "grassland"]
 	var is_high := t in ["hills", "hill", "highland", "mountain", "mountains", "alpine"]
@@ -29179,10 +29516,10 @@ func _refresh_single_province_fill(province_id: int) -> void:
 	col = _apply_agent_pressure_base_tint(col, province)
 	col = _apply_recovering_fill_tint(col, province_id)
 	col = _apply_support_radio_fill_tint(col, province)
-	# Riot tint (live on data_changed for riot pids)
 	if typeof(GameData) != TYPE_NIL and GameData.has_method("has_active_riot") and GameData.has_active_riot(province_id):
 		col = col.lerp(Color(0.85, 0.25, 0.25, 0.55), 0.40)
-	poly.color = col
+	_fill_cache_epoch += 1
+	_paint_province_fill(poly, col)
 
 
 ## Public helper for F10 harness / tester: force re-compute all province fills (tints).
@@ -29783,7 +30120,7 @@ func _apply_hover_fill(province_id: int, active: bool) -> void:
 		col = col.lerp(agent_tint, fill_strength)
 	elif contested:
 		col = col.lerp(_CONFLICT_FILL_TINT, 0.09)
-	poly.color = col.lerp(_HOVER_FILL_TINT, boost)
+	_paint_province_fill(poly, col.lerp(_HOVER_FILL_TINT, boost))
 
 
 func _update_outline_pulse() -> void:
