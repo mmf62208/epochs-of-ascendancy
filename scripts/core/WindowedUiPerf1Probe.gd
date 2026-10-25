@@ -15,6 +15,13 @@ const TECH_BAR_MS := 300.0
 const PROD_BAR_MS := 300.0
 const L_BAR_MS := 200.0
 const PROD_CYCLES := 5
+## Side-task main 477bdf00 median boot_chips_ms 34851 + 300.
+## This probe's boot_ms stops at map-ready + 8 frames (boot_map), which sat
+## ~650 ms under boot_chips on that sample. 3a5042e1 warms every mode on the
+## boot frame and lands near 39 s, over this bar.
+const BOOT_BAR_MS := 35151
+const WARM_FRAME_BAR_MS := 100.0
+const WARM_CACHE_MIN := 3000
 
 const CHIP_LABELS := {
 	"political": "Political",
@@ -90,6 +97,13 @@ func _run() -> void:
 	_report["provinces"] = nprov
 	_report["a3"] = _a3_line(nprov)
 	_note("UI_PERF1 A3 %s" % str(_report["a3"]))
+	var mr_boot := _map_renderer()
+	if mr_boot != null and mr_boot.has_method("hold_idle_fill_warm_for_probe"):
+		_report["during_warm"] = await _measure_during_warm(mr_boot)
+	else:
+		_report["during_warm"] = {"skipped": true}
+		_note("UI_PERF1 during_warm skipped (no idle fill warm)")
+	_flush_report()
 	var idle := await _sample_frames(FRAME_SAMPLES)
 	_report["idle_frames_ms"] = idle
 	_note("UI_PERF1 idle_frames n=%d median=%.1f worst=%.1f" % [idle.size(), _median(idle), _worst(idle)])
@@ -205,7 +219,7 @@ func _collect_switch(mr: Node, t0: int, gen0: int, via: String, mode: String, cy
 func _switch_line(row: Dictionary) -> String:
 	var prof: Dictionary = row.get("profile", {}) as Dictionary
 	return (
-		"UI_PERF1 mode=%s via=%s cycle=%d wall_ms=%.1f frame_worst_ms=%.1f applied=%s live=%s fill_us=%s color_us=%s assign_us=%s restore_us=%s stars_us=%s sync_us=%s chip_us=%s supply_ms=%s warp_us=%s press_us=%s release_us=%s skips=%s owns_us=%s legend_us=%s"
+		"UI_PERF1 mode=%s via=%s cycle=%d wall_ms=%.1f frame_worst_ms=%.1f applied=%s live=%s fill_us=%s color_us=%s assign_us=%s restore_us=%s stars_us=%s sync_us=%s chip_us=%s supply_ms=%s warp_us=%s press_us=%s release_us=%s skips=%s owns_us=%s legend_us=%s cache_n=%s"
 		% [
 			str(row.get("mode", "")),
 			str(row.get("via", "")),
@@ -228,6 +242,7 @@ func _switch_line(row: Dictionary) -> String:
 			str(row.get("skips", "")),
 			str(row.get("owns_us", "")),
 			str(row.get("legend_us", "")),
+			str(prof.get("cache_n", "")),
 		]
 	)
 
@@ -408,7 +423,84 @@ func _measure_l(mr: Node) -> Dictionary:
 	return {"samples": samples}
 
 
+func _measure_during_warm(mr: Node) -> Dictionary:
+	mr.call("hold_idle_fill_warm_for_probe")
+	var pending_terrain := bool(mr.get("fill_cache_warm_pending"))
+	_note("UI_PERF1 during_warm hold pending=%s" % str(pending_terrain))
+	var terrain: Dictionary = await _switch_chip(mr, "terrain", 0)
+	mr.call("release_idle_fill_warm_for_probe")
+	var over := 0
+	var frame_max := 0.0
+	var supply: Dictionary = {}
+	var pending_supply := false
+	var supply_clicked := false
+	var guard := 0
+	while guard < 4000:
+		guard += 1
+		var frame_ms := await _one_frame_ms()
+		var slice_us := int(mr.get("fill_warm_last_frame_us"))
+		if slice_us > 0:
+			frame_max = maxf(frame_max, frame_ms)
+			if frame_ms > WARM_FRAME_BAR_MS:
+				over += 1
+				_note("UI_PERF1 during_warm frame_ms=%.1f slice_us=%d OVER" % [frame_ms, slice_us])
+		var pending := bool(mr.get("fill_cache_warm_pending"))
+		if not supply_clicked and int(mr.get("fill_warm_slices")) >= 1 and pending:
+			pending_supply = true
+			supply = await _switch_chip(mr, "supply", 0)
+			supply_clicked = true
+			continue
+		if supply_clicked and not pending:
+			break
+		if not pending and not supply_clicked and guard > 60:
+			break
+	var out := {
+		"skipped": false,
+		"pending_before_terrain": pending_terrain,
+		"terrain": terrain,
+		"pending_before_supply": pending_supply,
+		"supply": supply,
+		"warm_frames_over_100": over,
+		"warm_frame_max_ms": frame_max,
+		"warm_finished": not bool(mr.get("fill_cache_warm_pending")),
+		"slices": int(mr.get("fill_warm_slices")),
+		"warm_work_max_us": int(mr.get("fill_warm_frame_max_us")),
+	}
+	if bool(out["warm_finished"]):
+		var back: Dictionary = await _switch_chip(mr, "political", 0)
+		out["back_political"] = back
+	_note(
+		"UI_PERF1 during_warm terrain_cache=%s supply_cache=%s frames_over=%d frame_max=%.1f slices=%d finished=%s"
+		% [
+			str(_cache_n(terrain)),
+			str(_cache_n(supply)),
+			over,
+			frame_max,
+			int(out["slices"]),
+			str(bool(out["warm_finished"])),
+		]
+	)
+	return out
+
+
+func _one_frame_ms() -> float:
+	var a := Time.get_ticks_usec()
+	await process_frame
+	return float(Time.get_ticks_usec() - a) / 1000.0
+
+
+func _cache_n(row: Dictionary) -> int:
+	var prof: Dictionary = row.get("profile", {}) as Dictionary
+	return int(prof.get("cache_n", -1))
+
+
 func _grade() -> void:
+	var boot_ms := int(_report.get("boot_ms", 999999))
+	var boot_ok := boot_ms <= BOOT_BAR_MS
+	if not boot_ok:
+		_failures += 1
+		_note("UI_PERF1 FAIL boot_ms=%d bar=%d" % [boot_ms, BOOT_BAR_MS])
+	var warm_ok := _grade_during_warm()
 	var switches: Array = _report.get("switches", []) as Array
 	var walls: Array[float] = []
 	var frame_over := 0
@@ -458,7 +550,12 @@ func _grade() -> void:
 		l_walls.append(float((s_v as Dictionary).get("wall_ms", 99999.0)))
 	var l_med := _median(l_walls)
 	var l_ok := l_walls.size() > 0 and l_med <= L_BAR_MS and _worst(l_walls) <= L_BAR_MS
+	var idle_med := _median(_report.get("idle_frames_ms", []) as Array)
 	_report["grade"] = {
+		"boot_ms": boot_ms,
+		"boot_bar_ms": BOOT_BAR_MS,
+		"boot": "PASS" if boot_ok else "FAIL",
+		"during_warm": "PASS" if warm_ok else "FAIL",
 		"map_median_ms": med,
 		"map_worst_ms": worst,
 		"map_missed": missed,
@@ -467,18 +564,60 @@ func _grade() -> void:
 		"tech": "PASS" if tech_ok else "FAIL",
 		"prod": "PASS" if prod_ok else "FAIL",
 		"L": "PASS" if l_ok else "REPORT",
+		"idle_median_ms": idle_med,
 		"failures": _failures,
 	}
 	_note(
-		"UI_PERF1 grade map=%s median=%.1f worst=%.1f missed=%d tech=%s prod=%s L=%s l_median=%.1f"
+		"UI_PERF1 grade boot=%s boot_ms=%d during_warm=%s map=%s median=%.1f worst=%.1f missed=%d tech=%s prod=%s L=%s l_median=%.1f idle_median=%.1f"
 		% [
+			"PASS" if boot_ok else "FAIL", boot_ms,
+			"PASS" if warm_ok else "FAIL",
 			"PASS" if map_ok else "FAIL", med, worst, missed,
 			"PASS" if tech_ok else "FAIL",
 			"PASS" if prod_ok else "FAIL",
 			"PASS" if l_ok else "REPORT",
 			l_med,
+			idle_med,
 		]
 	)
+
+
+func _grade_during_warm() -> bool:
+	var info: Dictionary = _report.get("during_warm", {}) as Dictionary
+	if bool(info.get("skipped", false)):
+		return true
+	var ok := true
+	if not bool(info.get("pending_before_terrain", false)):
+		ok = false
+		_note("UI_PERF1 FAIL during_warm terrain click was not pending")
+	if not bool(info.get("pending_before_supply", false)):
+		ok = false
+		_note("UI_PERF1 FAIL during_warm supply click was not mid-warm")
+	if not _switch_cached(info.get("terrain", {}) as Dictionary, "terrain"):
+		ok = false
+	if not _switch_cached(info.get("supply", {}) as Dictionary, "supply"):
+		ok = false
+	if int(info.get("warm_frames_over_100", 1)) > 0:
+		ok = false
+		_note("UI_PERF1 FAIL during_warm frames_over_100=%s max=%.1f" % [
+			str(info.get("warm_frames_over_100")), float(info.get("warm_frame_max_ms", -1)),
+		])
+	if not bool(info.get("warm_finished", false)):
+		ok = false
+		_note("UI_PERF1 FAIL during_warm did not finish")
+	if not ok:
+		_failures += 1
+	return ok
+
+
+func _switch_cached(row: Dictionary, mode: String) -> bool:
+	var live := str(row.get("live_mode", ""))
+	var n := _cache_n(row)
+	var applied := bool(row.get("applied", false))
+	if applied and live == mode and n >= WARM_CACHE_MIN:
+		return true
+	_note("UI_PERF1 FAIL during_warm mode=%s applied=%s live=%s cache_n=%d" % [mode, str(applied), live, n])
+	return false
 
 
 func _finish() -> void:

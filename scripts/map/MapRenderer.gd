@@ -623,6 +623,28 @@ var _terrain_edge_mix_cache: Dictionary = {}
 var _fill_riot_ids: Dictionary = {}
 var _fill_cache_store: Dictionary = {}
 var _fill_cache_storing: bool = false
+## How many provinces the last mode-switch fill read from the cache (or stored).
+var _fill_profile_cache_n: int = 0
+## Idle fill warm. Political paint stays on the boot frame. The other mode
+## colors are stored after chrome is clear, in slices, so boot_chips_ms does
+## not include them. 36 frames covers the probe's 8-frame ready wait plus the
+## ~13 frames until the chip count is stable (GARRISON-PERF boot_chips clock).
+var fill_cache_warm_pending: bool = false
+var fill_warm_slices: int = 0
+var fill_warm_last_frame_us: int = 0
+var fill_warm_frame_max_us: int = 0
+var _idle_fill_armed: bool = false
+var _idle_fill_hold_for_probe: bool = false
+var _idle_fill_chrome_ready: bool = false
+var _idle_fill_delay_left: int = 0
+var _idle_fill_spec_i: int = 0
+var _idle_fill_pids: Array = []
+var _idle_fill_pid_i: int = 0
+var _idle_fill_store: Dictionary = {}
+var _idle_fill_key: String = ""
+var _idle_fill_skip_mode: String = ""
+const _IDLE_FILL_DELAY_FRAMES := 36
+const _IDLE_FILL_BUDGET_US := 30000
 const _FILL_VERTEX_WHITE := Color(1.0, 1.0, 1.0, 1.0)
 ## Pass 16/17: secondary stacked tints (e.g. vitality primary + strain + loyalty).
 var debug_tint_mode_secondary: String = ""  # first secondary (compat)
@@ -3909,6 +3931,7 @@ func _process(delta: float) -> void:
 	if _perf != null and _perf.enabled:
 		_perf_frame_start_usec = Time.get_ticks_usec()
 		_perf.begin("process_total")
+	_tick_idle_mode_fill_warm()
 	_expire_map_time_pulse_if_needed()
 	_tick_unit_card_press_consume_latch(delta)
 	_tick_begin_title_release_swallow()
@@ -14842,6 +14865,9 @@ func set_map_mode(mode: String = "political") -> void:
 		return
 	# Boot refreshes may rewarm the fill cache. A real switch must not.
 	_fill_cache_hold_warm = false
+	# A click before the idle warm finishes must not paint a half-built cache.
+	_idle_fill_drop_partial()
+	_idle_fill_skip_mode = m
 	current_map_mode = m
 	_sync_mapmode_toolbar()
 	ph["toolbar_us"] = Time.get_ticks_usec() - ph_t
@@ -15020,6 +15046,7 @@ func _apply_map_mode_visuals() -> void:
 	map_mode_switch_profile["supply_highlight_ms"] = _last_refresh_supply_highlights_ms
 	map_mode_switch_profile["apply_us"] = Time.get_ticks_usec() - apply_t0
 	map_mode_switch_profile["gen"] = map_mode_apply_gen
+	map_mode_switch_profile["cache_n"] = _fill_profile_cache_n
 	# Choke diamonds redraw so Danish/English Channel stay at correct sea centroids.
 	var ol_infra2 := get_overlay_layer("InfrastructureOverlayLayer")
 	if ol_infra2 != null and ol_infra2.has_method("queue_redraw"):
@@ -18569,8 +18596,8 @@ func _recolor_ussr_west_gap_mask() -> void:
 			poly.color = sea
 
 
-## Boot: build the lazy map-mode pieces and store fill colors so the first
-## chip is a cache hit. Restores the mode that was current when this started.
+## Boot: build the one-time map-mode pieces. Fill colors for non-political
+## modes are stored on later idle frames (see _tick_idle_mode_fill_warm).
 func _warm_map_mode_switch_path() -> void:
 	set_munitions_desk_visible(false)
 	set_repair_queue_visible(false)
@@ -18587,11 +18614,8 @@ func _warm_map_mode_switch_path() -> void:
 	_warm_map_mode_fill_cache()
 
 
-func _warm_map_mode_fill_cache() -> void:
-	var saved_mode := current_map_mode
-	var saved_tint := debug_tint_mode
-	var saved_supply := supply_mode
-	var specs: Array = [
+func _idle_fill_specs() -> Array:
+	return [
 		["political", ""],
 		["terrain", "terrain"],
 		["supply", ""],
@@ -18600,23 +18624,42 @@ func _warm_map_mode_fill_cache() -> void:
 		["infra", "infra"],
 		["strain", "strain"],
 	]
-	_fill_cache_warm_quiet = true
-	for spec_v in specs:
-		var spec: Array = spec_v
-		var mode := str(spec[0])
-		current_map_mode = mode
-		debug_tint_mode = str(spec[1])
-		supply_mode = mode == "supply"
-		_fill_cache_from_mode_switch = true
-		_refresh_province_fill_colors(true)
-		_fill_cache_from_mode_switch = false
-	current_map_mode = saved_mode
-	debug_tint_mode = saved_tint
-	supply_mode = saved_supply
-	_fill_cache_from_mode_switch = true
-	_refresh_province_fill_colors(true)
-	_fill_cache_from_mode_switch = false
-	_fill_cache_warm_quiet = false
+
+
+## Probe hook. Holds the idle warm so a chip click can land before it finishes.
+func hold_idle_fill_warm_for_probe() -> void:
+	_idle_fill_hold_for_probe = true
+
+
+func release_idle_fill_warm_for_probe() -> void:
+	_idle_fill_hold_for_probe = false
+
+
+func _warm_map_mode_fill_cache() -> void:
+	_schedule_idle_mode_fill_warm()
+
+
+func _schedule_idle_mode_fill_warm() -> void:
+	if _idle_fill_armed:
+		_idle_fill_drop_partial()
+		_idle_fill_spec_i = 0
+		fill_cache_warm_pending = true
+		return
+	_idle_fill_armed = true
+	_idle_fill_spec_i = 0
+	_idle_fill_drop_partial()
+	_idle_fill_delay_left = _IDLE_FILL_DELAY_FRAMES
+	fill_cache_warm_pending = true
+	fill_warm_slices = 0
+	fill_warm_last_frame_us = 0
+	fill_warm_frame_max_us = 0
+
+
+func _idle_fill_drop_partial() -> void:
+	_idle_fill_store = {}
+	_idle_fill_pids = []
+	_idle_fill_pid_i = 0
+	_idle_fill_key = ""
 
 
 func _queue_fill_cache_rewarm() -> void:
@@ -18630,7 +18673,110 @@ func _rewarm_fill_cache_if_holding() -> void:
 	_fill_cache_rewarm_queued = false
 	if not _fill_cache_hold_warm or _fill_cache_warm_quiet:
 		return
-	_warm_map_mode_fill_cache()
+	_schedule_idle_mode_fill_warm()
+
+
+func _idle_fill_chrome_is_clear() -> bool:
+	if _idle_fill_chrome_ready:
+		return true
+	var tree := get_tree()
+	if tree == null or tree.root == null:
+		return false
+	var ls := tree.root.find_child("LoadingScreen", true, false)
+	if ls != null and bool(ls.get("visible")):
+		return false
+	var boot := tree.root.find_child("LivingTitleBoot", true, false)
+	if boot != null and not bool(boot.get("_closed")):
+		return false
+	_idle_fill_chrome_ready = true
+	return true
+
+
+func _tick_idle_mode_fill_warm() -> void:
+	fill_warm_last_frame_us = 0
+	if not _idle_fill_armed or _idle_fill_hold_for_probe:
+		return
+	if not _idle_fill_chrome_is_clear():
+		return
+	if _idle_fill_delay_left > 0:
+		_idle_fill_delay_left -= 1
+		return
+	var t0 := Time.get_ticks_usec()
+	_idle_fill_pump(_IDLE_FILL_BUDGET_US)
+	fill_warm_last_frame_us = Time.get_ticks_usec() - t0
+	fill_warm_slices += 1
+	if fill_warm_last_frame_us > fill_warm_frame_max_us:
+		fill_warm_frame_max_us = fill_warm_last_frame_us
+
+
+func _idle_fill_pump(budget_us: int) -> void:
+	if province_nodes.is_empty():
+		return
+	var t0 := Time.get_ticks_usec()
+	var specs := _idle_fill_specs()
+	while Time.get_ticks_usec() - t0 < budget_us:
+		if _idle_fill_spec_i >= specs.size():
+			_idle_fill_armed = false
+			fill_cache_warm_pending = false
+			_idle_fill_drop_partial()
+			return
+		var spec: Array = specs[_idle_fill_spec_i]
+		var mode := str(spec[0])
+		var saved_mode := current_map_mode
+		var saved_tint := debug_tint_mode
+		var saved_supply := supply_mode
+		current_map_mode = mode
+		debug_tint_mode = str(spec[1])
+		supply_mode = mode == "supply"
+		if container != null:
+			_zoom_fill_characterization_scale = absf(container.scale.x)
+		var key := _mode_fill_cache_key()
+		var have := false
+		if _mode_fill_cache.has(key):
+			var slot: Variant = _mode_fill_cache[key]
+			have = slot is Dictionary and not (slot as Dictionary).is_empty()
+		if have or mode == _idle_fill_skip_mode:
+			current_map_mode = saved_mode
+			debug_tint_mode = saved_tint
+			supply_mode = saved_supply
+			_idle_fill_drop_partial()
+			_idle_fill_spec_i += 1
+			continue
+		if key != _idle_fill_key:
+			_idle_fill_store = {}
+			_idle_fill_pids = province_nodes.keys()
+			_idle_fill_pid_i = 0
+			_idle_fill_key = key
+			_begin_fill_riot_ids()
+		while _idle_fill_pid_i < _idle_fill_pids.size() and Time.get_ticks_usec() - t0 < budget_us:
+			var pid := int(_idle_fill_pids[_idle_fill_pid_i])
+			_idle_fill_pid_i += 1
+			if not province_nodes.has(pid) or not provinces.has(pid):
+				continue
+			var node := province_nodes[pid]
+			if not is_instance_valid(node):
+				continue
+			var poly: Polygon2D = _get_province_polygon(node)
+			if poly == null:
+				continue
+			if _asia_end_should_keep_fill_hidden(pid, poly):
+				continue
+			var province: Province = provinces[pid] as Province
+			_idle_fill_store[pid] = _compose_mode_fill_color(province, pid)
+		current_map_mode = saved_mode
+		debug_tint_mode = saved_tint
+		supply_mode = saved_supply
+		if _idle_fill_pid_i >= _idle_fill_pids.size() and not _idle_fill_pids.is_empty():
+			if not _idle_fill_store.is_empty():
+				_mode_fill_cache[key] = _idle_fill_store.duplicate()
+			_idle_fill_drop_partial()
+			_idle_fill_spec_i += 1
+		else:
+			return
+	if _idle_fill_spec_i >= specs.size():
+		_idle_fill_armed = false
+		fill_cache_warm_pending = false
+		_idle_fill_drop_partial()
 
 
 ## world_accurate: legacy theater art stays available in terrain mode only.
@@ -27104,6 +27250,18 @@ func _mode_fill_cache_note(pid: int, col: Color) -> void:
 	_fill_cache_store[pid] = col
 
 
+func _compose_mode_fill_color(province: Province, pid: int) -> Color:
+	var col := _get_province_color(province)
+	if supply_mode:
+		var fill := ProvinceInsight.depot_fill_ratio(pid)
+		if fill >= 0.0:
+			col = col.lerp(_supply_depot_tint_color(fill), _supply_depot_mix_amount())
+	col = _apply_agent_pressure_base_tint(col, province)
+	if _fill_riot_ids.has(pid):
+		col = col.lerp(Color(0.85, 0.25, 0.25, 0.55), 0.40)
+	return col
+
+
 func _begin_fill_riot_ids() -> void:
 	_fill_riot_ids = {}
 	if typeof(GameData) == TYPE_NIL or not GameData.has_method("get_provinces_with_active_riots"):
@@ -27174,14 +27332,7 @@ func _refresh_province_fill_colors(refresh_all: bool = false) -> void:
 		if cache_hit and cached.has(int(pid)):
 			col = cached[int(pid)]
 		else:
-			col = _get_province_color(province)
-			if supply_mode:
-				var fill := ProvinceInsight.depot_fill_ratio(int(pid))
-				if fill >= 0.0:
-					col = col.lerp(_supply_depot_tint_color(fill), _supply_depot_mix_amount())
-			col = _apply_agent_pressure_base_tint(col, province)
-			if _fill_riot_ids.has(int(pid)):
-				col = col.lerp(Color(0.85, 0.25, 0.25, 0.55), 0.40)
+			col = _compose_mode_fill_color(province, int(pid))
 			_mode_fill_cache_note(int(pid), col)
 		if cache_hit:
 			pass
@@ -27193,6 +27344,7 @@ func _refresh_province_fill_colors(refresh_all: bool = false) -> void:
 		_fill_profile_color_usec = Time.get_ticks_usec() - color_t0
 	if _fill_cache_storing and not _fill_cache_store.is_empty():
 		_mode_fill_cache[cache_key] = _fill_cache_store.duplicate()
+	_fill_profile_cache_n = cached.size() if cache_hit else _fill_cache_store.size()
 	_fill_cache_storing = false
 	if not _fill_cache_warm_quiet:
 		_refresh_supply_highlights()
