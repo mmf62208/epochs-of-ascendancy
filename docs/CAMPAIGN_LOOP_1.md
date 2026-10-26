@@ -62,7 +62,7 @@ AI declare golden, measured on the war-gate boot with player GER and overrides `
 
 Weight `w = 1 + factories + (key ? 10 : 0) + (capital ? 25 : 0)`. Progress is enemy-held start weight over total start weight. A tag at war with nobody stays at progress 0.
 
-POL (scenario country, not a major): 55 provinces, factory sum 167, keys `711112`, `711048`, `711090`, capital `711112` (8 factories, also a key). NATION-TAGS-1 adds Lviv `905854` and Lutsk `905855` (factories 0, base weight 1 each).
+POL (scenario country, not a major): 55 provinces, factory sum 167, keys `711112`, `711048`, `711090`, capital `711112` (8 factories, also a key). NATION-TAGS-1 adds Lviv `906005` and Lutsk `906006` (factories 0, base weight 1 each).
 
 - Total `55*1 + 167 + 10*3 + 25 = 277`.
 - Capital province `1 + 8 + 10 + 25 = 44`.

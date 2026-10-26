@@ -68430,7 +68430,7 @@
       "facility_tier": 1
     },
     {
-      "id": 905849,
+      "id": 906000,
       "name": "Kiev",
       "terrain": "plains",
       "domain": "land",
@@ -68448,7 +68448,7 @@
       }
     },
     {
-      "id": 905850,
+      "id": 906001,
       "name": "Odessa",
       "terrain": "plains",
       "domain": "land",
@@ -68466,7 +68466,7 @@
       }
     },
     {
-      "id": 905851,
+      "id": 906002,
       "name": "Kharkiv",
       "terrain": "plains",
       "domain": "land",
@@ -68484,7 +68484,7 @@
       }
     },
     {
-      "id": 905852,
+      "id": 906003,
       "name": "Dnipropetrovsk",
       "terrain": "plains",
       "domain": "land",
@@ -68502,7 +68502,7 @@
       }
     },
     {
-      "id": 905853,
+      "id": 906004,
       "name": "Crimean ASSR",
       "terrain": "plains",
       "domain": "land",
@@ -68520,7 +68520,7 @@
       }
     },
     {
-      "id": 905854,
+      "id": 906005,
       "name": "Lviv",
       "terrain": "plains",
       "domain": "land",
@@ -68538,7 +68538,7 @@
       }
     },
     {
-      "id": 905855,
+      "id": 906006,
       "name": "Lutsk",
       "terrain": "plains",
       "domain": "land",
@@ -68556,7 +68556,7 @@
       }
     },
     {
-      "id": 905856,
+      "id": 906007,
       "name": "Chernivtsi",
       "terrain": "plains",
       "domain": "land",
@@ -68574,7 +68574,7 @@
       }
     },
     {
-      "id": 905857,
+      "id": 906008,
       "name": "Chisinau",
       "terrain": "plains",
       "domain": "land",
@@ -68592,7 +68592,7 @@
       }
     },
     {
-      "id": 905858,
+      "id": 906009,
       "name": "Harbin",
       "terrain": "plains",
       "domain": "land",
@@ -68610,7 +68610,7 @@
       }
     },
     {
-      "id": 905859,
+      "id": 906010,
       "name": "Changchun",
       "terrain": "plains",
       "domain": "land",
@@ -68628,7 +68628,7 @@
       }
     },
     {
-      "id": 905860,
+      "id": 906011,
       "name": "Qiqihar",
       "terrain": "plains",
       "domain": "land",
@@ -68646,7 +68646,7 @@
       }
     },
     {
-      "id": 905861,
+      "id": 906012,
       "name": "Hailar",
       "terrain": "plains",
       "domain": "land",
@@ -68664,7 +68664,7 @@
       }
     },
     {
-      "id": 905862,
+      "id": 906013,
       "name": "Chongqing",
       "terrain": "plains",
       "domain": "land",
@@ -68682,7 +68682,7 @@
       }
     },
     {
-      "id": 905863,
+      "id": 906014,
       "name": "Guangzhou",
       "terrain": "plains",
       "domain": "land",
@@ -68700,7 +68700,7 @@
       }
     },
     {
-      "id": 905864,
+      "id": 906015,
       "name": "Chengdu",
       "terrain": "plains",
       "domain": "land",
@@ -68718,7 +68718,7 @@
       }
     },
     {
-      "id": 905865,
+      "id": 906016,
       "name": "Fuzhou",
       "terrain": "plains",
       "domain": "land",
@@ -68736,7 +68736,7 @@
       }
     },
     {
-      "id": 905866,
+      "id": 906017,
       "name": "Zhengzhou",
       "terrain": "plains",
       "domain": "land",
@@ -68754,7 +68754,7 @@
       }
     },
     {
-      "id": 905867,
+      "id": 906018,
       "name": "Taiyuan",
       "terrain": "plains",
       "domain": "land",
@@ -68772,7 +68772,7 @@
       }
     },
     {
-      "id": 905868,
+      "id": 906019,
       "name": "Guiyang",
       "terrain": "plains",
       "domain": "land",
@@ -68790,7 +68790,7 @@
       }
     },
     {
-      "id": 905869,
+      "id": 906020,
       "name": "Hohhot",
       "terrain": "plains",
       "domain": "land",

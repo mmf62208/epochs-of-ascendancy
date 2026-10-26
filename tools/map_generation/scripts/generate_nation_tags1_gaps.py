@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Append NATION-TAGS-1 gap provinces and set Poland's 1945 owners.
 
-Append-only ids 905849–905869. Does not renumber world_full or existing
-world_accurate ids. Idempotent: if the gaps and the 1945 Poland owners are
-already in place, it exits 0 without rewriting the board.
+Append-only ids 906000–906020 (moved off 905849–905869). Does not renumber
+world_full or any other world_accurate id. Idempotent: if the gaps and the
+1945 Poland owners are already in place, it exits 0 without rewriting the board.
 
   python3 tools/map_generation/scripts/generate_nation_tags1_gaps.py --dry-run
   python3 tools/map_generation/scripts/generate_nation_tags1_gaps.py

@@ -4,8 +4,10 @@ The four tags are era owners only. None of them own a 1936 province, and none
 are added to the 1936 multi-AI major list. Poland 1945 is an ownership fix on
 existing cc=PL provinces (Oder–Neisse), not a new geometry pack.
 
-Gap provinces are append-only ids 905849–905869. This module does not write
-the board; ``generate_nation_tags1_gaps.py`` does.
+Gap provinces are append-only ids 906000–906020. They moved off 905849–905869
+so they miss the GAP clash window 905849–905888 and the land ids used through
+905908 (GAP-USSR-WEST 905889–905899, GAP-WEST-UKR 905900–905908). This module
+does not write the board; ``generate_nation_tags1_gaps.py`` does.
 """
 from __future__ import annotations
 
@@ -24,8 +26,8 @@ SCENARIO_PATH = ROOT / "data" / "scenarios" / "world_accurate.json"
 
 ERA_YEARS: Tuple[int, ...] = (1910, 1918, 1936, 1945, 2026)
 NEW_TAGS = ("UKR", "MDA", "PRC", "MAN")
-FIRST_GAP_ID = 905849
-LAST_GAP_ID = 905869
+FIRST_GAP_ID = 906000
+LAST_GAP_ID = 906020
 PRIOR_MAX_LAND_ID = 905848
 BOARD_N_BEFORE = 3536
 LAND_N_BEFORE = 3196
@@ -70,27 +72,27 @@ class GapSpec:
 # set that contains Shenyang (902505). Do not park these holes in the
 # scrambled historical state names (Kiev / Bessarabia / Ukraine West).
 GAPS: Tuple[GapSpec, ...] = (
-    GapSpec(905849, "Kiev", 30.5234, 50.4501, ("RUS", "UKR", "SOV", "SOV", "UKR"), 388, 5, 3, "UKR"),
-    GapSpec(905850, "Odessa", 30.73, 46.48, ("RUS", "UKR", "SOV", "SOV", "UKR"), 388, 5, 3, "UKR"),
-    GapSpec(905851, "Kharkiv", 36.23, 49.99, ("RUS", "UKR", "SOV", "SOV", "UKR"), 388, 5, 3, "UKR"),
-    GapSpec(905852, "Dnipropetrovsk", 35.05, 48.46, ("RUS", "UKR", "SOV", "SOV", "UKR"), 388, 5, 3, "UKR"),
-    GapSpec(905853, "Crimean ASSR", 34.10, 45.30, ("RUS", "UKR", "SOV", "SOV", "UKR"), 388, 5, 3, "UKR"),
-    GapSpec(905854, "Lviv", 24.0316, 49.842, ("AUS", "POL", "POL", "SOV", "UKR"), 388, 5, 3, "UKR"),
-    GapSpec(905855, "Lutsk", 25.34, 50.75, ("RUS", "POL", "POL", "SOV", "UKR"), 388, 5, 3, "UKR"),
-    GapSpec(905856, "Chernivtsi", 25.94, 48.29, ("AUS", "ROM", "ROM", "SOV", "UKR"), 388, 5, 3, "UKR"),
-    GapSpec(905857, "Chisinau", 28.8575, 47.0105, ("RUS", "ROM", "ROM", "SOV", "MDA"), 357, 8, 2, "MDA"),
-    GapSpec(905858, "Harbin", 126.534, 45.803, ("CHI", "CHI", "CHI", "MAN", "PRC"), 289, 7, 3, "CHN"),
-    GapSpec(905859, "Changchun", 125.324, 43.817, ("CHI", "CHI", "CHI", "MAN", "PRC"), 289, 7, 3, "CHN"),
-    GapSpec(905860, "Qiqihar", 123.92, 47.35, ("CHI", "CHI", "CHI", "MAN", "PRC"), 289, 7, 3, "CHN"),
-    GapSpec(905861, "Hailar", 119.74, 49.21, ("CHI", "CHI", "CHI", "MAN", "PRC"), 289, 7, 3, "CHN"),
-    GapSpec(905862, "Chongqing", 106.55, 29.56, ("CHI", "CHI", "CHI", "CHI", "PRC"), 289, 7, 3, "CHN"),
-    GapSpec(905863, "Guangzhou", 113.26, 23.13, ("CHI", "CHI", "CHI", "CHI", "PRC"), 289, 7, 3, "CHN"),
-    GapSpec(905864, "Chengdu", 104.07, 30.67, ("CHI", "CHI", "CHI", "CHI", "PRC"), 289, 7, 3, "CHN"),
-    GapSpec(905865, "Fuzhou", 119.30, 26.07, ("CHI", "CHI", "CHI", "CHI", "PRC"), 289, 7, 3, "CHN"),
-    GapSpec(905866, "Zhengzhou", 113.63, 34.75, ("CHI", "CHI", "CHI", "CHI", "PRC"), 289, 7, 3, "CHN"),
-    GapSpec(905867, "Taiyuan", 112.55, 37.87, ("CHI", "CHI", "CHI", "CHI", "PRC"), 289, 7, 3, "CHN"),
-    GapSpec(905868, "Guiyang", 106.63, 26.65, ("CHI", "CHI", "CHI", "CHI", "PRC"), 289, 7, 3, "CHN"),
-    GapSpec(905869, "Hohhot", 111.75, 40.84, ("CHI", "CHI", "CHI", "CHI", "PRC"), 289, 7, 3, "CHN"),
+    GapSpec(906000, "Kiev", 30.5234, 50.4501, ("RUS", "UKR", "SOV", "SOV", "UKR"), 388, 5, 3, "UKR"),
+    GapSpec(906001, "Odessa", 30.73, 46.48, ("RUS", "UKR", "SOV", "SOV", "UKR"), 388, 5, 3, "UKR"),
+    GapSpec(906002, "Kharkiv", 36.23, 49.99, ("RUS", "UKR", "SOV", "SOV", "UKR"), 388, 5, 3, "UKR"),
+    GapSpec(906003, "Dnipropetrovsk", 35.05, 48.46, ("RUS", "UKR", "SOV", "SOV", "UKR"), 388, 5, 3, "UKR"),
+    GapSpec(906004, "Crimean ASSR", 34.10, 45.30, ("RUS", "UKR", "SOV", "SOV", "UKR"), 388, 5, 3, "UKR"),
+    GapSpec(906005, "Lviv", 24.0316, 49.842, ("AUS", "POL", "POL", "SOV", "UKR"), 388, 5, 3, "UKR"),
+    GapSpec(906006, "Lutsk", 25.34, 50.75, ("RUS", "POL", "POL", "SOV", "UKR"), 388, 5, 3, "UKR"),
+    GapSpec(906007, "Chernivtsi", 25.94, 48.29, ("AUS", "ROM", "ROM", "SOV", "UKR"), 388, 5, 3, "UKR"),
+    GapSpec(906008, "Chisinau", 28.8575, 47.0105, ("RUS", "ROM", "ROM", "SOV", "MDA"), 357, 8, 2, "MDA"),
+    GapSpec(906009, "Harbin", 126.534, 45.803, ("CHI", "CHI", "CHI", "MAN", "PRC"), 289, 7, 3, "CHN"),
+    GapSpec(906010, "Changchun", 125.324, 43.817, ("CHI", "CHI", "CHI", "MAN", "PRC"), 289, 7, 3, "CHN"),
+    GapSpec(906011, "Qiqihar", 123.92, 47.35, ("CHI", "CHI", "CHI", "MAN", "PRC"), 289, 7, 3, "CHN"),
+    GapSpec(906012, "Hailar", 119.74, 49.21, ("CHI", "CHI", "CHI", "MAN", "PRC"), 289, 7, 3, "CHN"),
+    GapSpec(906013, "Chongqing", 106.55, 29.56, ("CHI", "CHI", "CHI", "CHI", "PRC"), 289, 7, 3, "CHN"),
+    GapSpec(906014, "Guangzhou", 113.26, 23.13, ("CHI", "CHI", "CHI", "CHI", "PRC"), 289, 7, 3, "CHN"),
+    GapSpec(906015, "Chengdu", 104.07, 30.67, ("CHI", "CHI", "CHI", "CHI", "PRC"), 289, 7, 3, "CHN"),
+    GapSpec(906016, "Fuzhou", 119.30, 26.07, ("CHI", "CHI", "CHI", "CHI", "PRC"), 289, 7, 3, "CHN"),
+    GapSpec(906017, "Zhengzhou", 113.63, 34.75, ("CHI", "CHI", "CHI", "CHI", "PRC"), 289, 7, 3, "CHN"),
+    GapSpec(906018, "Taiyuan", 112.55, 37.87, ("CHI", "CHI", "CHI", "CHI", "PRC"), 289, 7, 3, "CHN"),
+    GapSpec(906019, "Guiyang", 106.63, 26.65, ("CHI", "CHI", "CHI", "CHI", "PRC"), 289, 7, 3, "CHN"),
+    GapSpec(906020, "Hohhot", 111.75, 40.84, ("CHI", "CHI", "CHI", "CHI", "PRC"), 289, 7, 3, "CHN"),
 )
 
 GAP_BY_ID: Dict[int, GapSpec] = {g.pid: g for g in GAPS}
@@ -362,7 +364,7 @@ def _audit_present_gaps(
             fails.append("%s missing from state %s" % (spec.pid, spec.state_id))
         if spec.pid not in [int(x) for x in (regions.get(spec.region_id) or {}).get("province_ids") or []]:
             fails.append("%s missing from region %s" % (spec.pid, spec.region_id))
-    if not any(f.startswith("905") or "gap" in f or "adjacency" in f or "era" in f for f in fails):
+    if not any(f.startswith("906") or "gap" in f or "adjacency" in f or "era" in f for f in fails):
         passes.append("gap owners, rings, and symmetric adjacency")
 
 

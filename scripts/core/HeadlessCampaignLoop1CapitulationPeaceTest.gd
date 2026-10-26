@@ -3,7 +3,7 @@ extends SceneTree
 ## CL1b capitulation and peace. Goldens are the economy-layer weights:
 ##   POL 55 provinces, factory sum 167, keys 3, capital 711112 weight 44, total 277.
 ##   Capital-only progress 44/277 = 0.158845. Threshold 0.40+0.40*55/100 = 0.62.
-##   The extra weight is Lviv 905854 and Lutsk 905855 (base 1, factories 0).
+##   The extra weight is Lviv 906005 and Lutsk 906006 (base 1, factories 0).
 ##   LUX pid 710977, factories 3, weight 29, minor threshold 0.50, annex_all.
 ##   FRA stability 70, threshold 0.68, keep_occupied.
 ## Crossing the threshold goes through the daily hook (not a direct check_all),

@@ -2,7 +2,7 @@ extends SceneTree
 
 ## NATION-TAGS-1. Parses board JSON only (no scenario boot, seed-neutral).
 ## Tags UKR / MDA / PRC / MAN resolve, 1936 owners of those tags stay empty,
-## 1945 Poland owns every cc=PL province, and gap ids 905849–905869 exist
+## 1945 Poland owns every cc=PL province, and gap ids 906000–906020 exist
 ## with symmetric adjacency and the era owners below.
 ##
 ##   tools/run_godot.sh --headless --path . -s res://scripts/core/HeadlessNationTags1Test.gd
@@ -54,27 +54,27 @@ func _read_json(res_path: String) -> Variant:
 
 func _gap_table() -> Array:
 	return [
-		{"id": 905849, "name": "Kiev", "owners": ["RUS", "UKR", "SOV", "SOV", "UKR"]},
-		{"id": 905850, "name": "Odessa", "owners": ["RUS", "UKR", "SOV", "SOV", "UKR"]},
-		{"id": 905851, "name": "Kharkiv", "owners": ["RUS", "UKR", "SOV", "SOV", "UKR"]},
-		{"id": 905852, "name": "Dnipropetrovsk", "owners": ["RUS", "UKR", "SOV", "SOV", "UKR"]},
-		{"id": 905853, "name": "Crimean ASSR", "owners": ["RUS", "UKR", "SOV", "SOV", "UKR"]},
-		{"id": 905854, "name": "Lviv", "owners": ["AUS", "POL", "POL", "SOV", "UKR"]},
-		{"id": 905855, "name": "Lutsk", "owners": ["RUS", "POL", "POL", "SOV", "UKR"]},
-		{"id": 905856, "name": "Chernivtsi", "owners": ["AUS", "ROM", "ROM", "SOV", "UKR"]},
-		{"id": 905857, "name": "Chisinau", "owners": ["RUS", "ROM", "ROM", "SOV", "MDA"]},
-		{"id": 905858, "name": "Harbin", "owners": ["CHI", "CHI", "CHI", "MAN", "PRC"]},
-		{"id": 905859, "name": "Changchun", "owners": ["CHI", "CHI", "CHI", "MAN", "PRC"]},
-		{"id": 905860, "name": "Qiqihar", "owners": ["CHI", "CHI", "CHI", "MAN", "PRC"]},
-		{"id": 905861, "name": "Hailar", "owners": ["CHI", "CHI", "CHI", "MAN", "PRC"]},
-		{"id": 905862, "name": "Chongqing", "owners": ["CHI", "CHI", "CHI", "CHI", "PRC"]},
-		{"id": 905863, "name": "Guangzhou", "owners": ["CHI", "CHI", "CHI", "CHI", "PRC"]},
-		{"id": 905864, "name": "Chengdu", "owners": ["CHI", "CHI", "CHI", "CHI", "PRC"]},
-		{"id": 905865, "name": "Fuzhou", "owners": ["CHI", "CHI", "CHI", "CHI", "PRC"]},
-		{"id": 905866, "name": "Zhengzhou", "owners": ["CHI", "CHI", "CHI", "CHI", "PRC"]},
-		{"id": 905867, "name": "Taiyuan", "owners": ["CHI", "CHI", "CHI", "CHI", "PRC"]},
-		{"id": 905868, "name": "Guiyang", "owners": ["CHI", "CHI", "CHI", "CHI", "PRC"]},
-		{"id": 905869, "name": "Hohhot", "owners": ["CHI", "CHI", "CHI", "CHI", "PRC"]},
+		{"id": 906000, "name": "Kiev", "owners": ["RUS", "UKR", "SOV", "SOV", "UKR"]},
+		{"id": 906001, "name": "Odessa", "owners": ["RUS", "UKR", "SOV", "SOV", "UKR"]},
+		{"id": 906002, "name": "Kharkiv", "owners": ["RUS", "UKR", "SOV", "SOV", "UKR"]},
+		{"id": 906003, "name": "Dnipropetrovsk", "owners": ["RUS", "UKR", "SOV", "SOV", "UKR"]},
+		{"id": 906004, "name": "Crimean ASSR", "owners": ["RUS", "UKR", "SOV", "SOV", "UKR"]},
+		{"id": 906005, "name": "Lviv", "owners": ["AUS", "POL", "POL", "SOV", "UKR"]},
+		{"id": 906006, "name": "Lutsk", "owners": ["RUS", "POL", "POL", "SOV", "UKR"]},
+		{"id": 906007, "name": "Chernivtsi", "owners": ["AUS", "ROM", "ROM", "SOV", "UKR"]},
+		{"id": 906008, "name": "Chisinau", "owners": ["RUS", "ROM", "ROM", "SOV", "MDA"]},
+		{"id": 906009, "name": "Harbin", "owners": ["CHI", "CHI", "CHI", "MAN", "PRC"]},
+		{"id": 906010, "name": "Changchun", "owners": ["CHI", "CHI", "CHI", "MAN", "PRC"]},
+		{"id": 906011, "name": "Qiqihar", "owners": ["CHI", "CHI", "CHI", "MAN", "PRC"]},
+		{"id": 906012, "name": "Hailar", "owners": ["CHI", "CHI", "CHI", "MAN", "PRC"]},
+		{"id": 906013, "name": "Chongqing", "owners": ["CHI", "CHI", "CHI", "CHI", "PRC"]},
+		{"id": 906014, "name": "Guangzhou", "owners": ["CHI", "CHI", "CHI", "CHI", "PRC"]},
+		{"id": 906015, "name": "Chengdu", "owners": ["CHI", "CHI", "CHI", "CHI", "PRC"]},
+		{"id": 906016, "name": "Fuzhou", "owners": ["CHI", "CHI", "CHI", "CHI", "PRC"]},
+		{"id": 906017, "name": "Zhengzhou", "owners": ["CHI", "CHI", "CHI", "CHI", "PRC"]},
+		{"id": 906018, "name": "Taiyuan", "owners": ["CHI", "CHI", "CHI", "CHI", "PRC"]},
+		{"id": 906019, "name": "Guiyang", "owners": ["CHI", "CHI", "CHI", "CHI", "PRC"]},
+		{"id": 906020, "name": "Hohhot", "owners": ["CHI", "CHI", "CHI", "CHI", "PRC"]},
 	]
 
 
@@ -229,4 +229,4 @@ func _run() -> void:
 			if symmetric:
 				_pass("%s owners and adjacency" % pid)
 	if _failures == 0:
-		_pass("gaps 905849-905869")
+		_pass("gaps 906000-906020")

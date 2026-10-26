@@ -206,9 +206,9 @@ def main() -> None:
     report = witness_report(doc)
     print(json.dumps(report, indent=2))
     if not args.no_subtract:
-        if report["kiev_in_land"] or report["kiev_in_province"] != 905849:
+        if report["kiev_in_land"] or report["kiev_in_province"] != 906000:
             raise SystemExit("Kiev witness failed: %s" % report)
-        if report["crimea_in_land"] or report["crimea_in_province"] != 905853:
+        if report["crimea_in_land"] or report["crimea_in_province"] != 906004:
             raise SystemExit("Crimea witness failed: %s" % report)
         if not report["black_sea_in_sea"] or report["black_sea_in_land"]:
             raise SystemExit("Black Sea witness failed: %s" % report)
