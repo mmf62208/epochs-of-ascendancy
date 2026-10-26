@@ -745,13 +745,17 @@ func _raise_garrison_at(tag: String, pid: int) -> bool:
 		n += 1
 		if n > 8:
 			return false
-	var fielded: Dictionary = LeaderManager.field_designed_unit(tag, "german_infantry_division_1943", pid, "land", {
-		"formation_id": fid,
-		"skip_leader": true,
-		"quiet": true,
-		"garrison_1936": true,
-		"force_new": true,
-	})
+	var fielded: Dictionary = {}
+	if LeaderManager.has_method("field_1936_garrison"):
+		fielded = LeaderManager.field_1936_garrison(tag, pid, fid, -1)
+	else:
+		fielded = LeaderManager.field_designed_unit(tag, "infantry_1936", pid, "land", {
+			"formation_id": fid,
+			"skip_leader": true,
+			"quiet": true,
+			"garrison_1936": true,
+			"force_new": true,
+		})
 	if bool(fielded.get("ok", false)):
 		print("GARRISON_COVER raise %s @ %d" % [fid, pid])
 		return true

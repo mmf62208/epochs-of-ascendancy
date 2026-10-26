@@ -20405,6 +20405,9 @@ func _nearest_player_land_formation_at_world(world_pos: Vector2) -> Object:
 				continue
 			if player_only and not _formation_is_player_tag(fo):
 				continue
+			# Garrison plates do not steal a click on a different hex (Kulmbach vs Berlin).
+			if not _garrison_chip_hit_allowed(fo, world_pos):
+				continue
 			if d <= best_d:
 				best_d = d
 				best = fo
@@ -20698,9 +20701,9 @@ func _select_map_unit(formation: Object) -> void:
 		attack_staging_province_id = pid
 		debug_combat_attacker_province_id = pid
 	var toast := "Unit selected · %s · click friendly province to MARCH (days) · Ctrl+click enemy to ASSAULT · Esc clears" % name_s
+	# One toast only. DebugOverlay's map toast also calls LeaderEventUI.show_toast,
+	# which painted a second "Unit selected" notice. SAVE-FULL-1 cherry-pick: MapRenderer._select_map_unit.
 	_show_inspector_toast(toast, 5.5)
-	if typeof(DebugOverlay) != TYPE_NIL:
-		DebugOverlay.toast_map_debug(toast)
 
 
 ## Selected-chip ring via nation-frame helper. One pin per province — match by station pid
@@ -21462,6 +21465,8 @@ func _pick_unit_formation_at_world(world_pos: Vector2, land_only: bool = false, 
 						fo = f2 as Object
 			if fo == null:
 				continue
+			if not _garrison_chip_hit_allowed(fo, world_pos):
+				continue
 			# FIX #6 / FLEET-2b: painted plate / bars / glyph ink under the
 			# cursor are never ownership-blocked. Halo (no painted pixels)
 			# never reaches here at z<0.65 — those clicks fall through to
@@ -21550,6 +21555,30 @@ func _pick_unit_formation_at_world(world_pos: Vector2, land_only: bool = false, 
 	if player_only:
 		return null
 	return null
+
+
+func _formation_is_garrison_1936(formation: Object) -> bool:
+	if formation == null or not is_instance_valid(formation):
+		return false
+	if not formation.has_method("has_meta"):
+		return false
+	return bool(formation.get_meta("garrison_1936", false))
+
+
+func _formation_card_design_text(formation: Object, design_id: String) -> String:
+	if _formation_is_garrison_1936(formation):
+		if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("garrison_1936_design_label"):
+			return str(LeaderManager.garrison_1936_design_label(design_id))
+		return "Infantry Division (1936)"
+	return design_id
+
+
+func _garrison_chip_hit_allowed(fo: Object, world_pos: Vector2) -> bool:
+	if not _formation_is_garrison_1936(fo):
+		return true
+	var station := int(fo.stationed_province_id) if "stationed_province_id" in fo else -1
+	var click_hex := _resolve_hex_pick_pid(world_pos)
+	return MapZoomLODScript.garrison_chip_owns_click(station, click_hex)
 
 
 func _show_unit_detail_popup(formation: Object) -> void:
@@ -21736,7 +21765,7 @@ func _show_unit_detail_popup(formation: Object) -> void:
 	if not ftype.is_empty():
 		lines.append("Type: %s" % ftype.replace("_", " ").capitalize())
 	if not dsn.is_empty():
-		lines.append("Design: %s" % dsn)
+		lines.append("Design: %s" % _formation_card_design_text(formation, dsn))
 	lines.append("Stationed: %s" % prov_name)
 	lines.append("Leader: %s" % leader_s)
 	var chrome_tips: PackedStringArray = PackedStringArray()
@@ -21745,7 +21774,7 @@ func _show_unit_detail_popup(formation: Object) -> void:
 		"Org %.0f%% · Str %.0f%% · Rdy %.0f%% · XP %.0f%%"
 		% [org_v * 100.0, str_v * 100.0, rdy_v * 100.0, xp_v * 100.0]
 	)
-	if not fid.is_empty():
+	if not fid.is_empty() and not _formation_is_garrison_1936(formation):
 		lines.append("ID: %s" % fid)
 	body.text = "\n".join(lines)
 	RetrowaveTheme.style_body_label(body)
@@ -27918,6 +27947,8 @@ func _pick_drawn_land_air_body_at_world(world_pos: Vector2, z: float = -1.0) -> 
 			var fo: Object = _formation_from_demo_icon(icon)
 			if fo == null:
 				continue
+			if not _garrison_chip_hit_allowed(fo, world_pos):
+				continue
 			if _formation_is_fleet_counter(fo):
 				continue
 			var chip_pos: Vector2 = _demo_unit_icon_world_pos(icon, id)
@@ -28350,6 +28381,7 @@ func _sync_unit_counter_scales(z: float = -1.0) -> void:
 		return
 	var s := _unit_counter_scale_for_zoom(z)
 	var sv := Vector2(s, s)
+	var gsv := sv * 0.55
 	for id_v in _demo_unit_icon_pids:
 		var id := int(id_v)
 		if not province_nodes.has(id):
@@ -28361,7 +28393,17 @@ func _sync_unit_counter_scales(z: float = -1.0) -> void:
 			if c is Node2D and str(c.name).begins_with("DemoUnitIcon_"):
 				if bool((c as Node2D).get_meta("sea_nation_disk", false)):
 					continue
-				(c as Node2D).scale = sv
+				var icon := c as Node2D
+				if bool(icon.get_meta("garrison_1936_chip", false)):
+					icon.scale = gsv
+					icon.modulate = Color(1, 1, 1, 0.62)
+					icon.z_index = 22
+					icon.z_as_relative = false
+				else:
+					icon.scale = sv
+					icon.modulate = Color.WHITE
+					icon.z_index = 28
+					icon.z_as_relative = false
 	var zz: float = z
 	if zz < 0.0:
 		zz = _get_camera_zoom() if has_method("_get_camera_zoom") else 1.0
@@ -28384,6 +28426,10 @@ func _sync_unit_counter_paint(z: float = -1.0) -> void:
 
 func _sync_unit_counter_visibility(z: float = -1.0) -> void:
 	var vis := _unit_counters_want_visible(z)
+	var zz := z
+	if zz < 0.0:
+		zz = _get_camera_zoom() if has_method("_get_camera_zoom") else 1.0
+	var gvis := MapZoomLODScript.show_garrison_counters_for_zoom(zz, show_unit_counters)
 	var sea_layer: Node2D = _ensure_sea_nation_layer()
 	if sea_layer != null:
 		sea_layer.visible = true
@@ -28403,7 +28449,11 @@ func _sync_unit_counter_visibility(z: float = -1.0) -> void:
 				node.visible = true
 			for c in node.get_children():
 				if c is Node2D and str(c.name).begins_with("DemoUnitIcon_"):
-					(c as Node2D).visible = vis
+					var icon := c as Node2D
+					if bool(icon.get_meta("garrison_1936_chip", false)):
+						icon.visible = gvis
+					else:
+						icon.visible = vis
 	_sync_unit_overlay_visibility(vis)
 	_notify_units_view_hud()
 
@@ -32746,6 +32796,13 @@ func _rebuild_demo_unit_icons(only_pids: Dictionary) -> void:
 			if "formation_id" in ff:
 				counter.set_meta("formation_id", str(ff.formation_id))
 			counter.set_meta("formation", ff)
+			if _formation_is_garrison_1936(ff):
+				counter.set_meta("garrison_1936_chip", true)
+				counter.z_index = 22
+				counter.scale = Vector2.ONE * _unit_counter_scale_for_zoom() * 0.55
+				counter.modulate = Color(1, 1, 1, 0.62)
+				var gz := _get_camera_zoom() if has_method("_get_camera_zoom") else 1.0
+				counter.visible = MapZoomLODScript.show_garrison_counters_for_zoom(gz, show_unit_counters)
 		counter.set_meta("province_id", id)
 		n.add_child(counter)
 

@@ -583,7 +583,11 @@ func field_designed_unit(
 	else:
 		f.formation_id = _alloc_fielded_formation_id(tag)
 	f.country_tag = tag
-	f.name = "%s %s" % [tag, did]
+	var shown := str(extras.get("display_name", "")).strip_edges()
+	if shown.is_empty():
+		f.name = "%s %s" % [tag, did]
+	else:
+		f.name = shown
 	f.organization = clampf(float(extras.get("organization", extras.get("org", 1.0))), 0.2, 1.0)
 	f.readiness = 1.0
 	f.strength = clampf(float(extras.get("strength", 1.0)), 0.2, 1.0)
@@ -598,6 +602,10 @@ func field_designed_unit(
 	_stamp_formation_composition(f, stamped)
 	if bool(extras.get("garrison_1936", false)):
 		f.set_meta("garrison_1936", true)
+		f.organization = 1.0
+		f.readiness = 1.0
+		f.strength = 1.0
+		_fill_garrison_full_toe(f)
 	if "fuel_level" in f:
 		f.fuel_level = 1.0
 	match dom:
@@ -639,7 +647,7 @@ func field_designed_unit(
 	}
 
 
-const GARRISON_1936_DESIGN := "german_infantry_division_1943"
+const GARRISON_1936_DESIGN := "infantry_1936"
 const GARRISON_1936_TAGS: Array[String] = ["GER", "FRA", "ENG", "SOV", "ITA", "JAP", "USA", "POL", "CZE"]
 const GARRISON_1936_CAPITALS := {
 	"GER": 710300,
@@ -659,14 +667,30 @@ const GARRISON_1936_EXTRA_CAPITALS := {
 
 ## Idempotent 1936 border + capital garrisons. Ids are garr1936_{TAG}_{pid}.
 ## No leader draw, so the multi-AI decision seed stays on the unseeded path.
+## Hexes that already hold a land division are skipped (not double-stacked).
 func seed_1936_start_garrisons(force: bool = false) -> Dictionary:
 	if _garrisons_1936_seeded and not force:
-		return {"ok": true, "already": true, "counts": _garrison_1936_counts(), "placed": 0}
+		return {
+			"ok": true,
+			"already": true,
+			"counts": _garrison_1936_counts(),
+			"placed": 0,
+			"skipped_occupied": 0,
+			"targets": 0,
+			"placed_counts": {},
+			"skipped_counts": {},
+			"target_counts": {},
+		}
 	if typeof(MapManager) == TYPE_NIL or not MapManager.has_method("get_provinces_by_owner"):
-		return {"ok": false, "reason": "no_board", "counts": {}, "placed": 0}
+		return {"ok": false, "reason": "no_board", "counts": {}, "placed": 0, "skipped_occupied": 0, "targets": 0}
 	if MapManager.get_provinces_by_owner("GER").size() < 20:
-		return {"ok": false, "reason": "no_board", "counts": {}, "placed": 0}
+		return {"ok": false, "reason": "no_board", "counts": {}, "placed": 0, "skipped_occupied": 0, "targets": 0}
 	var placed := 0
+	var skipped := 0
+	var target_n := 0
+	var placed_counts: Dictionary = {}
+	var skipped_counts: Dictionary = {}
+	var target_counts: Dictionary = {}
 	for tag in GARRISON_1936_TAGS:
 		var occupied := _land_pids_occupied(tag)
 		var targets: Array[int] = []
@@ -685,26 +709,214 @@ func seed_1936_start_garrisons(force: bool = false) -> Dictionary:
 			seen[cap] = true
 			targets.append(cap)
 		targets.sort()
+		target_counts[tag] = targets.size()
+		target_n += targets.size()
+		var placed_tag := 0
+		var skip_tag := 0
+		var ordinal := 0
 		for pid2 in targets:
+			ordinal += 1
 			if bool(occupied.get(pid2, false)):
+				skip_tag += 1
+				skipped += 1
 				continue
 			var fid := "garr1936_%s_%d" % [tag, pid2]
 			if formations.has(fid):
-				continue
-			var fielded: Dictionary = field_designed_unit(tag, GARRISON_1936_DESIGN, pid2, "land", {
-				"formation_id": fid,
-				"skip_leader": true,
-				"quiet": true,
-				"garrison_1936": true,
-				"force_new": true,
-			})
-			if bool(fielded.get("ok", false)):
+				placed_tag += 1
 				placed += 1
 				occupied[pid2] = true
+				continue
+			var fielded: Dictionary = field_1936_garrison(tag, pid2, fid, ordinal)
+			if bool(fielded.get("ok", false)):
+				placed_tag += 1
+				placed += 1
+				occupied[pid2] = true
+		placed_counts[tag] = placed_tag
+		skipped_counts[tag] = skip_tag
 	_garrisons_1936_seeded = true
 	var counts := _garrison_1936_counts()
-	print("LeaderManager: 1936 garrisons placed=%d %s" % [placed, str(counts)])
-	return {"ok": true, "already": false, "counts": counts, "placed": placed}
+	var detail := _garrison_1936_seed_detail(placed_counts, target_counts, skipped_counts)
+	print(
+		"LeaderManager: 1936 garrisons placed=%d skipped_occupied=%d targets=%d %s"
+		% [placed, skipped, target_n, detail]
+	)
+	return {
+		"ok": true,
+		"already": false,
+		"counts": counts,
+		"placed": placed,
+		"skipped_occupied": skipped,
+		"targets": target_n,
+		"placed_counts": placed_counts,
+		"skipped_counts": skipped_counts,
+		"target_counts": target_counts,
+	}
+
+
+## 1936 infantry for this nation. Catalog hit only from that nation's candidate
+## ids. Never another nation's design. Fallback is the generic infantry_1936 id.
+func garrison_1936_design_for(tag: String) -> String:
+	var t := tag.strip_edges().to_upper()
+	var cands: Array[String] = []
+	var low := t.to_lower()
+	cands.append("%s_infantry_1936" % low)
+	cands.append("%s_infantry_division_1936" % low)
+	for adj in _garrison_1936_adjectives(t):
+		cands.append("%s_infantry_1936" % adj)
+		cands.append("%s_infantry_division_1936" % adj)
+	for cid in cands:
+		if _garrison_1936_template_ok(t, cid):
+			return cid
+	return GARRISON_1936_DESIGN
+
+
+func garrison_1936_display_name(tag: String, ordinal: int) -> String:
+	var t := tag.strip_edges().to_upper()
+	if t.is_empty():
+		t = "GAR"
+	if ordinal < 1:
+		return "%s Garrison Division" % t
+	return "%s %s Garrison Division" % [t, _garrison_ordinal_word(ordinal)]
+
+
+## Human design line. Raw snake_case ids never reach the card.
+func garrison_1936_design_label(design_id: String) -> String:
+	var did := design_id.strip_edges()
+	var tpl: Object = _garrison_1936_template(did)
+	if tpl != null:
+		var nm := ""
+		if "display_name" in tpl:
+			nm = str(tpl.display_name).strip_edges()
+		elif "name" in tpl:
+			nm = str(tpl.name).strip_edges()
+		if not nm.is_empty() and nm != did and not _garrison_looks_like_raw_id(nm):
+			return nm
+	return "Infantry Division (1936)"
+
+
+func field_1936_garrison(tag: String, pid: int, fid: String, ordinal: int = -1) -> Dictionary:
+	var did := garrison_1936_design_for(tag)
+	return field_designed_unit(tag, did, pid, "land", {
+		"formation_id": fid,
+		"skip_leader": true,
+		"quiet": true,
+		"garrison_1936": true,
+		"force_new": true,
+		"display_name": garrison_1936_display_name(tag, ordinal),
+	})
+
+
+func _garrison_1936_adjectives(tag: String) -> Array[String]:
+	match tag.strip_edges().to_upper():
+		"GER":
+			return ["german"]
+		"FRA":
+			return ["french"]
+		"ENG":
+			return ["british"]
+		"SOV":
+			return ["soviet"]
+		"ITA":
+			return ["italian"]
+		"JAP":
+			return ["japanese"]
+		"USA":
+			return ["american"]
+		"POL":
+			return ["polish"]
+		"CZE":
+			return ["czech", "czechoslovak"]
+		_:
+			return []
+
+
+func _garrison_1936_template(design_id: String) -> Object:
+	var did := design_id.strip_edges()
+	if did.is_empty() or typeof(GameData) == TYPE_NIL or GameData.design_data == null:
+		return null
+	if not GameData.design_data.has_method("has_template") or not GameData.design_data.has_template(did):
+		return null
+	if GameData.design_data.has_method("get_template"):
+		var tpl: Variant = GameData.design_data.get_template(did)
+		if tpl is Object:
+			return tpl as Object
+	return null
+
+
+func _garrison_1936_template_ok(tag: String, design_id: String) -> bool:
+	var did := design_id.strip_edges()
+	if did.is_empty() or _garrison_design_is_foreign(tag, did):
+		return false
+	var tpl := _garrison_1936_template(did)
+	if tpl == null:
+		return false
+	var nation := ""
+	if "design_nation" in tpl:
+		nation = str(tpl.design_nation).strip_edges().to_upper()
+	if not nation.is_empty() and nation != "ALL" and nation != tag:
+		return false
+	return true
+
+
+func _garrison_design_is_foreign(tag: String, design_id: String) -> bool:
+	var id := design_id.strip_edges().to_lower()
+	if id.is_empty():
+		return false
+	var parts := id.split("_")
+	var own := tag.strip_edges().to_upper()
+	for other in GARRISON_1936_TAGS:
+		if other == own:
+			continue
+		if id.begins_with(other.to_lower() + "_"):
+			return true
+		for adj in _garrison_1936_adjectives(other):
+			if adj in parts:
+				return true
+	return false
+
+
+func _garrison_looks_like_raw_id(text: String) -> bool:
+	return text.contains("_") and not text.contains(" ")
+
+
+func _garrison_ordinal_word(n: int) -> String:
+	var v := maxi(1, n)
+	var mod100 := v % 100
+	var suffix := "th"
+	if mod100 < 11 or mod100 > 13:
+		match v % 10:
+			1:
+				suffix = "st"
+			2:
+				suffix = "nd"
+			3:
+				suffix = "rd"
+	return "%d%s" % [v, suffix]
+
+
+func _garrison_1936_seed_detail(placed_counts: Dictionary, target_counts: Dictionary, skipped_counts: Dictionary) -> String:
+	var parts: PackedStringArray = PackedStringArray()
+	for tag in GARRISON_1936_TAGS:
+		parts.append("%s %d/%d skip %d" % [
+			tag,
+			int(placed_counts.get(tag, 0)),
+			int(target_counts.get(tag, 0)),
+			int(skipped_counts.get(tag, 0)),
+		])
+	return "{%s}" % ", ".join(parts)
+
+
+func _fill_garrison_full_toe(f: Formation) -> void:
+	if f == null or f.formation_id.is_empty():
+		return
+	if typeof(ProductionManager) == TYPE_NIL or not ProductionManager.has_method("set_unit_equipment_stock"):
+		return
+	if typeof(LandCombatPower) == TYPE_NIL:
+		return
+	var toe: Dictionary = LandCombatPower.equipment_toe(LandCombatPower.composition_from_formation(f))
+	if toe.is_empty():
+		toe = {"infantry_equipment": 80}
+	ProductionManager.set_unit_equipment_stock(f.formation_id, toe)
 
 
 func garrison_1936_capital_pids(tag: String) -> Array[int]:
@@ -3891,6 +4103,8 @@ func get_save_data() -> Dictionary:
 		}
 		if f.has_meta("garrison_1936") and bool(f.get_meta("garrison_1936", false)):
 			formation_blob["garrison_1936"] = true
+			if typeof(ProductionManager) != TYPE_NIL and ProductionManager.has_method("get_unit_equipment_stock"):
+				formation_blob["equipment_stock"] = ProductionManager.get_unit_equipment_stock(f.formation_id)
 		formations_data[str(fid)] = formation_blob
 
 	return {
@@ -4056,6 +4270,12 @@ func apply_save_data(data: Dictionary) -> void:
 				f.set_meta("tank_bns", clampi(int(fd.get("tank_bns", 0)), 0, 3))
 			if bool(fd.get("garrison_1936", false)):
 				f.set_meta("garrison_1936", true)
+				if typeof(ProductionManager) != TYPE_NIL and ProductionManager.has_method("set_unit_equipment_stock"):
+					var stock_v: Variant = fd.get("equipment_stock", null)
+					if fd.has("equipment_stock") and stock_v is Dictionary:
+						ProductionManager.set_unit_equipment_stock(f.formation_id, stock_v as Dictionary)
+					else:
+						_fill_garrison_full_toe(f)
 			if "fuel_level" in f:
 				f.fuel_level = clampf(float(fd.get("fuel_level", 1.0)), 0.0, 1.0)
 			if "assigned_region_id" in f:
