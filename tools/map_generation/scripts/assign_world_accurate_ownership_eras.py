@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from collections import Counter
 from pathlib import Path
 from typing import Any, Dict
@@ -84,11 +85,15 @@ def paint_era(year: int, base: Dict[int, dict], own1936: Dict[str, str]) -> Dict
                 o[str(pid)] = "ENG"
 
         elif year == 1945:
-            if 710000 <= pid < 800000 and cc in (
+            # Poland keeps the Oder–Neisse provinces. Baltics and the other
+            # listed states stay Soviet. Gap-id era owners are applied after
+            # the loop so a future re-run does not drop UKR/MAN/PRC/MDA.
+            if 710000 <= pid < 800000 and cc == "PL":
+                o[str(pid)] = "POL"
+            elif 710000 <= pid < 800000 and cc in (
                 "EE",
                 "LV",
                 "LT",
-                "PL",
                 "RO",
                 "BG",
                 "HU",
@@ -220,7 +225,17 @@ def paint_era(year: int, base: Dict[int, dict], own1936: Dict[str, str]) -> Dict
             if o.get(str(pid)) == "SOV":
                 o[str(pid)] = "RUS"
 
+    _apply_nation_tags1_gap_owners(year, o)
     return o
+
+
+def _apply_nation_tags1_gap_owners(year: int, owners: Dict[str, str]) -> None:
+    lib = ROOT / "tools" / "map_generation" / "lib"
+    if str(lib) not in sys.path:
+        sys.path.insert(0, str(lib))
+    from nation_tags1_product import apply_gap_era_owners
+
+    apply_gap_era_owners(year, owners)
 
 
 def main() -> int:

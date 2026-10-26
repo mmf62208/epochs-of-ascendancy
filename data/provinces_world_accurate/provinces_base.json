@@ -68428,6 +68428,384 @@
       "special_features": [],
       "island_class": "mainland",
       "facility_tier": 1
+    },
+    {
+      "id": 905849,
+      "name": "Kiev",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [
+        "SOV"
+      ],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "source": "nation_tags1",
+        "adm0_a3": "UKR",
+        "admin": "UKR",
+        "level": "GAP",
+        "area": 1035.0
+      }
+    },
+    {
+      "id": 905850,
+      "name": "Odessa",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [
+        "SOV"
+      ],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "source": "nation_tags1",
+        "adm0_a3": "UKR",
+        "admin": "UKR",
+        "level": "GAP",
+        "area": 1035.0
+      }
+    },
+    {
+      "id": 905851,
+      "name": "Kharkiv",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [
+        "SOV"
+      ],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "source": "nation_tags1",
+        "adm0_a3": "UKR",
+        "admin": "UKR",
+        "level": "GAP",
+        "area": 1035.0
+      }
+    },
+    {
+      "id": 905852,
+      "name": "Dnipropetrovsk",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [
+        "SOV"
+      ],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "source": "nation_tags1",
+        "adm0_a3": "UKR",
+        "admin": "UKR",
+        "level": "GAP",
+        "area": 1035.0
+      }
+    },
+    {
+      "id": 905853,
+      "name": "Crimean ASSR",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [
+        "SOV"
+      ],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "source": "nation_tags1",
+        "adm0_a3": "UKR",
+        "admin": "UKR",
+        "level": "GAP",
+        "area": 1035.0
+      }
+    },
+    {
+      "id": 905854,
+      "name": "Lviv",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [
+        "POL"
+      ],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "source": "nation_tags1",
+        "adm0_a3": "UKR",
+        "admin": "UKR",
+        "level": "GAP",
+        "area": 1035.0
+      }
+    },
+    {
+      "id": 905855,
+      "name": "Lutsk",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [
+        "POL"
+      ],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "source": "nation_tags1",
+        "adm0_a3": "UKR",
+        "admin": "UKR",
+        "level": "GAP",
+        "area": 1035.0
+      }
+    },
+    {
+      "id": 905856,
+      "name": "Chernivtsi",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [
+        "ROM"
+      ],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "source": "nation_tags1",
+        "adm0_a3": "UKR",
+        "admin": "UKR",
+        "level": "GAP",
+        "area": 1035.0
+      }
+    },
+    {
+      "id": 905857,
+      "name": "Chisinau",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [
+        "ROM"
+      ],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "source": "nation_tags1",
+        "adm0_a3": "MDA",
+        "admin": "MDA",
+        "level": "GAP",
+        "area": 1035.0
+      }
+    },
+    {
+      "id": 905858,
+      "name": "Harbin",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [
+        "CHI"
+      ],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "source": "nation_tags1",
+        "adm0_a3": "CHN",
+        "admin": "CHN",
+        "level": "GAP",
+        "area": 1035.0
+      }
+    },
+    {
+      "id": 905859,
+      "name": "Changchun",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [
+        "CHI"
+      ],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "source": "nation_tags1",
+        "adm0_a3": "CHN",
+        "admin": "CHN",
+        "level": "GAP",
+        "area": 1035.0
+      }
+    },
+    {
+      "id": 905860,
+      "name": "Qiqihar",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [
+        "CHI"
+      ],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "source": "nation_tags1",
+        "adm0_a3": "CHN",
+        "admin": "CHN",
+        "level": "GAP",
+        "area": 1035.0
+      }
+    },
+    {
+      "id": 905861,
+      "name": "Hailar",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [
+        "CHI"
+      ],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "source": "nation_tags1",
+        "adm0_a3": "CHN",
+        "admin": "CHN",
+        "level": "GAP",
+        "area": 1035.0
+      }
+    },
+    {
+      "id": 905862,
+      "name": "Chongqing",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [
+        "CHI"
+      ],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "source": "nation_tags1",
+        "adm0_a3": "CHN",
+        "admin": "CHN",
+        "level": "GAP",
+        "area": 1035.0
+      }
+    },
+    {
+      "id": 905863,
+      "name": "Guangzhou",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [
+        "CHI"
+      ],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "source": "nation_tags1",
+        "adm0_a3": "CHN",
+        "admin": "CHN",
+        "level": "GAP",
+        "area": 1035.0
+      }
+    },
+    {
+      "id": 905864,
+      "name": "Chengdu",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [
+        "CHI"
+      ],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "source": "nation_tags1",
+        "adm0_a3": "CHN",
+        "admin": "CHN",
+        "level": "GAP",
+        "area": 1035.0
+      }
+    },
+    {
+      "id": 905865,
+      "name": "Fuzhou",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [
+        "CHI"
+      ],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "source": "nation_tags1",
+        "adm0_a3": "CHN",
+        "admin": "CHN",
+        "level": "GAP",
+        "area": 1035.0
+      }
+    },
+    {
+      "id": 905866,
+      "name": "Zhengzhou",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [
+        "CHI"
+      ],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "source": "nation_tags1",
+        "adm0_a3": "CHN",
+        "admin": "CHN",
+        "level": "GAP",
+        "area": 1035.0
+      }
+    },
+    {
+      "id": 905867,
+      "name": "Taiyuan",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [
+        "CHI"
+      ],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "source": "nation_tags1",
+        "adm0_a3": "CHN",
+        "admin": "CHN",
+        "level": "GAP",
+        "area": 1035.0
+      }
+    },
+    {
+      "id": 905868,
+      "name": "Guiyang",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [
+        "CHI"
+      ],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "source": "nation_tags1",
+        "adm0_a3": "CHN",
+        "admin": "CHN",
+        "level": "GAP",
+        "area": 1035.0
+      }
+    },
+    {
+      "id": 905869,
+      "name": "Hohhot",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [
+        "CHI"
+      ],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "source": "nation_tags1",
+        "adm0_a3": "CHN",
+        "admin": "CHN",
+        "level": "GAP",
+        "area": 1035.0
+      }
     }
   ]
 }

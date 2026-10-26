@@ -62,13 +62,13 @@ AI declare golden, measured on the war-gate boot with player GER and overrides `
 
 Weight `w = 1 + factories + (key ? 10 : 0) + (capital ? 25 : 0)`. Progress is enemy-held start weight over total start weight. A tag at war with nobody stays at progress 0.
 
-POL (scenario country, not a major): 53 provinces, factory sum 167, keys `711112`, `711048`, `711090`, capital `711112` (8 factories, also a key).
+POL (scenario country, not a major): 55 provinces, factory sum 167, keys `711112`, `711048`, `711090`, capital `711112` (8 factories, also a key). NATION-TAGS-1 adds Lviv `905854` and Lutsk `905855` (factories 0, base weight 1 each).
 
-- Total `53*1 + 167 + 10*3 + 25 = 275`.
+- Total `55*1 + 167 + 10*3 + 25 = 277`.
 - Capital province `1 + 8 + 10 + 25 = 44`.
-- Capital-only progress `44/275 = 0.16`.
-- Threshold `clamp(0.40 + 0.40 * 55/100) = 0.62`. Held weight must reach `170.5`.
-- Dropping the capital weight (mutant M4) makes that province 19 and the total 250, so `19/250`, which is not `44/275`.
+- Capital-only progress `44/277 = 0.158845`.
+- Threshold `clamp(0.40 + 0.40 * 55/100) = 0.62`. Held weight must reach `171.74`.
+- Dropping the capital weight (mutant M4) makes that province 19 and the total 252, so `19/252`, which is not `44/277`.
 
 LUX (minor): one province `710977`, 3 factories, no key, capital by the factory rule. Weight `1+3+25 = 29`. Threshold `0.50`. Outcome `annex_all`.
 
@@ -76,7 +76,7 @@ FRA (major): stability 70, threshold `0.68`, outcome `keep_occupied`.
 
 The daily-check millisecond is the scan inside `check_all` and does not include annex. Annex time is `last_annex_ms`. Bars are 10 ms and 1500 ms, doubled when `EOA_SLOW_BOX=1`.
 
-Poland's German border is 22 provinces and weight 99 (0.36 of 275). Hop 2 adds 68 (cumulative 167, ratio 0.607). Hop 3 crosses 0.62 (cumulative 263). A single border hex cannot capitulate Poland. Attacker-win capture already sets the attacker's `stationed_province_id` to the taken province (`BattleManager` capture path), so an existing battle can walk forward without a new march planner. The soak uses that. It does not add front planning.
+Poland's German border is 22 provinces and weight 99 (0.357 of 277). Hop 2 adds 68 (cumulative 167, ratio 0.603). Hop 3 crosses 0.62 (cumulative 263). A single border hex cannot capitulate Poland. Attacker-win capture already sets the attacker's `stationed_province_id` to the taken province (`BattleManager` capture path), so an existing battle can walk forward without a new march planner. The soak uses that. It does not add front planning.
 
 ## Derived capitals (65 land tags)
 

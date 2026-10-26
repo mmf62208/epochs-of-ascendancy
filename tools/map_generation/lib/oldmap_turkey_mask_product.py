@@ -147,9 +147,13 @@ def witness_report(mask: dict, provinces: Sequence[dict] | None = None) -> dict:
     cx, cy = lonlat_to_canvas(*CRIMEA_LONLAT)
     sx, sy = lonlat_to_canvas(*BLACK_SEA_LONLAT)
     kiev_prov = None
+    crimea_prov = None
     for p in provinces:
-        if point_in_bbox(kx, ky, p["bbox"]) and point_in_ring(kx, ky, p["points"]):
+        if kiev_prov is None and point_in_bbox(kx, ky, p["bbox"]) and point_in_ring(kx, ky, p["points"]):
             kiev_prov = p["id"]
+        if crimea_prov is None and point_in_bbox(cx, cy, p["bbox"]) and point_in_ring(cx, cy, p["points"]):
+            crimea_prov = p["id"]
+        if kiev_prov is not None and crimea_prov is not None:
             break
     owned_centroids_in_mask = []
     for p in provinces:
@@ -171,6 +175,7 @@ def witness_report(mask: dict, provinces: Sequence[dict] | None = None) -> dict:
         "kiev_in_land": _covered(kx, ky, land),
         "kiev_in_province": kiev_prov,
         "crimea_in_land": _covered(cx, cy, land),
+        "crimea_in_province": crimea_prov,
         "black_sea_in_sea": _covered(sx, sy, sea),
         "black_sea_in_land": _covered(sx, sy, land),
         "owned_centroids_in_mask": owned_centroids_in_mask[:12],

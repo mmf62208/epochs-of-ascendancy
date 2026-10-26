@@ -739,14 +739,14 @@ def build_seas_coarsen_feed10_tyrrhenian_product(board_dir: str = "") -> Dict[st
     else:
         passes.append("seas_340_ids_kept")
     n_board = len(base)
-    if n_board < 3510 or n_board > 3545:
+    if n_board < 3510 or n_board > 3557:
         fails.append(f"board_scale_left_3520_band n={n_board}")
     else:
         passes.append(f"board_n={n_board}")
-    if n_board != 3536:
+    if n_board != 3557:
         fails.append(f"board_count_changed n={n_board}")
     else:
-        passes.append("board_3536_reshape_only")
+        passes.append("board_3557_reshape_only")
 
     world_full = ROOT / "data" / "provinces_world_full"
     if world_full.is_dir():
