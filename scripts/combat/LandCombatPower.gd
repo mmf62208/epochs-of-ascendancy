@@ -410,6 +410,66 @@ static func equipment_toe(comp: Dictionary) -> Dictionary:
 	return out
 
 
+static func formation_domain(formation: Object) -> String:
+	if formation == null:
+		return "land"
+	var ft := ""
+	if "formation_type" in formation:
+		ft = str(formation.formation_type).strip_edges()
+	if ft in ["fleet", "task_force", "ship"]:
+		return "naval"
+	if ft in ["air_wing", "air_squadron", "air_group"]:
+		return "air"
+	return "land"
+
+
+static func formation_design_id(formation: Object) -> String:
+	var dom := formation_domain(formation)
+	if dom == "naval" and "naval_design_id" in formation:
+		var nid := str(formation.naval_design_id).strip_edges()
+		if not nid.is_empty():
+			return nid
+	if dom == "air" and "air_design_id" in formation:
+		var aid := str(formation.air_design_id).strip_edges()
+		if not aid.is_empty():
+			return aid
+	if "design_id" in formation:
+		return str(formation.design_id).strip_edges()
+	return ""
+
+
+static func design_module_toe(design_id: String) -> Dictionary:
+	var tpl: Object = _try_design_template(design_id)
+	if tpl == null or not ("module_loadout" in tpl):
+		return {}
+	var raw: Variant = tpl.get("module_loadout")
+	if typeof(raw) != TYPE_DICTIONARY:
+		return {}
+	var out: Dictionary = {}
+	for slot in (raw as Dictionary).keys():
+		var mid := str((raw as Dictionary)[slot]).strip_edges()
+		if mid.is_empty():
+			continue
+		out[mid] = int(out.get(mid, 0)) + 1
+	return out
+
+
+## Land keeps composition_from_formation. Fleet and air use the design's
+## module_loadout (one per mounted module), never the infantry battalion TOE.
+static func equipment_toe_for_formation(formation: Object) -> Dictionary:
+	var dom := formation_domain(formation)
+	if dom == "land":
+		return equipment_toe(composition_from_formation(formation))
+	var toe := design_module_toe(formation_design_id(formation))
+	if not toe.is_empty():
+		return toe
+	if dom == "naval":
+		return {"naval_hull": 1}
+	if dom == "air":
+		return {"aircraft": 1}
+	return {}
+
+
 static func hardness_mix(soft: float, hard: float, defender_hardness: float) -> float:
 	var h := clampf(float(defender_hardness), 0.0, 1.0)
 	return (1.0 - h) * float(soft) + h * float(hard)

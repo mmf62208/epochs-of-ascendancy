@@ -138,8 +138,11 @@ static func _combat_log_tip_lines(formation: Object) -> PackedStringArray:
 
 
 static func _toe_bits_from_comp(comp: Dictionary) -> PackedStringArray:
+	return _toe_bits_from_toe(_safe_equipment_toe(comp))
+
+
+static func _toe_bits_from_toe(toe_eq: Dictionary) -> PackedStringArray:
 	var bits: PackedStringArray = PackedStringArray()
-	var toe_eq: Dictionary = _safe_equipment_toe(comp)
 	if toe_eq.is_empty():
 		return bits
 	var keys: Array = toe_eq.keys()
@@ -150,6 +153,14 @@ static func _toe_bits_from_comp(comp: Dictionary) -> PackedStringArray:
 		var short := str(k).replace("_equipment", "").replace("_", " ").strip_edges()
 		bits.append("%s %d" % [short, int(toe_eq[k])])
 	return bits
+
+
+static func _card_equipment_toe(formation: Object, comp: Dictionary = {}) -> Dictionary:
+	if typeof(LandCombatPower) != TYPE_NIL:
+		var raw: Variant = LandCombatPower.equipment_toe_for_formation(formation)
+		if raw is Dictionary and not (raw as Dictionary).is_empty():
+			return raw as Dictionary
+	return _safe_equipment_toe(comp)
 
 
 static func _fill_ratio_for(formation: Object) -> float:
@@ -168,18 +179,17 @@ static func _fill_ratio_for(formation: Object) -> float:
 			return clampf(meta_fill, 0.0, 2.0)
 	# Avoid calling ProductionManager.unit_toe_fill_ratio — get_formation_toe
 	# type-casts Formation and can abort the card before body is parented.
-	var fid := ""
-	if "formation_id" in formation:
-		var fid_v: Variant = formation.get("formation_id")
-		if typeof(fid_v) == TYPE_STRING or typeof(fid_v) == TYPE_INT:
-			fid = str(fid_v).strip_edges()
+	# No ledger and no toe_fill is untracked, not Fill 0%.
+	if not _fill_is_tracked(formation):
+		return -1.0
+	var fid := _formation_id_of(formation)
 	if (
 		not fid.is_empty()
 		and typeof(ProductionManager) != TYPE_NIL
 		and ProductionManager != null
 		and ProductionManager.has_method("get_unit_equipment_stock")
 	):
-		var toe: Dictionary = _safe_equipment_toe(_safe_composition(formation))
+		var toe: Dictionary = _card_equipment_toe(formation, _safe_composition(formation))
 		if not toe.is_empty():
 			var have_stock: Dictionary = {}
 			var stock_v: Variant = ProductionManager.call("get_unit_equipment_stock", fid)
@@ -198,17 +208,62 @@ static func _fill_ratio_for(formation: Object) -> float:
 	return -1.0
 
 
+static func _formation_id_of(formation: Object) -> String:
+	if formation == null or not ("formation_id" in formation):
+		return ""
+	var fid_v: Variant = formation.get("formation_id")
+	if typeof(fid_v) == TYPE_STRING or typeof(fid_v) == TYPE_INT:
+		return str(fid_v).strip_edges()
+	return ""
+
+
+static func _fill_is_tracked(formation: Object) -> bool:
+	if formation == null or not is_instance_valid(formation):
+		return false
+	if "toe_fill" in formation:
+		var tv: Variant = formation.get("toe_fill")
+		if typeof(tv) == TYPE_FLOAT or typeof(tv) == TYPE_INT:
+			return true
+	if formation.has_method("has_meta") and bool(formation.has_meta("toe_fill")):
+		return true
+	var fid := _formation_id_of(formation)
+	if fid.is_empty():
+		return false
+	if typeof(ProductionManager) == TYPE_NIL or ProductionManager == null:
+		return false
+	if ProductionManager.has_method("has_unit_equipment_ledger"):
+		return bool(ProductionManager.call("has_unit_equipment_ledger", fid))
+	return false
+
+
+## Chip StrNum and the card Fill line. Tracked fill uses the equipment ratio.
+## Untracked (no toe_fill, no ledger) uses strength so a fresh unit is 100 and 100.
+## Null or unknown tracked fill returns -1, which paints "Fill —%".
+static func shared_display_percent(formation: Object) -> int:
+	if formation == null or not is_instance_valid(formation):
+		return -1
+	if _fill_is_tracked(formation):
+		var fill := _fill_ratio_for(formation)
+		if fill < 0.0:
+			return -1
+		return int(round(clampf(fill, 0.0, 1.0) * 100.0))
+	var str_v := _safe_float_prop(formation, "strength", 1.0)
+	return int(round(clampf(_as_percent(str_v), 0.0, 100.0)))
+
+
 static func _fill_percent_line(formation: Object) -> String:
-	var fill := _fill_ratio_for(formation)
-	if fill < 0.0:
-		# Strength% is casualties remaining — never alias it as Fill%.
+	if formation == null or not is_instance_valid(formation):
 		return "Fill —%"
-	return "Fill %.0f%%" % (fill * 100.0)
+	var pct := shared_display_percent(formation)
+	if pct < 0:
+		# Strength% is casualties remaining — never alias an unknown ratio as Fill%.
+		return "Fill —%"
+	return "Fill %.0f%%" % float(pct)
 
 
 static func _fill_toe_fold_line(formation: Object, comp: Dictionary) -> String:
 	var fill_s := _fill_percent_line(formation)
-	var bits := _toe_bits_from_comp(comp)
+	var bits := _toe_bits_from_toe(_card_equipment_toe(formation, comp))
 	if fill_s.is_empty() and bits.is_empty():
 		return ""
 	if bits.is_empty():

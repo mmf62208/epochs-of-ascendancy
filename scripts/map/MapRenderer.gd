@@ -21800,6 +21800,10 @@ func _show_unit_detail_popup(formation: Object) -> void:
 			fill_txt = "%s · TOE —" % fill_txt
 		_apply_fill_toe_card_lines(fill_lbl, toe_lbl, fill_txt)
 		fill_ratio = _safe_unit_card_fill_ratio(formation)
+		if fill_ratio < 0.0 and typeof(UnitCardCombatStrip) != TYPE_NIL:
+			var shown_pct := int(UnitCardCombatStrip.shared_display_percent(formation))
+			if shown_pct >= 0:
+				fill_ratio = float(shown_pct) / 100.0
 		if fill_ratio >= 0.0 and fill_ratio < 0.5:
 			fill_col = RetrowaveTheme.WARNING
 		elif fill_ratio >= 0.5:
@@ -22088,6 +22092,8 @@ func _safe_unit_card_fill_ratio(formation: Object) -> float:
 		return -1.0
 	var raw: Variant = UnitCardCombatStrip._fill_ratio_for(formation)
 	if typeof(raw) == TYPE_FLOAT or typeof(raw) == TYPE_INT:
+		if float(raw) < 0.0:
+			return -1.0
 		return clampf(float(raw), 0.0, 2.0)
 	return -1.0
 
@@ -28770,7 +28776,12 @@ func _attach_unit_counter_chrome(counter: Node2D, ff: Object, nation_col: Color)
 		counter.add_child(train)
 	var str_lab: Node2D = _UnitChipTextScr.new() as Node2D
 	str_lab.name = "StrNum"
-	str_lab.set("text", "%d" % int(round(clampf(str_v, 0.0, 1.0) * 100.0)))
+	var shown := int(round(clampf(str_v, 0.0, 1.0) * 100.0))
+	if ff != null and typeof(UnitCardCombatStrip) != TYPE_NIL:
+		var sp: Variant = UnitCardCombatStrip.shared_display_percent(ff)
+		if (typeof(sp) == TYPE_INT or typeof(sp) == TYPE_FLOAT) and int(sp) >= 0:
+			shown = int(sp)
+	str_lab.set("text", "%d" % shown)
 	str_lab.set("font_size", 13)
 	str_lab.set("font_color", Color(0.99, 0.90, 0.38, 1.0))
 	str_lab.set("align_right", true)
@@ -32685,9 +32696,9 @@ var _icon_flush_queued: bool = false
 var _icon_flush_posts: int = 0
 ## Garrison chips skipped until the camera is inside operational zoom and the hex is on screen.
 var _icon_cull_hold: Dictionary = {}
-## Post-Begin smoke/home camera lands near 0.79. Garrison pins wait for a
-## tighter view so F5 boot does not instance the border set.
-const GARRISON_CHIP_MIN_ZOOM: float = 0.95
+## Post-Begin smoke/home camera lands near 0.79. Garrison pins use
+## MapZoomLOD.show_garrison_counters_for_zoom (z >= 0.95) so boot and the
+## Europe Home frame share one floor.
 
 
 func queue_unit_icon_rebuild(pids: Array) -> void:
@@ -32719,7 +32730,7 @@ func _hold_queued_icons_for_zoom(only: Dictionary) -> bool:
 	if only.is_empty() or not _unit_icon_cull_active():
 		return false
 	var z := _get_camera_zoom() if has_method("_get_camera_zoom") else 1.0
-	if z >= GARRISON_CHIP_MIN_ZOOM:
+	if MapZoomLODScript.show_garrison_counters_for_zoom(z, show_unit_counters):
 		return false
 	for pid_v in only.keys():
 		_icon_cull_hold[int(pid_v)] = true
@@ -32765,7 +32776,7 @@ func _defer_garrison_icon(ff: Object, pid: int, local_pos: Vector2) -> bool:
 	if not _unit_icon_cull_active() or not _formation_is_seed_garrison(ff):
 		return false
 	var z := _get_camera_zoom() if has_method("_get_camera_zoom") else 1.0
-	if z < GARRISON_CHIP_MIN_ZOOM:
+	if not MapZoomLODScript.show_garrison_counters_for_zoom(z, show_unit_counters):
 		return true
 	var host: Node2D = province_nodes.get(pid) as Node2D
 	var world := local_pos
@@ -32783,7 +32794,7 @@ func _reveal_culled_unit_icons(limit: int = 0) -> void:
 		_update_unit_icons_for_pids(all)
 		return
 	var z := _get_camera_zoom() if has_method("_get_camera_zoom") else 1.0
-	if z < GARRISON_CHIP_MIN_ZOOM:
+	if not MapZoomLODScript.show_garrison_counters_for_zoom(z, show_unit_counters):
 		return
 	var reveal: Array = []
 	for pid_v in _icon_cull_hold.keys():
