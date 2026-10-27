@@ -1,8 +1,11 @@
 extends SceneTree
 
 ## CL1b capitulation and peace. Goldens are the economy-layer weights:
-##   POL 55 provinces, factory sum 167, keys 3, capital 711112 weight 44, total 277.
-##   Capital-only progress 44/277 = 0.158845. Threshold 0.40+0.40*55/100 = 0.62.
+##   POL 55 provinces, factory sum 167, keys 3, capital 711112 weight 44.
+##   NATION-TAGS-1 Lviv+Lutsk (factories 0) made the total 277.
+##   MAP-RECONCILE-1 adds Stanislawow, Tarnopol, Rovno, Drohobych, Kovel
+##   (factories 1, base 1). Total 287. Capital-only 44/287 = 0.153310.
+##   Threshold stays 0.62 (stability, not province count).
 ##   The extra weight is Lviv 906005 and Lutsk 906006 (base 1, factories 0).
 ##   LUX pid 710977, factories 3, weight 29, minor threshold 0.50, annex_all.
 ##   FRA stability 70, threshold 0.68, keep_occupied.
@@ -10,7 +13,7 @@ extends SceneTree
 ## so a removed day hook fails this test.
 
 const POL_CAPITAL := 711112
-const POL_CAP_PROGRESS := 44.0 / 277.0
+const POL_CAP_PROGRESS := 44.0 / 287.0
 const POL_THRESHOLD := 0.62
 const LUX_PID := 710977
 const LUX_THRESHOLD := 0.50

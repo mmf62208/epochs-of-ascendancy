@@ -3216,7 +3216,18 @@
     "906017": "CHI",
     "906018": "CHI",
     "906019": "CHI",
-    "906020": "CHI"
+    "906020": "CHI",
+    "906100": "SOV",
+    "906101": "SOV",
+    "906102": "SOV",
+    "906103": "SOV",
+    "906104": "SOV",
+    "906105": "SOV",
+    "906106": "POL",
+    "906107": "POL",
+    "906108": "POL",
+    "906109": "POL",
+    "906110": "POL"
   },
   "meta": {
     "source": "polish_world_accurate_board",
@@ -3249,8 +3260,8 @@
         "SRB": "YUG"
       },
       "changed": 75,
-      "note": "SVN/SER/CRO/MKD/MNE→YUG, SVK→CZE for 1936-01-01 historical ownership"
+      "note": "SVN/SER/CRO/MKD/MNE\u2192YUG, SVK\u2192CZE for 1936-01-01 historical ownership"
     },
-    "ger_pol_1936_fix": "East Prussia + Pomerania + Silesia + Neumark to GER; corridor/Poznań stay POL"
+    "ger_pol_1936_fix": "East Prussia + Pomerania + Silesia + Neumark to GER; corridor/Pozna\u0144 stay POL"
   }
 }

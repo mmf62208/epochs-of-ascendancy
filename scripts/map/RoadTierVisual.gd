@@ -1339,6 +1339,11 @@ static func _hwy3_score_pid_less(a: Dictionary, b: Dictionary) -> bool:
 static func _hwy3_rec_is_hub_candidate(rec: Dictionary) -> bool:
 	if bool(rec.get("capital", false)):
 		return true
+	## A tier-2 city with no people is a gap rectangle, not a hub. Treating it
+	## as one pulled the Moscow→Haradok→Polotsk placeholder off the hub route,
+	## so the stub demote never saw those edges (dropped_n=0).
+	if int(rec.get("population", 0)) <= 0:
+		return false
 	if int(rec.get("tier", 0)) >= 2:
 		return true
 	if int(rec.get("population", 0)) >= 80000:
@@ -3556,14 +3561,23 @@ static func _hwy3_pick_hub_routes(cache: Array, inferred: Array, hub_ctx: Dictio
 		span_by_tag[tg1] = _hwy3_urban_span_pair_ids(hl1)
 		for si1 in range(sectors1.size()):
 			var sec1: int = int(sectors1[si1])
-			if sec1 > 0 and not hub_set.has(sec1) and rec_by_pid.has(sec1):
+			if sec1 > 0 and not hub_set.has(sec1):
 				var rec_sec_v: Variant = rec_by_pid.get(sec1, {})
-				if typeof(rec_sec_v) == TYPE_DICTIONARY:
-					var rec_sec: Dictionary = rec_sec_v
-					hubs.append(rec_sec)
-					hub_set[sec1] = true
-					hl1.append(rec_sec)
-					hubs_by_tag[tg1] = hl1
+				if typeof(rec_sec_v) != TYPE_DICTIONARY:
+					continue
+				var rec_sec: Dictionary = rec_sec_v
+				## Sector search falls through to every same-tag province. A
+				## non-hub (Polotsk area, pop 20k, tier 0) became a trunk once
+				## the Moscow–Haradok–Polotsk rings were real and colinear.
+				## That extra capital route is the roads1 19-vs-18 failure.
+				## Keep the sector id so the opposite-sector drop stays as it
+				## was, but do not paint a province the hub rule rejected.
+				if not _hwy3_rec_is_hub_candidate(rec_sec):
+					continue
+				hubs.append(rec_sec)
+				hub_set[sec1] = true
+				hl1.append(rec_sec)
+				hubs_by_tag[tg1] = hl1
 			if cap1 > 0 and sec1 > 0:
 				var already: bool = false
 				for pr_v in pair_ids:

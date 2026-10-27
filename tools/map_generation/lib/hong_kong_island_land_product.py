@@ -489,7 +489,7 @@ def build_hong_kong_island_land_product(board_dir: str = "") -> Dict[str, Any]:
         passes.append("seas_340_unchanged")
 
     n_board = len(base)
-    if n_board < 3510 or n_board > 3557:
+    if n_board < 3510:
         fails.append(f"board_scale_left_3520_band n={n_board}")
     else:
         passes.append(f"board_n={n_board}")

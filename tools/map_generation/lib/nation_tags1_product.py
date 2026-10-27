@@ -6,8 +6,9 @@ existing cc=PL provinces (Oder–Neisse), not a new geometry pack.
 
 Gap provinces are append-only ids 906000–906020. They moved off 905849–905869
 so they miss the GAP clash window 905849–905888 and the land ids used through
-905908 (GAP-USSR-WEST 905889–905899, GAP-WEST-UKR 905900–905908). This module
-does not write the board; ``generate_nation_tags1_gaps.py`` does.
+905908 (GAP-USSR-WEST 905889–905899, GAP-WEST-UKR 905900–905908).
+MAP-RECONCILE-1 adds the 11 unique names from those branches at 906100–906110.
+This module does not write the board.
 """
 from __future__ import annotations
 
@@ -32,8 +33,10 @@ PRIOR_MAX_LAND_ID = 905848
 BOARD_N_BEFORE = 3536
 LAND_N_BEFORE = 3196
 GAP_N = LAST_GAP_ID - FIRST_GAP_ID + 1
-BOARD_N_AFTER = BOARD_N_BEFORE + GAP_N
-LAND_N_AFTER = LAND_N_BEFORE + GAP_N
+# Unique USSR-west / west-Ukraine names folded at 906100–906110.
+RECONCILE_WEST_N = 11
+BOARD_N_AFTER = BOARD_N_BEFORE + GAP_N + RECONCILE_WEST_N
+LAND_N_AFTER = LAND_N_BEFORE + GAP_N + RECONCILE_WEST_N
 
 # Witnesses that must not move. 711112 is Warsaw (POL in 1936). 711074 is a
 # recovered Silesian province (GER in 1936, POL after the 1945 border).
