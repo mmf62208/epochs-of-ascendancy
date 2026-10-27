@@ -4194,6 +4194,7 @@ func _handle_camera_input(delta: float) -> void:
 	# Only clamp when camera moved — wrapping/clamp every idle frame was thrashing redraws.
 	if moved:
 		_clamp_camera_to_theater()
+		_reveal_culled_unit_icons(8)
 		# c4c44b8 Lisboa: Atlantic water sits in the left edge-pan strip on
 		# Home Europe. Camera slides onto Iberia while mouse slop stays <8px;
 		# leftover `_begin` then wiped sticky slop. Latch the camera move as
@@ -22199,6 +22200,10 @@ func _show_unit_detail_popup(formation: Object) -> void:
 			fill_txt = "%s · TOE —" % fill_txt
 		_apply_fill_toe_card_lines(fill_lbl, toe_lbl, fill_txt)
 		fill_ratio = _safe_unit_card_fill_ratio(formation)
+		if fill_ratio < 0.0 and typeof(UnitCardCombatStrip) != TYPE_NIL:
+			var shown_pct := int(UnitCardCombatStrip.shared_display_percent(formation))
+			if shown_pct >= 0:
+				fill_ratio = float(shown_pct) / 100.0
 		if fill_ratio >= 0.0 and fill_ratio < 0.5:
 			fill_col = RetrowaveTheme.WARNING
 		elif fill_ratio >= 0.5:
@@ -22487,6 +22492,8 @@ func _safe_unit_card_fill_ratio(formation: Object) -> float:
 		return -1.0
 	var raw: Variant = UnitCardCombatStrip._fill_ratio_for(formation)
 	if typeof(raw) == TYPE_FLOAT or typeof(raw) == TYPE_INT:
+		if float(raw) < 0.0:
+			return -1.0
 		return clampf(float(raw), 0.0, 2.0)
 	return -1.0
 
@@ -28900,6 +28907,7 @@ func _unit_counters_want_visible(z: float = -1.0) -> bool:
 func _sync_unit_counter_paint(z: float = -1.0) -> void:
 	_sync_unit_counter_visibility(z)
 	_sync_unit_counter_scales(z)
+	_reveal_culled_unit_icons()
 
 
 func _sync_unit_counter_visibility(z: float = -1.0) -> void:
@@ -29246,7 +29254,12 @@ func _attach_unit_counter_chrome(counter: Node2D, ff: Object, nation_col: Color)
 		counter.add_child(train)
 	var str_lab: Node2D = _UnitChipTextScr.new() as Node2D
 	str_lab.name = "StrNum"
-	str_lab.set("text", "%d" % int(round(clampf(str_v, 0.0, 1.0) * 100.0)))
+	var shown := int(round(clampf(str_v, 0.0, 1.0) * 100.0))
+	if ff != null and typeof(UnitCardCombatStrip) != TYPE_NIL:
+		var sp: Variant = UnitCardCombatStrip.shared_display_percent(ff)
+		if (typeof(sp) == TYPE_INT or typeof(sp) == TYPE_FLOAT) and int(sp) >= 0:
+			shown = int(sp)
+	str_lab.set("text", "%d" % shown)
 	str_lab.set("font_size", 13)
 	str_lab.set("font_color", Color(0.99, 0.90, 0.38, 1.0))
 	str_lab.set("align_right", true)
@@ -33165,6 +33178,135 @@ func _station_major_land_chip(tag: String, pid: int, design_id: String) -> Dicti
 	return result
 
 
+## Coalesce per-pid icon notifies into one rebuild per frame.
+## Seeded garrisons used to call_deferred a full index scan per hex.
+var _queued_icon_pids: Dictionary = {}
+var _icon_flush_queued: bool = false
+var _icon_flush_posts: int = 0
+## Garrison chips skipped until the camera is inside operational zoom and the hex is on screen.
+var _icon_cull_hold: Dictionary = {}
+## Post-Begin smoke/home camera lands near 0.79. Garrison pins use
+## MapZoomLOD.show_garrison_counters_for_zoom (z >= 0.95) so boot and the
+## Europe Home frame share one floor.
+
+
+func queue_unit_icon_rebuild(pids: Array) -> void:
+	for v in pids:
+		var pid := int(v)
+		if pid >= 0:
+			_queued_icon_pids[pid] = true
+	if _icon_flush_queued:
+		return
+	_icon_flush_queued = true
+	_icon_flush_posts += 1
+	call_deferred("_flush_queued_unit_icons")
+
+
+func _flush_queued_unit_icons() -> void:
+	_icon_flush_queued = false
+	if _queued_icon_pids.is_empty():
+		return
+	var only := _queued_icon_pids.duplicate()
+	_queued_icon_pids.clear()
+	# Seed queues one pid per garrison. Below the close-view floor, remember
+	# the pids and skip the icon index until the camera zooms in.
+	if _hold_queued_icons_for_zoom(only):
+		return
+	_rebuild_demo_unit_icons(only)
+
+
+func _hold_queued_icons_for_zoom(only: Dictionary) -> bool:
+	if only.is_empty() or not _unit_icon_cull_active():
+		return false
+	var z := _get_camera_zoom() if has_method("_get_camera_zoom") else 1.0
+	if MapZoomLODScript.show_garrison_counters_for_zoom(z, show_unit_counters):
+		return false
+	for pid_v in only.keys():
+		_icon_cull_hold[int(pid_v)] = true
+	return true
+
+
+func _unit_icon_cull_active() -> bool:
+	if DisplayServer.get_name() == "headless":
+		return false
+	var vp := get_viewport()
+	if vp == null:
+		return false
+	return vp.get_camera_2d() != null
+
+
+func _formation_is_seed_garrison(ff: Object) -> bool:
+	if ff == null or not ff.has_meta("garrison_1936"):
+		return false
+	return bool(ff.get_meta("garrison_1936"))
+
+
+func _unit_icon_world_in_view(world: Vector2) -> bool:
+	var vp := get_viewport()
+	if vp == null:
+		return true
+	var cam := vp.get_camera_2d()
+	if cam == null:
+		return true
+	var zoom := cam.zoom
+	var zx := maxf(absf(zoom.x), 0.0001)
+	var zy := maxf(absf(zoom.y), 0.0001)
+	var screen := vp.get_visible_rect().size
+	if screen.x < 2.0 or screen.y < 2.0:
+		return true
+	var half := Vector2(screen.x / zx, screen.y / zy) * 0.85
+	var delta := world - cam.get_screen_center_position()
+	return absf(delta.x) <= half.x and absf(delta.y) <= half.y
+
+
+## 1936 garrison pins stay off the tree at strategic / Home zoom and off-screen.
+## Headless and the no-camera path still build every chip.
+func _defer_garrison_icon(ff: Object, pid: int, local_pos: Vector2) -> bool:
+	if not _unit_icon_cull_active() or not _formation_is_seed_garrison(ff):
+		return false
+	var z := _get_camera_zoom() if has_method("_get_camera_zoom") else 1.0
+	if not MapZoomLODScript.show_garrison_counters_for_zoom(z, show_unit_counters):
+		return true
+	var host: Node2D = province_nodes.get(pid) as Node2D
+	var world := local_pos
+	if host != null:
+		world = host.to_global(local_pos)
+	return not _unit_icon_world_in_view(world)
+
+
+func _reveal_culled_unit_icons(limit: int = 0) -> void:
+	if _icon_cull_hold.is_empty():
+		return
+	if not _unit_icon_cull_active():
+		var all: Array = _icon_cull_hold.keys()
+		_icon_cull_hold.clear()
+		_update_unit_icons_for_pids(all)
+		return
+	var z := _get_camera_zoom() if has_method("_get_camera_zoom") else 1.0
+	if not MapZoomLODScript.show_garrison_counters_for_zoom(z, show_unit_counters):
+		return
+	var reveal: Array = []
+	for pid_v in _icon_cull_hold.keys():
+		var pid := int(pid_v)
+		var local := _unit_chip_offset_for_pid(pid)
+		if province_centroids.has(pid):
+			local = (province_centroids[pid] as Vector2) + _unit_chip_offset_for_pid(pid)
+		var host: Node2D = province_nodes.get(pid) as Node2D
+		var world := local
+		if host != null:
+			world = host.to_global(local)
+		if not _unit_icon_world_in_view(world):
+			continue
+		reveal.append(pid)
+		if limit > 0 and reveal.size() >= limit:
+			break
+	if reveal.is_empty():
+		return
+	for pid_v in reveal:
+		_icon_cull_hold.erase(int(pid_v))
+	_update_unit_icons_for_pids(reveal)
+
+
 ## Capture/move: rebuild pins for listed pids only (not the full board).
 func _update_unit_icons_for_pids(pids: Array) -> void:
 	var only: Dictionary = {}
@@ -33267,12 +33409,16 @@ func _rebuild_demo_unit_icons(only_pids: Dictionary) -> void:
 			icons_placed += sea_jobs.size()
 			continue
 
-		var counter := Node2D.new()
-		counter.name = "DemoUnitIcon_" + str(id)
 		# Province nodes sit at origin; chips use centroid, offset off capital stars.
 		var chip_pos := _unit_chip_offset_for_pid(id)
 		if province_centroids.has(id):
 			chip_pos = (province_centroids[id] as Vector2) + _unit_chip_offset_for_pid(id)
+		if _defer_garrison_icon(ff, id, chip_pos):
+			_icon_cull_hold[id] = true
+			continue
+		_icon_cull_hold.erase(id)
+		var counter := Node2D.new()
+		counter.name = "DemoUnitIcon_" + str(id)
 		counter.position = chip_pos
 		counter.z_index = 28
 		counter.z_as_relative = false

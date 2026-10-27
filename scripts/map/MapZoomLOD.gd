@@ -7,6 +7,8 @@ enum Tier { STRATEGIC, OPERATIONAL, TACTICAL }
 
 # Camera zoom bands (aligned with docs/MAP_SYSTEM_DESIGN.md §4.2, scaled for THEATER_SCALE canvas).
 const STRATEGIC_MAX_ZOOM: float = 0.55
+## Play Home on 1280x800 is z=0.787. Garrison pins wait for a tighter view.
+const GARRISON_COUNTER_MIN_ZOOM: float = 0.95
 # Europe Home frame (~Berlin+Paris+Rome) lands ~1.3; keep that as operational so
 # states names and first-session LOD match the human Europe view (not tactical).
 const OPERATIONAL_MAX_ZOOM: float = 1.55
@@ -158,11 +160,12 @@ static func show_unit_counters_for_zoom(z: float, master_enabled: bool = true) -
 
 
 ## Garrison chips are secondary. Line/air/fleet stay on the home zoom floor.
-## Garrisons paint only once the camera is past strategic (z > 0.55).
+## Garrisons paint only at the close view (#133 boot cull, z >= 0.95).
+## Play Home z=0.787 keeps line counters and hides garrison chips.
 static func show_garrison_counters_for_zoom(z: float, master_enabled: bool = true) -> bool:
 	if not show_unit_counters_for_zoom(z, master_enabled):
 		return false
-	return z > STRATEGIC_MAX_ZOOM
+	return z >= GARRISON_COUNTER_MIN_ZOOM
 
 
 ## A garrison chip may win a click only on its own hex. A neighbouring

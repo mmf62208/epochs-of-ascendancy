@@ -751,6 +751,10 @@ func get_unit_equipment_stock(unit_id: String) -> Dictionary:
 	return (raw as Dictionary).duplicate(true)
 
 
+func has_unit_equipment_ledger(unit_id: String) -> bool:
+	return _unit_equipment_stock.has(unit_id)
+
+
 func clear_unit_equipment_stock(unit_id: String) -> void:
 	_unit_equipment_stock.erase(unit_id)
 
