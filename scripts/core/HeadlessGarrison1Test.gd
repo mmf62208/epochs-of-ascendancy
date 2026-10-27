@@ -78,6 +78,7 @@ func _run() -> void:
 	_assert_save_roundtrip(lm)
 	_assert_berlin_holds(mm, tm, lm)
 	_assert_ai_soak(mm, sm, tm, lm)
+	_assert_play_p2(lm)
 	_finish()
 
 
@@ -209,14 +210,166 @@ func _assert_toast_zoom_pick() -> void:
 	var lod: GDScript = load("res://scripts/map/MapZoomLOD.gd") as GDScript
 	var home_line := bool(lod.call("show_unit_counters_for_zoom", 0.40, true))
 	var home_garr := bool(lod.call("show_garrison_counters_for_zoom", 0.40, true))
-	var ops_garr := bool(lod.call("show_garrison_counters_for_zoom", 0.90, true))
+	# Play #133 1280x800 Europe Home is z=0.787 (godot_r1.log EOA_ZOOM_BEGIN from=0.787).
+	var play_line := bool(lod.call("show_unit_counters_for_zoom", 0.787, true))
+	var play_garr := bool(lod.call("show_garrison_counters_for_zoom", 0.787, true))
+	var close_garr := bool(lod.call("show_garrison_counters_for_zoom", 1.00, true))
 	var kulm_steals := bool(lod.call("garrison_chip_owns_click", 710259, 710300))
 	var berlin_owns := bool(lod.call("garrison_chip_owns_click", 710300, 710300))
-	if not home_line or home_garr or not ops_garr or kulm_steals or not berlin_owns:
-		_fail("chip lod line=%s garr0.40=%s garr0.90=%s kulm=%s berlin=%s" % [home_line, home_garr, ops_garr, kulm_steals, berlin_owns])
+	var mr_src := FileAccess.get_file_as_string("res://scripts/map/MapRenderer.gd")
+	var defer_fn := _func_slice(mr_src, "_defer_garrison_icon")
+	var hold_fn := _func_slice(mr_src, "_hold_queued_icons_for_zoom")
+	var vis_fn := _func_slice(mr_src, "_sync_unit_counter_visibility")
+	var boot_uses_lod := (
+		"show_garrison_counters_for_zoom" in defer_fn
+		and "show_garrison_counters_for_zoom" in hold_fn
+		and "show_garrison_counters_for_zoom" in vis_fn
+	)
+	if (
+		not home_line or home_garr or not play_line or play_garr or not close_garr
+		or kulm_steals or not berlin_owns or not boot_uses_lod
+	):
+		_fail(
+			"chip lod line0.40=%s garr0.40=%s line0.787=%s garr0.787=%s garr1.00=%s kulm=%s berlin=%s boot_lod=%s"
+			% [home_line, home_garr, play_line, play_garr, close_garr, kulm_steals, berlin_owns, boot_uses_lod]
+		)
 		return
-	print("GARRISON_CHIP_VIS z=0.40 line_counters=%s garrison_counters=%s visible_garrison_chips_at_default_zoom=0" % [str(home_line), str(home_garr)])
-	_pass("one toast; garrisons hidden at z=0.40; Kulmbach cannot own a Berlin click")
+	print(
+		"GARRISON_CHIP_VIS z=0.787 line_counters=%s garrison_counters=%s visible_garrison_chips_at_default_zoom=0"
+		% [str(play_line), str(play_garr)]
+	)
+	_pass("one toast; garrisons hidden at play home z=0.787; Kulmbach cannot own a Berlin click")
+
+
+## Play findings on #133: fleet/air TOE, leader type, optional layers, Fill% == chip.
+func _assert_play_p2(lm: Node) -> void:
+	var reasons: PackedStringArray = PackedStringArray()
+	var lcp: GDScript = load("res://scripts/combat/LandCombatPower.gd") as GDScript
+	var strip: GDScript = load("res://scripts/ui/UnitCardCombatStrip.gd") as GDScript
+	var pm := get_root().get_node_or_null("ProductionManager")
+	# Load at runtime. A class_name reference here compiles ScenarioLoader before
+	# autoloads exist and breaks Formation.new() in field_designed_unit.
+	var sl_script: GDScript = load("res://scripts/core/ScenarioLoader.gd") as GDScript
+	var sl: Object = sl_script.new() if sl_script != null else null
+	if lcp == null or not lcp.has_method("equipment_toe_for_formation"):
+		reasons.append("b: equipment_toe_for_formation missing")
+	if strip == null or not strip.has_method("shared_display_percent"):
+		reasons.append("e: shared_display_percent missing")
+	if pm == null or not pm.has_method("has_unit_equipment_ledger"):
+		reasons.append("e: has_unit_equipment_ledger missing")
+	if sl == null or not sl.has_method("_missing_layer_is_warning"):
+		reasons.append("d: _missing_layer_is_warning missing")
+	else:
+		var warn_legacy_super := bool(sl.call("_missing_layer_is_warning", "provinces", "super_regions.json"))
+		var warn_legacy_hier := bool(sl.call("_missing_layer_is_warning", "provinces", "hierarchy_scaffold.json"))
+		var warn_wa_super := bool(sl.call("_missing_layer_is_warning", "provinces_world_accurate", "super_regions.json"))
+		var warn_wa_hier := bool(sl.call("_missing_layer_is_warning", "provinces_world_accurate", "hierarchy_scaffold.json"))
+		var legacy_missing := not FileAccess.file_exists("res://data/provinces/super_regions.json") and not FileAccess.file_exists("res://data/provinces/hierarchy_scaffold.json")
+		var wa_present := FileAccess.file_exists("res://data/provinces_world_accurate/super_regions.json") and FileAccess.file_exists("res://data/provinces_world_accurate/hierarchy_scaffold.json")
+		if warn_legacy_super or warn_legacy_hier or not warn_wa_super or not warn_wa_hier or not legacy_missing or not wa_present:
+			reasons.append(
+				"d: legacy_warn=%s/%s wa_warn=%s/%s legacy_missing=%s wa_present=%s"
+				% [warn_legacy_super, warn_legacy_hier, warn_wa_super, warn_wa_hier, legacy_missing, wa_present]
+			)
+	var lm_src := FileAccess.get_file_as_string("res://scripts/leaders/LeaderManager.gd")
+	var field_fn := _func_slice(lm_src, "field_designed_unit")
+	if (
+		"_allowed_leader_types_for_formation_type" not in field_fn
+		or "[\"general\", \"field_marshal\"]" in field_fn
+	):
+		reasons.append("c: field_designed_unit still picks generals for every domain")
+	var pol: Dictionary = lm.call("field_designed_unit", "POL", "king_george_v_class_bb", 950001, "naval", {
+		"formation_id": "p2_pol_kgv",
+		"display_name": "POL king_george_v_class_bb",
+		"quiet": true,
+		"force_new": true,
+	})
+	var pol_f: Object = lm.call("get_formation", "p2_pol_kgv")
+	if not bool(pol.get("ok", false)) or pol_f == null or str(pol_f.formation_type) != "fleet":
+		reasons.append("c: POL fleet field failed %s" % str(pol))
+	elif not str(pol_f.leader_id).strip_edges().is_empty():
+		var pol_leader: Object = lm.call("get_leader", str(pol_f.leader_id))
+		var pol_lt := str(pol_leader.leader_type) if pol_leader != null else ""
+		if pol_lt != "admiral":
+			reasons.append("c: POL fleet leader %s is %s" % [str(pol_f.leader_id), pol_lt])
+	var eng: Dictionary = lm.call("field_designed_unit", "ENG", "king_george_v_class_bb", 950001, "naval", {
+		"formation_id": "p2_eng_fleet",
+		"display_name": "ENG Fleet",
+		"quiet": true,
+		"force_new": true,
+	})
+	var air: Dictionary = lm.call("field_designed_unit", "ENG", "bf109g_fighter", 711414, "air", {
+		"formation_id": "p2_eng_wing",
+		"display_name": "ENG Wing",
+		"quiet": true,
+		"force_new": true,
+	})
+	var eng_f: Object = lm.call("get_formation", "p2_eng_fleet")
+	var air_f: Object = lm.call("get_formation", "p2_eng_wing")
+	if strip != null and eng_f != null and air_f != null and bool(eng.get("ok", false)) and bool(air.get("ok", false)):
+		var fleet_ln := _first_line(strip.call("lines_for", eng_f))
+		var air_ln := _first_line(strip.call("lines_for", air_f))
+		var fleet_ok := (
+			"infantry" not in fleet_ln
+			and ("naval" in fleet_ln or "mk15" in fleet_ln or "14inch" in fleet_ln or "carrier boiler" in fleet_ln)
+		)
+		var air_ok := (
+			"infantry" not in air_ln
+			and ("mg151" in air_ln or "aircraft" in air_ln)
+		)
+		if not fleet_ok or not air_ok:
+			reasons.append("b: fleet='%s' air='%s'" % [fleet_ln, air_ln])
+	else:
+		reasons.append("b: could not field ENG fleet/air")
+	if strip != null:
+		lm.call("field_designed_unit", "CZE", "m3_stuart_light_tank", 710200, "land", {
+			"formation_id": "p2_cze_div0",
+			"display_name": "Division 0",
+			"quiet": true,
+			"force_new": true,
+			"skip_leader": true,
+			"strength": 1.0,
+		})
+		var div: Object = lm.call("get_formation", "p2_cze_div0")
+		if div == null:
+			reasons.append("e: Division 0 was not fielded")
+		else:
+			if pm != null and pm.has_method("clear_unit_equipment_stock"):
+				pm.call("clear_unit_equipment_stock", "p2_cze_div0")
+			div.set("strength", 1.0)
+		var bare := _first_line(strip.call("lines_for", div) if div != null else PackedStringArray())
+		var bare_pct := -1
+		if strip.has_method("shared_display_percent"):
+			bare_pct = int(strip.call("shared_display_percent", div))
+		if "Fill 0%" in bare or bare_pct != 100 or not bare.begins_with("Fill 100%"):
+			reasons.append("e: untracked card='%s' shared=%d" % [bare, bare_pct])
+		if div != null:
+			div.set_meta("toe_fill", 0.28)
+			var tracked := _first_line(strip.call("lines_for", div))
+			var tracked_pct := -1
+			if strip.has_method("shared_display_percent"):
+				tracked_pct = int(strip.call("shared_display_percent", div))
+			if "Fill 28%" not in tracked or tracked_pct != 28:
+				reasons.append("e: tracked card='%s' shared=%d" % [tracked, tracked_pct])
+	var mr_src := FileAccess.get_file_as_string("res://scripts/map/MapRenderer.gd")
+	var chrome := _func_slice(mr_src, "_attach_unit_counter_chrome")
+	if "shared_display_percent" not in chrome or "fill_ratio = str_v" in mr_src:
+		reasons.append("e: chip StrNum is not the card Fill source")
+	if reasons.is_empty():
+		_pass("fleet/air TOE, POL admiral, optional province layers, Fill% matches chip")
+		return
+	_fail("play p2: %s" % " | ".join(reasons))
+
+
+func _first_line(raw: Variant) -> String:
+	if raw is PackedStringArray:
+		var rows: PackedStringArray = raw as PackedStringArray
+		if rows.is_empty():
+			return ""
+		return str(rows[0])
+	if raw is Array and not (raw as Array).is_empty():
+		return str((raw as Array)[0])
+	return ""
 
 
 func _func_slice(src: String, fname: String) -> String:

@@ -625,7 +625,10 @@ func field_designed_unit(
 	register_formation(f)
 	if not bool(extras.get("skip_leader", false)) and str(f.leader_id).strip_edges().is_empty() and has_method("pick_leader_id_for_formation"):
 		var used: Dictionary = _seed_used_leader_ids() if has_method("_seed_used_leader_ids") else {}
-		var pick := pick_leader_id_for_formation(tag, f.formation_type, used, ["general", "field_marshal"])
+		var allowed: Array = _allowed_leader_types_for_formation_type(f.formation_type)
+		var pick := ""
+		if not allowed.is_empty():
+			pick = pick_leader_id_for_formation(tag, f.formation_type, used, allowed)
 		if not pick.is_empty() and has_method("assign_leader_to_formation"):
 			assign_leader_to_formation(pick, f.formation_id)
 	_notify_map_icon_pid(pid)
