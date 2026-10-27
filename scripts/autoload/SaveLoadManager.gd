@@ -159,6 +159,15 @@ var _calendar_autosave_last_ms: float = -1.0
 var _calendar_autosave_last_json_bytes: int = -1
 var _calendar_autosave_last_lean: bool = false
 var _calendar_autosave_last_rearmed: bool = false
+## Elapsed day of the last gather. A year boundary on that same day does not
+## gather again. -1 means this process has not gathered yet.
+var _calendar_autosave_gathered_elapsed: int = -1
+## True when the queued write is a year boundary that is not a multiple of 7.
+var _calendar_autosave_queued_off_interval: bool = false
+## One deferred slot. If day 7 and a different year morning both want a write
+## in the same drain, the second waits here and runs after the first.
+var _calendar_autosave_followup_elapsed: int = -1
+var _calendar_autosave_followup_off_interval: bool = false
 
 
 func _ready() -> void:
@@ -202,11 +211,14 @@ func _on_day_advanced_for_autosave(_year: int = 0, _month: int = 0, _day: int = 
 	# Isolate the gather from day_emit so the F5 hour clock can keep moving
 	# (day-7 save_game_detailed used to freeze the spine session at 20:00).
 	if _calendar_autosave_pending:
+		# A year-boundary write already holds the slot. Keep this interval day
+		# so it still gathers after that write. A second interval day in the
+		# same batch still does not queue.
+		if _calendar_autosave_queued_off_interval and _calendar_autosave_queued_elapsed != elapsed:
+			_calendar_autosave_followup_elapsed = elapsed
+			_calendar_autosave_followup_off_interval = false
 		return
-	_calendar_autosave_serial += 1
-	_calendar_autosave_queued_elapsed = elapsed
-	_calendar_autosave_pending = true
-	call_deferred("_deferred_calendar_autosave", elapsed)
+	_queue_deferred_calendar_autosave(elapsed, false)
 
 
 func _elapsed_for_emitted_calendar(year: int, month: int, day: int) -> int:
@@ -306,10 +318,19 @@ func _deferred_calendar_autosave(elapsed: int) -> void:
 	if serial > 0:
 		_calendar_autosave_ran_serial = serial
 	if OS.get_environment("EOA_CALENDAR_AUTOSAVE").strip_edges() == "0":
+		_calendar_autosave_followup_elapsed = -1
+		_calendar_autosave_queued_off_interval = false
 		return
 	if typeof(TimeManager) != TYPE_NIL and bool(TimeManager.get("_living_playtest_clock")):
+		_calendar_autosave_followup_elapsed = -1
+		_calendar_autosave_queued_off_interval = false
 		return
-	if elapsed <= 0 or (elapsed % 7) != 0:
+	var off_interval := _calendar_autosave_queued_off_interval
+	_calendar_autosave_queued_off_interval = false
+	# Day 7 requires a positive multiple of 7. A year morning that is not on
+	# that interval still writes when it was queued with the off-interval flag.
+	if elapsed <= 0 or ((elapsed % 7) != 0 and not off_interval):
+		_chain_calendar_autosave_followup()
 		return
 	# Live F5 no longer skips this write. advance_live_f5_equivalent_days
 	# clears `_live_f5_equiv_clock` before this deferred frame. Put it back
@@ -324,6 +345,7 @@ func _deferred_calendar_autosave(elapsed: int) -> void:
 	var lean_now := _should_skip_live_f5_calendar_autosave()
 	_calendar_autosave_last_lean = lean_now
 	_calendar_autosave_last_rearmed = rearmed
+	_calendar_autosave_gathered_elapsed = elapsed
 	_calendar_autosave_gathers += 1
 	var rss_before := _vm_status_kb("VmRSS")
 	var hwm_before := _vm_status_kb("VmHWM")
@@ -360,6 +382,7 @@ func _deferred_calendar_autosave(elapsed: int) -> void:
 			LeaderEventUI.show_toast(toast_line, 2.0)
 	else:
 		push_warning("SaveLoadManager: Calendar autosave failed: %s" % res.get("error", "unknown"))
+	_chain_calendar_autosave_followup()
 
 
 func _vm_status_kb(key: String) -> int:
@@ -385,19 +408,73 @@ func _vm_status_kb(key: String) -> int:
 	return -1
 
 
-func _on_year_advanced_for_autosave(_year: int) -> void:
-	# Autosave to a fixed slot; keeps only the latest autosave for simplicity.
-	# Silent on success (print only), non-spammy toast on failure.
-	if _should_skip_live_f5_calendar_autosave():
-		_calendar_autosave_live_f5_skips += 1
+func _queue_deferred_calendar_autosave(elapsed: int, off_interval: bool) -> void:
+	# Do not latch this on the day-7 path. A later soak can rewind the
+	# calendar to elapsed 0 and must still gather its own day 7. The year
+	# hook is what skips an elapsed day that already gathered.
+	if elapsed <= 0:
 		return
-	var res := save_game_detailed("autosave")
-	if res.get("ok", false):
-		print("SaveLoadManager: Autosaved on year change -> autosave.json")
-	else:
-		push_warning("SaveLoadManager: Autosave failed: %s" % res.get("error", "unknown"))
-		if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
-			LeaderEventUI.show_toast("Autosave failed", 2.0, true)
+	if _calendar_autosave_pending:
+		return
+	_calendar_autosave_serial += 1
+	_calendar_autosave_queued_elapsed = elapsed
+	_calendar_autosave_queued_off_interval = off_interval
+	_calendar_autosave_pending = true
+	call_deferred("_deferred_calendar_autosave", elapsed)
+
+
+func _chain_calendar_autosave_followup() -> void:
+	if _calendar_autosave_followup_elapsed <= 0:
+		return
+	var elapsed := _calendar_autosave_followup_elapsed
+	var off := _calendar_autosave_followup_off_interval
+	_calendar_autosave_followup_elapsed = -1
+	_calendar_autosave_followup_off_interval = false
+	if elapsed == _calendar_autosave_gathered_elapsed:
+		return
+	_queue_deferred_calendar_autosave(elapsed, off)
+
+
+func _on_year_advanced_for_autosave(year: int) -> void:
+	# Autosave to a fixed slot; keeps only the latest autosave for simplicity.
+	# Headless (not the live path) still writes immediately.
+	# Live F5 used to return here, so a session that crossed into 1937 never
+	# wrote. 1936 is not a leap year: 1937-01-01 is elapsed 365, and 365 % 7
+	# is 1, so the day-7 hook does not write that morning. Queue the same
+	# deferred lean gather as day 7. If that elapsed day already gathered, or
+	# is already queued, do not gather again. Quit stays on _skip_quit_autosave.
+	if OS.get_environment("EOA_CALENDAR_AUTOSAVE").strip_edges() == "0":
+		return
+	if typeof(TimeManager) != TYPE_NIL and bool(TimeManager.get("_living_playtest_clock")):
+		return
+	if not _should_skip_live_f5_calendar_autosave():
+		var res := save_game_detailed("autosave")
+		if res.get("ok", false):
+			print("SaveLoadManager: Autosaved on year change -> autosave.json")
+		else:
+			push_warning("SaveLoadManager: Autosave failed: %s" % res.get("error", "unknown"))
+			if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
+				LeaderEventUI.show_toast("Autosave failed", 2.0, true)
+		return
+	var elapsed := _elapsed_for_emitted_calendar(year, 1, 1)
+	if elapsed <= 0 and typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("get_total_days_elapsed"):
+		elapsed = int(TimeManager.get_total_days_elapsed())
+	if elapsed <= 0:
+		return
+	# A rewound clock is a new timeline. Elapsed 7 gathered before the rewind
+	# must not suppress a later year morning, and must not suppress day 7.
+	if _calendar_autosave_gathered_elapsed >= 0 and elapsed < _calendar_autosave_gathered_elapsed:
+		_calendar_autosave_gathered_elapsed = -1
+	if elapsed == _calendar_autosave_gathered_elapsed:
+		return
+	if _calendar_autosave_pending and _calendar_autosave_queued_elapsed == elapsed:
+		return
+	_calendar_autosave_lean_live = true
+	if _calendar_autosave_pending:
+		_calendar_autosave_followup_elapsed = elapsed
+		_calendar_autosave_followup_off_interval = true
+		return
+	_queue_deferred_calendar_autosave(elapsed, true)
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST or what == NOTIFICATION_EXIT_TREE:
