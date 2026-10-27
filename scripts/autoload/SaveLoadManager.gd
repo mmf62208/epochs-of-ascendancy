@@ -149,6 +149,10 @@ var _last_save_path: String = ""
 var _calendar_autosave_pending: bool = false
 var _calendar_autosave_gathers: int = 0
 var _calendar_autosave_live_f5_skips: int = 0
+var _calendar_autosave_lean_live: bool = false
+var _calendar_autosave_rss_mid_kb: int = -1
+var _calendar_autosave_hwm_mid_kb: int = -1
+
 
 func _ready() -> void:
 	_ensure_save_dir()
@@ -169,12 +173,14 @@ func _on_day_advanced_for_autosave(_year: int = 0, _month: int = 0, _day: int = 
 	if typeof(TimeManager) != TYPE_NIL and bool(TimeManager.get("_living_playtest_clock")):
 		# Compact 20d Maginot clock: save_game_detailed every 7d hung the -s harness.
 		return
-	# Live editor/export Play (X11 / llvmpipe): full gather + pretty JSON of the
-	# 3520 board + hierarchy OOMs (~10GB RSS) at day +5/+6. Distinct from the
-	# already-fixed +2 AI softpipe. Player Ctrl+S is unchanged.
-	if _should_skip_live_f5_calendar_autosave():
-		_calendar_autosave_live_f5_skips += 1
-		return
+	# Live editor/export Play used to return here. The old gather dumped the
+	# hierarchy and OOMed (~10 GB RSS) at day +5/+6. SAVE-FULL-1 omits that
+	# dump, so a normal day roll on a positive multiple of 7 writes autosave.
+	# The predicate stays true on this path: quit still skips, and the gather
+	# stays lean (empty hierarchy, no map-ui blob). Days off the interval
+	# still write nothing. Player Ctrl+S is unchanged.
+	var lean_live_gather := _should_skip_live_f5_calendar_autosave()
+	_calendar_autosave_lean_live = lean_live_gather
 	var elapsed := 0
 	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("get_total_days_elapsed"):
 		elapsed = int(TimeManager.get_total_days_elapsed())
@@ -198,18 +204,81 @@ func _should_skip_live_f5_calendar_autosave() -> bool:
 
 func _deferred_calendar_autosave(elapsed: int) -> void:
 	_calendar_autosave_pending = false
-	# Re-check: the deferred frame may still be live F5 / softpipe.
-	if _should_skip_live_f5_calendar_autosave():
-		_calendar_autosave_live_f5_skips += 1
+	if OS.get_environment("EOA_CALENDAR_AUTOSAVE").strip_edges() == "0":
 		return
+	if typeof(TimeManager) != TYPE_NIL and bool(TimeManager.get("_living_playtest_clock")):
+		return
+	if elapsed <= 0 or (elapsed % 7) != 0:
+		return
+	# Live F5 no longer skips this write. advance_live_f5_equivalent_days
+	# clears `_live_f5_equiv_clock` before this deferred frame. Put it back
+	# for the gather so GameData still omits the hierarchy dump, then restore.
+	# Quit stays on _skip_quit_autosave. A headless run that never took the
+	# live path leaves the flag alone and keeps today's gather.
+	var rearmed := false
+	if _calendar_autosave_lean_live and typeof(TimeManager) != TYPE_NIL:
+		if not bool(TimeManager.get("_live_f5_equiv_clock")):
+			TimeManager.set("_live_f5_equiv_clock", true)
+			rearmed = true
+	var lean_now := _should_skip_live_f5_calendar_autosave()
 	_calendar_autosave_gathers += 1
+	var rss_before := _vm_status_kb("VmRSS")
+	var hwm_before := _vm_status_kb("VmHWM")
+	var t0 := Time.get_ticks_usec()
 	var res := save_game_detailed("autosave")
+	var save_ms := float(Time.get_ticks_usec() - t0) / 1000.0
+	if rearmed and typeof(TimeManager) != TYPE_NIL:
+		TimeManager.set("_live_f5_equiv_clock", false)
+	var rss_after := _vm_status_kb("VmRSS")
+	var hwm_after := _vm_status_kb("VmHWM")
 	if res.get("ok", false):
+		var toast_line := "Autosaved · day %d" % elapsed
 		print("SaveLoadManager: Calendar autosave day=%d -> autosave.json" % elapsed)
+		print("SaveLoadManager: %s" % toast_line)
+		print(
+			"SAVEFULL1FIX4_METRIC ms=%.1f bytes=%d rss_before=%d rss_mid=%d rss_after=%d hwm_before=%d hwm_mid=%d hwm_after=%d lean_day=%s lean_gather=%s rearmed=%s"
+			% [
+				save_ms,
+				int(res.get("bytes", 0)),
+				rss_before,
+				_calendar_autosave_rss_mid_kb,
+				rss_after,
+				hwm_before,
+				_calendar_autosave_hwm_mid_kb,
+				hwm_after,
+				str(_calendar_autosave_lean_live),
+				str(lean_now),
+				str(rearmed),
+			]
+		)
 		if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
-			LeaderEventUI.show_toast("Autosaved · day %d" % elapsed, 2.0)
+			LeaderEventUI.show_toast(toast_line, 2.0)
 	else:
 		push_warning("SaveLoadManager: Calendar autosave failed: %s" % res.get("error", "unknown"))
+
+
+func _vm_status_kb(key: String) -> int:
+	# FileAccess on /proc/self is sandboxed in this export. cat the Godot pid.
+	var pid := OS.get_process_id()
+	var out: Array = []
+	var code := OS.execute("/usr/bin/cat", PackedStringArray(["/proc/%d/status" % pid]), out, true, false)
+	if code != 0 or out.is_empty():
+		return -1
+	var text := ""
+	for item in out:
+		text += str(item)
+		if not str(item).ends_with("\n"):
+			text += "\n"
+	var prefix := key + ":"
+	for line in text.split("\n"):
+		if not line.begins_with(prefix):
+			continue
+		var parts := line.replace("\t", " ").split(" ", false)
+		for p in parts:
+			if p.is_valid_int():
+				return int(p)
+	return -1
+
 
 func _on_year_advanced_for_autosave(_year: int) -> void:
 	# Autosave to a fixed slot; keeps only the latest autosave for simplicity.
@@ -1544,6 +1613,11 @@ func save_game_detailed(slot_name: String = DEFAULT_SLOT) -> Dictionary:
 	# 3520-province blob doubled peak RSS on llvmpipe Play soaks.
 	var indent := "" if (safe_slot == "autosave" or _should_skip_live_f5_calendar_autosave()) else "\t"
 	var json_text := JSON.stringify(data, indent)
+	if safe_slot == "autosave":
+		# Sample while the JSON string is still live so the day-7 peak is not
+		# hidden by freeing it before the after-read.
+		_calendar_autosave_rss_mid_kb = _vm_status_kb("VmRSS")
+		_calendar_autosave_hwm_mid_kb = _vm_status_kb("VmHWM")
 	if json_text.is_empty() or json_text == "null":
 		var jmsg := "JSON stringify failed"
 		push_error("SaveLoadManager: %s" % jmsg)
