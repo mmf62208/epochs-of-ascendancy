@@ -23915,7 +23915,38 @@ var selected_formation_id: String = ""
 var _unit_pick_strategic_hint_shown: bool = false
 
 
+func _open_fight_keeps_domain_card(fid: String) -> bool:
+	# Fleet / air / space keep their card. Play b31b625a: Open fight on the
+	# GER fleet teleported it onto Maginot and opened Bas-Rhin, and an empty
+	# id while that fleet was selected grabbed GER_formation_0 for the same
+	# land sheet. Do not move the camera.
+	var use_fid := fid.strip_edges()
+	var fo: Object = null
+	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_formation"):
+		if not use_fid.is_empty():
+			fo = LeaderManager.get_formation(use_fid)
+		elif not selected_formation_id.is_empty():
+			var sel: Object = LeaderManager.get_formation(selected_formation_id)
+			if sel != null and (_formation_type_blocks_land_open(sel) or _formation_is_fleet_counter(sel)):
+				fo = sel
+				use_fid = selected_formation_id
+	if fo == null:
+		return false
+	if not _formation_type_blocks_land_open(fo) and not _formation_is_fleet_counter(fo):
+		return false
+	selected_formation_id = use_fid
+	if "stationed_province_id" in fo:
+		var stay := int(fo.stationed_province_id)
+		if stay >= 0:
+			attack_staging_province_id = stay
+			debug_combat_attacker_province_id = stay
+	_show_unit_detail_popup(fo)
+	return true
+
+
 func _open_fight_from_formation_id(fid: String) -> void:
+	if _open_fight_keeps_domain_card(fid):
+		return
 	# Prefer the selected unit's current hex + an adjacent enemy so Play can
 	# Open fight → Start without Ctrl (xdotool Ctrl is intermittent).
 	# First-session fallback stays GER Maginot 710173 → FRA 710739.

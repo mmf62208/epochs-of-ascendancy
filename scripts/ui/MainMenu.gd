@@ -55,6 +55,11 @@ static func apply_living_campaign_pick(tag: String = "GER", year: int = 1936) ->
 		facts["era_boot"] = era
 		facts["year"] = int(era.get("year", y))
 		facts["era"] = int(era.get("era", y))
+	var resolved := str(facts.get("player_tag", t)).strip_edges().to_upper()
+	if resolved.is_empty():
+		resolved = t
+	if typeof(SessionPlayers) != TYPE_NIL and SessionPlayers.has_method("adopt_living_human"):
+		SessionPlayers.adopt_living_human(resolved)
 	facts["ok"] = true
 	facts["applied"] = true
 	return facts
