@@ -157,6 +157,24 @@ static func show_unit_counters_for_zoom(z: float, master_enabled: bool = true) -
 	return show_unit_counters(tier_for_zoom(z), true)
 
 
+## Garrison chips are secondary. Line/air/fleet stay on the home zoom floor.
+## Garrisons paint only once the camera is past strategic (z > 0.55).
+static func show_garrison_counters_for_zoom(z: float, master_enabled: bool = true) -> bool:
+	if not show_unit_counters_for_zoom(z, master_enabled):
+		return false
+	return z > STRATEGIC_MAX_ZOOM
+
+
+## A garrison chip may win a click only on its own hex. A neighbouring
+## plate (Kulmbach over Berlin at Home zoom) must not steal the click.
+static func garrison_chip_owns_click(station_pid: int, click_hex: int) -> bool:
+	if station_pid <= 0:
+		return false
+	if click_hex <= 0:
+		return true
+	return station_pid == click_hex
+
+
 static func unit_counter_compact(t: Tier) -> bool:
 	return t == Tier.STRATEGIC
 
