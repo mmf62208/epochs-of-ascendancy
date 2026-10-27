@@ -134,6 +134,11 @@ func _setup_domain_filter_shell() -> void:
 func _deferred_first_refresh() -> void:
 	if not is_inside_tree():
 		return
+	# call_deferred runs before the first paint. Wait one frame so the shell
+	# is on screen, then build the list.
+	await get_tree().process_frame
+	if not is_inside_tree():
+		return
 	_setup_era_slider_quiet()
 	if not era_slider.value_changed.is_connected(_on_era_slider_changed):
 		era_slider.value_changed.connect(_on_era_slider_changed)
@@ -417,7 +422,7 @@ func _apply_map_integration_hint() -> void:
 	if not current_data.map_integration_note.is_empty():
 		parts.append(current_data.map_integration_note)
 	if not current_data.map_legend_bbcode.is_empty():
-		parts.append(current_data.map_legend_bbcode.strip_edges())
+		parts.append(_strip_bbcode_tags(current_data.map_legend_bbcode))
 	slots_label.tooltip_text = "\n".join(parts) if not parts.is_empty() else ""
 	var footer := "Map: tooltips show research, factory gates, and 📡 Support/Radio on your provinces"
 	if MapTechnologyContext.has_support_radio_bonuses(country_tag):
@@ -429,7 +434,19 @@ func _apply_map_integration_hint() -> void:
 
 
 func _strip_bbcode_tags(text: String) -> String:
-	return text.replace("[color=#8899aa]", "").replace("[/color]", "").strip_edges()
+	var out := ""
+	var i := 0
+	while i < text.length():
+		if text[i] == "[":
+			var close := text.find("]", i + 1)
+			if close < 0:
+				out += text.substr(i)
+				break
+			i = close + 1
+			continue
+		out += text[i]
+		i += 1
+	return out.strip_edges()
 
 
 func _count_entries_by_domain(tag: String, era_key: String) -> Dictionary:
@@ -528,6 +545,7 @@ func refresh_screen() -> void:
 		_domain_filter_id,
 		_selected_tech_id,
 		_era_filter_key,
+		_view_mode == "graph",
 	)
 	if not _selected_tech_id.is_empty():
 		var still_visible := false
@@ -542,6 +560,7 @@ func refresh_screen() -> void:
 				_domain_filter_id,
 				_selected_tech_id,
 				_era_filter_key,
+				_view_mode == "graph",
 			)
 	elif not current_data.research_entries.is_empty():
 		_selected_tech_id = str(current_data.research_entries[0].get("tech_id", ""))
@@ -635,26 +654,32 @@ func _populate_active_bar() -> void:
 
 
 func _populate_research_list() -> void:
+	# Build rows off the tree. In-tree add_child lays out on every row (O(n²)).
+	var parent := research_list.get_parent()
+	var idx := research_list.get_index() if parent != null else 0
+	if parent != null:
+		parent.remove_child(research_list)
 	for child in research_list.get_children():
-		child.queue_free()
-	if not list_scroll.visible:
-		return
-
-	if current_data.research_entries.is_empty():
-		var empty := Label.new()
-		empty.text = (
-			"No technologies match domain (%s) or era (%s). Try All domains or a wider era."
-			% [_domain_filter_id, _era_filter_key]
-		)
-		empty.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		RetrowaveTheme.style_body_label(empty)
-		research_list.add_child(empty)
-		return
-
-	for entry in current_data.research_entries:
-		if typeof(entry) != TYPE_DICTIONARY:
-			continue
-		research_list.add_child(_create_research_row(entry as Dictionary))
+		research_list.remove_child(child)
+		child.free()
+	if list_scroll != null and list_scroll.visible:
+		if current_data.research_entries.is_empty():
+			var empty := Label.new()
+			empty.text = (
+				"No technologies match domain (%s) or era (%s). Try All domains or a wider era."
+				% [_domain_filter_id, _era_filter_key]
+			)
+			empty.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			RetrowaveTheme.style_body_label(empty)
+			research_list.add_child(empty)
+		else:
+			for entry in current_data.research_entries:
+				if typeof(entry) != TYPE_DICTIONARY:
+					continue
+				research_list.add_child(_create_research_row(entry as Dictionary))
+	if parent != null:
+		parent.add_child(research_list)
+		parent.move_child(research_list, mini(idx, parent.get_child_count() - 1))
 
 
 func _populate_graph() -> void:

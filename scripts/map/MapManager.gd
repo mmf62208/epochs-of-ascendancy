@@ -2007,6 +2007,18 @@ func _engineer_repair_bonus(engineer_brigades: float) -> float:
 	)
 
 
+## Tint inputs only. The repair-rate breakdown walks national modifiers and the
+## engineer registry; map fill does not use the rate.
+func map_damage_tint_inputs(province: Province) -> Dictionary:
+	if province == null:
+		return {}
+	return {
+		"under_infra_sabotage": _province_under_infra_sabotage(province, province.id),
+		"depot_sabotage_level": _depot_sabotage_level(province.id),
+		"infrastructure": province.infrastructure,
+	}
+
+
 func _depot_sabotage_level(province_id: int) -> float:
 	if typeof(SupplyManager) == TYPE_NIL:
 		return 0.0
