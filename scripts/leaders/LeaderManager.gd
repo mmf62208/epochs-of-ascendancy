@@ -173,6 +173,13 @@ var pending_leader_replacements: Array[Dictionary] = []
 ## Human player country — replacement popups and pending badge only apply here.
 var player_country_tag: String = "USA"
 var formations: Dictionary = {}  # formation_id -> Formation
+## Monotonic suffix for fielded_* ids. Saved so a load does not reuse an id.
+var _fielded_seq: int = 0
+## Monotonic suffixes for generated leader ids and replacement request ids.
+## Saved so a load does not reuse an id and so two processes match.
+var _leader_id_seq: int = 0
+var _replacement_seq: int = 0
+var _garrisons_1936_seeded: bool = false
 var country_positions: Dictionary = {}  # country_tag -> { position_id -> leader_id }
 var trait_definitions: Dictionary = {}
 var training_path_definitions: Dictionary = {}
@@ -454,6 +461,74 @@ func register_formation(formation: Formation) -> void:
 	invalidate_leader_cache(formation.country_tag)
 
 
+func _alloc_fielded_formation_id(tag: String) -> String:
+	_fielded_seq += 1
+	var day := 0
+	if typeof(TimeManager) != TYPE_NIL and "total_days_elapsed" in TimeManager:
+		day = int(TimeManager.total_days_elapsed)
+	return "fielded_%s_d%d_%d" % [tag.to_lower(), day, _fielded_seq]
+
+
+func _note_fielded_seq(fid: String) -> void:
+	if not fid.begins_with("fielded_"):
+		return
+	var parts := fid.split("_")
+	if parts.is_empty():
+		return
+	var tail := str(parts[parts.size() - 1])
+	if tail.is_valid_int():
+		_fielded_seq = maxi(_fielded_seq, int(tail))
+
+
+func _sim_day() -> int:
+	if typeof(TimeManager) != TYPE_NIL and "total_days_elapsed" in TimeManager:
+		return int(TimeManager.total_days_elapsed)
+	return 0
+
+
+func alloc_generated_leader_id(country_tag: String, kind: String) -> String:
+	_leader_id_seq += 1
+	var k := kind.strip_edges().to_lower()
+	if k.is_empty():
+		k = "gen"
+	return "%s_%s_d%d_%d" % [country_tag.strip_edges().to_lower(), k, _sim_day(), _leader_id_seq]
+
+
+func _note_seq_tail(seq_name: String, id_text: String) -> void:
+	var parts := id_text.split("_")
+	if parts.size() < 2:
+		return
+	var day_tok := str(parts[parts.size() - 2])
+	var tail := str(parts[parts.size() - 1])
+	if not day_tok.begins_with("d") or not day_tok.substr(1).is_valid_int():
+		return
+	if not tail.is_valid_int():
+		return
+	var n := int(tail)
+	if seq_name == "leader":
+		_leader_id_seq = maxi(_leader_id_seq, n)
+	elif seq_name == "replacement":
+		_replacement_seq = maxi(_replacement_seq, n)
+
+
+func _alloc_replacement_request_id(context: String, target_id: String) -> String:
+	_replacement_seq += 1
+	return "%s_%s_d%d_%d" % [context, target_id, _sim_day(), _replacement_seq]
+
+
+## Append a replacement request without the player/AI auto-resolve path.
+## The long-war trace calls this inside the compared window.
+func open_traced_replacement(country_tag: String, target_id: String) -> String:
+	var tag := country_tag.strip_edges().to_upper()
+	var tid := target_id.strip_edges()
+	var types: Array[String] = ["general"]
+	var request := _build_replacement_request(tag, "formation", tid, tid, "", "", "traced", types)
+	if request.is_empty():
+		return ""
+	pending_leader_replacements.append(request)
+	return str(request.get("request_id", ""))
+
+
 ## Field a designer template as a living map unit (selectable chip + orders).
 func field_designed_unit(
 	country_tag: String,
@@ -468,6 +543,17 @@ func field_designed_unit(
 	var dom := domain.strip_edges().to_lower()
 	if tag.is_empty() or did.is_empty() or pid <= 0:
 		return {"ok": false, "error": "bad_args"}
+	var want_id := str(extras.get("formation_id", "")).strip_edges()
+	if not want_id.is_empty() and formations.has(want_id):
+		var prev: Formation = formations[want_id] as Formation
+		return {
+			"ok": true,
+			"already": true,
+			"formation_id": want_id,
+			"design_id": did,
+			"province_id": int(prev.stationed_province_id) if prev != null else pid,
+			"country_tag": tag,
+		}
 	if pid < 1000:
 		pid = 710173 if tag == "GER" else pid
 		if pid <= 0:
@@ -492,9 +578,16 @@ func field_designed_unit(
 					"country_tag": tag,
 				}
 	var f := Formation.new()
-	f.formation_id = "fielded_%s_%d" % [tag.to_lower(), Time.get_ticks_usec() % 100000000]
+	if not want_id.is_empty():
+		f.formation_id = want_id
+	else:
+		f.formation_id = _alloc_fielded_formation_id(tag)
 	f.country_tag = tag
-	f.name = "%s %s" % [tag, did]
+	var shown := str(extras.get("display_name", "")).strip_edges()
+	if shown.is_empty():
+		f.name = "%s %s" % [tag, did]
+	else:
+		f.name = shown
 	f.organization = clampf(float(extras.get("organization", extras.get("org", 1.0))), 0.2, 1.0)
 	f.readiness = 1.0
 	f.strength = clampf(float(extras.get("strength", 1.0)), 0.2, 1.0)
@@ -507,6 +600,12 @@ func field_designed_unit(
 			if cur.is_empty() and from_design.has(k):
 				stamped[k] = from_design[k]
 	_stamp_formation_composition(f, stamped)
+	if bool(extras.get("garrison_1936", false)):
+		f.set_meta("garrison_1936", true)
+		f.organization = 1.0
+		f.readiness = 1.0
+		f.strength = 1.0
+		_fill_garrison_full_toe(f)
 	if "fuel_level" in f:
 		f.fuel_level = 1.0
 	match dom:
@@ -524,16 +623,20 @@ func field_designed_unit(
 			f.design_id = did
 			f.current_land_mission = Formation.LAND_MISSION_ASSAULT
 	register_formation(f)
-	if str(f.leader_id).strip_edges().is_empty() and has_method("pick_leader_id_for_formation"):
+	if not bool(extras.get("skip_leader", false)) and str(f.leader_id).strip_edges().is_empty() and has_method("pick_leader_id_for_formation"):
 		var used: Dictionary = _seed_used_leader_ids() if has_method("_seed_used_leader_ids") else {}
-		var pick := pick_leader_id_for_formation(tag, f.formation_type, used, ["general", "field_marshal"])
+		var allowed: Array = _allowed_leader_types_for_formation_type(f.formation_type)
+		var pick := ""
+		if not allowed.is_empty():
+			pick = pick_leader_id_for_formation(tag, f.formation_type, used, allowed)
 		if not pick.is_empty() and has_method("assign_leader_to_formation"):
 			assign_leader_to_formation(pick, f.formation_id)
 	_notify_map_icon_pid(pid)
-	print(
-		"LeaderManager: fielded designer unit %s design=%s @%d"
-		% [f.formation_id, did, pid]
-	)
+	if not bool(extras.get("quiet", false)):
+		print(
+			"LeaderManager: fielded designer unit %s design=%s @%d"
+			% [f.formation_id, did, pid]
+		)
 	return {
 		"ok": true,
 		"already": false,
@@ -545,6 +648,342 @@ func field_designed_unit(
 		"strength": f.strength,
 		"visual_archetype": str(stamped.get("visual_archetype", "")),
 	}
+
+
+const GARRISON_1936_DESIGN := "infantry_1936"
+const GARRISON_1936_TAGS: Array[String] = ["GER", "FRA", "ENG", "SOV", "ITA", "JAP", "USA", "POL", "CZE"]
+const GARRISON_1936_CAPITALS := {
+	"GER": 710300,
+	"FRA": 710707,
+	"ENG": 711414,
+	"USA": 800792,
+	"SOV": 903534,
+	"ITA": 710963,
+	"JAP": 903995,
+	"POL": 711112,
+	"CZE": 710146,
+}
+const GARRISON_1936_EXTRA_CAPITALS := {
+	"POL": 711054,
+}
+
+
+## Idempotent 1936 border + capital garrisons. Ids are garr1936_{TAG}_{pid}.
+## No leader draw, so the multi-AI decision seed stays on the unseeded path.
+## Hexes that already hold a land division are skipped (not double-stacked).
+func seed_1936_start_garrisons(force: bool = false) -> Dictionary:
+	if _garrisons_1936_seeded and not force:
+		return {
+			"ok": true,
+			"already": true,
+			"counts": _garrison_1936_counts(),
+			"placed": 0,
+			"skipped_occupied": 0,
+			"targets": 0,
+			"placed_counts": {},
+			"skipped_counts": {},
+			"target_counts": {},
+		}
+	if typeof(MapManager) == TYPE_NIL or not MapManager.has_method("get_provinces_by_owner"):
+		return {"ok": false, "reason": "no_board", "counts": {}, "placed": 0, "skipped_occupied": 0, "targets": 0}
+	if MapManager.get_provinces_by_owner("GER").size() < 20:
+		return {"ok": false, "reason": "no_board", "counts": {}, "placed": 0, "skipped_occupied": 0, "targets": 0}
+	var placed := 0
+	var skipped := 0
+	var target_n := 0
+	var placed_counts: Dictionary = {}
+	var skipped_counts: Dictionary = {}
+	var target_counts: Dictionary = {}
+	for tag in GARRISON_1936_TAGS:
+		var occupied := _land_pids_occupied(tag)
+		var targets: Array[int] = []
+		var seen: Dictionary = {}
+		for pid_v in MapManager.get_provinces_by_owner(tag):
+			var pid := int(pid_v)
+			if not _garrison_1936_border(tag, pid):
+				continue
+			seen[pid] = true
+			targets.append(pid)
+		for cap in garrison_1936_capital_pids(tag):
+			if seen.has(cap):
+				continue
+			if not _garrison_1936_own_land(tag, cap):
+				continue
+			seen[cap] = true
+			targets.append(cap)
+		targets.sort()
+		target_counts[tag] = targets.size()
+		target_n += targets.size()
+		var placed_tag := 0
+		var skip_tag := 0
+		var ordinal := 0
+		for pid2 in targets:
+			ordinal += 1
+			if bool(occupied.get(pid2, false)):
+				skip_tag += 1
+				skipped += 1
+				continue
+			var fid := "garr1936_%s_%d" % [tag, pid2]
+			if formations.has(fid):
+				placed_tag += 1
+				placed += 1
+				occupied[pid2] = true
+				continue
+			var fielded: Dictionary = field_1936_garrison(tag, pid2, fid, ordinal)
+			if bool(fielded.get("ok", false)):
+				placed_tag += 1
+				placed += 1
+				occupied[pid2] = true
+		placed_counts[tag] = placed_tag
+		skipped_counts[tag] = skip_tag
+	_garrisons_1936_seeded = true
+	var counts := _garrison_1936_counts()
+	var detail := _garrison_1936_seed_detail(placed_counts, target_counts, skipped_counts)
+	print(
+		"LeaderManager: 1936 garrisons placed=%d skipped_occupied=%d targets=%d %s"
+		% [placed, skipped, target_n, detail]
+	)
+	return {
+		"ok": true,
+		"already": false,
+		"counts": counts,
+		"placed": placed,
+		"skipped_occupied": skipped,
+		"targets": target_n,
+		"placed_counts": placed_counts,
+		"skipped_counts": skipped_counts,
+		"target_counts": target_counts,
+	}
+
+
+## 1936 infantry for this nation. Catalog hit only from that nation's candidate
+## ids. Never another nation's design. Fallback is the generic infantry_1936 id.
+func garrison_1936_design_for(tag: String) -> String:
+	var t := tag.strip_edges().to_upper()
+	var cands: Array[String] = []
+	var low := t.to_lower()
+	cands.append("%s_infantry_1936" % low)
+	cands.append("%s_infantry_division_1936" % low)
+	for adj in _garrison_1936_adjectives(t):
+		cands.append("%s_infantry_1936" % adj)
+		cands.append("%s_infantry_division_1936" % adj)
+	for cid in cands:
+		if _garrison_1936_template_ok(t, cid):
+			return cid
+	return GARRISON_1936_DESIGN
+
+
+func garrison_1936_display_name(tag: String, ordinal: int) -> String:
+	var t := tag.strip_edges().to_upper()
+	if t.is_empty():
+		t = "GAR"
+	if ordinal < 1:
+		return "%s Garrison Division" % t
+	return "%s %s Garrison Division" % [t, _garrison_ordinal_word(ordinal)]
+
+
+## Human design line. Raw snake_case ids never reach the card.
+func garrison_1936_design_label(design_id: String) -> String:
+	var did := design_id.strip_edges()
+	var tpl: Object = _garrison_1936_template(did)
+	if tpl != null:
+		var nm := ""
+		if "display_name" in tpl:
+			nm = str(tpl.display_name).strip_edges()
+		elif "name" in tpl:
+			nm = str(tpl.name).strip_edges()
+		if not nm.is_empty() and nm != did and not _garrison_looks_like_raw_id(nm):
+			return nm
+	return "Infantry Division (1936)"
+
+
+func field_1936_garrison(tag: String, pid: int, fid: String, ordinal: int = -1) -> Dictionary:
+	var did := garrison_1936_design_for(tag)
+	return field_designed_unit(tag, did, pid, "land", {
+		"formation_id": fid,
+		"skip_leader": true,
+		"quiet": true,
+		"garrison_1936": true,
+		"force_new": true,
+		"display_name": garrison_1936_display_name(tag, ordinal),
+	})
+
+
+func _garrison_1936_adjectives(tag: String) -> Array[String]:
+	match tag.strip_edges().to_upper():
+		"GER":
+			return ["german"]
+		"FRA":
+			return ["french"]
+		"ENG":
+			return ["british"]
+		"SOV":
+			return ["soviet"]
+		"ITA":
+			return ["italian"]
+		"JAP":
+			return ["japanese"]
+		"USA":
+			return ["american"]
+		"POL":
+			return ["polish"]
+		"CZE":
+			return ["czech", "czechoslovak"]
+		_:
+			return []
+
+
+func _garrison_1936_template(design_id: String) -> Object:
+	var did := design_id.strip_edges()
+	if did.is_empty() or typeof(GameData) == TYPE_NIL or GameData.design_data == null:
+		return null
+	if not GameData.design_data.has_method("has_template") or not GameData.design_data.has_template(did):
+		return null
+	if GameData.design_data.has_method("get_template"):
+		var tpl: Variant = GameData.design_data.get_template(did)
+		if tpl is Object:
+			return tpl as Object
+	return null
+
+
+func _garrison_1936_template_ok(tag: String, design_id: String) -> bool:
+	var did := design_id.strip_edges()
+	if did.is_empty() or _garrison_design_is_foreign(tag, did):
+		return false
+	var tpl := _garrison_1936_template(did)
+	if tpl == null:
+		return false
+	var nation := ""
+	if "design_nation" in tpl:
+		nation = str(tpl.design_nation).strip_edges().to_upper()
+	if not nation.is_empty() and nation != "ALL" and nation != tag:
+		return false
+	return true
+
+
+func _garrison_design_is_foreign(tag: String, design_id: String) -> bool:
+	var id := design_id.strip_edges().to_lower()
+	if id.is_empty():
+		return false
+	var parts := id.split("_")
+	var own := tag.strip_edges().to_upper()
+	for other in GARRISON_1936_TAGS:
+		if other == own:
+			continue
+		if id.begins_with(other.to_lower() + "_"):
+			return true
+		for adj in _garrison_1936_adjectives(other):
+			if adj in parts:
+				return true
+	return false
+
+
+func _garrison_looks_like_raw_id(text: String) -> bool:
+	return text.contains("_") and not text.contains(" ")
+
+
+func _garrison_ordinal_word(n: int) -> String:
+	var v := maxi(1, n)
+	var mod100 := v % 100
+	var suffix := "th"
+	if mod100 < 11 or mod100 > 13:
+		match v % 10:
+			1:
+				suffix = "st"
+			2:
+				suffix = "nd"
+			3:
+				suffix = "rd"
+	return "%d%s" % [v, suffix]
+
+
+func _garrison_1936_seed_detail(placed_counts: Dictionary, target_counts: Dictionary, skipped_counts: Dictionary) -> String:
+	var parts: PackedStringArray = PackedStringArray()
+	for tag in GARRISON_1936_TAGS:
+		parts.append("%s %d/%d skip %d" % [
+			tag,
+			int(placed_counts.get(tag, 0)),
+			int(target_counts.get(tag, 0)),
+			int(skipped_counts.get(tag, 0)),
+		])
+	return "{%s}" % ", ".join(parts)
+
+
+func _fill_garrison_full_toe(f: Formation) -> void:
+	if f == null or f.formation_id.is_empty():
+		return
+	if typeof(ProductionManager) == TYPE_NIL or not ProductionManager.has_method("set_unit_equipment_stock"):
+		return
+	if typeof(LandCombatPower) == TYPE_NIL:
+		return
+	var toe: Dictionary = LandCombatPower.equipment_toe(LandCombatPower.composition_from_formation(f))
+	if toe.is_empty():
+		toe = {"infantry_equipment": 80}
+	ProductionManager.set_unit_equipment_stock(f.formation_id, toe)
+
+
+func garrison_1936_capital_pids(tag: String) -> Array[int]:
+	var out: Array[int] = []
+	var t := tag.strip_edges().to_upper()
+	var cap := int(GARRISON_1936_CAPITALS.get(t, 0))
+	if cap > 0:
+		out.append(cap)
+	var extra := int(GARRISON_1936_EXTRA_CAPITALS.get(t, 0))
+	if extra > 0:
+		out.append(extra)
+	return out
+
+
+func _garrison_1936_counts() -> Dictionary:
+	var counts: Dictionary = {}
+	for tag in GARRISON_1936_TAGS:
+		var n := 0
+		for f in get_formations_for_country(tag):
+			if f != null and bool(f.get_meta("garrison_1936", false)):
+				n += 1
+		counts[tag] = n
+	return counts
+
+
+func _land_pids_occupied(tag: String) -> Dictionary:
+	var occ: Dictionary = {}
+	for f in get_formations_for_country(tag):
+		if f == null:
+			continue
+		var ft := str(f.formation_type) if "formation_type" in f else ""
+		if ft != Formation.TYPE_DIVISION and ft != Formation.TYPE_GARRISON:
+			continue
+		var sid := int(f.stationed_province_id) if "stationed_province_id" in f else -1
+		if sid > 0:
+			occ[sid] = true
+	return occ
+
+
+func _garrison_1936_own_land(tag: String, pid: int) -> bool:
+	if pid <= 0 or pid >= 950000 or typeof(MapManager) == TYPE_NIL:
+		return false
+	var p = MapManager.get_province(pid) if MapManager.has_method("get_province") else null
+	if p == null or bool(p.is_sea):
+		return false
+	return str(p.owner_tag).strip_edges().to_upper() == tag
+
+
+func _garrison_1936_border(tag: String, pid: int) -> bool:
+	if not _garrison_1936_own_land(tag, pid):
+		return false
+	if not MapManager.has_method("get_adjacent_provinces"):
+		return false
+	for nid_v in MapManager.get_adjacent_provinces(pid, true):
+		var nid := int(nid_v)
+		if nid <= 0 or nid >= 950000:
+			continue
+		var np = MapManager.get_province(nid) if MapManager.has_method("get_province") else null
+		if np == null or bool(np.is_sea):
+			continue
+		var o := str(np.owner_tag).strip_edges().to_upper()
+		if not o.is_empty() and o != tag:
+			return true
+	return false
 
 
 ## Player-assign an air wing to a strategic region and a CAS-class mission.
@@ -885,7 +1324,9 @@ func _notify_map_icon_pid(pid: int) -> void:
 	var mr: Node = tree.get_first_node_in_group("map_renderer")
 	if mr == null:
 		mr = tree.root.find_child("WorldMap", true, false)
-	if mr != null and mr.has_method("_update_unit_icons_for_pids"):
+	if mr != null and mr.has_method("queue_unit_icon_rebuild"):
+		mr.queue_unit_icon_rebuild([pid])
+	elif mr != null and mr.has_method("_update_unit_icons_for_pids"):
 		mr.call_deferred("_update_unit_icons_for_pids", [pid])
 
 
@@ -2081,7 +2522,7 @@ func _build_replacement_request(
 	valid_leader_types: Array[String],
 ) -> Dictionary:
 	var draft := {
-		"request_id": "%s_%s_%d" % [context, target_id, Time.get_unix_time_from_system()],
+		"request_id": _alloc_replacement_request_id(context, target_id),
 		"country_tag": country_tag,
 		"context": context,
 		"target_id": target_id,
@@ -3621,7 +4062,7 @@ func get_save_data() -> Dictionary:
 		var f: Formation = formations[fid] as Formation
 		if f == null:
 			continue
-		formations_data[str(fid)] = {
+		var formation_blob := {
 			"formation_id": f.formation_id,
 			"name": f.name,
 			"formation_type": f.formation_type,
@@ -3658,8 +4099,18 @@ func get_save_data() -> Dictionary:
 			"assigned_region_id": int(f.assigned_region_id) if "assigned_region_id" in f else 0,
 			"current_air_mission": str(f.current_air_mission) if "current_air_mission" in f else "",
 			"air_range_config": str(f.air_range_config) if "air_range_config" in f else "",
+			"current_naval_order": str(f.current_naval_order) if "current_naval_order" in f else "",
+			"mission_intensity": float(f.mission_intensity) if "mission_intensity" in f else 1.0,
+			"parent_formation_id": str(f.parent_formation_id) if "parent_formation_id" in f else "",
+			"attached_air_formation_id": str(f.attached_air_formation_id) if "attached_air_formation_id" in f else "",
+			"campaign_inactive": bool(f.campaign_inactive) if "campaign_inactive" in f else false,
 			"last_manpower_loss": int(f.last_manpower_loss) if "last_manpower_loss" in f else 0,
 		}
+		if f.has_meta("garrison_1936") and bool(f.get_meta("garrison_1936", false)):
+			formation_blob["garrison_1936"] = true
+			if typeof(ProductionManager) != TYPE_NIL and ProductionManager.has_method("get_unit_equipment_stock"):
+				formation_blob["equipment_stock"] = ProductionManager.get_unit_equipment_stock(f.formation_id)
+		formations_data[str(fid)] = formation_blob
 
 	return {
 		"leaders": leaders_data,
@@ -3671,12 +4122,21 @@ func get_save_data() -> Dictionary:
 		"player_country_tag": player_country_tag,
 		"service_doctrines": service_doctrines.duplicate(true),
 		"organize_priority": organize_priority,
+		"fielded_seq": _fielded_seq,
+		"leader_id_seq": _leader_id_seq,
+		"replacement_seq": _replacement_seq,
+		"officer_training_quality": officer_training_quality.duplicate(true),
+		"months_in_training": months_in_training.duplicate(true),
+		"officer_training_debuff_months": officer_training_debuff_months.duplicate(true),
 	}
 
 func apply_save_data(data: Dictionary) -> void:
 	leaders.clear()
 	country_positions.clear()
 	officer_training_leader_id.clear()
+	officer_training_quality.clear()
+	months_in_training.clear()
+	officer_training_debuff_months.clear()
 	pending_retirements.clear()
 	pending_leader_replacements.clear()
 
@@ -3710,6 +4170,8 @@ func apply_save_data(data: Dictionary) -> void:
 			l.is_deceased = bool(ld.get("is_deceased", false))
 			l.assigned_army_id = str(ld.get("assigned_army_id", ""))
 			l.birth_year = int(ld.get("birth_year", 1900))
+			l.start_year = int(ld.get("start_year", l.start_year))
+			l.end_year = int(ld.get("end_year", l.end_year))
 			l.health = float(ld.get("health", 1.0))
 			l.duty_post = str(ld.get("duty_post", "active"))
 			l.stayed_past_retirement = bool(ld.get("stayed_past_retirement", false))
@@ -3745,6 +4207,20 @@ func apply_save_data(data: Dictionary) -> void:
 	if data.has("service_doctrines"):
 		service_doctrines = (data["service_doctrines"] as Dictionary).duplicate(true)
 
+	_fielded_seq = int(data.get("fielded_seq", 0))
+	_leader_id_seq = int(data.get("leader_id_seq", 0))
+	_replacement_seq = int(data.get("replacement_seq", 0))
+	for lid_key in leaders.keys():
+		_note_seq_tail("leader", str(lid_key))
+	for req_row in pending_leader_replacements:
+		if req_row is Dictionary:
+			_note_seq_tail("replacement", str(req_row.get("request_id", "")))
+	if data.get("officer_training_quality") is Dictionary:
+		officer_training_quality = (data["officer_training_quality"] as Dictionary).duplicate(true)
+	if data.get("months_in_training") is Dictionary:
+		months_in_training = (data["months_in_training"] as Dictionary).duplicate(true)
+	if data.get("officer_training_debuff_months") is Dictionary:
+		officer_training_debuff_months = (data["officer_training_debuff_months"] as Dictionary).duplicate(true)
 	if data.has("formations"):
 		var fdata: Dictionary = data["formations"] as Dictionary
 		for fid in fdata.keys():
@@ -3753,6 +4229,7 @@ func apply_save_data(data: Dictionary) -> void:
 				continue
 			var f := Formation.new()
 			f.formation_id = str(fd.get("formation_id", fid))
+			_note_fielded_seq(f.formation_id)
 			f.name = str(fd.get("name", ""))
 			f.formation_type = str(fd.get("formation_type", Formation.TYPE_DIVISION))
 			f.country_tag = str(fd.get("country_tag", ""))
@@ -3796,6 +4273,14 @@ func apply_save_data(data: Dictionary) -> void:
 				f.set_meta("infantry_bns", clampi(int(fd.get("infantry_bns", 1)), 1, 6))
 			if fd.has("tank_bns"):
 				f.set_meta("tank_bns", clampi(int(fd.get("tank_bns", 0)), 0, 3))
+			if bool(fd.get("garrison_1936", false)):
+				f.set_meta("garrison_1936", true)
+				if typeof(ProductionManager) != TYPE_NIL and ProductionManager.has_method("set_unit_equipment_stock"):
+					var stock_v: Variant = fd.get("equipment_stock", null)
+					if fd.has("equipment_stock") and stock_v is Dictionary:
+						ProductionManager.set_unit_equipment_stock(f.formation_id, stock_v as Dictionary)
+					else:
+						_fill_garrison_full_toe(f)
 			if "fuel_level" in f:
 				f.fuel_level = clampf(float(fd.get("fuel_level", 1.0)), 0.0, 1.0)
 			if "assigned_region_id" in f:
@@ -3804,6 +4289,16 @@ func apply_save_data(data: Dictionary) -> void:
 				f.current_air_mission = str(fd.get("current_air_mission"))
 			if "air_range_config" in f and str(fd.get("air_range_config", "")).strip_edges() != "":
 				f.air_range_config = str(fd.get("air_range_config"))
+			if "current_naval_order" in f and fd.has("current_naval_order"):
+				f.current_naval_order = str(fd.get("current_naval_order", f.current_naval_order))
+			if "mission_intensity" in f and fd.has("mission_intensity"):
+				f.mission_intensity = float(fd.get("mission_intensity", f.mission_intensity))
+			if "parent_formation_id" in f and fd.has("parent_formation_id"):
+				f.parent_formation_id = str(fd.get("parent_formation_id", ""))
+			if "attached_air_formation_id" in f and fd.has("attached_air_formation_id"):
+				f.attached_air_formation_id = str(fd.get("attached_air_formation_id", ""))
+			if "campaign_inactive" in f and fd.has("campaign_inactive"):
+				f.campaign_inactive = bool(fd.get("campaign_inactive", false))
 			if "last_manpower_loss" in f:
 				f.last_manpower_loss = int(fd.get("last_manpower_loss", 0))
 			if fd.get("combat_log") is Array:
@@ -4046,7 +4541,7 @@ func generate_new_leader_from_training(
 	var effective_quality := _get_effective_officer_training_quality(tag, training_leader)
 
 	var new_leader := Leader.new()
-	new_leader.leader_id = "%s_officer_%d" % [tag.to_lower(), Time.get_unix_time_from_system()]
+	new_leader.leader_id = alloc_generated_leader_id(tag, "officer")
 	new_leader.country_tag = tag
 	new_leader.leader_type = _pick_officer_cadet_leader_type(tag, leader_type)
 	new_leader.birth_year = get_current_year() - randi_range(27, 35)

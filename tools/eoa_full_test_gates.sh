@@ -4,13 +4,13 @@
 #
 # Usage (from repo root):
 #   tools/eoa_full_test_gates.sh
-#   tools/eoa_full_test_gates.sh --quick      # pure python only (no Godot)
+#   tools/eoa_full_test_gates.sh --quick      # pure python, plus HeadlessGarrison1Test when it stays under 30s
 #   tools/eoa_full_test_gates.sh --with-perf  # also map-tick perf sample
 #   tools/eoa_full_test_gates.sh --log DIR    # write logs under DIR
 #
-# --quick never launches Godot (no 4.7.1 binary needed). Full path calls
-# tools/run_godot.sh, which exits 1 immediately if no binary is found
-# (fail-closed; it must not hang).
+# --quick launches one Godot step, HeadlessGarrison1Test (~16s on this PC).
+# Full path calls tools/run_godot.sh, which exits 1 immediately if no binary
+# is found (fail-closed; it must not hang).
 # NE board/QC needs numpy+Pillow: pip install -r tools/map_generation/requirements.txt
 set -euo pipefail
 
@@ -195,11 +195,21 @@ run_step air_physics_p1 \
   "$PYTHON" -m unittest tools.map_generation.tests.test_air_physics_p1_product -v || fail
 
 if [[ "$QUICK" -eq 1 ]]; then
+  if pgrep -af '[g]odot|[G]odot|[g]amescope' >/dev/null; then
+    log "FAIL headless_garrison1 GODOT_BUSY"
+    FAILED=1
+  else
+    run_step headless_garrison1 env \
+      XDG_DATA_HOME="$(mktemp -d)" \
+      flock -n "${HOME}/.eoa_godot.lock" \
+      tools/run_godot.sh --headless --path . \
+      -s res://scripts/core/HeadlessGarrison1Test.gd || fail
+  fi
   if [[ "$FAILED" -eq 0 ]]; then
-    log "ALL PASSED (quick pure-only)"
+    log "ALL PASSED (quick)"
     exit 0
   fi
-  log "FAILED (quick pure-only)"
+  log "FAILED (quick)"
   exit 1
 fi
 

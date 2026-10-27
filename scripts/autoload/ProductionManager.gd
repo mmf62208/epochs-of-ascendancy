@@ -751,6 +751,10 @@ func get_unit_equipment_stock(unit_id: String) -> Dictionary:
 	return (raw as Dictionary).duplicate(true)
 
 
+func has_unit_equipment_ledger(unit_id: String) -> bool:
+	return _unit_equipment_stock.has(unit_id)
+
+
 func clear_unit_equipment_stock(unit_id: String) -> void:
 	_unit_equipment_stock.erase(unit_id)
 
@@ -3444,6 +3448,9 @@ func get_save_data() -> Dictionary:
 			"current_template_id": line.current_template_id,
 			"factory_id": line.factory_id,
 			"production_layer": line.current_production_layer if "current_production_layer" in line else "mass",
+			"design_states": _serialize_design_states(line),
+			"active_refinement": _serialize_refinement(line.active_refinement),
+			"custom_module_loadout": line.custom_module_loadout.duplicate(true),
 		}
 
 	return {
@@ -3454,9 +3461,24 @@ func get_save_data() -> Dictionary:
 		"unit_equipment_stock": _unit_equipment_stock.duplicate(true),
 		"province_resource_dev": province_resource_dev.duplicate(true),
 		"active_modifiers": _serialize_active_modifiers(),
+		"family_units_produced": _family_units_produced.duplicate(true),
 		"lines": lines_data,
-		# family experience, priority etc. can be added later if they prove important
 	}
+
+
+func _serialize_design_states(line: ProductionLine) -> Dictionary:
+	var out := {}
+	for key in line.design_states.keys():
+		var state: Variant = line.design_states[key]
+		if state is DesignLineState:
+			out[str(key)] = (state as DesignLineState).to_save_dict()
+	return out
+
+
+func _serialize_refinement(project: RefinementProject) -> Dictionary:
+	if project == null:
+		return {}
+	return project.to_save_dict()
 
 
 func _serialize_active_modifiers() -> Dictionary:
@@ -3503,6 +3525,10 @@ func apply_save_data(data: Dictionary) -> void:
 		province_resource_dev = (data["province_resource_dev"] as Dictionary).duplicate(true)
 	if data.has("active_modifiers"):
 		_restore_active_modifiers(data["active_modifiers"])
+	if data.has("family_units_produced") and data["family_units_produced"] is Dictionary:
+		_family_units_produced = (data["family_units_produced"] as Dictionary).duplicate(true)
+	else:
+		_family_units_produced = {}
 
 	if data.has("lines"):
 		var lines_data: Dictionary = data["lines"]
@@ -3532,6 +3558,20 @@ func apply_save_data(data: Dictionary) -> void:
 					line.current_production_layer = str(ld.get("production_layer", "mass"))
 				elif "current_production_layer" in line:
 					line.current_production_layer = "mass"
+				if ld.has("design_states") and ld["design_states"] is Dictionary:
+					line.design_states.clear()
+					for state_key in (ld["design_states"] as Dictionary).keys():
+						var state_row: Variant = (ld["design_states"] as Dictionary)[state_key]
+						if state_row is Dictionary:
+							line.design_states[str(state_key)] = DesignLineState.from_save_dict(state_row)
+				if ld.has("active_refinement"):
+					var ref_row: Variant = ld.get("active_refinement", {})
+					if ref_row is Dictionary and not (ref_row as Dictionary).is_empty():
+						line.active_refinement = RefinementProject.from_save_dict(ref_row)
+					else:
+						line.active_refinement = null
+				if ld.has("custom_module_loadout") and ld["custom_module_loadout"] is Dictionary:
+					line.custom_module_loadout = (ld["custom_module_loadout"] as Dictionary).duplicate(true)
 
 	clear_all_caches()
 	print("ProductionManager: Save data applied (%d lines)" % (data.get("lines", {}).size() if data.has("lines") else 0))

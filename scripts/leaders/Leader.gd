@@ -55,11 +55,31 @@ func add_experience(amount: int, source: String = "", count_as_battle: bool = fa
 		return
 	experience += amount
 	total_experience_earned += amount
-	last_xp_gain_time = int(Time.get_unix_time_from_system())
+	last_xp_gain_time = _sim_day_now()
 	if not source.is_empty():
 		last_xp_source = source
 	if count_as_battle:
 		battles_fought += 1
+
+
+## Sim-day stamp without naming the TimeManager autoload. Leader is a class_name
+## Resource compiled inside autoload cycles; a direct TimeManager identifier
+## fails that compile and makes Leader.new() unavailable.
+func _autoload(node_name: String) -> Node:
+	var loop := Engine.get_main_loop()
+	if loop == null or not (loop is SceneTree):
+		return null
+	return (loop as SceneTree).root.get_node_or_null(node_name)
+
+
+func _sim_day_now() -> int:
+	var node := _autoload("TimeManager")
+	if node == null:
+		return 0
+	var raw: Variant = node.get("total_days_elapsed")
+	if typeof(raw) == TYPE_INT or typeof(raw) == TYPE_FLOAT:
+		return int(raw)
+	return 0
 
 
 func get_experience() -> int:
@@ -90,8 +110,9 @@ func add_trait_unchecked(trait_id: String, level: int = 1) -> void:
 func add_trait(trait_id: String, level: int = 1) -> bool:
 	if trait_id.is_empty():
 		return false
-	if typeof(LeaderManager) != TYPE_NIL:
-		return LeaderManager.try_add_trait_to_leader(self, trait_id, level)
+	var lm := _autoload("LeaderManager")
+	if lm != null and lm.has_method("try_add_trait_to_leader"):
+		return bool(lm.call("try_add_trait_to_leader", self, trait_id, level))
 	add_trait_unchecked(trait_id, level)
 	return true
 
@@ -124,8 +145,11 @@ func get_trait_level(trait_id: String) -> int:
 
 
 func _get_trait_effects() -> Dictionary:
-	if typeof(LeaderManager) != TYPE_NIL:
-		return LeaderManager.get_leader_trait_effects(self)
+	var lm := _autoload("LeaderManager")
+	if lm != null and lm.has_method("get_leader_trait_effects"):
+		var raw: Variant = lm.call("get_leader_trait_effects", self)
+		if raw is Dictionary:
+			return raw
 	return {}
 
 

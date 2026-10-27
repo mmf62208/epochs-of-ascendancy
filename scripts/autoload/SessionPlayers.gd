@@ -327,6 +327,39 @@ func set_active_tag(tag: String) -> Dictionary:
 	return {"ok": false, "error": "tag_not_in_slots"}
 
 
+## Begin / Command Center nation pick. Retarget the human seat so a later
+## sync cannot restore the autoload default (USA) over the nation just chosen.
+## Does not add AI seats, clear the command queue, or reset the turn.
+func adopt_living_human(tag: String) -> void:
+	var t := tag.strip_edges().to_upper()
+	if t.is_empty():
+		return
+	if slots.is_empty():
+		setup_solo_play(t)
+		return
+	for i in range(slots.size()):
+		var existing: Dictionary = slots[i]
+		if str(existing.get("control", "")) != CONTROL_HUMAN:
+			continue
+		if str(existing.get("tag", "")) == t:
+			active_index = i
+			_sync_leader_player_tag()
+			return
+	var idx := -1
+	for j in range(slots.size()):
+		if str((slots[j] as Dictionary).get("control", "")) == CONTROL_HUMAN:
+			idx = j
+			break
+	if idx < 0:
+		idx = clampi(active_index, 0, slots.size() - 1)
+	var row: Dictionary = slots[idx]
+	row["tag"] = t
+	row["control"] = CONTROL_HUMAN
+	slots[idx] = row
+	active_index = idx
+	_sync_leader_player_tag()
+
+
 func _sync_leader_player_tag() -> void:
 	var tag := get_active_tag()
 	if tag.is_empty():

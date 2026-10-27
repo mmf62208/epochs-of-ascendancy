@@ -599,6 +599,53 @@ var _btn_station_engineers: Button = null
 # Demo map tint mode for strain (welfare) / vitality (settlement) / development re-tint layers (wired from DebugOverlay / hotkeys F1-F4).
 # "supply" handled via the L overlay toggle (existing supply layer) but exposable as mode.
 var debug_tint_mode: String = ""  # "", "vitality", "strain", "development", "loyalty", "infra"  -- boosts the corresponding tint/characterize layer for basic mapmode-style views. Use set_map_mode().
+## UI-PERF-1: last set_map_mode phase times (microseconds). Read by the probe; no sim effect.
+var map_mode_switch_profile: Dictionary = {}
+var map_mode_apply_gen: int = 0
+var _fill_profile_color_usec: int = 0
+var _fill_profile_assign_usec: int = 0
+## Mode-switch fill cache. Epoch bumps on non-mode refreshes (day, zoom, owner).
+var _mode_fill_cache: Dictionary = {}
+var _fill_cache_epoch: int = 0
+var _fill_cache_from_mode_switch: bool = false
+var _fill_cache_warm_quiet: bool = false
+## True until the first real map-mode switch. A boot refresh bumps the cache
+## epoch; while this holds, that refresh queues another warm so the first chip
+## is still a hit.
+var _fill_cache_hold_warm: bool = true
+var _fill_cache_rewarm_queued: bool = false
+## Chip-click split for the windowed probe. Not gameplay.
+var ui_perf_toolbar_skips: int = 0
+var ui_perf_owns_us: int = 0
+var ui_perf_legend_us: int = 0
+var _fill_modulate_ready: bool = false
+var _terrain_edge_mix_cache: Dictionary = {}
+var _fill_riot_ids: Dictionary = {}
+var _fill_cache_store: Dictionary = {}
+var _fill_cache_storing: bool = false
+## How many provinces the last mode-switch fill read from the cache (or stored).
+var _fill_profile_cache_n: int = 0
+## Idle fill warm. Political paint stays on the boot frame. The other mode
+## colors are stored after chrome is clear, in slices, so boot_chips_ms does
+## not include them. 36 frames covers the probe's 8-frame ready wait plus the
+## ~13 frames until the chip count is stable (GARRISON-PERF boot_chips clock).
+var fill_cache_warm_pending: bool = false
+var fill_warm_slices: int = 0
+var fill_warm_last_frame_us: int = 0
+var fill_warm_frame_max_us: int = 0
+var _idle_fill_armed: bool = false
+var _idle_fill_hold_for_probe: bool = false
+var _idle_fill_chrome_ready: bool = false
+var _idle_fill_delay_left: int = 0
+var _idle_fill_spec_i: int = 0
+var _idle_fill_pids: Array = []
+var _idle_fill_pid_i: int = 0
+var _idle_fill_store: Dictionary = {}
+var _idle_fill_key: String = ""
+var _idle_fill_skip_mode: String = ""
+const _IDLE_FILL_DELAY_FRAMES := 36
+const _IDLE_FILL_BUDGET_US := 30000
+const _FILL_VERTEX_WHITE := Color(1.0, 1.0, 1.0, 1.0)
 ## Pass 16/17: secondary stacked tints (e.g. vitality primary + strain + loyalty).
 var debug_tint_mode_secondary: String = ""  # first secondary (compat)
 var debug_tint_mode_secondaries: Array = []  # Pass 17: full secondary list
@@ -2151,6 +2198,35 @@ func _search_ui_owns_click() -> bool:
 	return sr.get_global_rect().grow(6.0).has_point(vp_r.get_mouse_position())
 
 
+func _map_mode_toolbar_owns_click(screen_pos: Vector2) -> bool:
+	# Chip clicks arrive with event.position. gamescope warp_mouse can leave
+	# get_mouse_position() on the map, so a rect test against that point still
+	# ran the 3520 pick (~200 ms) under every chip. Do not mark the event
+	# handled — the Button still has to toggle.
+	if _map_mode_toolbar == null or not is_instance_valid(_map_mode_toolbar) or not (_map_mode_toolbar is Control):
+		return false
+	var tb := _map_mode_toolbar as Control
+	if not tb.visible:
+		return false
+	if tb.get_global_rect().grow(6.0).has_point(screen_pos):
+		return true
+	return _control_tree_owns_point(tb, screen_pos)
+
+
+func _control_tree_owns_point(root_c: Control, screen_pos: Vector2) -> bool:
+	for ch_v in root_c.get_children():
+		if not (ch_v is Control):
+			continue
+		var ch := ch_v as Control
+		if not ch.visible:
+			continue
+		if ch.mouse_filter != Control.MOUSE_FILTER_IGNORE and ch.get_global_rect().grow(4.0).has_point(screen_pos):
+			return true
+		if _control_tree_owns_point(ch, screen_pos):
+			return true
+	return false
+
+
 func _road_spine_btn_owns_click() -> bool:
 	# Play MIXED d0b1587d: leftover map pan / pick-block swallowed inspector
 	# button-up (same class as Search Go). Rect first — hover can miss.
@@ -2284,20 +2360,24 @@ func _route_living_title_escape() -> void:
 	_esc_open_command_center()
 
 
-func _top_bar_owns_click() -> bool:
+func _top_bar_owns_click(screen_pos: Vector2 = Vector2(-100000, -100000)) -> bool:
 	# Softpipe / living-title: gui_get_hovered_control() can miss TopInfoBar
 	# 4x / pause (same class as Search Go). Rect first so leftover pick-block
 	# cannot set_input_as_handled over the live clock chrome.
+	# Pass event.position from _input. gamescope warp_mouse leaves
+	# get_mouse_position() on the map, so a Tech/Prod click paid the unit scan.
 	var tree: SceneTree = get_tree()
 	if tree == null:
 		return false
 	var tib: Control = TopInfoBar.find_in_tree(tree) as Control
 	if tib == null or not is_instance_valid(tib) or not tib.visible:
 		return false
-	var vp_t: Viewport = get_viewport()
-	if vp_t == null:
-		return false
-	var mouse_t: Vector2 = vp_t.get_mouse_position()
+	var mouse_t: Vector2 = screen_pos
+	if mouse_t.x < -50000.0:
+		var vp_t: Viewport = get_viewport()
+		if vp_t == null:
+			return false
+		mouse_t = vp_t.get_mouse_position()
 	if tib.get_global_rect().grow(4.0).has_point(mouse_t):
 		return true
 	var speed_row: Control = tib.get_node_or_null("ContentRow/LeftContainer/TimeSpeedContainer") as Control
@@ -3015,6 +3095,16 @@ func _input(event: InputEvent) -> void:
 			if _campaign_modal_consumes_pointer(event):
 				get_viewport().set_input_as_handled()
 				return
+			# The title node stays in the tree after Begin, so "boot is up" is
+			# the wrong guard. A chip or top-bar click must not run the unit
+			# scan. Do not mark handled — the Button still toggles.
+			var own0 := Time.get_ticks_usec()
+			var toolbar_hit := _map_mode_toolbar_owns_click(event.position)
+			var top_hit := false if toolbar_hit else _top_bar_owns_click(event.position)
+			ui_perf_owns_us += int(Time.get_ticks_usec() - own0)
+			if toolbar_hit or top_hit:
+				ui_perf_toolbar_skips += 1
+				return
 			# TipDismiss arms this on press. Clear after the release frame so
 			# the same click cannot open the unit under the ×, and the next click can.
 			if not event.pressed and has_meta("eoa_tip_dismiss_swallow_release"):
@@ -3046,15 +3136,22 @@ func _input(event: InputEvent) -> void:
 					)
 					var title_act: String = _route_living_title_pointer(event)
 					print("EOA_LIVE_PTR who=MapRenderer._input action=%s" % title_act)
-					if title_act == "begin" or title_act == "cc" or title_act == "panel":
+					if title_act == "begin" or title_act == "cc" or title_act == "panel" or title_act == "load" or title_act == "close":
 						if title_act == "begin":
 							arm_begin_title_release_swallow()
 						get_viewport().set_input_as_handled()
+						return
+					if title_act == "passthrough":
 						return
 					if _living_title_owns_event(event) or _top_bar_owns_click():
 						return
 					# Map-area press: do not mark handled — GUI / window_input
 					# / title _input must still see the event.
+					return
+				# command center release passthrough: × and Load must see the
+				# mouse-up. Eating it here left CloseX armed and never pressed.
+				var boot_rel: Node = _living_title_boot_node()
+				if boot_rel != null and boot_rel.has_method("_command_center_is_up") and bool(boot_rel.call("_command_center_is_up")):
 					return
 				if _living_title_owns_event(event) or _top_bar_owns_click():
 					return
@@ -3479,6 +3576,11 @@ func _unhandled_input(event: InputEvent) -> void:
 	# Spatial picking click handling — this path makes the system fully functional
 	# even when create_area_nodes_for_fallback=false (pure MapPickGrid mode, zero Area2D nodes).
 	if use_spatial_picking and event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		# Chip / top-bar: do not walk the title tree or hex-pick. The Button
+		# already saw this event in the GUI pass.
+		var chip_at := _map_pick_screen_pos(event)
+		if _map_mode_toolbar_owns_click(chip_at) or _top_bar_owns_click(chip_at):
+			return
 		if event.pressed:
 			_clear_begin_title_release_swallow_on_new_left_press()
 			_clear_ui_close_release_swallow_on_new_left_press()
@@ -3521,7 +3623,9 @@ func _unhandled_input(event: InputEvent) -> void:
 				_dismiss_close_control_from_input()
 			get_viewport().set_input_as_handled()
 			return
-		if _top_bar_owns_click() or _mouse_over_search_control() or _search_ui_owns_click() or _living_title_owns_click() or _road_spine_btn_owns_click():
+		if _top_bar_owns_click() or _mouse_over_search_control() or _search_ui_owns_click() or _living_title_owns_click() or _road_spine_btn_owns_click() or _map_mode_toolbar_owns_click(event.position):
+			# Toolbar owns the chip. Do not hex-pick under it, and do not mark
+			# the click handled — the Button still has to toggle the mode.
 			return
 		if not event.ctrl_pressed and not event.shift_pressed:
 			if event.pressed:
@@ -3834,6 +3938,7 @@ func _process(delta: float) -> void:
 	if _perf != null and _perf.enabled:
 		_perf_frame_start_usec = Time.get_ticks_usec()
 		_perf.begin("process_total")
+	_tick_idle_mode_fill_warm()
 	_expire_map_time_pulse_if_needed()
 	_tick_unit_card_press_consume_latch(delta)
 	_tick_begin_title_release_swallow()
@@ -4096,6 +4201,7 @@ func _handle_camera_input(delta: float) -> void:
 	# Only clamp when camera moved — wrapping/clamp every idle frame was thrashing redraws.
 	if moved:
 		_clamp_camera_to_theater()
+		_reveal_culled_unit_icons(8)
 		# c4c44b8 Lisboa: Atlantic water sits in the left edge-pan strip on
 		# Home Europe. Camera slides onto Iberia while mouse slop stays <8px;
 		# leftover `_begin` then wiped sticky slop. Latch the camera move as
@@ -4343,8 +4449,17 @@ func _layout_supply_legend() -> void:
 	if _map_mode_toolbar != null and _map_mode_toolbar.has_method("get_panel_height"):
 		toolbar_h = float(_map_mode_toolbar.call("get_panel_height"))
 	var chrome_top := top_clearance + toolbar_h + 6.0
-	_apply_supply_legend_fixed_frame()
 	var sz: Vector2 = _supply_legend_host_size()
+	# Supply enter used to re-pin this host on every toggle (~20 ms) after it
+	# was already sitting on the chrome row.
+	if (
+		is_equal_approx(host.offset_left, 10.0)
+		and is_equal_approx(host.offset_top, chrome_top)
+		and host.size.is_equal_approx(sz)
+		and _supply_legend_panel.size.is_equal_approx(sz)
+	):
+		return
+	_apply_supply_legend_fixed_frame()
 	_pin_control_top_left(host, 10.0, chrome_top, sz)
 	_pin_control_top_left(_supply_legend_panel, 0.0, 0.0, sz)
 	_sync_supply_legend_pulse_host()
@@ -14746,6 +14861,9 @@ func apply_mapmode_preset_stack(primary_mode: String, stack: Array = []) -> void
 
 
 func set_map_mode(mode: String = "political") -> void:
+	var sync_t0 := Time.get_ticks_usec()
+	var ph_t := sync_t0
+	var ph := {}
 	var m := mode.strip_edges().to_lower()
 	if m == "chokepoints":
 		m = "naval"
@@ -14753,8 +14871,15 @@ func set_map_mode(mode: String = "political") -> void:
 		m = "political"
 	if m == current_map_mode and m != "infra" and m != "naval":
 		return
+	# Boot refreshes may rewarm the fill cache. A real switch must not.
+	_fill_cache_hold_warm = false
+	# A click before the idle warm finishes must not paint a half-built cache.
+	_idle_fill_drop_partial()
+	_idle_fill_skip_mode = m
 	current_map_mode = m
 	_sync_mapmode_toolbar()
+	ph["toolbar_us"] = Time.get_ticks_usec() - ph_t
+	ph_t = Time.get_ticks_usec()
 	# Clear secondary stack tints unless re-applied by preset.
 	debug_tint_mode_secondary = ""
 	debug_tint_mode_secondaries.clear()
@@ -14778,14 +14903,22 @@ func set_map_mode(mode: String = "political") -> void:
 	set_munitions_desk_visible(m == "supply" or m == "munitions" or supply_mode)
 	# Pass 22: repair queue chip for infra / munitions / supply ops.
 	set_repair_queue_visible(m in ["infra", "munitions", "supply"] or supply_mode)
+	ph["supply_us"] = Time.get_ticks_usec() - ph_t
+	ph_t = Time.get_ticks_usec()
 	# Infra mode: show roads/rails + numbers. Supply: sparse muted roads (not full spiderweb).
 	# Political (default): hide for clean fills.
 	var ol_infra := get_overlay_layer("InfrastructureOverlayLayer")
 	if m == "infra":
-		if ol_infra and ol_infra.has_method("_schedule_rebuild_all_infra_layers"):
-			ol_infra.call("_schedule_rebuild_all_infra_layers")
-		elif ol_infra and ol_infra.has_method("rebuild_all_infra_layers"):
-			ol_infra.call_deferred("rebuild_all_infra_layers")
+		# Roads are built at boot. Rebuilding here invalidated the HWY-3 cache
+		# and walked every land edge (~0.7 s) on each Infra chip.
+		var roads_warm := false
+		if ol_infra and ol_infra.has_method("mode_switch_roads_are_warm"):
+			roads_warm = bool(ol_infra.call("mode_switch_roads_are_warm"))
+		if not roads_warm:
+			if ol_infra and ol_infra.has_method("_schedule_rebuild_all_infra_layers"):
+				ol_infra.call("_schedule_rebuild_all_infra_layers")
+			elif ol_infra and ol_infra.has_method("rebuild_all_infra_layers"):
+				ol_infra.call_deferred("rebuild_all_infra_layers")
 		if ol_infra and ol_infra.has_method("set_show_roads"):
 			ol_infra.set_show_roads(true)
 			ol_infra.set_show_rails(true)
@@ -14815,6 +14948,8 @@ func set_map_mode(mode: String = "political") -> void:
 				supply_map_layer.call("clear_route_highlight")
 		if ol_infra.has_method("queue_redraw"):
 			ol_infra.queue_redraw()
+	ph["roads_us"] = Time.get_ticks_usec() - ph_t
+	ph_t = Time.get_ticks_usec()
 	if m == "naval":
 		var ol_n := get_overlay_layer("InfrastructureOverlayLayer")
 		if ol_n and ol_n.has_method("queue_redraw"):
@@ -14827,6 +14962,8 @@ func set_map_mode(mode: String = "political") -> void:
 			ol_res.set("show_resource_icons", m == "resources")
 			if ol_res.has_method("queue_redraw"):
 				ol_res.queue_redraw()
+	ph["glyphs_us"] = Time.get_ticks_usec() - ph_t
+	ph_t = Time.get_ticks_usec()
 	if m == "weather":
 		debug_tint_mode = "weather"
 	elif m == "munitions":
@@ -14840,17 +14977,40 @@ func set_map_mode(mode: String = "political") -> void:
 	else:
 		debug_tint_mode = "strain" if m == "strain" else ("vitality" if m == "vitality" else ("development" if m == "development" else ("loyalty" if m == "loyalty" else ("infra" if m == "infra" else ("region_control" if m == "region_control" else ("naval" if m == "naval" else ""))))))
 	# Stream 2: state name labels on states mapmode (operational zoom).
+	# Boot already built the layer. Rebuilding on every States chip freed and
+	# recreated every nation/state label (~400 ms).
 	if m == "states":
-		_schedule_political_labels_rebuild()
+		var labels := _ensure_political_labels_layer()
+		if labels != null and labels.has_method("labels_are_built") and bool(labels.call("labels_are_built")):
+			if labels.has_method("set_map_mode_context"):
+				labels.call("set_map_mode_context", m)
+			if labels.has_method("sync_tier"):
+				labels.call("sync_tier", _map_lod_tier)
+		else:
+			_schedule_political_labels_rebuild()
 	if _political_labels_layer != null and is_instance_valid(_political_labels_layer):
 		if _political_labels_layer.has_method("set_map_mode_context"):
 			_political_labels_layer.call("set_map_mode_context", m)
+	ph["labels_us"] = Time.get_ticks_usec() - ph_t
+	ph_t = Time.get_ticks_usec()
 	# Pass 22: restore remembered primary intensity for linked modes.
 	if m in INTENSITY_LINKED_MODES and primary_mapmode_intensity.has(m):
 		secondary_tint_intensity[m] = clampf(float(primary_mapmode_intensity[m]), 0.25, 2.0)
 	_sync_road_quiet_mode()
+	ph["quiet_us"] = Time.get_ticks_usec() - ph_t
+	ph_t = Time.get_ticks_usec()
 	_ensure_ussr_west_gap_mask()
+	ph["mask_us"] = Time.get_ticks_usec() - ph_t
+	ph_t = Time.get_ticks_usec()
 	_apply_legacy_underlay_policy()
+	ph["underlay_us"] = Time.get_ticks_usec() - ph_t
+	map_mode_switch_profile = {
+		"mode": m,
+		"sync_us": Time.get_ticks_usec() - sync_t0,
+		"phases": ph,
+	}
+	if not _last_supply_toggle_profile.is_empty():
+		map_mode_switch_profile["supply_toggle"] = _last_supply_toggle_profile.duplicate()
 	if not _map_mode_apply_scheduled:
 		_map_mode_apply_scheduled = true
 		call_deferred("_apply_map_mode_visuals")
@@ -14858,6 +15018,7 @@ func set_map_mode(mode: String = "political") -> void:
 
 func _apply_map_mode_visuals() -> void:
 	_map_mode_apply_scheduled = false
+	var apply_t0 := Time.get_ticks_usec()
 	var m := current_map_mode
 	# Nuclear: kill batched mesh on every mapmode switch. Mesh is owner-only and used to
 	# leave land polys at a≈0.02 → F2–F4 looked like Europe vanished when mesh went off.
@@ -14868,11 +15029,32 @@ func _apply_map_mode_visuals() -> void:
 			_province_mesh_layer.call("set_enabled", false)
 		_province_mesh_layer.visible = false
 	# Viewport cull can leave most of Europe node.visible=false; mapmode must not inherit holes.
+	var phase_t := Time.get_ticks_usec()
 	_force_all_province_nodes_visible()
+	var force_us := Time.get_ticks_usec() - phase_t
+	phase_t = Time.get_ticks_usec()
+	_fill_cache_from_mode_switch = true
 	_refresh_province_fill_colors(true)
+	_fill_cache_from_mode_switch = false
+	var fill_us := Time.get_ticks_usec() - phase_t
+	phase_t = Time.get_ticks_usec()
 	_restore_land_poly_visibility()
+	var restore_us := Time.get_ticks_usec() - phase_t
+	phase_t = Time.get_ticks_usec()
 	# Capitals on every mode; F1 especially must show full star set.
 	_ensure_capital_stars_visible()
+	var stars_us := Time.get_ticks_usec() - phase_t
+	map_mode_apply_gen += 1
+	map_mode_switch_profile["force_us"] = force_us
+	map_mode_switch_profile["fill_us"] = fill_us
+	map_mode_switch_profile["fill_color_us"] = _fill_profile_color_usec
+	map_mode_switch_profile["fill_assign_us"] = _fill_profile_assign_usec
+	map_mode_switch_profile["restore_us"] = restore_us
+	map_mode_switch_profile["stars_us"] = stars_us
+	map_mode_switch_profile["supply_highlight_ms"] = _last_refresh_supply_highlights_ms
+	map_mode_switch_profile["apply_us"] = Time.get_ticks_usec() - apply_t0
+	map_mode_switch_profile["gen"] = map_mode_apply_gen
+	map_mode_switch_profile["cache_n"] = _fill_profile_cache_n
 	# Choke diamonds redraw so Danish/English Channel stay at correct sea centroids.
 	var ol_infra2 := get_overlay_layer("InfrastructureOverlayLayer")
 	if ol_infra2 != null and ol_infra2.has_method("queue_redraw"):
@@ -14907,11 +15089,8 @@ func _apply_map_mode_visuals() -> void:
 		elif m == "states": mode_label = "States · colored fills by state · names @ operational zoom (Shift+F9)"
 		elif m == "terrain": mode_label = "Terrain · plains/forest/mtn/desert · sea blue (Ctrl+F9)"
 		DebugOverlay.toast_map_debug("Map mode: %s — %s" % [m, mode_label])
-	call_deferred("_ensure_capital_stars_visible")
-	if m == "political":
-		# F1: always re-assert full capital star set after any mesh/cull path.
-		call_deferred("_force_all_province_nodes_visible")
-		call_deferred("_ensure_capital_stars_visible")
+	# Stars were ensured once above. A deferred second/third pass re-walked
+	# every province and pushed the chip frame past 1 s.
 
 
 func _toolbar_highlight_mode() -> String:
@@ -14961,10 +15140,21 @@ func _force_all_province_nodes_visible() -> void:
 			_political_labels_layer.call("sync_viewport", Rect2(), false)
 
 
+var _land_poly_visibility_ready: bool = false
+
+
 ## After mapmode / mesh toggles: land polys must be opaque; sea below land z.
 func _restore_land_poly_visibility() -> void:
-	# Restore forces capital-star visibility; do not trust the last-px skip.
-	_invalidate_capital_star_scale_cache()
+	# Invalidate only when the star px notch changed. Unconditional invalidate
+	# forced a full font walk on every chip (~200 ms) even at a stable zoom.
+	var star_px := _capital_star_font_px()
+	if star_px != _capital_star_last_sync_px or _asia_end_force_star_pids.size() != _capital_star_last_sync_force_n:
+		_invalidate_capital_star_scale_cache()
+	# Boot already stamped z and alpha. Repeating the 3520 walk on every chip
+	# was ~200 ms and did not change mode colors (those live on modulate).
+	if _land_poly_visibility_ready and _fill_modulate_ready:
+		return
+	var touched := 0
 	for pid in province_nodes.keys():
 		var node: Node2D = province_nodes[pid] as Node2D
 		if node == null or not is_instance_valid(node):
@@ -14985,39 +15175,53 @@ func _restore_land_poly_visibility() -> void:
 		# Sea IDs on this board are 950000+
 		if int(pid) >= 950000:
 			is_water = true
-		if _asia_end_hulls_hidden and _asia_end_is_protected_row(int(pid)):
-			node.z_index = 8
+		var z := 8 if (_asia_end_hulls_hidden and _asia_end_is_protected_row(int(pid))) else _province_draw_z_index(int(pid), is_water)
+		if node.z_index != z:
+			node.z_index = z
+		touched += 1
+		# Fills live on modulate after the first mode paint. Rewriting vertex
+		# color here rebuilt every polygon mesh (~200 ms) on top of the fill pass.
+		if _fill_modulate_ready:
+			var m := poly.modulate
+			var changed := false
+			if is_water:
+				if m.a < 0.99:
+					m.a = 1.0
+					changed = true
+			else:
+				if m.a < 0.85:
+					m.a = 0.96
+					changed = true
+				if m.r + m.g + m.b < 0.12:
+					m = Color(0.35, 0.38, 0.42, 0.96)
+					changed = true
+			if changed:
+				poly.modulate = m
 		else:
-			node.z_index = _province_draw_z_index(int(pid), is_water)
-		if is_water:
-			var sc := poly.color
-			sc.a = 1.0
-			poly.color = sc
-		else:
-			var col := poly.color
-			if col.a < 0.85:
-				col.a = 0.96
-			# Never leave land near-black (looks "deleted")
-			if col.r + col.g + col.b < 0.12:
-				col = Color(0.35, 0.38, 0.42, 0.96)
-			poly.color = col
-		# Capital stars: always on top of land (all mapmodes including F2–F4)
-		for child in node.get_children():
-			if child is Label and (child as Label).has_meta(META_MAP_GLYPH_CAPITAL):
-				var lbl := child as Label
-				lbl.visible = true
-				lbl.modulate = Color(1.0, 1.0, 1.0, 1.0)
-				lbl.z_as_relative = false
-				lbl.z_index = 40
-				lbl.add_theme_color_override("font_color", Color(1.0, 0.92, 0.15, 1.0))
-				lbl.add_theme_color_override("font_outline_color", Color(0.02, 0.02, 0.05, 1.0))
-				lbl.add_theme_constant_override("outline_size", 8)
+			if is_water:
+				var sc := poly.color
+				sc.a = 1.0
+				poly.color = sc
+			else:
+				var col := poly.color
+				if col.a < 0.85:
+					col.a = 0.96
+				if col.r + col.g + col.b < 0.12:
+					col = Color(0.35, 0.38, 0.42, 0.96)
+				poly.color = col
+	if _fill_modulate_ready and touched > 100:
+		_land_poly_visibility_ready = true
+
+
+var _capital_star_roster_ready: bool = false
 
 
 func _ensure_capital_stars_visible() -> void:
-	_invalidate_capital_star_scale_cache()
-	_restore_land_poly_visibility()
 	# Re-stamp stars if missing (mapmode / mesh paths must never drop capitals).
+	# Caller restores fills. Walking every child here duplicated that cost.
+	if _capital_star_roster_ready:
+		_sync_capital_star_scales()
+		return
 	var n_stars := 0
 	for pid in province_nodes.keys():
 		var node: Node2D = province_nodes[pid] as Node2D
@@ -15035,6 +15239,7 @@ func _ensure_capital_stars_visible() -> void:
 		if not has_star:
 			_add_capital_star_to_node(node, int(pid))
 			n_stars += 1
+	_capital_star_roster_ready = true
 	_sync_capital_star_scales()
 	if n_stars > 0:
 		print("MapRenderer: capital stars visible n=%d" % n_stars)
@@ -15618,6 +15823,8 @@ func _boot_political_map_complete() -> void:
 	var ol := get_overlay_layer("InfrastructureOverlayLayer")
 	if ol != null and ol.has_method("queue_redraw"):
 		ol.queue_redraw()
+	# First chip used to pay one-time mask/desk setup and the first color walk.
+	_warm_map_mode_switch_path()
 
 
 var _render_restore_pid: int = -1
@@ -16205,14 +16412,19 @@ func _sync_batched_mesh_fills(force: bool = false) -> void:
 			if poly == null:
 				continue
 			var prov: Province = provinces.get(pid) as Province if provinces.has(pid) else null
-			var c := poly.color
 			var is_w := (prov != null and bool(prov.is_sea)) or int(pid) >= 950000
-			if is_w:
-				c.a = 0.85
-			else:
-				c.a = 0.55  # mesh paints solid; poly still shows if mesh gaps
+			var want_a := 0.85 if is_w else 0.55  # mesh paints solid; poly still shows if mesh gaps
 			node.z_index = _province_draw_z_index(int(pid), is_w)
-			poly.color = c
+			# Keep vertex color white. Writing poly.color rebuilds every province mesh.
+			if _fill_modulate_ready and poly.color == _FILL_VERTEX_WHITE:
+				var m := poly.modulate
+				if not is_equal_approx(m.a, want_a):
+					m.a = want_a
+					poly.modulate = m
+			else:
+				var c := poly.color
+				c.a = want_a
+				poly.color = c
 	else:
 		if _province_mesh_layer.has_method("set_enabled"):
 			_province_mesh_layer.call("set_enabled", false)
@@ -17987,14 +18199,15 @@ func _create_province_node(province: Province, geo: Dictionary) -> Node2D:
 
 	var poly := Polygon2D.new()
 	points = ProvincePolygonUtil.assign_polygon2d(poly, points)
-	poly.color = _get_province_color(province)
+	# White vertices once. Later mode chips change modulate and do not rebuild the mesh.
+	_paint_province_fill(poly, _get_province_color(province))
 	poly.antialiased = true
 	if _asia_end_hulls_hidden and _asia_end_should_hide_row_fill(int(province.id), node):
 		poly.visible = false
 		poly.set_meta("asia_sov_hull_hidden", true)
-		var hc: Color = poly.color
-		hc.a = 0.0
-		poly.color = hc
+		var hm := poly.modulate
+		hm.a = 0.0
+		poly.modulate = hm
 
 	# Area2D is now completely optional.
 	# In the recommended production pure-spatial configuration (use_spatial_picking=true AND
@@ -18391,8 +18604,199 @@ func _recolor_ussr_west_gap_mask() -> void:
 			poly.color = sea
 
 
+## Boot: build the one-time map-mode pieces. Fill colors for non-political
+## modes are stored on later idle frames (see _tick_idle_mode_fill_warm).
+func _warm_map_mode_switch_path() -> void:
+	set_munitions_desk_visible(false)
+	set_repair_queue_visible(false)
+	_sync_road_quiet_mode()
+	var ol := get_overlay_layer("InfrastructureOverlayLayer")
+	if ol != null and ol.has_method("set_map_mode_for_glyphs"):
+		ol.call("set_map_mode_for_glyphs", current_map_mode)
+	_ensure_ussr_west_gap_mask()
+	_warm_terrain_underlay()
+	if _political_labels_layer != null and is_instance_valid(_political_labels_layer):
+		if _political_labels_layer.has_method("set_map_mode_context"):
+			_political_labels_layer.call("set_map_mode_context", "terrain")
+			_political_labels_layer.call("set_map_mode_context", current_map_mode if not str(current_map_mode).is_empty() else "political")
+	_warm_map_mode_fill_cache()
+
+
+func _idle_fill_specs() -> Array:
+	return [
+		["political", ""],
+		["terrain", "terrain"],
+		["supply", ""],
+		["resources", "resources"],
+		["states", "states"],
+		["infra", "infra"],
+		["strain", "strain"],
+	]
+
+
+## Probe hook. Holds the idle warm so a chip click can land before it finishes.
+func hold_idle_fill_warm_for_probe() -> void:
+	_idle_fill_hold_for_probe = true
+
+
+func release_idle_fill_warm_for_probe() -> void:
+	_idle_fill_hold_for_probe = false
+
+
+func _warm_map_mode_fill_cache() -> void:
+	_schedule_idle_mode_fill_warm()
+
+
+func _schedule_idle_mode_fill_warm() -> void:
+	if _idle_fill_armed:
+		_idle_fill_drop_partial()
+		_idle_fill_spec_i = 0
+		fill_cache_warm_pending = true
+		return
+	_idle_fill_armed = true
+	_idle_fill_spec_i = 0
+	_idle_fill_drop_partial()
+	_idle_fill_delay_left = _IDLE_FILL_DELAY_FRAMES
+	fill_cache_warm_pending = true
+	fill_warm_slices = 0
+	fill_warm_last_frame_us = 0
+	fill_warm_frame_max_us = 0
+
+
+func _idle_fill_drop_partial() -> void:
+	_idle_fill_store = {}
+	_idle_fill_pids = []
+	_idle_fill_pid_i = 0
+	_idle_fill_key = ""
+
+
+func _queue_fill_cache_rewarm() -> void:
+	if not _fill_cache_hold_warm or _fill_cache_rewarm_queued or _fill_cache_warm_quiet:
+		return
+	_fill_cache_rewarm_queued = true
+	call_deferred("_rewarm_fill_cache_if_holding")
+
+
+func _rewarm_fill_cache_if_holding() -> void:
+	_fill_cache_rewarm_queued = false
+	if not _fill_cache_hold_warm or _fill_cache_warm_quiet:
+		return
+	_schedule_idle_mode_fill_warm()
+
+
+func _idle_fill_chrome_is_clear() -> bool:
+	if _idle_fill_chrome_ready:
+		return true
+	var tree := get_tree()
+	if tree == null or tree.root == null:
+		return false
+	var ls := tree.root.find_child("LoadingScreen", true, false)
+	if ls != null and bool(ls.get("visible")):
+		return false
+	var boot := tree.root.find_child("LivingTitleBoot", true, false)
+	if boot != null and not bool(boot.get("_closed")):
+		return false
+	_idle_fill_chrome_ready = true
+	return true
+
+
+func _tick_idle_mode_fill_warm() -> void:
+	fill_warm_last_frame_us = 0
+	if not _idle_fill_armed or _idle_fill_hold_for_probe:
+		return
+	if not _idle_fill_chrome_is_clear():
+		return
+	if _idle_fill_delay_left > 0:
+		_idle_fill_delay_left -= 1
+		return
+	var t0 := Time.get_ticks_usec()
+	_idle_fill_pump(_IDLE_FILL_BUDGET_US)
+	fill_warm_last_frame_us = Time.get_ticks_usec() - t0
+	fill_warm_slices += 1
+	if fill_warm_last_frame_us > fill_warm_frame_max_us:
+		fill_warm_frame_max_us = fill_warm_last_frame_us
+
+
+func _idle_fill_pump(budget_us: int) -> void:
+	if province_nodes.is_empty():
+		return
+	var t0 := Time.get_ticks_usec()
+	var specs := _idle_fill_specs()
+	while Time.get_ticks_usec() - t0 < budget_us:
+		if _idle_fill_spec_i >= specs.size():
+			_idle_fill_armed = false
+			fill_cache_warm_pending = false
+			_idle_fill_drop_partial()
+			return
+		var spec: Array = specs[_idle_fill_spec_i]
+		var mode := str(spec[0])
+		var saved_mode := current_map_mode
+		var saved_tint := debug_tint_mode
+		var saved_supply := supply_mode
+		current_map_mode = mode
+		debug_tint_mode = str(spec[1])
+		supply_mode = mode == "supply"
+		if container != null:
+			_zoom_fill_characterization_scale = absf(container.scale.x)
+		var key := _mode_fill_cache_key()
+		var have := false
+		if _mode_fill_cache.has(key):
+			var slot: Variant = _mode_fill_cache[key]
+			have = slot is Dictionary and not (slot as Dictionary).is_empty()
+		if have or mode == _idle_fill_skip_mode:
+			current_map_mode = saved_mode
+			debug_tint_mode = saved_tint
+			supply_mode = saved_supply
+			_idle_fill_drop_partial()
+			_idle_fill_spec_i += 1
+			continue
+		if key != _idle_fill_key:
+			_idle_fill_store = {}
+			_idle_fill_pids = province_nodes.keys()
+			_idle_fill_pid_i = 0
+			_idle_fill_key = key
+			_begin_fill_riot_ids()
+		while _idle_fill_pid_i < _idle_fill_pids.size() and Time.get_ticks_usec() - t0 < budget_us:
+			var pid := int(_idle_fill_pids[_idle_fill_pid_i])
+			_idle_fill_pid_i += 1
+			if not province_nodes.has(pid) or not provinces.has(pid):
+				continue
+			var node := province_nodes[pid]
+			if not is_instance_valid(node):
+				continue
+			var poly: Polygon2D = _get_province_polygon(node)
+			if poly == null:
+				continue
+			if _asia_end_should_keep_fill_hidden(pid, poly):
+				continue
+			var province: Province = provinces[pid] as Province
+			_idle_fill_store[pid] = _compose_mode_fill_color(province, pid)
+		current_map_mode = saved_mode
+		debug_tint_mode = saved_tint
+		supply_mode = saved_supply
+		if _idle_fill_pid_i >= _idle_fill_pids.size() and not _idle_fill_pids.is_empty():
+			if not _idle_fill_store.is_empty():
+				_mode_fill_cache[key] = _idle_fill_store.duplicate()
+			_idle_fill_drop_partial()
+			_idle_fill_spec_i += 1
+		else:
+			return
+	if _idle_fill_spec_i >= specs.size():
+		_idle_fill_armed = false
+		fill_cache_warm_pending = false
+		_idle_fill_drop_partial()
+
+
 ## world_accurate: legacy theater art stays available in terrain mode only.
 ## Political and the other map modes read holes as the mask / ocean floor.
+func _warm_terrain_underlay() -> void:
+	var prev := current_map_mode
+	current_map_mode = "terrain"
+	_apply_legacy_underlay_policy()
+	current_map_mode = prev
+	_apply_legacy_underlay_policy()
+
+
 func _apply_legacy_underlay_policy() -> void:
 	if not _is_gis_board_active():
 		return
@@ -20205,6 +20609,10 @@ func _try_open_land_chip_from_input(ctrl_click: bool = false, event: InputEvent 
 		return false
 	if _begin_title_release_blocks_map_pick():
 		return false
+	if event != null:
+		var chip_at := _map_pick_screen_pos(event)
+		if _map_mode_toolbar_owns_click(chip_at) or _top_bar_owns_click(chip_at):
+			return false
 	if _top_bar_owns_click() or _mouse_over_search_control() or _search_ui_owns_click() or _mouse_over_close_control() or _road_spine_btn_owns_click():
 		return false
 	if _unit_card_consumed_press or _unit_card_release_eaten:
@@ -20404,6 +20812,9 @@ func _nearest_player_land_formation_at_world(world_pos: Vector2) -> Object:
 			if land_only and _formation_type_blocks_land_open(fo):
 				continue
 			if player_only and not _formation_is_player_tag(fo):
+				continue
+			# Garrison plates do not steal a click on a different hex (Kulmbach vs Berlin).
+			if not _garrison_chip_hit_allowed(fo, world_pos):
 				continue
 			if d <= best_d:
 				best_d = d
@@ -20698,9 +21109,9 @@ func _select_map_unit(formation: Object) -> void:
 		attack_staging_province_id = pid
 		debug_combat_attacker_province_id = pid
 	var toast := "Unit selected · %s · click friendly province to MARCH (days) · Ctrl+click enemy to ASSAULT · Esc clears" % name_s
+	# One toast only. DebugOverlay's map toast also calls LeaderEventUI.show_toast,
+	# which painted a second "Unit selected" notice. SAVE-FULL-1 cherry-pick: MapRenderer._select_map_unit.
 	_show_inspector_toast(toast, 5.5)
-	if typeof(DebugOverlay) != TYPE_NIL:
-		DebugOverlay.toast_map_debug(toast)
 
 
 ## Selected-chip ring via nation-frame helper. One pin per province — match by station pid
@@ -21462,6 +21873,8 @@ func _pick_unit_formation_at_world(world_pos: Vector2, land_only: bool = false, 
 						fo = f2 as Object
 			if fo == null:
 				continue
+			if not _garrison_chip_hit_allowed(fo, world_pos):
+				continue
 			# FIX #6 / FLEET-2b: painted plate / bars / glyph ink under the
 			# cursor are never ownership-blocked. Halo (no painted pixels)
 			# never reaches here at z<0.65 — those clicks fall through to
@@ -21550,6 +21963,30 @@ func _pick_unit_formation_at_world(world_pos: Vector2, land_only: bool = false, 
 	if player_only:
 		return null
 	return null
+
+
+func _formation_is_garrison_1936(formation: Object) -> bool:
+	if formation == null or not is_instance_valid(formation):
+		return false
+	if not formation.has_method("has_meta"):
+		return false
+	return bool(formation.get_meta("garrison_1936", false))
+
+
+func _formation_card_design_text(formation: Object, design_id: String) -> String:
+	if _formation_is_garrison_1936(formation):
+		if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("garrison_1936_design_label"):
+			return str(LeaderManager.garrison_1936_design_label(design_id))
+		return "Infantry Division (1936)"
+	return design_id
+
+
+func _garrison_chip_hit_allowed(fo: Object, world_pos: Vector2) -> bool:
+	if not _formation_is_garrison_1936(fo):
+		return true
+	var station := int(fo.stationed_province_id) if "stationed_province_id" in fo else -1
+	var click_hex := _resolve_hex_pick_pid(world_pos)
+	return MapZoomLODScript.garrison_chip_owns_click(station, click_hex)
 
 
 func _show_unit_detail_popup(formation: Object) -> void:
@@ -21736,7 +22173,7 @@ func _show_unit_detail_popup(formation: Object) -> void:
 	if not ftype.is_empty():
 		lines.append("Type: %s" % ftype.replace("_", " ").capitalize())
 	if not dsn.is_empty():
-		lines.append("Design: %s" % dsn)
+		lines.append("Design: %s" % _formation_card_design_text(formation, dsn))
 	lines.append("Stationed: %s" % prov_name)
 	lines.append("Leader: %s" % leader_s)
 	var chrome_tips: PackedStringArray = PackedStringArray()
@@ -21745,7 +22182,7 @@ func _show_unit_detail_popup(formation: Object) -> void:
 		"Org %.0f%% · Str %.0f%% · Rdy %.0f%% · XP %.0f%%"
 		% [org_v * 100.0, str_v * 100.0, rdy_v * 100.0, xp_v * 100.0]
 	)
-	if not fid.is_empty():
+	if not fid.is_empty() and not _formation_is_garrison_1936(formation):
 		lines.append("ID: %s" % fid)
 	body.text = "\n".join(lines)
 	RetrowaveTheme.style_body_label(body)
@@ -21770,6 +22207,10 @@ func _show_unit_detail_popup(formation: Object) -> void:
 			fill_txt = "%s · TOE —" % fill_txt
 		_apply_fill_toe_card_lines(fill_lbl, toe_lbl, fill_txt)
 		fill_ratio = _safe_unit_card_fill_ratio(formation)
+		if fill_ratio < 0.0 and typeof(UnitCardCombatStrip) != TYPE_NIL:
+			var shown_pct := int(UnitCardCombatStrip.shared_display_percent(formation))
+			if shown_pct >= 0:
+				fill_ratio = float(shown_pct) / 100.0
 		if fill_ratio >= 0.0 and fill_ratio < 0.5:
 			fill_col = RetrowaveTheme.WARNING
 		elif fill_ratio >= 0.5:
@@ -22058,6 +22499,8 @@ func _safe_unit_card_fill_ratio(formation: Object) -> float:
 		return -1.0
 	var raw: Variant = UnitCardCombatStrip._fill_ratio_for(formation)
 	if typeof(raw) == TYPE_FLOAT or typeof(raw) == TYPE_INT:
+		if float(raw) < 0.0:
+			return -1.0
 		return clampf(float(raw), 0.0, 2.0)
 	return -1.0
 
@@ -23873,7 +24316,38 @@ var selected_formation_id: String = ""
 var _unit_pick_strategic_hint_shown: bool = false
 
 
+func _open_fight_keeps_domain_card(fid: String) -> bool:
+	# Fleet / air / space keep their card. Play b31b625a: Open fight on the
+	# GER fleet teleported it onto Maginot and opened Bas-Rhin, and an empty
+	# id while that fleet was selected grabbed GER_formation_0 for the same
+	# land sheet. Do not move the camera.
+	var use_fid := fid.strip_edges()
+	var fo: Object = null
+	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_formation"):
+		if not use_fid.is_empty():
+			fo = LeaderManager.get_formation(use_fid)
+		elif not selected_formation_id.is_empty():
+			var sel: Object = LeaderManager.get_formation(selected_formation_id)
+			if sel != null and (_formation_type_blocks_land_open(sel) or _formation_is_fleet_counter(sel)):
+				fo = sel
+				use_fid = selected_formation_id
+	if fo == null:
+		return false
+	if not _formation_type_blocks_land_open(fo) and not _formation_is_fleet_counter(fo):
+		return false
+	selected_formation_id = use_fid
+	if "stationed_province_id" in fo:
+		var stay := int(fo.stationed_province_id)
+		if stay >= 0:
+			attack_staging_province_id = stay
+			debug_combat_attacker_province_id = stay
+	_show_unit_detail_popup(fo)
+	return true
+
+
 func _open_fight_from_formation_id(fid: String) -> void:
+	if _open_fight_keeps_domain_card(fid):
+		return
 	# Prefer the selected unit's current hex + an adjacent enemy so Play can
 	# Open fight → Start without Ctrl (xdotool Ctrl is intermittent).
 	# First-session fallback stays GER Maginot 710173 → FRA 710739.
@@ -23997,6 +24471,43 @@ func _province_has_defending_units(pid: int, owner_tag: String) -> bool:
 	return not divs.is_empty()
 
 
+## Same name the unit card shows. Raw formation ids (garr1936_…, fielded_…) never do.
+static func open_fight_attacker_label(formation: Object, fid: String) -> String:
+	var raw := str(fid).strip_edges()
+	var label := ""
+	if formation != null:
+		var named: Variant = formation.get("name")
+		if named != null:
+			label = str(named).strip_edges()
+	if _open_fight_label_is_raw(label, raw):
+		label = ""
+	if label.is_empty() and formation != null and bool(formation.get_meta("garrison_1936", false)):
+		var tag := str(formation.get("country_tag")).strip_edges().to_upper()
+		var ordinal := int(formation.get_meta("garrison_1936_ordinal", 0))
+		if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("garrison_1936_display_name") and not tag.is_empty():
+			var pretty := str(LeaderManager.garrison_1936_display_name(tag, ordinal)).strip_edges()
+			if not _open_fight_label_is_raw(pretty, raw):
+				label = pretty
+	if label.is_empty() and formation != null:
+		var shown: Variant = formation.get("display_name")
+		if shown != null:
+			var dn := str(shown).strip_edges()
+			if not _open_fight_label_is_raw(dn, raw):
+				label = dn
+	if label.is_empty():
+		return "Division"
+	return label
+
+
+static func _open_fight_label_is_raw(text: String, fid: String) -> bool:
+	var t := text.strip_edges()
+	if t.is_empty() or t == fid.strip_edges():
+		return true
+	if t.begins_with("garr1936_") or t.begins_with("fielded_"):
+		return true
+	return t.contains("_") and not t.contains(" ")
+
+
 func _show_open_fight_sheet(
 	fid: String,
 	formation: Object,
@@ -24023,11 +24534,7 @@ func _show_open_fight_sheet(
 	var old := ui.get_node_or_null("OpenFightSheet")
 	if old != null:
 		old.queue_free()
-	var att_name := str(formation.get("display_name")) if formation != null and "display_name" in formation else fid
-	if att_name.strip_edges().is_empty() and formation != null and "name" in formation:
-		att_name = str(formation.get("name"))
-	if att_name.strip_edges().is_empty():
-		att_name = "Division"
+	var att_name := open_fight_attacker_label(formation, fid)
 	var from_name := _province_display_name(from_pid)
 	var def_tag := ""
 	var def_name := "no adjacent enemy"
@@ -26802,6 +27309,8 @@ func _refresh_province_fill_pids(pids: Array) -> void:
 		return
 	if container != null:
 		_zoom_fill_characterization_scale = absf(container.scale.x)
+	_fill_cache_epoch += 1
+	_begin_fill_riot_ids()
 	var seen: Dictionary = {}
 	for v in pids:
 		var pid := int(v)
@@ -26826,14 +27335,67 @@ func _refresh_province_fill_pids(pids: Array) -> void:
 			if fill >= 0.0:
 				col = col.lerp(_supply_depot_tint_color(fill), _supply_depot_mix_amount())
 		col = _apply_agent_pressure_base_tint(col, province)
-		if typeof(GameData) != TYPE_NIL and GameData.has_method("has_active_riot") and GameData.has_active_riot(pid):
+		if _fill_riot_ids.has(pid):
 			col = col.lerp(Color(0.85, 0.25, 0.25, 0.55), 0.40)
-		poly.color = col
+		_paint_province_fill(poly, col)
+		_mode_fill_cache_note(int(pid), col)
+
+
+func _mode_fill_cache_key() -> String:
+	var zq := int(round(_zoom_fill_characterization_scale * 100.0))
+	var inten := 1.0
+	if debug_tint_mode in INTENSITY_LINKED_MODES:
+		inten = float(primary_mapmode_intensity.get(debug_tint_mode, secondary_tint_intensity.get(debug_tint_mode, 1.0)))
+	return "%s|%s|%s|%d|%.3f|%d" % [
+		current_map_mode, str(supply_mode), debug_tint_mode, zq, inten, _fill_cache_epoch,
+	]
+
+
+func _mode_fill_cache_note(pid: int, col: Color) -> void:
+	if not _fill_cache_storing:
+		return
+	_fill_cache_store[pid] = col
+
+
+func _compose_mode_fill_color(province: Province, pid: int) -> Color:
+	var col := _get_province_color(province)
+	if supply_mode:
+		var fill := ProvinceInsight.depot_fill_ratio(pid)
+		if fill >= 0.0:
+			col = col.lerp(_supply_depot_tint_color(fill), _supply_depot_mix_amount())
+	col = _apply_agent_pressure_base_tint(col, province)
+	if _fill_riot_ids.has(pid):
+		col = col.lerp(Color(0.85, 0.25, 0.25, 0.55), 0.40)
+	return col
+
+
+func _begin_fill_riot_ids() -> void:
+	_fill_riot_ids = {}
+	if typeof(GameData) == TYPE_NIL or not GameData.has_method("get_provinces_with_active_riots"):
+		return
+	for rid in GameData.get_provinces_with_active_riots():
+		_fill_riot_ids[int(rid)] = true
+
+
+## Vertex color stays white so a mode chip only updates modulate.
+## Writing Polygon2D.color rebuilds the mesh for every province.
+func _paint_province_fill(poly: Polygon2D, col: Color) -> void:
+	if poly.color != _FILL_VERTEX_WHITE:
+		poly.color = _FILL_VERTEX_WHITE
+	if poly.modulate != col:
+		poly.modulate = col
+	_fill_modulate_ready = true
 
 
 func _refresh_province_fill_colors(refresh_all: bool = false) -> void:
+	_fill_profile_color_usec = 0
+	_fill_profile_assign_usec = 0
 	if container != null:
 		_zoom_fill_characterization_scale = absf(container.scale.x)
+	if not _fill_cache_from_mode_switch:
+		_fill_cache_epoch += 1
+		# The warm ran at the previous epoch. Rebuild it before the first chip.
+		_queue_fill_cache_rewarm()
 	# Accurate board (~3.5k): ALWAYS paint every province. Lazy "interesting" cull (~180 pids)
 	# left NOR/SWE/FIN/UK-north/Vestjylland unpainted until F2 forced a full repaint.
 	var board_n := maxi(provinces.size(), province_nodes.size())
@@ -26844,6 +27406,20 @@ func _refresh_province_fill_colors(refresh_all: bool = false) -> void:
 		or board_n >= MapZoomLODScript.ACCURATE_BOARD_CULL_THRESHOLD
 	)
 	var interesting := {} if use_all else _get_interesting_province_ids()
+	var cache_key := _mode_fill_cache_key() if _fill_cache_from_mode_switch else ""
+	var cached: Dictionary = {}
+	if _fill_cache_from_mode_switch and _mode_fill_cache.has(cache_key):
+		var slot: Variant = _mode_fill_cache[cache_key]
+		if slot is Dictionary:
+			cached = slot
+	var cache_hit := _fill_cache_from_mode_switch and not cached.is_empty()
+	_fill_cache_storing = _fill_cache_from_mode_switch and not cache_hit
+	if _fill_cache_storing:
+		_fill_cache_store = {}
+	if not cache_hit:
+		_begin_fill_riot_ids()
+	var color_t0 := Time.get_ticks_usec()
+	var assign_t0 := color_t0
 	for pid in province_nodes.keys():
 		if interesting.size() > 0 and not interesting.has(int(pid)):
 			continue  # lazy cull
@@ -26859,17 +27435,26 @@ func _refresh_province_fill_colors(refresh_all: bool = false) -> void:
 		if _asia_end_should_keep_fill_hidden(int(pid), poly):
 			_hide_fill_on_node(node as Node2D)
 			continue
-		var col := _get_province_color(province)
-		if supply_mode:
-			var fill := ProvinceInsight.depot_fill_ratio(int(pid))
-			if fill >= 0.0:
-				col = col.lerp(_supply_depot_tint_color(fill), _supply_depot_mix_amount())
-		col = _apply_agent_pressure_base_tint(col, province)
-		# Riot tint for active_riots provinces (red overlay hint when political or any mode; visible on inspector hover too via single refresh)
-		if typeof(GameData) != TYPE_NIL and GameData.has_method("has_active_riot") and GameData.has_active_riot(int(pid)):
-			col = col.lerp(Color(0.85, 0.25, 0.25, 0.55), 0.40)  # riot red tint
-		poly.color = col
-	_refresh_supply_highlights()
+		var col: Color
+		if cache_hit and cached.has(int(pid)):
+			col = cached[int(pid)]
+		else:
+			col = _compose_mode_fill_color(province, int(pid))
+			_mode_fill_cache_note(int(pid), col)
+		if cache_hit:
+			pass
+		_paint_province_fill(poly, col)
+	if cache_hit:
+		_fill_profile_assign_usec = Time.get_ticks_usec() - assign_t0
+		_fill_profile_color_usec = 0
+	else:
+		_fill_profile_color_usec = Time.get_ticks_usec() - color_t0
+	if _fill_cache_storing and not _fill_cache_store.is_empty():
+		_mode_fill_cache[cache_key] = _fill_cache_store.duplicate()
+	_fill_profile_cache_n = cached.size() if cache_hit else _fill_cache_store.size()
+	_fill_cache_storing = false
+	if not _fill_cache_warm_quiet:
+		_refresh_supply_highlights()
 	# Drift compares camera zoom. GIS locks container.scale at 1.0 — recording
 	# that scale here made every unpaused Home/operational frame look like a
 	# zoom drift and recolored all ~3520 fills.
@@ -27918,6 +28503,8 @@ func _pick_drawn_land_air_body_at_world(world_pos: Vector2, z: float = -1.0) -> 
 			var fo: Object = _formation_from_demo_icon(icon)
 			if fo == null:
 				continue
+			if not _garrison_chip_hit_allowed(fo, world_pos):
+				continue
 			if _formation_is_fleet_counter(fo):
 				continue
 			var chip_pos: Vector2 = _demo_unit_icon_world_pos(icon, id)
@@ -28350,6 +28937,7 @@ func _sync_unit_counter_scales(z: float = -1.0) -> void:
 		return
 	var s := _unit_counter_scale_for_zoom(z)
 	var sv := Vector2(s, s)
+	var gsv := sv * 0.55
 	for id_v in _demo_unit_icon_pids:
 		var id := int(id_v)
 		if not province_nodes.has(id):
@@ -28361,7 +28949,17 @@ func _sync_unit_counter_scales(z: float = -1.0) -> void:
 			if c is Node2D and str(c.name).begins_with("DemoUnitIcon_"):
 				if bool((c as Node2D).get_meta("sea_nation_disk", false)):
 					continue
-				(c as Node2D).scale = sv
+				var icon := c as Node2D
+				if bool(icon.get_meta("garrison_1936_chip", false)):
+					icon.scale = gsv
+					icon.modulate = Color(1, 1, 1, 0.62)
+					icon.z_index = 22
+					icon.z_as_relative = false
+				else:
+					icon.scale = sv
+					icon.modulate = Color.WHITE
+					icon.z_index = 28
+					icon.z_as_relative = false
 	var zz: float = z
 	if zz < 0.0:
 		zz = _get_camera_zoom() if has_method("_get_camera_zoom") else 1.0
@@ -28380,10 +28978,15 @@ func _unit_counters_want_visible(z: float = -1.0) -> bool:
 func _sync_unit_counter_paint(z: float = -1.0) -> void:
 	_sync_unit_counter_visibility(z)
 	_sync_unit_counter_scales(z)
+	_reveal_culled_unit_icons()
 
 
 func _sync_unit_counter_visibility(z: float = -1.0) -> void:
 	var vis := _unit_counters_want_visible(z)
+	var zz := z
+	if zz < 0.0:
+		zz = _get_camera_zoom() if has_method("_get_camera_zoom") else 1.0
+	var gvis := MapZoomLODScript.show_garrison_counters_for_zoom(zz, show_unit_counters)
 	var sea_layer: Node2D = _ensure_sea_nation_layer()
 	if sea_layer != null:
 		sea_layer.visible = true
@@ -28403,7 +29006,11 @@ func _sync_unit_counter_visibility(z: float = -1.0) -> void:
 				node.visible = true
 			for c in node.get_children():
 				if c is Node2D and str(c.name).begins_with("DemoUnitIcon_"):
-					(c as Node2D).visible = vis
+					var icon := c as Node2D
+					if bool(icon.get_meta("garrison_1936_chip", false)):
+						icon.visible = gvis
+					else:
+						icon.visible = vis
 	_sync_unit_overlay_visibility(vis)
 	_notify_units_view_hud()
 
@@ -28718,7 +29325,12 @@ func _attach_unit_counter_chrome(counter: Node2D, ff: Object, nation_col: Color)
 		counter.add_child(train)
 	var str_lab: Node2D = _UnitChipTextScr.new() as Node2D
 	str_lab.name = "StrNum"
-	str_lab.set("text", "%d" % int(round(clampf(str_v, 0.0, 1.0) * 100.0)))
+	var shown := int(round(clampf(str_v, 0.0, 1.0) * 100.0))
+	if ff != null and typeof(UnitCardCombatStrip) != TYPE_NIL:
+		var sp: Variant = UnitCardCombatStrip.shared_display_percent(ff)
+		if (typeof(sp) == TYPE_INT or typeof(sp) == TYPE_FLOAT) and int(sp) >= 0:
+			shown = int(sp)
+	str_lab.set("text", "%d" % shown)
 	str_lab.set("font_size", 13)
 	str_lab.set("font_color", Color(0.99, 0.90, 0.38, 1.0))
 	str_lab.set("align_right", true)
@@ -28740,6 +29352,17 @@ func _attach_unit_counter_chrome(counter: Node2D, ff: Object, nation_col: Color)
 
 ## 0..1 how strongly this land province sits on a plains↔hills/mountains transition front.
 func _terrain_transition_edge_mix(province: Province) -> float:
+	if province == null or province.is_sea:
+		return 0.0
+	var pid := int(province.id)
+	if _terrain_edge_mix_cache.has(pid):
+		return float(_terrain_edge_mix_cache[pid])
+	var mix := _terrain_transition_edge_mix_calc(province)
+	_terrain_edge_mix_cache[pid] = mix
+	return mix
+
+
+func _terrain_transition_edge_mix_calc(province: Province) -> float:
 	if province == null or province.is_sea:
 		return 0.0
 	var t := str(province.terrain).strip_edges().to_lower()
@@ -29179,10 +29802,10 @@ func _refresh_single_province_fill(province_id: int) -> void:
 	col = _apply_agent_pressure_base_tint(col, province)
 	col = _apply_recovering_fill_tint(col, province_id)
 	col = _apply_support_radio_fill_tint(col, province)
-	# Riot tint (live on data_changed for riot pids)
 	if typeof(GameData) != TYPE_NIL and GameData.has_method("has_active_riot") and GameData.has_active_riot(province_id):
 		col = col.lerp(Color(0.85, 0.25, 0.25, 0.55), 0.40)
-	poly.color = col
+	_fill_cache_epoch += 1
+	_paint_province_fill(poly, col)
 
 
 ## Public helper for F10 harness / tester: force re-compute all province fills (tints).
@@ -29783,7 +30406,7 @@ func _apply_hover_fill(province_id: int, active: bool) -> void:
 		col = col.lerp(agent_tint, fill_strength)
 	elif contested:
 		col = col.lerp(_CONFLICT_FILL_TINT, 0.09)
-	poly.color = col.lerp(_HOVER_FILL_TINT, boost)
+	_paint_province_fill(poly, col.lerp(_HOVER_FILL_TINT, boost))
 
 
 func _update_outline_pulse() -> void:
@@ -32276,7 +32899,7 @@ func ensure_playable_front_chips(focus_camera: bool = true) -> Dictionary:
 		return result
 	var ger_land: Array = []
 	for f in LeaderManager.get_formations_for_country("GER"):
-		if f == null:
+		if f == null or bool(f.get_meta("garrison_1936", false)):
 			continue
 		var ft := str(f.formation_type) if "formation_type" in f else ""
 		if ft == Formation.TYPE_DIVISION or ft == Formation.TYPE_GARRISON:
@@ -32285,14 +32908,14 @@ func ensure_playable_front_chips(focus_camera: bool = true) -> Dictionary:
 		LeaderManager.field_designed_unit("GER", "panzer_iii_j_medium", GER_FRONT, "land")
 		ger_land.clear()
 		for f3 in LeaderManager.get_formations_for_country("GER"):
-			if f3 == null:
+			if f3 == null or bool(f3.get_meta("garrison_1936", false)):
 				continue
 			var ft3 := str(f3.formation_type) if "formation_type" in f3 else ""
 			if ft3 == Formation.TYPE_DIVISION or ft3 == Formation.TYPE_GARRISON:
 				ger_land.append(f3)
 	var fra_land: Array = []
 	for f2 in LeaderManager.get_formations_for_country("FRA"):
-		if f2 == null:
+		if f2 == null or bool(f2.get_meta("garrison_1936", false)):
 			continue
 		var ft2 := str(f2.formation_type) if "formation_type" in f2 else ""
 		if ft2 == Formation.TYPE_DIVISION or ft2 == Formation.TYPE_GARRISON:
@@ -32354,6 +32977,9 @@ func ensure_playable_front_chips(focus_camera: bool = true) -> Dictionary:
 	if graphical and bool(result["ok"]) and focus_camera:
 		_center_camera_on_province(GER_FRONT, "soft")
 		_toast_easy_unit_orders()
+	if LeaderManager.has_method("seed_1936_start_garrisons"):
+		var garrisons: Dictionary = LeaderManager.seed_1936_start_garrisons(false)
+		result["garrisons"] = garrisons.get("counts", {})
 	print(
 		"MapRenderer: playable front chips GER=%d FRA=%d pid=%d jap=%d fleet=%d wing_r=%d"
 		% [
@@ -32623,6 +33249,135 @@ func _station_major_land_chip(tag: String, pid: int, design_id: String) -> Dicti
 	return result
 
 
+## Coalesce per-pid icon notifies into one rebuild per frame.
+## Seeded garrisons used to call_deferred a full index scan per hex.
+var _queued_icon_pids: Dictionary = {}
+var _icon_flush_queued: bool = false
+var _icon_flush_posts: int = 0
+## Garrison chips skipped until the camera is inside operational zoom and the hex is on screen.
+var _icon_cull_hold: Dictionary = {}
+## Post-Begin smoke/home camera lands near 0.79. Garrison pins use
+## MapZoomLOD.show_garrison_counters_for_zoom (z >= 0.95) so boot and the
+## Europe Home frame share one floor.
+
+
+func queue_unit_icon_rebuild(pids: Array) -> void:
+	for v in pids:
+		var pid := int(v)
+		if pid >= 0:
+			_queued_icon_pids[pid] = true
+	if _icon_flush_queued:
+		return
+	_icon_flush_queued = true
+	_icon_flush_posts += 1
+	call_deferred("_flush_queued_unit_icons")
+
+
+func _flush_queued_unit_icons() -> void:
+	_icon_flush_queued = false
+	if _queued_icon_pids.is_empty():
+		return
+	var only := _queued_icon_pids.duplicate()
+	_queued_icon_pids.clear()
+	# Seed queues one pid per garrison. Below the close-view floor, remember
+	# the pids and skip the icon index until the camera zooms in.
+	if _hold_queued_icons_for_zoom(only):
+		return
+	_rebuild_demo_unit_icons(only)
+
+
+func _hold_queued_icons_for_zoom(only: Dictionary) -> bool:
+	if only.is_empty() or not _unit_icon_cull_active():
+		return false
+	var z := _get_camera_zoom() if has_method("_get_camera_zoom") else 1.0
+	if MapZoomLODScript.show_garrison_counters_for_zoom(z, show_unit_counters):
+		return false
+	for pid_v in only.keys():
+		_icon_cull_hold[int(pid_v)] = true
+	return true
+
+
+func _unit_icon_cull_active() -> bool:
+	if DisplayServer.get_name() == "headless":
+		return false
+	var vp := get_viewport()
+	if vp == null:
+		return false
+	return vp.get_camera_2d() != null
+
+
+func _formation_is_seed_garrison(ff: Object) -> bool:
+	if ff == null or not ff.has_meta("garrison_1936"):
+		return false
+	return bool(ff.get_meta("garrison_1936"))
+
+
+func _unit_icon_world_in_view(world: Vector2) -> bool:
+	var vp := get_viewport()
+	if vp == null:
+		return true
+	var cam := vp.get_camera_2d()
+	if cam == null:
+		return true
+	var zoom := cam.zoom
+	var zx := maxf(absf(zoom.x), 0.0001)
+	var zy := maxf(absf(zoom.y), 0.0001)
+	var screen := vp.get_visible_rect().size
+	if screen.x < 2.0 or screen.y < 2.0:
+		return true
+	var half := Vector2(screen.x / zx, screen.y / zy) * 0.85
+	var delta := world - cam.get_screen_center_position()
+	return absf(delta.x) <= half.x and absf(delta.y) <= half.y
+
+
+## 1936 garrison pins stay off the tree at strategic / Home zoom and off-screen.
+## Headless and the no-camera path still build every chip.
+func _defer_garrison_icon(ff: Object, pid: int, local_pos: Vector2) -> bool:
+	if not _unit_icon_cull_active() or not _formation_is_seed_garrison(ff):
+		return false
+	var z := _get_camera_zoom() if has_method("_get_camera_zoom") else 1.0
+	if not MapZoomLODScript.show_garrison_counters_for_zoom(z, show_unit_counters):
+		return true
+	var host: Node2D = province_nodes.get(pid) as Node2D
+	var world := local_pos
+	if host != null:
+		world = host.to_global(local_pos)
+	return not _unit_icon_world_in_view(world)
+
+
+func _reveal_culled_unit_icons(limit: int = 0) -> void:
+	if _icon_cull_hold.is_empty():
+		return
+	if not _unit_icon_cull_active():
+		var all: Array = _icon_cull_hold.keys()
+		_icon_cull_hold.clear()
+		_update_unit_icons_for_pids(all)
+		return
+	var z := _get_camera_zoom() if has_method("_get_camera_zoom") else 1.0
+	if not MapZoomLODScript.show_garrison_counters_for_zoom(z, show_unit_counters):
+		return
+	var reveal: Array = []
+	for pid_v in _icon_cull_hold.keys():
+		var pid := int(pid_v)
+		var local := _unit_chip_offset_for_pid(pid)
+		if province_centroids.has(pid):
+			local = (province_centroids[pid] as Vector2) + _unit_chip_offset_for_pid(pid)
+		var host: Node2D = province_nodes.get(pid) as Node2D
+		var world := local
+		if host != null:
+			world = host.to_global(local)
+		if not _unit_icon_world_in_view(world):
+			continue
+		reveal.append(pid)
+		if limit > 0 and reveal.size() >= limit:
+			break
+	if reveal.is_empty():
+		return
+	for pid_v in reveal:
+		_icon_cull_hold.erase(int(pid_v))
+	_update_unit_icons_for_pids(reveal)
+
+
 ## Capture/move: rebuild pins for listed pids only (not the full board).
 func _update_unit_icons_for_pids(pids: Array) -> void:
 	var only: Dictionary = {}
@@ -32725,12 +33480,16 @@ func _rebuild_demo_unit_icons(only_pids: Dictionary) -> void:
 			icons_placed += sea_jobs.size()
 			continue
 
-		var counter := Node2D.new()
-		counter.name = "DemoUnitIcon_" + str(id)
 		# Province nodes sit at origin; chips use centroid, offset off capital stars.
 		var chip_pos := _unit_chip_offset_for_pid(id)
 		if province_centroids.has(id):
 			chip_pos = (province_centroids[id] as Vector2) + _unit_chip_offset_for_pid(id)
+		if _defer_garrison_icon(ff, id, chip_pos):
+			_icon_cull_hold[id] = true
+			continue
+		_icon_cull_hold.erase(id)
+		var counter := Node2D.new()
+		counter.name = "DemoUnitIcon_" + str(id)
 		counter.position = chip_pos
 		counter.z_index = 28
 		counter.z_as_relative = false
@@ -32743,6 +33502,13 @@ func _rebuild_demo_unit_icons(only_pids: Dictionary) -> void:
 			if "formation_id" in ff:
 				counter.set_meta("formation_id", str(ff.formation_id))
 			counter.set_meta("formation", ff)
+			if _formation_is_garrison_1936(ff):
+				counter.set_meta("garrison_1936_chip", true)
+				counter.z_index = 22
+				counter.scale = Vector2.ONE * _unit_counter_scale_for_zoom() * 0.55
+				counter.modulate = Color(1, 1, 1, 0.62)
+				var gz := _get_camera_zoom() if has_method("_get_camera_zoom") else 1.0
+				counter.visible = MapZoomLODScript.show_garrison_counters_for_zoom(gz, show_unit_counters)
 		counter.set_meta("province_id", id)
 		n.add_child(counter)
 

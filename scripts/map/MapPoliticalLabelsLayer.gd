@@ -63,6 +63,10 @@ func rebuild_from_map_data(province_centroids: Dictionary, provinces: Dictionary
 	_apply_tier_visibility(_current_tier)
 
 
+func labels_are_built() -> bool:
+	return _built
+
+
 func set_map_mode_context(map_mode: String) -> void:
 	var m := map_mode.strip_edges().to_lower()
 	if m == _current_map_mode:

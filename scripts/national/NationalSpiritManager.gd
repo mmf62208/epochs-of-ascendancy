@@ -78,6 +78,36 @@ func apply_treaty_spirit(country_tag: String, spirit_id: String) -> bool:
 	return true  # already had it
 
 
+func get_save_data() -> Dictionary:
+	var out := {}
+	for tag in country_spirits.keys():
+		var ids: Array = []
+		var raw: Variant = country_spirits[tag]
+		if raw is Array:
+			for spirit_id in raw as Array:
+				ids.append(str(spirit_id))
+		out[str(tag)] = ids
+	return {"country_spirits": out}
+
+
+func apply_save_data(data: Dictionary) -> void:
+	if not data.has("country_spirits"):
+		return
+	var src: Variant = data.get("country_spirits", {})
+	if typeof(src) != TYPE_DICTIONARY:
+		return
+	country_spirits.clear()
+	for tag in (src as Dictionary).keys():
+		var ids: Array[String] = []
+		var raw: Variant = (src as Dictionary)[tag]
+		if raw is Array:
+			for spirit_id in raw as Array:
+				var sid := str(spirit_id).strip_edges()
+				if not sid.is_empty():
+					ids.append(sid)
+		country_spirits[str(tag).strip_edges().to_upper()] = ids
+
+
 func remove_treaty_spirit(country_tag: String, spirit_id: String) -> void:
 	var tag := country_tag.strip_edges().to_upper()
 	var sid := spirit_id.strip_edges()

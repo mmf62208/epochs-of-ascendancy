@@ -430,9 +430,21 @@ func load_province_layers(data_dir: String = ""):
 	_load_state_and_region_layers(data_dir)
 	_load_project_sites_layer(data_dir)
 
-func _load_json_dict(path: String) -> Dictionary:
+## super_regions.json and hierarchy_scaffold.json are optional on the legacy
+## data/provinces preload. They are required overlays for a real scenario dir
+## (provinces_world_accurate ships both). Other missing files still warn.
+func _missing_layer_is_warning(data_dir: String, file_name: String) -> bool:
+	if data_dir == "provinces" and (
+		file_name == "super_regions.json" or file_name == "hierarchy_scaffold.json"
+	):
+		return false
+	return true
+
+
+func _load_json_dict(path: String, warn_missing: bool = true) -> Dictionary:
 	if not FileAccess.file_exists(path):
-		push_warning("Missing layer file: " + path)
+		if warn_missing:
+			push_warning("Missing layer file: " + path)
 		return {}
 	var file = FileAccess.open(path, FileAccess.READ)
 	if not file:
@@ -543,7 +555,11 @@ func _load_state_and_region_layers(data_dir: String = ""):
 				"notes": r.get("notes", "")
 			}
 
-	var super_data = _load_json_dict("res://data/" + data_dir + "/super_regions.json")
+	var super_name := "super_regions.json"
+	var super_data = _load_json_dict(
+		"res://data/" + data_dir + "/" + super_name,
+		_missing_layer_is_warning(data_dir, super_name)
+	)
 	var sregs = super_data.get("super_regions", [])
 	if typeof(sregs) == TYPE_ARRAY:
 		for sr in sregs:
@@ -555,7 +571,11 @@ func _load_state_and_region_layers(data_dir: String = ""):
 				super_region_names[srid] = str(sr.get("name", "Super Region %d" % srid))
 
 	# Four-tier: province → super from hierarchy_scaffold bindings when present.
-	var scaffold = _load_json_dict("res://data/" + data_dir + "/hierarchy_scaffold.json")
+	var hier_name := "hierarchy_scaffold.json"
+	var scaffold = _load_json_dict(
+		"res://data/" + data_dir + "/" + hier_name,
+		_missing_layer_is_warning(data_dir, hier_name)
+	)
 	var p2super: Variant = scaffold.get("province_to_super_region", {})
 	if typeof(p2super) == TYPE_DICTIONARY:
 		for pid_key in p2super:
