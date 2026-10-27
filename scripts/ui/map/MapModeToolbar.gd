@@ -332,8 +332,20 @@ func set_fronts_legend(text: String) -> void:
 
 
 ## Pass 18: show chips for active secondary tint modes (strain/vitality/loyalty/development).
+func _secondary_row_is_clear() -> bool:
+	if _secondary_row == null:
+		return true
+	if _secondary_row.visible:
+		return false
+	return _secondary_row.get_child_count() == 0
+
+
 func _rebuild_secondary_tint_chips(stack: Array, primary_mode: String = "") -> void:
 	if _secondary_row == null:
+		return
+	var pm_early := primary_mode.strip_edges().to_lower()
+	var primary_ix_early := pm_early in ["strain", "vitality", "development", "loyalty", "munitions"]
+	if stack.is_empty() and not primary_ix_early and _secondary_row_is_clear():
 		return
 	for c in _secondary_row.get_children():
 		c.queue_free()
@@ -615,14 +627,21 @@ func set_mode(mode: String, notify_renderer: bool = true) -> void:
 	var m := mode.strip_edges().to_lower()
 	if not m in MODES:
 		m = "political"
-	if m == _current_mode and notify_renderer:
-		_sync_mode_chip_pressed()
+	# Same mode with notify=false is the renderer's echo of a chip click.
+	# Running the legend again queued a second toolbar layout on that click.
+	if m == _current_mode:
+		if notify_renderer:
+			_sync_mode_chip_pressed()
 		return
 	_current_mode = m
 	_sync_mode_chip_pressed()
+	var legend_t0 := Time.get_ticks_usec()
 	_update_legend(m)
+	if _map_renderer != null and "ui_perf_legend_us" in _map_renderer:
+		_map_renderer.ui_perf_legend_us = int(_map_renderer.ui_perf_legend_us) + int(Time.get_ticks_usec() - legend_t0)
 	if notify_renderer and _map_renderer != null and _map_renderer.has_method("set_map_mode"):
 		_map_renderer.call("set_map_mode", m)
+	var chip_t0 := Time.get_ticks_usec()
 	# Pass 22: ensure Ix row appears for primary-linked modes.
 	var stack_live: Array = []
 	if _map_renderer != null and "debug_tint_mode_secondaries" in _map_renderer:
@@ -630,6 +649,10 @@ func set_mode(mode: String, notify_renderer: bool = true) -> void:
 		if live is Array:
 			stack_live = live.duplicate()
 	_rebuild_secondary_tint_chips(stack_live, m)
+	if _map_renderer != null and "map_mode_switch_profile" in _map_renderer:
+		var prof: Dictionary = _map_renderer.map_mode_switch_profile
+		prof["chip_us"] = Time.get_ticks_usec() - chip_t0
+		_map_renderer.map_mode_switch_profile = prof
 	mode_changed.emit(m)
 
 
@@ -694,7 +717,7 @@ func _update_legend(mode: String) -> void:
 		if _map_renderer != null and "debug_tint_mode_secondaries" in _map_renderer:
 			var live = _map_renderer.debug_tint_mode_secondaries
 			has_sec = live is Array and not live.is_empty()
-		if not has_sec:
+		if not has_sec and not _secondary_row_is_clear():
 			_rebuild_secondary_tint_chips([])
 	_legend.text = base
 	layout_changed.emit()

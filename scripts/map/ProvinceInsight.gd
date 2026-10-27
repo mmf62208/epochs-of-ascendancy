@@ -3764,7 +3764,14 @@ const _MapNextListHelpers := preload("res://scripts/map/MapNextListHelpers.gd")
 static func build_map_damage_state(province: Province) -> Dictionary:
 	if province == null:
 		return {}
-	var bd := _infra_repair_breakdown(province)
+	var under := false
+	var depot := 0.0
+	var infra := int(province.infrastructure)
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("map_damage_tint_inputs"):
+		var inputs: Dictionary = MapManager.map_damage_tint_inputs(province)
+		under = bool(inputs.get("under_infra_sabotage", false))
+		depot = float(inputs.get("depot_sabotage_level", 0.0))
+		infra = int(inputs.get("infrastructure", infra))
 	var site_dmg := 0
 	for site in province.special_sites:
 		if site != null and site.is_damaged():
@@ -3774,12 +3781,12 @@ static func build_map_damage_state(province: Province) -> Dictionary:
 	if mgr != null and mgr.has_method("is_project_sabotaged"):
 		proj_sabo = mgr.is_project_sabotaged(province.id)
 	return {
-		"under_infra_sabotage": bool(bd.get("under_infra_sabotage", false)),
-		"depot_sabotage_level": float(bd.get("depot_sabotage_level", 0.0)),
+		"under_infra_sabotage": under,
+		"depot_sabotage_level": depot,
 		"site_damaged_count": site_dmg,
 		"project_sabotaged": proj_sabo,
 		"agent_pressure_kind": agent_pressure_focus_kind(province),
-		"infrastructure": int(bd.get("infrastructure", province.infrastructure)),
+		"infrastructure": infra,
 	}
 
 
