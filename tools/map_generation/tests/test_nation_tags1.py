@@ -95,6 +95,48 @@ class TestNationTags1(unittest.TestCase):
         full_ids = {int(row["id"]) for row in full["provinces"]}
         self.assertTrue(set(ids).isdisjoint(full_ids))
 
+    def test_reconcile_west_ids_start_at_906100_and_miss_clash(self) -> None:
+        """MAP-RECONCILE-1 unique #126/#128 names. Fails while they are absent
+        or if any of them lands in 905849–905908 or 906000–906020.
+        """
+        names = (
+            "Vinnytsia",
+            "Chernihiv",
+            "Donetsk",
+            "Smolensk",
+            "Kursk",
+            "Tula",
+            "Stanislawow",
+            "Tarnopol",
+            "Rovno",
+            "Drohobych",
+            "Kovel",
+        )
+        base = json.loads(
+            (ROOT / "data" / "provinces_world_accurate" / "provinces_base.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        by_name = {}
+        board_ids = set()
+        for row in base["provinces"]:
+            pid = int(row["id"])
+            board_ids.add(pid)
+            by_name.setdefault(str(row.get("name")), pid)
+        got = []
+        for name in names:
+            self.assertIn(name, by_name, name)
+            got.append(by_name[name])
+        self.assertEqual(got, list(range(906100, 906100 + len(names))))
+        clash_land = set(range(CLASH_LO, SCANNED_LAND_HI + 1))
+        clash_tags = set(range(906000, 906021))
+        self.assertEqual(sorted(set(got) & clash_land), [])
+        self.assertEqual(sorted(set(got) & clash_tags), [])
+        self.assertEqual(sorted(board_ids & clash_land), [])
+        self.assertTrue(set(SCANNED_SEAS).isdisjoint(board_ids))
+        self.assertNotIn(950343, board_ids)
+        self.assertTrue(set(got).isdisjoint(set(range(905849, 905909))))
+
 
 if __name__ == "__main__":
     unittest.main()

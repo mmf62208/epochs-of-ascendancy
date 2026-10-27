@@ -2117,6 +2117,48 @@ func _record_stub_drop(p1: int, p2: int) -> void:
     })
 
 
+func _land_adjacent(a: int, b: int) -> bool:
+    if map_manager == null or not map_manager.has_method("get_adjacency_system"):
+        return false
+    var adj: Variant = map_manager.get_adjacency_system()
+    if adj == null or not (adj is Object) or not (adj as Object).has_method("get_land_neighbors"):
+        return false
+    var nbs_v: Variant = (adj as Object).call("get_land_neighbors", a)
+    if typeof(nbs_v) != TYPE_ARRAY:
+        return false
+    return (nbs_v as Array).has(b)
+
+
+## 903534 Moscow, 905807 Polotsk area, 905809 Haradok area. The 2-edge stub.
+## Gap hubs can drop it off the hub route. Keep the demote while the two edges
+## are still land-adjacent, including after those rings stop being 36-vertex
+## placeholders (MAP-RECONCILE-1 re-ring).
+func _force_moscow_placeholder_stub(cache: Array[Dictionary]) -> void:
+    var already: Dictionary = {}
+    for row_v in _road_stub_dropped:
+        if typeof(row_v) == TYPE_DICTIONARY:
+            already[str((row_v as Dictionary).get("key", ""))] = true
+    var pairs: Array = [[903534, 905809], [905807, 905809]]
+    for pair_v in pairs:
+        var pair: Array = pair_v
+        var p1: int = int(pair[0])
+        var p2: int = int(pair[1])
+        if not _land_adjacent(p1, p2):
+            continue
+        var key: String = RoadTierVisualScript.edge_key(p1, p2)
+        for entry in cache:
+            if RoadTierVisualScript.edge_key(int(entry.get("p1", 0)), int(entry.get("p2", 0))) != key:
+                continue
+            entry["display_tier"] = RoadTierVisualScript.TIER_PAVED
+            entry["tier"] = maxi(int(entry.get("tier", 0)), RoadTierVisualScript.TIER_PAVED)
+            entry["demoted_stub"] = true
+            break
+        if already.has(key):
+            continue
+        _record_stub_drop(p1, p2)
+        already[key] = true
+
+
 func _demote_orphan_highway_stubs(cache: Array[Dictionary]) -> void:
     _road_stub_dropped.clear()
     var snapshot: Array = []
@@ -2137,6 +2179,9 @@ func _demote_orphan_highway_stubs(cache: Array[Dictionary]) -> void:
         entry["tier"] = maxi(int(entry.get("tier", 0)), RoadTierVisualScript.TIER_PAVED)
         entry["demoted_stub"] = true
         _record_stub_drop(p1, p2)
+    ## Gap hubs can drop these two edges off the highway graph, so the loop
+    ## above never records them. Demote them whenever they are still land-adjacent.
+    _force_moscow_placeholder_stub(cache)
     if not _road_stub_dropped.is_empty():
         var parts: PackedStringArray = PackedStringArray()
         for row2_v in _road_stub_dropped:

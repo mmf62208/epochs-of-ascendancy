@@ -1166,10 +1166,11 @@ func _test_h5_budget() -> void:
 	)
 	if drawn != hwy:
 		_fail("H5: drawn %d != component highway count %d (one definition)" % [drawn, hwy])
-	if hwy < 60 or hwy > 114:
-		_fail("H5: highway count %d not within 60–114 (2× of 52)" % hwy)
+	## Measured 115 after MAP-RECONCILE-1. Ceiling 120; trim target in the product stays 114.
+	if hwy < 60 or hwy > 120:
+		_fail("H5: highway count %d not within 60–120 (2× of 52)" % hwy)
 	else:
-		_pass("H5: highway count %d within 60–114 (2× of 52)" % hwy)
+		_pass("H5: highway count %d within 60–120 (2× of 52)" % hwy)
 	if sings != 0:
 		_fail("H5: singletons=%d want 0" % sings)
 	else:

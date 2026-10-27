@@ -2938,7 +2938,7 @@
       "tier": 2
     },
     "710727": {
-      "city_name": "Haute-Saône",
+      "city_name": "Haute-Sa\u00f4ne",
       "tier": 2
     },
     "711516": {
@@ -8538,6 +8538,50 @@
     },
     "906020": {
       "city_name": "Hohhot",
+      "tier": 2
+    },
+    "906100": {
+      "city_name": "Vinnytsia",
+      "tier": 2
+    },
+    "906101": {
+      "city_name": "Chernihiv",
+      "tier": 2
+    },
+    "906102": {
+      "city_name": "Donetsk",
+      "tier": 2
+    },
+    "906103": {
+      "city_name": "Smolensk",
+      "tier": 2
+    },
+    "906104": {
+      "city_name": "Kursk",
+      "tier": 2
+    },
+    "906105": {
+      "city_name": "Tula",
+      "tier": 2
+    },
+    "906106": {
+      "city_name": "Stanislawow",
+      "tier": 2
+    },
+    "906107": {
+      "city_name": "Tarnopol",
+      "tier": 2
+    },
+    "906108": {
+      "city_name": "Rovno",
+      "tier": 2
+    },
+    "906109": {
+      "city_name": "Drohobych",
+      "tier": 2
+    },
+    "906110": {
+      "city_name": "Kovel",
       "tier": 2
     }
   },

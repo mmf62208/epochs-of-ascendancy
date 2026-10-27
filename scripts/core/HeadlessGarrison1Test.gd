@@ -93,7 +93,9 @@ func _assert_garrison_fielding(lm: Node, pm: Node, seeded: Dictionary) -> void:
 	var placed := int(seeded.get("placed", -1))
 	var skipped := int(seeded.get("skipped_occupied", -1))
 	var targets := int(seeded.get("targets", -1))
-	if placed != 550 or skipped != 0 or targets != 550 or placed != targets:
+	# 550 was main after NATION-TAGS-1 (#138). MAP-RECONCILE-1 border fold is net +8:
+	# SOV +905807 +905808 +905816 +906100 -903493, POL +711101 +906106 +906107 +906109 +906110.
+	if placed != 558 or skipped != 0 or targets != 558 or placed != targets:
 		_fail("empty board placed=%d skipped=%d targets=%d" % [placed, skipped, targets])
 		return
 	var seen := 0
@@ -138,7 +140,7 @@ func _assert_garrison_fielding(lm: Node, pm: Node, seeded: Dictionary) -> void:
 	if seen != placed:
 		_fail("fielded %d != placed %d" % [seen, placed])
 		return
-	_pass("549 garrisons full TOE, 1936 design, nation names")
+	_pass("558 garrisons full TOE, 1936 design, nation names")
 
 
 func _assert_occupied_skip(lm: Node) -> Dictionary:

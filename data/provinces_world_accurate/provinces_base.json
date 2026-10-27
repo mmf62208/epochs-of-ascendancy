@@ -13088,7 +13088,7 @@
     },
     {
       "id": 710727,
-      "name": "Haute-Saône",
+      "name": "Haute-Sa\u00f4ne",
       "terrain": "plains",
       "domain": "land",
       "theater": "europe_core",
@@ -68805,6 +68805,212 @@
         "admin": "CHN",
         "level": "GAP",
         "area": 1035.0
+      }
+    },
+    {
+      "id": 906100,
+      "name": "Vinnytsia",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [
+        "SOV"
+      ],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "source": "map_reconcile1",
+        "from_id": 905890,
+        "adm0_a3": "UKR",
+        "admin": "UKR",
+        "level": "GAP"
+      }
+    },
+    {
+      "id": 906101,
+      "name": "Chernihiv",
+      "terrain": "forest",
+      "domain": "land",
+      "core_for_tags": [
+        "SOV"
+      ],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "source": "map_reconcile1",
+        "from_id": 905891,
+        "adm0_a3": "UKR",
+        "admin": "UKR",
+        "level": "GAP"
+      }
+    },
+    {
+      "id": 906102,
+      "name": "Donetsk",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [
+        "SOV"
+      ],
+      "natural_resources": {
+        "coal": 1,
+        "steel": 1,
+        "oil": 1
+      },
+      "population_base": 0,
+      "meta": {
+        "source": "map_reconcile1",
+        "from_id": 905895,
+        "adm0_a3": "UKR",
+        "admin": "UKR",
+        "level": "GAP"
+      }
+    },
+    {
+      "id": 906103,
+      "name": "Smolensk",
+      "terrain": "forest",
+      "domain": "land",
+      "core_for_tags": [
+        "SOV"
+      ],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "source": "map_reconcile1",
+        "from_id": 905897,
+        "adm0_a3": "RUS",
+        "admin": "RUS",
+        "level": "GAP"
+      }
+    },
+    {
+      "id": 906104,
+      "name": "Kursk",
+      "terrain": "forest",
+      "domain": "land",
+      "core_for_tags": [
+        "SOV"
+      ],
+      "natural_resources": {
+        "steel": 1
+      },
+      "population_base": 0,
+      "meta": {
+        "source": "map_reconcile1",
+        "from_id": 905898,
+        "adm0_a3": "RUS",
+        "admin": "RUS",
+        "level": "GAP"
+      }
+    },
+    {
+      "id": 906105,
+      "name": "Tula",
+      "terrain": "forest",
+      "domain": "land",
+      "core_for_tags": [
+        "SOV"
+      ],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "source": "map_reconcile1",
+        "from_id": 905899,
+        "adm0_a3": "RUS",
+        "admin": "RUS",
+        "level": "GAP"
+      }
+    },
+    {
+      "id": 906106,
+      "name": "Stanislawow",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [
+        "POL"
+      ],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "source": "map_reconcile1",
+        "from_id": 905902,
+        "adm0_a3": "UKR",
+        "admin": "UKR",
+        "level": "GAP"
+      }
+    },
+    {
+      "id": 906107,
+      "name": "Tarnopol",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [
+        "POL"
+      ],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "source": "map_reconcile1",
+        "from_id": 905903,
+        "adm0_a3": "UKR",
+        "admin": "UKR",
+        "level": "GAP"
+      }
+    },
+    {
+      "id": 906108,
+      "name": "Rovno",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [
+        "POL"
+      ],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "source": "map_reconcile1",
+        "from_id": 905905,
+        "adm0_a3": "UKR",
+        "admin": "UKR",
+        "level": "GAP"
+      }
+    },
+    {
+      "id": 906109,
+      "name": "Drohobych",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [
+        "POL"
+      ],
+      "natural_resources": {
+        "coal": 1
+      },
+      "population_base": 0,
+      "meta": {
+        "source": "map_reconcile1",
+        "from_id": 905906,
+        "adm0_a3": "UKR",
+        "admin": "UKR",
+        "level": "GAP"
+      }
+    },
+    {
+      "id": 906110,
+      "name": "Kovel",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [
+        "POL"
+      ],
+      "natural_resources": {},
+      "population_base": 0,
+      "meta": {
+        "source": "map_reconcile1",
+        "from_id": 905907,
+        "adm0_a3": "UKR",
+        "admin": "UKR",
+        "level": "GAP"
       }
     }
   ]
