@@ -1793,9 +1793,10 @@ func simulate_ix1_spine_start_to_complete(max_days: int = 60) -> Dictionary:
 
 
 ## Live editor/export Play stand-in: day_ai + budgeted AI invest run, playtest
-## skips do not. Fails closed if full-board consider would fire, calendar
-## autosave gathers, or the clock does not move past day +6 in a short budget
-## (headless-only green is not KEEP). Default 8d crosses the live +5/+6 wall.
+## skips do not. Fails closed if full-board consider would fire, the clock
+## does not move past day +6, or an 8-day advance from elapsed 0 does not
+## gather exactly one lean day-7 autosave. Zero gathers and a second gather
+## both fail. Memory cap and the short time budget still hold.
 func simulate_live_f5_day_advance(days: int = 8) -> Dictionary:
 	var n := clampi(int(days), 1, 20)
 	_full_board_ai_invest_calls = 0
@@ -1809,6 +1810,10 @@ func simulate_live_f5_day_advance(days: int = 8) -> Dictionary:
 	if sl != null:
 		sl.set("_calendar_autosave_gathers", 0)
 		sl.set("_calendar_autosave_live_f5_skips", 0)
+	# The soak contract is an advance from elapsed 0 that passes 7 Jan.
+	# Prior spine ticks in the same process must not move that window.
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("initialize_from_scenario_start_date"):
+		TimeManager.call("initialize_from_scenario_start_date", "1936-01-01")
 	var hub := IX1_FALLBACK_HUB
 	if not active_projects.has(hub):
 		restore_project(hub, {
@@ -1849,6 +1854,10 @@ func simulate_live_f5_day_advance(days: int = 8) -> Dictionary:
 		if TimeManager.has_method("_drain_living_f5_flush"):
 			TimeManager.call("_drain_living_f5_flush", n)
 		TimeManager.paused = was_paused
+	# The day-7 write is call_deferred. Sample it before this function returns
+	# so ok sees the one gather. The queued idle call does not gather again.
+	if sl != null and sl.has_method("settle_deferred_calendar_autosave"):
+		sl.call("settle_deferred_calendar_autosave")
 	var ms := Time.get_ticks_msec() - t0
 	var mem1 := int(OS.get_static_memory_usage())
 	var mem_delta := maxi(0, mem1 - mem0)
@@ -1865,11 +1874,36 @@ func simulate_live_f5_day_advance(days: int = 8) -> Dictionary:
 		past_hour_plus6 = false
 	var autosave_gathers := 0
 	var autosave_skips := 0
+	var autosave_ms := -1.0
+	var autosave_bytes := 0
+	var autosave_hier := -1
+	var autosave_parsed := false
+	var autosave_lean := false
 	if sl != null:
 		autosave_gathers = int(sl.get("_calendar_autosave_gathers"))
 		autosave_skips = int(sl.get("_calendar_autosave_live_f5_skips"))
+		if sl.has_method("calendar_autosave_file_report"):
+			var report: Dictionary = sl.call("calendar_autosave_file_report")
+			autosave_ms = float(report.get("ms", -1.0))
+			autosave_bytes = int(report.get("bytes", 0))
+			autosave_hier = int(report.get("hier_keys", -1))
+			autosave_parsed = bool(report.get("parsed", false))
+			autosave_lean = bool(report.get("lean_gather", false))
 	var ms_budget := 16000 if n >= 7 else 8000
 	var mem_budget := 48 * 1024 * 1024
+	# From elapsed 0, N days cross one multiple of 7 when N is in 7..13.
+	# The default soak is 8. Zero gathers and a second gather both fail.
+	var autosave_one := autosave_gathers == 1
+	var autosave_file_ok := (
+		autosave_one
+		and autosave_parsed
+		and autosave_lean
+		and autosave_hier <= 0
+		and autosave_ms >= 0.0
+		and autosave_ms <= 1000.0
+		and autosave_bytes > 0
+		and autosave_bytes <= 8388608
+	)
 	var ok := (
 		elapsed_delta >= n
 		and consider_calls == 0
@@ -1877,7 +1911,7 @@ func simulate_live_f5_day_advance(days: int = 8) -> Dictionary:
 		and past_plus2
 		and past_plus6
 		and past_hour_plus6
-		and autosave_gathers == 0
+		and autosave_file_ok
 		and mem_delta <= mem_budget
 		and ms <= ms_budget
 	)
@@ -1895,6 +1929,10 @@ func simulate_live_f5_day_advance(days: int = 8) -> Dictionary:
 		"provinces_considered": _ai_infra_provinces_considered,
 		"calendar_autosave_gathers": autosave_gathers,
 		"calendar_autosave_live_f5_skips": autosave_skips,
+		"calendar_autosave_ms": autosave_ms,
+		"calendar_autosave_bytes": autosave_bytes,
+		"calendar_autosave_hier_keys": autosave_hier,
+		"calendar_autosave_lean": autosave_lean,
 		"memory_delta_bytes": mem_delta,
 		"elapsed_ms": ms,
 		"live_f5_equiv": true,

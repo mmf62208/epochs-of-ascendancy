@@ -152,6 +152,13 @@ var _calendar_autosave_live_f5_skips: int = 0
 var _calendar_autosave_lean_live: bool = false
 var _calendar_autosave_rss_mid_kb: int = -1
 var _calendar_autosave_hwm_mid_kb: int = -1
+var _calendar_autosave_serial: int = 0
+var _calendar_autosave_ran_serial: int = 0
+var _calendar_autosave_queued_elapsed: int = -1
+var _calendar_autosave_last_ms: float = -1.0
+var _calendar_autosave_last_json_bytes: int = -1
+var _calendar_autosave_last_lean: bool = false
+var _calendar_autosave_last_rearmed: bool = false
 
 
 func _ready() -> void:
@@ -184,14 +191,102 @@ func _on_day_advanced_for_autosave(_year: int = 0, _month: int = 0, _day: int = 
 	var elapsed := 0
 	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("get_total_days_elapsed"):
 		elapsed = int(TimeManager.get_total_days_elapsed())
+	# A batched light-sim drain emits each day only after total_days_elapsed
+	# is already the final value. The signal still carries that day's date.
+	# An 8-day advance from elapsed 0 must still see day 7, not only day 8.
+	var emitted := _elapsed_for_emitted_calendar(_year, _month, _day)
+	if emitted > 0 and emitted < elapsed:
+		elapsed = emitted
 	if elapsed <= 0 or (elapsed % 7) != 0:
 		return
 	# Isolate the gather from day_emit so the F5 hour clock can keep moving
 	# (day-7 save_game_detailed used to freeze the spine session at 20:00).
 	if _calendar_autosave_pending:
 		return
+	_calendar_autosave_serial += 1
+	_calendar_autosave_queued_elapsed = elapsed
 	_calendar_autosave_pending = true
 	call_deferred("_deferred_calendar_autosave", elapsed)
+
+
+func _elapsed_for_emitted_calendar(year: int, month: int, day: int) -> int:
+	# Days from the scenario start to this signal date. Elapsed 0 is the start
+	# date itself, matching TimeManager.total_days_elapsed after N rollovers.
+	if typeof(TimeManager) == TYPE_NIL or year < 1 or month < 1 or day < 1:
+		return -1
+	var start := str(TimeManager.get("scenario_start_date"))
+	if start.is_empty():
+		start = "1936-01-01"
+	var parts := start.split("-")
+	var y := 1936
+	var m := 1
+	var d := 1
+	if parts.size() >= 1 and parts[0].is_valid_int():
+		y = int(parts[0])
+	if parts.size() >= 2 and parts[1].is_valid_int():
+		m = clampi(int(parts[1]), 1, 12)
+	if parts.size() >= 3 and parts[2].is_valid_int():
+		d = clampi(int(parts[2]), 1, 31)
+	var n := 0
+	while n < 20000:
+		if y == year and m == month and d == day:
+			return n
+		if y > year or (y == year and (m > month or (m == month and d > day))):
+			return -1
+		d += 1
+		var dim := 31
+		if TimeManager.has_method("_get_days_in_month"):
+			dim = int(TimeManager.call("_get_days_in_month", m, y))
+		if d > dim:
+			d = 1
+			m += 1
+			if m > 12:
+				m = 1
+				y += 1
+		n += 1
+	return -1
+
+
+## Headless soaks sample gathers before the idle frame. Run the queued day-7
+## write now. The deferred call that is already queued sees the same serial
+## and does not gather a second time.
+func settle_deferred_calendar_autosave() -> void:
+	if not _calendar_autosave_pending:
+		return
+	_deferred_calendar_autosave(_calendar_autosave_queued_elapsed)
+
+
+## File on disk after the day-7 gather. hier_keys 0 is the empty lean blob.
+## -1 means the key is absent. A positive count is the hierarchy dump.
+func calendar_autosave_file_report() -> Dictionary:
+	var path := get_save_path_global("autosave")
+	var nbytes := 0
+	var hier := -1
+	var parsed_ok := false
+	if FileAccess.file_exists(path):
+		var f := FileAccess.open(path, FileAccess.READ)
+		if f != null:
+			nbytes = int(f.get_length())
+			var text := f.get_as_text()
+			f.close()
+			var parsed: Variant = JSON.parse_string(text)
+			if parsed is Dictionary:
+				parsed_ok = true
+				var gd: Variant = (parsed as Dictionary).get("game_data", null)
+				if gd is Dictionary and (gd as Dictionary).has("hierarchy_membership_live"):
+					var h: Variant = (gd as Dictionary).get("hierarchy_membership_live")
+					hier = (h as Dictionary).size() if h is Dictionary else 999999
+	return {
+		"path": path,
+		"bytes": nbytes,
+		"parsed": parsed_ok,
+		"hier_keys": hier,
+		"ms": _calendar_autosave_last_ms,
+		"json_bytes": _calendar_autosave_last_json_bytes,
+		"lean_gather": _calendar_autosave_last_lean,
+		"rearmed": _calendar_autosave_last_rearmed,
+		"gathers": _calendar_autosave_gathers,
+	}
 
 
 func _should_skip_live_f5_calendar_autosave() -> bool:
@@ -203,7 +298,13 @@ func _should_skip_live_f5_calendar_autosave() -> bool:
 
 
 func _deferred_calendar_autosave(elapsed: int) -> void:
+	var serial := _calendar_autosave_serial
+	if serial > 0 and serial == _calendar_autosave_ran_serial:
+		_calendar_autosave_pending = false
+		return
 	_calendar_autosave_pending = false
+	if serial > 0:
+		_calendar_autosave_ran_serial = serial
 	if OS.get_environment("EOA_CALENDAR_AUTOSAVE").strip_edges() == "0":
 		return
 	if typeof(TimeManager) != TYPE_NIL and bool(TimeManager.get("_living_playtest_clock")):
@@ -221,12 +322,16 @@ func _deferred_calendar_autosave(elapsed: int) -> void:
 			TimeManager.set("_live_f5_equiv_clock", true)
 			rearmed = true
 	var lean_now := _should_skip_live_f5_calendar_autosave()
+	_calendar_autosave_last_lean = lean_now
+	_calendar_autosave_last_rearmed = rearmed
 	_calendar_autosave_gathers += 1
 	var rss_before := _vm_status_kb("VmRSS")
 	var hwm_before := _vm_status_kb("VmHWM")
 	var t0 := Time.get_ticks_usec()
 	var res := save_game_detailed("autosave")
 	var save_ms := float(Time.get_ticks_usec() - t0) / 1000.0
+	_calendar_autosave_last_ms = save_ms
+	_calendar_autosave_last_json_bytes = int(res.get("bytes", -1))
 	if rearmed and typeof(TimeManager) != TYPE_NIL:
 		TimeManager.set("_live_f5_equiv_clock", false)
 	var rss_after := _vm_status_kb("VmRSS")

@@ -110,7 +110,7 @@ func _test_source_gates_full_board_ai_invest() -> void:
 		return
 	var autosave_hook := _slice_func(save, "_on_day_advanced_for_autosave")
 	if "is_live_f5_play_path" not in autosave_hook and "_should_skip_live_f5_calendar_autosave" not in autosave_hook:
-		_fail("calendar autosave must skip live F5 / softpipe (day +5/+6 OOM)")
+		_fail("calendar autosave must keep the live-F5 lean predicate (quit skip + empty hierarchy)")
 		return
 	if "is_live_f5_play_path" not in gate and "DisplayServer.get_name()" not in gate:
 		_fail("full-board AI gate must also skip graphical editor/export Play, not only light_sim")
@@ -142,7 +142,10 @@ func _test_source_live_f5_path_cannot_full_board_scan() -> void:
 		_fail("simulate_live_f5_day_advance must drive TopInfoBar hour clock (not days-only)")
 		return
 	if "past_plus6" not in sim or "calendar_autosave_gathers" not in sim:
-		_fail("simulate_live_f5_day_advance must prove past +6 and skip calendar autosave")
+		_fail("simulate_live_f5_day_advance must prove past +6 and count calendar autosave")
+		return
+	if "autosave_gathers == 1" not in sim:
+		_fail("simulate_live_f5_day_advance ok must require exactly one calendar autosave")
 		return
 	if "living_playtest_clock" in sim and "advance_living_playtest_days" in sim:
 		_fail("live-equiv sim must not use advance_living_playtest_days")
@@ -207,6 +210,9 @@ func _test_source_live_f5_path_cannot_full_board_scan() -> void:
 		return
 	if "Province captured" not in soak or "toast_mouse_ignore" not in soak:
 		_fail("softpipe soak must exercise capture toasts + input ignore")
+		return
+	if "autosave_gathers == 1" not in soak:
+		_fail("softpipe soak ok must require exactly one calendar autosave")
 		return
 	var agent_day := _slice_func(_read(SRC_AGENT), "_on_game_day_advanced")
 	if "is_live_f5_play_path" not in agent_day:
@@ -452,6 +458,21 @@ func _test_live_f5_equivalent_day_advance() -> void:
 	var considered := int(result.get("provinces_considered", 9999))
 	var gathers := int(result.get("calendar_autosave_gathers", -1))
 	var mem_delta := int(result.get("memory_delta_bytes", -1))
+	var save_ms := float(result.get("calendar_autosave_ms", -1.0))
+	var save_bytes := int(result.get("calendar_autosave_bytes", 0))
+	var hier_keys := int(result.get("calendar_autosave_hier_keys", 1))
+	if gathers != 1:
+		_fail("calendar autosave gathered %d times on live-equiv path (need exactly 1)" % gathers)
+		return
+	if save_ms < 0.0 or save_ms > 1000.0:
+		_fail("live-equiv autosave took %.1f ms (cap 1000)" % save_ms)
+		return
+	if save_bytes <= 0 or save_bytes > 8388608:
+		_fail("live-equiv autosave file is %d bytes (cap 8388608)" % save_bytes)
+		return
+	if hier_keys > 0 or not bool(result.get("calendar_autosave_lean", false)):
+		_fail("live-equiv autosave is not the lean save: %s" % str(result))
+		return
 	if not bool(result.get("ok", false)):
 		_fail("live-F5-equiv day advance not ok: %s" % str(result))
 		return
@@ -476,9 +497,6 @@ func _test_live_f5_equivalent_day_advance() -> void:
 	if considered > 16:
 		_fail("live AI infra pick considered %d provinces (cap 16)" % considered)
 		return
-	if gathers != 0:
-		_fail("calendar autosave gathered %d times on live-equiv path (must skip)" % gathers)
-		return
 	if mem_delta > 48 * 1024 * 1024:
 		_fail("live-F5-equiv memory grew %d bytes (unbounded)" % mem_delta)
 		return
@@ -488,9 +506,11 @@ func _test_live_f5_equivalent_day_advance() -> void:
 	if bool(result.get("living_playtest_clock", true)):
 		_fail("live-equiv result must not claim living_playtest_clock")
 		return
+	if not _autosave_guards_stay_quiet():
+		return
 	_pass(
-		"live-F5-equiv +%dd past+6 hour+6 consider=%d pick=%d autosave=0 mem=%d (%dms)"
-		% [elapsed, consider, considered, mem_delta, ms]
+		"live-F5-equiv +%dd past+6 hour+6 consider=%d pick=%d autosave=%d ms=%.1f bytes=%d hier=%d mem=%d (%dms)"
+		% [elapsed, consider, considered, gathers, save_ms, save_bytes, hier_keys, mem_delta, ms]
 	)
 
 
@@ -569,8 +589,18 @@ func _test_live_f5_softpipe_past_plus6_soak() -> void:
 	if not bool(result.get("harvest_day5", false)):
 		_fail("softpipe soak never crossed day +5 harvest cadence: %s" % str(result))
 		return
-	if int(result.get("calendar_autosave_gathers", 1)) != 0:
-		_fail("softpipe soak gathered calendar autosave: %s" % str(result))
+	var soak_gathers := int(result.get("calendar_autosave_gathers", 0))
+	var soak_ms := float(result.get("calendar_autosave_ms", -1.0))
+	var soak_bytes := int(result.get("calendar_autosave_bytes", 0))
+	var soak_hier := int(result.get("calendar_autosave_hier_keys", 1))
+	if soak_gathers != 1:
+		_fail("softpipe soak calendar autosave gathers=%d (need exactly 1): %s" % [soak_gathers, str(result)])
+		return
+	if soak_ms < 0.0 or soak_ms > 1000.0 or soak_bytes <= 0 or soak_bytes > 8388608:
+		_fail("softpipe autosave ms=%.1f bytes=%d (caps 1000 ms / 8388608 bytes)" % [soak_ms, soak_bytes])
+		return
+	if soak_hier > 0 or not bool(result.get("calendar_autosave_lean", false)):
+		_fail("softpipe autosave is not the lean save: %s" % str(result))
 		return
 	if not bool(result.get("toast_mouse_ignore", false)):
 		_fail("toast stack still steals TopInfoBar: %s" % str(result))
@@ -582,9 +612,55 @@ func _test_live_f5_softpipe_past_plus6_soak() -> void:
 		_fail("softpipe soak took %dms (wedged)" % ms)
 		return
 	_pass(
-		"softpipe soak past 7 Jan day=%s elapsed=%s paused=%s autosave=0 toast_ignore=1 (%dms)"
-		% [str(result.get("day")), str(result.get("elapsed_delta")), str(result.get("paused")), ms]
+		"softpipe soak past 7 Jan day=%s elapsed=%s paused=%s autosave=%d ms=%.1f bytes=%d hier=%d toast_ignore=1 (%dms)"
+		% [str(result.get("day")), str(result.get("elapsed_delta")), str(result.get("paused")), soak_gathers, soak_ms, soak_bytes, soak_hier, ms]
 	)
+
+
+func _autosave_guards_stay_quiet() -> bool:
+	## EOA_CALENDAR_AUTOSAVE=0 and the living-playtest clock gather zero.
+	## A gather here fails. Elapsed 14 is a day-7 boundary so a removed guard
+	## would write.
+	var sl: Node = _autoload("SaveLoadManager")
+	var tm: Node = _autoload("TimeManager")
+	if sl == null or tm == null:
+		_fail("autosave guard check missing SaveLoadManager or TimeManager")
+		return false
+	var gathers0 := int(sl.get("_calendar_autosave_gathers"))
+	var saved_elapsed := int(tm.get("total_days_elapsed"))
+	var saved_year := int(tm.get("current_year"))
+	var saved_month := int(tm.get("current_month"))
+	var saved_day := int(tm.get("current_day"))
+	var saved_living := bool(tm.get("_living_playtest_clock"))
+	var saved_env := OS.get_environment("EOA_CALENDAR_AUTOSAVE")
+	tm.set("total_days_elapsed", 14)
+	tm.set("current_year", 1936)
+	tm.set("current_month", 1)
+	tm.set("current_day", 15)
+	tm.set("_living_playtest_clock", true)
+	sl.call("_on_day_advanced_for_autosave", 1936, 1, 15)
+	if sl.has_method("settle_deferred_calendar_autosave"):
+		sl.call("settle_deferred_calendar_autosave")
+	var after_living := int(sl.get("_calendar_autosave_gathers"))
+	tm.set("_living_playtest_clock", false)
+	OS.set_environment("EOA_CALENDAR_AUTOSAVE", "0")
+	sl.call("_on_day_advanced_for_autosave", 1936, 1, 15)
+	if sl.has_method("settle_deferred_calendar_autosave"):
+		sl.call("settle_deferred_calendar_autosave")
+	var after_kill := int(sl.get("_calendar_autosave_gathers"))
+	OS.set_environment("EOA_CALENDAR_AUTOSAVE", saved_env)
+	tm.set("_living_playtest_clock", saved_living)
+	tm.set("total_days_elapsed", saved_elapsed)
+	tm.set("current_year", saved_year)
+	tm.set("current_month", saved_month)
+	tm.set("current_day", saved_day)
+	if after_living != gathers0:
+		_fail("living-playtest clock gathered calendar autosave (%d -> %d)" % [gathers0, after_living])
+		return false
+	if after_kill != gathers0:
+		_fail("EOA_CALENDAR_AUTOSAVE=0 gathered calendar autosave (%d -> %d)" % [gathers0, after_kill])
+		return false
+	return true
 
 
 func _test_smoke_advance_past_plus6_after_hatch() -> void:

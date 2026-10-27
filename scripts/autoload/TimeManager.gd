@@ -844,8 +844,9 @@ func _smoke_calendar_is_past_7_jan() -> bool:
 
 func simulate_live_f5_softpipe_past_plus6() -> Dictionary:
 	## Play softpipe soak: Begin+4x must cross past 7 Jan (not hour_delta=32 only).
-	## Exercises day-+5 harvest cadence, day-7 autosave skip, and toast+MapMode
-	## input chrome so a 6 Jan 20:00 wedge FAILS this gate.
+	## Exercises day-+5 harvest cadence, exactly one lean day-7 autosave, and
+	## toast+MapMode input chrome so a 6 Jan 20:00 wedge FAILS this gate.
+	## Zero gathers and a second gather in this 8-day window both fail.
 	initialize_from_scenario_start_date("1936-01-01")
 	set_paused(true)
 	set_time_scale(1.0)
@@ -887,6 +888,9 @@ func simulate_live_f5_softpipe_past_plus6() -> Dictionary:
 		i += 1
 	if not _pending_sim_events.is_empty():
 		_drain_living_f5_flush(8)
+	# Day 7 queues the write. Count it before this function returns.
+	if sl != null and sl.has_method("settle_deferred_calendar_autosave"):
+		sl.call("settle_deferred_calendar_autosave")
 	var gathers1 := gathers0
 	if sl != null:
 		gathers1 = int(sl.get("_calendar_autosave_gathers"))
@@ -902,13 +906,36 @@ func simulate_live_f5_softpipe_past_plus6() -> Dictionary:
 	var past_plus6 := elapsed_delta >= 7 and past_7_jan
 	var harvest_day5 := elapsed_delta >= 5
 	var autosave_gathers := gathers1 - gathers0
+	var autosave_ms := -1.0
+	var autosave_bytes := 0
+	var autosave_hier := -1
+	var autosave_parsed := false
+	var autosave_lean := false
+	if sl != null and sl.has_method("calendar_autosave_file_report"):
+		var report: Dictionary = sl.call("calendar_autosave_file_report")
+		autosave_ms = float(report.get("ms", -1.0))
+		autosave_bytes = int(report.get("bytes", 0))
+		autosave_hier = int(report.get("hier_keys", -1))
+		autosave_parsed = bool(report.get("parsed", false))
+		autosave_lean = bool(report.get("lean_gather", false))
 	var mapmode_ok := true
+	var autosave_one := autosave_gathers == 1
+	var autosave_file_ok := (
+		autosave_one
+		and autosave_parsed
+		and autosave_lean
+		and autosave_hier <= 0
+		and autosave_ms >= 0.0
+		and autosave_ms <= 1000.0
+		and autosave_bytes > 0
+		and autosave_bytes <= 8388608
+	)
 	var ok := (
 		(not paused)
 		and past_plus6
 		and past_7_jan
 		and harvest_day5
-		and autosave_gathers == 0
+		and autosave_file_ok
 		and toast_ignore
 		and mapmode_ok
 		and hour_delta >= 24
@@ -931,6 +958,10 @@ func simulate_live_f5_softpipe_past_plus6() -> Dictionary:
 		"past_7_jan": past_7_jan,
 		"harvest_day5": harvest_day5,
 		"calendar_autosave_gathers": autosave_gathers,
+		"calendar_autosave_ms": autosave_ms,
+		"calendar_autosave_bytes": autosave_bytes,
+		"calendar_autosave_hier_keys": autosave_hier,
+		"calendar_autosave_lean": autosave_lean,
 		"toast_mouse_ignore": toast_ignore,
 		"toast_n": toast_n,
 		"mapmode_cannot_steal_top_bar": mapmode_ok,
