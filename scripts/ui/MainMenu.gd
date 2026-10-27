@@ -265,6 +265,8 @@ func _build_ui() -> void:
 	close_x.focus_mode = Control.FOCUS_ALL
 	close_x.mouse_filter = Control.MOUSE_FILTER_STOP
 	close_x.process_mode = Node.PROCESS_MODE_ALWAYS
+	# Press closes even when the title overlay eats the matching release.
+	close_x.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
 	close_x.add_to_group("eoa_ui_close_x")
 	# Press arms leftover-release swallow before MapRenderer `_input` sees the up.
 	close_x.button_down.connect(_on_close_x_button_down)
@@ -671,6 +673,7 @@ func _make_save_row(info: Dictionary) -> Control:
 	load_b.custom_minimum_size = Vector2(80, 32)
 	load_b.disabled = not occupied
 	load_b.mouse_filter = Control.MOUSE_FILTER_STOP
+	load_b.set_meta("eoa_load_slot", slot)
 	load_b.pressed.connect(_on_load_slot.bind(slot))
 	RetrowaveTheme.style_primary_button(load_b)
 	actions.add_child(load_b)

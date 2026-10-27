@@ -311,6 +311,11 @@ func _on_submit(text: String) -> void:
 	if now - _submit_guard_msec < SUBMIT_GUARD_MS:
 		return
 	_submit_guard_msec = now
+	# Debug console: "declare war on POL". Release builds never take this branch.
+	if OS.is_debug_build():
+		var declared: Dictionary = WarStateDomain.debug_console_declare(text)
+		if bool(declared.get("handled", false)):
+			return
 	_ensure_live_controls()
 	if _names.is_empty():
 		_rebuild_index()

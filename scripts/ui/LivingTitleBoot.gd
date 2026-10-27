@@ -49,6 +49,9 @@ var _always_on_top_set := false
 ## Smoke-only auto-begin (EOA_SMOKE_AUTO_BEGIN=1). Default OFF. Not product Begin PASS.
 var _smoke_auto_begin_armed := false
 var _smoke_auto_begin_delay_s := 0.0
+## Slot chosen by the exact Load-button hit (title row or Command Center).
+var _pending_load_slot := ""
+var _pending_load_via_cc := false
 ## Grown hit pads: computerUse screenshot clicks often land on the label edge, not the Control core.
 const BEGIN_HIT_GROW := 36.0
 const CC_HIT_GROW := 28.0
@@ -419,6 +422,7 @@ func _fill_save_rows(col: VBoxContainer) -> void:
 			btn.custom_minimum_size = Vector2(0, 30)
 			btn.mouse_filter = Control.MOUSE_FILTER_STOP
 			btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
+			btn.set_meta("eoa_load_slot", slot)
 			btn.pressed.connect(_on_load.bind(slot))
 			RetrowaveTheme.style_secondary_button(btn)
 			col.add_child(btn)
@@ -804,6 +808,34 @@ func handle_live_pointer(event: InputEvent) -> String:
 
 
 func _classify_points(pts: Array[Vector2]) -> String:
+	_pending_load_slot = ""
+	_pending_load_via_cc = false
+	# Exact Load / × before the grown CC and panel pads. Those pads used to
+	# swallow "Load · quicksave" and the Command Center's own Load and ×.
+	if _command_center_is_up():
+		for p_cc in pts:
+			if _cc_close_owns_point(p_cc):
+				return "close"
+		for p_ld in pts:
+			var cc_slot := _cc_load_slot_at(p_ld)
+			if not cc_slot.is_empty():
+				_pending_load_slot = cc_slot
+				_pending_load_via_cc = true
+				return "load"
+		for p_tl in pts:
+			var over_slot := _title_load_slot_at(p_tl)
+			if not over_slot.is_empty():
+				_pending_load_slot = over_slot
+				return "load"
+		for p_mm in pts:
+			if _command_center_covers_point(p_mm):
+				return "passthrough"
+	else:
+		for p_title in pts:
+			var title_slot := _title_load_slot_at(p_title)
+			if not title_slot.is_empty():
+				_pending_load_slot = title_slot
+				return "load"
 	# CC first so Command Center · Esc / Esc · Menu are never stolen by the Begin slab.
 	if _any_point_matches(pts, "cc"):
 		return "cc"
@@ -817,7 +849,95 @@ func _classify_points(pts: Array[Vector2]) -> String:
 	return "map"
 
 
+func _button_exact_point(btn: Button, screen: Vector2) -> bool:
+	if btn == null or not is_instance_valid(btn) or not btn.visible or btn.disabled:
+		return false
+	return btn.get_global_rect().has_point(screen)
+
+
+func _title_load_slot_at(screen: Vector2) -> String:
+	var root_n := get_node_or_null("LivingTitleRoot")
+	if root_n == null:
+		return ""
+	for n in root_n.find_children("*", "Button", true, false):
+		if not (n is Button):
+			continue
+		var b := n as Button
+		if not b.has_meta("eoa_load_slot"):
+			continue
+		if _button_exact_point(b, screen):
+			return str(b.get_meta("eoa_load_slot")).strip_edges()
+	return ""
+
+
+func _live_main_menu() -> Node:
+	if not _command_center_is_up():
+		return null
+	var tree := get_tree()
+	if tree == null or tree.root == null:
+		return null
+	return tree.root.get_node_or_null("MainMenu")
+
+
+func _cc_close_owns_point(screen: Vector2) -> bool:
+	var mm := _live_main_menu()
+	if mm == null or not mm.has_method("close_x_button"):
+		return false
+	var btn: Button = mm.call("close_x_button")
+	return _button_exact_point(btn, screen)
+
+
+func _cc_load_slot_at(screen: Vector2) -> String:
+	var mm := _live_main_menu()
+	if mm == null:
+		return ""
+	for n in mm.find_children("*", "Button", true, false):
+		if not (n is Button):
+			continue
+		var b := n as Button
+		if str(b.text) != "Load" or not b.has_meta("eoa_load_slot"):
+			continue
+		if _button_exact_point(b, screen):
+			return str(b.get_meta("eoa_load_slot")).strip_edges()
+	return ""
+
+
+func _command_center_covers_point(screen: Vector2) -> bool:
+	var mm := _live_main_menu()
+	if mm == null:
+		return false
+	var root_c := mm.get_node_or_null("Root") as Control
+	if root_c != null and root_c.get_global_rect().has_point(screen):
+		return true
+	var vp := get_viewport()
+	if vp == null:
+		return true
+	return vp.get_visible_rect().has_point(screen)
+
+
 func _apply_pointer_hit(hit: String, pending_press: bool = false) -> String:
+	if hit == "load":
+		print("EOA_LIVE_PTR who=title.handle_live_pointer action=load")
+		var slot := _pending_load_slot
+		if _pending_load_via_cc:
+			var mm_load := _live_main_menu()
+			if mm_load != null and mm_load.has_method("_on_load_slot"):
+				mm_load.call("_on_load_slot", slot)
+		else:
+			_on_load(slot)
+		return "load"
+	if hit == "close":
+		print("EOA_LIVE_PTR who=title.handle_live_pointer action=close")
+		var mm_close := _live_main_menu()
+		if mm_close != null:
+			if mm_close.has_method("arm_cc_close_release_swallow"):
+				mm_close.call("arm_cc_close_release_swallow", pending_press)
+			if mm_close.has_method("_force_close"):
+				mm_close.call("_force_close")
+		return "close"
+	if hit == "passthrough":
+		print("EOA_LIVE_PTR who=title.handle_live_pointer action=passthrough")
+		return "passthrough"
 	if hit == "begin":
 		print("EOA_LIVE_PTR who=title.handle_live_pointer action=begin")
 		_on_begin_new(pending_press, true)
@@ -1162,7 +1282,7 @@ func _on_window_input(event: InputEvent) -> void:
 	if is_live_pointer_press(event):
 		var action_w: String = handle_live_pointer(event)
 		print("EOA_LIVE_PTR who=title.window_input action=%s" % action_w)
-		if action_w == "begin" or action_w == "cc" or action_w == "panel":
+		if action_w == "begin" or action_w == "cc" or action_w == "panel" or action_w == "load" or action_w == "close":
 			var vp_w: Viewport = get_viewport()
 			if vp_w != null:
 				vp_w.set_input_as_handled()
@@ -1257,7 +1377,7 @@ func _on_sink_gui_input(event: InputEvent) -> void:
 		return
 	if is_live_pointer_press(event):
 		var action_s: String = handle_live_pointer(event)
-		if action_s == "begin" or action_s == "cc" or action_s == "panel":
+		if action_s == "begin" or action_s == "cc" or action_s == "panel" or action_s == "load" or action_s == "close":
 			var vp_s: Viewport = get_viewport()
 			if vp_s != null:
 				vp_s.set_input_as_handled()
@@ -1307,7 +1427,7 @@ func _input(event: InputEvent) -> void:
 	if is_live_pointer_press(event):
 		var action_i: String = handle_live_pointer(event)
 		print("EOA_LIVE_PTR who=title._input action=%s" % action_i)
-		if action_i == "begin" or action_i == "cc" or action_i == "panel":
+		if action_i == "begin" or action_i == "cc" or action_i == "panel" or action_i == "load" or action_i == "close":
 			var vp: Viewport = get_viewport()
 			if vp != null:
 				vp.set_input_as_handled()

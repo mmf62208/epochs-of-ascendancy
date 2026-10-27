@@ -618,6 +618,13 @@ func _gather_save_data() -> Dictionary:
 	if loader != null:
 		scenario_name = loader.get_current_scenario_name()
 	data["metadata"]["scenario_id"] = scenario_name
+	# Living nation, not the USA placeholder. The load list reads this field.
+	var player_tag := "USA"
+	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_player_country_tag"):
+		var live_tag := str(LeaderManager.get_player_country_tag()).strip_edges().to_upper()
+		if not live_tag.is_empty():
+			player_tag = live_tag
+	data["metadata"]["player_tag"] = player_tag
 
 	# Richer metadata for future save menu (timestamp already set above, scenario captured)
 	data["metadata"]["last_played"] = Time.get_datetime_string_from_system(true)

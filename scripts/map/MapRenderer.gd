@@ -3046,15 +3046,22 @@ func _input(event: InputEvent) -> void:
 					)
 					var title_act: String = _route_living_title_pointer(event)
 					print("EOA_LIVE_PTR who=MapRenderer._input action=%s" % title_act)
-					if title_act == "begin" or title_act == "cc" or title_act == "panel":
+					if title_act == "begin" or title_act == "cc" or title_act == "panel" or title_act == "load" or title_act == "close":
 						if title_act == "begin":
 							arm_begin_title_release_swallow()
 						get_viewport().set_input_as_handled()
+						return
+					if title_act == "passthrough":
 						return
 					if _living_title_owns_event(event) or _top_bar_owns_click():
 						return
 					# Map-area press: do not mark handled — GUI / window_input
 					# / title _input must still see the event.
+					return
+				# command center release passthrough: × and Load must see the
+				# mouse-up. Eating it here left CloseX armed and never pressed.
+				var boot_rel: Node = _living_title_boot_node()
+				if boot_rel != null and boot_rel.has_method("_command_center_is_up") and bool(boot_rel.call("_command_center_is_up")):
 					return
 				if _living_title_owns_event(event) or _top_bar_owns_click():
 					return
@@ -24032,6 +24039,43 @@ func _province_has_defending_units(pid: int, owner_tag: String) -> bool:
 	return not divs.is_empty()
 
 
+## Same name the unit card shows. Raw formation ids (garr1936_…, fielded_…) never do.
+static func open_fight_attacker_label(formation: Object, fid: String) -> String:
+	var raw := str(fid).strip_edges()
+	var label := ""
+	if formation != null:
+		var named: Variant = formation.get("name")
+		if named != null:
+			label = str(named).strip_edges()
+	if _open_fight_label_is_raw(label, raw):
+		label = ""
+	if label.is_empty() and formation != null and bool(formation.get_meta("garrison_1936", false)):
+		var tag := str(formation.get("country_tag")).strip_edges().to_upper()
+		var ordinal := int(formation.get_meta("garrison_1936_ordinal", 0))
+		if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("garrison_1936_display_name") and not tag.is_empty():
+			var pretty := str(LeaderManager.garrison_1936_display_name(tag, ordinal)).strip_edges()
+			if not _open_fight_label_is_raw(pretty, raw):
+				label = pretty
+	if label.is_empty() and formation != null:
+		var shown: Variant = formation.get("display_name")
+		if shown != null:
+			var dn := str(shown).strip_edges()
+			if not _open_fight_label_is_raw(dn, raw):
+				label = dn
+	if label.is_empty():
+		return "Division"
+	return label
+
+
+static func _open_fight_label_is_raw(text: String, fid: String) -> bool:
+	var t := text.strip_edges()
+	if t.is_empty() or t == fid.strip_edges():
+		return true
+	if t.begins_with("garr1936_") or t.begins_with("fielded_"):
+		return true
+	return t.contains("_") and not t.contains(" ")
+
+
 func _show_open_fight_sheet(
 	fid: String,
 	formation: Object,
@@ -24058,11 +24102,7 @@ func _show_open_fight_sheet(
 	var old := ui.get_node_or_null("OpenFightSheet")
 	if old != null:
 		old.queue_free()
-	var att_name := str(formation.get("display_name")) if formation != null and "display_name" in formation else fid
-	if att_name.strip_edges().is_empty() and formation != null and "name" in formation:
-		att_name = str(formation.get("name"))
-	if att_name.strip_edges().is_empty():
-		att_name = "Division"
+	var att_name := open_fight_attacker_label(formation, fid)
 	var from_name := _province_display_name(from_pid)
 	var def_tag := ""
 	var def_name := "no adjacent enemy"
