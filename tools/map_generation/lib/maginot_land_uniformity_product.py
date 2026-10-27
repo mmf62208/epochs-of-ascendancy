@@ -1287,7 +1287,7 @@ def build_maginot_land_uniformity_product(board_dir: str = "") -> Dict[str, Any]
         fails.append("unexpected_new_id_block")
 
     n_board = len(base)
-    if n_board < 3510 or n_board > 3540:
+    if n_board < 3510 or n_board > 3557:
         fails.append(f"board_scale_left_3520_band n={n_board}")
     else:
         passes.append(f"board_n={n_board}")

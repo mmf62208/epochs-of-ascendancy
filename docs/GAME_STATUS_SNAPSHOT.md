@@ -179,6 +179,8 @@ Every Cursor / Grok / human session on this tree:
 | Seas | 340 (IDs 950000+) |
 | **Total** | **~3520** (land **~3180** + sea 340) |
 
+NATION-TAGS-1 appends UKR / MDA / PRC / MAN era tags (no 1936 owners), 1945 POL on existing `cc=PL` provinces, and gap provinces 906000–906020 (moved off 905849–905869, which clash with GAP-HAWAII through GAP-WEST-UKR up to 905908). Live board 3557. The ~3520 band string stays.
+
 ---
 
 ## 2. Pillar health (map as living star)

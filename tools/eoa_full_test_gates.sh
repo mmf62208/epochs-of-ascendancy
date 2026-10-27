@@ -105,6 +105,7 @@ run_step unit_board_play_path \
     tools.map_generation.tests.test_ix1_road_spine_product \
     tools.map_generation.tests.test_rx1_rhine_crossing_product \
     tools.map_generation.tests.test_oldmap_turkey_mask_product \
+    tools.map_generation.tests.test_nation_tags1 \
     tools.map_generation.tests.test_world_accurate_capital_pick_product \
     tools.map_generation.tests.test_world_accurate_strategic_and_assault \
     tools.map_generation.tests.test_world_accurate_multi_front_and_deploy \
@@ -451,6 +452,9 @@ else
 
   run_step launch_designer_validation \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessDesignerValidationTest.gd || fail
+
+  run_step launch_nation_tags1 \
+    tools/run_godot.sh --headless --path . -s res://scripts/core/HeadlessNationTags1Test.gd || fail
 
   run_step launch_campaign_loop1_war_gate \
     tools/run_godot.sh --headless --path . -s res://scripts/core/HeadlessCampaignLoop1WarGateTest.gd || fail

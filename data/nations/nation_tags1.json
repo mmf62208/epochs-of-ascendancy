@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "source": "nation_tags1",
+  "note": "Era tags only. None own a 1936 province on world_accurate.",
+  "tags": [
+    {
+      "tag": "UKR",
+      "name": "Ukraine",
+      "color": "#005BBB",
+      "flag": "ukr.png"
+    },
+    {
+      "tag": "MDA",
+      "name": "Moldova",
+      "color": "#003DA5",
+      "flag": "mda.png"
+    },
+    {
+      "tag": "PRC",
+      "name": "People's Republic of China",
+      "color": "#DE2910",
+      "flag": "prc.png"
+    },
+    {
+      "tag": "MAN",
+      "name": "Manchukuo",
+      "color": "#FFDE00",
+      "flag": "man.png"
+    }
+  ]
+}

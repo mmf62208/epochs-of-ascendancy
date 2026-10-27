@@ -8455,6 +8455,90 @@
     "905771": {
       "city_name": "BGD North",
       "tier": 2
+    },
+    "906000": {
+      "city_name": "Kiev",
+      "tier": 2
+    },
+    "906001": {
+      "city_name": "Odessa",
+      "tier": 2
+    },
+    "906002": {
+      "city_name": "Kharkiv",
+      "tier": 2
+    },
+    "906003": {
+      "city_name": "Dnipropetrovsk",
+      "tier": 2
+    },
+    "906004": {
+      "city_name": "Crimean ASSR",
+      "tier": 2
+    },
+    "906005": {
+      "city_name": "Lviv",
+      "tier": 2
+    },
+    "906006": {
+      "city_name": "Lutsk",
+      "tier": 2
+    },
+    "906007": {
+      "city_name": "Chernivtsi",
+      "tier": 2
+    },
+    "906008": {
+      "city_name": "Chisinau",
+      "tier": 2
+    },
+    "906009": {
+      "city_name": "Harbin",
+      "tier": 2
+    },
+    "906010": {
+      "city_name": "Changchun",
+      "tier": 2
+    },
+    "906011": {
+      "city_name": "Qiqihar",
+      "tier": 2
+    },
+    "906012": {
+      "city_name": "Hailar",
+      "tier": 2
+    },
+    "906013": {
+      "city_name": "Chongqing",
+      "tier": 2
+    },
+    "906014": {
+      "city_name": "Guangzhou",
+      "tier": 2
+    },
+    "906015": {
+      "city_name": "Chengdu",
+      "tier": 2
+    },
+    "906016": {
+      "city_name": "Fuzhou",
+      "tier": 2
+    },
+    "906017": {
+      "city_name": "Zhengzhou",
+      "tier": 2
+    },
+    "906018": {
+      "city_name": "Taiyuan",
+      "tier": 2
+    },
+    "906019": {
+      "city_name": "Guiyang",
+      "tier": 2
+    },
+    "906020": {
+      "city_name": "Hohhot",
+      "tier": 2
     }
   },
   "meta": {

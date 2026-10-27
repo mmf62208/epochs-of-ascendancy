@@ -2178,6 +2178,7 @@ const _1936_NATION_NAMES: Dictionary = {
 	"ELS": "El Salvador", "PAN": "Panama", "LIB": "Liberia", "BHU": "Bhutan",
 	"NEP": "Nepal", "MON": "Mongolia", "NZL": "New Zealand", "MLT": "Malta",
 	"CYP": "Cyprus", "LIE": "Liechtenstein",
+	"UKR": "Ukraine", "MDA": "Moldova", "PRC": "People's Republic of China", "MAN": "Manchukuo",
 }
 
 ## Distinct HOI-style political paints for minors (majors already in scenario JSON).
@@ -2200,6 +2201,7 @@ const _1936_NATION_COLORS: Dictionary = {
 	"ELS": "#0F47AF", "PAN": "#005293", "LIB": "#002868", "BHU": "#FF4E12",
 	"NEP": "#DC143C", "MON": "#C4272F", "NZL": "#00247D", "MLT": "#CF142B",
 	"CYP": "#D47600", "LIE": "#5B2C6F",
+	"UKR": "#005BBB", "MDA": "#003DA5", "PRC": "#DE2910", "MAN": "#FFDE00",
 }
 
 ## Curated 1936 capital province IDs (Europe NUTS / known hubs). Prefer over 0-pop first-seen.
