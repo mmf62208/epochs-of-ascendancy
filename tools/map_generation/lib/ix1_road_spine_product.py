@@ -495,6 +495,8 @@ def ix1_day_tick_unblocked() -> Dict[str, Any]:
         missing.append("live_equiv_past_hour_plus6")
     if "past_plus6" not in live_sim or "calendar_autosave_gathers" not in live_sim:
         missing.append("live_equiv_past_plus6")
+    if "autosave_gathers == 1" not in live_sim or "autosave_gathers == 0" in live_sim:
+        missing.append("live_equiv_one_autosave")
     if "_living_playtest_clock = true" in live_clock:
         missing.append("live_equiv_uses_playtest_clock")
     if "_live_f5_equiv_clock = true" not in live_clock:
@@ -503,6 +505,12 @@ def ix1_day_tick_unblocked() -> Dict[str, Any]:
         missing.append("live_equiv_harness")
     if "past_plus6" not in harness or "calendar_autosave_gathers" not in harness:
         missing.append("live_equiv_plus6_harness")
+    live_harness = _slice_func(harness, "_test_live_f5_equivalent_day_advance")
+    if "gathers != 1" not in live_harness or "gathers != 0" in live_harness:
+        missing.append("live_equiv_harness_one_gather")
+    soak_harness = _slice_func(harness, "_test_live_f5_softpipe_past_plus6_soak")
+    if "soak_gathers != 1" not in soak_harness:
+        missing.append("softpipe_harness_one_gather")
     if "past_hour_plus6" not in harness:
         missing.append("live_equiv_hour_harness")
     input_fn = _slice_func(ren, "_input")
@@ -528,6 +536,8 @@ def ix1_day_tick_unblocked() -> Dict[str, Any]:
     soak = _slice_func(tm, "simulate_live_f5_softpipe_past_plus6")
     if "past_7_jan" not in soak or "advance_real_time" not in soak:
         missing.append("softpipe_past_plus6_soak")
+    if "autosave_gathers == 1" not in soak or "autosave_gathers == 0" in soak:
+        missing.append("softpipe_one_autosave")
     if "Province captured" not in soak:
         missing.append("softpipe_soak_capture_toasts")
     if "simulate_live_f5_softpipe_past_plus6" not in harness or "past_7_jan" not in _slice_func(

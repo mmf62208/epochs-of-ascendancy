@@ -216,6 +216,35 @@ static func declare_war(attacker: String, defender: String, goal: String = "") -
 	return {"ok": true, "pair": key, "called": called, "day": day}
 
 
+## Debug-build search line only. Release builds ignore it. No diplomacy button.
+##   declare war POL
+##   declare war on POL
+static func debug_console_declare(line: String) -> Dictionary:
+	if not OS.is_debug_build():
+		return {"handled": false, "ok": false, "reason": "release"}
+	var raw := line.strip_edges()
+	var low := raw.to_lower()
+	var rest := ""
+	if low.begins_with("declare war on "):
+		rest = raw.substr("declare war on ".length()).strip_edges()
+	elif low.begins_with("declare war "):
+		rest = raw.substr("declare war ".length()).strip_edges()
+	else:
+		return {"handled": false}
+	var defender := ""
+	if not rest.is_empty():
+		defender = rest.split(" ", false)[0].strip_edges().to_upper()
+	if defender.is_empty():
+		return {"handled": true, "ok": false, "reason": "missing defender"}
+	var attacker := _player()
+	var result := declare_war(attacker, defender, "debug")
+	result["handled"] = true
+	result["attacker"] = attacker
+	result["defender"] = defender
+	print("EOA_DEBUG_DECLARE_WAR attacker=%s defender=%s ok=%s" % [attacker, defender, str(bool(result.get("ok", false)))])
+	return result
+
+
 static func _call_to_arms(attacker: String, defender: String) -> Array:
 	var joined: Array = []
 	for raw in _relation_tags():

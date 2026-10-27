@@ -70,9 +70,36 @@ static func _apply_traits_from_data(leader: Leader, leader_data: Dictionary) -> 
 				leader.add_trait_unchecked(str(trait_id), 1)
 
 
+func _leader_manager() -> Node:
+	var loop := Engine.get_main_loop()
+	if loop is SceneTree:
+		return (loop as SceneTree).root.get_node_or_null("LeaderManager")
+	return null
+
+
+func _leader_manager_year() -> int:
+	var node := _leader_manager()
+	if node != null and node.has_method("get_current_year"):
+		return int(node.call("get_current_year"))
+	return 1936
+
+
+func _try_add_trait(leader: Leader, trait_id: String) -> void:
+	var node := _leader_manager()
+	if node != null and node.has_method("try_add_trait_to_leader"):
+		node.call("try_add_trait_to_leader", leader, trait_id, 1)
+
+
+func _alloc_gen_leader_id(country_tag: String) -> String:
+	var node := _leader_manager()
+	if node != null and node.has_method("alloc_generated_leader_id"):
+		return str(node.call("alloc_generated_leader_id", country_tag, "gen"))
+	return "%s_gen_d0_0" % country_tag.to_lower()
+
+
 func generate_leader(country_tag: String, leader_type: String = "general") -> Leader:
 	var leader_data := {
-		"leader_id": "%s_gen_%d" % [country_tag, Time.get_unix_time_from_system()],
+		"leader_id": _alloc_gen_leader_id(country_tag),
 		"name": _generate_name(country_tag),
 		"country_tag": country_tag,
 		"leader_type": leader_type,
@@ -83,16 +110,16 @@ func generate_leader(country_tag: String, leader_type: String = "general") -> Le
 		"planning_skill": randi_range(1, 6),
 		"initiative_skill": randi_range(3, 6),
 		"birth_year": randi_range(1895, 1910),
-		"start_year": LeaderManager.get_current_year() if typeof(LeaderManager) != TYPE_NIL else 1936,
+		"start_year": _leader_manager_year(),
 	}
 	var leader := create_leader_from_data(leader_data)
 
 	if randf() < 0.15:
 		var trait_id: String = SPECIAL_TRAITS[randi() % SPECIAL_TRAITS.size()]
-		LeaderManager.try_add_trait_to_leader(leader, trait_id, 1)
+		_try_add_trait(leader, trait_id)
 
 	if randf() < 0.08:
-		LeaderManager.try_add_trait_to_leader(leader, "reckless", 1)
+		_try_add_trait(leader, "reckless")
 
 	return leader
 

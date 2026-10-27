@@ -16,7 +16,7 @@ const POSSIBLE_LAST_NAMES: Array[String] = [
 static func generate_agent(country_tag: String, year: int = 1936) -> Agent:
 	var agent := Agent.new()
 
-	agent.agent_id = "%s_agent_%d" % [country_tag.to_lower(), Time.get_unix_time_from_system()]
+	agent.agent_id = "%s_agent_unset" % country_tag.to_lower()
 	agent.country_tag = country_tag
 	agent.name = _generate_name()
 	agent.birth_year = year - randi_range(25, 42)

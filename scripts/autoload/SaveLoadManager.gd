@@ -8,7 +8,7 @@
 ## === SAVE FORMAT (JSON, human-readable for debugging) ===
 ## Root dictionary:
 ## {
-##   "save_version": 1,                    # Integer. Bump on breaking changes.
+##   "save_version": 2,                    # Integer. Bump on breaking changes.
 ##   "metadata": {
 ##     "timestamp": "2026-05-18T14:30:00", # ISO-ish from Time.get_datetime_string_from_system
 ##     "scenario_id": "1936",              # Future: ScenarioLoader scenario identifier
@@ -91,7 +91,7 @@
 ## - Time (date, start date, pause/scale)
 ## - Technology (full country research state + active progress)
 ## - Agents + Networks (full resources + daily effect trackers)
-## - Map provinces (owner/controller, development, infrastructure)
+## - Map provinces (owner/controller, development, infrastructure, factories)
 ## - Supply depots (stockpile, throughput, sabotage_level) + division_deployments
 ## - Leader formations (stationed_province_id per division)
 ## - NationalModifierManager temporary effects
@@ -141,7 +141,7 @@
 extends Node
 
 const SAVE_DIR := "user://saves/"
-const SAVE_VERSION := 1
+const SAVE_VERSION := 2
 const SAVE_GAME_VERSION := "0.2-dev"   # Bumped for richer metadata support
 const DEFAULT_SLOT := "quicksave"
 
@@ -149,6 +149,26 @@ var _last_save_path: String = ""
 var _calendar_autosave_pending: bool = false
 var _calendar_autosave_gathers: int = 0
 var _calendar_autosave_live_f5_skips: int = 0
+var _calendar_autosave_lean_live: bool = false
+var _calendar_autosave_rss_mid_kb: int = -1
+var _calendar_autosave_hwm_mid_kb: int = -1
+var _calendar_autosave_serial: int = 0
+var _calendar_autosave_ran_serial: int = 0
+var _calendar_autosave_queued_elapsed: int = -1
+var _calendar_autosave_last_ms: float = -1.0
+var _calendar_autosave_last_json_bytes: int = -1
+var _calendar_autosave_last_lean: bool = false
+var _calendar_autosave_last_rearmed: bool = false
+## Elapsed day of the last gather. A year boundary on that same day does not
+## gather again. -1 means this process has not gathered yet.
+var _calendar_autosave_gathered_elapsed: int = -1
+## True when the queued write is a year boundary that is not a multiple of 7.
+var _calendar_autosave_queued_off_interval: bool = false
+## One deferred slot. If day 7 and a different year morning both want a write
+## in the same drain, the second waits here and runs after the first.
+var _calendar_autosave_followup_elapsed: int = -1
+var _calendar_autosave_followup_off_interval: bool = false
+
 
 func _ready() -> void:
 	_ensure_save_dir()
@@ -169,23 +189,116 @@ func _on_day_advanced_for_autosave(_year: int = 0, _month: int = 0, _day: int = 
 	if typeof(TimeManager) != TYPE_NIL and bool(TimeManager.get("_living_playtest_clock")):
 		# Compact 20d Maginot clock: save_game_detailed every 7d hung the -s harness.
 		return
-	# Live editor/export Play (X11 / llvmpipe): full gather + pretty JSON of the
-	# 3520 board + hierarchy OOMs (~10GB RSS) at day +5/+6. Distinct from the
-	# already-fixed +2 AI softpipe. Player Ctrl+S is unchanged.
-	if _should_skip_live_f5_calendar_autosave():
-		_calendar_autosave_live_f5_skips += 1
-		return
+	# Live editor/export Play used to return here. The old gather dumped the
+	# hierarchy and OOMed (~10 GB RSS) at day +5/+6. SAVE-FULL-1 omits that
+	# dump, so a normal day roll on a positive multiple of 7 writes autosave.
+	# The predicate stays true on this path: quit still skips, and the gather
+	# stays lean (empty hierarchy, no map-ui blob). Days off the interval
+	# still write nothing. Player Ctrl+S is unchanged.
+	var lean_live_gather := _should_skip_live_f5_calendar_autosave()
+	_calendar_autosave_lean_live = lean_live_gather
 	var elapsed := 0
 	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("get_total_days_elapsed"):
 		elapsed = int(TimeManager.get_total_days_elapsed())
+	# A batched light-sim drain emits each day only after total_days_elapsed
+	# is already the final value. The signal still carries that day's date.
+	# An 8-day advance from elapsed 0 must still see day 7, not only day 8.
+	var emitted := _elapsed_for_emitted_calendar(_year, _month, _day)
+	if emitted > 0 and emitted < elapsed:
+		elapsed = emitted
 	if elapsed <= 0 or (elapsed % 7) != 0:
 		return
 	# Isolate the gather from day_emit so the F5 hour clock can keep moving
 	# (day-7 save_game_detailed used to freeze the spine session at 20:00).
 	if _calendar_autosave_pending:
+		# A year-boundary write already holds the slot. Keep this interval day
+		# so it still gathers after that write. A second interval day in the
+		# same batch still does not queue.
+		if _calendar_autosave_queued_off_interval and _calendar_autosave_queued_elapsed != elapsed:
+			_calendar_autosave_followup_elapsed = elapsed
+			_calendar_autosave_followup_off_interval = false
 		return
-	_calendar_autosave_pending = true
-	call_deferred("_deferred_calendar_autosave", elapsed)
+	_queue_deferred_calendar_autosave(elapsed, false)
+
+
+func _elapsed_for_emitted_calendar(year: int, month: int, day: int) -> int:
+	# Days from the scenario start to this signal date. Elapsed 0 is the start
+	# date itself, matching TimeManager.total_days_elapsed after N rollovers.
+	if typeof(TimeManager) == TYPE_NIL or year < 1 or month < 1 or day < 1:
+		return -1
+	var start := str(TimeManager.get("scenario_start_date"))
+	if start.is_empty():
+		start = "1936-01-01"
+	var parts := start.split("-")
+	var y := 1936
+	var m := 1
+	var d := 1
+	if parts.size() >= 1 and parts[0].is_valid_int():
+		y = int(parts[0])
+	if parts.size() >= 2 and parts[1].is_valid_int():
+		m = clampi(int(parts[1]), 1, 12)
+	if parts.size() >= 3 and parts[2].is_valid_int():
+		d = clampi(int(parts[2]), 1, 31)
+	var n := 0
+	while n < 20000:
+		if y == year and m == month and d == day:
+			return n
+		if y > year or (y == year and (m > month or (m == month and d > day))):
+			return -1
+		d += 1
+		var dim := 31
+		if TimeManager.has_method("_get_days_in_month"):
+			dim = int(TimeManager.call("_get_days_in_month", m, y))
+		if d > dim:
+			d = 1
+			m += 1
+			if m > 12:
+				m = 1
+				y += 1
+		n += 1
+	return -1
+
+
+## Headless soaks sample gathers before the idle frame. Run the queued day-7
+## write now. The deferred call that is already queued sees the same serial
+## and does not gather a second time.
+func settle_deferred_calendar_autosave() -> void:
+	if not _calendar_autosave_pending:
+		return
+	_deferred_calendar_autosave(_calendar_autosave_queued_elapsed)
+
+
+## File on disk after the day-7 gather. hier_keys 0 is the empty lean blob.
+## -1 means the key is absent. A positive count is the hierarchy dump.
+func calendar_autosave_file_report() -> Dictionary:
+	var path := get_save_path_global("autosave")
+	var nbytes := 0
+	var hier := -1
+	var parsed_ok := false
+	if FileAccess.file_exists(path):
+		var f := FileAccess.open(path, FileAccess.READ)
+		if f != null:
+			nbytes = int(f.get_length())
+			var text := f.get_as_text()
+			f.close()
+			var parsed: Variant = JSON.parse_string(text)
+			if parsed is Dictionary:
+				parsed_ok = true
+				var gd: Variant = (parsed as Dictionary).get("game_data", null)
+				if gd is Dictionary and (gd as Dictionary).has("hierarchy_membership_live"):
+					var h: Variant = (gd as Dictionary).get("hierarchy_membership_live")
+					hier = (h as Dictionary).size() if h is Dictionary else 999999
+	return {
+		"path": path,
+		"bytes": nbytes,
+		"parsed": parsed_ok,
+		"hier_keys": hier,
+		"ms": _calendar_autosave_last_ms,
+		"json_bytes": _calendar_autosave_last_json_bytes,
+		"lean_gather": _calendar_autosave_last_lean,
+		"rearmed": _calendar_autosave_last_rearmed,
+		"gathers": _calendar_autosave_gathers,
+	}
 
 
 func _should_skip_live_f5_calendar_autosave() -> bool:
@@ -197,33 +310,171 @@ func _should_skip_live_f5_calendar_autosave() -> bool:
 
 
 func _deferred_calendar_autosave(elapsed: int) -> void:
-	_calendar_autosave_pending = false
-	# Re-check: the deferred frame may still be live F5 / softpipe.
-	if _should_skip_live_f5_calendar_autosave():
-		_calendar_autosave_live_f5_skips += 1
+	var serial := _calendar_autosave_serial
+	if serial > 0 and serial == _calendar_autosave_ran_serial:
+		_calendar_autosave_pending = false
 		return
+	_calendar_autosave_pending = false
+	if serial > 0:
+		_calendar_autosave_ran_serial = serial
+	if OS.get_environment("EOA_CALENDAR_AUTOSAVE").strip_edges() == "0":
+		_calendar_autosave_followup_elapsed = -1
+		_calendar_autosave_queued_off_interval = false
+		return
+	if typeof(TimeManager) != TYPE_NIL and bool(TimeManager.get("_living_playtest_clock")):
+		_calendar_autosave_followup_elapsed = -1
+		_calendar_autosave_queued_off_interval = false
+		return
+	var off_interval := _calendar_autosave_queued_off_interval
+	_calendar_autosave_queued_off_interval = false
+	# Day 7 requires a positive multiple of 7. A year morning that is not on
+	# that interval still writes when it was queued with the off-interval flag.
+	if elapsed <= 0 or ((elapsed % 7) != 0 and not off_interval):
+		_chain_calendar_autosave_followup()
+		return
+	# Live F5 no longer skips this write. advance_live_f5_equivalent_days
+	# clears `_live_f5_equiv_clock` before this deferred frame. Put it back
+	# for the gather so GameData still omits the hierarchy dump, then restore.
+	# Quit stays on _skip_quit_autosave. A headless run that never took the
+	# live path leaves the flag alone and keeps today's gather.
+	var rearmed := false
+	if _calendar_autosave_lean_live and typeof(TimeManager) != TYPE_NIL:
+		if not bool(TimeManager.get("_live_f5_equiv_clock")):
+			TimeManager.set("_live_f5_equiv_clock", true)
+			rearmed = true
+	var lean_now := _should_skip_live_f5_calendar_autosave()
+	_calendar_autosave_last_lean = lean_now
+	_calendar_autosave_last_rearmed = rearmed
+	_calendar_autosave_gathered_elapsed = elapsed
 	_calendar_autosave_gathers += 1
+	var rss_before := _vm_status_kb("VmRSS")
+	var hwm_before := _vm_status_kb("VmHWM")
+	var t0 := Time.get_ticks_usec()
 	var res := save_game_detailed("autosave")
+	var save_ms := float(Time.get_ticks_usec() - t0) / 1000.0
+	_calendar_autosave_last_ms = save_ms
+	_calendar_autosave_last_json_bytes = int(res.get("bytes", -1))
+	if rearmed and typeof(TimeManager) != TYPE_NIL:
+		TimeManager.set("_live_f5_equiv_clock", false)
+	var rss_after := _vm_status_kb("VmRSS")
+	var hwm_after := _vm_status_kb("VmHWM")
 	if res.get("ok", false):
+		var toast_line := "Autosaved · day %d" % elapsed
 		print("SaveLoadManager: Calendar autosave day=%d -> autosave.json" % elapsed)
+		print("SaveLoadManager: %s" % toast_line)
+		print(
+			"SAVEFULL1FIX4_METRIC ms=%.1f bytes=%d rss_before=%d rss_mid=%d rss_after=%d hwm_before=%d hwm_mid=%d hwm_after=%d lean_day=%s lean_gather=%s rearmed=%s"
+			% [
+				save_ms,
+				int(res.get("bytes", 0)),
+				rss_before,
+				_calendar_autosave_rss_mid_kb,
+				rss_after,
+				hwm_before,
+				_calendar_autosave_hwm_mid_kb,
+				hwm_after,
+				str(_calendar_autosave_lean_live),
+				str(lean_now),
+				str(rearmed),
+			]
+		)
 		if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
-			LeaderEventUI.show_toast("Autosaved · day %d" % elapsed, 2.0)
+			LeaderEventUI.show_toast(toast_line, 2.0)
 	else:
 		push_warning("SaveLoadManager: Calendar autosave failed: %s" % res.get("error", "unknown"))
+	_chain_calendar_autosave_followup()
 
-func _on_year_advanced_for_autosave(_year: int) -> void:
-	# Autosave to a fixed slot; keeps only the latest autosave for simplicity.
-	# Silent on success (print only), non-spammy toast on failure.
-	if _should_skip_live_f5_calendar_autosave():
-		_calendar_autosave_live_f5_skips += 1
+
+func _vm_status_kb(key: String) -> int:
+	# FileAccess on /proc/self is sandboxed in this export. cat the Godot pid.
+	var pid := OS.get_process_id()
+	var out: Array = []
+	var code := OS.execute("/usr/bin/cat", PackedStringArray(["/proc/%d/status" % pid]), out, true, false)
+	if code != 0 or out.is_empty():
+		return -1
+	var text := ""
+	for item in out:
+		text += str(item)
+		if not str(item).ends_with("\n"):
+			text += "\n"
+	var prefix := key + ":"
+	for line in text.split("\n"):
+		if not line.begins_with(prefix):
+			continue
+		var parts := line.replace("\t", " ").split(" ", false)
+		for p in parts:
+			if p.is_valid_int():
+				return int(p)
+	return -1
+
+
+func _queue_deferred_calendar_autosave(elapsed: int, off_interval: bool) -> void:
+	# Do not latch this on the day-7 path. A later soak can rewind the
+	# calendar to elapsed 0 and must still gather its own day 7. The year
+	# hook is what skips an elapsed day that already gathered.
+	if elapsed <= 0:
 		return
-	var res := save_game_detailed("autosave")
-	if res.get("ok", false):
-		print("SaveLoadManager: Autosaved on year change -> autosave.json")
-	else:
-		push_warning("SaveLoadManager: Autosave failed: %s" % res.get("error", "unknown"))
-		if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
-			LeaderEventUI.show_toast("Autosave failed", 2.0, true)
+	if _calendar_autosave_pending:
+		return
+	_calendar_autosave_serial += 1
+	_calendar_autosave_queued_elapsed = elapsed
+	_calendar_autosave_queued_off_interval = off_interval
+	_calendar_autosave_pending = true
+	call_deferred("_deferred_calendar_autosave", elapsed)
+
+
+func _chain_calendar_autosave_followup() -> void:
+	if _calendar_autosave_followup_elapsed <= 0:
+		return
+	var elapsed := _calendar_autosave_followup_elapsed
+	var off := _calendar_autosave_followup_off_interval
+	_calendar_autosave_followup_elapsed = -1
+	_calendar_autosave_followup_off_interval = false
+	if elapsed == _calendar_autosave_gathered_elapsed:
+		return
+	_queue_deferred_calendar_autosave(elapsed, off)
+
+
+func _on_year_advanced_for_autosave(year: int) -> void:
+	# Autosave to a fixed slot; keeps only the latest autosave for simplicity.
+	# Headless (not the live path) still writes immediately.
+	# Live F5 used to return here, so a session that crossed into 1937 never
+	# wrote. 1936 is not a leap year: 1937-01-01 is elapsed 365, and 365 % 7
+	# is 1, so the day-7 hook does not write that morning. Queue the same
+	# deferred lean gather as day 7. If that elapsed day already gathered, or
+	# is already queued, do not gather again. Quit stays on _skip_quit_autosave.
+	if OS.get_environment("EOA_CALENDAR_AUTOSAVE").strip_edges() == "0":
+		return
+	if typeof(TimeManager) != TYPE_NIL and bool(TimeManager.get("_living_playtest_clock")):
+		return
+	if not _should_skip_live_f5_calendar_autosave():
+		var res := save_game_detailed("autosave")
+		if res.get("ok", false):
+			print("SaveLoadManager: Autosaved on year change -> autosave.json")
+		else:
+			push_warning("SaveLoadManager: Autosave failed: %s" % res.get("error", "unknown"))
+			if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
+				LeaderEventUI.show_toast("Autosave failed", 2.0, true)
+		return
+	var elapsed := _elapsed_for_emitted_calendar(year, 1, 1)
+	if elapsed <= 0 and typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("get_total_days_elapsed"):
+		elapsed = int(TimeManager.get_total_days_elapsed())
+	if elapsed <= 0:
+		return
+	# A rewound clock is a new timeline. Elapsed 7 gathered before the rewind
+	# must not suppress a later year morning, and must not suppress day 7.
+	if _calendar_autosave_gathered_elapsed >= 0 and elapsed < _calendar_autosave_gathered_elapsed:
+		_calendar_autosave_gathered_elapsed = -1
+	if elapsed == _calendar_autosave_gathered_elapsed:
+		return
+	if _calendar_autosave_pending and _calendar_autosave_queued_elapsed == elapsed:
+		return
+	_calendar_autosave_lean_live = true
+	if _calendar_autosave_pending:
+		_calendar_autosave_followup_elapsed = elapsed
+		_calendar_autosave_followup_off_interval = true
+		return
+	_queue_deferred_calendar_autosave(elapsed, true)
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST or what == NOTIFICATION_EXIT_TREE:
@@ -559,12 +810,19 @@ func _gather_save_data() -> Dictionary:
 
 	# --- TimeManager ---
 	if typeof(TimeManager) != TYPE_NIL:
+		var date := TimeManager.get_current_date()
+		date.erase("hour")
+		date.erase("date_string")
 		data["time"] = {
-			"current_date": TimeManager.get_current_date(),
+			"current_date": date,
 			"scenario_start_date": TimeManager.get_scenario_start_date(),
 			"paused": TimeManager.is_paused(),
 			"time_scale": TimeManager.time_scale,
 			"total_days_elapsed": TimeManager.get_total_days_elapsed(),
+			"current_hour": TimeManager.current_hour,
+			"run_seed": int(TimeManager.run_seed) if "run_seed" in TimeManager else 0,
+			"accumulated_days": float(TimeManager._accumulated_game_days),
+			"accumulated_hours": float(TimeManager._accumulated_game_hours),
 		}
 
 	# --- TechnologyManager ---
@@ -598,8 +856,12 @@ func _gather_save_data() -> Dictionary:
 	# --- NationalModifierManager ---
 	if typeof(NationalModifierManager) != TYPE_NIL:
 		data["national_modifiers"] = {
-			"country_modifiers": NationalModifierManager.country_modifiers.duplicate(true)
+			"country_modifiers": NationalModifierManager.country_modifiers.duplicate(true),
+			"effect_seq": int(NationalModifierManager._effect_seq),
 		}
+
+	if typeof(NationalSpiritManager) != TYPE_NIL and NationalSpiritManager.has_method("get_save_data"):
+		data["national_spirits"] = NationalSpiritManager.get_save_data()
 
 	# --- Scenario metadata ---
 	var scenario_name := ""
@@ -607,6 +869,13 @@ func _gather_save_data() -> Dictionary:
 	if loader != null:
 		scenario_name = loader.get_current_scenario_name()
 	data["metadata"]["scenario_id"] = scenario_name
+	# Living nation, not the USA placeholder. The load list reads this field.
+	var player_tag := "USA"
+	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_player_country_tag"):
+		var live_tag := str(LeaderManager.get_player_country_tag()).strip_edges().to_upper()
+		if not live_tag.is_empty():
+			player_tag = live_tag
+	data["metadata"]["player_tag"] = player_tag
 
 	# Richer metadata for future save menu (timestamp already set above, scenario captured)
 	data["metadata"]["last_played"] = Time.get_datetime_string_from_system(true)
@@ -751,6 +1020,9 @@ func _apply_save_data(data: Dictionary) -> void:
 	if data.has("national_modifiers") and typeof(NationalModifierManager) != TYPE_NIL:
 		_apply_national_modifier_state(data["national_modifiers"])
 
+	if data.has("national_spirits") and typeof(NationalSpiritManager) != TYPE_NIL and NationalSpiritManager.has_method("apply_save_data"):
+		NationalSpiritManager.apply_save_data(data["national_spirits"])
+
 	# 5. Technology research state + unlocks
 	if data.has("technology") and typeof(TechnologyManager) != TYPE_NIL:
 		_apply_technology_state(data["technology"])
@@ -830,6 +1102,10 @@ func _apply_save_data(data: Dictionary) -> void:
 		if RelationsManager.has_method("apply_save_data"):
 			RelationsManager.apply_save_data(data["relations"])
 
+	# Leader / agent / modifier years are not their own calendar. The next
+	# year boundary increments them, so a load must leave them on the restored clock.
+	_sync_sim_years_from_clock()
+
 	# Future: after all core state, allow other managers to react
 	# e.g. if typeof(ProductionManager) != TYPE_NIL and ProductionManager.has_method("on_game_loaded"):
 	#     ProductionManager.on_game_loaded()
@@ -842,6 +1118,10 @@ func _apply_time_state(t: Dictionary) -> void:
 		TimeManager.current_year = int(d.get("year", 1936))
 		TimeManager.current_month = int(d.get("month", 1))
 		TimeManager.current_day = int(d.get("day", 1))
+		if d.has("hour") and not t.has("current_hour"):
+			TimeManager.current_hour = clampi(int(d.get("hour", 0)), 0, 23)
+	if t.has("current_hour"):
+		TimeManager.current_hour = clampi(int(t.get("current_hour", 0)), 0, 23)
 	if t.has("scenario_start_date"):
 		TimeManager.scenario_start_date = str(t["scenario_start_date"])
 	if t.has("paused"):
@@ -850,12 +1130,36 @@ func _apply_time_state(t: Dictionary) -> void:
 		TimeManager.set_time_scale(float(t.get("time_scale", 1.0)))
 	if t.has("total_days_elapsed"):
 		TimeManager.total_days_elapsed = maxi(0, int(t.get("total_days_elapsed", 0)))
+	if t.has("run_seed") and "run_seed" in TimeManager:
+		TimeManager.run_seed = int(t.get("run_seed", 0))
+	if t.has("accumulated_days"):
+		TimeManager._accumulated_game_days = float(t.get("accumulated_days", 0.0))
+	if t.has("accumulated_hours"):
+		TimeManager._accumulated_game_hours = float(t.get("accumulated_hours", 0.0))
 	# Do not fire game_day_advanced etc. here — we are restoring state, not simulating.
+
+
+## Leader, agent, and modifier years follow TimeManager during play via year
+## signals. They are not stored on their own. Restoring only the clock leaves
+## them at the boot year, so the next 1 January increments a stale counter.
+func _sync_sim_years_from_clock() -> void:
+	if typeof(TimeManager) == TYPE_NIL:
+		return
+	var year := int(TimeManager.get_current_year())
+	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("set_current_year"):
+		LeaderManager.set_current_year(year)
+	if typeof(AgentManager) != TYPE_NIL and AgentManager.has_method("set_current_year"):
+		AgentManager.set_current_year(year)
+		AgentManager._last_year_ticked = year
+	if typeof(NationalModifierManager) != TYPE_NIL and NationalModifierManager.has_method("set_current_year"):
+		NationalModifierManager.set_current_year(year)
+		NationalModifierManager._last_year_ticked = year
+
 
 ## --- Agents (most complex because of Resource instances) ---
 
 func _serialize_agent_state() -> Dictionary:
-	var out := { "agents": {}, "networks": {} }
+	var out := { "agents": {}, "networks": {}, "agent_seq": int(AgentManager._agent_seq) }
 
 	# Agents
 	for ctag in AgentManager.agents.keys():
@@ -975,6 +1279,13 @@ func _apply_agent_state(a: Dictionary) -> void:
 
 	# Note: We do not re-emit every signal here; UI that cares can refresh on demand
 	# or we can emit a single "agents_state_restored" if we add the signal later.
+	AgentManager._agent_seq = int(a.get("agent_seq", 0))
+	for ctag2 in AgentManager.agents.keys():
+		var restored: Variant = AgentManager.agents[ctag2]
+		if restored is Array:
+			for agent_v in restored as Array:
+				if agent_v is Agent:
+					AgentManager.note_agent_id((agent_v as Agent).agent_id)
 	print("SaveLoad: Restored %d agent countries + %d networks" % [agents_by_country.size(), nets.size()])
 
 ## --- Map (provinces) ---
@@ -996,6 +1307,7 @@ func _serialize_map_state() -> Dictionary:
 			"controller_tag": p.controller_tag,
 			"development_level": p.development_level,
 			"infrastructure": p.infrastructure,
+			"factories": int(p.factories),
 			"settlement_level": p.settlement_level,
 			"built_road_neighbors": p.built_road_neighbors.duplicate(),
 			"built_rail_neighbors": p.built_rail_neighbors.duplicate(),
@@ -1067,6 +1379,14 @@ func _apply_map_state(m: Dictionary) -> void:
 
 		if e.has("infrastructure"):
 			MapManager.update_province_infrastructure(pid, int(e["infrastructure"]))
+
+		# Factory counts feed military_strength when a tag has no divisions.
+		# The boot map uses a different count than a mid-war economy, so a
+		# load that skips this field starts wars the uninterrupted run does not.
+		if e.has("factories"):
+			var p_fac: Province = MapManager.get_province(pid)
+			if p_fac != null:
+				p_fac.factories = int(e["factories"])
 
 		if e.has("settlement_level"):
 			var sl := float(e.get("settlement_level", 0.0))
@@ -1227,6 +1547,8 @@ func _apply_national_modifier_state(n: Dictionary) -> void:
 		return
 	# Replace wholesale — tick_modifiers will continue decaying on next monthly tick
 	NationalModifierManager.country_modifiers = (n.get("country_modifiers", {}) as Dictionary).duplicate(true)
+	if NationalModifierManager.has_method("apply_saved_effect_seq"):
+		NationalModifierManager.apply_saved_effect_seq(int(n.get("effect_seq", 0)))
 	print("SaveLoad: National modifier effects restored")
 
 ## --- Technology ---
@@ -1235,20 +1557,30 @@ func _apply_technology_state(t: Dictionary) -> void:
 	if typeof(TechnologyManager) == TYPE_NIL:
 		return
 
-	var cs: Dictionary = t.get("country_state", {}) as Dictionary
-	if not cs.is_empty():
-		TechnologyManager.country_state = cs.duplicate(true)
+	if TechnologyManager.has_method("apply_save_data"):
+		var payload := t.duplicate(true)
+		# A stub or empty country_state must not wipe scenario research.
+		var cs: Variant = payload.get("country_state", {})
+		if not (cs is Dictionary) or (cs as Dictionary).is_empty():
+			payload.erase("country_state")
+		TechnologyManager.apply_save_data(payload)
+	else:
+		var legacy: Dictionary = t.get("country_state", {}) as Dictionary
+		if not legacy.is_empty():
+			TechnologyManager.country_state = legacy.duplicate(true)
+		if TechnologyManager.has_method("_rebuild_unlock_indices"):
+			TechnologyManager._rebuild_unlock_indices()
 
-	# Rebuild any derived indices that depend on the restored state
-	if TechnologyManager.has_method("_rebuild_unlock_indices"):
-		TechnologyManager._rebuild_unlock_indices()
+	# Old blobs omit the year. Follow the clock already restored above.
+	if not t.has("current_year") and typeof(TimeManager) != TYPE_NIL and TechnologyManager.has_method("set_current_year"):
+		TechnologyManager.set_current_year(int(TimeManager.get_current_year()))
+	if TechnologyManager.has_method("get_current_year"):
+		TechnologyManager._last_year_ticked = int(TechnologyManager.get_current_year())
 
-	# Let screens / UI that listen to research_state_changed refresh
-	for tag in TechnologyManager.country_state.keys():
-		if TechnologyManager.has_signal("research_state_changed"):
-			TechnologyManager.research_state_changed.emit(str(tag))
-
-	print("SaveLoad: Technology country_state restored for %d countries" % TechnologyManager.country_state.size())
+	print("SaveLoad: Technology country_state restored for %d countries (year %d)" % [
+		TechnologyManager.country_state.size(),
+		int(TechnologyManager.get_current_year()) if TechnologyManager.has_method("get_current_year") else 0,
+	])
 
 ## Convenience / debug helpers
 
@@ -1313,16 +1645,64 @@ func _migrate_save_data(data: Dictionary) -> void:
 	if v >= SAVE_VERSION:
 		return
 	print("SaveLoad: Migrating save from v%d to v%d" % [v, SAVE_VERSION])
+	if v < 2:
+		_migrate_save_v1_to_v2(data)
+	data["save_version"] = SAVE_VERSION
 
-	# Example future migration (uncomment and extend as needed):
-	# if v < 2:
-	#     if not data.has("production"):
-	#         data["production"] = {}
-	#     if data.has("old_key_name"):
-	#         data["new_key_name"] = data.pop("old_key_name")
-	#     # Provide defaults for new sections, fix shapes, etc.
 
-	data["save_version"] = SAVE_VERSION  # mark as upgraded
+## v1 blobs omitted depot fuel/munitions, id counters, and the supply cursors.
+## Missing keys get defaults. National spirits are left untouched so a missing
+## section still reloads the definition list.
+func _migrate_save_v1_to_v2(data: Dictionary) -> void:
+	var supply: Variant = data.get("supply", {})
+	if supply is Dictionary:
+		var depots: Variant = (supply as Dictionary).get("depots", {})
+		if depots is Dictionary:
+			for pid_str in (depots as Dictionary).keys():
+				var entry: Variant = (depots as Dictionary)[pid_str]
+				if typeof(entry) != TYPE_DICTIONARY:
+					continue
+				var row: Dictionary = entry
+				if not row.has("fuel_stockpile"):
+					row["fuel_stockpile"] = 0.0
+				if not row.has("munitions_stockpile"):
+					row["munitions_stockpile"] = float(row.get("stockpile", 0.0)) * 0.35
+				(depots as Dictionary)[pid_str] = row
+			(supply as Dictionary)["depots"] = depots
+		if not (supply as Dictionary).has("refill_queue"):
+			(supply as Dictionary)["refill_queue"] = []
+		if not (supply as Dictionary).has("supply_day_jobs"):
+			(supply as Dictionary)["supply_day_jobs"] = []
+		if not (supply as Dictionary).has("attrition"):
+			(supply as Dictionary)["attrition"] = {"losses": {}, "leaders": {}}
+		data["supply"] = supply
+	var leaders: Variant = data.get("leaders", {})
+	if leaders is Dictionary:
+		if not (leaders as Dictionary).has("replacement_seq"):
+			(leaders as Dictionary)["replacement_seq"] = 0
+		if not (leaders as Dictionary).has("leader_id_seq"):
+			(leaders as Dictionary)["leader_id_seq"] = 0
+		if not (leaders as Dictionary).has("fielded_seq"):
+			(leaders as Dictionary)["fielded_seq"] = 0
+		if not (leaders as Dictionary).has("officer_training_quality"):
+			(leaders as Dictionary)["officer_training_quality"] = {}
+		if not (leaders as Dictionary).has("months_in_training"):
+			(leaders as Dictionary)["months_in_training"] = {}
+		if not (leaders as Dictionary).has("officer_training_debuff_months"):
+			(leaders as Dictionary)["officer_training_debuff_months"] = {}
+		data["leaders"] = leaders
+	var production: Variant = data.get("production", {})
+	if production is Dictionary and not (production as Dictionary).has("family_units_produced"):
+		(production as Dictionary)["family_units_produced"] = {}
+		data["production"] = production
+	var agents: Variant = data.get("agents", {})
+	if agents is Dictionary and not (agents as Dictionary).has("agent_seq"):
+		(agents as Dictionary)["agent_seq"] = 0
+		data["agents"] = agents
+	var modifiers: Variant = data.get("national_modifiers", {})
+	if modifiers is Dictionary and not (modifiers as Dictionary).has("effect_seq"):
+		(modifiers as Dictionary)["effect_seq"] = 0
+		data["national_modifiers"] = modifiers
 
 ## === Infrastructure migration support (added May 2026) ===
 ## Handles old saves that pre-date the "infrastructure_projects" section.
@@ -1415,6 +1795,11 @@ func save_game_detailed(slot_name: String = DEFAULT_SLOT) -> Dictionary:
 	# 3520-province blob doubled peak RSS on llvmpipe Play soaks.
 	var indent := "" if (safe_slot == "autosave" or _should_skip_live_f5_calendar_autosave()) else "\t"
 	var json_text := JSON.stringify(data, indent)
+	if safe_slot == "autosave":
+		# Sample while the JSON string is still live so the day-7 peak is not
+		# hidden by freeing it before the after-read.
+		_calendar_autosave_rss_mid_kb = _vm_status_kb("VmRSS")
+		_calendar_autosave_hwm_mid_kb = _vm_status_kb("VmHWM")
 	if json_text.is_empty() or json_text == "null":
 		var jmsg := "JSON stringify failed"
 		push_error("SaveLoadManager: %s" % jmsg)

@@ -18,6 +18,30 @@ const LAND_FORMATION_TYPES: Array[String] = [
 ]
 
 
+## Land design for a minor the major-power match does not name.
+## CZE uses the LT vz. 35 template; SWE uses Strv m/38. FIN and NOR use their
+## 1936 national files when those files exist. BEL has no national file, so it
+## stays on m3_stuart_light_tank. A blanket `{tag}_armor_1936` swap would
+## retarget every scenario-spawned minor and can move the decision seed.
+static func minor_land_design_id(tag: String) -> String:
+	var t := tag.strip_edges().to_upper()
+	if t == "CZE" and _unit_template_exists("lt_vz_35_light"):
+		return "lt_vz_35_light"
+	if t == "SWE" and _unit_template_exists("swe_armor_1936"):
+		return "swe_armor_1936"
+	if t == "FIN" and _unit_template_exists("fin_armor_1936"):
+		return "fin_armor_1936"
+	if t == "NOR" and _unit_template_exists("nor_armor_1936"):
+		return "nor_armor_1936"
+	if t == "BEL" and _unit_template_exists("bel_armor_1936"):
+		return "bel_armor_1936"
+	return "m3_stuart_light_tank"
+
+
+static func _unit_template_exists(design_id: String) -> bool:
+	return FileAccess.file_exists("res://data/unit_templates/%s.json" % design_id)
+
+
 ## Pure station resolver (mirrors tools/map_generation/lib/formation_station_resolver.py).
 ## Prefer capital when it is in owned_land_ids; else first sorted owned land; else -1.
 ## Rejects non-positive ids. Callers must only pass land (non-sea) owned ids.
@@ -203,7 +227,7 @@ func spawn_test_formations_for_country(
 				elif tag == "POL":
 					formation.design_id = "pol_armor_1936" if i % 2 == 0 else "m3_stuart_light_tank"
 				else:
-					formation.design_id = "m3_stuart_light_tank"
+					formation.design_id = minor_land_design_id(tag)
 			Formation.TYPE_FLEET:
 				formation.name = "Fleet %d" % i
 				formation.current_naval_order = Formation.NAVAL_ORDER_SEARCH_PATROL if i % 2 == 0 else Formation.NAVAL_ORDER_SEARCH_AND_DESTROY

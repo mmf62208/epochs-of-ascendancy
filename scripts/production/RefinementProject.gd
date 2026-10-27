@@ -35,6 +35,44 @@ static func from_def(def: Dictionary, for_template_id: String) -> RefinementProj
 	return project
 
 
+func to_save_dict() -> Dictionary:
+	return {
+		"id": id,
+		"display_name": display_name,
+		"category": category,
+		"template_id": template_id,
+		"days_total": days_total,
+		"days_elapsed": days_elapsed,
+		"reliability_gain": reliability_gain,
+		"maturity_gain": maturity_gain,
+		"maintenance_reduction": maintenance_reduction,
+		"cost": cost.duplicate(true),
+		"blocks_production": blocks_production,
+		"production_penalty": production_penalty,
+		"max_completions": max_completions,
+		"tradeoff_summary": tradeoff_summary,
+	}
+
+
+static func from_save_dict(data: Dictionary) -> RefinementProject:
+	var project := RefinementProject.new()
+	project.id = str(data.get("id", ""))
+	project.display_name = str(data.get("display_name", project.id))
+	project.category = str(data.get("category", "refinement"))
+	project.template_id = str(data.get("template_id", ""))
+	project.days_total = float(data.get("days_total", 0.0))
+	project.days_elapsed = float(data.get("days_elapsed", 0.0))
+	project.reliability_gain = float(data.get("reliability_gain", 0.0))
+	project.maturity_gain = float(data.get("maturity_gain", 0.0))
+	project.maintenance_reduction = float(data.get("maintenance_reduction", 0.0))
+	project.cost = _dict_from_variant(data.get("cost", {}))
+	project.blocks_production = bool(data.get("blocks_production", false))
+	project.production_penalty = float(data.get("production_penalty", 0.0))
+	project.max_completions = int(data.get("max_completions", 1))
+	project.tradeoff_summary = str(data.get("tradeoff_summary", ""))
+	return project
+
+
 func advance(days: float) -> void:
 	days_elapsed = minf(days_elapsed + days, days_total)
 

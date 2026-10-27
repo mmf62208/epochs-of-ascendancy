@@ -10,6 +10,8 @@ signal national_modifier_applied(country_tag: String, effect_id: String)
 signal national_modifier_expired(country_tag: String, effect_id: String)
 
 var country_modifiers: Dictionary = {}  # country_tag -> Array[Dictionary]
+## Monotonic suffix for effect ids that callers do not name. Saved with the modifier blob.
+var _effect_seq: int = 0
 
 var _current_year: int = 1936
 var _last_year_ticked: int = -1  # Dedup guard for year signal (TM + Leader both may fire during migration)
@@ -68,8 +70,8 @@ func apply_national_effect(country_tag: String, effect_data: Dictionary) -> bool
 	var effect := effect_data.duplicate(true)
 
 	# Ensure required fields
-	if not effect.has("effect_id"):
-		effect["effect_id"] = "%s_%s_%d" % [tag, effect.get("source", "unknown"), Time.get_unix_time_from_system()]
+	if not effect.has("effect_id") or str(effect.get("effect_id", "")).is_empty():
+		effect["effect_id"] = alloc_effect_id(tag, str(effect.get("source", "unknown")))
 
 	if not effect.has("remaining_months"):
 		effect["remaining_months"] = int(effect.get("duration_months", 6))
@@ -94,6 +96,40 @@ func apply_national_effect(country_tag: String, effect_data: Dictionary) -> bool
 	effects.append(effect)
 	national_modifier_applied.emit(tag, effect["effect_id"])
 	return true
+
+
+func alloc_effect_id(country_tag: String, source: String) -> String:
+	_effect_seq += 1
+	var day := 0
+	if typeof(TimeManager) != TYPE_NIL and "total_days_elapsed" in TimeManager:
+		day = int(TimeManager.total_days_elapsed)
+	var src := source.strip_edges()
+	if src.is_empty():
+		src = "unknown"
+	return "%s_%s_d%d_%d" % [country_tag.strip_edges().to_upper(), src, day, _effect_seq]
+
+
+func note_effect_id(effect_id: String) -> void:
+	var parts := effect_id.split("_")
+	if parts.size() < 2:
+		return
+	var day_tok := str(parts[parts.size() - 2])
+	var tail := str(parts[parts.size() - 1])
+	if not day_tok.begins_with("d") or not day_tok.substr(1).is_valid_int():
+		return
+	if tail.is_valid_int():
+		_effect_seq = maxi(_effect_seq, int(tail))
+
+
+func apply_saved_effect_seq(seq: int) -> void:
+	_effect_seq = maxi(0, seq)
+	for tag in country_modifiers.keys():
+		var effects: Variant = country_modifiers[tag]
+		if not effects is Array:
+			continue
+		for row in effects as Array:
+			if row is Dictionary:
+				note_effect_id(str((row as Dictionary).get("effect_id", "")))
 
 
 ## Advances all modifiers by the given number of months.
