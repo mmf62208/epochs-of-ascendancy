@@ -8,6 +8,7 @@ Gap provinces are append-only ids 906000–906020. They moved off 905849–90586
 so they miss the GAP clash window 905849–905888 and the land ids used through
 905908 (GAP-USSR-WEST 905889–905899, GAP-WEST-UKR 905900–905908).
 MAP-RECONCILE-1 adds the 11 unique names from those branches at 906100–906110.
+GAP-CHINA-2 adds the 28 unique #124 China names at 906111–906138.
 This module does not write the board.
 """
 from __future__ import annotations
@@ -35,8 +36,11 @@ LAND_N_BEFORE = 3196
 GAP_N = LAST_GAP_ID - FIRST_GAP_ID + 1
 # Unique USSR-west / west-Ukraine names folded at 906100–906110.
 RECONCILE_WEST_N = 11
-BOARD_N_AFTER = BOARD_N_BEFORE + GAP_N + RECONCILE_WEST_N
-LAND_N_AFTER = LAND_N_BEFORE + GAP_N + RECONCILE_WEST_N
+# Unique GAP-CHINA names folded at 906111–906138. Six #124 cities stay on
+# their #136 ids, so they are not in this count.
+CHINA2_N = 28
+BOARD_N_AFTER = BOARD_N_BEFORE + GAP_N + RECONCILE_WEST_N + CHINA2_N
+LAND_N_AFTER = LAND_N_BEFORE + GAP_N + RECONCILE_WEST_N + CHINA2_N
 
 # Witnesses that must not move. 711112 is Warsaw (POL in 1936). 711074 is a
 # recovered Silesian province (GER in 1936, POL after the 1945 border).

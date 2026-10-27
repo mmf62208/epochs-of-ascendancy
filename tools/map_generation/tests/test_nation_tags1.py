@@ -137,6 +137,141 @@ class TestNationTags1(unittest.TestCase):
         self.assertNotIn(950343, board_ids)
         self.assertTrue(set(got).isdisjoint(set(range(905849, 905909))))
 
+    def test_gap_china2_ids_start_at_906111_and_miss_clash(self) -> None:
+        """GAP-CHINA-2 unique #124 names. Fails while they are absent or if any
+        of them lands in a clash window, on a #136/#137 id, or on world_full.
+        """
+        names = (
+            "Urumqi-Turfan",
+            "U-Tsang (Lhasa)",
+            "Changtang (N. Tibet)",
+            "Xikang East (Kangding)",
+            "Qinghai East (Xining)",
+            "Ningxia",
+            "Shanxi North (Datong)",
+            "Shaanbei (Yanan)",
+            "Guanzhong (Xian)",
+            "Shaannan (Hanzhong)",
+            "Henan North (Kaifeng)",
+            "Henan South (Xinyang)",
+            "Jiangsu North (Xuzhou)",
+            "Jiangsu South (Shanghai-Nanking)",
+            "Anhui North (Bengbu)",
+            "Zhejiang North (Hangzhou)",
+            "Zhejiang South (Wenzhou)",
+            "Jiangxi North (Nanchang)",
+            "Jiangxi South (Ganzhou)",
+            "Hubei East (Wuhan)",
+            "Hubei West (Yichang)",
+            "Hunan South (Hengyang)",
+            "Sichuan North (Nanchong)",
+            "Yunnan West (Dali)",
+            "Guangxi West (Nanning)",
+            "Guangdong East (Swatow)",
+            "Guangdong West (Leizhou)",
+            "Hainan",
+        )
+        kept = {
+            906013: "Chongqing",
+            906014: "Guangzhou",
+            906015: "Chengdu",
+            906016: "Fuzhou",
+            906018: "Taiyuan",
+            906019: "Guiyang",
+        }
+        blobs = {
+            902487: "CHN North",
+            902491: "CHN East",
+            902493: "CHN West",
+            902496: "CHN North",
+            902504: "CHN West",
+            902505: "CHN East",
+            902514: "CHN West",
+            902521: "CHN East",
+            902523: "CHN West",
+            902526: "CHN West",
+            902534: "CHN West",
+            902544: "CHN North",
+            902564: "CHN East",
+            902566: "CHN South",
+            902568: "CHN West",
+            902569: "CHN West",
+            902590: "CHN East",
+            902598: "CHN South",
+            902601: "CHN South",
+            902633: "CHN South",
+            902634: "CHN South",
+            902646: "CHN South",
+        }
+        base = json.loads(
+            (ROOT / "data" / "provinces_world_accurate" / "provinces_base.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        by_name = {}
+        by_id = {}
+        for row in base["provinces"]:
+            pid = int(row["id"])
+            by_id[pid] = row
+            by_name.setdefault(str(row.get("name")), pid)
+        got = []
+        for name in names:
+            self.assertIn(name, by_name, name)
+            got.append(by_name[name])
+        self.assertEqual(got, list(range(906111, 906111 + len(names))))
+        for pid, name in kept.items():
+            self.assertEqual(str(by_id[pid]["name"]), name)
+            self.assertNotIn(pid, got)
+        for pid, name in blobs.items():
+            self.assertEqual(str(by_id[pid]["name"]), name)
+        own36 = json.loads(
+            (ROOT / "data" / "provinces_world_accurate" / "province_ownership_1936.json").read_text(
+                encoding="utf-8"
+            )
+        )["owners"]
+        own26 = json.loads(
+            (ROOT / "data" / "provinces_world_accurate" / "province_ownership_2026.json").read_text(
+                encoding="utf-8"
+            )
+        )["owners"]
+        for pid in got:
+            self.assertEqual(own36[str(pid)], "CHI")
+            self.assertEqual(own26[str(pid)], "PRC")
+            self.assertEqual(int(by_id[pid]["population_base"]), 0)
+        for pid, name in blobs.items():
+            self.assertEqual(own36[str(pid)], "CHI")
+        cities = json.loads(
+            (ROOT / "data" / "provinces_world_accurate" / "province_city_layer.json").read_text(
+                encoding="utf-8"
+            )
+        )["provinces"]
+        self.assertEqual(cities["902590"]["city_name"], "Anking")
+        self.assertEqual(cities["906124"]["city_name"], "Shanghai")
+        adj = json.loads(
+            (ROOT / "data" / "provinces_world_accurate" / "province_adjacency.json").read_text(
+                encoding="utf-8"
+            )
+        )["adjacency"]
+        kinmen = {int(x) for x in adj["903981"]}
+        hunan = {int(x) for x in adj["902598"]}
+        self.assertIn(902598, kinmen)
+        self.assertIn(903981, hunan)
+        self.assertIn(902633, kinmen)
+        clash_land = set(range(CLASH_LO, SCANNED_LAND_HI + 1))
+        clash_tags = set(range(906000, 906021))
+        clash_west = set(range(906100, 906111))
+        self.assertEqual(sorted(set(got) & clash_land), [])
+        self.assertEqual(sorted(set(got) & clash_tags), [])
+        self.assertEqual(sorted(set(got) & clash_west), [])
+        self.assertTrue(set(SCANNED_SEAS).isdisjoint(set(got)))
+        full = json.loads(
+            (ROOT / "data" / "provinces_world_full" / "provinces_base.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        full_ids = {int(row["id"]) for row in full["provinces"]}
+        self.assertTrue(set(got).isdisjoint(full_ids))
+
 
 if __name__ == "__main__":
     unittest.main()

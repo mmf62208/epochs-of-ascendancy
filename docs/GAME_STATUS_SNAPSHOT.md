@@ -179,7 +179,7 @@ Every Cursor / Grok / human session on this tree:
 | Seas | 340 (IDs 950000+) |
 | **Total** | **~3520** (land **~3180** + sea 340) |
 
-NATION-TAGS-1 appends UKR / MDA / PRC / MAN era tags (no 1936 owners), 1945 POL on existing `cc=PL` provinces, and gap provinces 906000–906020 (moved off 905849–905869, which clash with GAP-HAWAII through GAP-WEST-UKR up to 905908). MAP-RECONCILE-1 folds the unique #126/#128 names onto 906100–906110 (board 3568, land 3228) and upgrades the nine overlapping Ukraine/Moldova rings in place. The ~3520 band string stays.
+NATION-TAGS-1 appends UKR / MDA / PRC / MAN era tags (no 1936 owners), 1945 POL on existing `cc=PL` provinces, and gap provinces 906000–906020 (moved off 905849–905869, which clash with GAP-HAWAII through GAP-WEST-UKR up to 905908). MAP-RECONCILE-1 folds the unique #126/#128 names onto 906100–906110 (board 3568, land 3228) and upgrades the nine overlapping Ukraine/Moldova rings in place. GAP-CHINA-2 folds the unique #124 China names onto 906111–906138 (board 3596, land 3256), bridges six #136 city rings in place, and replaces the 22 CHI blob rings without renaming them. The ~3520 band string stays.
 
 ---
 

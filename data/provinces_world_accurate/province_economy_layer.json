@@ -21435,6 +21435,174 @@
       "factories": 1,
       "infrastructure": 2,
       "development_level": 2
+    },
+    "906111": {
+      "population": 0,
+      "factories": 4,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "906112": {
+      "population": 0,
+      "factories": 6,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "906113": {
+      "population": 0,
+      "factories": 8,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "906114": {
+      "population": 0,
+      "factories": 0,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "906115": {
+      "population": 0,
+      "factories": 3,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "906116": {
+      "population": 0,
+      "factories": 3,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "906117": {
+      "population": 0,
+      "factories": 1,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "906118": {
+      "population": 0,
+      "factories": 2,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "906119": {
+      "population": 0,
+      "factories": 2,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "906120": {
+      "population": 0,
+      "factories": 1,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "906121": {
+      "population": 0,
+      "factories": 0,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "906122": {
+      "population": 0,
+      "factories": 0,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "906123": {
+      "population": 0,
+      "factories": 1,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "906124": {
+      "population": 0,
+      "factories": 1,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "906125": {
+      "population": 0,
+      "factories": 0,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "906126": {
+      "population": 0,
+      "factories": 1,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "906127": {
+      "population": 0,
+      "factories": 0,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "906128": {
+      "population": 0,
+      "factories": 1,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "906129": {
+      "population": 0,
+      "factories": 0,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "906130": {
+      "population": 0,
+      "factories": 1,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "906131": {
+      "population": 0,
+      "factories": 2,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "906132": {
+      "population": 0,
+      "factories": 2,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "906133": {
+      "population": 0,
+      "factories": 2,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "906134": {
+      "population": 0,
+      "factories": 0,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "906135": {
+      "population": 0,
+      "factories": 2,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "906136": {
+      "population": 0,
+      "factories": 1,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "906137": {
+      "population": 0,
+      "factories": 1,
+      "infrastructure": 3,
+      "development_level": 2
+    },
+    "906138": {
+      "population": 0,
+      "factories": 1,
+      "infrastructure": 3,
+      "development_level": 2
     }
   },
   "meta": {
