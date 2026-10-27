@@ -93,7 +93,7 @@ func _assert_garrison_fielding(lm: Node, pm: Node, seeded: Dictionary) -> void:
 	var placed := int(seeded.get("placed", -1))
 	var skipped := int(seeded.get("skipped_occupied", -1))
 	var targets := int(seeded.get("targets", -1))
-	if placed != 549 or skipped != 0 or targets != 549 or placed != targets:
+	if placed != 550 or skipped != 0 or targets != 550 or placed != targets:
 		_fail("empty board placed=%d skipped=%d targets=%d" % [placed, skipped, targets])
 		return
 	var seen := 0
