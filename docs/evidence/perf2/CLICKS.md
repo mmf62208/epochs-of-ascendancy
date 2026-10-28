@@ -38,9 +38,10 @@ and wheel-notch cost; plate positions and capital stars must look unchanged.
    Expect: stars return to **20 px** (not stuck at the glyph-pass 36 px).
 3. Keep wheeling in past operational (z > 1.55, including the playtest
    12-notch / z≈5.62 Budapest–Belgrade view) with supply **off**.
-   Expect: capital stars **grow on screen** toward 36 px and stay in 18–36
-   (not font 36 × camera ≈ 281 px at z=5.62). A same-px notch at that zoom
-   must keep the fitted size.
+   Expect: a **crisp** ★ about 18–36 px (not a 4 px font stretched to a
+   6–7 px blur, and not font 36 × camera ≈ 281 px). Font stays at the
+   on-screen size; the node is counter-scaled by 1/zoom. After Home and
+   after L, operational stars return to 20 px font.
    Operational and Home hide/size rules above stay.
 
 ## Must keep (visible)

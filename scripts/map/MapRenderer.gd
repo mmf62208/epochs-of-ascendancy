@@ -15281,16 +15281,13 @@ func _capital_star_font_px(zoom_override: float = -1.0) -> int:
 	# Perf2 (d) parks here and requires font 20.
 	if z <= MapZoomLODScript.OPERATIONAL_MAX_ZOOM:
 		return int(clampf(16.0 / maxf(z, 0.35), 11.0, 20.0))
-	# Live wheel / Home-notch only call `_sync_capital_star_scales`. Screen px
-	# is font * camera_zoom * CAPITAL_STAR_GLYPH_BOX. Invert so on-screen size
-	# grows with zoom but stays in 18–36 (CAPITAL_STAR_SCREEN_MAX is the cap).
-	# 013f808f wrote raw font 18–36, which became 281 screen px at z=5.62.
-	var screen := _capital_star_target_screen_px(z)
-	var denom := maxf(z * CAPITAL_STAR_GLYPH_BOX, 0.08)
-	var font := int(round(screen / denom))
-	while font > 1 and float(font) * denom > CAPITAL_STAR_SCREEN_MAX + 0.05:
-		font -= 1
-	return maxi(font, 1)
+	# Font IS the on-screen target (CAPITAL_STAR_SCREEN_MIN/MAX). Do not
+	# divide by zoom — d3fc8c3d rasterised a 4 px ★ and scaled the smudge.
+	return clampi(
+		int(round(_capital_star_target_screen_px(z))),
+		int(CAPITAL_STAR_SCREEN_MIN),
+		int(CAPITAL_STAR_SCREEN_MAX),
+	)
 
 
 func _capital_star_apply_screen_fit(star: Label, font_px: int, z: float, ctr: Vector2 = Vector2.ZERO, force: bool = false) -> void:
@@ -15298,27 +15295,21 @@ func _capital_star_apply_screen_fit(star: Label, font_px: int, z: float, ctr: Ve
 		star.scale = Vector2.ONE
 		star.pivot_offset = Vector2.ZERO
 		return
-	# Measure the unscaled glyph box, then scale so canvas span == target.
-	# Do not touch pivot_offset — that changes get_rect() and double-counts.
+	# Rasterise at the on-screen size, then counter-scale by
+	# 1/(camera zoom × glyph box) so the camera does not enlarge a tiny font.
 	star.scale = Vector2.ONE
 	star.pivot_offset = Vector2.ZERO
 	star.add_theme_font_size_override("font_size", font_px)
 	var ol := clampi(int(round(float(font_px) * 0.30)), 1, 6)
 	star.add_theme_constant_override("outline_size", ol)
 	star.reset_size()
-	var target := _capital_star_target_screen_px(z)
-	if force:
-		var force_screen := float(font_px) * maxf(z, 0.01) * CAPITAL_STAR_GLYPH_BOX
-		target = minf(CAPITAL_STAR_SCREEN_MAX, maxf(target, force_screen))
-	if target <= 0.01:
-		star.scale = Vector2.ONE
-		return
 	var ms := star.get_rect().size
-	var world := maxf(ms.x, ms.y)
-	if world < 1.0:
-		world = float(font_px) * CAPITAL_STAR_GLYPH_BOX
-	var pred := world * maxf(z, 0.01)
-	var sc := clampf(target / maxf(pred, 0.01), 0.20, 2.0)
+	var sc := 1.0
+	if z > MapZoomLODScript.OPERATIONAL_MAX_ZOOM:
+		# Counter-scale 1/(camera zoom). The 1.40 glyph box is Label padding;
+		# folding it in here left a 17 px core. 1/z keeps a 36 px ★ at ~24 px
+		# bright ink (in 18–36) without ever scaling a 4 px atlas up.
+		sc = 1.0 / maxf(z, 0.08)
 	star.scale = Vector2(sc, sc)
 	if ctr != Vector2.ZERO:
 		star.position = ctr - ms * sc * 0.5
