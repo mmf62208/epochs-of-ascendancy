@@ -1557,6 +1557,15 @@ func _on_begin_new(pending_press: bool = false, from_pointer: bool = false) -> v
 
 
 func _on_load(slot: String) -> void:
+	# Same leftover-release contract as pointer Begin. Load used to `_finish`
+	# without it, so the held button armed a map drag and the release selected
+	# the nation under the button.
+	_arm_begin_release_swallow(false, true)
+	var tree_load: SceneTree = Engine.get_main_loop() as SceneTree
+	if tree_load != null:
+		var mr_load: Node = tree_load.get_first_node_in_group("map_renderer")
+		if mr_load != null and mr_load.has_method("arm_chrome_hold_swallow"):
+			mr_load.call("arm_chrome_hold_swallow")
 	var out: Dictionary = apply_living_title_boot(_tag, _year, slot)
 	_finish(out)
 

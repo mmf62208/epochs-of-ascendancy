@@ -261,10 +261,14 @@ func _build_ui() -> void:
 
 	# Title bar: title + upper-right ✕ to return to game.
 	var title_row := HBoxContainer.new()
+	title_row.name = "CommandCenterHeader"
+	title_row.mouse_filter = Control.MOUSE_FILTER_STOP
 	title_row.add_theme_constant_override("separation", 8)
 	outer.add_child(title_row)
 
 	var title := Label.new()
+	title.name = "CommandCenterTitle"
+	title.mouse_filter = Control.MOUSE_FILTER_STOP
 	title.text = "Command Center"
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -445,16 +449,18 @@ func _build_ui() -> void:
 
 func _on_blocker_gui_input(event: InputEvent) -> void:
 	# Click outside panel (on dimmed map) closes menu — same as ✕ / ESC.
+	# Press and release both stop here so the map never sees them.
 	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
-		if mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT:
-			# Only if click is not over the panel rect.
-			if _panel != null and is_instance_valid(_panel):
-				var local := _panel.get_global_rect()
-				if local.has_point(mb.global_position):
-					return
+		if mb.button_index != MOUSE_BUTTON_LEFT:
+			return
+		if _panel != null and is_instance_valid(_panel):
+			var local := _panel.get_global_rect()
+			if local.has_point(mb.global_position):
+				return
+		if mb.pressed:
 			_force_close()
-			_root.accept_event()
+		_root.accept_event()
 
 
 func _center_panel() -> void:
@@ -1020,6 +1026,11 @@ func _process(_delta: float) -> void:
 func _force_close() -> void:
 	# Swallow is armed on CloseX button_down / poll handle, not here.
 	# `_force_close` re-arm cleared poll `pending_press` (same-spot stayed dead).
+	# Esc, X, and Begin all land here. Drop any map press that was in flight
+	# so the next click is not a leftover drag.
+	var mr_close := _map_renderer_for_close()
+	if mr_close != null and mr_close.has_method("clear_overlay_close_map_gesture"):
+		mr_close.call("clear_overlay_close_map_gesture")
 	if _closing:
 		_pause_game(false)
 		menu_closed.emit()

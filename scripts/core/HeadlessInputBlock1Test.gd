@@ -98,6 +98,11 @@ func _run() -> void:
 	await _test_cc_click_does_not_arm_map()
 	await _test_begin_closes_cc_three_times()
 	await _test_esc_one_layer_each()
+	await _test_real_chrome_clicks()
+	await _test_real_title_load()
+	await _test_real_cc_load()
+	await _test_real_esc_clears_then_begin()
+	await _test_real_search_esc()
 	_cleanup()
 
 
@@ -133,7 +138,7 @@ func _write_quicksave() -> void:
 
 
 func _setup_map_renderer() -> bool:
-	var mr_script: Script = load("res://scripts/map/MapRenderer.gd") as Script
+	var mr_script: Script = _map_pick_hook_script()
 	if mr_script == null:
 		_fail("MapRenderer.gd missing")
 		return false
@@ -156,6 +161,7 @@ func _setup_map_renderer() -> bool:
 	_info.size = Vector2(280, 200)
 	map_ui.add_child(_info)
 	_mr.set("info_panel", _info)
+	_wire_info_labels()
 	_cam = Camera2D.new()
 	_cam.name = "MapCamera"
 	_cam.position = Vector2(400, 300)
@@ -375,8 +381,23 @@ func _reset_gesture() -> void:
 	_mr.set("_left_pan_active", false)
 	_mr.set("_left_gesture_dragged", false)
 	_mr.set("_left_button_was_up", true)
+	_mr.set("_left_origin_valid", false)
+	_mr.set("_left_gesture_origin", Vector2(-9, -9))
+	_mr.set("_left_origin_screen", Vector2(-9, -9))
+	_mr.set("_left_max_slop_sq", 0.0)
+	_mr.set("_left_skip_next_pick", false)
+	_mr.set("_cc_map_press_latch", false)
+	# A prior inspector Esc leaves this set. It hides a later held click from
+	# `_process`. Each case starts from an idle map.
+	_mr.set("_close_ignore_stale_left_down", false)
+	if "_chrome_hold_swallowed" in _mr:
+		_mr.set("_chrome_hold_swallowed", false)
+	_mr.set("_left_sticky_valid", false)
+	_mr.set("_left_sticky_slop_sq", 0.0)
 	_mr.set("selected_province_id", SENTINEL_PID)
 	_mr.set("selected_formation_id", "")
+	if _cam != null:
+		_cam.position = Vector2(400, 300)
 
 
 func _test_cc_click_does_not_arm_map() -> void:
@@ -598,6 +619,570 @@ func _test_esc_one_layer_each() -> void:
 		_fail("Esc stack still open after 3 presses (%s)" % _layer_state())
 		return
 	_pass("Esc closed search, inspector, then Command Center in 3 presses")
+
+
+func _map_pick_hook_script() -> Script:
+	var hook := GDScript.new()
+	hook.source_code = """extends \"res://scripts/map/MapRenderer.gd\"
+func _resolve_map_pick_pid(world_pos: Vector2) -> int:
+	if bool(get_meta(\"eoa_test_force_pick\", false)):
+		return 711414
+	return super._resolve_map_pick_pid(world_pos)
+
+func _resolve_hex_pick_pid(world_pos: Vector2) -> int:
+	if bool(get_meta(\"eoa_test_force_pick\", false)):
+		return 711414
+	return super._resolve_hex_pick_pid(world_pos)
+"""
+	if hook.reload() != OK:
+		return load("res://scripts/map/MapRenderer.gd") as Script
+	return hook
+
+
+func _add_info_label(node_name: String) -> Label:
+	var lab := Label.new()
+	lab.name = node_name
+	lab.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_info.add_child(lab)
+	return lab
+
+
+func _wire_info_labels() -> void:
+	_mr.set("info_name", _add_info_label("LabelName"))
+	_mr.set("info_owner", _add_info_label("LabelOwner"))
+	_mr.set("info_population", _add_info_label("LabelPopulation"))
+	_mr.set("info_terrain", _add_info_label("LabelTerrain"))
+	_mr.set("info_factories", _add_info_label("LabelFactories"))
+	_mr.set("info_dev", _add_info_label("LabelDev"))
+	_mr.set("info_resources", _add_info_label("LabelResources"))
+	_mr.set("info_core", _add_info_label("LabelCore"))
+	_mr.set("info_special", _add_info_label("LabelSpecial"))
+	_mr.set("info_logistics", _add_info_label("LabelLogistics"))
+	_mr.set("info_combat", _add_info_label("LabelCombat"))
+	_mr.set("info_national", _add_info_label("LabelNational"))
+	var mods := RichTextLabel.new()
+	mods.name = "InfoModifiers"
+	mods.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_info.add_child(mods)
+	_mr.set("info_modifiers", mods)
+
+
+func _seed_province(pid: int, tag: String, pname: String) -> void:
+	# Load at runtime. Naming the province class here makes the -s entry
+	# script compile Province.gd before the GameData autoload exists.
+	var script: Script = load("res://scripts/data/Province.gd") as Script
+	if script == null or not script.can_instantiate():
+		push_error("INPUT_BLOCK1 province script unavailable")
+		return
+	var p: Object = script.new()
+	p.set("id", pid)
+	p.set("name", pname)
+	p.set("owner_tag", tag)
+	p.set("controller_tag", tag)
+	p.set("terrain", "urban")
+	p.set("population", 1000000)
+	if _mr != null and _mr.get("provinces") is Dictionary:
+		(_mr.get("provinces") as Dictionary)[pid] = p
+	var mm := root.get_node_or_null("MapManager")
+	if mm == null:
+		return
+	var bag: Variant = mm.get("_provinces")
+	if bag is Dictionary:
+		bag[pid] = p
+
+
+func _send_real(ev: InputEvent) -> void:
+	if ev is InputEventMouse:
+		_warp_mouse((ev as InputEventMouse).position)
+	Input.parse_input_event(ev)
+	if Input.has_method("flush_buffered_events"):
+		Input.flush_buffered_events()
+
+
+func _click_down(pt: Vector2) -> void:
+	_send_real(_make_mouse(pt, true))
+
+
+func _click_up(pt: Vector2) -> void:
+	_send_real(_make_mouse(pt, false))
+
+
+func _move_to(pt: Vector2) -> void:
+	var mot := InputEventMouseMotion.new()
+	mot.device = 0
+	mot.position = pt
+	mot.global_position = pt
+	var from := root.get_mouse_position() if root != null else pt
+	mot.relative = pt - from
+	if mot.relative.length_squared() < 1.0:
+		mot.relative = Vector2(4, 4)
+	mot.velocity = mot.relative * 40.0
+	mot.button_mask = MOUSE_BUTTON_MASK_LEFT if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) else 0
+	_send_real(mot)
+
+
+func _gesture_line(tag: String) -> String:
+	return "INPUT_BLOCK1 %s btn=%s origin_valid=%s drag=%s latch=%s pid=%s" % [
+		tag,
+		str(bool(_mr.get("_left_btn_down"))),
+		str(bool(_mr.get("_left_origin_valid"))),
+		str(bool(_mr.get("_left_gesture_dragged"))),
+		str(bool(_mr.get("_cc_map_press_latch"))),
+		str(int(_mr.get("selected_province_id"))),
+	]
+
+
+func _gesture_dirty() -> bool:
+	if bool(_mr.get("_left_btn_down")):
+		return true
+	if bool(_mr.get("_left_origin_valid")):
+		return true
+	if bool(_mr.get("_left_gesture_dragged")):
+		return true
+	if bool(_mr.get("_cc_map_press_latch")):
+		return true
+	return int(_mr.get("selected_province_id")) != SENTINEL_PID
+
+
+func _title_tag() -> String:
+	if _title == null or not is_instance_valid(_title):
+		return ""
+	return str(_title.get("_tag"))
+
+
+func _header_point() -> Vector2:
+	var mm := _cc_node()
+	if mm == null:
+		return Vector2.ZERO
+	var header := mm.find_child("CommandCenterHeader", true, false) as Control
+	if header != null:
+		return header.get_global_rect().get_center()
+	for n in mm.find_children("*", "Label", true, false):
+		if n is Label and (n as Label).text == "Command Center":
+			return (n as Control).get_global_rect().get_center()
+	return Vector2.ZERO
+
+
+func _close_point() -> Vector2:
+	var mm := _cc_node()
+	if mm == null:
+		return Vector2.ZERO
+	var btn := mm.find_child("CloseX", true, false) as Control
+	if btn == null:
+		return Vector2.ZERO
+	return btn.get_global_rect().get_center()
+
+
+func _title_load_point() -> Vector2:
+	if _title == null or not is_instance_valid(_title):
+		return Vector2.ZERO
+	for n in _title.find_children("*", "Button", true, false):
+		if n is Button and (n as Button).has_meta("eoa_load_slot"):
+			return (n as Control).get_global_rect().get_center()
+	return Vector2.ZERO
+
+
+func _begin_point() -> Vector2:
+	if _title == null or not is_instance_valid(_title):
+		return Vector2.ZERO
+	var btn := _title.find_child("LivingTitleBegin", true, false) as Control
+	if btn == null:
+		return Vector2.ZERO
+	return btn.get_global_rect().get_center()
+
+
+func _press_drag_release(case_name: String, pt: Vector2, drag: bool) -> bool:
+	_move_to(pt)
+	await process_frame
+	_click_down(pt)
+	await process_frame
+	var dirty := false
+	var line := _gesture_line("%s phase=press" % case_name)
+	print(line)
+	dirty = dirty or _gesture_dirty()
+	var up_at := pt
+	if drag:
+		up_at = pt + Vector2(36, 22)
+		_move_to(up_at)
+		await process_frame
+		print(_gesture_line("%s phase=drag" % case_name))
+		dirty = dirty or _gesture_dirty()
+	_click_up(up_at)
+	await process_frame
+	print(_gesture_line("%s phase=release" % case_name))
+	dirty = dirty or _gesture_dirty()
+	await process_frame
+	print(_gesture_line("%s phase=frame" % case_name))
+	dirty = dirty or _gesture_dirty()
+	return dirty
+
+
+func _test_real_chrome_clicks() -> void:
+	print("INPUT_BLOCK1 case=real_chrome")
+	var specs: Array[Dictionary] = [
+		{"name": "real_game_dim", "title": false, "kind": "dim", "drag": true, "cc_stays": false},
+		{"name": "real_game_header", "title": false, "kind": "header", "drag": true, "cc_stays": true},
+		{"name": "real_game_x", "title": false, "kind": "x", "drag": true, "cc_stays": false},
+		{"name": "real_title_dim", "title": true, "kind": "dim", "drag": true, "cc_stays": false},
+		{"name": "real_title_header", "title": true, "kind": "header", "drag": true, "cc_stays": true},
+		{"name": "real_title_x", "title": true, "kind": "x", "drag": true, "cc_stays": false},
+	]
+	for spec in specs:
+		var case_name := str(spec["name"])
+		if bool(spec["title"]):
+			if not await _spawn_title():
+				return
+		else:
+			_drop_title_now()
+			await _flush(2)
+		if not await _open_cc(bool(spec["title"])):
+			_fail("%s: Command Center not up" % case_name)
+			return
+		_reset_gesture()
+		_mr.set("selected_province_id", SENTINEL_PID)
+		var pt := Vector2(40, 400)
+		if str(spec["kind"]) == "header":
+			pt = _header_point()
+		elif str(spec["kind"]) == "x":
+			pt = _close_point()
+		if pt == Vector2.ZERO:
+			_fail("%s: control centre missing" % case_name)
+			return
+		print("INPUT_BLOCK1 %s pt=%s" % [case_name, str(pt)])
+		var dirty := await _press_drag_release(case_name, pt, bool(spec["drag"]))
+		var cc_up := _cc_capturing()
+		print("INPUT_BLOCK1 %s cc_up=%s" % [case_name, str(cc_up)])
+		if dirty:
+			_fail("%s: click reached the map" % case_name)
+		elif cc_up != bool(spec["cc_stays"]):
+			_fail("%s: Command Center up=%s" % [case_name, str(cc_up)])
+		else:
+			_pass("%s consumed press, release, and the next frame" % case_name)
+		_drop_title_now()
+		_close_cc()
+		await _flush(2)
+
+
+func _arm_force_pick() -> void:
+	_seed_province(711414, "ENG", "London")
+	if _mr != null:
+		_mr.set_meta("eoa_test_force_pick", true)
+
+
+func _test_real_title_load() -> void:
+	print("INPUT_BLOCK1 case=real_title_load")
+	if not await _spawn_title():
+		return
+	_close_cc()
+	await _flush(2)
+	_arm_force_pick()
+	_reset_gesture()
+	_set_date(1918, 1, 1)
+	var pt := _title_load_point()
+	if pt == Vector2.ZERO:
+		_fail("real_title_load: title Load button missing")
+		return
+	var tag0 := _title_tag()
+	print("INPUT_BLOCK1 real_title_load pt=%s tag=%s" % [str(pt), tag0])
+	var dirty := await _press_drag_release("real_title_load", pt, false)
+	var tag1 := _title_tag()
+	print(
+		"INPUT_BLOCK1 real_title_load date=%s title_closed=%s tag=%s"
+		% [_date_text(), str(_title_closed()), tag1]
+	)
+	if dirty or tag1 == "ENG" or int(_mr.get("selected_province_id")) == 711414:
+		_fail("real_title_load: Load selected the nation or province under the button")
+	elif not _title_closed():
+		_fail("real_title_load: title Load did not enter the save")
+	elif _date_text() != SAVE_DATE:
+		_fail("real_title_load: date=%s" % _date_text())
+	else:
+		_pass("real_title_load did not select the province under Load")
+	if _mr != null:
+		_mr.set_meta("eoa_test_force_pick", false)
+
+
+func _test_real_cc_load() -> void:
+	print("INPUT_BLOCK1 case=real_cc_load")
+	if not await _spawn_title():
+		return
+	if not await _open_cc(true):
+		_fail("real_cc_load: Command Center not up")
+		return
+	_arm_force_pick()
+	_reset_gesture()
+	_set_date(1918, 1, 1)
+	var load_b := _find_quicksave_load()
+	if load_b == null:
+		_fail("real_cc_load: quicksave Load missing")
+		return
+	var pt := load_b.get_global_rect().get_center()
+	print("INPUT_BLOCK1 real_cc_load pt=%s tag=%s" % [str(pt), _title_tag()])
+	# Hold and drag after Load closes the Command Center. The release and the
+	# next frame must not select the nation under that gesture.
+	var dirty := await _press_drag_release("real_cc_load", pt, true)
+	print(
+		"INPUT_BLOCK1 real_cc_load date=%s title_closed=%s tag=%s cc=%s"
+		% [_date_text(), str(_title_closed()), _title_tag(), str(_cc_capturing())]
+	)
+	if dirty or _title_tag() == "ENG" or int(_mr.get("selected_province_id")) == 711414:
+		_fail("real_cc_load: Load selected the nation or province under the button")
+	elif _title_closed():
+		_fail("real_cc_load: Load closed the title")
+	elif _date_text() != SAVE_DATE:
+		_fail("real_cc_load: date=%s" % _date_text())
+	else:
+		_pass("real_cc_load did not select the province under Load")
+	if _mr != null:
+		_mr.set_meta("eoa_test_force_pick", false)
+
+
+func _type_ascii(text: String) -> void:
+	for i in text.length():
+		var code := text.unicode_at(i)
+		var key := InputEventKey.new()
+		key.device = 0
+		key.pressed = true
+		key.echo = false
+		key.unicode = code
+		key.keycode = code as Key
+		key.physical_keycode = key.keycode
+		_send_real(key)
+		await process_frame
+		var up := key.duplicate() as InputEventKey
+		up.pressed = false
+		up.unicode = 0
+		_send_real(up)
+		await process_frame
+
+
+func _test_real_esc_clears_then_begin() -> void:
+	print("INPUT_BLOCK1 case=real_esc_clear_begin")
+	_drop_title_now()
+	await _flush(2)
+	_close_cc()
+	await _flush(2)
+	_reset_gesture()
+	var pt := Vector2(900, 500)
+	_move_to(pt)
+	await process_frame
+	_click_down(pt)
+	await process_frame
+	_move_to(pt + Vector2(40, 24))
+	await process_frame
+	var armed_line := _gesture_line("real_esc_clear_begin phase=armed")
+	print(armed_line)
+	if not bool(_mr.get("_left_btn_down")):
+		_fail("real_esc_clear_begin: map press did not arm")
+		_click_up(pt + Vector2(40, 24))
+		return
+	await _send_esc()
+	await _flush(3)
+	print("INPUT_BLOCK1 real_esc_clear_begin phase=opened cc=%s" % str(_cc_capturing()))
+	if not _cc_capturing():
+		_fail("real_esc_clear_begin: Esc did not open Command Center")
+		_click_up(pt + Vector2(40, 24))
+		return
+	await _send_esc()
+	await _flush(2)
+	var closed_line := _gesture_line("real_esc_clear_begin phase=closed")
+	print(closed_line)
+	var dirty := _gesture_dirty()
+	_click_up(pt + Vector2(40, 24))
+	await _flush(2)
+	print(_gesture_line("real_esc_clear_begin phase=released"))
+	dirty = dirty or _gesture_dirty()
+	if not await _spawn_title():
+		return
+	_set_date(1918, 1, 1)
+	var begin_pt := _begin_point()
+	if begin_pt == Vector2.ZERO:
+		_fail("real_esc_clear_begin: Begin button missing")
+		return
+	_click_down(begin_pt)
+	await process_frame
+	_click_up(begin_pt)
+	await _flush(4)
+	var began := _title_closed() and _date_text() == "1936-01-01"
+	print(
+		"INPUT_BLOCK1 real_esc_clear_begin phase=begin title_closed=%s date=%s"
+		% [str(_title_closed()), _date_text()]
+	)
+	if dirty:
+		_fail("real_esc_clear_begin: Esc close left a pending map press")
+	elif not began:
+		_fail("real_esc_clear_begin: first Begin after Esc did not start")
+	else:
+		_pass("real_esc_clear_begin cleared the press and Begin worked once")
+
+
+func _search_line() -> LineEdit:
+	var search := _search_node()
+	if search == null:
+		return null
+	return search.find_child("SearchLineEdit", true, false) as LineEdit
+
+
+func _open_cc_from_menu() -> bool:
+	var root_win := root as Window
+	if root_win != null:
+		root_win.gui_embed_subwindows = true
+	var mb: MenuButton = _bar.get("menu_button") as MenuButton
+	if mb == null or not mb.visible:
+		_fail("real_search_esc: Menu button missing")
+		return false
+	var menu_pt := mb.get_global_rect().get_center()
+	_click_down(menu_pt)
+	await process_frame
+	_click_up(menu_pt)
+	await _flush(3)
+	var popup := mb.get_popup()
+	if popup == null or not popup.visible:
+		_fail("real_search_esc: Menu popup did not open")
+		return false
+	var idx := -1
+	for i in popup.item_count:
+		if popup.get_item_text(i) == "Settings":
+			idx = i
+			break
+	if idx < 0:
+		_fail("real_search_esc: Settings item missing")
+		return false
+	# The Menu click opened an embedded popup. Its items are drawn, not
+	# child buttons, and a release in the first 400 ms is ignored. Move
+	# across the popup through the root viewport (that forwards into the
+	# focused window) until Settings is the focused row, then click it.
+	popup.grab_focus()
+	await process_frame
+	var hit := _scan_popup_row(popup, idx)
+	print(
+		"INPUT_BLOCK1 real_search_esc menu embedded=%s focus=%s size=%s pos=%s hit=%s row=%s"
+		% [
+			str(popup.is_embedded()),
+			str(popup.has_focus()),
+			str(popup.size),
+			str(popup.position),
+			str(hit),
+			str(popup.get_focused_item()),
+		]
+	)
+	if hit.x < 0.0:
+		_fail("real_search_esc: Settings row was not under the pointer")
+		return false
+	OS.delay_msec(450)
+	_root_click(hit, true)
+	_root_click(hit, false)
+	await _flush(2)
+	if not _cc_capturing():
+		_root_click(hit, true)
+		_root_click(hit, false)
+		await _flush(4)
+	return _cc_capturing()
+
+
+func _scan_popup_row(popup: PopupMenu, idx: int) -> Vector2:
+	var origin := Vector2(popup.position)
+	var best := Vector2(-1, -1)
+	var y := 4
+	while y < int(popup.size.y) - 2:
+		var pt := origin + Vector2(maxf(popup.size.x, 40.0) * 0.5, float(y))
+		var mot := InputEventMouseMotion.new()
+		mot.device = 0
+		mot.position = pt
+		mot.global_position = pt
+		mot.relative = Vector2(0, 4)
+		mot.velocity = Vector2(0, 40)
+		root.push_input(mot)
+		if popup.get_focused_item() == idx:
+			best = pt
+			break
+		y += 4
+	return best
+
+
+func _root_click(pt: Vector2, pressed: bool) -> void:
+	var ev := _make_mouse(pt, pressed)
+	root.push_input(ev)
+
+
+func _test_real_search_esc() -> void:
+	print("INPUT_BLOCK1 case=real_search_esc")
+	_drop_title_now()
+	await _flush(2)
+	_close_cc()
+	await _flush(2)
+	if _info != null:
+		_info.visible = false
+	_seed_province(710300, "GER", "Berlin")
+	_reset_gesture()
+	var line := _search_line()
+	if line == null:
+		_fail("real_search_esc: search line missing")
+		return
+	# The direct Esc case leaves a query and a results node. Start this
+	# case from an empty line so the typed keys are what open the row.
+	var search_reset := _search_node()
+	if search_reset != null:
+		var leftover := search_reset.get_node_or_null("SearchResults")
+		if leftover != null and is_instance_valid(leftover):
+			leftover.free()
+	line.text = ""
+	line.release_focus()
+	var line_pt := line.get_global_rect().get_center()
+	_click_down(line_pt)
+	await process_frame
+	_click_up(line_pt)
+	await _flush(2)
+	if not line.has_focus():
+		_fail("real_search_esc: search line did not focus")
+		return
+	await _type_ascii("berlin")
+	await _flush(2)
+	var search := _search_node()
+	var row := search.find_child("SearchResultRow", true, false) as Button if search != null else null
+	if row == null or not row.visible:
+		_fail("real_search_esc: result row did not open for berlin text=%s" % line.text)
+		return
+	var row_pt := row.get_global_rect().get_center()
+	print("INPUT_BLOCK1 real_search_esc row=%s text=%s" % [str(row_pt), line.text])
+	_click_down(row_pt)
+	await process_frame
+	_click_up(row_pt)
+	await _flush(4)
+	if not _search_open() or not _inspector_open():
+		_fail("real_search_esc: after pick %s" % _layer_state())
+		return
+	if not await _open_cc_from_menu():
+		_fail("real_search_esc: Menu did not open Command Center (%s)" % _layer_state())
+		return
+	if not (_search_open() and _inspector_open() and _cc_capturing()):
+		_fail("real_search_esc: stack not armed %s" % _layer_state())
+		return
+	print("INPUT_BLOCK1 real_search_esc before ", _layer_state())
+	var order: PackedStringArray = []
+	var presses := 0
+	while presses < 4 and (_search_open() or _inspector_open() or _cc_capturing()):
+		var before_s := _search_open()
+		var before_i := _inspector_open()
+		var before_c := _cc_capturing()
+		await _send_esc()
+		presses += 1
+		var changed: PackedStringArray = []
+		if before_s != _search_open():
+			changed.append("search")
+		if before_i != _inspector_open():
+			changed.append("inspector")
+		if before_c != _cc_capturing():
+			changed.append("cc")
+		var tag := "dead" if changed.is_empty() else "+".join(changed)
+		order.append(tag)
+		print("INPUT_BLOCK1 real_search_esc press=%d changed=%s %s" % [presses, tag, _layer_state()])
+	var order_s := ",".join(order)
+	print("INPUT_BLOCK1 real_search_esc presses=%d order=%s" % [presses, order_s])
+	if order_s != "search,inspector,cc" or presses != 3:
+		_fail("real_search_esc: presses=%d order=%s" % [presses, order_s])
+		return
+	_pass("real_search_esc closed search, inspector, then Command Center")
 
 
 func _cleanup() -> void:
