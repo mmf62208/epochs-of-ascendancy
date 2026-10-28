@@ -140,11 +140,12 @@ func _test_source_needles() -> void:
 	if "no_owner_or_control_flip_to_attacker" not in news:
 		_fail("_post_battle_news must skip capture toast unless owner/control flipped to attacker")
 		return
-	if "captured %s from %s" not in news:
-		_fail("_post_battle_news must word captures as attacker captured X from owner")
+	var notice := _slice_func(bm, "_capture_notice_title")
+	if "captured %s from %s" not in notice:
+		_fail("_capture_notice_title must word captures as attacker captured X from owner")
 		return
-	if "(undefended)" not in news:
-		_fail("_post_battle_news must mark undefended empty-hex captures")
+	if "(undefended)" not in notice:
+		_fail("_capture_notice_title must mark undefended empty-hex captures")
 		return
 	if "previous_owner_tag" not in _slice_func(bm, "_apply_attacker_win_capture_light"):
 		_fail("light capture must record previous_owner_tag")
