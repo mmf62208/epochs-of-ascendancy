@@ -315,6 +315,9 @@ var _left_origin_valid: bool = false
 var _left_max_slop_sq: float = 0.0
 ## This left-button-down: once slop exceeds 8px, THIS release cannot pick (no time-box).
 var _left_btn_down: bool = false
+## INPUT-BLOCK-1: left press that began on the Command Center. Stays set through
+## the matching release when the dimmer queue_frees the overlay mid-gesture.
+var _cc_map_press_latch: bool = false
 var _left_gesture_dragged: bool = false
 var _left_gesture_origin: Vector2 = Vector2.ZERO
 ## Process frame of last `_end_left_button_down`.
@@ -1479,6 +1482,10 @@ func _reseed_left_origin_from_idle_up(mouse: Vector2) -> void:
 
 
 func _begin_left_map_gesture(new_press: bool = false) -> void:
+	# #134: a Command Center press is not a map gesture, including the process
+	# frame that sees Input still held after `_input` returned.
+	if _cc_overlay_blocks_map_pointer():
+		return
 	# Mid-gesture `_begin()` (no new_press): keep origin (Play: 400ms re-arm
 	# opened Finistère). A real MouseButton press always resets — stuck
 	# `_left_btn_down` after inspector/Open-fight Close must not inherit
@@ -1555,6 +1562,8 @@ func _begin_left_map_gesture(new_press: bool = false) -> void:
 
 
 func _note_left_gesture_motion() -> void:
+	if _cc_overlay_blocks_map_pointer():
+		return
 	if _close_ignore_stale_left_down:
 		return
 	_note_sticky_slop()
@@ -1763,6 +1772,8 @@ func _left_release_must_skip_pick() -> bool:
 func _left_down_is_live_map_drag() -> bool:
 	# CLOSE-1: after card Close, leftover Input-down is not a map drag.
 	if _close_ignore_stale_left_down:
+		return false
+	if _cc_overlay_blocks_map_pointer():
 		return false
 	return _left_pan_armed or _left_btn_down or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
 
@@ -2820,15 +2831,17 @@ func _handle_escape_key() -> void:
 	if _esc_stack_frame == frame_now:
 		return
 	_esc_stack_frame = frame_now
-	# Search LineEdit must not steal idle Esc→CC (Play MIXED e36825b after +6d).
-	# Release focus and keep walking the stack — do not treat unfocus as a dismiss.
-	_release_search_focus()
 	# Living title owns the boot screen: do not dismiss a hidden inspector first.
 	# Play d18cbae: layer 120/130 was not enough — title must accept live Esc
 	# (keycode / physical / ui_cancel) and MapRenderer must not also toggle-close.
 	if _living_title_boot_is_up():
 		_route_living_title_escape()
 		return
+	# Search field / results is its own layer. An empty focused line is not:
+	# idle Esc after +6d must still open Command Center (Play MIXED e36825b).
+	if _dismiss_search_esc_layer():
+		return
+	_release_search_focus()
 	# UI-1: Leaders (and other top-bar screens) close on Esc before unit-deselect
 	# or Command Center. Consume so this Esc cannot also open the pause menu.
 	if _dismiss_named_overlay_screen("LeaderAssignmentScreen"):
@@ -2859,7 +2872,51 @@ func _handle_escape_key() -> void:
 		return
 	if _dismiss_map_overlays_esc():
 		return
+	var cc_esc := _command_center_overlay()
+	if cc_esc != null and not bool(cc_esc.get("_closing")):
+		if cc_esc.has_method("_force_close"):
+			cc_esc.call("_force_close")
+		return
 	_esc_open_command_center()
+
+
+func _command_center_overlay() -> Node:
+	var tree := get_tree()
+	if tree == null or tree.root == null:
+		return null
+	var mm := tree.root.get_node_or_null("MainMenu")
+	if mm == null or not is_instance_valid(mm) or mm.is_queued_for_deletion():
+		return null
+	if str(mm.name) != "MainMenu":
+		return null
+	return mm
+
+
+func _cc_overlay_blocks_map_pointer() -> bool:
+	if _cc_map_press_latch:
+		return true
+	return _command_center_overlay() != null
+
+
+func _clear_cc_map_press_latch() -> void:
+	_cc_map_press_latch = false
+
+
+func _dismiss_search_esc_layer() -> bool:
+	var search: Node = null
+	if _map_search != null and is_instance_valid(_map_search):
+		search = _map_search
+	elif get_tree() != null and get_tree().root != null:
+		search = get_tree().root.find_child("MapProvinceSearch", true, false)
+	if search == null or not search.has_method("esc_layer_open"):
+		return false
+	if not bool(search.call("esc_layer_open")):
+		return false
+	if search.has_method("dismiss_esc_layer"):
+		search.call("dismiss_esc_layer")
+	else:
+		_release_search_focus()
+	return true
 
 
 func _esc_open_command_center() -> void:
@@ -3094,6 +3151,17 @@ func _input(event: InputEvent) -> void:
 		elif event.button_index == MOUSE_BUTTON_LEFT:
 			if _campaign_modal_consumes_pointer(event):
 				get_viewport().set_input_as_handled()
+				return
+			# #134: Command Center owns this click. Do not arm a map gesture and
+			# do not mark handled — Load / × still need the GUI press.
+			# The latch stays through this event so `_unhandled_input` can eat
+			# the release after a dimmer `accept_event` / queue_free. Deferred
+			# clear covers the case where GUI already marked the event handled.
+			if _cc_overlay_blocks_map_pointer():
+				if event.pressed:
+					_cc_map_press_latch = true
+				else:
+					call_deferred("_clear_cc_map_press_latch")
 				return
 			# The title node stays in the tree after Begin, so "boot is up" is
 			# the wrong guard. A chip or top-bar click must not run the unit
@@ -3357,6 +3425,17 @@ func _control_contains_point(ctrl: Control, pt: Vector2) -> bool:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	# After GUI: a Command Center press must not still-click the map, including
+	# the release of a dimmer click that already queue_freed the overlay.
+	if (
+		event is InputEventMouseButton
+		and (event as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT
+		and _cc_overlay_blocks_map_pointer()
+	):
+		if not (event as InputEventMouseButton).pressed:
+			_cc_map_press_latch = false
+		get_viewport().set_input_as_handled()
+		return
 	if event is InputEventKey and event.pressed and not event.echo:
 		if _gui_text_field_has_focus() and not _is_live_escape_event(event) and event.keycode != KEY_ESCAPE:
 			return

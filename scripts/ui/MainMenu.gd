@@ -166,8 +166,19 @@ func _input(event: InputEvent) -> void:
 		])
 		get_viewport().set_input_as_handled()
 		return
-	_force_close()
+	_route_escape_to_stack()
 	get_viewport().set_input_as_handled()
+
+
+func _route_escape_to_stack() -> void:
+	# One owner: MapRenderer walks search → inspector → Command Center.
+	# Closing here as well made the first Esc skip the layers underneath.
+	var tree := get_tree()
+	var mr: Node = tree.get_first_node_in_group("map_renderer") if tree != null else null
+	if mr != null and mr.has_method("_handle_escape_key"):
+		mr.call("_handle_escape_key")
+		return
+	_force_close()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -185,7 +196,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		])
 		get_viewport().set_input_as_handled()
 		return
-	_force_close()
+	_route_escape_to_stack()
 	get_viewport().set_input_as_handled()
 
 

@@ -37,6 +37,9 @@ var _esc_routed_to_cc := false
 var _esc_poll_held := false
 ## Edge-trigger for `_process` pointer poll (Play 5adb38e: mouse Begin/CC never fired).
 var _ptr_poll_held := false
+## INPUT-BLOCK-1: a press that hit the Command Center (Load / dimmer / panel)
+## must not classify as Begin after that press closes the overlay.
+var _cc_pointer_latch := false
 ## Edge-trigger for documented Begin keys (Enter / Space / B) when `_input` never runs.
 var _begin_key_poll_held := false
 ## Periodic window-focus nudge while title is up (computerUse Esc may miss an unfocused X11 window).
@@ -784,11 +787,33 @@ func owns_any_collected_point(event: InputEvent = null) -> bool:
 ## Event-coord dispatch. Play 5adb38e: visible Begin / Command Center · Esc /
 ## Esc · Menu clicks did nothing because MapRenderer swallowed using a stale
 ## get_mouse_position() and GUI never saw the press.
+func _main_menu_node() -> Node:
+	var tree := get_tree()
+	if tree == null or tree.root == null:
+		return null
+	var mm := tree.root.get_node_or_null("MainMenu")
+	if mm == null or not is_instance_valid(mm) or mm.is_queued_for_deletion():
+		return null
+	if str(mm.name) != "MainMenu":
+		return null
+	return mm
+
+
+## Command Center still owns this press while it is open, closing, or latched.
+func _menu_blocks_begin() -> bool:
+	if _cc_pointer_latch:
+		return true
+	return _main_menu_node() != null
+
+
 func handle_live_pointer(event: InputEvent) -> String:
 	if _closed:
 		return "closed"
 	if event != null and not is_live_pointer_press(event):
 		return "ignore"
+	# Latch before classify: Load's own _force_close runs inside this call.
+	if _main_menu_node() != null:
+		_cc_pointer_latch = true
 	# Event coords first. OR-ing a stale Viewport.get_mouse_position() with
 	# a good event can steal Begin→CC (or fire a chip the pointer missed).
 	var ev_pts: Array[Vector2] = []
@@ -845,6 +870,10 @@ func _classify_points(pts: Array[Vector2]) -> String:
 		return "panel"
 	for p in pts:
 		if left_column_is_begin(p) and not cc_owns_screen_point(p):
+			# Quicksave Load sits in the left 52%. After Load closes the
+			# Command Center the same press must not fall through to Begin.
+			if _menu_blocks_begin():
+				return "passthrough"
 			return "begin"
 	return "map"
 
@@ -939,6 +968,9 @@ func _apply_pointer_hit(hit: String, pending_press: bool = false) -> String:
 		print("EOA_LIVE_PTR who=title.handle_live_pointer action=passthrough")
 		return "passthrough"
 	if hit == "begin":
+		if _menu_blocks_begin():
+			print("EOA_LIVE_PTR who=title.handle_live_pointer action=passthrough")
+			return "passthrough"
 		print("EOA_LIVE_PTR who=title.handle_live_pointer action=begin")
 		_on_begin_new(pending_press, true)
 		return "begin"
@@ -1166,6 +1198,10 @@ func _process(delta: float) -> void:
 		print("EOA_LIVE_PTR who=title._process action=begin_key")
 		handle_live_begin()
 		return
+	# Drop the latch only after the button is up, so the same held click
+	# cannot poll Begin once Load has queue_freed the Command Center.
+	if not os_left_button_held():
+		_cc_pointer_latch = false
 	if _poll_live_pointer_just_pressed():
 		_log_live_raw_ptr("title._process", null)
 		var polled: String = handle_live_pointer(null)
@@ -1525,9 +1561,21 @@ func _on_load(slot: String) -> void:
 	_finish(out)
 
 
+func _close_command_center_overlay() -> void:
+	var mm := _main_menu_node()
+	if mm == null:
+		return
+	if bool(mm.get("_closing")):
+		return
+	if mm.has_method("_force_close"):
+		mm.call("_force_close")
+
+
 func _finish(out: Dictionary) -> void:
 	if _closed:
 		return
+	# CC-HANG-1: Begin must not leave the full-rect Command Center capturing input.
+	_close_command_center_overlay()
 	_closed = true
 	_clear_opened_from_title_meta()
 	_center_on_player(str(out.get("player_tag", _tag)))

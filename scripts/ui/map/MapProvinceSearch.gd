@@ -43,6 +43,26 @@ func _ready() -> void:
 	ensure_chrome_visible()
 
 
+## Esc layer: a focused query or a visible results list. An empty focused
+## line is not a layer — idle Esc must still open the Command Center.
+func esc_layer_open() -> bool:
+	var results := get_node_or_null("SearchResults") as CanvasItem
+	if results != null and is_instance_valid(results) and results.visible:
+		return true
+	if _line != null and is_instance_valid(_line) and _line.has_focus():
+		return not _line.text.strip_edges().is_empty()
+	return false
+
+
+func dismiss_esc_layer() -> void:
+	var results := get_node_or_null("SearchResults") as CanvasItem
+	if results != null and is_instance_valid(results):
+		results.visible = false
+	var vp := get_viewport()
+	if vp != null:
+		vp.gui_release_focus()
+
+
 func _input(event: InputEvent) -> void:
 	# Enter after living title / +6d: LineEdit text_submitted can no-op if focus is stale.
 	if not (event is InputEventKey):
