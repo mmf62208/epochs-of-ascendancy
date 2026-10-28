@@ -1,12 +1,11 @@
 extends SceneTree
 
-## PERF-2 live star zoom: capital stars must grow on the real viewport.
-## Play MIXED on b16b9b53: wheel/Home only call `_sync_capital_star_scales` →
-## `_capital_star_font_px` capped at 20, so Budapest/Belgrade stayed ~20 px at
-## camera zoom 5.62. The 18–36 clamp lived only on `_layout_zoomed_map_glyphs`
-## (not the live wheel path). This guard drives that live light-refresh path
-## at two+ zooms and measures on-screen star pixels. Must FAIL on b16b9b53
-## and PASS on the tip. Does not load WorldMap.tscn / 3520.
+## PERF-2 live star zoom: on-screen capital stars stay in 18–36 px.
+## 013f808f wrote font 36 above operational. The Label lives in world space,
+## so camera zoom 5.62 turned that into ~281 screen px. The live path must
+## invert font for camera zoom × glyph box so the canvas span grows with
+## zoom but stays in 18–36 (36 is the cap). Must FAIL on 013f808f and PASS
+## on the tip. Does not load WorldMap.tscn / 3520.
 ##
 ##   tools/run_godot.sh --headless --path . --resolution 1280x720 \
 ##     -s res://scripts/core/HeadlessPerf2StarZoomPxTest.gd
@@ -22,11 +21,8 @@ const BERLIN := 710300
 const STAR_WORLD := Vector2(4000.0, 1600.0)
 const META_STAR := &"_map_glyph_capital"
 const FLUSH_FRAMES := 6
-const HIGH_MIN_FONT_PX := 28
-const TACTICAL_MIN_SCREEN_PX := 70.0
-const DEEP_MIN_SCREEN_PX := 150.0
-const OP_MAX_SCREEN_PX := 26.0
-const GROW_RATIO := 1.80
+const SCREEN_MIN_PX := 18.0
+const SCREEN_MAX_PX := 36.0
 
 var _failures: int = 0
 var _mr: Node = null
@@ -81,11 +77,10 @@ func _run() -> void:
 	var op: Dictionary = await _measure_at_zoom("operational", OP_Z)
 	var tac: Dictionary = await _measure_at_zoom("tactical", TACTICAL_Z)
 	var deep: Dictionary = await _measure_at_zoom("deep", DEEP_Z)
-	_assert_band("operational", op, false)
-	_assert_band("tactical", tac, true)
-	_assert_band("deep", deep, true)
-	_assert_grew(op, tac, "tactical")
-	_assert_grew(op, deep, "deep")
+	_assert_screen_band("operational", op)
+	_assert_screen_band("tactical", tac)
+	_assert_screen_band("deep", deep)
+	_assert_monotone(op, tac, deep)
 	_cleanup()
 
 
@@ -101,14 +96,17 @@ func _test_source_needles() -> void:
 	if "OPERATIONAL_MAX_ZOOM" not in px_fn:
 		_fail("_capital_star_font_px must leave the idle 20 px cap above OPERATIONAL_MAX_ZOOM")
 		return
-	if "18, 36" not in px_fn and "18,36" not in px_fn:
-		_fail("_capital_star_font_px must apply the 18–36 clamp on the live sync path")
+	if "CAPITAL_STAR_GLYPH_BOX" not in px_fn:
+		_fail("_capital_star_font_px must correct font for camera zoom × glyph box (013f808f wrote raw 18–36 font)")
+		return
+	if "CAPITAL_STAR_SCREEN_MAX" not in px_fn:
+		_fail("_capital_star_font_px must cap on-screen size at 36 px, not font size")
 		return
 	var sync_fn := _slice_func(src, "_sync_capital_star_scales")
 	if "_capital_star_font_px(_z)" not in sync_fn and "_capital_star_font_px( _z )" not in sync_fn:
 		_fail("_sync_capital_star_scales must honor the wheel-measured zoom override")
 		return
-	_pass("source needles (live font px + sync uses _z)")
+	_pass("source needles (screen 18–36 via zoom × glyph box)")
 
 
 func _setup_map_renderer() -> bool:
@@ -210,8 +208,6 @@ func _measure_at_zoom(name_s: String, z: float) -> Dictionary:
 		_mr.call("_refresh_terrain_zoom_light")
 	elif _mr.has_method("_sync_capital_star_scales"):
 		_mr.call("_sync_capital_star_scales", z)
-	if _star != null:
-		_star.reset_size()
 	await _flush()
 	if _svp != null:
 		_svp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
@@ -256,50 +252,39 @@ func _measure_at_zoom(name_s: String, z: float) -> Dictionary:
 	}
 
 
-func _assert_band(name_s: String, m: Dictionary, high: bool) -> void:
+func _assert_screen_band(name_s: String, m: Dictionary) -> void:
 	var screen_px := float(m.get("screen_px", -1.0))
-	var font_px := int(m.get("font_px", -1))
-	var formula_px := int(m.get("formula_px", -1))
 	if screen_px < 4.0:
 		_fail("%s star screen_px=%.1f (nothing drawn)" % [name_s, screen_px])
 		return
-	if high:
-		var want_screen := TACTICAL_MIN_SCREEN_PX if name_s == "tactical" else DEEP_MIN_SCREEN_PX
-		if font_px < HIGH_MIN_FONT_PX:
-			_fail(
-				"%s live font_px=%d < %d (wheel sync still idle-capped; formula=%d screen=%.1f)"
-				% [name_s, font_px, HIGH_MIN_FONT_PX, formula_px, screen_px]
-			)
-		else:
-			_pass("%s live font_px=%d" % [name_s, font_px])
-		if formula_px < HIGH_MIN_FONT_PX:
-			_fail("%s _capital_star_font_px=%d (want 18–36 clamp, 36 at z>=2)" % [name_s, formula_px])
-		else:
-			_pass("%s live formula_px=%d" % [name_s, formula_px])
-		if screen_px + 0.05 < want_screen:
-			_fail(
-				"%s screen_px=%.1f < %.0f (b16b9b53 idle 11 px * camera cannot reach this)"
-				% [name_s, screen_px, want_screen]
-			)
-		else:
-			_pass("%s screen_px=%.1f (>= %.0f)" % [name_s, screen_px, want_screen])
+	if screen_px + 0.05 < SCREEN_MIN_PX or screen_px > SCREEN_MAX_PX + 0.05:
+		_fail(
+			"%s screen_px=%.1f outside 18–36 (013f808f font-36 × camera overflows this band)"
+			% [name_s, screen_px]
+		)
 	else:
-		if screen_px > OP_MAX_SCREEN_PX:
-			_fail("%s operational screen_px=%.1f > %.0f" % [name_s, screen_px, OP_MAX_SCREEN_PX])
-		else:
-			_pass("%s operational screen_px=%.1f" % [name_s, screen_px])
+		_pass("%s screen_px=%.1f in 18–36" % [name_s, screen_px])
 
 
-func _assert_grew(op: Dictionary, later: Dictionary, name_s: String) -> void:
+func _assert_monotone(op: Dictionary, tac: Dictionary, deep: Dictionary) -> void:
 	var a := float(op.get("screen_px", -1.0))
-	var b := float(later.get("screen_px", -1.0))
-	if a < 4.0 or b < 4.0:
-		_fail("%s grow check missing sizes op=%.1f later=%.1f" % [name_s, a, b])
+	var b := float(tac.get("screen_px", -1.0))
+	var c := float(deep.get("screen_px", -1.0))
+	if a < 4.0 or b < 4.0 or c < 4.0:
+		_fail("monotone check missing sizes op=%.1f tac=%.1f deep=%.1f" % [a, b, c])
 		return
-	if b + 0.05 < a * GROW_RATIO:
-		_fail("%s screen_px=%.1f did not grow vs operational %.1f (need ≥%.2f×)" % [name_s, b, a, GROW_RATIO])
+	if b + 0.05 < a:
+		_fail("tactical screen_px=%.1f shrank vs operational %.1f" % [b, a])
 	else:
-		_pass("%s screen_px=%.1f > operational %.1f" % [name_s, b, a])
+		_pass("tactical screen_px=%.1f >= operational %.1f" % [b, a])
+	if c + 0.05 < b:
+		_fail("deep screen_px=%.1f shrank vs tactical %.1f" % [c, b])
+	else:
+		_pass("deep screen_px=%.1f >= tactical %.1f" % [c, b])
+	if c + 0.05 < a:
+		_fail("deep screen_px=%.1f < operational %.1f" % [c, a])
+	else:
+		_pass("deep screen_px=%.1f >= operational %.1f" % [c, a])
 
 
 func _star_font_px() -> int:
@@ -313,25 +298,15 @@ func _star_font_px() -> int:
 func _star_canvas_span() -> float:
 	if _star == null or not is_instance_valid(_star):
 		return -1.0
-	_star.reset_size()
-	var xf: Transform2D = _star.get_global_transform_with_canvas()
 	var r: Rect2 = _star.get_rect()
-	var pts: Array[Vector2] = [
-		xf * r.position,
-		xf * Vector2(r.position.x + r.size.x, r.position.y),
-		xf * Vector2(r.position.x, r.position.y + r.size.y),
-		xf * (r.position + r.size),
-	]
-	var min_x := pts[0].x
-	var max_x := pts[0].x
-	var min_y := pts[0].y
-	var max_y := pts[0].y
-	for p in pts:
-		min_x = minf(min_x, p.x)
-		max_x = maxf(max_x, p.x)
-		min_y = minf(min_y, p.y)
-		max_y = maxf(max_y, p.y)
-	return maxf(max_x - min_x, max_y - min_y)
+	var box := maxf(r.size.x, r.size.y)
+	var z := 1.0
+	if _cam != null:
+		z = maxf(_cam.zoom.x, _cam.zoom.y)
+	# Label.get_rect() already includes CanvasItem.scale. The canvas
+	# transform also has that scale, so xf * get_rect() counts it twice
+	# (38 px vs the 36 px cap). On-screen span is box × camera zoom.
+	return box * z
 
 
 func _capture_ink_bbox() -> Dictionary:

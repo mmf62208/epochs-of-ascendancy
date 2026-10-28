@@ -5,20 +5,22 @@ Tip `1421609c3cba82b35c36ab9b2d0230632bb0369b` (pre-FIX #1). FIX #1 parent
 `b2674c6c` (main `425b4448` merged). xvfb / headless ≠ live Play. Never
 `EOA_SKIP_TITLE`. `tools/run_godot.sh` only (Godot 4.7.1-rc2). HOLD merge.
 
-## Live star zoom (Play MIXED `b16b9b53`)
+## Live star zoom (Play MIXED `b16b9b53` → screen cap after `013f808f`)
 
 `HeadlessPerf2StarZoomPxTest` drives `_refresh_terrain_zoom_light` (the live
-wheel path) at z=0.76 / 2.00 / 5.62 and measures SubViewport canvas-span px.
+wheel path) at z=0.76 / 2.00 / 5.62 and measures on-screen star px. `013f808f`
+wrote font 36 above operational; the Label is world-space so z=5.62 was 281 px
+on screen. Font is now inverted for camera zoom × glyph box (18–36 screen px).
 
-| zoom | `b16b9b53` | after live clamp |
-|---|---|---|
-| operational 0.76 | font 20 · screen 21.3 | font 20 · screen 21.3 |
-| tactical 2.00 | font 11 · screen 32.0 | font 36 · screen 100.0 |
-| deep 5.62 | font 11 · screen 89.9 | font 36 · screen 281.0 |
-| RESULT | **FAIL** failures=8 | **PASS** failures=0 |
+| zoom | `b16b9b53` | `013f808f` | after screen cap |
+|---|---|---|---|
+| operational 0.76 | font 20 · screen 21.3 | font 20 · screen 21.3 | font 20 · screen 21.3 |
+| tactical 2.00 | font 11 · screen 32.0 | font 36 · screen 100.0 | font 12 · screen 36.0 |
+| deep 5.62 | font 11 · screen 89.9 | font 36 · screen 281.0 | font 4 · screen 36.0 |
+| RESULT | **FAIL** | **FAIL** failures=3 | **PASS** failures=0 |
 
-The 18–36 clamp now lives on `_capital_star_font_px` so wheel/Home sync
-writes it. Operational 20 px + Home hide + (d) same-px restore 20 kept.
+On-screen size stays in 18–36, never shrinks with zoom, deep ≥ operational.
+Operational 20 px font + Home hide + (d) same-px restore 20 kept.
 
 ## FIX #1 capital-star stale skip (before / after)
 
