@@ -30899,8 +30899,18 @@ func _pulse_amount_for_supply_role(role: String) -> float:
 func _refresh_supply_highlights(reuse_cached_roles: bool = false) -> void:
 	var t0 := Time.get_ticks_usec()
 	# Hang-class: L off is hide-only. Never walk 3520 nodes or rebuild Line2Ds.
+	# Yellow route rings are Line2Ds on the previous role pids, not the batch.
+	# Capture those pids before the dict clear; an empty dict does not walk the board.
 	if not supply_mode:
 		_set_supply_outline_batch_visible(false)
+		var prev_pids: Array[int] = []
+		for pid_v in _supply_role_by_province.keys():
+			prev_pids.append(int(pid_v))
+		for pid in prev_pids:
+			var hide_node := _province_node(pid)
+			if hide_node == null:
+				continue
+			ProvinceMapVisuals.hide_polished_outline(hide_node, ProvinceMapVisuals.NODE_SUPPLY)
 		_supply_role_by_province = {}
 		_last_refresh_supply_highlights_ms = float(Time.get_ticks_usec() - t0) / 1000.0
 		return
