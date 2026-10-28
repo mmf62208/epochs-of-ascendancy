@@ -36,6 +36,11 @@ and wheel-notch cost; plate positions and capital stars must look unchanged.
 2. At operational zoom (star px = 20), toggle the **supply overlay**, then
    one same-px wheel notch.
    Expect: stars return to **20 px** (not stuck at the glyph-pass 36 px).
+3. Keep wheeling in past operational (z > 1.55, including the playtest
+   12-notch / z≈5.62 Budapest–Belgrade view) with supply **off**.
+   Expect: capital stars **grow** to the 18–36 px clamp (36 at z≥2.0), not
+   stay ~20 px. A same-px notch at that zoom must keep the enlarged size.
+   Operational and Home hide/size rules above stay.
 
 ## Must keep (visible)
 

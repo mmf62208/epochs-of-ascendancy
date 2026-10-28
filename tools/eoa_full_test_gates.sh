@@ -359,6 +359,10 @@ else
     tools/run_godot.sh --headless --path . --resolution 1280x720 \
     -s res://scripts/core/HeadlessVis2CapitalStarsAfterLTest.gd || fail
 
+  run_step launch_perf2_star_zoom_px \
+    tools/run_godot.sh --headless --path . --resolution 1280x720 \
+    -s res://scripts/core/HeadlessPerf2StarZoomPxTest.gd || fail
+
   run_step launch_wheeldrift1 \
     tools/run_godot.sh --headless --path . --resolution 1280x740 \
     -s res://scripts/core/HeadlessWheelDrift1Test.gd || fail

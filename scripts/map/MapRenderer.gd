@@ -15245,12 +15245,18 @@ func _ensure_capital_stars_visible() -> void:
 		print("MapRenderer: capital stars visible n=%d" % n_stars)
 
 
-func _capital_star_font_px() -> int:
-	var z := _get_camera_zoom()
+func _capital_star_font_px(zoom_override: float = -1.0) -> int:
+	var z := zoom_override if zoom_override > 0.0001 else _get_camera_zoom()
 	if z <= MapZoomLODScript.STRATEGIC_MAX_ZOOM:
 		return 0  # hide at world/strategic — nation labels own that band
-	# ~16 screen px at operational Europe zoom; clamp so Maginot does not grow a carpet.
-	return int(clampf(16.0 / maxf(z, 0.35), 11.0, 20.0))
+	# Operational: ~16 screen px; clamp so Maginot does not grow a carpet.
+	if z <= MapZoomLODScript.OPERATIONAL_MAX_ZOOM:
+		return int(clampf(16.0 / maxf(z, 0.35), 11.0, 20.0))
+	# Live wheel / Home-notch only call `_sync_capital_star_scales`. Same 18–36
+	# clamp as the zoomed glyph pass (36 at zoom_metric 2.0). Do not keep the
+	# idle 20 px cap after the camera leaves operational zoom.
+	var zsc := _zoom_detail_scale_smooth(z, 1.8)
+	return clampi(int(round(28.0 * maxf(0.85, zsc))), 18, 36)
 
 
 var _capital_star_last_sync_px: int = -999
@@ -15263,7 +15269,9 @@ func _invalidate_capital_star_scale_cache() -> void:
 
 
 func _sync_capital_star_scales(_z: float = -1.0) -> void:
-	var px := _capital_star_font_px()
+	# Honor the zoom the wheel / Home path already measured. Ignoring `_z`
+	# made live notches keep the idle 20 px cap while camera.zoom was 5.62.
+	var px := _capital_star_font_px(_z)
 	var force_n: int = _asia_end_force_star_pids.size()
 	# Theme font overrides on ~37 stars cost ~200 ms/notch even when px is
 	# unchanged. Skip the walk when the last apply already matches.
@@ -15501,6 +15509,10 @@ func _refresh_province_detail_visibility() -> void:
 		return
 
 	var current_zoom := _get_camera_zoom()
+	# Unpaused 6th-frame path. Wheel already applied this via
+	# `_refresh_terrain_zoom_light`; cache-hit is two ints. Required so a
+	# non-wheel zoom still leaves the operational band at 18–36 px.
+	_sync_capital_star_scales(current_zoom)
 	if _political_labels_layer != null and is_instance_valid(_political_labels_layer):
 		if _political_labels_layer.has_method("sync_camera_zoom"):
 			_political_labels_layer.call("sync_camera_zoom", current_zoom)

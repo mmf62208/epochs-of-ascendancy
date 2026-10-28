@@ -5,6 +5,21 @@ Tip `1421609c3cba82b35c36ab9b2d0230632bb0369b` (pre-FIX #1). FIX #1 parent
 `b2674c6c` (main `425b4448` merged). xvfb / headless ≠ live Play. Never
 `EOA_SKIP_TITLE`. `tools/run_godot.sh` only (Godot 4.7.1-rc2). HOLD merge.
 
+## Live star zoom (Play MIXED `b16b9b53`)
+
+`HeadlessPerf2StarZoomPxTest` drives `_refresh_terrain_zoom_light` (the live
+wheel path) at z=0.76 / 2.00 / 5.62 and measures SubViewport canvas-span px.
+
+| zoom | `b16b9b53` | after live clamp |
+|---|---|---|
+| operational 0.76 | font 20 · screen 21.3 | font 20 · screen 21.3 |
+| tactical 2.00 | font 11 · screen 32.0 | font 36 · screen 100.0 |
+| deep 5.62 | font 11 · screen 89.9 | font 36 · screen 281.0 |
+| RESULT | **FAIL** failures=8 | **PASS** failures=0 |
+
+The 18–36 clamp now lives on `_capital_star_font_px` so wheel/Home sync
+writes it. Operational 20 px + Home hide + (d) same-px restore 20 kept.
+
 ## FIX #1 capital-star stale skip (before / after)
 
 `HeadlessPerf2FleetRefreshBudgetTest` (c)(d) on product `b2674c6c` vs this tip.
