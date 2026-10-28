@@ -146,6 +146,11 @@ var _hwy3_cached_input_key: String = ""
 var _hwy3_cached_rows: Array[Dictionary] = []
 var _hwy3_route_compute_count: int = 0
 var _hwy3_styling_pass_count: int = 0
+## Supply flag last passed to corridor styling. L calls set_show_roads(false)
+## while roads are already off. Returning before hwy3_cache_hit then skips a
+## supply change, so a forced-false hit flag never recomputes hub routes.
+var _hwy3_styled_supply_on: bool = false
+var _hwy3_styled_supply_valid: bool = false
 var _hub_label_layer: CanvasLayer = null
 var _hub_labels: Dictionary = {}
 
@@ -1462,14 +1467,27 @@ func set_show_proposed_splits(enabled: bool):
 
 ## Toggle infrastructure sub-layers. Called from DebugOverlay, options, or hotkeys.
 ## Now properly controls the Node2D sub-layer visibility (RoadLayer etc) for true toggle + node editing.
+func _hwy3_supply_changed_since_style() -> bool:
+    # Never-styled stays false so a boot set_show_roads(false) does not walk
+    # the signature before the deferred rebuild. After a style pass, L must
+    # not return here: the rebuild is what reads hwy3_cache_hit.
+    if not _hwy3_styled_supply_valid:
+        return false
+    return _read_supply_on() != _hwy3_styled_supply_on
+
+
 func set_show_roads(enabled: bool):
     # Mode switches call this on the way in and out. Rebuilding when the flag
     # is already correct walked the road cache again (~50 ms) for no visual change.
-    if show_roads == enabled:
+    # A supply change with roads still off is not that case. L always passes
+    # false. Returning here used to skip hwy3_cache_hit, so the bypass_toggle
+    # mutant (flag forced false) still reused the hub-route snapshot.
+    if show_roads == enabled and not _hwy3_supply_changed_since_style():
         return
     show_roads = enabled
-    # HWY-3 supply-toggle cache: rebuild on an actual toggle. Cache hit skips hub routing so
-    # L / political is not the old hitch. ROADS-1 stub filter still runs on apply.
+    # HWY-3 supply-toggle cache: rebuild on a roads toggle or a supply change.
+    # Cache hit skips hub routing so L / political is not the old hitch.
+    # ROADS-1 stub filter still runs on apply.
     rebuild_road_layer()
     _update_sub_layer_visibilities()
     queue_redraw()
@@ -1782,6 +1800,8 @@ func _clear_supply_corridor_lines() -> void:
 
 func _apply_hwy3_corridor_styling(supply_on: bool) -> void:
     _hwy3_styling_pass_count += 1
+    _hwy3_styled_supply_on = supply_on
+    _hwy3_styled_supply_valid = true
     _clear_supply_corridor_lines()
     var mr: Node = _map_renderer_or_null()
     for entry in _road_edge_cache:
