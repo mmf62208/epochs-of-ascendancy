@@ -15708,7 +15708,12 @@ func _layout_zoomed_map_glyphs_for_province_node(pid: int, zoom_metric: float, s
 			var lbl := child as Label
 			var base_px := int(lbl.get_meta(META_MAP_GLYPH_PX))
 			var is_capital := lbl.has_meta(META_MAP_GLYPH_CAPITAL)
-			if is_capital and not supply_mode:
+			# Supply off at strategic/operational zoom keeps the idle star
+			# (absolute z=40, `_capital_star_font_px` capped at 20, hidden at
+			# Home). A high zoom_metric is the zoomed glyph pass: fall through
+			# so the 18–36 px clamp runs (36 at zoom_metric 2.0). Do not lift
+			# the idle cap.
+			if is_capital and not supply_mode and zoom_metric <= MapZoomLODScript.OPERATIONAL_MAX_ZOOM:
 				_restore_idle_capital_star_draw_state(lbl, int(pid), ctr)
 				continue
 			# Capital gold stars stay visible at all zoom levels (Washington/Tokyo were
@@ -15742,7 +15747,14 @@ func _layout_zoomed_map_glyphs_for_province_node(pid: int, zoom_metric: float, s
 				lbl.add_theme_color_override("font_color", Color(1.0, 0.84, 0.18, 1.0))
 				lbl.add_theme_color_override("font_outline_color", Color(0.12, 0.08, 0.02, 0.92))
 				lbl.add_theme_constant_override("outline_size", 6)
-				lbl.z_index = ProvinceMapVisuals.Z_MAP_GLYPH + 2
+				if supply_mode:
+					lbl.z_index = ProvinceMapVisuals.Z_MAP_GLYPH + 2
+				else:
+					# High zoom_metric still uses the 36 px clamp, but the star
+					# stays on the idle draw layer (not absolute glyph z=10).
+					var force_star := _asia_end_force_star_pids.has(int(pid))
+					lbl.z_as_relative = false
+					lbl.z_index = 80 if force_star else 40
 			else:
 				lbl.add_theme_color_override(
 					"font_outline_color",
