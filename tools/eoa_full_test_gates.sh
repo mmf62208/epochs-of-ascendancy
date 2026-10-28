@@ -359,7 +359,14 @@ else
     tools/run_godot.sh --headless --path . --resolution 1280x720 \
     -s res://scripts/core/HeadlessVis2CapitalStarsAfterLTest.gd || fail
 
+  # Dummy --headless cannot capture pixels: the .gd prints RESULT=SKIP.
+  # The xvfb wrapper still runs the full ink asserts (same class as other
+  # xvfb-only pixel checks: SKIP if no xvfb-run, PASS under Xvfb).
   run_step launch_perf2_star_zoom_px \
+    tools/run_godot.sh --headless --path . --resolution 1280x720 \
+    -s res://scripts/core/HeadlessPerf2StarZoomPxTest.gd || fail
+
+  run_step launch_perf2_star_zoom_px_xvfb \
     tools/eoa_perf2_star_zoom_px_guard.sh || fail
 
   run_step launch_wheeldrift1 \

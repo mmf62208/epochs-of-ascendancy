@@ -9,9 +9,10 @@ Tip `1421609c3cba82b35c36ab9b2d0230632bb0369b` (pre-FIX #1). FIX #1 parent
 
 `HeadlessPerf2StarZoomPxTest` via `tools/eoa_perf2_star_zoom_px_guard.sh` (xvfb,
 no `--headless`) drives `_refresh_terrain_zoom_light` and measures the star's
-**bright bbox from `get_image()`**. Dummy headless cannot capture pixels; the
-test fails honestly instead of using a transform. `d3fc8c3d` rasterised font 4
-and scaled it up → 6–7 px smudge. Font now stays at the on-screen target;
+**bright bbox from `get_image()`**. Dummy `--headless` cannot capture pixels
+and prints **RESULT=SKIP** (`render-only, needs xvfb`) instead of FAIL — same
+class as the other xvfb-only gate checks. `d3fc8c3d` rasterised font 4 and
+scaled it up → 6–7 px smudge. Font now stays at the on-screen target;
 counter-scale is `1/camera_zoom`.
 
 | zoom | `d3fc8c3d` (xvfb ink) | after counter-scale |

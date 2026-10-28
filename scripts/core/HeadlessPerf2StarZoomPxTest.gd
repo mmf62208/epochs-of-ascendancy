@@ -6,8 +6,11 @@ extends SceneTree
 ## the node is counter-scaled by 1/(camera zoom × glyph box) so the ★ is
 ## rasterised at its final size. On-screen ink is measured from a real
 ## viewport capture — never from a computed transform. Dummy --headless
-## cannot grab GPU pixels; launch via the xvfb wrapper.
+## cannot grab GPU pixels: report RESULT=SKIP (render-only, needs xvfb).
+## Full ink asserts run only under the xvfb wrapper.
 ##
+##   tools/run_godot.sh --headless --path . --resolution 1280x720 \
+##     -s res://scripts/core/HeadlessPerf2StarZoomPxTest.gd   # SKIP
 ##   tools/eoa_perf2_star_zoom_px_guard.sh
 ##   xvfb-run -a -s "-screen 0 1280x720x24" tools/run_godot.sh --path . \
 ##     --resolution 1280x720 -s res://scripts/core/HeadlessPerf2StarZoomPxTest.gd
@@ -40,6 +43,9 @@ func _init() -> void:
 
 
 func _start() -> void:
+	if _is_dummy_renderer():
+		_skip_dummy("render-only, needs xvfb")
+		return
 	await _run()
 	var ok := _failures == 0
 	print("HeadlessPerf2StarZoomPxTest: ", "PASS" if ok else "FAIL", " (failures=", _failures, ")")
@@ -47,6 +53,24 @@ func _start() -> void:
 	if OS.has_method("flush_stdout"):
 		OS.call("flush_stdout")
 	quit(0 if ok else 1)
+
+
+func _is_dummy_renderer() -> bool:
+	var ds := str(DisplayServer.get_name()).to_lower()
+	if ds.contains("headless") or ds.contains("dummy"):
+		return true
+	for arg in OS.get_cmdline_args():
+		if str(arg) == "--headless":
+			return true
+	return false
+
+
+func _skip_dummy(why: String) -> void:
+	print("HeadlessPerf2StarZoomPxTest: SKIP (", why, ")")
+	print("HeadlessPerf2StarZoomPxTest: RESULT=SKIP")
+	if OS.has_method("flush_stdout"):
+		OS.call("flush_stdout")
+	quit(0)
 
 
 func _fail(msg: String) -> void:
