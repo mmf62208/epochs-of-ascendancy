@@ -520,8 +520,24 @@ static func apply(rec: Dictionary = {}) -> Dictionary:
 		var dpid := int(r.get("to_id", 1))
 		if typeof(WarStateDomain) != TYPE_NIL and WarStateDomain.loop_enabled():
 			var loop_declared: Dictionary = WarStateDomain.player_declare_from_province(dpid)
+			var loop_ok := bool(loop_declared.get("ok", false)) or bool(loop_declared.get("already", false))
+			if not loop_ok:
+				return {
+					"ok": false,
+					"action": "declare",
+					"summary": str(loop_declared.get("reason", r.get("hint", "Declare war"))),
+				}
+			# Diplomatic only: apply_war_goal_live skips assault while the loop is on.
+			# The living counter still needs pushes >= 1 after a successful declare.
+			if typeof(GameData) != TYPE_NIL and GameData.has_method("apply_war_goal_execute"):
+				var pushed: Dictionary = GameData.apply_war_goal_execute(dpid)
+				return {
+					"ok": bool(pushed.get("ok", false)),
+					"action": "declare",
+					"summary": str(pushed.get("summary", loop_declared.get("reason", r.get("hint", "Declare war")))),
+				}
 			return {
-				"ok": bool(loop_declared.get("ok", false)) or bool(loop_declared.get("already", false)),
+				"ok": true,
 				"action": "declare",
 				"summary": str(loop_declared.get("reason", r.get("hint", "Declare war"))),
 			}

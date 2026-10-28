@@ -21847,13 +21847,16 @@ func _pick_unit_formation_at_world(world_pos: Vector2, land_only: bool = false, 
 			var chip_pos: Vector2 = _demo_unit_icon_world_pos(counter, id)
 			var d: float = world_pos.distance_squared_to(chip_pos)
 			var is_sea_disk: bool = bool(counter.get_meta("sea_nation_disk", false))
+			var channel_anchor: bool = bool(counter.get_meta("living_channel_anchor", false))
 			# FIX #5: below z0.65 land/air hit is the painted body (plate+bars+
 			# label), own and foreign — not the 40 px circle.
 			# FIX #6: painted body is accepted without the ownership block;
 			# topmost draw order wins (not nearest centre).
 			# FLEET-2b: only actually painted pixels (plate, bars, glyph ink).
 			# A fat designation AABB with no ink cannot win.
-			if z < 0.65 and not is_sea_disk:
+			# Channel anchor uses the fleet-disk radius so it stays pickable
+			# without covering the other nations' plates.
+			if z < 0.65 and not is_sea_disk and not channel_anchor:
 				if not _world_in_unit_painted_rect(world_pos, counter):
 					continue
 			else:
@@ -27675,14 +27678,8 @@ func _unit_chip_base_world(pid: int) -> Vector2:
 func _iter_demo_unit_icons_at_pid(id: int) -> Array:
 	var out: Array = []
 	var seen: Dictionary = {}
-	if province_nodes.has(id):
-		var n: Node2D = province_nodes[id] as Node2D
-		if n != null:
-			for c in n.get_children():
-				if c is Node2D and str(c.name).begins_with("DemoUnitIcon_"):
-					out.append(c)
-					seen[c] = true
-	# FIX #2b: plates parented to SeaNationFleetLayer (above choke diamonds).
+	# Shared-sea plates first so a province-node Channel anchor does not
+	# steal the ENG disk's name / sea_nation_disk lookup.
 	var layer: Node2D = _ensure_sea_nation_layer()
 	if layer != null:
 		var prefix := "DemoUnitIcon_%d" % id
@@ -27693,6 +27690,15 @@ func _iter_demo_unit_icons_at_pid(id: int) -> Array:
 			if nm == prefix or nm.begins_with(prefix + "_"):
 				if not seen.has(c2):
 					out.append(c2)
+					seen[c2] = true
+	if province_nodes.has(id):
+		var n: Node2D = province_nodes[id] as Node2D
+		if n != null:
+			for c in n.get_children():
+				if c is Node2D and str(c.name).begins_with("DemoUnitIcon_"):
+					if not seen.has(c):
+						out.append(c)
+						seen[c] = true
 	return out
 
 
@@ -28880,6 +28886,8 @@ func _demo_unit_icon_hit_radius_world(z: float, counter: Node2D = null) -> float
 		var disk_r: float = _sea_nation_fleet_disk_radius_world(z, counter)
 		# Small pad so the "TAG Fleet N" under the disk stays clickable.
 		return disk_r + 3.0
+	if counter != null and is_instance_valid(counter) and bool(counter.get_meta("living_channel_anchor", false)):
+		return _sea_nation_fleet_disk_radius_world(z, counter)
 	return _unit_counter_drawn_body_radius_world(z, counter)
 
 
@@ -28930,6 +28938,7 @@ func _sync_sea_nation_fleet_offsets(z: float) -> void:
 				col = MapManager.get_country_color(tag)
 			var fo: Object = _formation_from_demo_icon(icon)
 			_style_sea_nation_plate_chrome(icon, fo, tag, i, col)
+		_align_channel_fleet_anchor(id, stacked)
 
 
 func _sync_unit_counter_scales(z: float = -1.0) -> void:
@@ -28948,6 +28957,8 @@ func _sync_unit_counter_scales(z: float = -1.0) -> void:
 		for c in node.get_children():
 			if c is Node2D and str(c.name).begins_with("DemoUnitIcon_"):
 				if bool((c as Node2D).get_meta("sea_nation_disk", false)):
+					continue
+				if bool((c as Node2D).get_meta("living_channel_anchor", false)):
 					continue
 				var icon := c as Node2D
 				if bool(icon.get_meta("garrison_1936_chip", false)):
@@ -33476,6 +33487,9 @@ func _rebuild_demo_unit_icons(only_pids: Dictionary) -> void:
 					sea_jobs.size(),
 					tex_cache
 				)
+			# Land path names the chip DemoUnitIcon_{pid} on the province node.
+			# Shared Channel plates stay DemoUnitIcon_{pid}_{TAG} on the layer.
+			_place_channel_fleet_chip(n, id, sea_jobs)
 			_demo_unit_icon_pids.append(id)
 			icons_placed += sea_jobs.size()
 			continue
@@ -33794,6 +33808,78 @@ func _demo_icon_jobs_for_province(id: int, ff: Object, force_tag: String, sea_na
 			"sea_disk": false,
 		})
 	return jobs
+
+
+## Province-node chip for the ENG fleet on a shared sea (Channel 950001).
+## Named like the land path so pick can read formation_id. Per-nation plates stay on the layer.
+func _place_channel_fleet_chip(host: Node2D, id: int, jobs: Array) -> void:
+	if host == null:
+		return
+	var eng_fo: Object = null
+	var eng_off := Vector2.ZERO
+	for job_v in jobs:
+		var job: Dictionary = job_v as Dictionary if job_v is Dictionary else {}
+		if str(job.get("tag", "")).strip_edges().to_upper() != "ENG":
+			continue
+		eng_fo = job.get("fo") as Object if job.get("fo") is Object else null
+		eng_off = job.get("offset", Vector2.ZERO) as Vector2
+		break
+	if eng_fo == null or not ("formation_id" in eng_fo):
+		return
+	var fid := str(eng_fo.formation_id).strip_edges()
+	if fid.is_empty():
+		return
+	var old: Node = host.get_node_or_null("DemoUnitIcon_%d" % id)
+	if old != null:
+		host.remove_child(old)
+		old.free()
+	var counter := Node2D.new()
+	counter.name = "DemoUnitIcon_%d" % id
+	counter.position = _unit_chip_base_world(id) + eng_off
+	counter.z_index = 28
+	counter.z_as_relative = false
+	var place_z: float = 1.0
+	if has_method("_get_camera_zoom"):
+		place_z = _get_camera_zoom()
+	counter.scale = Vector2.ONE * _sea_nation_counter_scale(14.5, place_z)
+	counter.visible = true
+	counter.set_meta("formation_id", fid)
+	counter.set_meta("formation", eng_fo)
+	counter.set_meta("province_id", id)
+	counter.set_meta("living_channel_anchor", true)
+	host.add_child(counter)
+	var nation_col := Color(0.85, 0.88, 0.95, 1.0)
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_country_color"):
+		nation_col = MapManager.get_country_color("ENG")
+	_attach_unit_counter_chrome(counter, eng_fo, nation_col)
+
+
+func _align_channel_fleet_anchor(id: int, stacked: Array) -> void:
+	if not province_nodes.has(id):
+		return
+	var host: Node2D = province_nodes[id] as Node2D
+	if host == null:
+		return
+	var anchor: Node2D = host.get_node_or_null("DemoUnitIcon_%d" % id) as Node2D
+	if anchor == null or not bool(anchor.get_meta("living_channel_anchor", false)):
+		return
+	var eng_plate: Node2D = null
+	for s_v in stacked:
+		var plate: Node2D = s_v as Node2D
+		if plate == null:
+			continue
+		if str(plate.get_meta("sea_nation_tag", "")).strip_edges().to_upper() != "ENG":
+			continue
+		eng_plate = plate
+		break
+	if eng_plate == null:
+		return
+	if anchor.is_inside_tree() and eng_plate.is_inside_tree():
+		anchor.global_position = eng_plate.global_position
+	else:
+		anchor.position = eng_plate.position
+	anchor.scale = eng_plate.scale
+	anchor.visible = true
 
 
 func _place_sea_nation_fleet_counter(
