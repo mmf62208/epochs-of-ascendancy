@@ -4,6 +4,10 @@
 Snap is 1e-4 px. A new outline fails when it crosses itself or overlaps
 another land province by more than 1 px². Sea zones are coarse and are
 not part of this gate.
+
+audit_play_gaps also fails the theatre holes and thin labelled points from
+the 908fee18 play pass. It is not a world-wide strip check: many real
+micro-provinces are narrower than 8 px on purpose.
 """
 from __future__ import annotations
 
@@ -780,4 +784,191 @@ def audit_outlines(geometries, domains):
             )
             if lost > OVERLAP_LIMIT:
                 problems.append({"id": pid, "kind": "overlap", "other": oid, "area": round(lost, 3)})
+    return problems
+
+
+# Labelled points that rendered as strips on 908fee18, plus the neighbours
+# that take the enclosed holes. A self-crossing ring is width 0: the fill
+# path triangulates the raw ring, not the even-odd area.
+STRIP_MIN = 8.0
+THEATER_STRIP_IDS = (
+    902598,  # Hunan North, self-crossing on 908fee18
+    902634,  # Yunnan East, self-crossing, takes part of the southwest hole
+    906013,  # Chongqing
+    906015,  # Chengdu
+    906019,  # Guiyang
+    906112,  # Lhasa, takes the Tibet specks it touches
+    906113,  # Changtang, takes the Tibet hole
+    906114,
+    906122,
+    906130,
+    906131,
+    906132,
+    906133,
+    906134,
+    906135,
+)
+
+# Integer canvas points. Each square is entirely unowned on 908fee18 and sits
+# inside the play hole with a margin, so a 1 px boundary shave still leaves it
+# inside the filled province. rad is an inclusive half-width. min_empty is the
+# failure threshold (px).
+_SOLID_HOLES = (
+    ("sw_core", 6444, 1616, 10, 30),       # ~41.2k enclosed southwest hole
+    ("yunnan_band", 6334, 1726, 3, 30),    # Yunnan side of the ~48k gap
+    ("hunan_hole", 6616, 1504, 4, 30),     # ~2.6k hole beside Hunan
+    ("tibet_hole", 6079, 1384, 3, 30),     # 906113 hole
+)
+# The three Tibet specks (21 + 3 + 1 px). Inclusive pixel-center box.
+_SPECK_BOX = ("tibet_specks", 6156, 1495, 6172, 1528, 8)
+_SPECK_PROBES = (
+    ("tibet_speck_21", 6161, 1501),
+    ("tibet_speck_3", 6164, 1509),
+    ("tibet_speck_1", 6170, 1527),
+)
+
+
+def label_strip_width(points, anchor):
+    """Minimum chord in px through the labelled point.
+
+    Self-crossing and missing rings return 0. The chord is the shortest of
+    16 axes. A point outside the ring returns 0.
+    """
+    ring = _open_ring(points)
+    if len(ring) < 3 or not anchor or len(anchor) < 2:
+        return 0.0
+    if _self_kinds(ring):
+        return 0.0
+    if _area(ring) < 0.0:
+        ring = list(reversed(ring))
+    x = float(anchor[0])
+    y = float(anchor[1])
+    if not _point_in_face(ring, x, y):
+        return 0.0
+    best = 1e9
+    for k in range(16):
+        ang = math.pi * k / 16.0
+        dx = math.cos(ang)
+        dy = math.sin(ang)
+
+        def _reach(sgn, dx=dx, dy=dy):
+            span = 0.25
+            while span < 800.0 and _point_in_face(ring, x + sgn * dx * span, y + sgn * dy * span):
+                span *= 1.7
+            if span >= 800.0:
+                return 800.0
+            lo = 0.0 if span <= 0.25 else span / 1.7
+            hi = span
+            if lo > 0.0 and not _point_in_face(ring, x + sgn * dx * lo, y + sgn * dy * lo):
+                lo = 0.0
+            for _ in range(22):
+                mid = (lo + hi) * 0.5
+                if _point_in_face(ring, x + sgn * dx * mid, y + sgn * dy * mid):
+                    lo = mid
+                else:
+                    hi = mid
+            return lo
+
+        width = _reach(1.0) + _reach(-1.0)
+        if width < best:
+            best = width
+    return best
+
+
+def _loops_of(ring):
+    """Simple even-odd pieces. A simple ring is used as-is."""
+    if len(ring) < 3:
+        return []
+    if _self_kinds(ring):
+        return [l for l in covered_loops(ring) if _area(l) > 0.0]
+    if _area(ring) < 0.0:
+        ring = list(reversed(ring))
+    return [ring]
+
+
+def _hole_candidates(rings, boxes):
+    """Land fill loops whose bbox meets any test box."""
+    out = []
+    for pid, ring in rings.items():
+        bb = _bbox(ring)
+        hit = False
+        for x0, y0, x1, y1 in boxes:
+            if not (bb[2] < x0 or x1 < bb[0] or bb[3] < y0 or y1 < bb[1]):
+                hit = True
+                break
+        if not hit:
+            continue
+        loops = _loops_of(ring)
+        if loops:
+            out.append((bb, loops))
+    return out
+
+
+def _owned(cands, x, y):
+    for bb, loops in cands:
+        if x < bb[0] - 0.1 or x > bb[2] + 0.1 or y < bb[1] - 0.1 or y > bb[3] + 0.1:
+            continue
+        for loop in loops:
+            if _point_in_face(loop, x, y):
+                return True
+    return False
+
+
+def audit_play_gaps(geometries, domains):
+    """Theatre holes and thin labelled points from the 908fee18 play pass.
+
+    Fails when a theatre label sits in a strip narrower than 8 px (or in a
+    self-crossing ring), when an interior square of a named hole is still
+    unowned, or when the Tibet speck box still holds 8 px or more of sea.
+    """
+    rings = {}
+    for g in geometries:
+        pid = int(g["id"])
+        ring = _open_ring(g.get("points"))
+        if len(ring) < 3:
+            continue
+        if domains.get(pid) in _WATER or pid >= 950000:
+            continue
+        rings[pid] = ring
+    by_anchor = {}
+    for g in geometries:
+        by_anchor[int(g["id"])] = g.get("label_anchor")
+    problems = []
+    for pid in THEATER_STRIP_IDS:
+        ring = rings.get(pid)
+        if ring is None:
+            problems.append({"kind": "strip", "id": pid, "detail": "missing"})
+            continue
+        width = label_strip_width(ring, by_anchor.get(pid))
+        if width < STRIP_MIN:
+            problems.append({"kind": "strip", "id": pid, "width": round(width, 2)})
+    boxes = []
+    for name, cx, cy, rad, _vmin in _SOLID_HOLES:
+        boxes.append((cx - rad, cy - rad, cx + rad, cy + rad))
+    sx0, sy0, sx1, sy1 = _SPECK_BOX[1], _SPECK_BOX[2], _SPECK_BOX[3], _SPECK_BOX[4]
+    boxes.append((sx0, sy0, sx1, sy1))
+    cands = _hole_candidates(rings, boxes)
+    for name, cx, cy, rad, vmin in _SOLID_HOLES:
+        empty = 0
+        for dy in range(-rad, rad + 1):
+            for dx in range(-rad, rad + 1):
+                if not _owned(cands, cx + dx, cy + dy):
+                    empty += 1
+        if empty >= vmin:
+            problems.append({"kind": "hole", "name": name, "empty": empty, "min": vmin})
+    speck_empty = 0
+    for y in range(sy0, sy1 + 1):
+        for x in range(sx0, sx1 + 1):
+            if not _owned(cands, x, y):
+                speck_empty += 1
+    if speck_empty >= _SPECK_BOX[5]:
+        problems.append({
+            "kind": "hole",
+            "name": _SPECK_BOX[0],
+            "empty": speck_empty,
+            "min": _SPECK_BOX[5],
+        })
+    for name, x, y in _SPECK_PROBES:
+        if not _owned(cands, x, y):
+            problems.append({"kind": "unowned", "name": name, "x": x, "y": y})
     return problems
