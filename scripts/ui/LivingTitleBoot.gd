@@ -55,6 +55,13 @@ var _smoke_auto_begin_delay_s := 0.0
 ## Slot chosen by the exact Load-button hit (title row or Command Center).
 var _pending_load_slot := ""
 var _pending_load_via_cc := false
+## One Esc opens the title Command Center. The next Esc closes it.
+## Same-frame re-entry must not open and close on the press that opened it.
+var _title_esc_frame := -1
+var _title_esc_did_open := false
+var _title_esc_did_close := false
+## Frame of the close. The press that closed the overlay must not also Begin.
+var _begin_block_frame := -1
 ## Grown hit pads: computerUse screenshot clicks often land on the label edge, not the Control core.
 const BEGIN_HIT_GROW := 36.0
 const CC_HIT_GROW := 28.0
@@ -488,7 +495,7 @@ func _refresh_choice_buttons() -> void:
 		if smoke_auto_begin_enabled():
 			_status.text = "SMOKE AUTO-BEGIN armed — title will dismiss without a click. Product Begin/Esc still FAIL until post-boot EOA_LIVE_RAW_* arrives."
 		else:
-			_status.text = "Click Begin · Germany · 1936 or press Enter / Space. Esc or Esc · Menu opens Command Center (Esc is not required to start)."
+			_status.text = "Click Begin · Germany · 1936 or press Enter / Space. Esc opens Command Center; Esc again closes it (Esc is not required to start)."
 
 
 ## Live DisplayServer Esc: keycode, physical_keycode, key_label, unicode 27, or ui_cancel.
@@ -516,7 +523,7 @@ static func is_live_escape_event(event: InputEvent) -> bool:
 	return false
 
 
-## True while any living-title overlay is still open (Play Esc ×2 must not close CC).
+## True while any living-title overlay is still open.
 ## Skips queued-for-deletion leftovers so find_child cannot lie title_up=false.
 static func _walk_first_open_title(n: Node) -> Node:
 	if n != null and is_instance_valid(n) and not n.is_queued_for_deletion():
@@ -590,7 +597,8 @@ func live_routing_facts() -> Dictionary:
 		"esc_routed_to_cc": _esc_routed_to_cc,
 		"closed": _closed,
 		"processing_process": is_processing(),
-		"sticky_open_only": true,
+		"sticky_open_only": false,
+		"title_esc_closes_cc": true,
 		"pointer_event_path": true,
 		"touch_path": true,
 		"ptr_poll": true,
@@ -799,11 +807,22 @@ func _main_menu_node() -> Node:
 	return mm
 
 
-## Command Center still owns this press while it is open, closing, or latched.
+## Command Center owns Begin while it is open, and for the rest of the close frame.
+## A closing or already-freed overlay must not turn the next click into passthrough.
 func _menu_blocks_begin() -> bool:
-	if _cc_pointer_latch:
+	if _command_center_is_up():
 		return true
-	return _main_menu_node() != null
+	if _begin_block_frame == Engine.get_process_frames():
+		return true
+	_cc_pointer_latch = false
+	return false
+
+
+func clear_pending_pointer() -> void:
+	_cc_pointer_latch = false
+	_pending_load_slot = ""
+	_pending_load_via_cc = false
+	_begin_block_frame = Engine.get_process_frames()
 
 
 func handle_live_pointer(event: InputEvent) -> String:
@@ -811,8 +830,13 @@ func handle_live_pointer(event: InputEvent) -> String:
 		return "closed"
 	if event != null and not is_live_pointer_press(event):
 		return "ignore"
-	# Latch before classify: Load's own _force_close runs inside this call.
-	if _main_menu_node() != null:
+	# The event path owns this press. Do not let the _process poll treat the
+	# same held button as a second click (that second click was Begin).
+	if event != null:
+		_ptr_poll_held = true
+	# Latch only while the overlay is actually up. Load's _force_close runs
+	# inside this call and clears the latch for the next click.
+	if _command_center_is_up():
 		_cc_pointer_latch = true
 	# Event coords first. OR-ing a stale Viewport.get_mouse_position() with
 	# a good event can steal Begin→CC (or fire a chip the pointer missed).
@@ -1007,23 +1031,59 @@ func apply_smoke_auto_begin() -> bool:
 
 
 func handle_live_command_center_click() -> bool:
-	print("LivingTitleBoot: live mouse Command Center · Esc (delivery backup)")
+	# Mouse opens. It does not toggle-close an overlay this click just revealed.
+	print("LivingTitleBoot: live mouse Command Center")
 	_log_live_esc("title.mouse_cc", null)
-	return handle_live_escape()
+	if _closed:
+		return false
+	_esc_routed_to_cc = true
+	if _command_center_is_up():
+		return true
+	print("LivingTitleBoot: live mouse Command Center → open")
+	return _open_command_center_from_title()
+
+
+func _title_esc_roll_frame() -> void:
+	var frame_now := Engine.get_process_frames()
+	if frame_now == _title_esc_frame:
+		return
+	_title_esc_frame = frame_now
+	_title_esc_did_open = false
+	_title_esc_did_close = false
+
+
+func title_esc_opened_this_frame() -> bool:
+	_title_esc_roll_frame()
+	return _title_esc_did_open
+
+
+func note_title_esc_closed() -> void:
+	_title_esc_roll_frame()
+	_title_esc_did_close = true
+	_esc_routed_to_cc = true
+	clear_pending_pointer()
 
 
 func handle_live_escape() -> bool:
 	if _closed:
 		return false
-	# Play softpipe presses Esc ×2 (dismiss-then-idle). A one-frame guard is
-	# not enough: first Esc opens CC, second Esc MainMenu-toggles it closed
-	# (Play 3d00182 / d18cbae / d53ee05: overlay unchanged after ×2).
-	# Sticky open-only while this title is up.
+	# One press, one step. The press that opened the Command Center must not
+	# also close it when MainMenu and the title both see that Esc.
+	_title_esc_roll_frame()
 	_log_live_esc("title.handle_live_escape", null)
-	if _esc_routed_to_cc or _command_center_is_up():
+	if _command_center_is_up():
+		if _title_esc_did_open:
+			return true
+		_close_command_center_overlay()
+		_title_esc_did_close = true
 		_esc_routed_to_cc = true
-		return _ensure_command_center_stays_open()
+		clear_pending_pointer()
+		print("EOA_LIVE_ESC who=LivingTitleBoot.close_cc")
+		return true
+	if _title_esc_did_close:
+		return true
 	_esc_routed_to_cc = true
+	_title_esc_did_open = true
 	print("LivingTitleBoot: live Esc → Command Center")
 	return _open_command_center_from_title()
 
@@ -1223,18 +1283,6 @@ func _command_center_is_up() -> bool:
 	return true
 
 
-func _ensure_command_center_stays_open() -> bool:
-	if _command_center_is_up():
-		var tree_s: SceneTree = get_tree()
-		if tree_s != null and tree_s.root != null:
-			var mm_s: Node = tree_s.root.get_node_or_null("MainMenu")
-			if mm_s != null:
-				mm_s.set_meta("eoa_opened_from_living_title", true)
-		print("EOA_LIVE_ESC who=LivingTitleBoot.stay cc already up (Play Esc ×2 open-only)")
-		return true
-	return _open_command_center_from_title()
-
-
 func _ensure_living_begin_binding() -> void:
 	# Enter / Space / B dismiss the title without requiring a focused MouseButton.
 	if not InputMap.has_action("eoa_living_begin"):
@@ -1369,8 +1417,7 @@ func _open_command_center_from_title() -> bool:
 		return false
 	if _command_center_is_up():
 		return true
-	# Immediate open-only (not deferred toggle). Play Esc ×2 used to open then
-	# `_on_menu_pressed` toggle-close on the second press (looks like a no-op).
+	# Immediate open (not a deferred toggle). A later Esc closes.
 	var tib: Node = _find_top_info_bar(tree)
 	if tib != null:
 		if tib.has_method("open_command_center_stay"):
@@ -1557,6 +1604,11 @@ func _on_begin_new(pending_press: bool = false, from_pointer: bool = false) -> v
 
 
 func _on_load(slot: String) -> void:
+	# window_input and the viewport both deliver the same press. The second
+	# one arrives after _finish has already entered the save.
+	if _closed:
+		print("EOA_LOAD_APPLY skip duplicate slot=%s via=title" % slot)
+		return
 	# Same leftover-release contract as pointer Begin. Load used to `_finish`
 	# without it, so the held button armed a map drag and the release selected
 	# the nation under the button.
@@ -1567,6 +1619,9 @@ func _on_load(slot: String) -> void:
 		if mr_load != null and mr_load.has_method("arm_chrome_hold_swallow"):
 			mr_load.call("arm_chrome_hold_swallow")
 	var out: Dictionary = apply_living_title_boot(_tag, _year, slot)
+	if bool(out.get("duplicate", false)):
+		print("EOA_LOAD_APPLY skip duplicate slot=%s via=title" % slot)
+		return
 	_finish(out)
 
 

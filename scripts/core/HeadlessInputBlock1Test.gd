@@ -103,6 +103,12 @@ func _run() -> void:
 	await _test_real_cc_load()
 	await _test_real_esc_clears_then_begin()
 	await _test_real_search_esc()
+	# Search and load run before the title Esc/Begin case. On the old tip Esc
+	# leaves the Command Center up, and the Begin rect is the Exit button, so
+	# that click quits the process. These two still have to print their fails.
+	await _test_real_search_type_esc()
+	await _test_load_apply_once()
+	await _test_real_title_esc_then_begin()
 	_cleanup()
 
 
@@ -214,15 +220,21 @@ func _spawn_title() -> bool:
 
 
 func _drop_title_now() -> void:
+	# queue_free keeps the name until end of frame, so the next LivingTitleBoot
+	# is renamed to @LivingTitleBoot@… and MainMenu no longer sees the title.
+	# Esc then takes the in-game path. free() releases the name now.
 	if _title != null and is_instance_valid(_title):
 		_title.set("_closed", true)
+		_title.name = "LivingTitleBootGone"
 		if not _title.is_queued_for_deletion():
-			_title.queue_free()
+			_title.free()
 	_title = null
 	var stray := root.get_node_or_null("LivingTitleBoot")
-	if stray != null and is_instance_valid(stray) and not stray.is_queued_for_deletion():
+	if stray != null and is_instance_valid(stray):
 		stray.set("_closed", true)
-		stray.queue_free()
+		stray.name = "LivingTitleBootGone"
+		if not stray.is_queued_for_deletion():
+			stray.free()
 
 
 func _cc_node() -> Node:
@@ -1183,6 +1195,373 @@ func _test_real_search_esc() -> void:
 		_fail("real_search_esc: presses=%d order=%s" % [presses, order_s])
 		return
 	_pass("real_search_esc closed search, inspector, then Command Center")
+
+
+func _push_click(pt: Vector2) -> void:
+	_warp_mouse(pt)
+	root.push_input(_make_mouse(pt, true))
+	await process_frame
+	root.push_input(_make_mouse(pt, false))
+	await process_frame
+
+
+func _push_esc() -> void:
+	var key := InputEventKey.new()
+	key.device = 0
+	key.keycode = KEY_ESCAPE
+	key.physical_keycode = KEY_ESCAPE
+	key.key_label = KEY_ESCAPE
+	key.pressed = true
+	key.echo = false
+	key.unicode = 0
+	root.push_input(key)
+	await process_frame
+	var up := key.duplicate() as InputEventKey
+	up.pressed = false
+	up.unicode = 0
+	root.push_input(up)
+	await process_frame
+
+
+func _type_unicode_push(text: String) -> void:
+	for i in text.length():
+		var code := text.unicode_at(i)
+		var key := InputEventKey.new()
+		key.device = 0
+		key.pressed = true
+		key.echo = false
+		key.unicode = code
+		key.keycode = code as Key
+		key.physical_keycode = key.keycode
+		root.push_input(key)
+		await process_frame
+		var up := key.duplicate() as InputEventKey
+		up.pressed = false
+		up.unicode = 0
+		root.push_input(up)
+		await process_frame
+
+
+func _park_pointer() -> void:
+	var away := Vector2(1100, 720)
+	_warp_mouse(away)
+	root.push_input(_make_mouse(away, false))
+	await process_frame
+
+
+func _open_title_cc_by_click() -> bool:
+	if not await _spawn_title():
+		return false
+	_close_cc()
+	await _flush(2)
+	_set_date(1918, 1, 1)
+	if _title == null or not is_instance_valid(_title):
+		_fail("title missing before Command Center click")
+		return false
+	var btn := _title.find_child("LivingTitleCommandCenter", true, false) as Control
+	if btn == null:
+		_fail("LivingTitleCommandCenter missing")
+		return false
+	await _push_click(btn.get_global_rect().get_center())
+	await _flush(3)
+	if not _cc_capturing():
+		_fail("title Command Center click did not open")
+		return false
+	return true
+
+
+func _first_begin_starts(tag: String) -> void:
+	await _park_pointer()
+	var begin_pt := _begin_point()
+	if begin_pt == Vector2.ZERO:
+		_fail("%s: Begin button missing" % tag)
+		return
+	await _push_click(begin_pt)
+	await _flush(4)
+	var began := _title_closed() and _date_text() == "1936-01-01"
+	print(
+		"INPUT_BLOCK1 %s begin title_closed=%s date=%s cc=%s"
+		% [tag, str(_title_closed()), _date_text(), str(_cc_capturing())]
+	)
+	if not began:
+		_fail("%s: first Begin click did not start (date=%s closed=%s)" % [tag, _date_text(), str(_title_closed())])
+	else:
+		_pass("%s first Begin click started" % tag)
+
+
+func _test_real_title_esc_then_begin() -> void:
+	print("INPUT_BLOCK1 case=real_title_esc_then_begin")
+	if not await _open_title_cc_by_click():
+		return
+	await _push_esc()
+	await _flush(3)
+	var cc_after := _cc_capturing()
+	print("INPUT_BLOCK1 title_esc cc_after_esc=%s title_closed=%s" % [str(cc_after), str(_title_closed())])
+	if cc_after:
+		_fail("title_esc: Esc left the Command Center open")
+	elif _title_closed():
+		_fail("title_esc: Esc closed the title")
+	else:
+		_pass("title_esc Esc closed the Command Center")
+		await _first_begin_starts("title_esc")
+
+	print("INPUT_BLOCK1 case=real_title_x_then_begin")
+	if not await _open_title_cc_by_click():
+		return
+	var x_pt := _close_point()
+	if x_pt == Vector2.ZERO:
+		_fail("title_x: CloseX missing")
+		return
+	await _push_click(x_pt)
+	await _flush(3)
+	print(
+		"INPUT_BLOCK1 title_x cc_after=%s title_closed=%s date=%s"
+		% [str(_cc_capturing()), str(_title_closed()), _date_text()]
+	)
+	if _cc_capturing():
+		_fail("title_x: X left the Command Center open")
+	elif _title_closed() or _date_text() != PRE_DATE:
+		_fail("title_x: X began the campaign")
+	else:
+		_pass("title_x X closed the Command Center")
+	await _first_begin_starts("title_x")
+
+	print("INPUT_BLOCK1 case=real_title_backdrop_then_begin")
+	if not await _open_title_cc_by_click():
+		return
+	var backdrop := Vector2(20, 400)
+	await _push_click(backdrop)
+	await _flush(3)
+	print(
+		"INPUT_BLOCK1 title_backdrop cc_after=%s title_closed=%s date=%s"
+		% [str(_cc_capturing()), str(_title_closed()), _date_text()]
+	)
+	if _cc_capturing():
+		_fail("title_backdrop: backdrop left the Command Center open")
+	elif _title_closed() or _date_text() != PRE_DATE:
+		_fail("title_backdrop: backdrop began the campaign")
+	else:
+		_pass("title_backdrop backdrop closed the Command Center")
+	await _first_begin_starts("title_backdrop")
+
+
+func _search_near_miss() -> Vector2:
+	var search := _search_node() as Control
+	var line := _search_line()
+	if search == null or line == null:
+		return Vector2(-1, -1)
+	var go := search.find_child("SearchGoButton", true, false) as Control
+	var host := search.get_global_rect()
+	var grown := host.grow(8.0)
+	var line_rect := line.get_global_rect()
+	var candidates: Array[Vector2] = [
+		Vector2(line_rect.position.x + 8.0, line_rect.end.y + 5.0),
+		Vector2(host.end.x + 4.0, host.get_center().y),
+		Vector2(host.end.x - 6.0, host.get_center().y),
+		Vector2(host.position.x + 4.0, host.end.y + 5.0),
+	]
+	for pt in candidates:
+		if not grown.has_point(pt):
+			continue
+		if line_rect.has_point(pt):
+			continue
+		if go != null and go.get_global_rect().has_point(pt):
+			continue
+		return pt
+	return Vector2(-1, -1)
+
+
+func _test_real_search_type_esc() -> void:
+	print("INPUT_BLOCK1 case=real_search_type_esc")
+	_drop_title_now()
+	await _flush(2)
+	_close_cc()
+	await _flush(2)
+	if _info != null:
+		_info.visible = false
+	_seed_province(710300, "GER", "Berlin")
+	var search := _search_node()
+	if search != null and search.has_method("ensure_chrome_visible"):
+		search.call("ensure_chrome_visible")
+	await _flush(2)
+	var line := _search_line()
+	if line == null:
+		_fail("real_search_type_esc: search line missing")
+		return
+	var leftover := search.get_node_or_null("SearchResults") if search != null else null
+	if leftover != null and is_instance_valid(leftover):
+		leftover.free()
+	line.text = ""
+	line.release_focus()
+	var pt := _search_near_miss()
+	var on_line := line.get_global_rect().has_point(pt)
+	print("INPUT_BLOCK1 search_type on_line=%s pt=%s line=%s" % [str(on_line), str(pt), str(line.get_global_rect())])
+	if pt.x < 0.0 or on_line:
+		_fail("real_search_type_esc: no near-miss outside the line")
+		return
+	await _push_click(pt)
+	await _flush(2)
+	await _type_unicode_push("berlin")
+	await _flush(2)
+	print("INPUT_BLOCK1 search_type text=%s focus=%s" % [line.text, str(line.has_focus())])
+	if line.text != "berlin":
+		_fail("real_search_type_esc: typed text=%s" % line.text)
+		return
+	var row := search.find_child("SearchResultRow", true, false) as Button if search != null else null
+	if row == null or not row.visible:
+		_fail("real_search_type_esc: result row missing")
+		return
+	await _push_click(row.get_global_rect().get_center())
+	await _flush(4)
+	if not _search_open() or not _inspector_open():
+		_fail("real_search_type_esc: after pick %s" % _layer_state())
+		return
+	if not await _open_cc_from_menu():
+		_fail("real_search_type_esc: Menu did not open Command Center (%s)" % _layer_state())
+		return
+	print("INPUT_BLOCK1 search_type_esc before ", _layer_state())
+	var order: PackedStringArray = []
+	var presses := 0
+	while presses < 4 and (_search_open() or _inspector_open() or _cc_capturing()):
+		var before_s := _search_open()
+		var before_i := _inspector_open()
+		var before_c := _cc_capturing()
+		await _push_esc()
+		presses += 1
+		var changed: PackedStringArray = []
+		if before_s != _search_open():
+			changed.append("search")
+		if before_i != _inspector_open():
+			changed.append("inspector")
+		if before_c != _cc_capturing():
+			changed.append("cc")
+		var tag := "dead" if changed.is_empty() else "+".join(changed)
+		order.append(tag)
+		print("INPUT_BLOCK1 search_type_esc press=%d changed=%s %s" % [presses, tag, _layer_state()])
+	var order_s := ",".join(order)
+	if order_s != "search,inspector,cc" or presses != 3:
+		_fail("real_search_type_esc: presses=%d order=%s" % [presses, order_s])
+		return
+	await _push_esc()
+	await _flush(4)
+	print("INPUT_BLOCK1 search_type_esc next_cc=%s %s" % [str(_cc_capturing()), _layer_state()])
+	if not _cc_capturing():
+		_fail("real_search_type_esc: next Esc did not open Command Center")
+		return
+	_pass("real_search_type_esc typed a near-miss, then Esc closed one layer and the next Esc opened Command Center")
+
+
+func _load_apply_count() -> int:
+	var slm := _saves()
+	if slm != null and "eoa_load_apply_count" in slm:
+		return int(slm.get("eoa_load_apply_count"))
+	return int(root.get_meta("eoa_load_apply_count", -1))
+
+
+func _install_legacy_load_counter() -> void:
+	# Old tip has no product counter. Count each load_game_detailed call so the
+	# same assertion fails there and passes once the product counts real applies.
+	var slm := _saves()
+	if slm == null or "eoa_load_apply_count" in slm:
+		return
+	var wrapper := GDScript.new()
+	wrapper.source_code = (
+		"extends \"res://scripts/autoload/SaveLoadManager.gd\"\n"
+		+ "var eoa_load_apply_count: int = 0\n"
+		+ "func load_game_detailed(slot_name: String = \"quicksave\") -> Dictionary:\n"
+		+ "\teoa_load_apply_count += 1\n"
+		+ "\tprint(\"EOA_LOAD_APPLY n=%d slot=%s\" % [eoa_load_apply_count, slot_name])\n"
+		+ "\treturn super.load_game_detailed(slot_name)\n"
+	)
+	var err := wrapper.reload()
+	if err != OK:
+		_fail("legacy load counter failed to compile (%s)" % str(err))
+		return
+	slm.set_script(wrapper)
+	print("INPUT_BLOCK1 legacy_load_counter=1")
+
+
+func _connect_title_window_input() -> void:
+	var win := root as Window
+	if win == null or _title == null or not is_instance_valid(_title):
+		return
+	if bool(_title.get("_closed")):
+		return
+	var cb := Callable(_title, "_on_window_input")
+	if not win.window_input.is_connected(cb):
+		win.window_input.connect(cb)
+
+
+func _window_then_push_click(pt: Vector2) -> void:
+	_connect_title_window_input()
+	_warp_mouse(pt)
+	var press := _make_mouse(pt, true)
+	var win := root as Window
+	if win != null:
+		win.window_input.emit(press)
+	root.push_input(press)
+	await process_frame
+	var rel := _make_mouse(pt, false)
+	if win != null:
+		win.window_input.emit(rel)
+	root.push_input(rel)
+	await _park_pointer()
+
+
+func _test_load_apply_once() -> void:
+	_install_legacy_load_counter()
+	print("INPUT_BLOCK1 case=load_once_title")
+	if not await _spawn_title():
+		return
+	_close_cc()
+	await _flush(2)
+	_set_date(1918, 1, 1)
+	var title_pt := _title_load_point()
+	if title_pt == Vector2.ZERO:
+		_fail("load_once_title: title Load button missing")
+		return
+	var before_title := _load_apply_count()
+	await _window_then_push_click(title_pt)
+	await _flush(3)
+	var delta_title := _load_apply_count() - before_title
+	print(
+		"INPUT_BLOCK1 load_apply_delta=%d via=title date=%s title_closed=%s"
+		% [delta_title, _date_text(), str(_title_closed())]
+	)
+	if delta_title != 1 or _date_text() != SAVE_DATE or not _title_closed():
+		_fail(
+			"load_once_title: delta=%d date=%s closed=%s"
+			% [delta_title, _date_text(), str(_title_closed())]
+		)
+	else:
+		_pass("load_once_title applied the save once")
+
+	print("INPUT_BLOCK1 case=load_once_cc")
+	if not await _spawn_title():
+		return
+	if not await _open_cc(true):
+		_fail("load_once_cc: Command Center not up")
+		return
+	_set_date(1918, 1, 1)
+	var load_b := _find_quicksave_load()
+	if load_b == null:
+		_fail("load_once_cc: quicksave Load missing")
+		return
+	var before_cc := _load_apply_count()
+	await _window_then_push_click(load_b.get_global_rect().get_center())
+	await _flush(3)
+	var delta_cc := _load_apply_count() - before_cc
+	print(
+		"INPUT_BLOCK1 load_apply_delta=%d via=cc date=%s title_closed=%s cc=%s"
+		% [delta_cc, _date_text(), str(_title_closed()), str(_cc_capturing())]
+	)
+	if delta_cc != 1 or _date_text() != SAVE_DATE or _title_closed():
+		_fail(
+			"load_once_cc: delta=%d date=%s closed=%s"
+			% [delta_cc, _date_text(), str(_title_closed())]
+		)
+	else:
+		_pass("load_once_cc applied the save once")
 
 
 func _cleanup() -> void:

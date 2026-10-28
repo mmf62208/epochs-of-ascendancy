@@ -63,6 +63,41 @@ func dismiss_esc_layer() -> void:
 		vp.gui_release_focus()
 
 
+## Click-to-type. A near miss on the search chrome still focuses the line so
+## a real key (and xdotool) lands in the field. Does not clear the query.
+func focus_for_typing() -> void:
+	ensure_chrome_visible()
+	if _line == null or not is_instance_valid(_line):
+		return
+	_line.focus_mode = Control.FOCUS_ALL
+	_line.editable = true
+	_line.mouse_filter = Control.MOUSE_FILTER_STOP
+	_line.grab_focus()
+	call_deferred("_grab_search_line_focus")
+
+
+func _grab_search_line_focus() -> void:
+	if not is_inside_tree():
+		return
+	if _line == null or not is_instance_valid(_line):
+		return
+	_line.grab_focus()
+
+
+func _gui_input(event: InputEvent) -> void:
+	if not (event is InputEventMouseButton):
+		return
+	var mb := event as InputEventMouseButton
+	if not mb.pressed or mb.button_index != MOUSE_BUTTON_LEFT:
+		return
+	if _go != null and is_instance_valid(_go) and _go.get_global_rect().has_point(mb.global_position):
+		return
+	var results := get_node_or_null("SearchResults") as Control
+	if results != null and results.visible and results.get_global_rect().has_point(mb.global_position):
+		return
+	focus_for_typing()
+
+
 func _input(event: InputEvent) -> void:
 	# Enter after living title / +6d: LineEdit text_submitted can no-op if focus is stale.
 	if not (event is InputEventKey):

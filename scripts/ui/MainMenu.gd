@@ -117,7 +117,6 @@ func _any_open_living_title(n: Node) -> bool:
 
 
 func _living_title_is_up() -> bool:
-	# Play Esc ×2 on the living title must leave Command Center visible.
 	# Walk the tree (do not use find_child — queued leftovers lie title_up=false).
 	# Do not reference LivingTitleBoot class_name (-s harness parse).
 	var tree: SceneTree = get_tree()
@@ -128,6 +127,45 @@ func _living_title_is_up() -> bool:
 	if tree.current_scene != null and _any_open_living_title(tree.current_scene):
 		return true
 	return false
+
+
+func _find_open_living_title(n: Node) -> Node:
+	if _node_is_open_living_title(n):
+		return n
+	for child in n.get_children():
+		var found := _find_open_living_title(child)
+		if found != null:
+			return found
+	return null
+
+
+func _first_open_living_title() -> Node:
+	var tree: SceneTree = get_tree()
+	if tree == null:
+		return null
+	if tree.root != null:
+		var from_root := _find_open_living_title(tree.root)
+		if from_root != null:
+			return from_root
+	if tree.current_scene != null:
+		return _find_open_living_title(tree.current_scene)
+	return null
+
+
+func _close_for_living_title_esc() -> void:
+	# Title Esc closes. The press that opened this overlay must not also close it.
+	var title_up_now := _living_title_is_up()
+	var title := _first_open_living_title()
+	if title != null and title.has_method("title_esc_opened_this_frame") and bool(title.call("title_esc_opened_this_frame")):
+		print("EOA_LIVE_ESC who=MainMenu.keep_cc opened_this_frame=1")
+		return
+	print(
+		"EOA_LIVE_ESC who=MainMenu.close_cc title_up=%s from_title_meta=%s"
+		% [str(title_up_now), str(has_meta("eoa_opened_from_living_title"))]
+	)
+	if title != null and title.has_method("note_title_esc_closed"):
+		title.call("note_title_esc_closed")
+	_force_close()
 
 
 func _is_live_escape_event(event: InputEvent) -> bool:
@@ -160,10 +198,7 @@ func _input(event: InputEvent) -> void:
 		% [str(process_mode), str(title_up_now), str(_closing), str(get_tree() != null)]
 	)
 	if _living_title_is_up() or has_meta("eoa_opened_from_living_title"):
-		# Open-only while the title overlay is up (Play 3d00182 Esc ×2 toggle-close).
-		print("EOA_LIVE_ESC who=MainMenu.keep_cc title_up=%s from_title_meta=%s (do not _force_close)" % [
-			str(_living_title_is_up()), str(has_meta("eoa_opened_from_living_title"))
-		])
+		_close_for_living_title_esc()
 		get_viewport().set_input_as_handled()
 		return
 	_route_escape_to_stack()
@@ -191,9 +226,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		% [str(process_mode), str(_living_title_is_up())]
 	)
 	if _living_title_is_up() or has_meta("eoa_opened_from_living_title"):
-		print("EOA_LIVE_ESC who=MainMenu.keep_cc title_up=%s from_title_meta=%s (do not _force_close)" % [
-			str(_living_title_is_up()), str(has_meta("eoa_opened_from_living_title"))
-		])
+		_close_for_living_title_esc()
 		get_viewport().set_input_as_handled()
 		return
 	_route_escape_to_stack()
@@ -748,6 +781,10 @@ func _format_detail(meta: Dictionary) -> String:
 
 
 func _on_load_slot(slot: String) -> void:
+	# The same press is delivered by window_input and again by the viewport.
+	if _closing:
+		print("EOA_LOAD_APPLY skip duplicate slot=%s via=cc" % slot)
+		return
 	print("MainMenu: load slot=", slot)
 	var slm := _slm()
 	if slm == null or not slm.has_method("load_game_detailed"):
@@ -766,6 +803,9 @@ func _on_load_slot(slot: String) -> void:
 			return
 	_set_status("Loading \"%s\"…" % slot)
 	var result: Dictionary = slm.call("load_game_detailed", slot)
+	if bool(result.get("duplicate", false)):
+		print("EOA_LOAD_APPLY skip duplicate slot=%s via=cc" % slot)
+		return
 	if bool(result.get("ok", false)):
 		_set_status("Loaded \"%s\"" % slot)
 		_toast("Loaded %s" % slot, 2.0)
@@ -1023,11 +1063,32 @@ func _process(_delta: float) -> void:
 		handle_live_close_pointer(null)
 
 
+func _clear_title_pending_pointer() -> void:
+	var tree := get_tree()
+	if tree == null:
+		return
+	var stack: Array[Node] = []
+	if tree.root != null:
+		stack.append(tree.root)
+	if tree.current_scene != null:
+		stack.append(tree.current_scene)
+	while stack.size() > 0:
+		var n: Node = stack.pop_back()
+		if n != null and is_instance_valid(n) and str(n.name).begins_with("LivingTitleBoot"):
+			if n.has_method("clear_pending_pointer"):
+				n.call("clear_pending_pointer")
+		if n == null:
+			continue
+		for c in n.get_children():
+			stack.append(c)
+
+
 func _force_close() -> void:
 	# Swallow is armed on CloseX button_down / poll handle, not here.
 	# `_force_close` re-arm cleared poll `pending_press` (same-spot stayed dead).
-	# Esc, X, and Begin all land here. Drop any map press that was in flight
-	# so the next click is not a leftover drag.
+	# Esc, X, and the backdrop all land here. Drop the title latch so the next
+	# Begin click is not a leftover passthrough, and drop any map press.
+	_clear_title_pending_pointer()
 	var mr_close := _map_renderer_for_close()
 	if mr_close != null and mr_close.has_method("clear_overlay_close_map_gesture"):
 		mr_close.call("clear_overlay_close_map_gesture")

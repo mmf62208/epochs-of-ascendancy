@@ -2211,6 +2211,26 @@ func _mouse_over_search_control() -> bool:
 	return false
 
 
+func _focus_search_from_point(screen: Vector2) -> void:
+	# event.position, not get_mouse_position(). A click on the search padding
+	# or a few pixels outside the line must still focus it for typing.
+	if _living_title_boot_is_up():
+		return
+	if _map_search == null or not is_instance_valid(_map_search) or not (_map_search is Control):
+		return
+	var sr := _map_search as Control
+	if not sr.visible or not sr.get_global_rect().grow(8.0).has_point(screen):
+		return
+	var go := sr.find_child("SearchGoButton", true, false) as Control
+	if go != null and go.visible and go.get_global_rect().has_point(screen):
+		return
+	var results := sr.get_node_or_null("SearchResults") as Control
+	if results != null and results.visible and results.get_global_rect().grow(2.0).has_point(screen):
+		return
+	if sr.has_method("focus_for_typing"):
+		sr.call("focus_for_typing")
+
+
 func _search_ui_owns_click() -> bool:
 	if _map_search == null or not is_instance_valid(_map_search) or not (_map_search is Control):
 		return false
@@ -3266,6 +3286,10 @@ func _input(event: InputEvent) -> void:
 				else:
 					call_deferred("_clear_cc_map_press_latch")
 				return
+			# Top bar owns the search strip, so the early top-bar return below
+			# would skip this. A near-miss still has to focus the line.
+			if event.pressed and not _living_title_boot_is_up():
+				_focus_search_from_point(event.position)
 			# Result row / line / Go: the release must reach the Button and must
 			# not still-click the province under the dropdown.
 			if not event.pressed and (_mouse_over_search_control() or _search_ui_owns_click()):

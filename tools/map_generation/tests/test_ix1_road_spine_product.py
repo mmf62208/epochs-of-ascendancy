@@ -196,7 +196,7 @@ class TestIx1RoadSpineProduct(unittest.TestCase):
         self.assertNotIn("living_title_rect_owns_click", tick.get("missing") or [])
         self.assertNotIn("living_title_live_input", tick.get("missing") or [])
         self.assertNotIn("living_title_esc_process_poll", tick.get("missing") or [])
-        self.assertNotIn("living_title_esc_open_only", tick.get("missing") or [])
+        self.assertNotIn("living_title_esc_closes", tick.get("missing") or [])
         self.assertNotIn("living_title_smoke_auto_begin", tick.get("missing") or [])
         self.assertNotIn("living_title_smoke_auto_begin_apply", tick.get("missing") or [])
         self.assertNotIn("testrunner_smoke_auto_begin", tick.get("missing") or [])
