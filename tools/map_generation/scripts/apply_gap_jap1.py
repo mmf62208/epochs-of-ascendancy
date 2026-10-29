@@ -544,6 +544,39 @@ def _absorb_new_holes(new_rings, yields, geo, base):
     return new_rings
 
 
+def _sea_overlap_n(dst_bounds, dst, src_bounds, src) -> int:
+    """Count dst pixels that src also sets. Does not clear them.
+
+    _subtract both counts and clears. The coarse-sea test has to see the
+    overlap before deciding whether that sea is a coast or an inland blob.
+    """
+    dx0, dy0, dx1, dy1 = dst_bounds
+    sx0, sy0, sx1, sy1 = src_bounds
+    ix0, iy0 = max(dx0, sx0), max(dy0, sy0)
+    ix1, iy1 = min(dx1, sx1), min(dy1, sy1)
+    if ix0 >= ix1 or iy0 >= iy1:
+        return 0
+    sub_d = dst[iy0 - dy0 : iy1 - dy0, ix0 - dx0 : ix1 - dx0]
+    sub_s = src[iy0 - sy0 : iy1 - sy0, ix0 - sx0 : ix1 - sx0]
+    return int(((sub_d == 1) & (sub_s == 1)).sum())
+
+
+def _bridge_diagonals(mask):
+    """Join land that only touches at a corner.
+
+    Okinawa's admin outline is one island, but the raster splits it where
+    the coast crosses a pixel corner. 4-connected components then drop the
+    smaller half. One bridge pixel keeps the outline as a single ring.
+    """
+    a = mask[:-1, :-1] == 1
+    b = mask[:-1, 1:] == 1
+    c = mask[1:, :-1] == 1
+    d = mask[1:, 1:] == 1
+    mask[:-1, 1:][a & d & ~b & ~c] = 1
+    mask[:-1, :-1][b & c & ~a & ~d] = 1
+    return mask
+
+
 def clip_batch(matched, base, geo):
     """Return (new_rings, yields, stolen_from) for this matched subset."""
     import numpy as np
@@ -584,15 +617,36 @@ def clip_batch(matched, base, geo):
             continue
         if _is_water(pid, row):
             sea_masks.append((pid, *_mask_of(pid, pts)))
-    # Admin mask before the sea clip. A coarse sea polygon can cover a whole
-    # district (Bandarban sits inside 950308). A single sea ring cannot be
-    # punched into an interior hole, so that district keeps its admin pixels
-    # and overlaps the sea the way the existing CHI coast already does.
+    # A sea that swallows an inland prefecture is not a coastline. Scotia
+    # Sea Edge covers the Kanto plain. Skip that sea for the whole batch,
+    # including the prefectures where it only bites an edge (Nagano, Kanagawa).
+    # Real seas that never cover an interior stay as coast clips.
+    coarse_seas = set()
+    for pid in gis_masks:
+        bounds, mask = gis_masks[pid]
+        admin_px = int(mask.sum())
+        if admin_px <= 0:
+            continue
+        for sid, sb, sm in sea_masks:
+            n = _sea_overlap_n(bounds, mask, sb, sm)
+            if n > max(80, int(0.15 * admin_px)):
+                coarse_seas.add(sid)
+    if coarse_seas:
+        print("coarse-sea ids", sorted(coarse_seas), flush=True)
+    # Admin mask before the sea clip. A single sea ring cannot be punched
+    # into an interior hole, so a district inside a coarse sea keeps its
+    # admin pixels and overlaps that sea.
     admin_masks = {}
     for pid in gis_masks:
         bounds, mask = gis_masks[pid]
         admin_masks[pid] = (tuple(bounds), mask.copy())
-        for _sid, sb, sm in sea_masks:
+        admin_px = int(mask.sum())
+        for sid, sb, sm in sea_masks:
+            if sid in coarse_seas:
+                n = _sea_overlap_n(bounds, mask, sb, sm)
+                if n:
+                    print("coarse-sea skipped", pid, sid, n, "of", admin_px, flush=True)
+                continue
             _subtract(bounds, mask, sb, sm)
         for _sid, sb, sm in frozen_masks:
             _subtract(bounds, mask, sb, sm)
@@ -686,6 +740,7 @@ def clip_batch(matched, base, geo):
         if ring is None:
             if int(mask.sum()) < 3:
                 raise RuntimeError("province %s empty after clip" % pid)
+            _bridge_diagonals(mask)
             ring = _ring_from_mask(mask, bounds)
         ring = _force_simple(pid, ring)
         new_rings[pid] = ring
