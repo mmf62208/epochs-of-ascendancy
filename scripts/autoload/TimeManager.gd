@@ -129,6 +129,9 @@ func _ready() -> void:
 	# The 1936 rules file is a few kilobytes. Read it at boot so the first
 	# day_battles sample is not the cold parse (PERF-4 bar is base + 10%).
 	_warm_campaign_rules()
+	# Ink win script + JSON. The first load was the PERF-4 dayroll frame
+	# (day_battles ~380ms on the first live-F5 day). Pay it at boot.
+	_warm_ink_victory()
 
 
 func _warm_campaign_rules() -> void:
@@ -137,6 +140,17 @@ func _warm_campaign_rules() -> void:
 	if typeof(WarStateDomain) == TYPE_NIL:
 		return
 	WarStateDomain.loop_enabled()
+
+
+func _warm_ink_victory() -> void:
+	var t0 := Time.get_ticks_usec()
+	var scr: Variant = load("res://scripts/core/CampaignInkEndDomain.gd")
+	if scr != null:
+		set_meta("eoa_ink_end_domain", scr)
+		if scr is GDScript:
+			(scr as GDScript).call("load_rules")
+	var ms := float(Time.get_ticks_usec() - t0) / 1000.0
+	print("TimeManager: ink victory warm %.1fms" % ms)
 
 
 func _process(_delta: float) -> void:
