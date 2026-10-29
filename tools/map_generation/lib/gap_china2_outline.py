@@ -6,8 +6,11 @@ another land province by more than 1 px². Sea zones are coarse and are
 not part of this gate.
 
 audit_play_gaps also fails the theatre holes and thin labelled points from
-the 908fee18 play pass. It is not a world-wide strip check: many real
-micro-provinces are narrower than 8 px on purpose.
+the 908fee18 play pass, and the 1bf83066 residuals: any CHI×CHI nonzero
+overlap over 1 px², any enclosed China hole over 500 px², and hairline
+slivers between neighbouring CHI provinces. It is not a world-wide strip
+check: many real micro-provinces are narrower than 8 px on purpose.
+Sea overlaps are not counted.
 """
 from __future__ import annotations
 
@@ -904,6 +907,240 @@ def _hole_candidates(rings, boxes):
     return out
 
 
+# 1936 CHI land. Sea zones are not in this set. Coarse sea overlaps
+# (906112×950302 8059.4, 906112×950308 1962.6, 906136×950011 426.4)
+# are pre-existing and are not a CHI×CHI check.
+CHI_LAND_IDS = frozenset((
+    902487, 902491, 902493, 902496, 902504, 902505, 902514, 902521, 902523,
+    902526, 902534, 902544, 902564, 902566, 902568, 902569, 902590, 902598,
+    902601, 902633, 902634, 902646,
+    906009, 906010, 906011, 906012, 906013, 906014, 906015, 906016, 906017,
+    906018, 906019, 906020,
+    906111, 906112, 906113, 906114, 906115, 906116, 906117, 906118, 906119,
+    906120, 906121, 906122, 906123, 906124, 906125, 906126, 906127, 906128,
+    906129, 906130, 906131, 906132, 906133, 906134, 906135, 906136, 906137,
+    906138,
+))
+# Bounded unowned face of the CHI arrangement. The 1bf83066 holes are
+# 2415 / 1397 / 1037 / 784 in Xinjiang and 761 near (6532, 1355), plus the
+# wider central gaps the same test catches.
+HOLE_AREA_LIMIT = 500.0
+# Samples 0.75 and 1.5 px off a CHI edge that sit in no land and within
+# 2 px of a second CHI province. One sample is about 1 px of border.
+SLIVER_REACH = 2.0
+SLIVER_LENGTH_LIMIT = 80.0
+
+
+def _chi_rings(rings):
+    return sorted(pid for pid in CHI_LAND_IDS if pid in rings and len(rings[pid]) >= 3)
+
+
+def _nz_pair_area(ring_a, ring_b):
+    """Area where both rings have a nonzero winding."""
+    arr = _Arr([ring_a, ring_b])
+
+    def keep(_i, pt, ring_a=ring_a, ring_b=ring_b):
+        return _winding(ring_a, pt[0], pt[1]) != 0 and _winding(ring_b, pt[0], pt[1]) != 0
+
+    return sum(abs(_area(loop)) for loop in arr.select(keep))
+
+
+def _chi_overlap_problems(rings):
+    ids = _chi_rings(rings)
+    boxes = {pid: _bbox(rings[pid]) for pid in ids}
+    problems = []
+    for i, aid in enumerate(ids):
+        ra, ba = rings[aid], boxes[aid]
+        for bid in ids[i + 1:]:
+            bb = boxes[bid]
+            if ba[2] < bb[0] or bb[2] < ba[0] or ba[3] < bb[1] or bb[3] < ba[1]:
+                continue
+            area = _nz_pair_area(ra, rings[bid])
+            if area > OVERLAP_LIMIT:
+                problems.append({
+                    "kind": "chi_overlap",
+                    "id": aid,
+                    "other": bid,
+                    "area": round(area, 3),
+                })
+    return problems
+
+
+def _chi_hole_loops(rings):
+    """Positive-area CHI faces outside every CHI nonzero fill."""
+    ids = _chi_rings(rings)
+    chi = [rings[pid] for pid in ids]
+    if not chi:
+        return []
+    boxes = [_bbox(ring) for ring in chi]
+    arr = _Arr(chi)
+
+    def outside(pt, chi=chi, boxes=boxes):
+        x, y = pt
+        for ring, bb in zip(chi, boxes):
+            if x < bb[0] - 0.2 or x > bb[2] + 0.2 or y < bb[1] - 0.2 or y > bb[3] + 0.2:
+                continue
+            if _winding(ring, x, y) != 0:
+                return False
+        return True
+
+    loops = []
+    for loop in arr.select(lambda _i, pt: outside(pt)):
+        if _area(loop) > HOLE_AREA_LIMIT:
+            loops.append(loop)
+    return loops
+
+
+def _chi_hole_problems(rings):
+    problems = []
+    for loop in _chi_hole_loops(rings):
+        area = _area(loop)
+        cx = sum(p[0] for p in loop) / len(loop)
+        cy = sum(p[1] for p in loop) / len(loop)
+        problems.append({
+            "kind": "chi_hole",
+            "area": round(area, 1),
+            "x": round(cx, 1),
+            "y": round(cy, 1),
+        })
+    problems.sort(key=lambda row: -row["area"])
+    return problems
+
+
+def _sliver_length(rings):
+    """Length of CHI edge, in px, that has unowned land within 2 px of two CHI provinces.
+
+    A sample is taken every 1 px along each CHI edge, 0.75 px and 1.5 px to
+    either side. It counts when that point is outside every land ring, the
+    nearest other CHI edge is at most SLIVER_REACH px away, and the sample
+    sits between this edge and that neighbour. Each count adds the sample
+    spacing. A retraced edge can contribute twice.
+    """
+    ids = _chi_rings(rings)
+    edges = []
+    for pid in ids:
+        ring = rings[pid]
+        n = len(ring)
+        for i in range(n):
+            a, b = ring[i], ring[(i + 1) % n]
+            if a != b:
+                edges.append((pid, a[0], a[1], b[0], b[1]))
+    cell = 8.0
+    grid = defaultdict(list)
+    for i, (_pid, ax, ay, bx, by) in enumerate(edges):
+        x0, x1 = (ax, bx) if ax <= bx else (bx, ax)
+        y0, y1 = (ay, by) if ay <= by else (by, ay)
+        gx0 = int(math.floor(x0 / cell)) - 1
+        gx1 = int(math.floor(x1 / cell)) + 1
+        gy0 = int(math.floor(y0 / cell)) - 1
+        gy1 = int(math.floor(y1 / cell)) + 1
+        for gx in range(gx0, gx1 + 1):
+            for gy in range(gy0, gy1 + 1):
+                grid[(gx, gy)].append(i)
+    chi_boxes = {pid: _bbox(rings[pid]) for pid in ids}
+    foreign = []
+    for pid, ring in rings.items():
+        if pid in CHI_LAND_IDS or len(ring) < 3:
+            continue
+        foreign.append((ring, _bbox(ring)))
+
+    def owns_chi(x, y):
+        for pid in ids:
+            bb = chi_boxes[pid]
+            if x < bb[0] - 0.4 or x > bb[2] + 0.4 or y < bb[1] - 0.4 or y > bb[3] + 0.4:
+                continue
+            if _winding(rings[pid], x, y) != 0:
+                return True
+        return False
+
+    def owns_foreign(x, y):
+        for ring, bb in foreign:
+            if x < bb[0] or x > bb[2] or y < bb[1] or y > bb[3]:
+                continue
+            if _winding(ring, x, y) != 0:
+                return True
+        return False
+
+    def nearest_other(x, y, skip, reach=SLIVER_REACH):
+        best = 1e18
+        best_pid = None
+        best_q = (x, y)
+        gx0 = int(math.floor((x - reach) / cell))
+        gx1 = int(math.floor((x + reach) / cell))
+        gy0 = int(math.floor((y - reach) / cell))
+        gy1 = int(math.floor((y + reach) / cell))
+        seen = set()
+        for gx in range(gx0, gx1 + 1):
+            for gy in range(gy0, gy1 + 1):
+                for j in grid.get((gx, gy), ()):
+                    if j in seen:
+                        continue
+                    seen.add(j)
+                    pid, ax, ay, bx, by = edges[j]
+                    if pid == skip:
+                        continue
+                    vx, vy = bx - ax, by - ay
+                    el2 = vx * vx + vy * vy
+                    if el2 < 1e-18:
+                        d = math.hypot(x - ax, y - ay)
+                        q = (ax, ay)
+                    else:
+                        t = max(0.0, min(1.0, ((x - ax) * vx + (y - ay) * vy) / el2))
+                        q = (ax + t * vx, ay + t * vy)
+                        d = math.hypot(x - q[0], y - q[1])
+                    if d < best:
+                        best = d
+                        best_pid = pid
+                        best_q = q
+        return best, best_pid, best_q
+
+    total = 0.0
+    for pid, ax, ay, bx, by in edges:
+        dx, dy = bx - ax, by - ay
+        el = math.hypot(dx, dy)
+        if el < 1.0:
+            continue
+        nx, ny = -dy / el, dx / el
+        nstep = max(1, int(el))
+        spacing = el / nstep
+        for s in range(nstep):
+            t = (s + 0.5) / nstep
+            mx = ax + dx * t
+            my = ay + dy * t
+            hit = False
+            for dist in (0.75, 1.5):
+                if hit:
+                    break
+                for sgn in (1.0, -1.0):
+                    px = mx + sgn * nx * dist
+                    py = my + sgn * ny * dist
+                    if owns_chi(px, py):
+                        continue
+                    d, _qid, _q = nearest_other(px, py, pid)
+                    if d > SLIVER_REACH:
+                        continue
+                    # A coincident shared border leaves the seaward sample
+                    # 0.75 px from both edges. Count the sample only when the
+                    # edges themselves are 0.35–3.6 px apart and the sample
+                    # lies in that gap, not beyond a corner or a thin coast.
+                    d_edge, _eid, qe = nearest_other(mx, my, pid, reach=4.0)
+                    if d_edge < 0.35 or d_edge > 3.6:
+                        continue
+                    vx, vy = qe[0] - mx, qe[1] - my
+                    el2 = vx * vx + vy * vy
+                    if el2 < 1e-8:
+                        continue
+                    proj = ((px - mx) * vx + (py - my) * vy) / el2
+                    if proj < 0.15 or proj > 0.92:
+                        continue
+                    if owns_foreign(px, py):
+                        continue
+                    total += spacing
+                    hit = True
+                    break
+    return total
+
+
 def _owned(cands, x, y):
     for bb, loops in cands:
         if x < bb[0] - 0.1 or x > bb[2] + 0.1 or y < bb[1] - 0.1 or y > bb[3] + 0.1:
@@ -915,11 +1152,13 @@ def _owned(cands, x, y):
 
 
 def audit_play_gaps(geometries, domains):
-    """Theatre holes and thin labelled points from the 908fee18 play pass.
+    """Theatre gaps from 908fee18, plus the 1bf83066 China residuals.
 
-    Fails when a theatre label sits in a strip narrower than 8 px (or in a
-    self-crossing ring), when an interior square of a named hole is still
-    unowned, or when the Tibet speck box still holds 8 px or more of sea.
+    Fails when a theatre label sits in a strip narrower than 8 px, when an
+    interior square of a named hole is still unowned, when two CHI land
+    provinces overlap by more than 1 px² (nonzero winding), when an enclosed
+    CHI face is larger than 500 px², or when hairline samples between two CHI
+    provinces exceed SLIVER_LENGTH_LIMIT. Sea overlaps are not counted.
     """
     rings = {}
     for g in geometries:
@@ -971,4 +1210,13 @@ def audit_play_gaps(geometries, domains):
     for name, x, y in _SPECK_PROBES:
         if not _owned(cands, x, y):
             problems.append({"kind": "unowned", "name": name, "x": x, "y": y})
+    problems.extend(_chi_overlap_problems(rings))
+    problems.extend(_chi_hole_problems(rings))
+    sliver = _sliver_length(rings)
+    if sliver > SLIVER_LENGTH_LIMIT:
+        problems.append({
+            "kind": "sliver",
+            "length": round(sliver, 1),
+            "limit": SLIVER_LENGTH_LIMIT,
+        })
     return problems

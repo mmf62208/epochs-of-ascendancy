@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""GAP-CHINA-2 outlines 906111–906138 stay simple and off their land neighbours.
+"""GAP-CHINA-2 outlines stay simple, and the China play gaps stay closed.
 
-Fails when any of those rings crosses itself, or overlaps another land
-province by more than 1 px². Also fails the 908fee18 play gaps: theatre
-labels thinner than 8 px, and the enclosed southwest, Hunan, and Tibet holes.
-Sea zones are coarse and are not checked here.
+Fails when any of 906111–906138 crosses itself or overlaps another land
+province by more than 1 px² (even-odd). Also fails the 908fee18 play gaps
+and the 1bf83066 residuals: a CHI×CHI nonzero overlap over 1 px², an
+enclosed China hole over 500 px², or a hairline sliver between neighbouring
+CHI provinces. Coarse sea overlaps are not counted.
 """
 from __future__ import annotations
 
