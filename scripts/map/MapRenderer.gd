@@ -539,6 +539,10 @@ const MapRegionHighlightLayerScript = preload("res://scripts/map/MapRegionHighli
 const META_MAP_GLYPH_PX := &"_map_glyph_px"
 const META_MAP_GLYPH_CAPITAL := &"_map_glyph_capital"
 const META_MAP_GLYPH_OFFS := &"_map_glyph_offs"
+## ★ Label get_rect() / font_size (20 font @ z=0.76 → 21.3 canvas px).
+const CAPITAL_STAR_GLYPH_BOX := 1.40
+const CAPITAL_STAR_SCREEN_MIN := 18.0
+const CAPITAL_STAR_SCREEN_MAX := 36.0
 var _zoom_fill_characterization_scale: float = 1.0
 var _fill_color_zoom_bucket: int = -2000000000
 var _fill_zoom_at_last_paint: float = -10.0
@@ -15245,38 +15249,109 @@ func _ensure_capital_stars_visible() -> void:
 		print("MapRenderer: capital stars visible n=%d" % n_stars)
 
 
-func _capital_star_font_px() -> int:
-	var z := _get_camera_zoom()
+func _capital_star_target_screen_px(z: float) -> float:
+	if z <= MapZoomLODScript.STRATEGIC_MAX_ZOOM:
+		return 0.0
+	# Operational: keep the idle font's on-screen size (20 font @ 0.76 → ~21 px).
+	if z <= MapZoomLODScript.OPERATIONAL_MAX_ZOOM:
+		var op_font := int(clampf(16.0 / maxf(z, 0.35), 11.0, 20.0))
+		return clampf(
+			float(op_font) * z * CAPITAL_STAR_GLYPH_BOX,
+			CAPITAL_STAR_SCREEN_MIN,
+			CAPITAL_STAR_SCREEN_MAX,
+		)
+	# Grow from the operational-edge screen toward 36; hit the cap by z=2.0.
+	var edge_z := MapZoomLODScript.OPERATIONAL_MAX_ZOOM
+	var edge_font := int(clampf(16.0 / maxf(edge_z, 0.35), 11.0, 20.0))
+	var edge_screen := clampf(
+		float(edge_font) * edge_z * CAPITAL_STAR_GLYPH_BOX,
+		CAPITAL_STAR_SCREEN_MIN,
+		CAPITAL_STAR_SCREEN_MAX,
+	)
+	var u := clampf((z - edge_z) / 0.45, 0.0, 1.0)
+	var smooth := u * u * (3.0 - 2.0 * u)
+	return lerpf(edge_screen, CAPITAL_STAR_SCREEN_MAX, smooth)
+
+
+func _capital_star_font_px(zoom_override: float = -1.0) -> int:
+	var z := zoom_override if zoom_override > 0.0001 else _get_camera_zoom()
 	if z <= MapZoomLODScript.STRATEGIC_MAX_ZOOM:
 		return 0  # hide at world/strategic — nation labels own that band
-	# ~16 screen px at operational Europe zoom; clamp so Maginot does not grow a carpet.
-	return int(clampf(16.0 / maxf(z, 0.35), 11.0, 20.0))
+	# Operational: ~16 screen px; clamp so Maginot does not grow a carpet.
+	# Perf2 (d) parks here and requires font 20.
+	if z <= MapZoomLODScript.OPERATIONAL_MAX_ZOOM:
+		return int(clampf(16.0 / maxf(z, 0.35), 11.0, 20.0))
+	# Font IS the on-screen target (CAPITAL_STAR_SCREEN_MIN/MAX). Do not
+	# divide by zoom — d3fc8c3d rasterised a 4 px ★ and scaled the smudge.
+	return clampi(
+		int(round(_capital_star_target_screen_px(z))),
+		int(CAPITAL_STAR_SCREEN_MIN),
+		int(CAPITAL_STAR_SCREEN_MAX),
+	)
+
+
+func _capital_star_apply_screen_fit(star: Label, font_px: int, z: float, ctr: Vector2 = Vector2.ZERO, force: bool = false) -> void:
+	if font_px <= 0:
+		star.scale = Vector2.ONE
+		star.pivot_offset = Vector2.ZERO
+		return
+	# Rasterise at the on-screen size, then counter-scale by
+	# 1/(camera zoom × glyph box) so the camera does not enlarge a tiny font.
+	star.scale = Vector2.ONE
+	star.pivot_offset = Vector2.ZERO
+	star.add_theme_font_size_override("font_size", font_px)
+	var ol := clampi(int(round(float(font_px) * 0.30)), 1, 6)
+	star.add_theme_constant_override("outline_size", ol)
+	star.reset_size()
+	var ms := star.get_rect().size
+	var sc := 1.0
+	if z > MapZoomLODScript.OPERATIONAL_MAX_ZOOM:
+		# Counter-scale 1/(camera zoom). The 1.40 glyph box is Label padding;
+		# folding it in here left a 17 px core. 1/z keeps a 36 px ★ at ~24 px
+		# bright ink (in 18–36) without ever scaling a 4 px atlas up.
+		sc = 1.0 / maxf(z, 0.08)
+	star.scale = Vector2(sc, sc)
+	if ctr != Vector2.ZERO:
+		star.position = ctr - ms * sc * 0.5
 
 
 var _capital_star_last_sync_px: int = -999
 var _capital_star_last_sync_force_n: int = -1
+var _capital_star_last_sync_z_key: int = -999
 
 
 func _invalidate_capital_star_scale_cache() -> void:
 	_capital_star_last_sync_px = -999
 	_capital_star_last_sync_force_n = -1
+	_capital_star_last_sync_z_key = -999
 
 
 func _sync_capital_star_scales(_z: float = -1.0) -> void:
-	var px := _capital_star_font_px()
+	# Honor the zoom the wheel / Home path already measured. Ignoring `_z`
+	# made live notches keep the idle 20 px cap while camera.zoom was 5.62.
+	var z_use := _z if _z > 0.0001 else _get_camera_zoom()
+	var px := _capital_star_font_px(_z)
 	var force_n: int = _asia_end_force_star_pids.size()
+	var z_key := int(round(z_use * 200.0))
 	# Theme font overrides on ~37 stars cost ~200 ms/notch even when px is
-	# unchanged. Skip the walk when the last apply already matches.
-	if px == _capital_star_last_sync_px and force_n == _capital_star_last_sync_force_n:
+	# unchanged. Skip the walk when the last apply already matches. Zoom is
+	# in the key because residual screen-fit scale depends on it.
+	if (
+		px == _capital_star_last_sync_px
+		and force_n == _capital_star_last_sync_force_n
+		and z_key == _capital_star_last_sync_z_key
+	):
 		return
 	_capital_star_last_sync_px = px
 	_capital_star_last_sync_force_n = force_n
+	_capital_star_last_sync_z_key = z_key
 	for pid in province_nodes.keys():
 		var node: Node2D = province_nodes[pid] as Node2D
 		if node == null:
 			continue
 		var force := _asia_end_force_star_pids.has(int(pid))
 		var use_px := 32 if force else px
+		var ctr: Vector2 = province_centroids.get(int(pid), Vector2.ZERO) as Vector2
 		for child in node.get_children():
 			if not (child is Label) or not (child as Label).has_meta(META_MAP_GLYPH_CAPITAL):
 				continue
@@ -15288,16 +15363,14 @@ func _sync_capital_star_scales(_z: float = -1.0) -> void:
 			if star.visible != want_vis:
 				star.visible = want_vis
 			if use_px <= 0:
+				star.scale = Vector2.ONE
 				continue
 			# Skip the theme write only when the live override already matches.
 			# Layout / restore can change font_size without updating META_MAP_GLYPH_PX.
-			if actual_px == use_px:
-				if force:
-					star.z_as_relative = false
-					star.z_index = 80
-				continue
-			star.add_theme_font_size_override("font_size", use_px)
+			if actual_px != use_px:
+				star.add_theme_font_size_override("font_size", use_px)
 			star.set_meta(META_MAP_GLYPH_PX, use_px)
+			_capital_star_apply_screen_fit(star, use_px, z_use, ctr, force)
 			if force:
 				star.z_as_relative = false
 				star.z_index = 80
@@ -15331,6 +15404,8 @@ func _add_capital_star_to_node(node: Node2D, pid: int, force_px: int = 0) -> voi
 	var sms := star.get_minimum_size()
 	star.position = center - sms * 0.5
 	node.add_child(star)
+	if px > 0:
+		_capital_star_apply_screen_fit(star, px, _get_camera_zoom(), center, force_px > 0)
 
 
 func _sync_weather_mapmode_particles(enable: bool) -> void:
@@ -15501,6 +15576,10 @@ func _refresh_province_detail_visibility() -> void:
 		return
 
 	var current_zoom := _get_camera_zoom()
+	# Unpaused 6th-frame path. Wheel already applied this via
+	# `_refresh_terrain_zoom_light`; cache-hit is two ints. Required so a
+	# non-wheel zoom still leaves the operational band at 18–36 px.
+	_sync_capital_star_scales(current_zoom)
 	if _political_labels_layer != null and is_instance_valid(_political_labels_layer):
 		if _political_labels_layer.has_method("sync_camera_zoom"):
 			_political_labels_layer.call("sync_camera_zoom", current_zoom)
@@ -15592,6 +15671,9 @@ func _refresh_province_detail_visibility() -> void:
 					if child is Label and not (child as Label).has_meta(META_MAP_GLYPH_PX):
 						(child as Label).visible = show_details
 				_layout_zoomed_map_glyphs_for_province_node(int(pid), current_zoom, show_details)
+	# Glyph pass at high zoom_metric still writes font 36 (Perf2 (d)). Re-apply
+	# the camera-zoom × glyph-box fit so live unpaused stars stay in 18–36 px.
+	_sync_capital_star_scales(current_zoom)
 
 
 ## Smooth 0→1 ramp as map scale enters tactical band (relative to `terrain_zoom_near_thresh`).
@@ -15683,16 +15765,12 @@ func _restore_idle_capital_star_draw_state(star: Label, pid: int, ctr: Vector2) 
 	star.modulate = Color(1.0, 1.0, 1.0, 1.0)
 	star.visible = px > 0
 	if px <= 0:
+		star.scale = Vector2.ONE
 		return
-	star.add_theme_font_size_override("font_size", px)
 	star.set_meta(META_MAP_GLYPH_PX, px)
 	star.add_theme_color_override("font_color", Color(1.0, 0.92, 0.15, 1.0))
 	star.add_theme_color_override("font_outline_color", Color(0.02, 0.02, 0.05, 1.0))
-	star.add_theme_constant_override("outline_size", 6)
-	star.reset_size()
-	if ctr != Vector2.ZERO:
-		var sms := star.get_minimum_size()
-		star.position = ctr - sms * 0.5
+	_capital_star_apply_screen_fit(star, px, _get_camera_zoom(), ctr, force)
 
 
 func _layout_zoomed_map_glyphs_for_province_node(pid: int, zoom_metric: float, show_glyphs: bool) -> void:
@@ -15708,7 +15786,12 @@ func _layout_zoomed_map_glyphs_for_province_node(pid: int, zoom_metric: float, s
 			var lbl := child as Label
 			var base_px := int(lbl.get_meta(META_MAP_GLYPH_PX))
 			var is_capital := lbl.has_meta(META_MAP_GLYPH_CAPITAL)
-			if is_capital and not supply_mode:
+			# Supply off at strategic/operational zoom keeps the idle star
+			# (absolute z=40, `_capital_star_font_px` capped at 20, hidden at
+			# Home). A high zoom_metric is the zoomed glyph pass: fall through
+			# so the 18–36 px clamp runs (36 at zoom_metric 2.0). Do not lift
+			# the idle cap.
+			if is_capital and not supply_mode and zoom_metric <= MapZoomLODScript.OPERATIONAL_MAX_ZOOM:
 				_restore_idle_capital_star_draw_state(lbl, int(pid), ctr)
 				continue
 			# Capital gold stars stay visible at all zoom levels (Washington/Tokyo were
@@ -15739,10 +15822,21 @@ func _layout_zoomed_map_glyphs_for_province_node(pid: int, zoom_metric: float, s
 			var goa_cap := 0.78 if supply_mode else 0.88
 			if is_capital:
 				# Keep gold capital star (do not wash to white like feature glyphs).
+				# Scale stays 1 here so Perf2 (d) can still count font 36; live
+				# `_sync_capital_star_scales` then fits on-screen size to 18–36.
+				lbl.scale = Vector2.ONE
+				lbl.pivot_offset = Vector2.ZERO
 				lbl.add_theme_color_override("font_color", Color(1.0, 0.84, 0.18, 1.0))
 				lbl.add_theme_color_override("font_outline_color", Color(0.12, 0.08, 0.02, 0.92))
 				lbl.add_theme_constant_override("outline_size", 6)
-				lbl.z_index = ProvinceMapVisuals.Z_MAP_GLYPH + 2
+				if supply_mode:
+					lbl.z_index = ProvinceMapVisuals.Z_MAP_GLYPH + 2
+				else:
+					# High zoom_metric still uses the 36 px clamp, but the star
+					# stays on the idle draw layer (not absolute glyph z=10).
+					var force_star := _asia_end_force_star_pids.has(int(pid))
+					lbl.z_as_relative = false
+					lbl.z_index = 80 if force_star else 40
 			else:
 				lbl.add_theme_color_override(
 					"font_outline_color",

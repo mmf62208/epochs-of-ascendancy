@@ -5,6 +5,26 @@ Tip `1421609c3cba82b35c36ab9b2d0230632bb0369b` (pre-FIX #1). FIX #1 parent
 `b2674c6c` (main `425b4448` merged). xvfb / headless ≠ live Play. Never
 `EOA_SKIP_TITLE`. `tools/run_godot.sh` only (Godot 4.7.1-rc2). HOLD merge.
 
+## Live star zoom (Play FAILED `d3fc8c3d` blur)
+
+`HeadlessPerf2StarZoomPxTest` via `tools/eoa_perf2_star_zoom_px_guard.sh` (xvfb,
+no `--headless`) drives `_refresh_terrain_zoom_light` and measures the star's
+**bright bbox from `get_image()`**. Dummy `--headless` cannot capture pixels
+and prints **RESULT=SKIP** (`render-only, needs xvfb`) instead of FAIL — same
+class as the other xvfb-only gate checks. `d3fc8c3d` rasterised font 4 and
+scaled it up → 6–7 px smudge. Font now stays at the on-screen target;
+counter-scale is `1/camera_zoom`.
+
+| zoom | `d3fc8c3d` (xvfb ink) | after counter-scale |
+|---|---|---|
+| operational 0.76 | font 20 · ink 10 | font 20 · ink 10 |
+| tactical 2.00 | font 12 · ink 13 | font 36 · ink 26 |
+| deep 5.62 | font 4 · ink 7 | font 36 · ink 25 |
+| RESULT | **FAIL** failures=9 | **PASS** failures=0 |
+
+Font ≥ 14 at every measured zoom. Deep bright bbox ≥ 18. Operational 20 px
+font + Home hide + (d) same-px restore 20 kept.
+
 ## FIX #1 capital-star stale skip (before / after)
 
 `HeadlessPerf2FleetRefreshBudgetTest` (c)(d) on product `b2674c6c` vs this tip.
