@@ -31,6 +31,7 @@ func _pass(msg: String) -> void:
 
 func _run_and_quit() -> void:
 	_run()
+	await _test_runtime_two_esc_closes_cc()
 	var ok := _failures == 0
 	print("HeadlessIx1LivingTitleEscBeginTest: ", "PASS" if ok else "FAIL", " (failures=", _failures, ")")
 	print("HeadlessIx1LivingTitleEscBeginTest: RESULT=", "PASS" if ok else "FAIL")
@@ -68,7 +69,6 @@ func _run() -> void:
 	_test_runtime_pointer_event_not_mouse_singleton()
 	_test_runtime_begin_key_and_raw_logs()
 	_test_runtime_esc_opens_cc()
-	_test_runtime_two_esc_keeps_cc()
 	_test_runtime_smoke_auto_begin_hatch()
 	_test_runtime_smoke_advance_past_plus6_flag()
 
@@ -96,8 +96,11 @@ func _test_source_live_input_routing() -> void:
 	if "func _process" not in title_src or "_poll_live_escape_just_pressed" not in title_src:
 		_fail("LivingTitleBoot must poll Input singleton Esc when _input never fires (Play 3d00182)")
 		return
-	if "_ensure_command_center_stays_open" not in title_src and "open-only" not in title_src:
-		_fail("LivingTitleBoot Esc must be sticky open-only (Play Esc ×2 must not toggle-close CC)")
+	if "clear_pending_pointer" not in title_src or "LivingTitleBoot.close_cc" not in title_src:
+		_fail("LivingTitleBoot Esc must close the title Command Center and clear the pending pointer")
+		return
+	if "note_title_esc_closed" not in title_src:
+		_fail("LivingTitleBoot must record the Esc that closed the Command Center")
 		return
 	if "func handle_live_escape" not in title_src or "func handle_live_begin" not in title_src:
 		_fail("LivingTitleBoot must expose handle_live_escape / handle_live_begin")
@@ -187,7 +190,10 @@ func _test_source_live_input_routing() -> void:
 		_fail("MainMenu source missing")
 		return
 	if "_living_title_is_up" not in mm or "eoa_opened_from_living_title" not in mm:
-		_fail("MainMenu must keep CC while living title is up / opened-from-title meta")
+		_fail("MainMenu must see the living title and the opened-from-title meta")
+		return
+	if "MainMenu.close_cc" not in mm:
+		_fail("MainMenu Esc must close the Command Center while the living title is up")
 		return
 	var mm_input := _slice_func(mm, "_input")
 	if mm_input.is_empty() or "_living_title_is_up" not in mm_input:
@@ -705,9 +711,9 @@ func _test_runtime_esc_opens_cc() -> void:
 	title.queue_free()
 
 
-func _test_runtime_two_esc_keeps_cc() -> void:
-	# Play softpipe always presses Esc ×2. Headless single-Esc was green while
-	# live CC opened then toggle-closed (Play 3d00182 overlay unchanged).
+func _test_runtime_two_esc_closes_cc() -> void:
+	# One Esc opens the title Command Center. The next Esc, on a later frame,
+	# closes it. A same-frame second delivery must not close the press that opened it.
 	var leftover_mm: Node = root.get_node_or_null("MainMenu")
 	if leftover_mm != null:
 		leftover_mm.free()
@@ -731,20 +737,19 @@ func _test_runtime_two_esc_keeps_cc() -> void:
 		cc.queue_free()
 		title.queue_free()
 		return
+	await process_frame
 	var esc2: InputEvent = _make_escape("keycode")
-	if title.has_method("_input"):
-		title.call("_input", esc2)
 	if cc.has_method("_input"):
 		cc.call("_input", esc2)
-	if cc.has_method("handle_live_escape"):
-		pass
-	if bool(cc.get("_closing")) or cc.is_queued_for_deletion() or root.get_node_or_null("MainMenu") == null:
-		_fail("second Esc must not close Command Center while living title is up (Play Esc ×2)")
+	if title.has_method("_input"):
+		title.call("_input", esc2)
+	if not bool(cc.get("_closing")) and not cc.is_queued_for_deletion():
+		_fail("second Esc must close the title Command Center")
+		cc.queue_free()
 		title.queue_free()
 		return
 	if not bool(title.get("_esc_routed_to_cc")):
-		_fail("title must stay sticky-routed after second Esc")
-		cc.queue_free()
+		_fail("title must stay routed after the Esc that closed Command Center")
 		title.queue_free()
 		return
 	# Input-singleton poll path (when `_input` never runs on live DisplayServer).
@@ -764,12 +769,12 @@ func _test_runtime_two_esc_keeps_cc() -> void:
 		if "_poll_live_escape_just_pressed" not in proc_fn or "handle_live_escape" not in proc_fn:
 			_fail("LivingTitleBoot._process must poll live Esc and call handle_live_escape")
 			title_poll.queue_free()
-			cc.queue_free()
 			title.queue_free()
 			return
-	_pass("two Esc keep Command Center open; title poll + MainMenu ignore while title up")
+	_pass("second Esc closes the title Command Center; first Esc still opens; poll stays")
 	title_poll.queue_free()
-	cc.queue_free()
+	if is_instance_valid(cc) and not cc.is_queued_for_deletion():
+		cc.queue_free()
 	title.queue_free()
 
 

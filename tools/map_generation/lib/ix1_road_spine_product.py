@@ -571,8 +571,9 @@ def ix1_day_tick_unblocked() -> Dict[str, Any]:
         missing.append("living_title_live_input")
     if "_poll_live_escape_just_pressed" not in title or "func _process" not in title:
         missing.append("living_title_esc_process_poll")
-    if "_ensure_command_center_stays_open" not in title:
-        missing.append("living_title_esc_open_only")
+    # Title Esc closes the Command Center. The old sticky-open helper is gone.
+    if "LivingTitleBoot.close_cc" not in title or "title_esc_closes_cc" not in title:
+        missing.append("living_title_esc_closes")
     if "LivingTitleCommandCenter" not in title or "handle_live_command_center_click" not in title:
         missing.append("living_title_mouse_cc")
     if "LivingTitleEscChip" not in title or "begin_without_esc" not in title:

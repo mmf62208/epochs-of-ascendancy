@@ -43,6 +43,61 @@ func _ready() -> void:
 	ensure_chrome_visible()
 
 
+## Esc layer: a focused query or a visible results list. An empty focused
+## line is not a layer — idle Esc must still open the Command Center.
+func esc_layer_open() -> bool:
+	var results := get_node_or_null("SearchResults") as CanvasItem
+	if results != null and is_instance_valid(results) and results.visible:
+		return true
+	if _line != null and is_instance_valid(_line) and _line.has_focus():
+		return not _line.text.strip_edges().is_empty()
+	return false
+
+
+func dismiss_esc_layer() -> void:
+	var results := get_node_or_null("SearchResults") as CanvasItem
+	if results != null and is_instance_valid(results):
+		results.visible = false
+	var vp := get_viewport()
+	if vp != null:
+		vp.gui_release_focus()
+
+
+## Click-to-type. A near miss on the search chrome still focuses the line so
+## a real key (and xdotool) lands in the field. Does not clear the query.
+func focus_for_typing() -> void:
+	ensure_chrome_visible()
+	if _line == null or not is_instance_valid(_line):
+		return
+	_line.focus_mode = Control.FOCUS_ALL
+	_line.editable = true
+	_line.mouse_filter = Control.MOUSE_FILTER_STOP
+	_line.grab_focus()
+	call_deferred("_grab_search_line_focus")
+
+
+func _grab_search_line_focus() -> void:
+	if not is_inside_tree():
+		return
+	if _line == null or not is_instance_valid(_line):
+		return
+	_line.grab_focus()
+
+
+func _gui_input(event: InputEvent) -> void:
+	if not (event is InputEventMouseButton):
+		return
+	var mb := event as InputEventMouseButton
+	if not mb.pressed or mb.button_index != MOUSE_BUTTON_LEFT:
+		return
+	if _go != null and is_instance_valid(_go) and _go.get_global_rect().has_point(mb.global_position):
+		return
+	var results := get_node_or_null("SearchResults") as Control
+	if results != null and results.visible and results.get_global_rect().has_point(mb.global_position):
+		return
+	focus_for_typing()
+
+
 func _input(event: InputEvent) -> void:
 	# Enter after living title / +6d: LineEdit text_submitted can no-op if focus is stale.
 	if not (event is InputEventKey):
@@ -121,6 +176,8 @@ func _ensure_live_controls() -> void:
 	_style_search_line(_line)
 	if not _line.text_submitted.is_connected(_on_submit):
 		_line.text_submitted.connect(_on_submit)
+	if not _line.text_changed.is_connected(_on_search_text_changed):
+		_line.text_changed.connect(_on_search_text_changed)
 	if not _line.gui_input.is_connected(_on_line_gui_input):
 		_line.gui_input.connect(_on_line_gui_input)
 
@@ -306,7 +363,84 @@ func _on_go_pressed() -> void:
 	_on_submit(_line.text if _line != null else "")
 
 
+func _on_search_text_changed(text: String) -> void:
+	_refresh_search_results(text)
+
+
+func _ensure_results_panel() -> VBoxContainer:
+	var results := get_node_or_null("SearchResults") as VBoxContainer
+	if results != null and is_instance_valid(results):
+		return results
+	# A previous harness may have mounted a non-box SearchResults. Replace it
+	# only when it is not already the live list.
+	var stray := get_node_or_null("SearchResults")
+	if stray != null and is_instance_valid(stray):
+		return null
+	results = VBoxContainer.new()
+	results.name = "SearchResults"
+	results.visible = false
+	results.mouse_filter = Control.MOUSE_FILTER_STOP
+	results.top_level = true
+	results.z_index = 200
+	results.process_mode = Node.PROCESS_MODE_ALWAYS
+	add_child(results)
+	return results
+
+
+func _hide_search_results() -> void:
+	var results := get_node_or_null("SearchResults") as CanvasItem
+	if results != null and is_instance_valid(results):
+		results.visible = false
+
+
+func _refresh_search_results(text: String) -> void:
+	var results := _ensure_results_panel()
+	if results == null:
+		return
+	# free() now, not queue_free(). The next key would otherwise add a second
+	# SearchResultRow while the old one is still named, and Godot renames the
+	# live row so the click target disappears.
+	for child in results.get_children():
+		child.free()
+	var q := text.strip_edges()
+	if q.is_empty():
+		results.visible = false
+		return
+	if _names.is_empty():
+		_rebuild_index()
+	var pid := resolve_search_query(q)
+	if pid < 0:
+		results.visible = false
+		return
+	var row := Button.new()
+	row.name = "SearchResultRow"
+	row.text = "%s · %d" % [q, pid]
+	row.mouse_filter = Control.MOUSE_FILTER_STOP
+	row.focus_mode = Control.FOCUS_ALL
+	row.custom_minimum_size = Vector2(220, 28)
+	row.size = Vector2(220, 28)
+	row.set_meta("eoa_search_pid", pid)
+	# Row pick opens the inspector and leaves the list up, so Esc still closes
+	# search before the inspector. Enter / Go hide the list (see _on_submit).
+	row.pressed.connect(_on_result_row_pressed.bind(pid))
+	results.add_child(row)
+	results.visible = true
+	results.custom_minimum_size = Vector2(220, 32)
+	results.size = Vector2(220, 36)
+	if _line != null and is_instance_valid(_line):
+		var line_rect := _line.get_global_rect()
+		results.global_position = line_rect.position + Vector2(0, line_rect.size.y + 2.0)
+	results.move_to_front()
+
+
+func _on_result_row_pressed(pid: int) -> void:
+	_go_to_province(pid)
+
+
 func _on_submit(text: String) -> void:
+	# Enter / Go commit the query and close the search layer. A result-row
+	# click does not come through here, so the list stays an Esc layer.
+	_hide_search_results()
 	var now: int = Time.get_ticks_msec()
 	if now - _submit_guard_msec < SUBMIT_GUARD_MS:
 		return

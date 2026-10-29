@@ -315,6 +315,13 @@ var _left_origin_valid: bool = false
 var _left_max_slop_sq: float = 0.0
 ## This left-button-down: once slop exceeds 8px, THIS release cannot pick (no time-box).
 var _left_btn_down: bool = false
+## INPUT-BLOCK-1: left press that began on the Command Center. Stays set through
+## the matching release when the dimmer queue_frees the overlay mid-gesture.
+var _cc_map_press_latch: bool = false
+## Press on the dimmer, header, or X, or a close that happened while the button
+## was still down. Blocks `_process` from turning that hold into a map gesture.
+## Not a map pending press: `_left_btn_down` and the drag origin stay clear.
+var _chrome_hold_swallowed: bool = false
 var _left_gesture_dragged: bool = false
 var _left_gesture_origin: Vector2 = Vector2.ZERO
 ## Process frame of last `_end_left_button_down`.
@@ -1483,6 +1490,12 @@ func _reseed_left_origin_from_idle_up(mouse: Vector2) -> void:
 
 
 func _begin_left_map_gesture(new_press: bool = false) -> void:
+	# #134: a Command Center press is not a map gesture, including the process
+	# frame that sees Input still held after `_input` returned.
+	if _cc_overlay_blocks_map_pointer():
+		return
+	if _overlay_hold_blocks_map_gesture():
+		return
 	# Mid-gesture `_begin()` (no new_press): keep origin (Play: 400ms re-arm
 	# opened Finistère). A real MouseButton press always resets — stuck
 	# `_left_btn_down` after inspector/Open-fight Close must not inherit
@@ -1559,6 +1572,10 @@ func _begin_left_map_gesture(new_press: bool = false) -> void:
 
 
 func _note_left_gesture_motion() -> void:
+	if _cc_overlay_blocks_map_pointer():
+		return
+	if _overlay_hold_blocks_map_gesture():
+		return
 	if _close_ignore_stale_left_down:
 		return
 	_note_sticky_slop()
@@ -1768,11 +1785,17 @@ func _left_down_is_live_map_drag() -> bool:
 	# CLOSE-1: after card Close, leftover Input-down is not a map drag.
 	if _close_ignore_stale_left_down:
 		return false
+	if _cc_overlay_blocks_map_pointer():
+		return false
+	if _overlay_hold_blocks_map_gesture():
+		return false
 	return _left_pan_armed or _left_btn_down or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
 
 
 func _left_drag_should_pan() -> bool:
 	if _close_ignore_stale_left_down:
+		return false
+	if _overlay_hold_blocks_map_gesture():
 		return false
 	if _left_pan_active:
 		return true
@@ -2186,10 +2209,30 @@ func _mouse_over_search_control() -> bool:
 	var n_s: Node = hov_s
 	while n_s != null:
 		var nn_s: String = str(n_s.name)
-		if nn_s == "MapProvinceSearch" or nn_s == "SearchGoButton" or nn_s == "SearchLineEdit":
+		if nn_s == "MapProvinceSearch" or nn_s == "SearchGoButton" or nn_s == "SearchLineEdit" or nn_s == "SearchResults":
 			return true
 		n_s = n_s.get_parent()
 	return false
+
+
+func _focus_search_from_point(screen: Vector2) -> void:
+	# event.position, not get_mouse_position(). A click on the search padding
+	# or a few pixels outside the line must still focus it for typing.
+	if _living_title_boot_is_up():
+		return
+	if _map_search == null or not is_instance_valid(_map_search) or not (_map_search is Control):
+		return
+	var sr := _map_search as Control
+	if not sr.visible or not sr.get_global_rect().grow(8.0).has_point(screen):
+		return
+	var go := sr.find_child("SearchGoButton", true, false) as Control
+	if go != null and go.visible and go.get_global_rect().has_point(screen):
+		return
+	var results := sr.get_node_or_null("SearchResults") as Control
+	if results != null and results.visible and results.get_global_rect().grow(2.0).has_point(screen):
+		return
+	if sr.has_method("focus_for_typing"):
+		sr.call("focus_for_typing")
 
 
 func _search_ui_owns_click() -> bool:
@@ -2198,8 +2241,14 @@ func _search_ui_owns_click() -> bool:
 	var vp_r: Viewport = get_viewport()
 	if vp_r == null:
 		return false
+	var mouse_r: Vector2 = vp_r.get_mouse_position()
 	var sr: Control = _map_search as Control
-	return sr.get_global_rect().grow(6.0).has_point(vp_r.get_mouse_position())
+	if sr.get_global_rect().grow(6.0).has_point(mouse_r):
+		return true
+	var results_r := sr.get_node_or_null("SearchResults") as Control
+	if results_r != null and results_r.visible and results_r.get_global_rect().grow(4.0).has_point(mouse_r):
+		return true
+	return false
 
 
 func _map_mode_toolbar_owns_click(screen_pos: Vector2) -> bool:
@@ -2824,15 +2873,17 @@ func _handle_escape_key() -> void:
 	if _esc_stack_frame == frame_now:
 		return
 	_esc_stack_frame = frame_now
-	# Search LineEdit must not steal idle Esc→CC (Play MIXED e36825b after +6d).
-	# Release focus and keep walking the stack — do not treat unfocus as a dismiss.
-	_release_search_focus()
 	# Living title owns the boot screen: do not dismiss a hidden inspector first.
 	# Play d18cbae: layer 120/130 was not enough — title must accept live Esc
 	# (keycode / physical / ui_cancel) and MapRenderer must not also toggle-close.
 	if _living_title_boot_is_up():
 		_route_living_title_escape()
 		return
+	# Search field / results is its own layer. An empty focused line is not:
+	# idle Esc after +6d must still open Command Center (Play MIXED e36825b).
+	if _dismiss_search_esc_layer():
+		return
+	_release_search_focus()
 	# UI-1: Leaders (and other top-bar screens) close on Esc before unit-deselect
 	# or Command Center. Consume so this Esc cannot also open the pause menu.
 	if _dismiss_named_overlay_screen("LeaderAssignmentScreen"):
@@ -2863,7 +2914,127 @@ func _handle_escape_key() -> void:
 		return
 	if _dismiss_map_overlays_esc():
 		return
+	var cc_esc := _command_center_overlay()
+	if cc_esc != null and not bool(cc_esc.get("_closing")):
+		if cc_esc.has_method("_force_close"):
+			cc_esc.call("_force_close")
+		return
 	_esc_open_command_center()
+
+
+func _command_center_overlay() -> Node:
+	var tree := get_tree()
+	if tree == null or tree.root == null:
+		return null
+	var mm := tree.root.get_node_or_null("MainMenu")
+	if mm == null or not is_instance_valid(mm) or mm.is_queued_for_deletion():
+		return null
+	if str(mm.name) != "MainMenu":
+		return null
+	return mm
+
+
+func _cc_overlay_blocks_map_pointer() -> bool:
+	if _cc_map_press_latch:
+		return true
+	return _command_center_overlay() != null
+
+
+func _clear_cc_map_press_latch() -> void:
+	_cc_map_press_latch = false
+
+
+func _overlay_hold_blocks_map_gesture() -> bool:
+	# Dim / header / X, or a close (Esc, X, Begin, Load) that happened while
+	# the button was still down. `_process` must not `_begin` from Input-down.
+	if _chrome_hold_swallowed:
+		return true
+	if not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+		return false
+	if _begin_title_release_blocks_map_pick():
+		return true
+	if _ui_close_release_blocks_map_pick():
+		return true
+	return false
+
+
+func _cc_chrome_consumes_point(screen: Vector2) -> bool:
+	# Dimmer (outside the panel), the header bar, and the X. The rest of the
+	# panel keeps the press latch so Load still receives the GUI event.
+	var mm := _command_center_overlay()
+	if mm == null or bool(mm.get("_closing")):
+		return false
+	var close_b := mm.find_child("CloseX", true, false) as Control
+	if close_b != null and close_b.is_visible_in_tree() and close_b.get_global_rect().has_point(screen):
+		return true
+	var header := mm.find_child("CommandCenterHeader", true, false) as Control
+	if header != null and header.is_visible_in_tree() and header.get_global_rect().has_point(screen):
+		return true
+	var panel := mm.get_node_or_null("Root/MenuPanel") as Control
+	var blocker := mm.get_node_or_null("Root/Blocker") as Control
+	if blocker != null and blocker.is_visible_in_tree() and blocker.get_global_rect().has_point(screen):
+		if panel == null or not panel.get_global_rect().has_point(screen):
+			return true
+	return false
+
+
+func arm_chrome_hold_swallow() -> void:
+	# Title Load / a close that must not become a map press. Clears gesture
+	# fields so this hold is not a pending press.
+	_chrome_hold_swallowed = true
+	_cc_map_press_latch = false
+	_left_btn_down = false
+	_left_pan_armed = false
+	_left_pan_active = false
+	_left_gesture_dragged = false
+	_left_origin_valid = false
+	_left_max_slop_sq = 0.0
+	_left_skip_next_pick = false
+	_left_slop_latched = false
+	_left_gesture_panned = false
+	_left_pan_committed = false
+	_left_cam_moved_this_down = false
+	_left_sticky_valid = false
+	_left_sticky_slop_sq = 0.0
+	_left_button_was_up = true
+
+
+func clear_overlay_close_map_gesture() -> void:
+	# Esc, X, and Begin all `_force_close`. Drop the pending press and the
+	# drag origin. A button that is still down cannot re-arm until it is up,
+	# so the next click (Begin after Esc) is a fresh press.
+	arm_chrome_hold_swallow()
+	if not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+		_chrome_hold_swallowed = false
+
+
+func _release_chrome_hold_without_pick() -> void:
+	_chrome_hold_swallowed = false
+	_cc_map_press_latch = false
+	_end_left_button_down()
+	_clear_left_slop_after_still_click()
+
+
+func _tick_chrome_hold_swallow() -> void:
+	if _chrome_hold_swallowed and not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+		_chrome_hold_swallowed = false
+
+
+func _dismiss_search_esc_layer() -> bool:
+	var search: Node = null
+	if _map_search != null and is_instance_valid(_map_search):
+		search = _map_search
+	elif get_tree() != null and get_tree().root != null:
+		search = get_tree().root.find_child("MapProvinceSearch", true, false)
+	if search == null or not search.has_method("esc_layer_open"):
+		return false
+	if not bool(search.call("esc_layer_open")):
+		return false
+	if search.has_method("dismiss_esc_layer"):
+		search.call("dismiss_esc_layer")
+	else:
+		_release_search_focus()
+	return true
 
 
 func _esc_open_command_center() -> void:
@@ -3099,6 +3270,34 @@ func _input(event: InputEvent) -> void:
 			if _campaign_modal_consumes_pointer(event):
 				get_viewport().set_input_as_handled()
 				return
+			# Dimmer / header / X consume press and release. Do not latch a map
+			# press and do not mark the press handled — the Control still closes.
+			if not event.pressed and _chrome_hold_swallowed:
+				_release_chrome_hold_without_pick()
+				get_viewport().set_input_as_handled()
+				return
+			if event.pressed and _cc_chrome_consumes_point(event.position):
+				arm_chrome_hold_swallow()
+				return
+			# #134: Command Center owns this click. Do not arm a map gesture and
+			# do not mark handled — Load / × still need the GUI press.
+			# The latch stays through this event so `_unhandled_input` can eat
+			# the release after a dimmer `accept_event` / queue_free. Deferred
+			# clear covers the case where GUI already marked the event handled.
+			if _cc_overlay_blocks_map_pointer():
+				if event.pressed:
+					_cc_map_press_latch = true
+				else:
+					call_deferred("_clear_cc_map_press_latch")
+				return
+			# Top bar owns the search strip, so the early top-bar return below
+			# would skip this. A near-miss still has to focus the line.
+			if event.pressed and not _living_title_boot_is_up():
+				_focus_search_from_point(event.position)
+			# Result row / line / Go: the release must reach the Button and must
+			# not still-click the province under the dropdown.
+			if not event.pressed and (_mouse_over_search_control() or _search_ui_owns_click()):
+				return
 			# The title node stays in the tree after Begin, so "boot is up" is
 			# the wrong guard. A chip or top-bar click must not run the unit
 			# scan. Do not mark handled — the Button still toggles.
@@ -3133,6 +3332,12 @@ func _input(event: InputEvent) -> void:
 				# Play 5adb38e: never swallow title-up presses. Route by event
 				# coords (computerUse may not update get_mouse_position first).
 				# Blind set_input_as_handled() here made Begin / mouse-CC dead.
+				if not event.pressed and (_chrome_hold_swallowed or _begin_title_release_blocks_map_pick() or _ui_close_release_blocks_map_pick()):
+					_release_chrome_hold_without_pick()
+					call_deferred("_clear_begin_title_release_swallow")
+					call_deferred("_clear_ui_close_release_swallow")
+					get_viewport().set_input_as_handled()
+					return
 				if event.pressed:
 					print(
 						"EOA_LIVE_RAW_PTR who=MapRenderer._input class=mouse btn=%s pos=%s"
@@ -3361,6 +3566,17 @@ func _control_contains_point(ctrl: Control, pt: Vector2) -> bool:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	# After GUI: a Command Center press must not still-click the map, including
+	# the release of a dimmer click that already queue_freed the overlay.
+	if (
+		event is InputEventMouseButton
+		and (event as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT
+		and _cc_overlay_blocks_map_pointer()
+	):
+		if not (event as InputEventMouseButton).pressed:
+			_cc_map_press_latch = false
+		get_viewport().set_input_as_handled()
+		return
 	if event is InputEventKey and event.pressed and not event.echo:
 		if _gui_text_field_has_focus() and not _is_live_escape_event(event) and event.keycode != KEY_ESCAPE:
 			return
@@ -3582,6 +3798,13 @@ func _unhandled_input(event: InputEvent) -> void:
 	if use_spatial_picking and event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		# Chip / top-bar: do not walk the title tree or hex-pick. The Button
 		# already saw this event in the GUI pass.
+		if _chrome_hold_swallowed or _overlay_hold_blocks_map_gesture():
+			if not event.pressed:
+				_release_chrome_hold_without_pick()
+				call_deferred("_clear_begin_title_release_swallow")
+				call_deferred("_clear_ui_close_release_swallow")
+			get_viewport().set_input_as_handled()
+			return
 		var chip_at := _map_pick_screen_pos(event)
 		if _map_mode_toolbar_owns_click(chip_at) or _top_bar_owns_click(chip_at):
 			return
@@ -3947,6 +4170,7 @@ func _process(delta: float) -> void:
 	_tick_unit_card_press_consume_latch(delta)
 	_tick_begin_title_release_swallow()
 	_tick_ui_close_release_swallow()
+	_tick_chrome_hold_swallow()
 
 	# When sim is paused, skip heavy LOD/fill/theater work — pan/zoom/UI stay responsive for playtest.
 	var sim_paused := false

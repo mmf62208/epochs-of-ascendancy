@@ -146,6 +146,10 @@ const SAVE_GAME_VERSION := "0.2-dev"   # Bumped for richer metadata support
 const DEFAULT_SLOT := "quicksave"
 
 var _last_save_path: String = ""
+## Real load applications. A same-frame second delivery of the same slot does not count.
+var eoa_load_apply_count: int = 0
+var _load_apply_frame: int = -1
+var _load_apply_slot: String = ""
 var _calendar_autosave_pending: bool = false
 var _calendar_autosave_gathers: int = 0
 var _calendar_autosave_live_f5_skips: int = 0
@@ -1835,6 +1839,11 @@ func save_game_detailed(slot_name: String = DEFAULT_SLOT) -> Dictionary:
 
 ## Enhanced load with migration + feedback.
 func load_game_detailed(slot_name: String = DEFAULT_SLOT) -> Dictionary:
+	var slot_key := str(slot_name)
+	var frame_now := Engine.get_process_frames()
+	if frame_now == _load_apply_frame and slot_key == _load_apply_slot:
+		print("EOA_LOAD_APPLY skip duplicate slot=%s" % slot_key)
+		return {"ok": true, "duplicate": true, "path": get_save_path(slot_name), "slot": slot_key}
 	var path := get_save_path(slot_name)
 	if not FileAccess.file_exists(path):
 		var msg := "File not found: " + path
@@ -1860,8 +1869,13 @@ func load_game_detailed(slot_name: String = DEFAULT_SLOT) -> Dictionary:
 	if file_version > SAVE_VERSION:
 		push_warning("SaveLoadManager: Save v%d > current v%d; best-effort only" % [file_version, SAVE_VERSION])
 
+	# Claim the frame before apply so a re-entrant second call cannot apply again.
+	_load_apply_frame = frame_now
+	_load_apply_slot = slot_key
 	_apply_save_data(data)
-	return {"ok": true, "path": path, "version": file_version}
+	eoa_load_apply_count += 1
+	print("EOA_LOAD_APPLY n=%d slot=%s" % [eoa_load_apply_count, slot_key])
+	return {"ok": true, "path": path, "version": file_version, "slot": slot_key}
 
 ## === UX helpers (delete, rename) for save menu ===
 
