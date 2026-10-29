@@ -421,7 +421,13 @@ static func dress_tooltip_popup(node: Node) -> void:
 		while parts.size() > 0 and str(parts[parts.size() - 1]).strip_edges().is_empty():
 			parts.remove_at(parts.size() - 1)
 		label.text = "\n".join(parts)
+	# Autowrap uses the control width. A max size alone leaves that width at 0
+	# and the popup collapses to a few characters. Width is the longest line,
+	# capped at the theme max, so short tips stay narrow and long ones wrap.
+	var wrap_size := _tooltip_body_size(label, parts, max_w)
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.clip_text = false
+	label.custom_minimum_size = wrap_size
 	# y < 0 means no max height (0 would crush the label).
 	label.custom_maximum_size = Vector2(float(max_w), -1)
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -432,6 +438,7 @@ static func dress_tooltip_popup(node: Node) -> void:
 	var box := VBoxContainer.new()
 	box.name = "EoaTooltipBox"
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.custom_minimum_size = Vector2(wrap_size.x, 0)
 	box.add_theme_constant_override("separation", 4)
 	pop.add_child(box)
 	label.reparent(box)
@@ -466,6 +473,23 @@ static func dress_tooltip_popup(node: Node) -> void:
 	chip.add_theme_color_override("font_color", CYAN)
 	chip_panel.add_child(chip)
 	row.add_child(chip_panel)
+
+
+## Body size for the engine tooltip label. Width is the longest line, capped
+## at max_w. Height is the wrapped block so the popup cannot clip it.
+static func _tooltip_body_size(label: Label, lines: PackedStringArray, max_w: int) -> Vector2:
+	var font := label.get_theme_font("font")
+	if font == null:
+		font = ThemeDB.fallback_font
+	var widest := 48.0
+	for line in lines:
+		var s := str(line)
+		if s.is_empty():
+			continue
+		widest = maxf(widest, font.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, TOOLTIP_FONT_SIZE).x)
+	var wrap_w := minf(widest, float(max_w))
+	var block := font.get_multiline_string_size("\n".join(lines), HORIZONTAL_ALIGNMENT_LEFT, wrap_w, TOOLTIP_FONT_SIZE)
+	return Vector2(wrap_w, maxf(block.y, float(TOOLTIP_FONT_SIZE)))
 
 
 static func _hotkey_line(line: String) -> bool:

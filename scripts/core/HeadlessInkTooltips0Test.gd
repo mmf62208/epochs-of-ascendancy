@@ -255,6 +255,13 @@ func _test_dress_wrap() -> void:
 		_fail("dressed max width %s want 320" % str(dressed.custom_maximum_size))
 	else:
 		_pass("dressed tooltip wraps at 320")
+	var min_s := dressed.get_combined_minimum_size()
+	if min_s.x < 200.0 or min_s.x > 340.0:
+		_fail("dressed width collapsed %s" % str(min_s))
+	elif min_s.y < 28.0:
+		_fail("dressed height collapsed %s" % str(min_s))
+	else:
+		_pass("dressed tooltip keeps a readable width %s" % str(min_s))
 	var chip := pop.find_child("HotkeyChip", true, false)
 	if chip == null:
 		_fail("hotkey chip missing")
