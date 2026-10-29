@@ -22387,12 +22387,14 @@ func _show_unit_detail_popup(formation: Object) -> void:
 	ui.add_child(panel)
 
 	var margin := MarginContainer.new()
+	margin.clip_contents = false
 	margin.add_theme_constant_override("margin_left", 10)
 	margin.add_theme_constant_override("margin_right", 10)
 	margin.add_theme_constant_override("margin_top", 8)
 	margin.add_theme_constant_override("margin_bottom", 8)
 	panel.add_child(margin)
 	var vbox := VBoxContainer.new()
+	vbox.clip_contents = false
 	vbox.add_theme_constant_override("separation", 4)
 	margin.add_child(vbox)
 
@@ -22431,13 +22433,21 @@ func _show_unit_detail_popup(formation: Object) -> void:
 	fill_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	fill_lbl.custom_minimum_size = Vector2(290, 0)
 	fill_lbl.clip_text = false
+	fill_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	fill_lbl.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	fill_lbl.mouse_filter = Control.MOUSE_FILTER_STOP
+	# Literal first. fill_line_tooltip runs only after body is parented.
+	fill_lbl.tooltip_text = "Fill —%\nFill ≠ Strength. Equipment on hand vs the unit's TOE (table of equipment). Not combat strength. Refills daily from your national stockpile."
 	RetrowaveTheme.style_body_label(fill_lbl)
-	# Fill is equipment/TOE, never Strength%. Unknown ratio stays cyan, not warning.
+	# Fill is equipment/TOE, never Strength%. Unknown stays cyan.
+	# ≥80% SUCCESS, 50–79% CYAN, <50% WARNING.
 	var fill_col: Color = RetrowaveTheme.CYAN
 	if fill_ratio >= 0.0 and fill_ratio < 0.5:
 		fill_col = RetrowaveTheme.WARNING
-	elif fill_ratio >= 0.5:
+	elif fill_ratio >= 0.8:
 		fill_col = RetrowaveTheme.SUCCESS
+	elif fill_ratio >= 0.5:
+		fill_col = RetrowaveTheme.CYAN
 	fill_lbl.add_theme_color_override("font_color", fill_col)
 	fill_lbl.add_theme_font_size_override("font_size", 16)
 	fill_lbl.custom_minimum_size = Vector2(290, 22)
@@ -22457,6 +22467,10 @@ func _show_unit_detail_popup(formation: Object) -> void:
 	fill_bar.name = "FillToeBar"
 	fill_bar.custom_minimum_size = Vector2(0, 4)
 	fill_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	fill_bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	fill_bar.clip_contents = false
+	fill_bar.mouse_filter = Control.MOUSE_FILTER_STOP
+	fill_bar.tooltip_text = fill_lbl.tooltip_text
 	fill_bar.max_value = 100.0
 	fill_bar.value = 0.0
 	fill_bar.show_percentage = false
@@ -22531,11 +22545,18 @@ func _show_unit_detail_popup(formation: Object) -> void:
 				fill_ratio = float(shown_pct) / 100.0
 		if fill_ratio >= 0.0 and fill_ratio < 0.5:
 			fill_col = RetrowaveTheme.WARNING
-		elif fill_ratio >= 0.5:
+		elif fill_ratio >= 0.8:
 			fill_col = RetrowaveTheme.SUCCESS
+		elif fill_ratio >= 0.5:
+			fill_col = RetrowaveTheme.CYAN
 		fill_lbl.add_theme_color_override("font_color", fill_col)
 		toe_lbl.add_theme_color_override("font_color", fill_col)
 		fill_bar.value = clampf(fill_ratio, 0.0, 1.0) * 100.0
+		if typeof(UnitCardCombatStrip) != TYPE_NIL:
+			var fill_tip := str(UnitCardCombatStrip.fill_line_tooltip(formation))
+			if not fill_tip.is_empty():
+				fill_lbl.tooltip_text = fill_tip
+				fill_bar.tooltip_text = fill_tip
 		if strip0.size() > 1:
 			for si in range(1, strip0.size()):
 				var rest_ln := str(strip0[si]).strip_edges()

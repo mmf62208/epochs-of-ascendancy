@@ -80,6 +80,16 @@ static func bbcode_for(formation: Object) -> String:
 	return "\n".join(lines_for(formation))
 
 
+## Card Fill line. Null or untracked fill stays "Fill —%". Strength is named
+## so the line cannot be read as combat strength.
+static func fill_line_tooltip(formation: Object) -> String:
+	var pct := -1
+	if formation != null and is_instance_valid(formation):
+		pct = shared_display_percent(formation)
+	var title := "Fill —%" if pct < 0 else "Fill %d%%" % pct
+	return "%s\nFill ≠ Strength. Equipment on hand vs the unit's TOE (table of equipment). Not combat strength. Refills daily from your national stockpile." % title
+
+
 static func tooltip_lines_for(formation: Object) -> PackedStringArray:
 	var tips: PackedStringArray = PackedStringArray()
 	if formation == null or not is_instance_valid(formation):
