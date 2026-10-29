@@ -319,6 +319,9 @@ func _ensure_start_paused_for_playtest() -> void:
 		Engine.time_scale = 1.0
 		_last_sim_tick_msec = Time.get_ticks_msec()
 		_update_speed_buttons()
+		# Date tooltip was written before this deferred pause, so refresh it
+		# or a paused start still says "Running at 1x".
+		_update_date_time()
 		print("TopInfoBar: start PAUSED (press 1x / Space / keys 1-4 to advance time).")
 
 
