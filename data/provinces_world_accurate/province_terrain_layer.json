@@ -14271,6 +14271,118 @@
     "906110": {
       "terrain": "plains",
       "domain": "land"
+    },
+    "906111": {
+      "terrain": "plains",
+      "domain": "land"
+    },
+    "906112": {
+      "terrain": "plains",
+      "domain": "land"
+    },
+    "906113": {
+      "terrain": "mountains",
+      "domain": "land"
+    },
+    "906114": {
+      "terrain": "plains",
+      "domain": "land"
+    },
+    "906115": {
+      "terrain": "plains",
+      "domain": "land"
+    },
+    "906116": {
+      "terrain": "plains",
+      "domain": "land"
+    },
+    "906117": {
+      "terrain": "plains",
+      "domain": "land"
+    },
+    "906118": {
+      "terrain": "plains",
+      "domain": "land"
+    },
+    "906119": {
+      "terrain": "plains",
+      "domain": "land"
+    },
+    "906120": {
+      "terrain": "plains",
+      "domain": "land"
+    },
+    "906121": {
+      "terrain": "plains",
+      "domain": "land"
+    },
+    "906122": {
+      "terrain": "plains",
+      "domain": "land"
+    },
+    "906123": {
+      "terrain": "plains",
+      "domain": "land"
+    },
+    "906124": {
+      "terrain": "plains",
+      "domain": "land"
+    },
+    "906125": {
+      "terrain": "plains",
+      "domain": "land"
+    },
+    "906126": {
+      "terrain": "plains",
+      "domain": "land"
+    },
+    "906127": {
+      "terrain": "plains",
+      "domain": "land"
+    },
+    "906128": {
+      "terrain": "plains",
+      "domain": "land"
+    },
+    "906129": {
+      "terrain": "plains",
+      "domain": "land"
+    },
+    "906130": {
+      "terrain": "plains",
+      "domain": "land"
+    },
+    "906131": {
+      "terrain": "plains",
+      "domain": "land"
+    },
+    "906132": {
+      "terrain": "plains",
+      "domain": "land"
+    },
+    "906133": {
+      "terrain": "plains",
+      "domain": "land"
+    },
+    "906134": {
+      "terrain": "plains",
+      "domain": "land"
+    },
+    "906135": {
+      "terrain": "plains",
+      "domain": "land"
+    },
+    "906136": {
+      "terrain": "plains",
+      "domain": "land"
+    },
+    "906137": {
+      "terrain": "plains",
+      "domain": "land"
+    },
+    "906138": {
+      "terrain": "plains",
+      "domain": "land"
     }
   }
 }

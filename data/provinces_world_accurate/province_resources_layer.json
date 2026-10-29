@@ -13674,6 +13674,113 @@
     "906110": {
       "coal": 0,
       "steel": 0
+    },
+    "906111": {
+      "coal": 4,
+      "tungsten": 7
+    },
+    "906112": {
+      "coal": 6,
+      "tungsten": 12
+    },
+    "906113": {
+      "coal": 8,
+      "tungsten": 15
+    },
+    "906114": {
+      "tungsten": 1
+    },
+    "906115": {
+      "coal": 3,
+      "tungsten": 6
+    },
+    "906116": {
+      "coal": 3,
+      "tungsten": 5
+    },
+    "906117": {
+      "coal": 1,
+      "tungsten": 2
+    },
+    "906118": {
+      "coal": 2,
+      "tungsten": 3
+    },
+    "906119": {
+      "coal": 2,
+      "tungsten": 4
+    },
+    "906120": {
+      "coal": 1,
+      "tungsten": 3
+    },
+    "906121": {
+      "tungsten": 1
+    },
+    "906122": {
+      "coal": 0,
+      "steel": 0
+    },
+    "906123": {
+      "coal": 1,
+      "tungsten": 1
+    },
+    "906124": {
+      "coal": 1,
+      "tungsten": 3
+    },
+    "906125": {
+      "coal": 0,
+      "steel": 0
+    },
+    "906126": {
+      "coal": 1,
+      "tungsten": 3
+    },
+    "906127": {
+      "tungsten": 1
+    },
+    "906128": {
+      "coal": 1,
+      "tungsten": 2
+    },
+    "906129": {
+      "tungsten": 1
+    },
+    "906130": {
+      "coal": 1,
+      "tungsten": 2
+    },
+    "906131": {
+      "coal": 2,
+      "tungsten": 4
+    },
+    "906132": {
+      "coal": 2,
+      "tungsten": 3
+    },
+    "906133": {
+      "coal": 2,
+      "tungsten": 3
+    },
+    "906134": {
+      "tungsten": 1
+    },
+    "906135": {
+      "coal": 2,
+      "tungsten": 3
+    },
+    "906136": {
+      "coal": 1,
+      "tungsten": 2
+    },
+    "906137": {
+      "coal": 1,
+      "tungsten": 3
+    },
+    "906138": {
+      "coal": 1,
+      "tungsten": 1
     }
   },
   "meta": {

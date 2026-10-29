@@ -7696,7 +7696,7 @@
       "tier": 2
     },
     "902590": {
-      "city_name": "Shanghai",
+      "city_name": "Anking",
       "tier": 2
     },
     "902598": {
@@ -8583,7 +8583,35 @@
     "906110": {
       "city_name": "Kovel",
       "tier": 2
-    }
+    },
+    "906111": {"city_name": "Urumqi", "tier": 2},
+    "906112": {"city_name": "Lhasa", "tier": 2},
+    "906113": {"city_name": "Changtang (N. Tibet)", "tier": 2},
+    "906114": {"city_name": "Kangding", "tier": 2},
+    "906115": {"city_name": "Xining", "tier": 2},
+    "906116": {"city_name": "Yinchuan", "tier": 2},
+    "906117": {"city_name": "Datong", "tier": 2},
+    "906118": {"city_name": "Yanan", "tier": 2},
+    "906119": {"city_name": "Xian", "tier": 2},
+    "906120": {"city_name": "Hanzhong", "tier": 2},
+    "906121": {"city_name": "Kaifeng", "tier": 2},
+    "906122": {"city_name": "Xinyang", "tier": 2},
+    "906123": {"city_name": "Xuzhou", "tier": 2},
+    "906124": {"city_name": "Shanghai", "tier": 2},
+    "906125": {"city_name": "Bengbu", "tier": 2},
+    "906126": {"city_name": "Hangzhou", "tier": 2},
+    "906127": {"city_name": "Wenzhou", "tier": 2},
+    "906128": {"city_name": "Nanchang", "tier": 2},
+    "906129": {"city_name": "Ganzhou", "tier": 2},
+    "906130": {"city_name": "Wuhan", "tier": 2},
+    "906131": {"city_name": "Yichang", "tier": 2},
+    "906132": {"city_name": "Hengyang", "tier": 2},
+    "906133": {"city_name": "Nanchong", "tier": 2},
+    "906134": {"city_name": "Dali", "tier": 2},
+    "906135": {"city_name": "Nanning", "tier": 2},
+    "906136": {"city_name": "Swatow", "tier": 2},
+    "906137": {"city_name": "Luichow", "tier": 2},
+    "906138": {"city_name": "Haikou", "tier": 2}
   },
   "meta": {
     "source": "polish_capital_layers_v1_4",

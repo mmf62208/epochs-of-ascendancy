@@ -30,7 +30,10 @@ const EXPECTED_INFRA := [
 	{"day": 4, "tag": "ENG", "pid": 711481},
 	{"day": 5, "tag": "POL", "pid": 711054},
 	{"day": 6, "tag": "SOV", "pid": 0},
-	{"day": 7, "tag": "JAP", "pid": 902474},
+	# Was Pohnpei 902474. Chahar 902521 now also borders Sakju 903951, so the
+	# JAP border cap of 2 fills on that one province and the next pick is the
+	# Kinmen emergency seed.
+	{"day": 7, "tag": "JAP", "pid": 903981},
 ]
 
 var _failures := 0
