@@ -106,12 +106,34 @@ static func open_continuation_picker() -> Node:
 	layer.layer = 126
 	layer.process_mode = Node.PROCESS_MODE_ALWAYS
 	layer.add_to_group("continuation_picker")
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.55)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.mouse_filter = Control.MOUSE_FILTER_STOP
+	layer.add_child(dim)
+	var panel := Panel.new()
+	panel.name = "Choices"
+	panel.custom_minimum_size = Vector2(520, 460)
+	panel.size = Vector2(520, 460)
+	panel.position = Vector2(380, 140)
+	var panel_style := StyleBoxFlat.new()
+	panel_style.bg_color = RetrowaveTheme.BG_PANEL
+	panel_style.border_color = RetrowaveTheme.WARNING
+	panel_style.set_border_width_all(2)
+	panel_style.set_corner_radius_all(6)
+	panel_style.content_margin_left = 18
+	panel_style.content_margin_right = 18
+	panel_style.content_margin_top = 16
+	panel_style.content_margin_bottom = 16
+	panel.add_theme_stylebox_override("panel", panel_style)
+	layer.add_child(panel)
 	var box := VBoxContainer.new()
-	box.name = "Choices"
-	box.position = Vector2(80, 80)
-	layer.add_child(box)
+	box.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	box.add_theme_constant_override("separation", 8)
+	panel.add_child(box)
 	var header := Label.new()
 	header.text = "Choose nation to continue playing as"
+	RetrowaveTheme.style_column_header(header)
 	box.add_child(header)
 	var opts: Array = []
 	var raw_opts: Variant = pending.get("options", [])
@@ -121,15 +143,11 @@ static func open_continuation_picker() -> Node:
 		var b := Button.new()
 		var chosen := str(opt)
 		b.text = "Continue as " + chosen
+		b.custom_minimum_size = Vector2(0, 36)
+		RetrowaveTheme.style_secondary_button(b)
 		b.pressed.connect(_on_picker_continue.bind(chosen))
 		box.add_child(b)
 	tree.root.add_child(layer)
-	if DisplayServer.get_name() != "headless":
-		var win := PeaceConferenceWindow.new()
-		win.add_to_group("continuation_picker")
-		tree.root.add_child(win)
-		if not pending.is_empty():
-			win._populate_continuation_ui(pending)
 	return layer
 
 
@@ -271,7 +289,7 @@ var _living_winner: String = ""
 var _living_loser: String = ""
 var _living_pid: int = -1
 
-@onready var main_vbox: VBoxContainer = $Margin/MainVBox   # Will be created in code if needed
+var main_vbox: VBoxContainer
 
 var title_label: Label
 var leverage_label: Label
