@@ -614,6 +614,8 @@ func _apply_theme() -> void:
 	RetrowaveTheme.style_info_bar_label(date_time_label, RetrowaveTheme.CYAN)
 	for label in [steel_label, aluminum_label, oil_label, rubber_label]:
 		RetrowaveTheme.style_info_bar_label(label, RetrowaveTheme.TEXT_DIM)
+		if label != null:
+			label.mouse_filter = Control.MOUSE_FILTER_STOP
 	for btn in [
 		production_button,
 		leaders_button,
@@ -1456,14 +1458,76 @@ func _apply_units_compact_label(compact: bool) -> void:
 		units_view_button.custom_minimum_size = Vector2(64, 28)
 
 
+func _comma_int(n: int) -> String:
+	var sign := ""
+	if n < 0:
+		sign = "-"
+		n = -n
+	var s := str(n)
+	var out := ""
+	while s.length() > 3:
+		out = "," + s.substr(s.length() - 3, 3) + out
+		s = s.substr(0, s.length() - 3)
+	return sign + s + out
+
+
+func _fmt_rate(v: float) -> String:
+	if absf(v) >= 10.0 or is_equal_approx(v, roundf(v)):
+		return "%d" % int(round(v))
+	return "%.1f" % v
+
+
+## Per-day harvest income. -1 when the cache is empty or the keys are absent.
+## Does not subtract consumption.
+func _income_per_day(keys: PackedStringArray) -> float:
+	if typeof(ProductionManager) == TYPE_NIL or ProductionManager == null:
+		return -1.0
+	if not ProductionManager.has_method("get_last_daily_harvest_report"):
+		return -1.0
+	var report: Dictionary = ProductionManager.get_last_daily_harvest_report()
+	if report.is_empty():
+		return -1.0
+	var days := float(report.get("days", 0.0))
+	if days <= 0.0:
+		return -1.0
+	var added_v: Variant = report.get("total_added", {})
+	if not (added_v is Dictionary):
+		return -1.0
+	var added: Dictionary = added_v
+	var total := 0.0
+	var any := false
+	for k in keys:
+		if added.has(k):
+			any = true
+			total += float(added[k])
+	if not any:
+		return -1.0
+	return total / days
+
+
+func _resource_tooltip(title: String, amount: float, body: String, keys: PackedStringArray, hotkey: String = "") -> String:
+	var lines: PackedStringArray = PackedStringArray()
+	lines.append("%s · %s" % [title, _comma_int(int(round(amount)))])
+	lines.append(body)
+	var inc := _income_per_day(keys)
+	if inc >= 0.0:
+		lines.append("+%s/day" % _fmt_rate(inc))
+	if not hotkey.is_empty():
+		lines.append(hotkey)
+	return "\n".join(lines)
+
+
 func _update_resources() -> void:
 	var stockpile: Dictionary = {}
 	if ProductionManager != null:
 		var raw = ProductionManager.get("national_stockpile")
 		if raw is Dictionary:
 			stockpile = raw
-	steel_label.text = "Steel: %.0f" % float(stockpile.get("steel", 0.0))
-	aluminum_label.text = "Aluminum: %.0f" % float(stockpile.get("aluminum", 0.0))
+	var steel_amt := float(stockpile.get("steel", 0.0))
+	var aluminum_amt := float(stockpile.get("aluminum", 0.0))
+	var rubber_amt := float(stockpile.get("rubber", 0.0))
+	steel_label.text = "Steel: %.0f" % steel_amt
+	aluminum_label.text = "Aluminum: %.0f" % aluminum_amt
 	# Fuel major absorbs oil feedstock; show Fuel (Energy when present for industry meter).
 	var fuel_amt := float(stockpile.get("fuel", stockpile.get("oil", 0.0)))
 	var energy_amt := float(stockpile.get("energy", 0.0))
@@ -1471,7 +1535,37 @@ func _update_resources() -> void:
 		oil_label.text = "Energy: %.0f  Fuel: %.0f" % [energy_amt, fuel_amt]
 	else:
 		oil_label.text = "Fuel: %.0f" % fuel_amt
-	rubber_label.text = "Rubber: %.0f" % float(stockpile.get("rubber", 0.0))
+	rubber_label.text = "Rubber: %.0f" % rubber_amt
+	steel_label.tooltip_text = _resource_tooltip(
+		"Steel", steel_amt,
+		"Rifles, artillery, tanks and ships. Stockpile refills division TOE daily.",
+		PackedStringArray(["steel"])
+	)
+	aluminum_label.tooltip_text = _resource_tooltip(
+		"Aluminum", aluminum_amt,
+		"Aircraft and light vehicles.",
+		PackedStringArray(["aluminum"])
+	)
+	rubber_label.tooltip_text = _resource_tooltip(
+		"Rubber", rubber_amt,
+		"Trucks and tires. Needed to fill motorized TOE.",
+		PackedStringArray(["rubber"])
+	)
+	var fuel_tip := _resource_tooltip(
+		"Fuel", fuel_amt,
+		"Moves motorized units and aircraft. Low fuel slows attacks. Press G to check supply.",
+		PackedStringArray(["fuel", "oil"]),
+		"[G]"
+	)
+	if energy_amt > 0.0:
+		var energy_tip := _resource_tooltip(
+			"Energy", energy_amt,
+			"Runs factories. Shortages cut output.",
+			PackedStringArray(["energy"])
+		)
+		oil_label.tooltip_text = energy_tip + "\n\n" + fuel_tip
+	else:
+		oil_label.tooltip_text = fuel_tip
 	# Steel/Al text widen is the Play 48e4fe20 reflow that dropped overlay Search.
 	_keep_search_chrome_sticky()
 
