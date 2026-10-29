@@ -40,6 +40,7 @@ from gap_ussr_west2_product import (  # noqa: E402
     largest_component,
     open_ring,
     overlap_px,
+    point_in_ring,
     rasterize_centers,
     ring_area,
     ring_bbox,
@@ -254,6 +255,58 @@ def _ring_from_mask(mask, bounds) -> List[List[float]]:
     if missing != 0 or extra > HOLE_PX_MAX:
         raise RuntimeError("trace missing %d extra %d kept %d dropped %d" % (missing, extra, kept, dropped))
     return [_json_pt(x, y) for x, y in ring]
+
+
+def _shave_new_border_slivers(old_ring, ring, others):
+    """Drop contour stairs that enter a neighbour the old ring did not cover.
+
+    A pixel contour follows cell edges, so it can bulge a fraction of a pixel
+    into the next province. That bulge is new area. Coarse overlaps that the
+    old ring already had are left in place.
+    """
+    from gap_china2_outline import _area, _nz_pair_area, as_points, region_loops
+
+    cur = open_ring(ring)
+    old = open_ring(old_ring)
+
+    def _probes(pts):
+        for x, y in pts:
+            yield x, y
+        n = len(pts)
+        for i in range(n):
+            x1, y1 = pts[i]
+            x2, y2 = pts[(i + 1) % n]
+            yield (x1 + x2) * 0.5, (y1 + y2) * 0.5
+
+    for other in others:
+        other = open_ring(other)
+        if len(other) < 3 or len(cur) < 3:
+            continue
+        cb = ring_bbox(cur)
+        ob = ring_bbox(other)
+        if cb[2] < ob[0] or ob[2] < cb[0] or cb[3] < ob[1] or ob[3] < cb[1]:
+            continue
+        fresh = False
+        for x, y in _probes(cur):
+            if point_in_ring(x, y, other) and not point_in_ring(x, y, old):
+                fresh = True
+                break
+        if not fresh:
+            continue
+        if _nz_pair_area(old, other) > 1.0:
+            continue
+        if _nz_pair_area(cur, other) <= 1.0:
+            continue
+        loops = region_loops([cur], [other], "difference")
+        if not loops:
+            raise RuntimeError("shave removed the ring")
+        best = max(loops, key=_area)
+        cur = open_ring(as_points(best, nd=4))
+        if len(cur) in (36, 72):
+            a, b = cur[0], cur[1]
+            mid = ((a[0] + b[0]) * 0.5, (a[1] + b[1]) * 0.5)
+            cur = [a, mid] + list(cur[1:])
+    return [_json_pt(x, y) for x, y in cur]
 
 
 def _box_gap(a, b) -> float:
@@ -566,6 +619,15 @@ def build(apply: bool) -> int:
         else:
             detail = [(sid, overlap_px(ring, new_rings[sid])) for sid in took]
             raise RuntimeError("notch %s still overlaps %s" % (pid, detail))
+        others = []
+        for oid, g in geo.items():
+            if oid == pid or oid in took or _is_water(oid, base.get(oid, {})):
+                continue
+            opts = open_ring(g.get("points") or [])
+            if len(opts) >= 3:
+                others.append(opts)
+        ring = _shave_new_border_slivers(geo[pid]["points"], ring, others)
+        painted = rasterize_centers(ring, ob[0], ob[1], ob[2] - ob[0], ob[3] - ob[1])
         yields[pid] = ring
         yield_masks[pid] = (ob, painted)
         stolen_from[pid] = took
