@@ -148,6 +148,11 @@ const DEFAULT_SLOT := "quicksave"
 var _last_save_path: String = ""
 ## Real load applications. A same-frame second delivery of the same slot does not count.
 var eoa_load_apply_count: int = 0
+## total_days_elapsed at the last successful save. -1 means this session has not saved.
+var _last_saved_elapsed: int = -1
+var _tag_names: Dictionary = {}
+var _tag_names_loaded: bool = false
+const _MONTHS: PackedStringArray = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 var _load_apply_frame: int = -1
 var _load_apply_slot: String = ""
 var _calendar_autosave_pending: bool = false
@@ -633,6 +638,153 @@ const BROWSER_SLOTS: PackedStringArray = [
 ]
 
 
+## Slot kind from the name. Old saves omit metadata.save_kind and use this.
+func slot_kind(slot_name: String) -> String:
+	var s := str(slot_name).strip_edges().to_lower()
+	if s == "quicksave" or s.begins_with("quick"):
+		return "quick"
+	if s == "autosave" or s.begins_with("autosave"):
+		return "auto"
+	return "manual"
+
+
+func kind_badge(kind: String) -> String:
+	match kind:
+		"quick":
+			return "QUICK"
+		"auto":
+			return "AUTO"
+		_:
+			return "MANUAL"
+
+
+func slot_is_occupied(slot_name: String) -> bool:
+	return FileAccess.file_exists(get_save_path(slot_name))
+
+
+## Days of game time since the last save in this session. Never saved counts
+## from day 0, so day 1 already warns. Not a wall-clock threshold.
+func unsaved_in_game_days() -> int:
+	if typeof(TimeManager) == TYPE_NIL:
+		return 0
+	var elapsed := int(TimeManager.total_days_elapsed)
+	if TimeManager.has_method("get_total_days_elapsed"):
+		elapsed = int(TimeManager.get_total_days_elapsed())
+	if _last_saved_elapsed < 0:
+		return maxi(0, elapsed)
+	return maxi(0, elapsed - _last_saved_elapsed)
+
+
+## Autosave loads do not warn. Any other slot warns after one unsaved day.
+func load_confirm_required(slot_name: String) -> bool:
+	if slot_kind(slot_name) == "auto":
+		return false
+	return unsaved_in_game_days() >= 1
+
+
+func nation_display_name(tag: String) -> String:
+	var t := tag.strip_edges().to_upper()
+	if t.is_empty():
+		return ""
+	_ensure_tag_names()
+	if _tag_names.has(t):
+		return str(_tag_names[t])
+	return t
+
+
+func nation_card_line(tag: String) -> String:
+	var t := tag.strip_edges().to_upper()
+	if t.is_empty():
+		return "—"
+	var name := nation_display_name(t)
+	if name.is_empty() or name == t:
+		return t
+	return "%s (%s)" % [name, t]
+
+
+func format_game_date_display(iso: String) -> String:
+	var s := str(iso).strip_edges()
+	if s.length() < 10:
+		return "—"
+	var month := int(s.substr(5, 2))
+	var day := int(s.substr(8, 2))
+	if month < 1 or month > 12 or day < 1:
+		return "—"
+	return "%d %s %s" % [day, _MONTHS[month - 1], s.substr(0, 4)]
+
+
+func slot_replace_blurb(slot_name: String) -> String:
+	var meta := _peek_metadata(get_save_path(slot_name))
+	var tag := str(meta.get("player_tag", "")).strip_edges().to_upper()
+	var nation := nation_display_name(tag) if not tag.is_empty() else "this nation"
+	var date := format_game_date_display(str(meta.get("game_date", "")))
+	if date == "—":
+		date = "unknown date"
+	return "'%s' (%s · %s) will be replaced. This can't be undone." % [slot_name, nation, date]
+
+
+func _ensure_tag_names() -> void:
+	if _tag_names_loaded:
+		return
+	_tag_names_loaded = true
+	var path := "res://data/scenarios/campaign_rules_1936.json"
+	if not FileAccess.file_exists(path):
+		return
+	var f := FileAccess.open(path, FileAccess.READ)
+	if f == null:
+		return
+	var parsed: Variant = JSON.parse_string(f.get_as_text())
+	f.close()
+	if typeof(parsed) != TYPE_DICTIONARY:
+		return
+	var names: Variant = (parsed as Dictionary).get("tag_names", {})
+	if names is Dictionary:
+		_tag_names = (names as Dictionary).duplicate(true)
+
+
+func _current_game_date_iso() -> String:
+	if typeof(TimeManager) == TYPE_NIL:
+		return ""
+	var y := int(TimeManager.current_year)
+	if y <= 0:
+		return ""
+	return "%04d-%02d-%02d" % [y, int(TimeManager.current_month), int(TimeManager.current_day)]
+
+
+func _stamp_slot_metadata(data: Dictionary, slot_name: String) -> void:
+	if typeof(data.get("metadata", null)) != TYPE_DICTIONARY:
+		data["metadata"] = {}
+	var meta: Dictionary = data["metadata"]
+	meta["save_kind"] = slot_kind(slot_name)
+	var game_date := _current_game_date_iso()
+	if not game_date.is_empty():
+		meta["game_date"] = game_date
+	# play_time_seconds stays 0. The card does not show it.
+	data["metadata"] = meta
+
+
+func _note_save_elapsed() -> void:
+	if typeof(TimeManager) == TYPE_NIL:
+		return
+	if TimeManager.has_method("get_total_days_elapsed"):
+		_last_saved_elapsed = int(TimeManager.get_total_days_elapsed())
+	else:
+		_last_saved_elapsed = int(TimeManager.total_days_elapsed)
+
+
+func _adopt_loaded_elapsed() -> void:
+	_note_save_elapsed()
+
+
+func _notify_top_bar_speed_resync() -> void:
+	var tree := Engine.get_main_loop() as SceneTree
+	if tree == null:
+		return
+	for n in tree.get_nodes_in_group("top_info_bar"):
+		if n != null and is_instance_valid(n) and n.has_method("resync_speed_from_time_manager"):
+			n.call("resync_speed_from_time_manager")
+
+
 ## Player-facing slot list: fixed empty slots + occupied files from list_saves().
 ## Each row: slot, occupied, status, label, can_load, can_save, api_save, api_load, metadata.
 ## Load/save actions must use save_game_detailed / load_game_detailed (not reimplemented).
@@ -680,21 +832,33 @@ func _format_slot_ui_row(slot: String, occupied: bool, metadata: Variant) -> Dic
 		name = "unnamed"
 	var label := ""
 	var status := "empty"
+	var kind := str(meta.get("save_kind", "")).strip_edges().to_lower()
+	if kind.is_empty():
+		kind = slot_kind(name)
+	var player := str(meta.get("player_tag", "")).strip_edges().to_upper()
+	var nation_line := nation_card_line(player) if occupied else "—"
+	var game_date_label := "—"
+	if occupied:
+		game_date_label = format_game_date_display(str(meta.get("game_date", "")))
+	var ts := str(meta.get("timestamp", meta.get("last_played", "")))
+	var saved_short := ts.substr(0, mini(16, ts.length())) if not ts.is_empty() else "—"
+	var when_line := ""
 	if occupied:
 		status = "occupied"
 		var bits: PackedStringArray = [name]
 		var scenario := str(meta.get("scenario_id", "")).strip_edges()
-		var player := str(meta.get("player_tag", "")).strip_edges().to_upper()
-		var ts := str(meta.get("timestamp", meta.get("last_played", "")))
 		if not scenario.is_empty():
 			bits.append(scenario)
 		if not player.is_empty():
 			bits.append(player)
-		if not ts.is_empty():
-			bits.append(ts.substr(0, mini(16, ts.length())))
+		if not saved_short.is_empty() and saved_short != "—":
+			bits.append(saved_short)
 		label = " · ".join(bits)
+		when_line = "%s · Saved %s" % [game_date_label, saved_short]
 	else:
 		label = "%s · empty" % name
+		when_line = "Empty slot"
+	# Playtime is intentionally absent. Old files may still store play_time_seconds.
 	return {
 		"slot": name,
 		"occupied": occupied,
@@ -702,9 +866,15 @@ func _format_slot_ui_row(slot: String, occupied: bool, metadata: Variant) -> Dic
 		"label": label,
 		"metadata": meta.duplicate(true) if not meta.is_empty() else {},
 		"can_load": occupied,
-		"can_save": true,
+		"can_save": kind != "auto",
 		"api_save": "save_game_detailed",
 		"api_load": "load_game_detailed",
+		"kind": kind,
+		"kind_badge": kind_badge(kind),
+		"nation_line": nation_line,
+		"game_date_label": game_date_label,
+		"when_line": when_line,
+		"playtime_hidden": true,
 	}
 
 func _peek_metadata(path: String) -> Dictionary:
@@ -724,6 +894,7 @@ func _peek_metadata(path: String) -> Dictionary:
 func save_game(slot_name: String = DEFAULT_SLOT) -> bool:
 	var path := get_save_path(slot_name)
 	var data := _gather_save_data()
+	_stamp_slot_metadata(data, slot_name)
 	var json_text := JSON.stringify(data, "\t")   # Pretty for human debugging
 
 	var f := FileAccess.open(path, FileAccess.WRITE)
@@ -737,6 +908,7 @@ func save_game(slot_name: String = DEFAULT_SLOT) -> bool:
 	f.close()
 
 	_last_save_path = path
+	_note_save_elapsed()
 	print("SaveLoadManager: Game saved → %s (v%d, %d bytes)" % [path, SAVE_VERSION, json_text.length()])
 
 	# Consistent non-intrusive feedback
@@ -772,6 +944,8 @@ func load_game(slot_name: String = DEFAULT_SLOT) -> bool:
 		push_warning("SaveLoadManager: Save is v%d (current v%d). Best-effort load may drop fields." % [file_version, SAVE_VERSION])
 
 	_apply_save_data(data)
+	_adopt_loaded_elapsed()
+	_notify_top_bar_speed_resync()
 	print("SaveLoadManager: Game loaded ← %s (v%d)" % [path, file_version])
 
 	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
@@ -794,10 +968,13 @@ func _gather_save_data() -> Dictionary:
 		"save_version": SAVE_VERSION,
 		"metadata": {
 			"timestamp": Time.get_datetime_string_from_system(true),
-			"scenario_id": "1936",
-			"player_tag": "USA",
+			# Live scenario name and player tag. Empty stays empty — never a USA/1936 placeholder.
+			"scenario_id": "",
+			"player_tag": "",
 			"play_time_seconds": 0,
 			"game_version": SAVE_GAME_VERSION,
+			"game_date": "",
+			"save_kind": "",
 		},
 		"time": {},
 		"technology": {},
@@ -873,13 +1050,12 @@ func _gather_save_data() -> Dictionary:
 	if loader != null:
 		scenario_name = loader.get_current_scenario_name()
 	data["metadata"]["scenario_id"] = scenario_name
-	# Living nation, not the USA placeholder. The load list reads this field.
-	var player_tag := "USA"
-	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_player_country_tag"):
-		var live_tag := str(LeaderManager.get_player_country_tag()).strip_edges().to_upper()
-		if not live_tag.is_empty():
-			player_tag = live_tag
+	# The field itself, not get_player_country_tag()'s USA default when the field is empty.
+	var player_tag := ""
+	if typeof(LeaderManager) != TYPE_NIL:
+		player_tag = str(LeaderManager.player_country_tag).strip_edges().to_upper()
 	data["metadata"]["player_tag"] = player_tag
+	data["metadata"]["game_date"] = _current_game_date_iso()
 
 	# Richer metadata for future save menu (timestamp already set above, scenario captured)
 	data["metadata"]["last_played"] = Time.get_datetime_string_from_system(true)
@@ -1316,7 +1492,8 @@ func _serialize_map_state() -> Dictionary:
 			"built_road_neighbors": p.built_road_neighbors.duplicate(),
 			"built_rail_neighbors": p.built_rail_neighbors.duplicate(),
 			"special_sites": _serialize_special_sites(p),
-			# Add more mutables (factories, resources, special_features deltas, cores, etc.) as they gain runtime mutation.
+			# Optional. Old saves omit this key and keep the live deposit table.
+			"resources": p.resources.duplicate(true) if p.resources is Dictionary else {},
 		})
 	return out
 
@@ -1416,6 +1593,12 @@ func _apply_map_state(m: Dictionary) -> void:
 
 		if e.has("special_sites"):
 			_apply_special_sites(pid, e["special_sites"])
+
+		# Missing key: leave the province's current deposits (old saves).
+		if e.has("resources") and e["resources"] is Dictionary:
+			var p_res: Province = MapManager.get_province(pid)
+			if p_res != null:
+				p_res.resources = (e["resources"] as Dictionary).duplicate(true)
 
 	print("SaveLoad: Applied province state to %d provinces (signals emitted)" % list.size())
 
@@ -1794,6 +1977,7 @@ func save_game_detailed(slot_name: String = DEFAULT_SLOT) -> Dictionary:
 	if not lw_out.has("last_aar") or typeof(lw_out.get("last_aar", null)) != TYPE_DICTIONARY:
 		lw_out["last_aar"] = {}
 	data["land_war"] = lw_out
+	_stamp_slot_metadata(data, safe_slot)
 
 	# Autosave / live F5: compact JSON (no tab indent). Pretty-print of the
 	# 3520-province blob doubled peak RSS on llvmpipe Play soaks.
@@ -1824,6 +2008,7 @@ func save_game_detailed(slot_name: String = DEFAULT_SLOT) -> Dictionary:
 	f.store_string(json_text)
 	f.close()
 	_last_save_path = path
+	_note_save_elapsed()
 	var bytes := json_text.length()
 	print("SaveLoadManager: Game saved → %s (v%d, %d bytes, slot=%s)" % [abs_path, SAVE_VERSION, bytes, safe_slot])
 	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
@@ -1873,6 +2058,8 @@ func load_game_detailed(slot_name: String = DEFAULT_SLOT) -> Dictionary:
 	_load_apply_frame = frame_now
 	_load_apply_slot = slot_key
 	_apply_save_data(data)
+	_adopt_loaded_elapsed()
+	_notify_top_bar_speed_resync()
 	eoa_load_apply_count += 1
 	print("EOA_LOAD_APPLY n=%d slot=%s" % [eoa_load_apply_count, slot_key])
 	return {"ok": true, "path": path, "version": file_version, "slot": slot_key}
