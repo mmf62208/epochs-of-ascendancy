@@ -57,7 +57,6 @@ from gap_fra1_product import (  # noqa: E402
 from gap_ussr_west2_product import (  # noqa: E402
     HOLE_PX_MAX,
     integer_bounds,
-    is_placeholder_ring,
     open_ring,
     overlap_px,
     point_in_ring,
