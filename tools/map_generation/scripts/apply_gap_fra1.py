@@ -48,6 +48,7 @@ from apply_gap_ussr_west2 import (  # noqa: E402
 from gap_fra1_product import (  # noqa: E402
     META_RING,
     META_YIELD,
+    SCOPE_PLACEHOLDER_IDS,
     UNKNOWN_PLACEHOLDER_IDS,
     UNKNOWN_REASONS,
     audit_changed,
@@ -146,21 +147,23 @@ def match_provinces(base, geo, owners, parts) -> Tuple[dict, List[dict]]:
     options = defaultdict(list)
     skipped_unknown = []
     considered = []
-    for key, tag in owners.items():
-        if tag != "FRA":
+    for pid in SCOPE_PLACEHOLDER_IDS:
+        if owners.get(str(pid)) != "FRA":
             continue
-        pid = int(key)
         if pid >= 950000 or _is_water(pid, base.get(pid, {})):
             continue
         g = geo.get(pid)
-        if g is None or not is_placeholder_ring(g.get("points") or []):
+        if g is None:
             continue
+        meta = g.get("meta") if isinstance(g.get("meta"), dict) else {}
+        if meta.get(META_RING):
+            continue
+        considered.append(pid)
         if pid in FROZEN:
             skipped_unknown.append(
                 {"id": pid, "name": base[pid]["name"], "reason": UNKNOWN_REASONS.get(pid, "frozen")}
             )
             continue
-        meta = g.get("meta") if isinstance(g.get("meta"), dict) else {}
         adm = str(meta.get("adm0_a3") or "")
         level = str(meta.get("level") or "")
         pts = open_ring(g.get("points") or [])
@@ -168,7 +171,6 @@ def match_provinces(base, geo, owners, parts) -> Tuple[dict, List[dict]]:
         radius = math.sqrt(max(ring_area(pts), 1.0) / math.pi)
         folded = norm_name(base[pid]["name"])
         limit = max(80.0, 1.5 * radius)
-        considered.append(pid)
         hits = 0
         for lv in _levels(level):
             for part in parts.get((adm, lv)) or []:
@@ -217,7 +219,7 @@ def match_provinces(base, geo, owners, parts) -> Tuple[dict, List[dict]]:
                 {"id": pid, "name": base[pid]["name"], "reason": "admin part already used by a closer province"}
             )
     skipped_unknown.sort(key=lambda row: row["id"])
-    print("matched", len(matched), "unknown", len(skipped_unknown), "placeholders", len(considered) + len(FROZEN), flush=True)
+    print("matched", len(matched), "unknown", len(skipped_unknown), "open", len(considered), flush=True)
     return matched, skipped_unknown
 
 
@@ -226,6 +228,23 @@ def _order_preserving(old, new_set):
     have = set(kept)
     added = sorted(n for n in new_set if n not in have)
     return kept + added, added, [n for n in old if n not in new_set]
+
+
+def _ring_hits_foreign(pid, ring, other_land, sea_masks, matched, geo) -> bool:
+    """True when this outline covers another land province or a sea zone."""
+    for entry in other_land:
+        if overlap_px(ring, entry[1]) > 1:
+            return True
+    for sid, _sb, _sm in sea_masks:
+        opts = open_ring(geo[sid].get("points") or [])
+        if len(opts) >= 3 and overlap_px(ring, opts) > 1:
+            return True
+    for other, info in matched.items():
+        if other == pid:
+            continue
+        if overlap_px(ring, info["canvas"]) > 1:
+            return True
+    return False
 
 
 def _touches(pid, ring, rings) -> set:
@@ -474,13 +493,25 @@ def clip_batch(matched, base, geo):
             ob, om = gis_masks[other]
             _subtract(bounds, bulge_u, ob, om)
         mask = mask | bulge_u
-        if int(mask.sum()) < 3:
+        if int(mask.sum()) < 1:
             raise RuntimeError("province %s empty after clip" % pid)
         final_masks[pid] = (bounds, mask)
 
     new_rings: Dict[int, List[List[float]]] = {}
     for pid, (bounds, mask) in list(final_masks.items()):
-        ring = _ring_from_mask(mask, bounds)
+        # A reef can cover fewer than three pixel centers. The contour tracer
+        # refuses that, and a stair would invent a shape. Keep the admin
+        # outline when it does not cover another province.
+        ring = None
+        if int(mask.sum()) < 12:
+            canvas = [_json_pt(float(p[0]), float(p[1])) for p in open_ring(matched[pid]["canvas"])]
+            if canvas and not self_crosses(canvas) and ring_area(canvas) > 0:
+                if not _ring_hits_foreign(pid, canvas, other_land, sea_masks, matched, geo):
+                    ring = canvas
+        if ring is None:
+            if int(mask.sum()) < 3:
+                raise RuntimeError("province %s empty after clip" % pid)
+            ring = _ring_from_mask(mask, bounds)
         if self_crosses(ring):
             raise RuntimeError("self-cross rering %s" % pid)
         new_rings[pid] = ring
