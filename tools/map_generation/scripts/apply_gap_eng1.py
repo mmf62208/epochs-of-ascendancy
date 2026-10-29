@@ -1038,6 +1038,23 @@ def build(apply: bool, adm0: str, limit: int, id_filter: Sequence[int], match_on
             if pid not in adj.get(str(nid), []):
                 print("refuse: asymmetric", pid, nid)
                 return 2
+    # A real outline can pull away from a coarse neighbour on every side.
+    # Keep one old link so that province is not left with an empty list.
+    for oid_s, nbs in list(adj.items()):
+        if nbs:
+            continue
+        oid = int(oid_s)
+        restorers = [row for row in adj_changes if oid in row["dropped"]]
+        if not restorers:
+            continue
+        pid = restorers[0]["id"]
+        adj[oid_s] = [pid]
+        if oid not in adj[str(pid)]:
+            adj[str(pid)].append(oid)
+        row = restorers[0]
+        row["dropped"] = [n for n in row["dropped"] if n != oid]
+        print("restore-link", oid, "keeps", pid, flush=True)
+    adj_changes[:] = [row for row in adj_changes if row["added"] or row["dropped"]]
 
     rows = []
     for pid, ring in sorted(new_rings.items()):
