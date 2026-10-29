@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "enabled": true,
+  "end_date": "1949-01-01",
+  "win_if_end_date_reached": true,
+  "win_if_all_enemy_capitals_controlled": true,
+  "enemy_scope": "at_war_with_player",
+  "victory_points": {
+    "enabled": false,
+    "source": "province.victory_points",
+    "controller": "player",
+    "threshold": 500
+  }
+}

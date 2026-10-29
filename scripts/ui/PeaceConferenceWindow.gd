@@ -89,6 +89,55 @@ static func open_living_sheet(
 	return sheet
 
 
+## Successor picker after an ink defeat. Headless uses a CanvasLayer (a Window
+## does not show there). The buttons call the same switch as the 1918 picker.
+static func open_continuation_picker() -> Node:
+	var tree := Engine.get_main_loop() as SceneTree
+	if tree == null or tree.root == null:
+		return null
+	for n in tree.get_nodes_in_group("continuation_picker"):
+		if is_instance_valid(n) and not n.is_queued_for_deletion():
+			return n
+	var pending: Dictionary = {}
+	if typeof(GameData) != TYPE_NIL and GameData.has_method("get_pending_continuation"):
+		pending = GameData.get_pending_continuation()
+	var layer := CanvasLayer.new()
+	layer.name = "ContinuationPicker"
+	layer.layer = 126
+	layer.process_mode = Node.PROCESS_MODE_ALWAYS
+	layer.add_to_group("continuation_picker")
+	var box := VBoxContainer.new()
+	box.name = "Choices"
+	box.position = Vector2(80, 80)
+	layer.add_child(box)
+	var header := Label.new()
+	header.text = "Choose nation to continue playing as"
+	box.add_child(header)
+	var opts: Array = []
+	var raw_opts: Variant = pending.get("options", [])
+	if raw_opts is Array:
+		opts = raw_opts
+	for opt in opts:
+		var b := Button.new()
+		var chosen := str(opt)
+		b.text = "Continue as " + chosen
+		b.pressed.connect(_on_picker_continue.bind(chosen))
+		box.add_child(b)
+	tree.root.add_child(layer)
+	if DisplayServer.get_name() != "headless":
+		var win := PeaceConferenceWindow.new()
+		win.add_to_group("continuation_picker")
+		tree.root.add_child(win)
+		if not pending.is_empty():
+			win._populate_continuation_ui(pending)
+	return layer
+
+
+static func _on_picker_continue(tag: String) -> void:
+	if typeof(GameData) != TYPE_NIL and GameData.has_method("execute_player_switch_to"):
+		GameData.execute_player_switch_to(tag, "ink defeat continuation")
+
+
 static func _open_campaign_peace_sheet(winner_tag: String, loser_tag: String, campaign: Dictionary) -> Dictionary:
 	var w := winner_tag.strip_edges().to_upper()
 	var l := loser_tag.strip_edges().to_upper()

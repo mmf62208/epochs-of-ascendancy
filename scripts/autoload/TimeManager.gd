@@ -1492,7 +1492,21 @@ func _campaign_before_battles() -> void:
 		CapitulationDomain.ensure_snapshot()
 
 
+func _maybe_present_ink_victory() -> void:
+	# Read-only date / existing-war check. Does not boot wars or write peace_state.
+	var scr: Variant = null
+	if has_meta("eoa_ink_end_domain"):
+		scr = get_meta("eoa_ink_end_domain")
+	if scr == null:
+		scr = load("res://scripts/core/CampaignInkEndDomain.gd")
+		if scr != null:
+			set_meta("eoa_ink_end_domain", scr)
+	if scr is GDScript:
+		(scr as GDScript).call("evaluate_day")
+
+
 func _campaign_after_battles() -> void:
+	_maybe_present_ink_victory()
 	if typeof(WarStateDomain) == TYPE_NIL or not WarStateDomain.loop_enabled():
 		return
 	var at_war := WarStateDomain.any_war()
