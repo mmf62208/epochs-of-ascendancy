@@ -107,6 +107,7 @@ run_step unit_board_play_path \
     tools.map_generation.tests.test_oldmap_turkey_mask_product \
     tools.map_generation.tests.test_nation_tags1 \
     tools.map_generation.tests.test_gap_china2_geom \
+    tools.map_generation.tests.test_gap_ussr_west2 \
     tools.map_generation.tests.test_world_accurate_capital_pick_product \
     tools.map_generation.tests.test_world_accurate_strategic_and_assault \
     tools.map_generation.tests.test_world_accurate_multi_front_and_deploy \
