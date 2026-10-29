@@ -81,6 +81,7 @@ var units_view_button: Button = null
 
 func _ready() -> void:
 	add_to_group("top_info_bar")
+	RetrowaveTheme.install_tooltip_theme(get_tree())
 	# PASS on root so empty bar chrome does not steal map pan; buttons still STOP.
 	# ALWAYS so clicks work even if SceneTree is briefly paused during load.
 	mouse_filter = Control.MOUSE_FILTER_PASS
