@@ -2,7 +2,7 @@
 """GAP-ENG-1: ENG 1936 land rings are real admin outlines, except listed UNKNOWNs.
 
 Fails while any in-scope ENG 1936 land ring is still a 36/72-vertex
-placeholder, other than the eleven with no placeable admin polygon. The re-ringed
+placeholder, other than the twelve with no placeable admin polygon. The re-ringed
 provinces must tile: pixel overlap ≤ 1, polygon intersection area ≤ 1 px²,
 no new enclosed hole over 250 px², no self-intersection or self-touch, no
 zero-neighbour province.
@@ -44,8 +44,8 @@ class GapEng1Test(unittest.TestCase):
         geo, owners, _adj, domains = _load()
         self.assertEqual(len(geo["provinces"]), 3596)
         self.assertEqual(len(SCOPE_PLACEHOLDER_IDS), 259)
-        self.assertEqual(len(UNKNOWN_PLACEHOLDER_IDS), 11)
-        self.assertEqual(EXPECTED_RERINGS, 248)
+        self.assertEqual(len(UNKNOWN_PLACEHOLDER_IDS), 12)
+        self.assertEqual(EXPECTED_RERINGS, 247)
         remaining = scope_placeholder_ids(owners, geo["provinces"], domains)
         self.assertEqual(remaining, sorted(UNKNOWN_PLACEHOLDER_IDS))
         by_id = {int(g["id"]): g for g in geo["provinces"]}

@@ -5,7 +5,7 @@ placeholders (id < 950000, domain land, 36 vertices). geoBoundaries gbOpen
 has no ADM file for ATA, CYM, HMD, JEY, IMN, SGS, or FLK. Somaliland and
 Kashmir have no admin polygon that matches the blob. Potaro-Siparuni
 lies inside the Venezuelan claim zone, and cutting it out splits that
-province. Those eleven stay placeholders. Every other ring is the admin
+province. Those twelve stay placeholders. Every other ring is the admin
 polygon it was simplified from, clipped the way GAP-USSR-WEST-2 clips.
 
 A ring this pass writes is strictly simple: no self-intersection and no
@@ -41,7 +41,7 @@ OWNER = "ENG"
 
 UNKNOWN_PLACEHOLDER_IDS = (
     900316, 900329, 902131, 902133, 902134, 902422, 902423, 902447,
-    902448, 902475, 902476,
+    902448, 902475, 902476, 905394,
 )
 UNKNOWN_REASONS = {
     900316: "gbOpen SOM has no unit named Somaliland; Woqooyi Galbeed under the centroid is 0.18 of the blob",
@@ -55,6 +55,7 @@ UNKNOWN_REASONS = {
     902448: "gbOpen has no IMN ADM1 or ADM2 (API 404)",
     902475: "gbOpen has no SGS ADM1 or ADM2 (API 404)",
     902476: "gbOpen has no FLK ADM1 or ADM2 (API 404)",
+    905394: "Ayi is covered by Ma'an 905393 (36 of 38 px); no separate ring remains",
 }
 
 # Every ENG 1936 land placeholder on 925c2877.

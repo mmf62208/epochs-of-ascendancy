@@ -624,7 +624,7 @@ def clip_batch(matched, base, geo):
             ob, om = gis_masks[other]
             _subtract(bounds, bulge_u, ob, om)
         mask = mask | bulge_u
-        if int(mask.sum()) < 1:
+        if int(mask.sum()) < 12:
             ab, am = admin_masks[pid]
             restored = np.zeros_like(mask)
             _or_into(bounds, restored, ab, am)
@@ -635,10 +635,11 @@ def clip_batch(matched, base, geo):
                     continue
                 ob, om = gis_masks[other]
                 _subtract(bounds, restored, ob, om)
-            if int(restored.sum()) < 12:
+            if int(restored.sum()) >= 12 and int(restored.sum()) > int(mask.sum()):
+                mask = restored
+                print("coarse-sea overlap kept", pid, int(mask.sum()), flush=True)
+            elif int(mask.sum()) < 1:
                 raise RuntimeError("province %s empty after clip" % pid)
-            mask = restored
-            print("coarse-sea overlap kept", pid, int(mask.sum()), flush=True)
         final_masks[pid] = (bounds, mask)
 
     new_rings: Dict[int, List[List[float]]] = {}
