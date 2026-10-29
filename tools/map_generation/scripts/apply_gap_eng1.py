@@ -48,6 +48,7 @@ from apply_gap_ussr_west2 import (  # noqa: E402
     _splice_field,
     _subtract,
 )
+from gap_china2_outline import CHI_LAND_IDS  # noqa: E402
 from gap_eng1_product import (  # noqa: E402
     DO_NOT_EDIT_IDS,
     META_RING,
@@ -83,7 +84,9 @@ EVIDENCE = Path.home() / "gapeng1" / "evidence"
 GARRISON_TAGS = ("GER", "FRA", "ENG", "SOV", "ITA", "JAP", "USA", "POL", "CZE")
 # Unknowns stay circles. Pre-existing raw-invalid rings, including the FRA
 # defects, are subtracted from new rings and never rewritten.
-FROZEN = set(UNKNOWN_PLACEHOLDER_IDS) | set(DO_NOT_EDIT_IDS)
+# CHI land is audited by test_gap_china2_geom. Notching it opens slivers.
+# Those rings are subtracted from new outlines and never rewritten.
+FROZEN = set(UNKNOWN_PLACEHOLDER_IDS) | set(DO_NOT_EDIT_IDS) | set(CHI_LAND_IDS)
 ADM_ALIASES = {
     "SDS": ("SSD",),
     "PSX": ("PSE",),
