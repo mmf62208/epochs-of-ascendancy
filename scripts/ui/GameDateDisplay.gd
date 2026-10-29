@@ -143,37 +143,28 @@ static func format_top_bar_line(include_pause_glyph: bool = true) -> String:
 static func format_top_bar_tooltip() -> String:
 	if not has_time_manager():
 		return "Game calendar (TimeManager not loaded)."
-	var current := TimeManager.get_current_date()
-	var start_iso := TimeManager.get_scenario_start_date()
-	var start_readable := format_iso_date_readable(start_iso)
-	var now_readable := "%s %02d:00" % [
-		format_iso_date_readable(str(current.get("date_day_only", current.get("date_string", "")))),
-		int(current.get("hour", 0)),
+	var date := get_current_date_dict()
+	var hour := int(date.get("hour", 0))
+	var title := "%s · %02d:00" % [
+		format_calendar_date(
+			int(date.get("year", 1936)),
+			int(date.get("month", 1)),
+			int(date.get("day", 1)),
+			true,
+		),
+		hour,
 	]
-	var elapsed := days_since_scenario_start()
-	var lines: PackedStringArray = [
-		"Scenario start: %s" % start_readable,
-		"Current: %s" % now_readable,
-	]
-	var months := months_since_scenario_start()
-	if elapsed > 0:
-		if months >= 1:
-			lines.append(
-				"Time elapsed: %d day(s) · %d month(s) since scenario start"
-				% [elapsed, months]
-			)
-		else:
-			lines.append("Time elapsed: %d day(s) since scenario start" % elapsed)
-	else:
-		lines.append("Day 1 — unpause: 1× advances ~1 game hour per real second.")
-	lines.append(
-		"1× = hour-by-hour · 2×/3×/4× faster hours · full day sim fires at midnight."
-	)
+	var body := ""
 	if TimeManager.is_paused():
-		lines.append("Simulation paused.")
-	elif TimeManager.time_scale > 1.01:
-		lines.append("Game speed: %.0f×" % TimeManager.time_scale)
-	return "\n".join(lines)
+		body = "Paused. Each day: production, reinforcement and battles resolve."
+	else:
+		var scale := maxf(float(TimeManager.time_scale), 0.1)
+		var hours_left := 24 - hour
+		if hours_left <= 0:
+			hours_left = 24
+		var secs := int(round(float(hours_left) / scale))
+		body = "Running at %.0fx · next day in ~%ds." % [scale, secs]
+	return "%s\n%s\n[Space] [.]" % [title, body]
 
 
 static func format_map_date_plain(include_elapsed: bool = true) -> String:

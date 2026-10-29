@@ -98,9 +98,7 @@ func _ready() -> void:
 	_update_resources()
 	_update_direction()
 	if date_time_label:
-		date_time_label.clip_text = true
 		date_time_label.visible = true
-		date_time_label.custom_minimum_size = Vector2(148, 28)
 		date_time_label.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 		date_time_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 		date_time_label.add_theme_color_override("font_color", Color(0.95, 0.9, 0.6))
@@ -384,13 +382,11 @@ func _apply_responsive_layout() -> void:
 
 	if date_time_label:
 		date_time_label.visible = true
-		date_time_label.custom_minimum_size = Vector2(100 if compact else 148, 26)
 		date_time_label.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 		date_time_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-		date_time_label.clip_text = true
-		date_time_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		date_time_label.add_theme_font_size_override("font_size", 12 if compact else 13)
 		date_time_label.tooltip_text = GameDateDisplay.format_top_bar_tooltip()
+		_fit_date_label()
 	_apply_war_chip_layout(vp_w)
 	_apply_units_compact_label(compact)
 	_apply_search_compact(compact)
@@ -399,7 +395,7 @@ func _apply_responsive_layout() -> void:
 		menu_button.text = "Menu" if not narrow else "M"
 		menu_button.custom_minimum_size = Vector2(40 if narrow else 56, 28)
 		menu_button.size_flags_horizontal = Control.SIZE_SHRINK_END
-		menu_button.tooltip_text = "Save · Load · Settings · Help · Policies · Debug"
+		menu_button.tooltip_text = "Command Center\nSave, load, settings, help, policies.\n[Esc] · [Ctrl+S] save · [Ctrl+L] load"
 
 	# Slim single-row bar (no second-row hotseat chrome cutting into buttons).
 	custom_minimum_size.y = 48.0 if compact else 52.0
@@ -417,7 +413,7 @@ func _ensure_speed_overflow_menu() -> void:
 	_speed_overflow = MenuButton.new()
 	_speed_overflow.name = "SpeedOverflowMenu"
 	_speed_overflow.text = "Spd"
-	_speed_overflow.tooltip_text = "Simulation speed (2x-4x)"
+	_speed_overflow.tooltip_text = _speed_tooltip()
 	_speed_overflow.custom_minimum_size = Vector2(40, 28)
 	_time_speed_container.add_child(_speed_overflow)
 	RetrowaveTheme.style_secondary_button(_speed_overflow)
@@ -438,7 +434,7 @@ func _apply_speed_layout(show_all: bool, compact: bool) -> void:
 	if pause_button:
 		pause_button.custom_minimum_size = Vector2(36, h)
 		pause_button.text = "||" if not is_paused else ">"
-		pause_button.tooltip_text = "Pause / Resume (Space)"
+		pause_button.tooltip_text = _pause_tooltip()
 		pause_button.visible = true
 	if speed1_button:
 		speed1_button.custom_minimum_size = Vector2(32, h)
@@ -460,7 +456,7 @@ func _ensure_nav_overflow_menu() -> void:
 	_nav_overflow = MenuButton.new()
 	_nav_overflow.name = "NavOverflowMenu"
 	_nav_overflow.text = "More ▾"
-	_nav_overflow.tooltip_text = "Trade · Space · Match · Orders · HH Agenda · Map"
+	_nav_overflow.tooltip_text = "Trade · Space · Match · Orders · HH Agenda · Map\nSecondary screens."
 	_nav_overflow.visible = true
 	_nav_overflow.custom_minimum_size = Vector2(64, 28)
 	_center_container.add_child(_nav_overflow)
@@ -658,7 +654,7 @@ func _apply_theme() -> void:
 		orders_btn.name = "OrdersButton"
 		orders_btn.text = "Orders"
 		orders_btn.visible = false
-		orders_btn.tooltip_text = "Theater orders (also in More ▾)"
+		orders_btn.tooltip_text = "Theater Command\nAdvanced orders for every front. Most first-session orders live on the unit card."
 		$ContentRow/CenterContainer.add_child(orders_btn)
 		orders_btn.pressed.connect(_on_orders_pressed)
 	if get_node_or_null("ContentRow/CenterContainer/HHAgendaButton") == null:
@@ -846,7 +842,7 @@ func _ensure_units_view_button() -> void:
 	btn.text = "Units"
 	btn.toggle_mode = true
 	btn.button_pressed = true
-	btn.tooltip_text = "Show or hide unit counters (U). View only — does not change orders or the sim."
+	btn.tooltip_text = "Show or hide unit counters. View only — does not change orders or the sim.\n[U]"
 	btn.custom_minimum_size = Vector2(64, 28)
 	btn.focus_mode = Control.FOCUS_NONE
 	btn.process_mode = Node.PROCESS_MODE_ALWAYS
@@ -865,7 +861,9 @@ func sync_units_view_button(shown: bool) -> void:
 		return
 	units_view_button.set_pressed_no_signal(shown)
 	units_view_button.tooltip_text = (
-		"Hide unit counters (U). View only." if shown else "Show unit counters (U). View only."
+		"Hide unit counters. View only — does not change orders or the sim.\n[U]"
+		if shown
+		else "Show unit counters. View only — does not change orders or the sim.\n[U]"
 	)
 	var compact := false
 	if get_viewport() != null:
@@ -1245,16 +1243,17 @@ func _update_speed_buttons() -> void:
 			RetrowaveTheme.style_speed_button(buttons[i], not is_paused and (i + 1) == current_speed)
 			# Dim inactive speeds; keep icon visibility high on active.
 			buttons[i].modulate = Color.WHITE if (not is_paused and (i + 1) == current_speed) else Color(0.75, 0.8, 0.9, 0.9)
+			buttons[i].tooltip_text = _speed_tooltip()
 	if pause_button:
 		_refresh_pause_icon()
+		pause_button.tooltip_text = _pause_tooltip()
 		if is_paused:
 			pause_button.modulate = RetrowaveTheme.MAGENTA
-			pause_button.tooltip_text = "Resume simulation"
 		else:
 			pause_button.modulate = Color.WHITE
-			pause_button.tooltip_text = "Pause simulation (keeps UI responsive)"
 	if _speed_overflow and is_instance_valid(_speed_overflow):
 		_speed_overflow.text = "%dx" % current_speed if not is_paused else "Spd"
+		_speed_overflow.tooltip_text = _speed_tooltip()
 
 
 func _on_pause_pressed() -> void:
@@ -1348,15 +1347,46 @@ func _update_date_time() -> void:
 		)
 	else:
 		date_time_label.text = GameDateDisplay.format_top_bar_line(true)
-	var tip := GameDateDisplay.format_top_bar_tooltip()
-	date_time_label.tooltip_text = tip
-	pause_button.tooltip_text = "Pause / resume simulation\n\n" + tip if not tip.is_empty() else "Pause / resume simulation"
+	date_time_label.tooltip_text = GameDateDisplay.format_top_bar_tooltip()
+	_fit_date_label()
+	if pause_button:
+		pause_button.tooltip_text = _pause_tooltip()
 	if is_paused:
 		date_time_label.modulate = RetrowaveTheme.MAGENTA
-		pause_button.tooltip_text = "Resume simulation\n\n" + tip if not tip.is_empty() else "Resume simulation"
 	else:
 		date_time_label.modulate = Color.WHITE
 	refresh_campaign_war_readout()
+
+
+func _pause_tooltip() -> String:
+	var title := "Resume" if is_paused else "Pause"
+	return "%s\nThe UI stays live while paused.\n[Space] [.]" % title
+
+
+func _speed_tooltip() -> String:
+	return "Speed\n1x normal · 2x · 3x · 4x fast. Higher speed resolves more days per second.\n[1] [2] [3] [4]"
+
+
+func _fit_date_label() -> void:
+	if date_time_label == null:
+		return
+	date_time_label.clip_text = false
+	date_time_label.text_overrun_behavior = TextServer.OVERRUN_NO_TRIMMING
+	date_time_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	date_time_label.mouse_filter = Control.MOUSE_FILTER_STOP
+	var font := date_time_label.get_theme_font("font")
+	var fsize := date_time_label.get_theme_font_size("font_size")
+	if fsize <= 0:
+		fsize = 13
+	var text := date_time_label.text
+	var probe := text
+	if not probe.contains("(+"):
+		probe = text + " (+4d)"
+	var w := float(text.length()) * float(fsize) * 0.6
+	if font != null:
+		w = font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, fsize).x
+		w = maxf(w, font.get_string_size(probe, HORIZONTAL_ALIGNMENT_LEFT, -1, fsize).x)
+	date_time_label.custom_minimum_size = Vector2(w + 10.0, 28.0)
 
 
 func refresh_campaign_war_readout() -> void:
