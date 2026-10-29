@@ -60,8 +60,11 @@ var _clock_unpause_msec: int = 0
 ## Layout breakpoints (viewport width). Secondary screens always live in More ▾ for usability.
 const WIDTH_COMPACT := 1400
 const WIDTH_NARROW := 1100
-const WIDTH_SHOW_RESOURCES := 1500
+const WIDTH_SHOW_RESOURCES := 1280
 const WIDTH_SHOW_ALL_SPEEDS := 900
+const SEARCH_WIDTH_WIDE := 308.0
+const SEARCH_WIDTH_COMPACT := 168.0
+const SEARCH_WIDTH_NARROW := 148.0
 const WAR_CHIP_MAX_COMPACT := 72.0
 const WAR_CHIP_MAX_WIDE := 160.0
 
@@ -169,27 +172,18 @@ func host_map_search_chrome(search: Control) -> void:
 		if old_p != null:
 			old_p.remove_child(search)
 		slot.add_child(search)
-	search.z_index = 80
-	search.z_as_relative = false
+	search.z_index = 0
+	search.z_as_relative = true
 	search.mouse_filter = Control.MOUSE_FILTER_STOP
 	search.visible = true
 	search.modulate = Color(1, 1, 1, 1)
 	search.process_mode = Node.PROCESS_MODE_ALWAYS
 	search.clip_contents = false
-	var compact_search := false
-	if get_viewport() != null:
-		compact_search = get_viewport().get_visible_rect().size.x < WIDTH_COMPACT
-	search.custom_minimum_size = Vector2(240.0 if compact_search else 308.0, 32.0)
+	var search_w := _search_width_for_viewport()
+	search.custom_minimum_size = Vector2(search_w, 32.0)
 	if slot == _right_container:
-		search.set_anchors_preset(Control.PRESET_TOP_LEFT, false)
-		search.anchor_left = 0.0
-		search.anchor_top = 0.0
-		search.anchor_right = 0.0
-		search.anchor_bottom = 0.0
-		search.offset_left = 0.0
-		search.offset_top = 0.0
-		search.offset_right = 0.0
-		search.offset_bottom = 0.0
+		# Stay in the HBox flow. Absolute TOP_LEFT anchors painted Search over
+		# Steel / Aluminum / Rubber at 1280 (Play MIXED 05bf7fb1).
 		search.size_flags_horizontal = Control.SIZE_SHRINK_END
 		search.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		# [Resources] [Search+Go] [Menu] — Search stays on the right through reflow.
@@ -203,7 +197,7 @@ func host_map_search_chrome(search: Control) -> void:
 	else:
 		move_child(search, get_child_count() - 1)
 	if search.has_method("ensure_chrome_visible"):
-		search.call("ensure_chrome_visible")
+		search.call("ensure_chrome_visible", search_w)
 
 
 func _find_hosted_map_search() -> Control:
@@ -231,27 +225,41 @@ func _keep_search_chrome_sticky() -> void:
 	host_map_search_chrome(search)
 
 
-func _protect_search_from_resource_overflow() -> void:
-	## Hide extra resource chips before Search can be pushed off the strip.
-	var vp_w := 1280.0
+func _viewport_layout_width() -> float:
+	if has_meta("eoa_layout_vp_w"):
+		return float(get_meta("eoa_layout_vp_w"))
 	if get_viewport() != null:
-		vp_w = get_viewport().get_visible_rect().size.x
-	var reserved := 308.0 + 72.0 + 24.0
-	var left_min := 240.0
-	var center_min := 360.0
-	var room: float = vp_w - left_min - center_min - reserved
-	if rubber_label != null and room < 220.0:
-		rubber_label.visible = false
-	if oil_label != null and room < 160.0:
-		oil_label.visible = false
-	# Play MIXED 002df244: at 1280px Steel/Al painted under Search. Hide them
-	# before they can clip the sticky Search slot.
-	if aluminum_label != null and (room < 280.0 or vp_w < 1680.0):
-		aluminum_label.visible = false
-	if steel_label != null and (room < 200.0 or vp_w < 1560.0):
-		steel_label.visible = false
+		return get_viewport().get_visible_rect().size.x
+	return 1280.0
+
+
+func _search_width_for_viewport(vp_w: float = -1.0) -> float:
+	var w := vp_w
+	if w < 0.0:
+		w = _viewport_layout_width()
+	if w < WIDTH_NARROW:
+		return SEARCH_WIDTH_NARROW
+	if w < WIDTH_COMPACT:
+		return SEARCH_WIDTH_COMPACT
+	return SEARCH_WIDTH_WIDE
+
+
+func _protect_search_from_resource_overflow() -> void:
+	## Keep every resource chip hoverable at 1280+. Shrink Search instead of
+	## hiding Steel / Aluminum / Rubber (Play MIXED 05bf7fb1).
+	var vp_w := _viewport_layout_width()
 	if _resources_container != null:
-		_resources_container.clip_contents = true
+		_resources_container.clip_contents = false
+	if vp_w < WIDTH_SHOW_RESOURCES:
+		return
+	for lab in [steel_label, aluminum_label, oil_label, rubber_label]:
+		if lab == null:
+			continue
+		lab.visible = true
+		lab.clip_text = false
+		lab.mouse_filter = Control.MOUSE_FILTER_STOP
+	_apply_resource_icon_compact(vp_w < WIDTH_COMPACT)
+	_apply_search_compact(vp_w < WIDTH_COMPACT)
 
 
 func arm_play_clock_after_begin() -> void:
@@ -328,7 +336,7 @@ func _ensure_start_paused_for_playtest() -> void:
 func _apply_responsive_layout() -> void:
 	if not is_inside_tree():
 		return
-	var vp_w := get_viewport().get_visible_rect().size.x
+	var vp_w := _viewport_layout_width()
 	var compact := vp_w < WIDTH_COMPACT
 	var narrow := vp_w < WIDTH_NARROW
 	var show_resources := vp_w >= WIDTH_SHOW_RESOURCES
@@ -372,16 +380,19 @@ func _apply_responsive_layout() -> void:
 
 	if _resources_container:
 		_resources_container.visible = show_resources
-		_resources_container.add_theme_constant_override("separation", 8)
+		_resources_container.add_theme_constant_override("separation", 6 if compact else 8)
+		_resources_container.clip_contents = false
+		_resources_container.size_flags_horizontal = Control.SIZE_SHRINK_END
 
 	if steel_label:
-		steel_label.visible = show_resources and vp_w >= WIDTH_SHOW_RESOURCES + 80
+		steel_label.visible = show_resources
 	if aluminum_label:
-		aluminum_label.visible = show_resources and vp_w >= WIDTH_SHOW_RESOURCES + 220
+		aluminum_label.visible = show_resources
 	if oil_label:
 		oil_label.visible = show_resources
 	if rubber_label:
-		rubber_label.visible = show_resources and vp_w >= WIDTH_SHOW_RESOURCES + 100
+		rubber_label.visible = show_resources
+	_apply_resource_icon_compact(compact)
 
 	if date_time_label:
 		date_time_label.visible = true
@@ -1336,9 +1347,7 @@ func _pause_for_menu(pause: bool) -> void:
 
 
 func _update_date_time() -> void:
-	var vp_w := 1280.0
-	if get_viewport() != null:
-		vp_w = get_viewport().get_visible_rect().size.x
+	var vp_w := _viewport_layout_width()
 	var compact := vp_w < WIDTH_COMPACT
 	if compact:
 		var date: Dictionary = GameDateDisplay.get_current_date_dict()
@@ -1358,7 +1367,17 @@ func _update_date_time() -> void:
 		date_time_label.modulate = RetrowaveTheme.MAGENTA
 	else:
 		date_time_label.modulate = Color.WHITE
+	_refresh_open_date_tooltip()
 	refresh_campaign_war_readout()
+
+
+func _refresh_open_date_tooltip() -> void:
+	if date_time_label == null or get_viewport() == null:
+		return
+	var mouse := get_viewport().get_mouse_position()
+	if not date_time_label.get_global_rect().has_point(mouse):
+		return
+	RetrowaveTheme.refresh_open_tooltip_text(get_tree(), date_time_label.tooltip_text)
 
 
 func _pause_tooltip() -> String:
@@ -1471,10 +1490,33 @@ func _apply_search_compact(compact: bool) -> void:
 	var search: Control = _find_hosted_map_search()
 	if search == null or not is_instance_valid(search):
 		return
-	search.custom_minimum_size = Vector2(240.0 if compact else 308.0, 32.0)
+	var search_w := _search_width_for_viewport()
+	search.custom_minimum_size = Vector2(search_w, 32.0)
+	if search.has_method("ensure_chrome_visible"):
+		search.call("ensure_chrome_visible", search_w)
 	var line: Control = search.get_node_or_null("SearchLineEdit") as Control
 	if line != null:
-		line.custom_minimum_size = Vector2(172.0 if compact else 240.0, 28.0)
+		var line_w := 112.0 if compact else 240.0
+		if search_w <= SEARCH_WIDTH_NARROW:
+			line_w = 96.0
+		elif search_w <= SEARCH_WIDTH_COMPACT:
+			line_w = 112.0
+		line.custom_minimum_size = Vector2(line_w, 28.0)
+
+
+func _apply_resource_icon_compact(compact: bool) -> void:
+	if _resources_container == null:
+		return
+	for c in _resources_container.get_children():
+		if c is TextureRect and str(c.name).begins_with("Icon_"):
+			(c as TextureRect).visible = not compact
+	var fsize := 12 if compact else 13
+	for lab in [steel_label, aluminum_label, oil_label, rubber_label]:
+		if lab == null:
+			continue
+		lab.add_theme_font_size_override("font_size", fsize)
+		lab.clip_text = false
+		lab.mouse_filter = Control.MOUSE_FILTER_STOP
 
 
 func _apply_units_compact_label(compact: bool) -> void:

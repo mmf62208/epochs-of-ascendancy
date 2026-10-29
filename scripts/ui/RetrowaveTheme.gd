@@ -13,6 +13,7 @@ const WARNING := Color("#ff6666")
 const SUCCESS := Color("#55ff99")
 const TOOLTIP_MAX_WIDTH := 320
 const TOOLTIP_FONT_SIZE := 14
+const TOOLTIP_EDGE_MARGIN := 4.0
 
 
 static func style_top_info_bar(bar: Control) -> void:
@@ -385,8 +386,13 @@ static func _deferred_dress_tooltip(node: Node) -> void:
 	if not is_instance_valid(node):
 		return
 	dress_tooltip_popup(node)
-	if node is PopupPanel and (node as PopupPanel).visible:
-		(node as PopupPanel).reset_size()
+	if not (node is PopupPanel):
+		return
+	var pop := node as PopupPanel
+	_connect_tooltip_placement(pop)
+	if pop.visible:
+		pop.reset_size()
+		place_tooltip_popup(pop)
 
 
 ## Wrap the engine tooltip label at 320px and lift a trailing [Hotkey] line
@@ -501,3 +507,160 @@ static func _hotkey_line(line: String) -> bool:
 	if s.ends_with("."):
 		return false
 	return true
+
+
+## Keep a tooltip fully inside the viewport. Prefer below-left of the anchor;
+## flip above / to the left when that side would clip, then clamp leftovers.
+static func clamp_tooltip_rect(
+	tip_size: Vector2,
+	viewport: Rect2,
+	anchor: Rect2,
+	margin: float = TOOLTIP_EDGE_MARGIN
+) -> Rect2:
+	var m := maxf(margin, 0.0)
+	var vp := Rect2(
+		viewport.position + Vector2(m, m),
+		Vector2(maxf(viewport.size.x - m * 2.0, 1.0), maxf(viewport.size.y - m * 2.0, 1.0))
+	)
+	var w := minf(maxf(tip_size.x, 1.0), vp.size.x)
+	var h := minf(maxf(tip_size.y, 1.0), vp.size.y)
+	var gap := 4.0
+	var x := anchor.position.x
+	var y := anchor.position.y + maxf(anchor.size.y, 1.0) + gap
+	if y + h > vp.position.y + vp.size.y:
+		y = anchor.position.y - h - gap
+	if y < vp.position.y:
+		var room_below: float = (vp.position.y + vp.size.y) - (anchor.position.y + maxf(anchor.size.y, 0.0))
+		var room_above: float = anchor.position.y - vp.position.y
+		if room_below >= room_above:
+			y = anchor.position.y + maxf(anchor.size.y, 0.0) + gap
+		y = clampf(y, vp.position.y, vp.position.y + vp.size.y - h)
+	if x + w > vp.position.x + vp.size.x:
+		x = anchor.position.x + maxf(anchor.size.x, 0.0) - w
+	if x < vp.position.x:
+		x = vp.position.x
+	if x + w > vp.position.x + vp.size.x:
+		x = vp.position.x + vp.size.x - w
+	return Rect2(Vector2(x, y), Vector2(w, h))
+
+
+static func place_tooltip_popup(
+	pop: PopupPanel,
+	viewport_rect: Rect2 = Rect2(),
+	anchor: Rect2 = Rect2()
+) -> Rect2:
+	if pop == null or not is_instance_valid(pop):
+		return Rect2()
+	pop.reset_size()
+	var sz := Vector2(pop.size)
+	if sz.x < 8.0 or sz.y < 8.0:
+		sz = pop.get_combined_minimum_size()
+	if sz.x < 8.0:
+		sz.x = 48.0
+	if sz.y < 8.0:
+		sz.y = 24.0
+	var vp := viewport_rect
+	if vp.size.x < 1.0 or vp.size.y < 1.0:
+		var v: Viewport = pop.get_viewport()
+		if v != null:
+			vp = v.get_visible_rect()
+		else:
+			vp = Rect2(0.0, 0.0, 1280.0, 800.0)
+	var anc := anchor
+	if anc.size == Vector2.ZERO and anc.position == Vector2.ZERO:
+		var mouse := Vector2.ZERO
+		var v2: Viewport = pop.get_viewport()
+		if v2 != null:
+			mouse = v2.get_mouse_position()
+		if mouse != Vector2.ZERO:
+			anc = Rect2(mouse, Vector2(1, 1))
+		else:
+			anc = Rect2(Vector2(pop.position), Vector2(1, 1))
+	var placed := clamp_tooltip_rect(sz, vp, anc)
+	pop.position = Vector2i(int(round(placed.position.x)), int(round(placed.position.y)))
+	if placed.size.x + 0.5 < sz.x or placed.size.y + 0.5 < sz.y:
+		pop.size = Vector2i(int(ceil(placed.size.x)), int(ceil(placed.size.y)))
+	return placed
+
+
+static func _connect_tooltip_placement(pop: PopupPanel) -> void:
+	if pop == null or bool(pop.get_meta("eoa_tooltip_place_hook", false)):
+		return
+	pop.set_meta("eoa_tooltip_place_hook", true)
+	if not pop.visibility_changed.is_connected(_on_tooltip_place_needed):
+		pop.visibility_changed.connect(_on_tooltip_place_needed.bind(pop))
+	if pop.has_signal("size_changed") and not pop.size_changed.is_connected(_on_tooltip_place_needed):
+		pop.size_changed.connect(_on_tooltip_place_needed.bind(pop))
+
+
+static func _on_tooltip_place_needed(pop: PopupPanel) -> void:
+	if pop == null or not is_instance_valid(pop) or not pop.visible:
+		return
+	if bool(pop.get_meta("eoa_tooltip_placing", false)):
+		return
+	pop.set_meta("eoa_tooltip_placing", true)
+	place_tooltip_popup(pop)
+	pop.set_meta("eoa_tooltip_placing", false)
+
+
+static func find_visible_tooltip_popup(from: Node) -> PopupPanel:
+	if from == null:
+		return null
+	if from is PopupPanel:
+		var pop := from as PopupPanel
+		if pop.visible and str(pop.theme_type_variation) == "TooltipPanel":
+			return pop
+	for c in from.get_children():
+		var found := find_visible_tooltip_popup(c)
+		if found != null:
+			return found
+	return null
+
+
+static func tooltip_body_label(pop: PopupPanel) -> Label:
+	if pop == null:
+		return null
+	var box: Node = pop.find_child("EoaTooltipBox", true, false)
+	if box != null:
+		for c in box.get_children():
+			if c is Label:
+				return c as Label
+	for c in pop.get_children():
+		if c is Label:
+			return c as Label
+	return null
+
+
+## Cheap in-place refresh while a tooltip is already up (date / speed).
+static func refresh_open_tooltip_text(tree: SceneTree, text: String) -> void:
+	if tree == null or tree.root == null:
+		return
+	var pop := find_visible_tooltip_popup(tree.root)
+	if pop == null:
+		var vp: Viewport = tree.root.get_viewport()
+		if vp != null:
+			pop = find_visible_tooltip_popup(vp)
+	if pop == null:
+		return
+	var label := tooltip_body_label(pop)
+	if label == null:
+		return
+	var parts := text.split("\n")
+	var hotkey := ""
+	if parts.size() >= 2 and _hotkey_line(str(parts[parts.size() - 1])):
+		hotkey = str(parts[parts.size() - 1]).strip_edges()
+		parts.remove_at(parts.size() - 1)
+		while parts.size() > 0 and str(parts[parts.size() - 1]).strip_edges().is_empty():
+			parts.remove_at(parts.size() - 1)
+	label.text = "\n".join(parts)
+	var max_w := TOOLTIP_MAX_WIDTH
+	var wrap_size := _tooltip_body_size(label, parts, max_w)
+	label.custom_minimum_size = wrap_size
+	label.custom_maximum_size = Vector2(float(max_w), -1)
+	var chip: Node = pop.find_child("HotkeyChip", true, false)
+	if chip != null and chip.get_child_count() > 0:
+		var chip_lab: Label = chip.get_child(0) as Label
+		if chip_lab != null and not hotkey.is_empty():
+			chip_lab.text = hotkey
+	pop.reset_size()
+	place_tooltip_popup(pop)

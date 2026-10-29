@@ -368,6 +368,7 @@ func _build_ui() -> void:
 	# (Play d18cbae: cursor on Begin, no transition, then window-exit).
 	_begin_btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
 	_begin_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_begin_btn.tooltip_text = begin_campaign_tooltip(_tag, _year)
 	# Press arms a one-shot leftover-release swallow (TipDismiss pattern).
 	# Begin queue_free()s on press; a real ~80 ms mouse-up must not pick the map.
 	_begin_btn.button_down.connect(_arm_begin_release_swallow)
@@ -491,11 +492,20 @@ func _refresh_choice_buttons() -> void:
 	if _begin_btn != null:
 		var place := str(NATION_LABELS.get(_tag, _tag))
 		_begin_btn.text = "Begin · %s · %d" % [place, _year]
+		_begin_btn.tooltip_text = begin_campaign_tooltip(_tag, _year)
 	if _status != null:
 		if smoke_auto_begin_enabled():
 			_status.text = "SMOKE AUTO-BEGIN armed — title will dismiss without a click. Product Begin/Esc still FAIL until post-boot EOA_LIVE_RAW_* arrives."
 		else:
 			_status.text = "Click Begin · Germany · 1936 or press Enter / Space. Esc opens Command Center; Esc again closes it (Esc is not required to start)."
+
+
+static func begin_campaign_tooltip(tag: String = "GER", year: int = 1936) -> String:
+	var place := str(NATION_LABELS.get(tag.strip_edges().to_upper(), tag))
+	return (
+		"Begin · %s · %d\nStarts the campaign on the map. Time stays paused until you press 1x or Space.\n[Enter] [Space] [B]"
+		% [place, year]
+	)
 
 
 ## Live DisplayServer Esc: keycode, physical_keycode, key_label, unicode 27, or ui_cancel.

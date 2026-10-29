@@ -22437,7 +22437,7 @@ func _show_unit_detail_popup(formation: Object) -> void:
 	fill_lbl.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	fill_lbl.mouse_filter = Control.MOUSE_FILTER_STOP
 	# Literal first. fill_line_tooltip runs only after body is parented.
-	fill_lbl.tooltip_text = "Fill —%\nFill ≠ Strength. Equipment on hand vs the unit's TOE (table of equipment). Not combat strength. Refills daily from your national stockpile."
+	fill_lbl.tooltip_text = "Fill —% · Strength 1.00\nFill ≠ Strength. Equipment on hand vs the unit's TOE (table of equipment). Not combat strength. Refills daily from your national stockpile."
 	RetrowaveTheme.style_body_label(fill_lbl)
 	# Fill is equipment/TOE, never Strength%. Unknown stays cyan.
 	# ≥80% SUCCESS, 50–79% CYAN, <50% WARNING.
