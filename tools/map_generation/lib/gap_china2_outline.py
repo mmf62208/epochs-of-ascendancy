@@ -7,7 +7,7 @@ not part of this gate.
 
 audit_play_gaps also fails the theatre holes and thin labelled points from
 the 908fee18 play pass, and the 1bf83066 residuals: any CHI×CHI nonzero
-overlap over 1 px², any enclosed China hole over 500 px², and hairline
+overlap over 1 px², any enclosed China hole over 250 px², and hairline
 slivers between neighbouring CHI provinces. It is not a world-wide strip
 check: many real micro-provinces are narrower than 8 px on purpose.
 Sea overlaps are not counted.
@@ -924,7 +924,7 @@ CHI_LAND_IDS = frozenset((
 # Bounded unowned face of the CHI arrangement. The 1bf83066 holes are
 # 2415 / 1397 / 1037 / 784 in Xinjiang and 761 near (6532, 1355), plus the
 # wider central gaps the same test catches.
-HOLE_AREA_LIMIT = 500.0
+HOLE_AREA_LIMIT = 250.0
 # Samples 0.75 and 1.5 px off a CHI edge that sit in no land and within
 # 2 px of a second CHI province. One sample is about 1 px of border.
 SLIVER_REACH = 2.0
@@ -1157,7 +1157,7 @@ def audit_play_gaps(geometries, domains):
     Fails when a theatre label sits in a strip narrower than 8 px, when an
     interior square of a named hole is still unowned, when two CHI land
     provinces overlap by more than 1 px² (nonzero winding), when an enclosed
-    CHI face is larger than 500 px², or when hairline samples between two CHI
+    CHI face is larger than 250 px², or when hairline samples between two CHI
     provinces exceed SLIVER_LENGTH_LIMIT. Sea overlaps are not counted.
     """
     rings = {}

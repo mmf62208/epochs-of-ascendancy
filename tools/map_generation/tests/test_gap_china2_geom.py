@@ -4,7 +4,7 @@
 Fails when any of 906111–906138 crosses itself or overlaps another land
 province by more than 1 px² (even-odd). Also fails the 908fee18 play gaps
 and the 1bf83066 residuals: a CHI×CHI nonzero overlap over 1 px², an
-enclosed China hole over 500 px², or a hairline sliver between neighbouring
+enclosed China hole over 250 px², or a hairline sliver between neighbouring
 CHI provinces. Coarse sea overlaps are not counted.
 """
 from __future__ import annotations
