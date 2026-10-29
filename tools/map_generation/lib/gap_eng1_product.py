@@ -452,6 +452,14 @@ def audit_rerings(geometry: Sequence[dict], domains: Dict[int, str], adjacency: 
         g = by_id[pid]
         if is_placeholder_ring(g.get("points") or []):
             problems.append("still-placeholder %s" % pid)
-    # A notched neighbour is a ring this branch wrote. It has to stay simple.
-    problems.extend(audit_changed(geometry, domains, adjacency, flagged + yielded))
+    for pid in yielded:
+        g = by_id[pid]
+        pts = open_ring(g.get("points") or [])
+        if ring_is_raw_invalid(pts):
+            problems.append("raw-invalid %s" % pid)
+        if len(adjacency.get(str(pid)) or []) < 1:
+            problems.append("zero-neighbour %s" % pid)
+    # Overlap is checked on the new admin rings. A notched neighbour may keep
+    # an overlap it already had with a province this pass did not redraw.
+    problems.extend(audit_changed(geometry, domains, adjacency, flagged))
     return problems

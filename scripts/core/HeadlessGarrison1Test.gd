@@ -96,7 +96,10 @@ func _assert_garrison_fielding(lm: Node, pm: Node, seeded: Dictionary) -> void:
 	# 550 was main after NATION-TAGS-1 (#138). MAP-RECONCILE-1 border fold is net +8:
 	# SOV +905807 +905808 +905816 +906100 -903493, POL +711101 +906106 +906107 +906109 +906110.
 	# GAP-CHINA-2 is ENG +1 only: 905844 now touches CHI land. Other tags unchanged.
-	if placed != 559 or skipped != 0 or targets != 559 or placed != targets:
+	# GAP-ENG-1 is net +15. ENG +8: 903055 903063 903069 903080 (Canada, now touch USA),
+	# 904353 Puta-O and 904369 Loilen (touch CHI), 905722 Ibri and 905731 Hayma (touch SAU).
+	# USA +7: 800096 800253 800290 800426 800427 800609 801171 now touch ENG Canada.
+	if placed != 574 or skipped != 0 or targets != 574 or placed != targets:
 		_fail("empty board placed=%d skipped=%d targets=%d" % [placed, skipped, targets])
 		return
 	var seen := 0
@@ -141,7 +144,7 @@ func _assert_garrison_fielding(lm: Node, pm: Node, seeded: Dictionary) -> void:
 	if seen != placed:
 		_fail("fielded %d != placed %d" % [seen, placed])
 		return
-	_pass("559 garrisons full TOE, 1936 design, nation names")
+	_pass("574 garrisons full TOE, 1936 design, nation names")
 
 
 func _assert_occupied_skip(lm: Node) -> Dictionary:

@@ -761,6 +761,45 @@ def clip_batch(matched, base, geo):
             pts = open_ring(g.get("points") or [])
             if len(pts) >= 3:
                 land_for_check[pid] = pts
+    # A traced stair can cover a few pixels of the neighbour the mask
+    # subtract already cleared. The higher id, or the new ring against an
+    # older neighbour, gives those pixels back.
+    for _guard in range(4):
+        shaved_any = False
+        for pid in sorted(new_rings):
+            ring = new_rings[pid]
+            bb = integer_bounds(ring, 0)
+            blockers = []
+            for oid, other in land_for_check.items():
+                if oid == pid:
+                    continue
+                if oid in new_rings and oid > pid:
+                    continue
+                if not _bboxes_overlap(bb, integer_bounds(other, 0)):
+                    continue
+                ov = overlap_px(ring, other)
+                if ov <= 1:
+                    continue
+                blockers.append(other)
+            if not blockers:
+                continue
+            bounds = integer_bounds(ring, 1)
+            mask = rasterize_centers(
+                ring, bounds[0], bounds[1], bounds[2] - bounds[0], bounds[3] - bounds[1]
+            )
+            for other in blockers:
+                ob = integer_bounds(other, 1)
+                om = rasterize_centers(other, ob[0], ob[1], ob[2] - ob[0], ob[3] - ob[1])
+                _subtract(bounds, mask, ob, om)
+            if int(mask.sum()) < 12:
+                raise RuntimeError("overlap shave emptied %s" % pid)
+            ring = _force_simple(pid, _ring_from_mask(mask, bounds))
+            new_rings[pid] = ring
+            land_for_check[pid] = open_ring(ring)
+            shaved_any = True
+            print("pixel-shave", pid, "blockers", len(blockers), flush=True)
+        if not shaved_any:
+            break
     boxes = {pid: integer_bounds(pts, 0) for pid, pts in land_for_check.items()}
     for pid, ring in new_rings.items():
         for oid, other in land_for_check.items():
@@ -785,6 +824,9 @@ def clip_batch(matched, base, geo):
         return True
 
     def _poly_fix(pid, ring):
+        old_pts = open_ring((geo.get(pid) or {}).get("points") or [])
+        # A notched neighbour may keep overlap it already had. A new ring may not.
+        keep_old = pid not in new_rings and len(old_pts) >= 3
         for _guard in range(8):
             hit = None
             for oid, other in land_for_check.items():
@@ -792,11 +834,18 @@ def clip_batch(matched, base, geo):
                     continue
                 if not _bboxes_overlap(integer_bounds(ring, 0), integer_bounds(other, 0)):
                     continue
-                # Grid stairs that share no pixel center have no polygon area.
-                if _on_grid(ring) and _on_grid(other) and overlap_px(ring, other) <= 1:
+                allow_px = overlap_px(old_pts, other) if keep_old else 1
+                if allow_px < 1:
+                    allow_px = 1
+                if _on_grid(ring) and _on_grid(other) and overlap_px(ring, other) <= allow_px:
                     continue
                 area = _nz_pair_area(_clean(ring), _clean(other))
-                if area > POLY_OVERLAP_MAX:
+                allow_area = POLY_OVERLAP_MAX
+                if keep_old and not (_on_grid(ring) and _on_grid(other)):
+                    allow_area = max(POLY_OVERLAP_MAX, _nz_pair_area(_clean(old_pts), _clean(other)))
+                elif keep_old:
+                    allow_area = max(POLY_OVERLAP_MAX, float(allow_px))
+                if area > allow_area:
                     hit = (area, oid, other)
                     break
             if hit is None:
