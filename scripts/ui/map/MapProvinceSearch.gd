@@ -178,7 +178,11 @@ func _ensure_live_controls() -> void:
 		_line = LineEdit.new()
 		_line.name = LINE_NAME
 		add_child(_line)
-	_line.placeholder_text = "Search province..."
+	var host_w := custom_minimum_size.x
+	if host_w > 0.0 and host_w < 200.0:
+		_line.placeholder_text = "Search"
+	else:
+		_line.placeholder_text = "Search province..."
 	_style_search_line(_line)
 	if not _line.text_submitted.is_connected(_on_submit):
 		_line.text_submitted.connect(_on_submit)
@@ -209,8 +213,17 @@ func _chrome_widths() -> Vector2:
 	var host_w := custom_minimum_size.x
 	if host_w < 32.0:
 		host_w = maxf(size.x, 308.0)
-	var go_w := 40.0 if host_w < 220.0 else 48.0
-	var line_w := maxf(88.0, host_w - go_w - 8.0)
+	var go_w := 48.0
+	var sep := 8.0
+	var line_floor := 88.0
+	if host_w < 180.0:
+		go_w = 36.0
+		sep = 4.0
+		line_floor = 48.0
+	elif host_w < 220.0:
+		go_w = 40.0
+		sep = 6.0
+	var line_w := maxf(line_floor, host_w - go_w - sep)
 	return Vector2(line_w, go_w)
 
 
@@ -249,10 +262,13 @@ func _style_search_line(line: LineEdit) -> void:
 	sb.border_color = Color(0.2, 0.9, 1, 0.9)
 	sb.set_border_width_all(1)
 	sb.set_corner_radius_all(3)
-	sb.content_margin_left = 8
-	sb.content_margin_right = 8
+	var side := 4.0 if widths.x < 120.0 else 8.0
+	sb.content_margin_left = side
+	sb.content_margin_right = side
 	sb.content_margin_top = 4
 	sb.content_margin_bottom = 4
+	if widths.x < 140.0:
+		line.add_theme_font_size_override("font_size", 12)
 	line.add_theme_stylebox_override("normal", sb)
 	line.add_theme_stylebox_override("focus", sb)
 	line.add_theme_color_override("font_color", Color(0.95, 0.96, 1, 1))
