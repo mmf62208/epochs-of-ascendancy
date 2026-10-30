@@ -3233,7 +3233,7 @@ func _input(event: InputEvent) -> void:
 		# computerUse / remote desktop often delivers touch, not MouseButton.
 		if _is_live_pointer_press(event):
 			var touch_act: String = _route_living_title_pointer(event)
-			if touch_act == "begin" or touch_act == "cc" or touch_act == "panel":
+			if LivingTitleBoot.consumes_live_action(touch_act):
 				get_viewport().set_input_as_handled()
 		return
 	if event is InputEventMouseButton:
@@ -3281,15 +3281,27 @@ func _input(event: InputEvent) -> void:
 				get_viewport().set_input_as_handled()
 				return
 			if event.pressed and _cc_chrome_consumes_point(event.position):
+				# Header click and CloseX. Do not mark handled: CloseX `pressed`
+				# still closes. The click latch keeps that from a second sound.
+				var mm_ch := _command_center_overlay()
+				if mm_ch != null and mm_ch.has_method("activate_live_pointer"):
+					mm_ch.call("activate_live_pointer", event.position)
 				arm_chrome_hold_swallow()
 				return
 			# #134: Command Center owns this click. Do not arm a map gesture and
 			# do not mark handled — Load / × still need the GUI press.
+			# Refresh is not a GUI `pressed` from this path: activate it here.
 			# The latch stays through this event so `_unhandled_input` can eat
 			# the release after a dimmer `accept_event` / queue_free. Deferred
 			# clear covers the case where GUI already marked the event handled.
 			if _cc_overlay_blocks_map_pointer():
 				if event.pressed:
+					var mm_ov := _command_center_overlay()
+					if mm_ov != null and mm_ov.has_method("live_pointer_target") and str(mm_ov.call("live_pointer_target", event.position)) == "refresh":
+						if mm_ov.has_method("activate_live_pointer"):
+							mm_ov.call("activate_live_pointer", event.position)
+						get_viewport().set_input_as_handled()
+						return
 					_cc_map_press_latch = true
 				else:
 					call_deferred("_clear_cc_map_press_latch")
@@ -3349,7 +3361,7 @@ func _input(event: InputEvent) -> void:
 					)
 					var title_act: String = _route_living_title_pointer(event)
 					print("EOA_LIVE_PTR who=MapRenderer._input action=%s" % title_act)
-					if title_act == "begin" or title_act == "cc" or title_act == "panel" or title_act == "load" or title_act == "close":
+					if LivingTitleBoot.consumes_live_action(title_act):
 						if title_act == "begin":
 							arm_begin_title_release_swallow()
 						get_viewport().set_input_as_handled()
@@ -6707,22 +6719,11 @@ func load_library_theme_presets_file(path: String = "") -> int:
 	return get_library_theme_presets().size()
 
 
-## Pass 58/59: force-play pin focus SFX at current volume/bus (ignores mute for preview).
+## Pass 58/59: force-play pin focus SFX at current volume/bus (ignores pin mute).
 func preview_pin_focus_sfx() -> void:
-	var path := str(_SFX_PATHS.get("pin_focus", _SFX_PATHS["map"]))
-	if not ResourceLoader.exists(path):
-		return
-	var stream = load(path)
-	if stream == null:
-		return
-	if _map_sfx_player == null or not is_instance_valid(_map_sfx_player):
-		_map_sfx_player = AudioStreamPlayer.new()
-		_map_sfx_player.name = "MapActionSfx"
-		add_child(_map_sfx_player)
-	_map_sfx_player.bus = get_pin_focus_sfx_bus()
-	_map_sfx_player.volume_db = get_pin_focus_sfx_volume_db()
-	_map_sfx_player.stream = stream
-	_map_sfx_player.play()
+	var audio := _audio_manager()
+	if audio != null and audio.has_method("play_forced"):
+		audio.call("play_forced", "pin_focus")
 
 
 ## Pass 59: pin focus SFX audio bus name (must exist in AudioServer or falls back to Master).
@@ -24597,32 +24598,27 @@ func _play_unit_loop_sfx(event: String, formation: Object = null) -> void:
 	var key := "select"
 	if typeof(LandBattleSfx) != TYPE_NIL:
 		key = str(LandBattleSfx.key_for_unit(event, kind))
+	var ev := event.strip_edges().to_lower()
+	if ev == "clash" or ev == "combat" or ev == "battle":
+		_play_map_sfx("combat_clash")
+		return
 	_play_map_sfx(key)
 
 
+func _audio_manager() -> Node:
+	var tree := get_tree()
+	if tree == null or tree.root == null:
+		return null
+	return tree.root.get_node_or_null("AudioManager")
+
+
 func _play_map_sfx(kind: String) -> void:
-	# Pass 56–59: pin focus mute / volume / bus.
+	# Pass 56–59: pin focus mute. Volume and bus stay on the map prefs.
 	if kind == "pin_focus" and not get_pin_focus_sfx_enabled():
 		return
-	var path := str(_SFX_PATHS.get(kind, _SFX_PATHS["select"]))
-	if not ResourceLoader.exists(path):
-		return
-	var stream = load(path)
-	if stream == null:
-		return
-	if _map_sfx_player == null or not is_instance_valid(_map_sfx_player):
-		_map_sfx_player = AudioStreamPlayer.new()
-		_map_sfx_player.name = "MapActionSfx"
-		_map_sfx_player.volume_db = -8.0
-		add_child(_map_sfx_player)
-	if kind == "pin_focus":
-		_map_sfx_player.bus = get_pin_focus_sfx_bus()
-		_map_sfx_player.volume_db = get_pin_focus_sfx_volume_db()
-	else:
-		_map_sfx_player.bus = "Master"
-		_map_sfx_player.volume_db = -8.0
-	_map_sfx_player.stream = stream
-	_map_sfx_player.play()
+	var audio := _audio_manager()
+	if audio != null and audio.has_method("play"):
+		audio.call("play", kind)
 
 
 # ====================== PROVINCE ASSAULT (main combat loop) ======================

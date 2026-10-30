@@ -1,0 +1,95 @@
+{
+  "keys": {
+    "select": {
+      "path": "res://audio/sfx/ui/select.wav",
+      "bus": "UI",
+      "volume_db": 0.0,
+      "pitch_jitter": 0.0,
+      "max_polyphony": 4
+    },
+    "confirm": {
+      "path": "res://audio/sfx/ui/confirm.wav",
+      "bus": "UI",
+      "volume_db": 0.0,
+      "pitch_jitter": 0.01,
+      "max_polyphony": 3
+    },
+    "achievement": {
+      "path": "res://audio/sfx/ui/achievement.wav",
+      "bus": "UI",
+      "volume_db": -2.0,
+      "pitch_jitter": 0.0,
+      "max_polyphony": 2
+    },
+    "error": {
+      "path": "res://audio/sfx/ui/error.wav",
+      "bus": "UI",
+      "volume_db": -2.0,
+      "pitch_jitter": 0.0,
+      "max_polyphony": 2
+    },
+    "map": {
+      "path": "res://audio/sfx/map/map.wav",
+      "bus": "SFX",
+      "volume_db": -4.0,
+      "pitch_jitter": 0.0,
+      "max_polyphony": 2
+    },
+    "pin_focus": {
+      "path": "res://audio/sfx/map/pin_focus.wav",
+      "bus": "SFX",
+      "volume_db": -6.0,
+      "pitch_jitter": 0.0,
+      "max_polyphony": 2
+    },
+    "ui_click": {
+      "path": "res://audio/sfx/ui/ui_click.wav",
+      "bus": "UI",
+      "volume_db": 0.0,
+      "pitch_jitter": 0.01,
+      "max_polyphony": 4
+    },
+    "ui_hover": {
+      "path": "res://audio/sfx/ui/ui_hover.wav",
+      "bus": "UI",
+      "volume_db": -6.0,
+      "pitch_jitter": 0.0,
+      "max_polyphony": 1
+    },
+    "day_tick": {
+      "path": "res://audio/sfx/map/day_tick.wav",
+      "bus": "SFX",
+      "volume_db": -16.0,
+      "pitch_jitter": 0.0,
+      "max_polyphony": 1
+    },
+    "combat_clash": {
+      "path": "res://audio/sfx/combat/combat_clash.wav",
+      "bus": "SFX",
+      "volume_db": 0.0,
+      "pitch_jitter": 0.05,
+      "max_polyphony": 3
+    },
+    "alert": {
+      "path": "res://audio/sfx/ui/alert.wav",
+      "bus": "SFX",
+      "volume_db": -4.0,
+      "pitch_jitter": 0.0,
+      "max_polyphony": 2
+    },
+    "end_victory_sting": {
+      "path": "res://audio/sfx/end/end_victory_sting.wav",
+      "bus": "SFX",
+      "volume_db": -2.0,
+      "pitch_jitter": 0.0,
+      "max_polyphony": 1
+    },
+    "end_defeat_sting": {
+      "path": "res://audio/sfx/end/end_defeat_sting.wav",
+      "bus": "SFX",
+      "volume_db": -2.0,
+      "pitch_jitter": 0.0,
+      "max_polyphony": 1
+    }
+  }
+}
