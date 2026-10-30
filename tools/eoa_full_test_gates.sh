@@ -4,11 +4,11 @@
 #
 # Usage (from repo root):
 #   tools/eoa_full_test_gates.sh
-#   tools/eoa_full_test_gates.sh --quick      # pure python, plus garrison, ink tooltips, campaign save
+#   tools/eoa_full_test_gates.sh --quick      # pure python, plus garrison, ink tooltips, campaign save, audio1
 #   tools/eoa_full_test_gates.sh --with-perf  # also map-tick perf sample
 #   tools/eoa_full_test_gates.sh --log DIR    # write logs under DIR
 #
-# --quick launches HeadlessGarrison1Test, HeadlessInkTooltips0Test, then HeadlessCampaignSave1Test.
+# --quick launches HeadlessGarrison1Test, HeadlessInkTooltips0Test, HeadlessCampaignSave1Test, then HeadlessAudio1Test.
 # Full path calls tools/run_godot.sh, which exits 1 immediately if no binary
 # is found (fail-closed; it must not hang).
 # NE board/QC needs numpy+Pillow: pip install -r tools/map_generation/requirements.txt
@@ -205,6 +205,7 @@ if [[ "$QUICK" -eq 1 ]]; then
     log "FAIL headless_garrison1 GODOT_BUSY"
     log "FAIL headless_ink_tooltips0 GODOT_BUSY"
     log "FAIL headless_campaign_save1 GODOT_BUSY"
+    log "FAIL headless_audio1 GODOT_BUSY"
     FAILED=1
   else
     run_step headless_garrison1 env \
@@ -222,6 +223,19 @@ if [[ "$QUICK" -eq 1 ]]; then
       flock -n "${HOME}/.eoa_godot.lock" \
       tools/run_godot.sh --headless --path . \
       -s res://scripts/core/HeadlessCampaignSave1Test.gd || fail
+    run_step headless_audio1 bash -c '
+      log=$(mktemp)
+      XDG_DATA_HOME="$(mktemp -d)" flock -n "${HOME}/.eoa_godot.lock" \
+        tools/run_godot.sh --headless --path . \
+        -s res://scripts/core/HeadlessAudio1Test.gd >"$log" 2>&1
+      code=$?
+      cat "$log"
+      if grep -q "SCRIPT ERROR" "$log"; then
+        echo "[eoa-gates] FAIL headless_audio1 SCRIPT ERROR"
+        exit 1
+      fi
+      exit "$code"
+    ' || fail
   fi
   if [[ "$FAILED" -eq 0 ]]; then
     log "ALL PASSED (quick)"

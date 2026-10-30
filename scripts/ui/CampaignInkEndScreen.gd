@@ -51,6 +51,12 @@ static func _open(outcome: String, tag: String, reason: String) -> Node:
 
 func _ready() -> void:
 	add_to_group("campaign_ink_end_screen")
+	var sting := "end_victory_sting" if _outcome == "win" else "end_defeat_sting"
+	var tree := get_tree()
+	if tree != null and tree.root != null:
+		var am := tree.root.get_node_or_null("AudioManager")
+		if am != null and am.has_method("play"):
+			am.call("play", sting)
 	layer = 125
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_acquire_clock_lock()

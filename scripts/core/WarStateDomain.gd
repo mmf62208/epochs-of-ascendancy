@@ -213,7 +213,20 @@ static func declare_war(attacker: String, defender: String, goal: String = "") -
 	var called: Array = []
 	if goal != "call_to_arms":
 		called = _call_to_arms(a, b)
+	_note_war_audio()
 	return {"ok": true, "pair": key, "called": called, "day": day}
+
+
+static func _note_war_audio() -> void:
+	var loop := Engine.get_main_loop()
+	if not (loop is SceneTree):
+		return
+	var root := (loop as SceneTree).root
+	if root == null:
+		return
+	var am := root.get_node_or_null("AudioManager")
+	if am != null and am.has_method("play"):
+		am.call("play", "alert")
 
 
 ## Debug-build search line only. Release builds ignore it. No diplomacy button.

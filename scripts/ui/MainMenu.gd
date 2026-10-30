@@ -438,6 +438,8 @@ func _build_ui() -> void:
 		left.add_child(dbg_hdr)
 		_add_action_button(left, "Open Debug Overlay (F10)", "debug", false)
 
+	_add_audio_settings(left)
+
 	var spacer := Control.new()
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	left.add_child(spacer)
@@ -534,6 +536,73 @@ func _center_panel() -> void:
 	_panel.custom_minimum_size = Vector2(w, h)
 	_panel.size = Vector2(w, h)
 	_panel.position = Vector2((vp.x - w) * 0.5, (vp.y - h) * 0.5)
+
+
+func _audio_node() -> Node:
+	var tree := get_tree()
+	if tree == null or tree.root == null:
+		return null
+	return tree.root.get_node_or_null("AudioManager")
+
+
+func _add_audio_settings(parent: VBoxContainer) -> void:
+	var block := VBoxContainer.new()
+	block.name = "AudioSettings"
+	block.add_theme_constant_override("separation", 4)
+	parent.add_child(block)
+	var hdr := Label.new()
+	hdr.text = "SETTINGS"
+	RetrowaveTheme.style_column_header(hdr)
+	block.add_child(hdr)
+	var audio := _audio_node()
+	block.add_child(_audio_slider("Master", "MasterVolume", _audio_db(audio, "get_master_db", 0.0), "set_master_db"))
+	block.add_child(_audio_slider("UI", "UiVolume", _audio_db(audio, "get_ui_db", -12.0), "set_ui_db"))
+	block.add_child(_audio_slider("SFX", "SfxVolume", _audio_db(audio, "get_sfx_db", 0.0), "set_sfx_db"))
+	var mute := CheckButton.new()
+	mute.name = "MuteAudio"
+	mute.text = "Mute"
+	mute.focus_mode = Control.FOCUS_ALL
+	mute.button_pressed = bool(audio.call("is_muted")) if audio != null and audio.has_method("is_muted") else false
+	mute.toggled.connect(_on_audio_mute_toggled)
+	block.add_child(mute)
+
+
+func _audio_db(audio: Node, getter: String, fallback: float) -> float:
+	if audio != null and audio.has_method(getter):
+		return float(audio.call(getter))
+	return fallback
+
+
+func _audio_slider(label_text: String, node_name: String, value: float, setter: String) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	var lab := Label.new()
+	lab.text = label_text
+	lab.custom_minimum_size = Vector2(64, 0)
+	RetrowaveTheme.style_body_label(lab)
+	row.add_child(lab)
+	var slider := HSlider.new()
+	slider.name = node_name
+	slider.min_value = -40.0
+	slider.max_value = 0.0
+	slider.step = 1.0
+	slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	slider.custom_minimum_size = Vector2(80, 20)
+	slider.value = value
+	slider.value_changed.connect(_on_audio_slider.bind(setter))
+	row.add_child(slider)
+	return row
+
+
+func _on_audio_slider(value: float, setter: String) -> void:
+	var audio := _audio_node()
+	if audio != null and audio.has_method(setter):
+		audio.call(setter, value)
+
+
+func _on_audio_mute_toggled(on: bool) -> void:
+	var audio := _audio_node()
+	if audio != null and audio.has_method("set_muted"):
+		audio.call("set_muted", on)
 
 
 func _add_action_button(parent: VBoxContainer, text: String, id: String, primary: bool, danger: bool = false) -> void:
