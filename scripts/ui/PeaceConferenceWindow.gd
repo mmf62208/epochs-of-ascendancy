@@ -114,9 +114,9 @@ static func open_continuation_picker() -> Node:
 	layer.add_child(dim)
 	var panel := Panel.new()
 	panel.name = "Choices"
-	panel.custom_minimum_size = Vector2(520, 460)
-	panel.size = Vector2(520, 460)
-	panel.position = Vector2(380, 140)
+	panel.custom_minimum_size = Vector2(520, 620)
+	panel.size = Vector2(520, 620)
+	panel.position = Vector2(380, 70)
 	var panel_style := StyleBoxFlat.new()
 	panel_style.bg_color = RetrowaveTheme.BG_PANEL
 	panel_style.border_color = RetrowaveTheme.WARNING
@@ -137,6 +137,17 @@ static func open_continuation_picker() -> Node:
 	header.text = "Choose nation to continue playing as"
 	RetrowaveTheme.style_column_header(header)
 	box.add_child(header)
+	var scroll := ScrollContainer.new()
+	scroll.name = "PickerScroll"
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.custom_minimum_size = Vector2(0, 420)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	box.add_child(scroll)
+	var opts_box := VBoxContainer.new()
+	opts_box.name = "PickerOpts"
+	opts_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	opts_box.add_theme_constant_override("separation", 8)
+	scroll.add_child(opts_box)
 	var opts: Array = []
 	var raw_opts: Variant = pending.get("options", [])
 	if raw_opts is Array:
@@ -149,7 +160,7 @@ static func open_continuation_picker() -> Node:
 		b.custom_minimum_size = Vector2(0, 36)
 		RetrowaveTheme.style_secondary_button(b)
 		b.pressed.connect(_on_picker_select.bind(layer, chosen))
-		box.add_child(b)
+		opts_box.add_child(b)
 	var actions := HBoxContainer.new()
 	actions.add_theme_constant_override("separation", 12)
 	box.add_child(actions)
@@ -176,9 +187,9 @@ static func _on_picker_select(layer: Node, tag: String) -> void:
 	if layer == null or not is_instance_valid(layer):
 		return
 	layer.set_meta("chosen_tag", tag)
-	var box := layer.find_child("PickerBox", true, false)
-	if box != null:
-		for c in box.get_children():
+	var opts_box := layer.find_child("PickerOpts", true, false)
+	if opts_box != null:
+		for c in opts_box.get_children():
 			if c is Button and str(c.name).begins_with("BtnPick_"):
 				var on := str(c.name) == "BtnPick_%s" % tag
 				c.modulate = Color.WHITE if on else Color(0.75, 0.8, 0.9, 0.9)
