@@ -74,6 +74,7 @@ var _blocker: ColorRect
 
 var _delete_confirm: ConfirmationDialog
 var _pending_delete_slot := ""
+var _confirm_layer: Control = null
 var _rename_dialog: AcceptDialog
 var _rename_field: LineEdit
 var _pending_rename_slot := ""
@@ -83,6 +84,7 @@ var _nation_btns: Dictionary = {}
 var _era_btns: Dictionary = {}
 ## Edge-trigger for `_process` pointer poll (computerUse leftover on CloseX).
 var _close_ptr_poll_held: bool = false
+var _clock_lock_held: bool = false
 
 
 func _ready() -> void:
@@ -90,7 +92,7 @@ func _ready() -> void:
 	layer = COMMAND_CENTER_LAYER
 	_build_ui()
 	_ensure_dialogs()
-	_pause_game(true)
+	_acquire_clock_lock()
 	_set_status("Paused · Save / Load slots on the right · ESC or Close to resume")
 	_refresh_save_list()
 	set_process_input(true)
@@ -190,6 +192,9 @@ func _is_live_escape_event(event: InputEvent) -> bool:
 func _input(event: InputEvent) -> void:
 	if _closing:
 		return
+	if _confirm_blocks_event(event):
+		get_viewport().set_input_as_handled()
+		return
 	if not _is_live_escape_event(event):
 		return
 	var title_up_now: bool = _living_title_is_up()
@@ -218,6 +223,9 @@ func _route_escape_to_stack() -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if _closing:
+		return
+	if _confirm_blocks_event(event):
+		get_viewport().set_input_as_handled()
 		return
 	if not _is_live_escape_event(event):
 		return
@@ -302,7 +310,8 @@ func _build_ui() -> void:
 	var title := Label.new()
 	title.name = "CommandCenterTitle"
 	title.mouse_filter = Control.MOUSE_FILTER_STOP
-	title.text = "Command Center"
+	var pause_menu := not _living_title_is_up() and not has_meta("eoa_opened_from_living_title")
+	title.text = "Paused" if pause_menu else "Command Center"
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -342,6 +351,7 @@ func _build_ui() -> void:
 
 	# --- Left: actions ---
 	var left := VBoxContainer.new()
+	left.name = "GameActions"
 	left.custom_minimum_size = Vector2(240, 0)
 	left.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	left.add_theme_constant_override("separation", 8)
@@ -353,7 +363,18 @@ func _build_ui() -> void:
 	left.add_child(left_hdr)
 
 	_options_vbox = left
-	_add_action_button(left, "Save Game (quicksave)", "save", true)
+	if pause_menu:
+		var resume := Button.new()
+		resume.name = "BtnResume"
+		resume.text = "Resume"
+		resume.custom_minimum_size = Vector2(0, 38)
+		resume.focus_mode = Control.FOCUS_ALL
+		resume.process_mode = Node.PROCESS_MODE_ALWAYS
+		resume.mouse_filter = Control.MOUSE_FILTER_STOP
+		resume.pressed.connect(_force_close)
+		RetrowaveTheme.style_primary_button(resume)
+		left.add_child(resume)
+	_add_action_button(left, "Save Game (quicksave)", "save", not pause_menu)
 	_add_action_button(left, "Save As…", "save_as", false)
 	_add_action_button(left, "Refresh save list", "refresh", false)
 	_add_action_button(left, "Trade Market", "trade_market", true)
@@ -361,21 +382,27 @@ func _build_ui() -> void:
 	_add_action_button(left, "Return to Title", "return_to_main", false)
 	_add_action_button(left, "Exit to Desktop", "exit", false, true)
 
+	var new_game := VBoxContainer.new()
+	new_game.name = "NewGameBlock"
+	new_game.add_to_group("eoa_cc_new_game")
+	new_game.add_theme_constant_override("separation", 8)
+	new_game.visible = not pause_menu
+	left.add_child(new_game)
 	var camp_hdr := Label.new()
 	camp_hdr.text = "CAMPAIGN"
 	RetrowaveTheme.style_column_header(camp_hdr)
-	left.add_child(camp_hdr)
+	new_game.add_child(camp_hdr)
 	var camp_hint := Label.new()
 	camp_hint.text = "GER Maginot is the F5 default. Pick a nation and era."
 	camp_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	RetrowaveTheme.style_body_label(camp_hint)
-	left.add_child(camp_hint)
+	new_game.add_child(camp_hint)
 	var nation_row_a := HBoxContainer.new()
 	nation_row_a.add_theme_constant_override("separation", 4)
-	left.add_child(nation_row_a)
+	new_game.add_child(nation_row_a)
 	var nation_row_b := HBoxContainer.new()
 	nation_row_b.add_theme_constant_override("separation", 4)
-	left.add_child(nation_row_b)
+	new_game.add_child(nation_row_b)
 	var ni := 0
 	for tag in LIVING_CC_NATIONS:
 		var nbtn := Button.new()
@@ -392,7 +419,7 @@ func _build_ui() -> void:
 		ni += 1
 	var era_row := HBoxContainer.new()
 	era_row.add_theme_constant_override("separation", 4)
-	left.add_child(era_row)
+	new_game.add_child(era_row)
 	for yr in LIVING_CC_ERAS:
 		var ebtn := Button.new()
 		ebtn.text = str(int(yr))
@@ -439,8 +466,10 @@ func _build_ui() -> void:
 	right_v.add_child(sav_hdr)
 
 	var sav_hint := Label.new()
-	sav_hint.text = "Click Save on a slot to write · Load to restore · Save Game uses quicksave"
+	sav_hint.name = "SaveListHint"
+	sav_hint.text = "Click Save on a slot to write · Load to restore · Save Game uses quicksave · Ctrl+Shift+S opens this list"
 	sav_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	sav_hint.tooltip_text = "Save / load slots. Ctrl+Shift+S opens this list. F6 is the loyalty mapmode."
 	RetrowaveTheme.style_body_label(sav_hint)
 	right_v.add_child(sav_hint)
 
@@ -617,6 +646,28 @@ func _save_to_slot(slot: String) -> void:
 		_toast("Save system unavailable.", 3.0, true)
 		push_error("MainMenu: SaveLoadManager missing")
 		return
+	var kind := "manual"
+	if slm.has_method("slot_kind"):
+		kind = str(slm.call("slot_kind", slot))
+	if kind == "auto":
+		_set_status("Autosave is written by the game. Choose a manual slot.")
+		_toast("Autosave is written by the game.", 2.5, true)
+		return
+	var occupied := false
+	if slm.has_method("slot_is_occupied"):
+		occupied = bool(slm.call("slot_is_occupied", slot))
+	# Quicksave overwrites without a dialog. Occupied manual slots confirm.
+	if occupied and kind != "quick":
+		_open_overwrite_confirm(slot)
+		return
+	_write_slot(slot)
+
+
+func _write_slot(slot: String) -> void:
+	var slm := _slm()
+	if slm == null or not slm.has_method("save_game_detailed"):
+		_set_status("SAVE FAILED: SaveLoadManager missing")
+		return
 	_set_status("Saving \"%s\"… (large boards take a few seconds)" % slot)
 	print("MainMenu: saving slot=", slot)
 	var result: Dictionary = slm.call("save_game_detailed", slot)
@@ -637,8 +688,12 @@ func _save_to_slot(slot: String) -> void:
 func _refresh_save_list() -> void:
 	if _save_list_vbox == null or not is_instance_valid(_save_list_vbox):
 		return
-	for c in _save_list_vbox.get_children():
-		c.queue_free()
+	# Free immediately so a rewritten autosave does not leave a stale card
+	# (queue_free keeps the old SlotCard_* in the tree until the frame ends).
+	while _save_list_vbox.get_child_count() > 0:
+		var stale: Node = _save_list_vbox.get_child(0)
+		_save_list_vbox.remove_child(stale)
+		stale.free()
 
 	var slm := _slm()
 	if slm == null:
@@ -687,7 +742,8 @@ func _make_save_row(info: Dictionary) -> Control:
 	var label := str(info.get("label", slot))
 
 	var row := PanelContainer.new()
-	row.custom_minimum_size = Vector2(0, 88)
+	row.custom_minimum_size = Vector2(0, 112)
+	row.name = "SlotCard_%s" % slot
 	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	RetrowaveTheme.style_detail_panel_flat(row)
 
@@ -698,8 +754,15 @@ func _make_save_row(info: Dictionary) -> Control:
 	var title_row := HBoxContainer.new()
 	outer.add_child(title_row)
 
+	var badge := str(info.get("kind_badge", ""))
+	var nation_line := str(info.get("nation_line", ""))
+	var when_line := str(info.get("when_line", ""))
 	var name_l := Label.new()
-	name_l.text = label if not label.is_empty() else slot
+	name_l.name = "SlotTitle"
+	if badge.is_empty():
+		name_l.text = label if not label.is_empty() else slot
+	else:
+		name_l.text = "%s   %s" % [slot, badge]
 	name_l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	name_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	name_l.add_theme_font_size_override("font_size", 14)
@@ -707,6 +770,7 @@ func _make_save_row(info: Dictionary) -> Control:
 	title_row.add_child(name_l)
 
 	var st := Label.new()
+	st.name = "SlotStatus"
 	st.text = "occupied" if occupied else "empty"
 	RetrowaveTheme.style_body_label(st)
 	if occupied:
@@ -714,7 +778,21 @@ func _make_save_row(info: Dictionary) -> Control:
 	title_row.add_child(st)
 
 	var detail := Label.new()
-	detail.text = _format_detail(meta) if occupied else "Empty slot — press Save to write here"
+	detail.name = "SlotDetail"
+	var unreadable := bool(info.get("unreadable", false)) or nation_line.find("unreadable") >= 0
+	if unreadable:
+		detail.text = "%s\n%s" % [
+			nation_line if not nation_line.is_empty() else "Save unreadable",
+			when_line if not when_line.is_empty() else "Save unreadable",
+		]
+		st.add_theme_color_override("font_color", RetrowaveTheme.WARNING)
+		st.text = "unreadable"
+	elif occupied and not nation_line.is_empty():
+		detail.text = "%s\n%s" % [nation_line, when_line]
+	elif occupied:
+		detail.text = _format_detail(meta)
+	else:
+		detail.text = "Empty slot — press Save to write here"
 	detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	RetrowaveTheme.style_body_label(detail)
 	outer.add_child(detail)
@@ -736,7 +814,9 @@ func _make_save_row(info: Dictionary) -> Control:
 	var save_b := Button.new()
 	save_b.text = "Save"
 	save_b.custom_minimum_size = Vector2(80, 32)
-	save_b.tooltip_text = "Write current game into this slot"
+	var can_save := bool(info.get("can_save", true))
+	save_b.disabled = not can_save
+	save_b.tooltip_text = "Autosave is written by the game." if not can_save else "Write current game into this slot"
 	save_b.mouse_filter = Control.MOUSE_FILTER_STOP
 	save_b.pressed.connect(_save_to_slot.bind(slot))
 	RetrowaveTheme.style_secondary_button(save_b)
@@ -785,6 +865,17 @@ func _on_load_slot(slot: String) -> void:
 	if _closing:
 		print("EOA_LOAD_APPLY skip duplicate slot=%s via=cc" % slot)
 		return
+	var slm := _slm()
+	if slm != null and slm.has_method("load_confirm_required") and bool(slm.call("load_confirm_required", slot)):
+		_open_load_confirm(slot)
+		return
+	_load_slot_now(slot)
+
+
+func _load_slot_now(slot: String) -> void:
+	if _closing:
+		print("EOA_LOAD_APPLY skip duplicate slot=%s via=cc" % slot)
+		return
 	print("MainMenu: load slot=", slot)
 	var slm := _slm()
 	if slm == null or not slm.has_method("load_game_detailed"):
@@ -811,6 +902,8 @@ func _on_load_slot(slot: String) -> void:
 		_toast("Loaded %s" % slot, 2.0)
 		print("MainMenu: load ok → %s" % slot)
 		_sync_hud_after_load()
+		# Closing the menu must not put the pre-menu clock back over the save.
+		set_meta("eoa_loaded_clock", true)
 		_force_close()
 	else:
 		var err := str(result.get("error", "Load failed"))
@@ -869,10 +962,185 @@ func _on_save_as_confirmed() -> void:
 	_save_to_slot(slot)
 
 
+func _confirm_visible() -> bool:
+	return _confirm_layer != null and is_instance_valid(_confirm_layer) and _confirm_layer.visible
+
+
+func _dismiss_confirm() -> void:
+	if _confirm_layer != null and is_instance_valid(_confirm_layer):
+		_confirm_layer.queue_free()
+	_confirm_layer = null
+
+
+func _confirm_blocks_event(event: InputEvent) -> bool:
+	if not _confirm_visible() or event == null:
+		return false
+	if _is_live_escape_event(event):
+		_dismiss_confirm()
+		_pending_delete_slot = ""
+		return true
+	if not (event is InputEventKey):
+		return false
+	var key := event as InputEventKey
+	if not key.pressed or key.echo:
+		return false
+	var accept := key.keycode == KEY_ENTER or key.keycode == KEY_KP_ENTER or key.physical_keycode == KEY_ENTER
+	if not accept and key.is_action_pressed("ui_accept"):
+		accept = true
+	if not accept:
+		return false
+	# Delete: Enter does nothing. Other confirms: Enter confirms.
+	if _confirm_layer != null and str(_confirm_layer.name) == "DeleteSaveConfirm":
+		return true
+	_activate_confirm()
+	return true
+
+
+func _activate_confirm() -> void:
+	if _confirm_layer == null or not is_instance_valid(_confirm_layer):
+		return
+	var btn: Node = _confirm_layer.find_child("BtnLoad", true, false)
+	if btn == null:
+		btn = _confirm_layer.find_child("BtnDanger", true, false)
+	if btn is BaseButton:
+		(btn as BaseButton).pressed.emit()
+
+
+func _open_text_confirm(node_name: String, title: String, body: String, action_label: String, on_action: Callable, save_first_slot: String = "") -> void:
+	_dismiss_confirm()
+	if _root == null or not is_instance_valid(_root):
+		return
+	var host := Control.new()
+	host.name = node_name
+	host.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	host.mouse_filter = Control.MOUSE_FILTER_STOP
+	host.process_mode = Node.PROCESS_MODE_ALWAYS
+	host.z_index = 40
+	_root.add_child(host)
+	_confirm_layer = host
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.45)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.mouse_filter = Control.MOUSE_FILTER_STOP
+	host.add_child(dim)
+	var panel := Panel.new()
+	panel.name = "ConfirmPanel"
+	panel.custom_minimum_size = Vector2(420, 180)
+	panel.size = Vector2(420, 180)
+	panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	var style := StyleBoxFlat.new()
+	style.bg_color = RetrowaveTheme.BG_PANEL
+	style.border_color = RetrowaveTheme.WARNING
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(4)
+	panel.add_theme_stylebox_override("panel", style)
+	var vp := Vector2(960, 680)
+	if get_viewport() != null:
+		vp = get_viewport().get_visible_rect().size
+	panel.position = Vector2(maxf(8.0, (vp.x - 420.0) * 0.5), maxf(8.0, (vp.y - 180.0) * 0.5))
+	host.add_child(panel)
+	var title_l := Label.new()
+	title_l.name = "ConfirmTitle"
+	title_l.text = title
+	title_l.position = Vector2(16, 14)
+	title_l.size = Vector2(388, 28)
+	title_l.add_theme_font_size_override("font_size", 16)
+	title_l.add_theme_color_override("font_color", RetrowaveTheme.TEXT_PRIMARY)
+	panel.add_child(title_l)
+	var body_l := Label.new()
+	body_l.name = "ConfirmBody"
+	body_l.text = body
+	body_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	body_l.position = Vector2(16, 48)
+	body_l.size = Vector2(388, 68)
+	body_l.add_theme_font_size_override("font_size", 14)
+	body_l.add_theme_color_override("font_color", RetrowaveTheme.TEXT_PRIMARY)
+	panel.add_child(body_l)
+	var cancel := Button.new()
+	cancel.name = "BtnCancel"
+	cancel.text = "Cancel"
+	cancel.position = Vector2(300, 128)
+	cancel.custom_minimum_size = Vector2(104, 36)
+	cancel.focus_mode = Control.FOCUS_ALL
+	cancel.process_mode = Node.PROCESS_MODE_ALWAYS
+	cancel.pressed.connect(func() -> void:
+		_pending_delete_slot = ""
+		_dismiss_confirm()
+	)
+	RetrowaveTheme.style_secondary_button(cancel)
+	panel.add_child(cancel)
+	if not save_first_slot.is_empty():
+		var save_first := Button.new()
+		save_first.name = "BtnSaveFirst"
+		save_first.text = "Save first"
+		save_first.position = Vector2(150, 128)
+		save_first.custom_minimum_size = Vector2(140, 36)
+		var load_slot := save_first_slot
+		save_first.pressed.connect(func() -> void:
+			_dismiss_confirm()
+			_write_slot("quicksave")
+			_load_slot_now(load_slot)
+		)
+		RetrowaveTheme.style_secondary_button(save_first)
+		panel.add_child(save_first)
+		var load_b := Button.new()
+		load_b.name = "BtnLoad"
+		load_b.text = action_label
+		load_b.position = Vector2(16, 128)
+		load_b.custom_minimum_size = Vector2(120, 36)
+		load_b.pressed.connect(func() -> void:
+			_dismiss_confirm()
+			on_action.call()
+		)
+		RetrowaveTheme.style_primary_button(load_b)
+		panel.add_child(load_b)
+	else:
+		var danger := Button.new()
+		danger.name = "BtnDanger"
+		danger.text = action_label
+		danger.position = Vector2(16, 128)
+		danger.custom_minimum_size = Vector2(140, 36)
+		danger.pressed.connect(func() -> void:
+			_dismiss_confirm()
+			on_action.call()
+		)
+		RetrowaveTheme.style_danger_button(danger)
+		panel.add_child(danger)
+	cancel.call_deferred("grab_focus")
+
+
+func _open_overwrite_confirm(slot: String) -> void:
+	var blurb := "'%s' will be replaced. This can't be undone." % slot
+	var slm := _slm()
+	if slm != null and slm.has_method("slot_replace_blurb"):
+		blurb = str(slm.call("slot_replace_blurb", slot))
+	_open_text_confirm("OverwriteSaveConfirm", "Overwrite save?", blurb, "Overwrite", _write_slot.bind(slot))
+
+
+func _open_load_confirm(slot: String) -> void:
+	_open_text_confirm(
+		"LoadUnsavedConfirm",
+		"Load '%s'?" % slot,
+		"Progress since your last save will be lost.",
+		"Load",
+		_load_slot_now.bind(slot),
+		slot
+	)
+
+
+func open_delete_confirm(slot: String) -> void:
+	_open_delete(slot)
+
+
 func _open_delete(slot: String) -> void:
 	_pending_delete_slot = slot
-	_delete_confirm.dialog_text = "Delete save \"%s\"? This cannot be undone." % slot
-	_delete_confirm.popup_centered()
+	_open_text_confirm(
+		"DeleteSaveConfirm",
+		"Delete save?",
+		"'%s' will be permanently deleted." % slot,
+		"Delete",
+		_on_delete_confirmed
+	)
 
 
 func _on_delete_confirmed() -> void:
@@ -1093,14 +1361,45 @@ func _force_close() -> void:
 	if mr_close != null and mr_close.has_method("clear_overlay_close_map_gesture"):
 		mr_close.call("clear_overlay_close_map_gesture")
 	if _closing:
-		_pause_game(false)
+		_release_clock_lock()
 		menu_closed.emit()
 		queue_free()
 		return
 	_closing = true
-	_pause_game(false)
+	_release_clock_lock()
 	menu_closed.emit()
 	queue_free()
+
+
+func _acquire_clock_lock() -> void:
+	if _clock_lock_held:
+		return
+	if typeof(TimeManager) == TYPE_NIL:
+		return
+	if TimeManager.has_method("acquire_overlay_clock_lock"):
+		TimeManager.acquire_overlay_clock_lock()
+		_clock_lock_held = true
+		return
+	_pause_game(true)
+
+
+func _release_clock_lock() -> void:
+	if not _clock_lock_held:
+		return
+	if Engine.time_scale < 0.001:
+		Engine.time_scale = 1.0
+	if typeof(TimeManager) != TYPE_NIL:
+		if has_meta("eoa_loaded_clock"):
+			remove_meta("eoa_loaded_clock")
+			if TimeManager.has_method("note_overlay_clock_from_current"):
+				TimeManager.note_overlay_clock_from_current()
+		if TimeManager.has_method("release_overlay_clock_lock"):
+			TimeManager.release_overlay_clock_lock()
+	_clock_lock_held = false
+
+
+func _exit_tree() -> void:
+	_release_clock_lock()
 
 
 func _pause_game(pause: bool) -> void:
@@ -1109,21 +1408,44 @@ func _pause_game(pause: bool) -> void:
 	if pause:
 		if not has_meta("was_paused_before_menu"):
 			set_meta("was_paused_before_menu", TimeManager.is_paused())
-		TimeManager.set_paused(true)
+		if TimeManager.has_method("acquire_overlay_clock_lock") and not _clock_lock_held:
+			TimeManager.acquire_overlay_clock_lock()
+			_clock_lock_held = true
+		else:
+			TimeManager.set_paused(true)
 		if Engine.time_scale < 0.001:
 			Engine.time_scale = 1.0
 	else:
-		var was_paused: bool = get_meta("was_paused_before_menu", true)
-		TimeManager.set_paused(was_paused)
+		var top_bar: Node = TopInfoBar.find_in_tree(get_tree()) if get_tree() != null else null
+		if has_meta("eoa_loaded_clock"):
+			remove_meta("eoa_loaded_clock")
+			if has_meta("was_paused_before_menu"):
+				remove_meta("was_paused_before_menu")
+			if _clock_lock_held and TimeManager.has_method("note_overlay_clock_from_current"):
+				TimeManager.note_overlay_clock_from_current()
+			if _clock_lock_held and TimeManager.has_method("release_overlay_clock_lock"):
+				TimeManager.release_overlay_clock_lock()
+				_clock_lock_held = false
+			Engine.time_scale = 1.0
+			if top_bar != null and top_bar.has_method("resync_speed_from_time_manager"):
+				top_bar.call("resync_speed_from_time_manager")
+			return
+		if _clock_lock_held and TimeManager.has_method("release_overlay_clock_lock"):
+			TimeManager.release_overlay_clock_lock()
+			_clock_lock_held = false
+		else:
+			var was_paused: bool = get_meta("was_paused_before_menu", true)
+			TimeManager.set_paused(was_paused)
 		Engine.time_scale = 1.0
 		if has_meta("was_paused_before_menu"):
 			remove_meta("was_paused_before_menu")
-		var top_bar: Node = TopInfoBar.find_in_tree(get_tree()) if get_tree() != null else null
 		if top_bar != null:
-			if top_bar.has_method("_sync_pause_from_time_manager"):
+			if top_bar.has_method("resync_speed_from_time_manager"):
+				top_bar.call("resync_speed_from_time_manager")
+			elif top_bar.has_method("_sync_pause_from_time_manager"):
 				top_bar.call("_sync_pause_from_time_manager")
-			if top_bar.has_method("_update_speed_buttons"):
-				top_bar.call("_update_speed_buttons")
+				if top_bar.has_method("_update_speed_buttons"):
+					top_bar.call("_update_speed_buttons")
 
 
 func _set_status(text: String) -> void:

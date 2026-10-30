@@ -238,6 +238,26 @@ func initialize_from_map_data(map_data: MapScenarioData) -> void:
 ## Add temporary provinces from in-game editor. These overlay for picking, queries, hover etc.
 ## Human can draw and immediately test gameplay impact (movement, supply, combat width) without full reload.
 ## Call clear_temporary_editor_provinces() to remove.
+## One overlay province for headless save probes. The caller passes plain fields so a
+## `-s` script never names the province type (that reference breaks the type's compile).
+func add_editor_province_from_fields(pid: int, owner: String, controller: String, resources: Dictionary) -> void:
+	var made := Province.new()
+	made.id = pid
+	made.name = "Editor Probe"
+	made.owner_tag = owner
+	made.controller_tag = controller
+	made.resources = resources.duplicate(true)
+	var bag: Dictionary[int, Province] = {}
+	bag[pid] = made
+	var geo := {
+		pid: {
+			"points": PackedVector2Array([Vector2.ZERO, Vector2(1, 0), Vector2(0, 1)]),
+			"label_anchor": [0, 0],
+		},
+	}
+	add_temporary_editor_provinces(bag, geo)
+
+
 func add_temporary_editor_provinces(new_provs: Dictionary[int, Province], new_geo: Dictionary) -> void:
 	_editor_provinces = new_provs.duplicate()
 	_editor_geometry = new_geo.duplicate()

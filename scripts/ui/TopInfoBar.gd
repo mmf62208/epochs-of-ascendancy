@@ -422,7 +422,7 @@ func _apply_responsive_layout() -> void:
 		menu_button.text = "Menu" if not narrow else "M"
 		menu_button.custom_minimum_size = Vector2(40 if narrow else 56, 28)
 		menu_button.size_flags_horizontal = Control.SIZE_SHRINK_END
-		menu_button.tooltip_text = "Command Center\nSave, load, settings, help, policies.\n[Esc] · [Ctrl+S] save · [Ctrl+L] load"
+		menu_button.tooltip_text = "Command Center\nSave, load, settings, help, policies.\n[Esc] · [Ctrl+S] save · [Ctrl+L] load · [Ctrl+Shift+S] save list"
 
 	# Slim single-row bar (no second-row hotseat chrome cutting into buttons).
 	custom_minimum_size.y = 48.0 if compact else 52.0
@@ -454,6 +454,8 @@ func _ensure_speed_overflow_menu() -> void:
 
 
 func _on_speed_overflow_pressed(id: int) -> void:
+	if _overlay_holds_clock():
+		return
 	_set_game_speed(id)
 
 
@@ -930,6 +932,10 @@ func _connect_buttons() -> void:
 	_connect_once(trade_button, _on_trade_pressed)
 	_connect_once(space_button, _on_space_pressed)
 	_connect_once(matchmaking_button, _on_matchmaking_pressed)
+	if save_button:
+		save_button.tooltip_text = "Save list · Command Center slots\n[Ctrl+Shift+S] · [Ctrl+S] quicksave"
+	if load_button:
+		load_button.tooltip_text = "Load from Command Center slots\n[Ctrl+Shift+S] · [Ctrl+L] quickload"
 	_connect_once(save_button, _on_menu_pressed)
 	_connect_once(load_button, _on_menu_pressed)
 	_connect_once(settings_button, _on_settings_pressed)
@@ -999,8 +1005,10 @@ func _step_live_clock() -> void:
 		_sim_tick_busy = false
 		_sim_tick_busy_since_msec = 0
 	# Player owns clock: never let TimeManager stay paused while UI shows running (re-pause race).
+	# Overlays (Paused CC / VICTORY / DEFEAT) own the clock — do not fight them.
 	if (
 		not is_paused
+		and not _overlay_holds_clock()
 		and has_meta("player_owns_clock")
 		and bool(get_meta("player_owns_clock"))
 		and typeof(TimeManager) != TYPE_NIL
@@ -1010,6 +1018,7 @@ func _step_live_clock() -> void:
 		TimeManager.set_time_scale(float(current_speed))
 	if (
 		not is_paused
+		and not _overlay_holds_clock()
 		and has_meta("player_owns_clock")
 		and bool(get_meta("player_owns_clock"))
 		and _clock_unpause_msec > 0
@@ -1027,7 +1036,7 @@ func _step_live_clock() -> void:
 		_clock_unpause_msec = 0
 		_last_sim_tick_msec = Time.get_ticks_msec()
 		return
-	if is_paused or _sim_tick_busy:
+	if is_paused or _sim_tick_busy or _overlay_holds_clock():
 		return
 	if _last_sim_tick_msec <= 0:
 		_last_sim_tick_msec = now
@@ -1061,7 +1070,7 @@ func _refill_supply_after_clock() -> void:
 
 
 func _on_tick() -> void:
-	if is_paused or _sim_tick_busy:
+	if is_paused or _sim_tick_busy or _overlay_holds_clock():
 		return
 	_sim_tick_busy = true
 	_sim_tick_busy_since_msec = Time.get_ticks_msec()
@@ -1134,6 +1143,9 @@ func _input(event: InputEvent) -> void:
 	if key.keycode == KEY_SPACE or key.keycode == KEY_PERIOD:
 		if _search_line_owns_typed_keys():
 			return
+		if _overlay_holds_clock():
+			get_viewport().set_input_as_handled()
+			return
 		_on_pause_pressed()
 		get_viewport().set_input_as_handled()
 
@@ -1145,24 +1157,31 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.keycode == KEY_SPACE or event.keycode == KEY_PERIOD:
 		if _search_line_owns_typed_keys():
 			return
+		if _overlay_holds_clock():
+			get_viewport().set_input_as_handled()
+			return
 		_on_pause_pressed()
 		get_viewport().set_input_as_handled()
 		return
 	# 1–4 number keys set speed and unpause
 	if event.keycode == KEY_1 or event.keycode == KEY_KP_1:
-		_set_game_speed(1)
+		if not _overlay_holds_clock():
+			_set_game_speed(1)
 		get_viewport().set_input_as_handled()
 		return
 	if event.keycode == KEY_2 or event.keycode == KEY_KP_2:
-		_set_game_speed(2)
+		if not _overlay_holds_clock():
+			_set_game_speed(2)
 		get_viewport().set_input_as_handled()
 		return
 	if event.keycode == KEY_3 or event.keycode == KEY_KP_3:
-		_set_game_speed(3)
+		if not _overlay_holds_clock():
+			_set_game_speed(3)
 		get_viewport().set_input_as_handled()
 		return
 	if event.keycode == KEY_4 or event.keycode == KEY_KP_4:
-		_set_game_speed(4)
+		if not _overlay_holds_clock():
+			_set_game_speed(4)
 		get_viewport().set_input_as_handled()
 		return
 	# Global debug hotkey — opens the dedicated Debug Overlay
@@ -1212,6 +1231,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.ctrl_pressed and not event.shift_pressed and event.keycode == KEY_L:
 		if typeof(SaveLoadManager) != TYPE_NIL:
 			SaveLoadManager.quickload()
+			resync_speed_from_time_manager()
 			_update_date_time()
 			_update_resources()
 			print("Ctrl+L QuickLoad triggered")
@@ -1239,7 +1259,29 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 
+func _overlay_holds_clock() -> bool:
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("overlay_holds_clock"):
+		if bool(TimeManager.overlay_holds_clock()):
+			return true
+	var tree := get_tree()
+	if tree == null:
+		return false
+	if not tree.get_nodes_in_group("campaign_ink_end_screen").is_empty():
+		return true
+	if not tree.get_nodes_in_group("continuation_picker").is_empty():
+		return true
+	var menu := tree.root.get_node_or_null("MainMenu") if tree.root != null else null
+	if menu != null and is_instance_valid(menu) and not menu.is_queued_for_deletion():
+		if str(menu.get("layer")) != "" or menu is CanvasLayer:
+			var title := menu.find_child("CommandCenterTitle", true, false)
+			if title != null and str(title.text) == "Paused":
+				return true
+	return false
+
+
 func _set_game_speed(speed: int) -> void:
+	if _overlay_holds_clock():
+		return
 	current_speed = clampi(speed, 1, 4)
 	is_paused = false
 	# Player took clock control — TestRunner must not re-pause on deferred interactive passes.
@@ -1288,6 +1330,8 @@ func _update_speed_buttons() -> void:
 
 
 func _on_pause_pressed() -> void:
+	if _overlay_holds_clock():
+		return
 	is_paused = not is_paused
 	set_meta("player_owns_clock", true)
 	Engine.time_scale = 1.0
@@ -1318,6 +1362,17 @@ func _sync_pause_from_time_manager() -> void:
 	if typeof(TimeManager) == TYPE_NIL:
 		return
 	is_paused = TimeManager.is_paused()
+
+
+## Load restores time_scale into TimeManager. The bar must re-read it.
+## Do not call _set_game_speed: that unpauses and steps a day.
+func resync_speed_from_time_manager() -> void:
+	if typeof(TimeManager) == TYPE_NIL:
+		return
+	var spd := int(round(float(TimeManager.time_scale)))
+	current_speed = clampi(spd, 1, 4)
+	is_paused = TimeManager.is_paused()
+	_update_speed_buttons()
 
 
 func _sync_time_manager_controls() -> void:
@@ -2716,150 +2771,19 @@ func _add_menu_button(parent: VBoxContainer, label: String, option: String) -> v
 	parent.add_child(btn)
 
 
-## Basic in-code Save Manager popup (F6 or via Save button enhancement).
-## Pack G: primary path uses save_browser_campaign_product_live + apply_save_browser_* only.
+## Ctrl+Shift+S used to open a second save panel. Command Center already
+## covers save, load, delete, and overwrite, so this opens that list.
+## KEY_F6 stays the loyalty mapmode on MapRenderer.
 func _show_save_manager_popup() -> void:
-	if typeof(SaveLoadManager) == TYPE_NIL and typeof(GameData) == TYPE_NIL:
-		print("SaveLoadManager not ready")
+	if get_tree() == null:
 		return
-
-	# Remove any previous instance
 	var existing := get_tree().root.get_node_or_null("SaveManagerPopup")
 	if existing != null:
 		existing.queue_free()
-
-	var panel := Panel.new()
-	panel.name = "SaveManagerPopup"
-	panel.size = Vector2(560, 420)
-	panel.position = Vector2(200, 120)
-	panel.z_index = 100
-
-	var vbox := VBoxContainer.new()
-	vbox.size = panel.size - Vector2(20, 20)
-	vbox.position = Vector2(10, 10)
-	panel.add_child(vbox)
-
-	var title := Label.new()
-	title.text = "Save Browser (product APIs · Pack G)"
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(title)
-
-	var product: Dictionary = {}
-	if typeof(GameData) != TYPE_NIL and GameData.has_method("save_browser_campaign_product_live"):
-		product = GameData.save_browser_campaign_product_live()
-	var prod_lbl := Label.new()
-	prod_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	prod_lbl.text = str(product.get("summary", product.get("plain", "Save browser product")))
-	vbox.add_child(prod_lbl)
-
-	var action_row := HBoxContainer.new()
-	var resume_btn := Button.new()
-	resume_btn.text = "Resume recommended"
-	resume_btn.pressed.connect(func():
-		if typeof(GameData) != TYPE_NIL and GameData.has_method("apply_save_browser_resume"):
-			GameData.apply_save_browser_resume(1)
-		_update_date_time()
-		_update_resources()
-		panel.queue_free()
-	)
-	action_row.add_child(resume_btn)
-	var cp_btn := Button.new()
-	cp_btn.text = "Checkpoint (product)"
-	cp_btn.pressed.connect(func():
-		if typeof(GameData) != TYPE_NIL and GameData.has_method("apply_save_browser_checkpoint"):
-			GameData.apply_save_browser_checkpoint(1)
-		panel.queue_free()
-		_show_save_manager_popup()
-	)
-	action_row.add_child(cp_btn)
-	vbox.add_child(action_row)
-
-	var rows: Array = []
-	if SaveLoadManager != null and SaveLoadManager.has_method("list_slots_for_ui"):
-		rows = SaveLoadManager.list_slots_for_ui()
-	elif SaveLoadManager != null:
-		rows = SaveLoadManager.list_saves()
-	if rows.is_empty():
-		var l := Label.new()
-		l.text = "No slots. Use Checkpoint to create autosave via product API."
-		vbox.add_child(l)
-	else:
-		for s in rows:
-			if typeof(s) != TYPE_DICTIONARY:
-				continue
-			var h := HBoxContainer.new()
-			var slot_label := Label.new()
-			var occupied := bool(s.get("occupied", true))
-			var row_text := str(s.get("label", s.get("slot", "?")))
-			if row_text.is_empty():
-				var meta := s.get("metadata", {}) as Dictionary
-				var ts := str(meta.get("timestamp", ""))
-				row_text = "%s  (%s)" % [s.get("slot", "?"), ts.substr(0, 16) if ts.length() > 16 else ts]
-			slot_label.text = row_text
-			slot_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			h.add_child(slot_label)
-
-			var load_btn := Button.new()
-			load_btn.text = "Load"
-			load_btn.disabled = not occupied
-			load_btn.pressed.connect(func():
-				## Route through product resume when possible; else slot load via order panel save_slot
-				var slot_n := str(s.get("slot", ""))
-				if typeof(GameData) != TYPE_NIL and GameData.has_method("apply_order_panel_action"):
-					GameData.apply_order_panel_action("save_slot:%s" % slot_n if not slot_n.begins_with("save_slot:") else slot_n, 1)
-					## Prefer explicit load if SaveLoadManager available for occupied slots
-					if occupied and SaveLoadManager.has_method("load_game_detailed"):
-						SaveLoadManager.load_game_detailed(slot_n)
-					elif occupied:
-						SaveLoadManager.load_game(slot_n)
-				elif SaveLoadManager.has_method("load_game_detailed"):
-					SaveLoadManager.load_game_detailed(slot_n)
-				else:
-					SaveLoadManager.load_game(slot_n)
-				_update_date_time()
-				_update_resources()
-				panel.queue_free()
-			)
-			h.add_child(load_btn)
-
-			var save_btn := Button.new()
-			save_btn.text = "Save"
-			save_btn.pressed.connect(func():
-				var slot_n := str(s.get("slot", ""))
-				## Pack G: prefer product checkpoint; per-slot still via SaveLoadManager for UI honesty
-				if typeof(GameData) != TYPE_NIL and GameData.has_method("apply_save_browser_checkpoint"):
-					GameData.apply_save_browser_checkpoint(1)
-				if SaveLoadManager.has_method("save_game_detailed"):
-					SaveLoadManager.save_game_detailed(slot_n)
-				else:
-					SaveLoadManager.save_game(slot_n)
-				panel.queue_free()
-				_show_save_manager_popup()
-			)
-			h.add_child(save_btn)
-
-			var del_btn := Button.new()
-			del_btn.text = "Delete"
-			del_btn.disabled = not occupied
-			del_btn.pressed.connect(func():
-				SaveLoadManager.delete_save(s.get("slot", ""))
-				panel.queue_free()
-				_show_save_manager_popup()
-			)
-			h.add_child(del_btn)
-
-			vbox.add_child(h)
-
-	var close_btn := Button.new()
-	close_btn.text = "Close (F6)"
-	close_btn.pressed.connect(func(): panel.queue_free())
-	vbox.add_child(close_btn)
-
-	get_tree().root.add_child(panel)
-	print("Save Browser popup opened (%d slots) via product APIs" % rows.size())
+	print("TopInfoBar: save browser → Command Center list")
+	_open_command_center(true)
 
 
-## Helper to populate the Save Manager list inside the main menu with rich metadata.
 func _populate_save_list(parent: VBoxContainer, owning_panel: Panel) -> void:
 	parent.add_child(Control.new())  # spacer
 	var rows: Array = []
@@ -2894,29 +2818,25 @@ func _populate_save_list(parent: VBoxContainer, owning_panel: Panel) -> void:
 		load_btn.disabled = not occupied
 		load_btn.pressed.connect(func():
 			var slot_n := str(s.get("slot", ""))
-			if SaveLoadManager.has_method("load_game_detailed"):
-				SaveLoadManager.load_game_detailed(slot_n)
-			else:
-				SaveLoadManager.load_game(slot_n)
-			_update_date_time()
-			_update_resources()
-			if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
-				LeaderEventUI.show_toast("Game loaded: " + slot_n, 2.5)
 			if owning_panel and is_instance_valid(owning_panel):
 				owning_panel.queue_free()
-			_pause_for_menu(false)
+			_open_command_center(true)
+			var menu := get_tree().root.get_node_or_null("MainMenu") if get_tree() != null else null
+			if menu != null and menu.has_method("_on_load_slot"):
+				menu.call("_on_load_slot", slot_n)
 		)
 		h.add_child(load_btn)
 
 		var del_btn := Button.new()
 		del_btn.text = "Delete"
 		del_btn.pressed.connect(func():
-			SaveLoadManager.delete_save(s.get("slot", ""))
-			if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
-				LeaderEventUI.show_toast("Save deleted: " + s.get("slot", ""), 2.0, true)
+			var slot_n := str(s.get("slot", ""))
 			if owning_panel and is_instance_valid(owning_panel):
 				owning_panel.queue_free()
-			_show_main_menu_popup_fallback()  # refresh
+			_open_command_center(true)
+			var menu := get_tree().root.get_node_or_null("MainMenu") if get_tree() != null else null
+			if menu != null and menu.has_method("open_delete_confirm"):
+				menu.call("open_delete_confirm", slot_n)
 		)
 		h.add_child(del_btn)
 

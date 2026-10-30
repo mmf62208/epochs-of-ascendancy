@@ -3147,20 +3147,28 @@ func _build_ui() -> void:
 	var defeat_test_btn := Button.new()
 	defeat_test_btn.text = "Simulate Player Defeat (offer continuation)"
 	defeat_test_btn.pressed.connect(func():
-		if typeof(GameData) != TYPE_NIL:
+		if typeof(GameData) != TYPE_NIL and GameData.has_method("trigger_national_defeat_or_continuation"):
 			var ptag := "TUR"
 			if typeof(LeaderManager) != TYPE_NIL:
-				ptag = LeaderManager.get_player_country_tag()
-			var pend: Dictionary = GameData.trigger_national_defeat_or_continuation(ptag, "Manual defeat test (capital lost / treaty)") if GameData.has_method("trigger_national_defeat_or_continuation") else {}
-			var peace_script: Script = load("res://scripts/ui/PeaceConferenceWindow.gd") as Script
-			if peace_script == null:
-				_toast("PeaceConferenceWindow.gd failed to load")
-				return
-			var w: Node = peace_script.new()
-			get_tree().root.add_child(w)
-			_toast("Defeat triggered — continuation options available in the window")
+				ptag = str(LeaderManager.player_country_tag).strip_edges()
+				if ptag.is_empty():
+					ptag = LeaderManager.get_player_country_tag()
+			GameData.trigger_national_defeat_or_continuation(ptag, "Manual defeat test (capital lost / treaty)")
+			_toast("Defeat triggered — end screen is up. Continue as… opens the picker.")
 	)
 	province_editor_section.add_child(defeat_test_btn)
+
+	var victory_test_btn := Button.new()
+	victory_test_btn.text = "Simulate Player Victory"
+	victory_test_btn.pressed.connect(func():
+		var ink: Script = load("res://scripts/core/CampaignInkEndDomain.gd") as Script
+		if ink != null and ink.has_method("present_forced_victory"):
+			ink.call("present_forced_victory", "Manual victory test")
+			_toast("Victory triggered — keep playing, save, or return to the menu.")
+		else:
+			_toast("Victory screen failed to load")
+	)
+	province_editor_section.add_child(victory_test_btn)
 
 	var phases_demo_btn := Button.new()
 	phases_demo_btn.text = "Open Policy/Law Screen (1919/1923 follow-ons + continuation policies)"

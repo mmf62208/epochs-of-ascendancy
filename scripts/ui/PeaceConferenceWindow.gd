@@ -89,6 +89,160 @@ static func open_living_sheet(
 	return sheet
 
 
+## Successor picker after an ink defeat. Headless uses a CanvasLayer (a Window
+## does not show there). Pick a nation, then Confirm. Cancel returns to DEFEAT.
+static func open_continuation_picker() -> Node:
+	var tree := Engine.get_main_loop() as SceneTree
+	if tree == null or tree.root == null:
+		return null
+	for n in tree.get_nodes_in_group("continuation_picker"):
+		if is_instance_valid(n) and not n.is_queued_for_deletion():
+			return n
+	var pending: Dictionary = {}
+	if typeof(GameData) != TYPE_NIL and GameData.has_method("get_pending_continuation"):
+		pending = GameData.get_pending_continuation()
+	var layer := CanvasLayer.new()
+	layer.name = "ContinuationPicker"
+	layer.layer = 126
+	layer.process_mode = Node.PROCESS_MODE_ALWAYS
+	layer.add_to_group("continuation_picker")
+	layer.set_meta("chosen_tag", "")
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.55)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.mouse_filter = Control.MOUSE_FILTER_STOP
+	layer.add_child(dim)
+	var panel := Panel.new()
+	panel.name = "Choices"
+	panel.custom_minimum_size = Vector2(520, 620)
+	panel.size = Vector2(520, 620)
+	panel.position = Vector2(380, 70)
+	var panel_style := StyleBoxFlat.new()
+	panel_style.bg_color = RetrowaveTheme.BG_PANEL
+	panel_style.border_color = RetrowaveTheme.WARNING
+	panel_style.set_border_width_all(2)
+	panel_style.set_corner_radius_all(6)
+	panel_style.content_margin_left = 18
+	panel_style.content_margin_right = 18
+	panel_style.content_margin_top = 16
+	panel_style.content_margin_bottom = 16
+	panel.add_theme_stylebox_override("panel", panel_style)
+	layer.add_child(panel)
+	var box := VBoxContainer.new()
+	box.name = "PickerBox"
+	box.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	box.add_theme_constant_override("separation", 8)
+	panel.add_child(box)
+	var header := Label.new()
+	header.text = "Choose nation to continue playing as"
+	RetrowaveTheme.style_column_header(header)
+	box.add_child(header)
+	var scroll := ScrollContainer.new()
+	scroll.name = "PickerScroll"
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.custom_minimum_size = Vector2(0, 420)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	box.add_child(scroll)
+	var opts_box := VBoxContainer.new()
+	opts_box.name = "PickerOpts"
+	opts_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	opts_box.add_theme_constant_override("separation", 8)
+	scroll.add_child(opts_box)
+	var opts: Array = []
+	var raw_opts: Variant = pending.get("options", [])
+	if raw_opts is Array:
+		opts = raw_opts
+	for opt in opts:
+		var b := Button.new()
+		var chosen := str(opt)
+		b.name = "BtnPick_%s" % chosen
+		b.text = "Continue as " + chosen
+		b.custom_minimum_size = Vector2(0, 36)
+		RetrowaveTheme.style_secondary_button(b)
+		b.pressed.connect(_on_picker_select.bind(layer, chosen))
+		opts_box.add_child(b)
+	var actions := HBoxContainer.new()
+	actions.add_theme_constant_override("separation", 12)
+	box.add_child(actions)
+	var confirm := Button.new()
+	confirm.name = "BtnConfirmContinue"
+	confirm.text = "Confirm"
+	confirm.disabled = true
+	confirm.custom_minimum_size = Vector2(160, 40)
+	RetrowaveTheme.style_primary_button(confirm)
+	confirm.pressed.connect(_on_picker_confirm.bind(layer))
+	actions.add_child(confirm)
+	var cancel := Button.new()
+	cancel.name = "BtnCancelPicker"
+	cancel.text = "Cancel"
+	cancel.custom_minimum_size = Vector2(160, 40)
+	RetrowaveTheme.style_secondary_button(cancel)
+	cancel.pressed.connect(_on_picker_cancel.bind(layer))
+	actions.add_child(cancel)
+	tree.root.add_child(layer)
+	return layer
+
+
+static func _on_picker_select(layer: Node, tag: String) -> void:
+	if layer == null or not is_instance_valid(layer):
+		return
+	layer.set_meta("chosen_tag", tag)
+	var opts_box := layer.find_child("PickerOpts", true, false)
+	if opts_box != null:
+		for c in opts_box.get_children():
+			if c is Button and str(c.name).begins_with("BtnPick_"):
+				var on := str(c.name) == "BtnPick_%s" % tag
+				c.modulate = Color.WHITE if on else Color(0.75, 0.8, 0.9, 0.9)
+	var confirm := layer.find_child("BtnConfirmContinue", true, false)
+	if confirm is BaseButton:
+		(confirm as BaseButton).disabled = tag.strip_edges().is_empty()
+
+
+static func _on_picker_confirm(layer: Node) -> void:
+	if layer == null or not is_instance_valid(layer):
+		return
+	var tag := str(layer.get_meta("chosen_tag", "")).strip_edges().to_upper()
+	if tag.is_empty():
+		return
+	if typeof(GameData) != TYPE_NIL and GameData.has_method("execute_player_switch_to"):
+		GameData.execute_player_switch_to(tag, "ink defeat continuation")
+	_dismiss_picker(layer)
+	_dismiss_ink_end_screens()
+
+
+static func _on_picker_cancel(layer: Node) -> void:
+	_dismiss_picker(layer)
+
+
+static func _dismiss_picker(layer: Node) -> void:
+	if layer == null or not is_instance_valid(layer):
+		return
+	if layer.is_in_group("continuation_picker"):
+		layer.remove_from_group("continuation_picker")
+	layer.name = "ContinuationPicker_dying"
+	layer.queue_free()
+
+
+static func _dismiss_ink_end_screens() -> void:
+	var tree := Engine.get_main_loop() as SceneTree
+	if tree == null:
+		return
+	for n in tree.get_nodes_in_group("campaign_ink_end_screen"):
+		if n == null or not is_instance_valid(n):
+			continue
+		if n.has_method("_dismiss_end_screen"):
+			n.call("_dismiss_end_screen")
+			continue
+		n.remove_from_group("campaign_ink_end_screen")
+		n.name = "CampaignInkEndScreen_dying"
+		n.queue_free()
+
+
+static func _on_picker_continue(tag: String) -> void:
+	if typeof(GameData) != TYPE_NIL and GameData.has_method("execute_player_switch_to"):
+		GameData.execute_player_switch_to(tag, "ink defeat continuation")
+
+
 static func _open_campaign_peace_sheet(winner_tag: String, loser_tag: String, campaign: Dictionary) -> Dictionary:
 	var w := winner_tag.strip_edges().to_upper()
 	var l := loser_tag.strip_edges().to_upper()
@@ -222,7 +376,7 @@ var _living_winner: String = ""
 var _living_loser: String = ""
 var _living_pid: int = -1
 
-@onready var main_vbox: VBoxContainer = $Margin/MainVBox   # Will be created in code if needed
+var main_vbox: VBoxContainer
 
 var title_label: Label
 var leverage_label: Label

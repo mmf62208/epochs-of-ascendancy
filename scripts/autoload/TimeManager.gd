@@ -64,6 +64,12 @@ var scenario_start_year: int = 1936
 
 var paused: bool = false
 var time_scale: float = 1.0   # Interactive: multipliers on hours/wall-sec (1×, 2×, 3×, 4×)
+## Command Center / ink end screens hold the clock. Speed keys cannot unpause
+## until the last overlay releases. Nested opens share one saved pause+speed.
+var _overlay_clock_locks: int = 0
+var _overlay_saved_paused: bool = false
+var _overlay_saved_scale: float = 1.0
+var _overlay_saved_valid: bool = false
 
 ## Monotonic day counter since scenario start (incremented in advance_days).
 var total_days_elapsed: int = 0
@@ -129,6 +135,9 @@ func _ready() -> void:
 	# The 1936 rules file is a few kilobytes. Read it at boot so the first
 	# day_battles sample is not the cold parse (PERF-4 bar is base + 10%).
 	_warm_campaign_rules()
+	# Ink win script + JSON. The first load was the PERF-4 dayroll frame
+	# (day_battles ~380ms on the first live-F5 day). Pay it at boot.
+	_warm_ink_victory()
 
 
 func _warm_campaign_rules() -> void:
@@ -137,6 +146,17 @@ func _warm_campaign_rules() -> void:
 	if typeof(WarStateDomain) == TYPE_NIL:
 		return
 	WarStateDomain.loop_enabled()
+
+
+func _warm_ink_victory() -> void:
+	var t0 := Time.get_ticks_usec()
+	var scr: Variant = load("res://scripts/core/CampaignInkEndDomain.gd")
+	if scr != null:
+		set_meta("eoa_ink_end_domain", scr)
+		if scr is GDScript:
+			(scr as GDScript).call("load_rules")
+	var ms := float(Time.get_ticks_usec() - t0) / 1000.0
+	print("TimeManager: ink victory warm %.1fms" % ms)
 
 
 func _process(_delta: float) -> void:
@@ -991,6 +1011,49 @@ func set_time_scale(scale: float) -> void:
 	time_scale = maxf(0.1, scale)   # Safety clamp
 	# Future: this can affect advance rates when we have a real simulation loop.
 
+
+func overlay_holds_clock() -> bool:
+	return _overlay_clock_locks > 0
+
+
+func acquire_overlay_clock_lock() -> void:
+	if _overlay_clock_locks == 0:
+		_overlay_saved_paused = paused
+		_overlay_saved_scale = time_scale
+		_overlay_saved_valid = true
+		set_paused(true)
+	_overlay_clock_locks += 1
+	_notify_overlay_clock_bar()
+
+
+## After a load while an overlay is open, Resume should restore the loaded clock.
+func note_overlay_clock_from_current() -> void:
+	if _overlay_clock_locks <= 0:
+		return
+	_overlay_saved_paused = paused
+	_overlay_saved_scale = time_scale
+	_overlay_saved_valid = true
+
+
+func release_overlay_clock_lock() -> void:
+	if _overlay_clock_locks <= 0:
+		return
+	_overlay_clock_locks -= 1
+	if _overlay_clock_locks == 0 and _overlay_saved_valid:
+		set_paused(_overlay_saved_paused)
+		set_time_scale(_overlay_saved_scale)
+		_overlay_saved_valid = false
+	_notify_overlay_clock_bar()
+
+
+func _notify_overlay_clock_bar() -> void:
+	var tree := Engine.get_main_loop() as SceneTree
+	if tree == null:
+		return
+	for n in tree.get_nodes_in_group("top_info_bar"):
+		if n != null and is_instance_valid(n) and n.has_method("resync_speed_from_time_manager"):
+			n.call("resync_speed_from_time_manager")
+
 ## Convenience helper: advance exactly one full year (primarily for testing/manual use).
 func advance_one_year() -> void:
 	advance_days(365.0)
@@ -1492,7 +1555,21 @@ func _campaign_before_battles() -> void:
 		CapitulationDomain.ensure_snapshot()
 
 
+func _maybe_present_ink_victory() -> void:
+	# Read-only date / existing-war check. Does not boot wars or write peace_state.
+	var scr: Variant = null
+	if has_meta("eoa_ink_end_domain"):
+		scr = get_meta("eoa_ink_end_domain")
+	if scr == null:
+		scr = load("res://scripts/core/CampaignInkEndDomain.gd")
+		if scr != null:
+			set_meta("eoa_ink_end_domain", scr)
+	if scr is GDScript:
+		(scr as GDScript).call("evaluate_day")
+
+
 func _campaign_after_battles() -> void:
+	_maybe_present_ink_victory()
 	if typeof(WarStateDomain) == TYPE_NIL or not WarStateDomain.loop_enabled():
 		return
 	var at_war := WarStateDomain.any_war()

@@ -658,7 +658,34 @@ func trigger_national_defeat_or_continuation(old_tag: String, reason: String = "
 	}
 
 	print("National defeat/continuation triggered for %s: %s" % [old_tag, reason])
+	_present_player_ink_defeat(old_tag, reason)
 	return peace_state["pending_continuation"]
+
+
+## Pause and show the ink end screen when the human's nation falls.
+## Skips when the older campaign-end sheet is already up (its Continue button
+## calls this hook and must not stack a second screen).
+func _present_player_ink_defeat(old_tag: String, reason: String) -> void:
+	var defeated := old_tag.strip_edges().to_upper()
+	if defeated.is_empty() or typeof(LeaderManager) == TYPE_NIL:
+		return
+	var live := str(LeaderManager.player_country_tag).strip_edges().to_upper()
+	if live.is_empty() or live != defeated:
+		return
+	var tree := Engine.get_main_loop() as SceneTree
+	if tree != null:
+		for n in tree.get_nodes_in_group("campaign_end_screen"):
+			if is_instance_valid(n) and not n.is_queued_for_deletion():
+				return
+		for n in tree.get_nodes_in_group("campaign_ink_end_screen"):
+			if is_instance_valid(n) and not n.is_queued_for_deletion():
+				return
+	var scr: Script = load("res://scripts/ui/CampaignInkEndScreen.gd") as Script
+	if scr != null and scr.has_method("present_loss"):
+		scr.call("present_loss", defeated, reason)
+		return
+	if typeof(TimeManager) != TYPE_NIL:
+		TimeManager.set_paused(true)
 
 
 ## === Follow-on Peace Events (multi-year influence points after 1918 conference) ===
