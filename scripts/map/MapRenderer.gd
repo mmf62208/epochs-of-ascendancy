@@ -2744,7 +2744,11 @@ func _layout_map_search_chrome() -> void:
 		host.add_child(sr)
 	if host != null and host.has_method("host_map_search_chrome"):
 		host.call("host_map_search_chrome", sr)
+	# Keep a width the top bar already fitted (>= 88). Forcing 308 here is
+	# what shoved Rubber and Fuel past 1280 after the bar had made room.
 	var box_w := 308.0
+	if sr.custom_minimum_size.x >= 88.0:
+		box_w = sr.custom_minimum_size.x
 	var box_h := 32.0
 	# In-flow on TopInfoBar RightContainer survives More+/Steel/Al reflow.
 	# Overlay PRESET_TOP_RIGHT is fallback only (parent Control with real width —
@@ -2755,13 +2759,13 @@ func _layout_map_search_chrome() -> void:
 		sr.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		sr.visible = true
 		sr.modulate = Color(1, 1, 1, 1)
-		sr.z_index = 80
-		sr.z_as_relative = false
+		sr.z_index = 0
+		sr.z_as_relative = true
 		sr.mouse_filter = Control.MOUSE_FILTER_STOP
 		sr.process_mode = Node.PROCESS_MODE_ALWAYS
 		sr.clip_contents = false
 		if sr.has_method("ensure_chrome_visible"):
-			sr.call("ensure_chrome_visible")
+			sr.call("ensure_chrome_visible", box_w)
 		sr.reset_size()
 		sr.force_update_transform()
 		return
@@ -22437,7 +22441,7 @@ func _show_unit_detail_popup(formation: Object) -> void:
 	fill_lbl.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	fill_lbl.mouse_filter = Control.MOUSE_FILTER_STOP
 	# Literal first. fill_line_tooltip runs only after body is parented.
-	fill_lbl.tooltip_text = "Fill —%\nFill ≠ Strength. Equipment on hand vs the unit's TOE (table of equipment). Not combat strength. Refills daily from your national stockpile."
+	fill_lbl.tooltip_text = "Fill —% · Strength 1.00\nFill ≠ Strength. Equipment on hand vs the unit's TOE (table of equipment). Not combat strength. Refills daily from your national stockpile."
 	RetrowaveTheme.style_body_label(fill_lbl)
 	# Fill is equipment/TOE, never Strength%. Unknown stays cyan.
 	# ≥80% SUCCESS, 50–79% CYAN, <50% WARNING.

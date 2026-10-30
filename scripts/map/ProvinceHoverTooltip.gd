@@ -382,12 +382,13 @@ func show_text(
 	# Cap reported size so positioning never assumes a huge card.
 	size.x = minf(size.x, max_width)
 	size.y = minf(size.y, max_height)
-	var pos := screen_pos + Vector2(12, 10)
-	if pos.x + size.x > viewport_size.x - 8.0:
-		pos.x = viewport_size.x - size.x - 8.0
-	if pos.y + size.y > viewport_size.y - 8.0:
-		pos.y = screen_pos.y - size.y - 12.0
-	position = pos
+	var placed := RetrowaveTheme.clamp_tooltip_rect(
+		size,
+		Rect2(Vector2.ZERO, viewport_size),
+		Rect2(screen_pos, Vector2(1, 1)),
+		8.0
+	)
+	position = placed.position
 
 
 func _on_meta_clicked(meta: Variant) -> void:
