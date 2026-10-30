@@ -32,6 +32,11 @@ func _run() -> void:
 	_test_command_center_pause_menu()
 	_test_save_browser_opens_command_center()
 	_test_live_win_then_loss()
+	_test_clock_stays_paused_under_overlays()
+	_test_continue_as_closes_in_order()
+	_test_save_hint_and_f6_loyalty()
+	_test_save_list_polish()
+	_test_victory_render()
 	var ok := _failures == 0
 	print("HeadlessCampaignSave1Test: ", "PASS" if ok else "FAIL", " (failures=", _failures, ")")
 	print("HeadlessCampaignSave1Test: RESULT=", "PASS" if ok else "FAIL")
@@ -499,6 +504,388 @@ func _test_live_win_then_loss() -> void:
 	_pass("loss: end screen before the continuation picker, clock paused")
 
 
+func _test_clock_stays_paused_under_overlays() -> void:
+	_free_menu()
+	_free_group("campaign_ink_end_screen")
+	_free_group("continuation_picker")
+	var tm := root.get_node_or_null("TimeManager")
+	var bar := _make_bar()
+	if tm == null or bar == null:
+		_fail("clock: autoload or bar missing")
+		return
+	tm.set_paused(false)
+	tm.set_time_scale(2.0)
+	bar.set("current_speed", 2)
+	bar.set("is_paused", false)
+	bar.set_meta("player_owns_clock", true)
+	var elapsed0 := int(tm.total_days_elapsed)
+	var menu := _make_menu()
+	if menu == null:
+		_fail("clock: CC missing")
+		return
+	if not bool(tm.call("is_paused")):
+		_fail("clock: CC did not pause TimeManager")
+		return
+	bar.call("_set_game_speed", 4)
+	if not bool(tm.call("is_paused")) or not is_equal_approx(float(tm.time_scale), 2.0):
+		_fail("clock: speed key moved TimeManager under CC (paused=%s scale=%s)" % [str(tm.call("is_paused")), str(tm.time_scale)])
+		return
+	bar.call("_on_pause_pressed")
+	if bar.has_method("_step_live_clock"):
+		bar.call("_step_live_clock")
+	if not bool(tm.call("is_paused")):
+		_fail("clock: pause/space still moved TimeManager under CC")
+		return
+	if not is_equal_approx(float(tm.time_scale), 2.0):
+		_fail("clock: speed under CC changed scale to %s" % str(tm.time_scale))
+		return
+	if int(tm.total_days_elapsed) != elapsed0:
+		_fail("clock: days advanced under CC")
+		return
+	if menu.has_method("_force_close"):
+		menu.call("_force_close")
+	if bool(tm.call("is_paused")):
+		_fail("clock: Resume did not restore the earlier running state")
+		return
+	if not is_equal_approx(float(tm.time_scale), 2.0):
+		_fail("clock: Resume lost 2x (scale=%s)" % str(tm.time_scale))
+		return
+	_pass("clock: CC blocks speed keys and Resume restores 2x")
+	tm.set_paused(false)
+	tm.set_time_scale(3.0)
+	bar.set("current_speed", 3)
+	bar.set("is_paused", false)
+	var screen: Script = load("res://scripts/ui/CampaignInkEndScreen.gd") as Script
+	if screen == null:
+		_fail("clock: end screen script missing")
+		return
+	screen.call("present_win", "GER", "end_date")
+	if not bool(tm.call("is_paused")):
+		_fail("clock: VICTORY did not pause")
+		return
+	bar.call("_set_game_speed", 4)
+	if not bool(tm.call("is_paused")) or not is_equal_approx(float(tm.time_scale), 3.0):
+		_fail("clock: speed key moved the clock under VICTORY")
+		return
+	var win := _ink_screen()
+	var keep := win.find_child("BtnKeepPlaying", true, false) if win != null else null
+	if keep is BaseButton:
+		(keep as BaseButton).pressed.emit()
+	if bool(tm.call("is_paused")):
+		_fail("clock: Keep playing did not restore the earlier running state")
+		return
+	if not is_equal_approx(float(tm.time_scale), 3.0):
+		_fail("clock: Keep playing lost 3x (scale=%s)" % str(tm.time_scale))
+		return
+	_pass("clock: VICTORY blocks speed keys and Keep playing restores 3x")
+
+
+func _test_continue_as_closes_in_order() -> void:
+	_free_menu()
+	_free_group("campaign_ink_end_screen")
+	_free_group("continuation_picker")
+	var tm := root.get_node_or_null("TimeManager")
+	var lm := root.get_node_or_null("LeaderManager")
+	var gd := root.get_node_or_null("GameData")
+	var screen: Script = load("res://scripts/ui/CampaignInkEndScreen.gd") as Script
+	if tm == null or lm == null or gd == null or screen == null:
+		_fail("continue: autoload missing")
+		return
+	_free_group("campaign_ink_end_screen")
+	_free_group("continuation_picker")
+	screen.call("clear_log")
+	lm.call("set_player_country_tag", "GER")
+	tm.set_paused(false)
+	tm.set_time_scale(2.0)
+	gd.call("trigger_national_defeat_or_continuation", "GER", "continue-order")
+	var loss := _ink_screen()
+	if loss == null:
+		_fail("continue: DEFEAT missing")
+		return
+	var cont := loss.find_child("BtnContinueAs", true, false)
+	if not (cont is BaseButton):
+		_fail("continue: Continue as… missing")
+		return
+	(cont as BaseButton).pressed.emit()
+	var picker := _picker()
+	if picker == null:
+		_fail("continue: picker missing")
+		return
+	if _ink_screen() == null:
+		_fail("continue: DEFEAT vanished when the picker opened")
+		return
+	var cancel := picker.find_child("BtnCancelPicker", true, false)
+	if not (cancel is BaseButton):
+		_fail("continue: Cancel missing on picker")
+		return
+	(cancel as BaseButton).pressed.emit()
+	if _picker() != null:
+		_fail("continue: Cancel left the picker in the tree")
+		return
+	if _ink_screen() == null:
+		_fail("continue: Cancel did not return to DEFEAT")
+		return
+	if str(lm.player_country_tag).strip_edges().to_upper() != "GER":
+		_fail("continue: Cancel switched the player")
+		return
+	cont = _ink_screen().find_child("BtnContinueAs", true, false)
+	if cont is BaseButton:
+		(cont as BaseButton).pressed.emit()
+	picker = _picker()
+	if picker == null:
+		_fail("continue: picker did not reopen")
+		return
+	var usa := picker.find_child("BtnPick_USA", true, false)
+	if not (usa is BaseButton):
+		_fail("continue: USA pick button missing")
+		return
+	(usa as BaseButton).pressed.emit()
+	if str(lm.player_country_tag).strip_edges().to_upper() != "GER":
+		_fail("continue: pick switched before Confirm")
+		return
+	var confirm := picker.find_child("BtnConfirmContinue", true, false)
+	if not (confirm is BaseButton):
+		_fail("continue: Confirm missing")
+		return
+	(confirm as BaseButton).pressed.emit()
+	if _picker() != null:
+		_fail("continue: picker still in the tree after Confirm")
+		return
+	if _ink_screen() != null:
+		_fail("continue: DEFEAT still in the tree after Confirm")
+		return
+	if str(lm.player_country_tag).strip_edges().to_upper() != "USA":
+		_fail("continue: player is %s after Confirm" % str(lm.player_country_tag))
+		return
+	if _orphaned_end_nodes():
+		_fail("continue: leftover picker or end screen in the tree")
+		return
+	_pass("continue: Cancel returns to DEFEAT; Confirm closes both and switches")
+
+
+func _test_save_hint_and_f6_loyalty() -> void:
+	var bar := _make_bar()
+	if bar == null:
+		_fail("hint: top bar missing")
+		return
+	var save_tip := ""
+	var save_btn: Variant = bar.get("save_button")
+	if save_btn is Control:
+		save_tip = str((save_btn as Control).tooltip_text)
+	var menu_tip := ""
+	var menu_btn: Variant = bar.get("menu_button")
+	if menu_btn is Control:
+		menu_tip = str((menu_btn as Control).tooltip_text)
+	if save_tip.find("Ctrl+Shift+S") < 0 and menu_tip.find("Ctrl+Shift+S") < 0:
+		_fail("hint: top bar save control tooltip missing Ctrl+Shift+S (save='%s' menu='%s')" % [save_tip, menu_tip])
+		return
+	var menu := _make_menu()
+	if menu == null:
+		_fail("hint: CC missing")
+		return
+	var hint := menu.find_child("SaveListHint", true, false)
+	if hint == null or str(hint.text).find("Ctrl+Shift+S") < 0:
+		_fail("hint: CC save/load section missing Ctrl+Shift+S")
+		return
+	var mr_src := FileAccess.get_file_as_string("res://scripts/map/MapRenderer.gd")
+	var f6 := mr_src.find("keycode == KEY_F6")
+	if f6 < 0:
+		_fail("f6: KEY_F6 missing on MapRenderer")
+		return
+	var slice := mr_src.substr(f6, 180)
+	if slice.find("loyalty") < 0:
+		_fail("f6: KEY_F6 is no longer the loyalty mapmode")
+		return
+	if slice.find("save") >= 0 or slice.find("Save") >= 0:
+		_fail("f6: KEY_F6 was rebound toward save")
+		return
+	_pass("hint: Ctrl+Shift+S on save list; F6 stays loyalty")
+	if menu.has_method("_force_close"):
+		menu.call("_force_close")
+
+
+func _test_save_list_polish() -> void:
+	_free_menu()
+	var sl := root.get_node_or_null("SaveLoadManager")
+	var tm := root.get_node_or_null("TimeManager")
+	var lm := root.get_node_or_null("LeaderManager")
+	if sl == null or tm == null or lm == null:
+		_fail("polish: autoload missing")
+		return
+	var sl_src := FileAccess.get_file_as_string("res://scripts/autoload/SaveLoadManager.gd")
+	if sl_src.find("const SAVE_VERSION := 2") < 0:
+		_fail("polish: SAVE_VERSION is not 2")
+		return
+	lm.call("set_player_country_tag", "GER")
+	tm.current_year = 1936
+	tm.current_month = 3
+	tm.current_day = 14
+	tm.total_days_elapsed = 14
+	var saved: Dictionary = sl.call("save_game_detailed", SLOT)
+	if not bool(saved.get("ok", false)):
+		_fail("polish: save failed")
+		return
+	var row := _slot_row(sl, SLOT)
+	var when := str(row.get("when_line", ""))
+	var saved_at := when
+	var idx := when.find("Saved ")
+	if idx >= 0:
+		saved_at = when.substr(idx)
+	if saved_at.find("T") >= 0:
+		_fail("polish: save time is still ISO/UTC with T ('%s')" % when)
+	if saved_at.find("Saved ") < 0:
+		_fail("polish: when_line missing Saved ('%s')" % when)
+	tm.current_year = 1936
+	tm.current_month = 3
+	tm.current_day = 14
+	var auto1: Dictionary = sl.call("save_game_detailed", "autosave")
+	if not bool(auto1.get("ok", false)):
+		_fail("polish: first autosave failed")
+		return
+	var menu := _make_menu()
+	if menu == null:
+		_fail("polish: CC missing")
+		return
+	var card := menu.find_child("SlotCard_autosave", true, false)
+	var detail := card.find_child("SlotDetail", true, false) if card != null else null
+	if detail == null or str(detail.text).find("14 Mar 1936") < 0:
+		_fail("polish: autosave card missing 14 Mar 1936 ('%s')" % (str(detail.text) if detail != null else "missing"))
+		return
+	tm.current_year = 1936
+	tm.current_month = 4
+	tm.current_day = 20
+	tm.total_days_elapsed = 51
+	var auto2: Dictionary = sl.call("save_game_detailed", "autosave")
+	if not bool(auto2.get("ok", false)):
+		_fail("polish: rewritten autosave failed")
+		return
+	if menu.has_method("_refresh_save_list"):
+		menu.call("_refresh_save_list")
+	card = menu.find_child("SlotCard_autosave", true, false)
+	detail = card.find_child("SlotDetail", true, false) if card != null else null
+	var detail_txt := str(detail.text) if detail != null else ""
+	if detail_txt.find("20 Apr 1936") < 0:
+		_fail("polish: autosave card did not refresh in-game date ('%s')" % detail_txt)
+		return
+	if detail_txt.find("14 Mar 1936") >= 0:
+		_fail("polish: stale autosave date still on the card ('%s')" % detail_txt)
+		return
+	var bad_path := str(sl.call("get_save_path", "slot2"))
+	var bf := FileAccess.open(bad_path, FileAccess.WRITE)
+	if bf == null:
+		_fail("polish: could not write corrupt slot2")
+		return
+	bf.store_string("{not json")
+	bf.close()
+	var bad_row := _slot_row(sl, "slot2")
+	var blob := str(bad_row.get("nation_line", "")) + "\n" + str(bad_row.get("when_line", "")) + "\n" + str(bad_row.get("game_date_label", ""))
+	if blob.find("unreadable") < 0 and blob.find("Unreadable") < 0:
+		_fail("polish: corrupt card is a bare dash ('%s')" % blob)
+		return
+	var tag_before := str(lm.player_country_tag)
+	var loaded: Dictionary = sl.call("load_game_detailed", "slot2")
+	if bool(loaded.get("ok", false)):
+		_fail("polish: corrupt slot2 loaded")
+		return
+	if str(loaded.get("error", "")).find("unreadable") < 0:
+		_fail("polish: corrupt load error '%s'" % str(loaded.get("error", "")))
+		return
+	if str(lm.player_country_tag) != tag_before:
+		_fail("polish: corrupt load mutated player tag")
+		return
+	_pass("polish: local save time, autosave date refresh, corrupt slot unreadable")
+	if menu.has_method("_force_close"):
+		menu.call("_force_close")
+
+
+func _test_victory_render() -> void:
+	DisplayServer.window_set_size(Vector2i(1280, 800))
+	if root is Window:
+		(root as Window).size = Vector2i(1280, 800)
+	_free_group("campaign_ink_end_screen")
+	var screen: Script = load("res://scripts/ui/CampaignInkEndScreen.gd") as Script
+	if screen == null:
+		_fail("victory: script missing")
+		return
+	var why := "end_date, enemy_capitals"
+	screen.call("present_win", "GER", why)
+	var win := _ink_screen()
+	if win == null:
+		_fail("victory: screen missing")
+		return
+	var title := win.find_child("OutcomeTitle", true, false)
+	if title == null or str(title.text) != "VICTORY":
+		_fail("victory: title is not VICTORY")
+		return
+	var reason := win.find_child("OutcomeReason", true, false)
+	if reason == null or str(reason.text).find("end_date") < 0:
+		_fail("victory: reasons text missing")
+		return
+	var vp := Rect2(0, 0, 1280, 800)
+	for nm in ["OutcomeTitle", "OutcomeReason", "BtnKeepPlaying", "BtnSave", "BtnMainMenu"]:
+		var n := win.find_child(nm, true, false)
+		if not (n is Control):
+			_fail("victory: %s missing" % nm)
+			return
+		var r: Rect2 = (n as Control).get_global_rect()
+		if r.size.x <= 0.0 or r.size.y <= 0.0:
+			continue
+		if r.position.x < -1.0 or r.position.y < -1.0 or r.end.x > vp.size.x + 1.0 or r.end.y > vp.size.y + 1.0:
+			_fail("victory: %s outside 1280×800 at %s" % [nm, str(r)])
+			return
+	_pass("victory: VICTORY reasons and buttons inside 1280×800")
+	if win.has_method("_dismiss_end_screen"):
+		win.call("_dismiss_end_screen")
+	else:
+		win.queue_free()
+
+
+func _picker() -> Node:
+	for n in get_nodes_in_group("continuation_picker"):
+		if is_instance_valid(n) and not n.is_queued_for_deletion():
+			if str(n.name).ends_with("_dying"):
+				continue
+			return n
+	return null
+
+
+func _free_group(group: String) -> void:
+	for n in get_nodes_in_group(group):
+		if n == null or not is_instance_valid(n):
+			continue
+		if n.has_method("_release_clock_lock"):
+			n.call("_release_clock_lock")
+		if n.is_in_group(group):
+			n.remove_from_group(group)
+		n.name = str(n.name) + "_dying"
+		var parent := n.get_parent()
+		if parent != null:
+			parent.remove_child(n)
+		n.free()
+
+
+func _free_menu() -> void:
+	var menu := root.get_node_or_null("MainMenu")
+	if menu == null or not is_instance_valid(menu):
+		return
+	if menu.has_method("_release_clock_lock"):
+		menu.call("_release_clock_lock")
+	var parent := menu.get_parent()
+	if parent != null:
+		parent.remove_child(menu)
+	menu.free()
+
+
+func _orphaned_end_nodes() -> bool:
+	for n in get_nodes_in_group("continuation_picker"):
+		if is_instance_valid(n) and not n.is_queued_for_deletion() and not str(n.name).ends_with("_dying"):
+			return true
+	for n2 in get_nodes_in_group("campaign_ink_end_screen"):
+		if is_instance_valid(n2) and not n2.is_queued_for_deletion() and not str(n2.name).ends_with("_dying"):
+			return true
+	return false
+
+
 func _formations(lm: Node) -> Dictionary:
 	var raw: Variant = lm.get("formations")
 	if raw is Dictionary:
@@ -563,7 +950,7 @@ func _make_menu() -> Node:
 func _ink_screen() -> Node:
 	var nodes := get_nodes_in_group("campaign_ink_end_screen")
 	for n in nodes:
-		if is_instance_valid(n) and not n.is_queued_for_deletion():
+		if is_instance_valid(n) and not n.is_queued_for_deletion() and not str(n.name).ends_with("_dying"):
 			return n
 	return null
 
