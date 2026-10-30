@@ -87,6 +87,7 @@ func _run() -> void:
 		return
 	_test_front_chips()
 	_test_eng_channel_fleet()
+	_test_map_country_select()
 	_test_ger_maginot_air_wing()
 	_test_organize()
 	_test_completing_bars()
@@ -521,6 +522,24 @@ func _test_eng_channel_fleet() -> void:
 		_fail("Channel %d is not a sea hex" % ENG_CHANNEL)
 		return
 	_pass("ENG fleet on sea hex %d" % ENG_CHANNEL)
+	_pass("NEXT stationed Channel fleet %d" % ENG_CHANNEL)
+	var saved_station := int(fleet.stationed_province_id)
+	fleet.stationed_province_id = ENG_NORTH_SEA
+	if _mm != null and _mm.has_method("living_choke_state"):
+		var bite: Dictionary = _mm.call("living_choke_state", ENG_CHANNEL, ENG_TAG) as Dictionary
+		fleet.stationed_province_id = saved_station
+		if not bool(bite.get("bite", false)):
+			_fail("Channel off-station supply bite missing: %s" % str(bite))
+			return
+		var bite_sentence := str(bite.get("sentence", "")).to_lower()
+		if "off-station" not in bite_sentence or "supply bite" not in bite_sentence:
+			_fail("Channel off-station supply bite sentence: %s" % str(bite.get("sentence", "")))
+			return
+		_pass("Channel off-station supply bite")
+	else:
+		fleet.stationed_province_id = saved_station
+		_fail("living_choke_state missing")
+		return
 	var chip: Node = _chip_on(ENG_CHANNEL)
 	if chip == null:
 		_fail("no DemoUnitIcon on Channel fleet %d" % ENG_CHANNEL)
@@ -565,6 +584,58 @@ func _test_eng_channel_fleet() -> void:
 			_pass("ENG NEXT choke source=%s" % str(rec.get("source")))
 
 
+func _test_map_country_select() -> void:
+	var title_scr: Script = load("res://scripts/ui/LivingTitleBoot.gd") as Script
+	if title_scr == null or not title_scr.has_method("playable_tag_from_province"):
+		_fail("playable_tag_from_province missing")
+		return
+	var chi_tag := str(title_scr.call("playable_tag_from_province", CHI_FRONT))
+	if not chi_tag.is_empty():
+		_fail("map pick not playable CHI got %s" % chi_tag)
+		return
+	_pass("map pick not playable CHI")
+	var fra_tag := str(title_scr.call("playable_tag_from_province", FRA_FRONT))
+	if fra_tag != "FRA":
+		_fail("map pick FRA land got %s" % fra_tag)
+		return
+	_pass("map pick FRA land")
+	var ger_tag := str(title_scr.call("playable_tag_from_province", GER_CAPITAL))
+	if ger_tag != "GER":
+		_fail("map pick GER capital got %s" % ger_tag)
+		return
+	_pass("map pick GER capital")
+	var jap_tag := str(title_scr.call("playable_tag_from_province", JAP_FRONT))
+	if jap_tag != "JAP":
+		_fail("map pick JAP land got %s" % jap_tag)
+		return
+	_pass("map pick JAP land")
+	var hook_scr: Script = load("res://scripts/ui/PlayNextHook.gd") as Script
+	if hook_scr == null or not hook_scr.has_method("living_diplomacy_from_province"):
+		_fail("living_diplomacy_from_province missing")
+		return
+	var influence: Dictionary = hook_scr.call("living_diplomacy_from_province", FRA_FRONT, "GER") as Dictionary
+	if not bool(influence.get("ok", false)) or str(influence.get("other_tag", "")) != "FRA":
+		_fail("map influence FRA got %s" % str(influence))
+		return
+	_pass("map influence FRA")
+	if not hook_scr.has_method("send_agent_to_province"):
+		_fail("send_agent_to_province missing")
+		return
+	var agent: Dictionary = hook_scr.call("send_agent_to_province", FRA_FRONT, "GER") as Dictionary
+	if not bool(agent.get("ok", false)):
+		_fail("send agent to FRA got %s" % str(agent))
+		return
+	_pass("send agent to FRA")
+	if not hook_scr.has_method("apply_living_trade"):
+		_fail("apply_living_trade missing")
+		return
+	var trade: Dictionary = hook_scr.call("apply_living_trade", FRA_FRONT, "GER") as Dictionary
+	if not bool(trade.get("ok", false)):
+		_fail("map trade FRA got %s" % str(trade))
+		return
+	_pass("map trade FRA")
+
+
 func _test_ger_maginot_air_wing() -> void:
 	var wing: Object = null
 	if _lm != null and _lm.has_method("get_formations_for_country"):
@@ -584,6 +655,7 @@ func _test_ger_maginot_air_wing() -> void:
 		_fail("GER wing assigned region want %d got %d" % [MAGINOT_REGION, rid])
 		return
 	_pass("GER wing assigned Maginot-region %d" % rid)
+	_pass("NEXT assign CAS")
 	var battle := {
 		"from_id": GER_FRONT,
 		"to_id": FRA_FRONT,
@@ -599,8 +671,15 @@ func _test_ger_maginot_air_wing() -> void:
 	if att_on < 1.0:
 		_fail("assigned Maginot-region CAS want >0 got %s" % str(att_on))
 		return
-	if "assigned_region_id" in wing:
-		wing.assigned_region_id = 0
+	var wing_fid := str(wing.formation_id) if "formation_id" in wing else ""
+	if _lm == null or not _lm.has_method("unassign_air_wing"):
+		_fail("unassign_air_wing missing")
+		return
+	var unassigned: Dictionary = _lm.call("unassign_air_wing", wing_fid) as Dictionary
+	if not bool(unassigned.get("ok", false)):
+		_fail("NEXT unassign CAS failed: %s" % str(unassigned))
+		return
+	_pass("NEXT unassign CAS")
 	var cas_off: Dictionary = _bm.call("land_battle_cas_power", battle)
 	var att_off := float(cas_off.get("cas_att", 0.0))
 	print("  [INFO] CAS unassigned %s" % str(cas_off))
@@ -1497,6 +1576,21 @@ func _test_peace_occupation() -> void:
 		_fail("NEXT occupation missing resistance: %s" % str(unrest))
 		return
 	_pass("NEXT occupation unrest %s" % str(unrest.get("label", "")))
+	var tm_occ: Node = _autoload("TimeManager")
+	if tm_occ == null or not tm_occ.has_method("_maybe_tick_occupation_unrest"):
+		_fail("occupation unrest tick missing")
+		return
+	var ticks_before := 0
+	if "peace_state" in gd and gd.peace_state is Dictionary:
+		ticks_before = int((gd.peace_state as Dictionary).get("occupation_tick_count", 0))
+	tm_occ.call("_maybe_tick_occupation_unrest")
+	var ticks_after := ticks_before
+	if "peace_state" in gd and gd.peace_state is Dictionary:
+		ticks_after = int((gd.peace_state as Dictionary).get("occupation_tick_count", 0))
+	if ticks_after <= ticks_before:
+		_fail("occupation unrest tick did not advance (%d→%d)" % [ticks_before, ticks_after])
+		return
+	_pass("occupation unrest tick")
 	var aar_scr: Script = load("res://scripts/combat/LandBattleAar.gd") as Script
 	if aar_scr != null and aar_scr.has_method("economy_sentence"):
 		var eco := str(aar_scr.call("economy_sentence", fra_p.get("resources"), 1936, DEF_TAG, ATT_TAG))
@@ -1806,6 +1900,44 @@ func _test_nation_era_next() -> void:
 		_fail("restore GER player tag failed")
 		return
 	_pass("restored default GER Maginot player tag")
+	var menu_scr: Script = load("res://scripts/ui/MainMenu.gd") as Script
+	if menu_scr == null or not menu_scr.has_method("apply_living_campaign_pick"):
+		_fail("apply_living_campaign_pick missing")
+		return
+	var jap_pick: Dictionary = menu_scr.call("apply_living_campaign_pick", "JAP", 2026) as Dictionary
+	if str(jap_pick.get("player_tag", "")) != "JAP" or int(jap_pick.get("year", 0)) != 2026:
+		_fail("CC campaign pick JAP 2026 got %s" % str(jap_pick))
+		return
+	_pass("CC campaign pick JAP 2026")
+	var fra_pick: Dictionary = menu_scr.call("apply_living_campaign_pick", "FRA", 1918) as Dictionary
+	if str(fra_pick.get("player_tag", "")) != "FRA" or int(fra_pick.get("year", 0)) != 1918:
+		_fail("CC campaign pick FRA 1918 got %s" % str(fra_pick))
+		return
+	_pass("CC campaign pick FRA 1918")
+	var unk_pick: Dictionary = menu_scr.call("living_campaign_pick_facts", "ZZZ", 1492) as Dictionary
+	if str(unk_pick.get("player_tag", "")) != "GER" or int(unk_pick.get("year", 0)) != 1936:
+		_fail("CC unknown pick defaults GER 1936 got %s" % str(unk_pick))
+		return
+	_pass("CC unknown pick defaults GER 1936")
+	var title_scr: Script = load("res://scripts/ui/LivingTitleBoot.gd") as Script
+	if title_scr == null or not title_scr.has_method("should_show_living_title"):
+		_fail("should_show_living_title missing")
+		return
+	if bool(title_scr.call("should_show_living_title")):
+		_fail("title boot skipped headless but should_show returned true")
+		return
+	_pass("title boot skipped headless")
+	if not title_scr.has_method("apply_living_title_boot"):
+		_fail("apply_living_title_boot missing")
+		return
+	var eng_boot: Dictionary = title_scr.call("apply_living_title_boot", "ENG", 1918, "") as Dictionary
+	if str(eng_boot.get("player_tag", "")) != "ENG" or int(eng_boot.get("year", 0)) != 1918:
+		_fail("title boot new ENG 1918 got %s" % str(eng_boot))
+		return
+	_pass("title boot new ENG 1918")
+	_lm.call("boot_living_player", ATT_TAG)
+	if tm != null and tm.has_method("boot_living_era"):
+		tm.call("boot_living_era", 1936)
 
 
 func _test_playtest_clock() -> void:
@@ -1882,6 +2014,14 @@ func _test_playtest_clock() -> void:
 		_fail("playtest clock save/load drifted Maginot GER owner")
 		return
 	_pass("playtest clock save/load elapsed=%d AAR restored" % int(rt.get("elapsed_restored", 0)))
+	if not clock.has("ai_land_started_n") or not clock.has("ai_started_to_ids"):
+		_fail("playtest clock AI land start missing from %s" % str(clock))
+		return
+	_pass("playtest clock AI land start ai_land_started_n=%d" % int(clock.get("ai_land_started_n", 0)))
+	if not clock.has("occupation_tick_n"):
+		_fail("playtest clock occupation unrest tick missing from %s" % str(clock))
+		return
+	_pass("playtest clock occupation unrest tick n=%d" % int(clock.get("occupation_tick_n", 0)))
 	_pass("playtest clock advanced %d days (elapsed=%d)" % [advanced, elapsed])
 
 

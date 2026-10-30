@@ -519,10 +519,21 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
         left = ren.find("MOUSE_BUTTON_LEFT", i)
         end = ren.find("MOUSE_BUTTON_RIGHT", left if left >= 0 else i)
         spatial = ren[left if left >= 0 else i : end if end > 0 else i + 8000]
+    # 46ed9eba: left-click hex read lives in _still_click_province_pid, which
+    # still calls get_province_at_world_pos. Pin stays before that call.
+    still_fn = _slice(ren, "_still_click_province_pid")
+    hex_body = _slice(ren, "_resolve_hex_pick_pid")
+    hex_tok = "_still_click_province_pid"
+    if hex_tok not in spatial:
+        hex_tok = "get_province_at_world_pos"
     pin_first = (
         "_try_open_unit_at_world" in spatial
-        and "get_province_at_world_pos" in spatial
-        and spatial.find("_try_open_unit_at_world") < spatial.find("get_province_at_world_pos")
+        and hex_tok in spatial
+        and spatial.find("_try_open_unit_at_world") < spatial.find(hex_tok)
+        and (
+            "get_province_at_world_pos" in still_fn
+            or "get_province_at_world_pos" in hex_body
+        )
     )
     wiring["pin_before_hex"] = pin_first
     (passes if pin_first else fails).append("pin_before_hex")
