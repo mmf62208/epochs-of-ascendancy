@@ -140,6 +140,10 @@
 
 extends Node
 
+## Fired after a save actually applies. Same-frame duplicate deliveries and
+## failed reads do not emit. Defeat / victory overlays listen and dismiss.
+signal load_completed(slot_name: String)
+
 const SAVE_DIR := "user://saves/"
 const SAVE_VERSION := 2
 const SAVE_GAME_VERSION := "0.2-dev"   # Bumped for richer metadata support
@@ -837,6 +841,11 @@ func _adopt_loaded_elapsed() -> void:
 			TimeManager.note_overlay_clock_from_current()
 
 
+## Successful apply only. Duplicate same-frame deliveries and failed reads return earlier.
+func _emit_load_completed(slot_name: String) -> void:
+	load_completed.emit(str(slot_name))
+
+
 func _notify_top_bar_speed_resync() -> void:
 	var tree := Engine.get_main_loop() as SceneTree
 	if tree == null:
@@ -1078,7 +1087,7 @@ func load_game(slot_name: String = DEFAULT_SLOT) -> bool:
 
 	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
 		LeaderEventUI.show_toast("Game loaded (" + slot_name + ")", 2.5)
-
+	_emit_load_completed(slot_name)
 	return true
 
 ## === INTERNAL GATHER / APPLY ===
@@ -2202,6 +2211,7 @@ func load_game_detailed(slot_name: String = DEFAULT_SLOT) -> Dictionary:
 	_notify_top_bar_speed_resync()
 	eoa_load_apply_count += 1
 	print("EOA_LOAD_APPLY n=%d slot=%s" % [eoa_load_apply_count, slot_key])
+	_emit_load_completed(slot_key)
 	return {"ok": true, "path": path, "version": file_version, "slot": slot_key}
 
 ## === UX helpers (delete, rename) for save menu ===

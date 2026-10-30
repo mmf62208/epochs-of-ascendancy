@@ -90,6 +90,8 @@ var _pending_sim_events: Array = []
 var _sim_flush_scheduled: bool = false
 ## Compact 5–20d playtest clock: light capture (no execute BFS-retreat), F5 flush.
 var _living_playtest_clock: bool = false
+var _playtest_ai_started_to_ids: Array = []
+var _playtest_occupation_tick_n: int = 0
 ## Headless stand-in for editor/export Play: light sim + day_ai/invest, no playtest skips.
 var _live_f5_equiv_clock: bool = false
 var _draining_f5_flush: bool = false
@@ -1317,6 +1319,8 @@ func advance_living_playtest_days(days: int = 5) -> Dictionary:
 	var from_month := current_month
 	var was_paused := paused
 	paused = false
+	_playtest_ai_started_to_ids.clear()
+	_playtest_occupation_tick_n = 0
 	_living_playtest_clock = true
 	advance_days(float(n))
 	var flushed := _drain_living_f5_flush(n)
@@ -1344,6 +1348,9 @@ func advance_living_playtest_days(days: int = 5) -> Dictionary:
 		"news": true,
 		"f5_flush": true,
 		"flushed": flushed,
+		"ai_land_started_n": _playtest_ai_started_to_ids.size(),
+		"ai_started_to_ids": _playtest_ai_started_to_ids.duplicate(),
+		"occupation_tick_n": _playtest_occupation_tick_n,
 	}
 
 
@@ -1415,6 +1422,7 @@ func _flush_sim_events() -> void:
 		_reseed_sim_day(int(ev.get("elapsed", total_days_elapsed)))
 		_begin_day_tick_profile()
 		_emit_game_day_advanced_profiled(int(ev.get("year", 0)), int(ev.get("month", 0)), int(ev.get("day", 0)))
+		_maybe_tick_occupation_unrest()
 		if kind == "day":
 			# Legacy single-event day (should not queue on F5).
 			# _maybe_run_interactive_multi_ai / _maybe_run_ai_infra_invest / _maybe_run_ai_land_battle_starts
@@ -1589,10 +1597,6 @@ func _campaign_after_battles() -> void:
 
 
 func _maybe_run_ai_land_battle_starts() -> void:
-	if _living_playtest_clock:
-		# Compact 20d Maginot clock ticks open fights only — new AI assaults
-		# were opening extra fronts (and execute-risk on empty hexes).
-		return
 	if typeof(WarStateDomain) != TYPE_NIL and WarStateDomain.loop_enabled():
 		if WarStateDomain.ai_stopped():
 			return
@@ -1613,7 +1617,11 @@ func _maybe_run_ai_land_battle_starts() -> void:
 	var day_i := 0
 	if has_method("get_total_days_elapsed"):
 		day_i = int(get_total_days_elapsed())
-	BattleManager.try_ai_start_land_battles(day_i)
+	var started: Variant = BattleManager.try_ai_start_land_battles(day_i)
+	if _living_playtest_clock and started is Dictionary:
+		for row_v in (started as Dictionary).get("started", []):
+			if row_v is Dictionary:
+				_playtest_ai_started_to_ids.append(int((row_v as Dictionary).get("to_id", -1)))
 
 
 func _tick_own_land_marches() -> void:
@@ -1761,6 +1769,20 @@ func _callable_profile_label(cb: Callable) -> String:
 			nm = n.get_class()
 		return "%s.%s" % [nm, method_name]
 	return "%s.%s" % [obj.get_class(), method_name]
+
+
+func _maybe_tick_occupation_unrest() -> void:
+	if typeof(GameData) == TYPE_NIL or not GameData.has_method("apply_occupation_daily_tick_live"):
+		return
+	var store: Dictionary = {}
+	if "peace_state" in GameData and GameData.peace_state is Dictionary:
+		var raw: Variant = (GameData.peace_state as Dictionary).get("occupation_province", {})
+		if raw is Dictionary:
+			store = raw
+	for key in store.keys():
+		GameData.apply_occupation_daily_tick_live(int(str(key)))
+		if _living_playtest_clock:
+			_playtest_occupation_tick_n += 1
 
 
 func _emit_game_day_advanced_profiled(year: int, month: int, day: int) -> void:

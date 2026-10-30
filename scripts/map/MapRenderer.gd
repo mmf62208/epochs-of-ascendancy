@@ -3973,8 +3973,12 @@ func _unhandled_input(event: InputEvent) -> void:
 					get_viewport().set_input_as_handled()
 					return
 			elif selected_formation_id.is_empty():
-				# MV-1b FIX #1 item 2: own air/fleet/space disk before land spill.
-				if _try_open_unit_at_world(world_pos):
+				# MV-1b: own air/fleet/space disk before land spill.
+				# A capital star under the cursor beats that air/fleet chip
+				# (Berlin star vs Air Wing). Land still runs, so a division
+				# plate beats the star. The star inspect is the block below.
+				var star_beats_air: bool = _capital_star_pid_at(world_pos) > 0
+				if not star_beats_air and _try_open_unit_at_world(world_pos):
 					get_viewport().set_input_as_handled()
 					return
 				if _try_open_land_unit_at_world(world_pos, false, disk_only):
@@ -20901,8 +20905,8 @@ func _try_living_title_map_pick(pid: int) -> bool:
 	if not _living_title_boot_is_up():
 		return false
 	var boot: Node = _living_title_boot_node()
-	if boot != null and boot.has_method("select_from_province"):
-		boot.call("select_from_province", pid)
+	if boot is LivingTitleBoot and (boot as LivingTitleBoot).has_method("select_from_province"):
+		(boot as LivingTitleBoot).select_from_province(pid)
 	return true
 
 
@@ -21106,8 +21110,14 @@ func _nearest_player_land_formation_at_world(world_pos: Vector2) -> Object:
 			if not counter.visible:
 				continue
 			# Painted chrome after Home/fit — not AABB-floor widen.
-			var chip_pos: Vector2 = _demo_unit_icon_world_pos(counter, id)
-			var hit_r: float = _demo_unit_icon_hit_radius_world(z, counter)
+			if not str(counter.name).begins_with("DemoUnitIcon_"):
+				continue
+			var chip_pos: Vector2 = counter.global_position
+			if chip_pos == Vector2.ZERO:
+				chip_pos = counter.position
+			if chip_pos == Vector2.ZERO:
+				chip_pos = _demo_unit_icon_world_pos(counter, id)
+			var hit_r: float = _unit_counter_hit_radius_world(z, counter)
 			var accept_r: float = maxf(hit_r, CHROME_SPILL_WORLD)
 			var d: float = world_pos.distance_to(chip_pos)
 			if d > accept_r:
@@ -21391,8 +21401,8 @@ func _mv1_selected_own_land_ready_to_commit(world_pos: Vector2) -> bool:
 
 func _try_open_unit_at_world(world_pos: Vector2) -> bool:
 	# MV-1b: player-tag air/fleet/space only, disk hit (no spill). Foreign
-	# chips fall through to the province / move path. Never `_select_map_unit`
-	# a non-player formation from this still-click.
+	# chips fall through to the province / move path. Never select a
+	# non-player formation from this still-click.
 	var land_only: bool = false
 	var player_only: bool = true
 	var fo := _pick_unit_formation_at_world(world_pos, land_only, player_only)
@@ -22166,8 +22176,14 @@ func _pick_unit_formation_at_world(world_pos: Vector2, land_only: bool = false, 
 			# Hidden pins (strategic LOD) must not steal hex clicks.
 			if not counter.visible:
 				continue
-			# Live painted plate after Home/fit. Prefer chrome world pos (not AABB-floor widen).
-			var chip_pos: Vector2 = _demo_unit_icon_world_pos(counter, id)
+			if not str(counter.name).begins_with("DemoUnitIcon_"):
+				continue
+			# Live plate position. Zero global means the icon is not in the tree yet.
+			var chip_pos: Vector2 = counter.global_position
+			if chip_pos == Vector2.ZERO:
+				chip_pos = counter.position
+			if chip_pos == Vector2.ZERO:
+				chip_pos = _demo_unit_icon_world_pos(counter, id)
 			var d: float = world_pos.distance_squared_to(chip_pos)
 			var is_sea_disk: bool = bool(counter.get_meta("sea_nation_disk", false))
 			# FIX #5: below z0.65 land/air hit is the painted body (plate+bars+
@@ -22181,6 +22197,8 @@ func _pick_unit_formation_at_world(world_pos: Vector2, land_only: bool = false, 
 					continue
 			else:
 				var hit_r: float = _demo_unit_icon_hit_radius_world(z, counter)
+				if not is_sea_disk:
+					hit_r = _unit_counter_hit_radius_world(z, counter)
 				if d > hit_r * hit_r:
 					continue
 			var fo: Object = null

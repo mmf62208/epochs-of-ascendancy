@@ -1573,6 +1573,10 @@ func _tick_one_open_land_battle(battle: Dictionary) -> Dictionary:
 			# Compact playtest clock is already a sync loop — apply light capture
 			# now (no execute, no land-path BFS) so idle deferred cannot BFS later.
 			if typeof(TimeManager) != TYPE_NIL and bool(TimeManager.get("_living_playtest_clock")):
+				# Same light capture the idle frame runs. The sync playtest loop
+				# has no idle frame, so apply now as well; the deferred call
+				# no-ops once the province is already ours.
+				call_deferred("_deferred_resolve_attacker_win", att_tag, to_id, from_id, att_fid)
 				_apply_attacker_win_capture_light(att_tag, to_id, from_id, att_fid)
 				ev["success"] = true
 				ev["deferred_capture"] = false

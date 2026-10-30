@@ -107,10 +107,10 @@ class TestUnitCentricPickProduct(unittest.TestCase):
         self.assertNotIn("DIG_CHIP_SKIP", ren)
         land_i = ren.find("func _try_open_land_unit_at_world")
         self.assertGreaterEqual(land_i, 0)
-        land_slice = ren[land_i : land_i + 2400]
-        next_land = land_slice.find("\nfunc ", 1)
-        if next_land > 0:
-            land_slice = land_slice[:next_land]
+        # Sea-bind and hex-miss grew this function past the old 2400 extractor.
+        # The lock is the whole function, including hex resolve after the disk miss.
+        next_land = ren.find("\nfunc ", land_i + 1)
+        land_slice = ren[land_i:next_land] if next_land > land_i else ren[land_i:]
         self.assertIn("_pick_land_unit_formation_at_world", land_slice)
         self.assertIn("_player_land_formation_at_province", land_slice)
         self.assertIn("_formation_is_player_tag", land_slice)

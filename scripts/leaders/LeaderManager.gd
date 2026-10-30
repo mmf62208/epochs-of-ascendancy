@@ -1023,6 +1023,33 @@ func assign_air_wing_to_region(
 	return result
 
 
+## Clear a player CAS assignment. The air card's Unassign button calls this.
+func unassign_air_wing(formation_id: String) -> Dictionary:
+	var fid := formation_id.strip_edges()
+	var result := {"ok": false, "fid": fid, "region_id": -1, "mission": ""}
+	if fid.is_empty():
+		result["error"] = "bad_args"
+		return result
+	var f: Formation = get_formation(fid)
+	if f == null:
+		result["error"] = "unknown"
+		return result
+	var ft := str(f.formation_type) if "formation_type" in f else ""
+	if ft != Formation.TYPE_AIR_WING and ft != Formation.TYPE_AIR_SQUADRON and ft != Formation.TYPE_AIR_GROUP:
+		result["error"] = "not_air"
+		return result
+	if "assigned_region_id" in f:
+		f.assigned_region_id = -1
+	if f.has_method("set_air_mission"):
+		f.set_air_mission("")
+	elif "current_air_mission" in f:
+		f.current_air_mission = ""
+	result["ok"] = true
+	result["region_id"] = int(f.assigned_region_id) if "assigned_region_id" in f else -1
+	result["mission"] = str(f.current_air_mission) if "current_air_mission" in f else ""
+	return result
+
+
 func _stamp_formation_composition(f: Formation, extras: Dictionary) -> void:
 	if f == null:
 		return
