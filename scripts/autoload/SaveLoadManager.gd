@@ -619,8 +619,13 @@ func list_saves() -> Array[Dictionary]:
 		if not dir.current_is_dir() and file_name.ends_with(".json"):
 			var full := SAVE_DIR + file_name
 			var slot := file_name.get_basename()
-			var meta := _peek_metadata(full)
-			result.append({ "slot": slot, "path": full, "metadata": meta })
+			var inspected := _inspect_save_file(full)
+			result.append({
+				"slot": slot,
+				"path": full,
+				"metadata": inspected.get("metadata", {}),
+				"unreadable": not bool(inspected.get("readable", false)),
+			})
 		file_name = dir.get_next()
 	dir.list_dir_end()
 	# Sort by timestamp desc if present
@@ -713,6 +718,56 @@ func format_game_date_display(iso: String) -> String:
 	return "%d %s %s" % [day, _MONTHS[month - 1], s.substr(0, 4)]
 
 
+## Wall-clock save time in the player's local timezone. Never the UTC ISO with T.
+func format_save_time_display(ts: String, unix: float = -1.0) -> String:
+	if unix >= 1.0:
+		return _format_unix_local(int(unix))
+	var s := str(ts).strip_edges()
+	if s.is_empty():
+		return "—"
+	var iso := s.replace(" ", "T")
+	if iso.length() >= 16 and iso[10] == "T":
+		var parsed := Time.get_unix_time_from_datetime_string(iso)
+		if parsed > 0:
+			# Datetime strings without Z were stored as local wall time.
+			return _format_datetime_parts(iso)
+	return s if s.length() <= 19 else s.substr(0, 19)
+
+
+func _format_unix_local(unix: int) -> String:
+	var tz: Dictionary = Time.get_time_zone_from_system()
+	var bias := int(tz.get("bias", 0))
+	var local_unix := unix + bias * 60
+	var d: Dictionary = Time.get_datetime_dict_from_unix_time(local_unix)
+	return _format_datetime_dict(d)
+
+
+func _format_datetime_parts(iso: String) -> String:
+	if iso.length() < 16:
+		return "—"
+	var d := {
+		"year": int(iso.substr(0, 4)),
+		"month": int(iso.substr(5, 2)),
+		"day": int(iso.substr(8, 2)),
+		"hour": int(iso.substr(11, 2)),
+		"minute": int(iso.substr(14, 2)),
+	}
+	return _format_datetime_dict(d)
+
+
+func _format_datetime_dict(d: Dictionary) -> String:
+	var month := int(d.get("month", 0))
+	if month < 1 or month > 12:
+		return "—"
+	return "%d %s %04d %02d:%02d" % [
+		int(d.get("day", 1)),
+		_MONTHS[month - 1],
+		int(d.get("year", 0)),
+		int(d.get("hour", 0)),
+		int(d.get("minute", 0)),
+	]
+
+
 func slot_replace_blurb(slot_name: String) -> String:
 	var meta := _peek_metadata(get_save_path(slot_name))
 	var tag := str(meta.get("player_tag", "")).strip_edges().to_upper()
@@ -759,6 +814,9 @@ func _stamp_slot_metadata(data: Dictionary, slot_name: String) -> void:
 	var game_date := _current_game_date_iso()
 	if not game_date.is_empty():
 		meta["game_date"] = game_date
+	meta["timestamp"] = Time.get_datetime_string_from_system(false)
+	meta["timestamp_unix"] = Time.get_unix_time_from_system()
+	meta["last_played"] = str(meta.get("timestamp", ""))
 	# play_time_seconds stays 0. The card does not show it.
 	data["metadata"] = meta
 
@@ -774,6 +832,9 @@ func _note_save_elapsed() -> void:
 
 func _adopt_loaded_elapsed() -> void:
 	_note_save_elapsed()
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("note_overlay_clock_from_current"):
+		if TimeManager.has_method("overlay_holds_clock") and bool(TimeManager.overlay_holds_clock()):
+			TimeManager.note_overlay_clock_from_current()
 
 
 func _notify_top_bar_speed_resync() -> void:
@@ -783,6 +844,15 @@ func _notify_top_bar_speed_resync() -> void:
 	for n in tree.get_nodes_in_group("top_info_bar"):
 		if n != null and is_instance_valid(n) and n.has_method("resync_speed_from_time_manager"):
 			n.call("resync_speed_from_time_manager")
+
+
+func _notify_save_list_refresh() -> void:
+	var tree := Engine.get_main_loop() as SceneTree
+	if tree == null or tree.root == null:
+		return
+	var menu := tree.root.get_node_or_null("MainMenu")
+	if menu != null and is_instance_valid(menu) and menu.has_method("_refresh_save_list"):
+		menu.call_deferred("_refresh_save_list")
 
 
 ## Player-facing slot list: fixed empty slots + occupied files from list_saves().
@@ -805,7 +875,12 @@ func list_slots_for_ui() -> Array[Dictionary]:
 			continue
 		seen[name] = true
 		if occupied.has(name):
-			rows.append(_format_slot_ui_row(name, true, occupied[name].get("metadata", {})))
+			rows.append(_format_slot_ui_row(
+				name,
+				true,
+				occupied[name].get("metadata", {}),
+				bool(occupied[name].get("unreadable", false))
+			))
 		else:
 			rows.append(_format_slot_ui_row(name, false, {}))
 	# Extra discovered slots
@@ -821,11 +896,16 @@ func list_slots_for_ui() -> Array[Dictionary]:
 	)
 	for e in extras:
 		var sn := str(e.get("slot", ""))
-		rows.append(_format_slot_ui_row(sn, true, e.get("metadata", {})))
+		rows.append(_format_slot_ui_row(
+			sn,
+			true,
+			e.get("metadata", {}),
+			bool(e.get("unreadable", false))
+		))
 	return rows
 
 
-func _format_slot_ui_row(slot: String, occupied: bool, metadata: Variant) -> Dictionary:
+func _format_slot_ui_row(slot: String, occupied: bool, metadata: Variant, unreadable: bool = false) -> Dictionary:
 	var meta: Dictionary = metadata if typeof(metadata) == TYPE_DICTIONARY else {}
 	var name := slot.strip_edges()
 	if name.is_empty():
@@ -838,12 +918,20 @@ func _format_slot_ui_row(slot: String, occupied: bool, metadata: Variant) -> Dic
 	var player := str(meta.get("player_tag", "")).strip_edges().to_upper()
 	var nation_line := nation_card_line(player) if occupied else "—"
 	var game_date_label := "—"
-	if occupied:
+	if occupied and not unreadable:
 		game_date_label = format_game_date_display(str(meta.get("game_date", "")))
 	var ts := str(meta.get("timestamp", meta.get("last_played", "")))
-	var saved_short := ts.substr(0, mini(16, ts.length())) if not ts.is_empty() else "—"
+	var unix := float(meta.get("timestamp_unix", -1))
+	var saved_short := format_save_time_display(ts, unix) if occupied and not unreadable else "—"
 	var when_line := ""
-	if occupied:
+	if unreadable:
+		status = "unreadable"
+		nation_line = "Save unreadable"
+		game_date_label = "Save unreadable"
+		saved_short = "Save unreadable"
+		label = "%s · unreadable" % name
+		when_line = "Save unreadable"
+	elif occupied:
 		status = "occupied"
 		var bits: PackedStringArray = [name]
 		var scenario := str(meta.get("scenario_id", "")).strip_edges()
@@ -875,21 +963,53 @@ func _format_slot_ui_row(slot: String, occupied: bool, metadata: Variant) -> Dic
 		"game_date_label": game_date_label,
 		"when_line": when_line,
 		"playtime_hidden": true,
+		"unreadable": unreadable,
 	}
 
 func _peek_metadata(path: String) -> Dictionary:
+	return _inspect_save_file(path).get("metadata", {}) as Dictionary
+
+
+func _inspect_save_file(path: String) -> Dictionary:
 	if not FileAccess.file_exists(path):
-		return {}
+		return {"readable": false, "metadata": {}, "error": "missing"}
 	var f := FileAccess.open(path, FileAccess.READ)
 	if f == null:
-		return {}
+		return {"readable": false, "metadata": {}, "error": "cannot open"}
 	var text := f.get_as_text()
 	f.close()
 	var parsed: Variant = JSON.parse_string(text)
 	if typeof(parsed) != TYPE_DICTIONARY:
-		return {}
+		return {"readable": false, "metadata": {}, "error": "unreadable"}
 	var d: Dictionary = parsed
-	return d.get("metadata", {}) as Dictionary
+	if not _blob_looks_like_save(d):
+		return {"readable": false, "metadata": {}, "error": "unreadable"}
+	var meta: Dictionary = {}
+	if d.get("metadata") is Dictionary:
+		meta = (d.get("metadata", {}) as Dictionary).duplicate(true)
+	if str(meta.get("game_date", "")).strip_edges().is_empty() and d.get("time") is Dictionary:
+		var time_blob: Dictionary = d.get("time", {})
+		var date_v: Variant = time_blob.get("current_date", {})
+		if date_v is Dictionary:
+			var cd: Dictionary = date_v
+			var y := int(cd.get("year", 0))
+			var mo := int(cd.get("month", 0))
+			var da := int(cd.get("day", 0))
+			if y > 0 and mo > 0 and da > 0:
+				meta["game_date"] = "%04d-%02d-%02d" % [y, mo, da]
+	return {"readable": true, "metadata": meta, "error": ""}
+
+
+func _blob_looks_like_save(data: Dictionary) -> bool:
+	if not data.has("save_version"):
+		return false
+	if not (data.get("metadata") is Dictionary):
+		return false
+	return true
+
+
+func _unreadable_load_error() -> String:
+	return "This save is unreadable."
 
 func save_game(slot_name: String = DEFAULT_SLOT) -> bool:
 	var path := get_save_path(slot_name)
@@ -910,6 +1030,7 @@ func save_game(slot_name: String = DEFAULT_SLOT) -> bool:
 	_last_save_path = path
 	_note_save_elapsed()
 	print("SaveLoadManager: Game saved → %s (v%d, %d bytes)" % [path, SAVE_VERSION, json_text.length()])
+	_notify_save_list_refresh()
 
 	# Consistent non-intrusive feedback
 	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
@@ -935,10 +1056,17 @@ func load_game(slot_name: String = DEFAULT_SLOT) -> bool:
 
 	var parsed: Variant = JSON.parse_string(text)
 	if typeof(parsed) != TYPE_DICTIONARY:
-		push_error("SaveLoadManager: Corrupt save file (root not a Dictionary)")
+		push_error("SaveLoadManager: This save is unreadable.")
+		if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
+			LeaderEventUI.show_toast(_unreadable_load_error(), 3.0, true)
 		return false
 
 	var data: Dictionary = parsed
+	if not _blob_looks_like_save(data):
+		push_error("SaveLoadManager: This save is unreadable.")
+		if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
+			LeaderEventUI.show_toast(_unreadable_load_error(), 3.0, true)
+		return false
 	var file_version := int(data.get("save_version", 0))
 	if file_version > SAVE_VERSION:
 		push_warning("SaveLoadManager: Save is v%d (current v%d). Best-effort load may drop fields." % [file_version, SAVE_VERSION])
@@ -967,7 +1095,8 @@ func _gather_save_data() -> Dictionary:
 	var data := {
 		"save_version": SAVE_VERSION,
 		"metadata": {
-			"timestamp": Time.get_datetime_string_from_system(true),
+			"timestamp": Time.get_datetime_string_from_system(false),
+			"timestamp_unix": Time.get_unix_time_from_system(),
 			# Live scenario name and player tag. Empty stays empty — never a USA/1936 placeholder.
 			"scenario_id": "",
 			"player_tag": "",
@@ -1058,7 +1187,9 @@ func _gather_save_data() -> Dictionary:
 	data["metadata"]["game_date"] = _current_game_date_iso()
 
 	# Richer metadata for future save menu (timestamp already set above, scenario captured)
-	data["metadata"]["last_played"] = Time.get_datetime_string_from_system(true)
+	data["metadata"]["last_played"] = Time.get_datetime_string_from_system(false)
+	data["metadata"]["timestamp"] = str(data["metadata"].get("timestamp", Time.get_datetime_string_from_system(false)))
+	data["metadata"]["timestamp_unix"] = Time.get_unix_time_from_system()
 	data["metadata"]["game_version"] = SAVE_GAME_VERSION
 	# play_time_seconds left as 0 for now (future: accumulate in _ready or day ticks)
 
@@ -2011,6 +2142,7 @@ func save_game_detailed(slot_name: String = DEFAULT_SLOT) -> Dictionary:
 	_note_save_elapsed()
 	var bytes := json_text.length()
 	print("SaveLoadManager: Game saved → %s (v%d, %d bytes, slot=%s)" % [abs_path, SAVE_VERSION, bytes, safe_slot])
+	_notify_save_list_refresh()
 	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
 		LeaderEventUI.show_toast("Saved %s (%d KB)" % [safe_slot, int(bytes / 1024)], 2.5)
 	return {
@@ -2045,9 +2177,17 @@ func load_game_detailed(slot_name: String = DEFAULT_SLOT) -> Dictionary:
 
 	var parsed: Variant = JSON.parse_string(text)
 	if typeof(parsed) != TYPE_DICTIONARY:
-		return {"ok": false, "error": "Corrupt JSON (not object)", "path": path}
+		var unread := _unreadable_load_error()
+		if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
+			LeaderEventUI.show_toast(unread, 3.0, true)
+		return {"ok": false, "error": unread, "path": path}
 
 	var data: Dictionary = parsed
+	if not _blob_looks_like_save(data):
+		var unread2 := _unreadable_load_error()
+		if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
+			LeaderEventUI.show_toast(unread2, 3.0, true)
+		return {"ok": false, "error": unread2, "path": path}
 	_migrate_save_data(data)  # upgrades in place if old
 
 	var file_version := int(data.get("save_version", 0))
