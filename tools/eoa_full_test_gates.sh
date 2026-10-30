@@ -4,11 +4,11 @@
 #
 # Usage (from repo root):
 #   tools/eoa_full_test_gates.sh
-#   tools/eoa_full_test_gates.sh --quick      # pure python, plus HeadlessGarrison1Test when it stays under 30s
+#   tools/eoa_full_test_gates.sh --quick      # pure python, plus HeadlessGarrison1Test and HeadlessInkTooltips0Test
 #   tools/eoa_full_test_gates.sh --with-perf  # also map-tick perf sample
 #   tools/eoa_full_test_gates.sh --log DIR    # write logs under DIR
 #
-# --quick launches one Godot step, HeadlessGarrison1Test (~16s on this PC).
+# --quick launches HeadlessGarrison1Test then HeadlessInkTooltips0Test.
 # Full path calls tools/run_godot.sh, which exits 1 immediately if no binary
 # is found (fail-closed; it must not hang).
 # NE board/QC needs numpy+Pillow: pip install -r tools/map_generation/requirements.txt
@@ -203,6 +203,7 @@ run_step air_physics_p1 \
 if [[ "$QUICK" -eq 1 ]]; then
   if pgrep -af '[g]odot|[G]odot|[g]amescope' >/dev/null; then
     log "FAIL headless_garrison1 GODOT_BUSY"
+    log "FAIL headless_ink_tooltips0 GODOT_BUSY"
     FAILED=1
   else
     run_step headless_garrison1 env \
@@ -210,6 +211,11 @@ if [[ "$QUICK" -eq 1 ]]; then
       flock -n "${HOME}/.eoa_godot.lock" \
       tools/run_godot.sh --headless --path . \
       -s res://scripts/core/HeadlessGarrison1Test.gd || fail
+    run_step headless_ink_tooltips0 env \
+      XDG_DATA_HOME="$(mktemp -d)" \
+      flock -n "${HOME}/.eoa_godot.lock" \
+      tools/run_godot.sh --headless --path . \
+      -s res://scripts/core/HeadlessInkTooltips0Test.gd || fail
   fi
   if [[ "$FAILED" -eq 0 ]]; then
     log "ALL PASSED (quick)"
@@ -223,6 +229,11 @@ fi
 if [[ ! -x tools/run_godot.sh ]]; then
   log "WARN: tools/run_godot.sh missing; skipping Godot steps"
 else
+  run_step headless_ink_tooltips0 env \
+    XDG_DATA_HOME="$(mktemp -d)" \
+    tools/run_godot.sh --headless --path . \
+    -s res://scripts/core/HeadlessInkTooltips0Test.gd || fail
+
   run_step launch_pick \
     tools/run_godot.sh --headless -s res://tools/map_manager_pick_harness_accurate.gd || fail
 

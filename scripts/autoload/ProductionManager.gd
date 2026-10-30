@@ -30,6 +30,12 @@ const RETOOLING_RULES_PATH := "res://data/production/retooling_similarity.json"
 var production_stance: String = "balanced"
 ## Last factory→stockpile→TOE beat (unit card / toast).
 var last_stockpile_toe_plain: String = ""
+## Last successful daily_resource_harvest_tick report (income only, not saved).
+var last_daily_harvest_report: Dictionary = {}
+
+
+func get_last_daily_harvest_report() -> Dictionary:
+	return last_daily_harvest_report
 
 ## Active production lines: line_id -> ProductionLine
 var _lines: Dictionary = {}
@@ -3713,6 +3719,9 @@ func daily_resource_harvest_tick(days: float = 1.0) -> Dictionary:
 	report["by_tag"] = by_tag
 	report["total_added"] = total_added
 	report["cohesion_events"] = cohesion_events
+	# Income only. Early returns above leave the previous report in place.
+	# total_added is already multiplied by days (the light sim passes 5.0).
+	last_daily_harvest_report = report.duplicate(true)
 	return report
 
 

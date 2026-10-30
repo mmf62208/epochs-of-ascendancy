@@ -141,21 +141,27 @@ static func fold_search_key(s: String) -> String:
 	return t
 
 
-func ensure_chrome_visible() -> void:
+func ensure_chrome_visible(min_width: float = -1.0) -> void:
 	## Stay-alive / hatch: LineEdit+Go must paint and accept focus.
 	## Play c82233c8: visible/focusable/live flags were 1 but drawn height was
 	## 0 on a CanvasLayer parent — force actual child sizes here.
 	## Play 48e4fe20: first paint was live then TopInfoBar Steel/Al reflow
 	## dropped overlay chrome — keep forced geometry when re-hosted in-flow.
+	## min_width lets the 1280 strip keep Search beside resource chips.
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	visible = true
 	modulate = Color(1, 1, 1, 1)
 	mouse_filter = Control.MOUSE_FILTER_STOP
-	z_index = 80
-	z_as_relative = false
+	z_index = 0
+	z_as_relative = true
 	clip_contents = false
-	custom_minimum_size = Vector2(308, 32)
-	size = Vector2(maxf(size.x, 308.0), maxf(size.y, 32.0))
+	var w := 308.0
+	if min_width > 0.0:
+		w = min_width
+	elif custom_minimum_size.x >= 88.0 and custom_minimum_size.x < 308.0:
+		w = custom_minimum_size.x
+	custom_minimum_size = Vector2(w, 32)
+	size = Vector2(maxf(size.x, w), maxf(size.y, 32.0))
 	add_theme_constant_override("separation", 6)
 	_ensure_live_controls()
 	if _line != null:
@@ -172,7 +178,11 @@ func _ensure_live_controls() -> void:
 		_line = LineEdit.new()
 		_line.name = LINE_NAME
 		add_child(_line)
-	_line.placeholder_text = "Search province..."
+	var host_w := custom_minimum_size.x
+	if host_w > 0.0 and host_w < 200.0:
+		_line.placeholder_text = "Search"
+	else:
+		_line.placeholder_text = "Search province..."
 	_style_search_line(_line)
 	if not _line.text_submitted.is_connected(_on_submit):
 		_line.text_submitted.connect(_on_submit)
@@ -199,14 +209,33 @@ func _ensure_live_controls() -> void:
 		_go.gui_input.connect(_on_go_gui_input)
 
 
+func _chrome_widths() -> Vector2:
+	var host_w := custom_minimum_size.x
+	if host_w < 32.0:
+		host_w = maxf(size.x, 308.0)
+	var go_w := 48.0
+	var sep := 8.0
+	var line_floor := 88.0
+	if host_w < 180.0:
+		go_w = 36.0
+		sep = 4.0
+		line_floor = 48.0
+	elif host_w < 220.0:
+		go_w = 40.0
+		sep = 6.0
+	var line_w := maxf(line_floor, host_w - go_w - sep)
+	return Vector2(line_w, go_w)
+
+
 func _force_child_geometry() -> void:
+	var widths := _chrome_widths()
 	if _line != null and is_instance_valid(_line):
-		_line.custom_minimum_size = Vector2(180, 28)
-		_line.size = Vector2(180, 28)
+		_line.custom_minimum_size = Vector2(widths.x, 28)
+		_line.size = Vector2(widths.x, 28)
 		_line.visible = true
 	if _go != null and is_instance_valid(_go):
-		_go.custom_minimum_size = Vector2(48, 28)
-		_go.size = Vector2(48, 28)
+		_go.custom_minimum_size = Vector2(widths.y, 28)
+		_go.size = Vector2(widths.y, 28)
 		_go.visible = true
 	reset_size()
 	queue_sort()
@@ -221,7 +250,10 @@ func _style_search_line(line: LineEdit) -> void:
 	line.visible = true
 	line.modulate = Color(1, 1, 1, 1)
 	line.custom_minimum_size = Vector2(180, 28)
-	line.size = Vector2(180, 28)
+	var widths := _chrome_widths()
+	if widths.x + 0.5 < 180.0:
+		line.custom_minimum_size = Vector2(widths.x, 28)
+	line.size = Vector2(line.custom_minimum_size.x, 28)
 	line.mouse_filter = Control.MOUSE_FILTER_STOP
 	line.focus_mode = Control.FOCUS_ALL
 	line.editable = true
@@ -230,10 +262,13 @@ func _style_search_line(line: LineEdit) -> void:
 	sb.border_color = Color(0.2, 0.9, 1, 0.9)
 	sb.set_border_width_all(1)
 	sb.set_corner_radius_all(3)
-	sb.content_margin_left = 8
-	sb.content_margin_right = 8
+	var side := 4.0 if widths.x < 120.0 else 8.0
+	sb.content_margin_left = side
+	sb.content_margin_right = side
 	sb.content_margin_top = 4
 	sb.content_margin_bottom = 4
+	if widths.x < 140.0:
+		line.add_theme_font_size_override("font_size", 12)
 	line.add_theme_stylebox_override("normal", sb)
 	line.add_theme_stylebox_override("focus", sb)
 	line.add_theme_color_override("font_color", Color(0.95, 0.96, 1, 1))
@@ -244,8 +279,9 @@ func _style_search_go(btn: Button) -> void:
 	btn.process_mode = Node.PROCESS_MODE_ALWAYS
 	btn.visible = true
 	btn.modulate = Color(1, 1, 1, 1)
-	btn.custom_minimum_size = Vector2(48, 28)
-	btn.size = Vector2(48, 28)
+	var widths := _chrome_widths()
+	btn.custom_minimum_size = Vector2(widths.y, 28)
+	btn.size = Vector2(widths.y, 28)
 	btn.mouse_filter = Control.MOUSE_FILTER_STOP
 	btn.focus_mode = Control.FOCUS_ALL
 	var sb := StyleBoxFlat.new()

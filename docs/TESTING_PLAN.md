@@ -8,7 +8,18 @@
 
 ## Recommended Testing Approach
 
-### 0. PROD-1 Prod button (top info bar)
+### 0. INK-TOOLTIPS-P0 theme / clamp / 1280 resources
+
+Play MIXED on `05bf7fb1`: engine tooltips near the bottom of 1280×800 were cut off; Search painted over Steel / Aluminum / Rubber and clipped Fuel. `RetrowaveTheme.clamp_tooltip_rect` flips or clamps every dressed tooltip inside the viewport. FIX #2 keeps five resource chips hoverable at 1280 (Steel, Aluminum, Energy, Rubber, Fuel), each with its own B2 tooltip, and Search in-flow. `HeadlessInkTooltips0Test` asserts each chip is visible, non-zero, fully inside the viewport and every clipping ancestor, does not overlap another chip or Search, and has a distinct tooltip. It checks 1280×800 at peace and at war, plus 1600×900 and 1920×1080. The same test fails on `93fd001b`.
+
+```bash
+tools/run_godot.sh --headless --path . --resolution 1280x800 \
+  -s res://scripts/core/HeadlessInkTooltips0Test.gd
+```
+
+On `--quick` (after HeadlessGarrison1Test). Same 14 known `unit_board_play_path` reds.
+
+### 0a. PROD-1 Prod button (top info bar)
 
 Live 1280×800 after Begin: leftover MapRenderer left-up swallow used to eat Prod (`ACTION_MODE_BUTTON_RELEASE`). Guard clicks the real ProductionButton through `Input.parse_input_event` (not `_on_production_pressed`), asserts the production screen is visible, then Close→Prod opens it again.
 

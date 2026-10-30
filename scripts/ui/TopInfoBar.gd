@@ -60,10 +60,20 @@ var _clock_unpause_msec: int = 0
 ## Layout breakpoints (viewport width). Secondary screens always live in More ▾ for usability.
 const WIDTH_COMPACT := 1400
 const WIDTH_NARROW := 1100
-const WIDTH_SHOW_RESOURCES := 1500
+const WIDTH_SHOW_RESOURCES := 1280
 const WIDTH_SHOW_ALL_SPEEDS := 900
+const SEARCH_WIDTH_WIDE := 308.0
+const SEARCH_WIDTH_COMPACT := 168.0
+const SEARCH_WIDTH_NARROW := 148.0
+## Floor that still keeps a LineEdit + Go inside the chip row at 1280.
+const SEARCH_WIDTH_FLOOR := 96.0
 const WAR_CHIP_MAX_COMPACT := 72.0
 const WAR_CHIP_MAX_WIDE := 160.0
+## Fitted Search width for one viewport. Cleared at the start of each layout.
+var _fitted_search_width: float = -1.0
+var _fitted_search_vp: float = -1.0
+var _fitting_row: bool = false
+var energy_label: Label = null
 
 @onready var _content_row: HBoxContainer = $ContentRow
 @onready var _resources_container: HBoxContainer = $ContentRow/RightContainer/ResourcesContainer
@@ -81,6 +91,7 @@ var units_view_button: Button = null
 
 func _ready() -> void:
 	add_to_group("top_info_bar")
+	RetrowaveTheme.install_tooltip_theme(get_tree())
 	# PASS on root so empty bar chrome does not steal map pan; buttons still STOP.
 	# ALWAYS so clicks work even if SceneTree is briefly paused during load.
 	mouse_filter = Control.MOUSE_FILTER_PASS
@@ -97,9 +108,7 @@ func _ready() -> void:
 	_update_resources()
 	_update_direction()
 	if date_time_label:
-		date_time_label.clip_text = true
 		date_time_label.visible = true
-		date_time_label.custom_minimum_size = Vector2(148, 28)
 		date_time_label.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 		date_time_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 		date_time_label.add_theme_color_override("font_color", Color(0.95, 0.9, 0.6))
@@ -170,27 +179,18 @@ func host_map_search_chrome(search: Control) -> void:
 		if old_p != null:
 			old_p.remove_child(search)
 		slot.add_child(search)
-	search.z_index = 80
-	search.z_as_relative = false
+	search.z_index = 0
+	search.z_as_relative = true
 	search.mouse_filter = Control.MOUSE_FILTER_STOP
 	search.visible = true
 	search.modulate = Color(1, 1, 1, 1)
 	search.process_mode = Node.PROCESS_MODE_ALWAYS
 	search.clip_contents = false
-	var compact_search := false
-	if get_viewport() != null:
-		compact_search = get_viewport().get_visible_rect().size.x < WIDTH_COMPACT
-	search.custom_minimum_size = Vector2(240.0 if compact_search else 308.0, 32.0)
+	var search_w := _search_width_for_viewport()
+	search.custom_minimum_size = Vector2(search_w, 32.0)
 	if slot == _right_container:
-		search.set_anchors_preset(Control.PRESET_TOP_LEFT, false)
-		search.anchor_left = 0.0
-		search.anchor_top = 0.0
-		search.anchor_right = 0.0
-		search.anchor_bottom = 0.0
-		search.offset_left = 0.0
-		search.offset_top = 0.0
-		search.offset_right = 0.0
-		search.offset_bottom = 0.0
+		# Stay in the HBox flow. Absolute TOP_LEFT anchors painted Search over
+		# Steel / Aluminum / Rubber at 1280 (Play MIXED 05bf7fb1).
 		search.size_flags_horizontal = Control.SIZE_SHRINK_END
 		search.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		# [Resources] [Search+Go] [Menu] — Search stays on the right through reflow.
@@ -204,7 +204,7 @@ func host_map_search_chrome(search: Control) -> void:
 	else:
 		move_child(search, get_child_count() - 1)
 	if search.has_method("ensure_chrome_visible"):
-		search.call("ensure_chrome_visible")
+		search.call("ensure_chrome_visible", search_w)
 
 
 func _find_hosted_map_search() -> Control:
@@ -232,27 +232,46 @@ func _keep_search_chrome_sticky() -> void:
 	host_map_search_chrome(search)
 
 
-func _protect_search_from_resource_overflow() -> void:
-	## Hide extra resource chips before Search can be pushed off the strip.
-	var vp_w := 1280.0
+func _viewport_layout_width() -> float:
+	if has_meta("eoa_layout_vp_w"):
+		return float(get_meta("eoa_layout_vp_w"))
+	var w := 1280.0
 	if get_viewport() != null:
-		vp_w = get_viewport().get_visible_rect().size.x
-	var reserved := 308.0 + 72.0 + 24.0
-	var left_min := 240.0
-	var center_min := 360.0
-	var room: float = vp_w - left_min - center_min - reserved
-	if rubber_label != null and room < 220.0:
-		rubber_label.visible = false
-	if oil_label != null and room < 160.0:
-		oil_label.visible = false
-	# Play MIXED 002df244: at 1280px Steel/Al painted under Search. Hide them
-	# before they can clip the sticky Search slot.
-	if aluminum_label != null and (room < 280.0 or vp_w < 1680.0):
-		aluminum_label.visible = false
-	if steel_label != null and (room < 200.0 or vp_w < 1560.0):
-		steel_label.visible = false
+		w = get_viewport().get_visible_rect().size.x
+	# The bar can be narrower than the project viewport (headless default is
+	# 1680). Ignore the pre-layout size, which is a tiny placeholder.
+	if size.x >= 800.0:
+		w = minf(w, size.x)
+	return w
+
+
+func _search_width_for_viewport(vp_w: float = -1.0) -> float:
+	var w := vp_w
+	if w < 0.0:
+		w = _viewport_layout_width()
+	if is_equal_approx(_fitted_search_vp, w) and _fitted_search_width >= SEARCH_WIDTH_FLOOR:
+		return _fitted_search_width
+	if w < WIDTH_NARROW:
+		return SEARCH_WIDTH_NARROW
+	if w < WIDTH_COMPACT:
+		return SEARCH_WIDTH_COMPACT
+	return SEARCH_WIDTH_WIDE
+
+
+func _protect_search_from_resource_overflow() -> void:
+	## Keep every resource chip hoverable at 1280+. Shrink Search instead of
+	## hiding Steel / Aluminum / Rubber (Play MIXED 05bf7fb1).
+	var vp_w := _viewport_layout_width()
 	if _resources_container != null:
-		_resources_container.clip_contents = true
+		_resources_container.clip_contents = false
+	if vp_w < WIDTH_SHOW_RESOURCES:
+		return
+	for lab in _resource_labels():
+		lab.visible = true
+		lab.clip_text = false
+		lab.mouse_filter = Control.MOUSE_FILTER_STOP
+	_apply_resource_icon_compact(vp_w < WIDTH_COMPACT)
+	_apply_search_compact(vp_w < WIDTH_COMPACT)
 
 
 func arm_play_clock_after_begin() -> void:
@@ -320,17 +339,24 @@ func _ensure_start_paused_for_playtest() -> void:
 		Engine.time_scale = 1.0
 		_last_sim_tick_msec = Time.get_ticks_msec()
 		_update_speed_buttons()
+		# Date tooltip was written before this deferred pause, so refresh it
+		# or a paused start still says "Running at 1x".
+		_update_date_time()
 		print("TopInfoBar: start PAUSED (press 1x / Space / keys 1-4 to advance time).")
 
 
 func _apply_responsive_layout() -> void:
 	if not is_inside_tree():
 		return
-	var vp_w := get_viewport().get_visible_rect().size.x
+	var vp_w := _viewport_layout_width()
 	var compact := vp_w < WIDTH_COMPACT
 	var narrow := vp_w < WIDTH_NARROW
 	var show_resources := vp_w >= WIDTH_SHOW_RESOURCES
 	var show_all_speeds := vp_w >= WIDTH_SHOW_ALL_SPEEDS
+	_fitted_search_width = -1.0
+	_fitted_search_vp = -1.0
+	_ensure_resource_chips()
+	_restore_strip_button_styles()
 
 	if _content_row:
 		_content_row.offset_left = 8.0
@@ -370,26 +396,24 @@ func _apply_responsive_layout() -> void:
 
 	if _resources_container:
 		_resources_container.visible = show_resources
-		_resources_container.add_theme_constant_override("separation", 8)
+		_resources_container.add_theme_constant_override("separation", 6 if compact else 8)
+		_resources_container.clip_contents = false
+		_resources_container.size_flags_horizontal = Control.SIZE_SHRINK_END
 
-	if steel_label:
-		steel_label.visible = show_resources and vp_w >= WIDTH_SHOW_RESOURCES + 80
-	if aluminum_label:
-		aluminum_label.visible = show_resources and vp_w >= WIDTH_SHOW_RESOURCES + 220
-	if oil_label:
-		oil_label.visible = show_resources
-	if rubber_label:
-		rubber_label.visible = show_resources and vp_w >= WIDTH_SHOW_RESOURCES + 100
+	for lab in _resource_labels():
+		lab.visible = show_resources
+		var chip: Control = lab.get_parent() as Control
+		if chip != null and str(chip.name).ends_with("Chip"):
+			chip.visible = show_resources
+	_apply_resource_icon_compact(compact)
 
 	if date_time_label:
 		date_time_label.visible = true
-		date_time_label.custom_minimum_size = Vector2(100 if compact else 148, 26)
 		date_time_label.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 		date_time_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-		date_time_label.clip_text = true
-		date_time_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		date_time_label.add_theme_font_size_override("font_size", 12 if compact else 13)
 		date_time_label.tooltip_text = GameDateDisplay.format_top_bar_tooltip()
+		_fit_date_label()
 	_apply_war_chip_layout(vp_w)
 	_apply_units_compact_label(compact)
 	_apply_search_compact(compact)
@@ -398,7 +422,7 @@ func _apply_responsive_layout() -> void:
 		menu_button.text = "Menu" if not narrow else "M"
 		menu_button.custom_minimum_size = Vector2(40 if narrow else 56, 28)
 		menu_button.size_flags_horizontal = Control.SIZE_SHRINK_END
-		menu_button.tooltip_text = "Save · Load · Settings · Help · Policies · Debug"
+		menu_button.tooltip_text = "Command Center\nSave, load, settings, help, policies.\n[Esc] · [Ctrl+S] save · [Ctrl+L] load"
 
 	# Slim single-row bar (no second-row hotseat chrome cutting into buttons).
 	custom_minimum_size.y = 48.0 if compact else 52.0
@@ -406,6 +430,7 @@ func _apply_responsive_layout() -> void:
 	_refresh_hotseat_visibility()
 	_protect_search_from_resource_overflow()
 	_keep_search_chrome_sticky()
+	_fit_top_bar_to_viewport(vp_w)
 
 
 func _ensure_speed_overflow_menu() -> void:
@@ -416,7 +441,7 @@ func _ensure_speed_overflow_menu() -> void:
 	_speed_overflow = MenuButton.new()
 	_speed_overflow.name = "SpeedOverflowMenu"
 	_speed_overflow.text = "Spd"
-	_speed_overflow.tooltip_text = "Simulation speed (2x-4x)"
+	_speed_overflow.tooltip_text = _speed_tooltip()
 	_speed_overflow.custom_minimum_size = Vector2(40, 28)
 	_time_speed_container.add_child(_speed_overflow)
 	RetrowaveTheme.style_secondary_button(_speed_overflow)
@@ -437,7 +462,7 @@ func _apply_speed_layout(show_all: bool, compact: bool) -> void:
 	if pause_button:
 		pause_button.custom_minimum_size = Vector2(36, h)
 		pause_button.text = "||" if not is_paused else ">"
-		pause_button.tooltip_text = "Pause / Resume (Space)"
+		pause_button.tooltip_text = _pause_tooltip()
 		pause_button.visible = true
 	if speed1_button:
 		speed1_button.custom_minimum_size = Vector2(32, h)
@@ -459,7 +484,7 @@ func _ensure_nav_overflow_menu() -> void:
 	_nav_overflow = MenuButton.new()
 	_nav_overflow.name = "NavOverflowMenu"
 	_nav_overflow.text = "More ▾"
-	_nav_overflow.tooltip_text = "Trade · Space · Match · Orders · HH Agenda · Map"
+	_nav_overflow.tooltip_text = "Trade · Space · Match · Orders · HH Agenda · Map\nSecondary screens."
 	_nav_overflow.visible = true
 	_nav_overflow.custom_minimum_size = Vector2(64, 28)
 	_center_container.add_child(_nav_overflow)
@@ -568,6 +593,7 @@ func _apply_hud_icons() -> void:
 	var res_pairs: Array[Array] = [
 		[steel_label, "steel"],
 		[aluminum_label, "aluminum"],
+		[energy_label, "coal"],
 		[oil_label, "fuel"],
 		[rubber_label, "rubber"],
 	]
@@ -611,8 +637,12 @@ func _refresh_hotseat_visibility() -> void:
 func _apply_theme() -> void:
 	RetrowaveTheme.style_top_info_bar(self)
 	RetrowaveTheme.style_info_bar_label(date_time_label, RetrowaveTheme.CYAN)
-	for label in [steel_label, aluminum_label, oil_label, rubber_label]:
+	for label in [steel_label, aluminum_label, oil_label, rubber_label, energy_label]:
+		if label == null:
+			continue
 		RetrowaveTheme.style_info_bar_label(label, RetrowaveTheme.TEXT_DIM)
+		if label != null:
+			label.mouse_filter = Control.MOUSE_FILTER_STOP
 	for btn in [
 		production_button,
 		leaders_button,
@@ -655,7 +685,7 @@ func _apply_theme() -> void:
 		orders_btn.name = "OrdersButton"
 		orders_btn.text = "Orders"
 		orders_btn.visible = false
-		orders_btn.tooltip_text = "Theater orders (also in More ▾)"
+		orders_btn.tooltip_text = "Theater Command\nAdvanced orders for every front. Most first-session orders live on the unit card."
 		$ContentRow/CenterContainer.add_child(orders_btn)
 		orders_btn.pressed.connect(_on_orders_pressed)
 	if get_node_or_null("ContentRow/CenterContainer/HHAgendaButton") == null:
@@ -843,7 +873,7 @@ func _ensure_units_view_button() -> void:
 	btn.text = "Units"
 	btn.toggle_mode = true
 	btn.button_pressed = true
-	btn.tooltip_text = "Show or hide unit counters (U). View only — does not change orders or the sim."
+	btn.tooltip_text = "Show or hide unit counters. View only — does not change orders or the sim.\n[U]"
 	btn.custom_minimum_size = Vector2(64, 28)
 	btn.focus_mode = Control.FOCUS_NONE
 	btn.process_mode = Node.PROCESS_MODE_ALWAYS
@@ -862,7 +892,9 @@ func sync_units_view_button(shown: bool) -> void:
 		return
 	units_view_button.set_pressed_no_signal(shown)
 	units_view_button.tooltip_text = (
-		"Hide unit counters (U). View only." if shown else "Show unit counters (U). View only."
+		"Hide unit counters. View only — does not change orders or the sim.\n[U]"
+		if shown
+		else "Show unit counters. View only — does not change orders or the sim.\n[U]"
 	)
 	var compact := false
 	if get_viewport() != null:
@@ -1242,16 +1274,17 @@ func _update_speed_buttons() -> void:
 			RetrowaveTheme.style_speed_button(buttons[i], not is_paused and (i + 1) == current_speed)
 			# Dim inactive speeds; keep icon visibility high on active.
 			buttons[i].modulate = Color.WHITE if (not is_paused and (i + 1) == current_speed) else Color(0.75, 0.8, 0.9, 0.9)
+			buttons[i].tooltip_text = _speed_tooltip()
 	if pause_button:
 		_refresh_pause_icon()
+		pause_button.tooltip_text = _pause_tooltip()
 		if is_paused:
 			pause_button.modulate = RetrowaveTheme.MAGENTA
-			pause_button.tooltip_text = "Resume simulation"
 		else:
 			pause_button.modulate = Color.WHITE
-			pause_button.tooltip_text = "Pause simulation (keeps UI responsive)"
 	if _speed_overflow and is_instance_valid(_speed_overflow):
 		_speed_overflow.text = "%dx" % current_speed if not is_paused else "Spd"
+		_speed_overflow.tooltip_text = _speed_tooltip()
 
 
 func _on_pause_pressed() -> void:
@@ -1331,9 +1364,7 @@ func _pause_for_menu(pause: bool) -> void:
 
 
 func _update_date_time() -> void:
-	var vp_w := 1280.0
-	if get_viewport() != null:
-		vp_w = get_viewport().get_visible_rect().size.x
+	var vp_w := _viewport_layout_width()
 	var compact := vp_w < WIDTH_COMPACT
 	if compact:
 		var date: Dictionary = GameDateDisplay.get_current_date_dict()
@@ -1345,15 +1376,56 @@ func _update_date_time() -> void:
 		)
 	else:
 		date_time_label.text = GameDateDisplay.format_top_bar_line(true)
-	var tip := GameDateDisplay.format_top_bar_tooltip()
-	date_time_label.tooltip_text = tip
-	pause_button.tooltip_text = "Pause / resume simulation\n\n" + tip if not tip.is_empty() else "Pause / resume simulation"
+	date_time_label.tooltip_text = GameDateDisplay.format_top_bar_tooltip()
+	_fit_date_label()
+	if pause_button:
+		pause_button.tooltip_text = _pause_tooltip()
 	if is_paused:
 		date_time_label.modulate = RetrowaveTheme.MAGENTA
-		pause_button.tooltip_text = "Resume simulation\n\n" + tip if not tip.is_empty() else "Resume simulation"
 	else:
 		date_time_label.modulate = Color.WHITE
+	_refresh_open_date_tooltip()
 	refresh_campaign_war_readout()
+
+
+func _refresh_open_date_tooltip() -> void:
+	if date_time_label == null or get_viewport() == null:
+		return
+	var mouse := get_viewport().get_mouse_position()
+	if not date_time_label.get_global_rect().has_point(mouse):
+		return
+	RetrowaveTheme.refresh_open_tooltip_text(get_tree(), date_time_label.tooltip_text)
+
+
+func _pause_tooltip() -> String:
+	var title := "Resume" if is_paused else "Pause"
+	return "%s\nThe UI stays live while paused.\n[Space] [.]" % title
+
+
+func _speed_tooltip() -> String:
+	return "Speed\n1x normal · 2x · 3x · 4x fast. Higher speed resolves more days per second.\n[1] [2] [3] [4]"
+
+
+func _fit_date_label() -> void:
+	if date_time_label == null:
+		return
+	date_time_label.clip_text = false
+	date_time_label.text_overrun_behavior = TextServer.OVERRUN_NO_TRIMMING
+	date_time_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	date_time_label.mouse_filter = Control.MOUSE_FILTER_STOP
+	var font := date_time_label.get_theme_font("font")
+	var fsize := date_time_label.get_theme_font_size("font_size")
+	if fsize <= 0:
+		fsize = 13
+	var text := date_time_label.text
+	var probe := text
+	if not probe.contains("(+"):
+		probe = text + " (+4d)"
+	var w := float(text.length()) * float(fsize) * 0.6
+	if font != null:
+		w = font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, fsize).x
+		w = maxf(w, font.get_string_size(probe, HORIZONTAL_ALIGNMENT_LEFT, -1, fsize).x)
+	date_time_label.custom_minimum_size = Vector2(w + 10.0, 28.0)
 
 
 func refresh_campaign_war_readout() -> void:
@@ -1381,10 +1453,7 @@ func refresh_campaign_war_readout() -> void:
 	lbl.text = _compact_war_chip_text(line)
 	lbl.tooltip_text = _war_chip_tooltip(line)
 	lbl.visible = not line.is_empty()
-	var vp_w := 1280.0
-	if get_viewport() != null:
-		vp_w = get_viewport().get_visible_rect().size.x
-	_apply_war_chip_layout(vp_w)
+	_apply_war_chip_layout(_viewport_layout_width())
 
 
 func _compact_war_chip_text(line: String) -> String:
@@ -1431,14 +1500,26 @@ func _apply_war_chip_layout(vp_w: float) -> void:
 		lbl.custom_minimum_size = Vector2(0.0, 0.0)
 
 
-func _apply_search_compact(compact: bool) -> void:
-	var search: Control = _find_hosted_map_search()
-	if search == null or not is_instance_valid(search):
-		return
-	search.custom_minimum_size = Vector2(240.0 if compact else 308.0, 32.0)
-	var line: Control = search.get_node_or_null("SearchLineEdit") as Control
-	if line != null:
-		line.custom_minimum_size = Vector2(172.0 if compact else 240.0, 28.0)
+func _apply_search_compact(_compact: bool) -> void:
+	_apply_search_width(_search_width_for_viewport())
+
+
+func _apply_resource_icon_compact(compact: bool) -> void:
+	_ensure_resource_chips()
+	var fsize := 12 if compact else 13
+	for lab in _resource_labels():
+		lab.add_theme_font_size_override("font_size", fsize)
+		lab.clip_text = false
+		lab.mouse_filter = Control.MOUSE_FILTER_STOP
+		lab.text_overrun_behavior = TextServer.OVERRUN_NO_TRIMMING
+		var parent: Node = lab.get_parent()
+		if parent == null:
+			continue
+		var icon := parent.get_node_or_null("Icon_%s" % lab.name) as TextureRect
+		if icon != null:
+			icon.visible = true
+			icon.custom_minimum_size = Vector2(16, 16)
+			icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 
 func _apply_units_compact_label(compact: bool) -> void:
@@ -1455,24 +1536,533 @@ func _apply_units_compact_label(compact: bool) -> void:
 		units_view_button.custom_minimum_size = Vector2(64, 28)
 
 
+func _comma_int(n: int) -> String:
+	var sign := ""
+	if n < 0:
+		sign = "-"
+		n = -n
+	var s := str(n)
+	var out := ""
+	while s.length() > 3:
+		out = "," + s.substr(s.length() - 3, 3) + out
+		s = s.substr(0, s.length() - 3)
+	return sign + s + out
+
+
+func _fmt_rate(v: float) -> String:
+	if absf(v) >= 10.0 or is_equal_approx(v, roundf(v)):
+		return "%d" % int(round(v))
+	return "%.1f" % v
+
+
+## Per-day harvest income. -1 when the cache is empty or the keys are absent.
+## Does not subtract consumption.
+func _income_per_day(keys: PackedStringArray) -> float:
+	if typeof(ProductionManager) == TYPE_NIL or ProductionManager == null:
+		return -1.0
+	if not ProductionManager.has_method("get_last_daily_harvest_report"):
+		return -1.0
+	var report: Dictionary = ProductionManager.get_last_daily_harvest_report()
+	if report.is_empty():
+		return -1.0
+	var days := float(report.get("days", 0.0))
+	if days <= 0.0:
+		return -1.0
+	var added_v: Variant = report.get("total_added", {})
+	if not (added_v is Dictionary):
+		return -1.0
+	var added: Dictionary = added_v
+	var total := 0.0
+	var any := false
+	for k in keys:
+		if added.has(k):
+			any = true
+			total += float(added[k])
+	if not any:
+		return -1.0
+	return total / days
+
+
+func _resource_tooltip(title: String, amount: float, body: String, keys: PackedStringArray, hotkey: String = "") -> String:
+	var lines: PackedStringArray = PackedStringArray()
+	lines.append("%s · %s" % [title, _comma_int(int(round(amount)))])
+	lines.append(body)
+	var inc := _income_per_day(keys)
+	if inc >= 0.0:
+		lines.append("+%s/day" % _fmt_rate(inc))
+	if not hotkey.is_empty():
+		lines.append(hotkey)
+	return "\n".join(lines)
+
+
+func _resource_labels() -> Array[Label]:
+	var out: Array[Label] = []
+	for lab in [steel_label, aluminum_label, energy_label, rubber_label, oil_label]:
+		if lab != null and is_instance_valid(lab):
+			out.append(lab)
+	return out
+
+
+func _ensure_energy_label() -> void:
+	if energy_label != null and is_instance_valid(energy_label):
+		return
+	if _resources_container == null:
+		return
+	var existing := find_child("EnergyLabel", true, false) as Label
+	if existing != null:
+		energy_label = existing
+		return
+	var lab := Label.new()
+	lab.name = "EnergyLabel"
+	lab.mouse_filter = Control.MOUSE_FILTER_STOP
+	lab.clip_text = false
+	lab.text = "0"
+	_resources_container.add_child(lab)
+	energy_label = lab
+	RetrowaveTheme.style_info_bar_label(lab, RetrowaveTheme.TEXT_DIM)
+
+
+func _chip_name_for(lab: Label) -> String:
+	match str(lab.name):
+		"SteelLabel":
+			return "SteelChip"
+		"AluminumLabel":
+			return "AluminumChip"
+		"EnergyLabel":
+			return "EnergyChip"
+		"RubberLabel":
+			return "RubberChip"
+		"OilLabel":
+			return "FuelChip"
+		_:
+			return "ResChip_%s" % lab.name
+
+
+func _wrap_resource_chip(lab: Label) -> void:
+	if lab == null or _resources_container == null:
+		return
+	var chip_name := _chip_name_for(lab)
+	var parent := lab.get_parent()
+	if parent != null and str(parent.name) == chip_name and parent is Control:
+		var existing := parent as Control
+		existing.mouse_filter = Control.MOUSE_FILTER_STOP
+		existing.clip_contents = false
+		existing.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		return
+	var chip := HBoxContainer.new()
+	chip.name = chip_name
+	chip.mouse_filter = Control.MOUSE_FILTER_STOP
+	chip.clip_contents = false
+	chip.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	chip.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	chip.add_theme_constant_override("separation", 2)
+	if parent == _resources_container:
+		var idx := lab.get_index()
+		_resources_container.add_child(chip)
+		_resources_container.move_child(chip, idx)
+		lab.reparent(chip)
+	elif parent != null:
+		parent.add_child(chip)
+		lab.reparent(chip)
+	else:
+		_resources_container.add_child(chip)
+		chip.add_child(lab)
+	lab.mouse_filter = Control.MOUSE_FILTER_STOP
+	lab.clip_text = false
+	lab.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+
+
+func _reparent_loose_resource_icons() -> void:
+	if _resources_container == null:
+		return
+	var loose: Array[Node] = []
+	for c in _resources_container.get_children():
+		if c is TextureRect and str(c.name).begins_with("Icon_"):
+			loose.append(c)
+	for c in loose:
+		var label_name := str(c.name).substr(5)
+		var lab := _resources_container.find_child(label_name, true, false) as Label
+		if lab == null:
+			continue
+		var chip: Node = lab.get_parent()
+		if chip == null or chip == _resources_container:
+			continue
+		c.reparent(chip)
+		chip.move_child(c, 0)
+		if c is CanvasItem:
+			(c as CanvasItem).visible = true
+		if c is Control:
+			(c as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+
+func _order_resource_chips() -> void:
+	if _resources_container == null:
+		return
+	var i := 0
+	var labs: Array[Label] = [steel_label, aluminum_label, energy_label, rubber_label, oil_label]
+	for lab in labs:
+		if lab == null:
+			continue
+		var chip: Node = lab.get_parent()
+		if chip != null and chip.get_parent() == _resources_container:
+			_resources_container.move_child(chip, i)
+			i += 1
+
+
+func _attach_resource_icon(lab: Label, key: String) -> void:
+	if lab == null:
+		return
+	var tex: Texture2D = _HudIcons.resource_icon(key, 24)
+	if tex == null:
+		return
+	_HudIcons.decorate_label_with_icon(lab, tex, 16)
+	var parent := lab.get_parent()
+	if parent == null:
+		return
+	var icon := parent.get_node_or_null("Icon_%s" % lab.name) as TextureRect
+	if icon == null:
+		return
+	icon.visible = true
+	icon.custom_minimum_size = Vector2(16, 16)
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+
+
+func _ensure_resource_chips() -> void:
+	if _resources_container == null:
+		return
+	_ensure_energy_label()
+	for lab in [steel_label, aluminum_label, energy_label, rubber_label, oil_label]:
+		_wrap_resource_chip(lab)
+	_reparent_loose_resource_icons()
+	_order_resource_chips()
+	_attach_resource_icon(steel_label, "steel")
+	_attach_resource_icon(aluminum_label, "aluminum")
+	_attach_resource_icon(energy_label, "coal")
+	_attach_resource_icon(rubber_label, "rubber")
+	_attach_resource_icon(oil_label, "fuel")
+
+
+func _set_chip_amount(lab: Label, amount: float) -> void:
+	if lab == null:
+		return
+	lab.text = _comma_int(int(round(amount)))
+	var col := RetrowaveTheme.TEXT_DIM
+	if amount > 0.0:
+		col = RetrowaveTheme.TEXT_PRIMARY
+	lab.add_theme_color_override("font_color", col)
+	_fit_chip_label(lab)
+
+
+func _set_chip_tooltip(lab: Label, tip: String) -> void:
+	if lab == null:
+		return
+	lab.tooltip_text = tip
+	lab.mouse_filter = Control.MOUSE_FILTER_STOP
+	var chip := lab.get_parent() as Control
+	if chip != null and str(chip.name).ends_with("Chip"):
+		chip.tooltip_text = tip
+		chip.mouse_filter = Control.MOUSE_FILTER_STOP
+
+
+func _fit_chip_label(lab: Label) -> void:
+	lab.clip_text = false
+	lab.text_overrun_behavior = TextServer.OVERRUN_NO_TRIMMING
+	lab.autowrap_mode = TextServer.AUTOWRAP_OFF
+	var fsize := lab.get_theme_font_size("font_size")
+	if fsize <= 0:
+		fsize = 12
+	var font := lab.get_theme_font("font")
+	var w := float(lab.text.length()) * float(fsize) * 0.55
+	if font != null:
+		w = font.get_string_size(lab.text, HORIZONTAL_ALIGNMENT_LEFT, -1, fsize).x
+	lab.custom_minimum_size = Vector2(ceili(w) + 1, 18)
+	var chip := lab.get_parent() as Control
+	if chip != null and str(chip.name).ends_with("Chip"):
+		chip.clip_contents = false
+		chip.custom_minimum_size = Vector2(ceili(w) + 20.0, 22.0)
+		chip.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+
+
+func _restore_strip_button_styles() -> void:
+	for btn in [production_button, leaders_button, technology_button, diplomacy_button, agents_button]:
+		if btn != null:
+			RetrowaveTheme.style_nav_button(btn)
+	if _nav_overflow != null and is_instance_valid(_nav_overflow):
+		RetrowaveTheme.style_nav_button(_nav_overflow)
+	for btn in [pause_button, speed1_button, speed2_button, speed3_button, speed4_button, units_view_button]:
+		if btn != null:
+			RetrowaveTheme.style_secondary_button(btn)
+	if menu_button != null and is_instance_valid(menu_button):
+		RetrowaveTheme.style_secondary_button(menu_button)
+
+
+func _content_budget(vp_w: float) -> float:
+	return maxf(320.0, vp_w - 16.0)
+
+
+func _hbox_children_min(box: HBoxContainer) -> float:
+	if box == null or not box.visible:
+		return 0.0
+	var sep := float(box.get_theme_constant("separation"))
+	var total := 0.0
+	var n := 0
+	for c in box.get_children():
+		if not (c is Control):
+			continue
+		var ctrl := c as Control
+		if not ctrl.visible:
+			continue
+		total += _control_min_x(ctrl)
+		n += 1
+	if n > 1:
+		total += sep * float(n - 1)
+	return maxf(total, box.custom_minimum_size.x)
+
+
+func _control_min_x(ctrl: Control) -> float:
+	if ctrl == null or not ctrl.visible:
+		return 0.0
+	if ctrl is HBoxContainer:
+		return _hbox_children_min(ctrl as HBoxContainer)
+	return ctrl.get_combined_minimum_size().x
+
+
+func _row_min_x() -> float:
+	if _content_row == null:
+		return 0.0
+	return _hbox_children_min(_content_row)
+
+
+func _apply_search_width(search_w: float) -> void:
+	var search := _find_hosted_map_search()
+	if search == null or not is_instance_valid(search):
+		return
+	var w := maxf(SEARCH_WIDTH_FLOOR, search_w)
+	var go_w := 48.0
+	var sep := 8.0
+	var line_floor := 88.0
+	if w < 180.0:
+		go_w = 36.0
+		sep = 4.0
+		line_floor = 48.0
+	elif w < 220.0:
+		go_w = 40.0
+		sep = 6.0
+	var line_w := maxf(line_floor, w - go_w - sep)
+	search.custom_minimum_size = Vector2(w, 32.0)
+	search.size_flags_horizontal = Control.SIZE_SHRINK_END
+	search.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	if search is BoxContainer:
+		(search as BoxContainer).add_theme_constant_override("separation", int(sep))
+	var line := search.get_node_or_null("SearchLineEdit") as Control
+	if line != null:
+		line.custom_minimum_size = Vector2(line_w, 28.0)
+	var go := search.get_node_or_null("SearchGoButton") as BaseButton
+	if go != null:
+		go.custom_minimum_size = Vector2(go_w, 28.0)
+		if w < 200.0:
+			_shrink_button_box(go, go_w, 28.0, 2.0)
+	if search.has_method("ensure_chrome_visible"):
+		search.call("ensure_chrome_visible", w)
+
+
+func _shrink_button_box(btn: BaseButton, w: float, h: float, margin: float) -> void:
+	if btn == null:
+		return
+	btn.custom_minimum_size = Vector2(w, h)
+	btn.add_theme_constant_override("h_separation", 2)
+	if btn is Button:
+		(btn as Button).add_theme_constant_override("icon_max_width", 14)
+	for state in ["normal", "hover", "pressed"]:
+		var src := btn.get_theme_stylebox(state)
+		if src == null or not (src is StyleBoxFlat):
+			continue
+		var flat := (src as StyleBoxFlat).duplicate() as StyleBoxFlat
+		if flat == null:
+			continue
+		flat.content_margin_left = margin
+		flat.content_margin_right = margin
+		flat.content_margin_top = 2.0
+		flat.content_margin_bottom = 2.0
+		btn.add_theme_stylebox_override(state, flat)
+
+
+func _shrink_nav_to(w: float, h: float) -> void:
+	for btn in [production_button, leaders_button, technology_button, diplomacy_button, agents_button]:
+		if btn == null:
+			continue
+		_shrink_button_box(btn, w, h, 2.0)
+		btn.add_theme_font_size_override("font_size", 12)
+	if _nav_overflow != null and is_instance_valid(_nav_overflow):
+		_nav_overflow.text = "More"
+		_shrink_button_box(_nav_overflow, maxf(w, 46.0), h, 2.0)
+		_nav_overflow.add_theme_font_size_override("font_size", 12)
+
+
+func _shrink_clock_buttons() -> void:
+	if pause_button:
+		_shrink_button_box(pause_button, 34.0, 26.0, 2.0)
+	for sb in [speed1_button, speed2_button, speed3_button, speed4_button]:
+		if sb:
+			_shrink_button_box(sb, 30.0, 26.0, 2.0)
+	if units_view_button != null and is_instance_valid(units_view_button):
+		_shrink_button_box(units_view_button, 30.0, 26.0, 2.0)
+	if _time_speed_container:
+		_time_speed_container.add_theme_constant_override("separation", 2)
+
+
+func _tighten_date_padding() -> void:
+	if date_time_label == null:
+		return
+	var font := date_time_label.get_theme_font("font")
+	var fsize := date_time_label.get_theme_font_size("font_size")
+	if fsize <= 0:
+		fsize = 12
+	var probe := date_time_label.text
+	if not probe.contains("(+"):
+		probe = probe + " (+4d)"
+	var w := float(probe.length()) * float(fsize) * 0.6
+	if font != null:
+		w = font.get_string_size(probe, HORIZONTAL_ALIGNMENT_LEFT, -1, fsize).x
+	date_time_label.custom_minimum_size = Vector2(w + 2.0, 26.0)
+
+
+func _set_row_separations(sep: int) -> void:
+	if _content_row:
+		_content_row.add_theme_constant_override("separation", sep)
+	if _left_container:
+		_left_container.add_theme_constant_override("separation", sep)
+	if _right_container:
+		_right_container.add_theme_constant_override("separation", sep)
+	if _center_container:
+		_center_container.add_theme_constant_override("separation", sep)
+	if _resources_container:
+		_resources_container.add_theme_constant_override("separation", sep)
+
+
+func _fit_top_bar_to_viewport(vp_w: float) -> void:
+	if _fitting_row or _content_row == null:
+		return
+	_fitting_row = true
+	var budget := _content_budget(vp_w)
+	if is_equal_approx(_fitted_search_vp, vp_w) and _fitted_search_width >= SEARCH_WIDTH_FLOOR:
+		_apply_search_width(_fitted_search_width)
+		if _row_min_x() <= budget + 0.5:
+			_clamp_row_to_bar()
+			_fitting_row = false
+			return
+	var search_w := _search_width_for_viewport(vp_w)
+	if vp_w < WIDTH_COMPACT:
+		search_w = minf(search_w, 128.0)
+		_set_row_separations(2)
+		_shrink_nav_to(44.0, 26.0)
+		_shrink_clock_buttons()
+		if menu_button != null and is_instance_valid(menu_button):
+			_shrink_button_box(menu_button, 44.0, 26.0, 2.0)
+			menu_button.add_theme_font_size_override("font_size", 12)
+		_tighten_date_padding()
+	elif vp_w < 1700.0:
+		search_w = minf(search_w, 220.0)
+	_apply_search_width(search_w)
+	var guard := 0
+	while _row_min_x() > budget + 0.5 and search_w > SEARCH_WIDTH_FLOOR + 0.5 and guard < 16:
+		search_w = maxf(SEARCH_WIDTH_FLOOR, search_w - 8.0)
+		_apply_search_width(search_w)
+		guard += 1
+	if _row_min_x() > budget + 0.5:
+		_set_row_separations(2)
+		_shrink_nav_to(40.0, 26.0)
+		_shrink_clock_buttons()
+		_tighten_date_padding()
+		if menu_button != null and is_instance_valid(menu_button):
+			if vp_w < WIDTH_COMPACT:
+				menu_button.text = "M"
+			_shrink_button_box(menu_button, 36.0 if vp_w < WIDTH_COMPACT else 48.0, 26.0, 2.0)
+		guard = 0
+		while _row_min_x() > budget + 0.5 and search_w > SEARCH_WIDTH_FLOOR + 0.5 and guard < 8:
+			search_w = maxf(SEARCH_WIDTH_FLOOR, search_w - 8.0)
+			_apply_search_width(search_w)
+			guard += 1
+	_fitted_search_width = search_w
+	_fitted_search_vp = vp_w
+	if vp_w >= 800.0 and _row_min_x() > budget + 1.0:
+		print("TopInfoBar: row min %.1f > budget %.1f at vp %.0f (search %.0f)" % [
+			_row_min_x(), budget, vp_w, search_w,
+		])
+	_clamp_row_to_bar()
+	if not is_queued_for_deletion():
+		call_deferred("_clamp_row_to_bar")
+	_fitting_row = false
+
+
+func _clamp_row_to_bar() -> void:
+	## A fat first pass can leave ContentRow wider than the bar. Anchors do not
+	## shrink it after the buttons get shorter, so Search stays past 1280.
+	if _content_row == null or not is_inside_tree():
+		return
+	var inner := size.x - 16.0
+	if inner < 64.0:
+		inner = _content_budget(_viewport_layout_width())
+	_content_row.offset_left = 8.0
+	_content_row.offset_top = 6.0
+	_content_row.offset_right = -8.0
+	_content_row.offset_bottom = -6.0
+	_content_row.custom_minimum_size.x = 0.0
+	if _content_row.size.x > inner + 0.5:
+		_content_row.size.x = inner
+		_content_row.queue_sort()
+
+
 func _update_resources() -> void:
+	_ensure_resource_chips()
 	var stockpile: Dictionary = {}
 	if ProductionManager != null:
 		var raw = ProductionManager.get("national_stockpile")
 		if raw is Dictionary:
 			stockpile = raw
-	steel_label.text = "Steel: %.0f" % float(stockpile.get("steel", 0.0))
-	aluminum_label.text = "Aluminum: %.0f" % float(stockpile.get("aluminum", 0.0))
-	# Fuel major absorbs oil feedstock; show Fuel (Energy when present for industry meter).
+	var steel_amt := float(stockpile.get("steel", 0.0))
+	var aluminum_amt := float(stockpile.get("aluminum", 0.0))
+	var rubber_amt := float(stockpile.get("rubber", 0.0))
 	var fuel_amt := float(stockpile.get("fuel", stockpile.get("oil", 0.0)))
 	var energy_amt := float(stockpile.get("energy", 0.0))
-	if energy_amt > 0.0:
-		oil_label.text = "Energy: %.0f  Fuel: %.0f" % [energy_amt, fuel_amt]
-	else:
-		oil_label.text = "Fuel: %.0f" % fuel_amt
-	rubber_label.text = "Rubber: %.0f" % float(stockpile.get("rubber", 0.0))
-	# Steel/Al text widen is the Play 48e4fe20 reflow that dropped overlay Search.
+	# Face is icon + amount. The resource name lives in the B2 tooltip.
+	_set_chip_amount(steel_label, steel_amt)
+	_set_chip_amount(aluminum_label, aluminum_amt)
+	_set_chip_amount(energy_label, energy_amt)
+	_set_chip_amount(rubber_label, rubber_amt)
+	_set_chip_amount(oil_label, fuel_amt)
+	_set_chip_tooltip(steel_label, _resource_tooltip(
+		"Steel", steel_amt,
+		"Rifles, artillery, tanks and ships. Stockpile refills division TOE daily.",
+		PackedStringArray(["steel"])
+	))
+	_set_chip_tooltip(aluminum_label, _resource_tooltip(
+		"Aluminum", aluminum_amt,
+		"Aircraft and light vehicles.",
+		PackedStringArray(["aluminum"])
+	))
+	_set_chip_tooltip(energy_label, _resource_tooltip(
+		"Energy", energy_amt,
+		"Runs factories. Shortages cut output.",
+		PackedStringArray(["energy"])
+	))
+	_set_chip_tooltip(rubber_label, _resource_tooltip(
+		"Rubber", rubber_amt,
+		"Trucks and tires. Needed to fill motorized TOE.",
+		PackedStringArray(["rubber"])
+	))
+	_set_chip_tooltip(oil_label, _resource_tooltip(
+		"Fuel", fuel_amt,
+		"Moves motorized units and aircraft. Low fuel slows attacks. Press G to check supply.",
+		PackedStringArray(["fuel", "oil"]),
+		"[G]"
+	))
+	# Amount width changes must not push Search back over the chips.
 	_keep_search_chrome_sticky()
+	if is_inside_tree():
+		_fit_top_bar_to_viewport(_viewport_layout_width())
 
 
 func _close_overlay_screens() -> void:
