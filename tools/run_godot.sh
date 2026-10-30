@@ -62,7 +62,7 @@ if [[ "$already_import" -eq 0 ]]; then
   fi
 fi
 if [[ "$NEED_IMPORT" -eq 1 ]]; then
-  echo "run_godot: class cache stale or missing — one-time --headless --import"
+  echo "run_godot: class cache missing Rx1RhineCrossing/WarStateDomain or other class_name — one-time --headless --import"
   "$GODOT" --path "$ROOT" --headless --import --quit
 fi
 
