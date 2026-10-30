@@ -10,7 +10,7 @@
 
 ### 0. INK-TOOLTIPS-P0 theme / clamp / 1280 resources
 
-Play MIXED on `05bf7fb1`: engine tooltips near the bottom of 1280×800 were cut off; Search painted over Steel / Aluminum / Rubber and clipped Fuel. `RetrowaveTheme.clamp_tooltip_rect` flips or clamps every dressed tooltip inside the viewport. The top bar keeps all four resource chips hoverable at 1280 (Search stays in-flow). `HeadlessInkTooltips0Test` asserts tooltip rects inside 1280×800 and no Search/resource overlap.
+Play MIXED on `05bf7fb1`: engine tooltips near the bottom of 1280×800 were cut off; Search painted over Steel / Aluminum / Rubber and clipped Fuel. `RetrowaveTheme.clamp_tooltip_rect` flips or clamps every dressed tooltip inside the viewport. FIX #2 keeps five resource chips hoverable at 1280 (Steel, Aluminum, Energy, Rubber, Fuel), each with its own B2 tooltip, and Search in-flow. `HeadlessInkTooltips0Test` asserts each chip is visible, non-zero, fully inside the viewport and every clipping ancestor, does not overlap another chip or Search, and has a distinct tooltip. It checks 1280×800 at peace and at war, plus 1600×900 and 1920×1080. The same test fails on `93fd001b`.
 
 ```bash
 tools/run_godot.sh --headless --path . --resolution 1280x800 \
