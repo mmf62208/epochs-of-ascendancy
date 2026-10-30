@@ -84,6 +84,7 @@ var _nation_btns: Dictionary = {}
 var _era_btns: Dictionary = {}
 ## Edge-trigger for `_process` pointer poll (computerUse leftover on CloseX).
 var _close_ptr_poll_held: bool = false
+var _clock_lock_held: bool = false
 
 
 func _ready() -> void:
@@ -91,7 +92,7 @@ func _ready() -> void:
 	layer = COMMAND_CENTER_LAYER
 	_build_ui()
 	_ensure_dialogs()
-	_pause_game(true)
+	_acquire_clock_lock()
 	_set_status("Paused · Save / Load slots on the right · ESC or Close to resume")
 	_refresh_save_list()
 	set_process_input(true)
@@ -465,8 +466,10 @@ func _build_ui() -> void:
 	right_v.add_child(sav_hdr)
 
 	var sav_hint := Label.new()
-	sav_hint.text = "Click Save on a slot to write · Load to restore · Save Game uses quicksave"
+	sav_hint.name = "SaveListHint"
+	sav_hint.text = "Click Save on a slot to write · Load to restore · Save Game uses quicksave · Ctrl+Shift+S opens this list"
 	sav_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	sav_hint.tooltip_text = "Save / load slots. Ctrl+Shift+S opens this list. F6 is the loyalty mapmode."
 	RetrowaveTheme.style_body_label(sav_hint)
 	right_v.add_child(sav_hint)
 
@@ -685,8 +688,12 @@ func _write_slot(slot: String) -> void:
 func _refresh_save_list() -> void:
 	if _save_list_vbox == null or not is_instance_valid(_save_list_vbox):
 		return
-	for c in _save_list_vbox.get_children():
-		c.queue_free()
+	# Free immediately so a rewritten autosave does not leave a stale card
+	# (queue_free keeps the old SlotCard_* in the tree until the frame ends).
+	while _save_list_vbox.get_child_count() > 0:
+		var stale: Node = _save_list_vbox.get_child(0)
+		_save_list_vbox.remove_child(stale)
+		stale.free()
 
 	var slm := _slm()
 	if slm == null:
@@ -772,7 +779,15 @@ func _make_save_row(info: Dictionary) -> Control:
 
 	var detail := Label.new()
 	detail.name = "SlotDetail"
-	if occupied and not nation_line.is_empty():
+	var unreadable := bool(info.get("unreadable", false)) or nation_line.find("unreadable") >= 0
+	if unreadable:
+		detail.text = "%s\n%s" % [
+			nation_line if not nation_line.is_empty() else "Save unreadable",
+			when_line if not when_line.is_empty() else "Save unreadable",
+		]
+		st.add_theme_color_override("font_color", RetrowaveTheme.WARNING)
+		st.text = "unreadable"
+	elif occupied and not nation_line.is_empty():
 		detail.text = "%s\n%s" % [nation_line, when_line]
 	elif occupied:
 		detail.text = _format_detail(meta)
@@ -1346,14 +1361,45 @@ func _force_close() -> void:
 	if mr_close != null and mr_close.has_method("clear_overlay_close_map_gesture"):
 		mr_close.call("clear_overlay_close_map_gesture")
 	if _closing:
-		_pause_game(false)
+		_release_clock_lock()
 		menu_closed.emit()
 		queue_free()
 		return
 	_closing = true
-	_pause_game(false)
+	_release_clock_lock()
 	menu_closed.emit()
 	queue_free()
+
+
+func _acquire_clock_lock() -> void:
+	if _clock_lock_held:
+		return
+	if typeof(TimeManager) == TYPE_NIL:
+		return
+	if TimeManager.has_method("acquire_overlay_clock_lock"):
+		TimeManager.acquire_overlay_clock_lock()
+		_clock_lock_held = true
+		return
+	_pause_game(true)
+
+
+func _release_clock_lock() -> void:
+	if not _clock_lock_held:
+		return
+	if Engine.time_scale < 0.001:
+		Engine.time_scale = 1.0
+	if typeof(TimeManager) != TYPE_NIL:
+		if has_meta("eoa_loaded_clock"):
+			remove_meta("eoa_loaded_clock")
+			if TimeManager.has_method("note_overlay_clock_from_current"):
+				TimeManager.note_overlay_clock_from_current()
+		if TimeManager.has_method("release_overlay_clock_lock"):
+			TimeManager.release_overlay_clock_lock()
+	_clock_lock_held = false
+
+
+func _exit_tree() -> void:
+	_release_clock_lock()
 
 
 func _pause_game(pause: bool) -> void:
@@ -1362,7 +1408,11 @@ func _pause_game(pause: bool) -> void:
 	if pause:
 		if not has_meta("was_paused_before_menu"):
 			set_meta("was_paused_before_menu", TimeManager.is_paused())
-		TimeManager.set_paused(true)
+		if TimeManager.has_method("acquire_overlay_clock_lock") and not _clock_lock_held:
+			TimeManager.acquire_overlay_clock_lock()
+			_clock_lock_held = true
+		else:
+			TimeManager.set_paused(true)
 		if Engine.time_scale < 0.001:
 			Engine.time_scale = 1.0
 	else:
@@ -1371,12 +1421,21 @@ func _pause_game(pause: bool) -> void:
 			remove_meta("eoa_loaded_clock")
 			if has_meta("was_paused_before_menu"):
 				remove_meta("was_paused_before_menu")
+			if _clock_lock_held and TimeManager.has_method("note_overlay_clock_from_current"):
+				TimeManager.note_overlay_clock_from_current()
+			if _clock_lock_held and TimeManager.has_method("release_overlay_clock_lock"):
+				TimeManager.release_overlay_clock_lock()
+				_clock_lock_held = false
 			Engine.time_scale = 1.0
 			if top_bar != null and top_bar.has_method("resync_speed_from_time_manager"):
 				top_bar.call("resync_speed_from_time_manager")
 			return
-		var was_paused: bool = get_meta("was_paused_before_menu", true)
-		TimeManager.set_paused(was_paused)
+		if _clock_lock_held and TimeManager.has_method("release_overlay_clock_lock"):
+			TimeManager.release_overlay_clock_lock()
+			_clock_lock_held = false
+		else:
+			var was_paused: bool = get_meta("was_paused_before_menu", true)
+			TimeManager.set_paused(was_paused)
 		Engine.time_scale = 1.0
 		if has_meta("was_paused_before_menu"):
 			remove_meta("was_paused_before_menu")

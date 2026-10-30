@@ -20,8 +20,6 @@ static func reset_for_test() -> void:
 
 static func note_keep_playing() -> void:
 	_keep_playing = true
-	if typeof(TimeManager) != TYPE_NIL:
-		TimeManager.set_paused(false)
 
 
 static func load_rules() -> Dictionary:
@@ -216,9 +214,10 @@ static func _present_win(result: Dictionary) -> void:
 		for n in tree.get_nodes_in_group("campaign_ink_end_screen"):
 			if is_instance_valid(n):
 				return
-	if typeof(TimeManager) != TYPE_NIL:
-		TimeManager.set_paused(true)
 	var scr: Script = load("res://scripts/ui/CampaignInkEndScreen.gd") as Script
 	if scr != null and scr.has_method("present_win"):
 		var why := ", ".join(result.get("reasons", []))
 		scr.call("present_win", _player_tag(), why)
+		return
+	if typeof(TimeManager) != TYPE_NIL:
+		TimeManager.set_paused(true)

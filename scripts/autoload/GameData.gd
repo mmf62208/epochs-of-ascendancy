@@ -680,11 +680,12 @@ func _present_player_ink_defeat(old_tag: String, reason: String) -> void:
 		for n in tree.get_nodes_in_group("campaign_ink_end_screen"):
 			if is_instance_valid(n) and not n.is_queued_for_deletion():
 				return
-	if typeof(TimeManager) != TYPE_NIL:
-		TimeManager.set_paused(true)
 	var scr: Script = load("res://scripts/ui/CampaignInkEndScreen.gd") as Script
 	if scr != null and scr.has_method("present_loss"):
 		scr.call("present_loss", defeated, reason)
+		return
+	if typeof(TimeManager) != TYPE_NIL:
+		TimeManager.set_paused(true)
 
 
 ## === Follow-on Peace Events (multi-year influence points after 1918 conference) ===

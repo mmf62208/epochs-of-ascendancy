@@ -90,7 +90,7 @@ static func open_living_sheet(
 
 
 ## Successor picker after an ink defeat. Headless uses a CanvasLayer (a Window
-## does not show there). The buttons call the same switch as the 1918 picker.
+## does not show there). Pick a nation, then Confirm. Cancel returns to DEFEAT.
 static func open_continuation_picker() -> Node:
 	var tree := Engine.get_main_loop() as SceneTree
 	if tree == null or tree.root == null:
@@ -106,6 +106,7 @@ static func open_continuation_picker() -> Node:
 	layer.layer = 126
 	layer.process_mode = Node.PROCESS_MODE_ALWAYS
 	layer.add_to_group("continuation_picker")
+	layer.set_meta("chosen_tag", "")
 	var dim := ColorRect.new()
 	dim.color = Color(0, 0, 0, 0.55)
 	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -128,6 +129,7 @@ static func open_continuation_picker() -> Node:
 	panel.add_theme_stylebox_override("panel", panel_style)
 	layer.add_child(panel)
 	var box := VBoxContainer.new()
+	box.name = "PickerBox"
 	box.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	box.add_theme_constant_override("separation", 8)
 	panel.add_child(box)
@@ -142,13 +144,87 @@ static func open_continuation_picker() -> Node:
 	for opt in opts:
 		var b := Button.new()
 		var chosen := str(opt)
+		b.name = "BtnPick_%s" % chosen
 		b.text = "Continue as " + chosen
 		b.custom_minimum_size = Vector2(0, 36)
 		RetrowaveTheme.style_secondary_button(b)
-		b.pressed.connect(_on_picker_continue.bind(chosen))
+		b.pressed.connect(_on_picker_select.bind(layer, chosen))
 		box.add_child(b)
+	var actions := HBoxContainer.new()
+	actions.add_theme_constant_override("separation", 12)
+	box.add_child(actions)
+	var confirm := Button.new()
+	confirm.name = "BtnConfirmContinue"
+	confirm.text = "Confirm"
+	confirm.disabled = true
+	confirm.custom_minimum_size = Vector2(160, 40)
+	RetrowaveTheme.style_primary_button(confirm)
+	confirm.pressed.connect(_on_picker_confirm.bind(layer))
+	actions.add_child(confirm)
+	var cancel := Button.new()
+	cancel.name = "BtnCancelPicker"
+	cancel.text = "Cancel"
+	cancel.custom_minimum_size = Vector2(160, 40)
+	RetrowaveTheme.style_secondary_button(cancel)
+	cancel.pressed.connect(_on_picker_cancel.bind(layer))
+	actions.add_child(cancel)
 	tree.root.add_child(layer)
 	return layer
+
+
+static func _on_picker_select(layer: Node, tag: String) -> void:
+	if layer == null or not is_instance_valid(layer):
+		return
+	layer.set_meta("chosen_tag", tag)
+	var box := layer.find_child("PickerBox", true, false)
+	if box != null:
+		for c in box.get_children():
+			if c is Button and str(c.name).begins_with("BtnPick_"):
+				var on := str(c.name) == "BtnPick_%s" % tag
+				c.modulate = Color.WHITE if on else Color(0.75, 0.8, 0.9, 0.9)
+	var confirm := layer.find_child("BtnConfirmContinue", true, false)
+	if confirm is BaseButton:
+		(confirm as BaseButton).disabled = tag.strip_edges().is_empty()
+
+
+static func _on_picker_confirm(layer: Node) -> void:
+	if layer == null or not is_instance_valid(layer):
+		return
+	var tag := str(layer.get_meta("chosen_tag", "")).strip_edges().to_upper()
+	if tag.is_empty():
+		return
+	if typeof(GameData) != TYPE_NIL and GameData.has_method("execute_player_switch_to"):
+		GameData.execute_player_switch_to(tag, "ink defeat continuation")
+	_dismiss_picker(layer)
+	_dismiss_ink_end_screens()
+
+
+static func _on_picker_cancel(layer: Node) -> void:
+	_dismiss_picker(layer)
+
+
+static func _dismiss_picker(layer: Node) -> void:
+	if layer == null or not is_instance_valid(layer):
+		return
+	if layer.is_in_group("continuation_picker"):
+		layer.remove_from_group("continuation_picker")
+	layer.name = "ContinuationPicker_dying"
+	layer.queue_free()
+
+
+static func _dismiss_ink_end_screens() -> void:
+	var tree := Engine.get_main_loop() as SceneTree
+	if tree == null:
+		return
+	for n in tree.get_nodes_in_group("campaign_ink_end_screen"):
+		if n == null or not is_instance_valid(n):
+			continue
+		if n.has_method("_dismiss_end_screen"):
+			n.call("_dismiss_end_screen")
+			continue
+		n.remove_from_group("campaign_ink_end_screen")
+		n.name = "CampaignInkEndScreen_dying"
+		n.queue_free()
 
 
 static func _on_picker_continue(tag: String) -> void:

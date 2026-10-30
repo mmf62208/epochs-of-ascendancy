@@ -398,7 +398,7 @@ func _apply_responsive_layout() -> void:
 		menu_button.text = "Menu" if not narrow else "M"
 		menu_button.custom_minimum_size = Vector2(40 if narrow else 56, 28)
 		menu_button.size_flags_horizontal = Control.SIZE_SHRINK_END
-		menu_button.tooltip_text = "Command Center\nSave, load, settings, help, policies.\n[Esc] · [Ctrl+S] save · [Ctrl+L] load"
+		menu_button.tooltip_text = "Command Center\nSave, load, settings, help, policies.\n[Esc] · [Ctrl+S] save · [Ctrl+L] load · [Ctrl+Shift+S] save list"
 
 	# Slim single-row bar (no second-row hotseat chrome cutting into buttons).
 	custom_minimum_size.y = 48.0 if compact else 52.0
@@ -429,6 +429,8 @@ func _ensure_speed_overflow_menu() -> void:
 
 
 func _on_speed_overflow_pressed(id: int) -> void:
+	if _overlay_holds_clock():
+		return
 	_set_game_speed(id)
 
 
@@ -902,6 +904,10 @@ func _connect_buttons() -> void:
 	_connect_once(trade_button, _on_trade_pressed)
 	_connect_once(space_button, _on_space_pressed)
 	_connect_once(matchmaking_button, _on_matchmaking_pressed)
+	if save_button:
+		save_button.tooltip_text = "Save list · Command Center slots\n[Ctrl+Shift+S] · [Ctrl+S] quicksave"
+	if load_button:
+		load_button.tooltip_text = "Load from Command Center slots\n[Ctrl+Shift+S] · [Ctrl+L] quickload"
 	_connect_once(save_button, _on_menu_pressed)
 	_connect_once(load_button, _on_menu_pressed)
 	_connect_once(settings_button, _on_settings_pressed)
@@ -971,8 +977,10 @@ func _step_live_clock() -> void:
 		_sim_tick_busy = false
 		_sim_tick_busy_since_msec = 0
 	# Player owns clock: never let TimeManager stay paused while UI shows running (re-pause race).
+	# Overlays (Paused CC / VICTORY / DEFEAT) own the clock — do not fight them.
 	if (
 		not is_paused
+		and not _overlay_holds_clock()
 		and has_meta("player_owns_clock")
 		and bool(get_meta("player_owns_clock"))
 		and typeof(TimeManager) != TYPE_NIL
@@ -982,6 +990,7 @@ func _step_live_clock() -> void:
 		TimeManager.set_time_scale(float(current_speed))
 	if (
 		not is_paused
+		and not _overlay_holds_clock()
 		and has_meta("player_owns_clock")
 		and bool(get_meta("player_owns_clock"))
 		and _clock_unpause_msec > 0
@@ -999,7 +1008,7 @@ func _step_live_clock() -> void:
 		_clock_unpause_msec = 0
 		_last_sim_tick_msec = Time.get_ticks_msec()
 		return
-	if is_paused or _sim_tick_busy:
+	if is_paused or _sim_tick_busy or _overlay_holds_clock():
 		return
 	if _last_sim_tick_msec <= 0:
 		_last_sim_tick_msec = now
@@ -1033,7 +1042,7 @@ func _refill_supply_after_clock() -> void:
 
 
 func _on_tick() -> void:
-	if is_paused or _sim_tick_busy:
+	if is_paused or _sim_tick_busy or _overlay_holds_clock():
 		return
 	_sim_tick_busy = true
 	_sim_tick_busy_since_msec = Time.get_ticks_msec()
@@ -1106,6 +1115,9 @@ func _input(event: InputEvent) -> void:
 	if key.keycode == KEY_SPACE or key.keycode == KEY_PERIOD:
 		if _search_line_owns_typed_keys():
 			return
+		if _overlay_holds_clock():
+			get_viewport().set_input_as_handled()
+			return
 		_on_pause_pressed()
 		get_viewport().set_input_as_handled()
 
@@ -1117,24 +1129,31 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.keycode == KEY_SPACE or event.keycode == KEY_PERIOD:
 		if _search_line_owns_typed_keys():
 			return
+		if _overlay_holds_clock():
+			get_viewport().set_input_as_handled()
+			return
 		_on_pause_pressed()
 		get_viewport().set_input_as_handled()
 		return
 	# 1–4 number keys set speed and unpause
 	if event.keycode == KEY_1 or event.keycode == KEY_KP_1:
-		_set_game_speed(1)
+		if not _overlay_holds_clock():
+			_set_game_speed(1)
 		get_viewport().set_input_as_handled()
 		return
 	if event.keycode == KEY_2 or event.keycode == KEY_KP_2:
-		_set_game_speed(2)
+		if not _overlay_holds_clock():
+			_set_game_speed(2)
 		get_viewport().set_input_as_handled()
 		return
 	if event.keycode == KEY_3 or event.keycode == KEY_KP_3:
-		_set_game_speed(3)
+		if not _overlay_holds_clock():
+			_set_game_speed(3)
 		get_viewport().set_input_as_handled()
 		return
 	if event.keycode == KEY_4 or event.keycode == KEY_KP_4:
-		_set_game_speed(4)
+		if not _overlay_holds_clock():
+			_set_game_speed(4)
 		get_viewport().set_input_as_handled()
 		return
 	# Global debug hotkey — opens the dedicated Debug Overlay
@@ -1212,7 +1231,29 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 
+func _overlay_holds_clock() -> bool:
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("overlay_holds_clock"):
+		if bool(TimeManager.overlay_holds_clock()):
+			return true
+	var tree := get_tree()
+	if tree == null:
+		return false
+	if not tree.get_nodes_in_group("campaign_ink_end_screen").is_empty():
+		return true
+	if not tree.get_nodes_in_group("continuation_picker").is_empty():
+		return true
+	var menu := tree.root.get_node_or_null("MainMenu") if tree.root != null else null
+	if menu != null and is_instance_valid(menu) and not menu.is_queued_for_deletion():
+		if str(menu.get("layer")) != "" or menu is CanvasLayer:
+			var title := menu.find_child("CommandCenterTitle", true, false)
+			if title != null and str(title.text) == "Paused":
+				return true
+	return false
+
+
 func _set_game_speed(speed: int) -> void:
+	if _overlay_holds_clock():
+		return
 	current_speed = clampi(speed, 1, 4)
 	is_paused = false
 	# Player took clock control — TestRunner must not re-pause on deferred interactive passes.
@@ -1261,6 +1302,8 @@ func _update_speed_buttons() -> void:
 
 
 func _on_pause_pressed() -> void:
+	if _overlay_holds_clock():
+		return
 	is_paused = not is_paused
 	set_meta("player_owns_clock", true)
 	Engine.time_scale = 1.0

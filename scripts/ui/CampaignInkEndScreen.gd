@@ -11,6 +11,7 @@ static var present_log: Array = []
 var _outcome: String = "loss"
 var _tag: String = ""
 var _reason: String = ""
+var _clock_lock_held: bool = false
 
 
 static func clear_log() -> void:
@@ -52,6 +53,7 @@ func _ready() -> void:
 	add_to_group("campaign_ink_end_screen")
 	layer = 125
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	_acquire_clock_lock()
 	var dim := ColorRect.new()
 	dim.name = "Dimmer"
 	dim.color = Color(RetrowaveTheme.BG_DEEP.r, RetrowaveTheme.BG_DEEP.g, RetrowaveTheme.BG_DEEP.b, 0.8)
@@ -259,9 +261,36 @@ func _on_keep() -> void:
 	var dom: Script = load("res://scripts/core/CampaignInkEndDomain.gd") as Script
 	if dom != null and dom.has_method("note_keep_playing"):
 		dom.call("note_keep_playing")
-	if typeof(TimeManager) != TYPE_NIL:
-		TimeManager.set_paused(false)
+	_dismiss_end_screen()
+
+
+func _acquire_clock_lock() -> void:
+	if _clock_lock_held:
+		return
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("acquire_overlay_clock_lock"):
+		TimeManager.acquire_overlay_clock_lock()
+		_clock_lock_held = true
+	elif typeof(TimeManager) != TYPE_NIL:
+		TimeManager.set_paused(true)
+
+
+func _release_clock_lock() -> void:
+	if not _clock_lock_held:
+		return
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("release_overlay_clock_lock"):
+		TimeManager.release_overlay_clock_lock()
+	_clock_lock_held = false
+
+
+func _dismiss_end_screen() -> void:
+	remove_from_group("campaign_ink_end_screen")
+	name = "CampaignInkEndScreen_dying"
+	_release_clock_lock()
 	queue_free()
+
+
+func _exit_tree() -> void:
+	_release_clock_lock()
 
 
 func _on_save() -> void:
