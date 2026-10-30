@@ -1,7 +1,10 @@
 extends SceneTree
 
 ## INK-TOOLTIPS-P0: global tooltip theme, Fill ≠ Strength, resource copy,
-## date box width. Fails on a4ebd959 (delay 0.5, empty resource tips, clipped date).
+## date box width, and five resource chips inside the viewport.
+## Fails on a4ebd959 (delay 0.5, empty resource tips, clipped date).
+## Fails on 93fd001b: at 1280×800 the war chip pushes Rubber out of the
+## viewport, Energy has no chip, and Search runs past the right edge.
 ##
 ##   tools/run_godot.sh --headless --path . -s res://scripts/core/HeadlessInkTooltips0Test.gd
 ##
@@ -101,19 +104,32 @@ func _test_bar_tooltips() -> void:
 	root.add_child(bar)
 	await process_frame
 	await process_frame
+	_seed_resource_stockpile()
+	if bar.has_method("_update_resources"):
+		bar.call("_update_resources")
 	var steel := bar.get("steel_label") as Label
 	var aluminum := bar.get("aluminum_label") as Label
 	var oil := bar.get("oil_label") as Label
 	var rubber := bar.get("rubber_label") as Label
+	var energy := bar.get("energy_label") as Label
+	if energy == null:
+		energy = bar.find_child("EnergyLabel", true, false) as Label
 	var date_lbl := bar.get("date_time_label") as Label
 	var pause_btn := bar.get("pause_button") as Button
 	_expect_tip(steel, "Steel", "steel")
 	_expect_tip(aluminum, "Aluminum", "aluminum")
 	_expect_tip(rubber, "Rubber", "rubber")
+	_expect_tip(energy, "Energy", "energy")
+	if energy != null and not str(energy.tooltip_text).contains("Runs factories. Shortages cut output."):
+		_fail("energy tooltip missing factory body: %s" % str(energy.tooltip_text))
 	if oil == null or str(oil.tooltip_text).strip_edges().is_empty():
 		_fail("fuel tooltip empty")
-	elif not ("G" in str(oil.tooltip_text)):
-		_fail("fuel tooltip missing G: %s" % str(oil.tooltip_text))
+	elif not str(oil.tooltip_text).contains("Press G to check supply."):
+		_fail("fuel tooltip missing G body: %s" % str(oil.tooltip_text))
+	elif not str(oil.tooltip_text).contains("[G]"):
+		_fail("fuel tooltip missing [G]: %s" % str(oil.tooltip_text))
+	elif str(oil.tooltip_text).contains("Runs factories"):
+		_fail("fuel tooltip includes the energy body: %s" % str(oil.tooltip_text))
 	else:
 		_pass("fuel tooltip mentions G")
 	if date_lbl == null:
@@ -349,23 +365,50 @@ func _test_tooltip_clamp() -> void:
 
 
 func _test_bar_1280_resources() -> void:
+	await _assert_resource_chips(1280, 800, false)
+	await _assert_resource_chips(1280, 800, true)
+	await _assert_resource_chips(1600, 900, false)
+	await _assert_resource_chips(1920, 1080, false)
+
+
+func _seed_resource_stockpile() -> void:
+	var pm := root.get_node_or_null("ProductionManager")
+	if pm != null and "national_stockpile" in pm:
+		pm.national_stockpile = {
+			"steel": 12400.0,
+			"aluminum": 3400.0,
+			"energy": 9000.0,
+			"fuel": 12000.0,
+			"rubber": 800.0,
+		}
+
+
+func _assert_resource_chips(vp_w: int, vp_h: int, at_war: bool) -> void:
+	DisplayServer.window_set_size(Vector2i(vp_w, vp_h))
+	root.size = Vector2i(vp_w, vp_h)
+	var ui := CanvasLayer.new()
+	ui.name = "InkChipUI"
+	ui.layer = 110
+	root.add_child(ui)
 	var packed := load(BAR_SCENE) as PackedScene
 	if packed == null:
-		_fail("TopInfoBar scene missing for 1280 layout")
+		_fail("TopInfoBar scene missing for %d layout" % vp_w)
+		ui.queue_free()
 		return
 	var bar := packed.instantiate() as Control
 	if bar == null:
-		_fail("TopInfoBar instantiate failed for 1280 layout")
+		_fail("TopInfoBar instantiate failed for %d layout" % vp_w)
+		ui.queue_free()
 		return
-	bar.set_meta("eoa_layout_vp_w", 1280.0)
-	bar.set_anchors_preset(Control.PRESET_TOP_LEFT, false)
+	if "player_country_tag" in bar:
+		bar.set("player_country_tag", "GER")
+	bar.set_anchors_preset(Control.PRESET_TOP_WIDE)
 	bar.offset_left = 0.0
 	bar.offset_top = 0.0
-	bar.offset_right = 1280.0
+	bar.offset_right = 0.0
 	bar.offset_bottom = 52.0
-	bar.custom_minimum_size = Vector2(1280, 52)
-	bar.size = Vector2(1280, 52)
-	root.add_child(bar)
+	ui.add_child(bar)
+	_seed_resource_stockpile()
 	var search_script := load("res://scripts/ui/map/MapProvinceSearch.gd")
 	var search: Control = null
 	if search_script != null:
@@ -374,54 +417,201 @@ func _test_bar_1280_resources() -> void:
 		search.name = "MapProvinceSearch"
 		if bar.has_method("host_map_search_chrome"):
 			bar.call("host_map_search_chrome", search)
-	if bar.has_method("_apply_responsive_layout"):
-		bar.call("_apply_responsive_layout")
+	if at_war:
+		_arm_one_war()
+	else:
+		_clear_war()
+	if bar.has_method("refresh_campaign_war_readout"):
+		bar.call("refresh_campaign_war_readout")
 	if bar.has_method("_update_resources"):
 		bar.call("_update_resources")
-	await process_frame
-	await process_frame
-	await process_frame
-	var steel := bar.get("steel_label") as Label
-	var aluminum := bar.get("aluminum_label") as Label
-	var oil := bar.get("oil_label") as Label
-	var rubber := bar.get("rubber_label") as Label
+	if bar.has_method("_apply_responsive_layout"):
+		bar.call("_apply_responsive_layout")
+	_play_search_layout(search)
+	for _i in 4:
+		await process_frame
+	var vp := Rect2(0, 0, float(vp_w), float(vp_h))
+	var tag := "%dx%d war=%s" % [vp_w, vp_h, "1" if at_war else "0"]
+	var specs: Array[Dictionary] = [
+		{"key": "Steel", "nodes": ["SteelChip", "SteelLabel"], "body": "Rifles, artillery, tanks and ships. Stockpile refills division TOE daily."},
+		{"key": "Aluminum", "nodes": ["AluminumChip", "AluminumLabel"], "body": "Aircraft and light vehicles."},
+		{"key": "Energy", "nodes": ["EnergyChip", "EnergyLabel"], "body": "Runs factories. Shortages cut output."},
+		{"key": "Rubber", "nodes": ["RubberChip", "RubberLabel"], "body": "Trucks and tires. Needed to fill motorized TOE."},
+		{"key": "Fuel", "nodes": ["FuelChip", "OilLabel"], "body": "Press G to check supply."},
+	]
+	var chips: Array[Control] = []
+	var tip_keys: Array[Dictionary] = []
+	for spec in specs:
+		var chip := _find_named(bar, spec["nodes"] as Array)
+		var key := str(spec["key"])
+		if chip == null:
+			_fail("%s %s chip missing" % [tag, key])
+			print("CHIP_RECT %s %s MISSING" % [tag, key])
+			continue
+		chips.append(chip)
+		var r := chip.get_global_rect()
+		var tip := str(chip.tooltip_text).strip_edges()
+		tip_keys.append({"key": key, "tip": tip})
+		var inside := _rect_inside(r, vp, 0.5)
+		var clip_msg := _clip_ancestor_problem(chip)
+		print("CHIP_RECT %s %s rect=%s vis=%s size=%s inside=%s clip=%s tip_len=%d" % [
+			tag, key, str(r), str(chip.is_visible_in_tree()), str(chip.size), str(inside),
+			clip_msg if not clip_msg.is_empty() else "ok", tip.length(),
+		])
+		if not chip.is_visible_in_tree():
+			_fail("%s %s not visible in tree" % [tag, key])
+		elif chip.size.x <= 0.0 or chip.size.y <= 0.0:
+			_fail("%s %s size is zero %s" % [tag, key, str(chip.size)])
+		elif not inside:
+			_fail("%s %s rect not inside viewport %s" % [tag, key, str(r)])
+		elif not clip_msg.is_empty():
+			_fail("%s %s %s" % [tag, key, clip_msg])
+		elif tip.is_empty():
+			_fail("%s %s tooltip empty" % [tag, key])
+		elif not tip.contains(str(spec["body"])):
+			_fail("%s %s tooltip missing body: %s" % [tag, key, tip])
+		elif key == "Fuel" and not tip.contains("[G]"):
+			_fail("%s Fuel tooltip missing [G]: %s" % [tag, tip])
+		elif key == "Fuel" and tip.contains("Runs factories"):
+			_fail("%s Fuel tooltip includes energy body" % tag)
+		elif key != "Fuel" and tip.contains("Press G to check supply."):
+			_fail("%s %s tooltip includes the fuel body" % [tag, key])
+		else:
+			_pass("%s %s chip %s" % [tag, key, str(r)])
+	var seen: Dictionary = {}
+	for pair in tip_keys:
+		var tip_s := str(pair["tip"])
+		if tip_s.is_empty():
+			continue
+		if seen.has(tip_s):
+			_fail("%s tooltip duplicated %s and %s" % [tag, str(seen[tip_s]), str(pair["key"])])
+		else:
+			seen[tip_s] = str(pair["key"])
+	if seen.size() == specs.size():
+		_pass("%s five tooltips distinct" % tag)
 	var hosted: Control = search
 	if hosted == null or not is_instance_valid(hosted):
 		hosted = bar.find_child("MapProvinceSearch", true, false) as Control
-	var labels: Array[Label] = [steel, aluminum, oil, rubber]
-	var names: PackedStringArray = PackedStringArray(["steel", "aluminum", "fuel", "rubber"])
-	var all_ok := true
-	for i in labels.size():
-		var lab: Label = labels[i]
-		var nm := str(names[i])
-		if lab == null or not lab.visible:
-			_fail("%s counter hidden at 1280" % nm)
-			all_ok = false
-			continue
-		if lab.mouse_filter == Control.MOUSE_FILTER_IGNORE:
-			_fail("%s counter ignores mouse at 1280" % nm)
-			all_ok = false
-		var r := lab.get_global_rect()
-		if r.size.x < 4.0 or r.size.y < 4.0:
-			_fail("%s counter has empty rect %s" % [nm, str(r)])
-			all_ok = false
-		elif r.position.x + r.size.x > 1280.5:
-			_fail("%s counter clipped at right edge %s" % [nm, str(r)])
-			all_ok = false
-		elif hosted != null and hosted.visible and r.intersects(hosted.get_global_rect()):
-			_fail("%s counter overlapped by search %s vs %s" % [nm, str(r), str(hosted.get_global_rect())])
-			all_ok = false
+	var blockers: Array[Control] = []
+	if hosted != null:
+		blockers.append(hosted)
+		var sr := hosted.get_global_rect()
+		print("CHIP_RECT %s Search rect=%s vis=%s size=%s inside=%s" % [
+			tag, str(sr), str(hosted.is_visible_in_tree()), str(hosted.size), str(_rect_inside(sr, vp, 0.5)),
+		])
+		if not hosted.is_visible_in_tree() or hosted.size.x <= 0.0 or hosted.size.y <= 0.0:
+			_fail("%s search missing" % tag)
+		elif not _rect_inside(sr, vp, 0.5):
+			_fail("%s search not inside viewport %s" % [tag, str(sr)])
 		else:
-			_pass("%s counter visible/hoverable at 1280 %s" % [nm, str(r)])
-	if hosted == null or not hosted.visible:
-		_fail("search chrome missing at 1280")
-	elif hosted.get_global_rect().position.x + hosted.get_global_rect().size.x > 1280.5:
-		_fail("search chrome past right edge %s" % str(hosted.get_global_rect()))
-	else:
-		_pass("search chrome beside resources %s" % str(hosted.get_global_rect()))
-	if all_ok:
-		_pass("resource counters not overlapped by search at 1280")
+			_pass("%s search inside %s" % [tag, str(sr)])
+	for nm in ["PauseButton", "Speed1Button", "Speed2Button", "Speed3Button", "Speed4Button", "DateTimeLabel"]:
+		var clock := bar.find_child(nm, true, false) as Control
+		if clock == null or not clock.is_visible_in_tree():
+			_fail("%s %s missing" % [tag, nm])
+			continue
+		blockers.append(clock)
+		var cr := clock.get_global_rect()
+		print("CHIP_RECT %s %s rect=%s" % [tag, nm, str(cr)])
+		if not _rect_inside(cr, vp, 0.5):
+			_fail("%s %s not inside viewport %s" % [tag, nm, str(cr)])
+	for i in chips.size():
+		for j in range(i + 1, chips.size()):
+			if _rects_overlap(chips[i].get_global_rect(), chips[j].get_global_rect()):
+				_fail("%s chips overlap %s" % [tag, str(chips[i].get_global_rect())])
+		for b in blockers:
+			if _rects_overlap(chips[i].get_global_rect(), b.get_global_rect()):
+				_fail("%s %s overlaps %s %s vs %s" % [
+					tag, chips[i].name, b.name, str(chips[i].get_global_rect()), str(b.get_global_rect()),
+				])
 	bar.queue_free()
+	ui.queue_free()
+	await process_frame
+
+
+func _find_named(bar: Node, names: Array) -> Control:
+	for nm in names:
+		var chip := bar.find_child(str(nm), true, false) as Control
+		if chip != null:
+			return chip
+	return null
+
+
+func _clear_war() -> void:
+	var war := load("res://scripts/core/WarStateDomain.gd") as GDScript
+	if war != null and war.has_method("reset_for_test"):
+		war.call("reset_for_test")
+
+
+func _arm_one_war() -> void:
+	var lm := root.get_node_or_null("LeaderManager")
+	if lm != null and lm.has_method("set_player_country_tag"):
+		lm.call("set_player_country_tag", "GER")
+	var tm := root.get_node_or_null("TimeManager")
+	if tm != null:
+		tm.scenario_start_year = 1936
+		tm.current_year = 1936
+		tm.current_month = 1
+		tm.current_day = 1
+	var war := load("res://scripts/core/WarStateDomain.gd") as GDScript
+	if war == null:
+		_fail("WarStateDomain missing")
+		return
+	if war.has_method("reset_for_test"):
+		war.call("reset_for_test")
+	if war.has_method("clear_rule_overrides"):
+		war.call("clear_rule_overrides")
+	if war.has_method("declare_war"):
+		var one: Dictionary = war.call("declare_war", "GER", "POL", "call_to_arms")
+		if not bool(one.get("ok", false)):
+			_fail("declare POL failed %s" % str(one))
+
+
+func _play_search_layout(search: Control) -> void:
+	## Play calls MapRenderer._layout_map_search_chrome after the bar hosts Search.
+	## On 93fd001b that forces a 308px Search and shoves the right side off 1280.
+	if search == null or not is_instance_valid(search):
+		return
+	var mr_script := load("res://scripts/map/MapRenderer.gd")
+	if mr_script == null:
+		_fail("MapRenderer script missing for search layout")
+		return
+	var mr: Node = mr_script.new()
+	mr.set("_map_search", search)
+	if mr.has_method("_layout_map_search_chrome"):
+		mr.call("_layout_map_search_chrome")
+	mr.free()
+
+
+func _rect_inside(r: Rect2, outer: Rect2, slop: float) -> bool:
+	if r.size.x <= 0.0 or r.size.y <= 0.0:
+		return false
+	return (
+		r.position.x + slop >= outer.position.x
+		and r.position.y + slop >= outer.position.y
+		and r.end.x <= outer.end.x + slop
+		and r.end.y <= outer.end.y + slop
+	)
+
+
+func _rects_overlap(a: Rect2, b: Rect2) -> bool:
+	var aa := a.grow(-0.5)
+	var bb := b.grow(-0.5)
+	if aa.size.x <= 0.0 or aa.size.y <= 0.0 or bb.size.x <= 0.0 or bb.size.y <= 0.0:
+		return false
+	return aa.intersects(bb)
+
+
+func _clip_ancestor_problem(c: Control) -> String:
+	var r := c.get_global_rect()
+	var n: Node = c.get_parent()
+	while n != null:
+		if n is Control and (n as Control).clip_contents:
+			var pr := (n as Control).get_global_rect()
+			if not _rect_inside(r, pr, 0.5):
+				return "clipped by %s rect=%s parent=%s" % [n.name, str(r), str(pr)]
+		n = n.get_parent()
+	return ""
 
 
 func _test_begin_tooltip() -> void:
