@@ -419,7 +419,11 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
         and "_living_playtest_clock" in _slice(tm_src, "is_interactive_light_sim")
         and "day_emit" in tm_src
         and "day_battles" in tm_src
-        and "game_day_advanced.emit" in tm_src
+        # 4d22630d (PERF-4) stopped calling game_day_advanced.emit. Listeners
+        # run inside _emit_game_day_advanced_profiled so each one is timed.
+        and "_emit_game_day_advanced_profiled" in tm_src
+        and 'get_signal_connection_list("game_day_advanced")' in tm_src
+        and "game_day_advanced.emit" not in tm_src
         and "_tick_open_land_battles" in tm_src
         and '"aar"' in clock_fn
         and '"news"' in clock_fn

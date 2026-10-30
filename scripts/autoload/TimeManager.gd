@@ -1791,9 +1791,6 @@ func _emit_game_day_advanced_profiled(year: int, month: int, day: int) -> void:
 	var worst_ms := 0.0
 	var t_all := Time.get_ticks_usec()
 	var conns: Array = get_signal_connection_list("game_day_advanced")
-	if conns.is_empty():
-		game_day_advanced.emit(year, month, day)
-		return
 	for conn_v in conns:
 		if typeof(conn_v) != TYPE_DICTIONARY:
 			continue
