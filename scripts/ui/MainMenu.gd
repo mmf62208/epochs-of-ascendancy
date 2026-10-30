@@ -267,15 +267,26 @@ func _build_ui() -> void:
 	_panel.process_mode = Node.PROCESS_MODE_ALWAYS
 	_panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	_panel.custom_minimum_size = Vector2(MENU_WIDTH, MENU_HEIGHT)
+	_panel.clip_contents = true
 	_root.add_child(_panel)
 	RetrowaveTheme.style_menu_panel(_panel)
+
+	# Child minimum sizes (autowrap labels, the save list) must not grow the
+	# panel past the viewport. This slot reports a small minimum and fits
+	# its child to the panel rect, so Settings stay inside 1280×800.
+	var slot := _PanelSlot.new()
+	slot.name = "PanelSlot"
+	slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	slot.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	slot.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_panel.add_child(slot)
 
 	var margin := MarginContainer.new()
 	margin.add_theme_constant_override("margin_left", 18)
 	margin.add_theme_constant_override("margin_right", 18)
 	margin.add_theme_constant_override("margin_top", 12)
 	margin.add_theme_constant_override("margin_bottom", 14)
-	_panel.add_child(margin)
+	slot.add_child(margin)
 
 	var outer := VBoxContainer.new()
 	outer.add_theme_constant_override("separation", 12)
@@ -349,20 +360,35 @@ func _build_ui() -> void:
 	content.add_theme_constant_override("separation", 16)
 	outer.add_child(content)
 
-	# --- Left: actions ---
+	# --- Left: actions scroll, settings pinned so Mute stays on screen ---
 	var left := VBoxContainer.new()
 	left.name = "GameActions"
-	left.custom_minimum_size = Vector2(240, 0)
+	# Wide enough for Master slider + Mute on one row at 1280×800.
+	left.custom_minimum_size = Vector2(340, 0)
+	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	left.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	left.add_theme_constant_override("separation", 8)
 	content.add_child(left)
 
+	var left_scroll := ScrollContainer.new()
+	left_scroll.name = "GameActionsScroll"
+	left_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	left_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	left_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	left_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	left.add_child(left_scroll)
+
+	var left_inner := VBoxContainer.new()
+	left_inner.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	left_inner.add_theme_constant_override("separation", 8)
+	left_scroll.add_child(left_inner)
+
 	var left_hdr := Label.new()
 	left_hdr.text = "GAME"
 	RetrowaveTheme.style_column_header(left_hdr)
-	left.add_child(left_hdr)
+	left_inner.add_child(left_hdr)
 
-	_options_vbox = left
+	_options_vbox = left_inner
 	if pause_menu:
 		var resume := Button.new()
 		resume.name = "BtnResume"
@@ -373,21 +399,21 @@ func _build_ui() -> void:
 		resume.mouse_filter = Control.MOUSE_FILTER_STOP
 		resume.pressed.connect(_force_close)
 		RetrowaveTheme.style_primary_button(resume)
-		left.add_child(resume)
-	_add_action_button(left, "Save Game (quicksave)", "save", not pause_menu)
-	_add_action_button(left, "Save As…", "save_as", false)
-	_add_action_button(left, "Refresh save list", "refresh", false)
-	_add_action_button(left, "Trade Market", "trade_market", true)
-	_add_action_button(left, "Help / About", "help", false)
-	_add_action_button(left, "Return to Title", "return_to_main", false)
-	_add_action_button(left, "Exit to Desktop", "exit", false, true)
+		left_inner.add_child(resume)
+	_add_action_button(left_inner, "Save Game (quicksave)", "save", not pause_menu)
+	_add_action_button(left_inner, "Save As…", "save_as", false)
+	_add_action_button(left_inner, "Refresh save list", "refresh", false)
+	_add_action_button(left_inner, "Trade Market", "trade_market", true)
+	_add_action_button(left_inner, "Help / About", "help", false)
+	_add_action_button(left_inner, "Return to Title", "return_to_main", false)
+	_add_action_button(left_inner, "Exit to Desktop", "exit", false, true)
 
 	var new_game := VBoxContainer.new()
 	new_game.name = "NewGameBlock"
 	new_game.add_to_group("eoa_cc_new_game")
 	new_game.add_theme_constant_override("separation", 8)
 	new_game.visible = not pause_menu
-	left.add_child(new_game)
+	left_inner.add_child(new_game)
 	var camp_hdr := Label.new()
 	camp_hdr.text = "CAMPAIGN"
 	RetrowaveTheme.style_column_header(camp_hdr)
@@ -395,6 +421,7 @@ func _build_ui() -> void:
 	var camp_hint := Label.new()
 	camp_hint.text = "GER Maginot is the F5 default. Pick a nation and era."
 	camp_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	camp_hint.custom_minimum_size = Vector2(300, 0)
 	RetrowaveTheme.style_body_label(camp_hint)
 	new_game.add_child(camp_hint)
 	var nation_row_a := HBoxContainer.new()
@@ -435,14 +462,11 @@ func _build_ui() -> void:
 		var dbg_hdr := Label.new()
 		dbg_hdr.text = "DEBUG"
 		RetrowaveTheme.style_column_header(dbg_hdr)
-		left.add_child(dbg_hdr)
-		_add_action_button(left, "Open Debug Overlay (F10)", "debug", false)
+		left_inner.add_child(dbg_hdr)
+		_add_action_button(left_inner, "Open Debug Overlay (F10)", "debug", false)
 
+	# Pinned under the scroll so Mute is inside the panel at 1280×800.
 	_add_audio_settings(left)
-
-	var spacer := Control.new()
-	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	left.add_child(spacer)
 
 	# --- Right: save browser ---
 	var right := PanelContainer.new()
@@ -471,6 +495,7 @@ func _build_ui() -> void:
 	sav_hint.name = "SaveListHint"
 	sav_hint.text = "Click Save on a slot to write · Load to restore · Save Game uses quicksave · Ctrl+Shift+S opens this list"
 	sav_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	sav_hint.custom_minimum_size = Vector2(280, 0)
 	sav_hint.tooltip_text = "Save / load slots. Ctrl+Shift+S opens this list. F6 is the loyalty mapmode."
 	RetrowaveTheme.style_body_label(sav_hint)
 	right_v.add_child(sav_hint)
@@ -509,6 +534,20 @@ func _build_ui() -> void:
 	_center_panel()
 	if get_viewport():
 		get_viewport().size_changed.connect(_center_panel)
+
+
+class _PanelSlot extends Container:
+	func _get_minimum_size() -> Vector2:
+		return Vector2(320, 160)
+
+	func _notification(what: int) -> void:
+		if what != NOTIFICATION_SORT_CHILDREN:
+			return
+		for c in get_children():
+			var child := c as Control
+			if child == null:
+				continue
+			fit_child_in_rect(child, Rect2(Vector2.ZERO, size))
 
 
 func _on_blocker_gui_input(event: InputEvent) -> void:
@@ -555,16 +594,18 @@ func _add_audio_settings(parent: VBoxContainer) -> void:
 	RetrowaveTheme.style_column_header(hdr)
 	block.add_child(hdr)
 	var audio := _audio_node()
-	block.add_child(_audio_slider("Master", "MasterVolume", _audio_db(audio, "get_master_db", 0.0), "set_master_db"))
-	block.add_child(_audio_slider("UI", "UiVolume", _audio_db(audio, "get_ui_db", -12.0), "set_ui_db"))
-	block.add_child(_audio_slider("SFX", "SfxVolume", _audio_db(audio, "get_sfx_db", 0.0), "set_sfx_db"))
+	var master_row := _audio_slider("Master", "MasterVolume", _audio_db(audio, "get_master_db", 0.0), "set_master_db")
 	var mute := CheckButton.new()
 	mute.name = "MuteAudio"
 	mute.text = "Mute"
 	mute.focus_mode = Control.FOCUS_ALL
+	mute.size_flags_horizontal = Control.SIZE_SHRINK_END
 	mute.button_pressed = bool(audio.call("is_muted")) if audio != null and audio.has_method("is_muted") else false
 	mute.toggled.connect(_on_audio_mute_toggled)
-	block.add_child(mute)
+	master_row.add_child(mute)
+	block.add_child(master_row)
+	block.add_child(_audio_slider("UI", "UiVolume", _audio_db(audio, "get_ui_db", -12.0), "set_ui_db"))
+	block.add_child(_audio_slider("SFX", "SfxVolume", _audio_db(audio, "get_sfx_db", 0.0), "set_sfx_db"))
 
 
 func _audio_db(audio: Node, getter: String, fallback: float) -> float:
@@ -599,6 +640,63 @@ func _on_audio_slider(value: float, setter: String) -> void:
 		audio.call(setter, value)
 
 
+func _control_has_point(node: Control, screen: Vector2) -> bool:
+	if node == null or not is_instance_valid(node) or not node.visible:
+		return false
+	return node.get_global_rect().has_point(screen)
+
+
+func _find_action_button(action_id: String) -> Button:
+	var want := action_id.strip_edges()
+	for n in find_children("*", "Button", true, false):
+		if not (n is Button):
+			continue
+		var b := n as Button
+		if str(b.get_meta("eoa_cc_action", "")) == want and not b.disabled and b.visible:
+			return b
+	return null
+
+
+## "refresh", "close", "header", or "" for a screen point. Geometry only.
+func live_pointer_target(screen: Vector2) -> String:
+	var refresh := _find_action_button("refresh")
+	if refresh != null and _control_has_point(refresh, screen):
+		return "refresh"
+	var close_b := close_x_button()
+	if close_b != null and _control_has_point(close_b, screen):
+		return "close"
+	var header := find_child("CommandCenterHeader", true, false) as Control
+	if _control_has_point(header, screen):
+		return "header"
+	return ""
+
+
+## One click for a live-pointer hit. Refresh also emits pressed once per frame.
+func activate_live_pointer(screen: Vector2) -> String:
+	var kind := live_pointer_target(screen)
+	if kind == "refresh":
+		var am := _audio_node()
+		var btn := _find_action_button("refresh")
+		if am != null and am.has_method("activate_button"):
+			am.call("activate_button", btn)
+		elif btn != null:
+			btn.pressed.emit()
+		return "refresh"
+	if kind == "close":
+		_play_live_click(close_x_button())
+		return "close"
+	if kind == "header":
+		_play_live_click(find_child("CommandCenterHeader", true, false))
+		return "header"
+	return ""
+
+
+func _play_live_click(source: Object) -> void:
+	var am := _audio_node()
+	if am != null and am.has_method("play_ui_click"):
+		am.call("play_ui_click", source)
+
+
 func _on_audio_mute_toggled(on: bool) -> void:
 	var audio := _audio_node()
 	if audio != null and audio.has_method("set_muted"):
@@ -612,6 +710,9 @@ func _add_action_button(parent: VBoxContainer, text: String, id: String, primary
 	btn.focus_mode = Control.FOCUS_ALL
 	btn.process_mode = Node.PROCESS_MODE_ALWAYS
 	btn.mouse_filter = Control.MOUSE_FILTER_STOP
+	btn.set_meta("eoa_cc_action", id)
+	if id == "refresh":
+		btn.name = "RefreshSaveList"
 	# Bind by string id (stable); avoid async signal sinks that drop without await.
 	btn.pressed.connect(_on_action.bind(id))
 	if danger:

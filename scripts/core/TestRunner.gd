@@ -665,6 +665,9 @@ func _ensure_game_interactive() -> void:
 	if not has_meta("eoa_main_fix1_hooks_ran"):
 		set_meta("eoa_main_fix1_hooks_ran", true)
 		call_deferred("_maybe_run_main_fix1_play_hooks")
+	if not has_meta("eoa_audio1_ready_war_ran"):
+		set_meta("eoa_audio1_ready_war_ran", true)
+		call_deferred("_maybe_run_audio1_ready_war")
 	if OS.get_environment("EOA_UI_SMOKE").strip_edges() == "1" and not has_meta("eoa_ui_smoke_ran"):
 		set_meta("eoa_ui_smoke_ran", true)
 		call_deferred("_run_ui_smoke_and_quit")
@@ -676,6 +679,23 @@ func _ensure_game_interactive() -> void:
 	if OS.get_environment("EOA_FEB_CLOCK").strip_edges() == "1" and not has_meta("eoa_feb_clock_ran"):
 		set_meta("eoa_feb_clock_ran", true)
 		call_deferred("_run_feb_clock_advance_test")
+
+
+func _maybe_run_audio1_ready_war() -> void:
+	if not OS.is_debug_build():
+		return
+	if OS.get_environment("EOA_AUDIO1_READY_WAR").strip_edges() != "1":
+		return
+	# Begin has not applied the picked nation yet. The title-closed path grants.
+	var boot: Node = get_node_or_null("LivingTitleBoot")
+	if boot != null and is_instance_valid(boot) and not bool(boot.get("_closed")):
+		return
+	var scr: GDScript = load("res://scripts/core/Audio1PlayHooks.gd") as GDScript
+	if scr == null:
+		print("EOA_AUDIO1_READY_WAR fail=missing Audio1PlayHooks.gd")
+		return
+	if scr.has_method("maybe_run"):
+		scr.call("maybe_run")
 
 
 func _maybe_run_main_fix1_play_hooks() -> void:
@@ -833,6 +853,9 @@ func _on_living_title_boot_closed(result: Dictionary) -> void:
 	if has_meta("eoa_title_esc_held"):
 		remove_meta("eoa_title_esc_held")
 	print("TestRunner: living title closed %s" % str(result))
+	# Re-grant after Begin so the justification matches the nation just picked.
+	# No-op unless EOA_AUDIO1_READY_WAR=1 on a debug build.
+	_maybe_run_audio1_ready_war()
 	var tag := str(result.get("player_tag", player_tag)).strip_edges().to_upper()
 	if tag.is_empty():
 		tag = "GER"

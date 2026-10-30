@@ -55,6 +55,11 @@ var _smoke_auto_begin_delay_s := 0.0
 ## Slot chosen by the exact Load-button hit (title row or Command Center).
 var _pending_load_slot := ""
 var _pending_load_via_cc := false
+var _pending_load_button: Button = null
+## Exact nation / date button under the pointer (Command Center closed).
+var _pending_choice: Button = null
+## Screen point for a Command Center header or Refresh hit.
+var _pending_screen := Vector2.ZERO
 ## One Esc opens the title Command Center. The next Esc closes it.
 ## Same-frame re-entry must not open and close on the press that opened it.
 var _title_esc_frame := -1
@@ -832,7 +837,24 @@ func clear_pending_pointer() -> void:
 	_cc_pointer_latch = false
 	_pending_load_slot = ""
 	_pending_load_via_cc = false
+	_pending_load_button = null
+	_pending_choice = null
+	_pending_screen = Vector2.ZERO
 	_begin_block_frame = Engine.get_process_frames()
+
+
+## Actions whose press is fully handled here. GUI must not also emit `pressed`.
+static func consumes_live_action(action: String) -> bool:
+	return (
+		action == "begin"
+		or action == "cc"
+		or action == "panel"
+		or action == "load"
+		or action == "close"
+		or action == "choice"
+		or action == "refresh"
+		or action == "header"
+	)
 
 
 func handle_live_pointer(event: InputEvent) -> String:
@@ -869,6 +891,9 @@ func handle_live_pointer(event: InputEvent) -> String:
 func _classify_points(pts: Array[Vector2]) -> String:
 	_pending_load_slot = ""
 	_pending_load_via_cc = false
+	_pending_load_button = null
+	_pending_choice = null
+	_pending_screen = Vector2.ZERO
 	# Exact Load / × before the grown CC and panel pads. Those pads used to
 	# swallow "Load · quicksave" and the Command Center's own Load and ×.
 	if _command_center_is_up():
@@ -886,6 +911,14 @@ func _classify_points(pts: Array[Vector2]) -> String:
 			if not over_slot.is_empty():
 				_pending_load_slot = over_slot
 				return "load"
+		for p_rf in pts:
+			if _cc_live_target(p_rf) == "refresh":
+				_pending_screen = p_rf
+				return "refresh"
+		for p_hd in pts:
+			if _cc_live_target(p_hd) == "header":
+				_pending_screen = p_hd
+				return "header"
 		for p_mm in pts:
 			if _command_center_covers_point(p_mm):
 				return "passthrough"
@@ -895,6 +928,13 @@ func _classify_points(pts: Array[Vector2]) -> String:
 			if not title_slot.is_empty():
 				_pending_load_slot = title_slot
 				return "load"
+		# Exact nation / date hits. Grown Begin / panel pads used to swallow
+		# these and the click never reached `pressed`.
+		for p_ch in pts:
+			var choice := _choice_button_at(p_ch)
+			if choice != null:
+				_pending_choice = choice
+				return "choice"
 	# CC first so Command Center · Esc / Esc · Menu are never stolen by the Begin slab.
 	if _any_point_matches(pts, "cc"):
 		return "cc"
@@ -929,8 +969,52 @@ func _title_load_slot_at(screen: Vector2) -> String:
 		if not b.has_meta("eoa_load_slot"):
 			continue
 		if _button_exact_point(b, screen):
+			_pending_load_button = b
 			return str(b.get_meta("eoa_load_slot")).strip_edges()
 	return ""
+
+
+func _choice_button_at(screen: Vector2) -> Button:
+	for k in _nation_btns.keys():
+		var btn: Button = _nation_btns[k]
+		if _button_exact_point(btn, screen):
+			return btn
+	for yk in _era_btns.keys():
+		var ebtn: Button = _era_btns[yk]
+		if _button_exact_point(ebtn, screen):
+			return ebtn
+	return null
+
+
+func _cc_live_target(screen: Vector2) -> String:
+	var mm := _live_main_menu()
+	if mm == null or not mm.has_method("live_pointer_target"):
+		return ""
+	return str(mm.call("live_pointer_target", screen))
+
+
+func _audio_manager() -> Node:
+	var tree := get_tree()
+	if tree == null or tree.root == null:
+		return null
+	return tree.root.get_node_or_null("AudioManager")
+
+
+func _play_live_click(source: Object) -> void:
+	var am := _audio_manager()
+	if am != null and am.has_method("play_ui_click"):
+		am.call("play_ui_click", source)
+
+
+func _activate_choice(btn: Button) -> void:
+	if btn == null or not is_instance_valid(btn):
+		return
+	var am := _audio_manager()
+	if am != null and am.has_method("activate_button"):
+		am.call("activate_button", btn)
+		return
+	if not btn.disabled:
+		btn.pressed.emit()
 
 
 func _live_main_menu() -> Node:
@@ -961,6 +1045,7 @@ func _cc_load_slot_at(screen: Vector2) -> String:
 		if str(b.text) != "Load" or not b.has_meta("eoa_load_slot"):
 			continue
 		if _button_exact_point(b, screen):
+			_pending_load_button = b
 			return str(b.get_meta("eoa_load_slot")).strip_edges()
 	return ""
 
@@ -981,6 +1066,8 @@ func _command_center_covers_point(screen: Vector2) -> bool:
 func _apply_pointer_hit(hit: String, pending_press: bool = false) -> String:
 	if hit == "load":
 		print("EOA_LIVE_PTR who=title.handle_live_pointer action=load")
+		# Handler is already the pressed connection. Play once; do not emit.
+		_play_live_click(_pending_load_button)
 		var slot := _pending_load_slot
 		if _pending_load_via_cc:
 			var mm_load := _live_main_menu()
@@ -993,11 +1080,23 @@ func _apply_pointer_hit(hit: String, pending_press: bool = false) -> String:
 		print("EOA_LIVE_PTR who=title.handle_live_pointer action=close")
 		var mm_close := _live_main_menu()
 		if mm_close != null:
+			if mm_close.has_method("close_x_button"):
+				_play_live_click(mm_close.call("close_x_button"))
 			if mm_close.has_method("arm_cc_close_release_swallow"):
 				mm_close.call("arm_cc_close_release_swallow", pending_press)
 			if mm_close.has_method("_force_close"):
 				mm_close.call("_force_close")
 		return "close"
+	if hit == "refresh" or hit == "header":
+		print("EOA_LIVE_PTR who=title.handle_live_pointer action=%s" % hit)
+		var mm_live := _live_main_menu()
+		if mm_live != null and mm_live.has_method("activate_live_pointer"):
+			mm_live.call("activate_live_pointer", _pending_screen)
+		return hit
+	if hit == "choice":
+		print("EOA_LIVE_PTR who=title.handle_live_pointer action=choice")
+		_activate_choice(_pending_choice)
+		return "choice"
 	if hit == "passthrough":
 		print("EOA_LIVE_PTR who=title.handle_live_pointer action=passthrough")
 		return "passthrough"
@@ -1006,10 +1105,13 @@ func _apply_pointer_hit(hit: String, pending_press: bool = false) -> String:
 			print("EOA_LIVE_PTR who=title.handle_live_pointer action=passthrough")
 			return "passthrough"
 		print("EOA_LIVE_PTR who=title.handle_live_pointer action=begin")
+		# Direct call carries the pointer args. Emitting pressed would Begin again.
+		_play_live_click(_begin_btn)
 		_on_begin_new(pending_press, true)
 		return "begin"
 	if hit == "cc":
 		print("EOA_LIVE_PTR who=title.handle_live_pointer action=cc")
+		_play_live_click(_cc_btn)
 		handle_live_command_center_click()
 		return "cc"
 	if hit == "panel":
@@ -1376,7 +1478,7 @@ func _on_window_input(event: InputEvent) -> void:
 	if is_live_pointer_press(event):
 		var action_w: String = handle_live_pointer(event)
 		print("EOA_LIVE_PTR who=title.window_input action=%s" % action_w)
-		if action_w == "begin" or action_w == "cc" or action_w == "panel" or action_w == "load" or action_w == "close":
+		if consumes_live_action(action_w):
 			var vp_w: Viewport = get_viewport()
 			if vp_w != null:
 				vp_w.set_input_as_handled()
@@ -1470,7 +1572,7 @@ func _on_sink_gui_input(event: InputEvent) -> void:
 		return
 	if is_live_pointer_press(event):
 		var action_s: String = handle_live_pointer(event)
-		if action_s == "begin" or action_s == "cc" or action_s == "panel" or action_s == "load" or action_s == "close":
+		if consumes_live_action(action_s):
 			var vp_s: Viewport = get_viewport()
 			if vp_s != null:
 				vp_s.set_input_as_handled()
@@ -1520,7 +1622,7 @@ func _input(event: InputEvent) -> void:
 	if is_live_pointer_press(event):
 		var action_i: String = handle_live_pointer(event)
 		print("EOA_LIVE_PTR who=title._input action=%s" % action_i)
-		if action_i == "begin" or action_i == "cc" or action_i == "panel" or action_i == "load" or action_i == "close":
+		if consumes_live_action(action_i):
 			var vp: Viewport = get_viewport()
 			if vp != null:
 				vp.set_input_as_handled()

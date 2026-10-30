@@ -20,7 +20,7 @@ var _failures: int = 0
 
 
 func _init() -> void:
-	call_deferred("_run")
+	call_deferred("_start")
 
 
 func _fail(msg: String) -> void:
@@ -32,12 +32,16 @@ func _pass(msg: String) -> void:
 	print("  [PASS] HeadlessAudio1Test: ", msg)
 
 
+func _start() -> void:
+	await _run()
+	_finish()
+
+
 func _run() -> void:
 	print("HeadlessAudio1Test: display=", DisplayServer.get_name())
 	var am := _audio()
 	if am == null:
 		_fail("AudioManager autoload missing")
-		_finish()
 		return
 	_test_manifest_and_credits()
 	_test_buses(am)
@@ -48,7 +52,9 @@ func _run() -> void:
 	_test_pin_mute(am)
 	_test_end_stings(am)
 	_test_settings(am)
-	_finish()
+	await _test_live_clicks(am)
+	await _test_mute_layout(am)
+	_test_ready_war()
 
 
 func _finish() -> void:
@@ -326,6 +332,344 @@ func _test_settings(am: Node) -> void:
 	if menu.has_method("_force_close"):
 		menu.call("_force_close")
 	_pass("volume and mute round-trip %s" % cfg_path)
+
+
+const PLAY_SIZE := Vector2i(1280, 800)
+
+
+func _set_play_size() -> void:
+	DisplayServer.window_set_size(PLAY_SIZE)
+	root.size = PLAY_SIZE
+	await process_frame
+	await process_frame
+
+
+func _click_count(am: Node) -> int:
+	return _count_req(am, "ui_click")
+
+
+func _pointer(pos: Vector2) -> InputEventMouseButton:
+	var ev := InputEventMouseButton.new()
+	ev.button_index = MOUSE_BUTTON_LEFT
+	ev.pressed = true
+	ev.position = pos
+	ev.global_position = pos
+	return ev
+
+
+func _twice(am: Node, boot: Node, pos: Vector2) -> String:
+	am.call("clear_request_log")
+	var first := str(boot.call("handle_live_pointer", _pointer(pos)))
+	var second := str(boot.call("handle_live_pointer", _pointer(pos)))
+	if _click_count(am) != 1:
+		_fail("ui_click count %d at %s (second=%s)" % [_click_count(am), str(pos), second])
+	return first
+
+
+func _button_center(btn: Control) -> Vector2:
+	return btn.get_global_rect().get_center()
+
+
+func _test_live_clicks(am: Node) -> void:
+	await _set_play_size()
+	var old := root.get_node_or_null("Audio1Menu")
+	if old != null:
+		old.queue_free()
+		await process_frame
+	var boot := _spawn_title()
+	if boot == null:
+		return
+	await process_frame
+	await process_frame
+	var nations: Dictionary = boot.get("_nation_btns")
+	var eras: Dictionary = boot.get("_era_btns")
+	var fra: Button = nations.get("FRA") as Button
+	var era: Button = eras.get(1918) as Button
+	if fra == null or era == null:
+		_fail("title nation/date buttons missing")
+		boot.queue_free()
+		return
+	if fra.get_global_rect().size.y < 8.0 or era.get_global_rect().size.y < 8.0:
+		_fail("title choice buttons have no rect fra=%s era=%s" % [fra.get_global_rect(), era.get_global_rect()])
+		boot.queue_free()
+		return
+	var nation_act := _twice(am, boot, _button_center(fra))
+	if nation_act != "choice" or str(boot.get("_tag")) != "FRA":
+		_fail("nation click action=%s tag=%s" % [nation_act, str(boot.get("_tag"))])
+	else:
+		_pass("title nation click plays one ui_click")
+	await process_frame
+	var date_act := _twice(am, boot, _button_center(era))
+	if date_act != "choice" or int(boot.get("_year")) != 1918:
+		_fail("date click action=%s year=%s" % [date_act, str(boot.get("_year"))])
+	else:
+		_pass("title date click plays one ui_click")
+	await process_frame
+	await _assert_no_double_press(am)
+	var title_load := _plant_load_button(boot.get_node("LivingTitleRoot"), Vector2(40, 40))
+	await process_frame
+	var load_act := _twice(am, boot, _button_center(title_load))
+	if load_act != "load" or not bool(boot.get("_closed")):
+		_fail("title load action=%s closed=%s" % [load_act, str(boot.get("_closed"))])
+	else:
+		_pass("title Load click plays one ui_click")
+	boot.queue_free()
+	await process_frame
+
+	var boot_cc := _spawn_title()
+	var menu := _spawn_menu(true)
+	if boot_cc == null or menu == null:
+		return
+	await process_frame
+	await process_frame
+	var title := menu.find_child("CommandCenterTitle", true, false) as Label
+	if title == null or title.text != "Command Center":
+		_fail("living Command Center title is %s" % (title.text if title != null else "missing"))
+	var header := menu.find_child("CommandCenterHeader", true, false) as Control
+	var refresh := menu.find_child("RefreshSaveList", true, false) as Button
+	if header == null or refresh == null:
+		_fail("header or refresh missing")
+	else:
+		var header_pos := header.get_global_rect().position + Vector2(40, header.get_global_rect().size.y * 0.5)
+		var header_act := _twice(am, boot_cc, header_pos)
+		if header_act != "header":
+			_fail("header click action=%s pos=%s rect=%s" % [header_act, header_pos, header.get_global_rect()])
+		else:
+			_pass("Command Center header plays one ui_click")
+		await process_frame
+		var presses := [0]
+		refresh.pressed.connect(func() -> void: presses[0] += 1)
+		var refresh_act := _twice(am, boot_cc, _button_center(refresh))
+		if refresh_act != "refresh" or int(presses[0]) != 1:
+			_fail("refresh action=%s emits=%s" % [refresh_act, str(presses[0])])
+		else:
+			_pass("Refresh plays one ui_click and emits pressed once")
+	await process_frame
+	var cc_load := _plant_load_button(menu, Vector2(8, 8))
+	await process_frame
+	var cc_act := _twice(am, boot_cc, _button_center(cc_load))
+	if cc_act != "load":
+		_fail("CC load action=%s rect=%s" % [cc_act, cc_load.get_global_rect()])
+	elif bool(menu.get("_closing")):
+		_fail("missing CC load closed the menu")
+	else:
+		_pass("Command Center Load plays one ui_click")
+	boot_cc.queue_free()
+	if is_instance_valid(menu):
+		menu.queue_free()
+	await process_frame
+
+
+func _spawn_title() -> Node:
+	var scr: Script = load("res://scripts/ui/LivingTitleBoot.gd") as Script
+	if scr == null:
+		_fail("LivingTitleBoot missing")
+		return null
+	var boot: Node = scr.new()
+	boot.name = "LivingTitleBoot"
+	root.add_child(boot)
+	return boot
+
+
+func _spawn_menu(from_title: bool) -> Node:
+	var packed := load("res://scenes/ui/MainMenu.tscn") as PackedScene
+	if packed == null:
+		_fail("Command Center scene missing")
+		return null
+	var menu := packed.instantiate()
+	menu.name = "MainMenu"
+	if from_title:
+		menu.set_meta("eoa_opened_from_living_title", true)
+	root.add_child(menu)
+	return menu
+
+
+func _plant_load_button(parent: Node, pos: Vector2) -> Button:
+	var btn := Button.new()
+	btn.text = "Load"
+	btn.set_meta("eoa_load_slot", "audio1_missing_slot")
+	btn.position = pos
+	btn.size = Vector2(88, 28)
+	btn.custom_minimum_size = Vector2(88, 28)
+	parent.add_child(btn)
+	return btn
+
+
+func _assert_no_double_press(am: Node) -> void:
+	var btn := Button.new()
+	btn.name = "Audio1Double"
+	btn.text = "Double"
+	root.add_child(btn)
+	am.call("clear_request_log")
+	var first := bool(am.call("activate_button", btn))
+	var second := bool(am.call("activate_button", btn))
+	var pair := _click_count(am)
+	await process_frame
+	var emitted := [0]
+	btn.pressed.connect(func() -> void: emitted[0] += 1)
+	am.call("clear_request_log")
+	am.call("play_ui_click", btn)
+	btn.pressed.emit()
+	var clicks := _click_count(am)
+	btn.queue_free()
+	if not first or second or pair != 1 or clicks != 1 or int(emitted[0]) != 1:
+		_fail("double activate first=%s second=%s pair=%d clicks=%d emit=%d" % [first, second, pair, clicks, emitted[0]])
+		return
+	_pass("same-frame pressed does not play a second ui_click")
+
+
+func _test_mute_layout(_am: Node) -> void:
+	await _set_play_size()
+	var tall := _spawn_menu(true)
+	if tall == null:
+		return
+	await process_frame
+	await process_frame
+	_assert_mute_inside(tall, "command-center")
+	await _shot_mute(tall, "command_center")
+	tall.queue_free()
+	await process_frame
+	var pause := _spawn_menu(false)
+	if pause == null:
+		return
+	await process_frame
+	await process_frame
+	var paused := pause.find_child("CommandCenterTitle", true, false) as Label
+	if paused == null or paused.text != "Paused":
+		_fail("pause title is %s" % (paused.text if paused != null else "missing"))
+	_assert_mute_inside(pause, "pause")
+	await _shot_mute(pause, "pause")
+	pause.queue_free()
+	await process_frame
+
+
+func _assert_mute_inside(menu: Node, label: String) -> void:
+	var mute := menu.find_child("MuteAudio", true, false) as CheckButton
+	if mute == null:
+		_fail("%s Mute missing" % label)
+		return
+	var rect := mute.get_global_rect()
+	var view := Rect2(Vector2.ZERO, Vector2(PLAY_SIZE))
+	var panel := menu.get_node_or_null("Root/MenuPanel") as Control
+	var actions := menu.find_child("GameActions", true, false) as Control
+	var scroll := menu.find_child("GameActionsScroll", true, false) as ScrollContainer
+	var ok := true
+	if rect.size.x < 8.0 or rect.size.y < 8.0:
+		_fail("%s Mute size %s" % [label, rect])
+		ok = false
+	if not view.encloses(rect):
+		var vp := Vector2.ZERO
+		if root.get_viewport() != null:
+			vp = root.get_viewport().get_visible_rect().size
+		_fail("%s Mute outside 1280x800 %s vp=%s panel=%s" % [label, rect, vp, panel.get_global_rect() if panel != null else "none"])
+		ok = false
+	if panel != null and not panel.get_global_rect().grow(1.0).encloses(rect):
+		_fail("%s Mute outside panel %s panel=%s" % [label, rect, panel.get_global_rect()])
+		ok = false
+	if actions != null and not actions.get_global_rect().grow(1.0).encloses(rect):
+		_fail("%s Mute outside settings column %s col=%s" % [label, rect, actions.get_global_rect()])
+		ok = false
+	if not mute.is_visible_in_tree() or mute.disabled:
+		_fail("%s Mute not reachable visible=%s disabled=%s" % [label, mute.is_visible_in_tree(), mute.disabled])
+		ok = false
+	if scroll != null and scroll.scroll_vertical != 0:
+		_fail("%s settings scrolled %d" % [label, scroll.scroll_vertical])
+		ok = false
+	if ok:
+		_pass("%s Mute inside 1280x800 %s" % [label, rect])
+
+
+func _shot_mute(menu: Node, tag: String) -> void:
+	var dir := OS.get_environment("EOA_AUDIO1_MUTE_SHOT").strip_edges()
+	if dir.is_empty():
+		return
+	await process_frame
+	await RenderingServer.frame_post_draw
+	var vp := root.get_viewport()
+	if vp == null:
+		print("  [INFO] HeadlessAudio1Test: no viewport for ", tag)
+		return
+	var tex := vp.get_texture()
+	if tex == null:
+		print("  [INFO] HeadlessAudio1Test: no texture for ", tag)
+		return
+	var img := tex.get_image()
+	if img == null or img.is_empty():
+		print("  [INFO] HeadlessAudio1Test: empty shot for ", tag)
+		return
+	DirAccess.make_dir_recursive_absolute(dir)
+	var full := dir.path_join("mute_%s_1280x800.png" % tag)
+	var err := img.save_png(full)
+	var mute := menu.find_child("MuteAudio", true, false) as Control
+	if mute != null:
+		var r := mute.get_global_rect().grow(36.0)
+		var ri := Rect2i(int(r.position.x), int(r.position.y), int(r.size.x), int(r.size.y))
+		ri = ri.intersection(Rect2i(0, 0, img.get_width(), img.get_height()))
+		if ri.size.x > 0 and ri.size.y > 0:
+			img.get_region(ri).save_png(dir.path_join("mute_%s_crop.png" % tag))
+	print("  [INFO] HeadlessAudio1Test: shot %s err=%s %s" % [tag, err, full])
+
+
+func _script_has(scr: Script, method_name: String) -> bool:
+	if scr == null:
+		return false
+	for m in scr.get_script_method_list():
+		if str(m.get("name", "")) == method_name:
+			return true
+	return false
+
+
+func _test_ready_war() -> void:
+	# Load by path so this harness does not compile the domain before autoloads exist.
+	var hooks: Script = load("res://scripts/core/Audio1PlayHooks.gd") as Script
+	var domain: Script = load("res://scripts/core/WarStateDomain.gd") as Script
+	if hooks == null or not _script_has(hooks, "maybe_run"):
+		_fail("Audio1PlayHooks missing")
+		return
+	if domain == null or not _script_has(domain, "grant_ready_player_justify"):
+		_fail("WarStateDomain did not compile")
+		return
+	OS.set_environment("EOA_AUDIO1_READY_WAR", "")
+	var off: Dictionary = hooks.call("maybe_run")
+	if bool(off.get("ran", true)) or str(off.get("reason", "")) != "off":
+		_fail("hook ran while off %s" % str(off))
+		return
+	if bool(domain.call("player_has_justify", "FRA")):
+		_fail("off hook wrote a FRA justify")
+		return
+	var tm := root.get_node_or_null("TimeManager")
+	if tm == null:
+		_fail("TimeManager missing")
+		return
+	var days := int(tm.get("total_days_elapsed"))
+	OS.set_environment("EOA_AUDIO1_READY_WAR", "1")
+	var on: Dictionary = hooks.call("maybe_run")
+	OS.set_environment("EOA_AUDIO1_READY_WAR", "")
+	if not bool(on.get("ran", false)):
+		_fail("hook did not run when enabled %s" % str(on))
+		domain.call("reset_for_test")
+		return
+	# -s harness has no board, so the default Maginot lookup has no owner.
+	# The explicit defender is the same writer Play uses once the map is up.
+	var granted: Dictionary = on
+	if not bool(on.get("ok", false)):
+		var raw: Variant = domain.call("grant_ready_player_justify", "FRA")
+		if raw is Dictionary:
+			granted = raw
+	if not bool(granted.get("ok", false)):
+		_fail("grant failed %s" % str(granted))
+		domain.call("reset_for_test")
+		return
+	var defender := str(granted.get("defender", ""))
+	if not bool(domain.call("player_justify_is_ready_for", defender)):
+		_fail("justify not ready for %s" % defender)
+	if int(tm.get("total_days_elapsed")) != days:
+		_fail("hook moved the clock %d -> %d" % [days, int(tm.get("total_days_elapsed"))])
+	domain.call("reset_for_test")
+	if bool(domain.call("player_has_justify", defender)):
+		_fail("reset left the justify")
+		return
+	_pass("ready-war hook stays off; grant does not move the clock")
 
 
 func _wav_peak_db(path: String) -> float:

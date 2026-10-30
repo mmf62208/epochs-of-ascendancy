@@ -209,8 +209,41 @@ func _on_node_added(node: Node) -> void:
 		_wire_button(node as BaseButton)
 
 
-func _on_ui_pressed() -> void:
-	play("ui_click")
+## One ui_click per control per frame. Live-pointer code calls this, and
+## `pressed` calls it again; the second call in that frame does not play.
+var _ui_click_latch: Dictionary = {}
+
+
+func play_ui_click(source: Object = null) -> bool:
+	var frame := Engine.get_process_frames()
+	var sid := 0
+	if source != null and is_instance_valid(source):
+		sid = source.get_instance_id()
+	var key := "%d:%d" % [sid, frame]
+	if bool(_ui_click_latch.get(key, false)):
+		return false
+	if _ui_click_latch.size() > 48:
+		_ui_click_latch.clear()
+	_ui_click_latch[key] = true
+	return play("ui_click")
+
+
+## Live-pointer activation. Emits `pressed` once per control per frame and
+## plays one click even when that emit also reaches `_on_ui_pressed`.
+func activate_button(btn: BaseButton) -> bool:
+	if btn == null or not is_instance_valid(btn) or btn.disabled:
+		return false
+	var frame := Engine.get_process_frames()
+	if int(btn.get_meta("_eoa_live_press_frame", -999999)) == frame:
+		return false
+	btn.set_meta("_eoa_live_press_frame", frame)
+	play_ui_click(btn)
+	btn.pressed.emit()
+	return true
+
+
+func _on_ui_pressed(btn: BaseButton = null) -> void:
+	play_ui_click(btn)
 
 
 func _on_ui_hover() -> void:
@@ -237,7 +270,7 @@ func _wire_button(btn: BaseButton) -> void:
 	if btn.has_meta("_eoa_audio_wired"):
 		return
 	btn.set_meta("_eoa_audio_wired", true)
-	var press_cb := Callable(self, "_on_ui_pressed")
+	var press_cb := _on_ui_pressed.bind(btn)
 	var hover_cb := Callable(self, "_on_ui_hover")
 	if not btn.pressed.is_connected(press_cb):
 		btn.pressed.connect(press_cb)

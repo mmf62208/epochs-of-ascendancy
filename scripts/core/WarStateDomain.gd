@@ -446,6 +446,51 @@ static func begin_player_justify_from_province(province_id: int) -> Dictionary:
 	return _begin_justify(attacker, defender, _day() + int(rules()["player_justify_days"]), "player")
 
 
+## Debug/test helper. Writes one player justify that is ready today.
+## Does not advance the clock, roll RNG, or declare the war.
+## GER uses the Maginot border pid 710739 when that hex is still French.
+static func grant_ready_player_justify(defender: String = "") -> Dictionary:
+	if not loop_enabled():
+		return {"ok": false, "reason": "campaign loop inactive"}
+	var attacker := _player()
+	var b := _tag(defender)
+	var pid := -1
+	if b.is_empty() and attacker == "GER" and _owner_of(710739) == "FRA" and borders_tag(710739, "GER"):
+		b = "FRA"
+		pid = 710739
+	if b.is_empty():
+		var suggested := suggest_player_target()
+		b = _tag(str(suggested.get("tag", "")))
+		pid = int(suggested.get("pid", -1))
+	if b.is_empty() or b == attacker:
+		return {"ok": false, "reason": "no target", "attacker": attacker}
+	if pid <= 0:
+		pid = _border_pid(attacker, b)
+	var day := _day()
+	var key := "%s>%s" % [attacker, b]
+	var just := _justifies()
+	just[key] = {
+		"attacker": attacker,
+		"defender": b,
+		"ready_day": day,
+		"kind": "player",
+		"start_day": day,
+	}
+	_state()["justifies"] = just
+	print(
+		"EOA_AUDIO1_READY_WAR attacker=%s defender=%s ready_day=%d pid=%d"
+		% [attacker, b, day, pid]
+	)
+	return {
+		"ok": true,
+		"attacker": attacker,
+		"defender": b,
+		"ready_day": day,
+		"pid": pid,
+		"kind": "player",
+	}
+
+
 static func player_declare_from_province(province_id: int) -> Dictionary:
 	if not loop_enabled():
 		return {"ok": false, "reason": "campaign loop inactive"}

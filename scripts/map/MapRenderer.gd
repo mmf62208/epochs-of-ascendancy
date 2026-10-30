@@ -3233,7 +3233,7 @@ func _input(event: InputEvent) -> void:
 		# computerUse / remote desktop often delivers touch, not MouseButton.
 		if _is_live_pointer_press(event):
 			var touch_act: String = _route_living_title_pointer(event)
-			if touch_act == "begin" or touch_act == "cc" or touch_act == "panel":
+			if LivingTitleBoot.consumes_live_action(touch_act):
 				get_viewport().set_input_as_handled()
 		return
 	if event is InputEventMouseButton:
@@ -3281,15 +3281,27 @@ func _input(event: InputEvent) -> void:
 				get_viewport().set_input_as_handled()
 				return
 			if event.pressed and _cc_chrome_consumes_point(event.position):
+				# Header click and CloseX. Do not mark handled: CloseX `pressed`
+				# still closes. The click latch keeps that from a second sound.
+				var mm_ch := _command_center_overlay()
+				if mm_ch != null and mm_ch.has_method("activate_live_pointer"):
+					mm_ch.call("activate_live_pointer", event.position)
 				arm_chrome_hold_swallow()
 				return
 			# #134: Command Center owns this click. Do not arm a map gesture and
 			# do not mark handled — Load / × still need the GUI press.
+			# Refresh is not a GUI `pressed` from this path: activate it here.
 			# The latch stays through this event so `_unhandled_input` can eat
 			# the release after a dimmer `accept_event` / queue_free. Deferred
 			# clear covers the case where GUI already marked the event handled.
 			if _cc_overlay_blocks_map_pointer():
 				if event.pressed:
+					var mm_ov := _command_center_overlay()
+					if mm_ov != null and mm_ov.has_method("live_pointer_target") and str(mm_ov.call("live_pointer_target", event.position)) == "refresh":
+						if mm_ov.has_method("activate_live_pointer"):
+							mm_ov.call("activate_live_pointer", event.position)
+						get_viewport().set_input_as_handled()
+						return
 					_cc_map_press_latch = true
 				else:
 					call_deferred("_clear_cc_map_press_latch")
@@ -3349,7 +3361,7 @@ func _input(event: InputEvent) -> void:
 					)
 					var title_act: String = _route_living_title_pointer(event)
 					print("EOA_LIVE_PTR who=MapRenderer._input action=%s" % title_act)
-					if title_act == "begin" or title_act == "cc" or title_act == "panel" or title_act == "load" or title_act == "close":
+					if LivingTitleBoot.consumes_live_action(title_act):
 						if title_act == "begin":
 							arm_begin_title_release_swallow()
 						get_viewport().set_input_as_handled()
