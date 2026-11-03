@@ -457,6 +457,7 @@ func _build_ui() -> void:
 		era_row.add_child(ebtn)
 		_era_btns[int(yr)] = ebtn
 	_refresh_living_campaign_buttons()
+	_add_victory_paths_readout(left_inner)
 
 	if OS.is_debug_build():
 		var dbg_hdr := Label.new()
@@ -742,6 +743,30 @@ func _on_living_era_pressed(year: int) -> void:
 	_refresh_living_campaign_buttons()
 	_set_status("Playing %s · %d" % [str(out.get("player_tag", tag)), int(out.get("year", year))])
 	_toast("Era · %d" % int(out.get("year", year)), 2.5)
+
+
+## Read-only path progress on the existing Command Center column.
+## The node is absent unless EOA_VICTORY_PATHS=1, so the flag-off tree matches main.
+func _add_victory_paths_readout(parent: Node) -> void:
+	if parent == null:
+		return
+	if typeof(GameData) == TYPE_NIL or not GameData.has_method("victory_paths_enabled"):
+		return
+	if not bool(GameData.victory_paths_enabled()):
+		return
+	var text := ""
+	if GameData.has_method("victory_paths_progress_text"):
+		text = str(GameData.victory_paths_progress_text())
+	if text.is_empty():
+		return
+	var label := Label.new()
+	label.name = "VictoryPathsReadout"
+	label.text = text
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	RetrowaveTheme.style_body_label(label)
+	parent.add_child(label)
 
 
 func _refresh_living_campaign_buttons() -> void:

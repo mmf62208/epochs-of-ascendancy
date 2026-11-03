@@ -1578,6 +1578,7 @@ func _maybe_present_ink_victory() -> void:
 
 
 func _campaign_after_battles() -> void:
+	var paths_presented := _maybe_tick_victory_paths()
 	_maybe_present_ink_victory()
 	if typeof(WarStateDomain) == TYPE_NIL or not WarStateDomain.loop_enabled():
 		return
@@ -1594,6 +1595,8 @@ func _campaign_after_battles() -> void:
 	if not at_war and not CampaignEndDomain.latched() and not CampaignEndDomain.time_limit_due():
 		if typeof(CapitulationDomain) == TYPE_NIL or not CapitulationDomain.has_capitulated():
 			return
+	if paths_presented:
+		return
 	CampaignEndDomain.evaluate_and_latch(int(total_days_elapsed))
 
 
@@ -1779,6 +1782,18 @@ func _maybe_tick_stability_justice() -> void:
 		return
 	if GameData.has_method("stability_justice_tick_day"):
 		GameData.stability_justice_tick_day()
+
+
+## Flag off returns before any path state is created.
+func _maybe_tick_victory_paths() -> bool:
+	if typeof(GameData) == TYPE_NIL or not GameData.has_method("victory_paths_enabled"):
+		return false
+	if not GameData.victory_paths_enabled():
+		return false
+	if not GameData.has_method("victory_paths_tick_day"):
+		return false
+	var result: Dictionary = GameData.victory_paths_tick_day()
+	return bool(result.get("presented", false))
 
 
 func _maybe_tick_occupation_unrest() -> void:
