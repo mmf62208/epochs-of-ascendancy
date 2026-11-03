@@ -26696,8 +26696,16 @@ func _refresh_next_hook_chip() -> void:
 	if typeof(PlayNextHook) != TYPE_NIL:
 		rec = PlayNextHook.recommend(_player_tag())
 	var hint := str(rec.get("hint", "Unpause a day"))
-	_next_hook_chip.text = "NEXT · %s" % str(rec.get("label", "Unpause a day"))
-	_next_hook_chip.tooltip_text = hint
+	var stab_line := ""
+	if typeof(GameData) != TYPE_NIL and GameData.has_method("stability_justice_chip_line"):
+		stab_line = str(GameData.stability_justice_chip_line())
+	if stab_line.is_empty():
+		_next_hook_chip.text = "NEXT · %s" % str(rec.get("label", "Unpause a day"))
+		_next_hook_chip.tooltip_text = hint
+	else:
+		_next_hook_chip.custom_minimum_size = Vector2(640, 28)
+		_next_hook_chip.text = "NEXT · %s · %s" % [str(rec.get("label", "Unpause a day")), stab_line]
+		_next_hook_chip.tooltip_text = "%s\n%s" % [hint, stab_line]
 
 
 func _sync_land_battle_bubbles() -> int:

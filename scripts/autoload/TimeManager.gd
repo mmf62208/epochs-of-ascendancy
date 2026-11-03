@@ -1423,6 +1423,7 @@ func _flush_sim_events() -> void:
 		_begin_day_tick_profile()
 		_emit_game_day_advanced_profiled(int(ev.get("year", 0)), int(ev.get("month", 0)), int(ev.get("day", 0)))
 		_maybe_tick_occupation_unrest()
+		_maybe_tick_stability_justice()
 		if kind == "day":
 			# Legacy single-event day (should not queue on F5).
 			# _maybe_run_interactive_multi_ai / _maybe_run_ai_infra_invest / _maybe_run_ai_land_battle_starts
@@ -1769,6 +1770,15 @@ func _callable_profile_label(cb: Callable) -> String:
 			nm = n.get_class()
 		return "%s.%s" % [nm, method_name]
 	return "%s.%s" % [obj.get_class(), method_name]
+
+
+func _maybe_tick_stability_justice() -> void:
+	if typeof(GameData) == TYPE_NIL or not GameData.has_method("stability_justice_enabled"):
+		return
+	if not GameData.stability_justice_enabled():
+		return
+	if GameData.has_method("stability_justice_tick_day"):
+		GameData.stability_justice_tick_day()
 
 
 func _maybe_tick_occupation_unrest() -> void:

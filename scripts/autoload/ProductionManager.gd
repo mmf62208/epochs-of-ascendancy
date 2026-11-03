@@ -2830,7 +2830,7 @@ func _get_national_production_modifiers(country_tag: String, production_layer: S
 	if _interactive_ai_day_cache_ready and _interactive_ai_national_mod_cache.has(cache_key):
 		var hit: Variant = _interactive_ai_national_mod_cache[cache_key]
 		if hit is Dictionary:
-			return (hit as Dictionary).duplicate()
+			return _apply_stability_justice_output(country_tag, (hit as Dictionary).duplicate())
 	var result := {
 		"output_multiplier": 1.0,
 		"reliability_multiplier": 1.0,
@@ -2840,7 +2840,7 @@ func _get_national_production_modifiers(country_tag: String, production_layer: S
 	}
 
 	if country_tag.is_empty():
-		return result
+		return _apply_stability_justice_output(country_tag, result)
 
 	# Permanent spirits
 	if typeof(NationalSpiritManager) != TYPE_NIL:
@@ -2881,6 +2881,15 @@ func _get_national_production_modifiers(country_tag: String, production_layer: S
 
 	if _interactive_ai_day_cache_ready:
 		_interactive_ai_national_mod_cache[cache_key] = result.duplicate()
+	return _apply_stability_justice_output(country_tag, result)
+
+
+func _apply_stability_justice_output(country_tag: String, result: Dictionary) -> Dictionary:
+	if typeof(GameData) == TYPE_NIL or not GameData.has_method("stability_justice_output_multiplier"):
+		return result
+	var mult := float(GameData.stability_justice_output_multiplier(country_tag))
+	if mult < 1.0:
+		result["output_multiplier"] = float(result.get("output_multiplier", 1.0)) * mult
 	return result
 
 

@@ -4,6 +4,7 @@ extends Node
 
 ## Preload (not bare class_name) so a stale .godot class cache cannot blank the map.
 const _Rx1Rhine := preload("res://scripts/map/Rx1RhineCrossing.gd")
+const _StabilityJustice := preload("res://scripts/core/StabilityJusticeDomain.gd")
 
 var design_data: DesignDataLoader = DesignDataLoader.new()
 
@@ -12359,7 +12360,7 @@ func get_save_data() -> Dictionary:
 	var skip_hier := false
 	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("is_live_f5_play_path"):
 		skip_hier = bool(TimeManager.is_live_f5_play_path())
-	return {
+	var data := {
 		"demographic_policies": peace_state.get("demographic_policies", {}).duplicate(true),
 		"non_citizen_ratio": peace_state.get("non_citizen_ratio", {}).duplicate(true),
 		"foreign_military_pct": peace_state.get("foreign_military_pct", {}).duplicate(true),
@@ -12422,6 +12423,11 @@ func get_save_data() -> Dictionary:
 		"peace_settlements": peace_state["peace_settlements"].duplicate(true) if peace_state.get("peace_settlements") is Array else [],
 		"version": 1
 	}
+	if stability_justice_enabled():
+		var sj_blob: Dictionary = _StabilityJustice.export_save_blob()
+		if not sj_blob.is_empty():
+			data["stability_justice"] = sj_blob
+	return data
 
 
 func _export_hierarchy_membership_live() -> Dictionary:
@@ -12487,6 +12493,11 @@ func apply_save_data(data: Dictionary) -> void:
 		peace_state["campaign_end"] = data["campaign_end"].duplicate(true)
 	if data.has("peace_settlements") and data["peace_settlements"] is Array:
 		peace_state["peace_settlements"] = data["peace_settlements"].duplicate(true)
+	if stability_justice_enabled():
+		if data.has("stability_justice") and data["stability_justice"] is Dictionary:
+			_StabilityJustice.import_save_blob(data["stability_justice"])
+		else:
+			_StabilityJustice.load_missing_save()
 	# Pillar state for peace ripples/follow-ons
 	if data.has("ascendancy"):
 		peace_state["ascendancy"] = data["ascendancy"].duplicate(true)
@@ -25150,14 +25161,24 @@ func apply_war_goal_board(province_id: int = 1) -> Dictionary:
 	return _apply_day_queue(MapPolishFormatters.execute_war_goal_step("board", province_id), province_id)
 
 func apply_war_goal_justify(province_id: int = 1) -> Dictionary:
+	var result: Dictionary = {}
 	if MapManager.has_method("apply_war_goal_step_for_province"):
-		return MapManager.apply_war_goal_step_for_province(province_id, "justify")
-	return _apply_day_queue(MapPolishFormatters.execute_war_goal_step("justify", province_id), province_id)
+		result = MapManager.apply_war_goal_step_for_province(province_id, "justify")
+	else:
+		result = _apply_day_queue(MapPolishFormatters.execute_war_goal_step("justify", province_id), province_id)
+	if stability_justice_enabled():
+		result = _StabilityJustice.merge_justify(result, _StabilityJustice.note_justify(province_id))
+	return result
 
 func apply_war_goal_execute(province_id: int = 1) -> Dictionary:
+	var result: Dictionary = {}
 	if MapManager.has_method("apply_war_goal_step_for_province"):
-		return MapManager.apply_war_goal_step_for_province(province_id, "execute")
-	return _apply_day_queue(MapPolishFormatters.execute_war_goal_step("execute", province_id), province_id)
+		result = MapManager.apply_war_goal_step_for_province(province_id, "execute")
+	else:
+		result = _apply_day_queue(MapPolishFormatters.execute_war_goal_step("execute", province_id), province_id)
+	if stability_justice_enabled():
+		result = _StabilityJustice.merge_execute(result, _StabilityJustice.note_execute(province_id))
+	return result
 
 func apply_multi_front_campaign_ai_product(province_id: int = 1) -> Dictionary:
 	if MapManager.has_method("apply_multi_front_campaign_ai_product"):
@@ -26325,6 +26346,36 @@ var last_interactive_multi_ai_profile: Dictionary = {}
 
 func get_last_interactive_multi_ai_profile() -> Dictionary:
 	return last_interactive_multi_ai_profile.duplicate(true)
+
+
+## Stability and war justification. Default OFF.
+## EOA_STABILITY_JUSTICE=1 enables it. Unset or any other value leaves the shipped path unchanged.
+func stability_justice_enabled() -> bool:
+	return OS.get_environment("EOA_STABILITY_JUSTICE").strip_edges() == "1"
+
+
+func stability_justice_tick_day() -> Dictionary:
+	if not stability_justice_enabled():
+		return {"ok": true, "skipped": true}
+	return _StabilityJustice.tick_day()
+
+
+func stability_justice_output_multiplier(country_tag: String) -> float:
+	if not stability_justice_enabled():
+		return 1.0
+	return float(_StabilityJustice.output_multiplier_for_tag(country_tag))
+
+
+func stability_justice_supply_scale() -> Dictionary:
+	if not stability_justice_enabled():
+		return {"apply": false, "multiplier": 1.0, "tag": ""}
+	return _StabilityJustice.supply_scale()
+
+
+func stability_justice_chip_line() -> String:
+	if not stability_justice_enabled():
+		return ""
+	return str(_StabilityJustice.chip_line())
 
 
 ## Interactive F5 multi-AI day: budgeted non-player major production applies so multi-day
