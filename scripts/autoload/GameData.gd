@@ -6,6 +6,7 @@ extends Node
 const _Rx1Rhine := preload("res://scripts/map/Rx1RhineCrossing.gd")
 const _StabilityJustice := preload("res://scripts/core/StabilityJusticeDomain.gd")
 const _VictoryPaths := preload("res://scripts/core/VictoryPathsDomain.gd")
+const _SystemToggles := preload("res://scripts/core/SystemTogglesDomain.gd")
 
 var design_data: DesignDataLoader = DesignDataLoader.new()
 
@@ -12432,6 +12433,9 @@ func get_save_data() -> Dictionary:
 		var vp_blob: Dictionary = _VictoryPaths.export_save_blob()
 		if not vp_blob.is_empty():
 			data["victory_paths"] = vp_blob
+	var toggle_blob: Dictionary = _SystemToggles.export_save_blob()
+	if not toggle_blob.is_empty():
+		data["system_toggles"] = toggle_blob
 	return data
 
 
@@ -12498,16 +12502,24 @@ func apply_save_data(data: Dictionary) -> void:
 		peace_state["campaign_end"] = data["campaign_end"].duplicate(true)
 	if data.has("peace_settlements") and data["peace_settlements"] is Array:
 		peace_state["peace_settlements"] = data["peace_settlements"].duplicate(true)
+	if data.has("system_toggles") and data["system_toggles"] is Dictionary:
+		_SystemToggles.import_save_blob(data["system_toggles"])
+	else:
+		_SystemToggles.load_missing_save()
 	if stability_justice_enabled():
 		if data.has("stability_justice") and data["stability_justice"] is Dictionary:
 			_StabilityJustice.import_save_blob(data["stability_justice"])
 		else:
 			_StabilityJustice.load_missing_save()
+	else:
+		_StabilityJustice.clear_state()
 	if victory_paths_enabled():
 		if data.has("victory_paths") and data["victory_paths"] is Dictionary:
 			_VictoryPaths.import_save_blob(data["victory_paths"])
 		else:
 			_VictoryPaths.load_missing_save()
+	else:
+		_VictoryPaths.clear_state()
 	# Pillar state for peace ripples/follow-ons
 	if data.has("ascendancy"):
 		peace_state["ascendancy"] = data["ascendancy"].duplicate(true)
@@ -26359,9 +26371,9 @@ func get_last_interactive_multi_ai_profile() -> Dictionary:
 
 
 ## Stability and war justification. Default OFF.
-## EOA_STABILITY_JUSTICE=1 enables it. Unset or any other value leaves the shipped path unchanged.
+## EOA_STABILITY_JUSTICE=1 or 0 wins. Otherwise the campaign setup toggle, otherwise off.
 func stability_justice_enabled() -> bool:
-	return OS.get_environment("EOA_STABILITY_JUSTICE").strip_edges() == "1"
+	return _SystemToggles.is_enabled("stability_justice")
 
 
 func stability_justice_tick_day() -> Dictionary:
@@ -26389,9 +26401,9 @@ func stability_justice_chip_line() -> String:
 
 
 ## 1936 victory paths. Default OFF.
-## EOA_VICTORY_PATHS=1 enables them. Any other value leaves the shipped path unchanged.
+## EOA_VICTORY_PATHS=1 or 0 wins. Otherwise the campaign setup toggle, otherwise off.
 func victory_paths_enabled() -> bool:
-	return OS.get_environment("EOA_VICTORY_PATHS").strip_edges() == "1"
+	return _SystemToggles.is_enabled("victory_paths")
 
 
 func victory_paths_tick_day() -> Dictionary:

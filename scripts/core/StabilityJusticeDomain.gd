@@ -1,6 +1,6 @@
 # scripts/core/StabilityJusticeDomain.gd
 ## Player-only stability and war justification.
-## Inactive unless GameData.stability_justice_enabled() (EOA_STABILITY_JUSTICE=1).
+## Inactive unless GameData.stability_justice_enabled() (campaign toggle, or EOA_STABILITY_JUSTICE=1).
 ## The flag-off path must not create this state, draw RNG, or add save keys.
 class_name StabilityJusticeDomain
 extends RefCounted

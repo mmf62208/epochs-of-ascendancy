@@ -6,6 +6,7 @@ extends CanvasLayer
 
 signal boot_closed(result: Dictionary)
 
+const _SystemToggles := preload("res://scripts/core/SystemTogglesDomain.gd")
 const LIVING_TITLE_NATIONS := ["GER", "ENG", "FRA", "JAP", "USA", "SOV", "ITA", "POL"]
 const LIVING_TITLE_ERAS := [1918, 1936, 2026]
 ## Above UILayer HUD (110) and toasts (90) so Begin is not covered; below Command Center (130).
@@ -26,6 +27,7 @@ var _year := 1936
 var _nation_btns: Dictionary = {}
 var _era_btns: Dictionary = {}
 var _begin_btn: Button
+var _toggle_boxes: Dictionary = {}
 var _cc_btn: Button
 var _esc_chip: Button
 var _panel: PanelContainer
@@ -261,7 +263,7 @@ func _build_ui() -> void:
 
 	var panel := PanelContainer.new()
 	panel.name = "LivingTitlePanel"
-	panel.custom_minimum_size = Vector2(420, 610)
+	panel.custom_minimum_size = Vector2(420, 720)
 	panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	panel.process_mode = Node.PROCESS_MODE_ALWAYS
 	RetrowaveTheme.style_menu_panel(panel)
@@ -269,9 +271,9 @@ func _build_ui() -> void:
 	_panel = panel
 	panel.set_anchors_preset(Control.PRESET_CENTER_LEFT)
 	panel.offset_left = 28
-	panel.offset_top = -300
+	panel.offset_top = -360
 	panel.offset_right = 448
-	panel.offset_bottom = 320
+	panel.offset_bottom = 380
 
 	var margin := MarginContainer.new()
 	margin.add_theme_constant_override("margin_left", 16)
@@ -338,6 +340,8 @@ func _build_ui() -> void:
 			row_b.add_child(nbtn)
 		_nation_btns[str(tag)] = nbtn
 		i += 1
+
+	fill_system_toggles(col)
 
 	var sav_h := Label.new()
 	sav_h.text = "LOAD GAME"
@@ -416,6 +420,71 @@ func _build_esc_chip(root: Control) -> void:
 	_esc_chip.offset_top = 6.0
 	_esc_chip.offset_bottom = 54.0
 	root.add_child(_esc_chip)
+
+
+## One checkbox per registry row. A new JSON entry shows up here with no other UI edit.
+func fill_system_toggles(parent: Node) -> int:
+	_toggle_boxes = {}
+	var rows: Array = _SystemToggles.entries()
+	if rows.is_empty() or parent == null:
+		return 0
+	var header := Label.new()
+	header.name = "SystemTogglesHeader"
+	header.text = "SYSTEMS"
+	RetrowaveTheme.style_column_header(header)
+	parent.add_child(header)
+	var n := 0
+	for raw in rows:
+		if not (raw is Dictionary):
+			continue
+		var entry: Dictionary = raw
+		var id := str(entry.get("id", "")).strip_edges()
+		if id.is_empty():
+			continue
+		var label := str(entry.get("label", id)).strip_edges()
+		if label.is_empty():
+			label = id
+		var box := CheckBox.new()
+		box.name = "SystemToggle_%s" % id
+		box.text = label
+		box.button_pressed = bool(entry.get("default", false))
+		box.focus_mode = Control.FOCUS_ALL
+		box.mouse_filter = Control.MOUSE_FILTER_STOP
+		box.process_mode = Node.PROCESS_MODE_ALWAYS
+		box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		box.custom_minimum_size = Vector2(360, 28)
+		var env_name := str(entry.get("env", "")).strip_edges()
+		if env_name.is_empty():
+			box.tooltip_text = "%s\nSaved with this campaign. Off leaves the system out." % label
+		else:
+			box.tooltip_text = "%s\nSaved with this campaign. %s=1 or 0 overrides this box." % [label, env_name]
+		_style_system_toggle(box)
+		parent.add_child(box)
+		_toggle_boxes[id] = box
+		n += 1
+	return n
+
+
+func _style_system_toggle(box: CheckBox) -> void:
+	box.add_theme_color_override("font_color", RetrowaveTheme.TEXT_PRIMARY)
+	box.add_theme_color_override("font_hover_color", RetrowaveTheme.CYAN)
+	box.add_theme_color_override("font_pressed_color", RetrowaveTheme.CYAN)
+	box.add_theme_color_override("font_hover_pressed_color", RetrowaveTheme.CYAN)
+	box.add_theme_color_override("font_focus_color", RetrowaveTheme.CYAN)
+	box.add_theme_font_size_override("font_size", 14)
+
+
+## Writes the checkbox choices. Empty when the title never built the rows.
+func commit_setup_toggles() -> Dictionary:
+	if _toggle_boxes.is_empty():
+		return _SystemToggles.export_save_blob()
+	var chosen := {}
+	for id_v in _toggle_boxes.keys():
+		var box: CheckBox = _toggle_boxes[id_v]
+		if box == null or not is_instance_valid(box):
+			continue
+		chosen[str(id_v)] = box.button_pressed
+	return _SystemToggles.apply_setup(chosen)
 
 
 func _fill_save_rows(col: VBoxContainer) -> void:
@@ -1711,6 +1780,7 @@ func _on_begin_new(pending_press: bool = false, from_pointer: bool = false) -> v
 	elif os_left_button_held():
 		_arm_begin_release_swallow(false, false)
 	print("LivingTitleBoot: live Begin · %s · %d" % [_tag, _year])
+	commit_setup_toggles()
 	var out: Dictionary = apply_living_title_boot(_tag, _year, "")
 	_finish(out)
 
