@@ -34,6 +34,7 @@ func _run() -> void:
 	_test_live_win_then_loss()
 	_test_clock_stays_paused_under_overlays()
 	_test_continue_as_closes_in_order()
+	_test_defeat_load_closes_end_screen()
 	_test_save_hint_and_f6_loyalty()
 	_test_save_list_polish()
 	_test_victory_render()
@@ -661,6 +662,124 @@ func _test_continue_as_closes_in_order() -> void:
 		_fail("continue: leftover picker or end screen in the tree")
 		return
 	_pass("continue: Cancel returns to DEFEAT; Confirm closes both and switches")
+
+
+## A successful load from DEFEAT must dismiss the end screen and any continuation
+## picker, then restore the clock the save carried. A missing slot must leave both up.
+func _test_defeat_load_closes_end_screen() -> void:
+	_free_menu()
+	_free_group("campaign_ink_end_screen")
+	_free_group("continuation_picker")
+	var tm := root.get_node_or_null("TimeManager")
+	var sl := root.get_node_or_null("SaveLoadManager")
+	var lm := root.get_node_or_null("LeaderManager")
+	var gd := root.get_node_or_null("GameData")
+	if tm == null or sl == null or lm == null or gd == null:
+		_fail("defeat-load: autoload missing")
+		return
+	var bar := _make_bar()
+	if bar == null:
+		_fail("defeat-load: top bar missing")
+		return
+	lm.call("set_player_country_tag", "GER")
+	tm.set_paused(false)
+	tm.set_time_scale(3.0)
+	bar.set("current_speed", 3)
+	bar.set("is_paused", false)
+	var saved: Dictionary = sl.call("save_game_detailed", "quicksave")
+	if not bool(saved.get("ok", false)):
+		_fail("defeat-load: quicksave failed %s" % str(saved.get("error", "")))
+		return
+	gd.call("trigger_national_defeat_or_continuation", "GER", "defeat-load")
+	var loss := _ink_screen()
+	if loss == null:
+		_fail("defeat-load: DEFEAT missing")
+		return
+	var cont := loss.find_child("BtnContinueAs", true, false)
+	if cont is BaseButton:
+		(cont as BaseButton).pressed.emit()
+	if _picker() == null or _ink_screen() == null:
+		_fail("defeat-load: DEFEAT or picker missing before load")
+		return
+	var missing: Dictionary = sl.call("load_game_detailed", "qr1_missing_slot")
+	if bool(missing.get("ok", false)):
+		_fail("defeat-load: missing slot loaded")
+		return
+	if _ink_screen() == null or _picker() == null:
+		_fail("defeat-load: failed load dismissed DEFEAT or the picker")
+		return
+	if not bool(tm.call("overlay_holds_clock")) or not bool(tm.call("is_paused")):
+		_fail("defeat-load: failed load released the clock")
+		return
+	if not bool(sl.call("quickload")):
+		_fail("defeat-load: quickload failed")
+		return
+	if _ink_screen() != null or _picker() != null or _orphaned_end_nodes():
+		_fail("defeat-load: quickload left DEFEAT, picker, or an orphan")
+		return
+	if bool(tm.call("overlay_holds_clock")):
+		_fail("defeat-load: clock lock still held after quickload")
+		return
+	if bool(tm.call("is_paused")) or not is_equal_approx(float(tm.time_scale), 3.0):
+		_fail("defeat-load: quickload clock paused=%s scale=%s" % [str(tm.call("is_paused")), str(tm.time_scale)])
+		return
+	if int(bar.get("current_speed")) != 3 or bool(bar.get("is_paused")):
+		_fail("defeat-load: bar speed=%s paused=%s after quickload" % [str(bar.get("current_speed")), str(bar.get("is_paused"))])
+		return
+	_pass("defeat-load: failed load keeps DEFEAT; Ctrl+L closes it and restores 3x")
+	tm.set_paused(false)
+	tm.set_time_scale(2.0)
+	bar.set("current_speed", 2)
+	bar.set("is_paused", false)
+	saved = sl.call("save_game_detailed", "quicksave")
+	if not bool(saved.get("ok", false)):
+		_fail("defeat-load: 2x quicksave failed")
+		return
+	_free_menu()
+	gd.call("trigger_national_defeat_or_continuation", "GER", "defeat-load-cc")
+	loss = _ink_screen()
+	if loss == null:
+		_fail("defeat-load: second DEFEAT missing")
+		return
+	cont = loss.find_child("BtnContinueAs", true, false)
+	if cont is BaseButton:
+		(cont as BaseButton).pressed.emit()
+	if _picker() == null:
+		_fail("defeat-load: second picker missing")
+		return
+	var load_btn := loss.find_child("BtnLoadSave", true, false)
+	if not (load_btn is BaseButton):
+		_fail("defeat-load: Load save button missing")
+		return
+	(load_btn as BaseButton).pressed.emit()
+	var menu := root.get_node_or_null("MainMenu")
+	if menu == null or not is_instance_valid(menu) or menu.is_queued_for_deletion():
+		_fail("defeat-load: Load save did not open Command Center")
+		return
+	if not menu.has_method("_load_slot_now"):
+		_fail("defeat-load: Command Center has no _load_slot_now")
+		return
+	menu.call("_load_slot_now", "quicksave")
+	if _ink_screen() != null or _picker() != null or _orphaned_end_nodes():
+		_fail("defeat-load: slot load left DEFEAT, picker, or an orphan")
+		return
+	menu = root.get_node_or_null("MainMenu")
+	if menu != null and is_instance_valid(menu) and not menu.is_queued_for_deletion():
+		_fail("defeat-load: Command Center stayed open after slot load")
+		return
+	if bool(tm.call("overlay_holds_clock")):
+		_fail("defeat-load: clock lock still held after slot load")
+		return
+	if bool(tm.call("is_paused")) or not is_equal_approx(float(tm.time_scale), 2.0):
+		_fail("defeat-load: slot load clock paused=%s scale=%s" % [str(tm.call("is_paused")), str(tm.time_scale)])
+		return
+	if int(bar.get("current_speed")) != 2 or bool(bar.get("is_paused")):
+		_fail("defeat-load: bar speed=%s paused=%s after slot load" % [str(bar.get("current_speed")), str(bar.get("is_paused"))])
+		return
+	_pass("defeat-load: Load save then slot load closes DEFEAT, picker, and Command Center at 2x")
+	_free_menu()
+	_free_group("campaign_ink_end_screen")
+	_free_group("continuation_picker")
 
 
 func _test_save_hint_and_f6_loyalty() -> void:

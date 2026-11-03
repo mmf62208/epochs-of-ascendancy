@@ -7,6 +7,7 @@ extends CanvasLayer
 const PANEL_SIZE := Vector2(760, 520)
 
 static var present_log: Array = []
+static var _load_hooked: bool = false
 
 var _outcome: String = "loss"
 var _tag: String = ""
@@ -20,6 +21,36 @@ static func clear_log() -> void:
 
 static func log_entries() -> Array:
 	return present_log.duplicate()
+
+
+## One process-wide listener. A successful load closes every end screen and
+## continuation picker. Failed reads and same-frame duplicate deliveries do not emit.
+static func _hook_load_completed() -> void:
+	if _load_hooked:
+		return
+	if typeof(SaveLoadManager) == TYPE_NIL or not SaveLoadManager.has_signal("load_completed"):
+		return
+	if not SaveLoadManager.load_completed.is_connected(_on_any_load_completed):
+		SaveLoadManager.load_completed.connect(_on_any_load_completed)
+	_load_hooked = true
+
+
+static func _on_any_load_completed(_slot_name: String) -> void:
+	var tree := Engine.get_main_loop() as SceneTree
+	if tree == null:
+		return
+	var scr: Script = load("res://scripts/ui/PeaceConferenceWindow.gd") as Script
+	if scr != null and scr.has_method("_dismiss_picker"):
+		var pickers: Array = tree.get_nodes_in_group("continuation_picker").duplicate()
+		for p in pickers:
+			if p != null and is_instance_valid(p) and not p.is_queued_for_deletion():
+				scr.call("_dismiss_picker", p)
+	if scr != null and scr.has_method("_dismiss_ink_end_screens"):
+		scr.call("_dismiss_ink_end_screens")
+		return
+	for n in tree.get_nodes_in_group("campaign_ink_end_screen"):
+		if n != null and is_instance_valid(n) and n.has_method("_dismiss_end_screen"):
+			n.call("_dismiss_end_screen")
 
 
 static func present_loss(tag: String, reason: String) -> Node:
@@ -51,6 +82,7 @@ static func _open(outcome: String, tag: String, reason: String) -> Node:
 
 func _ready() -> void:
 	add_to_group("campaign_ink_end_screen")
+	_hook_load_completed()
 	var sting := "end_victory_sting" if _outcome == "win" else "end_defeat_sting"
 	var tree := get_tree()
 	if tree != null and tree.root != null:

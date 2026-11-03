@@ -135,10 +135,10 @@ class TestUnitCardFillToeVisibilityProduct(unittest.TestCase):
         self.assertIn("func _resolve_hex_pick_pid", src)
         land_i = src.find("func _try_open_land_unit_at_world")
         self.assertGreaterEqual(land_i, 0)
-        land_slice = src[land_i : land_i + 2400]
-        next_land = land_slice.find("\nfunc ", 1)
-        if next_land > 0:
-            land_slice = land_slice[:next_land]
+        # Sea-bind and hex-miss grew this function past the old 2400 extractor.
+        # The lock is the whole function, including hex resolve after the disk miss.
+        next_land = src.find("\nfunc ", land_i + 1)
+        land_slice = src[land_i:next_land] if next_land > land_i else src[land_i:]
         self.assertIn("_resolve_hex_pick_pid", land_slice)
         self.assertNotIn("_resolve_map_pick_pid", land_slice)
         self.assertGreaterEqual(land_slice.count("_player_land_formation_at_province"), 2)

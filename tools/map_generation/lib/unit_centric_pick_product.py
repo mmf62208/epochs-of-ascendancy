@@ -52,7 +52,9 @@ def _spatial_left_click_slice(renderer_src: str) -> str:
     if left < 0:
         left = i
     end = renderer_src.find("MOUSE_BUTTON_RIGHT", left)
-    if end < 0 or end - left > 12000:
+    # The left-click block grew past 12k (MV-1b / CRASH-1). Truncating at 8k
+    # hid the province resolve. The order checks still run on this block only.
+    if end < 0:
         end = left + 8000
     return renderer_src[left:end]
 
@@ -147,9 +149,19 @@ def build_unit_centric_pick_product(*, check_wiring: bool = True) -> Dict[str, A
     star_before_chip = False
     if spatial:
         i_pin = spatial.find("_try_open_unit_at_world")
-        i_hex = spatial.find("get_province_at_world_pos")
+        # 46ed9eba moved the left-click hex read into _still_click_province_pid.
+        # That helper still calls get_province_at_world_pos. Pin stays before it.
+        i_hex = spatial.find("_still_click_province_pid")
+        if i_hex < 0:
+            i_hex = spatial.find("get_province_at_world_pos")
         i_star = spatial.find("_capital_star_pid_at")
-        pin_first = i_pin >= 0 and i_hex >= 0 and i_pin < i_hex
+        still_fn = _gd_func_slice(ren, "_still_click_province_pid")
+        hex_fn_body = _gd_func_slice(ren, "_resolve_hex_pick_pid")
+        hex_live = (
+            "get_province_at_world_pos" in still_fn
+            or "get_province_at_world_pos" in hex_fn_body
+        )
+        pin_first = i_pin >= 0 and i_hex >= 0 and i_pin < i_hex and hex_live
         star_before_chip = i_star >= 0 and i_pin >= 0 and i_star < i_pin
     wiring["pin_before_hex"] = pin_first
     if pin_first:

@@ -198,11 +198,20 @@ def build_unit_counter_chrome_product(*, check_wiring: bool = True) -> Dict[str,
     else:
         fails.append("pick_skips_hidden_only")
 
-    # Shift+U must be handled before plain KEY_U (supply-flow toggle used to swallow it).
-    i_shift_u = ren.find("event.shift_pressed")
-    i_toggle = ren.find("toggle_unit_counters()")
-    i_flow_u = ren.find("toggle_strategic_flow_overlay()")
-    shift_u_first = i_toggle >= 0 and i_flow_u >= 0 and i_toggle < i_flow_u
+    # RX-1 (dbbdef48): plain U toggles unit counters; Shift+U toggles
+    # supply/sealane flow. The shift branch is first so Shift+U is not
+    # swallowed by plain U. HeadlessRx1RhineVisibilityTest locks this binding.
+    u_at = ren.find("if event.keycode == KEY_U")
+    u_win = ren[u_at:u_at + 700] if u_at >= 0 else ""
+    i_shift_u = u_win.find("event.shift_pressed")
+    i_flow_u = u_win.find("toggle_strategic_flow_overlay()")
+    i_toggle = u_win.find("toggle_unit_counters()")
+    shift_u_first = (
+        i_shift_u >= 0
+        and i_flow_u > i_shift_u
+        and i_toggle > i_flow_u
+        and "Supply/sealane flow" in u_win
+    )
     wiring["shift_u_before_plain_u"] = shift_u_first
     if shift_u_first:
         passes.append("shift_u_before_plain_u")
