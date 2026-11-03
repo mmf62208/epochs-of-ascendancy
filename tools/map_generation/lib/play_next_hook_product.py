@@ -229,12 +229,17 @@ def rank_next_beat(facts: Dict[str, Any] | None = None) -> Dict[str, Any]:
                 "to_id": wpid,
             }
         if not bool(f.get("war_declared")):
+            label = "Declare war"
+            hint = "War goal justified — declare"
+            if bool(f.get("stability_declare_warn")):
+                hint = "Unjustified: −15% stability"
+                label = "%s · %s" % (label, hint)
             return {
                 "ok": True,
                 "action": "declare",
                 "source": "war_goal",
-                "label": "Declare war",
-                "hint": "War goal justified — declare",
+                "label": label,
+                "hint": hint,
                 "to_id": wpid,
             }
     if bool(f.get("any_open_battle")) or bool(f.get("has_open_battle")):

@@ -1474,10 +1474,29 @@ func _advance_supply_day_light(days: float = 1.0) -> void:
 		force_registry.decay_all_recon(days)
 
 
+func _stability_justice_supply_scale() -> Dictionary:
+	if typeof(GameData) == TYPE_NIL or not GameData.has_method("stability_justice_supply_scale"):
+		return {"apply": false, "multiplier": 1.0, "tag": ""}
+	var scale: Variant = GameData.stability_justice_supply_scale()
+	if scale is Dictionary:
+		return scale
+	return {"apply": false, "multiplier": 1.0, "tag": ""}
+
+
+func _apply_stability_supply_gen(daily_gen: float, owner_tag: String, scale: Dictionary) -> float:
+	if not bool(scale.get("apply", false)):
+		return daily_gen
+	if str(owner_tag).strip_edges().to_upper() != str(scale.get("tag", "")).strip_edges().to_upper():
+		return daily_gen
+	return daily_gen * float(scale.get("multiplier", 1.0))
+
+
 func _generate_local_supply_from_development_light(days: float) -> void:
 	## Budgeted slice of depots per day so world_full (2k+ depots) cannot freeze the clock.
 	if days <= 0.0 or depot_states.is_empty():
 		return
+	var sj_scale := _stability_justice_supply_scale()
+	var sj_apply := bool(sj_scale.get("apply", false))
 	var keys: Array = depot_states.keys()
 	var n := keys.size()
 	if n == 0:
@@ -1511,6 +1530,8 @@ func _generate_local_supply_from_development_light(days: float) -> void:
 			var disruption: float = AgentManager.get_supply_disruption_in_province(int(pid_var))
 			if disruption > 0.0:
 				daily_gen *= (1.0 - clampf(disruption * 0.25, 0.0, 0.6))
+		if sj_apply:
+			daily_gen = _apply_stability_supply_gen(daily_gen, str(province.owner_tag), sj_scale)
 		state.apply_inflow(daily_gen)
 
 ## Compact Maginot playtest clock only. Live Play uses advance_supply_day.
@@ -2286,6 +2307,8 @@ func _generate_local_supply_from_development(days: float) -> void:
 func _generate_local_supply_range(days: float, keys: Array, start: int, deadline_usec: int) -> int:
 	if days <= 0.0 or typeof(Province) == TYPE_NIL:
 		return keys.size()
+	var sj_scale := _stability_justice_supply_scale()
+	var sj_apply := bool(sj_scale.get("apply", false))
 	var i := start
 	var n := keys.size()
 	while i < n:
@@ -2357,6 +2380,8 @@ func _generate_local_supply_range(days: float, keys: Array, start: int, deadline
 				var penalty := clampf(disruption * 0.25, 0.0, 0.6)  # up to 60% reduction from strong network
 				daily_gen *= (1.0 - penalty)
 
+		if sj_apply:
+			daily_gen = _apply_stability_supply_gen(daily_gen, str(province.owner_tag), sj_scale)
 		state.apply_inflow(daily_gen)
 		if deadline_usec > 0:
 			_supply_slice_note_item_ms(Time.get_ticks_usec() - t_item)

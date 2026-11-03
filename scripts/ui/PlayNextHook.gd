@@ -238,14 +238,21 @@ static func rank_from_snapshot(facts: Dictionary = {}) -> Dictionary:
 			var dlabel := "Declare war"
 			if not wname.is_empty():
 				dlabel = "Declare war on %s" % wname
+			var dhint := "War goal justified — declare"
+			# Campaign justify can be ready (14 days) before the stability
+			# justify finishes (30 days). The Declare chip must name the cost.
+			if bool(f.get("stability_declare_warn", false)):
+				dhint = "Unjustified: −15% stability"
+				dlabel = "%s · %s" % [dlabel, dhint]
 			return {
 				"ok": true,
 				"action": "declare",
 				"label": dlabel,
-				"hint": "War goal justified — declare",
+				"hint": dhint,
 				"fid": "",
 				"to_id": wpid,
 				"source": "war_goal",
+				"target_tag": wtag,
 			}
 	if bool(f.get("any_open_battle", false)) or bool(f.get("has_open_battle", false)):
 		return {
@@ -520,10 +527,18 @@ static func apply(rec: Dictionary = {}) -> Dictionary:
 		var dpid := int(r.get("to_id", 1))
 		if typeof(WarStateDomain) != TYPE_NIL and WarStateDomain.loop_enabled():
 			var loop_declared: Dictionary = WarStateDomain.player_declare_from_province(dpid)
+			var fresh := bool(loop_declared.get("ok", false)) and not bool(loop_declared.get("already", false))
+			var summary := str(loop_declared.get("reason", r.get("hint", "Declare war")))
+			if fresh and _stability_enabled() and typeof(StabilityJusticeDomain) != TYPE_NIL:
+				var note: Dictionary = StabilityJusticeDomain.note_execute(dpid)
+				if not bool(note.get("skipped", true)):
+					var progress := str(note.get("progress", "")).strip_edges()
+					if not progress.is_empty():
+						summary = progress
 			return {
 				"ok": bool(loop_declared.get("ok", false)) or bool(loop_declared.get("already", false)),
 				"action": "declare",
-				"summary": str(loop_declared.get("reason", r.get("hint", "Declare war"))),
+				"summary": summary,
 			}
 		if typeof(GameData) != TYPE_NIL and GameData.has_method("apply_war_goal_execute"):
 			var declared: Dictionary = GameData.apply_war_goal_execute(dpid)
@@ -770,12 +785,26 @@ static func _gather_facts(player_tag: String) -> Dictionary:
 				player = pt
 		if tag == player:
 			facts["war_declared"] = not WarStateDomain.enemies_of(tag).is_empty()
-			facts["war_justified"] = WarStateDomain.player_justify_is_ready()
-			var suggested: Dictionary = WarStateDomain.suggest_player_target()
-			var spid := int(suggested.get("pid", -1))
-			if spid > 0:
-				facts["war_goal_pid"] = spid
-				facts["war_goal_tag"] = str(suggested.get("tag", ""))
+			# Flag on: a started stability justify pins the NEXT target to that
+			# country. A fresh suggest must not relabel Japan as France.
+			var pinned := _stability_war_goal_pin()
+			if not pinned.is_empty():
+				facts["war_justified"] = bool(pinned.get("ready", false))
+				var ppid := int(pinned.get("pid", -1))
+				if ppid > 0:
+					facts["war_goal_pid"] = ppid
+					facts["war_goal_tag"] = str(pinned.get("tag", ""))
+				if bool(pinned.get("warn", false)):
+					facts["stability_declare_warn"] = true
+			else:
+				facts["war_justified"] = WarStateDomain.player_justify_is_ready()
+				var suggested: Dictionary = WarStateDomain.suggest_player_target()
+				var spid := int(suggested.get("pid", -1))
+				if spid > 0:
+					facts["war_goal_pid"] = spid
+					facts["war_goal_tag"] = str(suggested.get("tag", ""))
+				if bool(facts.get("war_justified", false)) and _stability_declare_warn_needed():
+					facts["stability_declare_warn"] = true
 			if typeof(CampaignEndDomain) != TYPE_NIL and CampaignEndDomain.latched():
 				facts["campaign_over"] = true
 	facts["vacant_chief"] = _vacant_chief(tag)
@@ -1032,6 +1061,49 @@ static func _diplomacy_row(tag: String) -> Dictionary:
 		if bool(row.get("ok", false)):
 			return row
 	return empty
+
+
+static func _stability_enabled() -> bool:
+	return typeof(GameData) != TYPE_NIL and GameData.has_method("stability_justice_enabled") and bool(GameData.stability_justice_enabled())
+
+
+static func _province_owner_tag(pid: int) -> String:
+	if pid <= 0 or typeof(MapManager) == TYPE_NIL or not MapManager.has_method("get_province"):
+		return ""
+	var p: Object = MapManager.get_province(pid)
+	if p == null:
+		return ""
+	return str(p.get("owner_tag")).strip_edges().to_upper()
+
+
+## Active stability justify, flag on only. Empty when the flag is off, so the
+## suggest path below stays the shipped one.
+static func _stability_war_goal_pin() -> Dictionary:
+	if not _stability_enabled() or typeof(StabilityJusticeDomain) == TYPE_NIL:
+		return {}
+	var st: Dictionary = StabilityJusticeDomain.justify_status()
+	if not bool(st.get("active", false)):
+		return {}
+	var pid := int(st.get("province_id", 0))
+	var owner := _province_owner_tag(pid)
+	if pid <= 0 or owner.is_empty():
+		return {}
+	var ready := false
+	if typeof(WarStateDomain) != TYPE_NIL and WarStateDomain.loop_enabled():
+		ready = WarStateDomain.player_justify_is_ready_for(owner)
+	return {
+		"pid": pid,
+		"tag": owner,
+		"ready": ready,
+		"warn": ready and not bool(st.get("complete", false)),
+	}
+
+
+static func _stability_declare_warn_needed() -> bool:
+	if not _stability_enabled() or typeof(StabilityJusticeDomain) == TYPE_NIL:
+		return false
+	var st: Dictionary = StabilityJusticeDomain.justify_status()
+	return not bool(st.get("complete", false))
 
 
 static func _war_goal_row(tag: String) -> Dictionary:
