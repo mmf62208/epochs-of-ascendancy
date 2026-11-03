@@ -7,12 +7,12 @@
 *.import
 # FAC-1a: facilities icons need committed imports so mipmaps stay ON.
 !assets/graphics/icons/facilities/*.import
-export_presets.cfg
+# export_presets.cfg is tracked (Windows Desktop preset).
 *.uid                    # Godot UID cache files (causes merge conflicts)
 *.tmp
 *.temp
 
-# Godot exports / builds
+# Godot exports / builds (never commit export output)
 export/
 build/
 dist/
