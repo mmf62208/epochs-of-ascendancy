@@ -4,11 +4,11 @@
 #
 # Usage (from repo root):
 #   tools/eoa_full_test_gates.sh
-#   tools/eoa_full_test_gates.sh --quick      # pure python, plus garrison, ink tooltips, campaign save, audio1, stability justice
+#   tools/eoa_full_test_gates.sh --quick      # pure python, plus garrison, ink tooltips, campaign save, audio1, stability justice, victory paths
 #   tools/eoa_full_test_gates.sh --with-perf  # also map-tick perf sample
 #   tools/eoa_full_test_gates.sh --log DIR    # write logs under DIR
 #
-# --quick launches HeadlessGarrison1Test, HeadlessInkTooltips0Test, HeadlessCampaignSave1Test, HeadlessAudio1Test, then HeadlessStabilityJustice1Test.
+# --quick launches HeadlessGarrison1Test, HeadlessInkTooltips0Test, HeadlessCampaignSave1Test, HeadlessAudio1Test, HeadlessStabilityJustice1Test, then HeadlessVictoryPaths1Test.
 # Full path calls tools/run_godot.sh, which exits 1 immediately if no binary
 # is found (fail-closed; it must not hang).
 # NE board/QC needs numpy+Pillow: pip install -r tools/map_generation/requirements.txt
@@ -207,6 +207,7 @@ if [[ "$QUICK" -eq 1 ]]; then
     log "FAIL headless_campaign_save1 GODOT_BUSY"
     log "FAIL headless_audio1 GODOT_BUSY"
     log "FAIL headless_stability_justice1 GODOT_BUSY"
+    log "FAIL headless_victory_paths1 GODOT_BUSY"
     FAILED=1
   else
     run_step headless_garrison1 env \
@@ -250,6 +251,23 @@ if [[ "$QUICK" -eq 1 ]]; then
       fi
       if ! grep -q "RESULT=PASS" "$log"; then
         echo "[eoa-gates] FAIL headless_stability_justice1 missing RESULT=PASS"
+        exit 1
+      fi
+      exit "$code"
+    ' || fail
+    run_step headless_victory_paths1 bash -c '
+      log=$(mktemp)
+      XDG_DATA_HOME="$(mktemp -d)" flock -n "${HOME}/.eoa_godot.lock" \
+        tools/run_godot.sh --headless --path . \
+        -s res://scripts/core/HeadlessVictoryPaths1Test.gd >"$log" 2>&1
+      code=$?
+      cat "$log"
+      if grep -q "SCRIPT ERROR" "$log"; then
+        echo "[eoa-gates] FAIL headless_victory_paths1 SCRIPT ERROR"
+        exit 1
+      fi
+      if ! grep -q "RESULT=PASS" "$log"; then
+        echo "[eoa-gates] FAIL headless_victory_paths1 missing RESULT=PASS"
         exit 1
       fi
       exit "$code"
@@ -525,6 +543,24 @@ else
 
   run_step launch_nation_tags1 \
     tools/run_godot.sh --headless --path . -s res://scripts/core/HeadlessNationTags1Test.gd || fail
+
+  run_step launch_victory_paths1 bash -c '
+    log=$(mktemp)
+    XDG_DATA_HOME="$(mktemp -d)" flock -n "${HOME}/.eoa_godot.lock" \
+      tools/run_godot.sh --headless --path . \
+      -s res://scripts/core/HeadlessVictoryPaths1Test.gd >"$log" 2>&1
+    code=$?
+    cat "$log"
+    if grep -q "SCRIPT ERROR" "$log"; then
+      echo "[eoa-gates] FAIL launch_victory_paths1 SCRIPT ERROR"
+      exit 1
+    fi
+    if ! grep -q "RESULT=PASS" "$log"; then
+      echo "[eoa-gates] FAIL launch_victory_paths1 missing RESULT=PASS"
+      exit 1
+    fi
+    exit "$code"
+  ' || fail
 
   run_step launch_campaign_loop1_war_gate \
     tools/run_godot.sh --headless --path . -s res://scripts/core/HeadlessCampaignLoop1WarGateTest.gd || fail

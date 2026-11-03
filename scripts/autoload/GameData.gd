@@ -5,6 +5,7 @@ extends Node
 ## Preload (not bare class_name) so a stale .godot class cache cannot blank the map.
 const _Rx1Rhine := preload("res://scripts/map/Rx1RhineCrossing.gd")
 const _StabilityJustice := preload("res://scripts/core/StabilityJusticeDomain.gd")
+const _VictoryPaths := preload("res://scripts/core/VictoryPathsDomain.gd")
 
 var design_data: DesignDataLoader = DesignDataLoader.new()
 
@@ -12427,6 +12428,10 @@ func get_save_data() -> Dictionary:
 		var sj_blob: Dictionary = _StabilityJustice.export_save_blob()
 		if not sj_blob.is_empty():
 			data["stability_justice"] = sj_blob
+	if victory_paths_enabled():
+		var vp_blob: Dictionary = _VictoryPaths.export_save_blob()
+		if not vp_blob.is_empty():
+			data["victory_paths"] = vp_blob
 	return data
 
 
@@ -12498,6 +12503,11 @@ func apply_save_data(data: Dictionary) -> void:
 			_StabilityJustice.import_save_blob(data["stability_justice"])
 		else:
 			_StabilityJustice.load_missing_save()
+	if victory_paths_enabled():
+		if data.has("victory_paths") and data["victory_paths"] is Dictionary:
+			_VictoryPaths.import_save_blob(data["victory_paths"])
+		else:
+			_VictoryPaths.load_missing_save()
 	# Pillar state for peace ripples/follow-ons
 	if data.has("ascendancy"):
 		peace_state["ascendancy"] = data["ascendancy"].duplicate(true)
@@ -26376,6 +26386,24 @@ func stability_justice_chip_line() -> String:
 	if not stability_justice_enabled():
 		return ""
 	return str(_StabilityJustice.chip_line())
+
+
+## 1936 victory paths. Default OFF.
+## EOA_VICTORY_PATHS=1 enables them. Any other value leaves the shipped path unchanged.
+func victory_paths_enabled() -> bool:
+	return OS.get_environment("EOA_VICTORY_PATHS").strip_edges() == "1"
+
+
+func victory_paths_tick_day() -> Dictionary:
+	if not victory_paths_enabled():
+		return {"ok": true, "skipped": true, "created": false, "presented": false}
+	return _VictoryPaths.tick_day()
+
+
+func victory_paths_progress_text() -> String:
+	if not victory_paths_enabled():
+		return ""
+	return str(_VictoryPaths.progress_text())
 
 
 ## Interactive F5 multi-AI day: budgeted non-player major production applies so multi-day

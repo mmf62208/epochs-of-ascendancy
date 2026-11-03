@@ -12,6 +12,7 @@ static var _load_hooked: bool = false
 var _outcome: String = "loss"
 var _tag: String = ""
 var _reason: String = ""
+var _detail: Dictionary = {}
 var _clock_lock_held: bool = false
 
 
@@ -53,17 +54,17 @@ static func _on_any_load_completed(_slot_name: String) -> void:
 			n.call("_dismiss_end_screen")
 
 
-static func present_loss(tag: String, reason: String) -> Node:
+static func present_loss(tag: String, reason: String, detail: Dictionary = {}) -> Node:
 	present_log.append("end_screen")
-	return _open("loss", tag, reason)
+	return _open("loss", tag, reason, detail)
 
 
-static func present_win(tag: String, reason: String) -> Node:
+static func present_win(tag: String, reason: String, detail: Dictionary = {}) -> Node:
 	present_log.append("end_screen")
-	return _open("win", tag, reason)
+	return _open("win", tag, reason, detail)
 
 
-static func _open(outcome: String, tag: String, reason: String) -> Node:
+static func _open(outcome: String, tag: String, reason: String, detail: Dictionary = {}) -> Node:
 	var tree := Engine.get_main_loop() as SceneTree
 	if tree == null or tree.root == null:
 		return null
@@ -74,6 +75,7 @@ static func _open(outcome: String, tag: String, reason: String) -> Node:
 	layer._outcome = outcome
 	layer._tag = tag.strip_edges().to_upper()
 	layer._reason = reason
+	layer._detail = detail.duplicate(true)
 	layer.layer = 125
 	layer.process_mode = Node.PROCESS_MODE_ALWAYS
 	tree.root.add_child(layer)
@@ -136,6 +138,15 @@ func _ready() -> void:
 	title.add_theme_color_override("font_color", border)
 	box.add_child(title)
 
+	var path_title := str(_detail.get("path_title", "")).strip_edges()
+	if not path_title.is_empty():
+		var path_label := Label.new()
+		path_label.name = "PathTitle"
+		path_label.text = path_title
+		path_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		RetrowaveTheme.style_body_label(path_label)
+		box.add_child(path_label)
+
 	var sub := Label.new()
 	sub.name = "OutcomeSubtitle"
 	sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -154,6 +165,15 @@ func _ready() -> void:
 	RetrowaveTheme.style_body_label(when)
 	box.add_child(when)
 
+	var winner_txt := str(_detail.get("winner", "")).strip_edges()
+	if not winner_txt.is_empty():
+		var winner := Label.new()
+		winner.name = "OutcomeWinner"
+		winner.text = winner_txt
+		winner.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		RetrowaveTheme.style_body_label(winner)
+		box.add_child(winner)
+
 	if not _reason.strip_edges().is_empty():
 		var why := Label.new()
 		why.name = "OutcomeReason"
@@ -164,7 +184,8 @@ func _ready() -> void:
 
 	var stats := Label.new()
 	stats.name = "OutcomeStats"
-	stats.text = _stats_line()
+	var stats_override := str(_detail.get("stats", "")).strip_edges()
+	stats.text = stats_override if not stats_override.is_empty() else _stats_line()
 	RetrowaveTheme.style_body_label(stats)
 	box.add_child(stats)
 

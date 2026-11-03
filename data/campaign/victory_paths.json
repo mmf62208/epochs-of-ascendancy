@@ -1,0 +1,74 @@
+{
+  "version": 1,
+  "enabled": true,
+  "end_date": "1949-01-01",
+  "tags": ["GER", "FRA", "ENG", "USA", "SOV", "ITA", "JAP", "POL"],
+  "majors": ["GER", "FRA", "ENG", "USA", "SOV", "ITA", "JAP"],
+  "priority": ["conquest", "atomic", "arsenal", "score"],
+  "same_day": "player_else_tag_sort",
+  "notes": "1936 victory paths. Every threshold lives here. Satellite is a disabled stub. Score territory is the count of controlled targets, industry is factory count, wars_won is capitulated major enemies.",
+  "targets": [
+    {"id": 710300, "tag": "GER", "kind": "capital"},
+    {"id": 710707, "tag": "FRA", "kind": "capital"},
+    {"id": 711414, "tag": "ENG", "kind": "capital"},
+    {"id": 800792, "tag": "USA", "kind": "capital"},
+    {"id": 903534, "tag": "SOV", "kind": "capital"},
+    {"id": 710963, "tag": "ITA", "kind": "capital"},
+    {"id": 903995, "tag": "JAP", "kind": "capital"},
+    {"id": 711054, "tag": "POL", "kind": "capital"}
+  ],
+  "paths": {
+    "conquest": {
+      "enabled": true,
+      "title": "Conquest",
+      "capital_ratio": 0.75,
+      "or_all_major_enemies_capitulated": true
+    },
+    "atomic": {
+      "enabled": true,
+      "title": "Atomic",
+      "tech_ids": ["nuclear_thermal_engine", "nuclear_marine_propulsion_1955"],
+      "tech_match": "all",
+      "project_state_key": "atomic_projects",
+      "project_id": "atomic",
+      "hold_days": 30,
+      "reset_if_lost": true
+    },
+    "arsenal": {
+      "enabled": true,
+      "title": "Arsenal of the World",
+      "industry_share": 0.4,
+      "sustain_days": 90,
+      "reset_if_below": true
+    },
+    "score": {
+      "enabled": true,
+      "title": "Score",
+      "weights": {"territory": 1.0, "industry": 1.0, "wars_won": 25.0}
+    },
+    "satellite": {
+      "enabled": false,
+      "disabled": true,
+      "title": "Satellite",
+      "progress_label": "Satellite deferred",
+      "note": "Deferred. Not evaluated."
+    }
+  },
+  "text": {
+    "defeat_reason": "{winner} won {title} first.",
+    "conquest_reason": "{title}: {held} of {total} target capitals.",
+    "conquest_cap_reason": "{title}: every major enemy has capitulated.",
+    "atomic_reason": "{title}: the atomic project held.",
+    "arsenal_reason": "{title}: world industry share held.",
+    "score_reason": "{title}: highest score on {date}.",
+    "stats_conquest": "Capitals {held}/{total}",
+    "stats_atomic": "Hold {hold}/{need}",
+    "stats_arsenal": "Share {pct}% · {streak}/{need}",
+    "stats_score": "Score {score} · territory {territory} · industry {industry} · wars {wars}",
+    "line_conquest": "{title} {held}/{total}",
+    "line_atomic": "{title} {hold}/{need}",
+    "line_arsenal": "{title} {pct}% · {streak}/{need}",
+    "line_score": "{title} {score}",
+    "line_off": "{label}"
+  }
+}
