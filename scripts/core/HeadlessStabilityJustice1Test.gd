@@ -37,6 +37,9 @@ func _run() -> void:
 	_test_flag_on(gd)
 	_test_save_roundtrip(gd)
 	_test_drift_clamp(gd)
+	_test_chip_one_decimal(gd)
+	_test_offered_target_and_declare_warning(gd)
+	_test_chip_refreshes_on_load(gd)
 	_finish()
 
 
@@ -253,3 +256,237 @@ func _test_drift_clamp(gd: Node) -> void:
 		_fail("stability went above 1")
 		return
 	_pass("drift stays clamped to 0..1")
+
+
+const _UNJUST_WARN := "Unjustified: −15% stability"
+
+
+func _test_chip_one_decimal(gd: Node) -> void:
+	OS.set_environment("EOA_STABILITY_JUSTICE", "1")
+	_sj.call("clear_state")
+	_sj.call("import_save_blob", {"stability": 0.998, "justify": {"active": false}})
+	var line := str(gd.call("stability_justice_chip_line"))
+	if line != "Stability 99.8%":
+		_fail("chip one decimal want Stability 99.8%% got %s" % line)
+		return
+	_sj.call("import_save_blob", {"stability": 1.0, "justify": {"active": false}})
+	var full := str(gd.call("stability_justice_chip_line"))
+	if full != "Stability 100.0%":
+		_fail("chip one decimal at full want Stability 100.0%% got %s" % full)
+		return
+	_pass("chip shows one decimal (Stability 99.8%)")
+
+
+func _test_offered_target_and_declare_warning(gd: Node) -> void:
+	## Germany 1936, flag on. The NEXT chip is painted while the seat is still
+	## USA ("Justify war on Japan"). The seat then becomes Germany and the
+	## player clicks that chip. The offered country, the justify, and the later
+	## declare must all be Japan. Before the 30-day stability justify finishes,
+	## the Declare chip names the stability cost.
+	OS.set_environment("EOA_STABILITY_JUSTICE", "1")
+	OS.set_environment("EOA_CAMPAIGN_LOOP", "1")
+	OS.set_environment("EOA_SCENARIO_EARLY_WARS", "0")
+	OS.set_environment("EOA_CALENDAR_AUTOSAVE", "0")
+	var mm := root.get_node_or_null("MapManager")
+	var sm := root.get_node_or_null("SupplyManager")
+	var lm := root.get_node_or_null("LeaderManager")
+	var sp := root.get_node_or_null("SessionPlayers")
+	var tm := root.get_node_or_null("TimeManager")
+	var boot: GDScript = load("res://scripts/core/CampaignLoopTestBoot.gd") as GDScript
+	var hook: GDScript = load("res://scripts/ui/PlayNextHook.gd") as GDScript
+	var war: GDScript = load("res://scripts/core/WarStateDomain.gd") as GDScript
+	if mm == null or boot == null or hook == null or war == null or lm == null:
+		_fail("target agreement missing map, hook, or war domain")
+		return
+	if tm != null and "scenario_start_year" in tm:
+		tm.scenario_start_year = 1936
+	if tm != null and "total_days_elapsed" in tm:
+		tm.total_days_elapsed = 0
+	if not bool(boot.call("boot", mm, sm, "GER")):
+		_fail("target agreement map boot failed")
+		return
+	war.call("reset_for_test")
+	war.call("clear_rule_overrides")
+	_sj.call("clear_state")
+	if not lm.has_method("set_player_country_tag"):
+		_fail("LeaderManager.set_player_country_tag missing")
+		return
+	lm.call("set_player_country_tag", "USA")
+	if sp != null and sp.has_method("setup_solo_play"):
+		sp.call("setup_solo_play", "USA")
+	var mr := _make_map_renderer()
+	if mr == null:
+		_fail("MapRenderer missing for the NEXT chip")
+		return
+	mr.call("_refresh_next_hook_chip")
+	var chip := _next_chip(mr)
+	if chip == null:
+		_fail("PlayNextHookChip was not built")
+		return
+	var offered := chip.text
+	if "Japan" not in offered:
+		_fail("offered NEXT text was not Japan: %s" % offered)
+		return
+	lm.call("set_player_country_tag", "GER")
+	if sp != null and sp.has_method("setup_solo_play"):
+		sp.call("setup_solo_play", "GER")
+	chip.pressed.emit()
+	var just: Dictionary = _sj.call("justify_status")
+	var jowner := _owner_of(mm, int(just.get("province_id", 0)))
+	var defenders := _player_justify_defenders(gd, "GER")
+	if jowner != "JAP" or not defenders.has("JAP") or defenders.has("FRA"):
+		_fail("offered Japan justified owner=%s defenders=%s chip='%s'" % [jowner, str(defenders), offered])
+		return
+	if tm != null and "total_days_elapsed" in tm:
+		tm.total_days_elapsed = 14
+	var decl: Dictionary = hook.call("recommend", "GER")
+	var downer := _owner_of(mm, int(decl.get("to_id", -1)))
+	var shown := "%s\n%s" % [str(decl.get("label", "")), str(decl.get("hint", ""))]
+	if downer != "JAP" or "Japan" not in str(decl.get("label", "")):
+		_fail("declare target owner=%s label=%s (offered JAP, justified JAP)" % [downer, str(decl.get("label", ""))])
+		return
+	if _UNJUST_WARN not in shown:
+		_fail("declare chip missing stability warning: %s" % shown)
+		return
+	var applied: Dictionary = hook.call("apply", decl)
+	if not _war_pair(gd, "GER", "JAP"):
+		_fail("declare did not open GER-JAP apply=%s wars=%s" % [str(applied), _wars_text(gd)])
+		return
+	if _war_pair(gd, "GER", "FRA"):
+		_fail("declare also opened France")
+		return
+	_pass("offered Japan == justify Japan == declare Japan")
+	_pass("declare warns '%s' before the 30-day justify completes" % _UNJUST_WARN)
+	if is_instance_valid(mr):
+		mr.queue_free()
+
+
+func _test_chip_refreshes_on_load(gd: Node) -> void:
+	OS.set_environment("EOA_STABILITY_JUSTICE", "1")
+	_sj.call("clear_state")
+	_sj.call("import_save_blob", {"stability": 1.0, "justify": {"active": false}})
+	var mr := _make_map_renderer()
+	if mr == null:
+		_fail("MapRenderer missing for load refresh")
+		return
+	mr.call("_refresh_next_hook_chip")
+	var chip := _next_chip(mr)
+	if chip == null:
+		_fail("chip missing before load")
+		return
+	if "100.0%" not in chip.text and "100%" not in chip.text:
+		_fail("chip paint missing stability: %s" % chip.text)
+		return
+	_sj.call("import_save_blob", {"stability": 0.998, "justify": {"active": false}})
+	if "99.8%" in chip.text:
+		_fail("chip changed before load_completed: %s" % chip.text)
+		return
+	var slm := root.get_node_or_null("SaveLoadManager")
+	if slm == null or not slm.has_signal("load_completed"):
+		_fail("SaveLoadManager.load_completed missing")
+		return
+	slm.emit_signal("load_completed", "sj1_headless")
+	if "99.8%" not in chip.text:
+		_fail("chip did not refresh on load_completed: %s" % chip.text)
+		return
+	_pass("stability chip refreshes on load_completed")
+	if is_instance_valid(mr):
+		mr.queue_free()
+
+
+func _make_map_renderer() -> Node:
+	var scr: Script = load("res://scripts/map/MapRenderer.gd") as Script
+	if scr == null:
+		return null
+	var mr := scr.new() as Node
+	if mr == null:
+		return null
+	var ui := CanvasLayer.new()
+	ui.name = "UI"
+	mr.add_child(ui)
+	var info := Panel.new()
+	info.name = "InfoPanel"
+	var close := Button.new()
+	close.name = "BtnClose"
+	info.add_child(close)
+	ui.add_child(info)
+	if "info_panel" in mr:
+		mr.set("info_panel", info)
+	var container := Node2D.new()
+	container.name = "ProvinceContainers"
+	mr.add_child(container)
+	if "container" in mr:
+		mr.set("container", container)
+	var cam := Camera2D.new()
+	cam.name = "MapCamera"
+	mr.add_child(cam)
+	root.add_child(mr)
+	return mr
+
+
+func _next_chip(mr: Node) -> Button:
+	var ui := mr.get_node_or_null("UI")
+	if ui == null:
+		return null
+	return ui.get_node_or_null("PlayNextHookChip") as Button
+
+
+func _owner_of(mm: Node, pid: int) -> String:
+	if pid <= 0 or mm == null or not mm.has_method("get_province"):
+		return ""
+	var p: Object = mm.call("get_province", pid)
+	if p == null:
+		return ""
+	return str(p.get("owner_tag")).strip_edges().to_upper()
+
+
+func _player_justify_defenders(gd: Node, attacker: String) -> Array:
+	var out: Array = []
+	var cw: Variant = gd.peace_state.get("campaign_wars", {})
+	if not (cw is Dictionary):
+		return out
+	var just: Variant = (cw as Dictionary).get("justifies", {})
+	if not (just is Dictionary):
+		return out
+	var want := attacker.strip_edges().to_upper()
+	for k in (just as Dictionary).keys():
+		var row_v: Variant = (just as Dictionary)[k]
+		if not (row_v is Dictionary):
+			continue
+		var row: Dictionary = row_v
+		if str(row.get("attacker", "")).strip_edges().to_upper() != want:
+			continue
+		out.append(str(row.get("defender", "")).strip_edges().to_upper())
+	return out
+
+
+func _war_pair(gd: Node, a: String, b: String) -> bool:
+	var cw: Variant = gd.peace_state.get("campaign_wars", {})
+	if not (cw is Dictionary):
+		return false
+	var wars: Variant = (cw as Dictionary).get("wars", {})
+	if not (wars is Dictionary):
+		return false
+	var aa := a.strip_edges().to_upper()
+	var bb := b.strip_edges().to_upper()
+	for k in (wars as Dictionary).keys():
+		var row_v: Variant = (wars as Dictionary)[k]
+		if not (row_v is Dictionary):
+			continue
+		var row: Dictionary = row_v
+		var x := str(row.get("a", "")).strip_edges().to_upper()
+		var y := str(row.get("b", "")).strip_edges().to_upper()
+		if (x == aa and y == bb) or (x == bb and y == aa):
+			return true
+		var atk := str(row.get("attacker", "")).strip_edges().to_upper()
+		var dfn := str(row.get("defender", "")).strip_edges().to_upper()
+		if (atk == aa and dfn == bb) or (atk == bb and dfn == aa):
+			return true
+	return false
+
+
+func _wars_text(gd: Node) -> String:
+	var cw: Variant = gd.peace_state.get("campaign_wars", {})
+	if not (cw is Dictionary):
+		return ""
+	return str((cw as Dictionary).get("wars", {}))

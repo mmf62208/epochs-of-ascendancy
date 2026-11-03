@@ -83,13 +83,14 @@ static func has_state() -> bool:
 static func chip_line() -> String:
 	if not enabled():
 		return ""
-	var pct := int(round(stability() * 100.0))
+	# One decimal so a day's drift (about 0.2 points) is visible.
+	var pct := "%.1f" % snappedf(stability() * 100.0, 0.1)
 	var just := justify_status()
 	if bool(just.get("active", false)) and bool(just.get("complete", false)):
-		return "Stability %d%% · Justified" % pct
+		return "Stability %s%% · Justified" % pct
 	if bool(just.get("active", false)):
-		return "Stability %d%% · Justify %d/%d" % [pct, int(just.get("days_done", 0)), JUSTIFY_DAYS]
-	return "Stability %d%%" % pct
+		return "Stability %s%% · Justify %d/%d" % [pct, int(just.get("days_done", 0)), JUSTIFY_DAYS]
+	return "Stability %s%%" % pct
 
 
 static func note_justify(province_id: int) -> Dictionary:

@@ -401,6 +401,7 @@ var _supply_route_highlight_host: Node2D = null
 var _supply_corridor_gem_a: Polygon2D = null
 var _supply_corridor_gem_b: Polygon2D = null
 var _next_hook_chip: Button = null
+var _stability_load_hooked: bool = false
 var _current_theater_bounds: Rect2 = GRAND_THEATER_CANONICAL_BOUNDS  # updated on theater/chunk/world load; used for camera clamp to avoid gray lost space on pan/zoom to NA etc.
 
 # Coarse world territories for clickable "regions" when on full world grand/stitched view.
@@ -26686,15 +26687,29 @@ func _refresh_next_hook_chip() -> void:
 			_next_hook_chip.add_theme_constant_override("outline_size", 3)
 		ui.add_child(_next_hook_chip)
 		_next_hook_chip.pressed.connect(func() -> void:
-			if typeof(PlayNextHook) != TYPE_NIL:
-				var rec_apply: Dictionary = PlayNextHook.recommend(_player_tag())
-				var out: Dictionary = PlayNextHook.apply(rec_apply)
-				_show_inspector_toast(str(out.get("summary", "Next")), 3.5)
-				_refresh_next_hook_chip()
+			if typeof(PlayNextHook) == TYPE_NIL:
+				return
+			# Flag on: apply the country painted on the chip. A fresh
+			# recommend() after the seat changes (USA Japan → GER France)
+			# must not replace the offer the player clicked.
+			var rec_apply: Dictionary = {}
+			var use_painted := typeof(GameData) != TYPE_NIL and GameData.has_method("stability_justice_enabled") and bool(GameData.stability_justice_enabled())
+			if use_painted and _next_hook_chip != null and is_instance_valid(_next_hook_chip):
+				var painted: Variant = _next_hook_chip.get_meta("play_next_rec", {})
+				if painted is Dictionary and not (painted as Dictionary).is_empty():
+					rec_apply = (painted as Dictionary).duplicate(true)
+			if rec_apply.is_empty():
+				rec_apply = PlayNextHook.recommend(_player_tag())
+			var out: Dictionary = PlayNextHook.apply(rec_apply)
+			_show_inspector_toast(str(out.get("summary", "Next")), 3.5)
+			_refresh_next_hook_chip()
 		)
 	var rec: Dictionary = {}
 	if typeof(PlayNextHook) != TYPE_NIL:
 		rec = PlayNextHook.recommend(_player_tag())
+	if _next_hook_chip != null and is_instance_valid(_next_hook_chip):
+		_next_hook_chip.set_meta("play_next_rec", rec.duplicate(true))
+	_hook_stability_chip_load()
 	var hint := str(rec.get("hint", "Unpause a day"))
 	var stab_line := ""
 	if typeof(GameData) != TYPE_NIL and GameData.has_method("stability_justice_chip_line"):
@@ -26706,6 +26721,28 @@ func _refresh_next_hook_chip() -> void:
 		_next_hook_chip.custom_minimum_size = Vector2(640, 28)
 		_next_hook_chip.text = "NEXT · %s · %s" % [str(rec.get("label", "Unpause a day")), stab_line]
 		_next_hook_chip.tooltip_text = "%s\n%s" % [hint, stab_line]
+
+
+func _hook_stability_chip_load() -> void:
+	if _stability_load_hooked:
+		return
+	if typeof(GameData) == TYPE_NIL or not GameData.has_method("stability_justice_enabled"):
+		return
+	if not bool(GameData.stability_justice_enabled()):
+		return
+	if typeof(SaveLoadManager) == TYPE_NIL or not SaveLoadManager.has_signal("load_completed"):
+		return
+	if not SaveLoadManager.load_completed.is_connected(_on_stability_justice_load_completed):
+		SaveLoadManager.load_completed.connect(_on_stability_justice_load_completed)
+	_stability_load_hooked = true
+
+
+func _on_stability_justice_load_completed(_slot_name: String) -> void:
+	if typeof(GameData) == TYPE_NIL or not GameData.has_method("stability_justice_enabled"):
+		return
+	if not bool(GameData.stability_justice_enabled()):
+		return
+	_refresh_next_hook_chip()
 
 
 func _sync_land_battle_bubbles() -> int:
