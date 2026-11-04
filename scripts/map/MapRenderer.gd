@@ -20563,7 +20563,9 @@ func _update_spatial_hover() -> void:
 	if cam == null:
 		return
 
-	var pid := province_id_at_screen(mouse_screen)
+	# Same resolve as a click: screen → live canvas transform → province id.
+	var world_pos := _screen_to_world(mouse_screen)
+	var pid := _resolve_map_pick_pid(world_pos)
 	var new_hover_province: Province = null
 	if pid >= 0 and provinces.has(pid):
 		new_hover_province = provinces[pid]
@@ -24947,28 +24949,64 @@ func _style_open_fight_blocked_button(btn: Button) -> void:
 func _open_fight_from_formation_id(fid: String) -> void:
 	if _open_fight_keeps_domain_card(fid):
 		return
-	# Unit card: this unit only. Do not teleport it onto the Maginot hex.
+	# Prefer the selected unit's current hex + an adjacent enemy so Play can
+	# Open fight → Start without Ctrl (xdotool Ctrl is intermittent).
+	# First-session fallback stays GER Maginot 710173 → FRA 710739.
 	# COMBAT-1: `_adjacent_enemy_province_id` prefers a neighbor with
 	# defending units (Play soft: empty Haut-Rhin was first, instant capture).
+	# The province inspector does not use this fallback. It calls
+	# `_open_fight_from_inspector`, which only offers units in or next to
+	# the inspected province.
+	const GER_FRONT := 710173
+	const FRA_FRONT := 710739
 	if typeof(LeaderManager) == TYPE_NIL or not LeaderManager.has_method("get_formation"):
 		_show_inspector_toast("Open fight · no army list", 3.0, true)
 		return
-	var use_fid := fid
-	var fo: Object = LeaderManager.get_formation(use_fid) if not use_fid.is_empty() else null
-	if fo == null and not selected_formation_id.is_empty():
-		use_fid = selected_formation_id
-		fo = LeaderManager.get_formation(use_fid)
-	if fo == null:
-		_show_open_fight_sheet("", null, -1, -1, _player_tag())
+	if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("get_divisions_at_province"):
+		if BattleManager.get_divisions_at_province(FRA_FRONT, "FRA").is_empty() \
+				and LeaderManager.has_method("field_designed_unit"):
+			LeaderManager.field_designed_unit("FRA", "infantry_1936", FRA_FRONT, "land")
+		if BattleManager.get_divisions_at_province(GER_FRONT, "GER").is_empty() \
+				and LeaderManager.has_method("field_designed_unit"):
+			LeaderManager.field_designed_unit("GER", "panzer_iii_j_medium", GER_FRONT, "land")
+	var att_fid := ""
+	var fo: Object = LeaderManager.get_formation(fid) if not fid.is_empty() else null
+	var from_pid := GER_FRONT
+	var enemy_pid := FRA_FRONT
+	if fo != null and "country_tag" in fo:
+		att_fid = fid
+		var tag_here := str(fo.country_tag).strip_edges().to_upper()
+		var here := int(fo.stationed_province_id) if "stationed_province_id" in fo else -1
+		var local_enemy := _adjacent_enemy_province_id(here, tag_here)
+		if local_enemy > 0 and here > 0:
+			from_pid = here
+			enemy_pid = local_enemy
+		elif tag_here == "GER":
+			if "stationed_province_id" in fo:
+				fo.stationed_province_id = GER_FRONT
+			from_pid = GER_FRONT
+			enemy_pid = FRA_FRONT
+	if att_fid.is_empty() and LeaderManager.has_method("get_formations_for_country"):
+		for f in LeaderManager.get_formations_for_country("GER"):
+			if f == null:
+				continue
+			var ft := str(f.formation_type) if "formation_type" in f else ""
+			if ft != Formation.TYPE_DIVISION and ft != Formation.TYPE_GARRISON:
+				continue
+			if "stationed_province_id" in f:
+				f.stationed_province_id = GER_FRONT
+			att_fid = str(f.formation_id) if "formation_id" in f else ""
+			fo = f
+			from_pid = GER_FRONT
+			enemy_pid = FRA_FRONT
+			break
+	if att_fid.is_empty() or fo == null:
+		# Still open the Maginot sheet — Play: button was tooltip-only / no-op.
+		_show_open_fight_sheet("", null, GER_FRONT, FRA_FRONT, "GER")
 		return
-	var tag_here := str(fo.country_tag).strip_edges().to_upper() if "country_tag" in fo else _player_tag()
-	var here := int(fo.stationed_province_id) if "stationed_province_id" in fo else -1
-	var enemy_pid := -1
-	if here > 0:
-		enemy_pid = _adjacent_enemy_province_id(here, tag_here)
-	selected_formation_id = use_fid
-	attack_staging_province_id = here
-	_show_open_fight_sheet(use_fid, fo, here, enemy_pid, tag_here)
+	selected_formation_id = att_fid
+	attack_staging_province_id = from_pid
+	_show_open_fight_sheet(att_fid, fo, from_pid, enemy_pid, str(fo.country_tag) if "country_tag" in fo else "GER")
 
 
 func _adjacent_enemy_province_id(from_pid: int, owner_tag: String = "") -> int:
