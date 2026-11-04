@@ -60,6 +60,14 @@ var _pending_load_via_cc := false
 var _pending_load_button: Button = null
 ## Exact nation / date button under the pointer (Command Center closed).
 var _pending_choice: Button = null
+## Exact SystemToggle_* under the pointer. The panel pad used to swallow it.
+var _pending_toggle: CheckBox = null
+## Same-frame pointer delivery (window_input and _input) must flip a box once.
+var _system_toggle_ptr_frame := -1
+var _system_toggle_ptr_id := 0
+## Same-frame Space/Enter delivery must flip a focused box once, not Begin.
+var _system_toggle_key_frame := -1
+var _system_toggle_key_code := 0
 ## Screen point for a Command Center header or Refresh hit.
 var _pending_screen := Vector2.ZERO
 ## One Esc opens the title Command Center. The next Esc closes it.
@@ -908,6 +916,7 @@ func clear_pending_pointer() -> void:
 	_pending_load_via_cc = false
 	_pending_load_button = null
 	_pending_choice = null
+	_pending_toggle = null
 	_pending_screen = Vector2.ZERO
 	_begin_block_frame = Engine.get_process_frames()
 
@@ -921,6 +930,7 @@ static func consumes_live_action(action: String) -> bool:
 		or action == "load"
 		or action == "close"
 		or action == "choice"
+		or action == "toggle"
 		or action == "refresh"
 		or action == "header"
 	)
@@ -962,6 +972,7 @@ func _classify_points(pts: Array[Vector2]) -> String:
 	_pending_load_via_cc = false
 	_pending_load_button = null
 	_pending_choice = null
+	_pending_toggle = null
 	_pending_screen = Vector2.ZERO
 	# Exact Load / × before the grown CC and panel pads. Those pads used to
 	# swallow "Load · quicksave" and the Command Center's own Load and ×.
@@ -1004,6 +1015,14 @@ func _classify_points(pts: Array[Vector2]) -> String:
 			if choice != null:
 				_pending_choice = choice
 				return "choice"
+		# System toggles sit inside the panel. The panel catch-all used to
+		# consume the press (EOA_LIVE_PTR action=panel) before the CheckBox
+		# saw it, so the box never toggled and never looked pressed.
+		for p_tg in pts:
+			var toggle := _system_toggle_at(p_tg)
+			if toggle != null:
+				_pending_toggle = toggle
+				return "toggle"
 	# CC first so Command Center · Esc / Esc · Menu are never stolen by the Begin slab.
 	if _any_point_matches(pts, "cc"):
 		return "cc"
@@ -1053,6 +1072,129 @@ func _choice_button_at(screen: Vector2) -> Button:
 		if _button_exact_point(ebtn, screen):
 			return ebtn
 	return null
+
+
+func _system_toggle_at(screen: Vector2) -> CheckBox:
+	for id_v in _toggle_boxes.keys():
+		var box: CheckBox = _toggle_boxes[id_v]
+		if box == null or not is_instance_valid(box) or not box.visible or box.disabled:
+			continue
+		if not str(box.name).begins_with("SystemToggle_"):
+			continue
+		if box.get_global_rect().has_point(screen):
+			return box
+	return null
+
+
+func _focused_system_toggle() -> CheckBox:
+	var vp := get_viewport()
+	if vp == null:
+		return null
+	var fo: Control = vp.gui_get_focus_owner()
+	if fo == null or not (fo is CheckBox):
+		return null
+	if not str(fo.name).begins_with("SystemToggle_"):
+		return null
+	if not fo.visible or (fo as BaseButton).disabled:
+		return null
+	return fo as CheckBox
+
+
+func _system_toggle_accept_code(event: InputEvent) -> int:
+	if event == null:
+		return 0
+	if event is InputEventKey:
+		var key: InputEventKey = event
+		if not key.pressed or key.echo:
+			return 0
+		if key.ctrl_pressed or key.alt_pressed or key.meta_pressed:
+			return 0
+		if key.keycode == KEY_SPACE or key.physical_keycode == KEY_SPACE:
+			return KEY_SPACE
+		if key.keycode == KEY_ENTER or key.physical_keycode == KEY_ENTER:
+			return KEY_ENTER
+		if key.keycode == KEY_KP_ENTER or key.physical_keycode == KEY_KP_ENTER:
+			return KEY_KP_ENTER
+		return 0
+	if event is InputEventAction:
+		var act: InputEventAction = event
+		if bool(act.pressed) and str(act.action) == "ui_accept":
+			return KEY_ENTER
+	return 0
+
+
+func _held_system_toggle_code() -> int:
+	if Input.is_key_pressed(KEY_SPACE) or Input.is_physical_key_pressed(KEY_SPACE):
+		return KEY_SPACE
+	if Input.is_key_pressed(KEY_ENTER) or Input.is_physical_key_pressed(KEY_ENTER):
+		return KEY_ENTER
+	if Input.is_key_pressed(KEY_KP_ENTER) or Input.is_physical_key_pressed(KEY_KP_ENTER):
+		return KEY_KP_ENTER
+	if InputMap.has_action("ui_accept") and Input.is_action_just_pressed("ui_accept"):
+		return KEY_ENTER
+	return 0
+
+
+func _activate_system_toggle(box: CheckBox) -> void:
+	if box == null or not is_instance_valid(box) or box.disabled:
+		return
+	_play_live_click(box)
+	box.button_pressed = not box.button_pressed
+
+
+func _apply_system_toggle_press(box: CheckBox) -> void:
+	if box == null or not is_instance_valid(box):
+		return
+	var frame := Engine.get_process_frames()
+	var iid := box.get_instance_id()
+	if _system_toggle_ptr_frame == frame and _system_toggle_ptr_id == iid:
+		return
+	_system_toggle_ptr_frame = frame
+	_system_toggle_ptr_id = iid
+	_activate_system_toggle(box)
+
+
+## Space/Enter on a focused SystemToggle_* flips that box. B still Begins.
+## A same-frame repeat returns true without flipping again.
+func try_focused_system_toggle_key(event: InputEvent) -> bool:
+	var code := _system_toggle_accept_code(event)
+	if code == 0:
+		return false
+	var box := _focused_system_toggle()
+	if box == null:
+		return false
+	var frame := Engine.get_process_frames()
+	if not (_system_toggle_key_frame == frame and _system_toggle_key_code == code):
+		_system_toggle_key_frame = frame
+		_system_toggle_key_code = code
+		_activate_system_toggle(box)
+	return true
+
+
+func _swallow_focused_system_toggle_from_held_key() -> bool:
+	var box := _focused_system_toggle()
+	if box == null:
+		return false
+	var code := _held_system_toggle_code()
+	if code == 0:
+		return false
+	var frame := Engine.get_process_frames()
+	if not (_system_toggle_key_frame == frame and _system_toggle_key_code == code):
+		_system_toggle_key_frame = frame
+		_system_toggle_key_code = code
+		_activate_system_toggle(box)
+	return true
+
+
+func _route_live_begin_key(event: InputEvent, who: String) -> void:
+	if try_focused_system_toggle_key(event):
+		print("EOA_LIVE_PTR who=%s action=toggle_key" % who)
+	else:
+		print("EOA_LIVE_PTR who=%s action=begin_key" % who)
+		handle_live_begin()
+	var vp := get_viewport()
+	if vp != null:
+		vp.set_input_as_handled()
 
 
 func _cc_live_target(screen: Vector2) -> String:
@@ -1166,6 +1308,10 @@ func _apply_pointer_hit(hit: String, pending_press: bool = false) -> String:
 		print("EOA_LIVE_PTR who=title.handle_live_pointer action=choice")
 		_activate_choice(_pending_choice)
 		return "choice"
+	if hit == "toggle":
+		print("EOA_LIVE_PTR who=title.handle_live_pointer action=toggle")
+		_apply_system_toggle_press(_pending_toggle)
+		return "toggle"
 	if hit == "passthrough":
 		print("EOA_LIVE_PTR who=title.handle_live_pointer action=passthrough")
 		return "passthrough"
@@ -1191,6 +1337,11 @@ func _apply_pointer_hit(hit: String, pending_press: bool = false) -> String:
 
 func handle_live_begin() -> Dictionary:
 	# Begin dismisses the title without requiring Esc first (Play 2a4ed6b softpipe).
+	# A focused SystemToggle_* owns Space/Enter. Polls that call this with the
+	# key still down must flip the box, not start the campaign.
+	if _swallow_focused_system_toggle_from_held_key():
+		print("EOA_LIVE_PTR who=title.handle_live_begin action=toggle_key")
+		return {"ok": false, "closed": _closed, "mode": "toggle", "player_tag": _tag, "year": _year}
 	print("EOA_LIVE_PTR who=title.handle_live_begin action=begin")
 	_on_begin_new()
 	return {"ok": _closed, "closed": _closed, "mode": "new", "player_tag": _tag, "year": _year}
@@ -1436,8 +1587,11 @@ func _process(delta: float) -> void:
 		handle_live_escape()
 	if _poll_live_begin_key_just_pressed():
 		_log_live_raw_key("title._process.begin_key", null)
-		print("EOA_LIVE_PTR who=title._process action=begin_key")
-		handle_live_begin()
+		var polled_begin: Dictionary = handle_live_begin()
+		if str(polled_begin.get("mode", "")) == "toggle":
+			print("EOA_LIVE_PTR who=title._process action=toggle_key")
+		else:
+			print("EOA_LIVE_PTR who=title._process action=begin_key")
 		return
 	# Drop the latch only after the button is up, so the same held click
 	# cannot poll Begin once Load has queue_freed the Command Center.
@@ -1541,8 +1695,7 @@ func _on_window_input(event: InputEvent) -> void:
 		handle_live_escape()
 		return
 	if is_live_begin_event(event):
-		print("EOA_LIVE_PTR who=title.window_input action=begin_key")
-		handle_live_begin()
+		_route_live_begin_key(event, "title.window_input")
 		return
 	if is_live_pointer_press(event):
 		var action_w: String = handle_live_pointer(event)
@@ -1682,11 +1835,7 @@ func _input(event: InputEvent) -> void:
 				vp_e.set_input_as_handled()
 		return
 	if is_live_begin_event(event):
-		print("EOA_LIVE_PTR who=title._input action=begin_key")
-		handle_live_begin()
-		var vp_b: Viewport = get_viewport()
-		if vp_b != null:
-			vp_b.set_input_as_handled()
+		_route_live_begin_key(event, "title._input")
 		return
 	if is_live_pointer_press(event):
 		var action_i: String = handle_live_pointer(event)
@@ -1708,11 +1857,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				vp_u.set_input_as_handled()
 		return
 	if is_live_begin_event(event):
-		print("EOA_LIVE_PTR who=title._unhandled_input action=begin_key")
-		handle_live_begin()
-		var vp_ub: Viewport = get_viewport()
-		if vp_ub != null:
-			vp_ub.set_input_as_handled()
+		_route_live_begin_key(event, "title._unhandled_input")
+		return
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
@@ -1726,11 +1872,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
 				vp_k.set_input_as_handled()
 		return
 	if is_live_begin_event(event):
-		print("EOA_LIVE_PTR who=title._unhandled_key_input action=begin_key")
-		handle_live_begin()
-		var vp_kb: Viewport = get_viewport()
-		if vp_kb != null:
-			vp_kb.set_input_as_handled()
+		_route_live_begin_key(event, "title._unhandled_key_input")
+		return
 
 
 func _shortcut_input(event: InputEvent) -> void:
@@ -1744,11 +1887,8 @@ func _shortcut_input(event: InputEvent) -> void:
 				vp_s.set_input_as_handled()
 		return
 	if is_live_begin_event(event):
-		print("EOA_LIVE_PTR who=title._shortcut_input action=begin_key")
-		handle_live_begin()
-		var vp_sb: Viewport = get_viewport()
-		if vp_sb != null:
-			vp_sb.set_input_as_handled()
+		_route_live_begin_key(event, "title._shortcut_input")
+		return
 
 
 func _arm_begin_release_swallow(pending_press: bool = false, skip_held_check: bool = false) -> void:

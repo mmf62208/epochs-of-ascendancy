@@ -826,8 +826,11 @@ func _process(_delta: float) -> void:
 			set_meta("eoa_title_begin_key_held", true)
 			print("EOA_LIVE_RAW_KEY who=TestRunner._process event=begin_key")
 			if boot.has_method("handle_live_begin"):
-				boot.call("handle_live_begin")
-				print("EOA_LIVE_PTR who=TestRunner._process action=begin_key")
+				var began: Dictionary = boot.call("handle_live_begin")
+				if str(began.get("mode", "new")) == "toggle":
+					print("EOA_LIVE_PTR who=TestRunner._process action=toggle_key")
+				else:
+					print("EOA_LIVE_PTR who=TestRunner._process action=begin_key")
 	else:
 		if has_meta("eoa_title_begin_key_held"):
 			remove_meta("eoa_title_begin_key_held")
