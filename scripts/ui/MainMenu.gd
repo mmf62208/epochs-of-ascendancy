@@ -462,7 +462,7 @@ func _build_ui() -> void:
 	_refresh_living_campaign_buttons()
 	_add_victory_paths_readout(left_inner)
 
-	if OS.is_debug_build():
+	if DebugOverlay.dev_menu_allowed():
 		var dbg_hdr := Label.new()
 		dbg_hdr.text = "DEBUG"
 		RetrowaveTheme.style_column_header(dbg_hdr)
@@ -823,6 +823,8 @@ func _on_action(id: String) -> void:
 			menu_closed.emit()
 			get_tree().quit()
 		"debug":
+			if not DebugOverlay.dev_menu_allowed():
+				return
 			var dbg: Node = get_tree().root.get_node_or_null("DebugOverlay")
 			if dbg != null and dbg.has_method("toggle"):
 				dbg.call("toggle")

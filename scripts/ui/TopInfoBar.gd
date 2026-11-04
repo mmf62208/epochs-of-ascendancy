@@ -726,10 +726,10 @@ func _apply_theme() -> void:
 	if matchmaking_button:
 		matchmaking_button.visible = false
 
-	# Debug overlay quick toggle (only in debug builds) -- we put "Debug (F10)" inside the compact MenuButton
-	# to save top bar space. F10 / Ctrl+Shift+R still work globally.
+	# Debug overlay quick toggle. The player Menu hides it unless this is a
+	# debug build and ProjectSettings eoa/dev_menu is on.
 	var is_headless_ev := OS.get_environment("EOA_HEADLESS_EVIDENCE") == "1"
-	if OS.is_debug_build() and debug_button == null and not is_headless_ev:
+	if DebugOverlay.dev_menu_allowed() and debug_button == null and not is_headless_ev:
 		# Pre-create the overlay (hidden) so hotkeys and other systems can find it immediately.
 		# Use the static toggle/hide which now prefers adding under UILayer for proper screen-space behavior.
 		# Deferred to avoid any early tree/window issues on Linux/X11.
@@ -771,11 +771,12 @@ func _setup_compact_menu() -> void:
 	popup.add_separator()
 	popup.add_item("Exit to Desktop", 5)
 	var is_headless_ev := OS.get_environment("EOA_HEADLESS_EVIDENCE") == "1"
-	if OS.is_debug_build() and not is_headless_ev:
+	if DebugOverlay.dev_menu_allowed() and not is_headless_ev:
 		popup.add_separator()
 		popup.add_item("Debug (F10)", 4)
 
-	popup.id_pressed.connect(_on_menu_item_pressed)
+	if not popup.id_pressed.is_connected(_on_menu_item_pressed):
+		popup.id_pressed.connect(_on_menu_item_pressed)
 
 	# Hide the old flat buttons to free space (they are still there in scene for now)
 	for btn in [save_button, load_button, settings_button, help_button]:
@@ -799,7 +800,7 @@ func _on_menu_item_pressed(id: int) -> void:
 			get_tree().quit()
 		4:
 			var is_headless_ev2 := OS.get_environment("EOA_HEADLESS_EVIDENCE") == "1"
-			if OS.is_debug_build() and not is_headless_ev2:
+			if DebugOverlay.dev_menu_allowed() and not is_headless_ev2:
 				call_deferred("_deferred_debug_toggle")
 		6:
 			# Consolidated Policies/Dir access (keeps primary overhead to exact 6: Prod/Leaders/Tech/Dip/Agents/Map)
@@ -1187,7 +1188,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	# Global debug hotkey — opens the dedicated Debug Overlay
 	if event.keycode == KEY_F10 or (event.ctrl_pressed and event.shift_pressed and event.keycode == KEY_R):
 		var is_headless_ev3 := OS.get_environment("EOA_HEADLESS_EVIDENCE") == "1"
-		if not is_headless_ev3:
+		if not is_headless_ev3 and DebugOverlay.dev_menu_allowed():
 			call_deferred("_deferred_debug_toggle")
 		get_viewport().set_input_as_handled()
 		return

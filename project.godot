@@ -100,3 +100,7 @@ buses/default_bus_layout="res://default_bus_layout.tres"
 [gui]
 
 timers/tooltip_delay_sec=0.45
+
+[eoa]
+
+dev_menu=false
