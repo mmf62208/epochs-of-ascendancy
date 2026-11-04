@@ -37,6 +37,8 @@ var _names: Dictionary = {}  # lower / folded name -> pid
 var _folded_names: Dictionary = {}  # ascii-folded key -> pid
 var _submit_guard_msec: int = 0
 var _last_live_submit_pid: int = -1
+## Frame until which a deferred grab must not undo Esc or a map click.
+var _suppress_line_grab_frame: int = -1
 
 
 func _ready() -> void:
@@ -54,18 +56,32 @@ func esc_layer_open() -> bool:
 	return false
 
 
+func _line_grab_blocked() -> bool:
+	return Engine.get_process_frames() <= _suppress_line_grab_frame
+
+
+func _block_line_grab() -> void:
+	# This frame and the next: gui_input and a deferred grab run after _input.
+	_suppress_line_grab_frame = Engine.get_process_frames() + 1
+
+
 func dismiss_esc_layer() -> void:
+	# Close the layer and drop the query. An empty focused line is not a
+	# layer, so the next Esc can open the pause menu.
+	_block_line_grab()
 	var results := get_node_or_null("SearchResults") as CanvasItem
 	if results != null and is_instance_valid(results):
 		results.visible = false
-	var vp := get_viewport()
-	if vp != null:
-		vp.gui_release_focus()
+	if _line != null and is_instance_valid(_line):
+		_line.text = ""
+	_release_line_focus()
 
 
 ## Click-to-type. A near miss on the search chrome still focuses the line so
 ## a real key (and xdotool) lands in the field. Does not clear the query.
 func focus_for_typing() -> void:
+	if _line_grab_blocked():
+		return
 	ensure_chrome_visible()
 	if _line == null or not is_instance_valid(_line):
 		return
@@ -77,11 +93,55 @@ func focus_for_typing() -> void:
 
 
 func _grab_search_line_focus() -> void:
+	if _line_grab_blocked():
+		return
 	if not is_inside_tree():
 		return
 	if _line == null or not is_instance_valid(_line):
 		return
 	_line.grab_focus()
+
+
+## Drop LineEdit focus. Also drop a result-row button that grabbed focus
+## after `pressed`, so hotkeys are not left inside the search chrome.
+func _release_line_focus() -> void:
+	_block_line_grab()
+	if _line != null and is_instance_valid(_line) and _line.has_focus():
+		_line.release_focus()
+	var vp := get_viewport()
+	if vp != null:
+		var fo: Control = vp.gui_get_focus_owner()
+		if fo != null and is_instance_valid(fo) and (_line == fo or fo is LineEdit or fo is TextEdit or fo is CodeEdit or is_ancestor_of(fo)):
+			vp.gui_release_focus()
+
+
+func _release_focus_after_result_pick() -> void:
+	# Keep SearchResults visible so the next Esc still closes search before
+	# the inspector. Focus itself must not stay in the field or the row.
+	_release_line_focus()
+
+
+func _is_escape_key(key: InputEventKey) -> bool:
+	if key.keycode == KEY_ESCAPE or key.physical_keycode == KEY_ESCAPE:
+		return true
+	if key.key_label == KEY_ESCAPE:
+		return true
+	if int(key.unicode) == 27:
+		return true
+	return key.is_action_pressed("ui_cancel")
+
+
+func _campaign_title_owns_escape() -> bool:
+	# Living title handles its own Esc. Do not swallow it from the search line.
+	var tree := get_tree()
+	if tree == null or tree.root == null:
+		return false
+	var n: Node = tree.root.find_child("LivingTitleBoot", true, false)
+	if n == null or not is_instance_valid(n) or bool(n.get("_closed")):
+		return false
+	if n is CanvasItem and not (n as CanvasItem).is_visible_in_tree():
+		return false
+	return true
 
 
 func _gui_input(event: InputEvent) -> void:
@@ -100,10 +160,22 @@ func _gui_input(event: InputEvent) -> void:
 
 func _input(event: InputEvent) -> void:
 	# Enter after living title / +6d: LineEdit text_submitted can no-op if focus is stale.
+	# Esc must release focus here. LineEdit::gui_input only unedits and accepts
+	# ui_cancel, so the field stayed focused and hotkeys never returned.
 	if not (event is InputEventKey):
 		return
 	var key: InputEventKey = event
 	if not key.pressed or key.echo:
+		return
+	if _is_escape_key(key):
+		if _campaign_title_owns_escape():
+			return
+		if not esc_layer_open():
+			return
+		dismiss_esc_layer()
+		var vp_esc: Viewport = get_viewport()
+		if vp_esc != null:
+			vp_esc.set_input_as_handled()
 		return
 	if key.keycode != KEY_ENTER and key.keycode != KEY_KP_ENTER:
 		return
@@ -112,6 +184,7 @@ func _input(event: InputEvent) -> void:
 	if not _line.has_focus() and not _search_owns_focus():
 		return
 	_on_submit(_line.text)
+	_release_line_focus()
 	var vp: Viewport = get_viewport()
 	if vp != null:
 		vp.set_input_as_handled()
@@ -311,9 +384,16 @@ func _on_line_gui_input(event: InputEvent) -> void:
 	var key: InputEventKey = event
 	if not key.pressed or key.echo:
 		return
+	if _is_escape_key(key):
+		if _campaign_title_owns_escape() or not esc_layer_open():
+			return
+		dismiss_esc_layer()
+		accept_event()
+		return
 	if key.keycode != KEY_ENTER and key.keycode != KEY_KP_ENTER:
 		return
 	_on_submit(_line.text if _line != null else "")
+	_release_line_focus()
 	accept_event()
 
 
@@ -456,8 +536,9 @@ func _refresh_search_results(text: String) -> void:
 	row.custom_minimum_size = Vector2(220, 28)
 	row.size = Vector2(220, 28)
 	row.set_meta("eoa_search_pid", pid)
-	# Row pick opens the inspector and leaves the list up, so Esc still closes
-	# search before the inspector. Enter / Go hide the list (see _on_submit).
+	# Row pick opens the inspector and leaves the list up, so the next Esc
+	# still closes search before the inspector. Focus is released (deferred,
+	# after the button grabs it). Enter / Go hide the list (see _on_submit).
 	row.pressed.connect(_on_result_row_pressed.bind(pid))
 	results.add_child(row)
 	results.visible = true
@@ -471,6 +552,7 @@ func _refresh_search_results(text: String) -> void:
 
 func _on_result_row_pressed(pid: int) -> void:
 	_go_to_province(pid)
+	call_deferred("_release_focus_after_result_pick")
 
 
 func _on_submit(text: String) -> void:
@@ -479,12 +561,14 @@ func _on_submit(text: String) -> void:
 	_hide_search_results()
 	var now: int = Time.get_ticks_msec()
 	if now - _submit_guard_msec < SUBMIT_GUARD_MS:
+		_release_line_focus()
 		return
 	_submit_guard_msec = now
 	# Debug console: "declare war on POL". Release builds never take this branch.
 	if OS.is_debug_build():
 		var declared: Dictionary = WarStateDomain.debug_console_declare(text)
 		if bool(declared.get("handled", false)):
+			_release_line_focus()
 			return
 	_ensure_live_controls()
 	if _names.is_empty():
@@ -496,8 +580,10 @@ func _on_submit(text: String) -> void:
 	_last_live_submit_pid = pid
 	if pid < 0:
 		_toast_search_miss(text)
+		_release_line_focus()
 		return
 	_go_to_province(pid)
+	_release_line_focus()
 
 
 func submit_from_live_ui(text: String) -> int:

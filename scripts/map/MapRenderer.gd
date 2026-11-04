@@ -2829,6 +2829,38 @@ func _release_search_focus() -> void:
 		vp.gui_release_focus()
 
 
+func _live_map_search() -> Node:
+	if _map_search != null and is_instance_valid(_map_search):
+		return _map_search
+	if get_tree() != null and get_tree().root != null:
+		return get_tree().root.find_child("MapProvinceSearch", true, false)
+	return null
+
+
+func _search_chrome_contains_point(screen: Vector2) -> bool:
+	var search := _live_map_search()
+	if search == null or not (search is Control):
+		return false
+	var sr := search as Control
+	if sr.visible and sr.get_global_rect().grow(8.0).has_point(screen):
+		return true
+	var results := sr.get_node_or_null("SearchResults") as Control
+	if results != null and results.visible and results.get_global_rect().grow(4.0).has_point(screen):
+		return true
+	return false
+
+
+func _release_search_on_map_press() -> void:
+	var search := _live_map_search()
+	if search != null and search.has_method("esc_layer_open") and bool(search.call("esc_layer_open")):
+		if search.has_method("dismiss_esc_layer"):
+			search.call("dismiss_esc_layer")
+	else:
+		_release_search_focus()
+	# LineEdit grabs focus again from the same click's gui_input, after _input.
+	call_deferred("_release_search_focus")
+
+
 func _apply_home_key(shift_pressed: bool) -> void:
 	# Home must stay cheap: recenter/fit only — no 3520 rebuild.
 	_arm_still_click_after_pan()
@@ -3388,6 +3420,10 @@ func _input(event: InputEvent) -> void:
 				_try_living_title_map_pick(title_pid)
 				get_viewport().set_input_as_handled()
 				return
+			if event.pressed and not _search_chrome_contains_point(event.position) and not _top_bar_owns_click(event.position):
+				# event.position, not the stale mouse. A search click keeps
+				# focus; a map click must drop it even if warp_mouse lagged.
+				_release_search_on_map_press()
 			if event.pressed and (
 				_top_bar_owns_click()
 				or _mouse_over_search_control()
