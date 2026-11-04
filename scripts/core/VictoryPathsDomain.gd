@@ -1,6 +1,6 @@
 # scripts/core/VictoryPathsDomain.gd
 ## 1936 victory paths. Thresholds live in data/campaign/victory_paths.json.
-## Inactive unless GameData.victory_paths_enabled() (EOA_VICTORY_PATHS=1).
+## Inactive unless GameData.victory_paths_enabled() (campaign toggle, or EOA_VICTORY_PATHS=1).
 ## Flag off: no state, no save key, no RNG, no war/tech/production writes.
 ## The daily tick only reads clocks, listed capitals, existing wars, and factory
 ## owner tags. It does not boot WarStateDomain or create tech country state.

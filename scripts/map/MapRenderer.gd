@@ -3207,6 +3207,10 @@ func _input(event: InputEvent) -> void:
 		if _living_title_boot_is_up() and _is_live_begin_key(event):
 			print("EOA_LIVE_RAW_KEY who=MapRenderer._input event=begin_key")
 			var boot_bk: Node = _living_title_boot_node()
+			if boot_bk != null and boot_bk.has_method("try_focused_system_toggle_key") and bool(boot_bk.call("try_focused_system_toggle_key", event)):
+				print("EOA_LIVE_PTR who=MapRenderer._input action=toggle_key")
+				get_viewport().set_input_as_handled()
+				return
 			if boot_bk != null and boot_bk.has_method("handle_live_begin"):
 				boot_bk.call("handle_live_begin")
 				print("EOA_LIVE_PTR who=MapRenderer._input action=begin_key")

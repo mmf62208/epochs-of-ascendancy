@@ -1,0 +1,16 @@
+{
+  "toggles": [
+    {
+      "id": "stability_justice",
+      "label": "Stability and Justice",
+      "default": false,
+      "env": "EOA_STABILITY_JUSTICE"
+    },
+    {
+      "id": "victory_paths",
+      "label": "Victory Paths",
+      "default": false,
+      "env": "EOA_VICTORY_PATHS"
+    }
+  ]
+}
