@@ -2154,6 +2154,7 @@ func save_game_detailed(slot_name: String = DEFAULT_SLOT) -> Dictionary:
 	_notify_save_list_refresh()
 	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
 		LeaderEventUI.show_toast("Saved %s (%d KB)" % [safe_slot, int(bytes / 1024)], 2.5)
+	_note_audio("save_ok")
 	return {
 		"ok": true,
 		"path": path,
@@ -2212,7 +2213,21 @@ func load_game_detailed(slot_name: String = DEFAULT_SLOT) -> Dictionary:
 	eoa_load_apply_count += 1
 	print("EOA_LOAD_APPLY n=%d slot=%s" % [eoa_load_apply_count, slot_key])
 	_emit_load_completed(slot_key)
+	call_deferred("_note_load_ok_settled")
 	return {"ok": true, "path": path, "version": file_version, "slot": slot_key}
+
+
+func _note_load_ok_settled() -> void:
+	call_deferred("_note_audio", "load_ok")
+
+
+func _note_audio(key: String) -> void:
+	var tree := get_tree()
+	if tree == null or tree.root == null:
+		return
+	var am := tree.root.get_node_or_null("AudioManager")
+	if am != null and am.has_method("play"):
+		am.call("play", key)
 
 ## === UX helpers (delete, rename) for save menu ===
 

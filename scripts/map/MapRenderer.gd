@@ -21270,6 +21270,9 @@ func _try_open_land_unit_at_world(
 		debug_combat_attacker_province_id = pid
 	var fid := str(fo.formation_id) if "formation_id" in fo else ""
 	if ctrl_click:
+		var audio_atk := _audio_manager()
+		if audio_atk != null and audio_atk.has_method("notify_assault_ordered"):
+			audio_atk.call("notify_assault_ordered")
 		_open_fight_from_formation_id(fid)
 		return true
 	_show_unit_detail_popup(fo)
@@ -21620,7 +21623,9 @@ func _try_move_selected_unit_to_province(province: Province) -> bool:
 	var cal := int(res.get("calendar_days", 1))
 	var path: Array = res.get("path", []) as Array
 	_highlight_march_path(path)
-	_play_unit_loop_sfx("move", _formation_for_sfx())
+	var audio_mv := _audio_manager()
+	if audio_mv != null and audio_mv.has_method("notify_mv1_move_committed"):
+		audio_mv.call("notify_mv1_move_committed")
 	_show_inspector_toast(
 		"March · %d hop%s · arrives in %d day%s · unpause to walk · %s"
 		% [hops_n, "s" if hops_n != 1 else "", cal, "s" if cal != 1 else "", province.name],
@@ -26784,7 +26789,9 @@ func _surface_last_land_aar_toast() -> void:
 	if "captured" in aar_line.to_lower() or "Province captured" in aar_line:
 		print("MAIN_FIX1_CAPTURE_SRC who=MapRenderer._surface_last_land_aar_toast line=%s" % aar_line)
 	_show_inspector_toast(aar_line, 5.5)
-	_play_map_sfx("achievement" if str(aar.get("winner", "")) == "attacker" else "map")
+	var audio_aar := _audio_manager()
+	if audio_aar != null and audio_aar.has_method("notify_province_outcome"):
+		audio_aar.call("notify_province_outcome", str(aar.get("winner", "")), aar_line)
 
 
 func _refresh_open_fight_card_after_tick() -> void:

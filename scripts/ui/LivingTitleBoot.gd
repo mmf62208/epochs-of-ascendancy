@@ -249,6 +249,7 @@ func _ready() -> void:
 	if smoke_auto_begin_enabled():
 		print("EOA_SMOKE_AUTO_BEGIN who=title.ready armed=1 (smoke-only; product Begin/Esc still FAIL)")
 		call_deferred("apply_smoke_auto_begin")
+	_note_music("menu")
 
 
 func _build_ui() -> void:
@@ -2010,12 +2011,22 @@ func _close_command_center_overlay() -> void:
 		mm.call("_force_close")
 
 
+func _note_music(mode: String) -> void:
+	var tree := get_tree()
+	if tree == null or tree.root == null:
+		return
+	var am := tree.root.get_node_or_null("AudioManager")
+	if am != null and am.has_method("note_presentation"):
+		am.call("note_presentation", mode)
+
+
 func _finish(out: Dictionary) -> void:
 	if _closed:
 		return
 	# CC-HANG-1: Begin must not leave the full-rect Command Center capturing input.
 	_close_command_center_overlay()
 	_closed = true
+	_note_music("game")
 	_clear_opened_from_title_meta()
 	_center_on_player(str(out.get("player_tag", _tag)))
 	boot_closed.emit(out)

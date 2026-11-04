@@ -27,11 +27,24 @@ static func key_for(event: String) -> String:
 		"daily_clash", "clash":
 			return KEY_DAILY_CLASH
 		"capture":
-			return KEY_CAPTURE
-		"bounce", "repulse":
+			return "capture"
+		"repulse":
+			return "repulse"
+		"bounce":
 			return KEY_BOUNCE
 		_:
 			return "select"
+
+
+## Province AAR. Armor/arty type-flavor keys stay on key_for_unit.
+static func key_for_aar(winner: String, line: String) -> String:
+	var w := winner.strip_edges().to_lower()
+	var text := line.to_lower()
+	if w == "attacker" or "captured" in text or "took" in text:
+		return "capture"
+	if w == "defender" or "held" in text or "repuls" in text:
+		return "repulse"
+	return "map"
 
 
 ## Type-flavored cues still map to existing _SFX_PATHS keys (no new wavs).

@@ -97,6 +97,7 @@ func _ready() -> void:
 	_refresh_save_list()
 	set_process_input(true)
 	set_process_unhandled_input(true)
+	_note_music("menu")
 
 
 func _node_is_open_living_title(n: Node) -> bool:
@@ -607,6 +608,7 @@ func _add_audio_settings(parent: VBoxContainer) -> void:
 	block.add_child(master_row)
 	block.add_child(_audio_slider("UI", "UiVolume", _audio_db(audio, "get_ui_db", -12.0), "set_ui_db"))
 	block.add_child(_audio_slider("SFX", "SfxVolume", _audio_db(audio, "get_sfx_db", 0.0), "set_sfx_db"))
+	block.add_child(_audio_percent_slider("Music", "MusicVolume", _audio_music_percent(audio)))
 
 
 func _audio_db(audio: Node, getter: String, fallback: float) -> float:
@@ -639,6 +641,48 @@ func _on_audio_slider(value: float, setter: String) -> void:
 	var audio := _audio_node()
 	if audio != null and audio.has_method(setter):
 		audio.call(setter, value)
+
+
+func _audio_music_percent(audio: Node) -> float:
+	if audio != null and audio.has_method("get_music_linear"):
+		return clampf(float(audio.call("get_music_linear")) * 100.0, 0.0, 100.0)
+	return 50.0
+
+
+func _audio_percent_slider(label_text: String, node_name: String, value: float) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	var lab := Label.new()
+	lab.text = label_text
+	lab.custom_minimum_size = Vector2(64, 0)
+	RetrowaveTheme.style_body_label(lab)
+	row.add_child(lab)
+	var slider := HSlider.new()
+	slider.name = node_name
+	slider.min_value = 0.0
+	slider.max_value = 100.0
+	slider.step = 1.0
+	slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	slider.custom_minimum_size = Vector2(80, 20)
+	slider.value = value
+	slider.value_changed.connect(_on_music_percent)
+	row.add_child(slider)
+	return row
+
+
+func _on_music_percent(value: float) -> void:
+	var audio := _audio_node()
+	if audio == null or not audio.has_method("get_music_linear") or not audio.has_method("set_music_linear"):
+		return
+	var cur := float(audio.call("get_music_linear")) * 100.0
+	if absf(cur - value) < 0.51 and absf(cur - value) > 0.001:
+		return
+	audio.call("set_music_linear", clampf(value / 100.0, 0.0, 1.0))
+
+
+func _note_music(mode: String) -> void:
+	var audio := _audio_node()
+	if audio != null and audio.has_method("note_presentation"):
+		audio.call("note_presentation", mode)
 
 
 func _control_has_point(node: Control, screen: Vector2) -> bool:
@@ -1547,6 +1591,7 @@ func _clear_title_pending_pointer() -> void:
 
 
 func _force_close() -> void:
+	_note_music("menu" if _living_title_is_up() else "game")
 	# Swallow is armed on CloseX button_down / poll handle, not here.
 	# `_force_close` re-arm cleared poll `pending_press` (same-spot stayed dead).
 	# Esc, X, and the backdrop all land here. Drop the title latch so the next

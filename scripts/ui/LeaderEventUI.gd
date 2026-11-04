@@ -111,13 +111,13 @@ func _eoa_spine_bisect_enabled() -> bool:
 	return _spine_bisect_logs
 
 
-func _play_alert_sfx() -> void:
+func _play_toast_sfx(is_error: bool) -> void:
 	var tree := get_tree()
 	if tree == null or tree.root == null:
 		return
 	var am := tree.root.get_node_or_null("AudioManager")
 	if am != null and am.has_method("play"):
-		am.call("play", "alert")
+		am.call("play", "toast_warn" if is_error else "toast_info")
 
 
 func _eoa_flush(msg: String) -> void:
@@ -132,8 +132,7 @@ func _eoa_flush(msg: String) -> void:
 func show_toast(message: String, duration_sec: float = 3.0, is_error: bool = false, is_important: bool = false, on_respond: Callable = Callable()) -> void:
 	# Same skip as post_news: headless -s toast timers + CanvasLayer hung
 	# CompleteTest after spine 91% (and Maginot after RESULT=PASS).
-	if is_error or "warn" in message.to_lower():
-		_play_alert_sfx()
+	_play_toast_sfx(is_error)
 	_eoa_flush("EOA_SMOKE_SPINE_BISECT who=LeaderEventUI.show_toast.enter")
 	if _should_skip_toast_ui():
 		_eoa_flush("EOA_SMOKE_SPINE_BISECT who=LeaderEventUI.show_toast.skip")

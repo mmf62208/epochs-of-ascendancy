@@ -113,8 +113,8 @@ func _test_manifest_and_credits() -> void:
 		if row.is_empty():
 			_fail("credits row missing %s" % path)
 			continue
-		var license_ok := "CC0" in row or "Original" in row
-		var source_ok := "http" in row or "gen_audio1_sfx.py" in row
+		var license_ok := "CC0" in row or "Original" in row or "original, project-owned" in row
+		var source_ok := "http" in row or "gen_audio1_sfx.py" in row or "gen_victory_fanfare.py" in row
 		if not license_ok or not source_ok:
 			_fail("credits license/source %s" % path)
 			continue
@@ -673,6 +673,11 @@ func _test_ready_war() -> void:
 
 
 func _wav_peak_db(path: String) -> float:
+	var abs_path := path
+	if path.begins_with("res://"):
+		abs_path = ProjectSettings.globalize_path(path)
+	if abs_path.ends_with(".ogg"):
+		return _ogg_peak_db(abs_path)
 	var f := FileAccess.open(path, FileAccess.READ)
 	if f == null:
 		return 99.0
@@ -697,3 +702,32 @@ func _wav_peak_db(path: String) -> float:
 	if mx <= 0:
 		return -120.0
 	return 20.0 * log(float(mx) / 32767.0) / log(10.0)
+
+
+## Hottest ffmpeg astats peak. Same -6 dBFS ceiling as the WAV reader.
+func _ogg_peak_db(abs_path: String) -> float:
+	var out: Array = []
+	var code := OS.execute("ffmpeg", [
+		"-hide_banner", "-nostats", "-i", abs_path,
+		"-af", "astats=metadata=1:reset=0",
+		"-f", "null", "-",
+	], out, true)
+	var peak := -120.0
+	var found := false
+	for line_v in out:
+		for line in str(line_v).split("\n"):
+			var mark := "Peak level dB:"
+			var at := line.find(mark)
+			if at < 0:
+				continue
+			var num := line.substr(at + mark.length()).strip_edges().split(" ")[0]
+			if num.is_empty() or num.contains("inf"):
+				continue
+			var v := float(num)
+			if not found or v > peak:
+				peak = v
+				found = true
+	if not found:
+		push_warning("HeadlessAudio1Test: ogg peak unread code=%s %s" % [str(code), abs_path])
+		return 99.0
+	return peak

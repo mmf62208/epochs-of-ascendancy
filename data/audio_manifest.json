@@ -43,18 +43,18 @@
       "max_polyphony": 2
     },
     "ui_click": {
-      "path": "res://audio/sfx/ui/ui_click.wav",
+      "path": "res://audio/sfx/ui/ui_click.ogg",
       "bus": "UI",
       "volume_db": 0.0,
       "pitch_jitter": 0.01,
       "max_polyphony": 4
     },
     "ui_hover": {
-      "path": "res://audio/sfx/ui/ui_hover.wav",
+      "path": "res://audio/sfx/ui/ui_hover.ogg",
       "bus": "UI",
       "volume_db": -6.0,
       "pitch_jitter": 0.0,
-      "max_polyphony": 1
+      "max_polyphony": 6
     },
     "day_tick": {
       "path": "res://audio/sfx/map/day_tick.wav",
@@ -64,9 +64,9 @@
       "max_polyphony": 1
     },
     "combat_clash": {
-      "path": "res://audio/sfx/combat/combat_clash.wav",
+      "path": "res://audio/sfx/combat/combat_clash.ogg",
       "bus": "SFX",
-      "volume_db": 0.0,
+      "volume_db": -8.0,
       "pitch_jitter": 0.05,
       "max_polyphony": 3
     },
@@ -78,16 +78,107 @@
       "max_polyphony": 2
     },
     "end_victory_sting": {
-      "path": "res://audio/sfx/end/end_victory_sting.wav",
+      "path": "res://audio/sfx/end/end_victory_sting.ogg",
       "bus": "SFX",
       "volume_db": -2.0,
       "pitch_jitter": 0.0,
       "max_polyphony": 1
     },
     "end_defeat_sting": {
-      "path": "res://audio/sfx/end/end_defeat_sting.wav",
+      "path": "res://audio/sfx/end/end_defeat_sting.ogg",
       "bus": "SFX",
       "volume_db": -2.0,
+      "pitch_jitter": 0.0,
+      "max_polyphony": 1
+    },
+    "toast_info": {
+      "path": "res://audio/sfx/ui/toast_info.ogg",
+      "bus": "UI",
+      "volume_db": -4.0,
+      "pitch_jitter": 0.0,
+      "max_polyphony": 2
+    },
+    "toast_warn": {
+      "path": "res://audio/sfx/ui/toast_warn.ogg",
+      "bus": "UI",
+      "volume_db": -4.0,
+      "pitch_jitter": 0.0,
+      "max_polyphony": 2
+    },
+    "save_ok": {
+      "path": "res://audio/sfx/ui/save_ok.ogg",
+      "bus": "UI",
+      "volume_db": -2.0,
+      "pitch_jitter": 0.0,
+      "max_polyphony": 1
+    },
+    "load_ok": {
+      "path": "res://audio/sfx/ui/load_ok.ogg",
+      "bus": "UI",
+      "volume_db": -2.0,
+      "pitch_jitter": 0.0,
+      "max_polyphony": 1
+    },
+    "order_move": {
+      "path": "res://audio/sfx/combat/order_move.ogg",
+      "bus": "SFX",
+      "volume_db": -4.0,
+      "pitch_jitter": 0.0,
+      "max_polyphony": 3
+    },
+    "order_attack": {
+      "path": "res://audio/sfx/combat/order_attack.ogg",
+      "bus": "SFX",
+      "volume_db": -4.0,
+      "pitch_jitter": 0.0,
+      "max_polyphony": 3
+    },
+    "order_issued": {
+      "path": "res://audio/sfx/ui/order_issued.ogg",
+      "bus": "UI",
+      "volume_db": 0.0,
+      "pitch_jitter": 0.0,
+      "max_polyphony": 2
+    },
+    "capture": {
+      "path": "res://audio/sfx/combat/battle_won.ogg",
+      "bus": "SFX",
+      "volume_db": -2.0,
+      "pitch_jitter": 0.0,
+      "max_polyphony": 2
+    },
+    "repulse": {
+      "path": "res://audio/sfx/combat/battle_lost.ogg",
+      "bus": "SFX",
+      "volume_db": -4.0,
+      "pitch_jitter": 0.0,
+      "max_polyphony": 2
+    },
+    "music_menu": {
+      "path": "res://audio/music/mus_menu_title.ogg",
+      "bus": "Music",
+      "volume_db": -6.0,
+      "pitch_jitter": 0.0,
+      "max_polyphony": 1
+    },
+    "music_peace": {
+      "path": "res://audio/music/mus_peace.ogg",
+      "bus": "Music",
+      "volume_db": -6.0,
+      "pitch_jitter": 0.0,
+      "max_polyphony": 1
+    },
+    "music_menu_alt": {
+      "path": "res://audio/music/mus_menu_alt.ogg",
+      "bus": "Music",
+      "volume_db": -6.0,
+      "pitch_jitter": 0.0,
+      "max_polyphony": 1
+    },
+    "music_menu_loop_alt": {
+      "path": "res://audio/music/mus_menu_loop_alt.ogg",
+      "bus": "Music",
+      "volume_db": -6.0,
       "pitch_jitter": 0.0,
       "max_polyphony": 1
     }
