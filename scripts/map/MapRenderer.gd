@@ -24739,64 +24739,159 @@ func _open_fight_keeps_domain_card(fid: String) -> bool:
 	return true
 
 
+func _open_fight_neighbor_ids(pid: int) -> Dictionary:
+	var near := {}
+	if pid <= 0:
+		return near
+	near[pid] = true
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_adjacent_provinces"):
+		for nid in MapManager.get_adjacent_provinces(pid, true):
+			near[int(nid)] = true
+	if provinces.has(pid):
+		var here: Province = provinces[pid] as Province
+		if here != null:
+			for nid in here.adjacencies:
+				near[int(nid)] = true
+	return near
+
+
+func _open_fight_centroid(pid: int) -> Vector2:
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_centroid"):
+		var c: Vector2 = MapManager.get_province_centroid(pid)
+		if c != Vector2.ZERO:
+			return c
+	if provinces.has(pid):
+		var p: Province = provinces[pid] as Province
+		if p != null:
+			return p.coordinates
+	return Vector2.ZERO
+
+
+## Inspector Open fight: only the player's land units in this province or next
+## to it, closest first. A selected unit elsewhere (Berlin inspector vs a
+## Baden-Baden division) is not offered and is not teleported.
+func _open_fight_candidates_for_province(pid: int) -> Array:
+	var rows: Array = []
+	var tag := _player_tag()
+	if pid <= 0 or typeof(LeaderManager) == TYPE_NIL or not LeaderManager.has_method("get_formations_for_country"):
+		return rows
+	var near := _open_fight_neighbor_ids(pid)
+	var origin := _open_fight_centroid(pid)
+	for f in LeaderManager.get_formations_for_country(tag):
+		if f == null:
+			continue
+		var ft := str(f.formation_type) if "formation_type" in f else ""
+		if ft != Formation.TYPE_DIVISION and ft != Formation.TYPE_GARRISON:
+			continue
+		var stay := int(f.stationed_province_id) if "stationed_province_id" in f else -1
+		if not near.has(stay):
+			continue
+		var fid := str(f.formation_id) if "formation_id" in f else ""
+		var dist := 0.0
+		if stay != pid:
+			dist = origin.distance_to(_open_fight_centroid(stay))
+		rows.append({
+			"formation": f,
+			"fid": fid,
+			"dist": dist,
+			"station_pid": stay,
+			"station_name": _province_display_name(stay),
+			"label": open_fight_attacker_label(f, fid),
+		})
+	rows.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return float(a.get("dist", 0.0)) < float(b.get("dist", 0.0))
+	)
+	return rows
+
+
+func _open_fight_from_inspector() -> void:
+	var pid := selected_province_id
+	var tag := _player_tag()
+	var rows: Array = _open_fight_candidates_for_province(pid)
+	if rows.is_empty():
+		_show_open_fight_sheet("", null, pid, -1, tag, rows)
+		return
+	var use: Dictionary = rows[0]
+	if not selected_formation_id.is_empty():
+		for row_v in rows:
+			if row_v is Dictionary and str((row_v as Dictionary).get("fid", "")) == selected_formation_id:
+				use = row_v
+				break
+	var fo: Object = use.get("formation")
+	var fid := str(use.get("fid", ""))
+	var from_pid := int(use.get("station_pid", pid))
+	if fo != null and "country_tag" in fo:
+		var row_tag := str(fo.country_tag).strip_edges().to_upper()
+		if not row_tag.is_empty():
+			tag = row_tag
+	var enemy := -1
+	if from_pid > 0:
+		enemy = _adjacent_enemy_province_id(from_pid, tag)
+	selected_formation_id = fid
+	attack_staging_province_id = from_pid
+	_show_open_fight_sheet(fid, fo, from_pid, enemy, tag, rows)
+
+
+func _open_fight_block_reason(can_ok: bool, can_reason: String, enemy_pid: int) -> String:
+	if enemy_pid <= 0:
+		return "March next to an enemy hex"
+	if can_ok:
+		return ""
+	var why := can_reason.strip_edges()
+	if why.is_empty():
+		why = "Cannot start this battle"
+	if why.begins_with("Not at war") and not why.contains("justify a war goal first"):
+		why = "%s — justify a war goal first" % why
+	return why
+
+
+func _style_open_fight_blocked_button(btn: Button) -> void:
+	btn.disabled = true
+	var dim := RetrowaveTheme.TEXT_DIM
+	var border := dim
+	border.a = 0.4
+	var style := StyleBoxFlat.new()
+	style.bg_color = RetrowaveTheme.BG_PANEL
+	style.border_color = border
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(4)
+	style.content_margin_left = 14
+	style.content_margin_right = 14
+	style.content_margin_top = 8
+	style.content_margin_bottom = 8
+	btn.add_theme_stylebox_override("disabled", style)
+	btn.add_theme_stylebox_override("normal", style)
+	btn.add_theme_stylebox_override("hover", style)
+	btn.add_theme_stylebox_override("pressed", style)
+	btn.add_theme_color_override("font_color", dim)
+	btn.add_theme_color_override("font_disabled_color", dim)
+
+
 func _open_fight_from_formation_id(fid: String) -> void:
 	if _open_fight_keeps_domain_card(fid):
 		return
-	# Prefer the selected unit's current hex + an adjacent enemy so Play can
-	# Open fight → Start without Ctrl (xdotool Ctrl is intermittent).
-	# First-session fallback stays GER Maginot 710173 → FRA 710739.
+	# Unit card: this unit only. Do not teleport it onto the Maginot hex.
 	# COMBAT-1: `_adjacent_enemy_province_id` prefers a neighbor with
 	# defending units (Play soft: empty Haut-Rhin was first, instant capture).
-	const GER_FRONT := 710173
-	const FRA_FRONT := 710739
 	if typeof(LeaderManager) == TYPE_NIL or not LeaderManager.has_method("get_formation"):
 		_show_inspector_toast("Open fight · no army list", 3.0, true)
 		return
-	if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("get_divisions_at_province"):
-		if BattleManager.get_divisions_at_province(FRA_FRONT, "FRA").is_empty() \
-				and LeaderManager.has_method("field_designed_unit"):
-			LeaderManager.field_designed_unit("FRA", "infantry_1936", FRA_FRONT, "land")
-		if BattleManager.get_divisions_at_province(GER_FRONT, "GER").is_empty() \
-				and LeaderManager.has_method("field_designed_unit"):
-			LeaderManager.field_designed_unit("GER", "panzer_iii_j_medium", GER_FRONT, "land")
-	var att_fid := ""
-	var fo: Object = LeaderManager.get_formation(fid) if not fid.is_empty() else null
-	var from_pid := GER_FRONT
-	var enemy_pid := FRA_FRONT
-	if fo != null and "country_tag" in fo:
-		att_fid = fid
-		var tag_here := str(fo.country_tag).strip_edges().to_upper()
-		var here := int(fo.stationed_province_id) if "stationed_province_id" in fo else -1
-		var local_enemy := _adjacent_enemy_province_id(here, tag_here)
-		if local_enemy > 0 and here > 0:
-			from_pid = here
-			enemy_pid = local_enemy
-		elif tag_here == "GER":
-			if "stationed_province_id" in fo:
-				fo.stationed_province_id = GER_FRONT
-			from_pid = GER_FRONT
-			enemy_pid = FRA_FRONT
-	if att_fid.is_empty() and LeaderManager.has_method("get_formations_for_country"):
-		for f in LeaderManager.get_formations_for_country("GER"):
-			if f == null:
-				continue
-			var ft := str(f.formation_type) if "formation_type" in f else ""
-			if ft != Formation.TYPE_DIVISION and ft != Formation.TYPE_GARRISON:
-				continue
-			if "stationed_province_id" in f:
-				f.stationed_province_id = GER_FRONT
-			att_fid = str(f.formation_id) if "formation_id" in f else ""
-			fo = f
-			from_pid = GER_FRONT
-			enemy_pid = FRA_FRONT
-			break
-	if att_fid.is_empty() or fo == null:
-		# Still open the Maginot sheet — Play: button was tooltip-only / no-op.
-		_show_open_fight_sheet("", null, GER_FRONT, FRA_FRONT, "GER")
+	var use_fid := fid
+	var fo: Object = LeaderManager.get_formation(use_fid) if not use_fid.is_empty() else null
+	if fo == null and not selected_formation_id.is_empty():
+		use_fid = selected_formation_id
+		fo = LeaderManager.get_formation(use_fid)
+	if fo == null:
+		_show_open_fight_sheet("", null, -1, -1, _player_tag())
 		return
-	selected_formation_id = att_fid
-	attack_staging_province_id = from_pid
-	_show_open_fight_sheet(att_fid, fo, from_pid, enemy_pid, str(fo.country_tag) if "country_tag" in fo else "GER")
+	var tag_here := str(fo.country_tag).strip_edges().to_upper() if "country_tag" in fo else _player_tag()
+	var here := int(fo.stationed_province_id) if "stationed_province_id" in fo else -1
+	var enemy_pid := -1
+	if here > 0:
+		enemy_pid = _adjacent_enemy_province_id(here, tag_here)
+	selected_formation_id = use_fid
+	attack_staging_province_id = here
+	_show_open_fight_sheet(use_fid, fo, here, enemy_pid, tag_here)
 
 
 func _adjacent_enemy_province_id(from_pid: int, owner_tag: String = "") -> int:
@@ -24907,7 +25002,8 @@ func _show_open_fight_sheet(
 	formation: Object,
 	from_pid: int,
 	enemy_pid: int,
-	attacker_tag: String
+	attacker_tag: String,
+	candidates: Array = []
 ) -> void:
 	var ui := get_node_or_null("UI") as CanvasLayer
 	if ui == null:
@@ -24927,7 +25023,10 @@ func _show_open_fight_sheet(
 		unit_pop.queue_free()
 	var old := ui.get_node_or_null("OpenFightSheet")
 	if old != null:
-		old.queue_free()
+		# queue_free leaves the old sheet as OpenFightSheet until the frame ends,
+		# so a second Open fight in the same turn still reads the stale card.
+		ui.remove_child(old)
+		old.free()
 	var att_name := open_fight_attacker_label(formation, fid)
 	var from_name := _province_display_name(from_pid)
 	var def_tag := ""
@@ -25010,27 +25109,53 @@ func _show_open_fight_sheet(
 		if not rec.is_empty():
 			lines.append(rec)
 		if not can_ok:
-			lines.append("Blocked · %s" % can_reason)
+			lines.append("Blocked · %s" % _open_fight_block_reason(false, can_reason, enemy_pid))
 	else:
 		lines.append("Defender · —")
 		lines.append("No adjacent enemy. March next to a hostile hex, then Open fight.")
+	if not candidates.is_empty():
+		var unit_bits: PackedStringArray = PackedStringArray()
+		for row_v in candidates:
+			if not (row_v is Dictionary):
+				continue
+			var row: Dictionary = row_v
+			unit_bits.append("%s @ %s" % [str(row.get("label", "Division")), str(row.get("station_name", ""))])
+		if not unit_bits.is_empty():
+			lines.append("Units · %s" % ", ".join(unit_bits))
+	elif fid.is_empty():
+		lines.append("No unit in or next to this province.")
 	body.text = "\n".join(lines)
 	if typeof(RetrowaveTheme) != TYPE_NIL:
 		RetrowaveTheme.style_body_label(body)
 	vbox.add_child(body)
-	if enemy_pid > 0 and typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("start_land_battle"):
+	if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("start_land_battle"):
+		var block_reason := _open_fight_block_reason(can_ok, can_reason, enemy_pid)
+		var start_enabled := enemy_pid > 0 and can_ok
+		if not start_enabled:
+			var warn := Label.new()
+			warn.name = "OpenFightBlock"
+			warn.text = block_reason
+			warn.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			warn.add_theme_font_size_override("font_size", 13)
+			warn.add_theme_color_override("font_color", Color("#ff6666"))
+			vbox.add_child(warn)
 		var start_btn := Button.new()
 		start_btn.name = "BtnStartBattle"
 		start_btn.text = "Start battle"
 		start_btn.focus_mode = Control.FOCUS_NONE
 		start_btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
-		if typeof(RetrowaveTheme) != TYPE_NIL:
+		if start_enabled and typeof(RetrowaveTheme) != TYPE_NIL:
 			RetrowaveTheme.style_primary_button(start_btn)
+		elif not start_enabled:
+			_style_open_fight_blocked_button(start_btn)
+			start_btn.tooltip_text = block_reason
 		var start_fid := fid
 		var start_to := enemy_pid
 		var start_from := from_pid
 		var start_tag := attacker_tag
 		start_btn.pressed.connect(func() -> void:
+			if not start_enabled:
+				return
 			_arm_unit_card_press_consume()
 			var assault: Dictionary = BattleManager.start_land_battle(start_tag, start_to, start_from, start_fid)
 			# Instant empty-hex capture is success but not a fight — no Hold/Withdraw.
@@ -25232,7 +25357,7 @@ func _ensure_attack_button() -> void:
 		_btn_open_fight = Button.new()
 		_btn_open_fight.name = "BtnOpenFight"
 		_btn_open_fight.text = "Open fight"
-		_btn_open_fight.tooltip_text = "Open Attacker/Defender sheet · Start battle (GER Maginot vs FRA)."
+		_btn_open_fight.tooltip_text = "Open a fight with a unit in this province, or in a province next to it."
 		_btn_open_fight.set_anchors_preset(Control.PRESET_TOP_LEFT)
 		_btn_open_fight.offset_left = 210.0
 		_btn_open_fight.offset_top = 34.0
@@ -25241,7 +25366,7 @@ func _ensure_attack_button() -> void:
 		_btn_open_fight.focus_mode = Control.FOCUS_NONE
 		_btn_open_fight.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
 		_btn_open_fight.pressed.connect(func() -> void:
-			_open_fight_from_formation_id(selected_formation_id)
+			_open_fight_from_inspector()
 		)
 		info_panel.add_child(_btn_open_fight)
 	_btn_open_fight.visible = true
