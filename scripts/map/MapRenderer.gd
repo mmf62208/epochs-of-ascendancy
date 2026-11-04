@@ -556,6 +556,7 @@ var _fill_color_zoom_bucket: int = -2000000000
 var _fill_zoom_at_last_paint: float = -10.0
 var _last_detail_zoom: float = -1.0
 var _last_hover_mouse: Vector2 = Vector2(-99999, -99999)
+var _last_hover_cam_pose: Vector3 = Vector3(-99999, -99999, -99999)
 var _last_viewport_cull_pos: Vector2 = Vector2(-99999, -99999)
 var _last_viewport_cull_zoom: float = -1.0
 var _viewport_culling_active: bool = false
@@ -4611,7 +4612,15 @@ func _screen_to_world(screen_pos: Vector2) -> Vector2:
 	var cam := get_viewport().get_camera_2d()
 	if not cam:
 		return screen_pos
+	# The drawn map uses the live canvas transform. A cached one picks the
+	# province that was under the cursor before the last pan (Bern over Soviet land).
+	cam.force_update_transform()
 	return cam.get_canvas_transform().affine_inverse() * screen_pos
+
+
+## Province under a screen point. Hover and click both use this after the camera transform.
+func province_id_at_screen(screen: Vector2) -> int:
+	return _resolve_map_pick_pid(_screen_to_world(screen))
 
 
 func _on_close_pressed() -> void:
@@ -17630,8 +17639,11 @@ func center_europe_in_world_view() -> void:
 	_europe_focus_retry = 0
 	var cam := get_viewport().get_camera_2d() if get_viewport() else null
 	if cam:
-		var focus := frame.get_center()
-		# Always re-fit (not pan-only) so a zoom-out red void recovers on first Home.
+		# Europe frame sets the start zoom. The camera sits on the player capital
+		# (GER → Berlin), not the Berlin+Paris+Rome midpoint.
+		var focus := _player_capital_focus()
+		if focus == Vector2.ZERO:
+			focus = frame.get_center()
 		fit_camera_to_bounds(frame, focus, MapCanvasConfig.EUROPE_VIEW_FILL_RATIO)
 	_clamp_camera_to_theater()
 	# Home zoom is often still strategic-tier (~0.33–0.49). Re-paint chips here —
@@ -17640,6 +17652,9 @@ func center_europe_in_world_view() -> void:
 	# Stars use the same STRATEGIC_MAX_ZOOM hide rule as a wheel notch. Home is a
 	# camera jump, so _refresh_terrain_zoom_light never runs while paused.
 	_sync_capital_star_scales()
+	# Camera jumped under a still cursor. The next hover must pick again.
+	_last_hover_mouse = Vector2(-99999, -99999)
+	_last_hover_cam_pose = Vector3(-99999, -99999, -99999)
 	print("MapRenderer: centered on Europe (Berlin+Paris+Rome frame) inside world view")
 
 
@@ -17650,6 +17665,60 @@ func _sync_theater_bounds_to_map_data() -> void:
 			enable_map_wrap = false
 	# Always re-fit underlay to equirect WORLD_CANONICAL for GIS (not centroid AABB).
 	_fit_background_to_bounds()
+
+
+## Player capital world position. GER with no scenario capital is Berlin 710300.
+## A missing centroid falls through to the nation's land centroid.
+func _player_capital_province_id() -> int:
+	var tag := _player_tag()
+	var capital := 0
+	var tree := get_tree()
+	if tree != null and tree.root != null:
+		var loader: Node = tree.root.find_child("ScenarioLoader", true, false)
+		if loader != null and loader.has_method("_get_capital_province_id_for_tag"):
+			capital = int(loader.call("_get_capital_province_id_for_tag", tag))
+		if capital <= 0 and loader != null and "countries" in loader:
+			var countries: Variant = loader.get("countries")
+			if countries is Dictionary and (countries as Dictionary).has(tag):
+				var c: Variant = (countries as Dictionary)[tag]
+				if c is Dictionary:
+					capital = int((c as Dictionary).get("capital_province_id", 0))
+				elif c != null and "capital_province_id" in c:
+					capital = int(c.capital_province_id)
+	if capital <= 0 and typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_country"):
+		var country: Variant = MapManager.call("get_country", tag)
+		if country is Dictionary:
+			capital = int((country as Dictionary).get("capital_province_id", 0))
+		elif country != null and "capital_province_id" in country:
+			capital = int(country.capital_province_id)
+	if capital <= 0 and tag == "GER":
+		capital = 710300
+	return capital
+
+
+func _player_capital_focus() -> Vector2:
+	var pid := _player_capital_province_id()
+	var focus := _centroid_for_pid(pid) if pid > 0 else Vector2.ZERO
+	if focus != Vector2.ZERO:
+		return focus
+	return _player_land_focus()
+
+
+func _player_land_focus() -> Vector2:
+	var tag := _player_tag()
+	if typeof(MapManager) == TYPE_NIL or not MapManager.has_method("get_provinces_by_owner"):
+		return Vector2.ZERO
+	var sum := Vector2.ZERO
+	var n := 0
+	for pid_v in MapManager.get_provinces_by_owner(tag):
+		var c := _centroid_for_pid(int(pid_v))
+		if c == Vector2.ZERO:
+			continue
+		sum += c
+		n += 1
+	if n <= 0:
+		return Vector2.ZERO
+	return sum / float(n)
 
 
 func _centroid_for_pid(pid: int) -> Vector2:
@@ -20454,6 +20523,16 @@ func _update_spatial_hover() -> void:
 		return
 
 	var mouse_screen := get_viewport().get_mouse_position()
+	var cam_now := get_viewport().get_camera_2d()
+	if cam_now != null:
+		cam_now.force_update_transform()
+	var pose := Vector3.ZERO
+	if cam_now != null:
+		pose = Vector3(cam_now.global_position.x, cam_now.global_position.y, cam_now.zoom.x)
+	# A still cursor over land that slid under a pan must not keep the old tooltip.
+	if pose.distance_squared_to(_last_hover_cam_pose) > 0.01:
+		_last_hover_mouse = Vector2(-99999, -99999)
+		_last_hover_cam_pose = pose
 	# Skip expensive pick query + world transform when mouse hasn't moved (big idle CPU win after load).
 	if mouse_screen.distance_squared_to(_last_hover_mouse) < 0.5:
 		return
@@ -20480,13 +20559,11 @@ func _update_spatial_hover() -> void:
 			_clear_hover_state()
 		return
 
-	var cam := get_viewport().get_camera_2d()
+	var cam := cam_now
 	if cam == null:
 		return
 
-	var world_pos := _screen_to_world(mouse_screen)
-
-	var pid := _resolve_map_pick_pid(world_pos)
+	var pid := province_id_at_screen(mouse_screen)
 	var new_hover_province: Province = null
 	if pid >= 0 and provinces.has(pid):
 		new_hover_province = provinces[pid]
