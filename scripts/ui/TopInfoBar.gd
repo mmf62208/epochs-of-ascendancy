@@ -2757,6 +2757,8 @@ func _add_menu_button(parent: VBoxContainer, label: String, option: String) -> v
 		elif option == "load":
 			_on_load_pressed()
 		elif option == "return_to_main":
+			if typeof(SupplyManager) != TYPE_NIL and SupplyManager.has_method("clear_clock_bar_for_scene_change"):
+				SupplyManager.call("clear_clock_bar_for_scene_change")
 			get_tree().change_scene_to_file("res://scenes/TestScenario.tscn")
 		elif option == "exit":
 			get_tree().quit()
