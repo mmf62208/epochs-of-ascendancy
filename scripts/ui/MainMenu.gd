@@ -376,6 +376,9 @@ func _build_ui() -> void:
 	left_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	left_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	left_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	# Default deadzone is 0, so a 1px twitch turns the press into a scroll
+	# and a release-mode button never emits. Return to Title lives in here.
+	left_scroll.scroll_deadzone = 16
 	left.add_child(left_scroll)
 
 	var left_inner := VBoxContainer.new()
@@ -459,7 +462,7 @@ func _build_ui() -> void:
 	_refresh_living_campaign_buttons()
 	_add_victory_paths_readout(left_inner)
 
-	if OS.is_debug_build():
+	if DebugOverlay.dev_menu_allowed():
 		var dbg_hdr := Label.new()
 		dbg_hdr.text = "DEBUG"
 		RetrowaveTheme.style_column_header(dbg_hdr)
@@ -714,6 +717,10 @@ func _add_action_button(parent: VBoxContainer, text: String, id: String, primary
 	btn.set_meta("eoa_cc_action", id)
 	if id == "refresh":
 		btn.name = "RefreshSaveList"
+	# Press, not release. GameActionsScroll used to eat the first click:
+	# deadzone 0 treated a 1px move as a drag, so `pressed` never fired
+	# until a second, still click. One emit on button-down.
+	btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
 	# Bind by string id (stable); avoid async signal sinks that drop without await.
 	btn.pressed.connect(_on_action.bind(id))
 	if danger:
@@ -816,6 +823,8 @@ func _on_action(id: String) -> void:
 			menu_closed.emit()
 			get_tree().quit()
 		"debug":
+			if not DebugOverlay.dev_menu_allowed():
+				return
 			var dbg: Node = get_tree().root.get_node_or_null("DebugOverlay")
 			if dbg != null and dbg.has_method("toggle"):
 				dbg.call("toggle")
@@ -1440,8 +1449,22 @@ func _return_to_title() -> void:
 	_set_status("Reloading…")
 	_pause_game(false)
 	menu_closed.emit()
+	# Drop the cached clock bar while it is still a live node. The scene
+	# swap frees the old TopInfoBar; SupplyManager must not keep that ref.
+	if typeof(SupplyManager) != TYPE_NIL and SupplyManager.has_method("clear_clock_bar_for_scene_change"):
+		SupplyManager.call("clear_clock_bar_for_scene_change")
 	queue_free()
-	get_tree().change_scene_to_file("res://scenes/TestScenario.tscn")
+	var tree := get_tree()
+	if tree == null:
+		return
+	# Play always reloads TestScenario. A headless guard may supply a
+	# PackedScene on the root so it can idle the title without the harness.
+	if tree.root != null and tree.root.has_meta("eoa_return_title_scene"):
+		var packed: Variant = tree.root.get_meta("eoa_return_title_scene")
+		if packed is PackedScene:
+			tree.change_scene_to_packed(packed)
+			return
+	tree.change_scene_to_file("res://scenes/TestScenario.tscn")
 
 
 func _map_renderer_for_close() -> Node:
