@@ -65,8 +65,8 @@ var _pending_toggle: CheckBox = null
 ## Same-frame pointer delivery (window_input and _input) must flip a box once.
 var _system_toggle_ptr_frame := -1
 var _system_toggle_ptr_id := 0
-## Same-frame Space/Enter delivery must flip a focused box once, not Begin.
-var _system_toggle_key_frame := -1
+## One flip per Space/Enter key-down. A same-frame guard let the next process
+## frame, while the key was still held, flip the box back.
 var _system_toggle_key_code := 0
 ## Screen point for a Command Center header or Refresh hit.
 var _pending_screen := Vector2.ZERO
@@ -467,6 +467,7 @@ func fill_system_toggles(parent: Node) -> int:
 		else:
 			box.tooltip_text = "%s\nSaved with this campaign. %s=1 or 0 overrides this box." % [label, env_name]
 		_style_system_toggle(box)
+		box.gui_input.connect(_on_system_toggle_gui_input.bind(box))
 		parent.add_child(box)
 		_toggle_boxes[id] = box
 		n += 1
@@ -1123,6 +1124,41 @@ func _system_toggle_accept_code(event: InputEvent) -> int:
 	return 0
 
 
+func _system_toggle_release_code(event: InputEvent) -> int:
+	if event == null or not (event is InputEventKey):
+		return 0
+	var key: InputEventKey = event
+	if key.pressed or key.echo:
+		return 0
+	if key.ctrl_pressed or key.alt_pressed or key.meta_pressed:
+		return 0
+	if key.keycode == KEY_SPACE or key.physical_keycode == KEY_SPACE:
+		return KEY_SPACE
+	if key.keycode == KEY_ENTER or key.physical_keycode == KEY_ENTER:
+		return KEY_ENTER
+	if key.keycode == KEY_KP_ENTER or key.physical_keycode == KEY_KP_ENTER:
+		return KEY_KP_ENTER
+	return 0
+
+
+func _system_toggle_key_held(code: int) -> bool:
+	if code == KEY_SPACE:
+		return Input.is_key_pressed(KEY_SPACE) or Input.is_physical_key_pressed(KEY_SPACE)
+	if code == KEY_ENTER:
+		return Input.is_key_pressed(KEY_ENTER) or Input.is_physical_key_pressed(KEY_ENTER)
+	if code == KEY_KP_ENTER:
+		return Input.is_key_pressed(KEY_KP_ENTER) or Input.is_physical_key_pressed(KEY_KP_ENTER)
+	return false
+
+
+func _drop_system_toggle_key_if_up() -> void:
+	if _system_toggle_key_code == 0:
+		return
+	if _system_toggle_key_held(_system_toggle_key_code):
+		return
+	_system_toggle_key_code = 0
+
+
 func _held_system_toggle_code() -> int:
 	if Input.is_key_pressed(KEY_SPACE) or Input.is_physical_key_pressed(KEY_SPACE):
 		return KEY_SPACE
@@ -1133,6 +1169,16 @@ func _held_system_toggle_code() -> int:
 	if InputMap.has_action("ui_accept") and Input.is_action_just_pressed("ui_accept"):
 		return KEY_ENTER
 	return 0
+
+
+## CheckBox flips on ui_accept by itself (press arms it, release toggles).
+## That second flip cancels the custom one. Swallow the key here so only
+## try_focused_system_toggle_key / the held-key poll change the box.
+func _on_system_toggle_gui_input(event: InputEvent, box: CheckBox) -> void:
+	if _system_toggle_accept_code(event) == 0 and _system_toggle_release_code(event) == 0:
+		return
+	if box != null and is_instance_valid(box):
+		box.accept_event()
 
 
 func _activate_system_toggle(box: CheckBox) -> void:
@@ -1154,8 +1200,10 @@ func _apply_system_toggle_press(box: CheckBox) -> void:
 	_activate_system_toggle(box)
 
 
-## Space/Enter on a focused SystemToggle_* flips that box. B still Begins.
-## A same-frame repeat returns true without flipping again.
+## Space/Enter on a focused SystemToggle_* flips that box once per key-down.
+## B still Begins. A repeat of the same held key returns true without flipping.
+## `_input` runs before the checkbox, so this handler marks the event handled
+## and the checkbox's own ui_accept toggle must not also run.
 func try_focused_system_toggle_key(event: InputEvent) -> bool:
 	var code := _system_toggle_accept_code(event)
 	if code == 0:
@@ -1163,11 +1211,12 @@ func try_focused_system_toggle_key(event: InputEvent) -> bool:
 	var box := _focused_system_toggle()
 	if box == null:
 		return false
-	var frame := Engine.get_process_frames()
-	if not (_system_toggle_key_frame == frame and _system_toggle_key_code == code):
-		_system_toggle_key_frame = frame
+	if _system_toggle_key_code != code:
 		_system_toggle_key_code = code
 		_activate_system_toggle(box)
+	var vp := get_viewport()
+	if vp != null:
+		vp.set_input_as_handled()
 	return true
 
 
@@ -1178,9 +1227,10 @@ func _swallow_focused_system_toggle_from_held_key() -> bool:
 	var code := _held_system_toggle_code()
 	if code == 0:
 		return false
-	var frame := Engine.get_process_frames()
-	if not (_system_toggle_key_frame == frame and _system_toggle_key_code == code):
-		_system_toggle_key_frame = frame
+	# Already flipped on this key-down (event path or an earlier poll).
+	if _system_toggle_key_code != 0 and _system_toggle_key_held(_system_toggle_key_code):
+		return true
+	if _system_toggle_key_code != code:
 		_system_toggle_key_code = code
 		_activate_system_toggle(box)
 	return true
@@ -1466,12 +1516,14 @@ func _poll_live_pointer_just_pressed() -> bool:
 
 
 func _poll_live_begin_key_just_pressed() -> bool:
-	var held: bool = false
+	# Arm the latch on the edge. Returning before that left the next frame,
+	# while Space/Enter was still down, looking like a new press.
+	var edge := false
 	if InputMap.has_action("eoa_living_begin") and Input.is_action_just_pressed("eoa_living_begin"):
-		return true
-	if InputMap.has_action("ui_accept") and Input.is_action_just_pressed("ui_accept"):
-		return true
-	held = (
+		edge = true
+	elif InputMap.has_action("ui_accept") and Input.is_action_just_pressed("ui_accept"):
+		edge = true
+	var held := (
 		Input.is_key_pressed(KEY_ENTER)
 		or Input.is_physical_key_pressed(KEY_ENTER)
 		or Input.is_key_pressed(KEY_KP_ENTER)
@@ -1481,13 +1533,13 @@ func _poll_live_begin_key_just_pressed() -> bool:
 		or Input.is_key_pressed(KEY_B)
 		or Input.is_physical_key_pressed(KEY_B)
 	)
-	if held:
-		if _begin_key_poll_held:
-			return false
-		_begin_key_poll_held = true
-		return true
-	_begin_key_poll_held = false
-	return false
+	if not edge and not held:
+		_begin_key_poll_held = false
+		return false
+	if _begin_key_poll_held:
+		return false
+	_begin_key_poll_held = true
+	return true
 
 
 func _viewport_mouse() -> Vector2:
@@ -1568,6 +1620,7 @@ func _log_live_raw_key(who: String, event: InputEvent) -> void:
 func _process(delta: float) -> void:
 	if _closed:
 		return
+	_drop_system_toggle_key_if_up()
 	if smoke_auto_begin_enabled() and not _smoke_auto_begin_armed:
 		_smoke_auto_begin_delay_s += delta
 		if _smoke_auto_begin_delay_s >= 0.25:

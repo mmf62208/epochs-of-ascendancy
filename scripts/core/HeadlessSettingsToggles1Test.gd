@@ -423,6 +423,8 @@ func _test_setup_input(gd: Node) -> void:
 	await _assert_toggle_click()
 	_quiet()
 	await _assert_toggle_keys(gd)
+	_quiet()
+	await _assert_viewport_toggle_keys(gd)
 
 
 func _assert_toggle_click() -> void:
@@ -515,6 +517,81 @@ func _assert_toggle_keys(gd: Node) -> void:
 	_pass("input key: focused Space/Enter toggles the box; Begin with no box focused applies it")
 
 
+## Live window path. Press then release through Input.parse_input_event, and
+## keep the key down across process frames. A direct `_input` call hides the
+## second flip.
+func _assert_viewport_toggle_keys(gd: Node) -> void:
+	var boot := await _spawn_title()
+	if boot == null:
+		return
+	var box := boot.find_child("SystemToggle_stability_justice", true, false) as CheckBox
+	var other := boot.find_child("SystemToggle_victory_paths", true, false) as CheckBox
+	if box == null or other == null:
+		_fail("viewport key: system checkbox missing")
+		_free_title(boot)
+		return
+	if not await _focus_box(boot, box):
+		_free_title(boot)
+		return
+	var flips := {"n": 0}
+	box.toggled.connect(func(_on: bool) -> void:
+		flips["n"] = int(flips["n"]) + 1
+	)
+	await _pump_key(KEY_SPACE)
+	if bool(boot.get("_closed")) or not box.button_pressed or other.button_pressed or int(flips["n"]) != 1:
+		_fail("viewport key: focused Space flips=%s pressed=%s other=%s closed=%s (want one flip, checked, campaign not started)" % [str(flips["n"]), str(box.button_pressed), str(other.button_pressed), str(boot.get("_closed"))])
+		_free_title(boot)
+		return
+	if not await _focus_box(boot, box):
+		_free_title(boot)
+		return
+	await _pump_key(KEY_ENTER)
+	if bool(boot.get("_closed")) or box.button_pressed or other.button_pressed or int(flips["n"]) != 2:
+		_fail("viewport key: focused Enter flips=%s pressed=%s closed=%s (want one more flip, unchecked, campaign not started)" % [str(flips["n"]), str(box.button_pressed), str(boot.get("_closed"))])
+		_free_title(boot)
+		return
+	box.release_focus()
+	var vp := boot.get_viewport()
+	if vp != null:
+		vp.gui_release_focus()
+	await process_frame
+	var owner := vp.gui_get_focus_owner() if vp != null else null
+	if owner == box:
+		_fail("viewport key: checkbox kept focus before Begin")
+		_free_title(boot)
+		return
+	await _pump_key(KEY_ENTER)
+	# Begin sets _closed and queue_frees the title. The hold frames free it
+	# before this line runs.
+	var began := false
+	if not is_instance_valid(boot):
+		began = true
+	elif bool(boot.get("_closed")):
+		began = true
+	if not began:
+		_fail("viewport key: Enter with no system box focused did not Begin")
+		_free_title(boot)
+		return
+	if bool(gd.call("stability_justice_enabled")) or bool(gd.call("victory_paths_enabled")):
+		_fail("viewport key: Begin applied a checked box sj=%s vp=%s" % [str(gd.call("stability_justice_enabled")), str(gd.call("victory_paths_enabled"))])
+		return
+	_pass("viewport key: focused Space/Enter each flip once via InputEvent; Enter with no box focused Begins")
+
+
+func _pump_key(keycode: int) -> void:
+	# One live key-down: the Input singleton stays down across frames, then release.
+	Input.parse_input_event(_key_state(keycode, true))
+	if Input.has_method("flush_buffered_events"):
+		Input.flush_buffered_events()
+	for _i in 3:
+		await process_frame
+	Input.parse_input_event(_key_state(keycode, false))
+	if Input.has_method("flush_buffered_events"):
+		Input.flush_buffered_events()
+	for _j in 2:
+		await process_frame
+
+
 func _spawn_title() -> Node:
 	DisplayServer.window_set_size(Vector2i(1280, 800))
 	root.size = Vector2i(1280, 800)
@@ -559,8 +636,12 @@ func _mouse(pos: Vector2, pressed: bool) -> InputEventMouseButton:
 
 
 func _key(keycode: int) -> InputEventKey:
+	return _key_state(keycode, true)
+
+
+func _key_state(keycode: int, pressed: bool) -> InputEventKey:
 	var ev := InputEventKey.new()
-	ev.pressed = true
+	ev.pressed = pressed
 	ev.echo = false
 	ev.keycode = keycode as Key
 	ev.physical_keycode = keycode as Key
