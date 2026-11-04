@@ -27,6 +27,23 @@
 class_name DebugOverlay
 extends Control
 
+## Player builds keep MAP TOOLS closed. A release export is never a debug
+## build, so the menu item and F10 stay hidden even if the setting is on.
+static func dev_menu_allowed_for(debug_build: bool, dev_menu: bool) -> bool:
+	return debug_build and dev_menu
+
+
+static func dev_menu_setting() -> bool:
+	return bool(ProjectSettings.get_setting("eoa/dev_menu", false))
+
+
+static func dev_menu_allowed() -> bool:
+	return dev_menu_allowed_for(OS.is_debug_build(), dev_menu_setting())
+
+
+static func local_refresh_stamp() -> String:
+	return Time.get_datetime_string_from_system(false, true)
+
 const PANEL_WIDTH := 520
 const PANEL_HEIGHT := 680
 const MIN_PANEL_SIZE := Vector2(380, 420)
@@ -150,6 +167,8 @@ static func precreate_hidden() -> void:
 
 
 static func toggle() -> void:
+	if not dev_menu_allowed():
+		return
 	if instance == null:
 		precreate_hidden()
 	if instance:
@@ -160,6 +179,8 @@ static func toggle() -> void:
 
 
 static func show_overlay() -> void:
+	if not dev_menu_allowed():
+		return
 	if instance == null:
 		precreate_hidden()
 	if instance:
@@ -3683,7 +3704,7 @@ func _refresh_time_section() -> void:
 
 func _update_status() -> void:
 	if _status_label:
-		_status_label.text = "Last refreshed: %s  •  F10 / Ctrl+Shift+R to toggle" % Time.get_datetime_string_from_unix_time(int(_last_refresh_time))
+		_status_label.text = "Last refreshed: %s  •  F10 / Ctrl+Shift+R to toggle" % local_refresh_stamp()
 
 
 func _refresh_proposed_status(overlay: Node = null):

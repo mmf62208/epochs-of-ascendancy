@@ -184,7 +184,9 @@ var last_frame_plan_count: int = 0
 var plans_on_roll_frame: int = 0
 var _window_refill_anchor: int = 0
 var _window_saw_day_roll: bool = false
-var _clock_bar: Node = null
+## Untyped on purpose. A freed TopInfoBar stored in a typed Node errors
+## on read, before is_instance_valid can run. Return to Title frees the bar.
+var _clock_bar = null
 ## FIX #10 order log (SM._process → TopInfoBar clock → refill_after_clock).
 var _clock_order_enabled: bool = false
 var clock_order_log: PackedStringArray = PackedStringArray()
@@ -809,6 +811,9 @@ func _clock_bar_owns_after_clock_refill() -> bool:
 	return _clock_bar_is_live(_find_live_clock_bar())
 
 
+## Live means still in the tree, not queued to free, and processing.
+## Callers must prove is_instance_valid BEFORE this typed Node argument.
+## A freed instance errors at the call, so the body never runs.
 func _clock_bar_is_live(bar: Node) -> bool:
 	if bar == null or not is_instance_valid(bar):
 		return false
@@ -819,17 +824,64 @@ func _clock_bar_is_live(bar: Node) -> bool:
 	return true
 
 
-func _find_live_clock_bar() -> Node:
-	if _clock_bar_is_live(_clock_bar):
-		return _clock_bar
+func _clock_bar_ref_is_live(bar: Variant) -> bool:
+	if bar == null or not is_instance_valid(bar) or not (bar is Node):
+		return false
+	return _clock_bar_is_live(bar as Node)
+
+
+func _bind_clock_bar(bar: Node) -> void:
+	if bar == null or not is_instance_valid(bar):
+		_unbind_clock_bar()
+		return
+	if is_instance_valid(_clock_bar) and _clock_bar == bar:
+		_connect_clock_bar_exit(bar)
+		return
+	_unbind_clock_bar()
+	_clock_bar = bar
+	_connect_clock_bar_exit(bar)
+
+
+func _connect_clock_bar_exit(bar: Node) -> void:
+	if bar == null or not is_instance_valid(bar):
+		return
+	if not bar.tree_exiting.is_connected(_on_clock_bar_tree_exiting):
+		bar.tree_exiting.connect(_on_clock_bar_tree_exiting)
+
+
+func _unbind_clock_bar() -> void:
+	var bar: Variant = _clock_bar
 	_clock_bar = null
+	if bar == null or not is_instance_valid(bar) or not (bar is Node):
+		return
+	var node := bar as Node
+	if node.tree_exiting.is_connected(_on_clock_bar_tree_exiting):
+		node.tree_exiting.disconnect(_on_clock_bar_tree_exiting)
+
+
+func _on_clock_bar_tree_exiting() -> void:
+	_unbind_clock_bar()
+
+
+## Return to Title and any scene swap. Drops the signal and the cache
+## while the bar is still valid, then the next scene re-finds its own bar.
+func clear_clock_bar_for_scene_change() -> void:
+	_unbind_clock_bar()
+
+
+func _find_live_clock_bar() -> Node:
+	# is_instance_valid before any typed Node pass. A freed cache used to
+	# script-error on every _process after Return to Title.
+	if _clock_bar_ref_is_live(_clock_bar):
+		return _clock_bar
+	_unbind_clock_bar()
 	var tree := get_tree()
 	if tree == null or tree.root == null:
 		return null
 	var matches: Array[Node] = tree.root.find_children("TopInfoBar", "", true, false)
 	for n in matches:
-		if _clock_bar_is_live(n):
-			_clock_bar = n
+		if _clock_bar_ref_is_live(n):
+			_bind_clock_bar(n)
 			return n
 	return null
 

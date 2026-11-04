@@ -556,6 +556,7 @@ var _fill_color_zoom_bucket: int = -2000000000
 var _fill_zoom_at_last_paint: float = -10.0
 var _last_detail_zoom: float = -1.0
 var _last_hover_mouse: Vector2 = Vector2(-99999, -99999)
+var _last_hover_cam_pose: Vector3 = Vector3(-99999, -99999, -99999)
 var _last_viewport_cull_pos: Vector2 = Vector2(-99999, -99999)
 var _last_viewport_cull_zoom: float = -1.0
 var _viewport_culling_active: bool = false
@@ -2829,6 +2830,38 @@ func _release_search_focus() -> void:
 		vp.gui_release_focus()
 
 
+func _live_map_search() -> Node:
+	if _map_search != null and is_instance_valid(_map_search):
+		return _map_search
+	if get_tree() != null and get_tree().root != null:
+		return get_tree().root.find_child("MapProvinceSearch", true, false)
+	return null
+
+
+func _search_chrome_contains_point(screen: Vector2) -> bool:
+	var search := _live_map_search()
+	if search == null or not (search is Control):
+		return false
+	var sr := search as Control
+	if sr.visible and sr.get_global_rect().grow(8.0).has_point(screen):
+		return true
+	var results := sr.get_node_or_null("SearchResults") as Control
+	if results != null and results.visible and results.get_global_rect().grow(4.0).has_point(screen):
+		return true
+	return false
+
+
+func _release_search_on_map_press() -> void:
+	var search := _live_map_search()
+	if search != null and search.has_method("esc_layer_open") and bool(search.call("esc_layer_open")):
+		if search.has_method("dismiss_esc_layer"):
+			search.call("dismiss_esc_layer")
+	else:
+		_release_search_focus()
+	# LineEdit grabs focus again from the same click's gui_input, after _input.
+	call_deferred("_release_search_focus")
+
+
 func _apply_home_key(shift_pressed: bool) -> void:
 	# Home must stay cheap: recenter/fit only — no 3520 rebuild.
 	_arm_still_click_after_pan()
@@ -3392,6 +3425,10 @@ func _input(event: InputEvent) -> void:
 				_try_living_title_map_pick(title_pid)
 				get_viewport().set_input_as_handled()
 				return
+			if event.pressed and not _search_chrome_contains_point(event.position) and not _top_bar_owns_click(event.position):
+				# event.position, not the stale mouse. A search click keeps
+				# focus; a map click must drop it even if warp_mouse lagged.
+				_release_search_on_map_press()
 			if event.pressed and (
 				_top_bar_owns_click()
 				or _mouse_over_search_control()
@@ -4579,7 +4616,15 @@ func _screen_to_world(screen_pos: Vector2) -> Vector2:
 	var cam := get_viewport().get_camera_2d()
 	if not cam:
 		return screen_pos
+	# The drawn map uses the live canvas transform. A cached one picks the
+	# province that was under the cursor before the last pan (Bern over Soviet land).
+	cam.force_update_transform()
 	return cam.get_canvas_transform().affine_inverse() * screen_pos
+
+
+## Province under a screen point. Hover and click both use this after the camera transform.
+func province_id_at_screen(screen: Vector2) -> int:
+	return _resolve_map_pick_pid(_screen_to_world(screen))
 
 
 func _on_close_pressed() -> void:
@@ -17598,8 +17643,11 @@ func center_europe_in_world_view() -> void:
 	_europe_focus_retry = 0
 	var cam := get_viewport().get_camera_2d() if get_viewport() else null
 	if cam:
-		var focus := frame.get_center()
-		# Always re-fit (not pan-only) so a zoom-out red void recovers on first Home.
+		# Europe frame sets the start zoom. The camera sits on the player capital
+		# (GER → Berlin), not the Berlin+Paris+Rome midpoint.
+		var focus := _player_capital_focus()
+		if focus == Vector2.ZERO:
+			focus = frame.get_center()
 		fit_camera_to_bounds(frame, focus, MapCanvasConfig.EUROPE_VIEW_FILL_RATIO)
 	_clamp_camera_to_theater()
 	# Home zoom is often still strategic-tier (~0.33–0.49). Re-paint chips here —
@@ -17608,6 +17656,9 @@ func center_europe_in_world_view() -> void:
 	# Stars use the same STRATEGIC_MAX_ZOOM hide rule as a wheel notch. Home is a
 	# camera jump, so _refresh_terrain_zoom_light never runs while paused.
 	_sync_capital_star_scales()
+	# Camera jumped under a still cursor. The next hover must pick again.
+	_last_hover_mouse = Vector2(-99999, -99999)
+	_last_hover_cam_pose = Vector3(-99999, -99999, -99999)
 	print("MapRenderer: centered on Europe (Berlin+Paris+Rome frame) inside world view")
 
 
@@ -17618,6 +17669,60 @@ func _sync_theater_bounds_to_map_data() -> void:
 			enable_map_wrap = false
 	# Always re-fit underlay to equirect WORLD_CANONICAL for GIS (not centroid AABB).
 	_fit_background_to_bounds()
+
+
+## Player capital world position. GER with no scenario capital is Berlin 710300.
+## A missing centroid falls through to the nation's land centroid.
+func _player_capital_province_id() -> int:
+	var tag := _player_tag()
+	var capital := 0
+	var tree := get_tree()
+	if tree != null and tree.root != null:
+		var loader: Node = tree.root.find_child("ScenarioLoader", true, false)
+		if loader != null and loader.has_method("_get_capital_province_id_for_tag"):
+			capital = int(loader.call("_get_capital_province_id_for_tag", tag))
+		if capital <= 0 and loader != null and "countries" in loader:
+			var countries: Variant = loader.get("countries")
+			if countries is Dictionary and (countries as Dictionary).has(tag):
+				var c: Variant = (countries as Dictionary)[tag]
+				if c is Dictionary:
+					capital = int((c as Dictionary).get("capital_province_id", 0))
+				elif c != null and "capital_province_id" in c:
+					capital = int(c.capital_province_id)
+	if capital <= 0 and typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_country"):
+		var country: Variant = MapManager.call("get_country", tag)
+		if country is Dictionary:
+			capital = int((country as Dictionary).get("capital_province_id", 0))
+		elif country != null and "capital_province_id" in country:
+			capital = int(country.capital_province_id)
+	if capital <= 0 and tag == "GER":
+		capital = 710300
+	return capital
+
+
+func _player_capital_focus() -> Vector2:
+	var pid := _player_capital_province_id()
+	var focus := _centroid_for_pid(pid) if pid > 0 else Vector2.ZERO
+	if focus != Vector2.ZERO:
+		return focus
+	return _player_land_focus()
+
+
+func _player_land_focus() -> Vector2:
+	var tag := _player_tag()
+	if typeof(MapManager) == TYPE_NIL or not MapManager.has_method("get_provinces_by_owner"):
+		return Vector2.ZERO
+	var sum := Vector2.ZERO
+	var n := 0
+	for pid_v in MapManager.get_provinces_by_owner(tag):
+		var c := _centroid_for_pid(int(pid_v))
+		if c == Vector2.ZERO:
+			continue
+		sum += c
+		n += 1
+	if n <= 0:
+		return Vector2.ZERO
+	return sum / float(n)
 
 
 func _centroid_for_pid(pid: int) -> Vector2:
@@ -20422,6 +20527,16 @@ func _update_spatial_hover() -> void:
 		return
 
 	var mouse_screen := get_viewport().get_mouse_position()
+	var cam_now := get_viewport().get_camera_2d()
+	if cam_now != null:
+		cam_now.force_update_transform()
+	var pose := Vector3.ZERO
+	if cam_now != null:
+		pose = Vector3(cam_now.global_position.x, cam_now.global_position.y, cam_now.zoom.x)
+	# A still cursor over land that slid under a pan must not keep the old tooltip.
+	if pose.distance_squared_to(_last_hover_cam_pose) > 0.01:
+		_last_hover_mouse = Vector2(-99999, -99999)
+		_last_hover_cam_pose = pose
 	# Skip expensive pick query + world transform when mouse hasn't moved (big idle CPU win after load).
 	if mouse_screen.distance_squared_to(_last_hover_mouse) < 0.5:
 		return
@@ -20448,12 +20563,12 @@ func _update_spatial_hover() -> void:
 			_clear_hover_state()
 		return
 
-	var cam := get_viewport().get_camera_2d()
+	var cam := cam_now
 	if cam == null:
 		return
 
+	# Same resolve as a click: screen → live canvas transform → province id.
 	var world_pos := _screen_to_world(mouse_screen)
-
 	var pid := _resolve_map_pick_pid(world_pos)
 	var new_hover_province: Province = null
 	if pid >= 0 and provinces.has(pid):
@@ -24712,6 +24827,134 @@ func _open_fight_keeps_domain_card(fid: String) -> bool:
 	return true
 
 
+func _open_fight_neighbor_ids(pid: int) -> Dictionary:
+	var near := {}
+	if pid <= 0:
+		return near
+	near[pid] = true
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_adjacent_provinces"):
+		for nid in MapManager.get_adjacent_provinces(pid, true):
+			near[int(nid)] = true
+	if provinces.has(pid):
+		var here: Province = provinces[pid] as Province
+		if here != null:
+			for nid in here.adjacencies:
+				near[int(nid)] = true
+	return near
+
+
+func _open_fight_centroid(pid: int) -> Vector2:
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_centroid"):
+		var c: Vector2 = MapManager.get_province_centroid(pid)
+		if c != Vector2.ZERO:
+			return c
+	if provinces.has(pid):
+		var p: Province = provinces[pid] as Province
+		if p != null:
+			return p.coordinates
+	return Vector2.ZERO
+
+
+## Inspector Open fight: only the player's land units in this province or next
+## to it, closest first. A selected unit elsewhere (Berlin inspector vs a
+## Baden-Baden division) is not offered and is not teleported.
+func _open_fight_candidates_for_province(pid: int) -> Array:
+	var rows: Array = []
+	var tag := _player_tag()
+	if pid <= 0 or typeof(LeaderManager) == TYPE_NIL or not LeaderManager.has_method("get_formations_for_country"):
+		return rows
+	var near := _open_fight_neighbor_ids(pid)
+	var origin := _open_fight_centroid(pid)
+	for f in LeaderManager.get_formations_for_country(tag):
+		if f == null:
+			continue
+		var ft := str(f.formation_type) if "formation_type" in f else ""
+		if ft != Formation.TYPE_DIVISION and ft != Formation.TYPE_GARRISON:
+			continue
+		var stay := int(f.stationed_province_id) if "stationed_province_id" in f else -1
+		if not near.has(stay):
+			continue
+		var fid := str(f.formation_id) if "formation_id" in f else ""
+		var dist := 0.0
+		if stay != pid:
+			dist = origin.distance_to(_open_fight_centroid(stay))
+		rows.append({
+			"formation": f,
+			"fid": fid,
+			"dist": dist,
+			"station_pid": stay,
+			"station_name": _province_display_name(stay),
+			"label": open_fight_attacker_label(f, fid),
+		})
+	rows.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return float(a.get("dist", 0.0)) < float(b.get("dist", 0.0))
+	)
+	return rows
+
+
+func _open_fight_from_inspector() -> void:
+	var pid := selected_province_id
+	var tag := _player_tag()
+	var rows: Array = _open_fight_candidates_for_province(pid)
+	if rows.is_empty():
+		_show_open_fight_sheet("", null, pid, -1, tag, rows)
+		return
+	var use: Dictionary = rows[0]
+	if not selected_formation_id.is_empty():
+		for row_v in rows:
+			if row_v is Dictionary and str((row_v as Dictionary).get("fid", "")) == selected_formation_id:
+				use = row_v
+				break
+	var fo: Object = use.get("formation")
+	var fid := str(use.get("fid", ""))
+	var from_pid := int(use.get("station_pid", pid))
+	if fo != null and "country_tag" in fo:
+		var row_tag := str(fo.country_tag).strip_edges().to_upper()
+		if not row_tag.is_empty():
+			tag = row_tag
+	var enemy := -1
+	if from_pid > 0:
+		enemy = _adjacent_enemy_province_id(from_pid, tag)
+	selected_formation_id = fid
+	attack_staging_province_id = from_pid
+	_show_open_fight_sheet(fid, fo, from_pid, enemy, tag, rows)
+
+
+func _open_fight_block_reason(can_ok: bool, can_reason: String, enemy_pid: int) -> String:
+	if enemy_pid <= 0:
+		return "March next to an enemy hex"
+	if can_ok:
+		return ""
+	var why := can_reason.strip_edges()
+	if why.is_empty():
+		why = "Cannot start this battle"
+	if why.begins_with("Not at war") and not why.contains("justify a war goal first"):
+		why = "%s — justify a war goal first" % why
+	return why
+
+
+func _style_open_fight_blocked_button(btn: Button) -> void:
+	btn.disabled = true
+	var dim := RetrowaveTheme.TEXT_DIM
+	var border := dim
+	border.a = 0.4
+	var style := StyleBoxFlat.new()
+	style.bg_color = RetrowaveTheme.BG_PANEL
+	style.border_color = border
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(4)
+	style.content_margin_left = 14
+	style.content_margin_right = 14
+	style.content_margin_top = 8
+	style.content_margin_bottom = 8
+	btn.add_theme_stylebox_override("disabled", style)
+	btn.add_theme_stylebox_override("normal", style)
+	btn.add_theme_stylebox_override("hover", style)
+	btn.add_theme_stylebox_override("pressed", style)
+	btn.add_theme_color_override("font_color", dim)
+	btn.add_theme_color_override("font_disabled_color", dim)
+
+
 func _open_fight_from_formation_id(fid: String) -> void:
 	if _open_fight_keeps_domain_card(fid):
 		return
@@ -24720,6 +24963,9 @@ func _open_fight_from_formation_id(fid: String) -> void:
 	# First-session fallback stays GER Maginot 710173 → FRA 710739.
 	# COMBAT-1: `_adjacent_enemy_province_id` prefers a neighbor with
 	# defending units (Play soft: empty Haut-Rhin was first, instant capture).
+	# The province inspector does not use this fallback. It calls
+	# `_open_fight_from_inspector`, which only offers units in or next to
+	# the inspected province.
 	const GER_FRONT := 710173
 	const FRA_FRONT := 710739
 	if typeof(LeaderManager) == TYPE_NIL or not LeaderManager.has_method("get_formation"):
@@ -24880,7 +25126,8 @@ func _show_open_fight_sheet(
 	formation: Object,
 	from_pid: int,
 	enemy_pid: int,
-	attacker_tag: String
+	attacker_tag: String,
+	candidates: Array = []
 ) -> void:
 	var ui := get_node_or_null("UI") as CanvasLayer
 	if ui == null:
@@ -24900,7 +25147,10 @@ func _show_open_fight_sheet(
 		unit_pop.queue_free()
 	var old := ui.get_node_or_null("OpenFightSheet")
 	if old != null:
-		old.queue_free()
+		# queue_free leaves the old sheet as OpenFightSheet until the frame ends,
+		# so a second Open fight in the same turn still reads the stale card.
+		ui.remove_child(old)
+		old.free()
 	var att_name := open_fight_attacker_label(formation, fid)
 	var from_name := _province_display_name(from_pid)
 	var def_tag := ""
@@ -24983,27 +25233,53 @@ func _show_open_fight_sheet(
 		if not rec.is_empty():
 			lines.append(rec)
 		if not can_ok:
-			lines.append("Blocked · %s" % can_reason)
+			lines.append("Blocked · %s" % _open_fight_block_reason(false, can_reason, enemy_pid))
 	else:
 		lines.append("Defender · —")
 		lines.append("No adjacent enemy. March next to a hostile hex, then Open fight.")
+	if not candidates.is_empty():
+		var unit_bits: PackedStringArray = PackedStringArray()
+		for row_v in candidates:
+			if not (row_v is Dictionary):
+				continue
+			var row: Dictionary = row_v
+			unit_bits.append("%s @ %s" % [str(row.get("label", "Division")), str(row.get("station_name", ""))])
+		if not unit_bits.is_empty():
+			lines.append("Units · %s" % ", ".join(unit_bits))
+	elif fid.is_empty():
+		lines.append("No unit in or next to this province.")
 	body.text = "\n".join(lines)
 	if typeof(RetrowaveTheme) != TYPE_NIL:
 		RetrowaveTheme.style_body_label(body)
 	vbox.add_child(body)
-	if enemy_pid > 0 and typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("start_land_battle"):
+	if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("start_land_battle"):
+		var block_reason := _open_fight_block_reason(can_ok, can_reason, enemy_pid)
+		var start_enabled := enemy_pid > 0 and can_ok
+		if not start_enabled:
+			var warn := Label.new()
+			warn.name = "OpenFightBlock"
+			warn.text = block_reason
+			warn.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			warn.add_theme_font_size_override("font_size", 13)
+			warn.add_theme_color_override("font_color", Color("#ff6666"))
+			vbox.add_child(warn)
 		var start_btn := Button.new()
 		start_btn.name = "BtnStartBattle"
 		start_btn.text = "Start battle"
 		start_btn.focus_mode = Control.FOCUS_NONE
 		start_btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
-		if typeof(RetrowaveTheme) != TYPE_NIL:
+		if start_enabled and typeof(RetrowaveTheme) != TYPE_NIL:
 			RetrowaveTheme.style_primary_button(start_btn)
+		elif not start_enabled:
+			_style_open_fight_blocked_button(start_btn)
+			start_btn.tooltip_text = block_reason
 		var start_fid := fid
 		var start_to := enemy_pid
 		var start_from := from_pid
 		var start_tag := attacker_tag
 		start_btn.pressed.connect(func() -> void:
+			if not start_enabled:
+				return
 			_arm_unit_card_press_consume()
 			var assault: Dictionary = BattleManager.start_land_battle(start_tag, start_to, start_from, start_fid)
 			# Instant empty-hex capture is success but not a fight — no Hold/Withdraw.
@@ -25205,7 +25481,7 @@ func _ensure_attack_button() -> void:
 		_btn_open_fight = Button.new()
 		_btn_open_fight.name = "BtnOpenFight"
 		_btn_open_fight.text = "Open fight"
-		_btn_open_fight.tooltip_text = "Open Attacker/Defender sheet · Start battle (GER Maginot vs FRA)."
+		_btn_open_fight.tooltip_text = "Open a fight with a unit in this province, or in a province next to it."
 		_btn_open_fight.set_anchors_preset(Control.PRESET_TOP_LEFT)
 		_btn_open_fight.offset_left = 210.0
 		_btn_open_fight.offset_top = 34.0
@@ -25214,7 +25490,7 @@ func _ensure_attack_button() -> void:
 		_btn_open_fight.focus_mode = Control.FOCUS_NONE
 		_btn_open_fight.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
 		_btn_open_fight.pressed.connect(func() -> void:
-			_open_fight_from_formation_id(selected_formation_id)
+			_open_fight_from_inspector()
 		)
 		info_panel.add_child(_btn_open_fight)
 	_btn_open_fight.visible = true
