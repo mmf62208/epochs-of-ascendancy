@@ -99,7 +99,9 @@ func _assert_garrison_fielding(lm: Node, pm: Node, seeded: Dictionary) -> void:
 	# GAP-ENG-1 is net +15. ENG +8: 903055 903063 903069 903080 (Canada, now touch USA),
 	# 904353 Puta-O and 904369 Loilen (touch CHI), 905722 Ibri and 905731 Hayma (touch SAU).
 	# USA +7: 800096 800253 800290 800426 800427 800609 801171 now touch ENG Canada.
-	if placed != 574 or skipped != 0 or targets != 574 or placed != targets:
+	# MAP-2a: Alaska West 800015 now shares an edge with Yukon 903085. It had no
+	# foreign land neighbour before, so USA gains one border garrison. 574 → 575.
+	if placed != 575 or skipped != 0 or targets != 575 or placed != targets:
 		_fail("empty board placed=%d skipped=%d targets=%d" % [placed, skipped, targets])
 		return
 	var seen := 0
@@ -144,7 +146,7 @@ func _assert_garrison_fielding(lm: Node, pm: Node, seeded: Dictionary) -> void:
 	if seen != placed:
 		_fail("fielded %d != placed %d" % [seen, placed])
 		return
-	_pass("574 garrisons full TOE, 1936 design, nation names")
+	_pass("575 garrisons full TOE, 1936 design, nation names")
 
 
 func _assert_occupied_skip(lm: Node) -> Dictionary:
