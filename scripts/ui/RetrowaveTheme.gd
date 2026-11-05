@@ -344,14 +344,17 @@ static func make_tooltip_theme() -> Theme:
 	bg.a = 0.96
 	panel.bg_color = bg
 	var border := CYAN
-	border.a = 0.6
+	border.a = 0.85
 	panel.border_color = border
 	panel.set_border_width_all(1)
 	panel.set_corner_radius_all(4)
-	panel.content_margin_left = 8
-	panel.content_margin_right = 8
-	panel.content_margin_top = 6
-	panel.content_margin_bottom = 6
+	panel.content_margin_left = 10
+	panel.content_margin_right = 10
+	panel.content_margin_top = 8
+	panel.content_margin_bottom = 8
+	panel.shadow_color = Color(0, 0, 0, 0.35)
+	panel.shadow_size = 4
+	panel.shadow_offset = Vector2(2, 2)
 	theme.set_stylebox("panel", "TooltipPanel", panel)
 	theme.set_color("font_color", "TooltipLabel", TEXT_PRIMARY)
 	theme.set_font_size("font_size", "TooltipLabel", TOOLTIP_FONT_SIZE)
