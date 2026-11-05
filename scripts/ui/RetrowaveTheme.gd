@@ -20,6 +20,8 @@ const TOOLTIP_EDGE_MARGIN := 4.0
 ## Camera motion above this (px²) means the world under a still cursor changed.
 const TOOLTIP_PAN_CLEAR_PX2 := 0.25
 const TOOLTIP_RULE_COLOR := Color("#2a3a5c")
+## One process_frame callback per open tip. Keyed by popup instance id.
+static var _tooltip_pan_poll_cbs: Dictionary = {}
 
 
 static func style_top_info_bar(bar: Control) -> void:
@@ -811,34 +813,94 @@ static func refresh_open_tooltip_text(tree: SceneTree, text: String) -> void:
 	place_tooltip_popup(pop)
 
 
+## Pan-clear while a tip is open. One SceneTree.process_frame connection,
+## so a visible tip costs at most one check per frame. Stop when the tip is
+## gone, hidden, or the viewport has no camera. An idle self-requeue grows
+## the message queue without a bound and live-crashes (SIGSEGV).
 static func _arm_tooltip_pan_clear(pop: PopupPanel) -> void:
 	if pop == null or not is_instance_valid(pop):
 		return
 	if DisplayServer.get_name() == "headless":
 		return
+	_start_tooltip_pan_poll(pop)
+
+
+## Headless skips _arm_tooltip_pan_clear. Tests call this directly so the
+## same one-callback poll runs under a headless DisplayServer.
+static func _start_tooltip_pan_poll(pop: PopupPanel) -> void:
+	if pop == null or not is_instance_valid(pop):
+		return
+	if not pop.visible:
+		return
 	if bool(pop.get_meta("eoa_tooltip_pan_poll", false)):
 		return
+	var tree := pop.get_tree()
+	if tree == null:
+		return
 	pop.set_meta("eoa_tooltip_pan_poll", true)
+	pop.set_meta("eoa_tooltip_pan_poll_ticks", 0)
 	if pop.has_meta("eoa_tooltip_cam_pose"):
 		pop.remove_meta("eoa_tooltip_cam_pose")
-	_poll_tooltip_pan.call_deferred(pop)
+	var cb := _poll_tooltip_pan.bind(pop)
+	_tooltip_pan_poll_cbs[pop.get_instance_id()] = cb
+	if not tree.process_frame.is_connected(cb):
+		tree.process_frame.connect(cb)
+	var exit_cb := _on_tooltip_pan_poll_exiting.bind(pop)
+	if not pop.tree_exiting.is_connected(exit_cb):
+		pop.tree_exiting.connect(exit_cb, CONNECT_ONE_SHOT)
+
+
+static func _on_tooltip_pan_poll_exiting(pop: PopupPanel) -> void:
+	_stop_tooltip_pan_poll(pop)
+
+
+static func _stop_tooltip_pan_poll(pop: PopupPanel) -> void:
+	if pop == null or not is_instance_valid(pop):
+		return
+	var id := pop.get_instance_id()
+	var cb: Callable = _tooltip_pan_poll_cbs.get(id, Callable())
+	var tree := pop.get_tree()
+	if tree != null and cb.is_valid() and tree.process_frame.is_connected(cb):
+		tree.process_frame.disconnect(cb)
+	_tooltip_pan_poll_cbs.erase(id)
+	pop.set_meta("eoa_tooltip_pan_poll", false)
+	if pop.has_meta("eoa_tooltip_pan_poll_cb"):
+		pop.remove_meta("eoa_tooltip_pan_poll_cb")
+
+
+static func tooltip_pan_poll_active(pop: PopupPanel) -> bool:
+	if pop == null or not is_instance_valid(pop):
+		return false
+	if not bool(pop.get_meta("eoa_tooltip_pan_poll", false)):
+		return false
+	var cb: Callable = _tooltip_pan_poll_cbs.get(pop.get_instance_id(), Callable())
+	var tree := pop.get_tree()
+	return tree != null and cb.is_valid() and tree.process_frame.is_connected(cb)
+
+
+static func tooltip_pan_poll_tracked(instance_id: int) -> bool:
+	return _tooltip_pan_poll_cbs.has(instance_id)
 
 
 static func _poll_tooltip_pan(pop: PopupPanel) -> void:
 	if pop == null or not is_instance_valid(pop):
 		return
+	var ticks := int(pop.get_meta("eoa_tooltip_pan_poll_ticks", 0)) + 1
+	pop.set_meta("eoa_tooltip_pan_poll_ticks", ticks)
 	if not pop.visible:
-		pop.set_meta("eoa_tooltip_pan_poll", false)
+		_stop_tooltip_pan_poll(pop)
 		return
 	var host := _host_viewport(pop)
 	var cam: Camera2D = host.get_camera_2d() if host != null else null
-	if cam != null:
-		var now := cam.global_position
-		if pop.has_meta("eoa_tooltip_cam_pose"):
-			var prev: Vector2 = pop.get_meta("eoa_tooltip_cam_pose")
-			if tooltip_should_clear_for_pan(prev, now):
-				pop.hide()
-				pop.set_meta("eoa_tooltip_pan_poll", false)
-				return
-		pop.set_meta("eoa_tooltip_cam_pose", now)
-	_poll_tooltip_pan.call_deferred(pop)
+	# No camera: stop. Do not keep polling until one appears.
+	if cam == null:
+		_stop_tooltip_pan_poll(pop)
+		return
+	var now := cam.global_position
+	if pop.has_meta("eoa_tooltip_cam_pose"):
+		var prev: Vector2 = pop.get_meta("eoa_tooltip_cam_pose")
+		if tooltip_should_clear_for_pan(prev, now):
+			pop.hide()
+			_stop_tooltip_pan_poll(pop)
+			return
+	pop.set_meta("eoa_tooltip_cam_pose", now)
