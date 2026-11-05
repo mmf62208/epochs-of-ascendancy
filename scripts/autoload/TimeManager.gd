@@ -75,6 +75,8 @@ var _overlay_saved_valid: bool = false
 var total_days_elapsed: int = 0
 ## 0 keeps the global RNG alone (seed-md5 harness). A non-zero value reseeds
 ## each sim day from (run_seed, day) so a short day cannot shift the next day's draws.
+## SIM-1104-C: AI land-battle start, empty-hex siege, and light capture do not
+## draw this RNG — soak seeds stay identical by design.
 var run_seed: int = 0
 var _reseed_usec_total: int = 0
 var _reseed_calls: int = 0
