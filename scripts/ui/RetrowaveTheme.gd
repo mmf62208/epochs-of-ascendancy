@@ -17,6 +17,8 @@ const TOOLTIP_TITLE_FONT_SIZE := 15
 const TOOLTIP_TITLE_PREFIX := "# "
 const TOOLTIP_HOTKEY_SEP := " · "
 const TOOLTIP_EDGE_MARGIN := 4.0
+## Camera motion above this (px²) means the world under a still cursor changed.
+const TOOLTIP_PAN_CLEAR_PX2 := 0.25
 const TOOLTIP_RULE_COLOR := Color("#2a3a5c")
 
 
@@ -409,6 +411,7 @@ static func _deferred_dress_tooltip(node: Node) -> void:
 	if pop.visible:
 		pop.reset_size()
 		place_tooltip_popup(pop)
+	_arm_tooltip_pan_clear(pop)
 
 
 ## Wrap the engine tooltip label at 320px. A leading "# " line becomes the
@@ -445,6 +448,42 @@ static func dress_tooltip_popup(node: Node) -> void:
 	pop.add_child(box)
 	label.reparent(box)
 	_apply_tooltip_content(box, label, raw)
+
+
+## PopupPanel is a Window, so pop.get_viewport() is the popup itself. Its mouse
+## and visible rect sit at the popup origin, which Play saw as the top-left.
+## The cursor and the game window live on the parent viewport.
+static func _host_viewport(pop: Node) -> Viewport:
+	if pop == null:
+		return null
+	var parent := pop.get_parent()
+	while parent != null:
+		if parent is Viewport and parent != pop:
+			return parent as Viewport
+		parent = parent.get_parent()
+	var tree := pop.get_tree()
+	if tree != null and tree.root != null and tree.root != pop:
+		return tree.root
+	return null
+
+
+## Zero anchor means "unset". A known cursor wins over the engine popup
+## position, including when the cursor is the top-left pixel.
+static func resolve_tooltip_anchor(
+	anchor: Rect2,
+	cursor: Vector2,
+	popup_position: Vector2,
+	cursor_known: bool
+) -> Rect2:
+	if anchor.size != Vector2.ZERO or anchor.position != Vector2.ZERO:
+		return anchor
+	if cursor_known:
+		return Rect2(cursor, Vector2(1, 1))
+	return Rect2(popup_position, Vector2(1, 1))
+
+
+static func tooltip_should_clear_for_pan(from_pose: Vector2, to_pose: Vector2) -> bool:
+	return from_pose.distance_squared_to(to_pose) > TOOLTIP_PAN_CLEAR_PX2
 
 
 static func _tooltip_max_width() -> int:
@@ -674,28 +713,25 @@ static func place_tooltip_popup(
 	pop.reset_size()
 	var sz := Vector2(pop.size)
 	if sz.x < 8.0 or sz.y < 8.0:
-		sz = pop.get_combined_minimum_size()
+		sz = pop.get_contents_minimum_size()
 	if sz.x < 8.0:
 		sz.x = 48.0
 	if sz.y < 8.0:
 		sz.y = 24.0
+	var host := _host_viewport(pop)
 	var vp := viewport_rect
 	if vp.size.x < 1.0 or vp.size.y < 1.0:
-		var v: Viewport = pop.get_viewport()
-		if v != null:
-			vp = v.get_visible_rect()
-		else:
+		if host != null:
+			vp = host.get_visible_rect()
+		if vp.size.x < 1.0 or vp.size.y < 1.0:
 			vp = Rect2(0.0, 0.0, 1280.0, 800.0)
-	var anc := anchor
-	if anc.size == Vector2.ZERO and anc.position == Vector2.ZERO:
-		var mouse := Vector2.ZERO
-		var v2: Viewport = pop.get_viewport()
-		if v2 != null:
-			mouse = v2.get_mouse_position()
-		if mouse != Vector2.ZERO:
-			anc = Rect2(mouse, Vector2(1, 1))
-		else:
-			anc = Rect2(Vector2(pop.position), Vector2(1, 1))
+	var cursor := Vector2.ZERO
+	# Headless has no cursor. Live play uses the host mouse even at (0, 0)
+	# so a top-bar tip does not fall back to the engine's top-left position.
+	var cursor_known := host != null and DisplayServer.get_name() != "headless"
+	if cursor_known:
+		cursor = host.get_mouse_position()
+	var anc := resolve_tooltip_anchor(anchor, cursor, Vector2(pop.position), cursor_known)
 	var placed := clamp_tooltip_rect(sz, vp, anc)
 	pop.position = Vector2i(int(round(placed.position.x)), int(round(placed.position.y)))
 	if placed.size.x + 0.5 < sz.x or placed.size.y + 0.5 < sz.y:
@@ -721,6 +757,7 @@ static func _on_tooltip_place_needed(pop: PopupPanel) -> void:
 	pop.set_meta("eoa_tooltip_placing", true)
 	place_tooltip_popup(pop)
 	pop.set_meta("eoa_tooltip_placing", false)
+	_arm_tooltip_pan_clear(pop)
 
 
 static func find_visible_tooltip_popup(from: Node) -> PopupPanel:
@@ -772,3 +809,36 @@ static func refresh_open_tooltip_text(tree: SceneTree, text: String) -> void:
 		label.text = text
 	pop.reset_size()
 	place_tooltip_popup(pop)
+
+
+static func _arm_tooltip_pan_clear(pop: PopupPanel) -> void:
+	if pop == null or not is_instance_valid(pop):
+		return
+	if DisplayServer.get_name() == "headless":
+		return
+	if bool(pop.get_meta("eoa_tooltip_pan_poll", false)):
+		return
+	pop.set_meta("eoa_tooltip_pan_poll", true)
+	if pop.has_meta("eoa_tooltip_cam_pose"):
+		pop.remove_meta("eoa_tooltip_cam_pose")
+	_poll_tooltip_pan.call_deferred(pop)
+
+
+static func _poll_tooltip_pan(pop: PopupPanel) -> void:
+	if pop == null or not is_instance_valid(pop):
+		return
+	if not pop.visible:
+		pop.set_meta("eoa_tooltip_pan_poll", false)
+		return
+	var host := _host_viewport(pop)
+	var cam: Camera2D = host.get_camera_2d() if host != null else null
+	if cam != null:
+		var now := cam.global_position
+		if pop.has_meta("eoa_tooltip_cam_pose"):
+			var prev: Vector2 = pop.get_meta("eoa_tooltip_cam_pose")
+			if tooltip_should_clear_for_pan(prev, now):
+				pop.hide()
+				pop.set_meta("eoa_tooltip_pan_poll", false)
+				return
+		pop.set_meta("eoa_tooltip_cam_pose", now)
+	_poll_tooltip_pan.call_deferred(pop)
