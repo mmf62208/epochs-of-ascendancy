@@ -13,7 +13,11 @@ const WARNING := Color("#ff6666")
 const SUCCESS := Color("#55ff99")
 const TOOLTIP_MAX_WIDTH := 320
 const TOOLTIP_FONT_SIZE := 14
+const TOOLTIP_TITLE_FONT_SIZE := 15
+const TOOLTIP_TITLE_PREFIX := "# "
+const TOOLTIP_HOTKEY_SEP := " · "
 const TOOLTIP_EDGE_MARGIN := 4.0
+const TOOLTIP_RULE_COLOR := Color("#2a3a5c")
 
 
 static func style_top_info_bar(bar: Control) -> void:
@@ -407,8 +411,9 @@ static func _deferred_dress_tooltip(node: Node) -> void:
 		place_tooltip_popup(pop)
 
 
-## Wrap the engine tooltip label at 320px and lift a trailing [Hotkey] line
-## into a right-aligned CYAN chip. Does not free the engine Label.
+## Wrap the engine tooltip label at 320px. A leading "# " line becomes the
+## title. A trailing hotkey line splits on " · " into right-aligned chips.
+## Does not free the engine Label.
 static func dress_tooltip_popup(node: Node) -> void:
 	if node == null or not (node is PopupPanel):
 		return
@@ -425,29 +430,9 @@ static func dress_tooltip_popup(node: Node) -> void:
 	if label == null:
 		return
 	pop.set_meta("eoa_tooltip_dressed", true)
-	var max_w := TOOLTIP_MAX_WIDTH
-	var base := ThemeDB.get_default_theme()
-	if base != null:
-		var themed := int(base.get_constant("max_width", "TooltipLabel"))
-		if themed > 0:
-			max_w = themed
-	var parts := label.text.split("\n")
-	var hotkey := ""
-	if parts.size() >= 2 and _hotkey_line(str(parts[parts.size() - 1])):
-		hotkey = str(parts[parts.size() - 1]).strip_edges()
-		parts.remove_at(parts.size() - 1)
-		while parts.size() > 0 and str(parts[parts.size() - 1]).strip_edges().is_empty():
-			parts.remove_at(parts.size() - 1)
-		label.text = "\n".join(parts)
-	# Autowrap uses the control width. A max size alone leaves that width at 0
-	# and the popup collapses to a few characters. Width is the longest line,
-	# capped at the theme max, so short tips stay narrow and long ones wrap.
-	var wrap_size := _tooltip_body_size(label, parts, max_w)
+	var raw := label.text
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	label.clip_text = false
-	label.custom_minimum_size = wrap_size
-	# y < 0 means no max height (0 would crush the label).
-	label.custom_maximum_size = Vector2(float(max_w), -1)
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	label.set_anchors_preset(Control.PRESET_TOP_LEFT)
@@ -456,22 +441,142 @@ static func dress_tooltip_popup(node: Node) -> void:
 	var box := VBoxContainer.new()
 	box.name = "EoaTooltipBox"
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	box.custom_minimum_size = Vector2(wrap_size.x, 0)
 	box.add_theme_constant_override("separation", 4)
 	pop.add_child(box)
 	label.reparent(box)
-	if hotkey.is_empty():
+	_apply_tooltip_content(box, label, raw)
+
+
+static func _tooltip_max_width() -> int:
+	var max_w := TOOLTIP_MAX_WIDTH
+	var base := ThemeDB.get_default_theme()
+	if base != null:
+		var themed := int(base.get_constant("max_width", "TooltipLabel"))
+		if themed > 0:
+			max_w = themed
+	return max_w
+
+
+static func _hotkey_chip_texts(line: String) -> PackedStringArray:
+	var out: PackedStringArray = PackedStringArray()
+	for part in line.split(TOOLTIP_HOTKEY_SEP):
+		var s := str(part).strip_edges()
+		if not s.is_empty():
+			out.append(s)
+	return out
+
+
+static func _hotkey_chip_is_danger(text: String) -> bool:
+	return text.contains("Ctrl+Click") or text.contains("Del")
+
+
+static func _tooltip_chip_font() -> Font:
+	var theme := ThemeDB.get_default_theme()
+	if theme != null and theme.has_font("font", "CodeEdit"):
+		var mono := theme.get_font("font", "CodeEdit")
+		if mono != null:
+			return mono
+	return ThemeDB.fallback_font
+
+
+static func _apply_tooltip_content(box: Node, label: Label, raw: String) -> void:
+	if box == null or label == null:
+		return
+	_clear_tooltip_chrome(box)
+	var lines: PackedStringArray = raw.split("\n")
+	var hotkeys := PackedStringArray()
+	if lines.size() >= 2 and _hotkey_line(str(lines[lines.size() - 1])):
+		hotkeys = _hotkey_chip_texts(str(lines[lines.size() - 1]))
+		lines.remove_at(lines.size() - 1)
+		while lines.size() > 0 and str(lines[lines.size() - 1]).strip_edges().is_empty():
+			lines.remove_at(lines.size() - 1)
+	var title := ""
+	if lines.size() > 0:
+		var first := str(lines[0]).strip_edges()
+		if first.begins_with(TOOLTIP_TITLE_PREFIX):
+			title = first.substr(TOOLTIP_TITLE_PREFIX.length()).strip_edges()
+			lines.remove_at(0)
+			while lines.size() > 0 and str(lines[0]).strip_edges().is_empty():
+				lines.remove_at(0)
+	var body_lines := lines
+	var max_w := _tooltip_max_width()
+	label.text = "\n".join(body_lines)
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.clip_text = false
+	# y < 0 means no max height (0 would crush the label).
+	label.custom_maximum_size = Vector2(float(max_w), -1)
+	var wrap_size := _tooltip_body_size(label, body_lines, max_w)
+	if not title.is_empty():
+		var title_font := ThemeDB.fallback_font
+		if title_font != null:
+			var title_w := title_font.get_string_size(title, HORIZONTAL_ALIGNMENT_LEFT, -1, TOOLTIP_TITLE_FONT_SIZE).x
+			wrap_size.x = minf(maxf(wrap_size.x, title_w), float(max_w))
+	label.custom_minimum_size = wrap_size
+	if box is Control:
+		(box as Control).custom_minimum_size = Vector2(wrap_size.x, 0)
+	var insert_at := 0
+	if not title.is_empty():
+		var title_lab := Label.new()
+		title_lab.name = "EoaTooltipTitle"
+		title_lab.text = title
+		title_lab.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		title_lab.clip_text = false
+		title_lab.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		title_lab.custom_maximum_size = Vector2(float(max_w), -1)
+		title_lab.add_theme_font_size_override("font_size", TOOLTIP_TITLE_FONT_SIZE)
+		title_lab.add_theme_color_override("font_color", CYAN)
+		var bold := FontVariation.new()
+		bold.base_font = ThemeDB.fallback_font
+		bold.variation_embolden = 0.85
+		title_lab.add_theme_font_override("font", bold)
+		box.add_child(title_lab)
+		box.move_child(title_lab, insert_at)
+		insert_at += 1
+		var rule := HSeparator.new()
+		rule.name = "EoaTooltipRule"
+		rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var line := StyleBoxLine.new()
+		line.color = TOOLTIP_RULE_COLOR
+		line.thickness = 1
+		rule.add_theme_stylebox_override("separator", line)
+		rule.custom_minimum_size = Vector2(0, 1)
+		box.add_child(rule)
+		box.move_child(rule, insert_at)
+	if hotkeys.is_empty():
 		return
 	var row := HBoxContainer.new()
+	row.name = "EoaHotkeyRow"
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.alignment = BoxContainer.ALIGNMENT_END
+	row.add_theme_constant_override("separation", 6)
 	box.add_child(row)
+	var chip_font := _tooltip_chip_font()
+	for chip_text in hotkeys:
+		# Duplicate sibling names are uniquified. Readable form keeps the
+		# HotkeyChip hook (HotkeyChip, HotkeyChip2, …) instead of @Class@id.
+		row.add_child(_make_hotkey_chip(chip_text, chip_font), true)
+
+
+static func _clear_tooltip_chrome(box: Node) -> void:
+	var drop: Array[Node] = []
+	for c in box.get_children():
+		var n := str(c.name)
+		if n == "EoaTooltipTitle" or n == "EoaTooltipRule" or n == "EoaHotkeyRow":
+			drop.append(c)
+	for c in drop:
+		box.remove_child(c)
+		c.free()
+
+
+static func _make_hotkey_chip(chip_text: String, chip_font: Font) -> PanelContainer:
+	var danger := _hotkey_chip_is_danger(chip_text)
 	var chip_bg := StyleBoxFlat.new()
 	var cbg := BG_PANEL
 	cbg.a = 0.96
 	chip_bg.bg_color = cbg
-	var cb := CYAN
-	cb.a = 0.6
+	var cb := MAGENTA if danger else CYAN
+	if not danger:
+		cb.a = 0.6
 	chip_bg.border_color = cb
 	chip_bg.set_border_width_all(1)
 	chip_bg.set_corner_radius_all(3)
@@ -485,12 +590,15 @@ static func dress_tooltip_popup(node: Node) -> void:
 	chip_panel.size_flags_horizontal = Control.SIZE_SHRINK_END
 	chip_panel.add_theme_stylebox_override("panel", chip_bg)
 	var chip := Label.new()
-	chip.text = hotkey
+	chip.text = chip_text
 	chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	chip.clip_text = false
+	if chip_font != null:
+		chip.add_theme_font_override("font", chip_font)
 	chip.add_theme_font_size_override("font_size", 12)
-	chip.add_theme_color_override("font_color", CYAN)
+	chip.add_theme_color_override("font_color", MAGENTA if danger else CYAN)
 	chip_panel.add_child(chip)
-	row.add_child(chip_panel)
+	return chip_panel
 
 
 ## Body size for the engine tooltip label. Width is the longest line, capped
@@ -635,7 +743,7 @@ static func tooltip_body_label(pop: PopupPanel) -> Label:
 	var box: Node = pop.find_child("EoaTooltipBox", true, false)
 	if box != null:
 		for c in box.get_children():
-			if c is Label:
+			if c is Label and str(c.name) != "EoaTooltipTitle":
 				return c as Label
 	for c in pop.get_children():
 		if c is Label:
@@ -657,22 +765,10 @@ static func refresh_open_tooltip_text(tree: SceneTree, text: String) -> void:
 	var label := tooltip_body_label(pop)
 	if label == null:
 		return
-	var parts := text.split("\n")
-	var hotkey := ""
-	if parts.size() >= 2 and _hotkey_line(str(parts[parts.size() - 1])):
-		hotkey = str(parts[parts.size() - 1]).strip_edges()
-		parts.remove_at(parts.size() - 1)
-		while parts.size() > 0 and str(parts[parts.size() - 1]).strip_edges().is_empty():
-			parts.remove_at(parts.size() - 1)
-	label.text = "\n".join(parts)
-	var max_w := TOOLTIP_MAX_WIDTH
-	var wrap_size := _tooltip_body_size(label, parts, max_w)
-	label.custom_minimum_size = wrap_size
-	label.custom_maximum_size = Vector2(float(max_w), -1)
-	var chip: Node = pop.find_child("HotkeyChip", true, false)
-	if chip != null and chip.get_child_count() > 0:
-		var chip_lab: Label = chip.get_child(0) as Label
-		if chip_lab != null and not hotkey.is_empty():
-			chip_lab.text = hotkey
+	var box: Node = pop.find_child("EoaTooltipBox", true, false)
+	if box != null:
+		_apply_tooltip_content(box, label, text)
+	else:
+		label.text = text
 	pop.reset_size()
 	place_tooltip_popup(pop)
