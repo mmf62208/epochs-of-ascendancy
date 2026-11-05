@@ -71,3 +71,25 @@ python3 -m unittest tools.map_generation.tests.test_startup_guard_inventory -v
 Reports SHA-256 of shipped `world_accurate` key files and confirms **3596**
 province IDs including Berlin `710300`. Garrison **575** is runtime-only
 (`seed_1936_start_garrisons`).
+
+## One bounded cloud run (PARK)
+
+Cited artifacts: `docs/evidence/startup_guard/run-7d7a0b85-xvfb/`
+(also `/opt/cursor/artifacts/startup-guard/`). Full numbers in `RESULT.md`.
+
+| Label | Value |
+|-------|-------|
+| `DATA_INVARIANT` | PASS |
+| `PRESENTATION` | DIAGNOSTIC |
+| `LIVE_BLANK` | **NOT_REPRODUCED** |
+| `FIXTURE` | PASS |
+| `LIVE_STARTUP` | **NOT_CLAIMED** |
+
+Engine `--version`: `4.7.1.stable.official.a13da4feb`. xvfb 1280×800, not
+maximized; Vulkan missing → OpenGL/llvmpipe. Product Begin did not resize;
+controlled `860×550` changed `window.size` but viewport stayed 1280×800.
+`garrison_1936` observed **535** (stable through Begin; 575 is empty-board
+seed target). Seed `20fe9063…` not recomputed.
+
+**No live-startup PASS. No product fix implemented.** Smallest product
+proposal: **unknown** — pair blank remains outside this isolated recipe.
