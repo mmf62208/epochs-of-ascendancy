@@ -6,12 +6,26 @@ extends Node
 const MANIFEST_PATH := "res://data/audio_manifest.json"
 const CFG_PATH := "user://audio.cfg"
 const POOL_SIZE := 16
+## 80 ms between hovers. The CC0 hover file is 457 ms, so its polyphony is 6
+## and this gap stays the limit (Audio1 retries at 90 ms).
 const HOVER_GAP_MS := 80
 const UI_DEFAULT_DB := -12.0
 const SFX_DEFAULT_DB := 0.0
 const MASTER_DEFAULT_DB := 0.0
 const DB_MIN := -40.0
 const DB_MAX := 0.0
+const MUSIC_DEFAULT_DB := -6.0
+const MUSIC_FADE_SEC := 2.0
+const MUSIC_DUCK_DB := -8.0
+const MUSIC_SILENT_DB := -80.0
+const WAV_FALLBACK := {
+	"ui_click": "res://audio/sfx/ui/ui_click.wav",
+	"ui_hover": "res://audio/sfx/ui/ui_hover.wav",
+	"combat_clash": "res://audio/sfx/combat/combat_clash.wav",
+	"end_victory_sting": "res://audio/sfx/end/end_victory_sting.wav",
+	"end_defeat_sting": "res://audio/sfx/end/end_defeat_sting.wav",
+	"order_issued": "res://audio/sfx/ui/confirm.wav",
+}
 
 var _entries: Dictionary = {}
 var _streams: Dictionary = {}
@@ -27,15 +41,33 @@ var _ui_db: float = UI_DEFAULT_DB
 var _sfx_db: float = SFX_DEFAULT_DB
 var _muted: bool = false
 var _time: Node = null
+var _music_db: float = MUSIC_DEFAULT_DB
+var _music_linear: float = 0.5011872336272722
+var _music_mode: String = ""
+var _mus_in: AudioStreamPlayer = null
+var _mus_out: AudioStreamPlayer = null
+var _key_in: String = ""
+var _key_out: String = ""
+var _fade_t: float = 1.0
+var _fading: bool = false
+var _gain_in: float = 0.0
+var _gain_out: float = 0.0
+var _gain_trace: Array = []
+var _music_duck_db: float = 0.0
+var _music_duck_until_ms: int = 0
+var _music_duck_span_ms: int = 0
 
 
 func _init() -> void:
 	_pitch_rng.seed = 0x41554431
+	_music_linear = db_to_linear(MUSIC_DEFAULT_DB)
 
 
 func _ready() -> void:
+	set_process(false)
 	_load_manifest()
 	_build_pool()
+	_build_music()
 	_preload_streams()
 	load_settings()
 	var tree := get_tree()
@@ -80,6 +112,123 @@ func set_sfx_db(db: float) -> void:
 	_save_settings()
 
 
+func get_music_db() -> float:
+	return _music_db
+
+
+func get_music_linear() -> float:
+	return _music_linear
+
+
+## 0 is silent and stops the music players. 1 is unity on the Music bus.
+func set_music_linear(linear: float) -> void:
+	var v := clampf(linear, 0.0, 1.0)
+	var was := _music_mode
+	if v <= 0.0000001:
+		_music_linear = 0.0
+		_music_db = MUSIC_SILENT_DB
+		_music_halt()
+	else:
+		_music_linear = v
+		_music_db = linear_to_db(v)
+	_apply_buses()
+	_save_settings()
+	if v > 0.0000001 and not was.is_empty() and _key_in.is_empty():
+		note_presentation(was)
+
+
+func note_presentation(mode: String) -> void:
+	var m := mode.strip_edges().to_lower()
+	if m != "menu" and m != "game":
+		return
+	_music_mode = m
+	if m == "menu":
+		_music_request("music_menu")
+		return
+	_music_request("" if _player_at_war() else "music_peace")
+
+
+func notify_mv1_move_committed() -> void:
+	play("order_move")
+
+
+func notify_assault_ordered() -> void:
+	play("order_attack")
+
+
+func notify_province_outcome(winner: String, line: String) -> void:
+	var key := "map"
+	if typeof(LandBattleSfx) != TYPE_NIL:
+		key = str(LandBattleSfx.key_for_aar(winner, line))
+	if key.is_empty():
+		return
+	play(key)
+
+
+func music_incoming_key() -> String:
+	return _key_in
+
+
+func music_outgoing_key() -> String:
+	return _key_out
+
+
+func music_incoming_playing() -> bool:
+	return _mus_in != null and _mus_in.playing
+
+
+func music_outgoing_playing() -> bool:
+	return _mus_out != null and _mus_out.playing
+
+
+func music_incoming_gain() -> float:
+	return _gain_in
+
+
+func music_outgoing_gain() -> float:
+	return _gain_out
+
+
+func music_gain_trace() -> Array:
+	return _gain_trace.duplicate()
+
+
+func music_duck_db() -> float:
+	return _music_duck_db
+
+
+func music_duck_span_ms() -> int:
+	return _music_duck_span_ms
+
+
+func music_bus_db() -> float:
+	var idx := AudioServer.get_bus_index("Music")
+	if idx < 0:
+		return 99.0
+	return AudioServer.get_bus_volume_db(idx)
+
+
+func service_music(delta: float) -> void:
+	if _fading:
+		var step := 0.0
+		if MUSIC_FADE_SEC > 0.0:
+			step = maxf(0.0, delta) / MUSIC_FADE_SEC
+		_fade_t = minf(1.0, _fade_t + step)
+		_apply_music_gains()
+		_gain_trace.append({"in": _gain_in, "out": _gain_out, "key": _key_in})
+		if _gain_trace.size() > 240:
+			_gain_trace.pop_front()
+		if _fade_t >= 1.0:
+			_finish_fade()
+	_tick_music_duck(Time.get_ticks_msec())
+	if not _fading and _music_duck_until_ms <= 0:
+		set_process(false)
+
+
+func forget_cached_stream(key: String) -> void:
+	_streams.erase(key)
+
+
 func set_muted(on: bool) -> void:
 	_muted = on
 	_apply_buses()
@@ -95,6 +244,13 @@ func load_settings() -> void:
 	_ui_db = clampf(float(cf.get_value("audio", "ui_db", UI_DEFAULT_DB)), DB_MIN, DB_MAX)
 	_sfx_db = clampf(float(cf.get_value("audio", "sfx_db", SFX_DEFAULT_DB)), DB_MIN, DB_MAX)
 	_muted = bool(cf.get_value("audio", "muted", false))
+	_music_linear = clampf(float(cf.get_value("audio", "music_linear", db_to_linear(MUSIC_DEFAULT_DB))), 0.0, 1.0)
+	if _music_linear <= 0.0000001:
+		_music_linear = 0.0
+		_music_db = MUSIC_SILENT_DB
+		_music_halt()
+	else:
+		_music_db = linear_to_db(_music_linear)
 	_apply_buses()
 
 
@@ -143,6 +299,9 @@ func play_forced(key: String) -> bool:
 
 
 func _play(key: String, force_pin: bool) -> bool:
+	var entry := _entry(key)
+	if not entry.is_empty() and str(entry.get("bus", "")) == "Music":
+		return _music_request(key)
 	_remember(key)
 	if _muted:
 		return false
@@ -151,11 +310,10 @@ func _play(key: String, force_pin: bool) -> bool:
 		if now - _last_hover_ms < HOVER_GAP_MS:
 			return false
 		_last_hover_ms = now
-	var entry := _entry(key)
 	if entry.is_empty():
 		_warn_once(key)
 		return false
-	var stream := _streams.get(key) as AudioStream
+	var stream := _resolve_stream(key, entry)
 	if stream == null:
 		_warn_once(key)
 		return false
@@ -195,10 +353,13 @@ func _play(key: String, force_pin: bool) -> bool:
 	var rows: Array = _voices.get(key, [])
 	rows.append({"until_ms": until, "pitch": pitch, "slot": slot})
 	_voices[key] = rows
+	if key == "end_victory_sting" or key == "end_defeat_sting":
+		_arm_music_duck(stream)
 	return true
 
 
 func _on_game_day(_year: int, _month: int, _day: int) -> void:
+	_music_sync_war()
 	if not day_tick_allowed():
 		return
 	play("day_tick")
@@ -207,6 +368,8 @@ func _on_game_day(_year: int, _month: int, _day: int) -> void:
 func _on_node_added(node: Node) -> void:
 	if node is BaseButton:
 		_wire_button(node as BaseButton)
+	if str(node.name) == "WorldMap":
+		call_deferred("_refresh_music_scene")
 
 
 ## One ui_click per control per frame. Live-pointer code calls this, and
@@ -295,12 +458,16 @@ func _load_manifest() -> void:
 func _preload_streams() -> void:
 	for key_v in _entries.keys():
 		var key := str(key_v)
+		if str(_entry(key).get("bus", "")) == "Music":
+			continue
 		var path := str(_entry(key).get("path", ""))
 		if path.is_empty() or not _res_exists(path):
 			continue
 		var stream := load(path) as AudioStream
-		if stream != null:
-			_streams[key] = stream
+		if stream == null:
+			continue
+		_arm_loop(key, stream)
+		_streams[key] = stream
 
 
 func _build_pool() -> void:
@@ -316,6 +483,12 @@ func _apply_buses() -> void:
 	_set_bus("Master", _master_db, _muted)
 	_set_bus("UI", _ui_db, false)
 	_set_bus("SFX", _sfx_db, false)
+	var music_db := _music_db
+	if _music_linear <= 0.0000001:
+		music_db = MUSIC_SILENT_DB
+	else:
+		music_db = _music_db + _music_duck_db
+	_set_bus("Music", music_db, false)
 
 
 func _set_bus(bus_name: String, db: float, mute_bus: bool) -> void:
@@ -332,6 +505,8 @@ func _save_settings() -> void:
 	cf.set_value("audio", "ui_db", _ui_db)
 	cf.set_value("audio", "sfx_db", _sfx_db)
 	cf.set_value("audio", "muted", _muted)
+	cf.set_value("audio", "music_linear", _music_linear)
+	cf.set_value("audio", "music_db", _music_db)
 	cf.save(CFG_PATH)
 
 
@@ -404,3 +579,234 @@ func _res_exists(path: String) -> bool:
 	if FileAccess.file_exists(path):
 		return true
 	return FileAccess.file_exists(ProjectSettings.globalize_path(path))
+
+
+func _process(delta: float) -> void:
+	service_music(delta)
+
+
+func _resolve_stream(key: String, entry: Dictionary) -> AudioStream:
+	var cached := _streams.get(key) as AudioStream
+	if cached != null:
+		return cached
+	var path := str(entry.get("path", ""))
+	if not path.is_empty() and _res_exists(path):
+		var loaded := load(path) as AudioStream
+		if loaded != null:
+			_arm_loop(key, loaded)
+			_streams[key] = loaded
+			return loaded
+	var fb := str(WAV_FALLBACK.get(key, ""))
+	if fb.is_empty() or not _res_exists(fb):
+		return null
+	_warn_once(key)
+	var wav := load(fb) as AudioStream
+	if wav == null:
+		return null
+	_streams[key] = wav
+	return wav
+
+
+func _arm_loop(key: String, stream: AudioStream) -> void:
+	if not (stream is AudioStreamOggVorbis):
+		return
+	var ogg := stream as AudioStreamOggVorbis
+	if str(_entry(key).get("bus", "")) == "Music":
+		ogg.loop = true
+	elif key.begins_with("end_"):
+		ogg.loop = false
+
+
+func _build_music() -> void:
+	_mus_in = AudioStreamPlayer.new()
+	_mus_in.name = "MusicIn"
+	_mus_in.bus = "Music"
+	add_child(_mus_in)
+	_mus_out = AudioStreamPlayer.new()
+	_mus_out.name = "MusicOut"
+	_mus_out.bus = "Music"
+	add_child(_mus_out)
+
+
+func _music_request(key: String) -> bool:
+	if key == _key_in and (key.is_empty() or (_mus_in != null and _mus_in.playing)):
+		return _music_linear > 0.0 and not _muted
+	if not key.is_empty():
+		_remember(key)
+	if _muted or _music_linear <= 0.0000001:
+		if _music_linear <= 0.0000001:
+			_music_halt()
+		return false
+	var stream: AudioStream = null
+	if not key.is_empty():
+		stream = _resolve_stream(key, _entry(key))
+		if stream == null:
+			_warn_once(key)
+			return false
+	if _mus_in == null or _mus_out == null:
+		_build_music()
+	var prev := _mus_in
+	_mus_in = _mus_out
+	_mus_out = prev
+	_key_out = _key_in
+	_key_in = key
+	if stream != null:
+		_mus_in.stream = stream
+		_mus_in.bus = "Music"
+		_mus_in.play()
+	else:
+		_mus_in.stop()
+		_mus_in.stream = null
+	_fade_t = 0.0
+	_fading = true
+	_gain_trace.clear()
+	_apply_music_gains()
+	_gain_trace.append({"in": _gain_in, "out": _gain_out, "key": _key_in})
+	set_process(true)
+	return true
+
+
+func _apply_music_gains() -> void:
+	var inn := 1.0
+	var outg := 0.0
+	if _fading:
+		inn = _fade_t
+		outg = 1.0 - _fade_t
+	_gain_in = inn
+	_gain_out = outg
+	_set_music_gain(_mus_in, _key_in, inn)
+	_set_music_gain(_mus_out, _key_out, outg)
+
+
+func _set_music_gain(player: AudioStreamPlayer, key: String, gain: float) -> void:
+	if player == null:
+		return
+	var trim := -6.0
+	if not key.is_empty():
+		trim = float(_entry(key).get("volume_db", -6.0))
+	var gdb := MUSIC_SILENT_DB
+	if gain > 0.0001:
+		gdb = linear_to_db(gain)
+	player.volume_db = trim + gdb
+
+
+func _finish_fade() -> void:
+	_fading = false
+	_fade_t = 1.0
+	if _mus_out != null:
+		_mus_out.stop()
+		_mus_out.stream = null
+	_key_out = ""
+	if _key_in.is_empty() and _mus_in != null:
+		_mus_in.stop()
+		_mus_in.stream = null
+	_apply_music_gains()
+
+
+func _music_halt() -> void:
+	_fading = false
+	_fade_t = 1.0
+	_key_in = ""
+	_key_out = ""
+	_gain_in = 0.0
+	_gain_out = 0.0
+	if _mus_in != null:
+		_mus_in.stop()
+		_mus_in.stream = null
+	if _mus_out != null:
+		_mus_out.stop()
+		_mus_out.stream = null
+	_music_duck_db = 0.0
+	_music_duck_until_ms = 0
+
+
+func _arm_music_duck(stream: AudioStream) -> void:
+	if _music_linear <= 0.0000001:
+		return
+	var span := _length_ms(stream)
+	_music_duck_span_ms = span
+	_music_duck_until_ms = Time.get_ticks_msec() + span
+	_music_duck_db = MUSIC_DUCK_DB
+	_apply_buses()
+	set_process(true)
+
+
+func _tick_music_duck(now_ms: int) -> void:
+	if _music_duck_until_ms <= 0:
+		return
+	if now_ms < _music_duck_until_ms:
+		return
+	_music_duck_db = 0.0
+	_music_duck_until_ms = 0
+	_apply_buses()
+
+
+func _music_sync_war() -> void:
+	if _music_mode != "game" or _music_linear <= 0.0000001:
+		return
+	var want := "" if _player_at_war() else "music_peace"
+	if want == _key_in:
+		return
+	_music_request(want)
+
+
+## Read campaign_wars only when it already exists. Do not call WarStateDomain._state().
+func _player_at_war() -> bool:
+	if typeof(GameData) == TYPE_NIL:
+		return false
+	var peace: Variant = GameData.peace_state
+	if typeof(peace) != TYPE_DICTIONARY:
+		return false
+	var pd: Dictionary = peace
+	if not pd.has("campaign_wars"):
+		return false
+	var cw: Variant = pd.get("campaign_wars")
+	if typeof(cw) != TYPE_DICTIONARY:
+		return false
+	var wars: Variant = (cw as Dictionary).get("wars", null)
+	if typeof(wars) != TYPE_DICTIONARY or (wars as Dictionary).is_empty():
+		return false
+	var tag := ""
+	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_player_country_tag"):
+		tag = str(LeaderManager.get_player_country_tag()).strip_edges().to_upper()
+	if tag.is_empty():
+		return false
+	var wd: Dictionary = wars
+	for k in wd.keys():
+		var row: Variant = wd[k]
+		if typeof(row) == TYPE_DICTIONARY:
+			var rd: Dictionary = row
+			if str(rd.get("a", "")).to_upper() == tag or str(rd.get("b", "")).to_upper() == tag:
+				return true
+			if str(rd.get("attacker", "")).to_upper() == tag or str(rd.get("defender", "")).to_upper() == tag:
+				return true
+		elif tag in str(k).to_upper():
+			return true
+	return false
+
+
+func _refresh_music_scene() -> void:
+	var tree := get_tree()
+	if tree == null or tree.root == null:
+		return
+	var open_title := false
+	var closed_title := false
+	var menu := false
+	var map := false
+	for c in tree.root.get_children():
+		var n := str(c.name)
+		if n.begins_with("LivingTitleBoot") and ("_closed" in c):
+			if bool(c.get("_closed")):
+				closed_title = true
+			else:
+				open_title = true
+		elif n == "MainMenu":
+			menu = true
+		elif n == "WorldMap":
+			map = true
+	if open_title or menu:
+		note_presentation("menu")
+	elif closed_title and map:
+		note_presentation("game")
+	elif map and _music_mode.is_empty():
+		note_presentation("game")

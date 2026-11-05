@@ -1,0 +1,32 @@
+file,key,source_url,author,license,source_file
+audio/sfx/ui/ui_click.ogg,ui_click,https://opengameart.org/content/100-cc0-sfx,rubberduck,CC0 1.0,switch_01.ogg
+audio/sfx/ui/ui_hover.ogg,ui_hover,https://opengameart.org/content/100-cc0-sfx,rubberduck,CC0 1.0,switch_02.ogg
+audio/sfx/ui/toast_info.ogg,toast_info,https://opengameart.org/content/100-cc0-sfx,rubberduck,CC0 1.0,glass_01.ogg
+audio/sfx/ui/toast_warn.ogg,toast_warn,https://opengameart.org/content/100-cc0-sfx,rubberduck,CC0 1.0,bell_02.ogg
+audio/sfx/ui/order_issued.ogg,order_issued,https://opengameart.org/content/100-cc0-sfx,rubberduck,CC0 1.0,paper_01.ogg
+audio/sfx/combat/order_move.ogg,order_move,https://opengameart.org/content/100-cc0-sfx,rubberduck,CC0 1.0,wooden_01.ogg
+audio/sfx/combat/order_attack.ogg,order_attack,https://opengameart.org/content/100-cc0-sfx,rubberduck,CC0 1.0,shot_01.ogg
+audio/sfx/combat/combat_clash.ogg,combat_clash,https://opengameart.org/content/100-cc0-sfx,rubberduck,CC0 1.0,explosion.ogg
+audio/sfx/combat/battle_won.ogg,capture,https://opengameart.org/content/100-cc0-sfx,rubberduck,CC0 1.0,gong_01.ogg
+audio/sfx/combat/battle_lost.ogg,repulse,https://opengameart.org/content/100-cc0-sfx,rubberduck,CC0 1.0,slam_01.ogg
+audio/sfx/ui/save_ok.ogg,save_ok,https://opengameart.org/content/100-cc0-sfx,rubberduck,CC0 1.0,key_open_01.ogg
+audio/sfx/ui/load_ok.ogg,load_ok,https://opengameart.org/content/100-cc0-sfx,rubberduck,CC0 1.0,door_open.ogg
+audio/sfx/end/end_defeat_sting.ogg,end_defeat_sting,https://opengameart.org/content/sad-game-over,Emma_MA,CC0 1.0,sad_game_over.wav
+audio/music/mus_menu_title.ogg,music_menu,https://opengameart.org/content/fantasy-orchestral-theme,Joth,CC0 1.0,FantasyOrchestralTheme.mp3
+audio/music/mus_peace.ogg,music_peace,https://opengameart.org/content/forgotten-victory,yd,CC0 1.0,ForgottenVictory.ogg
+audio/music/mus_menu_alt.ogg,music_menu_alt,https://opengameart.org/content/generic-strings,thisismyusername,CC0 1.0,generic_strings.mp3
+audio/music/mus_menu_loop_alt.ogg,music_menu_loop_alt,https://opengameart.org/content/menu-loop,Akikazer,CC0 1.0,Loop-Menu.wav
+audio/sfx/end/end_victory_sting.ogg,end_victory_sting,tools/audio/gen_victory_fanfare.py,Ink,"original, project-owned",tools/audio/gen_victory_fanfare.py
+audio/sfx/ui/select.wav,select,tools/audio/gen_audio1_sfx.py,Epochs of Ascendancy,"original, project-owned",tools/audio/gen_audio1_sfx.py
+audio/sfx/ui/confirm.wav,confirm,tools/audio/gen_audio1_sfx.py,Epochs of Ascendancy,"original, project-owned",tools/audio/gen_audio1_sfx.py
+audio/sfx/ui/achievement.wav,achievement,tools/audio/gen_audio1_sfx.py,Epochs of Ascendancy,"original, project-owned",tools/audio/gen_audio1_sfx.py
+audio/sfx/ui/error.wav,error,tools/audio/gen_audio1_sfx.py,Epochs of Ascendancy,"original, project-owned",tools/audio/gen_audio1_sfx.py
+audio/sfx/ui/alert.wav,alert,tools/audio/gen_audio1_sfx.py,Epochs of Ascendancy,"original, project-owned",tools/audio/gen_audio1_sfx.py
+audio/sfx/ui/ui_click.wav,ui_click_wav,tools/audio/gen_audio1_sfx.py,Epochs of Ascendancy,"original, project-owned",tools/audio/gen_audio1_sfx.py
+audio/sfx/ui/ui_hover.wav,ui_hover_wav,tools/audio/gen_audio1_sfx.py,Epochs of Ascendancy,"original, project-owned",tools/audio/gen_audio1_sfx.py
+audio/sfx/map/map.wav,map,tools/audio/gen_audio1_sfx.py,Epochs of Ascendancy,"original, project-owned",tools/audio/gen_audio1_sfx.py
+audio/sfx/map/pin_focus.wav,pin_focus,tools/audio/gen_audio1_sfx.py,Epochs of Ascendancy,"original, project-owned",tools/audio/gen_audio1_sfx.py
+audio/sfx/map/day_tick.wav,day_tick,tools/audio/gen_audio1_sfx.py,Epochs of Ascendancy,"original, project-owned",tools/audio/gen_audio1_sfx.py
+audio/sfx/combat/combat_clash.wav,combat_clash_wav,tools/audio/gen_audio1_sfx.py,Epochs of Ascendancy,"original, project-owned",tools/audio/gen_audio1_sfx.py
+audio/sfx/end/end_victory_sting.wav,end_victory_sting_wav,tools/audio/gen_audio1_sfx.py,Epochs of Ascendancy,"original, project-owned",tools/audio/gen_audio1_sfx.py
+audio/sfx/end/end_defeat_sting.wav,end_defeat_sting_wav,tools/audio/gen_audio1_sfx.py,Epochs of Ascendancy,"original, project-owned",tools/audio/gen_audio1_sfx.py
