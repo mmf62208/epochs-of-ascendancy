@@ -20,6 +20,7 @@ HARD_MAX_OPEN_PER_TAG = 2
 MIN_AGGRESSION_TO_START = 0.50
 MIN_AGGRESSION_VS_PLAYER = 0.40
 SCAN_TAGS_PER_DAY = 2
+MIN_ATTACK_STRENGTH_RATIO = 1.5
 
 PERSONALITY_AGGRESSION: Dict[str, float] = {
     "GER": 0.88,
@@ -89,6 +90,10 @@ def score_opportunity(
         score += 1.5
     elif dfn <= 75.0:
         score += 0.8
+    if bool(opp.get("empty_hex", False)):
+        score -= 4.0
+    elif attack_ratio_ok(opp) and "attacker_power" in opp:
+        score += 5.0
     return score
 
 
@@ -108,6 +113,8 @@ def should_initiate(
     player = _norm_tag(player_tag)
     if tag and tag == player:
         return False
+    if not attack_ratio_ok(opp):
+        return False
     agr = personality_aggression(tag)
     vs_player = bool(player) and foe == player
     if vs_player:
@@ -117,6 +124,17 @@ def should_initiate(
     if agr < MIN_AGGRESSION_TO_START:
         return False
     return float(opp.get("score", 0.0)) >= 7.0
+
+
+def attack_ratio_ok(opp: Mapping[str, Any]) -> bool:
+    if bool(opp.get("empty_hex", False)):
+        return True
+    if "attacker_power" not in opp:
+        return True
+    def_p = float(opp.get("defender_power", 0.0) or 0.0)
+    if def_p <= 1.0:
+        return True
+    return float(opp.get("attacker_power", 0.0) or 0.0) + 0.0001 >= def_p * MIN_ATTACK_STRENGTH_RATIO
 
 
 def _hex_busy(from_id: int, to_id: int, open_hexes: Sequence[int]) -> bool:
@@ -375,6 +393,10 @@ def build_land_battle_ai_init_product() -> Dict[str, Any]:
         passes.append("ai_gd_api")
     else:
         fails.append("ai_gd_api")
+    if "MIN_ATTACK_STRENGTH_RATIO" in ai and "func attack_ratio_ok" in ai:
+        passes.append("ai_gd_strength_ratio")
+    else:
+        fails.append("ai_gd_strength_ratio")
     if "func try_ai_start_land_battles" in bm:
         passes.append("bm_try_ai")
     else:

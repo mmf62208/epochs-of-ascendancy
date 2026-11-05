@@ -12,6 +12,8 @@ const HARD_MAX_OPEN_PER_TAG := 2
 const MIN_AGGRESSION_TO_START := 0.50
 const MIN_AGGRESSION_VS_PLAYER := 0.40
 const SCAN_TAGS_PER_DAY := 2
+## SIM-1104-B: AI opens a defended hex only at this attacker:defender power ratio.
+const MIN_ATTACK_STRENGTH_RATIO := 1.5
 
 const PERSONALITY_AGGRESSION := {
 	"GER": 0.88,
@@ -60,6 +62,11 @@ static func score_opportunity(opp: Dictionary, player_tag: String = "") -> float
 		score += 1.5
 	elif dfn <= 75.0:
 		score += 0.8
+	# SIM-1104-B: a fair fight outranks the empty-hex walk when both exist.
+	if bool(opp.get("empty_hex", false)):
+		score -= 4.0
+	elif attack_ratio_ok(opp) and opp.has("attacker_power"):
+		score += 5.0
 	return score
 
 
@@ -78,6 +85,8 @@ static func should_initiate(
 	var player := player_tag.strip_edges().to_upper()
 	if not tag.is_empty() and tag == player:
 		return false
+	if not attack_ratio_ok(opp):
+		return false
 	var agr := personality_aggression(tag)
 	var vs_player := not player.is_empty() and foe == player
 	if vs_player:
@@ -87,6 +96,17 @@ static func should_initiate(
 	if agr < MIN_AGGRESSION_TO_START:
 		return false
 	return float(opp.get("score", 0.0)) >= 7.0
+
+
+static func attack_ratio_ok(opp: Dictionary) -> bool:
+	if bool(opp.get("empty_hex", false)):
+		return true
+	if not opp.has("attacker_power"):
+		return true
+	var def_p := float(opp.get("defender_power", 0.0))
+	if def_p <= 1.0:
+		return true
+	return float(opp.get("attacker_power", 0.0)) + 0.0001 >= def_p * MIN_ATTACK_STRENGTH_RATIO
 
 
 static func plan_day(
@@ -129,8 +149,11 @@ static func plan_day(
 			"formation_id": fid,
 			"has_formation": bool(src.get("has_formation", false)) or not fid.is_empty(),
 			"defender_power": float(src.get("defender_power", 80.0)),
+			"empty_hex": bool(src.get("empty_hex", false)),
 			"live_api": "start_land_battle",
 		}
+		if src.has("attacker_power"):
+			row["attacker_power"] = float(src.get("attacker_power", 0.0))
 		row["score"] = score_opportunity(row, player)
 		var already := int(open_per_tag.get(tag, 0))
 		if not should_initiate(row, player, already):
