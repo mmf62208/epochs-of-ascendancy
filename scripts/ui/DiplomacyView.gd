@@ -108,8 +108,12 @@ func _ready() -> void:
 		button_hbox.move_child(space_btn, trade_btn.get_index() + 1)
 	close_btn.pressed.connect(_on_close_pressed)
 
-	# Default selection
+	# Default selection. A chip click can set eoa_focus_country before the window opens.
 	_selected_country = "GER" if _player_country != "GER" else "SOV"
+	if has_meta("eoa_focus_country"):
+		var focused := str(get_meta("eoa_focus_country")).strip_edges().to_upper()
+		if not focused.is_empty():
+			_selected_country = focused
 	_populate_country_selector()
 	_refresh_view()
 
@@ -119,6 +123,19 @@ func _ready() -> void:
 	margin.modulate.a = 0.0
 	var tw := create_tween()
 	tw.tween_property(margin, "modulate:a", 1.0, 0.12)
+
+## Pre-select a nation. Safe before the window enters the tree.
+func focus_country(tag: String) -> void:
+	var focused := tag.strip_edges().to_upper()
+	if focused.is_empty():
+		return
+	set_meta("eoa_focus_country", focused)
+	_selected_country = focused
+	if country_selector != null:
+		_populate_country_selector()
+		if is_inside_tree():
+			_refresh_view()
+
 
 func _build_dynamic_ui() -> void:
 	# Player info

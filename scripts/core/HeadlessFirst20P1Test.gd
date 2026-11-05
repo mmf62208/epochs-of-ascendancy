@@ -16,6 +16,7 @@ const MUST_SEE: PackedStringArray = [
 ]
 
 var _failures: int = 0
+var _f2_done := false
 
 
 func _init() -> void:
@@ -27,10 +28,13 @@ func _run() -> void:
 		await _check_frame(sz)
 	await _check_epoch_title(Vector2i(1024, 720))
 	await _check_epoch_title(Vector2i(1280, 800))
+	await _check_f2()
 	_finish()
 
 
 func _finish() -> void:
+	if not _f2_done:
+		_fail("F2 did not finish")
 	if _failures == 0:
 		print("RESULT=PASS")
 		quit(0)
@@ -364,6 +368,168 @@ func _inset(gr: Rect2, frame: Rect2) -> float:
 
 func _contains_rect(outer: Rect2, inner: Rect2) -> bool:
 	return outer.encloses(inner.grow(-0.05)) if inner.size.x > 0.2 else outer.encloses(inner)
+
+
+func _check_f2() -> void:
+	# Runtime load: a parse-time PlayNextHook reference compiles before autoloads exist.
+	var hook: GDScript = load("res://scripts/ui/PlayNextHook.gd") as GDScript
+	var fmt: GDScript = load("res://scripts/map/MapPolishFormatters.gd") as GDScript
+	if hook == null or fmt == null:
+		_fail("F2 scripts missing")
+		return
+	hook.call("reset_goal_lock_for_test")
+	var fra := _goal_rec("FRA", "France", 710739, 0.42)
+	var first: Dictionary = hook.call("stick_chip_goal", fra, 0)
+	if bool(first.get("changed", false)) or str((first.get("rec", {}) as Dictionary).get("target_tag", "")) != "FRA":
+		_fail("F2 lock did not seed France")
+		return
+	var pol := _goal_rec("POL", "Poland", 710100, 1.0)
+	var early: Dictionary = hook.call("stick_chip_goal", pol, 29)
+	if bool(early.get("changed", false)) or str((early.get("rec", {}) as Dictionary).get("target_tag", "")) != "FRA":
+		_fail("F2 target moved before 30 days: %s" % str(early))
+		return
+	var later: Dictionary = hook.call("stick_chip_goal", pol, 30)
+	if not bool(later.get("changed", false)):
+		_fail("F2 stronger goal did not switch at day 30")
+		return
+	var toast := "Goal changed: %s" % str(later.get("reason", ""))
+	if not toast.begins_with("Goal changed:") or str(later.get("reason", "")).is_empty():
+		_fail("F2 missing change reason")
+		return
+	hook.call("reset_goal_lock_for_test")
+	hook.call("stick_chip_goal", _goal_rec("FRA", "France", 0, 0.42), 0)
+	var invalid: Dictionary = hook.call("stick_chip_goal", pol, 1)
+	if not bool(invalid.get("changed", false)):
+		_fail("F2 invalid goal did not release the lock")
+		return
+	var jargon: Dictionary = fmt.call("execute_war_goal_step", "execute", 1)
+	var queue_label := ""
+	var queue: Array = jargon.get("apply_queue", [])
+	if not queue.is_empty() and queue[0] is Dictionary:
+		queue_label = str((queue[0] as Dictionary).get("label", ""))
+	var visible := "%s\n%s\n%s" % [jargon.get("summary", ""), jargon.get("plain", ""), queue_label]
+	if hook.call("player_may_show_war_goal_jargon") == true:
+		_fail("F2 jargon predicate was true without a visible debug overlay")
+		return
+	for banned in ["Execute war-goal", "leaf", "score"]:
+		if banned in visible:
+			_fail("F2 release text contains %s: %s" % [banned, visible])
+			return
+	var why := str(hook.call("goal_why_line", "FRA", "France"))
+	if not why.begins_with("Why:") or "Diplomacy" not in why or "Execute war-goal" in why or "leaf" in why:
+		_fail("F2 why line %s" % why)
+		return
+	var tip: Dictionary = hook.call("goal_tooltip_copy", "France")
+	if str(tip.get("title", "")) != "Justify war goal":
+		_fail("F2 tooltip title %s" % str(tip.get("title", "")))
+		return
+	if not str(tip.get("click", "")).begins_with("Click · open Diplomacy on France"):
+		_fail("F2 click line %s" % str(tip.get("click", "")))
+		return
+	await _check_f2_chip()
+
+
+func _goal_rec(tag: String, name: String, pid: int, score: float) -> Dictionary:
+	return {
+		"ok": true,
+		"action": "justify",
+		"source": "war_goal",
+		"label": "Justify war on %s" % name,
+		"target_tag": tag,
+		"goal_name": name,
+		"to_id": pid,
+		"goal_score": score,
+	}
+
+
+func _check_f2_chip() -> void:
+	var scr: Script = load("res://scripts/map/MapRenderer.gd") as Script
+	if scr == null:
+		_fail("F2 MapRenderer missing")
+		return
+	var mr := scr.new() as Node
+	if mr == null:
+		_fail("F2 MapRenderer did not construct")
+		return
+	mr.name = "F2Map"
+	var ui := CanvasLayer.new()
+	ui.name = "UI"
+	mr.add_child(ui)
+	root.add_child(mr)
+	var boot_script: GDScript = load("res://scripts/ui/LivingTitleBoot.gd") as GDScript
+	if boot_script == null:
+		_fail("F2 title script missing")
+		mr.queue_free()
+		return
+	var boot := boot_script.new() as Node
+	boot.name = "LivingTitleBoot"
+	root.add_child(boot)
+	await _frames(1)
+	mr.call("_refresh_next_hook_chip")
+	var chip := ui.get_node_or_null("PlayNextHookChip") as Button
+	if chip == null:
+		_fail("F2 chip missing")
+		mr.queue_free()
+		boot.queue_free()
+		return
+	if chip.visible:
+		_fail("F2 chip visible on the title")
+		mr.queue_free()
+		boot.queue_free()
+		return
+	boot.queue_free()
+	await _frames(2)
+	mr.call("_refresh_next_hook_chip")
+	if not chip.visible:
+		_fail("F2 chip stayed hidden after the title closed")
+		mr.queue_free()
+		return
+	var shown := {
+		"source": "war_goal",
+		"action": "justify",
+		"target_tag": "FRA",
+		"goal_name": "France",
+		"to_id": 710739,
+		"label": "Justify war on France",
+		"goal_score": 1.0,
+	}
+	mr.call("_paint_goal_chip_detail", shown, true)
+	if chip.custom_minimum_size.x > 336.5 or chip.custom_minimum_size.y < 43.0:
+		_fail("F2 chip size %s" % chip.custom_minimum_size)
+		mr.queue_free()
+		return
+	var why := chip.get_node_or_null("GoalWhy") as Label
+	if why == null or not why.text.begins_with("Why:") or int(why.get_theme_font_size("font_size")) != 12:
+		_fail("F2 why label %s" % (why.text if why != null else "missing"))
+		mr.queue_free()
+		return
+	var title := ui.find_child("GoalTooltipTitle", true, false) as Label
+	if title == null or title.text != "Justify war goal" or int(title.get_theme_font_size("font_size")) != 14:
+		_fail("F2 tooltip title label")
+		mr.queue_free()
+		return
+	if title.get_theme_color("font_color") != RetrowaveTheme.CYAN:
+		_fail("F2 tooltip title color %s" % title.get_theme_color("font_color"))
+		mr.queue_free()
+		return
+	chip.set_meta("play_next_rec", shown)
+	chip.pressed.emit()
+	await _frames(2)
+	var dip := root.find_child("DiplomacyView", true, false)
+	if dip == null:
+		_fail("F2 click did not open Diplomacy")
+		mr.queue_free()
+		return
+	var selected := str(dip.get("_selected_country"))
+	if selected != "FRA":
+		_fail("F2 Diplomacy selected %s" % selected)
+		mr.queue_free()
+		dip.queue_free()
+		return
+	dip.queue_free()
+	mr.queue_free()
+	await _frames(1)
+	_f2_done = true
 
 
 func _label_exact(root_node: Node, text: String) -> Label:

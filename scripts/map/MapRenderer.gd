@@ -26977,21 +26977,39 @@ func _refresh_next_hook_chip() -> void:
 			# Flag on: apply the country painted on the chip. A fresh
 			# recommend() after the seat changes (USA Japan → GER France)
 			# must not replace the offer the player clicked.
+			var shown: Dictionary = {}
+			if _next_hook_chip != null and is_instance_valid(_next_hook_chip):
+				var painted_any: Variant = _next_hook_chip.get_meta("play_next_rec", {})
+				if painted_any is Dictionary:
+					shown = (painted_any as Dictionary).duplicate(true)
 			var rec_apply: Dictionary = {}
 			var use_painted := typeof(GameData) != TYPE_NIL and GameData.has_method("stability_justice_enabled") and bool(GameData.stability_justice_enabled())
-			if use_painted and _next_hook_chip != null and is_instance_valid(_next_hook_chip):
-				var painted: Variant = _next_hook_chip.get_meta("play_next_rec", {})
-				if painted is Dictionary and not (painted as Dictionary).is_empty():
-					rec_apply = (painted as Dictionary).duplicate(true)
+			if use_painted and not shown.is_empty():
+				rec_apply = shown.duplicate(true)
 			if rec_apply.is_empty():
 				rec_apply = PlayNextHook.recommend(_player_tag())
+			if shown.is_empty():
+				shown = rec_apply
+			if str(shown.get("source", "")) == "war_goal":
+				_open_diplomacy_on_tag(str(shown.get("target_tag", "")))
 			var out: Dictionary = PlayNextHook.apply(rec_apply)
 			_show_inspector_toast(str(out.get("summary", "Next")), 3.5)
 			_refresh_next_hook_chip()
 		)
+	if _living_title_boot_is_up():
+		_next_hook_chip.visible = false
+		return
+	_next_hook_chip.visible = true
 	var rec: Dictionary = {}
 	if typeof(PlayNextHook) != TYPE_NIL:
 		rec = PlayNextHook.recommend(_player_tag())
+		if not PlayNextHook.chip_goal_pinned():
+			var stuck: Dictionary = PlayNextHook.stick_chip_goal(rec, _next_hook_campaign_day())
+			rec = stuck.get("rec", rec)
+			if bool(stuck.get("changed", false)):
+				var reason := str(stuck.get("reason", "the goal moved"))
+				_flash_goal_chip()
+				_show_inspector_toast("Goal changed: %s" % reason, 3.5)
 	if _next_hook_chip != null and is_instance_valid(_next_hook_chip):
 		_next_hook_chip.set_meta("play_next_rec", rec.duplicate(true))
 	_hook_stability_chip_load()
@@ -26999,13 +27017,173 @@ func _refresh_next_hook_chip() -> void:
 	var stab_line := ""
 	if typeof(GameData) != TYPE_NIL and GameData.has_method("stability_justice_chip_line"):
 		stab_line = str(GameData.stability_justice_chip_line())
+	var war_goal := str(rec.get("source", "")) == "war_goal"
 	if stab_line.is_empty():
 		_next_hook_chip.text = "NEXT · %s" % str(rec.get("label", "Unpause a day"))
 		_next_hook_chip.tooltip_text = hint
 	else:
-		_next_hook_chip.custom_minimum_size = Vector2(640, 28)
 		_next_hook_chip.text = "NEXT · %s · %s" % [str(rec.get("label", "Unpause a day")), stab_line]
 		_next_hook_chip.tooltip_text = "%s\n%s" % [hint, stab_line]
+	_paint_goal_chip_detail(rec, war_goal)
+
+
+func _next_hook_campaign_day() -> int:
+	if typeof(TimeManager) != TYPE_NIL and "total_days_elapsed" in TimeManager:
+		return int(TimeManager.total_days_elapsed)
+	return 0
+
+
+func _open_diplomacy_on_tag(tag: String) -> void:
+	var focused := tag.strip_edges().to_upper()
+	if focused.is_empty():
+		return
+	var tree := get_tree()
+	if tree == null or tree.root == null:
+		return
+	var existing := tree.root.find_child("DiplomacyView", true, false)
+	if existing != null and existing.has_method("focus_country"):
+		existing.call("focus_country", focused)
+		if existing is CanvasItem:
+			(existing as CanvasItem).visible = true
+		return
+	if not ResourceLoader.exists("res://scenes/ui/DiplomacyView.tscn"):
+		return
+	var packed := load("res://scenes/ui/DiplomacyView.tscn") as PackedScene
+	if packed == null:
+		return
+	var view := packed.instantiate()
+	if view == null:
+		return
+	view.name = "DiplomacyView"
+	if view.has_method("focus_country"):
+		view.call("focus_country", focused)
+	tree.root.add_child(view)
+
+
+func _flash_goal_chip() -> void:
+	if _next_hook_chip == null or not is_instance_valid(_next_hook_chip):
+		return
+	if typeof(RetrowaveTheme) == TYPE_NIL:
+		return
+	for state in ["normal", "hover", "pressed"]:
+		var box := _next_hook_chip.get_theme_stylebox(state)
+		if box is StyleBoxFlat:
+			var copy := (box as StyleBoxFlat).duplicate() as StyleBoxFlat
+			copy.border_color = RetrowaveTheme.MAGENTA
+			_next_hook_chip.add_theme_stylebox_override(state, copy)
+	var token := Time.get_ticks_msec()
+	_next_hook_chip.set_meta("goal_flash_token", token)
+	var tw := _next_hook_chip.create_tween()
+	tw.tween_interval(0.6)
+	tw.tween_callback(func() -> void:
+		if _next_hook_chip == null or not is_instance_valid(_next_hook_chip):
+			return
+		if int(_next_hook_chip.get_meta("goal_flash_token", -1)) != token:
+			return
+		RetrowaveTheme.style_primary_button(_next_hook_chip)
+	)
+
+
+func _paint_goal_chip_detail(rec: Dictionary, war_goal: bool) -> void:
+	if _next_hook_chip == null or not is_instance_valid(_next_hook_chip):
+		return
+	var why := _next_hook_chip.get_node_or_null("GoalWhy") as Label
+	if not war_goal:
+		if why != null:
+			why.visible = false
+		var stab_wide := "Stability" in _next_hook_chip.text
+		_next_hook_chip.custom_minimum_size = Vector2(640, 28) if stab_wide else Vector2(420, 28)
+		_hide_goal_tooltip()
+		return
+	_next_hook_chip.custom_minimum_size = Vector2(336, 44)
+	_next_hook_chip.clip_text = true
+	_next_hook_chip.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	if why == null:
+		why = Label.new()
+		why.name = "GoalWhy"
+		why.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		why.position = Vector2(8, 22)
+		why.add_theme_font_size_override("font_size", 12)
+		why.add_theme_color_override("font_color", RetrowaveTheme.TEXT_DIM)
+		why.clip_text = true
+		why.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		why.custom_minimum_size = Vector2(320, 16)
+		_next_hook_chip.add_child(why)
+	why.visible = true
+	var display := str(rec.get("goal_name", rec.get("target_tag", ""))).strip_edges()
+	why.text = PlayNextHook.goal_why_line(str(rec.get("target_tag", "")), display)
+	var copy: Dictionary = PlayNextHook.goal_tooltip_copy(display)
+	var tip := "%s\n%s\n%s" % [str(copy.get("title", "")), str(copy.get("body", "")), str(copy.get("click", ""))]
+	_next_hook_chip.tooltip_text = tip
+	_next_hook_chip.set_meta("eoa_goal_tooltip", tip)
+	_ensure_goal_tooltip(copy)
+
+
+func _ensure_goal_tooltip(copy: Dictionary) -> void:
+	var ui := get_node_or_null("UI") as CanvasLayer
+	if ui == null:
+		return
+	var pop := ui.get_node_or_null("GoalTooltip") as PopupPanel
+	if pop == null:
+		pop = PopupPanel.new()
+		pop.name = "GoalTooltip"
+		pop.visible = false
+		if typeof(RetrowaveTheme) != TYPE_NIL:
+			var theme := RetrowaveTheme.make_tooltip_theme()
+			pop.theme = theme
+		var box := VBoxContainer.new()
+		box.name = "GoalTooltipBody"
+		box.custom_minimum_size = Vector2(280, 0)
+		pop.add_child(box)
+		var title := Label.new()
+		title.name = "GoalTooltipTitle"
+		title.add_theme_color_override("font_color", RetrowaveTheme.CYAN)
+		title.add_theme_font_size_override("font_size", 14)
+		box.add_child(title)
+		var body := Label.new()
+		body.name = "GoalTooltipText"
+		body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		body.custom_minimum_size = Vector2(280, 0)
+		body.add_theme_font_size_override("font_size", 14)
+		box.add_child(body)
+		var click := Label.new()
+		click.name = "GoalTooltipClick"
+		click.add_theme_font_size_override("font_size", 14)
+		box.add_child(click)
+		ui.add_child(pop)
+		if _next_hook_chip != null and not _next_hook_chip.mouse_entered.is_connected(_show_goal_tooltip):
+			_next_hook_chip.mouse_entered.connect(_show_goal_tooltip)
+			_next_hook_chip.mouse_exited.connect(_hide_goal_tooltip)
+	var title_l := pop.find_child("GoalTooltipTitle", true, false) as Label
+	var body_l := pop.find_child("GoalTooltipText", true, false) as Label
+	var click_l := pop.find_child("GoalTooltipClick", true, false) as Label
+	if title_l != null:
+		title_l.text = str(copy.get("title", "Justify war goal"))
+	if body_l != null:
+		body_l.text = str(copy.get("body", ""))
+	if click_l != null:
+		click_l.text = str(copy.get("click", ""))
+
+
+func _show_goal_tooltip() -> void:
+	var ui := get_node_or_null("UI") as CanvasLayer
+	if ui == null or _next_hook_chip == null:
+		return
+	var pop := ui.get_node_or_null("GoalTooltip") as PopupPanel
+	if pop == null:
+		return
+	var origin := _next_hook_chip.get_global_rect().end
+	pop.position = Vector2i(int(origin.x) - 300, int(origin.y) + 6)
+	pop.visible = true
+
+
+func _hide_goal_tooltip() -> void:
+	var ui := get_node_or_null("UI") as CanvasLayer
+	if ui == null:
+		return
+	var pop := ui.get_node_or_null("GoalTooltip") as PopupPanel
+	if pop != null:
+		pop.visible = false
 
 
 func _hook_stability_chip_load() -> void:

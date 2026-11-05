@@ -16,6 +16,14 @@ static func recommend(player_tag: String = "") -> Dictionary:
 	var tag := _living_player_tag(player_tag)
 	var rec: Dictionary = rank_from_snapshot(_gather_facts(tag))
 	rec["player_tag"] = tag
+	if str(rec.get("source", "")) == "war_goal":
+		var wtag := str(rec.get("target_tag", "")).strip_edges().to_upper()
+		if wtag.is_empty():
+			wtag = _province_owner_tag(int(rec.get("to_id", -1)))
+			rec["target_tag"] = wtag
+		rec["goal_score"] = score_chip_target(tag, wtag)
+		if str(rec.get("goal_name", "")).strip_edges().is_empty():
+			rec["goal_name"] = _chip_goal_display_name(wtag)
 	return rec
 
 
@@ -233,6 +241,8 @@ static func rank_from_snapshot(facts: Dictionary = {}) -> Dictionary:
 				"fid": "",
 				"to_id": wpid,
 				"source": "war_goal",
+				"target_tag": wtag,
+				"goal_name": wname,
 			}
 		if not bool(f.get("war_declared", false)):
 			var dlabel := "Declare war"
@@ -522,6 +532,7 @@ static func apply(rec: Dictionary = {}) -> Dictionary:
 			"ok": bool(justified.get("ok", false)),
 			"action": "justify",
 			"summary": str(justified.get("summary", r.get("hint", "Justify the war goal"))),
+			"target_tag": str(r.get("target_tag", "")),
 		}
 	if action == "declare":
 		var dpid := int(r.get("to_id", 1))
@@ -1061,6 +1072,138 @@ static func _diplomacy_row(tag: String) -> Dictionary:
 		if bool(row.get("ok", false)):
 			return row
 	return empty
+
+
+static var _chip_goal_lock: Dictionary = {}
+
+
+## Debug overlay only. Release builds and a hidden overlay keep the plain sentence.
+static func player_may_show_war_goal_jargon() -> bool:
+	if not OS.is_debug_build():
+		return false
+	if typeof(DebugOverlay) == TYPE_NIL:
+		return false
+	var inst: DebugOverlay = DebugOverlay.instance
+	return inst != null and is_instance_valid(inst) and inst.visible
+
+
+static func reset_goal_lock_for_test() -> void:
+	_chip_goal_lock = {}
+
+
+static func chip_goal_pinned() -> bool:
+	return not _stability_war_goal_pin().is_empty()
+
+
+## Preferred foe 1.0, then 0.8, 0.6… A neighbour who is not preferred stays near 0.42.
+static func score_chip_target(player_tag: String, defender: String) -> float:
+	var foe := defender.strip_edges().to_upper()
+	if foe.is_empty():
+		return 0.0
+	var prefs: Array = []
+	if typeof(LandBattleAi) != TYPE_NIL:
+		var raw: Variant = LandBattleAi.PREFERRED_FOES.get(player_tag.strip_edges().to_upper(), [])
+		if raw is Array:
+			prefs = raw
+	var i := 0
+	for p in prefs:
+		if str(p).strip_edges().to_upper() == foe:
+			return maxf(0.2, 1.0 - 0.2 * float(i))
+		i += 1
+	return 0.42
+
+
+static func goal_why_line(defender: String, display_name: String) -> String:
+	var name := display_name.strip_edges()
+	if name.is_empty():
+		name = defender.strip_edges().to_upper()
+	var days := 0
+	if typeof(WarStateDomain) != TYPE_NIL:
+		days = maxi(0, int(WarStateDomain.player_justify_days_left(defender)))
+	var because := "borders your frontier"
+	var player := ""
+	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_player_country_tag"):
+		player = str(LeaderManager.get_player_country_tag()).strip_edges().to_upper()
+	if not player.is_empty() and typeof(RelationsManager) != TYPE_NIL and RelationsManager.has_method("has_guarantee"):
+		if bool(RelationsManager.has_guarantee(defender, player)):
+			because = "%s guarantees your frontier" % name
+		elif bool(RelationsManager.has_guarantee(player, defender)):
+			because = "you guarantee %s" % name
+	return "Why: %s · ~%d days · Diplomacy" % [because, days]
+
+
+static func goal_tooltip_copy(display_name: String) -> Dictionary:
+	var name := display_name.strip_edges()
+	if name.is_empty():
+		name = "that country"
+	var body := "%s is the country this goal would bring into a war. The claim runs for the days shown on the chip. Open Diplomacy to read the relationship before you commit." % name
+	return {
+		"title": "Justify war goal",
+		"body": body,
+		"click": "Click · open Diplomacy on %s" % name,
+	}
+
+
+## Keep the chip's country until the goal is done, or a clearly better one has waited 30 days.
+static func stick_chip_goal(rec: Dictionary, day: int) -> Dictionary:
+	var out := {"rec": rec, "changed": false, "reason": ""}
+	if str(rec.get("source", "")) != "war_goal":
+		return out
+	var tag := str(rec.get("target_tag", "")).strip_edges().to_upper()
+	var pid := int(rec.get("to_id", -1))
+	var score := float(rec.get("goal_score", 0.42))
+	if tag.is_empty():
+		return out
+	if _chip_goal_lock.is_empty():
+		_chip_goal_lock = {"tag": tag, "pid": pid, "score": score, "day": day, "rec": rec.duplicate(true)}
+		return out
+	var old_tag := str(_chip_goal_lock.get("tag", "")).strip_edges().to_upper()
+	var old_pid := int(_chip_goal_lock.get("pid", -1))
+	if old_tag == tag:
+		_chip_goal_lock["score"] = score
+		_chip_goal_lock["rec"] = rec.duplicate(true)
+		_chip_goal_lock["tag"] = tag
+		if pid > 0:
+			_chip_goal_lock["pid"] = pid
+		return out
+	var blocked := _chip_goal_block_reason(old_tag, old_pid)
+	var waited := day - int(_chip_goal_lock.get("day", day))
+	var better := score > float(_chip_goal_lock.get("score", 0.0)) + 0.15 and waited >= 30
+	if blocked.is_empty() and not better:
+		var kept: Dictionary = (_chip_goal_lock.get("rec", {}) as Dictionary).duplicate(true)
+		if kept.is_empty():
+			return out
+		out["rec"] = kept
+		return out
+	var reason := blocked if not blocked.is_empty() else "a stronger goal is ready"
+	_chip_goal_lock = {"tag": tag, "pid": pid, "score": score, "day": day, "rec": rec.duplicate(true)}
+	out["changed"] = true
+	out["reason"] = reason
+	out["rec"] = rec
+	return out
+
+
+static func _chip_goal_block_reason(tag: String, pid: int) -> String:
+	if tag.is_empty() or pid <= 0:
+		return "that target is no longer valid"
+	if typeof(WarStateDomain) != TYPE_NIL:
+		var player := ""
+		if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_player_country_tag"):
+			player = str(LeaderManager.get_player_country_tag()).strip_edges().to_upper()
+		if not player.is_empty() and bool(WarStateDomain.is_at_war(player, tag)):
+			return "that war has already started"
+	return ""
+
+
+static func _chip_goal_display_name(tag: String) -> String:
+	var t := tag.strip_edges().to_upper()
+	if t.is_empty():
+		return ""
+	if typeof(WarStateDomain) != TYPE_NIL:
+		var named := str(WarStateDomain.tag_name(t)).strip_edges()
+		if not named.is_empty():
+			return named
+	return t
 
 
 static func _stability_enabled() -> bool:
