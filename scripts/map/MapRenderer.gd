@@ -3002,7 +3002,14 @@ func _handle_escape_key() -> void:
 		return
 	_release_search_focus()
 	# One Esc closes only the front play window. The next Esc can open pause.
-	if _dismiss_top_play_window():
+	# ProductionAssignmentScreen is in this list so it still closes before
+	# _esc_open_command_center, ahead of any other open play window it outranks.
+	if _dismiss_top_play_window([
+		"LeaderAssignmentScreen",
+		"ProductionAssignmentScreen",
+		"TechnologyScreen",
+		"DiplomacyView",
+	]):
 		_close_release_seen = true
 		return
 	# Garrison / unit card first: Close/Esc restores province inspector (Köln spine)
@@ -23892,7 +23899,8 @@ func _layout_road_spine_chrome_button() -> void:
 	var panel_w := absf(ip.offset_right - ip.offset_left)
 	if panel_w < 80.0:
 		panel_w = maxf(ip.size.x, 520.0)
-	# Own row under the header. Same-row placement overlapped the Settle label.
+	# Own row BELOW Settle. The old fixed top of 66 cleared Settle's 38–62 box
+	# and overlapped a wrapped header, so the row uses the stacked chrome top.
 	var left := 8.0
 	var top := _stacked_chrome_top("_btn_build_road_spine")
 	var height := 26.0
@@ -28193,9 +28201,9 @@ func _dismiss_named_overlay_screen(screen_name: String) -> bool:
 
 ## Frontmost of Diplomacy, Tech, Lead, and Production. Windows beat panels.
 ## Equal rank keeps the earlier name so Lead still closes before Production.
-func _dismiss_top_play_window() -> bool:
+func _dismiss_top_play_window(screen_names: Array) -> bool:
 	var best: Node = null
-	for screen_name in ["LeaderAssignmentScreen", "ProductionAssignmentScreen", "TechnologyScreen", "DiplomacyView"]:
+	for screen_name in screen_names:
 		var n := _find_named_overlay_screen(screen_name)
 		if n == null or not _overlay_node_is_up(n):
 			continue
@@ -28256,7 +28264,7 @@ func _dismiss_map_overlays_esc() -> bool:
 			return true
 	var tree := get_tree()
 	if tree:
-		for screen_name in ["AgentAssignmentScreen", "NationalSpiritsScreen"]:
+		for screen_name in ["ProductionAssignmentScreen", "AgentAssignmentScreen", "NationalSpiritsScreen"]:
 			var n := tree.root.get_node_or_null(screen_name)
 			if n == null and tree.current_scene:
 				var ui := tree.current_scene.get_node_or_null("UILayer/%s" % screen_name)
@@ -28273,7 +28281,7 @@ func _dismiss_map_overlays_esc() -> bool:
 			if layer:
 				for child in layer.get_children():
 					var cn := str(child.name)
-					if cn in ["AgentAssignmentScreen", "NationalSpiritsScreen"]:
+					if cn in ["ProductionAssignmentScreen", "AgentAssignmentScreen", "NationalSpiritsScreen"]:
 						if _overlay_node_is_up(child):
 							child.queue_free()
 							dismissed = true
