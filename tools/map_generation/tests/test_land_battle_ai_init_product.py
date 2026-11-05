@@ -11,6 +11,8 @@ sys.path.insert(0, str(ROOT / "tools" / "map_generation" / "lib"))
 
 from land_battle_ai_init_product import (  # noqa: E402
     HARD_MAX_STARTS_PER_DAY,
+    MIN_ATTACK_STRENGTH_RATIO,
+    attack_ratio_ok,
     build_land_battle_ai_init_product,
     land_battle_ai_init_integrity,
     personality_aggression,
@@ -81,6 +83,26 @@ class TestLandBattleAiInitProduct(unittest.TestCase):
                 player_tag="USA",
             )
         )
+
+    def test_strength_ratio_gate(self) -> None:
+        self.assertEqual(MIN_ATTACK_STRENGTH_RATIO, 1.5)
+        even = {
+            "tag": "GER",
+            "defender_tag": "POL",
+            "has_formation": True,
+            "score": 20.0,
+            "attacker_power": 100.0,
+            "defender_power": 100.0,
+        }
+        stacked = dict(even)
+        stacked["attacker_power"] = 150.0
+        self.assertFalse(attack_ratio_ok(even))
+        self.assertTrue(attack_ratio_ok(stacked))
+        self.assertFalse(should_initiate(even, player_tag="USA"))
+        self.assertTrue(should_initiate(stacked, player_tag="USA"))
+        empty = dict(even)
+        empty["empty_hex"] = True
+        self.assertTrue(attack_ratio_ok(empty))
 
 
 if __name__ == "__main__":

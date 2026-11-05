@@ -645,10 +645,18 @@ func start_land_battle(
 		"ground_hard": _target_is_ground_hard(target, to_id),
 		"next_hook": "",
 	}
+	var stacked: Array = [fid]
+	for extra in get_divisions_at_province(from_pid, tag):
+		var extra_fid := str(extra.get("formation_id", "")).strip_edges()
+		if extra_fid.is_empty() or stacked.has(extra_fid):
+			continue
+		stacked.append(extra_fid)
+	battle["att_fids"] = stacked
 	_rebuild_land_battle_powers(battle)
 	_next_land_battle_seq += 1
 	_open_land_battles.append(battle)
-	_set_formation_in_combat(fid, true)
+	for stacked_fid in stacked:
+		_set_formation_in_combat(str(stacked_fid), true)
 	_set_formation_in_combat(def_fid, true)
 	if typeof(ProductionManager) != TYPE_NIL and ProductionManager.has_method("ensure_demo_combat_stock"):
 		ProductionManager.ensure_demo_combat_stock(fid, tag)
@@ -896,6 +904,8 @@ func _rush_spare_to_capital(tag: String, cap_pid: int) -> bool:
 		var sid := int(f.stationed_province_id) if "stationed_province_id" in f else -1
 		if sid <= 0 or sid == cap_pid:
 			continue
+		if _station_touches_enemy(sid, tag):
+			continue
 		spare = f
 		break
 	if spare == null:
@@ -905,6 +915,24 @@ func _rush_spare_to_capital(tag: String, cap_pid: int) -> bool:
 	_note_garrison_station(str(spare.formation_id), tag, cap_pid)
 	print("CAPITAL_COVER rush %s %d -> %d" % [str(spare.formation_id), from_pid, cap_pid])
 	return true
+
+
+func _station_touches_enemy(pid: int, tag: String) -> bool:
+	if pid <= 0 or typeof(MapManager) == TYPE_NIL or not MapManager.has_method("get_adjacent_provinces"):
+		return false
+	var enemies: Dictionary = {}
+	if typeof(WarStateDomain) != TYPE_NIL:
+		for e in WarStateDomain.enemies_of(tag):
+			enemies[str(e).strip_edges().to_upper()] = true
+	if enemies.is_empty():
+		return false
+	for nid_v in MapManager.get_adjacent_provinces(pid, true):
+		var np = MapManager.get_province(int(nid_v)) if MapManager.has_method("get_province") else null
+		if np == null or bool(np.is_sea):
+			continue
+		if enemies.has(_province_controller_tag(np)):
+			return true
+	return false
 
 
 func _enemy_formation_within_hops(origin_pid: int, friendly_tag: String, hops: int) -> bool:
@@ -1063,15 +1091,29 @@ func try_ai_start_land_battles(day_index: int = 0) -> Dictionary:
 			var preview: Dictionary = can_assault_province(tag2, to_id, from_id)
 			var fid := str(preview.get("formation_id", "")).strip_edges()
 			if bool(preview.get("ok", false)) and not fid.is_empty():
-				opportunities.append({
-					"tag": tag2,
-					"from_id": from_id,
-					"to_id": to_id,
-					"defender_tag": str(t.get("defender_tag", preview.get("defender_tag", ""))),
-					"formation_id": fid,
-					"has_formation": true,
-					"defender_power": float(t.get("defender_power", 80.0)),
-				})
+				var def_tag2 := str(t.get("defender_tag", preview.get("defender_tag", ""))).strip_edges().to_upper()
+				var powers: Dictionary = _ai_front_powers(tag2, from_id, def_tag2, to_id)
+				var empty_hex := bool(powers.get("empty_hex", false))
+				var att_p := float(powers.get("attacker_power", 0.0))
+				var def_p := float(powers.get("defender_power", 80.0))
+				var ratio_ok := empty_hex or att_p + 0.0001 >= def_p * _ai_min_attack_ratio()
+				if ratio_ok:
+					opportunities.append({
+						"tag": tag2,
+						"from_id": from_id,
+						"to_id": to_id,
+						"defender_tag": def_tag2,
+						"formation_id": fid,
+						"has_formation": true,
+						"defender_power": def_p,
+						"attacker_power": att_p,
+						"empty_hex": empty_hex,
+					})
+					continue
+				# Defended but under 1.5:1 — stack an adjacent spare onto from_id.
+				_collect_adjacent_stack_march(
+					tag2, from_id, to_id, def_tag2, marching_fids, combat_fids, march_opps
+				)
 				continue
 			# No adjacent formation: spare rear marches toward from_id (own-land dest).
 			var dest_own := false
@@ -1082,8 +1124,7 @@ func try_ai_start_land_battles(day_index: int = 0) -> Dictionary:
 			if not dest_own:
 				continue
 			# Hang-class: F5 never BFS own-land paths for spare rear marches (16bbf1c +5d).
-			if _interactive_light_sim():
-				continue
+			# Adjacent stacking (one hop, no BFS) is allowed so a 1.5:1 attack can form.
 			if typeof(LeaderManager) == TYPE_NIL or not LeaderManager.has_method("get_formations_for_country"):
 				continue
 			var cap_pid := _capital_pid_for_tag(tag2)
@@ -1108,8 +1149,8 @@ func try_ai_start_land_battles(day_index: int = 0) -> Dictionary:
 				var station := int(f.stationed_province_id) if "stationed_province_id" in f else -1
 				if station <= 0 or station == from_id:
 					continue
-				var has_path := false
-				if typeof(FormationMovement) != TYPE_NIL:
+				var has_path := _provinces_adjacent(station, from_id)
+				if not has_path and not _interactive_light_sim() and typeof(FormationMovement) != TYPE_NIL:
 					var path: Array = FormationMovement.find_own_land_path(station, from_id, tag2)
 					has_path = path.size() >= 2
 				if not has_path:
@@ -1143,7 +1184,18 @@ func try_ai_start_land_battles(day_index: int = 0) -> Dictionary:
 		plan_player = "OBS"
 	# Finish an in-progress empty-hex siege before opening a new start.
 	var siege_forced: Array = []
+	var has_ratio_fight := false
+	for raw_opp in opportunities:
+		if typeof(raw_opp) != TYPE_DICTIONARY:
+			continue
+		var opp_row: Dictionary = raw_opp
+		if not bool(opp_row.get("empty_hex", false)) and opp_row.has("attacker_power"):
+			if LandBattleAi.attack_ratio_ok(opp_row):
+				has_ratio_fight = true
+				break
 	for tag_s in candidates:
+		if has_ratio_fight:
+			break
 		var cont: Dictionary = _active_empty_siege_opportunity(str(tag_s))
 		if not cont.is_empty():
 			siege_forced.append(cont)
@@ -1965,6 +2017,96 @@ func _active_empty_siege_opportunity(tag: String) -> Dictionary:
 		"siege_continue": true,
 		"defender_power": 1.0,
 	}
+
+
+func _ai_min_attack_ratio() -> float:
+	if typeof(LandBattleAi) != TYPE_NIL:
+		return float(LandBattleAi.MIN_ATTACK_STRENGTH_RATIO)
+	return 1.5
+
+
+func _ai_front_powers(att_tag: String, from_id: int, def_tag: String, to_id: int) -> Dictionary:
+	var terrain := "plains"
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province"):
+		var tp: Province = MapManager.get_province(to_id)
+		if tp != null and not str(tp.terrain).is_empty():
+			terrain = str(tp.terrain)
+	var att_divs: Array[Dictionary] = get_divisions_at_province(from_id, att_tag)
+	var def_divs: Array[Dictionary] = get_divisions_at_province(to_id, def_tag)
+	var att_p := 0.0
+	var def_p := 0.0
+	var opp_def: Object = null
+	if not def_divs.is_empty():
+		opp_def = _formation_from_id(str(def_divs[0].get("formation_id", "")), def_tag)
+	var opp_att: Object = null
+	if not att_divs.is_empty():
+		opp_att = _formation_from_id(str(att_divs[0].get("formation_id", "")), att_tag)
+	for row in att_divs:
+		var f: Formation = _formation_from_id(str(row.get("formation_id", "")), att_tag)
+		att_p += land_combat_power(f, terrain, "attack", opp_def)
+	for row2 in def_divs:
+		var df: Formation = _formation_from_id(str(row2.get("formation_id", "")), def_tag)
+		def_p += land_combat_power(df, terrain, "defend", opp_att)
+	return {
+		"attacker_power": att_p,
+		"defender_power": def_p,
+		"empty_hex": def_divs.is_empty(),
+		"att_n": att_divs.size(),
+		"def_n": def_divs.size(),
+	}
+
+
+func _collect_adjacent_stack_march(
+	tag: String,
+	from_id: int,
+	to_id: int,
+	def_tag: String,
+	marching_fids: Array,
+	combat_fids: Array,
+	march_opps: Array,
+) -> void:
+	if typeof(LeaderManager) == TYPE_NIL or not LeaderManager.has_method("get_formations_for_country"):
+		return
+	for f in LeaderManager.get_formations_for_country(tag):
+		if f == null:
+			continue
+		var ftype := str(f.formation_type) if "formation_type" in f else ""
+		if ftype != Formation.TYPE_DIVISION:
+			continue
+		var sfid := str(f.formation_id) if "formation_id" in f else ""
+		if sfid.is_empty():
+			continue
+		if marching_fids.has(sfid) or combat_fids.has(sfid):
+			continue
+		if "is_in_combat" in f and bool(f.is_in_combat):
+			continue
+		if typeof(FormationMovement) != TYPE_NIL and FormationMovement.has_march(sfid):
+			continue
+		var station := int(f.stationed_province_id) if "stationed_province_id" in f else -1
+		if station <= 0 or station == from_id:
+			continue
+		if not _provinces_adjacent(station, from_id):
+			continue
+		if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province"):
+			var sp: Province = MapManager.get_province(station)
+			if sp == null or _province_controller_tag(sp) != tag:
+				continue
+		march_opps.append({
+			"tag": tag,
+			"from_id": station,
+			"dest_id": from_id,
+			"to_id": to_id,
+			"defender_tag": def_tag,
+			"formation_id": sfid,
+			"has_own_path": true,
+			"at_rear": false,
+			"at_capital": false,
+			"dest_is_own_land": true,
+			"already_marching": false,
+			"in_combat": false,
+			"defender_power": 80.0,
+		})
+		return
 
 
 func _capture_session_closed() -> bool:
