@@ -688,6 +688,8 @@ var _map_search: HBoxContainer = null
 var _adjacency_preview: Node2D = null
 var _province_mesh_layer: Node2D = null
 var _province_id_badge: Label = null
+## Inspector header height including the 8 px gap under the action row.
+var _inspector_header_h: float = 40.0
 ## Pass 51: shared bulk chip selection across multi-window library popups.
 var _route_pack_bulk_sel: Array = []  # [{kind, value}]
 var _route_pack_bulk_watchers: Array = []  # Callables
@@ -2167,6 +2169,83 @@ func _dismiss_close_control_from_input() -> void:
 	_dismiss_inspector_and_restore_input()
 
 
+func _press_hits_inspector_close(event: InputEventMouseButton) -> bool:
+	if event == null or not event.pressed or event.button_index != MOUSE_BUTTON_LEFT:
+		return false
+	if btn_close == null or not is_instance_valid(btn_close) or not btn_close.visible:
+		return false
+	if info_panel == null or not (info_panel is CanvasItem) or not (info_panel as CanvasItem).visible:
+		return false
+	var rect := btn_close.get_global_rect()
+	if rect.size.x < 1.0 or rect.size.y < 1.0:
+		return false
+	var pt := event.position
+	if not rect.has_point(pt) and not rect.has_point(event.global_position):
+		return false
+	if _point_covered_by_foreign_chrome(pt):
+		return false
+	if _unit_card_covers_point(pt):
+		return false
+	return true
+
+
+func _try_inspector_close_from_event(event: InputEventMouseButton) -> bool:
+	if not _press_hits_inspector_close(event):
+		return false
+	_dismiss_inspector_and_restore_input()
+	var vp := get_viewport()
+	if vp != null:
+		vp.set_input_as_handled()
+	return true
+
+
+func _unit_card_covers_point(pt: Vector2) -> bool:
+	if not _unit_detail_popup_is_visible():
+		return false
+	var ui := get_node_or_null("UI")
+	if ui == null:
+		return false
+	var pop := ui.get_node_or_null("UnitDetailPopup") as Control
+	if pop == null or not pop.visible:
+		return false
+	return pop.get_global_rect().has_point(pt)
+
+
+func _point_covered_by_foreign_chrome(pt: Vector2) -> bool:
+	if info_panel != null and info_panel.is_inside_tree():
+		if _foreign_chrome_on(info_panel.get_parent(), pt):
+			return true
+		var panel_tree := info_panel.get_tree()
+		if panel_tree != null and panel_tree.root != info_panel.get_parent() and _foreign_chrome_on(panel_tree.root, pt):
+			return true
+	if is_inside_tree():
+		if _foreign_chrome_on(get_node_or_null("UI"), pt):
+			return true
+		var tree := get_tree()
+		if tree != null and _foreign_chrome_on(tree.root, pt):
+			return true
+	return false
+
+
+func _foreign_chrome_on(host: Node, pt: Vector2) -> bool:
+	if host == null:
+		return false
+	for n in host.get_children():
+		if n == info_panel or n == self:
+			continue
+		if n is Window and (n as Window).visible:
+			if Rect2((n as Window).position, (n as Window).size).has_point(pt):
+				return true
+		if n is DraggablePanel and (n as CanvasItem).visible:
+			if (n as Control).get_global_rect().has_point(pt):
+				return true
+		var nm := str(n.name)
+		if nm.ends_with("Screen") and n is Control and (n as CanvasItem).visible and not (n is DraggablePanel):
+			if (n as Control).get_global_rect().has_point(pt):
+				return true
+	return false
+
+
 func _mouse_over_close_control() -> bool:
 	var vp: Viewport = get_viewport()
 	if vp == null:
@@ -2922,15 +3001,15 @@ func _handle_escape_key() -> void:
 	if _dismiss_search_esc_layer():
 		return
 	_release_search_focus()
-	# UI-1: Leaders (and other top-bar screens) close on Esc before unit-deselect
-	# or Command Center. Consume so this Esc cannot also open the pause menu.
-	if _dismiss_named_overlay_screen("LeaderAssignmentScreen"):
-		_close_release_seen = true
-		return
-	# MAIN-FIX-1: Production is a DraggablePanel whose own Esc lives in
-	# `_unhandled_input`. MapRenderer `_input` owns the live Esc stack, so an
-	# open Prod never saw the key and idle Esc opened Command Center on top.
-	if _dismiss_named_overlay_screen("ProductionAssignmentScreen"):
+	# One Esc closes only the front play window. The next Esc can open pause.
+	# ProductionAssignmentScreen is in this list so it still closes first,
+	# ahead of any other open play window it outranks.
+	if _dismiss_top_play_window([
+		"LeaderAssignmentScreen",
+		"ProductionAssignmentScreen",
+		"TechnologyScreen",
+		"DiplomacyView",
+	]):
 		_close_release_seen = true
 		return
 	# Garrison / unit card first: Close/Esc restores province inspector (Köln spine)
@@ -3311,6 +3390,10 @@ func _input(event: InputEvent) -> void:
 		elif event.button_index == MOUSE_BUTTON_LEFT:
 			if _campaign_modal_consumes_pointer(event):
 				get_viewport().set_input_as_handled()
+				return
+			# xdotool / computerUse clicks do not refresh gui_get_hovered_control.
+			# Hit the inspector Close rect from the event position.
+			if event.pressed and _try_inspector_close_from_event(event):
 				return
 			# Dimmer / header / X consume press and release. Do not latch a map
 			# press and do not mark the press handled — the Control still closes.
@@ -4826,6 +4909,277 @@ func _pin_control_top_left(ctrl: Control, left: float, top: float, sz: Vector2) 
 	ctrl.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 
 
+func _sync_inspector_header(ip: Control, panel_w: float) -> void:
+	const PAD_L := 18.0
+	const PAD_R := 16.0
+	var inner_w := maxf(panel_w - PAD_L - PAD_R, 120.0)
+	var header := ip.get_node_or_null("InspectorHeader") as VBoxContainer
+	if header == null:
+		header = VBoxContainer.new()
+		header.name = "InspectorHeader"
+		header.mouse_filter = Control.MOUSE_FILTER_STOP
+		header.z_index = 40
+		header.add_theme_constant_override("separation", 4)
+		ip.add_child(header)
+		var row := HBoxContainer.new()
+		row.name = "InspectorHeaderRow"
+		row.mouse_filter = Control.MOUSE_FILTER_STOP
+		row.custom_minimum_size = Vector2(0, 32)
+		row.add_theme_constant_override("separation", 8)
+		header.add_child(row)
+		var title := Label.new()
+		title.name = "InspectorTitle"
+		title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		title.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+		title.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(title)
+		var spacer := Control.new()
+		spacer.name = "InspectorHeaderSpacer"
+		spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		spacer.custom_minimum_size = Vector2(8, 32)
+		row.add_child(spacer)
+		var flow := HFlowContainer.new()
+		flow.name = "InspectorActions"
+		flow.mouse_filter = Control.MOUSE_FILTER_STOP
+		flow.add_theme_constant_override("h_separation", 6)
+		flow.add_theme_constant_override("v_separation", 6)
+		header.add_child(flow)
+	header.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	header.position = Vector2(PAD_L, 0.0)
+	var row_box := header.get_node_or_null("InspectorHeaderRow") as HBoxContainer
+	var id_label := _inspector_header_id_label(row_box)
+	var title_label := header.find_child("InspectorTitle", true, false) as Label
+	if title_label != null:
+		var shown := info_name.text if info_name != null else ""
+		title_label.text = shown
+		title_label.add_theme_font_size_override("font_size", 18)
+		title_label.add_theme_color_override("font_color", RetrowaveTheme.CYAN)
+		title_label.clip_text = true
+		title_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		title_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		var id_w := 0.0
+		if id_label != null and id_label.visible:
+			id_w = id_label.custom_minimum_size.x
+		var avail := maxf(40.0, inner_w - 72.0 - id_w - 24.0)
+		var tw := avail
+		var font := title_label.get_theme_font("font")
+		if font != null and not shown.is_empty():
+			tw = font.get_string_size(shown, HORIZONTAL_ALIGNMENT_LEFT, -1, 18).x + 2.0
+		title_label.custom_minimum_size = Vector2(minf(tw, avail), 32.0)
+	if row_box != null and btn_close != null and is_instance_valid(btn_close):
+		_place_inspector_close(row_box)
+	var flow_box := header.get_node_or_null("InspectorActions") as HFlowContainer
+	_place_inspector_actions(flow_box)
+	var flow_h := 0.0
+	if flow_box != null:
+		flow_h = _inspector_actions_height(flow_box, inner_w)
+		flow_box.custom_minimum_size = Vector2(inner_w, flow_h)
+		flow_box.size = Vector2(inner_w, maxf(flow_h, 0.0))
+	if row_box != null:
+		row_box.custom_minimum_size = Vector2(inner_w, 32.0)
+	var body_h := 32.0
+	if flow_h > 0.0:
+		body_h += 4.0 + flow_h
+	header.custom_minimum_size = Vector2(inner_w, body_h)
+	header.size = Vector2(inner_w, body_h)
+	var measured := header.get_combined_minimum_size().y
+	if measured < body_h:
+		measured = body_h
+	_inspector_header_h = measured + 8.0
+
+
+func _inspector_header_id_label(row: HBoxContainer) -> Label:
+	_ensure_province_id_badge()
+	var id_label := _province_id_badge
+	if id_label == null or row == null:
+		return id_label
+	if id_label.get_parent() != row:
+		if id_label.get_parent() != null:
+			id_label.get_parent().remove_child(id_label)
+		row.add_child(id_label)
+		if row.get_child_count() > 1:
+			row.move_child(id_label, 1)
+	id_label.add_theme_font_size_override("font_size", 12)
+	id_label.add_theme_color_override("font_color", RetrowaveTheme.TEXT_DIM)
+	id_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	id_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	id_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	id_label.clip_text = false
+	id_label.text_overrun_behavior = TextServer.OVERRUN_NO_TRIMMING
+	id_label.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	id_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	if id_label.text.strip_edges().is_empty():
+		id_label.visible = false
+		id_label.custom_minimum_size = Vector2(0, 32)
+		return id_label
+	id_label.visible = true
+	var id_font := id_label.get_theme_font("font")
+	var id_tw := 64.0
+	if id_font != null:
+		id_tw = id_font.get_string_size(id_label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, 12).x + 4.0
+	id_label.custom_minimum_size = Vector2(id_tw, 32.0)
+	return id_label
+
+
+func _place_inspector_close(row: HBoxContainer) -> void:
+	if btn_close.get_parent() != row:
+		if btn_close.get_parent() != null:
+			btn_close.get_parent().remove_child(btn_close)
+		row.add_child(btn_close)
+	row.move_child(btn_close, row.get_child_count() - 1)
+	btn_close.layout_mode = 2
+	btn_close.text = "Close"
+	btn_close.process_mode = Node.PROCESS_MODE_ALWAYS
+	btn_close.focus_mode = Control.FOCUS_NONE
+	btn_close.mouse_filter = Control.MOUSE_FILTER_STOP
+	btn_close.size_flags_horizontal = Control.SIZE_SHRINK_END
+	btn_close.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	btn_close.custom_minimum_size = Vector2(72, 28)
+	RetrowaveTheme.style_danger_button(btn_close)
+	btn_close.add_theme_font_size_override("font_size", 14)
+	for state_name in ["normal", "hover", "pressed"]:
+		var src := btn_close.get_theme_stylebox(state_name)
+		if src == null:
+			continue
+		var st := src.duplicate() as StyleBoxFlat
+		if st == null:
+			continue
+		st.bg_color = Color("#2a1520")
+		st.border_color = RetrowaveTheme.WARNING
+		st.set_border_width_all(1)
+		st.content_margin_left = 6
+		st.content_margin_right = 6
+		st.content_margin_top = 2
+		st.content_margin_bottom = 2
+		btn_close.add_theme_stylebox_override(state_name, st)
+	btn_close.add_theme_color_override("font_color", RetrowaveTheme.WARNING)
+
+
+func _place_inspector_actions(flow: HFlowContainer) -> void:
+	if flow == null:
+		return
+	var buttons: Array[Button] = []
+	for candidate in [btn_national_spirits, _btn_settle, _btn_station_engineers, _btn_open_fight, _btn_attack]:
+		var btn := candidate as Button
+		if btn != null and is_instance_valid(btn):
+			buttons.append(btn)
+	var primary := _inspector_primary_action()
+	var idx := 0
+	for btn in buttons:
+		if btn.get_parent() != flow:
+			if btn.get_parent() != null:
+				btn.get_parent().remove_child(btn)
+			flow.add_child(btn)
+		if btn.get_index() != idx:
+			flow.move_child(btn, idx)
+		idx += 1
+		_style_inspector_action(btn, btn == primary)
+
+
+func _inspector_primary_action() -> Button:
+	if _btn_open_fight != null and is_instance_valid(_btn_open_fight) and _btn_open_fight.visible:
+		return _btn_open_fight
+	if _btn_settle != null and is_instance_valid(_btn_settle) and _btn_settle.visible:
+		return _btn_settle
+	if _btn_station_engineers != null and is_instance_valid(_btn_station_engineers) and _btn_station_engineers.visible:
+		return _btn_station_engineers
+	if btn_national_spirits != null and is_instance_valid(btn_national_spirits) and btn_national_spirits.visible:
+		return btn_national_spirits
+	return null
+
+
+func _style_inspector_action(btn: Button, primary: bool) -> void:
+	var full := btn.text
+	if not btn.has_meta("eoa_base_tooltip"):
+		btn.set_meta("eoa_base_tooltip", btn.tooltip_text)
+	var base := str(btn.get_meta("eoa_base_tooltip", ""))
+	if full.is_empty() or base == full or (not base.is_empty() and full in base):
+		btn.tooltip_text = full if base.is_empty() or base == full else base
+	else:
+		btn.tooltip_text = "%s\n%s" % [full, base]
+	btn.set_meta("eoa_full_label", full)
+	# 2 = container layout. The LayoutMode enum name does not compile here.
+	btn.layout_mode = 2
+	var border := RetrowaveTheme.CYAN if primary else RetrowaveTheme.TEXT_DIM
+	if not primary:
+		border.a = 0.5
+	var bg := Color("#12182a") if primary else Color("#12141c")
+	for state_name in ["normal", "hover", "pressed"]:
+		var st := StyleBoxFlat.new()
+		st.bg_color = bg
+		st.border_color = border
+		st.set_border_width_all(1)
+		st.set_corner_radius_all(4)
+		st.content_margin_left = 8
+		st.content_margin_right = 8
+		st.content_margin_top = 2
+		st.content_margin_bottom = 2
+		btn.add_theme_stylebox_override(state_name, st)
+	btn.add_theme_color_override("font_color", RetrowaveTheme.CYAN if primary else RetrowaveTheme.TEXT_PRIMARY)
+	btn.add_theme_font_size_override("font_size", 13)
+	var font := btn.get_theme_font("font")
+	var tw := 88.0
+	if font != null and not full.is_empty():
+		tw = font.get_string_size(full, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x + 20.0
+	tw = clampf(tw, 64.0, 180.0)
+	btn.custom_minimum_size = Vector2(tw, 28.0)
+	btn.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	btn.clip_text = true
+	btn.text_overrun_behavior = TextServer.OVERRUN_TRIM_WORD_ELLIPSIS
+	btn.focus_mode = Control.FOCUS_NONE
+	btn.mouse_filter = Control.MOUSE_FILTER_STOP
+
+
+func _inspector_actions_height(flow: HFlowContainer, width: float) -> float:
+	var x := 0.0
+	var rows := 0
+	var any := false
+	for c in flow.get_children():
+		var ctrl := c as Control
+		if ctrl == null or not ctrl.visible:
+			continue
+		var w := maxf(ctrl.custom_minimum_size.x, 28.0)
+		if any and x + w > width + 0.5:
+			rows += 1
+			x = 0.0
+		any = true
+		if rows == 0:
+			rows = 1
+		x += w + 6.0
+	if rows <= 0:
+		return 0.0
+	return float(rows) * 28.0 + float(rows - 1) * 6.0
+
+
+func _inspector_control_block(ctrl: Control, block_h: float) -> float:
+	if ctrl == null or not is_instance_valid(ctrl) or not ctrl.visible:
+		return 0.0
+	var h := maxf(ctrl.size.y, ctrl.custom_minimum_size.y)
+	if h < 8.0:
+		h = block_h
+	return h + 4.0
+
+
+func _stacked_chrome_top(stop_before: String) -> float:
+	var y := _inspector_header_h
+	var order: Array[String] = [
+		"_btn_build_road_spine",
+		"_label_spine_progress",
+		"_btn_build_rhine_bridge",
+		"_label_rx1_progress",
+		"_label_spine_start_notice",
+	]
+	var fallback: Array[float] = [26.0, 26.0, 26.0, 22.0, 22.0]
+	for i in order.size():
+		if order[i] == stop_before:
+			break
+		y += _inspector_control_block(get(order[i]) as Control, fallback[i])
+	return y
+
+
 ## Keep InfoPanel text fully inside the cyan box.
 ## Critical: never let content min-width exceed the panel; always clip; pin scroll size in pixels
 ## (anchor-only layout was letting content grow wider than the frame — scrollbar far outside).
@@ -4856,50 +5210,27 @@ func _layout_info_panel_inner() -> void:
 	const INNER_L := 12.0
 	const INNER_R := 12.0
 	const SCROLLBAR_W := 14.0
-	# Settle + IX-1 Build Road Spine share the chrome row under National Spirits / Close.
-	# Keep scroll under that row so Search+Go Köln does not bury the spine CTA in InfoContent.
-	var header_h := 40.0
-	if _btn_build_road_spine != null and is_instance_valid(_btn_build_road_spine) and _btn_build_road_spine.visible:
-		header_h = 68.0
-	if _btn_build_rhine_bridge != null and is_instance_valid(_btn_build_rhine_bridge) and _btn_build_rhine_bridge.visible:
-		header_h = maxf(header_h, 96.0)
-	# Status line sits in chrome below Settle / Build, not over the province title.
-	if _label_spine_progress != null and is_instance_valid(_label_spine_progress) and _label_spine_progress.visible:
-		if _btn_build_road_spine != null and is_instance_valid(_btn_build_road_spine) and _btn_build_road_spine.visible:
-			header_h = maxf(header_h, 128.0)
-		else:
-			header_h = maxf(header_h, 100.0)
-
-	if btn_national_spirits != null:
-		btn_national_spirits.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
-		btn_national_spirits.position = Vector2(PAD_L, 8.0)
-		btn_national_spirits.custom_minimum_size = Vector2(150, 26)
-		btn_national_spirits.size = Vector2(150, 26)
-		btn_national_spirits.mouse_filter = Control.MOUSE_FILTER_STOP
-	if btn_close != null:
-		btn_close.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
-		var close_w := 70.0
-		btn_close.position = Vector2(panel_w - PAD_R - close_w, 8.0)
-		btn_close.custom_minimum_size = Vector2(close_w, 26)
-		btn_close.size = Vector2(close_w, 26)
-		btn_close.process_mode = Node.PROCESS_MODE_ALWAYS
-		btn_close.focus_mode = Control.FOCUS_NONE
-		btn_close.mouse_filter = Control.MOUSE_FILTER_STOP
-	_ensure_province_id_badge()
-	if _province_id_badge != null and btn_close != null:
-		_province_id_badge.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
-		var id_w := 96.0
-		_province_id_badge.position = Vector2(btn_close.position.x - id_w - 8.0, 10.0)
-		_province_id_badge.custom_minimum_size = Vector2(id_w, 22)
-		_province_id_badge.size = Vector2(id_w, 22)
+	# Title, id, Close, and action buttons live in InspectorHeader. Spine / bridge
+	# chrome stacks under that real height so Search+Go Köln does not bury them.
+	_sync_inspector_header(ip, panel_w)
 
 	# Explicit pixel box for scroll — do NOT use full-rect anchors (content growth was expanding it).
 	var scroll_x := PAD_L
-	var scroll_y := header_h
 	var scroll_w := maxf(panel_w - PAD_L - PAD_R, 120.0)
-	var scroll_h := maxf(panel_h - header_h - FOOTER_PAD, 80.0)
 	_layout_road_spine_chrome_button()
 	_layout_spine_progress_label()
+	_layout_rhine_bridge_chrome_button()
+	_layout_rx1_progress_label()
+	_layout_spine_start_notice()
+	var scroll_y := _stacked_chrome_top("__scroll__")
+	var declare := ip.get_node_or_null("BtnDeclareWar") as Button
+	if declare != null and is_instance_valid(declare) and declare.visible:
+		declare.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+		declare.position = Vector2(PAD_L, scroll_y)
+		declare.custom_minimum_size = Vector2(minf(260.0, scroll_w), 28.0)
+		declare.size = declare.custom_minimum_size
+		scroll_y += declare.size.y + 4.0
+	var scroll_h := maxf(panel_h - scroll_y - FOOTER_PAD, 80.0)
 	var text_w := maxf(scroll_w - INNER_L - INNER_R - SCROLLBAR_W, 100.0)
 
 	var scroll := ip.get_node_or_null("InfoScroll") as ScrollContainer
@@ -23568,10 +23899,10 @@ func _layout_road_spine_chrome_button() -> void:
 	var panel_w := absf(ip.offset_right - ip.offset_left)
 	if panel_w < 80.0:
 		panel_w = maxf(ip.size.x, 520.0)
-	# Own row BELOW Settle (8,38,225,62). Same-row x=230 overlapped the
-	# overflowing "Settle Köln…" label ("Now building…" drawn on top).
+	# Own row BELOW Settle. The old fixed top of 66 cleared Settle's 38–62 box
+	# and overlapped a wrapped header, so the row uses the stacked chrome top.
 	var left := 8.0
-	var top := 66.0
+	var top := _stacked_chrome_top("_btn_build_road_spine")
 	var height := 26.0
 	var width := minf(480.0, maxf(220.0, panel_w - left - 16.0))
 	_btn_build_road_spine.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
@@ -24071,10 +24402,7 @@ func _layout_spine_progress_label() -> void:
 	if panel_w < 80.0:
 		panel_w = maxf(ip.size.x, 520.0)
 	_label_spine_progress.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
-	# Below Settle (y=38–62). If Build Road Spine is showing (y=66–92), sit under it.
-	var status_y := 70.0
-	if _btn_build_road_spine != null and is_instance_valid(_btn_build_road_spine) and _btn_build_road_spine.visible:
-		status_y = 98.0
+	var status_y := _stacked_chrome_top("_label_spine_progress")
 	_label_spine_progress.position = Vector2(8.0, status_y)
 	_label_spine_progress.custom_minimum_size = Vector2(minf(480.0, maxf(280.0, panel_w - 24.0)), 26.0)
 	_label_spine_progress.size = _label_spine_progress.custom_minimum_size
@@ -24108,9 +24436,7 @@ func _layout_spine_start_notice() -> void:
 	if panel_w < 80.0:
 		panel_w = maxf(ip.size.x, 520.0)
 	_label_spine_start_notice.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
-	var notice_y := 128.0
-	if _label_spine_progress != null and is_instance_valid(_label_spine_progress) and _label_spine_progress.visible:
-		notice_y = _label_spine_progress.position.y + _label_spine_progress.size.y + 6.0
+	var notice_y := _stacked_chrome_top("_label_spine_start_notice")
 	_label_spine_start_notice.position = Vector2(8.0, notice_y)
 	_label_spine_start_notice.custom_minimum_size = Vector2(minf(500.0, maxf(280.0, panel_w - 24.0)), 22.0)
 	_label_spine_start_notice.size = _label_spine_start_notice.custom_minimum_size
@@ -24233,15 +24559,8 @@ func _layout_rhine_bridge_chrome_button() -> void:
 	if panel_w < 80.0:
 		panel_w = maxf(ip.size.x, 520.0)
 	# Stack below IX-1 chrome when that chrome is actually visible (Köln).
-	# On Neuss the spine row is hidden — sit at the first chrome row so we
-	# do not overlap a leftover "Road spine" label (Play MIXED 9750f3d).
 	var left := 8.0
-	var spine_up := (
-		_btn_build_road_spine != null
-		and is_instance_valid(_btn_build_road_spine)
-		and _btn_build_road_spine.visible
-	)
-	var top := 146.0 if spine_up else 66.0
+	var top := _stacked_chrome_top("_btn_build_rhine_bridge")
 	var height := 26.0
 	var width := minf(480.0, maxf(220.0, panel_w - left - 16.0))
 	_btn_build_rhine_bridge.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
@@ -24469,13 +24788,7 @@ func _layout_rx1_progress_label() -> void:
 	if panel_w < 80.0:
 		panel_w = maxf(ip.size.x, 520.0)
 	_label_rx1_progress.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
-	# Below Build Bridge. Spine notice stays at y=120 only on Bonn/Köln/Leverkusen.
-	var spine_up := (
-		_btn_build_road_spine != null
-		and is_instance_valid(_btn_build_road_spine)
-		and _btn_build_road_spine.visible
-	)
-	var top := 174.0 if spine_up else 94.0
+	var top := _stacked_chrome_top("_label_rx1_progress")
 	_label_rx1_progress.position = Vector2(8.0, top)
 	_label_rx1_progress.custom_minimum_size = Vector2(minf(480.0, maxf(280.0, panel_w - 24.0)), 22.0)
 	_label_rx1_progress.size = _label_rx1_progress.custom_minimum_size
@@ -25576,7 +25889,7 @@ func _ensure_settle_button() -> void:
 	_btn_settle.offset_right = 225.0
 	_btn_settle.offset_bottom = 62.0
 	_btn_settle.clip_contents = true
-	_btn_settle.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	_btn_settle.text_overrun_behavior = TextServer.OVERRUN_TRIM_WORD_ELLIPSIS
 	if not _btn_settle.pressed.is_connected(_on_settle_province_pressed):
 		_btn_settle.pressed.connect(_on_settle_province_pressed)
 	info_panel.add_child(_btn_settle)
@@ -25588,8 +25901,8 @@ func _update_settle_button(province: Province) -> void:
 		return
 	if province == null or province.is_sea:
 		_btn_settle.visible = false
-		if typeof(CampaignWarChrome) != TYPE_NIL and _btn_settle.get_parent() != null:
-			CampaignWarChrome.mount(_btn_settle.get_parent(), province)
+		if typeof(CampaignWarChrome) != TYPE_NIL and info_panel != null:
+			CampaignWarChrome.mount(info_panel, province)
 		return
 	_btn_settle.visible = true
 	var settle_nm := str(province.name).strip_edges()
@@ -25597,8 +25910,8 @@ func _update_settle_button(province: Province) -> void:
 		settle_nm = "#%d" % province.id
 	_btn_settle.text = "🏠 Settle %s (+0.35, now %.2f)" % [settle_nm, province.settlement_level]
 	_btn_settle.tooltip_text = "Settle %s (#%d) now (real data). After click: vitality tint strengthens (cyan-green via characterize), inspector shows updated bonuses, combat def +2.5%%/lev. Use with map modes (F3 vitality)." % [settle_nm, province.id]
-	if typeof(CampaignWarChrome) != TYPE_NIL and _btn_settle.get_parent() != null:
-		CampaignWarChrome.mount(_btn_settle.get_parent(), province)
+	if typeof(CampaignWarChrome) != TYPE_NIL and info_panel != null:
+		CampaignWarChrome.mount(info_panel, province)
 
 
 func _on_settle_province_pressed() -> void:
@@ -26977,21 +27290,39 @@ func _refresh_next_hook_chip() -> void:
 			# Flag on: apply the country painted on the chip. A fresh
 			# recommend() after the seat changes (USA Japan → GER France)
 			# must not replace the offer the player clicked.
+			var shown: Dictionary = {}
+			if _next_hook_chip != null and is_instance_valid(_next_hook_chip):
+				var painted_any: Variant = _next_hook_chip.get_meta("play_next_rec", {})
+				if painted_any is Dictionary:
+					shown = (painted_any as Dictionary).duplicate(true)
 			var rec_apply: Dictionary = {}
 			var use_painted := typeof(GameData) != TYPE_NIL and GameData.has_method("stability_justice_enabled") and bool(GameData.stability_justice_enabled())
-			if use_painted and _next_hook_chip != null and is_instance_valid(_next_hook_chip):
-				var painted: Variant = _next_hook_chip.get_meta("play_next_rec", {})
-				if painted is Dictionary and not (painted as Dictionary).is_empty():
-					rec_apply = (painted as Dictionary).duplicate(true)
+			if use_painted and not shown.is_empty():
+				rec_apply = shown.duplicate(true)
 			if rec_apply.is_empty():
 				rec_apply = PlayNextHook.recommend(_player_tag())
+			if shown.is_empty():
+				shown = rec_apply
+			if str(shown.get("source", "")) == "war_goal":
+				_open_diplomacy_on_tag(str(shown.get("target_tag", "")))
 			var out: Dictionary = PlayNextHook.apply(rec_apply)
 			_show_inspector_toast(str(out.get("summary", "Next")), 3.5)
 			_refresh_next_hook_chip()
 		)
+	if _living_title_boot_is_up():
+		_next_hook_chip.visible = false
+		return
+	_next_hook_chip.visible = true
 	var rec: Dictionary = {}
 	if typeof(PlayNextHook) != TYPE_NIL:
 		rec = PlayNextHook.recommend(_player_tag())
+		if not PlayNextHook.chip_goal_pinned():
+			var stuck: Dictionary = PlayNextHook.stick_chip_goal(rec, _next_hook_campaign_day())
+			rec = stuck.get("rec", rec)
+			if bool(stuck.get("changed", false)):
+				var reason := str(stuck.get("reason", "the goal moved"))
+				_flash_goal_chip()
+				_show_inspector_toast("Goal changed: %s" % reason, 3.5)
 	if _next_hook_chip != null and is_instance_valid(_next_hook_chip):
 		_next_hook_chip.set_meta("play_next_rec", rec.duplicate(true))
 	_hook_stability_chip_load()
@@ -26999,13 +27330,173 @@ func _refresh_next_hook_chip() -> void:
 	var stab_line := ""
 	if typeof(GameData) != TYPE_NIL and GameData.has_method("stability_justice_chip_line"):
 		stab_line = str(GameData.stability_justice_chip_line())
+	var war_goal := str(rec.get("source", "")) == "war_goal"
 	if stab_line.is_empty():
 		_next_hook_chip.text = "NEXT · %s" % str(rec.get("label", "Unpause a day"))
 		_next_hook_chip.tooltip_text = hint
 	else:
-		_next_hook_chip.custom_minimum_size = Vector2(640, 28)
 		_next_hook_chip.text = "NEXT · %s · %s" % [str(rec.get("label", "Unpause a day")), stab_line]
 		_next_hook_chip.tooltip_text = "%s\n%s" % [hint, stab_line]
+	_paint_goal_chip_detail(rec, war_goal)
+
+
+func _next_hook_campaign_day() -> int:
+	if typeof(TimeManager) != TYPE_NIL and "total_days_elapsed" in TimeManager:
+		return int(TimeManager.total_days_elapsed)
+	return 0
+
+
+func _open_diplomacy_on_tag(tag: String) -> void:
+	var focused := tag.strip_edges().to_upper()
+	if focused.is_empty():
+		return
+	var tree := get_tree()
+	if tree == null or tree.root == null:
+		return
+	var existing := tree.root.find_child("DiplomacyView", true, false)
+	if existing != null and existing.has_method("focus_country"):
+		existing.call("focus_country", focused)
+		if existing is CanvasItem:
+			(existing as CanvasItem).visible = true
+		return
+	if not ResourceLoader.exists("res://scenes/ui/DiplomacyView.tscn"):
+		return
+	var packed := load("res://scenes/ui/DiplomacyView.tscn") as PackedScene
+	if packed == null:
+		return
+	var view := packed.instantiate()
+	if view == null:
+		return
+	view.name = "DiplomacyView"
+	if view.has_method("focus_country"):
+		view.call("focus_country", focused)
+	tree.root.add_child(view)
+
+
+func _flash_goal_chip() -> void:
+	if _next_hook_chip == null or not is_instance_valid(_next_hook_chip):
+		return
+	if typeof(RetrowaveTheme) == TYPE_NIL:
+		return
+	for state in ["normal", "hover", "pressed"]:
+		var box := _next_hook_chip.get_theme_stylebox(state)
+		if box is StyleBoxFlat:
+			var copy := (box as StyleBoxFlat).duplicate() as StyleBoxFlat
+			copy.border_color = RetrowaveTheme.MAGENTA
+			_next_hook_chip.add_theme_stylebox_override(state, copy)
+	var token := Time.get_ticks_msec()
+	_next_hook_chip.set_meta("goal_flash_token", token)
+	var tw := _next_hook_chip.create_tween()
+	tw.tween_interval(0.6)
+	tw.tween_callback(func() -> void:
+		if _next_hook_chip == null or not is_instance_valid(_next_hook_chip):
+			return
+		if int(_next_hook_chip.get_meta("goal_flash_token", -1)) != token:
+			return
+		RetrowaveTheme.style_primary_button(_next_hook_chip)
+	)
+
+
+func _paint_goal_chip_detail(rec: Dictionary, war_goal: bool) -> void:
+	if _next_hook_chip == null or not is_instance_valid(_next_hook_chip):
+		return
+	var why := _next_hook_chip.get_node_or_null("GoalWhy") as Label
+	if not war_goal:
+		if why != null:
+			why.visible = false
+		var stab_wide := "Stability" in _next_hook_chip.text
+		_next_hook_chip.custom_minimum_size = Vector2(640, 28) if stab_wide else Vector2(420, 28)
+		_hide_goal_tooltip()
+		return
+	_next_hook_chip.custom_minimum_size = Vector2(336, 44)
+	_next_hook_chip.clip_text = true
+	_next_hook_chip.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	if why == null:
+		why = Label.new()
+		why.name = "GoalWhy"
+		why.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		why.position = Vector2(8, 22)
+		why.add_theme_font_size_override("font_size", 12)
+		why.add_theme_color_override("font_color", RetrowaveTheme.TEXT_DIM)
+		why.clip_text = true
+		why.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		why.custom_minimum_size = Vector2(320, 16)
+		_next_hook_chip.add_child(why)
+	why.visible = true
+	var display := str(rec.get("goal_name", rec.get("target_tag", ""))).strip_edges()
+	why.text = PlayNextHook.goal_why_line(str(rec.get("target_tag", "")), display)
+	var copy: Dictionary = PlayNextHook.goal_tooltip_copy(display)
+	var tip := "%s\n%s\n%s" % [str(copy.get("title", "")), str(copy.get("body", "")), str(copy.get("click", ""))]
+	_next_hook_chip.tooltip_text = tip
+	_next_hook_chip.set_meta("eoa_goal_tooltip", tip)
+	_ensure_goal_tooltip(copy)
+
+
+func _ensure_goal_tooltip(copy: Dictionary) -> void:
+	var ui := get_node_or_null("UI") as CanvasLayer
+	if ui == null:
+		return
+	var pop := ui.get_node_or_null("GoalTooltip") as PopupPanel
+	if pop == null:
+		pop = PopupPanel.new()
+		pop.name = "GoalTooltip"
+		pop.visible = false
+		if typeof(RetrowaveTheme) != TYPE_NIL:
+			var theme := RetrowaveTheme.make_tooltip_theme()
+			pop.theme = theme
+		var box := VBoxContainer.new()
+		box.name = "GoalTooltipBody"
+		box.custom_minimum_size = Vector2(280, 0)
+		pop.add_child(box)
+		var title := Label.new()
+		title.name = "GoalTooltipTitle"
+		title.add_theme_color_override("font_color", RetrowaveTheme.CYAN)
+		title.add_theme_font_size_override("font_size", 14)
+		box.add_child(title)
+		var body := Label.new()
+		body.name = "GoalTooltipText"
+		body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		body.custom_minimum_size = Vector2(280, 0)
+		body.add_theme_font_size_override("font_size", 14)
+		box.add_child(body)
+		var click := Label.new()
+		click.name = "GoalTooltipClick"
+		click.add_theme_font_size_override("font_size", 14)
+		box.add_child(click)
+		ui.add_child(pop)
+		if _next_hook_chip != null and not _next_hook_chip.mouse_entered.is_connected(_show_goal_tooltip):
+			_next_hook_chip.mouse_entered.connect(_show_goal_tooltip)
+			_next_hook_chip.mouse_exited.connect(_hide_goal_tooltip)
+	var title_l := pop.find_child("GoalTooltipTitle", true, false) as Label
+	var body_l := pop.find_child("GoalTooltipText", true, false) as Label
+	var click_l := pop.find_child("GoalTooltipClick", true, false) as Label
+	if title_l != null:
+		title_l.text = str(copy.get("title", "Justify war goal"))
+	if body_l != null:
+		body_l.text = str(copy.get("body", ""))
+	if click_l != null:
+		click_l.text = str(copy.get("click", ""))
+
+
+func _show_goal_tooltip() -> void:
+	var ui := get_node_or_null("UI") as CanvasLayer
+	if ui == null or _next_hook_chip == null:
+		return
+	var pop := ui.get_node_or_null("GoalTooltip") as PopupPanel
+	if pop == null:
+		return
+	var origin := _next_hook_chip.get_global_rect().end
+	pop.position = Vector2i(int(origin.x) - 300, int(origin.y) + 6)
+	pop.visible = true
+
+
+func _hide_goal_tooltip() -> void:
+	var ui := get_node_or_null("UI") as CanvasLayer
+	if ui == null:
+		return
+	var pop := ui.get_node_or_null("GoalTooltip") as PopupPanel
+	if pop != null:
+		pop.visible = false
 
 
 func _hook_stability_chip_load() -> void:
@@ -27708,6 +28199,35 @@ func _dismiss_named_overlay_screen(screen_name: String) -> bool:
 	return true
 
 
+## Frontmost of Diplomacy, Tech, Lead, and Production. Windows beat panels.
+## Equal rank keeps the earlier name so Lead still closes before Production.
+func _dismiss_top_play_window(screen_names: Array) -> bool:
+	var best: Node = null
+	for screen_name in screen_names:
+		var n := _find_named_overlay_screen(screen_name)
+		if n == null or not _overlay_node_is_up(n):
+			continue
+		if best == null or _play_window_outranks(n, best):
+			best = n
+	if best == null:
+		return false
+	return _dismiss_named_overlay_screen(str(best.name))
+
+
+func _play_window_outranks(n: Node, best: Node) -> bool:
+	var n_win := 1 if n is Window else 0
+	var best_win := 1 if best is Window else 0
+	if n_win != best_win:
+		return n_win > best_win
+	var n_seq := int(n.get_meta("eoa_open_seq", 0))
+	var best_seq := int(best.get_meta("eoa_open_seq", 0))
+	if n_seq != best_seq:
+		return n_seq > best_seq
+	var n_z := (n as CanvasItem).z_index if n is CanvasItem else 0
+	var best_z := (best as CanvasItem).z_index if best is CanvasItem else 0
+	return n_z > best_z
+
+
 func _dismiss_space_layer_board_esc() -> bool:
 	# Space is a Window: Esc stays in its viewport (Play: MapRenderer never logged).
 	# Hide like Close (do not queue_free — TopInfoBar reuses the node).
@@ -27744,7 +28264,7 @@ func _dismiss_map_overlays_esc() -> bool:
 			return true
 	var tree := get_tree()
 	if tree:
-		for screen_name in ["LeaderAssignmentScreen", "ProductionAssignmentScreen", "TechnologyScreen", "AgentAssignmentScreen", "NationalSpiritsScreen"]:
+		for screen_name in ["ProductionAssignmentScreen", "AgentAssignmentScreen", "NationalSpiritsScreen"]:
 			var n := tree.root.get_node_or_null(screen_name)
 			if n == null and tree.current_scene:
 				var ui := tree.current_scene.get_node_or_null("UILayer/%s" % screen_name)
@@ -27761,7 +28281,7 @@ func _dismiss_map_overlays_esc() -> bool:
 			if layer:
 				for child in layer.get_children():
 					var cn := str(child.name)
-					if cn in ["LeaderAssignmentScreen", "ProductionAssignmentScreen", "TechnologyScreen", "AgentAssignmentScreen", "NationalSpiritsScreen"]:
+					if cn in ["ProductionAssignmentScreen", "AgentAssignmentScreen", "NationalSpiritsScreen"]:
 						if _overlay_node_is_up(child):
 							child.queue_free()
 							dismissed = true

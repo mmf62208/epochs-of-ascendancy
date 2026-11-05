@@ -81,6 +81,7 @@ func _ready() -> void:
 	add_to_group("technology_screen")
 	drag_handle = $TitleBar
 	super._ready()
+	set_meta("eoa_open_seq", Time.get_ticks_msec())
 	# Stay above map/HUD; root-child Controls can sit under map canvas layers otherwise.
 	z_index = 80
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -324,6 +325,36 @@ func _apply_screen_theme() -> void:
 	RetrowaveTheme.style_body_label(era_value_label)
 	RetrowaveTheme.style_body_label(footer_label)
 	call_deferred("_relayout_inspector_wrap")
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if not _is_tech_cancel(event):
+		return
+	if is_queued_for_deletion() or _tech_escape_yields():
+		return
+	queue_free()
+	var vp := get_viewport()
+	if vp != null:
+		vp.set_input_as_handled()
+
+
+func _is_tech_cancel(event: InputEvent) -> bool:
+	if event == null or not event.is_pressed() or event.is_echo():
+		return false
+	if event is InputEventKey:
+		var key := event as InputEventKey
+		if key.keycode == KEY_ESCAPE or key.physical_keycode == KEY_ESCAPE or key.key_label == KEY_ESCAPE:
+			return true
+	return event.is_action_pressed("ui_cancel")
+
+
+func _tech_escape_yields() -> bool:
+	var tree := get_tree()
+	if tree != null and tree.root != null:
+		var dip := tree.root.find_child("DiplomacyView", true, false)
+		if dip is Window and is_instance_valid(dip) and not dip.is_queued_for_deletion() and (dip as Window).visible:
+			return true
+	return not _is_frontmost_draggable()
 
 
 func _on_close_pressed() -> void:

@@ -27772,7 +27772,9 @@ static func execute_war_goal_step(step: String = "board", province_id: int = 1) 
 			leaf = "apply_focus"; action_id = "war_goal_justify"
 		"execute":
 			leaf = "apply_assault"; action_id = "war_goal_execute"
-	var label := "Execute war-goal %s · leaf %s · score %.2f" % [s, leaf, score]
+	var jargon := "Execute war-goal %s · leaf %s · score %.2f" % [s, leaf, score]
+	var player_label := "Advance the war goal (%s)." % s
+	var label := jargon if PlayNextHook.player_may_show_war_goal_jargon() else player_label
 	return {"step": s, "leaf_action": leaf, "action_id": action_id, "ok": true, "score": score, "province_id": province_id,
 		"apply_queue": [{"action_id": leaf, "province_id": province_id, "score": score, "enabled": true, "label": label, "step": s}],
 		"summary": label, "plain": label, "empty": false, "integration": ["execute_war_goal_step", s, leaf]}

@@ -68,6 +68,7 @@ func _ready() -> void:
 	add_to_group("production_screen")
 	drag_handle = $TitleBar
 	super._ready()
+	set_meta("eoa_open_seq", Time.get_ticks_msec())
 	z_index = 80
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	mouse_filter = Control.MOUSE_FILTER_STOP

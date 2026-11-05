@@ -272,7 +272,7 @@ func _build_ui() -> void:
 
 	var panel := PanelContainer.new()
 	panel.name = "LivingTitlePanel"
-	panel.custom_minimum_size = Vector2(420, 720)
+	panel.custom_minimum_size = Vector2(480, 680)
 	panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	panel.process_mode = Node.PROCESS_MODE_ALWAYS
 	RetrowaveTheme.style_menu_panel(panel)
@@ -280,15 +280,15 @@ func _build_ui() -> void:
 	_panel = panel
 	panel.set_anchors_preset(Control.PRESET_CENTER_LEFT)
 	panel.offset_left = 28
-	panel.offset_top = -360
-	panel.offset_right = 448
-	panel.offset_bottom = 380
+	panel.offset_top = -340
+	panel.offset_right = 508
+	panel.offset_bottom = 340
 
 	var margin := MarginContainer.new()
-	margin.add_theme_constant_override("margin_left", 16)
-	margin.add_theme_constant_override("margin_right", 16)
-	margin.add_theme_constant_override("margin_top", 12)
-	margin.add_theme_constant_override("margin_bottom", 12)
+	margin.add_theme_constant_override("margin_left", 0)
+	margin.add_theme_constant_override("margin_right", 0)
+	margin.add_theme_constant_override("margin_top", 0)
+	margin.add_theme_constant_override("margin_bottom", 0)
 	panel.add_child(margin)
 
 	var col := VBoxContainer.new()
@@ -304,6 +304,7 @@ func _build_ui() -> void:
 	var sub := Label.new()
 	sub.text = "The world is live. Click a playable country on the map, pick a date, or load a save."
 	sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	sub.custom_minimum_size = Vector2(400, 0)
 	RetrowaveTheme.style_body_label(sub)
 	col.add_child(sub)
 

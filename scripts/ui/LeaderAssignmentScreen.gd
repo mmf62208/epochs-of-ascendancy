@@ -74,6 +74,7 @@ func _ready() -> void:
 	add_to_group("leader_screen")
 	drag_handle = $TitleBar
 	super._ready()
+	set_meta("eoa_open_seq", Time.get_ticks_msec())
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	set_process_input(true)
 	_apply_content_margins()
@@ -157,20 +158,48 @@ func close_screen() -> void:
 
 
 func _input(event: InputEvent) -> void:
-	if event is InputEventKey and event.pressed and not event.echo:
+	_close_from_cancel(event)
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	_close_from_cancel(event)
+
+
+func _close_from_cancel(event: InputEvent) -> void:
+	if not _is_lead_cancel(event):
+		return
+	if is_queued_for_deletion() or _lead_escape_yields():
+		return
+	close_screen()
+	var vp := get_viewport()
+	if vp != null:
+		vp.set_input_as_handled()
+
+
+func _is_lead_cancel(event: InputEvent) -> bool:
+	if event == null or not event.is_pressed() or event.is_echo():
+		return false
+	if event is InputEventKey:
 		var key := event as InputEventKey
-		var is_esc: bool = (
-			key.keycode == KEY_ESCAPE
-			or key.physical_keycode == KEY_ESCAPE
-			or key.key_label == KEY_ESCAPE
-		)
-		if not is_esc and event.is_action_pressed("ui_cancel"):
-			is_esc = true
-		if is_esc:
-			close_screen()
-			var vp := get_viewport()
-			if vp != null:
-				vp.set_input_as_handled()
+		if key.keycode == KEY_ESCAPE or key.physical_keycode == KEY_ESCAPE or key.key_label == KEY_ESCAPE:
+			return true
+	return event.is_action_pressed("ui_cancel")
+
+
+func _lead_escape_yields() -> bool:
+	if _visible_diplomacy_window() != null:
+		return true
+	return not _is_frontmost_draggable()
+
+
+func _visible_diplomacy_window() -> Window:
+	var tree := get_tree()
+	if tree == null or tree.root == null:
+		return null
+	var n := tree.root.find_child("DiplomacyView", true, false)
+	if n is Window and is_instance_valid(n) and not n.is_queued_for_deletion() and (n as Window).visible:
+		return n as Window
+	return null
 
 
 func _apply_content_margins() -> void:
