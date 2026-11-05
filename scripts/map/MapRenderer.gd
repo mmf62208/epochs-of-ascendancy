@@ -3002,8 +3002,8 @@ func _handle_escape_key() -> void:
 		return
 	_release_search_focus()
 	# One Esc closes only the front play window. The next Esc can open pause.
-	# ProductionAssignmentScreen is in this list so it still closes before
-	# _esc_open_command_center, ahead of any other open play window it outranks.
+	# ProductionAssignmentScreen is in this list so it still closes first,
+	# ahead of any other open play window it outranks.
 	if _dismiss_top_play_window([
 		"LeaderAssignmentScreen",
 		"ProductionAssignmentScreen",
