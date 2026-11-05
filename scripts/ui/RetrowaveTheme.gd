@@ -20,8 +20,12 @@ const TOOLTIP_EDGE_MARGIN := 4.0
 ## Camera motion above this (px²) means the world under a still cursor changed.
 const TOOLTIP_PAN_CLEAR_PX2 := 0.25
 const TOOLTIP_RULE_COLOR := Color("#2a3a5c")
-## One process_frame callback per open tip. Keyed by popup instance id.
-static var _tooltip_pan_poll_cbs: Dictionary = {}
+## Open tip instance ids. One zero-arg SceneTree.process_frame callback
+## ticks every id; never bind a PopupPanel onto that signal (Godot then
+## emits engine ERROR "Cannot convert argument 1 from Object to Object"
+## for the rest of the session if the bound node dies).
+static var _tooltip_pan_poll_ids: Dictionary = {}
+static var _tooltip_pan_poll_tree: SceneTree = null
 
 
 static func style_top_info_bar(bar: Control) -> void:
@@ -841,31 +845,46 @@ static func _start_tooltip_pan_poll(pop: PopupPanel) -> void:
 	pop.set_meta("eoa_tooltip_pan_poll_ticks", 0)
 	if pop.has_meta("eoa_tooltip_cam_pose"):
 		pop.remove_meta("eoa_tooltip_cam_pose")
-	var cb := _poll_tooltip_pan.bind(pop)
-	_tooltip_pan_poll_cbs[pop.get_instance_id()] = cb
-	if not tree.process_frame.is_connected(cb):
-		tree.process_frame.connect(cb)
-	var exit_cb := _on_tooltip_pan_poll_exiting.bind(pop)
+	var id := pop.get_instance_id()
+	_tooltip_pan_poll_ids[id] = true
+	if _tooltip_pan_poll_tree == null or not is_instance_valid(_tooltip_pan_poll_tree):
+		_tooltip_pan_poll_tree = tree
+	if not tree.process_frame.is_connected(_poll_tooltip_pan):
+		tree.process_frame.connect(_poll_tooltip_pan)
+	var exit_cb := _on_tooltip_pan_poll_exiting.bind(id)
 	if not pop.tree_exiting.is_connected(exit_cb):
 		pop.tree_exiting.connect(exit_cb, CONNECT_ONE_SHOT)
 
 
-static func _on_tooltip_pan_poll_exiting(pop: PopupPanel) -> void:
-	_stop_tooltip_pan_poll(pop)
+static func _on_tooltip_pan_poll_exiting(instance_id: int) -> void:
+	_stop_tooltip_pan_poll_id(instance_id)
 
 
 static func _stop_tooltip_pan_poll(pop: PopupPanel) -> void:
-	if pop == null or not is_instance_valid(pop):
-		return
-	var id := pop.get_instance_id()
-	var cb: Callable = _tooltip_pan_poll_cbs.get(id, Callable())
-	var tree := pop.get_tree()
-	if tree != null and cb.is_valid() and tree.process_frame.is_connected(cb):
-		tree.process_frame.disconnect(cb)
-	_tooltip_pan_poll_cbs.erase(id)
-	pop.set_meta("eoa_tooltip_pan_poll", false)
-	if pop.has_meta("eoa_tooltip_pan_poll_cb"):
-		pop.remove_meta("eoa_tooltip_pan_poll_cb")
+	var id := 0
+	if pop != null:
+		id = pop.get_instance_id()
+	_stop_tooltip_pan_poll_id(id)
+
+
+static func _stop_tooltip_pan_poll_id(instance_id: int) -> void:
+	if instance_id != 0:
+		_tooltip_pan_poll_ids.erase(instance_id)
+		var obj := instance_from_id(instance_id)
+		if obj != null and is_instance_valid(obj) and obj is PopupPanel:
+			var pop := obj as PopupPanel
+			pop.set_meta("eoa_tooltip_pan_poll", false)
+			if pop.has_meta("eoa_tooltip_pan_poll_cb"):
+				pop.remove_meta("eoa_tooltip_pan_poll_cb")
+	if _tooltip_pan_poll_ids.is_empty():
+		_disconnect_tooltip_pan_poll()
+
+
+static func _disconnect_tooltip_pan_poll() -> void:
+	if _tooltip_pan_poll_tree != null and is_instance_valid(_tooltip_pan_poll_tree):
+		if _tooltip_pan_poll_tree.process_frame.is_connected(_poll_tooltip_pan):
+			_tooltip_pan_poll_tree.process_frame.disconnect(_poll_tooltip_pan)
+	_tooltip_pan_poll_tree = null
 
 
 static func tooltip_pan_poll_active(pop: PopupPanel) -> bool:
@@ -873,18 +892,53 @@ static func tooltip_pan_poll_active(pop: PopupPanel) -> bool:
 		return false
 	if not bool(pop.get_meta("eoa_tooltip_pan_poll", false)):
 		return false
-	var cb: Callable = _tooltip_pan_poll_cbs.get(pop.get_instance_id(), Callable())
-	var tree := pop.get_tree()
-	return tree != null and cb.is_valid() and tree.process_frame.is_connected(cb)
+	if not _tooltip_pan_poll_ids.has(pop.get_instance_id()):
+		return false
+	return (
+		_tooltip_pan_poll_tree != null
+		and is_instance_valid(_tooltip_pan_poll_tree)
+		and _tooltip_pan_poll_tree.process_frame.is_connected(_poll_tooltip_pan)
+	)
 
 
 static func tooltip_pan_poll_tracked(instance_id: int) -> bool:
-	return _tooltip_pan_poll_cbs.has(instance_id)
+	return _tooltip_pan_poll_ids.has(instance_id)
 
 
-static func _poll_tooltip_pan(pop: PopupPanel) -> void:
-	if pop == null or not is_instance_valid(pop):
+static func tooltip_pan_poll_bound_object_count(tree: SceneTree) -> int:
+	if tree == null:
+		return 0
+	var n := 0
+	for c in tree.process_frame.get_connections():
+		var cb: Callable = c.get("callable", Callable())
+		if str(cb.get_method()) != "_poll_tooltip_pan":
+			continue
+		n += cb.get_bound_arguments().size()
+	return n
+
+
+static func tooltip_pan_poll_process_frame_connected(tree: SceneTree) -> bool:
+	return tree != null and tree.process_frame.is_connected(_poll_tooltip_pan)
+
+
+## Zero-arg on purpose. Binding a typed PopupPanel onto process_frame is the
+## FIX #1 leak: engine memdelete / a failed tree_exiting hook leaves the
+## bound Object on the signal and every later frame logs
+## "Cannot convert argument 1 from Object to Object".
+static func _poll_tooltip_pan() -> void:
+	var ids: Array = _tooltip_pan_poll_ids.keys()
+	for raw in ids:
+		_tick_tooltip_pan_poll(int(raw))
+	if _tooltip_pan_poll_ids.is_empty():
+		_disconnect_tooltip_pan_poll()
+
+
+static func _tick_tooltip_pan_poll(instance_id: int) -> void:
+	var obj := instance_from_id(instance_id)
+	if obj == null or not is_instance_valid(obj) or not (obj is PopupPanel):
+		_stop_tooltip_pan_poll_id(instance_id)
 		return
+	var pop := obj as PopupPanel
 	var ticks := int(pop.get_meta("eoa_tooltip_pan_poll_ticks", 0)) + 1
 	pop.set_meta("eoa_tooltip_pan_poll_ticks", ticks)
 	if not pop.visible:
@@ -893,7 +947,7 @@ static func _poll_tooltip_pan(pop: PopupPanel) -> void:
 	var host := _host_viewport(pop)
 	var cam: Camera2D = host.get_camera_2d() if host != null else null
 	# No camera: stop. Do not keep polling until one appears.
-	if cam == null:
+	if cam == null or not is_instance_valid(cam):
 		_stop_tooltip_pan_poll(pop)
 		return
 	var now := cam.global_position
