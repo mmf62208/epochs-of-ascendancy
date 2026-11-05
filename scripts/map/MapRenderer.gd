@@ -3001,15 +3001,8 @@ func _handle_escape_key() -> void:
 	if _dismiss_search_esc_layer():
 		return
 	_release_search_focus()
-	# UI-1: Leaders (and other top-bar screens) close on Esc before unit-deselect
-	# or Command Center. Consume so this Esc cannot also open the pause menu.
-	if _dismiss_named_overlay_screen("LeaderAssignmentScreen"):
-		_close_release_seen = true
-		return
-	# MAIN-FIX-1: Production is a DraggablePanel whose own Esc lives in
-	# `_unhandled_input`. MapRenderer `_input` owns the live Esc stack, so an
-	# open Prod never saw the key and idle Esc opened Command Center on top.
-	if _dismiss_named_overlay_screen("ProductionAssignmentScreen"):
+	# One Esc closes only the front play window. The next Esc can open pause.
+	if _dismiss_top_play_window():
 		_close_release_seen = true
 		return
 	# Garrison / unit card first: Close/Esc restores province inspector (Köln spine)
@@ -28198,6 +28191,35 @@ func _dismiss_named_overlay_screen(screen_name: String) -> bool:
 	return true
 
 
+## Frontmost of Diplomacy, Tech, Lead, and Production. Windows beat panels.
+## Equal rank keeps the earlier name so Lead still closes before Production.
+func _dismiss_top_play_window() -> bool:
+	var best: Node = null
+	for screen_name in ["LeaderAssignmentScreen", "ProductionAssignmentScreen", "TechnologyScreen", "DiplomacyView"]:
+		var n := _find_named_overlay_screen(screen_name)
+		if n == null or not _overlay_node_is_up(n):
+			continue
+		if best == null or _play_window_outranks(n, best):
+			best = n
+	if best == null:
+		return false
+	return _dismiss_named_overlay_screen(str(best.name))
+
+
+func _play_window_outranks(n: Node, best: Node) -> bool:
+	var n_win := 1 if n is Window else 0
+	var best_win := 1 if best is Window else 0
+	if n_win != best_win:
+		return n_win > best_win
+	var n_seq := int(n.get_meta("eoa_open_seq", 0))
+	var best_seq := int(best.get_meta("eoa_open_seq", 0))
+	if n_seq != best_seq:
+		return n_seq > best_seq
+	var n_z := (n as CanvasItem).z_index if n is CanvasItem else 0
+	var best_z := (best as CanvasItem).z_index if best is CanvasItem else 0
+	return n_z > best_z
+
+
 func _dismiss_space_layer_board_esc() -> bool:
 	# Space is a Window: Esc stays in its viewport (Play: MapRenderer never logged).
 	# Hide like Close (do not queue_free — TopInfoBar reuses the node).
@@ -28234,7 +28256,7 @@ func _dismiss_map_overlays_esc() -> bool:
 			return true
 	var tree := get_tree()
 	if tree:
-		for screen_name in ["LeaderAssignmentScreen", "ProductionAssignmentScreen", "TechnologyScreen", "AgentAssignmentScreen", "NationalSpiritsScreen"]:
+		for screen_name in ["AgentAssignmentScreen", "NationalSpiritsScreen"]:
 			var n := tree.root.get_node_or_null(screen_name)
 			if n == null and tree.current_scene:
 				var ui := tree.current_scene.get_node_or_null("UILayer/%s" % screen_name)
@@ -28251,7 +28273,7 @@ func _dismiss_map_overlays_esc() -> bool:
 			if layer:
 				for child in layer.get_children():
 					var cn := str(child.name)
-					if cn in ["LeaderAssignmentScreen", "ProductionAssignmentScreen", "TechnologyScreen", "AgentAssignmentScreen", "NationalSpiritsScreen"]:
+					if cn in ["AgentAssignmentScreen", "NationalSpiritsScreen"]:
 						if _overlay_node_is_up(child):
 							child.queue_free()
 							dismissed = true

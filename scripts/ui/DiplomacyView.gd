@@ -67,8 +67,11 @@ var player_label: Label
 var bilateral_title: Label
 var bilateral_filter_hbox: HBoxContainer
 var offers_scroll: ScrollContainer
+var lower_scroll: ScrollContainer
 var offers_vbox: VBoxContainer
 var relations_metrics: HBoxContainer   # Dynamically populated metrics for Relations Overview
+var relations_panel: PanelContainer
+var relations_lines: VBoxContainer
 
 var _bilateral_filter: String = "ALL"  # ALL, SENT, RECEIVED
 
@@ -78,6 +81,7 @@ var _bilateral_filter: String = "ALL"  # ALL, SENT, RECEIVED
 @onready var close_btn: Button = $Margin/MainVBox/ButtonHBox/CloseButton
 
 func _ready() -> void:
+	set_meta("eoa_open_seq", Time.get_ticks_msec())
 	RetrowaveTheme.style_popup_root(self)
 	RetrowaveTheme.style_title(title_label)
 
@@ -181,13 +185,14 @@ func _build_dynamic_ui() -> void:
 	_add_bilateral_filter_button("Received by you", "RECEIVED")
 
 	# Deals + overview scroll so multiple bilateral deals and long treaty text stay readable.
-	var lower_scroll := ScrollContainer.new()
-	lower_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	lower_scroll = ScrollContainer.new()
+	lower_scroll.name = "LowerScroll"
+	lower_scroll.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	lower_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	lower_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	lower_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 	lower_scroll.clip_contents = true
-	lower_scroll.custom_minimum_size = Vector2(0, 360)
+	lower_scroll.custom_minimum_size = Vector2(0, 0)
 	main_vbox.add_child(lower_scroll)
 
 	var lower_vbox := VBoxContainer.new()
@@ -197,10 +202,11 @@ func _build_dynamic_ui() -> void:
 
 	# Offers list (scrollable; taller so multiple deals fit cleanly)
 	offers_scroll = ScrollContainer.new()
-	offers_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	offers_scroll.name = "OffersScroll"
+	offers_scroll.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	offers_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	offers_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	offers_scroll.custom_minimum_size.y = 200
+	offers_scroll.custom_minimum_size.y = 0
 	offers_scroll.clip_contents = true
 	lower_vbox.add_child(offers_scroll)
 
@@ -210,7 +216,8 @@ func _build_dynamic_ui() -> void:
 	offers_scroll.add_child(offers_vbox)
 
 	# === Relations Overview (larger flat box for readable wrap) ===
-	var relations_panel := PanelContainer.new()
+	relations_panel = PanelContainer.new()
+	relations_panel.name = "RelationsOverview"
 	RetrowaveTheme.style_detail_panel_flat(relations_panel)
 	relations_panel.custom_minimum_size = Vector2(0, 110)
 	relations_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -238,54 +245,14 @@ func _build_dynamic_ui() -> void:
 	relations_metrics.add_theme_constant_override("separation", 16)
 	rel_vbox.add_child(relations_metrics)
 
-	# Future extension point comment
-	var rel_note := Label.new()
-	rel_note.text = "Future: Opinion, prestige, diplomatic events, and national focus effects will integrate here via Relations system."
-	rel_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	rel_note.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	RetrowaveTheme.style_body_label(rel_note)
-	rel_note.add_theme_color_override("font_color", Color(0.65, 0.7, 0.8))
-	rel_vbox.add_child(rel_note)
+	relations_lines = VBoxContainer.new()
+	relations_lines.name = "RelationsLines"
+	relations_lines.add_theme_constant_override("separation", 4)
+	rel_vbox.add_child(relations_lines)
+	_refresh_relations_overview()
 
-	# 1918 Peace / Armistice Treaty Status — larger wrap box
-	var treaty_panel := PanelContainer.new()
-	RetrowaveTheme.style_detail_panel_flat(treaty_panel)
-	treaty_panel.custom_minimum_size = Vector2(0, 130)
-	treaty_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	lower_vbox.add_child(treaty_panel)
-	var treaty_margin := MarginContainer.new()
-	treaty_margin.add_theme_constant_override("margin_left", 12)
-	treaty_margin.add_theme_constant_override("margin_right", 12)
-	treaty_margin.add_theme_constant_override("margin_top", 10)
-	treaty_margin.add_theme_constant_override("margin_bottom", 10)
-	treaty_panel.add_child(treaty_margin)
-	var treaty_vbox := VBoxContainer.new()
-	treaty_vbox.add_theme_constant_override("separation", 4)
-	treaty_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	treaty_margin.add_child(treaty_vbox)
-	var treaty_header := Label.new()
-	treaty_header.text = "1918 Armistice Treaty Status + Ripples"
-	RetrowaveTheme.style_column_header(treaty_header)
-	treaty_vbox.add_child(treaty_header)
-	var treaty_label := Label.new()
-	treaty_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	treaty_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	if typeof(GameData) != TYPE_NIL and GameData.has_method("get_peace_state"):
-		var ps: Dictionary = GameData.get_peace_state()
-		var ptag := _player_country
-		var lev: int = int(GameData.get_inclusion_leverage(ptag)) if GameData.has_method("get_inclusion_leverage") else 0
-		var gr: int = int((ps.get("grievance", {}) as Dictionary).get(ptag, 0)) if ps.get("grievance") is Dictionary else 0
-		var completed: bool = bool(ps.get("conference_1918_completed", false))
-		var terms: Dictionary = ps.get("term_choices", {}) as Dictionary if ps.get("term_choices") is Dictionary else {}
-		var seat: String = str(terms.get("central_powers_seating", "pre-conference" if not completed else "resolved"))
-		if completed:
-			treaty_label.text = "Resolved. Lev used:%d Grievance:%d Seating:%s | %d terms recorded. Follow-ons (1919-1925) via TimeManager/year advance. Tech gates + spirits active. Use Agent diplomacy pre-resolve in replays for alt-history." % [lev, gr, seat, terms.size()]
-		else:
-			treaty_label.text = "Pre-conference. Inclusion leverage:%d (Central Powers: run 'Secure Seat', 'Honeypot', 'Bribe Minister' via Agents screen — high influence skill). Grievance:%d. F10 > Peace Conf to design deal. Ripples to tech/spirits/agents/leaders." % [lev, gr]
-	else:
-		treaty_label.text = "Peace state unavailable (init on 1918 scenario)."
-	RetrowaveTheme.style_body_label(treaty_label)
-	treaty_vbox.add_child(treaty_label)
+	if _diplomacy_scenario_year() == 1918:
+		_build_armistice_block(lower_vbox)
 
 	# === Agent Networks Status + Diplomatic Actions
 	var agent_panel := PanelContainer.new()
@@ -1001,6 +968,7 @@ func _refresh_view() -> void:
 	if _selected_country.is_empty():
 		return
 
+	_refresh_relations_overview()
 	bilateral_title.text = "Bilateral Trade Activity — " + _selected_country
 	# Pass 25: refresh negotiation + CRS readout.
 	_refresh_alliance_negotiation_ui()
@@ -1032,11 +1000,35 @@ func _refresh_view() -> void:
 		offers = filtered
 
 	if offers.is_empty():
+		offers_scroll.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+		offers_scroll.custom_minimum_size.y = 0
+		if lower_scroll != null:
+			lower_scroll.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+			lower_scroll.custom_minimum_size.y = 0
 		var empty := Label.new()
-		empty.text = "No active proposed offers between " + _player_country + " and " + _selected_country + "."
+		empty.name = "EmptyOffers"
+		empty.text = "No active offers with %s" % _selected_country
+		empty.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		empty.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		RetrowaveTheme.style_body_label(empty)
+		empty.add_theme_font_size_override("font_size", 14)
+		empty.add_theme_color_override("font_color", RetrowaveTheme.TEXT_DIM)
 		offers_vbox.add_child(empty)
+		var propose_row := CenterContainer.new()
+		propose_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var propose := Button.new()
+		propose.name = "ProposeTrade"
+		propose.text = "Propose trade"
+		RetrowaveTheme.style_primary_button(propose)
+		propose.pressed.connect(_open_trade_market_filtered)
+		propose_row.add_child(propose)
+		offers_vbox.add_child(propose_row)
 		return
+	offers_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	offers_scroll.custom_minimum_size.y = 0
+	if lower_scroll != null:
+		lower_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		lower_scroll.custom_minimum_size.y = 0
 
 	# Lightweight grouping for clarity when viewing "All"
 	if _bilateral_filter == "ALL":
@@ -1416,8 +1408,159 @@ func _on_trade_outcome(offer_id: String, from: String, to: String, _status: int,
 		_refresh_view()
 
 func _on_close_pressed() -> void:
+	close_screen()
+
+
+func close_screen() -> void:
+	if is_queued_for_deletion():
+		return
 	hide()
 	queue_free()
+
+
+func _input(event: InputEvent) -> void:
+	_close_from_cancel(event)
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	_close_from_cancel(event)
+
+
+func _close_from_cancel(event: InputEvent) -> void:
+	if not _is_diplomacy_cancel(event):
+		return
+	if is_queued_for_deletion():
+		return
+	hide()
+	var vp := get_viewport()
+	if vp != null:
+		vp.set_input_as_handled()
+	close_screen()
+
+
+func _is_diplomacy_cancel(event: InputEvent) -> bool:
+	if event == null or not event.is_pressed() or event.is_echo():
+		return false
+	if event is InputEventKey:
+		var key := event as InputEventKey
+		if key.keycode == KEY_ESCAPE or key.physical_keycode == KEY_ESCAPE or key.key_label == KEY_ESCAPE:
+			return true
+	return event.is_action_pressed("ui_cancel")
+
+
+func _diplomacy_scenario_year() -> int:
+	if typeof(TimeManager) != TYPE_NIL and "current_year" in TimeManager:
+		return int(TimeManager.current_year)
+	return 1936
+
+
+func _peace_conference_is_live() -> bool:
+	if _diplomacy_scenario_year() != 1918:
+		return false
+	if typeof(GameData) == TYPE_NIL or not GameData.has_method("get_peace_state"):
+		return false
+	var ps: Dictionary = GameData.get_peace_state()
+	if bool(ps.get("conference_1918_completed", false)):
+		return false
+	if bool(ps.get("conference_open", false)):
+		return true
+	return int(ps.get("conference_day", -1)) >= 0
+
+
+func _refresh_relations_overview() -> void:
+	if relations_panel == null or relations_lines == null:
+		return
+	for child in relations_lines.get_children():
+		child.queue_free()
+	var lines := _relations_overview_lines()
+	if lines.is_empty():
+		relations_panel.visible = false
+		return
+	relations_panel.visible = true
+	for line in lines:
+		var lab := Label.new()
+		lab.text = line
+		lab.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		RetrowaveTheme.style_body_label(lab)
+		relations_lines.add_child(lab)
+
+
+func _relations_overview_lines() -> PackedStringArray:
+	var lines := PackedStringArray()
+	var other := str(_selected_country).strip_edges().to_upper()
+	var player := str(_player_country).strip_edges().to_upper()
+	if other.is_empty() or player.is_empty():
+		return lines
+	if typeof(RelationsManager) != TYPE_NIL and RelationsManager.has_method("get_crs"):
+		var crs := float(RelationsManager.get_crs(player, other))
+		var band := "Neutral"
+		if RelationsManager.has_method("get_band"):
+			var info: Dictionary = RelationsManager.get_band(player, other)
+			band = str(info.get("label", info.get("id", band)))
+		lines.append("Opinion %s · CRS %.0f" % [band, crs])
+		if RelationsManager.has_method("has_guarantee"):
+			var guaranteed := (
+				bool(RelationsManager.has_guarantee(player, other))
+				or bool(RelationsManager.has_guarantee(other, player))
+			)
+			lines.append("Guarantee: %s" % ("yes" if guaranteed else "no"))
+	if typeof(WarStateDomain) != TYPE_NIL:
+		lines.append("At war: %s" % ("yes" if WarStateDomain.is_at_war(player, other) else "no"))
+	return lines
+
+
+func _build_armistice_block(host: VBoxContainer) -> void:
+	var treaty_panel := PanelContainer.new()
+	treaty_panel.name = "ArmisticeBlock"
+	RetrowaveTheme.style_detail_panel_flat(treaty_panel)
+	treaty_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	host.add_child(treaty_panel)
+	var treaty_margin := MarginContainer.new()
+	treaty_margin.add_theme_constant_override("margin_left", 12)
+	treaty_margin.add_theme_constant_override("margin_right", 12)
+	treaty_margin.add_theme_constant_override("margin_top", 10)
+	treaty_margin.add_theme_constant_override("margin_bottom", 10)
+	treaty_panel.add_child(treaty_margin)
+	var treaty_vbox := VBoxContainer.new()
+	treaty_vbox.add_theme_constant_override("separation", 4)
+	treaty_margin.add_child(treaty_vbox)
+	var treaty_header := Label.new()
+	treaty_header.text = "Armistice Treaty Status"
+	RetrowaveTheme.style_column_header(treaty_header)
+	treaty_vbox.add_child(treaty_header)
+	var treaty_label := Label.new()
+	treaty_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	treaty_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	treaty_label.text = "The armistice conference is not open yet."
+	if typeof(GameData) != TYPE_NIL and GameData.has_method("get_peace_state"):
+		var ps: Dictionary = GameData.get_peace_state()
+		var ptag := _player_country
+		var lev: int = int(GameData.get_inclusion_leverage(ptag)) if GameData.has_method("get_inclusion_leverage") else 0
+		var gr: int = int((ps.get("grievance", {}) as Dictionary).get(ptag, 0)) if ps.get("grievance") is Dictionary else 0
+		var completed: bool = bool(ps.get("conference_1918_completed", false))
+		if completed:
+			treaty_label.text = "Resolved. Leverage used: %d. Grievance: %d." % [lev, gr]
+		else:
+			treaty_label.text = "Pre-conference. Inclusion leverage: %d. Grievance: %d." % [lev, gr]
+	RetrowaveTheme.style_body_label(treaty_label)
+	treaty_vbox.add_child(treaty_label)
+	var open_btn := Button.new()
+	open_btn.name = "OpenPeaceConference"
+	open_btn.text = "Open Peace Conference"
+	var live := _peace_conference_is_live()
+	open_btn.disabled = not live
+	open_btn.tooltip_text = "The peace conference is not open yet." if not live else "Open the peace conference."
+	if live:
+		RetrowaveTheme.style_primary_button(open_btn)
+	else:
+		RetrowaveTheme.style_secondary_button(open_btn)
+	open_btn.pressed.connect(func() -> void:
+		if not _peace_conference_is_live():
+			return
+		if typeof(PeaceConferenceWindow) != TYPE_NIL:
+			PeaceConferenceWindow.open_living_sheet()
+	)
+	treaty_vbox.add_child(open_btn)
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:

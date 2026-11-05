@@ -2,6 +2,8 @@ extends SceneTree
 
 ## FIRST20-P1 windowed layout checks (F1–F4). F1: neon frame keeps label glyphs
 ## at least 40 px inside the outer edge, and pause sliders stay inside the frame.
+## F4: a 1936 diplomacy window has no placeholder copy, and one Esc closes only
+## the front play window. The next Esc opens pause.
 ##
 ##   XDG_DATA_HOME=$(mktemp -d) tools/run_godot.sh --headless --path . \
 ##     --resolution 1280x800 -s res://scripts/core/HeadlessFirst20P1Test.gd
@@ -18,6 +20,8 @@ const MUST_SEE: PackedStringArray = [
 var _failures: int = 0
 var _f2_done := false
 var _f3_done := false
+var _f4_done := false
+var _f4_map: Node = null
 
 
 func _init() -> void:
@@ -31,6 +35,7 @@ func _run() -> void:
 	await _check_epoch_title(Vector2i(1280, 800))
 	await _check_f2()
 	await _check_f3()
+	await _check_f4()
 	_finish()
 
 
@@ -39,6 +44,8 @@ func _finish() -> void:
 		_fail("F2 did not finish")
 	if not _f3_done:
 		_fail("F3 did not finish")
+	if not _f4_done:
+		_fail("F4 did not finish")
 	if _failures == 0:
 		print("RESULT=PASS")
 		quit(0)
@@ -870,3 +877,257 @@ func _label_starting(root_node: Node, text: String) -> Label:
 		if lab != null and lab.visible and lab.text.begins_with(text):
 			return lab
 	return null
+
+
+func _check_f4() -> void:
+	await _set_size(Vector2i(1280, 800))
+	if not await _f4_boot_map():
+		return
+	if not await _f4_check_diplomacy_copy():
+		return
+	if not await _f4_esc_one("res://scenes/ui/DiplomacyView.tscn", "DiplomacyView", true):
+		return
+	if not await _f4_esc_one("res://scenes/ui/TechnologyScreen.tscn", "TechnologyScreen", false):
+		return
+	if not await _f4_esc_one("res://scenes/ui/LeaderAssignmentScreen.tscn", "LeaderAssignmentScreen", false):
+		return
+	if not await _f4_esc_top_only():
+		return
+	_f4_done = true
+
+
+func _f4_boot_map() -> bool:
+	var scr: Script = load("res://scripts/map/MapRenderer.gd") as Script
+	if scr == null:
+		_fail("F4 MapRenderer missing")
+		return false
+	var mr := scr.new() as Node
+	if mr == null:
+		_fail("F4 MapRenderer did not construct")
+		return false
+	mr.name = "F4Map"
+	var containers := Node2D.new()
+	containers.name = "ProvinceContainers"
+	mr.add_child(containers)
+	if "container" in mr:
+		mr.container = containers
+	var map_ui := CanvasLayer.new()
+	map_ui.name = "UI"
+	mr.add_child(map_ui)
+	var info := Panel.new()
+	info.name = "InfoPanel"
+	info.visible = false
+	info.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	map_ui.add_child(info)
+	mr.set("info_panel", info)
+	var cam := Camera2D.new()
+	cam.name = "MapCamera"
+	cam.position = Vector2(400, 300)
+	mr.add_child(cam)
+	root.add_child(mr)
+	_f4_map = mr
+	var layer := CanvasLayer.new()
+	layer.name = "UILayer"
+	layer.layer = 110
+	root.add_child(layer)
+	var packed: PackedScene = load("res://scenes/ui/TopInfoBar.tscn") as PackedScene
+	if packed == null:
+		_fail("F4 TopInfoBar missing")
+		return false
+	var bar := packed.instantiate()
+	bar.name = "TopInfoBar"
+	layer.add_child(bar)
+	await _frames(2)
+	return true
+
+
+func _f4_check_diplomacy_copy() -> bool:
+	var dip := await _f4_open("res://scenes/ui/DiplomacyView.tscn", "DiplomacyView")
+	if dip == null:
+		return false
+	await _frames(2)
+	var banned := _f4_banned_copy(dip)
+	if not banned.is_empty():
+		_fail("F4 1936 diplomacy text %s" % banned)
+		dip.queue_free()
+		return false
+	if dip.find_child("ArmisticeBlock", true, false) != null or dip.find_child("OpenPeaceConference", true, false) != null:
+		_fail("F4 armistice block is present in 1936")
+		dip.queue_free()
+		return false
+	var empty := dip.find_child("EmptyOffers", true, false) as Label
+	var selected := str(dip.get("_selected_country")).strip_edges()
+	if empty == null or empty.text != "No active offers with %s" % selected:
+		_fail("F4 empty offers text %s" % (empty.text if empty != null else "missing"))
+		dip.queue_free()
+		return false
+	if empty.horizontal_alignment != HORIZONTAL_ALIGNMENT_CENTER:
+		_fail("F4 empty offers are not centered")
+		dip.queue_free()
+		return false
+	if int(empty.get_theme_font_size("font_size")) != 14 or empty.get_theme_color("font_color") != RetrowaveTheme.TEXT_DIM:
+		_fail("F4 empty offers style")
+		dip.queue_free()
+		return false
+	var propose := dip.find_child("ProposeTrade", true, false) as Button
+	if propose == null or propose.text != "Propose trade" or propose.get_theme_color("font_color") != RetrowaveTheme.CYAN:
+		_fail("F4 propose trade button")
+		dip.queue_free()
+		return false
+	var offers := dip.find_child("OffersScroll", true, false) as ScrollContainer
+	var lower := dip.find_child("LowerScroll", true, false) as ScrollContainer
+	if offers == null or lower == null:
+		_fail("F4 scroll nodes missing")
+		dip.queue_free()
+		return false
+	if offers.custom_minimum_size.y != 0.0 or lower.custom_minimum_size.y != 0.0:
+		_fail("F4 scroll min height %s / %s" % [offers.custom_minimum_size.y, lower.custom_minimum_size.y])
+		dip.queue_free()
+		return false
+	if (offers.size_flags_vertical & Control.SIZE_EXPAND) != 0 or (lower.size_flags_vertical & Control.SIZE_EXPAND) != 0:
+		_fail("F4 empty scroll still expands")
+		dip.queue_free()
+		return false
+	await _frames(2)
+	if offers.size.y >= 300.0:
+		_fail("F4 offers scroll dead space %s" % offers.size)
+		dip.queue_free()
+		return false
+	dip.queue_free()
+	await _frames(1)
+	return true
+
+
+func _f4_esc_one(scene_path: String, node_name: String, window_key: bool) -> bool:
+	await _f4_drop_menu()
+	var screen := await _f4_open(scene_path, node_name)
+	if screen == null:
+		return false
+	await _frames(1)
+	if not _f4_up(screen):
+		_fail("F4 %s was not open" % node_name)
+		return false
+	var key := _f4_esc_key()
+	if window_key and is_instance_valid(screen) and screen is Window:
+		(screen as Window).push_input(key)
+	else:
+		root.push_input(key)
+	await _frames(1)
+	if is_instance_valid(screen) and _f4_up(screen):
+		_fail("F4 Esc did not close %s" % node_name)
+		screen.queue_free()
+		return false
+	if _f4_menu_up():
+		_fail("F4 Esc that closed %s also opened pause" % node_name)
+		return false
+	await _frames(2)
+	root.push_input(_f4_esc_key())
+	await _frames(3)
+	if not _f4_menu_up():
+		_fail("F4 second Esc did not open pause after %s" % node_name)
+		return false
+	await _f4_drop_menu()
+	return true
+
+
+func _f4_esc_top_only() -> bool:
+	await _f4_drop_menu()
+	var tech := await _f4_open("res://scenes/ui/TechnologyScreen.tscn", "TechnologyScreen")
+	var dip := await _f4_open("res://scenes/ui/DiplomacyView.tscn", "DiplomacyView")
+	if tech == null or dip == null:
+		return false
+	await _frames(1)
+	root.push_input(_f4_esc_key())
+	await _frames(1)
+	if is_instance_valid(dip) and _f4_up(dip):
+		_fail("F4 Esc left Diplomacy open over Tech")
+		dip.queue_free()
+		if is_instance_valid(tech):
+			tech.queue_free()
+		return false
+	if not is_instance_valid(tech) or not _f4_up(tech):
+		_fail("F4 one Esc closed Tech along with Diplomacy")
+		return false
+	if _f4_menu_up():
+		_fail("F4 Esc that closed Diplomacy also opened pause")
+		tech.queue_free()
+		return false
+	tech.queue_free()
+	await _frames(1)
+	return true
+
+
+func _f4_open(scene_path: String, node_name: String) -> Node:
+	var packed: PackedScene = load(scene_path) as PackedScene
+	if packed == null:
+		_fail("F4 missing %s" % scene_path)
+		return null
+	var inst := packed.instantiate()
+	if inst == null:
+		_fail("F4 %s did not instantiate" % node_name)
+		return null
+	inst.name = node_name
+	root.add_child(inst)
+	await _frames(2)
+	return inst
+
+
+func _f4_drop_menu() -> void:
+	var mm := root.get_node_or_null("MainMenu")
+	if mm != null and is_instance_valid(mm):
+		mm.queue_free()
+	await _frames(1)
+
+
+func _f4_up(n: Node) -> bool:
+	if n == null or not is_instance_valid(n) or n.is_queued_for_deletion():
+		return false
+	if str(n.name).ends_with("_dying"):
+		return false
+	if n is Window:
+		return (n as Window).visible
+	if n is CanvasItem:
+		return (n as CanvasItem).visible
+	return true
+
+
+func _f4_menu_up() -> bool:
+	var mm := root.get_node_or_null("MainMenu")
+	if mm == null or not is_instance_valid(mm) or mm.is_queued_for_deletion():
+		return false
+	if str(mm.name) != "MainMenu":
+		return false
+	if mm is CanvasItem:
+		return (mm as CanvasItem).visible
+	return true
+
+
+func _f4_esc_key() -> InputEventKey:
+	var key := InputEventKey.new()
+	key.device = 0
+	key.keycode = KEY_ESCAPE
+	key.physical_keycode = KEY_ESCAPE
+	key.key_label = KEY_ESCAPE
+	key.pressed = true
+	key.echo = false
+	return key
+
+
+func _f4_banned_copy(n: Node) -> String:
+	var hits: PackedStringArray = PackedStringArray()
+	_f4_walk_copy(n, hits)
+	return " | ".join(hits)
+
+
+func _f4_walk_copy(n: Node, hits: PackedStringArray) -> void:
+	if n == null or not is_instance_valid(n):
+		return
+	var text := ""
+	if n is Label or n is Button or n is RichTextLabel or n is LinkButton:
+		text = str(n.get("text"))
+	for token in ["Future:", "1918", "F10"]:
+		if token in text:
+			hits.append("%s [%s]" % [str(n.name), text])
+			break
+	for child in n.get_children():
+		_f4_walk_copy(child, hits)
