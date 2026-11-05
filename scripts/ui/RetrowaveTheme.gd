@@ -52,7 +52,16 @@ static func style_summary_metric(label: Label, accent: Color = TEXT_PRIMARY) -> 
 
 static func style_column_header(label: Label) -> void:
 	label.add_theme_color_override("font_color", CYAN)
-	label.add_theme_font_size_override("font_size", 14)
+	label.add_theme_font_size_override("font_size", 13)
+	# Labels ignore stylebox content margins, so the 4 px top pad is extra height
+	# with the glyphs sitting on the bottom of that rect.
+	var line := 18.0
+	var font := ThemeDB.fallback_font
+	if font != null:
+		line = float(font.get_height(13))
+	var ms := label.custom_minimum_size
+	label.custom_minimum_size = Vector2(ms.x, maxf(ms.y, line + 4.0))
+	label.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
 
 
 static func style_row_label(label: Label) -> void:
@@ -130,10 +139,10 @@ static func style_menu_panel(control: Control) -> void:
 	style.texture_margin_right = 48
 	style.texture_margin_top = 48
 	style.texture_margin_bottom = 48
-	style.content_margin_left = 16
-	style.content_margin_right = 16
-	style.content_margin_top = 14
-	style.content_margin_bottom = 14
+	style.content_margin_left = 40
+	style.content_margin_right = 40
+	style.content_margin_top = 44
+	style.content_margin_bottom = 40
 	if control is PanelContainer or control is Panel:
 		control.add_theme_stylebox_override("panel", style)
 	else:

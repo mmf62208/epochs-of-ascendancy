@@ -119,9 +119,9 @@ func _build_fullscreen_ui() -> void:
 	var bottom := MarginContainer.new()
 	bottom.name = "BottomUI"
 	bottom.set_anchors_preset(Control.PRESET_FULL_RECT)
-	bottom.add_theme_constant_override("margin_left", 28)
-	bottom.add_theme_constant_override("margin_right", 28)
-	bottom.add_theme_constant_override("margin_bottom", 12)
+	bottom.add_theme_constant_override("margin_left", 40)
+	bottom.add_theme_constant_override("margin_right", 40)
+	bottom.add_theme_constant_override("margin_bottom", 40)
 	bottom.add_theme_constant_override("margin_top", 0)
 	_fade_root.add_child(bottom)
 
@@ -158,10 +158,14 @@ func _build_fullscreen_ui() -> void:
 	title_label = Label.new()
 	title_label.name = "TitleLabel"
 	title_label.text = "EPOCHS OF ASCENDANCY"
-	# When wordmark is present, title_label carries per-quarter chapter titles (smaller).
-	title_label.add_theme_font_size_override("font_size", 13 if wm_tex != null else 22)
+	# Chapter titles stay readable: wrap, never clip, and never exceed 20 px.
+	title_label.add_theme_font_size_override("font_size", 13 if wm_tex != null else 20)
 	title_label.add_theme_color_override("font_color", Color(0.95, 0.86, 0.45))
 	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	title_label.clip_text = false
+	title_label.text_overrun_behavior = TextServer.OVERRUN_NO_TRIMMING
+	title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title_label.visible = true
 	vbox.add_child(title_label)
 
@@ -198,6 +202,8 @@ func _build_fullscreen_ui() -> void:
 	tip_label.add_theme_color_override("font_color", Color(0.72, 0.72, 0.82))
 	tip_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(tip_label)
+	_bind_loading_title_fit()
+	_fit_loading_title()
 
 
 func show_loading(_option: String = "cycle", initial_tip: String = "Forging the Epochs of Ascendancy...") -> void:
@@ -213,7 +219,9 @@ func show_loading(_option: String = "cycle", initial_tip: String = "Forging the 
 	_max_art_quarter = -1
 	if _fade_root:
 		_fade_root.modulate = Color(1, 1, 1, 1)
+	_bind_loading_title_fit()
 	_apply_loading_art_for_progress(0.0)
+	_fit_loading_title()
 	if progress_bar:
 		progress_bar.value = 0.0
 	if tip_label:
@@ -298,6 +306,34 @@ func update_progress(progress: float, tip: String = "") -> void:
 			, CONNECT_ONE_SHOT)
 
 
+func _bind_loading_title_fit() -> void:
+	var vp := get_viewport()
+	if vp != null and not vp.size_changed.is_connected(_fit_loading_title):
+		vp.size_changed.connect(_fit_loading_title)
+
+
+func _fit_loading_title() -> void:
+	if title_label == null:
+		return
+	title_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	title_label.clip_text = false
+	title_label.text_overrun_behavior = TextServer.OVERRUN_NO_TRIMMING
+	title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var fs := int(title_label.get_theme_font_size("font_size"))
+	if fs <= 0 or fs > 20:
+		title_label.add_theme_font_size_override("font_size", 20)
+	var vp_w := 1280.0
+	var vp := get_viewport()
+	if vp != null:
+		var w := vp.get_visible_rect().size.x
+		if w > 1.0:
+			vp_w = w
+	# Panel is the viewport. 40 px inset each side → max width = panel − 80.
+	var max_w := maxf(64.0, vp_w - 80.0)
+	if title_label.size.x > max_w + 0.5:
+		title_label.size.x = max_w
+
+
 func _apply_loading_art_for_progress(progress: float) -> void:
 	var quarter_idx := clampi(int(progress * 4.0), 0, 3)
 	if progress >= 0.999:
@@ -313,6 +349,7 @@ func _apply_loading_art_for_progress(progress: float) -> void:
 			_hero_art.texture = tex
 	if title_label:
 		title_label.text = str(art.get("title", "EPOCHS OF ASCENDANCY"))
+		_fit_loading_title()
 	if subtitle_label:
 		subtitle_label.text = str(art.get("subtitle", ""))
 	print("LoadingScreen: art quarter %d/4 (%.0f%% band) — %s" % [quarter_idx + 1, float(quarter_idx) * 25.0, art.get("title", "")])

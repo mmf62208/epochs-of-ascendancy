@@ -283,10 +283,10 @@ func _build_ui() -> void:
 	_panel.add_child(slot)
 
 	var margin := MarginContainer.new()
-	margin.add_theme_constant_override("margin_left", 18)
-	margin.add_theme_constant_override("margin_right", 18)
-	margin.add_theme_constant_override("margin_top", 12)
-	margin.add_theme_constant_override("margin_bottom", 14)
+	margin.add_theme_constant_override("margin_left", 0)
+	margin.add_theme_constant_override("margin_right", 0)
+	margin.add_theme_constant_override("margin_top", 0)
+	margin.add_theme_constant_override("margin_bottom", 0)
 	slot.add_child(margin)
 
 	var outer := VBoxContainer.new()
@@ -508,7 +508,9 @@ func _build_ui() -> void:
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	scroll.custom_minimum_size = Vector2(0, 380)
+	# No fixed 380 px floor: the neon content box is shorter than that plus the
+	# pinned settings, and the list scrolls inside whatever height remains.
+	scroll.custom_minimum_size = Vector2(0, 0)
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 	right_v.add_child(scroll)
@@ -590,25 +592,46 @@ func _audio_node() -> Node:
 
 
 func _add_audio_settings(parent: VBoxContainer) -> void:
+	# Pinned under the actions scroll. Separator, then an 8 px gap, then the rows.
+	var pin := VBoxContainer.new()
+	pin.name = "SettingsPin"
+	pin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	pin.add_theme_constant_override("separation", 8)
+	parent.add_child(pin)
+	var sep := HSeparator.new()
+	sep.name = "SettingsSeparator"
+	var line := StyleBoxLine.new()
+	var line_c := RetrowaveTheme.CYAN
+	line_c.a = 0.35
+	line.color = line_c
+	line.thickness = 1
+	sep.add_theme_stylebox_override("separator", line)
+	sep.custom_minimum_size = Vector2(0, 1)
+	pin.add_child(sep)
 	var block := VBoxContainer.new()
 	block.name = "AudioSettings"
-	block.add_theme_constant_override("separation", 4)
-	parent.add_child(block)
+	block.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	block.add_theme_constant_override("separation", 0)
+	pin.add_child(block)
 	var hdr := Label.new()
+	hdr.name = "SettingsHeader"
 	hdr.text = "SETTINGS"
 	RetrowaveTheme.style_column_header(hdr)
 	block.add_child(hdr)
 	var audio := _audio_node()
-	var master_row := _audio_slider("Master", "MasterVolume", _audio_db(audio, "get_master_db", 0.0), "set_master_db")
+	block.add_child(_audio_slider("Master", "MasterVolume", _audio_db(audio, "get_master_db", 0.0), "set_master_db"))
+	var mute_row := HBoxContainer.new()
+	mute_row.name = "MuteRow"
+	mute_row.custom_minimum_size = Vector2(0, 28)
 	var mute := CheckButton.new()
 	mute.name = "MuteAudio"
 	mute.text = "Mute"
 	mute.focus_mode = Control.FOCUS_ALL
-	mute.size_flags_horizontal = Control.SIZE_SHRINK_END
+	mute.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	mute.button_pressed = bool(audio.call("is_muted")) if audio != null and audio.has_method("is_muted") else false
 	mute.toggled.connect(_on_audio_mute_toggled)
-	master_row.add_child(mute)
-	block.add_child(master_row)
+	mute_row.add_child(mute)
+	block.add_child(mute_row)
 	block.add_child(_audio_slider("UI", "UiVolume", _audio_db(audio, "get_ui_db", -12.0), "set_ui_db"))
 	block.add_child(_audio_slider("SFX", "SfxVolume", _audio_db(audio, "get_sfx_db", 0.0), "set_sfx_db"))
 	block.add_child(_audio_percent_slider("Music", "MusicVolume", _audio_music_percent(audio)))
@@ -620,11 +643,33 @@ func _audio_db(audio: Node, getter: String, fallback: float) -> float:
 	return fallback
 
 
+func _format_db(value: float) -> String:
+	var n := int(round(value))
+	if n < 0:
+		return "−%d dB" % absi(n)
+	return "%d dB" % n
+
+
+func _audio_value_label(node_name: String, text: String) -> Label:
+	var val := Label.new()
+	val.name = "%sValue" % node_name
+	val.text = text
+	val.custom_minimum_size = Vector2(56, 0)
+	val.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	val.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	val.add_theme_font_size_override("font_size", 13)
+	val.add_theme_color_override("font_color", RetrowaveTheme.TEXT_DIM)
+	val.clip_text = false
+	return val
+
+
 func _audio_slider(label_text: String, node_name: String, value: float, setter: String) -> HBoxContainer:
 	var row := HBoxContainer.new()
+	row.custom_minimum_size = Vector2(0, 28)
 	var lab := Label.new()
 	lab.text = label_text
 	lab.custom_minimum_size = Vector2(64, 0)
+	lab.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	RetrowaveTheme.style_body_label(lab)
 	row.add_child(lab)
 	var slider := HSlider.new()
@@ -634,9 +679,12 @@ func _audio_slider(label_text: String, node_name: String, value: float, setter: 
 	slider.step = 1.0
 	slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	slider.custom_minimum_size = Vector2(80, 20)
+	var val := _audio_value_label(node_name, _format_db(value))
 	slider.value = value
 	slider.value_changed.connect(_on_audio_slider.bind(setter))
+	slider.value_changed.connect(func(v: float) -> void: val.text = _format_db(v))
 	row.add_child(slider)
+	row.add_child(val)
 	return row
 
 
@@ -654,9 +702,11 @@ func _audio_music_percent(audio: Node) -> float:
 
 func _audio_percent_slider(label_text: String, node_name: String, value: float) -> HBoxContainer:
 	var row := HBoxContainer.new()
+	row.custom_minimum_size = Vector2(0, 28)
 	var lab := Label.new()
 	lab.text = label_text
 	lab.custom_minimum_size = Vector2(64, 0)
+	lab.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	RetrowaveTheme.style_body_label(lab)
 	row.add_child(lab)
 	var slider := HSlider.new()
@@ -666,9 +716,13 @@ func _audio_percent_slider(label_text: String, node_name: String, value: float) 
 	slider.step = 1.0
 	slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	slider.custom_minimum_size = Vector2(80, 20)
+	var shown := "%d%%" % int(round(value))
+	var val := _audio_value_label(node_name, shown)
 	slider.value = value
 	slider.value_changed.connect(_on_music_percent)
+	slider.value_changed.connect(func(v: float) -> void: val.text = "%d%%" % int(round(v)))
 	row.add_child(slider)
+	row.add_child(val)
 	return row
 
 
