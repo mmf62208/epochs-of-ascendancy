@@ -17,6 +17,7 @@ const MUST_SEE: PackedStringArray = [
 
 var _failures: int = 0
 var _f2_done := false
+var _f3_done := false
 
 
 func _init() -> void:
@@ -29,12 +30,15 @@ func _run() -> void:
 	await _check_epoch_title(Vector2i(1024, 720))
 	await _check_epoch_title(Vector2i(1280, 800))
 	await _check_f2()
+	await _check_f3()
 	_finish()
 
 
 func _finish() -> void:
 	if not _f2_done:
 		_fail("F2 did not finish")
+	if not _f3_done:
+		_fail("F3 did not finish")
 	if _failures == 0:
 		print("RESULT=PASS")
 		quit(0)
@@ -530,6 +534,326 @@ func _check_f2_chip() -> void:
 	mr.queue_free()
 	await _frames(1)
 	_f2_done = true
+
+
+func _check_f3() -> void:
+	await _set_size(Vector2i(1280, 800))
+	var cases: Array[Dictionary] = [
+		{"name": "Berlin", "id": 710300, "spine": false},
+		{"name": "Köln", "id": 710417, "spine": true},
+		{"name": "Hamburg", "id": 710321, "spine": false},
+	]
+	for item in cases:
+		if not await _check_f3_case(item):
+			return
+	if not await _check_f3_close_click():
+		return
+	_f3_done = true
+
+
+func _check_f3_case(item: Dictionary) -> bool:
+	var built: Dictionary = _f3_build(str(item["name"]), int(item["id"]), bool(item["spine"]))
+	if built.is_empty():
+		_fail("F3 %s harness missing" % str(item["name"]))
+		return false
+	var panel: Control = built["panel"]
+	var mr: Node = built["mr"]
+	mr.call("_layout_info_panel_inner")
+	await _frames(2)
+	mr.call("_layout_info_panel_inner")
+	await _frames(2)
+	var ok := _f3_assert_layout(str(item["name"]), panel, mr, bool(item["spine"]))
+	_f3_free(built)
+	await _frames(1)
+	return ok
+
+
+func _f3_build(prov_name: String, pid: int, spine: bool) -> Dictionary:
+	var script: GDScript = load("res://scripts/map/MapRenderer.gd") as GDScript
+	if script == null:
+		return {}
+	var mr: Node = script.new()
+	if mr == null:
+		return {}
+	var panel := Panel.new()
+	panel.name = "InfoPanel"
+	panel.visible = true
+	panel.clip_contents = true
+	panel.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	panel.position = Vector2(365, 82)
+	panel.offset_left = 365.0
+	panel.offset_top = 82.0
+	panel.offset_right = 925.0
+	panel.offset_bottom = 638.0
+	panel.size = Vector2(560, 556)
+	panel.custom_minimum_size = Vector2(560, 556)
+	root.add_child(panel)
+	var scroll := ScrollContainer.new()
+	scroll.name = "InfoScroll"
+	panel.add_child(scroll)
+	var margin := MarginContainer.new()
+	margin.name = "InfoContentMargin"
+	scroll.add_child(margin)
+	var content := VBoxContainer.new()
+	content.name = "InfoContent"
+	margin.add_child(content)
+	var name_l := Label.new()
+	name_l.name = "LabelName"
+	name_l.text = prov_name
+	content.add_child(name_l)
+	var badge := Label.new()
+	badge.name = "ProvinceIdBadge"
+	badge.text = "#%d" % pid
+	panel.add_child(badge)
+	var spirits := _f3_button("BtnNationalSpirits", "National Spirits", "National spirits")
+	var settle_text := "🏠 Settle %s (+0.35, now 1.25)" % prov_name
+	var settle := _f3_button("BtnSettleProvince", settle_text, "Settle the province")
+	var deploy := _f3_button("BtnStationEngineers", "Deploy Infanterie-Division", "Deploy the division")
+	var fight := _f3_button("BtnOpenFight", "Open fight", "Open a fight")
+	var attack := _f3_button("BtnAttackProvince", "Attack from Brandenburg", "Attack")
+	var close := _f3_button("BtnClose", "Close", "Close province inspector")
+	for btn in [spirits, settle, deploy, fight, attack, close]:
+		panel.add_child(btn)
+	var spine_btn: Button = null
+	if spine:
+		spine_btn = _f3_button("BtnBuildRoadSpine", "Build Road Spine", "Build the road spine")
+		spine_btn.visible = true
+		panel.add_child(spine_btn)
+	mr.set("info_panel", panel)
+	mr.set("info_name", name_l)
+	mr.set("btn_close", close)
+	mr.set("btn_national_spirits", spirits)
+	mr.set("_btn_settle", settle)
+	mr.set("_btn_station_engineers", deploy)
+	mr.set("_btn_open_fight", fight)
+	mr.set("_btn_attack", attack)
+	mr.set("_province_id_badge", badge)
+	if spine_btn != null:
+		mr.set("_btn_build_road_spine", spine_btn)
+	return {"panel": panel, "mr": mr, "close": close}
+
+
+func _f3_button(node_name: String, text: String, tip: String) -> Button:
+	var btn := Button.new()
+	btn.name = node_name
+	btn.text = text
+	btn.tooltip_text = tip
+	btn.visible = true
+	btn.mouse_filter = Control.MOUSE_FILTER_STOP
+	return btn
+
+
+func _f3_assert_layout(prov_name: String, panel: Control, mr: Node, spine: bool) -> bool:
+	var header := panel.get_node_or_null("InspectorHeader") as Control
+	if header == null:
+		_fail("F3 %s header missing" % prov_name)
+		return false
+	var title := header.find_child("InspectorTitle", true, false) as Label
+	var badge := header.find_child("ProvinceIdBadge", true, false) as Label
+	var close := header.find_child("BtnClose", true, false) as Button
+	if title == null or title.text != prov_name or int(title.get_theme_font_size("font_size")) != 18:
+		_fail("F3 %s title" % prov_name)
+		return false
+	if title.get_theme_color("font_color") != RetrowaveTheme.CYAN:
+		_fail("F3 %s title color" % prov_name)
+		return false
+	if badge == null or not badge.text.begins_with("#") or int(badge.get_theme_font_size("font_size")) != 12:
+		_fail("F3 %s id" % prov_name)
+		return false
+	if badge.get_theme_color("font_color") != RetrowaveTheme.TEXT_DIM:
+		_fail("F3 %s id color" % prov_name)
+		return false
+	if close == null or close.text != "Close":
+		_fail("F3 %s close missing" % prov_name)
+		return false
+	if close.get_theme_color("font_color") != RetrowaveTheme.WARNING:
+		_fail("F3 %s close color" % prov_name)
+		return false
+	if absf(close.size.x - 72.0) > 2.0 or absf(close.size.y - 28.0) > 2.0:
+		_fail("F3 %s close size %s" % [prov_name, str(close.size)])
+		return false
+	var controls: Array[Control] = []
+	for node in header.find_children("*", "Control", true, false):
+		var ctrl := node as Control
+		if ctrl == null or not ctrl.visible:
+			continue
+		if ctrl is Container or str(ctrl.name) == "InspectorHeaderSpacer":
+			continue
+		if ctrl.get_global_rect().size.x < 1.0 or ctrl.get_global_rect().size.y < 1.0:
+			continue
+		controls.append(ctrl)
+	if controls.size() < 5:
+		_fail("F3 %s header controls %d" % [prov_name, controls.size()])
+		return false
+	for i in controls.size():
+		for j in range(i + 1, controls.size()):
+			var a: Rect2 = (controls[i] as Control).get_global_rect()
+			var b: Rect2 = (controls[j] as Control).get_global_rect()
+			if a.intersects(b):
+				_fail("F3 %s overlap %s %s vs %s %s" % [prov_name, str(controls[i].name), str(a), str(controls[j].name), str(b)])
+				return false
+	if not _f3_glyphs_clear(title, close) or not _f3_glyphs_clear(badge, close):
+		_fail("F3 %s glyphs overlap close or miss the label" % prov_name)
+		return false
+	var settle := header.find_child("BtnSettleProvince", true, false) as Button
+	if settle == null:
+		_fail("F3 %s settle missing" % prov_name)
+		return false
+	if settle.text_overrun_behavior != TextServer.OVERRUN_TRIM_WORD_ELLIPSIS:
+		_fail("F3 %s settle overrun %s" % [prov_name, str(settle.text_overrun_behavior)])
+		return false
+	if settle.custom_minimum_size.x > 180.01:
+		_fail("F3 %s settle width %s" % [prov_name, str(settle.custom_minimum_size.x)])
+		return false
+	if not (settle.text in settle.tooltip_text):
+		_fail("F3 %s settle tooltip missing full text" % prov_name)
+		return false
+	var fight := header.find_child("BtnOpenFight", true, false) as Button
+	var spirits := header.find_child("BtnNationalSpirits", true, false) as Button
+	if fight == null or spirits == null:
+		_fail("F3 %s actions missing" % prov_name)
+		return false
+	var fight_border := _f3_border(fight)
+	var spirit_border := _f3_border(spirits)
+	if fight_border != RetrowaveTheme.CYAN:
+		_fail("F3 %s primary border %s" % [prov_name, str(fight_border)])
+		return false
+	var dim := RetrowaveTheme.TEXT_DIM
+	dim.a = 0.5
+	if spirit_border != dim:
+		_fail("F3 %s secondary border %s" % [prov_name, str(spirit_border)])
+		return false
+	var flow := header.get_node_or_null("InspectorActions") as HFlowContainer
+	if flow == null:
+		_fail("F3 %s flow missing" % prov_name)
+		return false
+	var order: PackedStringArray = PackedStringArray([
+		"BtnNationalSpirits", "BtnSettleProvince", "BtnStationEngineers", "BtnOpenFight", "BtnAttackProvince",
+	])
+	var seen := 0
+	for child in flow.get_children():
+		if str(child.name) == order[seen]:
+			seen += 1
+			if seen >= order.size():
+				break
+	if seen != order.size():
+		_fail("F3 %s action order" % prov_name)
+		return false
+	var hh := float(mr.get("_inspector_header_h"))
+	var measured := header.get_combined_minimum_size().y + 8.0
+	if absf(hh - measured) > 1.5 and absf(hh - (header.size.y + 8.0)) > 1.5:
+		_fail("F3 %s header_h %s measured %s" % [prov_name, str(hh), str(measured)])
+		return false
+	var scroll := panel.get_node_or_null("InfoScroll") as Control
+	if scroll == null or scroll.position.y + 0.5 < header.position.y + header.size.y:
+		_fail("F3 %s scroll overlaps header" % prov_name)
+		return false
+	if spine:
+		var spine_btn := panel.find_child("BtnBuildRoadSpine", true, false) as Button
+		if spine_btn == null or not spine_btn.visible:
+			_fail("F3 %s spine missing" % prov_name)
+			return false
+		var spine_rect := spine_btn.get_global_rect()
+		for ctrl in controls:
+			if spine_rect.intersects((ctrl as Control).get_global_rect()):
+				_fail("F3 %s spine overlaps %s" % [prov_name, str(ctrl.name)])
+				return false
+		if scroll.position.y + 0.5 < spine_btn.position.y + spine_btn.size.y:
+			_fail("F3 %s scroll overlaps spine" % prov_name)
+			return false
+	return true
+
+
+func _f3_glyphs_clear(lab: Label, close: Button) -> bool:
+	var count := lab.get_total_character_count()
+	if count <= 0:
+		return false
+	var xf := lab.get_global_transform()
+	var close_rect := close.get_global_rect()
+	var seen := 0
+	for i in count:
+		var local := lab.get_character_bounds(i)
+		if local.size.x <= 0.0 or local.size.y <= 0.0:
+			continue
+		var gr := Rect2(xf * local.position, local.size)
+		seen += 1
+		if close_rect.intersects(gr):
+			return false
+		if not lab.get_global_rect().encloses(gr):
+			return false
+	return seen > 0
+
+
+func _f3_border(btn: Button) -> Color:
+	var st := btn.get_theme_stylebox("normal") as StyleBoxFlat
+	if st == null:
+		return Color(0, 0, 0, 0)
+	return st.border_color
+
+
+func _check_f3_close_click() -> bool:
+	var built: Dictionary = _f3_build("Berlin", 710300, false)
+	if built.is_empty():
+		_fail("F3 close harness missing")
+		return false
+	var panel: Control = built["panel"]
+	var mr: Node = built["mr"]
+	var close: Button = built["close"]
+	mr.call("_layout_info_panel_inner")
+	await _frames(2)
+	var center: Vector2 = close.get_global_rect().get_center()
+	var hit := InputEventMouseButton.new()
+	hit.button_index = MOUSE_BUTTON_LEFT
+	hit.pressed = true
+	hit.position = center
+	hit.global_position = center
+	if mr.call("_press_hits_inspector_close", hit) != true:
+		_fail("F3 close ignored event at %s" % str(center))
+		_f3_free(built)
+		return false
+	var miss := InputEventMouseButton.new()
+	miss.button_index = MOUSE_BUTTON_LEFT
+	miss.pressed = true
+	miss.position = Vector2(-20, -20)
+	miss.global_position = miss.position
+	if mr.call("_press_hits_inspector_close", miss) == true:
+		_fail("F3 close hit a point outside the button")
+		_f3_free(built)
+		return false
+	var cover_script: GDScript = load("res://scripts/ui/DraggablePanel.gd") as GDScript
+	var cover: Control = cover_script.new() as Control
+	cover.name = "LeaderAssignmentScreen"
+	cover.visible = true
+	cover.position = close.get_global_rect().position - Vector2(10, 10)
+	cover.size = close.get_global_rect().size + Vector2(20, 20)
+	cover.custom_minimum_size = cover.size
+	root.add_child(cover)
+	await _frames(1)
+	if mr.call("_press_hits_inspector_close", hit) == true:
+		_fail("F3 close stole a click covered by another screen")
+		cover.queue_free()
+		_f3_free(built)
+		return false
+	cover.visible = false
+	await _frames(1)
+	if mr.call("_try_inspector_close_from_event", hit) != true or panel.visible:
+		_fail("F3 close event did not hide the inspector")
+		cover.queue_free()
+		_f3_free(built)
+		return false
+	cover.queue_free()
+	_f3_free(built)
+	await _frames(1)
+	return true
+
+
+func _f3_free(built: Dictionary) -> void:
+	var panel: Node = built.get("panel")
+	if panel != null and is_instance_valid(panel):
+		panel.queue_free()
+	var mr: Node = built.get("mr")
+	if mr != null and is_instance_valid(mr):
+		mr.queue_free()
 
 
 func _label_exact(root_node: Node, text: String) -> Label:
