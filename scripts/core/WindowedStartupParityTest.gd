@@ -295,6 +295,10 @@ func _tick_release_pointer() -> void:
 	_release_frames_left -= 1
 	if _release_frames_left > 0:
 		return
+	# Live leftover: Begin click at y≈800 on a maximized ~1920×1135 window becomes
+	# the bottom rim of the un-maximized 1280×800 window. Without a panel this
+	# harness's Begin sits at y≈819, which is *outside* 800 and skips edge pan.
+	# Release first so the warp cannot left-drag; then park on the new bottom strip.
 	var now_pt: Vector2 = _current_mouse()
 	_log("EOA_STARTUP_BLANK who=pointer_release pt=(%.1f,%.1f) press_pt=(%.1f,%.1f)" % [
 		now_pt.x, now_pt.y, _pointer_pt.x, _pointer_pt.y
@@ -304,6 +308,7 @@ func _tick_release_pointer() -> void:
 	if Input.has_method("flush_buffered_events"):
 		Input.flush_buffered_events()
 	_pointer_released = true
+	_park_pointer_leftover_on_unmax_rim()
 	_phase = Phase.WAIT_BOOT_CLOSED
 
 
@@ -401,6 +406,8 @@ func _do_resize() -> void:
 			"EOA_STARTUP_BLANK who=unmaximize_resize %dx%d (window+root.size; product Begin does not set_size)"
 			% [BLANK_RESIZE_W, BLANK_RESIZE_H]
 		)
+		if _begin_mode == "pointer":
+			_park_pointer_leftover_on_unmax_rim()
 	else:
 		_force_window(RESIZE_W, RESIZE_H, false)
 		_log(
@@ -1184,12 +1191,22 @@ func _classify_viewport_parity() -> String:
 		var size_a: Array = row.get("size", [0, 0]) as Array
 		var wx := int(size_a[0]) if size_a.size() >= 2 else 0
 		var wy := int(size_a[1]) if size_a.size() >= 2 else 0
-		if who == "pre_begin" or who == "post_dismiss" or who == "pre_shrink":
-			pre_vp = Vector2(float(row.get("vp_w", 0.0)), float(row.get("vp_h", 0.0)))
-			pre_win = Vector2i(wx, wy)
-		if who == "post_resize":
-			post_vp = Vector2(float(row.get("vp_w", 0.0)), float(row.get("vp_h", 0.0)))
-			post_win = Vector2i(wx, wy)
+		if _blank_mode:
+			# Product AOT-clear already un-maximized before harness pre_shrink.
+			# Compare maximized pre_begin against post-Begin 1280×800.
+			if who == "pre_begin" or who == "launch":
+				pre_vp = Vector2(float(row.get("vp_w", 0.0)), float(row.get("vp_h", 0.0)))
+				pre_win = Vector2i(wx, wy)
+			if who == "post_dismiss" or who == "post_resize":
+				post_vp = Vector2(float(row.get("vp_w", 0.0)), float(row.get("vp_h", 0.0)))
+				post_win = Vector2i(wx, wy)
+		else:
+			if who == "pre_begin" or who == "post_dismiss" or who == "pre_shrink":
+				pre_vp = Vector2(float(row.get("vp_w", 0.0)), float(row.get("vp_h", 0.0)))
+				pre_win = Vector2i(wx, wy)
+			if who == "post_resize":
+				post_vp = Vector2(float(row.get("vp_w", 0.0)), float(row.get("vp_h", 0.0)))
+				post_win = Vector2i(wx, wy)
 	var want_w: int = BLANK_RESIZE_W if _blank_mode else RESIZE_W
 	var want_h: int = BLANK_RESIZE_H if _blank_mode else RESIZE_H
 	_log(
@@ -1256,7 +1273,7 @@ func _finish() -> void:
 		"guard": "WindowedStartupParityTest",
 		"kind": "TEST_ONLY_DIAGNOSTIC",
 		"live_startup_pass_claimed": false,
-		"base_sha_expected": "7d7a0b856efba61c04364f123b6a7f37c3e310c8",
+		"base_sha_expected": "53f87116dcd8d65a69d744481de9e79eccdfa93b",
 		"engine_version": _engine_version,
 		"display": _ds_name,
 		"adapter": _adapter_name,
@@ -1363,6 +1380,16 @@ func _current_mouse() -> Vector2:
 	if vp != null:
 		return vp.get_mouse_position()
 	return _pointer_pt
+
+
+func _park_pointer_leftover_on_unmax_rim() -> void:
+	if _begin_mode != "pointer":
+		return
+	var rim_x: float = clampf(_pointer_pt.x, 16.0, float(BLANK_RESIZE_W) - 16.0)
+	var rim_y: float = float(BLANK_RESIZE_H) - 3.0
+	var rim := Vector2(rim_x, rim_y)
+	_warp_mouse(rim)
+	_log("EOA_STARTUP_BLANK who=leftover_rim_park pt=(%.1f,%.1f) (live leftover y=800 on 800-tall window)" % [rim.x, rim.y])
 
 
 func _force_window(w: int, h: int, maximize: bool, clamp_root: bool = true) -> void:

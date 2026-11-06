@@ -250,7 +250,9 @@ var _map_pick_block_until_msec: int = 0
 ## Close/Esc: do not move the camera (no snapshot restore — that still teleported).
 var _hold_camera_until_msec: int = 0
 var _last_mouse_pos := Vector2.ZERO
-## STARTUP-BLANK: one-shot probes after living-title Begin (log-only until a fix is armed).
+## STARTUP-BLANK: probes after living-title Begin + leftover-pointer swallow.
+## Evidence (pointer-rim): size_changed dcam=0; leftover on new bottom rim
+## edge-pans south (cam y 1526→8413, berlin_in_view=false, mesh_in_view=1).
 var _startup_blank_armed := false
 var _startup_blank_size_logged := false
 var _startup_blank_pointer_logged := false
@@ -258,9 +260,13 @@ var _startup_blank_size_hooked := false
 var _startup_blank_move_logs: int = 0
 var _startup_blank_cam_at_arm := Vector2.ZERO
 var _startup_blank_zoom_at_arm := 0.0
-var _startup_blank_settle_until_frame: int = -1
+var _startup_blank_settle_left: int = 0
+var _startup_blank_leftover_mouse := Vector2.INF
+var _startup_blank_leftover_ready := false
 const STARTUP_BLANK_MAX_MOVE_LOGS := 16
 const STARTUP_BLANK_GER_CAPITAL := 710300
+const STARTUP_BLANK_SETTLE_FRAMES := 18
+const STARTUP_BLANK_MOVE_PX := 6.0
 ## Close must not leave a deferred camera nudge (play extra: panel-close teleport).
 var _inspector_held_closed := false
 ## Live GIS camera at Close press — reassert every frame so europe_center / pick-center cannot teleport.
@@ -4466,12 +4472,13 @@ func _handle_camera_input(delta: float) -> void:
 		return
 	var blank_cam_before := cam.global_position
 	var blank_zoom_before := cam.zoom.x
+	_startup_blank_tick_leftover_swallow()
 
 	# Accumulate slop before the modal early-return so a leftover false-positive
 	# popup cannot wipe skip-pick; sea release then jump-zoomed Rio Grande Rise.
-	if _left_down_is_live_map_drag():
+	if not _startup_blank_swallow_pointer() and _left_down_is_live_map_drag():
 		_accumulate_left_drag_slop()
-	if not _left_pan_active and _left_drag_should_pan():
+	if not _startup_blank_swallow_pointer() and not _left_pan_active and _left_drag_should_pan():
 		_activate_left_drag_pan_from_slop()
 
 	# Command Center / modal screens: freeze all map pan (WASD, edge, drag).
@@ -4512,6 +4519,7 @@ func _handle_camera_input(delta: float) -> void:
 	if (
 		not _close_suppress_edge
 		and not MapViewInput.edge_pan_blocked_by_gui(get_viewport())
+		and not _startup_blank_swallow_pointer()
 	):
 		screen_edge = MapViewInput.edge_pan_direction_screen(get_viewport())
 		edge_dir = _gate_wheel_edge_pan(screen_edge)
@@ -4522,9 +4530,12 @@ func _handle_camera_input(delta: float) -> void:
 
 	# Left-drag pan after slop (click still picks). Middle / right drag too.
 	# Slop + physical left-down starts pan even if `_left_pan_armed` was cleared.
-	if _left_down_is_live_map_drag():
+	if _startup_blank_swallow_pointer():
+		_left_pan_armed = false
+		_left_pan_active = false
+	elif _left_down_is_live_map_drag():
 		_accumulate_left_drag_slop()
-	if not _left_pan_active and _left_drag_should_pan():
+	if not _startup_blank_swallow_pointer() and not _left_pan_active and _left_drag_should_pan():
 		_activate_left_drag_pan_from_slop()
 	# Middle / right / left-drag (pixel-based — works while paused). Drag up → camera north.
 	if _is_middle_dragging or _left_pan_active:
@@ -26975,6 +26986,11 @@ func arm_startup_blank_begin_probes() -> void:
 	_startup_blank_size_logged = false
 	_startup_blank_pointer_logged = false
 	_startup_blank_move_logs = 0
+	_startup_blank_leftover_ready = false
+	_startup_blank_leftover_mouse = Vector2.INF
+	_startup_blank_settle_left = STARTUP_BLANK_SETTLE_FRAMES
+	_left_pan_armed = false
+	_left_pan_active = false
 	var snap: Dictionary = log_startup_blank_camera("arm_probes")
 	_startup_blank_cam_at_arm = snap.get("cam", Vector2.ZERO) as Vector2
 	_startup_blank_zoom_at_arm = float(snap.get("zoom", 0.0))
@@ -27028,14 +27044,16 @@ func _startup_blank_log_first_size_changed(who: String) -> void:
 
 
 func _startup_blank_fix_enabled() -> bool:
+	if not _startup_blank_armed:
+		return false
 	if OS.get_environment("EOA_STARTUP_BLANK_MUTANT") == "1":
 		return false
-	return has_meta("eoa_startup_blank_fix") and bool(get_meta("eoa_startup_blank_fix"))
+	return true
 
 
 func _startup_blank_maybe_recenter_after_resize() -> void:
-	# Armed only after evidence shows the post-Begin size_changed is what throws
-	# the camera. Default is log-only.
+	# Not used. Pointer-rim evidence: first size_changed dcam=0; leftover rim
+	# edge-pan after that is what throws the camera. Recenter would be a no-op.
 	if not _startup_blank_fix_enabled():
 		return
 	if str(get_meta("eoa_startup_blank_fix_kind", "")) != "recenter":
@@ -27044,16 +27062,36 @@ func _startup_blank_maybe_recenter_after_resize() -> void:
 	log_startup_blank_camera("fix_recenter_after_size_changed")
 
 
+func _startup_blank_tick_leftover_swallow() -> void:
+	if not _startup_blank_fix_enabled():
+		return
+	if _startup_blank_settle_left > 0:
+		_startup_blank_settle_left -= 1
+		if _startup_blank_settle_left == 0:
+			var vp: Viewport = get_viewport()
+			_startup_blank_leftover_mouse = vp.get_mouse_position() if vp != null else Vector2.ZERO
+			_startup_blank_leftover_ready = true
+			log_startup_blank_camera(
+				"leftover_swallow_armed",
+				"pt=%s settle_frames=%d" % [str(_startup_blank_leftover_mouse), STARTUP_BLANK_SETTLE_FRAMES]
+			)
+	if _startup_blank_swallow_pointer():
+		_left_pan_armed = false
+		_left_pan_active = false
+		var vp2: Viewport = get_viewport()
+		if vp2 != null:
+			_last_mouse_pos = vp2.get_mouse_position()
+
+
 func _startup_blank_swallow_pointer() -> bool:
-	if not _startup_blank_armed:
-		return false
 	if not _startup_blank_fix_enabled():
 		return false
-	if str(get_meta("eoa_startup_blank_fix_kind", "")) != "swallow":
-		return false
-	if _startup_blank_settle_until_frame < 0:
+	if _startup_blank_settle_left > 0 or not _startup_blank_leftover_ready:
 		return true
-	return Engine.get_process_frames() <= _startup_blank_settle_until_frame
+	var vp: Viewport = get_viewport()
+	if vp == null:
+		return true
+	return vp.get_mouse_position().distance_to(_startup_blank_leftover_mouse) < STARTUP_BLANK_MOVE_PX
 
 
 func _startup_blank_note_pointer(event: InputEvent, via: String) -> void:
