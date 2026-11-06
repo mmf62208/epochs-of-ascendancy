@@ -1,0 +1,561 @@
+Using: /home/ubuntu/Applications/Godot-4.7.1/godot (4.7.1.stable.official.a13da4feb)
+Godot Engine v4.7.1.stable.official.a13da4feb - https://godotengine.org
+ERROR: Required Vulkan instance extension VK_KHR_surface not found.
+   at: _initialize_instance_extensions (drivers/vulkan/rendering_context_driver_vulkan.cpp:494)
+ERROR: Condition "err != OK" is true. Returning: err
+   at: initialize (drivers/vulkan/rendering_context_driver_vulkan.cpp:915)
+WARNING: Your video card drivers seem not to support the required Vulkan version, switching to OpenGL 3.
+     at: DisplayServerX11 (platform/linuxbsd/x11/display_server_x11.cpp:7124)
+WARNING: Could not set V-Sync mode, as changing V-Sync mode is not supported by the graphics driver.
+     at: set_use_vsync (platform/linuxbsd/x11/gl_manager_x11.cpp:372)
+OpenGL API 4.5 (Core Profile) Mesa 25.2.8-0ubuntu0.24.04.4 - Compatibility - Using Device: Mesa - llvmpipe (LLVM 20.1.2, 256 bits)
+ALSA lib confmisc.c:855:(parse_card) cannot find card '0'
+ALSA lib conf.c:5208:(_snd_config_evaluate) function snd_func_card_inum returned error: No such file or directory
+ALSA lib confmisc.c:422:(snd_func_concat) error evaluating strings
+ALSA lib conf.c:5208:(_snd_config_evaluate) function snd_func_concat returned error: No such file or directory
+ALSA lib confmisc.c:1342:(snd_func_refer) error evaluating name
+ALSA lib conf.c:5208:(_snd_config_evaluate) function snd_func_refer returned error: No such file or directory
+ALSA lib conf.c:5731:(snd_config_expand) Evaluate error: No such file or directory
+ALSA lib pcm.c:2721:(snd_pcm_open_noupdate) Unknown PCM default
+ERROR: Condition "status < 0" is true. Returning: ERR_CANT_OPEN
+   at: init_output_device (drivers/alsa/audio_driver_alsa.cpp:97)
+WARNING: All audio drivers failed, falling back to the dummy driver.
+     at: initialize (servers/audio/audio_server.cpp:258)
+
+✅ Equipment modules loaded: 1084
+✅ Unit templates loaded: 1025
+✅ Sustainment equipment loaded: 4
+✅ Production line rules loaded
+Manpower pool for GER updated from pop*conscript: 520000 (pop=65.0M, cons_level=0, frac=0.008)
+Manpower pool for FRA updated from pop*conscript: 320000 (pop=40.0M, cons_level=0, frac=0.008)
+Manpower pool for ENG updated from pop*conscript: 360000 (pop=45.0M, cons_level=0, frac=0.008)
+Manpower pool for USA updated from pop*conscript: 960000 (pop=120.0M, cons_level=0, frac=0.008)
+Manpower pool for SOV updated from pop*conscript: 1280000 (pop=160.0M, cons_level=0, frac=0.008)
+Manpower pool for JAP updated from pop*conscript: 560000 (pop=70.0M, cons_level=0, frac=0.008)
+Manpower pool for ITA updated from pop*conscript: 336000 (pop=42.0M, cons_level=0, frac=0.008)
+Manpower pool for POL updated from pop*conscript: 280000 (pop=35.0M, cons_level=0, frac=0.008)
+Manpower pool for FIN updated from pop*conscript: 28000 (pop=3.5M, cons_level=0, frac=0.008)
+Manpower pool for NOR updated from pop*conscript: 24000 (pop=3.0M, cons_level=0, frac=0.008)
+Manpower pool for SWE updated from pop*conscript: 48000 (pop=6.0M, cons_level=0, frac=0.008)
+Manpower pool for DNK updated from pop*conscript: 28000 (pop=3.5M, cons_level=0, frac=0.008)
+Manpower pool for NLD updated from pop*conscript: 64000 (pop=8.0M, cons_level=0, frac=0.008)
+Manpower pool for BEL updated from pop*conscript: 64000 (pop=8.0M, cons_level=0, frac=0.008)
+Loaded 81 leaders (18 in pool) from [res://data/leaders/historical_leaders_1936.json] for year 1936
+TimeManager: Initialized (default 1936-01-01)
+TimeManager: ink victory warm 405.4ms
+WeatherManager ready (lightweight season + event stub)
+AgentManager: Loaded 31 mission definitions
+SpecialSiteManager: Loaded definition 'radar_station_tier_1'
+SpecialSiteManager: Loaded definition 'airfield_tier_1'
+SpecialSiteManager: Loaded definition 'faroes_patrol_base'
+SpecialSiteManager: Loaded definition 'scandinavian_radar_net'
+SpecialSiteManager: Loaded definition 'baltic_naval_base_tier_1'
+SpecialSiteManager: Loaded definition 'heavy_water_plant'
+SpecialSiteManager: Loaded definition 'airfield_tier_3'
+SpecialSiteManager: Loaded definition 'icbm_site_tier_1'
+SpecialSiteManager: Loaded definition 'port_tier_3'
+SpecialSiteManager: Loaded definition 'northern_sea_chokepoint'
+SpecialSiteManager: Loaded definition 'gibraltar_fortress'
+SpecialSiteManager: Loaded definition 'naval_shipyard_tier_1'
+SpecialSiteManager: Loaded definition 'iceland_air_station'
+SpecialSiteManager: Loaded definition 'factory_tier_1'
+SpecialSiteManager: Loaded definition 'oil_refinery_tier_1'
+SpecialSiteManager: Loaded definition 'aircraft_rnd_lab'
+SpecialSiteManager: Loaded definition 'danish_straits_fortress'
+SpecialSiteManager: Loaded definition 'skagerrak_fortress'
+SpecialSiteManager: Loaded definition 'airfield_tier_4'
+SpecialSiteManager: Loaded definition 'special_project_heavy_water'
+SpecialSiteManager: Loaded definition 'orkney_naval_station'
+SpecialSiteManager: Loaded definition 'port_tier_2'
+SpecialSiteManager: Loaded definition 'airfield_tier_2'
+SpecialSiteManager: Loaded definition 'north_sea_air_station'
+SpecialSiteManager: Loaded definition 'prototype_test_airfield'
+SpecialSiteManager: Loaded definition 'kiel_canal_control'
+SpecialSiteManager: Loaded definition 'atlantic_patrol_base'
+SpecialSiteManager: Loaded 27 special site definitions
+TechnologyManager: Loaded 113 technology nodes
+SaveLoadManager: Created saves dir → /tmp/eoa-startup-guard/xdg/data/godot/app_userdata/Epochs-of-Ascendancy/saves/
+SaveLoadManager: Initialized (JSON format v2, user://saves/)
+WindowedStartupGuardTest: DisplayServer=X11 engine=4.7.1-stable (official) (NOT live Play / NOT live-startup PASS)
+InfrastructureDevelopmentManager: auto-connected to daily tick.
+✅ Province geometry loaded: 100 (from provinces)
+✅ Base provinces loaded: 840 provinces (from provinces) — will prune to 471 phase1 children if geometry match
+✅ Camera2D activated
+MapRenderer: WORLD CLASS stitched grand underlay set as default (full scrollable world map base). Europe polys overlay detailed area. Use F10 chunks or zoom for other continents (mountains via H layer).
+MapRenderer: WorldBackground reparented under ProvinceContainers (unified canvas)
+MapRenderer: Fitted underlay to equirect bounds [P: (0.0, 0.0), S: (14155.78, 7077.888)] · theater=[P: (-80.0, -80.0), S: (14315.78, 8957.889)] · container_scale=(1.0, 1.0) · bg_scale=(1.728, 1.728) · bg_parent=ProvinceContainers
+MapRenderer _ready() completed
+=== Epochs of Ascendancy Test Starting ===
+TestRunner: OS cmdline_args (for evidence detection): ["-s", "res://scripts/core/WindowedStartupGuardTest.gd"]
+TestRunner: DisplayServer name: X11 | has dedicated_server feature: false
+TestRunner: EOA envs: RUN_50= LONG= HEADLESS_EVIDENCE= FAST= TEST_SAVE= SMOKE_AUTO_BEGIN=0 SMOKE_ADVANCE_PAST_PLUS6=0
+[EVIDENCE TEST] 8+ space events integrated: first_satellite 1957, first_human_space 1961, moon_landing 1969, moon_base, space_station 1973, mars_landing, mars_base, explore_other + protests 'Space race spending causes unrest', ethics 'Ethical Concerns: space militarization?', secret programs + fleet events, competition/sabotage, ties to research ethics/Hand/low coh/secret. 1918 in process_peace_follow_ons: Versailles Treaty 1919 reparations crisis + alt if different leverage (inclusion/term_choices). Used post_news, apply_pillar. Persisted in save. TestRunner 50T forces 1957+. See GameData.gd:1451, TestRunner.gd:2590+ . Logs show calls, news, pillar for all.
+TestRunner: GUARD DECISION = GRAPHICAL (fast path, map visible first). Launch was plain (no --map-evidence). If you still see hang, do NOT pass --map-evidence or --headless on play launches. F10 harness + mouse/Ctrl-click combat work immediately after VIS print.
+LoadingScreen: art quarter 1/4 (0% band) — THE ASCENDANT GLOBE
+LoadingScreen: fullscreen cycle mode active (4 artworks @ 25% each).
+MapRenderer: Fitted underlay to equirect bounds [P: (0.0, 0.0), S: (14155.78, 7077.888)] · theater=[P: (-80.0, -80.0), S: (14315.78, 8957.889)] · container_scale=(1.0, 1.0) · bg_scale=(1.728, 1.728) · bg_parent=ProvinceContainers
+MapRenderer: Fitted underlay to equirect bounds [P: (0.0, 0.0), S: (14155.78, 7077.888)] · theater=[P: (-80.0, -80.0), S: (14315.78, 8957.889)] · container_scale=(1.0, 1.0) · bg_scale=(1.728, 1.728) · bg_parent=ProvinceContainers
+MapRenderer: Fitted underlay to equirect bounds [P: (0.0, 0.0), S: (14155.78, 7077.888)] · theater=[P: (-80.0, -80.0), S: (14315.78, 8957.889)] · container_scale=(1.0, 1.0) · bg_scale=(1.728, 1.728) · bg_parent=ProvinceContainers
+TimeManager: Paused = true
+TopInfoBar: start PAUSED (press 1x / Space / keys 1-4 to advance time).
+MapRenderer: Fitted underlay to equirect bounds [P: (0.0, 0.0), S: (14155.78, 7077.888)] · theater=[P: (-80.0, -80.0), S: (14315.78, 8957.889)] · container_scale=(1.0, 1.0) · bg_scale=(1.728, 1.728) · bg_parent=ProvinceContainers
+MapRenderer: Fitted underlay to equirect bounds [P: (0.0, 0.0), S: (14155.78, 7077.888)] · theater=[P: (-80.0, -80.0), S: (14315.78, 8957.889)] · container_scale=(1.0, 1.0) · bg_scale=(1.728, 1.728) · bg_parent=ProvinceContainers
+MapRenderer: Fitted underlay to equirect bounds [P: (0.0, 0.0), S: (14155.78, 7077.888)] · theater=[P: (-80.0, -80.0), S: (14315.78, 8957.889)] · container_scale=(1.0, 1.0) · bg_scale=(1.728, 1.728) · bg_parent=ProvinceContainers
+MapRenderer: Fitted underlay to equirect bounds [P: (0.0, 0.0), S: (14155.78, 7077.888)] · theater=[P: (-80.0, -80.0), S: (14315.78, 8957.889)] · container_scale=(1.0, 1.0) · bg_scale=(1.728, 1.728) · bg_parent=ProvinceContainers
+MapRenderer: Fitted underlay to equirect bounds [P: (0.0, 0.0), S: (14155.78, 7077.888)] · theater=[P: (-80.0, -80.0), S: (14315.78, 8957.889)] · container_scale=(1.0, 1.0) · bg_scale=(1.728, 1.728) · bg_parent=ProvinceContainers
+MapRenderer: Fitted underlay to equirect bounds [P: (0.0, 0.0), S: (14155.78, 7077.888)] · theater=[P: (-80.0, -80.0), S: (14315.78, 8957.889)] · container_scale=(1.0, 1.0) · bg_scale=(1.728, 1.728) · bg_parent=ProvinceContainers
+MapRenderer: Fitted underlay to equirect bounds [P: (0.0, 0.0), S: (14155.78, 7077.888)] · theater=[P: (-80.0, -80.0), S: (14315.78, 8957.889)] · container_scale=(1.0, 1.0) · bg_scale=(1.728, 1.728) · bg_parent=ProvinceContainers
+MapRenderer: Fitted underlay to equirect bounds [P: (0.0, 0.0), S: (14155.78, 7077.888)] · theater=[P: (-80.0, -80.0), S: (14315.78, 8957.889)] · container_scale=(1.0, 1.0) · bg_scale=(1.728, 1.728) · bg_parent=ProvinceContainers
+MapRenderer: Fitted underlay to equirect bounds [P: (0.0, 0.0), S: (14155.78, 7077.888)] · theater=[P: (-80.0, -80.0), S: (14315.78, 8957.889)] · container_scale=(1.0, 1.0) · bg_scale=(1.728, 1.728) · bg_parent=ProvinceContainers
+MapRenderer: Fitted underlay to equirect bounds [P: (0.0, 0.0), S: (14155.78, 7077.888)] · theater=[P: (-80.0, -80.0), S: (14315.78, 8957.889)] · container_scale=(1.0, 1.0) · bg_scale=(1.728, 1.728) · bg_parent=ProvinceContainers
+MapRenderer: Fitted underlay to equirect bounds [P: (0.0, 0.0), S: (14155.78, 7077.888)] · theater=[P: (-80.0, -80.0), S: (14315.78, 8957.889)] · container_scale=(1.0, 1.0) · bg_scale=(1.728, 1.728) · bg_parent=ProvinceContainers
+MapRenderer: Fitted underlay to equirect bounds [P: (0.0, 0.0), S: (14155.78, 7077.888)] · theater=[P: (-80.0, -80.0), S: (14315.78, 8957.889)] · container_scale=(1.0, 1.0) · bg_scale=(1.728, 1.728) · bg_parent=ProvinceContainers
+LoadingScreen: HIDE_AND_FREE — dismissing now.
+[LOAD PROGRESS] 12.5% - Entering scenario load for world_accurate...
+[LOAD PROGRESS] 13.0% - Parsing scenario JSON + loading province data dir...
+[LOAD PROGRESS] 13.5% - Parsed scenario JSON, preparing province data...
+ScenarioLoader: Switching to custom province data dir: provinces_world_accurate
+[LOAD PROGRESS] 14.0% - Loading province geometry/layers for phase1 (471 children dense)...
+ScenarioLoader: geometry marked world-native (full equirectangular canvas)
+✅ Province geometry loaded: 3596 (from provinces_world_accurate)
+✅ Base provinces loaded: 3596 provinces (from provinces_world_accurate) — will prune to 471 phase1 children if geometry match
+[LOAD PROGRESS] 14.5% - Loaded province geometry/layers for phase1 (471 children dense)...
+[LOAD PROGRESS] 15.0% - Copying base provinces and applying phase1 rebuilds...
+ScenarioLoader: FORCED to exactly 3596 provinces for provinces_world_accurate (pruned base/override mix; recreated 0). MapPickGrid/inspector/combat use this set.
+[LOAD PROGRESS] 16.0% - Rebuilt authoritative province set from geometry...
+ScenarioLoader: Post-prune pick grid rebuild; current provinces in MapManager ~0 (or will be after full init). Ensures world-class Europe 471 children overlay on grand uses correct phase1 set not legacy 840.
+ScenarioLoader: Second post-prune phase1 children pick rebuild completed.
+=== APPLYING SCENARIO OVERRIDES ===
+[LOAD PROGRESS] 15.5% - Applying scenario overrides (province owners, factories, dev, infra)...
+ScenarioLoader: ownership_era_seed year=1936 era=1936 owned=3256 skipped_prior=0 seed_only=1 player_agency=1
+ScenarioLoader: membership_era_seed year=1936 era=1936 mode=full bound=3256 states=429 stamped_regions=3596 seed_only=1 primary_eras=1910,1918,1936,2026 reapply_on_year_tick=0
+ScenarioLoader: hierarchy_live=1 states=429 regions=31 super_regions=4 pilot=true data_dir=provinces_world_accurate
+ScenarioLoader: hierarchy_query province=710000 state=Thrace region=Balkans super_region=Europe Theater four_tier=1
+ScenarioLoader: Ownership applied — land_owned=3256/3256 (100.0%) tags=65 majors_sample GER=421 FRA=320 ENG=596 USA=219 SOV=121 ITA=121 JAP=116
+ScenarioLoader: synthesized 57 paints + fixed 0 capitals + recolored 0 (total countries=65)
+ScenarioLoader: adjacency_live=1 method_path=provinces_world_accurate provinces=3596 directed_edges=18244
+ScenarioLoader: stamped capital feature on 37 provinces (map gold stars, tags=37 / owners=65)
+MapManager: loaded 34 data-driven naval chokepoint provinces (dir=provinces_world_accurate)
+ScenarioFactorySpawner: world_accurate — 107 factories, 7 shipyards across 30 province entries
+ScenarioFactorySpawner: majors — GER fac=15 sy=0 pids=[710300, 710321, 710205, 710417, 710323], FRA fac=10 sy=1 pids=[710707, 710792, 710798, 710734, 710711], ENG fac=16 sy=1 pids=[711414, 711344, 711391, 711495], USA fac=15 sy=2 pids=[800792, 802754, 802049, 802018, 801515], SOV fac=18 sy=0 pids=[903534, 903532], ITA fac=12 sy=2 pids=[710963, 710882, 710892], JAP fac=18 sy=1 pids=[903995, 903986, 904007]
+ScenarioFactorySpawner: resource plants seeded=19 (coal/steel/refinery/… by deposit)
+[ScenarioLoader] Initialized starting equipment stockpile for GER (5 equipment types from scenario data)
+[ScenarioLoader] Initialized starting equipment stockpile for FRA (3 equipment types from scenario data)
+[ScenarioLoader] Initialized starting equipment stockpile for ENG (4 equipment types from scenario data)
+[ScenarioLoader] Initialized starting equipment stockpile for USA (5 equipment types from scenario data)
+[ScenarioLoader] Initialized starting equipment stockpile for SOV (5 equipment types from scenario data)
+[ScenarioLoader] Initialized starting equipment stockpile for ITA (4 equipment types from scenario data)
+[ScenarioLoader] Initialized starting equipment stockpile for JAP (4 equipment types from scenario data)
+[ScenarioLoader] Initialized starting equipment stockpile for POL (4 equipment types from scenario data)
+[ScenarioLoader] Applied starting equipment stockpiles for 8 nations from scenario (realistic OOB/equipment per scenario json; future scenarios/mods control their own).
+[LOAD PROGRESS] 20.0% - Applied starting equipment stockpiles for 14 nations...
+AgentManager: Recruited Anya Kovacs for GER
+AgentManager: Recruited Victor Lang for GER
+AgentManager: Recruited Hiroshi Dubois for GER
+AgentManager: Recruited Dmitri Tanaka for GER
+AgentManager: Recruited Natasha Ivanov for GER
+AgentManager: Recruited Mei Petrov for GER
+[LOAD PROGRESS] 22.5% - Recruiting agents for GER (6 total so far)...
+AgentManager: Recruited Alexei Ivanov for FRA
+AgentManager: Recruited Johan Kowalski for FRA
+AgentManager: Recruited Anya Santos for FRA
+AgentManager: Recruited Lila Laurent for FRA
+AgentManager: Recruited Lila Tanaka for FRA
+AgentManager: Recruited Sofia Ivanov for FRA
+[LOAD PROGRESS] 22.5% - Recruiting agents for FRA (12 total so far)...
+AgentManager: Recruited Victor Santos for ENG
+AgentManager: Recruited Lila Schmidt for ENG
+AgentManager: Recruited Alexei Yamamoto for ENG
+AgentManager: Recruited Anya Lang for ENG
+AgentManager: Recruited Sofia Laurent for ENG
+AgentManager: Recruited Alexei Bauer for ENG
+[LOAD PROGRESS] 22.5% - Recruiting agents for ENG (18 total so far)...
+AgentManager: Recruited Anya Bauer for USA
+AgentManager: Recruited Mei Laurent for USA
+AgentManager: Recruited Victor Petrov for USA
+AgentManager: Recruited Thomas Bauer for USA
+AgentManager: Recruited Klaus Kowalski for USA
+AgentManager: Recruited Mei Bauer for USA
+[LOAD PROGRESS] 22.5% - Recruiting agents for USA (24 total so far)...
+AgentManager: Recruited Victor Santos for SOV
+AgentManager: Recruited Hiroshi Schmidt for SOV
+AgentManager: Recruited Klaus Schmidt for SOV
+AgentManager: Recruited Alexei Laurent for SOV
+AgentManager: Recruited Anya Ivanov for SOV
+AgentManager: Recruited Johan Yamamoto for SOV
+[LOAD PROGRESS] 22.5% - Recruiting agents for SOV (30 total so far)...
+AgentManager: Recruited Isabelle Kovacs for ITA
+AgentManager: Recruited Isabelle Petrov for ITA
+AgentManager: Recruited Alexei Santos for ITA
+AgentManager: Recruited Thomas Lang for ITA
+AgentManager: Recruited Marcus Kovacs for ITA
+AgentManager: Recruited Isabelle Kovacs for ITA
+[LOAD PROGRESS] 22.5% - Recruiting agents for ITA (36 total so far)...
+AgentManager: Recruited Mei Tanaka for JAP
+AgentManager: Recruited Dmitri Kowalski for JAP
+AgentManager: Recruited Marcus Bauer for JAP
+AgentManager: Recruited Sofia Kovacs for JAP
+AgentManager: Recruited Elena Kowalski for JAP
+AgentManager: Recruited Freya Dubois for JAP
+[LOAD PROGRESS] 22.5% - Recruiting agents for JAP (42 total so far)...
+AgentManager: Recruited Isabelle Yamamoto for POL
+AgentManager: Recruited Klaus Moreau for POL
+[LOAD PROGRESS] 22.5% - Recruiting agents for POL (44 total so far)...
+[ScenarioLoader] Recruited 44 starting agents across nations from scenario data (scenario controls agent pools for different eras/mods).
+[LOAD PROGRESS] 23.0% - All starting agents recruited (56 across 14 nations)...
+Doctrine set: GER army -> blitzkrieg (was )
+Doctrine set: GER navy -> submarine_commerce_raiding (was )
+Doctrine set: GER air_force -> strategic_bombing (was )
+Doctrine set: USA army -> deep_battle (was )
+Doctrine set: USA navy -> carrier_task_force (was )
+Doctrine set: USA air_force -> strategic_bombing (was )
+Doctrine set: ENG navy -> carrier_task_force (was )
+[SCENARIO DOCTRINES] Initialized service doctrines for majors. Player/chiefs set philosophy; agents iterate over time.
+[LOAD PROGRESS] 24.0% - Initialized service doctrines (blitzkrieg, carrier_task_force, etc. + penalty sim)...
+TimeManager: Scenario start date set to 1936-01-01 (year 1936)
+[LOAD PROGRESS] 24.5% - Loading scenario leaders (141 historical + pools)...
+Loaded 154 leaders (80 in pool) from [res://data/leaders/historical_leaders_1918.json, res://data/leaders/historical_leaders_1936.json] for year 1936
+✅ Scenario leaders loaded (world_accurate, 1936): 154 active, 80 pooled
+[LOAD PROGRESS] 25.0% - Loaded scenario leaders (141 active/pool)...
+[LOAD PROGRESS] 25.1% - Applying starting technology...
+TechnologyManager: Applied starting tech for scenario 'world_accurate' (65 countries, year 1936)
+[LOAD PROGRESS] 25.5% - Tech applied. Priming initiative tree...
+[LOAD PROGRESS] 26.0% - Tech applied for all countries. Spawning formations...
+[LOAD PROGRESS] 26.2% - Spawning formations for AFG (1/65)...
+Spawned 4 test formations for AFG (owned_land=30 capital=0 land_stationed=3 invalid=0 primary_station=904798)
+Spawned 4 test formations for ALB (owned_land=12 capital=710000 land_stationed=3 invalid=0 primary_station=710000)
+Spawned 4 test formations for ARG (owned_land=11 capital=903446 land_stationed=3 invalid=0 primary_station=903446)
+[LOAD PROGRESS] 26.7% - Spawning formations for AUS (4/65)...
+Spawned 4 test formations for AUS (owned_land=35 capital=710020 land_stationed=3 invalid=0 primary_station=710020)
+Spawned 4 test formations for BEL (owned_land=55 capital=710047 land_stationed=3 invalid=0 primary_station=710047)
+Spawned 4 test formations for BHU (owned_land=5 capital=0 land_stationed=3 invalid=0 primary_station=900426)
+Spawned 4 test formations for BOL (owned_land=6 capital=0 land_stationed=3 invalid=0 primary_station=903820)
+[LOAD PROGRESS] 27.5% - Spawning formations for BRA (8/65)...
+Spawned 4 test formations for BRA (owned_land=16 capital=0 land_stationed=3 invalid=0 primary_station=902885)
+Spawned 4 test formations for BUL (owned_land=28 capital=710105 land_stationed=3 invalid=0 primary_station=710105)
+Spawned 4 test formations for CHI (owned_land=62 capital=902487 land_stationed=3 invalid=0 primary_station=902487)
+Spawned 4 test formations for CHL (owned_land=6 capital=0 land_stationed=3 invalid=0 primary_station=903763)
+[LOAD PROGRESS] 28.2% - Spawning formations for COL (12/65)...
+Spawned 4 test formations for COL (owned_land=8 capital=0 land_stationed=3 invalid=0 primary_station=903680)
+Spawned 4 test formations for COS (owned_land=3 capital=0 land_stationed=3 invalid=0 primary_station=905445)
+Spawned 4 test formations for CUB (owned_land=3 capital=0 land_stationed=3 invalid=0 primary_station=904482)
+Spawned 4 test formations for CYP (owned_land=1 capital=710145 land_stationed=3 invalid=0 primary_station=710145)
+[LOAD PROGRESS] 29.0% - Spawning formations for CZE (16/65)...
+Spawned 4 test formations for CZE (owned_land=22 capital=710146 land_stationed=3 invalid=0 primary_station=710146)
+Spawned 4 test formations for DNK (owned_land=28 capital=710561 land_stationed=3 invalid=0 primary_station=710561)
+Spawned 4 test formations for DOM (owned_land=3 capital=0 land_stationed=2 invalid=0 primary_station=904898)
+Spawned 4 test formations for ECU (owned_land=5 capital=0 land_stationed=3 invalid=0 primary_station=904924)
+[LOAD PROGRESS] 29.7% - Spawning formations for ELS (20/65)...
+Spawned 4 test formations for ELS (owned_land=3 capital=0 land_stationed=3 invalid=0 primary_station=905426)
+Spawned 8 test formations for ENG (owned_land=596 capital=711414 land_stationed=6 invalid=0 primary_station=711414)
+Spawned 4 test formations for EST (owned_land=5 capital=710574 land_stationed=3 invalid=0 primary_station=710574)
+Spawned 4 test formations for FIN (owned_land=22 capital=710693 land_stationed=3 invalid=0 primary_station=710693)
+[LOAD PROGRESS] 30.4% - Spawning formations for FRA (24/65)...
+Spawned 8 test formations for FRA (owned_land=320 capital=710707 land_stationed=6 invalid=0 primary_station=710707)
+Spawned 8 test formations for GER (owned_land=421 capital=710300 land_stationed=6 invalid=0 primary_station=710300)
+Spawned 4 test formations for GRE (owned_land=52 capital=710577 land_stationed=3 invalid=0 primary_station=710577)
+Spawned 4 test formations for GUA (owned_land=3 capital=0 land_stationed=3 invalid=0 primary_station=904998)
+[LOAD PROGRESS] 31.2% - Spawning formations for HAI (28/65)...
+Spawned 4 test formations for HAI (owned_land=3 capital=0 land_stationed=2 invalid=0 primary_station=905412)
+Spawned 4 test formations for HON (owned_land=3 capital=0 land_stationed=3 invalid=0 primary_station=905135)
+Spawned 4 test formations for HUN (owned_land=20 capital=710829 land_stationed=3 invalid=0 primary_station=710829)
+Spawned 4 test formations for ICE (owned_land=2 capital=710858 land_stationed=3 invalid=0 primary_station=710858)
+[LOAD PROGRESS] 31.9% - Spawning formations for IRE (32/65)...
+Spawned 4 test formations for IRE (owned_land=8 capital=710854 land_stationed=3 invalid=0 primary_station=710854)
+Spawned 8 test formations for ITA (owned_land=121 capital=710963 land_stationed=6 invalid=0 primary_station=710963)
+Spawned 8 test formations for JAP (owned_land=116 capital=903995 land_stationed=6 invalid=0 primary_station=903995)
+Spawned 4 test formations for LAT (owned_land=6 capital=710982 land_stationed=3 invalid=0 primary_station=710982)
+[LOAD PROGRESS] 32.6% - Spawning formations for LIB (36/65)...
+Spawned 4 test formations for LIB (owned_land=3 capital=0 land_stationed=3 invalid=0 primary_station=900976)
+Spawned 4 test formations for LIE (owned_land=1 capital=710966 land_stationed=3 invalid=0 primary_station=710966)
+Spawned 4 test formations for LIT (owned_land=10 capital=710967 land_stationed=3 invalid=0 primary_station=710967)
+Spawned 4 test formations for LUX (owned_land=1 capital=710977 land_stationed=3 invalid=0 primary_station=710977)
+[LOAD PROGRESS] 33.4% - Spawning formations for MEX (40/65)...
+Spawned 4 test formations for MEX (owned_land=6 capital=0 land_stationed=3 invalid=0 primary_station=903166)
+Spawned 4 test formations for MLT (owned_land=2 capital=710993 land_stationed=2 invalid=0 primary_station=710993)
+Spawned 4 test formations for MON (owned_land=6 capital=0 land_stationed=3 invalid=0 primary_station=904102)
+Spawned 4 test formations for NEP (owned_land=5 capital=0 land_stationed=3 invalid=0 primary_station=905305)
+[LOAD PROGRESS] 34.1% - Spawning formations for NIC (44/65)...
+Spawned 4 test formations for NIC (owned_land=3 capital=0 land_stationed=3 invalid=0 primary_station=905180)
+Spawned 4 test formations for NLD (owned_land=146 capital=711019 land_stationed=3 invalid=0 primary_station=711019)
+Spawned 4 test formations for NOR (owned_land=13 capital=711039 land_stationed=3 invalid=0 primary_station=711039)
+Spawned 4 test formations for NZL (owned_land=4 capital=0 land_stationed=3 invalid=0 primary_station=902458)
+[LOAD PROGRESS] 34.9% - Spawning formations for PAN (48/65)...
+Spawned 4 test formations for PAN (owned_land=3 capital=0 land_stationed=2 invalid=0 primary_station=905396)
+Spawned 4 test formations for PAR (owned_land=6 capital=0 land_stationed=3 invalid=0 primary_station=905156)
+Spawned 4 test formations for PER (owned_land=74 capital=0 land_stationed=3 invalid=0 primary_station=903295)
+Spawned 4 test formations for POL (owned_land=60 capital=711112 land_stationed=3 invalid=0 primary_station=711112)
+[LOAD PROGRESS] 35.6% - Spawning formations for POR (52/65)...
+Spawned 4 test formations for POR (owned_land=51 capital=711138 land_stationed=3 invalid=0 primary_station=711138)
+Spawned 4 test formations for ROM (owned_land=61 capital=711177 land_stationed=3 invalid=0 primary_station=711177)
+Spawned 4 test formations for SAU (owned_land=29 capital=0 land_stationed=3 invalid=0 primary_station=903838)
+Spawned 4 test formations for SIA (owned_land=74 capital=0 land_stationed=3 invalid=0 primary_station=904506)
+[LOAD PROGRESS] 36.3% - Spawning formations for SOV (56/65)...
+Spawned 8 test formations for SOV (owned_land=121 capital=903534 land_stationed=7 invalid=0 primary_station=903534)
+Spawned 4 test formations for SPA (owned_land=62 capital=710643 land_stationed=3 invalid=0 primary_station=710643)
+Spawned 4 test formations for SWE (owned_land=21 capital=711213 land_stationed=3 invalid=0 primary_station=711213)
+Spawned 4 test formations for SWI (owned_land=26 capital=710122 land_stationed=3 invalid=0 primary_station=710122)
+[LOAD PROGRESS] 37.1% - Spawning formations for TUR (60/65)...
+Spawned 4 test formations for TUR (owned_land=82 capital=711276 land_stationed=3 invalid=0 primary_station=711276)
+Spawned 4 test formations for URG (owned_land=5 capital=0 land_stationed=3 invalid=0 primary_station=905087)
+Spawned 8 test formations for USA (owned_land=219 capital=800792 land_stationed=7 invalid=0 primary_station=800792)
+Spawned 4 test formations for VEN (owned_land=6 capital=0 land_stationed=3 invalid=0 primary_station=903792)
+[LOAD PROGRESS] 37.8% - Spawning formations for YEM (64/65)...
+Spawned 4 test formations for YEM (owned_land=21 capital=0 land_stationed=3 invalid=0 primary_station=905066)
+[LOAD PROGRESS] 38.0% - Spawning formations for YUG (65/65)...
+Spawned 4 test formations for YUG (owned_land=95 capital=711188 land_stationed=3 invalid=0 primary_station=711188)
+ScenarioLoader: Formation stations (owned land) — GER land_ok=6/6 st=710300, FRA land_ok=6/6 st=710707, ENG land_ok=6/6 st=711414, USA land_ok=7/7 st=800792, SOV land_ok=7/7 st=903534, ITA land_ok=6/6 st=710963, JAP land_ok=6/6 st=903995
+ScenarioLoader: Auto-assigned land leaders — total=45 by_tag={ "AFG": 0, "ALB": 0, "ARG": 1, "AUS": 1, "BEL": 2, "BHU": 0, "BOL": 0, "BRA": 1, "BUL": 0, "CHI": 0, "CHL": 1, "COL": 0, "COS": 0, "CUB": 0, "CYP": 0, "CZE": 0, "DNK": 1, "DOM": 0, "ECU": 0, "ELS": 0, "ENG": 3, "EST": 0, "FIN": 1, "FRA": 4, "GER": 4, "GRE": 0, "GUA": 0, "HAI": 0, "HON": 0, "HUN": 0, "ICE": 0, "IRE": 0, "ITA": 3, "JAP": 3, "LAT": 0, "LIB": 0, "LIE": 0, "LIT": 0, "LUX": 0, "MEX": 1, "MLT": 0, "MON": 0, "NEP": 0, "NIC": 0, "NLD": 2, "NOR": 1, "NZL": 0, "PAN": 0, "PAR": 0, "PER": 0, "POL": 3, "POR": 0, "ROM": 0, "SAU": 0, "SIA": 0, "SOV": 6, "SPA": 0, "SWE": 1, "SWI": 0, "TUR": 2, "URG": 0, "USA": 4, "VEN": 0, "YEM": 0, "YUG": 0 }
+ScenarioLoader: Land formation commanders — GER land_cmd=4/6 e.g.ger_manstein, FRA land_cmd=4/6 e.g.fra_petain, ENG land_cmd=3/6 e.g.eng_brooke, USA land_cmd=4/7 e.g.usa_marshall, SOV land_cmd=6/7 e.g.sov_zhukov, ITA land_cmd=3/6 e.g.ita_badoglio, JAP land_cmd=3/6 e.g.jap_yamashita
+ScenarioLoader: Auto-assigned branch leaders — naval=5 air=20 naval_by={ "AFG": 0, "ALB": 0, "ARG": 0, "AUS": 0, "BEL": 0, "BHU": 0, "BOL": 0, "BRA": 0, "BUL": 0, "CHI": 0, "CHL": 0, "COL": 0, "COS": 0, "CUB": 0, "CYP": 0, "CZE": 0, "DNK": 0, "DOM": 0, "ECU": 0, "ELS": 0, "ENG": 1, "EST": 0, "FIN": 0, "FRA": 1, "GER": 1, "GRE": 0, "GUA": 0, "HAI": 0, "HON": 0, "HUN": 0, "ICE": 0, "IRE": 0, "ITA": 1, "JAP": 1, "LAT": 0, "LIB": 0, "LIE": 0, "LIT": 0, "LUX": 0, "MEX": 0, "MLT": 0, "MON": 0, "NEP": 0, "NIC": 0, "NLD": 0, "NOR": 0, "NZL": 0, "PAN": 0, "PAR": 0, "PER": 0, "POL": 0, "POR": 0, "ROM": 0, "SAU": 0, "SIA": 0, "SOV": 0, "SPA": 0, "SWE": 0, "SWI": 0, "TUR": 0, "URG": 0, "USA": 0, "VEN": 0, "YEM": 0, "YUG": 0 } air_by={ "AFG": 0, "ALB": 0, "ARG": 1, "AUS": 1, "BEL": 0, "BHU": 0, "BOL": 0, "BRA": 1, "BUL": 0, "CHI": 0, "CHL": 1, "COL": 0, "COS": 0, "CUB": 0, "CYP": 0, "CZE": 0, "DNK": 1, "DOM": 0, "ECU": 0, "ELS": 0, "ENG": 1, "EST": 0, "FIN": 1, "FRA": 1, "GER": 1, "GRE": 0, "GUA": 0, "HAI": 0, "HON": 0, "HUN": 0, "ICE": 0, "IRE": 0, "ITA": 1, "JAP": 1, "LAT": 0, "LIB": 0, "LIE": 0, "LIT": 0, "LUX": 0, "MEX": 1, "MLT": 0, "MON": 0, "NEP": 0, "NIC": 0, "NLD": 1, "NOR": 1, "NZL": 1, "PAN": 0, "PAR": 0, "PER": 0, "POL": 1, "POR": 0, "ROM": 0, "SAU": 0, "SIA": 0, "SOV": 1, "SPA": 0, "SWE": 1, "SWI": 0, "TUR": 1, "URG": 0, "USA": 1, "VEN": 0, "YEM": 0, "YUG": 0 }
+ScenarioLoader: Naval formation commanders — GER nav=1/1 e.g.ger_raeder, FRA nav=1/1 e.g.fra_darlan, ENG nav=1/1 e.g.eng_cunningham, USA nav=0/0 e.g., SOV nav=0/0 e.g., ITA nav=1/1 e.g.ita_campioni_1936, JAP nav=1/1 e.g.jap_yamamoto
+ScenarioLoader: Air formation commanders — GER air=1/1 e.g.ger_bolten_1918, FRA air=1/1 e.g.fra_vuillemin_1936, ENG air=1/1 e.g.eng_dowding, USA air=1/1 e.g.usa_mitchell, SOV air=1/1 e.g.sov_rychagov_1936, ITA air=1/1 e.g.ita_arma_di_1918, JAP air=1/1 e.g.jap_air_1936
+Scenario loaded with formations for 65 countries (leader assignment).
+[LOAD PROGRESS] 40.0% - Spawned formations for all countries...
+[LOAD PROGRESS] 28.0% - Spawned scenario formations/OOB from starting equipment...
+[LOAD PROGRESS] 42.0% - Wiring equipment to formations from stockpiles...
+✅ Scenario loaded | Provinces: 3596 | Countries: 65
+[SCENARIO OOB EQUIP] Equipped 47 starting formations from country/national stockpiles (scenario data -> units have equipment on spawn).
+ScenarioLoader: Formation equip (land from stockpile) — GER land_equip=6/6 design=panzer_iii_j_medium, FRA land_equip=6/6 design=somua_s35_medium, ENG land_equip=6/6 design=m4_sherman_medium_tank, USA land_equip=7/7 design=m4_sherman_medium_tank, SOV land_equip=7/7 design=t34_medium_tank, ITA land_equip=6/6 design=cv33_tankette, JAP land_equip=6/6 design=jap_armor_1936
+[LOAD PROGRESS] 48.0% - Equipped OOB formations from scenario stockpiles...
+ScenarioLoader: Seeded starting industrial resource stockpile (steel/aluminum/fuel/rubber/coal)
+Assigned line 'oob_GER_panzer_iii_j_medium' to factory 71030001 (Province 710300, Slot 1)
+[OOB PRODUCTION] Started line oob_GER_panzer_iii_j_medium design=panzer_iii_j_medium factory=71030001 for GER
+Assigned line 'oob_GER_infantry_k98_bolt_action' to factory 71030001 (Province 710300, Slot 1)
+[OOB PRODUCTION] Started infantry line oob_GER_infantry_k98_bolt_action design=infantry_k98_bolt_action factory=71030001 for GER
+Assigned line 'oob_FRA_somua_s35_medium' to factory 71070701 (Province 710707, Slot 1)
+[OOB PRODUCTION] Started line oob_FRA_somua_s35_medium design=somua_s35_medium factory=71070701 for FRA
+Assigned line 'oob_FRA_infantry_k98_bolt_action' to factory 71070701 (Province 710707, Slot 1)
+[OOB PRODUCTION] Started infantry line oob_FRA_infantry_k98_bolt_action design=infantry_k98_bolt_action factory=71070701 for FRA
+Assigned line 'oob_ENG_m4_sherman_medium_tank' to factory 71141401 (Province 711414, Slot 1)
+[OOB PRODUCTION] Started line oob_ENG_m4_sherman_medium_tank design=m4_sherman_medium_tank factory=71141401 for ENG
+Assigned line 'oob_ENG_infantry_m1_garand' to factory 71141401 (Province 711414, Slot 1)
+[OOB PRODUCTION] Started infantry line oob_ENG_infantry_m1_garand design=infantry_m1_garand factory=71141401 for ENG
+Assigned line 'oob_USA_m4_sherman_medium_tank' to factory 80079201 (Province 800792, Slot 1)
+[OOB PRODUCTION] Started line oob_USA_m4_sherman_medium_tank design=m4_sherman_medium_tank factory=80079201 for USA
+Assigned line 'oob_USA_infantry_m1_garand' to factory 80079201 (Province 800792, Slot 1)
+[OOB PRODUCTION] Started infantry line oob_USA_infantry_m1_garand design=infantry_m1_garand factory=80079201 for USA
+Assigned line 'oob_SOV_t34_medium_tank' to factory 90353401 (Province 903534, Slot 1)
+[OOB PRODUCTION] Started line oob_SOV_t34_medium_tank design=t34_medium_tank factory=90353401 for SOV
+Assigned line 'oob_SOV_infantry_k98_bolt_action' to factory 90353401 (Province 903534, Slot 1)
+[OOB PRODUCTION] Started infantry line oob_SOV_infantry_k98_bolt_action design=infantry_k98_bolt_action factory=90353401 for SOV
+Assigned line 'oob_ITA_cv33_tankette' to factory 71096301 (Province 710963, Slot 1)
+[OOB PRODUCTION] Started line oob_ITA_cv33_tankette design=cv33_tankette factory=71096301 for ITA
+Assigned line 'oob_ITA_infantry_k98_bolt_action' to factory 71096301 (Province 710963, Slot 1)
+[OOB PRODUCTION] Started infantry line oob_ITA_infantry_k98_bolt_action design=infantry_k98_bolt_action factory=71096301 for ITA
+Assigned line 'oob_JAP_jap_armor_1936' to factory 90399501 (Province 903995, Slot 1)
+[OOB PRODUCTION] Started line oob_JAP_jap_armor_1936 design=jap_armor_1936 factory=90399501 for JAP
+Assigned line 'oob_JAP_infantry_k98_bolt_action' to factory 90399501 (Province 903995, Slot 1)
+[OOB PRODUCTION] Started infantry line oob_JAP_infantry_k98_bolt_action design=infantry_k98_bolt_action factory=90399501 for JAP
+Assigned line 'oob_POL_pol_armor_1936' to factory 71111201 (Province 711112, Slot 1)
+[OOB PRODUCTION] Started line oob_POL_pol_armor_1936 design=pol_armor_1936 factory=71111201 for POL
+[ScenarioLoader] OOB production bootstrap — lines=15 assigned_to_factory=15
+ScenarioLoader: Major production lines — GER line=oob_GER_panzer_iii_j_medium fac=71030001 design=panzer_iii_j_medium, FRA line=oob_FRA_somua_s35_medium fac=71070701 design=somua_s35_medium, ENG line=oob_ENG_m4_sherman_medium_tank fac=71141401 design=m4_sherman_medium_tank, USA line=oob_USA_m4_sherman_medium_tank fac=80079201 design=m4_sherman_medium_tank, SOV line=oob_SOV_t34_medium_tank fac=90353401 design=t34_medium_tank, ITA line=oob_ITA_cv33_tankette fac=71096301 design=cv33_tankette, JAP line=oob_JAP_jap_armor_1936 fac=90399501 design=jap_armor_1936
+ScenarioLoader: Industry bootstrap — GER fac=15 sy=0 lines_on_fac=2, FRA fac=11 sy=1 lines_on_fac=2, ENG fac=17 sy=1 lines_on_fac=2, USA fac=33 sy=2 lines_on_fac=2, SOV fac=20 sy=0 lines_on_fac=2, ITA fac=14 sy=2 lines_on_fac=2, JAP fac=19 sy=1 lines_on_fac=2
+MapManager: loaded 34 data-driven naval chokepoint provinces (dir=provinces_world_accurate)
+🗺️ MapPickGrid built with 3596 provinces, cell_size=64.0, 1793 cells
+🗺️ MapManager initialized with 3596 provinces (bounds: [P: (-0.040041, 226.9375), S: (14097.53, 8065.011)])
+🗺️ MapPickGrid built with 3596 provinces, cell_size=64.0, 1793 cells
+[ScenarioLoader] Post-spawn force: unit icons (NATO from assets) + nation borders (country colors) for immediate playtest visuals.
+Scenario connections: fully-controlled regions at load ENG(mm):1 GER:1 SOV:0 | direct(loader): ENG=1 GER=1 SOV=0 | ENG bonuses keys:["regional_pride", "manpower_recovery", "naval_range_multiplier"] (pride bonuses + region tint + effects now connected for 460 after regions remap + scenario owner align)
+MapManager: precomputed fronts tag=GER n=0 in 7ms
+Rendering map with 3596 provinces using Polygon2D...
+MapRenderer: Fitted underlay to equirect bounds [P: (0.0, 0.0), S: (14155.78, 7077.888)] · theater=[P: (-80.0, -80.0), S: (14315.78, 8957.889)] · container_scale=(1.0, 1.0) · bg_scale=(1.728, 1.728) · bg_parent=ProvinceContainers
+MapRenderer: Fitted underlay to equirect bounds [P: (0.0, 0.0), S: (14155.78, 7077.888)] · theater=[P: (-80.0, -80.0), S: (14315.78, 8957.889)] · container_scale=(1.0, 1.0) · bg_scale=(1.728, 1.728) · bg_parent=ProvinceContainers
+ROADS1_STUB_DEMOTE n=2 903534_905809 Moscow–Haradok area, 905807_905809 Polotsk area–Haradok area
+EOA_RT1_TRUNK who=overlay candidates=3409 trunk=1399 triangles=15 max_deg=5 avg_deg=1.89 highways=115 hwy_components=8 hwy_singletons=0
+InfrastructureOverlayLayer: Dynamic infra layers built (era=standard_1936 roads:4 rail-ties:0 cities:0 sites:0). Toggle with R/T/C/Y or F10.
+MapRenderer: InfrastructureOverlayLayer created and added (roads/rails/cities + special sites live layer).
+MapRenderer: FacilityIconLayer created (airfield icons; show_facilities default ON).
+✅ Map rendered with real polygons
+🗺️ MapPickGrid built with 3596 provinces, cell_size=110.6, 1227 cells
+LeaderManager: fielded designer unit fielded_usa_d0_1 design=king_george_v_class_bb @950001
+LeaderManager: fielded designer unit fielded_sov_d0_2 design=king_george_v_class_bb @950000
+LeaderManager: fielded designer unit fielded_pol_d0_3 design=king_george_v_class_bb @950001
+EOA_FLEET2 who=plate_label fid=fielded_usa_d0_1 tag=USA ordinal=1 label='USA|Fleet 1'
+EOA_FLEET2 who=plate_label fid=ENG_formation_2 tag=ENG ordinal=2 label='ENG|Fleet 2'
+EOA_FLEET2 who=plate_label fid=ITA_formation_2 tag=ITA ordinal=2 label='ITA|Fleet 2'
+EOA_FLEET2 who=plate_label fid=fielded_pol_d0_3 tag=POL ordinal=1 label='POL|Fleet 1'
+EOA_FLEET2 who=plate_label fid=FRA_formation_2 tag=FRA ordinal=2 label='FRA|Fleet 2'
+EOA_FLEET2 who=plate_label fid=GER_formation_2 tag=GER ordinal=2 label='GER|Fleet 2'
+EOA_FLEET2 who=plate_label fid=JAP_formation_2 tag=JAP ordinal=2 label='JAP|Fleet 2'
+EOA_FLEET2 who=plate_label fid=fielded_sov_d0_2 tag=SOV ordinal=1 label='SOV|Fleet 1'
+[MapRenderer] Unit icons placed=258 (indexed formations, no per-province template reload)
+LeaderManager: 1936 garrisons placed=535 skipped_occupied=40 targets=575 {GER 95/98 skip 3, FRA 117/121 skip 4, ENG 182/187 skip 5, SOV 27/34 skip 7, ITA 24/29 skip 5, JAP 9/14 skip 5, USA 34/40 skip 6, POL 31/33 skip 2, CZE 16/19 skip 3}
+MapRenderer: playable front chips GER=3 FRA=2 pid=710173 jap=903981 fleet=950001 wing_r=100
+MapRenderer: Fitted underlay to equirect bounds [P: (0.0, 0.0), S: (14155.78, 7077.888)] · theater=[P: (-80.0, -80.0), S: (14315.78, 8957.889)] · container_scale=(1.0, 1.0) · bg_scale=(1.728, 1.728) · bg_parent=ProvinceContainers
+TestRunner: map_renderer.initialize complete (polys live before deferred world stitching).
+MapRenderer: Fitted underlay to equirect bounds [P: (0.0, 0.0), S: (14155.78, 7077.888)] · theater=[P: (-80.0, -80.0), S: (14315.78, 8957.889)] · container_scale=(1.0, 1.0) · bg_scale=(1.728, 1.728) · bg_parent=ProvinceContainers
+MapRenderer: world nav ready · theater=[P: (-80.0, -80.0), S: (14315.78, 8957.889)] · min_zoom=0.035 · pan=2600 · container_scale=(1.0, 1.0)
+TerrainLayerStack: loaded WORLD layers (rivers/lakes + elevation/mountains) from metadata_world
+MapRenderer: TerrainLayerStack active (U=rivers/lakes, H=elevation/mountains, V=vegetation, S=snow ref).
+MapRenderer: Fitted underlay to equirect bounds [P: (0.0, 0.0), S: (14155.78, 7077.888)] · theater=[P: (-80.0, -80.0), S: (14315.78, 8957.889)] · container_scale=(1.0, 1.0) · bg_scale=(1.728, 1.728) · bg_parent=ProvinceContainers
+MapRenderer: world nav ready · theater=[P: (-80.0, -80.0), S: (14315.78, 8957.889)] · min_zoom=0.035 · pan=2600 · container_scale=(1.0, 1.0)
+ROADS1_STUB_DEMOTE n=2 903534_905809 Moscow–Haradok area, 905807_905809 Polotsk area–Haradok area
+EOA_RT1_TRUNK who=overlay candidates=3409 trunk=1383 triangles=14 max_deg=5 avg_deg=1.87 highways=115 hwy_components=8 hwy_singletons=0
+MapRenderer: WeatherOverlayLayer added (stub for snow progression, storms, events on GRAND THEATER bg; toggle via debug or hotkey). Hidden by default per design.
+MapRenderer: capital stars visible n=37
+MapRenderer: Fitted underlay to equirect bounds [P: (0.0, 0.0), S: (14155.78, 7077.888)] · theater=[P: (-80.0, -80.0), S: (14315.78, 8957.889)] · container_scale=(1.0, 1.0) · bg_scale=(1.728, 1.728) · bg_parent=ProvinceContainers
+MapRenderer: centered on Europe (Berlin+Paris+Rome frame) inside world view
+MapRenderer: Fitted underlay to equirect bounds [P: (0.0, 0.0), S: (14155.78, 7077.888)] · theater=[P: (-80.0, -80.0), S: (14315.78, 8957.889)] · container_scale=(1.0, 1.0) · bg_scale=(1.728, 1.728) · bg_parent=ProvinceContainers
+MapRenderer: world nav ready · theater=[P: (-80.0, -80.0), S: (14315.78, 8957.889)] · min_zoom=0.035 · pan=2600 · container_scale=(1.0, 1.0)
+WeatherOverlayLayer ready (full visuals: dynamic snow veil+mask+ tint on bg, rain/storm cues, event icons, blackout dims, naval notes; togglable)
+TestRunner: _dismiss_loading_screen removed 0 overlay(s).
+TestRunner: _ensure_game_interactive() — blockers cleared; camera/map/UI always-on; clock owned by player/Begin after title (no deferred re-pause).
+[LOAD PROGRESS] 58%+ — load screen dismissed early (map interactive).
+MapManager: loaded 34 data-driven naval chokepoint provinces (dir=provinces_world_accurate)
+🗺️ MapPickGrid built with 3596 provinces, cell_size=110.6, 1229 cells
+🗺️ MapManager initialized with 3596 provinces (bounds: [P: (-0.040041, 226.9375), S: (14097.53, 8065.011)])
+[LOAD PROGRESS] 62.0% - World underlay + polys scheduled (deferred).
+TestRunner: _dismiss_loading_screen removed 0 overlay(s).
+TestRunner: _ensure_game_interactive() — blockers cleared; camera/map/UI always-on; clock owned by player/Begin after title (no deferred re-pause).
+EOA_LIVE_RAW_PTR who=title.ready ds=X11 focused=true ds_btn=0 vp=(640.0, 400.0) begin_keys=Enter/Space/B
+TestRunner: living title boot — pick scenario date, country, or load (Esc / Esc · Menu / Begin without Esc)
+MapRenderer: Fitted underlay to equirect bounds [P: (0.0, 0.0), S: (14155.78, 7077.888)] · theater=[P: (-80.0, -80.0), S: (14315.78, 8957.889)] · container_scale=(1.0, 1.0) · bg_scale=(1.728, 1.728) · bg_parent=ProvinceContainers
+MapRenderer: world nav ready · theater=[P: (-80.0, -80.0), S: (14315.78, 8957.889)] · min_zoom=0.035 · pan=2600 · container_scale=(1.0, 1.0)
+MapManager: precomputed fronts tag=GER n=0 in 9ms
+MapRenderer: Fitted underlay to equirect bounds [P: (0.0, 0.0), S: (14155.78, 7077.888)] · theater=[P: (-80.0, -80.0), S: (14315.78, 8957.889)] · container_scale=(1.0, 1.0) · bg_scale=(1.728, 1.728) · bg_parent=ProvinceContainers
+MapRenderer: world nav ready · theater=[P: (-80.0, -80.0), S: (14315.78, 8957.889)] · min_zoom=0.035 · pan=2600 · container_scale=(1.0, 1.0)
+MapRenderer: Fitted underlay to equirect bounds [P: (0.0, 0.0), S: (14155.78, 7077.888)] · theater=[P: (-80.0, -80.0), S: (14315.78, 8957.889)] · container_scale=(1.0, 1.0) · bg_scale=(1.728, 1.728) · bg_parent=ProvinceContainers
+MapRenderer: centered on Europe (Berlin+Paris+Rome frame) inside world view
+MapRenderer: bootstrap_world_class_map complete (world ultra + GIS Europe focus + full pan).
+MapRenderer: Fitted underlay to equirect bounds [P: (0.0, 0.0), S: (14155.78, 7077.888)] · theater=[P: (-80.0, -80.0), S: (14315.78, 8957.889)] · container_scale=(1.0, 1.0) · bg_scale=(1.728, 1.728) · bg_parent=ProvinceContainers
+MapRenderer: world nav ready · theater=[P: (-80.0, -80.0), S: (14315.78, 8957.889)] · min_zoom=0.035 · pan=2600 · container_scale=(1.0, 1.0)
+MapRenderer: Fitted underlay to equirect bounds [P: (0.0, 0.0), S: (14155.78, 7077.888)] · theater=[P: (-80.0, -80.0), S: (14315.78, 8957.889)] · container_scale=(1.0, 1.0) · bg_scale=(1.728, 1.728) · bg_parent=ProvinceContainers
+MapRenderer: world nav ready · theater=[P: (-80.0, -80.0), S: (14315.78, 8957.889)] · min_zoom=0.035 · pan=2600 · container_scale=(1.0, 1.0)
+EOA_STARTUP_GUARD who=hook_title boot_closed+tree_exited
+EOA_STARTUP_GUARD who=world_ready elapsed=28 n=3596 title_visible=1
+[SCENARIO INIT] Stockpiles applied: GER=5 types (panzer etc from oob), BEL=0. Scenario json controls starting equipment for all 14 nations (realistic OOBs/planes/ships/troops).
+[SCENARIO INIT] Agents from scenario starting_agents: total 44 (more for majors, 2+ for minors; all nations).
+[SCENARIO INIT] Leaders loaded for scenario (historical per-era rosters + more per nation): active ~0.
+[SCENARIO DOCTRINES] GER Army: blitzkrieg, USA Navy: carrier_task_force (vital choice set; trade-offs applied to designs/ops. Chiefs implement, agents evolve).
+[SCENARIO TECH] GER 1936 base: dread1906=false synth1917=false mobile_study=true | USA carrier_exp=false (early 1890-191x foundations + interwar branches loaded via defaults+overrides for majors; alts like synth vs import available).
+  Diffusion example (synthetic project 1936): ~6% cost discount. Logic: no reward for 1-2 nation rushes (min 3 for count, 2yr time floor); but if >=5 nations have it, even 1yr behind gets early bonus (widespread knowledge helps catch-up for advancing ahead penalty).
+  Diffusion for common base tech (basic_machine_tools, likely high completers): ~0% (high adoption can trigger earlier/stronger even near-term).
+  New defend_tech_secrecy mission: counter-intel agents can target specific tech for Manhattan-style protection (extra block in theft logic if defender assigned).
+[DESIGNER VISUAL TEST] Sample base models archetypes (choose these in designer for distinct looks):
+  bf109g_fighter -> visual_archetype:prop_fighter domain:
+  b17g_fortress -> visual_archetype:four_engine_bomber domain:
+  a6m5_zero_carrier -> visual_archetype:carrier_fighter domain:
+  f15c_eagle -> visual_archetype:jet_fighter domain:
+  sb2c_helldiver -> visual_archetype:dive_bomber domain:
+  yamato_battleship -> visual_archetype:battleship domain:
+  akagi_carrier_1936 -> visual_archetype:fleet_carrier domain:
+  t34_medium_tank -> visual_archetype:medium_tank domain:
+  a7v_heavy -> visual_archetype:ww1_tank domain:
+  pol_armor_1918 -> visual_archetype:ww1_tank domain:
+  m3_stuart_light_tank -> visual_archetype:interwar_light_tank domain:
+  uh60_mexico_naval -> visual_archetype:helicopter domain:
+[AGENT AS PLAYER WILL + TIMELINE PROJECTS DEMO]
+  Applied agent national impacts (passive from active agents' attributes/traits -> NMM for Ascendancy/prod/research/resources/mil). Agents now literally extend player will into nation stats/pillars.
+  Expanded timeline agent projects (in national_projects_1890_1938.json): guderian_armor_reform_1929 (1929, mobile tanks led by breakthrough agents), tukhachevsky_deep_battle_1932 (1932 Soviet ops, intel/saboteur traits excel for bonuses + Ascendancy). Sponsor with right agent for bonuses, record/level scale impacts.
+  Sample GER ascendancy from agents: 0.003 (from influence traits/agents).
+[MAP ICONS] Different models will pick distinct NATO icons (fighter vs 4eng bomber vs carrier_fighter vs jet vs biplane vs light_carrier vs ww1_tank vs modern heavy etc.) based on archetype from design.
+MapRenderer: Fitted underlay to equirect bounds [P: (0.0, 0.0), S: (14155.78, 7077.888)] · theater=[P: (-80.0, -80.0), S: (14315.78, 8957.889)] · container_scale=(1.0, 1.0) · bg_scale=(1.728, 1.728) · bg_parent=ProvinceContainers
+MapRenderer: world nav ready · theater=[P: (-80.0, -80.0), S: (14315.78, 8957.889)] · min_zoom=0.035 · pan=2600 · container_scale=(1.0, 1.0)
+MapRenderer: Fitted underlay to equirect bounds [P: (0.0, 0.0), S: (14155.78, 7077.888)] · theater=[P: (-80.0, -80.0), S: (14315.78, 8957.889)] · container_scale=(1.0, 1.0) · bg_scale=(1.728, 1.728) · bg_parent=ProvinceContainers
+MapRenderer: centered on Europe (Berlin+Paris+Rome frame) inside world view
+TestRunner: Early demo owners for visible map polys in graphical (colors/tints immediate). More for world view.
+TestRunner: Early world forces visibility path complete (more demo owners + formations ready for grand world view).
+TestRunner: World elevation prepped for H (mountains on Africa/Aus/EAsia aligned in stitched world).
+[SAVE/LOAD TEST] Skipped (sim cycles only, runs after map init). Safe for --map-evidence / early _ready.
+✅ Playtest harness ready: board=provinces_world_accurate provinces=3596 (default world_accurate GIS hybrid ~3520 post US+RoW sparse; scaffold via EOA_SCENARIO=world_full). Load via F5 on TestScenario.tscn. F10 DebugOverlay for map modes / harness actions.
+  [SUBDIV PUSH] sample_subdivided_geometry.json with river-aware children available (105 provs, 5 river-cross guided by rivers.json; run generate to refresh)
+TestRunner: _dismiss_loading_screen removed 0 overlay(s).
+TestRunner: _ensure_game_interactive() — blockers cleared; camera/map/UI always-on; clock owned by player/Begin after title (no deferred re-pause).
+  [PUSHES] LOD and REGIONS demo code will execute in early chunk block if mr ready
+  [PUSHES] LOD and REGIONS demo code executed in early drive
+  [SUBDIV] sample_subdivided_geometry.json available with 105 provinces (5 river-cross children guided by real rivers.json + elev/terrain inference) - pushed in harness
+  [SUBDIV PUSH] Loaded sample_subdivided_geometry.json with 105 provinces (5 river-cross children guided by real rivers.json + elev/terrain inference)
+  [SUBDIV PUSH] sample_subdivided_geometry.json with river-aware children available (105 provs, 5 river-cross guided by rivers.json; run generate to refresh)
+MapRenderer: loaded sample subdiv geo with 105 provinces (5 river-aware children, 5 with river-cross natural border from real rivers.json)
+  child terrains (from inference layer): ["coastal", "coastal", "coastal", "coastal", "coastal"]
+MapManager: loaded sample subdiv geo with 105 provinces (5 river-aware children, 5 river-cross guided from real layers + inference terrain)
+   F10 opens DebugOverlay with 'Zero-Interference Full Europe Playtest Harness' section.
+   Buttons: (MAP PLAYTEST TOP: ... + 🌊 Force Naval Spot/Combat (stormy sea, subs, choke, groups, vis mods), ⚓ Chokepoint, ⚔️ Sub-battle, 🌍 world/center...) . Naval spotting simulator now in recon: weather/vis/storms, ship size/subs, groups, straits harder hide, range adjusted for night/storm closer. See _process_naval_recon + _try_trigger + BattleManager naval engagement.
+   Expected: MapRenderer tints on settled; Province inspector shows settlement org/attrition/supply/combat bonuses; BattleManager assaults get +2.5%/level defender (cap 25%); welfare/education/feminism enact with real anti-natal tradeoffs (short Mandate vs long HH win/family erosion/Golden block); low coh + traditional -> social rev toasts 'people demand changes' (bible/public ed/feminism/welfare) with Respond->PolicyLawScreen; Italy ITA starts elevated HH/welfare (unholy papal+mafia); HH pandemic/Spanish Flu narratives in erosion; agents lobby policies; Golden/combat/supply all map-tied via settled_areas + Province + effects; new LOD/Subdiv+Apply/Auto-theater/Revert/Force-river-combat buttons for fades, river-cross sample (5 children + live demo mutate w/ carried terrain/river_aware for inspector/combat test) + camera driven chunk/LOD + river border bonus + demo child terrain in BM/resolver + sub-battle sim + geo override + draw + pick test for subdivided + phase1 471. No further user input/setup needed for basic Europe loop test of all current systems.
+  [NAVAL CHOKEPOINT + RIVER SUPPLY TEST] has_chokepoint(18)=false supply_bonus=1.0 (straits/river for logi + def; see SupplyManager + resolver)
+  [FULL SUB-BATTLE DEMO] assault preview on 82 (demo child terrain + river/choke bonuses applied in resolver): { "ok": false, "reason": "Target province not found" }
+TestRunner: Normal graphical F5 - skipping heavy automated sims (naval/air/register loops) for fast startup. Use F10 harness or EOA_RUN_SIM_CYCLES=1.
+Scenario loaded. Initializing map renderer...
+  [SUBDIV PUSH] sample_subdivided_geometry.json with river-aware children available (105 provs, 5 river-cross guided by rivers.json; run generate to refresh)
+TestRunner: [TIMING] scenario load complete; starting map init at +1 ms from process start.
+  [SUBDIV] sample_subdivided_geometry.json available with 105 provinces (5 river-cross children guided by real rivers.json + elev/terrain inference)
+MapRenderer: loaded sample subdiv geo with 105 provinces (5 river-aware children, 5 with river-cross natural border from real rivers.json)
+  child terrains (from inference layer): ["coastal", "coastal", "coastal", "coastal", "coastal"]
+MapManager: loaded sample subdiv geo with 105 provinces (5 river-aware children, 5 river-cross guided from real layers + inference terrain)
+🗺️ MapPickGrid built with 3596 provinces, cell_size=110.6, 1229 cells
+TestRunner: Pick grid rebuilt post-init; MapManager province count: 3596 (world_accurate GIS hybrid default; phase1 only if EOA_SCENARIO=phase1_europe_test).
+TestRunner: _dismiss_loading_screen removed 0 overlay(s).
+TestRunner: _ensure_game_interactive() — blockers cleared; camera/map/UI always-on; clock owned by player/Begin after title (no deferred re-pause).
+[LOAD PROGRESS] 93%+ — load screen dismissed; camera and UI enabled for immediate testing.
+MapManager: loaded 34 data-driven naval chokepoint provinces (dir=provinces_world_accurate)
+🗺️ MapPickGrid built with 3596 provinces, cell_size=110.6, 1229 cells
+🗺️ MapManager initialized with 3596 provinces (bounds: [P: (-0.040041, 226.9375), S: (14097.53, 8065.011)])
+MapManager: DEMO GEO OVERRIDE cleared for 82
+MapRenderer: demo geo mutate reverted (parent view restored) + GEO OVERRIDE cleared
+TestRunner: InfrastructureDevelopmentManager wired to daily tick
+TestRunner: Graphical run detected - skipping immediate headless exercise. Map + harness should be visible now. F10 for full 'Zero-Interference Full Europe Playtest Harness'.
+TestRunner: Early demo colors forced on Europe polys for visible map over world stitched bg.
+MapRenderer: Fitted underlay to equirect bounds [P: (0.0, 0.0), S: (14155.78, 7077.888)] · theater=[P: (-80.0, -80.0), S: (14315.78, 8957.889)] · container_scale=(1.0, 1.0) · bg_scale=(1.728, 1.728) · bg_parent=ProvinceContainers
+MapRenderer: world nav ready · theater=[P: (-80.0, -80.0), S: (14315.78, 8957.889)] · min_zoom=0.035 · pan=2600 · container_scale=(1.0, 1.0)
+MapRenderer: Fitted underlay to equirect bounds [P: (0.0, 0.0), S: (14155.78, 7077.888)] · theater=[P: (-80.0, -80.0), S: (14315.78, 8957.889)] · container_scale=(1.0, 1.0) · bg_scale=(1.728, 1.728) · bg_parent=ProvinceContainers
+MapRenderer: centered on Europe (Berlin+Paris+Rome frame) inside world view
+TestRunner: Auto-framed camera to reasonable start (grand high-res large view forced later if applicable)
+TestRunner: Core 3596-province polygons rendered (MapRenderer + ProvinceContainers live; default board world_accurate). Detailed grand visuals + harness demos deferred to next frame(s) for responsive launch.
+Supply network ready (toggle overlay with L)
+TestRunner: Graphical path - time + top bar left fully active for immediate testing (advance date, click menus, camera, provinces).
+TestRunner: Player national chief positions cleared to Vacant for assignment testing (Patton etc still pickable).
+✅ MapManager ready with 3596 provinces (ProvinceEffects now centralized)
+TestRunner: Playtest map bootstrapped — production line tests run next frame (map visible first).
+TestRunner: [DEFERRED GRAND VISUALS] Running post-core-render grand bg + harness setup (first frame should have painted polys + initial camera by now).
+TestRunner: _dismiss_loading_screen removed 0 overlay(s).
+TestRunner: _ensure_game_interactive() — blockers cleared; camera/map/UI always-on; clock owned by player/Begin after title (no deferred re-pause).
+[MapRenderer] Unit icons placed=259 (indexed formations, no per-province template reload)
+MapDebug: Click a GER chip (green org / amber str) · click own land to MARCH · Ctrl+click France to ASSAULT · Esc clears
+MapRenderer: G toast-only (no corridor BFS)
+MapRenderer: playable front chips GER=3 FRA=2 pid=710173 jap=903981 fleet=950001 wing_r=100
+TestRunner: _dismiss_loading_screen removed 0 overlay(s).
+TestRunner: _ensure_game_interactive() — blockers cleared; camera/map/UI always-on; clock owned by player/Begin after title (no deferred re-pause).
+TestRunner: [DEFERRED GRAND VISUALS] Complete (bg + vis prints + basic seeds done post first frame; heavy + cycles + nudge already scheduled).
+MapManager: precomputed fronts tag=GER n=0 in 8ms
+MapRenderer: Fitted underlay to equirect bounds [P: (0.0, 0.0), S: (14155.78, 7077.888)] · theater=[P: (-80.0, -80.0), S: (14315.78, 8957.889)] · container_scale=(1.0, 1.0) · bg_scale=(1.728, 1.728) · bg_parent=ProvinceContainers
+MapRenderer: Fitted underlay to equirect bounds [P: (0.0, 0.0), S: (14155.78, 7077.888)] · theater=[P: (-80.0, -80.0), S: (14315.78, 8957.889)] · container_scale=(1.0, 1.0) · bg_scale=(1.728, 1.728) · bg_parent=ProvinceContainers
+MapRenderer: world nav ready · theater=[P: (-80.0, -80.0), S: (14315.78, 8957.889)] · min_zoom=0.035 · pan=2600 · container_scale=(1.0, 1.0)
+MapRenderer: Fitted underlay to equirect bounds [P: (0.0, 0.0), S: (14155.78, 7077.888)] · theater=[P: (-80.0, -80.0), S: (14315.78, 8957.889)] · container_scale=(1.0, 1.0) · bg_scale=(1.728, 1.728) · bg_parent=ProvinceContainers
+MapRenderer: centered on Europe (Berlin+Paris+Rome frame) inside world view
+MapRenderer: Fitted underlay to equirect bounds [P: (0.0, 0.0), S: (14155.78, 7077.888)] · theater=[P: (-80.0, -80.0), S: (14315.78, 8957.889)] · container_scale=(1.0, 1.0) · bg_scale=(1.728, 1.728) · bg_parent=ProvinceContainers
+MapRenderer: world nav ready · theater=[P: (-80.0, -80.0), S: (14315.78, 8957.889)] · min_zoom=0.035 · pan=2600 · container_scale=(1.0, 1.0)
+MapRenderer: Fitted underlay to equirect bounds [P: (0.0, 0.0), S: (14155.78, 7077.888)] · theater=[P: (-80.0, -80.0), S: (14315.78, 8957.889)] · container_scale=(1.0, 1.0) · bg_scale=(1.728, 1.728) · bg_parent=ProvinceContainers
+MapRenderer: centered on Europe (Berlin+Paris+Rome frame) inside world view
+TestRunner: _dismiss_loading_screen removed 0 overlay(s).
+TestRunner: _ensure_game_interactive() — blockers cleared; camera/map/UI always-on; clock owned by player/Begin after title (no deferred re-pause).
+TestRunner: Skipping production line tests during interactive play (set EOA_RUN_SIM_CYCLES=1 or use headless for full suite).
+TestRunner: _dismiss_loading_screen removed 0 overlay(s).
+TestRunner: _ensure_game_interactive() — blockers cleared; camera/map/UI always-on; clock owned by player/Begin after title (no deferred re-pause).
+EOA_STARTUP_GUARD who=pre_begin title_visible=1 shot=/tmp/eoa-startup-guard/pre_begin.png
+EOA_STARTUP_GUARD who=invoke_begin path=LivingTitleBoot.handle_live_begin
+EOA_LIVE_PTR who=title.handle_live_begin action=begin
+LivingTitleBoot: live Begin · GER · 1936
+TimeManager: Scenario start date set to 1936-01-01 (year 1936)
+TestRunner: living title closed { "ok": true, "player_tag": "GER", "year": 1936, "era": 1936, "nations": ["GER", "ENG", "FRA", "JAP", "USA", "SOV", "ITA", "POL"], "eras": [1918, 1936, 2026], "default_ger": true, "default_1936": true, "defaulted": false, "live": true, "nation": { "ok": true, "player_tag": "GER", "default_ger": true, "defaulted": false, "live": true }, "era_boot": { "ok": true, "year": 1936, "era": 1936, "live": true }, "applied": true, "mode": "new", "slot": "" }
+EOA_FIRST_SESSION_TIP shown=1 pass_through=1 text=Select a unit, then March or Open card.
+EOA_STARTUP_GUARD who=signal.boot_closed { "ok": true, "player_tag": "GER", "year": 1936, "era": 1936, "nations": ["GER", "ENG", "FRA", "JAP", "USA", "SOV", "ITA", "POL"], "eras": [1918, 1936, 2026], "default_ger": true, "default_1936": true, "defaulted": false, "live": true, "nation": { "ok": true, "player_tag": "GER", "default_ger": true, "defaulted": false, "live": true }, "era_boot": { "ok": true, "year": 1936, "era": 1936, "live": true }, "applied": true, "mode": "new", "slot": "" }
+EOA_STARTUP_GUARD who=begin_return { "ok": true, "closed": true, "mode": "new", "player_tag": "GER", "year": 1936 }
+EOA_STARTUP_GUARD who=signal.tree_exited usec=33797577
+EOA_STARTUP_GUARD who=boot_closed usec=33288004
+EOA_STARTUP_GUARD who=overlay_gone tree_exit_usec=33797577 visible=false
+EOA_STARTUP_GUARD who=post_dismiss title_visible=false shot=/tmp/eoa-startup-guard/post_dismiss.png
+EOA_STARTUP_GUARD who=controlled_resize 860x550 (product Begin does not set_size)
+EOA_STARTUP_GUARD who=post_resize shot=/tmp/eoa-startup-guard/post_resize.png
+EOA_STARTUP_GUARD DATA_INVARIANT=PASS
+EOA_STARTUP_GUARD PRESENTATION=DIAGNOSTIC LIVE_BLANK=NOT_REPRODUCED
+EOA_STARTUP_GUARD FIXTURE=PASS LIVE_STARTUP=NOT_CLAIMED
+  [PRESENTATION] garrison_1936_observed=535 shipped_expect=575 (reported, not invented)
+  [PRESENTATION] post_field_still_varied_color
+WindowedStartupGuardTest: RESULT=COMPLETED
+WindowedStartupGuardTest: LIVE_STARTUP=NOT_CLAIMED LIVE_BLANK=NOT_REPRODUCED
+WARNING: 7 ObjectDB instances were leaked at exit (run with `--verbose` for details).
+   at: cleanup (core/object/object.cpp:2536)
+ERROR: 3 resources still in use at exit (run with --verbose for details).
+   at: clear (core/io/resource.cpp:822)
