@@ -250,6 +250,14 @@ var _map_pick_block_until_msec: int = 0
 ## Close/Esc: do not move the camera (no snapshot restore — that still teleported).
 var _hold_camera_until_msec: int = 0
 var _last_mouse_pos := Vector2.ZERO
+## STARTUP-BLANK: leftover pointer after living-title Begin (edge pan + leftover
+## left-drag) until the cursor moves STARTUP_BLANK_MOVE_PX from the leftover.
+var _startup_blank_armed := false
+var _startup_blank_settle_left: int = 0
+var _startup_blank_leftover_mouse := Vector2.INF
+var _startup_blank_leftover_ready := false
+const STARTUP_BLANK_SETTLE_FRAMES := 18
+const STARTUP_BLANK_MOVE_PX := 6.0
 ## Close must not leave a deferred camera nudge (play extra: panel-close teleport).
 var _inspector_held_closed := false
 ## Live GIS camera at Close press — reassert every frame so europe_center / pick-center cannot teleport.
@@ -4451,12 +4459,13 @@ func _handle_camera_input(delta: float) -> void:
 	var cam := get_viewport().get_camera_2d()
 	if not cam:
 		return
+	_startup_blank_tick_leftover_swallow()
 
 	# Accumulate slop before the modal early-return so a leftover false-positive
 	# popup cannot wipe skip-pick; sea release then jump-zoomed Rio Grande Rise.
-	if _left_down_is_live_map_drag():
+	if not _startup_blank_swallow_pointer() and _left_down_is_live_map_drag():
 		_accumulate_left_drag_slop()
-	if not _left_pan_active and _left_drag_should_pan():
+	if not _startup_blank_swallow_pointer() and not _left_pan_active and _left_drag_should_pan():
 		_activate_left_drag_pan_from_slop()
 
 	# Command Center / modal screens: freeze all map pan (WASD, edge, drag).
@@ -4497,6 +4506,7 @@ func _handle_camera_input(delta: float) -> void:
 	if (
 		not _close_suppress_edge
 		and not MapViewInput.edge_pan_blocked_by_gui(get_viewport())
+		and not _startup_blank_swallow_pointer()
 	):
 		screen_edge = MapViewInput.edge_pan_direction_screen(get_viewport())
 		edge_dir = _gate_wheel_edge_pan(screen_edge)
@@ -4507,9 +4517,12 @@ func _handle_camera_input(delta: float) -> void:
 
 	# Left-drag pan after slop (click still picks). Middle / right drag too.
 	# Slop + physical left-down starts pan even if `_left_pan_armed` was cleared.
-	if _left_down_is_live_map_drag():
+	if _startup_blank_swallow_pointer():
+		_left_pan_armed = false
+		_left_pan_active = false
+	elif _left_down_is_live_map_drag():
 		_accumulate_left_drag_slop()
-	if not _left_pan_active and _left_drag_should_pan():
+	if not _startup_blank_swallow_pointer() and not _left_pan_active and _left_drag_should_pan():
 		_activate_left_drag_pan_from_slop()
 	# Middle / right / left-drag (pixel-based — works while paused). Drag up → camera north.
 	if _is_middle_dragging or _left_pan_active:
@@ -26834,6 +26847,55 @@ func _first_session_tip_dismiss_blocks_map_pick() -> bool:
 func _clear_first_session_tip_dismiss_swallow() -> void:
 	if has_meta("eoa_tip_dismiss_swallow_release"):
 		remove_meta("eoa_tip_dismiss_swallow_release")
+
+
+func arm_startup_blank_leftover_swallow() -> void:
+	_startup_blank_armed = true
+	_startup_blank_leftover_ready = false
+	_startup_blank_leftover_mouse = Vector2.INF
+	_startup_blank_settle_left = STARTUP_BLANK_SETTLE_FRAMES
+	_left_pan_armed = false
+	_left_pan_active = false
+
+
+func _startup_blank_fix_enabled() -> bool:
+	if not _startup_blank_armed:
+		return false
+	# Test-only: WindowedStartupParityTest sets this meta when EOA_STARTUP_BLANK_MUTANT=1.
+	if has_meta("eoa_startup_blank_mutant") and bool(get_meta("eoa_startup_blank_mutant")):
+		return false
+	return true
+
+
+func _startup_blank_tick_leftover_swallow() -> void:
+	if not _startup_blank_fix_enabled():
+		return
+	if _startup_blank_settle_left > 0:
+		_startup_blank_settle_left -= 1
+		if _startup_blank_settle_left == 0:
+			var vp: Viewport = get_viewport()
+			_startup_blank_leftover_mouse = vp.get_mouse_position() if vp != null else Vector2.ZERO
+			_startup_blank_leftover_ready = true
+	if _startup_blank_swallow_pointer():
+		_left_pan_armed = false
+		_left_pan_active = false
+		var vp2: Viewport = get_viewport()
+		if vp2 != null:
+			_last_mouse_pos = vp2.get_mouse_position()
+
+
+func _startup_blank_swallow_pointer() -> bool:
+	if not _startup_blank_fix_enabled():
+		return false
+	if _startup_blank_settle_left > 0 or not _startup_blank_leftover_ready:
+		return true
+	var vp: Viewport = get_viewport()
+	if vp == null:
+		return true
+	if vp.get_mouse_position().distance_to(_startup_blank_leftover_mouse) >= STARTUP_BLANK_MOVE_PX:
+		_startup_blank_armed = false
+		return false
+	return true
 
 
 func arm_begin_title_release_swallow(pending_press: bool = false) -> void:

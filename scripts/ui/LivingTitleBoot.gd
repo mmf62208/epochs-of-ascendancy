@@ -2030,8 +2030,20 @@ func _finish(out: Dictionary) -> void:
 	_note_music("game")
 	_clear_opened_from_title_meta()
 	_center_on_player(str(out.get("player_tag", _tag)))
+	_arm_startup_blank_leftover_swallow()
 	boot_closed.emit(out)
 	queue_free()
+
+
+func _arm_startup_blank_leftover_swallow() -> void:
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
+	if tree == null:
+		return
+	var mr: Node = tree.get_first_node_in_group("map_renderer")
+	if mr == null and tree.current_scene != null:
+		mr = tree.current_scene.find_child("MapRenderer", true, false)
+	if mr != null and mr.has_method("arm_startup_blank_leftover_swallow"):
+		mr.call("arm_startup_blank_leftover_swallow")
 
 
 func _clear_opened_from_title_meta() -> void:
