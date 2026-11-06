@@ -1,0 +1,14 @@
+# DRAG A/B — leftover left-drag pan (MOUSE_BUTTON_LEFT)
+# 20 steps × 5px = screen_dx 100, over land. Not live Play.
+# tip = cleaned STARTUP-BLANK (swallow on). main = 53f87116 product + same harness overlay.
+
+# WITH prior ≥6px move (warp leftover rim → interior 640,400, then left press+drag+release)
+# KEEP: both pan by the same dcam=132.53 (Δx=-132.53, Δy=0 during the drag).
+tip  DRAG_AB move_first=true  button=MOUSE_BUTTON_LEFT cam_before=(7601.51,1525.72) cam_after=(7468.98,1525.72) dcam=132.53 dzoom=0.0000 from=(640.0,400.0) screen_dx=100.0
+main DRAG_AB move_first=true  button=MOUSE_BUTTON_LEFT cam_before=(7082.58,6909.88) cam_after=(6950.05,6909.88) dcam=132.53 dzoom=0.0000 from=(640.0,400.0) screen_dx=100.0
+
+# WITHOUT prior move (left press+drag from leftover rim 268,797)
+# Documents swallow: tip cam_before is still Berlin; main already thrown south during settle.
+# The 100px drag itself is a ≥6px move, so tip swallow lifts mid-drag and rim edge-pan throws Y.
+tip  DRAG_AB move_first=false button=MOUSE_BUTTON_LEFT cam_before=(7601.51,1525.72) cam_after=(7468.98,5629.27) dcam=4105.69 dzoom=0.0000 from=(268.0,797.0) screen_dx=100.0
+main DRAG_AB move_first=false button=MOUSE_BUTTON_LEFT cam_before=(7601.51,7411.71) cam_after=(7468.98,8412.90) dcam=1009.92 dzoom=0.0000 from=(268.0,797.0) screen_dx=100.0

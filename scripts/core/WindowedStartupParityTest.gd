@@ -11,7 +11,9 @@ extends SceneTree
 ## STARTUP-BLANK extension (env, does not change the default #166 path):
 ##   EOA_STARTUP_BLANK_BEGIN=pointer|enter
 ##   EOA_STARTUP_BLANK_SOAK_S=<seconds>   (default 25; 120 as feasible)
-##   EOA_STARTUP_BLANK_MUTANT=1           (revert product fix)
+##   EOA_STARTUP_BLANK_MUTANT=1           (revert product fix via test-only meta)
+##   EOA_STARTUP_BLANK_DRAG=1             left-drag A/B after Begin
+##   EOA_STARTUP_BLANK_DRAG_MOVE=1        warp >=6px interior before the drag
 ## Pointer: synthetic mouse press on LivingTitleBegin, leftover release after,
 ## then un-maximize/resize to 1280x800 (window + root.size). Enter: KEY_ENTER.
 
@@ -47,6 +49,9 @@ enum Phase {
 	POST_DISMISS,
 	RESIZE,
 	POST_RESIZE,
+	DRAG_PREP,
+	DRAG_SLIDE,
+	DRAG_DONE,
 	SOAK,
 	FINISH,
 	DONE,
@@ -92,6 +97,18 @@ var _last_soak_log: int = -1
 var _blank_fail: PackedStringArray = PackedStringArray()
 var _blank_pass: PackedStringArray = PackedStringArray()
 var _camera_trace: Array[Dictionary] = []
+var _drag_mode: bool = false
+var _drag_move_first: bool = false
+var _drag_frames_left: int = 0
+var _drag_step: int = 0
+var _drag_from: Vector2 = Vector2.ZERO
+var _drag_cam_before: Vector2 = Vector2.ZERO
+var _drag_zoom_before: float = 0.0
+const DRAG_STEPS := 20
+const DRAG_STEP_PX := 5.0
+const DRAG_INTERIOR := Vector2(640.0, 400.0)
+const DRAG_PREP_FRAMES := 12
+const DRAG_TAIL_FRAMES := 6
 
 
 func _init() -> void:
@@ -130,11 +147,15 @@ func _start() -> void:
 	OS.set_environment("EOA_SKIP_TITLE", "0")
 	_begin_mode = OS.get_environment("EOA_STARTUP_BLANK_BEGIN").strip_edges().to_lower()
 	_blank_mode = _begin_mode == "pointer" or _begin_mode == "enter"
+	_drag_mode = _blank_mode and OS.get_environment("EOA_STARTUP_BLANK_DRAG") == "1"
+	_drag_move_first = OS.get_environment("EOA_STARTUP_BLANK_DRAG_MOVE") == "1"
 	if _blank_mode:
-		_log("EOA_STARTUP_BLANK who=harness_start begin=%s mutant=%s soak_s=%d" % [
+		_log("EOA_STARTUP_BLANK who=harness_start begin=%s mutant=%s soak_s=%d drag=%s drag_move=%s" % [
 			_begin_mode,
 			OS.get_environment("EOA_STARTUP_BLANK_MUTANT"),
 			_blank_soak_secs(),
+			str(_drag_mode),
+			str(_drag_move_first),
 		])
 		var blank_out := OS.get_environment("EOA_STARTUP_BLANK_OUT").strip_edges()
 		if not blank_out.is_empty():
@@ -180,6 +201,12 @@ func _on_process() -> void:
 			_do_resize()
 		Phase.POST_RESIZE:
 			_do_post_resize()
+		Phase.DRAG_PREP:
+			_tick_drag_prep()
+		Phase.DRAG_SLIDE:
+			_tick_drag_slide()
+		Phase.DRAG_DONE:
+			_tick_drag_done()
 		Phase.SOAK:
 			_tick_soak()
 		Phase.FINISH:
@@ -251,6 +278,7 @@ func _do_invoke_begin() -> void:
 	_hook_title_if_needed()
 	_timing["begin_usec"] = Time.get_ticks_usec()
 	_begin_invoked = true
+	_apply_mutant_meta()
 	if _begin_mode == "pointer":
 		_invoke_pointer_begin(boot)
 		return
@@ -436,7 +464,9 @@ func _do_post_resize() -> void:
 	_snapshots.append(snap)
 	_log("EOA_STARTUP_PARITY who=%s shot=%s" % [label, str(snap.get("png", ""))])
 	_note_camera_bounds(snap, "post_resize")
-	if _blank_mode:
+	if _blank_mode and _drag_mode:
+		_start_drag()
+	elif _blank_mode:
 		_start_soak()
 	else:
 		_phase = Phase.FINISH
@@ -446,6 +476,8 @@ func _blank_soak_secs() -> int:
 	var raw := OS.get_environment("EOA_STARTUP_BLANK_SOAK_S").strip_edges()
 	if raw.is_valid_int():
 		return maxi(int(raw), 2)
+	if _drag_mode:
+		return 3
 	return DEFAULT_BLANK_SOAK_S
 
 
@@ -455,6 +487,105 @@ func _start_soak() -> void:
 	_last_soak_log = -1
 	_log("EOA_STARTUP_BLANK who=soak_start secs=%d" % soak_s)
 	_phase = Phase.SOAK
+
+
+func _apply_mutant_meta() -> void:
+	if OS.get_environment("EOA_STARTUP_BLANK_MUTANT") != "1":
+		return
+	var mr := _map_renderer()
+	if mr == null:
+		_log("EOA_STARTUP_BLANK who=mutant_meta_missing_renderer")
+		return
+	mr.set_meta("eoa_startup_blank_mutant", true)
+	_log("EOA_STARTUP_BLANK who=mutant_meta_set")
+
+
+func _camera_pos() -> Vector2:
+	var cam := _camera()
+	if cam == null:
+		return Vector2.ZERO
+	return cam.global_position
+
+
+func _start_drag() -> void:
+	# Left-drag pan (MapRenderer._input MOUSE_BUTTON_LEFT + slop, then
+	# _handle_camera_input uses get_mouse_position while left is held).
+	if _drag_move_first:
+		var before_pt: Vector2 = _current_mouse()
+		_warp_mouse(DRAG_INTERIOR)
+		_log(
+			"EOA_STARTUP_BLANK who=drag_move_first from=(%.1f,%.1f) to=(%.1f,%.1f) dist=%.1f"
+			% [before_pt.x, before_pt.y, DRAG_INTERIOR.x, DRAG_INTERIOR.y, before_pt.distance_to(DRAG_INTERIOR)]
+		)
+	else:
+		_log("EOA_STARTUP_BLANK who=drag_no_prior_move pt=%s" % str(_current_mouse()))
+	_drag_frames_left = DRAG_PREP_FRAMES
+	_phase = Phase.DRAG_PREP
+
+
+func _tick_drag_prep() -> void:
+	_drag_frames_left -= 1
+	if _drag_frames_left > 0:
+		return
+	_drag_from = _current_mouse()
+	_drag_cam_before = _camera_pos()
+	var cam := _camera()
+	_drag_zoom_before = cam.zoom.x if cam != null else 0.0
+	_log(
+		"EOA_STARTUP_BLANK who=drag_press button=MOUSE_BUTTON_LEFT pt=(%.1f,%.1f) cam_before=(%.2f,%.2f) zoom=%.4f"
+		% [_drag_from.x, _drag_from.y, _drag_cam_before.x, _drag_cam_before.y, _drag_zoom_before]
+	)
+	_warp_mouse(_drag_from)
+	var down: InputEventMouseButton = _make_mouse(_drag_from, true)
+	Input.parse_input_event(down)
+	if Input.has_method("flush_buffered_events"):
+		Input.flush_buffered_events()
+	_drag_step = 0
+	_phase = Phase.DRAG_SLIDE
+
+
+func _tick_drag_slide() -> void:
+	_drag_step += 1
+	var prev: Vector2 = _drag_from + Vector2(DRAG_STEP_PX * float(_drag_step - 1), 0.0)
+	var pt: Vector2 = _drag_from + Vector2(DRAG_STEP_PX * float(_drag_step), 0.0)
+	_warp_mouse(pt)
+	var motion: InputEventMouseMotion = _make_motion(pt, pt - prev, true)
+	Input.parse_input_event(motion)
+	if Input.has_method("flush_buffered_events"):
+		Input.flush_buffered_events()
+	if _drag_step < DRAG_STEPS:
+		return
+	var up: InputEventMouseButton = _make_mouse(pt, false)
+	Input.parse_input_event(up)
+	if Input.has_method("flush_buffered_events"):
+		Input.flush_buffered_events()
+	_log("EOA_STARTUP_BLANK who=drag_release pt=(%.1f,%.1f) steps=%d dx=%.1f" % [pt.x, pt.y, DRAG_STEPS, DRAG_STEP_PX * float(DRAG_STEPS)])
+	_drag_frames_left = DRAG_TAIL_FRAMES
+	_phase = Phase.DRAG_DONE
+
+
+func _tick_drag_done() -> void:
+	_drag_frames_left -= 1
+	if _drag_frames_left > 0:
+		return
+	var after: Vector2 = _camera_pos()
+	var d: float = after.distance_to(_drag_cam_before)
+	_log(
+		"EOA_STARTUP_BLANK DRAG_AB move_first=%s button=MOUSE_BUTTON_LEFT cam_before=(%.2f,%.2f) cam_after=(%.2f,%.2f) dcam=%.2f dzoom=%.4f from=(%.1f,%.1f) screen_dx=%.1f"
+		% [
+			str(_drag_move_first),
+			_drag_cam_before.x,
+			_drag_cam_before.y,
+			after.x,
+			after.y,
+			d,
+			(_camera().zoom.x if _camera() != null else 0.0) - _drag_zoom_before,
+			_drag_from.x,
+			_drag_from.y,
+			DRAG_STEP_PX * float(DRAG_STEPS),
+		]
+	)
+	_start_soak()
 
 
 func _tick_soak() -> void:
@@ -1351,6 +1482,19 @@ func _root_window() -> Window:
 	if root is Window:
 		return root as Window
 	return null
+
+
+func _make_motion(screen_pt: Vector2, relative: Vector2, left_held: bool) -> InputEventMouseMotion:
+	_event_seq += 1
+	var ev := InputEventMouseMotion.new()
+	ev.device = 0
+	ev.position = screen_pt
+	ev.global_position = screen_pt
+	ev.relative = relative
+	ev.velocity = relative * 60.0
+	ev.button_mask = MOUSE_BUTTON_MASK_LEFT if left_held else 0
+	ev.set_meta("eoa_startup_blank_seq", _event_seq)
+	return ev
 
 
 func _make_mouse(screen_pt: Vector2, pressed: bool) -> InputEventMouseButton:

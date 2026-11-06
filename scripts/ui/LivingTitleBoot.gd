@@ -2029,34 +2029,21 @@ func _finish(out: Dictionary) -> void:
 	_closed = true
 	_note_music("game")
 	_clear_opened_from_title_meta()
-	_startup_blank_log_camera("finish_before_center")
 	_center_on_player(str(out.get("player_tag", _tag)))
-	_startup_blank_log_camera("finish_after_center")
-	_startup_blank_arm_map_probes()
+	_arm_startup_blank_leftover_swallow()
 	boot_closed.emit(out)
 	queue_free()
 
 
-func _startup_blank_map_renderer() -> Node:
+func _arm_startup_blank_leftover_swallow() -> void:
 	var tree: SceneTree = Engine.get_main_loop() as SceneTree
 	if tree == null:
-		return null
+		return
 	var mr: Node = tree.get_first_node_in_group("map_renderer")
 	if mr == null and tree.current_scene != null:
 		mr = tree.current_scene.find_child("MapRenderer", true, false)
-	return mr
-
-
-func _startup_blank_log_camera(who: String) -> void:
-	var mr: Node = _startup_blank_map_renderer()
-	if mr != null and mr.has_method("log_startup_blank_camera"):
-		mr.call("log_startup_blank_camera", who)
-
-
-func _startup_blank_arm_map_probes() -> void:
-	var mr: Node = _startup_blank_map_renderer()
-	if mr != null and mr.has_method("arm_startup_blank_begin_probes"):
-		mr.call("arm_startup_blank_begin_probes")
+	if mr != null and mr.has_method("arm_startup_blank_leftover_swallow"):
+		mr.call("arm_startup_blank_leftover_swallow")
 
 
 func _clear_opened_from_title_meta() -> void:

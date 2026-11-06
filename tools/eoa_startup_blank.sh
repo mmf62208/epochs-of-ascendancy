@@ -25,8 +25,20 @@ else
       export EOA_STARTUP_BLANK_BEGIN=pointer
       export EOA_STARTUP_BLANK_MUTANT=1
       ;;
+    drag_move)
+      export EOA_STARTUP_BLANK_BEGIN=pointer
+      export EOA_STARTUP_BLANK_DRAG=1
+      export EOA_STARTUP_BLANK_DRAG_MOVE=1
+      export EOA_STARTUP_BLANK_SOAK_S="${EOA_STARTUP_BLANK_SOAK_S:-3}"
+      ;;
+    drag_nomove)
+      export EOA_STARTUP_BLANK_BEGIN=pointer
+      export EOA_STARTUP_BLANK_DRAG=1
+      export EOA_STARTUP_BLANK_DRAG_MOVE=0
+      export EOA_STARTUP_BLANK_SOAK_S="${EOA_STARTUP_BLANK_SOAK_S:-3}"
+      ;;
     *)
-      echo "EOA_STARTUP_BLANK_ONLY must be pointer, enter, mutant, or empty" >&2
+      echo "EOA_STARTUP_BLANK_ONLY must be pointer, enter, mutant, drag_move, drag_nomove, or empty" >&2
       exit 2
       ;;
   esac

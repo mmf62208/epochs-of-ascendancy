@@ -244,6 +244,8 @@ run_windowed() {
       EOA_STARTUP_BLANK_BEGIN="$begin" \
       EOA_STARTUP_BLANK_MUTANT="$mutant" \
       EOA_STARTUP_BLANK_SOAK_S="${EOA_STARTUP_BLANK_SOAK_S:-}" \
+      EOA_STARTUP_BLANK_DRAG="${EOA_STARTUP_BLANK_DRAG:-}" \
+      EOA_STARTUP_BLANK_DRAG_MOVE="${EOA_STARTUP_BLANK_DRAG_MOVE:-}" \
       XDG_DATA_HOME="$xdg_data" \
       XDG_CONFIG_HOME="$xdg_config" \
       XDG_CACHE_HOME="$xdg_cache" \
@@ -295,6 +297,16 @@ run_windowed() {
   fi
   if [[ -n "$expect_blank" ]]; then
     grep -E "EOA_STARTUP_BLANK |EOA_STARTUP_PARITY |WindowedStartupParityTest:" "$log" | tail -n 60 || true
+    if [[ "$expect_blank" == "DRAG" ]]; then
+      if ! grep -q "EOA_STARTUP_BLANK DRAG_AB" "$log"; then
+        echo "WindowedStartupBlank: RESULT=FAIL name=$name want DRAG_AB"
+        tail -n 40 "$log" || true
+        return 1
+      fi
+      grep "EOA_STARTUP_BLANK DRAG_AB" "$log" || true
+      echo "EOA_STARTUP_BLANK who=drag_ab_logged name=$name"
+      return 0
+    fi
     if [[ "$expect_blank" == "PASS" ]]; then
       if ! grep -q "WindowedStartupParityTest: RESULT=COMPLETED" "$log"; then
         echo "WindowedStartupBlank: RESULT=FAIL name=$name want COMPLETED"
@@ -338,6 +350,20 @@ run_windowed() {
 
 BLANK_ALL="${EOA_STARTUP_BLANK:-0}"
 BLANK_BEGIN="${EOA_STARTUP_BLANK_BEGIN:-}"
+if [[ "${EOA_STARTUP_BLANK_DRAG:-0}" == "1" ]]; then
+  export EOA_STARTUP_BLANK_SOAK_S="${EOA_STARTUP_BLANK_SOAK_S:-3}"
+  drag_name="drag_move"
+  if [[ "${EOA_STARTUP_BLANK_DRAG_MOVE:-0}" != "1" ]]; then
+    drag_name="drag_nomove"
+  fi
+  echo "EOA_STARTUP_BLANK who=wrapper_drag name=$drag_name move=${EOA_STARTUP_BLANK_DRAG_MOVE:-0}"
+  if ! run_windowed "$drag_name" "pointer" "0" "1920x1200" ":86" "DRAG"; then
+    echo "WindowedStartupBlank: RESULT=FAIL drag"
+    exit 1
+  fi
+  echo "WindowedStartupBlank: RESULT=PASS drag (NOT live-startup PASS)"
+  exit 0
+fi
 if [[ "$BLANK_ALL" == "1" || -n "$BLANK_BEGIN" ]]; then
   export EOA_STARTUP_BLANK_SOAK_S="${EOA_STARTUP_BLANK_SOAK_S:-120}"
   echo "EOA_STARTUP_BLANK who=wrapper_blank soak_s=$EOA_STARTUP_BLANK_SOAK_S begin=${BLANK_BEGIN:-all} all=$BLANK_ALL"
