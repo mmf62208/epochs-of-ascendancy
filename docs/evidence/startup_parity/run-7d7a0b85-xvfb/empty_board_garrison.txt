@@ -1,0 +1,76 @@
+Using: /home/ubuntu/Applications/Godot-4.7.1/godot (4.7.1.stable.official.a13da4feb)
+Godot Engine v4.7.1.stable.official.a13da4feb - https://godotengine.org
+
+✅ Equipment modules loaded: 1084
+✅ Unit templates loaded: 1025
+✅ Sustainment equipment loaded: 4
+✅ Production line rules loaded
+Manpower pool for GER updated from pop*conscript: 520000 (pop=65.0M, cons_level=0, frac=0.008)
+Manpower pool for FRA updated from pop*conscript: 320000 (pop=40.0M, cons_level=0, frac=0.008)
+Manpower pool for ENG updated from pop*conscript: 360000 (pop=45.0M, cons_level=0, frac=0.008)
+Manpower pool for USA updated from pop*conscript: 960000 (pop=120.0M, cons_level=0, frac=0.008)
+Manpower pool for SOV updated from pop*conscript: 1280000 (pop=160.0M, cons_level=0, frac=0.008)
+Manpower pool for JAP updated from pop*conscript: 560000 (pop=70.0M, cons_level=0, frac=0.008)
+Manpower pool for ITA updated from pop*conscript: 336000 (pop=42.0M, cons_level=0, frac=0.008)
+Manpower pool for POL updated from pop*conscript: 280000 (pop=35.0M, cons_level=0, frac=0.008)
+Manpower pool for FIN updated from pop*conscript: 28000 (pop=3.5M, cons_level=0, frac=0.008)
+Manpower pool for NOR updated from pop*conscript: 24000 (pop=3.0M, cons_level=0, frac=0.008)
+Manpower pool for SWE updated from pop*conscript: 48000 (pop=6.0M, cons_level=0, frac=0.008)
+Manpower pool for DNK updated from pop*conscript: 28000 (pop=3.5M, cons_level=0, frac=0.008)
+Manpower pool for NLD updated from pop*conscript: 64000 (pop=8.0M, cons_level=0, frac=0.008)
+Manpower pool for BEL updated from pop*conscript: 64000 (pop=8.0M, cons_level=0, frac=0.008)
+Loaded 81 leaders (18 in pool) from [res://data/leaders/historical_leaders_1936.json] for year 1936
+TimeManager: Initialized (default 1936-01-01)
+TimeManager: ink victory warm 468.5ms
+WeatherManager ready (lightweight season + event stub)
+AgentManager: Loaded 31 mission definitions
+SpecialSiteManager: Loaded definition 'radar_station_tier_1'
+SpecialSiteManager: Loaded definition 'airfield_tier_1'
+SpecialSiteManager: Loaded definition 'faroes_patrol_base'
+SpecialSiteManager: Loaded definition 'scandinavian_radar_net'
+SpecialSiteManager: Loaded definition 'baltic_naval_base_tier_1'
+SpecialSiteManager: Loaded definition 'heavy_water_plant'
+SpecialSiteManager: Loaded definition 'airfield_tier_3'
+SpecialSiteManager: Loaded definition 'icbm_site_tier_1'
+SpecialSiteManager: Loaded definition 'port_tier_3'
+SpecialSiteManager: Loaded definition 'northern_sea_chokepoint'
+SpecialSiteManager: Loaded definition 'gibraltar_fortress'
+SpecialSiteManager: Loaded definition 'naval_shipyard_tier_1'
+SpecialSiteManager: Loaded definition 'iceland_air_station'
+SpecialSiteManager: Loaded definition 'factory_tier_1'
+SpecialSiteManager: Loaded definition 'oil_refinery_tier_1'
+SpecialSiteManager: Loaded definition 'aircraft_rnd_lab'
+SpecialSiteManager: Loaded definition 'danish_straits_fortress'
+SpecialSiteManager: Loaded definition 'skagerrak_fortress'
+SpecialSiteManager: Loaded definition 'airfield_tier_4'
+SpecialSiteManager: Loaded definition 'special_project_heavy_water'
+SpecialSiteManager: Loaded definition 'orkney_naval_station'
+SpecialSiteManager: Loaded definition 'port_tier_2'
+SpecialSiteManager: Loaded definition 'airfield_tier_2'
+SpecialSiteManager: Loaded definition 'north_sea_air_station'
+SpecialSiteManager: Loaded definition 'prototype_test_airfield'
+SpecialSiteManager: Loaded definition 'kiel_canal_control'
+SpecialSiteManager: Loaded definition 'atlantic_patrol_base'
+SpecialSiteManager: Loaded 27 special site definitions
+TechnologyManager: Loaded 113 technology nodes
+SaveLoadManager: Created saves dir → /home/ubuntu/.local/share/godot/app_userdata/Epochs-of-Ascendancy/saves/
+SaveLoadManager: Initialized (JSON format v2, user://saves/)
+MapManager: loaded 34 data-driven naval chokepoint provinces (dir=provinces_world_accurate)
+🗺️ MapPickGrid built with 3596 provinces, cell_size=110.6, 1 cells
+🗺️ MapManager initialized with 3596 provinces (bounds: [P: (0.0, 0.0), S: (0.0, 0.0)])
+EOA_STARTUP_PARITY who=empty_board provinces=3596 berlin_owner=GER expect_provinces=3596
+  [PASS] HeadlessStartupParityGarrisonTest: empty-board provinces=3596
+  [PASS] HeadlessStartupParityGarrisonTest: berlin_710300_owner=GER
+LeaderManager: 1936 garrisons placed=575 skipped_occupied=0 targets=575 {GER 98/98 skip 0, FRA 121/121 skip 0, ENG 187/187 skip 0, SOV 34/34 skip 0, ITA 29/29 skip 0, JAP 14/14 skip 0, USA 40/40 skip 0, POL 33/33 skip 0, CZE 19/19 skip 0}
+EOA_STARTUP_PARITY who=empty_seed placed=575 skipped_occupied=0 targets=575 counts={ "GER": 98, "FRA": 121, "ENG": 187, "SOV": 34, "ITA": 29, "JAP": 14, "USA": 40, "POL": 33, "CZE": 19 } target_counts={ "GER": 98, "FRA": 121, "ENG": 187, "SOV": 34, "ITA": 29, "JAP": 14, "USA": 40, "POL": 33, "CZE": 19 } skipped_counts={ "GER": 0, "FRA": 0, "ENG": 0, "SOV": 0, "ITA": 0, "JAP": 0, "USA": 0, "POL": 0, "CZE": 0 }
+  [PASS] HeadlessStartupParityGarrisonTest: empty-board 575 garrisons, 0 occupied skips, 575 targets
+LeaderManager: 1936 garrisons placed=574 skipped_occupied=1 targets=575 {GER 97/98 skip 1, FRA 121/121 skip 0, ENG 187/187 skip 0, SOV 34/34 skip 0, ITA 29/29 skip 0, JAP 14/14 skip 0, USA 40/40 skip 0, POL 33/33 skip 0, CZE 19/19 skip 0}
+EOA_STARTUP_PARITY who=occupied_berlin placed=574 skipped_occupied=1 targets=575
+  [PASS] HeadlessStartupParityGarrisonTest: occupied hex skipped (placed 574 + skipped 1 = targets 575). Live F5 535 is this skip class, not a second board.
+HeadlessStartupParityGarrisonTest: RESULT=PASS
+InfrastructureDevelopmentManager: auto-connected to daily tick.
+MapManager: precomputed fronts tag=GER n=0 in 6ms
+WARNING: 3 ObjectDB instances were leaked at exit (run with `--verbose` for details).
+   at: cleanup (core/object/object.cpp:2536)
+ERROR: 1 resources still in use at exit (run with --verbose for details).
+   at: clear (core/io/resource.cpp:822)

@@ -168,6 +168,7 @@ run_step unit_board_play_path \
     tools.map_generation.tests.test_resource_icon_lod \
     tools.map_generation.tests.test_map_resources_mapmode_product \
     tools.map_generation.tests.test_fac1a_airfield_icons \
+    tools.map_generation.tests.test_startup_parity_inventory \
     -v || fail
 
 run_step unit_save_path \

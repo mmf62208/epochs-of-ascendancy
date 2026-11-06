@@ -1,0 +1,120 @@
+{
+	"always_on_top": false,
+	"camera_pos": [
+		7601.28125,
+		1533.23815917969
+	],
+	"camera_zoom": 0.78277063369751,
+	"capital_in_visible_rect": true,
+	"chips": {
+		"aluminum": {
+			"stockpile": 4000.0,
+			"text": "0",
+			"visible": true
+		},
+		"energy": {
+			"stockpile": 0.0,
+			"text": "0",
+			"visible": true
+		},
+		"fuel": {
+			"stockpile": 4000.0,
+			"text": "0",
+			"visible": true
+		},
+		"layout_hides_below_1280": false,
+		"note": "hidden_chip_is_not_stockpile_zero",
+		"resources_container_visible": true,
+		"rubber": {
+			"stockpile": 2000.0,
+			"text": "0",
+			"visible": true
+		},
+		"steel": {
+			"stockpile": 12000.0,
+			"text": "0",
+			"visible": true
+		},
+		"vp_w": 1280.0
+	},
+	"elapsed_usec": 37690779,
+	"ger_capital_pid": 710300,
+	"ger_centroid": [
+		7603.83642578125,
+		1553.06518554688
+	],
+	"icons": {
+		"in_view": 100,
+		"nodes": 259,
+		"note": "node_visibility_not_pixel_proof",
+		"visible": 259
+	},
+	"image": {
+		"dark_frac": 0.44,
+		"h": 800,
+		"looks_uniform_light": false,
+		"looks_varied_color": true,
+		"mean_rgb": [
+			0.274971574544907,
+			0.235528439283371,
+			0.313216686248779
+		],
+		"near_light_frac": 0.01525,
+		"note": "sampled_mean_not_pixel_oracle",
+		"ok": true,
+		"sample_n": 4000,
+		"saturated_frac": 0.80775,
+		"w": 1280
+	},
+	"kind": "PRESENTATION_DIAGNOSTIC",
+	"mesh": {
+		"in_view": 1268,
+		"nodes": 3596,
+		"note": "counts_are_not_pixels_on_screen",
+		"visible": 3596
+	},
+	"monotonic_usec": 38028316,
+	"not_pixel_oracle": true,
+	"phase": "post_dismiss",
+	"png": "/tmp/eoa-startup-parity/post_dismiss.png",
+	"title_visible": false,
+	"underlay": {
+		"full_world_underlay_active": true,
+		"present": false,
+		"visible": false
+	},
+	"viewport_size": [
+		1280.0,
+		800.0
+	],
+	"visible_world_rect": [
+		6783.6728515625,
+		1022.23278808594,
+		1635.21716308594,
+		1022.0107421875
+	],
+	"window": {
+		"always_on_top": false,
+		"display": "X11",
+		"mode": "windowed",
+		"mode_i": 0,
+		"root_size": [
+			1280,
+			800
+		],
+		"size": [
+			1280,
+			800
+		],
+		"visible_rect": [
+			1280.0,
+			800.0
+		],
+		"vp_h": 800.0,
+		"vp_w": 1280.0,
+		"window_node_size": [
+			1280,
+			800
+		]
+	}
+}

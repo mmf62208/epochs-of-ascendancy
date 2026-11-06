@@ -1,0 +1,120 @@
+{
+	"always_on_top": true,
+	"camera_pos": [
+		7603.83642578125,
+		1553.06518554688
+	],
+	"camera_zoom": 0.333934724330902,
+	"capital_in_visible_rect": true,
+	"chips": {
+		"aluminum": {
+			"stockpile": 4000.0,
+			"text": "0",
+			"visible": true
+		},
+		"energy": {
+			"stockpile": 0.0,
+			"text": "0",
+			"visible": true
+		},
+		"fuel": {
+			"stockpile": 4000.0,
+			"text": "0",
+			"visible": true
+		},
+		"layout_hides_below_1280": false,
+		"note": "hidden_chip_is_not_stockpile_zero",
+		"resources_container_visible": true,
+		"rubber": {
+			"stockpile": 2000.0,
+			"text": "0",
+			"visible": true
+		},
+		"steel": {
+			"stockpile": 12000.0,
+			"text": "0",
+			"visible": true
+		},
+		"vp_w": 1280.0
+	},
+	"elapsed_usec": 34545073,
+	"ger_capital_pid": 710300,
+	"ger_centroid": [
+		7603.83642578125,
+		1553.06518554688
+	],
+	"icons": {
+		"in_view": 138,
+		"nodes": 259,
+		"note": "node_visibility_not_pixel_proof",
+		"visible": 259
+	},
+	"image": {
+		"dark_frac": 0.713942307692308,
+		"h": 776,
+		"looks_uniform_light": false,
+		"looks_varied_color": true,
+		"mean_rgb": [
+			0.175356343388557,
+			0.199203431606293,
+			0.264737010002136
+		],
+		"near_light_frac": 0.01875,
+		"note": "sampled_mean_not_pixel_oracle;title_visible_so_not_post_dismiss",
+		"ok": true,
+		"sample_n": 4160,
+		"saturated_frac": 0.761057692307692,
+		"w": 1280
+	},
+	"kind": "PRESENTATION_DIAGNOSTIC",
+	"mesh": {
+		"in_view": 1920,
+		"nodes": 3596,
+		"note": "counts_are_not_pixels_on_screen",
+		"visible": 3596
+	},
+	"monotonic_usec": 34882611,
+	"not_pixel_oracle": true,
+	"phase": "pre_begin",
+	"png": "/tmp/eoa-startup-parity/pre_begin.png",
+	"title_visible": true,
+	"underlay": {
+		"full_world_underlay_active": true,
+		"present": false,
+		"visible": false
+	},
+	"viewport_size": [
+		1280.0,
+		776.0
+	],
+	"visible_world_rect": [
+		5687.2939453125,
+		391.161499023438,
+		3833.08447265625,
+		2323.80737304688
+	],
+	"window": {
+		"always_on_top": true,
+		"display": "X11",
+		"mode": "maximized",
+		"mode_i": 2,
+		"root_size": [
+			1280,
+			776
+		],
+		"size": [
+			1280,
+			776
+		],
+		"visible_rect": [
+			1280.0,
+			776.0
+		],
+		"vp_h": 776.0,
+		"vp_w": 1280.0,
+		"window_node_size": [
+			1280,
+			776
+		]
+	}
+}

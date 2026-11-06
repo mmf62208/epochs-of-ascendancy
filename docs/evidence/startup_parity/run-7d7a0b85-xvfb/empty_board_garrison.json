@@ -1,0 +1,93 @@
+{
+	"empty_board": {
+		"counts": {
+			"CZE": 19,
+			"ENG": 187,
+			"FRA": 121,
+			"GER": 98,
+			"ITA": 29,
+			"JAP": 14,
+			"POL": 33,
+			"SOV": 34,
+			"USA": 40
+		},
+		"placed": 575,
+		"skipped_counts": {
+			"CZE": 0,
+			"ENG": 0,
+			"FRA": 0,
+			"GER": 0,
+			"ITA": 0,
+			"JAP": 0,
+			"POL": 0,
+			"SOV": 0,
+			"USA": 0
+		},
+		"skipped_occupied": 0,
+		"target_counts": {
+			"CZE": 19,
+			"ENG": 187,
+			"FRA": 121,
+			"GER": 98,
+			"ITA": 29,
+			"JAP": 14,
+			"POL": 33,
+			"SOV": 34,
+			"USA": 40
+		},
+		"targets": 575
+	},
+	"expect_garrisons": 575,
+	"expect_provinces": 3596,
+	"note": "575 is empty-board seed_1936_start_garrisons. Live F5 skips OOB-occupied border/capital hexes.",
+	"occupied_berlin": {
+		"counts": {
+			"CZE": 19,
+			"ENG": 187,
+			"FRA": 121,
+			"GER": 97,
+			"ITA": 29,
+			"JAP": 14,
+			"POL": 33,
+			"SOV": 34,
+			"USA": 40
+		},
+		"placed": 574,
+		"skipped_counts": {
+			"CZE": 0,
+			"ENG": 0,
+			"FRA": 0,
+			"GER": 1,
+			"ITA": 0,
+			"JAP": 0,
+			"POL": 0,
+			"SOV": 0,
+			"USA": 0
+		},
+		"skipped_occupied": 1,
+		"target_counts": {
+			"CZE": 19,
+			"ENG": 187,
+			"FRA": 121,
+			"GER": 98,
+			"ITA": 29,
+			"JAP": 14,
+			"POL": 33,
+			"SOV": 34,
+			"USA": 40
+		},
+		"targets": 575
+	},
+	"ok": true,
+	"tags": [
+		"GER",
+		"FRA",
+		"ENG",
+		"SOV",
+		"ITA",
+		"JAP",
+		"USA",
+		"POL",
+		"CZE"
+	]
+}

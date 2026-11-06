@@ -1,0 +1,34 @@
+{
+  "ok": true,
+  "status": "PASS",
+  "inventory": {
+    "ok": true,
+    "data_dir": "/agent/repos/epochs-of-ascendancy/data/provinces_world_accurate",
+    "file_sha256": {
+      "manifest_world_accurate.json": "21212fa422904bf676705f3bc2c4315f3c76c11a2bde1f74a8d9e36cdf2ee7a7",
+      "provinces_base.json": "d62645e9365f5f25c6bf3f566e6b3b50f0380fdec24f48a03e315a980bbd8fb4",
+      "province_ownership_1936.json": "c3ba2b0e92d09187b6a1bf18bd769e20e0ac60c4331945c9456d753b0a7513f8",
+      "province_adjacency.json": "be00f5bafa5fe625fb3c31dcc2bd07b426431ae11ff3a85ebaf60c7f7f5ca128",
+      "hierarchy_membership_1936.json": "3cad187c960721ef634d5af25b617363600134c811b78602e351f9ed2d357e6d"
+    },
+    "missing": [],
+    "province_ids_n": 3596,
+    "has_berlin_710300": true,
+    "manifest_provinces": 3596,
+    "manifest_land": 3256,
+    "manifest_sea": 340,
+    "fail": [],
+    "garrison_575": {
+      "kind": "empty_board_runtime",
+      "empty_board_targets": 575,
+      "note": "575 is seed_1936_start_garrisons on an empty formation table (HeadlessStartupParityGarrisonTest / HeadlessGarrison1Test). Live F5 TestScenario already has OOB land on some border/capital hexes; those hexes are skipped, so placed < 575 while targets stay 575."
+    },
+    "seed_20fe9063": {
+      "kind": "godot_runtime",
+      "method": "md5 of text after 'HeadlessPerf4LiveMultiAiDayTest: ' on the multi_ai_decisions= line, plus a trailing newline",
+      "expect_prefix": "20fe9063",
+      "expect_full": "20fe9063de285f19d4f9b8a105abfd31",
+      "note": "Recomputed by tools/eoa_startup_parity.sh via EOA_PERF4_SEED_ONLY=1"
+    }
+  }
+}

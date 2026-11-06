@@ -1,0 +1,8 @@
+test_inventory_ok_on_shipped_board (tools.map_generation.tests.test_startup_parity_inventory.TestStartupParityInventory.test_inventory_ok_on_shipped_board) ... ok
+test_missing_dir_fails (tools.map_generation.tests.test_startup_parity_inventory.TestStartupParityInventory.test_missing_dir_fails) ... ok
+test_product_wraps_inventory (tools.map_generation.tests.test_startup_parity_inventory.TestStartupParityInventory.test_product_wraps_inventory) ... ok
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.033s
+
+OK
