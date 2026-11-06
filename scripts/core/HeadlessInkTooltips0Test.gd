@@ -53,12 +53,14 @@ func _read(path: String) -> String:
 
 func _run() -> void:
 	_test_delay_and_theme()
+	await _test_headless_dress_skipped()
 	_test_tooltip_clamp()
 	await _test_bar_tooltips()
 	await _test_bar_1280_resources()
 	_test_fill_copy()
 	_test_dress_wrap()
 	_test_begin_tooltip()
+	_test_tooltip_p1()
 
 
 func _test_delay_and_theme() -> void:
@@ -210,12 +212,30 @@ func _test_fill_copy() -> void:
 			_fail("fill_line_tooltip missing")
 		else:
 			var tip := str(strip_script.call("fill_line_tooltip", null))
-			if tip.contains("Fill") and tip.contains("Strength 1.00"):
-				_pass("fill tooltip names Fill and Strength 1.00")
+			if (
+				tip.begins_with("# Fill is not Strength\n")
+				and tip.contains("Fill = men and equipment present vs. the TOE.")
+				and tip.contains("Strength = combat readiness (Fill × organization × supply).")
+				and tip.contains("A —% filled unit can still fight at full strength if organized and supplied.")
+				and tip.contains("[Click] select · [Ctrl+Click] attack")
+			):
+				_pass("fill tooltip explains Fill is not Strength")
 			else:
-				_fail("fill tooltip missing Strength value: %s" % tip)
-	if not ren.contains("Fill ≠ Strength"):
+				_fail("fill tooltip copy: %s" % tip)
+			var fixture := GDScript.new()
+			fixture.source_code = "extends RefCounted\nvar toe_fill: float = 0.62\nvar strength: float = 1.0\n"
+			if fixture.reload() != OK:
+				_fail("fill fixture failed to parse")
+			else:
+				var live := str(strip_script.call("fill_line_tooltip", fixture.new()))
+				if live.contains("A 62% filled unit can still fight at full strength if organized and supplied."):
+					_pass("fill tooltip uses live 62%")
+				else:
+					_fail("fill tooltip live percent: %s" % live)
+	if not ren.contains("Fill is not Strength"):
 		_fail("MapRenderer fill tooltip literal missing")
+	elif not ren.contains("A —% filled unit can still fight at full strength if organized and supplied."):
+		_fail("MapRenderer fill tooltip literal missing the live-percent sentence")
 	else:
 		_pass("MapRenderer fill tooltip literal")
 	if not (ren.contains("fill_ratio < 0.5") and ren.contains("RetrowaveTheme.WARNING")):
@@ -624,3 +644,345 @@ func _test_begin_tooltip() -> void:
 		_pass("Begin tooltip set")
 	else:
 		_fail("Begin tooltip missing body: %s" % tip)
+
+
+func _test_headless_dress_skipped() -> void:
+	if DisplayServer.get_name() != "headless":
+		_fail("expected headless DisplayServer, got %s" % DisplayServer.get_name())
+		return
+	var theme_src := _read("res://scripts/ui/RetrowaveTheme.gd")
+	if not theme_src.contains('DisplayServer.get_name() == "headless"'):
+		_fail("headless dress guard missing from RetrowaveTheme")
+		return
+	var pop := PopupPanel.new()
+	pop.theme_type_variation = "TooltipPanel"
+	var lab := Label.new()
+	lab.theme_type_variation = "TooltipLabel"
+	lab.text = "# Should Not Dress\nBody stays on the engine label.\n[A] · [B]"
+	pop.add_child(lab)
+	root.add_child(pop)
+	await process_frame
+	await process_frame
+	if pop.find_child("EoaTooltipBox", true, false) != null or bool(pop.get_meta("eoa_tooltip_dressed", false)):
+		_fail("headless auto-dressed a tooltip")
+	else:
+		_pass("headless skips dress")
+	pop.queue_free()
+
+
+func _test_tooltip_p1() -> void:
+	var theme_script := load("res://scripts/ui/RetrowaveTheme.gd")
+	if theme_script == null or not theme_script.has_method("make_tooltip_theme"):
+		_fail("make_tooltip_theme missing")
+		return
+	_assert_p1_panel(theme_script)
+	_assert_p1_title_and_chips(theme_script)
+	_assert_p1_anchor_and_pan(theme_script)
+	_assert_p1_fill_clamp(theme_script)
+	_assert_p1_source_mutant()
+
+
+func _assert_p1_panel(theme_script) -> void:
+	var theme_v: Variant = theme_script.call("make_tooltip_theme")
+	var theme := theme_v as Theme
+	if theme == null:
+		_fail("make_tooltip_theme returned no theme")
+		return
+	var panel := theme.get_stylebox("panel", "TooltipPanel") as StyleBoxFlat
+	if panel == null:
+		_fail("TooltipPanel stylebox missing")
+		return
+	var border := panel.border_color
+	var cyan := Color("#33e6ff")
+	if border.a < 0.8 or not _rgb_close(border, cyan):
+		_fail("border %s want CYAN alpha >= 0.8" % str(border))
+	elif panel.get_border_width(SIDE_LEFT) != 1 or panel.corner_radius_top_left != 4:
+		_fail("border width/radius drifted")
+	elif panel.content_margin_left != 10 or panel.content_margin_right != 10:
+		_fail("horizontal margin %s/%s want 10/10" % [panel.content_margin_left, panel.content_margin_right])
+	elif panel.content_margin_top != 8 or panel.content_margin_bottom != 8:
+		_fail("vertical margin %s/%s want 8/8" % [panel.content_margin_top, panel.content_margin_bottom])
+	elif panel.shadow_size != 4 or panel.shadow_offset != Vector2(2, 2):
+		_fail("shadow size %s offset %s want 4 (2,2)" % [panel.shadow_size, panel.shadow_offset])
+	elif not is_equal_approx(panel.shadow_color.a, 0.35) or panel.shadow_color.r > 0.01:
+		_fail("shadow color %s want #000000 alpha 0.35" % str(panel.shadow_color))
+	elif not is_equal_approx(panel.bg_color.a, 0.96):
+		_fail("panel bg alpha %s want 0.96" % str(panel.bg_color.a))
+	else:
+		_pass("panel border 0.85 margins 10/8 shadow 4")
+
+
+func _assert_p1_title_and_chips(theme_script) -> void:
+	var titled := _dress_tip(theme_script, "# Fill is not Strength\nBody line stays wrapped.\n[Click] select · [Ctrl+Click] attack · [Esc]")
+	if titled == null:
+		return
+	var title := titled.find_child("EoaTooltipTitle", true, false) as Label
+	var rule := titled.find_child("EoaTooltipRule", true, false) as HSeparator
+	if title == null:
+		_fail("titled tip has no EoaTooltipTitle")
+	elif title.text != "Fill is not Strength" or title.text.begins_with("#"):
+		_fail("title text %s" % title.text)
+	elif int(title.get_theme_font_size("font_size")) != 15:
+		_fail("title size %s want 15" % str(title.get_theme_font_size("font_size")))
+	elif not _rgb_close(title.get_theme_color("font_color"), Color("#33e6ff")):
+		_fail("title color %s want #33e6ff" % str(title.get_theme_color("font_color")))
+	else:
+		var fnt: Font = title.get_theme_font("font")
+		if not (fnt is FontVariation) or (fnt as FontVariation).variation_embolden < 0.5:
+			_fail("title font is not bold")
+		else:
+			_pass("title 15 px bold #33e6ff prefix stripped")
+	if rule == null:
+		_fail("titled tip has no EoaTooltipRule")
+	else:
+		var line := rule.get_theme_stylebox("separator") as StyleBoxLine
+		if line == null or not _rgb_close(line.color, Color("#2a3a5c")) or line.thickness != 1:
+			_fail("rule style %s" % str(line))
+		else:
+			_pass("title rule #2a3a5c")
+	var row := titled.find_child("EoaHotkeyRow", true, false) as HBoxContainer
+	if row == null or row.alignment != BoxContainer.ALIGNMENT_END:
+		_fail("hotkey row missing or not ALIGNMENT_END")
+	elif int(row.get_theme_constant("separation")) != 6:
+		_fail("hotkey row separation %s want 6" % str(row.get_theme_constant("separation")))
+	else:
+		_pass("hotkey row end-aligned sep 6")
+	_assert_chip_colors(titled, true)
+	titled.queue_free()
+	var plain := _dress_tip(theme_script, "Steel · 1,240\nNo title on this tip.\n[G]")
+	if plain == null:
+		return
+	if plain.find_child("EoaTooltipTitle", true, false) != null or plain.find_child("EoaTooltipRule", true, false) != null:
+		_fail("untitled tip created a title node")
+	else:
+		_pass("no # prefix means no title node")
+	plain.queue_free()
+	var three := _dress_tip(theme_script, "Body\n[A] · [B] · [C]")
+	if three == null:
+		return
+	var chips := _nodes_named(three, "HotkeyChip")
+	if chips.size() != 3:
+		_fail("[A] · [B] · [C] made %d chips %s" % [chips.size(), _chip_dump(three)])
+	else:
+		var danger := false
+		for chip in chips:
+			var sb := (chip as Control).get_theme_stylebox("panel") as StyleBoxFlat
+			if sb != null and _rgb_close(sb.border_color, Color("#ff33cc")):
+				danger = true
+		if danger:
+			_fail("plain [A][B][C] chip used the danger border")
+		else:
+			_pass("three HotkeyChip nodes")
+	three.queue_free()
+
+
+func _assert_chip_colors(pop: Node, expect_danger: bool) -> void:
+	var chips := _nodes_named(pop, "HotkeyChip")
+	if chips.size() != 3:
+		_fail("expected 3 chips, got %d %s" % [chips.size(), _chip_dump(pop)])
+		return
+	var saw_danger := false
+	var saw_safe := false
+	for chip in chips:
+		var panel := chip as PanelContainer
+		var sb := panel.get_theme_stylebox("panel") as StyleBoxFlat
+		var lab := panel.get_child(0) as Label
+		if sb == null or lab == null:
+			_fail("chip missing style or label")
+			return
+		if int(lab.get_theme_font_size("font_size")) != 12:
+			_fail("chip font %s want 12" % str(lab.get_theme_font_size("font_size")))
+			return
+		var danger := lab.text.contains("Ctrl+Click") or lab.text.contains("Del")
+		var want := Color("#ff33cc") if danger else Color("#33e6ff")
+		if not _rgb_close(sb.border_color, want) or not _rgb_close(lab.get_theme_color("font_color"), want):
+			_fail("chip %s border %s text %s" % [lab.text, str(sb.border_color), str(lab.get_theme_color("font_color"))])
+			return
+		if danger:
+			saw_danger = true
+			if sb.border_color.a < 0.99:
+				_fail("danger border alpha %s want opaque #ff33cc" % str(sb.border_color.a))
+				return
+		else:
+			saw_safe = true
+			if not is_equal_approx(sb.border_color.a, 0.6):
+				_fail("safe chip border alpha %s want 0.6" % str(sb.border_color.a))
+				return
+		if sb.get_border_width(SIDE_LEFT) != 1 or sb.corner_radius_top_left != 3:
+			_fail("chip border/radius drifted")
+			return
+		if sb.content_margin_left != 6 or sb.content_margin_top != 1:
+			_fail("chip margin drifted")
+			return
+	if expect_danger and not saw_danger:
+		_fail("Ctrl+Click chip was not #ff33cc")
+	elif not saw_safe:
+		_fail("no safe cyan chip")
+	else:
+		_pass("Ctrl+Click chip border #ff33cc")
+
+
+func _assert_p1_anchor_and_pan(theme_script) -> void:
+	var anc: Rect2 = theme_script.call(
+		"resolve_tooltip_anchor", Rect2(), Vector2(510, 22), Vector2(0, 0), true
+	)
+	if anc.position.distance_to(Vector2(510, 22)) > 0.01:
+		_fail("cursor anchor used %s not the cursor" % str(anc))
+	else:
+		_pass("top-bar tip anchors at the cursor")
+	var stuck: Rect2 = theme_script.call(
+		"resolve_tooltip_anchor", Rect2(), Vector2(510, 22), Vector2(0, 0), false
+	)
+	if stuck.position != Vector2.ZERO:
+		_fail("unknown cursor ignored popup position %s" % str(stuck))
+	var placed: Rect2 = theme_script.call(
+		"clamp_tooltip_rect", Vector2(280, 72), Rect2(0, 0, 1280, 720), anc
+	)
+	if placed.position.x < 200.0:
+		_fail("top-bar tip sat at the left edge %s" % str(placed))
+	elif not _rect_inside_margin(placed, Rect2(0, 0, 1280, 720), 4.0):
+		_fail("top-bar tip inside margin failed %s" % str(placed))
+	else:
+		_pass("top-bar tip is not parked at the top-left")
+	if bool(theme_script.call("tooltip_should_clear_for_pan", Vector2.ZERO, Vector2.ZERO)):
+		_fail("still camera cleared the tooltip")
+	elif not bool(theme_script.call("tooltip_should_clear_for_pan", Vector2.ZERO, Vector2(30, 0))):
+		_fail("pan did not clear the tooltip")
+	else:
+		_pass("stale hover clears on pan")
+	var probe := PopupPanel.new()
+	root.add_child(probe)
+	var host: Variant = theme_script.call("_host_viewport", probe)
+	if host == null or host == probe:
+		_fail("tooltip host viewport is the popup (top-left mouse)")
+	else:
+		_pass("tooltip reads the game viewport, not its own window")
+	probe.queue_free()
+
+
+func _assert_p1_fill_clamp(theme_script) -> void:
+	var strip_script := load(STRIP_SRC)
+	if strip_script == null:
+		_fail("strip missing for clamp")
+		return
+	var raw := str(strip_script.call("fill_line_tooltip", null))
+	var pop := _dress_tip(theme_script, raw)
+	if pop == null:
+		return
+	pop.reset_size()
+	var sz := Vector2(pop.size)
+	if sz.x < 8.0 or sz.y < 8.0:
+		sz = pop.get_contents_minimum_size()
+	if sz.x < 8.0:
+		sz.x = 280.0
+	if sz.y < 8.0:
+		sz.y = 140.0
+	for vp_size in [Vector2(1280, 720), Vector2(1920, 1080)]:
+		var vp := Rect2(Vector2.ZERO, vp_size)
+		var corner := Rect2(vp_size.x - 48.0, vp_size.y - 36.0, 24, 18)
+		var placed: Rect2 = theme_script.call("clamp_tooltip_rect", sz, vp, corner)
+		if not _rect_inside_margin(placed, vp, 4.0):
+			_fail("fill tip clipped at %s placed %s" % [str(vp_size), str(placed)])
+		else:
+			_pass("fill tip inside %s with 4 px %s" % [str(vp_size), str(placed)])
+		var bar := Rect2(vp_size.x * 0.45, 16, 20, 18)
+		var top: Rect2 = theme_script.call("clamp_tooltip_rect", sz, vp, bar)
+		if not _rect_inside_margin(top, vp, 4.0):
+			_fail("fill tip top-bar clipped at %s %s" % [str(vp_size), str(top)])
+	pop.queue_free()
+
+
+func _assert_p1_source_mutant() -> void:
+	var src := _read("res://scripts/ui/RetrowaveTheme.gd")
+	var needle := "const TOOLTIP_TITLE_PREFIX := \"# \""
+	if needle not in src:
+		_fail("mutant needle missing in real source")
+		return
+	var mutated := src.replace("class_name RetrowaveTheme\n", "")
+	mutated = mutated.replace(needle, "const TOOLTIP_TITLE_PREFIX := \"@@ \"")
+	var gs := GDScript.new()
+	gs.source_code = mutated
+	if gs.reload() != OK:
+		_fail("title mutant failed to parse")
+		return
+	var pop := _dress_tip(gs, "# Fill is not Strength\nBody\n[A] · [B] · [C]")
+	if pop == null:
+		_fail("title mutant dress failed")
+		return
+	var title := pop.find_child("EoaTooltipTitle", true, false)
+	if title != null:
+		_fail("title mutant survived (EoaTooltipTitle still built)")
+	else:
+		_pass("real-source title mutant killed")
+	pop.queue_free()
+
+
+func _dress_tip(theme_script, text: String) -> PopupPanel:
+	if theme_script == null or not theme_script.has_method("dress_tooltip_popup"):
+		_fail("dress_tooltip_popup missing")
+		return null
+	var pop := PopupPanel.new()
+	pop.theme_type_variation = "TooltipPanel"
+	var lab := Label.new()
+	lab.theme_type_variation = "TooltipLabel"
+	lab.text = text
+	pop.add_child(lab)
+	root.add_child(pop)
+	theme_script.call("dress_tooltip_popup", pop)
+	return pop
+
+
+func _nodes_named(node: Node, wanted: String) -> Array:
+	# Untyped on purpose: Array[Node].append_array drops every match but the first.
+	var into: Array = []
+	_collect_named(node, wanted, into)
+	return into
+
+
+func _collect_named(node: Node, wanted: String, into: Array) -> void:
+	if node == null:
+		return
+	if _name_is_hook(node, wanted):
+		into.append(node)
+	for c in node.get_children():
+		_collect_named(c, wanted, into)
+
+
+## Godot renames a second sibling HotkeyChip to HotkeyChip2 when the chip is
+## added with a readable name. The hook is still the HotkeyChip prefix.
+func _name_is_hook(node: Node, wanted: String) -> bool:
+	var n := str(node.name)
+	if n == wanted:
+		return true
+	if wanted != "HotkeyChip" or not n.begins_with("HotkeyChip"):
+		return false
+	var rest := n.substr(wanted.length())
+	return rest.is_valid_int()
+
+
+func _chip_dump(node: Node) -> String:
+	var row := node.find_child("EoaHotkeyRow", true, false)
+	if row == null:
+		return "no EoaHotkeyRow"
+	var bits: PackedStringArray = PackedStringArray()
+	for c in row.get_children():
+		var text := ""
+		if c.get_child_count() > 0 and c.get_child(0) is Label:
+			text = (c.get_child(0) as Label).text
+		bits.append("%s=%s" % [str(c.name), text])
+	return "row_children=%d [%s]" % [row.get_child_count(), ", ".join(bits)]
+
+
+func _rgb_close(a: Color, b: Color) -> bool:
+	return is_equal_approx(a.r, b.r) and is_equal_approx(a.g, b.g) and is_equal_approx(a.b, b.b)
+
+
+func _rect_inside_margin(r: Rect2, vp: Rect2, m: float) -> bool:
+	if r.size.x < 1.0 or r.size.y < 1.0:
+		return false
+	return (
+		r.position.x + 0.05 >= vp.position.x + m
+		and r.position.y + 0.05 >= vp.position.y + m
+		and r.position.x + r.size.x <= vp.position.x + vp.size.x - m + 0.05
+		and r.position.y + r.size.y <= vp.position.y + vp.size.y - m + 0.05
+	)

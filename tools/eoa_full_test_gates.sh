@@ -4,11 +4,15 @@
 #
 # Usage (from repo root):
 #   tools/eoa_full_test_gates.sh
-#   tools/eoa_full_test_gates.sh --quick      # pure python, plus garrison, ink tooltips, campaign save, audio1, audio2, stability justice, victory paths, settings toggles
+#   tools/eoa_full_test_gates.sh --quick      # pure python, plus garrison, ink tooltips, tooltip pan poll, campaign save, audio1, audio2, stability justice, victory paths, settings toggles
 #   tools/eoa_full_test_gates.sh --with-perf  # also map-tick perf sample
 #   tools/eoa_full_test_gates.sh --log DIR    # write logs under DIR
 #
-# --quick launches HeadlessGarrison1Test, HeadlessInkTooltips0Test, HeadlessCampaignSave1Test, HeadlessAudio1Test, HeadlessAudio2Test, HeadlessStabilityJustice1Test, HeadlessVictoryPaths1Test, then HeadlessSettingsToggles1Test.
+# --quick launches HeadlessGarrison1Test, HeadlessInkTooltips0Test,
+# HeadlessTooltipPanPollTest, HeadlessTooltipPanPollSignalTest,
+# HeadlessCampaignSave1Test, HeadlessAudio1Test, HeadlessAudio2Test,
+# HeadlessStabilityJustice1Test, HeadlessVictoryPaths1Test, then
+# HeadlessSettingsToggles1Test.
 # Full path calls tools/run_godot.sh, which exits 1 immediately if no binary
 # is found (fail-closed; it must not hang).
 # NE board/QC needs numpy+Pillow: pip install -r tools/map_generation/requirements.txt
@@ -206,6 +210,8 @@ if [[ "$QUICK" -eq 1 ]]; then
   if pgrep -af '[g]odot|[G]odot|[g]amescope' >/dev/null; then
     log "FAIL headless_garrison1 GODOT_BUSY"
     log "FAIL headless_ink_tooltips0 GODOT_BUSY"
+    log "FAIL headless_tooltip_pan_poll GODOT_BUSY"
+    log "FAIL headless_tooltip_pan_poll_signal GODOT_BUSY"
     log "FAIL headless_campaign_save1 GODOT_BUSY"
     log "FAIL headless_audio1 GODOT_BUSY"
     log "FAIL headless_audio2 GODOT_BUSY"
@@ -224,6 +230,48 @@ if [[ "$QUICK" -eq 1 ]]; then
       flock -n "${HOME}/.eoa_godot.lock" \
       tools/run_godot.sh --headless --path . \
       -s res://scripts/core/HeadlessInkTooltips0Test.gd || fail
+    run_step headless_tooltip_pan_poll bash -c '
+      log=$(mktemp)
+      XDG_DATA_HOME="$(mktemp -d)" flock -n "${HOME}/.eoa_godot.lock" \
+        tools/run_godot.sh --headless --path . \
+        -s res://scripts/core/HeadlessTooltipPanPollTest.gd >"$log" 2>&1
+      code=$?
+      cat "$log"
+      if grep -q "SCRIPT ERROR" "$log"; then
+        echo "[eoa-gates] FAIL headless_tooltip_pan_poll SCRIPT ERROR"
+        exit 1
+      fi
+      if ! grep -q "RESULT=PASS" "$log"; then
+        echo "[eoa-gates] FAIL headless_tooltip_pan_poll missing RESULT=PASS"
+        exit 1
+      fi
+      exit "$code"
+    ' || fail
+    run_step headless_tooltip_pan_poll_signal bash -c '
+      log=$(mktemp)
+      XDG_DATA_HOME="$(mktemp -d)" flock -n "${HOME}/.eoa_godot.lock" \
+        tools/run_godot.sh --headless --path . \
+        -s res://scripts/core/HeadlessTooltipPanPollSignalTest.gd >"$log" 2>&1
+      code=$?
+      cat "$log"
+      if grep -q "SCRIPT ERROR" "$log"; then
+        echo "[eoa-gates] FAIL headless_tooltip_pan_poll_signal SCRIPT ERROR"
+        exit 1
+      fi
+      if grep -q "Cannot convert argument 1 from Object to Object" "$log"; then
+        echo "[eoa-gates] FAIL headless_tooltip_pan_poll_signal process_frame Object-convert ERROR"
+        exit 1
+      fi
+      if grep -q "Error calling from signal .process_frame. to callable: .GDScript::_poll_tooltip_pan." "$log"; then
+        echo "[eoa-gates] FAIL headless_tooltip_pan_poll_signal process_frame callable ERROR"
+        exit 1
+      fi
+      if ! grep -q "RESULT=PASS" "$log"; then
+        echo "[eoa-gates] FAIL headless_tooltip_pan_poll_signal missing RESULT=PASS"
+        exit 1
+      fi
+      exit "$code"
+    ' || fail
     run_step headless_campaign_save1 env \
       XDG_DATA_HOME="$(mktemp -d)" \
       flock -n "${HOME}/.eoa_godot.lock" \
@@ -327,6 +375,50 @@ else
     XDG_DATA_HOME="$(mktemp -d)" \
     tools/run_godot.sh --headless --path . \
     -s res://scripts/core/HeadlessInkTooltips0Test.gd || fail
+
+  run_step headless_tooltip_pan_poll bash -c '
+    log=$(mktemp)
+    XDG_DATA_HOME="$(mktemp -d)" flock -n "${HOME}/.eoa_godot.lock" \
+      tools/run_godot.sh --headless --path . \
+      -s res://scripts/core/HeadlessTooltipPanPollTest.gd >"$log" 2>&1
+    code=$?
+    cat "$log"
+    if grep -q "SCRIPT ERROR" "$log"; then
+      echo "[eoa-gates] FAIL headless_tooltip_pan_poll SCRIPT ERROR"
+      exit 1
+    fi
+    if ! grep -q "RESULT=PASS" "$log"; then
+      echo "[eoa-gates] FAIL headless_tooltip_pan_poll missing RESULT=PASS"
+      exit 1
+    fi
+    exit "$code"
+  ' || fail
+
+  run_step headless_tooltip_pan_poll_signal bash -c '
+    log=$(mktemp)
+    XDG_DATA_HOME="$(mktemp -d)" flock -n "${HOME}/.eoa_godot.lock" \
+      tools/run_godot.sh --headless --path . \
+      -s res://scripts/core/HeadlessTooltipPanPollSignalTest.gd >"$log" 2>&1
+    code=$?
+    cat "$log"
+    if grep -q "SCRIPT ERROR" "$log"; then
+      echo "[eoa-gates] FAIL headless_tooltip_pan_poll_signal SCRIPT ERROR"
+      exit 1
+    fi
+    if grep -q "Cannot convert argument 1 from Object to Object" "$log"; then
+      echo "[eoa-gates] FAIL headless_tooltip_pan_poll_signal process_frame Object-convert ERROR"
+      exit 1
+    fi
+    if grep -q "Error calling from signal .process_frame. to callable: .GDScript::_poll_tooltip_pan." "$log"; then
+      echo "[eoa-gates] FAIL headless_tooltip_pan_poll_signal process_frame callable ERROR"
+      exit 1
+    fi
+    if ! grep -q "RESULT=PASS" "$log"; then
+      echo "[eoa-gates] FAIL headless_tooltip_pan_poll_signal missing RESULT=PASS"
+      exit 1
+    fi
+    exit "$code"
+  ' || fail
 
   run_step headless_campaign_save1 env \
     XDG_DATA_HOME="$(mktemp -d)" \
