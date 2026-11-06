@@ -250,6 +250,17 @@ var _map_pick_block_until_msec: int = 0
 ## Close/Esc: do not move the camera (no snapshot restore — that still teleported).
 var _hold_camera_until_msec: int = 0
 var _last_mouse_pos := Vector2.ZERO
+## STARTUP-BLANK: one-shot probes after living-title Begin (log-only until a fix is armed).
+var _startup_blank_armed := false
+var _startup_blank_size_logged := false
+var _startup_blank_pointer_logged := false
+var _startup_blank_size_hooked := false
+var _startup_blank_move_logs: int = 0
+var _startup_blank_cam_at_arm := Vector2.ZERO
+var _startup_blank_zoom_at_arm := 0.0
+var _startup_blank_settle_until_frame: int = -1
+const STARTUP_BLANK_MAX_MOVE_LOGS := 16
+const STARTUP_BLANK_GER_CAPITAL := 710300
 ## Close must not leave a deferred camera nudge (play extra: panel-close teleport).
 var _inspector_held_closed := false
 ## Live GIS camera at Close press — reassert every frame so europe_center / pick-center cannot teleport.
@@ -3226,6 +3237,7 @@ func _collect_campaign_buttons(n: Node, out: Array) -> void:
 
 
 func _input(event: InputEvent) -> void:
+	_startup_blank_note_pointer(event, "MapRenderer._input")
 	# Esc / I / Home must beat GUI focus (search LineEdit) so a stuck inspector cannot eat keys.
 	if event is InputEventKey and event.pressed and not event.echo:
 		# Search / any LineEdit: do not steal letters (Play: typing "i" fired I-glyphs).
@@ -3707,6 +3719,7 @@ func _control_contains_point(ctrl: Control, pt: Vector2) -> bool:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	_startup_blank_note_pointer(event, "MapRenderer._unhandled_input")
 	# After GUI: a Command Center press must not still-click the map, including
 	# the release of a dimmer click that already queue_freed the overlay.
 	if (
@@ -4451,6 +4464,8 @@ func _handle_camera_input(delta: float) -> void:
 	var cam := get_viewport().get_camera_2d()
 	if not cam:
 		return
+	var blank_cam_before := cam.global_position
+	var blank_zoom_before := cam.zoom.x
 
 	# Accumulate slop before the modal early-return so a leftover false-positive
 	# popup cannot wipe skip-pick; sea release then jump-zoomed Rio Grande Rise.
@@ -4573,6 +4588,13 @@ func _handle_camera_input(delta: float) -> void:
 
 	# Only clamp when camera moved — wrapping/clamp every idle frame was thrashing redraws.
 	if moved:
+		_startup_blank_note_camera_moved(
+			blank_cam_before,
+			blank_zoom_before,
+			edge_dir,
+			key_dir,
+			_left_pan_active
+		)
 		_clamp_camera_to_theater()
 		_reveal_culled_unit_icons(8)
 		# c4c44b8 Lisboa: Atlantic water sits in the left edge-pan strip on
@@ -4633,6 +4655,8 @@ func _zoom_toward_mouse(zoom_change: float, screen_pos: Vector2 = Vector2.INF) -
 	var cam := get_viewport().get_camera_2d()
 	if not cam:
 		return
+	var blank_cam_before := cam.global_position
+	var blank_zoom_before := cam.zoom.x
 
 	var mouse_screen: Vector2 = screen_pos
 	var vp := get_viewport()
@@ -4677,6 +4701,19 @@ func _zoom_toward_mouse(zoom_change: float, screen_pos: Vector2 = Vector2.INF) -
 		"EOA_ZOOM_END who=MapRenderer._zoom_toward_mouse z=%.3f ok=1"
 		% new_zoom.x
 	)
+	if _startup_blank_armed:
+		log_startup_blank_camera(
+			"zoom_toward_mouse",
+			"from_zoom=%.4f to_zoom=%.4f factor=%.4f screen=%s cam_before=(%.1f,%.1f)"
+			% [
+				blank_zoom_before,
+				cam.zoom.x,
+				zoom_change,
+				str(mouse_screen),
+				blank_cam_before.x,
+				blank_cam_before.y,
+			]
+		)
 
 ## Press/release pick uses the event's own position so a lagged
 ## get_viewport().get_mouse_position() cannot steal the click (FAC-1a FIX #7).
@@ -26834,6 +26871,274 @@ func _first_session_tip_dismiss_blocks_map_pick() -> bool:
 func _clear_first_session_tip_dismiss_swallow() -> void:
 	if has_meta("eoa_tip_dismiss_swallow_release"):
 		remove_meta("eoa_tip_dismiss_swallow_release")
+
+
+func log_startup_blank_camera(who: String, extra: String = "") -> Dictionary:
+	var cam: Camera2D = get_node_or_null("MapCamera") as Camera2D
+	if cam == null and get_viewport() != null:
+		cam = get_viewport().get_camera_2d()
+	var vp: Viewport = get_viewport()
+	var tree: SceneTree = get_tree()
+	var root_n: Window = tree.root if tree != null else null
+	var win: Window = get_window()
+	var cam_pos := Vector2.ZERO
+	var cam_zoom := 0.0
+	if cam != null:
+		cam_pos = cam.global_position
+		cam_zoom = cam.zoom.x
+	var vp_size := Vector2.ZERO
+	if vp != null:
+		vp_size = vp.get_visible_rect().size
+	var root_size := Vector2i.ZERO
+	if root_n != null:
+		root_size = root_n.size
+	var win_size := Vector2i.ZERO
+	var win_mode := -1
+	if win != null:
+		win_size = win.size
+		win_mode = int(win.mode)
+	var ds_size: Vector2i = DisplayServer.window_get_size()
+	var ds_mode: int = DisplayServer.window_get_mode()
+	var mouse_vp := Vector2.ZERO
+	if vp != null:
+		mouse_vp = vp.get_mouse_position()
+	var mouse_win := Vector2.ZERO
+	if win != null:
+		mouse_win = win.get_mouse_position()
+	var berlin := Vector2.ZERO
+	if province_centroids.has(STARTUP_BLANK_GER_CAPITAL):
+		berlin = province_centroids[STARTUP_BLANK_GER_CAPITAL] as Vector2
+	elif typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_centroid"):
+		berlin = MapManager.get_province_centroid(STARTUP_BLANK_GER_CAPITAL)
+	var vis := Rect2()
+	var berlin_in_view := false
+	if cam != null and vp_size.x > 1.0:
+		var z := maxf(absf(cam_zoom), 0.01)
+		var world := vp_size / z
+		var origin: Vector2 = cam.get_screen_center_position() - world * 0.5
+		vis = Rect2(origin, world)
+		berlin_in_view = vis.has_point(berlin)
+	var left_held := Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
+	var swallow := _begin_title_release_blocks_map_pick()
+	var line := (
+		"EOA_STARTUP_BLANK who=%s cam=(%.2f,%.2f) zoom=%.4f vp=%.0fx%.0f root=%dx%d win=%dx%d ds=%dx%d mode=%d/%d mouse_vp=(%.1f,%.1f) mouse_win=(%.1f,%.1f) berlin=(%.1f,%.1f) berlin_in_view=%s vis=[%.1f,%.1f,%.1f,%.1f] left_held=%s swallow=%s pan_active=%s pan_armed=%s left_btn=%s edge_contact=%.3f extra=%s"
+		% [
+			who,
+			cam_pos.x,
+			cam_pos.y,
+			cam_zoom,
+			vp_size.x,
+			vp_size.y,
+			root_size.x,
+			root_size.y,
+			win_size.x,
+			win_size.y,
+			ds_size.x,
+			ds_size.y,
+			win_mode,
+			ds_mode,
+			mouse_vp.x,
+			mouse_vp.y,
+			mouse_win.x,
+			mouse_win.y,
+			berlin.x,
+			berlin.y,
+			str(berlin_in_view),
+			vis.position.x,
+			vis.position.y,
+			vis.size.x,
+			vis.size.y,
+			str(left_held),
+			str(swallow),
+			str(_left_pan_active),
+			str(_left_pan_armed),
+			str(_left_btn_down),
+			_edge_rim_contact_sec,
+			extra,
+		]
+	)
+	print(line)
+	if OS.has_method("flush_stdout"):
+		OS.call("flush_stdout")
+	return {
+		"who": who,
+		"cam": cam_pos,
+		"zoom": cam_zoom,
+		"vp": vp_size,
+		"berlin_in_view": berlin_in_view,
+		"berlin": berlin,
+	}
+
+
+func arm_startup_blank_begin_probes() -> void:
+	_startup_blank_armed = true
+	_startup_blank_size_logged = false
+	_startup_blank_pointer_logged = false
+	_startup_blank_move_logs = 0
+	var snap: Dictionary = log_startup_blank_camera("arm_probes")
+	_startup_blank_cam_at_arm = snap.get("cam", Vector2.ZERO) as Vector2
+	_startup_blank_zoom_at_arm = float(snap.get("zoom", 0.0))
+	var win: Window = get_window()
+	if win != null and not _startup_blank_size_hooked:
+		if not win.size_changed.is_connected(_on_startup_blank_root_size_changed):
+			win.size_changed.connect(_on_startup_blank_root_size_changed)
+		_startup_blank_size_hooked = true
+	var vp: Viewport = get_viewport()
+	if vp != null and not vp.size_changed.is_connected(_on_startup_blank_vp_size_changed):
+		vp.size_changed.connect(_on_startup_blank_vp_size_changed)
+
+
+func _on_startup_blank_root_size_changed() -> void:
+	_startup_blank_log_first_size_changed("root_size_changed")
+
+
+func _on_startup_blank_vp_size_changed() -> void:
+	_startup_blank_log_first_size_changed("vp_size_changed")
+
+
+func _startup_blank_log_first_size_changed(who: String) -> void:
+	if not _startup_blank_armed:
+		return
+	var already := _startup_blank_size_logged
+	_startup_blank_size_logged = true
+	var cam: Camera2D = get_node_or_null("MapCamera") as Camera2D
+	if cam == null and get_viewport() != null:
+		cam = get_viewport().get_camera_2d()
+	var cam_now := Vector2.ZERO
+	var zoom_now := 0.0
+	if cam != null:
+		cam_now = cam.global_position
+		zoom_now = cam.zoom.x
+	var dcam := cam_now.distance_to(_startup_blank_cam_at_arm)
+	var dzoom := zoom_now - _startup_blank_zoom_at_arm
+	log_startup_blank_camera(
+		who if not already else who + "_again",
+		"first=%s cam_at_arm=(%.2f,%.2f) zoom_at_arm=%.4f dcam=%.2f dzoom=%.4f"
+		% [
+			str(not already),
+			_startup_blank_cam_at_arm.x,
+			_startup_blank_cam_at_arm.y,
+			_startup_blank_zoom_at_arm,
+			dcam,
+			dzoom,
+		]
+	)
+	if not already:
+		_startup_blank_maybe_recenter_after_resize()
+
+
+func _startup_blank_fix_enabled() -> bool:
+	if OS.get_environment("EOA_STARTUP_BLANK_MUTANT") == "1":
+		return false
+	return has_meta("eoa_startup_blank_fix") and bool(get_meta("eoa_startup_blank_fix"))
+
+
+func _startup_blank_maybe_recenter_after_resize() -> void:
+	# Armed only after evidence shows the post-Begin size_changed is what throws
+	# the camera. Default is log-only.
+	if not _startup_blank_fix_enabled():
+		return
+	if str(get_meta("eoa_startup_blank_fix_kind", "")) != "recenter":
+		return
+	_center_camera_on_province(STARTUP_BLANK_GER_CAPITAL, "soft")
+	log_startup_blank_camera("fix_recenter_after_size_changed")
+
+
+func _startup_blank_swallow_pointer() -> bool:
+	if not _startup_blank_armed:
+		return false
+	if not _startup_blank_fix_enabled():
+		return false
+	if str(get_meta("eoa_startup_blank_fix_kind", "")) != "swallow":
+		return false
+	if _startup_blank_settle_until_frame < 0:
+		return true
+	return Engine.get_process_frames() <= _startup_blank_settle_until_frame
+
+
+func _startup_blank_note_pointer(event: InputEvent, via: String) -> void:
+	if not _startup_blank_armed or event == null:
+		return
+	var is_release := false
+	var is_motion := false
+	var is_wheel := false
+	var cls := event.get_class()
+	var pos := Vector2.INF
+	if event is InputEventMouseButton:
+		var mb: InputEventMouseButton = event
+		pos = mb.position
+		is_release = not mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT
+		is_wheel = (
+			mb.button_index == MOUSE_BUTTON_WHEEL_UP
+			or mb.button_index == MOUSE_BUTTON_WHEEL_DOWN
+		)
+	elif event is InputEventMouseMotion:
+		is_motion = true
+		pos = (event as InputEventMouseMotion).position
+	elif event is InputEventMagnifyGesture or event is InputEventPanGesture:
+		is_motion = true
+	else:
+		return
+	if not (is_release or is_motion or is_wheel):
+		return
+	if _startup_blank_pointer_logged:
+		return
+	_startup_blank_pointer_logged = true
+	var cam: Camera2D = get_node_or_null("MapCamera") as Camera2D
+	if cam == null and get_viewport() != null:
+		cam = get_viewport().get_camera_2d()
+	var cam_before := Vector2.ZERO
+	var zoom_before := 0.0
+	if cam != null:
+		cam_before = cam.global_position
+		zoom_before = cam.zoom.x
+	log_startup_blank_camera(
+		"first_post_begin_pointer",
+		"via=%s class=%s release=%s motion=%s wheel=%s pos=%s cam_before=(%.2f,%.2f) zoom_before=%.4f"
+		% [via, cls, str(is_release), str(is_motion), str(is_wheel), str(pos), cam_before.x, cam_before.y, zoom_before]
+	)
+
+
+func _startup_blank_note_camera_moved(
+	cam_before: Vector2,
+	zoom_before: float,
+	edge_dir: Vector2,
+	key_dir: Vector2,
+	drag_pan: bool
+) -> void:
+	if not _startup_blank_armed:
+		return
+	if _startup_blank_move_logs >= STARTUP_BLANK_MAX_MOVE_LOGS:
+		return
+	_startup_blank_move_logs += 1
+	var reason := "unknown"
+	if key_dir != Vector2.ZERO:
+		reason = "wasd"
+	elif drag_pan:
+		reason = "left_drag"
+	elif edge_dir != Vector2.ZERO:
+		reason = "edge_pan"
+	var cam: Camera2D = get_viewport().get_camera_2d() if get_viewport() else null
+	var cam_after := cam.global_position if cam != null else Vector2.ZERO
+	var zoom_after := cam.zoom.x if cam != null else 0.0
+	var d := cam_after.distance_to(cam_before)
+	log_startup_blank_camera(
+		"camera_moved",
+		"n=%d reason=%s dcam=%.2f dzoom=%.4f cam_before=(%.2f,%.2f) zoom_before=%.4f edge=%s key=%s drag=%s last_mouse=%s"
+		% [
+			_startup_blank_move_logs,
+			reason,
+			d,
+			zoom_after - zoom_before,
+			cam_before.x,
+			cam_before.y,
+			zoom_before,
+			str(edge_dir),
+			str(key_dir),
+			str(drag_pan),
+			str(_last_mouse_pos),
+		]
+	)
 
 
 func arm_begin_title_release_swallow(pending_press: bool = false) -> void:

@@ -7,14 +7,24 @@ extends SceneTree
 ## Never claims live-startup PASS. Never labels a title-visible shot post_dismiss.
 ##
 ##   tools/eoa_startup_parity.sh
+##
+## STARTUP-BLANK extension (env, does not change the default #166 path):
+##   EOA_STARTUP_BLANK_BEGIN=pointer|enter
+##   EOA_STARTUP_BLANK_SOAK_S=<seconds>   (default 25; 120 as feasible)
+##   EOA_STARTUP_BLANK_MUTANT=1           (revert product fix)
+## Pointer: synthetic mouse press on LivingTitleBegin, leftover release after,
+## then un-maximize/resize to 1280x800 (window + root.size). Enter: KEY_ENTER.
 
 const VIEW_W := 1280
 const VIEW_H := 800
 const RESIZE_W := 860
 const RESIZE_H := 550
+const BLANK_RESIZE_W := 1280
+const BLANK_RESIZE_H := 800
 const WAIT_WORLD_SECS := 420
 const WAIT_DISMISS_SECS := 45
 const SETTLE_FRAMES := 18
+const DEFAULT_BLANK_SOAK_S := 25
 const GER_CAPITAL := 710300
 const GER_TAG := "GER"
 const EXPECT_YEAR := 1936
@@ -31,11 +41,13 @@ enum Phase {
 	SETTLE,
 	PRE_BEGIN,
 	INVOKE_BEGIN,
+	RELEASE_POINTER,
 	WAIT_BOOT_CLOSED,
 	WAIT_TREE_EXIT,
 	POST_DISMISS,
 	RESIZE,
 	POST_RESIZE,
+	SOAK,
 	FINISH,
 	DONE,
 }
@@ -68,6 +80,18 @@ var _adapter_name: String = ""
 var _viewport_parity: String = "INCOMPLETE"
 var _garrison_audit: Dictionary = {}
 var _window_log: Array[Dictionary] = []
+var _begin_mode: String = ""
+var _blank_mode: bool = false
+var _pointer_pt: Vector2 = Vector2.ZERO
+var _pointer_pressed: bool = false
+var _pointer_released: bool = false
+var _release_frames_left: int = 0
+var _event_seq: int = 0
+var _soak_until_usec: int = 0
+var _last_soak_log: int = -1
+var _blank_fail: PackedStringArray = PackedStringArray()
+var _blank_pass: PackedStringArray = PackedStringArray()
+var _camera_trace: Array[Dictionary] = []
 
 
 func _init() -> void:
@@ -104,7 +128,25 @@ func _start() -> void:
 	OS.set_environment("EOA_SMOKE_AUTO_BEGIN", "0")
 	OS.set_environment("EOA_SMOKE_ADVANCE_PAST_PLUS6", "0")
 	OS.set_environment("EOA_SKIP_TITLE", "0")
-	_force_window(VIEW_W, VIEW_H, true)
+	_begin_mode = OS.get_environment("EOA_STARTUP_BLANK_BEGIN").strip_edges().to_lower()
+	_blank_mode = _begin_mode == "pointer" or _begin_mode == "enter"
+	if _blank_mode:
+		_log("EOA_STARTUP_BLANK who=harness_start begin=%s mutant=%s soak_s=%d" % [
+			_begin_mode,
+			OS.get_environment("EOA_STARTUP_BLANK_MUTANT"),
+			_blank_soak_secs(),
+		])
+		var blank_out := OS.get_environment("EOA_STARTUP_BLANK_OUT").strip_edges()
+		if not blank_out.is_empty():
+			_out_dir = blank_out
+			DirAccess.make_dir_recursive_absolute(_out_dir)
+	if _blank_mode:
+		# Live title is maximized on a 1920×1200 desktop. Do not pin root.size
+		# to 1280×800 here — the un-maximize after Begin must actually change
+		# both window and viewport (1920-class → 1280×800).
+		_force_window(VIEW_W, VIEW_H, true, false)
+	else:
+		_force_window(VIEW_W, VIEW_H, true, true)
 	_log_window("launch")
 	var err := change_scene_to_file("res://scenes/TestScenario.tscn")
 	if err != OK:
@@ -126,6 +168,8 @@ func _on_process() -> void:
 			_do_pre_begin()
 		Phase.INVOKE_BEGIN:
 			_do_invoke_begin()
+		Phase.RELEASE_POINTER:
+			_tick_release_pointer()
 		Phase.WAIT_BOOT_CLOSED:
 			_tick_wait_boot_closed()
 		Phase.WAIT_TREE_EXIT:
@@ -136,6 +180,8 @@ func _on_process() -> void:
 			_do_resize()
 		Phase.POST_RESIZE:
 			_do_post_resize()
+		Phase.SOAK:
+			_tick_soak()
 		Phase.FINISH:
 			_finish()
 		Phase.DONE:
@@ -202,18 +248,89 @@ func _do_invoke_begin() -> void:
 		_fixture_fail.append("begin_no_title")
 		_finish()
 		return
+	_hook_title_if_needed()
+	_timing["begin_usec"] = Time.get_ticks_usec()
+	_begin_invoked = true
+	if _begin_mode == "pointer":
+		_invoke_pointer_begin(boot)
+		return
+	if _begin_mode == "enter":
+		_invoke_enter_begin(boot)
+		return
 	if not boot.has_method("handle_live_begin"):
 		_fixture_fail.append("begin_no_handle_live_begin")
 		_finish()
 		return
-	_hook_title_if_needed()
-	_timing["begin_usec"] = Time.get_ticks_usec()
-	_begin_invoked = true
 	_log("EOA_STARTUP_PARITY who=invoke_begin path=LivingTitleBoot.handle_live_begin")
 	var out: Variant = boot.call("handle_live_begin")
 	if out is Dictionary:
 		_begin_out = out as Dictionary
 	_log("EOA_STARTUP_PARITY who=begin_return %s" % str(_begin_out))
+	_phase = Phase.WAIT_BOOT_CLOSED
+
+
+func _invoke_pointer_begin(boot: Node) -> void:
+	var btn: Control = boot.find_child("LivingTitleBegin", true, false) as Control
+	if btn == null or not btn.is_visible_in_tree():
+		_fixture_fail.append("begin_button_missing")
+		_finish()
+		return
+	var rect: Rect2 = btn.get_global_rect()
+	_pointer_pt = rect.get_center()
+	_log(
+		"EOA_STARTUP_BLANK who=pointer_press pt=(%.1f,%.1f) rect=%s path=synthetic_mouse_on_LivingTitleBegin"
+		% [_pointer_pt.x, _pointer_pt.y, str(rect)]
+	)
+	_warp_mouse(_pointer_pt)
+	var down: InputEventMouseButton = _make_mouse(_pointer_pt, true)
+	Input.parse_input_event(down)
+	if Input.has_method("flush_buffered_events"):
+		Input.flush_buffered_events()
+	_pointer_pressed = true
+	_release_frames_left = 3
+	_phase = Phase.RELEASE_POINTER
+
+
+func _tick_release_pointer() -> void:
+	_release_frames_left -= 1
+	if _release_frames_left > 0:
+		return
+	var now_pt: Vector2 = _current_mouse()
+	_log("EOA_STARTUP_BLANK who=pointer_release pt=(%.1f,%.1f) press_pt=(%.1f,%.1f)" % [
+		now_pt.x, now_pt.y, _pointer_pt.x, _pointer_pt.y
+	])
+	var up: InputEventMouseButton = _make_mouse(now_pt, false)
+	Input.parse_input_event(up)
+	if Input.has_method("flush_buffered_events"):
+		Input.flush_buffered_events()
+	_pointer_released = true
+	_phase = Phase.WAIT_BOOT_CLOSED
+
+
+func _invoke_enter_begin(_boot: Node) -> void:
+	# Keyboard Begin must not leave a leftover pointer. Park the mouse interior
+	# (live A/B had the cursor outside the un-maximized window).
+	var park := Vector2(float(VIEW_W) * 0.5, float(VIEW_H) * 0.5)
+	_warp_mouse(park)
+	_log("EOA_STARTUP_BLANK who=enter_begin park=(%.1f,%.1f) path=KEY_ENTER" % [park.x, park.y])
+	var down := InputEventKey.new()
+	down.pressed = true
+	down.echo = false
+	down.keycode = KEY_ENTER
+	down.physical_keycode = KEY_ENTER
+	down.key_label = KEY_ENTER
+	Input.parse_input_event(down)
+	if Input.has_method("flush_buffered_events"):
+		Input.flush_buffered_events()
+	var up := InputEventKey.new()
+	up.pressed = false
+	up.echo = false
+	up.keycode = KEY_ENTER
+	up.physical_keycode = KEY_ENTER
+	up.key_label = KEY_ENTER
+	Input.parse_input_event(up)
+	if Input.has_method("flush_buffered_events"):
+		Input.flush_buffered_events()
 	_phase = Phase.WAIT_BOOT_CLOSED
 
 
@@ -276,11 +393,20 @@ func _do_post_dismiss() -> void:
 func _do_resize() -> void:
 	_timing["resize_usec"] = Time.get_ticks_usec()
 	_log_window("pre_shrink")
-	_force_window(RESIZE_W, RESIZE_H, false)
-	_log(
-		"EOA_STARTUP_PARITY who=controlled_resize %dx%d (product Begin does not set_size; harness sets window+root.size)"
-		% [RESIZE_W, RESIZE_H]
-	)
+	if _blank_mode:
+		# Live desktop: AOT clear un-maximizes 1920x1135 → 1280x800.
+		# Harness sets both window size and root.size (#166 viewport-parity contract).
+		_force_window(BLANK_RESIZE_W, BLANK_RESIZE_H, false)
+		_log(
+			"EOA_STARTUP_BLANK who=unmaximize_resize %dx%d (window+root.size; product Begin does not set_size)"
+			% [BLANK_RESIZE_W, BLANK_RESIZE_H]
+		)
+	else:
+		_force_window(RESIZE_W, RESIZE_H, false)
+		_log(
+			"EOA_STARTUP_PARITY who=controlled_resize %dx%d (product Begin does not set_size; harness sets window+root.size)"
+			% [RESIZE_W, RESIZE_H]
+		)
 	_log_window("shrink_applied")
 	_go_settle(Phase.POST_RESIZE)
 
@@ -302,7 +428,78 @@ func _do_post_resize() -> void:
 	var snap := _capture_observation(label, title_vis)
 	_snapshots.append(snap)
 	_log("EOA_STARTUP_PARITY who=%s shot=%s" % [label, str(snap.get("png", ""))])
-	_phase = Phase.FINISH
+	_note_camera_bounds(snap, "post_resize")
+	if _blank_mode:
+		_start_soak()
+	else:
+		_phase = Phase.FINISH
+
+
+func _blank_soak_secs() -> int:
+	var raw := OS.get_environment("EOA_STARTUP_BLANK_SOAK_S").strip_edges()
+	if raw.is_valid_int():
+		return maxi(int(raw), 2)
+	return DEFAULT_BLANK_SOAK_S
+
+
+func _start_soak() -> void:
+	var soak_s: int = _blank_soak_secs()
+	_soak_until_usec = Time.get_ticks_usec() + soak_s * 1000000
+	_last_soak_log = -1
+	_log("EOA_STARTUP_BLANK who=soak_start secs=%d" % soak_s)
+	_phase = Phase.SOAK
+
+
+func _tick_soak() -> void:
+	var now: int = Time.get_ticks_usec()
+	var elapsed: int = int((now - int(_timing.get("post_resize_usec", now))) / 1000000.0)
+	if elapsed != _last_soak_log:
+		_last_soak_log = elapsed
+		var snap: Dictionary = _collect_presentation("soak_%d" % elapsed, false)
+		_camera_trace.append({
+			"elapsed_s": elapsed,
+			"camera_pos": snap.get("camera_pos", []),
+			"camera_zoom": snap.get("camera_zoom", 0.0),
+			"capital_in_visible_rect": snap.get("capital_in_visible_rect", false),
+			"viewport_size": snap.get("viewport_size", []),
+		})
+		_log(
+			"EOA_STARTUP_BLANK who=soak_s=%d cam=%s zoom=%s capital_in_view=%s vp=%s mesh_in_view=%s"
+			% [
+				elapsed,
+				str(snap.get("camera_pos", [])),
+				str(snap.get("camera_zoom", 0.0)),
+				str(snap.get("capital_in_visible_rect", false)),
+				str(snap.get("viewport_size", [])),
+				str((snap.get("mesh", {}) as Dictionary).get("in_view", -1)),
+			]
+		)
+		_note_camera_bounds(snap, "soak_%d" % elapsed)
+	if now >= _soak_until_usec:
+		var end_snap: Dictionary = _capture_observation("post_soak", false)
+		_snapshots.append(end_snap)
+		_note_camera_bounds(end_snap, "post_soak")
+		_phase = Phase.FINISH
+
+
+func _note_camera_bounds(snap: Dictionary, label: String) -> void:
+	if not _blank_mode:
+		return
+	var in_view := bool(snap.get("capital_in_visible_rect", false))
+	var zoom := float(snap.get("camera_zoom", 0.0))
+	var mesh: Dictionary = snap.get("mesh", {}) as Dictionary
+	var mesh_in_view := int(mesh.get("in_view", -1))
+	var img: Dictionary = snap.get("image", {}) as Dictionary
+	var varied := bool(img.get("looks_varied_color", false)) if not img.is_empty() else true
+	var uniform := bool(img.get("looks_uniform_light", false)) if not img.is_empty() else false
+	var zoom_ok := zoom >= 0.05 and zoom <= 3.5
+	if in_view and zoom_ok and mesh_in_view >= 8 and not uniform:
+		_blank_pass.append("%s capital_in_view zoom=%.3f mesh_in_view=%d" % [label, zoom, mesh_in_view])
+		return
+	_blank_fail.append(
+		"%s capital_in_view=%s zoom=%.3f mesh_in_view=%d varied=%s uniform_light=%s cam=%s"
+		% [label, str(in_view), zoom, mesh_in_view, str(varied), str(uniform), str(snap.get("camera_pos", []))]
+	)
 
 
 func _go_settle(next_phase: int) -> void:
@@ -993,17 +1190,19 @@ func _classify_viewport_parity() -> String:
 		if who == "post_resize":
 			post_vp = Vector2(float(row.get("vp_w", 0.0)), float(row.get("vp_h", 0.0)))
 			post_win = Vector2i(wx, wy)
+	var want_w: int = BLANK_RESIZE_W if _blank_mode else RESIZE_W
+	var want_h: int = BLANK_RESIZE_H if _blank_mode else RESIZE_H
 	_log(
 		"EOA_STARTUP_PARITY who=viewport_parity pre_win=%dx%d pre_vp=%.0fx%.0f post_win=%dx%d post_vp=%.0fx%.0f want=%dx%d"
-		% [pre_win.x, pre_win.y, pre_vp.x, pre_vp.y, post_win.x, post_win.y, post_vp.x, post_vp.y, RESIZE_W, RESIZE_H]
+		% [pre_win.x, pre_win.y, pre_vp.x, pre_vp.y, post_win.x, post_win.y, post_vp.x, post_vp.y, want_w, want_h]
 	)
 	if post_vp.x <= 0.0 or post_vp.y <= 0.0:
 		return "FAIL_no_post_size"
 	if is_equal_approx(post_vp.x, pre_vp.x) and is_equal_approx(post_vp.y, pre_vp.y):
 		return "FAIL_viewport_unchanged"
-	if absf(post_vp.x - float(RESIZE_W)) > 8.0 or absf(post_vp.y - float(RESIZE_H)) > 8.0:
+	if absf(post_vp.x - float(want_w)) > 8.0 or absf(post_vp.y - float(want_h)) > 8.0:
 		if post_vp.x < pre_vp.x - 8.0 or post_vp.y < pre_vp.y - 8.0:
-			_presentation_notes.append("viewport_shrank_but_not_exact_860x550")
+			_presentation_notes.append("viewport_shrank_but_not_exact_target")
 			return "PASS"
 		return "FAIL_viewport_not_shrunk"
 	return "PASS"
@@ -1044,6 +1243,15 @@ func _finish() -> void:
 		_live_blank = _classify_live_blank()
 	var data_ok := _data_fail.is_empty() and not _pre_data.is_empty()
 	var fixture_ok := _fixture_fail.is_empty()
+	var blank_ok := (not _blank_mode) or _blank_fail.is_empty()
+	if _blank_mode and not blank_ok:
+		_fixture_fail.append("startup_blank_camera_or_map")
+		fixture_ok = false
+	var begin_path := "LivingTitleBoot.handle_live_begin"
+	if _begin_mode == "pointer":
+		begin_path = "synthetic_mouse_press_LivingTitleBegin+leftover_release"
+	elif _begin_mode == "enter":
+		begin_path = "synthetic_KEY_ENTER"
 	var payload := {
 		"guard": "WindowedStartupParityTest",
 		"kind": "TEST_ONLY_DIAGNOSTIC",
@@ -1053,9 +1261,14 @@ func _finish() -> void:
 		"display": _ds_name,
 		"adapter": _adapter_name,
 		"import_policy": "separate_headless_import_then_one_windowed_run",
-		"begin_path": "LivingTitleBoot.handle_live_begin",
+		"begin_path": begin_path,
+		"blank_mode": _blank_mode,
+		"blank_begin": _begin_mode,
+		"blank_pass": _blank_pass,
+		"blank_fail": _blank_fail,
+		"camera_trace": _camera_trace,
 		"launch_flags": "--resolution 1280x800 --position 0,0 --maximized",
-		"wm": "xfwm4 --compositor=off on Xvfb 1280x800",
+		"wm": "xfwm4 --compositor=off on Xvfb 1920x1200" if _blank_mode else "xfwm4 --compositor=off on Xvfb 1280x800",
 		"timing_usec": _timing,
 		"timing_note": "monotonic Time.get_ticks_usec since engine start; not wall 4x30s waits",
 		"begin_return": _begin_out,
@@ -1077,6 +1290,7 @@ func _finish() -> void:
 			"PRESENTATION": "DIAGNOSTIC",
 			"LIVE_BLANK": _live_blank,
 			"FIXTURE": "PASS" if fixture_ok else "FAIL",
+			"STARTUP_BLANK": "PASS" if blank_ok else "FAIL",
 			"LIVE_STARTUP": "NOT_CLAIMED",
 		},
 		"coverage_gaps": [
@@ -1092,6 +1306,16 @@ func _finish() -> void:
 	_log("EOA_STARTUP_PARITY GARRISON_SKIP=%s VIEWPORT_PARITY=%s" % [payload["labels"]["GARRISON_SKIP"], _viewport_parity])
 	_log("EOA_STARTUP_PARITY PRESENTATION=DIAGNOSTIC LIVE_BLANK=%s" % _live_blank)
 	_log("EOA_STARTUP_PARITY FIXTURE=%s LIVE_STARTUP=NOT_CLAIMED" % payload["labels"]["FIXTURE"])
+	if _blank_mode:
+		_log("EOA_STARTUP_BLANK STARTUP_BLANK=%s begin=%s mutant=%s" % [
+			payload["labels"]["STARTUP_BLANK"],
+			_begin_mode,
+			OS.get_environment("EOA_STARTUP_BLANK_MUTANT"),
+		])
+		for r in _blank_pass:
+			_log("  [BLANK_PASS] %s" % r)
+		for r in _blank_fail:
+			_log("  [BLANK_FAIL] %s" % r)
 	for r in _fixture_fail:
 		_log("  [FIXTURE] %s" % r)
 	for r in _data_fail:
@@ -1112,7 +1336,36 @@ func _root_window() -> Window:
 	return null
 
 
-func _force_window(w: int, h: int, maximize: bool) -> void:
+func _make_mouse(screen_pt: Vector2, pressed: bool) -> InputEventMouseButton:
+	_event_seq += 1
+	var ev := InputEventMouseButton.new()
+	ev.device = 0
+	ev.button_index = MOUSE_BUTTON_LEFT
+	ev.pressed = pressed
+	ev.canceled = false
+	ev.double_click = false
+	ev.position = screen_pt
+	ev.global_position = screen_pt
+	ev.button_mask = MOUSE_BUTTON_MASK_LEFT if pressed else 0
+	ev.set_meta("eoa_startup_blank_seq", _event_seq)
+	return ev
+
+
+func _warp_mouse(screen_pt: Vector2) -> void:
+	var vp: Viewport = root.get_viewport() if root != null else null
+	if vp != null:
+		vp.warp_mouse(screen_pt)
+	DisplayServer.warp_mouse(Vector2i(int(round(screen_pt.x)), int(round(screen_pt.y))))
+
+
+func _current_mouse() -> Vector2:
+	var vp: Viewport = root.get_viewport() if root != null else null
+	if vp != null:
+		return vp.get_mouse_position()
+	return _pointer_pt
+
+
+func _force_window(w: int, h: int, maximize: bool, clamp_root: bool = true) -> void:
 	if DisplayServer.get_name() == "headless":
 		return
 	var win := _root_window()
@@ -1120,7 +1373,7 @@ func _force_window(w: int, h: int, maximize: bool) -> void:
 		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_MAXIMIZED)
 		if win != null:
 			win.mode = Window.MODE_MAXIMIZED
-		if root != null:
+		if clamp_root and root != null:
 			root.size = Vector2i(VIEW_W, VIEW_H)
 		return
 	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)

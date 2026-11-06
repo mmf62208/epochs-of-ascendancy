@@ -22,3 +22,16 @@ Launch Godot only via `tools/run_godot.sh` (4.7.1). Needs xvfb + xfwm4. Output g
 6. **Post-Begin blank.** Scored only after (4) and (5) hold. Diagnostic; xvfb + xfwm4 + llvmpipe is not live desktop GPU/WM.
 
 Windowed run is not on the official `--quick` gate.
+
+## STARTUP-BLANK (pointer vs Enter)
+
+Extends this same harness (`WindowedStartupParityTest.gd` + this wrapper). Default path above is unchanged.
+
+```bash
+# pointer-Begin + Enter-Begin + pointer mutant (Xvfb 1920×1200, un-maximize to 1280×800)
+EOA_STARTUP_BLANK=1 EOA_STARTUP_PARITY_OUT=/tmp/eoa-startup-blank tools/eoa_startup_parity.sh
+# same:
+tools/eoa_startup_blank.sh
+```
+
+`EOA_STARTUP_BLANK_BEGIN=pointer|enter` runs one variant. Mutant: `EOA_STARTUP_BLANK_MUTANT=1`. Soak: `EOA_STARTUP_BLANK_SOAK_S` (wrapper default 120s). See `docs/evidence/startup_blank/`.

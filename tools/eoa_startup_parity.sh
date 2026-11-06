@@ -9,6 +9,13 @@
 # Order: inventory → empty-board garrison (headless) → seed hash (headless,
 # EOA_PERF4_SEED_ONLY) → import → one windowed xvfb+xfwm4 process.
 # Finite timeouts. Launch only via tools/run_godot.sh.
+#
+# STARTUP-BLANK extension (does not change the default #166 path):
+#   EOA_STARTUP_BLANK=1              pointer + Enter + pointer-mutant on 1920x1200
+#   EOA_STARTUP_BLANK_BEGIN=pointer  one pointer-Begin run (iteration)
+#   EOA_STARTUP_BLANK_BEGIN=enter    one Enter-Begin run
+#   EOA_STARTUP_BLANK_MUTANT=1       revert product fix (pointer must FAIL)
+#   EOA_STARTUP_BLANK_SOAK_S=120     post-resize soak seconds (default 25 in-engine)
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
@@ -188,88 +195,191 @@ if pgrep -af '[g]odot' >/dev/null; then
   exit 2
 fi
 
-LOG="$OUT/windowed.log"
-RSS_LOG="$OUT/rss.txt"
-: > "$RSS_LOG"
-echo "EOA_STARTUP_PARITY who=windowed_one_run timeout=600s xvfb=1280x800 xfwm4 --maximized"
-
-# Private X server + XFCE WM so maximize/resize ConfigureNotify reaches Godot.
-# Screen matches the live pair (1280x800). xfwm4 compositor off (llvmpipe).
-Xvfb :91 -screen 0 1280x800x24 -ac +extension GLX +render -noreset \
-  >"$OUT/xvfb.log" 2>&1 &
-XVFB_PID=$!
-sleep 0.4
-export DISPLAY=:91
-if command -v dbus-launch >/dev/null 2>&1; then
-  # shellcheck disable=SC2046
-  eval "$(dbus-launch --sh-syntax)"
-fi
-xfwm4 --replace --compositor=off --sm-client-disable >"$OUT/xfwm4.log" 2>&1 &
-WM_PID=$!
-sleep 0.6
-echo "EOA_STARTUP_PARITY who=wm xvfb_pid=$XVFB_PID xfwm4_pid=$WM_PID DISPLAY=$DISPLAY"
-
-set +e
-timeout 600 flock -n "$LOCK" \
-  "${ROOT}/tools/run_godot.sh" --path . --resolution 1280x800 --position 0,0 --maximized \
-  -s res://scripts/core/WindowedStartupParityTest.gd \
-  >"$LOG" 2>&1 &
-WRAP=$!
-peak_kb=0
-while kill -0 "$WRAP" 2>/dev/null; do
-  child_kb=0
-  GODOT_PIDS="$(pgrep -d ' ' -f 'WindowedStartupParityTest|Godot_v4|Applications/Godot-4.7.1/godot' 2>/dev/null || true)"
-  for pid in $GODOT_PIDS; do
-    [[ -z "$pid" ]] && continue
-    kb="$(awk '/VmRSS/{print $2}' "/proc/$pid/status" 2>/dev/null || true)"
-    if [[ -n "${kb:-}" ]]; then
-      child_kb=$((child_kb + kb))
-    fi
-  done
-  if [[ "${child_kb:-0}" -gt "$peak_kb" ]]; then
-    peak_kb="$child_kb"
+run_windowed() {
+  local name="$1"
+  local begin="${2:-}"
+  local mutant="${3:-0}"
+  local xvfb_geom="$4"
+  local disp="$5"
+  local expect_blank="${6:-}"
+  local vdir="$OUT"
+  if [[ -n "$name" ]]; then
+    vdir="$OUT/$name"
   fi
-  echo "rss_sample_kb=${child_kb:-0} peak_kb=$peak_kb" >> "$RSS_LOG"
-  sleep 2
-done
-wait "$WRAP"
-code=$?
-set -e
-mb="$(awk -v k="$peak_kb" 'BEGIN{printf "%.1f", k/1024}')"
-echo "EOA_STARTUP_PARITY who=windowed_done rc=$code rss_mb=$mb"
+  mkdir -p "$vdir"
+  local log="$vdir/windowed.log"
+  local rss="$vdir/rss.txt"
+  : > "$rss"
+  echo "EOA_STARTUP_PARITY who=windowed_one_run name=${name:-default} begin=${begin:-handle_live_begin} mutant=$mutant xvfb=$xvfb_geom display=$disp timeout=720s"
+
+  Xvfb "$disp" -screen 0 "${xvfb_geom}x24" -ac +extension GLX +render -noreset \
+    >"$vdir/xvfb.log" 2>&1 &
+  XVFB_PID=$!
+  sleep 0.4
+  export DISPLAY="$disp"
+  if command -v dbus-launch >/dev/null 2>&1; then
+    # shellcheck disable=SC2046
+    eval "$(dbus-launch --sh-syntax)"
+  fi
+  xfwm4 --replace --compositor=off --sm-client-disable >"$vdir/xfwm4.log" 2>&1 &
+  WM_PID=$!
+  sleep 0.6
+  echo "EOA_STARTUP_PARITY who=wm name=${name:-default} xvfb_pid=$XVFB_PID xfwm4_pid=$WM_PID DISPLAY=$DISPLAY"
+
+  local xdg_data="$XDG_DATA_HOME"
+  local xdg_config="$XDG_CONFIG_HOME"
+  local xdg_cache="$XDG_CACHE_HOME"
+  if [[ -n "$name" ]]; then
+    xdg_data="$vdir/xdg/data"
+    xdg_config="$vdir/xdg/config"
+    xdg_cache="$vdir/xdg/cache"
+    mkdir -p "$xdg_data" "$xdg_config" "$xdg_cache"
+  fi
+
+  set +e
+  timeout 720 flock -n "$LOCK" \
+    env \
+      EOA_STARTUP_PARITY_OUT="$vdir" \
+      EOA_STARTUP_BLANK_OUT="$vdir" \
+      EOA_STARTUP_BLANK_BEGIN="$begin" \
+      EOA_STARTUP_BLANK_MUTANT="$mutant" \
+      EOA_STARTUP_BLANK_SOAK_S="${EOA_STARTUP_BLANK_SOAK_S:-}" \
+      XDG_DATA_HOME="$xdg_data" \
+      XDG_CONFIG_HOME="$xdg_config" \
+      XDG_CACHE_HOME="$xdg_cache" \
+      DISPLAY="$disp" \
+    "${ROOT}/tools/run_godot.sh" --path . --resolution 1280x800 --position 0,0 --maximized \
+      -s res://scripts/core/WindowedStartupParityTest.gd \
+    >"$log" 2>&1 &
+  WRAP=$!
+  local peak_kb=0
+  while kill -0 "$WRAP" 2>/dev/null; do
+    local child_kb=0
+    GODOT_PIDS="$(pgrep -d ' ' -f 'WindowedStartupParityTest|Godot_v4|Applications/Godot-4.7.1/godot' 2>/dev/null || true)"
+    for pid in $GODOT_PIDS; do
+      [[ -z "$pid" ]] && continue
+      local kb
+      kb="$(awk '/VmRSS/{print $2}' "/proc/$pid/status" 2>/dev/null || true)"
+      if [[ -n "${kb:-}" ]]; then
+        child_kb=$((child_kb + kb))
+      fi
+    done
+    if [[ "${child_kb:-0}" -gt "$peak_kb" ]]; then
+      peak_kb="$child_kb"
+    fi
+    echo "rss_sample_kb=${child_kb:-0} peak_kb=$peak_kb" >> "$rss"
+    sleep 2
+  done
+  wait "$WRAP"
+  local code=$?
+  set -e
+  kill "$WM_PID" 2>/dev/null || true
+  kill "$XVFB_PID" 2>/dev/null || true
+  WM_PID=""
+  XVFB_PID=""
+  WRAP=""
+  local mb
+  mb="$(awk -v k="$peak_kb" 'BEGIN{printf "%.1f", k/1024}')"
+  echo "EOA_STARTUP_PARITY who=windowed_done name=${name:-default} rc=$code rss_mb=$mb"
+  LOG="$log"
+
+  if grep -Eiq "SCRIPT ERROR|SIGSEGV" "$log"; then
+    echo "WindowedStartupParityTest: RESULT=FIXTURE_FAIL engine_error name=${name:-default} log=$log"
+    echo "LIVE_BLANK=INCOMPLETE LIVE_STARTUP=NOT_CLAIMED"
+    grep -Ei "SCRIPT ERROR|SIGSEGV" "$log" || true
+    return 1
+  fi
+  if grep -q "LIVE_STARTUP=PASS" "$log"; then
+    echo "WindowedStartupParityTest: RESULT=FIXTURE_FAIL refused_live_startup_pass"
+    return 1
+  fi
+  if [[ -n "$expect_blank" ]]; then
+    grep -E "EOA_STARTUP_BLANK |EOA_STARTUP_PARITY |WindowedStartupParityTest:" "$log" | tail -n 60 || true
+    if [[ "$expect_blank" == "PASS" ]]; then
+      if ! grep -q "WindowedStartupParityTest: RESULT=COMPLETED" "$log"; then
+        echo "WindowedStartupBlank: RESULT=FAIL name=$name want COMPLETED"
+        tail -n 40 "$log" || true
+        return 1
+      fi
+      if ! grep -q "STARTUP_BLANK=PASS" "$log"; then
+        echo "WindowedStartupBlank: RESULT=FAIL name=$name want STARTUP_BLANK=PASS"
+        return 1
+      fi
+    else
+      if grep -q "STARTUP_BLANK=PASS" "$log"; then
+        echo "WindowedStartupBlank: RESULT=FAIL name=$name mutant was not killed (STARTUP_BLANK=PASS)"
+        return 1
+      fi
+      if ! grep -q "STARTUP_BLANK=FAIL" "$log"; then
+        echo "WindowedStartupBlank: RESULT=FAIL name=$name mutant want STARTUP_BLANK=FAIL"
+        return 1
+      fi
+      echo "EOA_STARTUP_BLANK who=mutant_killed name=$name"
+    fi
+    return 0
+  fi
+
+  if ! grep -q "WindowedStartupParityTest: RESULT=COMPLETED" "$log"; then
+    echo "WindowedStartupParityTest: RESULT=FIXTURE_FAIL rc=$code log=$log"
+    echo "LIVE_BLANK=INCOMPLETE LIVE_STARTUP=NOT_CLAIMED"
+    tail -n 80 "$log" || true
+    return 1
+  fi
+  if ! grep -q "VIEWPORT_PARITY=PASS" "$log"; then
+    echo "WindowedStartupParityTest: RESULT=FIXTURE_FAIL viewport_parity_not_pass"
+    echo "LIVE_BLANK=INCOMPLETE LIVE_STARTUP=NOT_CLAIMED"
+    grep -E "VIEWPORT_PARITY=|who=viewport_parity|who=window_" "$log" || true
+    return 1
+  fi
+  echo "WindowedStartupParityTest: RESULT=COMPLETED rss_mb=$mb (NOT live-startup PASS)"
+  grep -E "DATA_INVARIANT=|GARRISON_SKIP=|VIEWPORT_PARITY=|LIVE_BLANK=|FIXTURE=|LIVE_STARTUP=|who=live_garrison|who=empty_seed|who=viewport_parity" "$log" || true
+  return 0
+}
+
+BLANK_ALL="${EOA_STARTUP_BLANK:-0}"
+BLANK_BEGIN="${EOA_STARTUP_BLANK_BEGIN:-}"
+if [[ "$BLANK_ALL" == "1" || -n "$BLANK_BEGIN" ]]; then
+  export EOA_STARTUP_BLANK_SOAK_S="${EOA_STARTUP_BLANK_SOAK_S:-120}"
+  echo "EOA_STARTUP_BLANK who=wrapper_blank soak_s=$EOA_STARTUP_BLANK_SOAK_S begin=${BLANK_BEGIN:-all} all=$BLANK_ALL"
+  overall=0
+  if [[ "$BLANK_ALL" == "1" || "$BLANK_BEGIN" == "pointer" ]]; then
+    if [[ "${EOA_STARTUP_BLANK_MUTANT:-0}" == "1" && "$BLANK_BEGIN" == "pointer" ]]; then
+      run_windowed "mutant_pointer" "pointer" "1" "1920x1200" ":87" "FAIL" || overall=1
+    else
+      run_windowed "pointer" "pointer" "0" "1920x1200" ":87" "PASS" || overall=1
+    fi
+  fi
+  if [[ "$BLANK_ALL" == "1" || "$BLANK_BEGIN" == "enter" ]]; then
+    run_windowed "enter" "enter" "0" "1920x1200" ":88" "PASS" || overall=1
+  fi
+  if [[ "$BLANK_ALL" == "1" ]]; then
+    run_windowed "mutant_pointer" "pointer" "1" "1920x1200" ":89" "FAIL" || overall=1
+  fi
+  if [[ -d /opt/cursor/artifacts ]]; then
+    mkdir -p /opt/cursor/artifacts/startup-blank
+    cp -f "$OUT"/seed_hash.txt /opt/cursor/artifacts/startup-blank/ 2>/dev/null || true
+    cp -f "$OUT"/empty_board_garrison.log /opt/cursor/artifacts/startup-blank/ 2>/dev/null || true
+  fi
+  if [[ $overall -ne 0 ]]; then
+    echo "WindowedStartupBlank: RESULT=FAIL"
+    exit 1
+  fi
+  echo "WindowedStartupBlank: RESULT=PASS (NOT live-startup PASS)"
+  exit 0
+fi
+
+# Default #166 path: 1280x800 xvfb, handle_live_begin, 860x550 shrink.
+if ! run_windowed "" "" "0" "1280x800" ":91" ""; then
+  exit 1
+fi
 
 if [[ -d /opt/cursor/artifacts ]]; then
   mkdir -p /opt/cursor/artifacts/startup-parity
   cp -f "$OUT"/*.json /opt/cursor/artifacts/startup-parity/ 2>/dev/null || true
   cp -f "$OUT"/*.png /opt/cursor/artifacts/startup-parity/ 2>/dev/null || true
-  cp -f "$LOG" /opt/cursor/artifacts/startup-parity/windowed.log 2>/dev/null || true
+  cp -f "${LOG:-$OUT/windowed.log}" /opt/cursor/artifacts/startup-parity/windowed.log 2>/dev/null || true
   cp -f "$OUT/empty_board_garrison.log" /opt/cursor/artifacts/startup-parity/ 2>/dev/null || true
   cp -f "$OUT/seed_hash.log" /opt/cursor/artifacts/startup-parity/ 2>/dev/null || true
   cp -f "$OUT/seed_hash.txt" /opt/cursor/artifacts/startup-parity/ 2>/dev/null || true
 fi
-
-if ! grep -q "WindowedStartupParityTest: RESULT=COMPLETED" "$LOG"; then
-  echo "WindowedStartupParityTest: RESULT=FIXTURE_FAIL rc=$code log=$LOG"
-  echo "LIVE_BLANK=INCOMPLETE LIVE_STARTUP=NOT_CLAIMED"
-  tail -n 80 "$LOG" || true
-  exit 1
-fi
-if grep -Eiq "SCRIPT ERROR|SIGSEGV" "$LOG"; then
-  echo "WindowedStartupParityTest: RESULT=FIXTURE_FAIL engine_error log=$LOG"
-  echo "LIVE_BLANK=INCOMPLETE LIVE_STARTUP=NOT_CLAIMED"
-  grep -Ei "SCRIPT ERROR|SIGSEGV" "$LOG" || true
-  exit 1
-fi
-if grep -q "LIVE_STARTUP=PASS" "$LOG"; then
-  echo "WindowedStartupParityTest: RESULT=FIXTURE_FAIL refused_live_startup_pass"
-  exit 1
-fi
-if ! grep -q "VIEWPORT_PARITY=PASS" "$LOG"; then
-  echo "WindowedStartupParityTest: RESULT=FIXTURE_FAIL viewport_parity_not_pass"
-  echo "LIVE_BLANK=INCOMPLETE LIVE_STARTUP=NOT_CLAIMED"
-  grep -E "VIEWPORT_PARITY=|who=viewport_parity|who=window_" "$LOG" || true
-  exit 1
-fi
-echo "WindowedStartupParityTest: RESULT=COMPLETED rss_mb=$mb (NOT live-startup PASS)"
-grep -E "DATA_INVARIANT=|GARRISON_SKIP=|VIEWPORT_PARITY=|LIVE_BLANK=|FIXTURE=|LIVE_STARTUP=|who=live_garrison|who=empty_seed|who=viewport_parity" "$LOG" || true
 exit 0
