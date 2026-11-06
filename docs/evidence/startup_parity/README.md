@@ -1,46 +1,24 @@
-# STARTUP-PARITY — test-only Begin→viewport diagnostic
+# STARTUP-PARITY harness
 
-**MERGE: HOLD.** Test / harness / this note only. **Not** a product fix.
-Does **not** touch PR **#164** or PR **#165**.
+Test-only. Not a product fix. Never claims live-startup PASS.
 
-## What this is
-
-A **new** branch (not `cursor/startup-guard-1-5dbe`) that makes two
-previously unverified gaps measurable:
-
-1. **Fixture/baseline parity.** Why a prior xvfb guard saw **535** `garrison_1936`
-   chips against the required empty-board **575**. Same `world_accurate` files
-   (3596 IDs, Berlin `710300`) on both the empty-board seed and the live
-   TestScenario living-title → Begin path. Occupied OOB land hexes are skipped.
-2. **True viewport parity.** Live launch flags `--resolution 1280x800
-   --position 0,0 --maximized`, title ALWAYS_ON_TOP, then a post-Begin shrink
-   that actually changes `get_viewport().get_visible_rect().size` (not only
-   `DisplayServer.window_get_size`). Xvfb **+ xfwm4**.
-
-Only after both hold does the harness classify post-Begin blank.
-
-It **never** claims live-startup **PASS**.
-
-## Reproducible command
+## Run
 
 ```bash
 EOA_STARTUP_PARITY_OUT=/tmp/eoa-startup-parity tools/eoa_startup_parity.sh
 ```
 
-## Cited run
+Launch Godot only via `tools/run_godot.sh` (4.7.1). Needs xvfb + xfwm4. Output goes to `$EOA_STARTUP_PARITY_OUT` (default `/tmp/eoa-startup-parity`).
 
-`docs/evidence/startup_parity/run-7d7a0b85-xvfb/` (also `/opt/cursor/artifacts/startup-parity/`).
+`--quick` does **not** run the windowed wrapper. It does run `test_startup_parity_inventory` (static 3596 / Berlin `710300` file hashes).
 
-| Label | Value |
-|-------|-------|
-| `DATA_INVARIANT` | PASS |
-| `GARRISON_SKIP` | PASS (live 535 + skip 40 = empty-board **575** targets) |
-| `VIEWPORT_PARITY` | PASS (visible_rect 1280×800 → **860×550**) |
-| `LIVE_BLANK` | **NOT_REPRODUCED** |
-| `LIVE_STARTUP` | **NOT_CLAIMED** |
+## What it checks
 
-Seed md5 **`20fe9063de285f19d4f9b8a105abfd31`**. Engine `4.7.1.stable.official.a13da4feb`. xvfb + xfwm4; Vulkan missing → OpenGL/llvmpipe.
+1. **Inventory (no Godot).** Shipped `world_accurate` files: 3596 province IDs, Berlin `710300` present, SHA-256 of the five key JSONs.
+2. **Empty-board garrisons (headless).** `CampaignLoopTestBoot` + `seed_1936_start_garrisons`: **targets 575 = placed + skipped_occupied**. Empty board places 575 / skip 0. One occupied Berlin hex skips 1.
+3. **Seed-only (headless).** `EOA_PERF4_SEED_ONLY=1` on `HeadlessPerf4LiveMultiAiDayTest` recomputes md5 of the `multi_ai_decisions=` line. Expect prefix `20fe9063`. If the hash moved, stop — do not retarget the seed.
+4. **Live fixture (windowed).** TestScenario living title → `LivingTitleBoot.handle_live_begin` (GER 1936). Same board as (2); live placed count is below 575 when OOB land already occupies border/capital hexes. Identity is still **targets = placed + skipped_occupied**.
+5. **Viewport shrink.** Launch `--resolution 1280x800 --position 0,0 --maximized`. After Begin, harness sets **window + `root.size`** to 860×550 and requires `get_viewport().get_visible_rect().size` to change (`VIEWPORT_PARITY=PASS`). Title ALWAYS_ON_TOP is observed from product code (on while the title is up, off at teardown).
+6. **Post-Begin blank.** Scored only after (4) and (5) hold. Diagnostic; xvfb + xfwm4 + llvmpipe is not live desktop GPU/WM.
 
-**No live-startup PASS. No product fix.** Full numbers in `run-7d7a0b85-xvfb/RESULT.md`.
-
-`--quick` on this tip: **ALL PASSED**. map_qc NE **0.9853**.
+Windowed run is not on the official `--quick` gate.
