@@ -58,9 +58,9 @@ class TestMapStatesMapmodeProduct(unittest.TestCase):
 
     def test_renderer_and_toolbar_wire_states_terrain(self) -> None:
         ren = RENDERER.read_text(encoding="utf-8")
-        self.assertIn('set_map_mode("states")', ren)
-        self.assertIn('set_map_mode("terrain")', ren)
-        self.assertIn('set_map_mode("resources")', ren)
+        self.assertIn('_toggle_map_mode_hotkey("states")', ren)
+        self.assertIn('_toggle_map_mode_hotkey("terrain")', ren)
+        self.assertIn('_toggle_map_mode_hotkey("resources")', ren)
         self.assertIn("KEY_F9", ren)
         self.assertIn('debug_tint_mode == "states"', ren)
         self.assertIn('debug_tint_mode == "terrain"', ren)
@@ -82,8 +82,9 @@ class TestMapStatesMapmodeProduct(unittest.TestCase):
         input_i = ren.find("func _input")
         unh_i = ren.find("func _unhandled_input")
         input_fn = ren[input_i:unh_i]
-        self.assertIn('set_map_mode("terrain")', input_fn)
-        self.assertIn('set_map_mode("states")', input_fn)
+        self.assertIn("_handle_mapmode_hotkey", input_fn)
+        self.assertIn('_toggle_map_mode_hotkey("terrain")', ren)
+        self.assertIn('_toggle_map_mode_hotkey("states")', ren)
         self.assertIn("func _sync_mapmode_toolbar", ren)
 
 

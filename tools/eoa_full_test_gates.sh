@@ -120,6 +120,8 @@ run_step unit_board_play_path \
     tools.map_generation.tests.test_map_war_path_surface_product \
     tools.map_generation.tests.test_map_states_mapmode_product \
     tools.map_generation.tests.test_map_mode_toolbar_active_product \
+    tools.map_generation.tests.test_first20_p2_unit_lod_product \
+    tools.map_generation.tests.test_first20_p2_mapmode_toggle_product \
     tools.map_generation.tests.test_map_state_labels_surface_product \
     tools.map_generation.tests.test_map_nation_label_landmass_product \
     tools.map_generation.tests.test_map_live_border_fronts_surface_product \

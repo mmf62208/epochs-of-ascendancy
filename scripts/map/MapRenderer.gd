@@ -684,6 +684,8 @@ const SECONDARY_INTENSITY_PRESETS: Dictionary = {
 ## Modes whose primary fill strength is scaled by intensity.
 const INTENSITY_LINKED_MODES: Array = ["strain", "vitality", "development", "loyalty", "munitions"]
 var current_map_mode: String = "political"  # "political" | "strain" | "vitality" | "development" | "supply" | "munitions" | "loyalty" | "infra"  (Phase 2 map UX)
+## FIRST20-P2 F7: F-key toggle returns to this mode (default political).
+var _map_mode_hotkey_prior: String = "political"
 ## Pass 13: weather legend click filter (empty = show all ground states).
 var weather_ground_filter: String = ""
 
@@ -3271,45 +3273,7 @@ func _input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 			return
 		# Mapmodes in _input so toolbar/search focus cannot swallow F2–F4 / Ctrl+F9.
-		if event.keycode == KEY_F1:
-			set_map_mode("political")
-			get_viewport().set_input_as_handled()
-			return
-		if event.keycode == KEY_F2:
-			set_map_mode("strain")
-			get_viewport().set_input_as_handled()
-			return
-		if event.keycode == KEY_F3:
-			set_map_mode("vitality")
-			get_viewport().set_input_as_handled()
-			return
-		if event.keycode == KEY_F4:
-			set_map_mode("development")
-			get_viewport().set_input_as_handled()
-			return
-		if event.keycode == KEY_F5:
-			set_map_mode("supply")
-			get_viewport().set_input_as_handled()
-			return
-		if event.keycode == KEY_F6:
-			set_map_mode("loyalty")
-			get_viewport().set_input_as_handled()
-			return
-		if event.keycode == KEY_F7:
-			set_map_mode("infra")
-			get_viewport().set_input_as_handled()
-			return
-		if event.keycode == KEY_F8:
-			set_map_mode("weather")
-			get_viewport().set_input_as_handled()
-			return
-		if event.keycode == KEY_F9:
-			if event.ctrl_pressed:
-				set_map_mode("terrain")
-			elif event.shift_pressed:
-				set_map_mode("states")
-			else:
-				set_map_mode("resources")
+		if _handle_mapmode_hotkey(event):
 			get_viewport().set_input_as_handled()
 			return
 		if _is_live_escape_event(event) or event.keycode == KEY_ESCAPE:
@@ -3848,27 +3812,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 			return
 
-		# Basic mapmode hotkeys (F1-F5) for Phase 2 map UX depth on 460-prov test map.
-		# F1=political (default clean), F2=strain (welfare), F3=vitality (settlement), F4=development (dev lighten), F5=supply (L layer).
-		# Uses existing characterize / supply / dev code paths. Toasts via DebugOverlay. Zero interference with normal play (F-keys debug-only intent).
-		if event.keycode == KEY_F1:
-			set_map_mode("political")
-			get_viewport().set_input_as_handled()
-			return
-		if event.keycode == KEY_F2:
-			set_map_mode("strain")
-			get_viewport().set_input_as_handled()
-			return
-		if event.keycode == KEY_F3:
-			set_map_mode("vitality")
-			get_viewport().set_input_as_handled()
-			return
-		if event.keycode == KEY_F4:
-			set_map_mode("development")
-			get_viewport().set_input_as_handled()
-			return
-		if event.keycode == KEY_F5:
-			set_map_mode("supply")
+		# Basic mapmode hotkeys (F1-F5) — shared helper with _input (FIRST20-P2 F7 toggle).
+		if _handle_mapmode_hotkey(event):
 			get_viewport().set_input_as_handled()
 			return
 		# G must stay cheap on world_accurate: 3520 BFS / preview_player_route freezes the input frame.
@@ -3909,30 +3854,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			_focus_asia_view()
 			get_viewport().set_input_as_handled()
 			return
-		# F6/F7 for Phase 2 map UX additions (loyalty/foreign_mil tint, infra/road density using built_road/rail + layers)
-		if event.keycode == KEY_F6:
-			set_map_mode("loyalty")
-			get_viewport().set_input_as_handled()
-			return
-		if event.keycode == KEY_F7:
-			set_map_mode("infra")
-			get_viewport().set_input_as_handled()
-			return
-		# Pass 10: F8 weather ground-state mapmode (dry/mud/snow/storm fills).
-		if event.keycode == KEY_F8:
-			set_map_mode("weather")
-			get_viewport().set_input_as_handled()
-			return
-		# F9 — resources; Shift+F9 — states; Ctrl+F9 — terrain (modifiers first so plain F9 does not clobber)
-		if event.keycode == KEY_F9:
-			if event.ctrl_pressed:
-				set_map_mode("terrain")
-			elif event.shift_pressed:
-				set_map_mode("states")
-			else:
-				set_map_mode("resources")
-			get_viewport().set_input_as_handled()
-			return
+		# F6–F9 mapmodes live in `_handle_mapmode_hotkey` (called above).
 		# Debug world chunk load for portion testing (Ctrl+0..3 loads the 4 ~4k x 2k chunks of the full world source).
 		# Keeps province/terrain/snow_potential/region data from active scenario (europe full set), just swaps visual underlay + per-chunk elev/veg/snow ref layers for H/V/S.
 		# Useful to verify chunk snow bits, alignment, etc while Europe work continues.
@@ -15491,6 +15413,66 @@ func apply_mapmode_preset_stack(primary_mode: String, stack: Array = []) -> void
 		DebugOverlay.toast_map_debug("Preset stack: %s + %s" % [primary_mode, "+".join(parts)])
 
 
+## FIRST20-P2 F7: one F-key helper for `_input` and `_unhandled_input`.
+func _handle_mapmode_hotkey(event: InputEvent) -> bool:
+	if not (event is InputEventKey):
+		return false
+	var e := event as InputEventKey
+	if not e.pressed or e.echo:
+		return false
+	# Compare with `keycode == KEY_F*` so HeadlessCampaignSave1Test (F6=loyalty)
+	# and first-session hotkey wiring greps still see the live mapmode keys.
+	if e.keycode == KEY_F1:
+		_toggle_map_mode_hotkey("political")
+		return true
+	if e.keycode == KEY_F2:
+		_toggle_map_mode_hotkey("strain")
+		return true
+	if e.keycode == KEY_F3:
+		_toggle_map_mode_hotkey("vitality")
+		return true
+	if e.keycode == KEY_F4:
+		_toggle_map_mode_hotkey("development")
+		return true
+	if e.keycode == KEY_F5:
+		_toggle_map_mode_hotkey("supply")
+		return true
+	if e.keycode == KEY_F6:
+		_toggle_map_mode_hotkey("loyalty")
+		return true
+	if e.keycode == KEY_F7:
+		_toggle_map_mode_hotkey("infra")
+		return true
+	if e.keycode == KEY_F8:
+		_toggle_map_mode_hotkey("weather")
+		return true
+	if e.keycode == KEY_F9:
+		if e.ctrl_pressed:
+			_toggle_map_mode_hotkey("terrain")
+		elif e.shift_pressed:
+			_toggle_map_mode_hotkey("states")
+		else:
+			_toggle_map_mode_hotkey("resources")
+		return true
+	return false
+
+
+func _toggle_map_mode_hotkey(mode: String) -> void:
+	var m := mode.strip_edges().to_lower()
+	if m.is_empty():
+		m = "political"
+	if current_map_mode == m:
+		if m == "political":
+			return
+		var back := _map_mode_hotkey_prior.strip_edges().to_lower()
+		if back.is_empty() or back == m:
+			back = "political"
+		set_map_mode(back)
+		return
+	_map_mode_hotkey_prior = current_map_mode
+	set_map_mode(m)
+
+
 func set_map_mode(mode: String = "political") -> void:
 	var sync_t0 := Time.get_ticks_usec()
 	var ph_t := sync_t0
@@ -21957,6 +21939,9 @@ func _refresh_selected_unit_chip() -> void:
 			counter.add_child(frame)
 			if sel_f != null and _formation_is_player_tag(sel_f) and not _formation_type_blocks_land_open(sel_f):
 				_attach_fill_toe_readout(counter, sel_f)
+			var zz: float = _get_camera_zoom() if has_method("_get_camera_zoom") else 1.0
+			var is_fleet := bool(counter.get_meta("sea_nation_disk", false))
+			_apply_unit_lod_to_icon(counter, zz, _icon_is_selected_own(counter), is_fleet)
 
 
 func _fill_toe_chip_text(formation: Object) -> String:
@@ -30249,7 +30234,197 @@ func _unit_counters_want_visible(z: float = -1.0) -> bool:
 func _sync_unit_counter_paint(z: float = -1.0) -> void:
 	_sync_unit_counter_visibility(z)
 	_sync_unit_counter_scales(z)
+	_sync_unit_counter_lod(z)
 	_reveal_culled_unit_icons()
+
+
+func _icon_is_selected_own(icon: Node2D) -> bool:
+	if icon == null or selected_formation_id.is_empty():
+		return false
+	var fo: Object = _formation_from_demo_icon(icon)
+	if fo == null:
+		return false
+	if "formation_id" in fo and str(fo.formation_id) != str(selected_formation_id):
+		return false
+	return _formation_is_player_tag(fo)
+
+
+func _sync_unit_counter_lod(z: float = -1.0) -> void:
+	var zz := z
+	if zz < 0.0:
+		zz = _get_camera_zoom() if has_method("_get_camera_zoom") else 1.0
+	var sea_layer: Node2D = _ensure_sea_nation_layer()
+	if sea_layer != null:
+		for sc in sea_layer.get_children():
+			if sc is Node2D and str(sc.name).begins_with("DemoUnitIcon_"):
+				var sea_icon := sc as Node2D
+				_apply_unit_lod_to_icon(sea_icon, zz, _icon_is_selected_own(sea_icon), true)
+	if _demo_unit_icon_pids.is_empty():
+		return
+	for id_v in _demo_unit_icon_pids:
+		var id := int(id_v)
+		if not province_nodes.has(id):
+			continue
+		var node: Node2D = province_nodes[id] as Node2D
+		if node == null:
+			continue
+		for c in node.get_children():
+			if not (c is Node2D) or not str(c.name).begins_with("DemoUnitIcon_"):
+				continue
+			var icon := c as Node2D
+			var is_fleet := bool(icon.get_meta("sea_nation_disk", false))
+			_apply_unit_lod_to_icon(icon, zz, _icon_is_selected_own(icon), is_fleet)
+
+
+func _apply_unit_lod_to_icon(icon: Node2D, z: float, selected_own: bool, is_fleet: bool) -> void:
+	if icon == null:
+		return
+	var pol: Dictionary = MapZoomLODScript.unit_lod_policy(z, selected_own, is_fleet)
+	var band := str(pol.get("band", "full"))
+	var stack := band == "stack"
+	var full := band == "full"
+	icon.z_index = int(pol.get("chip_z", 28))
+	icon.z_as_relative = false
+	var plate := icon.get_node_or_null("NationPlate") as Polygon2D
+	var bars := icon.get_node_or_null("StatBars") as Node2D
+	var letter := icon.get_node_or_null("TypeLetter") as Node2D
+	var designation := icon.get_node_or_null("Designation") as Node2D
+	var str_num := icon.get_node_or_null("StrNum") as Node2D
+	var leader := icon.get_node_or_null("LeaderMark") as Node2D
+	var frame := icon.get_node_or_null("NationFrame") as Node2D
+	var badge := icon.get_node_or_null("StackBadge") as Node2D
+	var fill := icon.get_node_or_null("FillToeReadout") as Node2D
+	if bars != null:
+		bars.visible = bool(pol.get("show_bars", false))
+		var rdy := bars.get_node_or_null("RdyBar") as CanvasItem
+		if rdy != null:
+			rdy.visible = false
+	if letter != null:
+		letter.visible = bool(pol.get("show_letter", false))
+		if letter.visible and not full:
+			var raw := str(letter.get("text")) if "text" in letter else "I"
+			letter.set("text", MapZoomLODScript.unit_lod_mid_letter(raw))
+	var des_name := ""
+	if designation != null and "text" in designation:
+		des_name = str(designation.get("text"))
+	if designation != null:
+		var hide_nm := MapZoomLODScript.hide_default_unit_name(z, des_name, selected_own)
+		designation.visible = bool(pol.get("show_name", false)) and not hide_nm
+	if str_num != null:
+		str_num.visible = full
+	if leader != null:
+		leader.visible = full
+	if frame != null:
+		frame.visible = full or band == "mid"
+	if fill != null:
+		fill.visible = selected_own and full
+	if badge != null:
+		badge.visible = (not stack) and int(icon.get_meta("eoa_stack_n", 1)) > 1
+	for c in icon.get_children():
+		if c is Sprite2D:
+			(c as CanvasItem).visible = bool(pol.get("show_nato_glyph", true))
+	_apply_unit_lod_plate(plate, pol, icon)
+	_apply_unit_lod_count(icon, pol)
+	_apply_unit_lod_fleet_anchor(icon, pol)
+	if stack and not selected_own:
+		var cw := float(pol.get("chip_w", 22.0))
+		var s := cw / (44.0 * maxf(z, 0.04))
+		if bool(pol.get("fleet_anchor", false)):
+			s = float(pol.get("fleet_anchor_px", 10.0)) / (16.0 * maxf(z, 0.04))
+		icon.scale = Vector2(s, s)
+
+
+func _apply_unit_lod_plate(plate: Polygon2D, pol: Dictionary, icon: Node2D) -> void:
+	if plate == null:
+		return
+	if not plate.has_meta("eoa_plate_full_poly"):
+		plate.set_meta("eoa_plate_full_poly", plate.polygon)
+		plate.set_meta("eoa_plate_full_color", plate.color)
+	var stack_chip := bool(pol.get("stack_chip", false))
+	if stack_chip:
+		var hw := float(pol.get("chip_w", 22.0)) * 0.5
+		var hh := float(pol.get("chip_h", 16.0)) * 0.5
+		plate.polygon = PackedVector2Array([
+			Vector2(-hw, -hh), Vector2(hw, -hh), Vector2(hw, hh), Vector2(-hw, hh),
+		])
+		var deep := RetrowaveTheme.BG_DEEP
+		plate.color = Color(deep.r, deep.g, deep.b, 0.85)
+		plate.visible = true
+		var owner_col := Color(0.85, 0.88, 0.95, 1.0)
+		if plate.has_meta("eoa_owner_color"):
+			owner_col = plate.get_meta("eoa_owner_color") as Color
+		var stroke := icon.get_node_or_null("OwnerStroke") as Line2D
+		if stroke == null:
+			stroke = Line2D.new()
+			stroke.name = "OwnerStroke"
+			stroke.width = 1.0
+			stroke.closed = true
+			stroke.z_index = 0
+			icon.add_child(stroke)
+		stroke.visible = true
+		stroke.default_color = owner_col
+		stroke.points = PackedVector2Array([
+			Vector2(-hw, -hh), Vector2(hw, -hh), Vector2(hw, hh), Vector2(-hw, hh), Vector2(-hw, -hh),
+		])
+	else:
+		if plate.has_meta("eoa_plate_full_poly"):
+			plate.polygon = plate.get_meta("eoa_plate_full_poly")
+		if plate.has_meta("eoa_plate_full_color"):
+			plate.color = plate.get_meta("eoa_plate_full_color")
+		plate.visible = not bool(pol.get("fleet_anchor", false))
+		var stroke_off := icon.get_node_or_null("OwnerStroke") as Line2D
+		if stroke_off != null:
+			stroke_off.visible = false
+
+
+func _apply_unit_lod_count(icon: Node2D, pol: Dictionary) -> void:
+	var n := int(icon.get_meta("eoa_stack_n", 1))
+	var want := bool(pol.get("stack_chip", false))
+	var lab := icon.get_node_or_null("LodCount") as Node2D
+	if not want:
+		if lab != null:
+			lab.visible = false
+		return
+	if lab == null:
+		lab = _UnitChipTextScr.new() as Node2D
+		lab.name = "LodCount"
+		lab.z_index = 4
+		icon.add_child(lab)
+	lab.visible = true
+	lab.set("text", str(n))
+	lab.set("font_size", int(pol.get("count_px", 11)))
+	lab.set("font_color", Color.WHITE)
+	lab.set("align_center", true)
+	lab.position = Vector2(0, -6)
+	if lab.has_method("queue_redraw"):
+		lab.queue_redraw()
+
+
+func _apply_unit_lod_fleet_anchor(icon: Node2D, pol: Dictionary) -> void:
+	var want := bool(pol.get("fleet_anchor", false))
+	var anchor := icon.get_node_or_null("FleetAnchor") as Polygon2D
+	if not want:
+		if anchor != null:
+			anchor.visible = false
+		return
+	if anchor == null:
+		anchor = Polygon2D.new()
+		anchor.name = "FleetAnchor"
+		var r := 5.0
+		anchor.polygon = PackedVector2Array([
+			Vector2(0, -r), Vector2(r * 0.7, 0), Vector2(0, r), Vector2(-r * 0.7, 0),
+		])
+		anchor.z_index = 2
+		icon.add_child(anchor)
+	anchor.visible = true
+	var col := Color(0.85, 0.88, 0.95, 1.0)
+	var plate := icon.get_node_or_null("NationPlate") as Polygon2D
+	if plate != null and plate.has_meta("eoa_owner_color"):
+		col = plate.get_meta("eoa_owner_color") as Color
+	anchor.color = col
+	if plate != null:
+		plate.visible = false
+
 
 
 func _sync_unit_counter_visibility(z: float = -1.0) -> void:
@@ -30485,6 +30660,7 @@ func _make_unit_nation_plate(col: Color) -> Polygon2D:
 		clampf(col.b * 0.62 + 0.16, 0.18, 0.92),
 		0.96
 	)
+	plate.set_meta("eoa_owner_color", col)
 	plate.z_index = -1
 	return plate
 
@@ -30500,23 +30676,24 @@ func _make_unit_stat_bars(org_v: float, str_v: float, rdy_v: float = 1.0) -> Nod
 	var rdy_c := clampf(rdy_v, 0.0, 1.0)
 	var bg := Polygon2D.new()
 	bg.name = "BarBg"
-	bg.polygon = _poly_bar(Vector2.ZERO, Vector2(44, 14))
+	bg.polygon = _poly_bar(Vector2.ZERO, Vector2(44, 8))
 	bg.color = Color(0.06, 0.07, 0.1, 0.92)
 	root.add_child(bg)
 	var org_bar := Polygon2D.new()
 	org_bar.name = "OrgBar"
-	org_bar.polygon = _poly_bar(Vector2(0, 0), Vector2(maxf(3.0, 44.0 * org_c), 4))
+	org_bar.polygon = _poly_bar(Vector2(0, 0), Vector2(maxf(3.0, 44.0 * org_c), 3.0))
 	org_bar.color = Color(0.28, 0.82, 0.42, 0.98)
 	root.add_child(org_bar)
 	var str_bar := Polygon2D.new()
 	str_bar.name = "StrBar"
-	str_bar.polygon = _poly_bar(Vector2(0, 5), Vector2(maxf(3.0, 44.0 * str_c), 4))
+	str_bar.polygon = _poly_bar(Vector2(0, 4), Vector2(maxf(3.0, 44.0 * str_c), 3.0))
 	str_bar.color = Color(0.95, 0.72, 0.22, 0.98)
 	root.add_child(str_bar)
 	var rdy_bar := Polygon2D.new()
 	rdy_bar.name = "RdyBar"
-	rdy_bar.polygon = _poly_bar(Vector2(0, 10), Vector2(maxf(3.0, 44.0 * rdy_c), 4))
+	rdy_bar.polygon = _poly_bar(Vector2(0, 8), Vector2(maxf(3.0, 44.0 * rdy_c), 3.0))
 	rdy_bar.color = Color(0.38, 0.78, 0.95, 0.98)
+	rdy_bar.visible = false
 	root.add_child(rdy_bar)
 	return root
 
@@ -34986,10 +35163,12 @@ func _rebuild_demo_unit_icons(only_pids: Dictionary) -> void:
 			else:
 				_add_unit_stack_fanout(counter, spr, tex, tex_cache, samples, fan, nation_tag, nation_col, using_retrowave, era_folder)
 			_attach_unit_counter_chrome(counter, ff, nation_col)
+			counter.set_meta("eoa_stack_n", stack_n)
 			if stack_n > 1:
 				counter.add_child(_make_formation_stack_badge(stack_n))
 		else:
 			_attach_unit_counter_chrome(counter, ff, nation_col)
+			counter.set_meta("eoa_stack_n", stack_n)
 			if not nation_tag.is_empty():
 				counter.add_child(_make_unit_nation_frame(nation_col))
 			if stack_n > 1:
@@ -35004,6 +35183,7 @@ func _rebuild_demo_unit_icons(only_pids: Dictionary) -> void:
 	# Re-apply selected-chip chrome after pin rebuild (do not rebuild all pins for selection).
 	if not selected_formation_id.is_empty():
 		_refresh_selected_unit_chip()
+	_sync_unit_counter_lod()
 
 
 func _sorted_sea_nation_tags(tags: Array) -> Array:

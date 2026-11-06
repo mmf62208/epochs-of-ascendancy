@@ -340,7 +340,7 @@ def build_first_session_hotkeys_product(
         runner = TEST_RUNNER.read_text(encoding="utf-8") if TEST_RUNNER.is_file() else ""
 
         # Mapmodes on bare F5/F9
-        wiring["map_f5_supply"] = 'KEY_F5' in ren and 'set_map_mode("supply")' in ren
+        wiring["map_f5_supply"] = 'KEY_F5' in ren and '_toggle_map_mode_hotkey("supply")' in ren
         wiring["map_f9_resources"] = 'KEY_F9' in ren and "resources" in ren
         # Save must use Ctrl modifiers (not bare F5/F9)
         wiring["save_ctrl_s"] = "KEY_S" in top and ("ctrl_pressed" in top or "Ctrl" in top)
@@ -798,17 +798,20 @@ def build_first_session_hotkeys_product(
             and "_camera_nudge_gen" in ren
             and "func _nudge_camera_after_panel" in ren
         )
-        # P1: F-keys live in _input via set_map_mode; toolbar highlight follows.
+        # P1/P2: F-keys live in _input via the shared toggle helper.
+        handle_fn = _slice_func(ren, "_handle_mapmode_hotkey")
         wiring["fkeys_in_input"] = (
-            'KEY_F1' in input_fn
-            and 'set_map_mode("political")' in input_fn
-            and 'set_map_mode("strain")' in input_fn
-            and 'set_map_mode("vitality")' in input_fn
-            and 'set_map_mode("development")' in input_fn
-            and 'set_map_mode("terrain")' in input_fn
-            and 'set_map_mode("states")' in input_fn
-            and 'set_map_mode("resources")' in input_fn
-            and "event.ctrl_pressed" in input_fn
+            '_handle_mapmode_hotkey' in input_fn
+            and 'KEY_F1' in handle_fn
+            and bool(handle_fn)
+            and '_toggle_map_mode_hotkey("political")' in handle_fn
+            and '_toggle_map_mode_hotkey("strain")' in handle_fn
+            and '_toggle_map_mode_hotkey("vitality")' in handle_fn
+            and '_toggle_map_mode_hotkey("development")' in handle_fn
+            and '_toggle_map_mode_hotkey("terrain")' in handle_fn
+            and '_toggle_map_mode_hotkey("states")' in handle_fn
+            and '_toggle_map_mode_hotkey("resources")' in handle_fn
+            and "ctrl_pressed" in handle_fn
         )
         wiring["toolbar_follows_mode"] = (
             "func _sync_mapmode_toolbar" in ren

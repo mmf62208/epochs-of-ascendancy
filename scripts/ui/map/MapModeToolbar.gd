@@ -96,9 +96,11 @@ var _collapse_btn: Button = null
 var _wx_row: HBoxContainer = null
 var _wx_filter_btns: Dictionary = {}  # key -> Button
 var _wx_filter_key: String = ""
-var _preset_row: HBoxContainer = null
+var _preset_row: HFlowContainer = null
 ## Pass 18: chips showing active secondary mapmode tints from stacked presets.
-var _secondary_row: HBoxContainer = null
+var _secondary_row: HFlowContainer = null
+var _mode_row: HFlowContainer = null
+var _overflow_bin: Control = null
 var _current_mode: String = "political"
 var _collapsed: bool = false
 
@@ -168,11 +170,17 @@ func _build_ui() -> void:
 	title.add_theme_font_size_override("font_size", 12)
 	title_row.add_child(title)
 
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 3)
-	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	row.clip_contents = true
-	_body.add_child(row)
+	_mode_row = HFlowContainer.new()
+	_mode_row.add_theme_constant_override("h_separation", 3)
+	_mode_row.add_theme_constant_override("v_separation", 3)
+	_mode_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_mode_row.clip_contents = true
+	_body.add_child(_mode_row)
+	_overflow_bin = Control.new()
+	_overflow_bin.name = "OverflowBin"
+	_overflow_bin.visible = false
+	_overflow_bin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_overflow_bin)
 
 	_mode_group = ButtonGroup.new()
 	_mode_group.allow_unpress = false
@@ -195,21 +203,23 @@ func _build_ui() -> void:
 			if pressed:
 				_on_mode_pressed(mode_id)
 		)
-		row.add_child(btn)
+		_mode_row.add_child(btn)
 		_buttons[mode] = btn
 	_sync_mode_chip_pressed()
 
-	# Pass 14: quick mapmode presets.
-	_preset_row = HBoxContainer.new()
-	_preset_row.add_theme_constant_override("separation", 4)
+	# Pass 14: quick mapmode presets. FIRST20-P2: HFlow + More ▾ overflow.
+	_preset_row = HFlowContainer.new()
+	_preset_row.add_theme_constant_override("h_separation", 4)
+	_preset_row.add_theme_constant_override("v_separation", 4)
 	_preset_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_preset_row.clip_contents = true
 	_body.add_child(_preset_row)
 	_build_preset_row()
 
 	# Pass 18: active secondary tint legend chips.
-	_secondary_row = HBoxContainer.new()
-	_secondary_row.add_theme_constant_override("separation", 4)
+	_secondary_row = HFlowContainer.new()
+	_secondary_row.add_theme_constant_override("h_separation", 4)
+	_secondary_row.add_theme_constant_override("v_separation", 4)
 	_secondary_row.visible = false
 	_body.add_child(_secondary_row)
 
@@ -237,7 +247,7 @@ func _build_preset_row() -> void:
 	cap.text = "Preset"
 	cap.add_theme_font_size_override("font_size", 10)
 	cap.modulate = Color(0.7, 0.85, 1.0, 0.9)
-	_preset_row.add_child(cap)
+	var chips: Array[Control] = []
 	for p in PRESETS:
 		var label: String = str(p.get("label", p.get("id", "Preset")))
 		var mode: String = str(p.get("mode", "political"))
@@ -273,7 +283,8 @@ func _build_preset_row() -> void:
 		# Stacked presets get a subtle warm tint so they read as composite.
 		if not stack.is_empty():
 			btn.modulate = Color(1.08, 0.95, 1.05, 1.0)
-		_preset_row.add_child(btn)
+		chips.append(btn)
+	_pack_flow_with_more(_preset_row, cap, chips)
 
 
 func _apply_preset(mode: String, label: String = "", stack: Array = []) -> void:
@@ -372,40 +383,41 @@ func _rebuild_secondary_tint_chips(stack: Array, primary_mode: String = "") -> v
 		return
 	_secondary_row.visible = true
 	var cap := Label.new()
-	cap.text = "2nd" if not secs.is_empty() else "Ix"
+	cap.text = "2nd" if not secs.is_empty() else "Intensity"
 	cap.add_theme_font_size_override("font_size", 10)
 	cap.modulate = Color(0.75, 0.85, 1.0, 0.9)
-	_secondary_row.add_child(cap)
-	# Pass 21/22: intensity presets (Soft / Med / Hard / Max) for secondaries + primary.
+	var chips: Array[Control] = []
+	# FIRST20-P2 F7: Intensity Low/Med/High/Max + legend swatch.
 	var preset_cell := VBoxContainer.new()
 	preset_cell.add_theme_constant_override("separation", 1)
 	var preset_lbl := Label.new()
-	preset_lbl.text = "Ix"
-	preset_lbl.add_theme_font_size_override("font_size", 9)
+	preset_lbl.text = "Intensity"
+	preset_lbl.add_theme_font_size_override("font_size", 12)
 	preset_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	preset_lbl.modulate = Color(0.75, 0.85, 1.0, 0.85)
+	preset_lbl.add_theme_color_override("font_color", RetrowaveTheme.TEXT_DIM)
 	preset_cell.add_child(preset_lbl)
 	var preset_row := HBoxContainer.new()
 	preset_row.add_theme_constant_override("separation", 2)
 	preset_cell.add_child(preset_row)
 	for pdef in [
-		{"id": "soft", "label": "S", "hint": "Soft 0.5"},
-		{"id": "med", "label": "M", "hint": "Med 1.0"},
-		{"id": "hard", "label": "H", "hint": "Hard 1.5"},
-		{"id": "max", "label": "X", "hint": "Max 2.0"},
+		{"id": "soft", "label": "Low", "hint": "Low intensity 0.5"},
+		{"id": "med", "label": "Med", "hint": "Medium intensity 1.0"},
+		{"id": "hard", "label": "High", "hint": "High intensity 1.5"},
+		{"id": "max", "label": "Max", "hint": "Max intensity 2.0"},
 	]:
 		var pb := Button.new()
 		pb.text = str(pdef["label"])
 		pb.focus_mode = Control.FOCUS_NONE
-		pb.custom_minimum_size = Vector2(20, 18)
-		pb.add_theme_font_size_override("font_size", 9)
-		pb.tooltip_text = "Set secondary + primary intensities · %s" % str(pdef["hint"])
+		pb.custom_minimum_size = Vector2(0, 28)
+		pb.add_theme_font_size_override("font_size", 11)
+		pb.tooltip_text = str(pdef["hint"])
 		var pid: String = str(pdef["id"])
 		pb.pressed.connect(func() -> void:
 			_on_intensity_preset(pid, secs)
 		)
 		preset_row.add_child(pb)
-	_secondary_row.add_child(preset_cell)
+	preset_cell.add_child(_make_intensity_legend_swatch())
+	chips.append(preset_cell)
 	for sk3 in secs:
 		# Pass 19/20: toggle chip + intensity slider.
 		var cell := VBoxContainer.new()
@@ -440,7 +452,8 @@ func _rebuild_secondary_tint_chips(stack: Array, primary_mode: String = "") -> v
 			slider.tooltip_text = "Intensity %.2f (0.25–2.0)" % v
 		)
 		cell.add_child(slider)
-		_secondary_row.add_child(cell)
+		chips.append(cell)
+	_pack_flow_with_more(_secondary_row, cap, chips)
 	layout_changed.emit()
 
 
@@ -669,11 +682,35 @@ func _apply_mode_chip_idle_style(btn: Button, selected: bool) -> void:
 	if btn == null:
 		return
 	if selected:
-		btn.modulate = Color(1.14, 1.14, 1.20, 1.0)
+		var fill := StyleBoxFlat.new()
+		fill.bg_color = RetrowaveTheme.CYAN
+		fill.set_corner_radius_all(3)
+		fill.content_margin_left = 8
+		fill.content_margin_right = 8
+		fill.content_margin_top = 4
+		fill.content_margin_bottom = 4
+		btn.add_theme_stylebox_override("normal", fill)
+		btn.add_theme_stylebox_override("pressed", fill)
+		btn.add_theme_stylebox_override("hover", fill)
+		btn.add_theme_stylebox_override("focus", fill)
+		btn.add_theme_color_override("font_color", RetrowaveTheme.BG_DEEP)
+		btn.add_theme_color_override("font_pressed_color", RetrowaveTheme.BG_DEEP)
+		btn.add_theme_color_override("font_hover_color", RetrowaveTheme.BG_DEEP)
+		btn.add_theme_color_override("font_focus_color", RetrowaveTheme.BG_DEEP)
+		btn.modulate = Color.WHITE
 		btn.add_theme_font_size_override("font_size", 12)
 	else:
+		btn.remove_theme_stylebox_override("normal")
+		btn.remove_theme_stylebox_override("pressed")
+		btn.remove_theme_stylebox_override("hover")
+		btn.remove_theme_stylebox_override("focus")
+		btn.remove_theme_color_override("font_color")
+		btn.remove_theme_color_override("font_pressed_color")
+		btn.remove_theme_color_override("font_hover_color")
+		btn.remove_theme_color_override("font_focus_color")
 		btn.modulate = Color(0.82, 0.86, 0.94, 0.90)
 		btn.add_theme_font_size_override("font_size", 11)
+		btn.add_theme_color_override("font_color", RetrowaveTheme.TEXT_PRIMARY)
 
 
 func get_mode_pressed_state() -> Dictionary:
@@ -733,3 +770,147 @@ func format_weather_mapmode_hint() -> String:
 
 func get_current_mode() -> String:
 	return _current_mode
+
+
+func _flow_max_width() -> float:
+	var vp_w := 1280.0
+	var vp := get_viewport()
+	if vp != null:
+		vp_w = vp.get_visible_rect().size.x
+	var panel_w := size.x
+	if panel_w < 16.0:
+		panel_w = minf(620.0, maxf(200.0, vp_w - 16.0))
+	return minf(maxf(200.0, panel_w - 36.0), maxf(200.0, vp_w - 48.0))
+
+
+func _make_intensity_legend_swatch() -> Control:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 6)
+	var min_l := Label.new()
+	min_l.text = "min"
+	min_l.add_theme_font_size_override("font_size", 12)
+	min_l.add_theme_color_override("font_color", RetrowaveTheme.TEXT_DIM)
+	row.add_child(min_l)
+	var tex_rect := TextureRect.new()
+	tex_rect.custom_minimum_size = Vector2(120, 8)
+	tex_rect.stretch_mode = TextureRect.STRETCH_SCALE
+	var grad := Gradient.new()
+	grad.set_color(0, Color(0.25, 0.82, 0.45, 1.0))
+	grad.set_color(1, Color(0.95, 0.28, 0.32, 1.0))
+	var gtex := GradientTexture2D.new()
+	gtex.gradient = grad
+	gtex.width = 120
+	gtex.height = 8
+	gtex.fill_from = Vector2(0, 0.5)
+	gtex.fill_to = Vector2(1, 0.5)
+	tex_rect.texture = gtex
+	row.add_child(tex_rect)
+	var max_l := Label.new()
+	max_l.text = "max"
+	max_l.add_theme_font_size_override("font_size", 12)
+	max_l.add_theme_color_override("font_color", RetrowaveTheme.TEXT_DIM)
+	row.add_child(max_l)
+	return row
+
+
+func _pack_flow_with_more(row: Control, cap: Control, chips: Array[Control]) -> void:
+	if row == null:
+		return
+	while row.get_child_count() > 0:
+		var old: Node = row.get_child(0)
+		row.remove_child(old)
+		old.free()
+	if cap != null:
+		row.add_child(cap)
+	var max_w := _flow_max_width()
+	var cap_w := 48.0
+	if cap != null:
+		cap_w = maxf(cap.get_combined_minimum_size().x, 40.0)
+	var sep := 4.0
+	var used := cap_w
+	var rows_used := 1
+	var overflow: Array[Control] = []
+	for chip in chips:
+		var w := chip.get_combined_minimum_size().x
+		if w < 8.0:
+			w = 72.0
+		if used > 0.0 and used + sep + w > max_w:
+			rows_used += 1
+			used = 0.0
+		if rows_used > 2:
+			overflow.append(chip)
+			continue
+		row.add_child(chip)
+		used += w + sep
+	if overflow.is_empty():
+		return
+	var more := MenuButton.new()
+	more.name = "MoreOverflow"
+	more.text = "More ▾"
+	more.tooltip_text = "More map-mode chips"
+	more.focus_mode = Control.FOCUS_NONE
+	more.custom_minimum_size = Vector2(72, 28)
+	more.mouse_filter = Control.MOUSE_FILTER_STOP
+	var popup := more.get_popup()
+	if _overflow_bin == null:
+		_overflow_bin = Control.new()
+		_overflow_bin.visible = false
+		_overflow_bin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(_overflow_bin)
+	var stored: Array = []
+	for i in overflow.size():
+		var oc: Control = overflow[i]
+		if oc.get_parent() != null:
+			oc.get_parent().remove_child(oc)
+		_overflow_bin.add_child(oc)
+		oc.visible = false
+		var label := oc.name
+		if oc is Button:
+			label = (oc as Button).text
+		elif oc is VBoxContainer and oc.get_child_count() > 0:
+			var first := oc.get_child(0)
+			if first is Button:
+				label = (first as Button).text
+			elif first is Label:
+				label = (first as Label).text
+		popup.add_item(str(label), i)
+		stored.append(oc)
+	more.set_meta("eoa_overflow_chips", stored)
+	popup.id_pressed.connect(func(id: int) -> void:
+		var held: Array = more.get_meta("eoa_overflow_chips")
+		if id < 0 or id >= held.size():
+			return
+		var node: Control = held[id] as Control
+		if node is Button:
+			(node as Button).pressed.emit()
+		elif node is VBoxContainer:
+			for child in node.get_children():
+				if child is Button:
+					(child as Button).pressed.emit()
+					break
+	)
+	row.add_child(more)
+
+
+func get_strip_right_edge() -> float:
+	var right := 0.0
+	for n in [_mode_row, _preset_row, _secondary_row, _wx_row, _legend]:
+		if n is Control and (n as Control).visible:
+			var r := (n as Control).get_global_rect()
+			right = maxf(right, r.position.x + r.size.x)
+			for child in (n as Control).get_children():
+				if child is Control and (child as Control).visible:
+					var cr := (child as Control).get_global_rect()
+					right = maxf(right, cr.position.x + cr.size.x)
+	return right
+
+
+func relayout_overflow() -> void:
+	_build_preset_row()
+	if _secondary_row != null and _secondary_row.visible:
+		var stack_live: Array = []
+		if _map_renderer != null and "debug_tint_mode_secondaries" in _map_renderer:
+			var live = _map_renderer.debug_tint_mode_secondaries
+			if live is Array:
+				stack_live = live.duplicate()
+		_rebuild_secondary_tint_chips(stack_live, _current_mode)

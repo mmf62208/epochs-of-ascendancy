@@ -42,7 +42,7 @@ class TestMapResourcesMapmodeProduct(unittest.TestCase):
 
     def test_renderer_and_toolbar_wire_resources_mode(self) -> None:
         ren = RENDERER.read_text(encoding="utf-8")
-        self.assertIn('set_map_mode("resources")', ren)
+        self.assertIn('_toggle_map_mode_hotkey("resources")', ren)
         self.assertIn("KEY_F9", ren)
         self.assertIn("debug_tint_mode == \"resources\"", ren)
         self.assertIn("func resources_mapmode_color_from_dict", ren)
