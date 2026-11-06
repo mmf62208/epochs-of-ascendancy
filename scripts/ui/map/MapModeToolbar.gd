@@ -103,6 +103,8 @@ var _mode_row: HFlowContainer = null
 var _overflow_bin: Control = null
 var _current_mode: String = "political"
 var _collapsed: bool = false
+var _secondary_rebuild_queued: bool = false
+var _pending_secondary_stack: Array = []
 
 
 func _ready() -> void:
@@ -241,8 +243,7 @@ func _build_ui() -> void:
 func _build_preset_row() -> void:
 	if _preset_row == null:
 		return
-	for c in _preset_row.get_children():
-		c.queue_free()
+	_discard_row_children(_preset_row)
 	var cap := Label.new()
 	cap.text = "Preset"
 	cap.add_theme_font_size_override("font_size", 10)
@@ -271,7 +272,7 @@ func _build_preset_row() -> void:
 		var st: Array = stack.duplicate()
 		btn.pressed.connect(func() -> void:
 			_apply_preset(m, lbl, st)
-		)
+		, CONNECT_DEFERRED)
 		# Icon: prefer preset id (fronts / war_loop), then base mapmode stem.
 		var preset_id: String = str(p.get("id", "")).strip_edges().to_lower()
 		var mode_tex: Texture2D = _HudIcons.map_mode_icon(preset_id, 32) if not preset_id.is_empty() else null
@@ -323,7 +324,7 @@ func _apply_preset(mode: String, label: String = "", stack: Array = []) -> void:
 		_map_renderer.call("apply_mapmode_preset_stack", mode, stack)
 	else:
 		_apply_stack_fallback(stack)
-	_rebuild_secondary_tint_chips(stack, mode)
+	_schedule_secondary_rebuild(stack)
 	if _legend != null and not label.is_empty():
 		var extra := ""
 		if not stack.is_empty():
@@ -358,8 +359,7 @@ func _rebuild_secondary_tint_chips(stack: Array, primary_mode: String = "") -> v
 	var primary_ix_early := pm_early in ["strain", "vitality", "development", "loyalty", "munitions"]
 	if stack.is_empty() and not primary_ix_early and _secondary_row_is_clear():
 		return
-	for c in _secondary_row.get_children():
-		c.queue_free()
+	_discard_row_children(_secondary_row)
 	var pm := primary_mode.strip_edges().to_lower()
 	var secs: Array = []
 	for s in stack:
@@ -414,7 +414,7 @@ func _rebuild_secondary_tint_chips(stack: Array, primary_mode: String = "") -> v
 		var pid: String = str(pdef["id"])
 		pb.pressed.connect(func() -> void:
 			_on_intensity_preset(pid, secs)
-		)
+		, CONNECT_DEFERRED)
 		preset_row.add_child(pb)
 	preset_cell.add_child(_make_intensity_legend_swatch())
 	chips.append(preset_cell)
@@ -434,7 +434,7 @@ func _rebuild_secondary_tint_chips(stack: Array, primary_mode: String = "") -> v
 		chip.modulate = _secondary_chip_color(key_s)
 		chip.toggled.connect(func(on: bool) -> void:
 			_on_secondary_chip_toggled(key_s, on)
-		)
+		, CONNECT_DEFERRED)
 		cell.add_child(chip)
 		var slider := HSlider.new()
 		slider.min_value = 0.25
@@ -482,7 +482,7 @@ func _on_intensity_preset(preset_id: String, active_secs: Array) -> void:
 			stack_live = live2.duplicate()
 	if stack_live.is_empty():
 		stack_live = active_secs.duplicate()
-	_rebuild_secondary_tint_chips(stack_live, _current_mode)
+	_schedule_secondary_rebuild(stack_live)
 
 
 func _on_secondary_chip_toggled(key: String, on: bool) -> void:
@@ -506,7 +506,7 @@ func _on_secondary_chip_toggled(key: String, on: bool) -> void:
 		var live2 = _map_renderer.debug_tint_mode_secondaries
 		if live2 is Array:
 			stack_live = live2.duplicate()
-	_rebuild_secondary_tint_chips(stack_live, _current_mode)
+	_schedule_secondary_rebuild(stack_live)
 	if typeof(DebugOverlay) != TYPE_NIL:
 		DebugOverlay.toast_map_debug("Secondary %s · %s" % [key, "ON" if on else "OFF"])
 
@@ -541,8 +541,7 @@ func _apply_stack_fallback(stack: Array) -> void:
 func _build_weather_icon_legend() -> void:
 	if _wx_row == null:
 		return
-	for c in _wx_row.get_children():
-		c.queue_free()
+	_discard_row_children(_wx_row)
 	_wx_filter_btns.clear()
 	var caption := Label.new()
 	caption.text = "Wx"
@@ -813,13 +812,61 @@ func _make_intensity_legend_swatch() -> Control:
 	return row
 
 
-func _pack_flow_with_more(row: Control, cap: Control, chips: Array[Control]) -> void:
+func _schedule_secondary_rebuild(stack: Array = []) -> void:
+	_pending_secondary_stack = stack.duplicate()
+	if _secondary_rebuild_queued:
+		return
+	_secondary_rebuild_queued = true
+	call_deferred("_flush_secondary_rebuild")
+
+
+func _flush_secondary_rebuild() -> void:
+	_secondary_rebuild_queued = false
+	var stack_live: Array = _pending_secondary_stack.duplicate()
+	_pending_secondary_stack.clear()
+	if stack_live.is_empty() and _map_renderer != null and "debug_tint_mode_secondaries" in _map_renderer:
+		var live = _map_renderer.debug_tint_mode_secondaries
+		if live is Array:
+			stack_live = live.duplicate()
+	_rebuild_secondary_tint_chips(stack_live, _current_mode)
+
+
+func _discard_node(n: Node) -> void:
+	if n == null or not is_instance_valid(n):
+		return
+	if n is MenuButton:
+		_discard_overflow_held(n as MenuButton)
+		var popup := (n as MenuButton).get_popup()
+		if popup != null:
+			for conn in popup.id_pressed.get_connections():
+				popup.id_pressed.disconnect(conn["callable"])
+	var parent := n.get_parent()
+	if parent != null:
+		parent.remove_child(n)
+	n.queue_free()
+
+
+func _discard_overflow_held(more: MenuButton) -> void:
+	if more == null or not more.has_meta("eoa_overflow_chips"):
+		return
+	var held: Array = more.get_meta("eoa_overflow_chips")
+	more.remove_meta("eoa_overflow_chips")
+	for item in held:
+		if item is Node:
+			_discard_node(item as Node)
+
+
+func _discard_row_children(row: Control) -> void:
 	if row == null:
 		return
 	while row.get_child_count() > 0:
-		var old: Node = row.get_child(0)
-		row.remove_child(old)
-		old.free()
+		_discard_node(row.get_child(0))
+
+
+func _pack_flow_with_more(row: Control, cap: Control, chips: Array[Control]) -> void:
+	if row == null:
+		return
+	_discard_row_children(row)
 	if cap != null:
 		row.add_child(cap)
 	var max_w := _flow_max_width()
@@ -877,10 +924,12 @@ func _pack_flow_with_more(row: Control, cap: Control, chips: Array[Control]) -> 
 		stored.append(oc)
 	more.set_meta("eoa_overflow_chips", stored)
 	popup.id_pressed.connect(func(id: int) -> void:
-		var held: Array = more.get_meta("eoa_overflow_chips")
+		var held: Array = more.get_meta("eoa_overflow_chips") if more.has_meta("eoa_overflow_chips") else []
 		if id < 0 or id >= held.size():
 			return
 		var node: Control = held[id] as Control
+		if node == null or not is_instance_valid(node):
+			return
 		if node is Button:
 			(node as Button).pressed.emit()
 		elif node is VBoxContainer:
@@ -888,7 +937,7 @@ func _pack_flow_with_more(row: Control, cap: Control, chips: Array[Control]) -> 
 				if child is Button:
 					(child as Button).pressed.emit()
 					break
-	)
+	, CONNECT_DEFERRED)
 	row.add_child(more)
 
 

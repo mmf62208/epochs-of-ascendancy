@@ -19989,21 +19989,18 @@ func _characterize_province_fill(base: Color, province: Province, character_blen
 			# Slight desat so occupation reads over fill heat.
 			col = col.lerp(Color(col.r, col.g * 0.92, col.b * 0.85, 1.0), 0.25 * pcb)
 	elif debug_tint_mode == "infra":
-		# Infra / road density highlight (Phase 2): uses existing built_road_neighbors + built_rail_neighbors (from Province + MapManager build_* APIs) + raw infrastructure level.
-		# High density (many explicit connections or high infra) gets a steel/blue-green density boost tint + stronger dev-like lighten.
-		# Leverages the InfrastructureOverlayLayer roads/rails (Line2D children rebuilt on infra changes). No new geometry; just visual emphasis for mapmode.
+		# F7 infra: always-on steel-blue density heatmap (roads/rails + infra level).
+		# A low-density mix gate used to leave most land identical to political.
 		var road_n := float(province.built_road_neighbors.size() if province.built_road_neighbors else 0)
 		var rail_n := float(province.built_rail_neighbors.size() if province.built_rail_neighbors else 0)
-		var conn_density := clampf((road_n + rail_n * 1.5) / 8.0, 0.0, 1.0)  # rail weighted; 460 map has variable wiring
+		var conn_density := clampf((road_n + rail_n * 1.5) / 8.0, 0.0, 1.0)
 		var infra_n := clampf(float(clampi(province.infrastructure, 0, 50)) / 18.0, 0.0, 1.0)
-		var density := maxf(conn_density, infra_n * 0.7)
-		if density > 0.12:
-			# Subtle industrial/connected pop (steel-blue green tint for "developed arteries")
-			var dboost := clampf(density * 0.13 * cb, 0.0, 0.16)
-			col = col.lerp(Color(0.78, 0.92, 0.98, 1.0), dboost)
-			# Extra lighten on high density (pairs with existing dev but specific to built infra connections)
-			if density > 0.25:
-				col = col.lightened(clampf(density * 0.09 * cb, 0.0, 0.12))
+		var density := clampf(maxf(conn_density, infra_n), 0.08, 1.0)
+		var infra_col := Color(0.20, 0.28, 0.34, 1.0).lerp(Color(0.62, 0.90, 0.98, 1.0), density)
+		if province.is_sea:
+			col = col.lerp(Color(0.10, 0.16, 0.24, 1.0), 0.55 * cb)
+		else:
+			col = col.lerp(infra_col, clampf(0.78 * pcb, 0.42, 0.90))
 	elif debug_tint_mode == "region_control":
 		# Region control tint: green for fully controlled strategic region by owner (from MapManager + inferred regions), light red for partial/not full.
 		# Ties to regional pride bonuses, snow on high control areas, etc. Visible feedback for "taking ground" on the 460-prov map.

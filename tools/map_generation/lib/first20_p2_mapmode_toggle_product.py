@@ -192,6 +192,23 @@ def build_first20_p2_mapmode_toggle_product() -> Dict[str, Any]:
         passes.append("intensity_swatch")
     else:
         fails.append("intensity_swatch")
+    pack_fn = _gd_func_slice(tb, "_pack_flow_with_more")
+    discard_fn = _gd_func_slice(tb, "_discard_node")
+    if "old.free()" not in pack_fn and "queue_free" in discard_fn:
+        passes.append("pack_queue_free")
+    else:
+        fails.append("pack_queue_free")
+    if "CONNECT_DEFERRED" in tb:
+        passes.append("deferred_strip_press")
+    else:
+        fails.append("deferred_strip_press")
+    char_fn = _gd_func_slice(ren, "_characterize_province_fill")
+    infra_i = char_fn.find('debug_tint_mode == "infra"')
+    infra_slice = char_fn[infra_i : infra_i + 1200] if infra_i >= 0 else ""
+    if infra_i >= 0 and "0.12" not in infra_slice and "infra_col" in infra_slice:
+        passes.append("f7_infra_visible_tint")
+    else:
+        fails.append("f7_infra_visible_tint")
     style_fn = _gd_func_slice(tb, "_apply_mode_chip_idle_style")
     if "CYAN" in style_fn and "BG_DEEP" in style_fn:
         passes.append("active_cyan_fill")
