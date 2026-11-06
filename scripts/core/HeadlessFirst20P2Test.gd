@@ -8,7 +8,6 @@ extends SceneTree
 const SIZES: Array[Vector2i] = [Vector2i(1024, 720), Vector2i(1280, 800), Vector2i(1920, 1080)]
 const RIGHT_INSET := 8.0
 const LOD := preload("res://scripts/map/MapZoomLOD.gd")
-const SHOT_DIR := "res://docs/evidence/first20_p2"
 
 var _failures: int = 0
 var _mr: Node = null
@@ -23,7 +22,6 @@ func _run() -> void:
 	_test_lod_thresholds()
 	await _test_lod_apply()
 	await _test_f7_toggle_and_strip()
-	await _shots()
 	_finish()
 
 
@@ -137,11 +135,8 @@ func _test_lod_apply() -> void:
 	bars = icon.get_node_or_null("StatBars") as Node2D
 	if bars == null or not bars.visible:
 		_fail("F6 full band missing bars")
-	var rdy: CanvasItem = null
-	if bars != null:
-		rdy = bars.get_node_or_null("RdyBar") as CanvasItem
-	if rdy != null and rdy.visible:
-		_fail("F6 full band still shows readiness bar")
+	if bars != null and bars.get_node_or_null("RdyBar") != null:
+		_fail("F6 full band still has RdyBar")
 	else:
 		_pass("F6 full two-bar cap")
 	icon.queue_free()
@@ -267,25 +262,3 @@ func _find_button_text(n: Node, text: String) -> Button:
 		if hit != null:
 			return hit
 	return null
-
-
-func _shots() -> void:
-	# Best-effort grab. Do not await frame_post_draw — headless can hang there.
-	# Committed evidence is the PIL stills under docs/evidence/first20_p2/.
-	await _frames(2)
-	var dir := ProjectSettings.globalize_path(SHOT_DIR)
-	DirAccess.make_dir_recursive_absolute(dir)
-	var vp := root.get_viewport()
-	if vp == null:
-		print("INFO no viewport for shots")
-		return
-	var tex := vp.get_texture()
-	if tex == null:
-		print("INFO no texture for shots")
-		return
-	var img := tex.get_image()
-	if img == null or img.is_empty():
-		print("INFO empty shot")
-		return
-	img.save_png(dir.path_join("after_toolbar_live.png"))
-	print("INFO shot %s/after_toolbar_live.png" % dir)

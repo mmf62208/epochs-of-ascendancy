@@ -363,10 +363,10 @@ func _test_front_chips() -> void:
 		_fail("chip missing OrgBar/StrBar")
 	else:
 		_pass("chip OrgBar+StrBar present")
-		if bars.get_node_or_null("RdyBar") == null:
-			_fail("chip missing RdyBar")
+		if bars.get_node_or_null("RdyBar") != null:
+			_fail("chip still has RdyBar (F6 two-bar cap)")
 		else:
-			_pass("chip RdyBar present")
+			_pass("chip two-bar cap (no RdyBar)")
 	var letter: Node = chip.get_node_or_null("TypeLetter")
 	if letter == null:
 		_fail("chip missing TypeLetter")

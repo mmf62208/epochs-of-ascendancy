@@ -30296,9 +30296,6 @@ func _apply_unit_lod_to_icon(icon: Node2D, z: float, selected_own: bool, is_flee
 	var fill := icon.get_node_or_null("FillToeReadout") as Node2D
 	if bars != null:
 		bars.visible = bool(pol.get("show_bars", false))
-		var rdy := bars.get_node_or_null("RdyBar") as CanvasItem
-		if rdy != null:
-			rdy.visible = false
 	if letter != null:
 		letter.visible = bool(pol.get("show_letter", false))
 		if letter.visible and not full:
@@ -30665,15 +30662,14 @@ func _make_unit_nation_plate(col: Color) -> Polygon2D:
 	return plate
 
 
-## Org (green) + strength (amber) + readiness (cyan) bars on the chip itself.
-func _make_unit_stat_bars(org_v: float, str_v: float, rdy_v: float = 1.0) -> Node2D:
+## Org (green) + strength (amber). FIRST20-P2 F6: two 3 px bars, no readiness bar.
+func _make_unit_stat_bars(org_v: float, str_v: float) -> Node2D:
 	var root := Node2D.new()
 	root.name = "StatBars"
 	root.position = Vector2(-22, 20)
 	root.z_index = 3
 	var org_c := clampf(org_v, 0.0, 1.0)
 	var str_c := clampf(str_v, 0.0, 1.0)
-	var rdy_c := clampf(rdy_v, 0.0, 1.0)
 	var bg := Polygon2D.new()
 	bg.name = "BarBg"
 	bg.polygon = _poly_bar(Vector2.ZERO, Vector2(44, 8))
@@ -30689,12 +30685,6 @@ func _make_unit_stat_bars(org_v: float, str_v: float, rdy_v: float = 1.0) -> Nod
 	str_bar.polygon = _poly_bar(Vector2(0, 4), Vector2(maxf(3.0, 44.0 * str_c), 3.0))
 	str_bar.color = Color(0.95, 0.72, 0.22, 0.98)
 	root.add_child(str_bar)
-	var rdy_bar := Polygon2D.new()
-	rdy_bar.name = "RdyBar"
-	rdy_bar.polygon = _poly_bar(Vector2(0, 8), Vector2(maxf(3.0, 44.0 * rdy_c), 3.0))
-	rdy_bar.color = Color(0.38, 0.78, 0.95, 0.98)
-	rdy_bar.visible = false
-	root.add_child(rdy_bar)
 	return root
 
 
@@ -30730,15 +30720,12 @@ func _attach_unit_counter_chrome(counter: Node2D, ff: Object, nation_col: Color)
 	counter.add_child(_make_unit_type_letter(_unit_type_letter(ff)))
 	var org_v := 1.0
 	var str_v := 1.0
-	var rdy_v := 1.0
 	if ff != null:
 		if "organization" in ff:
 			org_v = float(ff.organization)
 		if "strength" in ff:
 			str_v = float(ff.strength)
-		if "readiness" in ff:
-			rdy_v = float(ff.readiness)
-	counter.add_child(_make_unit_stat_bars(org_v, str_v, rdy_v))
+	counter.add_child(_make_unit_stat_bars(org_v, str_v))
 	if ff != null and "leader_id" in ff and str(ff.leader_id).strip_edges() != "":
 		var mark: Node2D = _UnitChipTextScr.new() as Node2D
 		mark.name = "LeaderMark"

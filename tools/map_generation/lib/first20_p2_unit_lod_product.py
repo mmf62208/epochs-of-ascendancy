@@ -249,6 +249,10 @@ def build_first20_p2_unit_lod_product() -> Dict[str, Any]:
             fails.append("stat_bars_3px")
     else:
         fails.append("stat_bars_3px")
+    if "RdyBar" not in bars_fn:
+        passes.append("no_rdy_bar")
+    else:
+        fails.append("no_rdy_bar")
     if "NATION_LABEL_Z := 18" in labels or "NATION_LABEL_Z = 18" in labels:
         passes.append("nation_label_z_18")
     else:
