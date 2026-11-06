@@ -139,6 +139,9 @@ func _run() -> void:
 	if not _boot_live_supply_network(mm, sm):
 		_fail("supply network boot failed")
 		return
+	if OS.get_environment("EOA_PERF4_SEED_ONLY") == "1":
+		_test_multi_ai_decisions_stable(gd, tm)
+		return
 	if OS.get_environment("EOA_PERF4_SCENE_ORDER_ONLY") == "1":
 		await _test_leftover_queue_zero_plans_on_scene_order(tm, mm, sm)
 		return
