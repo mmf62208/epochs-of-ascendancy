@@ -13,6 +13,7 @@ EOA_STARTUP_BLANK=1 EOA_STARTUP_PARITY_OUT=/tmp/eoa-startup-blank tools/eoa_star
 # drag A/B (left-drag pan after Begin):
 EOA_STARTUP_BLANK_ONLY=drag_move tools/eoa_startup_blank.sh
 EOA_STARTUP_BLANK_ONLY=drag_nomove tools/eoa_startup_blank.sh
+EOA_STARTUP_BLANK_ONLY=return_spot tools/eoa_startup_blank.sh
 ```
 
 Xvfb 1920×1200 + xfwm4. Launch `--resolution 1280x800 --position 0,0 --maximized`, then harness un-maximizes to 1280×800 (`window` + `root.size`). Godot via `tools/run_godot.sh`. Isolated `XDG_*`.
@@ -26,6 +27,7 @@ Xvfb 1920×1200 + xfwm4. Launch `--resolution 1280x800 --position 0,0 --maximize
 | mutant_pointer | pointer | harness sets MapRenderer meta `eoa_startup_blank_mutant` | pointer FAIL |
 | drag_move | pointer, warp ≥6px to interior, then left-drag 100px | off | `DRAG_AB` logged |
 | drag_nomove | pointer, left-drag 100px from leftover (no prior move) | off | `DRAG_AB` logged |
+| return_spot | pointer, interior ≥6px then hold leftover rim | off | `RETURN_SPOT=PASS` (edge pan south) |
 
 Harness/test files may log. Product code has no `EOA_STARTUP_BLANK` prints.
 
@@ -37,7 +39,7 @@ Pre-fix excerpt: `pointer_rim_pre_fix.log.txt`.
 - `root_size_changed` **dcam=0.00** dzoom=0, `berlin_in_view=true` — resize is not the throw.
 - Leftover parked at `(268, 797)` (live leftover y=800 on the 800-tall window).
 - `camera_moved` n=1 `reason=left_drag` dcam=30.69; n=2+ `edge=(0, 1)` with EDGE-2 ramp. Cam y **1525.72 → 8412.90** (theater clamp). `berlin_in_view=false` by n=11. Soak mesh_in_view=1.
-- Product fix: swallow leftover pointer (edge pan + leftover left-drag) after Begin until the cursor moves ≥6 px from the post-settle leftover. Dead recenter-on-resize path dropped. Mutant is test-only: harness sets MapRenderer meta `eoa_startup_blank_mutant` (env `EOA_STARTUP_BLANK_MUTANT=1`); product does not read the env.
+- Product fix: swallow leftover pointer (edge pan + leftover left-drag) after Begin until the cursor moves ≥6 px from the post-settle leftover. **One-shot:** the first ≥6 px move sets `_startup_blank_armed = false`, so returning to the leftover rim later does not re-swallow. Dead recenter-on-resize path dropped. Mutant is test-only: harness sets MapRenderer meta `eoa_startup_blank_mutant` (env `EOA_STARTUP_BLANK_MUTANT=1`); product does not read the env.
 
 ## Pan button (by design)
 
@@ -69,5 +71,7 @@ KEEP: with prior move, both pans match **dcam=132.53**. Main's `cam_before` is a
 | enter, mouse interior (640,400) | 25 s then 120 s | PASS | same, no throw | 1188 |
 | pointer mutant (test-only meta) | 25 s | FAIL (killed) | y 1525.72 → 8412.90, Berlin out | 1 |
 | drag_move (tip, after ≥6px) | — | DRAG_AB | dcam=132.53 (matches main) | — |
+| return_spot on `f8c9a787` (armed never clears) | 2 s hold | FAIL | dcam=0.00 dy=0.00 | — |
+| return_spot after one-shot disarm | 2 s hold | PASS | y 1525.72 → 6200.96 dy=4675.24 | — |
 
 Seed md5 `20fe9063de285f19d4f9b8a105abfd31`. Empty-board garrisons 575. Live identity 535+40=575. Provinces 3596. map_qc NE **0.9853**. Godot 4.7.1.stable.official.a13da4feb via `tools/run_godot.sh`.

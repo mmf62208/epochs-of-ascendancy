@@ -26892,7 +26892,10 @@ func _startup_blank_swallow_pointer() -> bool:
 	var vp: Viewport = get_viewport()
 	if vp == null:
 		return true
-	return vp.get_mouse_position().distance_to(_startup_blank_leftover_mouse) < STARTUP_BLANK_MOVE_PX
+	if vp.get_mouse_position().distance_to(_startup_blank_leftover_mouse) >= STARTUP_BLANK_MOVE_PX:
+		_startup_blank_armed = false
+		return false
+	return true
 
 
 func arm_begin_title_release_swallow(pending_press: bool = false) -> void:

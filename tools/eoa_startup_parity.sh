@@ -16,6 +16,7 @@
 #   EOA_STARTUP_BLANK_BEGIN=enter    one Enter-Begin run
 #   EOA_STARTUP_BLANK_MUTANT=1       revert product fix (pointer must FAIL)
 #   EOA_STARTUP_BLANK_SOAK_S=120     post-resize soak seconds (default 25 in-engine)
+#   EOA_STARTUP_BLANK_RETURN_SPOT=1  disarm via interior move, then hold leftover rim (edge pan)
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
@@ -246,6 +247,7 @@ run_windowed() {
       EOA_STARTUP_BLANK_SOAK_S="${EOA_STARTUP_BLANK_SOAK_S:-}" \
       EOA_STARTUP_BLANK_DRAG="${EOA_STARTUP_BLANK_DRAG:-}" \
       EOA_STARTUP_BLANK_DRAG_MOVE="${EOA_STARTUP_BLANK_DRAG_MOVE:-}" \
+      EOA_STARTUP_BLANK_RETURN_SPOT="${EOA_STARTUP_BLANK_RETURN_SPOT:-}" \
       XDG_DATA_HOME="$xdg_data" \
       XDG_CONFIG_HOME="$xdg_config" \
       XDG_CACHE_HOME="$xdg_cache" \
@@ -307,6 +309,15 @@ run_windowed() {
       echo "EOA_STARTUP_BLANK who=drag_ab_logged name=$name"
       return 0
     fi
+    if [[ "$expect_blank" == "RETURN_SPOT" ]]; then
+      grep "EOA_STARTUP_BLANK RETURN_SPOT=" "$log" || true
+      if ! grep -q "EOA_STARTUP_BLANK RETURN_SPOT=PASS" "$log"; then
+        echo "WindowedStartupBlank: RESULT=FAIL name=$name want RETURN_SPOT=PASS"
+        return 1
+      fi
+      echo "EOA_STARTUP_BLANK who=return_spot_ok name=$name"
+      return 0
+    fi
     if [[ "$expect_blank" == "PASS" ]]; then
       if ! grep -q "WindowedStartupParityTest: RESULT=COMPLETED" "$log"; then
         echo "WindowedStartupBlank: RESULT=FAIL name=$name want COMPLETED"
@@ -350,6 +361,15 @@ run_windowed() {
 
 BLANK_ALL="${EOA_STARTUP_BLANK:-0}"
 BLANK_BEGIN="${EOA_STARTUP_BLANK_BEGIN:-}"
+if [[ "${EOA_STARTUP_BLANK_RETURN_SPOT:-0}" == "1" ]]; then
+  echo "EOA_STARTUP_BLANK who=wrapper_return_spot"
+  if ! run_windowed "return_spot" "pointer" "0" "1920x1200" ":86" "RETURN_SPOT"; then
+    echo "WindowedStartupBlank: RESULT=FAIL return_spot"
+    exit 1
+  fi
+  echo "WindowedStartupBlank: RESULT=PASS return_spot (NOT live-startup PASS)"
+  exit 0
+fi
 if [[ "${EOA_STARTUP_BLANK_DRAG:-0}" == "1" ]]; then
   export EOA_STARTUP_BLANK_SOAK_S="${EOA_STARTUP_BLANK_SOAK_S:-3}"
   drag_name="drag_move"

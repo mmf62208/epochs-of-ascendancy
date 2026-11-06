@@ -14,6 +14,7 @@ extends SceneTree
 ##   EOA_STARTUP_BLANK_MUTANT=1           (revert product fix via test-only meta)
 ##   EOA_STARTUP_BLANK_DRAG=1             left-drag A/B after Begin
 ##   EOA_STARTUP_BLANK_DRAG_MOVE=1        warp >=6px interior before the drag
+##   EOA_STARTUP_BLANK_RETURN_SPOT=1     disarm via interior move, then hold leftover rim
 ## Pointer: synthetic mouse press on LivingTitleBegin, leftover release after,
 ## then un-maximize/resize to 1280x800 (window + root.size). Enter: KEY_ENTER.
 
@@ -52,6 +53,8 @@ enum Phase {
 	DRAG_PREP,
 	DRAG_SLIDE,
 	DRAG_DONE,
+	RETURN_SPOT_INTERIOR,
+	RETURN_SPOT_HOLD,
 	SOAK,
 	FINISH,
 	DONE,
@@ -104,11 +107,19 @@ var _drag_step: int = 0
 var _drag_from: Vector2 = Vector2.ZERO
 var _drag_cam_before: Vector2 = Vector2.ZERO
 var _drag_zoom_before: float = 0.0
+var _return_spot_mode: bool = false
+var _leftover_rim: Vector2 = Vector2.ZERO
+var _return_spot_cam_before: Vector2 = Vector2.ZERO
+var _return_spot_frames_left: int = 0
+var _return_spot_until_usec: int = 0
 const DRAG_STEPS := 20
 const DRAG_STEP_PX := 5.0
 const DRAG_INTERIOR := Vector2(640.0, 400.0)
 const DRAG_PREP_FRAMES := 12
 const DRAG_TAIL_FRAMES := 6
+const RETURN_SPOT_INTERIOR_FRAMES := 18
+const RETURN_SPOT_HOLD_SECS := 2
+const RETURN_SPOT_DY_MIN := 40.0
 
 
 func _init() -> void:
@@ -149,13 +160,15 @@ func _start() -> void:
 	_blank_mode = _begin_mode == "pointer" or _begin_mode == "enter"
 	_drag_mode = _blank_mode and OS.get_environment("EOA_STARTUP_BLANK_DRAG") == "1"
 	_drag_move_first = OS.get_environment("EOA_STARTUP_BLANK_DRAG_MOVE") == "1"
+	_return_spot_mode = _blank_mode and OS.get_environment("EOA_STARTUP_BLANK_RETURN_SPOT") == "1"
 	if _blank_mode:
-		_log("EOA_STARTUP_BLANK who=harness_start begin=%s mutant=%s soak_s=%d drag=%s drag_move=%s" % [
+		_log("EOA_STARTUP_BLANK who=harness_start begin=%s mutant=%s soak_s=%d drag=%s drag_move=%s return_spot=%s" % [
 			_begin_mode,
 			OS.get_environment("EOA_STARTUP_BLANK_MUTANT"),
 			_blank_soak_secs(),
 			str(_drag_mode),
 			str(_drag_move_first),
+			str(_return_spot_mode),
 		])
 		var blank_out := OS.get_environment("EOA_STARTUP_BLANK_OUT").strip_edges()
 		if not blank_out.is_empty():
@@ -207,6 +220,10 @@ func _on_process() -> void:
 			_tick_drag_slide()
 		Phase.DRAG_DONE:
 			_tick_drag_done()
+		Phase.RETURN_SPOT_INTERIOR:
+			_tick_return_spot_interior()
+		Phase.RETURN_SPOT_HOLD:
+			_tick_return_spot_hold()
 		Phase.SOAK:
 			_tick_soak()
 		Phase.FINISH:
@@ -464,7 +481,9 @@ func _do_post_resize() -> void:
 	_snapshots.append(snap)
 	_log("EOA_STARTUP_PARITY who=%s shot=%s" % [label, str(snap.get("png", ""))])
 	_note_camera_bounds(snap, "post_resize")
-	if _blank_mode and _drag_mode:
+	if _blank_mode and _return_spot_mode:
+		_start_return_spot()
+	elif _blank_mode and _drag_mode:
 		_start_drag()
 	elif _blank_mode:
 		_start_soak()
@@ -586,6 +605,95 @@ func _tick_drag_done() -> void:
 		]
 	)
 	_start_soak()
+
+
+func _log_startup_blank_arm(who: String) -> void:
+	var mr := _map_renderer()
+	if mr == null:
+		_log("EOA_STARTUP_BLANK who=%s mr=null" % who)
+		return
+	_log(
+		"EOA_STARTUP_BLANK who=%s armed=%s ready=%s leftover=%s mouse=%s"
+		% [
+			who,
+			str(mr.get("_startup_blank_armed")),
+			str(mr.get("_startup_blank_leftover_ready")),
+			str(mr.get("_startup_blank_leftover_mouse")),
+			str(_current_mouse()),
+		]
+	)
+
+
+func _start_return_spot() -> void:
+	var rim: Vector2 = _leftover_rim
+	if rim == Vector2.ZERO:
+		rim = Vector2(clampf(_pointer_pt.x, 16.0, float(BLANK_RESIZE_W) - 16.0), float(BLANK_RESIZE_H) - 3.0)
+		_leftover_rim = rim
+	_log_startup_blank_arm("return_spot_before_interior")
+	var before_pt: Vector2 = _current_mouse()
+	_warp_mouse(DRAG_INTERIOR)
+	var motion: InputEventMouseMotion = _make_motion(DRAG_INTERIOR, DRAG_INTERIOR - before_pt, false)
+	Input.parse_input_event(motion)
+	if Input.has_method("flush_buffered_events"):
+		Input.flush_buffered_events()
+	_log(
+		"EOA_STARTUP_BLANK who=return_spot_interior from=(%.1f,%.1f) to=(%.1f,%.1f) dist=%.1f"
+		% [before_pt.x, before_pt.y, DRAG_INTERIOR.x, DRAG_INTERIOR.y, before_pt.distance_to(DRAG_INTERIOR)]
+	)
+	_return_spot_frames_left = RETURN_SPOT_INTERIOR_FRAMES
+	_phase = Phase.RETURN_SPOT_INTERIOR
+
+
+func _tick_return_spot_interior() -> void:
+	_warp_mouse(DRAG_INTERIOR)
+	_return_spot_frames_left -= 1
+	if _return_spot_frames_left > 0:
+		return
+	_log_startup_blank_arm("return_spot_after_interior")
+	_return_spot_cam_before = _camera_pos()
+	_warp_mouse(_leftover_rim)
+	var motion: InputEventMouseMotion = _make_motion(_leftover_rim, _leftover_rim - DRAG_INTERIOR, false)
+	Input.parse_input_event(motion)
+	if Input.has_method("flush_buffered_events"):
+		Input.flush_buffered_events()
+	_log(
+		"EOA_STARTUP_BLANK who=return_spot_hold rim=(%.1f,%.1f) cam_before=(%.2f,%.2f)"
+		% [_leftover_rim.x, _leftover_rim.y, _return_spot_cam_before.x, _return_spot_cam_before.y]
+	)
+	_log_startup_blank_arm("return_spot_back_on_rim")
+	_return_spot_until_usec = Time.get_ticks_usec() + RETURN_SPOT_HOLD_SECS * 1000000
+	_phase = Phase.RETURN_SPOT_HOLD
+
+
+func _tick_return_spot_hold() -> void:
+	_warp_mouse(_leftover_rim)
+	if Time.get_ticks_usec() < _return_spot_until_usec:
+		return
+	var after: Vector2 = _camera_pos()
+	var dy: float = after.y - _return_spot_cam_before.y
+	var d: float = after.distance_to(_return_spot_cam_before)
+	var ok: bool = dy >= RETURN_SPOT_DY_MIN
+	_log(
+		"EOA_STARTUP_BLANK RETURN_SPOT=%s cam_before=(%.2f,%.2f) cam_after=(%.2f,%.2f) dcam=%.2f dy=%.2f rim=(%.1f,%.1f) hold_s=%d"
+		% [
+			"PASS" if ok else "FAIL",
+			_return_spot_cam_before.x,
+			_return_spot_cam_before.y,
+			after.x,
+			after.y,
+			d,
+			dy,
+			_leftover_rim.x,
+			_leftover_rim.y,
+			RETURN_SPOT_HOLD_SECS,
+		]
+	)
+	if not ok:
+		_blank_fail.append(
+			"return_spot_no_edge_pan dy=%.2f want>=%.1f cam_before=%s cam_after=%s"
+			% [dy, RETURN_SPOT_DY_MIN, str(_return_spot_cam_before), str(after)]
+		)
+	_phase = Phase.FINISH
 
 
 func _tick_soak() -> void:
@@ -1532,6 +1640,7 @@ func _park_pointer_leftover_on_unmax_rim() -> void:
 	var rim_x: float = clampf(_pointer_pt.x, 16.0, float(BLANK_RESIZE_W) - 16.0)
 	var rim_y: float = float(BLANK_RESIZE_H) - 3.0
 	var rim := Vector2(rim_x, rim_y)
+	_leftover_rim = rim
 	_warp_mouse(rim)
 	_log("EOA_STARTUP_BLANK who=leftover_rim_park pt=(%.1f,%.1f) (live leftover y=800 on 800-tall window)" % [rim.x, rim.y])
 
