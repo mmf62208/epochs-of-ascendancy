@@ -28,10 +28,12 @@ class TestFirst20P2UnitLod(unittest.TestCase):
         self.assertEqual(UNIT_LOD_FULL_MIN_ZOOM, 1.2)
         self.assertEqual(unit_lod_band(0.39), "stack")
         self.assertEqual(unit_lod_band(0.599), "stack")
+        self.assertEqual(unit_lod_band(0.583), "stack")
         self.assertEqual(unit_lod_band(0.6), "mid")
         self.assertEqual(unit_lod_band(0.8), "mid")
         self.assertEqual(unit_lod_band(1.19), "mid")
         self.assertEqual(unit_lod_band(1.2), "full")
+        self.assertEqual(unit_lod_band(1.391), "full")
         self.assertEqual(unit_lod_band(2.0), "full")
 
     def test_mutant_wrong_cut_fails(self) -> None:
@@ -68,6 +70,7 @@ class TestFirst20P2UnitLod(unittest.TestCase):
     def test_product(self) -> None:
         p = build_first20_p2_unit_lod_product()
         self.assertTrue(p.get("ok"), msg=p)
+        self.assertIn("live_zoom_light_applies_lod", p.get("pass") or [])
         g = first20_p2_unit_lod_integrity()
         self.assertTrue(g.get("ok"), msg=g)
 

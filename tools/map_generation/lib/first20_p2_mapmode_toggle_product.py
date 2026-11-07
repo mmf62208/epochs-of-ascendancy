@@ -209,6 +209,17 @@ def build_first20_p2_mapmode_toggle_product() -> Dict[str, Any]:
         passes.append("f7_infra_visible_tint")
     else:
         fails.append("f7_infra_visible_tint")
+    if infra_i >= 0 and "RetrowaveTheme.CYAN" in infra_slice and "0.68" in infra_slice:
+        passes.append("f7_infra_steel_cyan")
+    else:
+        fails.append("f7_infra_steel_cyan")
+    repair_lines = [
+        ln for ln in ren.splitlines() if "set_repair_queue_visible" in ln
+    ]
+    if repair_lines and not any('"infra"' in ln for ln in repair_lines):
+        passes.append("f7_infra_no_auto_repair")
+    else:
+        fails.append("f7_infra_no_auto_repair")
     style_fn = _gd_func_slice(tb, "_apply_mode_chip_idle_style")
     if "CYAN" in style_fn and "BG_DEEP" in style_fn:
         passes.append("active_cyan_fill")

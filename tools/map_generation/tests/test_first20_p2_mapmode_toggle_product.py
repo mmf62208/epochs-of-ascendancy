@@ -67,6 +67,8 @@ class TestFirst20P2MapmodeToggle(unittest.TestCase):
     def test_product(self) -> None:
         p = build_first20_p2_mapmode_toggle_product()
         self.assertTrue(p.get("ok"), msg=p)
+        self.assertIn("f7_infra_no_auto_repair", p.get("pass") or [])
+        self.assertIn("f7_infra_steel_cyan", p.get("pass") or [])
         g = first20_p2_mapmode_toggle_integrity()
         self.assertTrue(g.get("ok"), msg=g)
 

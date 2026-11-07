@@ -237,6 +237,11 @@ def build_first20_p2_unit_lod_product() -> Dict[str, Any]:
         passes.append("paint_calls_lod")
     else:
         fails.append("paint_calls_lod")
+    light_fn = _gd_func_slice(ren, "_refresh_terrain_zoom_light")
+    if "_sync_unit_counter_lod" in light_fn:
+        passes.append("live_zoom_light_applies_lod")
+    else:
+        fails.append("live_zoom_light_applies_lod")
     if "eoa_stack_n" in ren:
         passes.append("stack_count_meta")
     else:

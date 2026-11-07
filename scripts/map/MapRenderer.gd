@@ -3612,6 +3612,10 @@ func _refresh_terrain_zoom_light() -> void:
 	# Pass 7: resync unit counter scales + LOD visibility without full icon rebuild.
 	_sync_unit_counter_scales(z)
 	_sync_unit_counter_visibility(z)
+	# FIRST20-P2 F6: Play wheel zoom never left the Home mid (chip+letter) band
+	# because this light path skipped `_sync_unit_counter_lod`. STACK/MID/FULL
+	# must re-apply from the live camera zoom (z<0.6 / 0.6–1.2 / ≥1.2).
+	_sync_unit_counter_lod(z)
 	_sync_capital_star_scales(z)
 	# Camera-space G stroke: keep ~26 screen px after Home wheel-zoom (no path rebuild).
 	_refresh_visible_supply_route_polyline_width()
@@ -15403,7 +15407,8 @@ func apply_mapmode_preset_stack(primary_mode: String, stack: Array = []) -> void
 				_munitions_desk.call("_sync_occ_filter_btn")
 	# Pass 19/22: munitions desk for supply stacks / munitions primary.
 	set_munitions_desk_visible(want_supply or pm == "supply" or pm == "munitions" or supply_mode)
-	set_repair_queue_visible(want_supply or pm in ["supply", "munitions", "infra"] or supply_mode)
+	# F7/infra mapmode must not auto-open the Repair queue popup.
+	set_repair_queue_visible(want_supply or pm in ["supply", "munitions"] or supply_mode)
 	if not debug_tint_mode_secondaries.is_empty() or debug_tint_mode_secondary != "" or pm == "munitions":
 		_refresh_province_fill_colors(true)
 	if typeof(DebugOverlay) != TYPE_NIL and not stack.is_empty():
@@ -15514,8 +15519,8 @@ func set_map_mode(mode: String = "political") -> void:
 		_map_minimap.call("set_show_munitions_pips", m == "munitions")
 	# Pass 19/22: munitions desk in supply / munitions modes.
 	set_munitions_desk_visible(m == "supply" or m == "munitions" or supply_mode)
-	# Pass 22: repair queue chip for infra / munitions / supply ops.
-	set_repair_queue_visible(m in ["infra", "munitions", "supply"] or supply_mode)
+	# Pass 22: repair queue for munitions / supply ops only — not F7 infra.
+	set_repair_queue_visible(m in ["munitions", "supply"] or supply_mode)
 	ph["supply_us"] = Time.get_ticks_usec() - ph_t
 	ph_t = Time.get_ticks_usec()
 	# Infra mode: show roads/rails + numbers. Supply: sparse muted roads (not full spiderweb).
@@ -19996,11 +20001,13 @@ func _characterize_province_fill(base: Color, province: Province, character_blen
 		var conn_density := clampf((road_n + rail_n * 1.5) / 8.0, 0.0, 1.0)
 		var infra_n := clampf(float(clampi(province.infrastructure, 0, 50)) / 18.0, 0.0, 1.0)
 		var density := clampf(maxf(conn_density, infra_n), 0.08, 1.0)
-		var infra_col := Color(0.20, 0.28, 0.34, 1.0).lerp(Color(0.62, 0.90, 0.98, 1.0), density)
+		# Steel → cyan heatmap. Low mix used to leave land looking dim grey.
+		var steel := Color(0.08, 0.46, 0.68, 1.0)
+		var infra_col := steel.lerp(RetrowaveTheme.CYAN, density)
 		if province.is_sea:
-			col = col.lerp(Color(0.10, 0.16, 0.24, 1.0), 0.55 * cb)
+			col = col.lerp(Color(0.06, 0.22, 0.38, 1.0), 0.55 * cb)
 		else:
-			col = col.lerp(infra_col, clampf(0.78 * pcb, 0.42, 0.90))
+			col = col.lerp(infra_col, clampf(0.90 * pcb, 0.68, 0.96))
 	elif debug_tint_mode == "region_control":
 		# Region control tint: green for fully controlled strategic region by owner (from MapManager + inferred regions), light red for partial/not full.
 		# Ties to regional pride bonuses, snow on high control areas, etc. Visible feedback for "taking ground" on the 460-prov map.

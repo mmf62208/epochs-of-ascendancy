@@ -21,6 +21,7 @@ func _init() -> void:
 func _run() -> void:
 	_test_lod_thresholds()
 	await _test_lod_apply()
+	await _test_lod_live_zoom()
 	await _test_f7_toggle_and_strip()
 	_finish()
 
@@ -142,6 +143,91 @@ func _test_lod_apply() -> void:
 	icon.queue_free()
 
 
+func _card_kind(icon: Node2D) -> String:
+	if icon == null:
+		return "missing"
+	var bars := icon.get_node_or_null("StatBars") as Node2D
+	var letter := icon.get_node_or_null("TypeLetter") as Node2D
+	var count := icon.get_node_or_null("LodCount") as Node2D
+	var bars_on := bars != null and bars.visible
+	var letter_on := letter != null and letter.visible
+	var count_on := count != null and count.visible
+	if count_on and not letter_on and not bars_on:
+		return "stack"
+	if letter_on and bars_on:
+		return "full"
+	if letter_on and not bars_on:
+		return "mid"
+	return "other"
+
+
+func _test_lod_live_zoom() -> void:
+	## Card type at 0.583 vs 1.391 after a live zoom (wheel light path), not first apply.
+	if _mr == null or not is_instance_valid(_mr):
+		var mr_script: Script = load("res://scripts/map/MapRenderer.gd") as Script
+		_mr = mr_script.new()
+		root.add_child(_mr)
+		await _frames(2)
+	var container: Node2D = _mr.get("container") as Node2D if "container" in _mr else null
+	if container == null:
+		container = Node2D.new()
+		container.name = "ProvinceContainers"
+		_mr.add_child(container)
+		_mr.container = container
+	var cam := _mr.get_node_or_null("MapCamera") as Camera2D
+	if cam == null:
+		cam = Camera2D.new()
+		cam.name = "MapCamera"
+		_mr.add_child(cam)
+	cam.enabled = true
+	cam.zoom = Vector2(0.787, 0.787)
+	cam.make_current()
+	_mr.set_process(false)
+	var tm: Node = root.get_node_or_null("TimeManager")
+	if tm != null and tm.has_method("set_paused"):
+		tm.call("set_paused", true)
+	var host := Node2D.new()
+	host.name = "Province_710173_live"
+	container.add_child(host)
+	var icon := Node2D.new()
+	icon.name = "DemoUnitIcon_710173_live"
+	icon.set_meta("eoa_stack_n", 4)
+	icon.set_meta("province_id", 710173)
+	host.add_child(icon)
+	if "province_nodes" in _mr:
+		_mr.province_nodes[710173] = host
+	if "_demo_unit_icon_pids" in _mr:
+		_mr._demo_unit_icon_pids = [710173]
+	_mr.call("_attach_unit_counter_chrome", icon, null, Color(0.35, 0.38, 0.42))
+	_mr.call("_apply_unit_lod_to_icon", icon, 0.787, false, false)
+	await _frames(1)
+	cam.zoom = Vector2(0.583, 0.583)
+	cam.make_current()
+	await _frames(1)
+	_mr.call("_refresh_terrain_zoom_light")
+	await _frames(1)
+	var k_lo := _card_kind(icon)
+	print("LIVE_LOD z=0.583 kind=%s" % k_lo)
+	cam.zoom = Vector2(1.391, 1.391)
+	cam.make_current()
+	await _frames(1)
+	_mr.call("_refresh_terrain_zoom_light")
+	await _frames(1)
+	var k_hi := _card_kind(icon)
+	print("LIVE_LOD z=1.391 kind=%s" % k_hi)
+	if k_lo == k_hi:
+		_fail("F6 live zoom same card kind %s at 0.583 and 1.391" % k_lo)
+	elif k_lo != "stack":
+		_fail("F6 live z=0.583 kind=%s want stack" % k_lo)
+	elif k_hi != "full":
+		_fail("F6 live z=1.391 kind=%s want full" % k_hi)
+	else:
+		_pass("F6 live zoom stack@0.583 vs full@1.391")
+	icon.queue_free()
+	host.queue_free()
+	_mr.set_process(true)
+
+
 func _boot_toolbar() -> bool:
 	if _mr == null or not is_instance_valid(_mr):
 		var mr_script: Script = load("res://scripts/map/MapRenderer.gd") as Script
@@ -242,6 +328,33 @@ func _test_f7_toggle_and_strip() -> void:
 			_pass("F7 active CYAN fill")
 	else:
 		_fail("F7 strain chip missing")
+	_mr.call("set_map_mode", "infra")
+	await _frames(2)
+	var rq: Node = _mr.get("_repair_queue_chip") as Node if "_repair_queue_chip" in _mr else null
+	if rq != null and rq is CanvasItem and (rq as CanvasItem).visible:
+		_fail("F7 infra auto-opened Repair queue")
+	else:
+		_pass("F7 infra does not auto-open Repair queue")
+	var prov_scr: Script = load("res://scripts/data/Province.gd") as Script
+	if prov_scr == null:
+		_fail("Province.gd missing")
+		return
+	var land: Resource = prov_scr.new() as Resource
+	land.set("id", 710173)
+	land.set("is_sea", false)
+	land.set("infrastructure", 12)
+	land.set("development_level", 8)
+	land.set("owner_tag", "")
+	_mr.set("debug_tint_mode", "infra")
+	_mr.set("current_map_mode", "infra")
+	var col: Color = _mr.call("_get_province_color", land)
+	var chroma := maxf(col.r, maxf(col.g, col.b)) - minf(col.r, minf(col.g, col.b))
+	print("F7_INFRA_FILL r=%.3f g=%.3f b=%.3f chroma=%.3f" % [col.r, col.g, col.b, chroma])
+	if col.b <= col.r + 0.08 or col.b <= col.g or chroma < 0.12:
+		_fail("F7 infra tint is not clearly blue (got %s chroma=%.3f)" % [str(col), chroma])
+	else:
+		_pass("F7 infra tint steel/cyan")
+	_mr.call("set_map_mode", "political")
 
 
 func _find_label_text(n: Node, text: String) -> Label:
