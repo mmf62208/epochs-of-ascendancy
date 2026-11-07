@@ -196,22 +196,30 @@ def states_terrain_hotkey_integrity() -> Dict[str, Any]:
     input_i = ren.find("func _input")
     unh_i = ren.find("func _unhandled_input")
     input_fn = ren[input_i:unh_i] if input_i >= 0 and unh_i > input_i else ""
+    handle_i = ren.find("func _handle_mapmode_hotkey")
+    handle_n = ren.find("\nfunc ", handle_i + 1) if handle_i >= 0 else -1
+    handle_fn = ren[handle_i:handle_n] if handle_i >= 0 and handle_n > handle_i else ""
     fails: list = []
     passes: list = []
     for mode, needle in (
-        ("political", 'set_map_mode("political")'),
-        ("strain", 'set_map_mode("strain")'),
-        ("vitality", 'set_map_mode("vitality")'),
-        ("development", 'set_map_mode("development")'),
-        ("resources", 'set_map_mode("resources")'),
-        ("states", 'set_map_mode("states")'),
-        ("terrain", 'set_map_mode("terrain")'),
+        ("political", '_toggle_map_mode_hotkey("political")'),
+        ("strain", '_toggle_map_mode_hotkey("strain")'),
+        ("vitality", '_toggle_map_mode_hotkey("vitality")'),
+        ("development", '_toggle_map_mode_hotkey("development")'),
+        ("resources", '_toggle_map_mode_hotkey("resources")'),
+        ("states", '_toggle_map_mode_hotkey("states")'),
+        ("terrain", '_toggle_map_mode_hotkey("terrain")'),
     ):
-        if needle in input_fn:
+        if needle in handle_fn:
             passes.append("input_%s" % mode)
         else:
             fails.append("missing_input_%s" % mode)
-    if "KEY_F9" in input_fn and "event.ctrl_pressed" in input_fn and 'set_map_mode("terrain")' in input_fn:
+    if (
+        "_handle_mapmode_hotkey" in input_fn
+        and "KEY_F9" in handle_fn
+        and "ctrl_pressed" in handle_fn
+        and '_toggle_map_mode_hotkey("terrain")' in handle_fn
+    ):
         passes.append("ctrl_f9_terrain_in_input")
     else:
         fails.append("ctrl_f9_terrain_not_in_input")

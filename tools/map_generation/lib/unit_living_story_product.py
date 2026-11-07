@@ -214,7 +214,10 @@ def build_unit_living_story_product(*, check_wiring: bool = True) -> Dict[str, A
             (passes if cond else fails).append(name)
 
         _ok("xp_in_power", "func xp_power_mult" in power and "xp_power_mult" in power)
-        _ok("rdy_bar", "RdyBar" in ren)
+        _ok(
+            "org_str_bars",
+            "OrgBar" in ren and "StrBar" in ren and "RdyBar" not in ren,
+        )
         _ok("letter_from_arch", "visual_archetype" in ren and "func _unit_type_letter" in ren)
         _ok("popup_symbols", "DOMAIN_SYMBOLS" in pop and "artillery" in pop)
         _ok("replace_dilute", "dilute_xp_replacements" in tm)
@@ -224,7 +227,7 @@ def build_unit_living_story_product(*, check_wiring: bool = True) -> Dict[str, A
         _ok("save_log", "combat_log" in lm)
         _ok("auto_cmd", "auto_assign_land_leaders" in lm)
         _ok("on_official_quick", "test_unit_living_story_product" in gates)
-        _ok("harness_story", "xp_power_mult" in harness or "RdyBar" in harness)
+        _ok("harness_story", "xp_power_mult" in harness or "OrgBar" in harness)
 
     ok = len(fails) == 0
     return {

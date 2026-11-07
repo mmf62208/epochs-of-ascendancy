@@ -187,6 +187,109 @@ static func unit_counter_min_zoom() -> float:
 	return EUROPE_HOME_COUNTER_MIN_ZOOM
 
 
+## FIRST20-P2 F6 — visual LOD on top of the Home paint floor.
+## z<0.6 stack chips; 0.6≤z<1.2 chip+letter; z≥1.2 full cards (≤2 bars).
+enum UnitLodBand { STACK, MID, FULL }
+
+const UNIT_LOD_STACK_MAX_ZOOM: float = 0.6
+const UNIT_LOD_FULL_MIN_ZOOM: float = 1.2
+const UNIT_LOD_STACK_CHIP_W: float = 22.0
+const UNIT_LOD_STACK_CHIP_H: float = 16.0
+const UNIT_LOD_STACK_COUNT_PX: int = 11
+const UNIT_LOD_FLEET_ANCHOR_PX: float = 10.0
+const UNIT_LOD_FULL_BAR_PX: float = 3.0
+const UNIT_LOD_FULL_BAR_MAX: int = 2
+const UNIT_LOD_CHIP_UNDER_LABEL_Z: int = 16
+const UNIT_LOD_CHIP_FULL_Z: int = 28
+
+
+static func unit_lod_band(z: float) -> UnitLodBand:
+	if z < UNIT_LOD_STACK_MAX_ZOOM:
+		return UnitLodBand.STACK
+	if z < UNIT_LOD_FULL_MIN_ZOOM:
+		return UnitLodBand.MID
+	return UnitLodBand.FULL
+
+
+static func unit_lod_band_name(z: float) -> String:
+	match unit_lod_band(z):
+		UnitLodBand.STACK:
+			return "stack"
+		UnitLodBand.MID:
+			return "mid"
+		UnitLodBand.FULL:
+			return "full"
+		_:
+			return "full"
+
+
+static func is_default_unit_name(n: String) -> bool:
+	var s := n.strip_edges()
+	if s.is_empty():
+		return true
+	var lower := s.to_lower()
+	if lower.begins_with("division "):
+		var rest := lower.substr(9).strip_edges()
+		return rest.is_valid_int()
+	return false
+
+
+static func hide_default_unit_name(z: float, n: String, selected_own: bool = false) -> bool:
+	if selected_own:
+		return false
+	if z >= UNIT_LOD_FULL_MIN_ZOOM:
+		return false
+	return is_default_unit_name(n)
+
+
+static func unit_lod_mid_letter(letter: String) -> String:
+	var L := letter.strip_edges().to_upper()
+	if L.is_empty():
+		L = "I"
+	match L:
+		"A", "H":
+			return "A"
+		"L":
+			return "L"
+		_:
+			return "I"
+
+
+static func unit_lod_policy(z: float, selected_own: bool = false, is_fleet: bool = false) -> Dictionary:
+	var band := unit_lod_band(z)
+	var full := selected_own or band == UnitLodBand.FULL
+	var band_out := "full"
+	if not full:
+		match band:
+			UnitLodBand.STACK:
+				band_out = "stack"
+			UnitLodBand.MID:
+				band_out = "mid"
+			UnitLodBand.FULL:
+				band_out = "full"
+			_:
+				band_out = "full"
+	var stack := band_out == "stack"
+	var mid := band_out == "mid"
+	return {
+		"band": band_out,
+		"show_bars": full,
+		"bar_count": UNIT_LOD_FULL_BAR_MAX if full else 0,
+		"bar_px": UNIT_LOD_FULL_BAR_PX,
+		"show_letter": full or mid,
+		"show_name": full,
+		"show_nato_glyph": full or mid,
+		"stack_chip": stack and not is_fleet,
+		"chip_w": UNIT_LOD_STACK_CHIP_W if stack else 44.0,
+		"chip_h": UNIT_LOD_STACK_CHIP_H if stack else 40.0,
+		"count_px": UNIT_LOD_STACK_COUNT_PX,
+		"fleet_anchor": is_fleet and stack,
+		"fleet_anchor_px": UNIT_LOD_FLEET_ANCHOR_PX,
+		"chip_z": UNIT_LOD_CHIP_FULL_Z if full else UNIT_LOD_CHIP_UNDER_LABEL_Z,
+		"label_z": 18,
+	}
+
+
 static func show_province_glyphs(t: Tier) -> bool:
 	return t == Tier.TACTICAL
 

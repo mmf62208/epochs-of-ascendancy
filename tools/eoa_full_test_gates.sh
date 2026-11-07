@@ -4,11 +4,11 @@
 #
 # Usage (from repo root):
 #   tools/eoa_full_test_gates.sh
-#   tools/eoa_full_test_gates.sh --quick      # pure python, plus garrison, ink tooltips, campaign save, audio1, audio2, stability justice, victory paths, settings toggles
+#   tools/eoa_full_test_gates.sh --quick      # pure python, plus garrison, ink, campaign save, audio, stability, victory, settings, first20-p2 strip press
 #   tools/eoa_full_test_gates.sh --with-perf  # also map-tick perf sample
 #   tools/eoa_full_test_gates.sh --log DIR    # write logs under DIR
 #
-# --quick launches HeadlessGarrison1Test, HeadlessInkTooltips0Test, HeadlessCampaignSave1Test, HeadlessAudio1Test, HeadlessAudio2Test, HeadlessStabilityJustice1Test, HeadlessVictoryPaths1Test, then HeadlessSettingsToggles1Test.
+# --quick launches HeadlessGarrison1Test, HeadlessInkTooltips0Test, HeadlessCampaignSave1Test, HeadlessAudio1Test, HeadlessAudio2Test, HeadlessStabilityJustice1Test, HeadlessVictoryPaths1Test, HeadlessSettingsToggles1Test, then HeadlessFirst20P2StripPressTest.
 # Full path calls tools/run_godot.sh, which exits 1 immediately if no binary
 # is found (fail-closed; it must not hang).
 # NE board/QC needs numpy+Pillow: pip install -r tools/map_generation/requirements.txt
@@ -120,6 +120,8 @@ run_step unit_board_play_path \
     tools.map_generation.tests.test_map_war_path_surface_product \
     tools.map_generation.tests.test_map_states_mapmode_product \
     tools.map_generation.tests.test_map_mode_toolbar_active_product \
+    tools.map_generation.tests.test_first20_p2_unit_lod_product \
+    tools.map_generation.tests.test_first20_p2_mapmode_toggle_product \
     tools.map_generation.tests.test_map_state_labels_surface_product \
     tools.map_generation.tests.test_map_nation_label_landmass_product \
     tools.map_generation.tests.test_map_live_border_fronts_surface_product \
@@ -212,6 +214,7 @@ if [[ "$QUICK" -eq 1 ]]; then
     log "FAIL headless_stability_justice1 GODOT_BUSY"
     log "FAIL headless_victory_paths1 GODOT_BUSY"
     log "FAIL headless_settings_toggles1 GODOT_BUSY"
+    log "FAIL headless_first20_p2_strip_press GODOT_BUSY"
     FAILED=1
   else
     run_step headless_garrison1 env \
@@ -306,6 +309,27 @@ if [[ "$QUICK" -eq 1 ]]; then
       fi
       if ! grep -q "RESULT=PASS" "$log"; then
         echo "[eoa-gates] FAIL headless_settings_toggles1 missing RESULT=PASS"
+        exit 1
+      fi
+      exit "$code"
+    ' || fail
+    run_step headless_first20_p2_strip_press bash -c '
+      log=$(mktemp)
+      XDG_DATA_HOME="$(mktemp -d)" flock -n "${HOME}/.eoa_godot.lock" \
+        tools/run_godot.sh --headless --path . --resolution 1024x720 \
+        -s res://scripts/core/HeadlessFirst20P2StripPressTest.gd >"$log" 2>&1
+      code=$?
+      cat "$log"
+      if grep -q "SCRIPT ERROR" "$log"; then
+        echo "[eoa-gates] FAIL headless_first20_p2_strip_press SCRIPT ERROR"
+        exit 1
+      fi
+      if grep -qE "freed or unreferenced|Cannot convert argument" "$log"; then
+        echo "[eoa-gates] FAIL headless_first20_p2_strip_press freed-object"
+        exit 1
+      fi
+      if ! grep -q "RESULT=PASS" "$log"; then
+        echo "[eoa-gates] FAIL headless_first20_p2_strip_press missing RESULT=PASS"
         exit 1
       fi
       exit "$code"
