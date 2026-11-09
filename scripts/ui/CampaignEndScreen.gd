@@ -75,6 +75,7 @@ func _ready() -> void:
 	layer = 125
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	add_to_group("campaign_end_screen")
+	set_process_input(true)
 	_acquire_clock_lock()
 	var blocker := ColorRect.new()
 	blocker.name = "Blocker"
@@ -104,17 +105,22 @@ func _ready() -> void:
 	box.custom_minimum_size = Vector2(512, 320)
 	box.add_theme_constant_override("separation", 10)
 	_panel.add_child(box)
+	var title_s := str(_model.get("title", "Campaign over"))
+	var reason_s := str(_model.get("reason", "")).strip_edges()
 	_title = Label.new()
 	_title.name = "Title"
-	_title.text = str(_model.get("title", "Campaign over"))
+	_title.text = title_s
 	_title.add_theme_font_size_override("font_size", 28)
 	_title.add_theme_color_override("font_color", Color(0.95, 0.86, 0.55))
 	box.add_child(_title)
 	_reason = Label.new()
 	_reason.name = "Reason"
-	_reason.text = str(_model.get("reason", ""))
+	_reason.text = reason_s
 	_reason.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_reason.custom_minimum_size = Vector2(500, 48)
+	# Title already carries the 1949 Eclipsed/Ascendant verdict. Do not repeat it.
+	var reason_dup := reason_s.is_empty() or reason_s == title_s or reason_s == title_s + "."
+	_reason.visible = not reason_dup
 	box.add_child(_reason)
 	var date_l := Label.new()
 	date_l.name = "Date"
@@ -134,7 +140,10 @@ func _ready() -> void:
 	_btn_load = _button("Load", _on_load)
 	_btn_load.name = "BtnLoad"
 	row.add_child(_btn_load)
-	_btn_keep = _button("Keep playing", _on_keep)
+	var keep_label := "Continue as Germany"
+	if typeof(CampaignEndDomain) != TYPE_NIL:
+		keep_label = CampaignEndDomain.keep_playing_label(str(_model.get("player_tag", "")))
+	_btn_keep = _button(keep_label, _on_keep)
 	_btn_keep.name = "BtnKeepPlaying"
 	var allow_keep := bool(_model.get("allow_keep_playing", false))
 	_btn_keep.visible = allow_keep
@@ -282,15 +291,40 @@ func _exit_tree() -> void:
 	_release_clock_lock()
 
 
+func _input(event: InputEvent) -> void:
+	if not visible:
+		return
+	if _is_escape(event):
+		get_viewport().set_input_as_handled()
+
+
+func _is_escape(event: InputEvent) -> bool:
+	if event == null:
+		return false
+	if event.is_action_pressed("ui_cancel"):
+		return true
+	if event is InputEventKey:
+		var key := event as InputEventKey
+		return key.pressed and not key.echo and (key.keycode == KEY_ESCAPE or key.physical_keycode == KEY_ESCAPE)
+	return false
+
+
 func _on_keep() -> void:
 	if not bool(_model.get("allow_keep_playing", false)):
 		return
-	_release_clock_lock()
 	if typeof(CampaignEndDomain) != TYPE_NIL:
 		CampaignEndDomain.set_keep_playing()
 	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("restore_after_campaign_end"):
 		LeaderEventUI.restore_after_campaign_end()
+	var tree := get_tree()
+	if tree != null:
+		for n in tree.get_nodes_in_group("campaign_ink_end_screen"):
+			if n != null and is_instance_valid(n) and n.has_method("_dismiss_end_screen"):
+				n.call("_dismiss_end_screen")
 	visible = false
+	remove_from_group("campaign_end_screen")
+	name = "CampaignEndScreen_dying"
+	_release_clock_lock()
 	queue_free()
 
 

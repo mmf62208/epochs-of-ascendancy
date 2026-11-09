@@ -24,6 +24,56 @@ static func reset_for_test() -> void:
 	GameData.peace_state["campaign_end"] = {}
 
 
+## Autoloads survive Return to Title. A new 1 Jan 1936 Begin must not
+## keep the previous campaign's wars, latch, or leader-event hold.
+static func reset_session_for_new_game() -> void:
+	if typeof(WarStateDomain) != TYPE_NIL:
+		WarStateDomain.reset_for_test()
+	if typeof(CapitulationDomain) != TYPE_NIL:
+		CapitulationDomain.reset_for_test()
+	reset_for_test()
+	if typeof(CampaignInkEndDomain) != TYPE_NIL:
+		CampaignInkEndDomain.reset_for_test()
+	if typeof(GameData) != TYPE_NIL:
+		GameData.peace_state.erase("pending_continuation")
+	if typeof(CampaignEndScreen) != TYPE_NIL:
+		CampaignEndScreen.dismiss_all()
+	var tree := Engine.get_main_loop() as SceneTree
+	if tree != null:
+		for n in tree.get_nodes_in_group("campaign_ink_end_screen"):
+			if n == null or not is_instance_valid(n):
+				continue
+			if n.has_method("_dismiss_end_screen"):
+				n.call("_dismiss_end_screen")
+			else:
+				n.queue_free()
+		for p in tree.get_nodes_in_group("continuation_picker"):
+			if p != null and is_instance_valid(p):
+				p.queue_free()
+		for bar in tree.get_nodes_in_group("top_info_bar"):
+			if bar != null and is_instance_valid(bar) and bar.has_method("refresh_campaign_war_readout"):
+				bar.call("refresh_campaign_war_readout")
+	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("restore_after_campaign_end"):
+		LeaderEventUI.restore_after_campaign_end()
+	if typeof(TimeManager) != TYPE_NIL:
+		if TimeManager.has_method("drop_pending_sim_events_on_campaign_end"):
+			TimeManager.drop_pending_sim_events_on_campaign_end()
+		if TimeManager.has_method("clear_overlay_clock_locks"):
+			TimeManager.clear_overlay_clock_locks()
+
+
+static func keep_playing_label(player: String = "") -> String:
+	var tag := player.strip_edges().to_upper()
+	if tag.is_empty():
+		tag = _player()
+	var name := tag
+	if typeof(WarStateDomain) != TYPE_NIL:
+		name = str(WarStateDomain.tag_name(tag)).strip_edges()
+	if name.is_empty():
+		name = tag if not tag.is_empty() else "Germany"
+	return "Continue as %s" % name
+
+
 static func latched() -> bool:
 	return _end().has("outcome")
 
@@ -238,11 +288,11 @@ static func _time_model(player: String, day_index: int) -> Dictionary:
 			break
 	var share := factory_share(player)
 	if rank == 1:
-		var reason := "Victory: Ascendant. Factory share %.1f%%." % (share * 100.0)
+		var reason := "Factory share %.1f%%." % (share * 100.0)
 		var model := _pack("victory", "time", player, day_index, "Victory: Ascendant", reason, reason)
 		model["rank"] = rank
 		return model
-	var reason2 := "Defeat: Eclipsed (rank %d)." % rank
+	var reason2 := "Factory share %.1f%%." % (share * 100.0)
 	var model2 := _pack("defeat", "time", player, day_index, "Defeat: Eclipsed (rank %d)" % rank, reason2, reason2)
 	model2["rank"] = rank
 	return model2

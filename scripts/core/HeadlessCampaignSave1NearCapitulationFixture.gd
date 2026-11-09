@@ -92,11 +92,29 @@ func _run() -> void:
 			return
 		out.store_string(text)
 		out.close()
-	print("NEAR_CAPITULATION_FIXTURE path=%s progress=%.4f threshold=%.4f bytes=%d" % [
+	var verify := FileAccess.get_file_as_string(out_abs)
+	var parsed: Variant = JSON.parse_string(verify)
+	if not (parsed is Dictionary):
+		push_error("near-capitulation fixture: saved JSON did not parse")
+		quit(1)
+		return
+	var gd: Dictionary = (parsed as Dictionary).get("game_data", {}) as Dictionary
+	var wars: Dictionary = ((gd.get("campaign_wars", {}) as Dictionary).get("wars", {}) as Dictionary)
+	if wars.is_empty():
+		push_error("near-capitulation fixture: saved JSON has no campaign_wars")
+		quit(1)
+		return
+	var cap_blob: Dictionary = gd.get("campaign_capitulation", {}) as Dictionary
+	if not bool(cap_blob.get("snapshotted", false)):
+		push_error("near-capitulation fixture: saved JSON missing capitulation snapshot")
+		quit(1)
+		return
+	print("NEAR_CAPITULATION_FIXTURE path=%s progress=%.4f threshold=%.4f bytes=%d wars=%d" % [
 		out_abs,
 		prog,
 		thresh,
 		FileAccess.get_file_as_bytes(out_abs).size(),
+		wars.size(),
 	])
 	quit(0)
 

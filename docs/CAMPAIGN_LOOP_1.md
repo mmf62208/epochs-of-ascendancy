@@ -384,6 +384,8 @@ Mike, 9 Nov 2026. Docs + Ink timeout wording only. No rule, threshold, default, 
 
 **FIX #1 (Play 74e8ac6f):** one overlay / one verdict at 1949. CL1 factory-share rank decides. Ink 1949 VICTORY is not shown after `campaign_end` latches. Dates are long form on every end screen. After latch the clock pauses, pending sim events drop, and leader popups (Leadership Transition) are held — save, load, and Return to Title still work. Player-capitulation Defeat shows **Continue as…** (picker, no second verdict). `allow_continuation` in `campaign_rules_1936.json` stays **false**. Ink enemy-capitals / national-defeat paths stay.
 
+**FIX #2 (Play 36775eab):** Return to Title / Begin call `CampaignEndDomain.reset_session_for_new_game` so a new 1 Jan 1936 game has 0 wars, no latch, no leader-event hold. Near-capitulation JSON `by_pid` keys are coerced on load so the real tick path capitulates in **N=1** day. 1949 Eclipsed/Ascendant is the title only (body is factory share). After **Continue as Germany** (was Keep playing), Esc opens the pause menu.
+
 **Provinces `0 → 421`:** display baseline. `CapitulationDomain.start_owned` is snapshotted on the first war day (`ensure_snapshot`), not at Begin, so a peaceful 1949 timeout had no start row. The sheet now uses the live controlled count when unsnapshotted. Snapshot-at-boot (true 1936 start vs wartime losses) is backlog.
 
 Play fixture: `tests/fixtures/campaign_save_1/` (README in that folder). Do not enable `dev_menu`.
@@ -400,13 +402,14 @@ Play fixture: `tests/fixtures/campaign_save_1/` (README in that folder). Do not 
 | Ink loss title | `:144` | `DEFEAT` | OK |
 | Ink loss subtitle | `:12` | government fallen + Continue as another nation or load a save | OK |
 | Ink Continue as… | `:212` | `Continue as…` | OK |
-| Ink Keep playing / Save / Main menu / Load save | `:208–216` | those labels | OK |
+| Ink Keep playing / Save / Main menu / Load save | `:208–216` | win keep button is `Continue as {nation}` | **FIX #2** — label only |
 | Ink PathTitle | `:149` | only if `detail.path_title` (Victory Paths on) | OK — absent when paths off |
 | Ink stats | `:338` | `Day N · V victory points · P provinces held` | OK — VP rule is off; this is a count, not a path promise |
-| CL1 defeat | `scripts/core/CampaignEndDomain.gd:113` · screen `:84` | `Defeat` / `{nation} capitulated on {date}` | OK |
-| CL1 victory | `:141` | `Victory` / `Decisive victory. N nation(s) capitulated.` | OK |
-| CL1 1949 | `_time_model` | `Victory: Ascendant` / `Defeat: Eclipsed (rank N)` + Date `1 January 1949` | **FIX #1** — never raw `1949-01-01`; Ink timeout panel suppressed |
+| CL1 defeat | `scripts/core/CampaignEndDomain.gd` · screen | `Defeat` / `{nation} capitulated on {date}` | OK |
+| CL1 victory | `_victory_model` | `Victory` / `Decisive victory. N nation(s) capitulated.` | OK |
+| CL1 1949 | `_time_model` | title `Victory: Ascendant` / `Defeat: Eclipsed (rank N)`; body factory share; Date `1 January 1949` | **FIX #2** — verdict once, never raw ISO |
 | CL1 Continue as… | `CampaignEndScreen` | visible on player-capitulation Defeat; hidden on 1949 / decisive victory | **FIX #1** — picker without a second verdict. Rules JSON `allow_continuation` still false |
+| CL1 Continue as {nation} | `BtnKeepPlaying` | was Keep playing; same keep-going behaviour | **FIX #2** — then Esc opens pause |
 | Continue-as picker header | `scripts/ui/PeaceConferenceWindow.gd:137` | `Choose nation to continue playing as` | OK |
 | Continue-as pick buttons | `:159` | `Continue as {TAG}` | OK |
 | Picker Confirm / Cancel | `:169` / `:177` | `Confirm` / `Cancel` | OK |

@@ -1267,10 +1267,17 @@ func _overlay_holds_clock() -> bool:
 	var tree := get_tree()
 	if tree == null:
 		return false
-	if not tree.get_nodes_in_group("campaign_ink_end_screen").is_empty():
-		return true
-	if not tree.get_nodes_in_group("continuation_picker").is_empty():
-		return true
+	for group_name in ["campaign_ink_end_screen", "campaign_end_screen", "continuation_picker"]:
+		for n in tree.get_nodes_in_group(group_name):
+			if n == null or not is_instance_valid(n) or n.is_queued_for_deletion():
+				continue
+			if str(n.name).ends_with("_dying"):
+				continue
+			if n is CanvasLayer and not (n as CanvasLayer).visible:
+				continue
+			if n is CanvasItem and not (n as CanvasItem).visible:
+				continue
+			return true
 	var menu := tree.root.get_node_or_null("MainMenu") if tree.root != null else null
 	if menu != null and is_instance_valid(menu) and not menu.is_queued_for_deletion():
 		if str(menu.get("layer")) != "" or menu is CanvasLayer:

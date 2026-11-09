@@ -311,6 +311,13 @@ func _latch_shot(mm: Node, sm: Node, kind: String, player: String) -> void:
 		if keep == null or not keep.visible:
 			_fail("%s Keep playing should stay visible" % kind)
 			return
+		if not str(keep.text).begins_with("Continue as "):
+			_fail("%s Keep playing label '%s' want Continue as <nation>" % [kind, keep.text])
+			return
+	if str(title.text) == str(reason.text) or str(reason.text) == str(title.text) + ".":
+		if reason.visible:
+			_fail("%s verdict duplicated title+reason '%s'" % [kind, reason.text])
+			return
 	if kind == "victory":
 		if str(reason.text).find("1 nation capitulated") < 0:
 			_fail("%s pluralization want 1 nation capitulated got %s" % [kind, reason.text])

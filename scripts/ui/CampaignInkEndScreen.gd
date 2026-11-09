@@ -214,7 +214,10 @@ func _ready() -> void:
 	row.add_theme_constant_override("separation", 12)
 	box.add_child(row)
 	if win:
-		row.add_child(_make_button("BtnKeepPlaying", "Keep playing", true, _on_keep))
+		var keep_label := "Continue as Germany"
+		if typeof(CampaignEndDomain) != TYPE_NIL:
+			keep_label = CampaignEndDomain.keep_playing_label(_tag)
+		row.add_child(_make_button("BtnKeepPlaying", keep_label, true, _on_keep))
 		row.add_child(_make_button("BtnSave", "Save", false, _on_save))
 		row.add_child(_make_button("BtnMainMenu", "Main menu", false, _on_main_menu))
 	else:

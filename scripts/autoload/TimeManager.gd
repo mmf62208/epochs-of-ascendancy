@@ -1027,6 +1027,12 @@ func drop_pending_sim_events_on_campaign_end() -> void:
 	_sim_flush_scheduled = false
 
 
+func clear_overlay_clock_locks() -> void:
+	_overlay_clock_locks = 0
+	_overlay_saved_valid = false
+	_notify_overlay_clock_bar()
+
+
 func overlay_holds_clock() -> bool:
 	return _overlay_clock_locks > 0
 

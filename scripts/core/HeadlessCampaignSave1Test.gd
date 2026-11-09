@@ -13,6 +13,9 @@ var _failures: int = 0
 
 
 func _init() -> void:
+	OS.set_environment("EOA_CAMPAIGN_LOOP", "1")
+	OS.set_environment("EOA_SCENARIO_EARLY_WARS", "0")
+	OS.set_environment("EOA_CALENDAR_AUTOSAVE", "0")
 	call_deferred("_run")
 
 
@@ -40,6 +43,9 @@ func _run() -> void:
 	_test_save_list_polish()
 	_test_victory_render()
 	await _test_1949_latch_one_overlay()
+	await _test_near_capitulation_real_tick()
+	await _test_return_begin_clears_war()
+	await _test_keep_playing_esc_opens_pause()
 	await _test_cc_polish_and_first_return()
 	var ok := _failures == 0
 	print("HeadlessCampaignSave1Test: ", "PASS" if ok else "FAIL", " (failures=", _failures, ")")
@@ -1158,6 +1164,20 @@ func _test_1949_latch_one_overlay() -> void:
 		_fail("1949: panel title '%s' want '%s'" % [str(title.text) if title != null else "missing", want_title])
 		_cleanup_1949(end, ev, tm)
 		return
+	var reason_l := cl1.find_child("Reason", true, false)
+	var reason_txt := str(reason_l.text) if reason_l != null else ""
+	if reason_l != null and reason_l.visible and (reason_txt == want_title or reason_txt == want_title + "."):
+		_fail("1949: verdict line duplicated title+reason '%s'" % reason_txt)
+		_cleanup_1949(end, ev, tm)
+		return
+	var keep_btn := cl1.find_child("BtnKeepPlaying", true, false) as Button
+	var want_keep := "Continue as Germany"
+	if end.has_method("keep_playing_label"):
+		want_keep = str(end.call("keep_playing_label", "GER"))
+	if keep_btn == null or str(keep_btn.text) != want_keep:
+		_fail("1949: Keep playing label '%s' want '%s'" % [str(keep_btn.text) if keep_btn != null else "missing", want_keep])
+		_cleanup_1949(end, ev, tm)
+		return
 	if rank != 1 and str(title.text).find("VICTORY") >= 0:
 		_fail("1949: VICTORY label on Eclipsed/Defeat")
 		_cleanup_1949(end, ev, tm)
@@ -1239,6 +1259,287 @@ func _test_1949_latch_one_overlay() -> void:
 		return
 	_pass("1949: one overlay, rank title, formatted date, paused, no event, save/load, Return to Title")
 	_cleanup_1949(end, ev, tm)
+
+
+func _test_near_capitulation_real_tick() -> void:
+	var mm := root.get_node_or_null("MapManager")
+	var sm := root.get_node_or_null("SupplyManager")
+	var tm := root.get_node_or_null("TimeManager")
+	var sl := root.get_node_or_null("SaveLoadManager")
+	var lm := root.get_node_or_null("LeaderManager")
+	var ev := root.get_node_or_null("LeaderEventUI")
+	var boot: GDScript = load("res://scripts/core/CampaignLoopTestBoot.gd") as GDScript
+	var war: GDScript = load("res://scripts/core/WarStateDomain.gd") as GDScript
+	var cap: GDScript = load("res://scripts/core/CapitulationDomain.gd") as GDScript
+	var end: GDScript = load("res://scripts/core/CampaignEndDomain.gd") as GDScript
+	if mm == null or tm == null or sl == null or lm == null or boot == null or war == null or cap == null or end == null:
+		_fail("near-cap: autoload or domain missing")
+		return
+	_free_group("campaign_end_screen")
+	_free_group("campaign_ink_end_screen")
+	if not bool(boot.call("boot", mm, sm, "GER")):
+		_fail("near-cap: board boot failed")
+		return
+	if not _install_near_capitulation_slot(sl):
+		return
+	war.call("reset_for_test")
+	cap.call("reset_for_test")
+	end.call("reset_for_test")
+	var loaded: Dictionary = sl.call("load_game_detailed", "near_capitulation")
+	if not bool(loaded.get("ok", false)):
+		_fail("near-cap: load failed %s" % str(loaded.get("error", "")))
+		return
+	lm.call("set_player_country_tag", "GER")
+	if not bool(war.call("any_war")):
+		_fail("near-cap: fixture did not restore GER-FRA war")
+		return
+	var prog := float(cap.call("progress", "GER"))
+	var thresh := float(cap.call("threshold", "GER"))
+	if prog + 0.0000001 < thresh:
+		_fail("near-cap: after load progress %.4f < threshold %.4f (JSON by_pid keys?)" % [prog, thresh])
+		_cleanup_near_cap(end, ev, tm, war, cap)
+		return
+	if bool(end.call("latched")):
+		_fail("near-cap: already latched on load (must fire through the tick path)")
+		_cleanup_near_cap(end, ev, tm, war, cap)
+		return
+	if tm.has_method("set_paused"):
+		tm.call("set_paused", false)
+	else:
+		tm.paused = false
+	var n := 0
+	const MAX_N := 15
+	while n < MAX_N:
+		if tm.has_method("advance_live_f5_equivalent_days"):
+			tm.call("advance_live_f5_equivalent_days", 1)
+		elif tm.has_method("advance_one_day"):
+			tm.call("advance_one_day")
+		else:
+			_fail("near-cap: no real tick path")
+			_cleanup_near_cap(end, ev, tm, war, cap)
+			return
+		n += 1
+		if bool(end.call("latched")) or bool(cap.call("is_capitulated", "GER")):
+			break
+	if not bool(end.call("latched")):
+		_fail("near-cap: no capitulation latch after %d real ticks (progress=%.4f thresh=%.4f)" % [n, float(cap.call("progress", "GER")), thresh])
+		_cleanup_near_cap(end, ev, tm, war, cap)
+		return
+	var model: Dictionary = end.call("view_model")
+	if str(model.get("kind", "")) != "defeat" and str(model.get("outcome", "")) != "defeat":
+		_fail("near-cap: latched kind=%s outcome=%s want defeat" % [str(model.get("kind", "")), str(model.get("outcome", ""))])
+		_cleanup_near_cap(end, ev, tm, war, cap)
+		return
+	var panel := _cl1_screen()
+	if panel == null:
+		_fail("near-cap: Defeat panel missing after %d ticks" % n)
+		_cleanup_near_cap(end, ev, tm, war, cap)
+		return
+	print("NEAR_CAPITULATION_N_DAYS=%d" % n)
+	_pass("near-cap: real tick path latched defeat in %d day(s)" % n)
+	_cleanup_near_cap(end, ev, tm, war, cap)
+
+
+func _test_return_begin_clears_war() -> void:
+	var mm := root.get_node_or_null("MapManager")
+	var sm := root.get_node_or_null("SupplyManager")
+	var tm := root.get_node_or_null("TimeManager")
+	var sl := root.get_node_or_null("SaveLoadManager")
+	var lm := root.get_node_or_null("LeaderManager")
+	var ev := root.get_node_or_null("LeaderEventUI")
+	var boot: GDScript = load("res://scripts/core/CampaignLoopTestBoot.gd") as GDScript
+	var war: GDScript = load("res://scripts/core/WarStateDomain.gd") as GDScript
+	var cap: GDScript = load("res://scripts/core/CapitulationDomain.gd") as GDScript
+	var end: GDScript = load("res://scripts/core/CampaignEndDomain.gd") as GDScript
+	var title_boot: GDScript = load("res://scripts/ui/LivingTitleBoot.gd") as GDScript
+	if mm == null or sl == null or lm == null or boot == null or war == null or end == null or title_boot == null:
+		_fail("rtt-begin: autoload or domain missing")
+		return
+	_free_group("campaign_end_screen")
+	_free_group("campaign_ink_end_screen")
+	_free_menu()
+	if not bool(boot.call("boot", mm, sm, "GER")):
+		_fail("rtt-begin: board boot failed")
+		return
+	if not _install_near_capitulation_slot(sl):
+		return
+	# Same slot as the prior real-tick test. SaveLoadManager skips a second
+	# apply on the same process frame (`EOA_LOAD_APPLY skip duplicate`).
+	await process_frame
+	await process_frame
+	var loaded: Dictionary = sl.call("load_game_detailed", "near_capitulation")
+	if not bool(loaded.get("ok", false)):
+		_fail("rtt-begin: load failed %s" % str(loaded.get("error", "")))
+		return
+	if not bool(war.call("any_war")):
+		_fail("rtt-begin: fixture is not at war")
+		return
+	if ev != null and ev.has_method("hold_for_campaign_end"):
+		ev.call("hold_for_campaign_end")
+	root.set_meta("eoa_return_title_scene", _dummy_title_scene())
+	var menu := _make_menu()
+	if menu == null:
+		_fail("rtt-begin: Command Center missing")
+		_cleanup_near_cap(end, ev, tm, war, cap)
+		return
+	await process_frame
+	var ret := _return_to_title_button(menu)
+	if ret == null:
+		_fail("rtt-begin: Return to Title missing")
+		_cleanup_near_cap(end, ev, tm, war, cap)
+		return
+	ret.pressed.emit()
+	await process_frame
+	await process_frame
+	var begun: Dictionary = title_boot.call("apply_living_title_boot", "GER", 1936, "")
+	if not bool(begun.get("ok", false)) and not bool(begun.get("applied", false)):
+		_fail("rtt-begin: Begin apply failed %s" % str(begun))
+		_cleanup_near_cap(end, ev, tm, war, cap)
+		return
+	if bool(war.call("any_war")):
+		_fail("rtt-begin: Begin still at war (%s)" % str(war.call("player_enemies_line")))
+		_cleanup_near_cap(end, ev, tm, war, cap)
+		return
+	if bool(end.call("latched")):
+		_fail("rtt-begin: campaign_end still latched")
+		_cleanup_near_cap(end, ev, tm, war, cap)
+		return
+	if ev != null and ev.has_method("events_held_for_campaign_end") and bool(ev.call("events_held_for_campaign_end")):
+		_fail("rtt-begin: LeaderEventUI hold still on")
+		_cleanup_near_cap(end, ev, tm, war, cap)
+		return
+	_pass("rtt-begin: Return to Title then Begin has 0 wars, no latch, no hold")
+	_cleanup_near_cap(end, ev, tm, war, cap)
+
+
+func _test_keep_playing_esc_opens_pause() -> void:
+	var mm := root.get_node_or_null("MapManager")
+	var sm := root.get_node_or_null("SupplyManager")
+	var tm := root.get_node_or_null("TimeManager")
+	var ev := root.get_node_or_null("LeaderEventUI")
+	var lm := root.get_node_or_null("LeaderManager")
+	var boot: GDScript = load("res://scripts/core/CampaignLoopTestBoot.gd") as GDScript
+	var end: GDScript = load("res://scripts/core/CampaignEndDomain.gd") as GDScript
+	var war: GDScript = load("res://scripts/core/WarStateDomain.gd") as GDScript
+	var cap: GDScript = load("res://scripts/core/CapitulationDomain.gd") as GDScript
+	if tm == null or end == null or boot == null or mm == null:
+		_fail("keep-esc: autoload missing")
+		return
+	_free_group("campaign_end_screen")
+	_free_group("campaign_ink_end_screen")
+	_free_menu()
+	if not bool(boot.call("boot", mm, sm, "GER")):
+		_fail("keep-esc: board boot failed")
+		return
+	if lm != null and lm.has_method("set_player_country_tag"):
+		lm.call("set_player_country_tag", "GER")
+	var bar := _make_bar()
+	if bar == null:
+		_fail("keep-esc: TopInfoBar missing")
+		return
+	tm.current_year = 1949
+	tm.current_month = 1
+	tm.current_day = 1
+	tm.total_days_elapsed = 13 * 365
+	if tm.has_method("set_paused"):
+		tm.call("set_paused", false)
+	if war != null and war.has_method("reset_for_test"):
+		war.call("reset_for_test")
+	if cap != null and cap.has_method("reset_for_test"):
+		cap.call("reset_for_test")
+	end.call("reset_for_test")
+	tm.call("_campaign_after_battles")
+	await process_frame
+	await process_frame
+	var cl1 := _cl1_screen()
+	if cl1 == null:
+		_fail("keep-esc: end overlay missing")
+		_cleanup_near_cap(end, ev, tm, war, cap)
+		return
+	var keep := cl1.find_child("BtnKeepPlaying", true, false) as Button
+	if keep == null or not keep.visible:
+		_fail("keep-esc: Continue as <nation> missing")
+		_cleanup_near_cap(end, ev, tm, war, cap)
+		return
+	keep.pressed.emit()
+	await process_frame
+	await process_frame
+	if _cl1_screen() != null:
+		_fail("keep-esc: overlay still up after Continue as")
+		_cleanup_near_cap(end, ev, tm, war, cap)
+		return
+	var esc := InputEventKey.new()
+	esc.pressed = true
+	esc.echo = false
+	esc.keycode = KEY_ESCAPE
+	esc.physical_keycode = KEY_ESCAPE
+	if bar.has_method("_unhandled_input"):
+		bar.call("_unhandled_input", esc)
+	else:
+		Input.parse_input_event(esc)
+	await process_frame
+	await process_frame
+	var menu := root.get_node_or_null("MainMenu")
+	if menu == null or not is_instance_valid(menu) or menu.is_queued_for_deletion():
+		_fail("keep-esc: Esc did not open pause / Command Center")
+		_cleanup_near_cap(end, ev, tm, war, cap)
+		return
+	var title := menu.find_child("CommandCenterTitle", true, false)
+	if title == null or str(title.text) != "Paused":
+		_fail("keep-esc: Command Center title '%s'" % (str(title.text) if title != null else "missing"))
+		_cleanup_near_cap(end, ev, tm, war, cap)
+		return
+	_pass("keep-esc: Esc after Continue as opens pause menu")
+	_cleanup_near_cap(end, ev, tm, war, cap)
+
+
+func _install_near_capitulation_slot(sl: Node) -> bool:
+	var src := ProjectSettings.globalize_path("res://tests/fixtures/campaign_save_1/near_capitulation.json")
+	if not FileAccess.file_exists(src):
+		_fail("near-cap: fixture missing %s" % src)
+		return false
+	var dest := ""
+	if sl != null and sl.has_method("get_save_path_global"):
+		dest = str(sl.call("get_save_path_global", "near_capitulation"))
+	if dest.is_empty():
+		dest = ProjectSettings.globalize_path("user://saves/near_capitulation.json")
+	DirAccess.make_dir_recursive_absolute(dest.get_base_dir())
+	var err := DirAccess.copy_absolute(src, dest)
+	if err != OK:
+		var text := FileAccess.get_file_as_string(src)
+		var out := FileAccess.open(dest, FileAccess.WRITE)
+		if out == null:
+			_fail("near-cap: could not install slot dest=%s err=%s" % [dest, str(err)])
+			return false
+		out.store_string(text)
+		out.close()
+	return true
+
+
+func _cleanup_near_cap(end: GDScript, ev: Node, tm: Node, war: GDScript, cap: GDScript) -> void:
+	_free_group("campaign_end_screen")
+	_free_group("campaign_ink_end_screen")
+	_free_group("continuation_picker")
+	_free_menu()
+	if end != null and end.has_method("reset_for_test"):
+		end.call("reset_for_test")
+	if war != null and war.has_method("reset_for_test"):
+		war.call("reset_for_test")
+	if cap != null and cap.has_method("reset_for_test"):
+		cap.call("reset_for_test")
+	if ev != null and ev.has_method("restore_after_campaign_end"):
+		ev.call("restore_after_campaign_end")
+	if tm != null:
+		tm.current_year = 1936
+		tm.current_month = 1
+		tm.current_day = 1
+		tm.total_days_elapsed = 0
+		if tm.has_method("set_paused"):
+			tm.call("set_paused", true)
+		if tm.has_method("clear_overlay_clock_locks"):
+			tm.call("clear_overlay_clock_locks")
+	if root.has_meta("eoa_return_title_scene"):
+		root.remove_meta("eoa_return_title_scene")
 
 
 func _cleanup_1949(end: GDScript, ev: Node, tm: Node) -> void:
