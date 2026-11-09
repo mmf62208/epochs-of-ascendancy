@@ -89,10 +89,13 @@ func apply_national_effect(country_tag: String, effect_data: Dictionary) -> bool
 	# remove_effect() erases the country key when the last effect is removed — re-create the bucket before append.
 	remove_effect(tag, effect["effect_id"])
 
-	if not country_modifiers.has(tag):
-		var bucket: Array[Dictionary] = []
-		country_modifiers[tag] = bucket
-	var effects: Array[Dictionary] = country_modifiers[tag]
+	# Dictionary / JSON leftover is an untyped Array. A typed assign from
+	# that Variant SCRIPT ERRORs on the second Begin after Return to Title.
+	var effects: Array[Dictionary] = []
+	var stored: Variant = country_modifiers.get(tag, [])
+	if stored is Array:
+		effects.assign(stored)
+	country_modifiers[tag] = effects
 	effects.append(effect)
 	national_modifier_applied.emit(tag, effect["effect_id"])
 	return true

@@ -51,6 +51,12 @@ var _raw_ptr_log_msec := 0
 var _raw_key_log_msec := 0
 var _window_input_hooked := false
 var _always_on_top_set := false
+## Mode when this title raised ALWAYS_ON_TOP. grab_focus / xfwm4 can drop
+## MAXIMIZED to ~860×550 before _exit_tree, so AOT-clear must not trust mode_now.
+var _mode_when_aot_raised: int = -1
+## First graphical F5 title. Later Return-to-Title overlays reuse it so a
+## dropped maximize is restored on the next Begin instead of staying windowed.
+static var _session_mode_at_first_aot: int = -1
 ## Smoke-only auto-begin (EOA_SMOKE_AUTO_BEGIN=1). Default OFF. Not product Begin PASS.
 var _smoke_auto_begin_armed := false
 var _smoke_auto_begin_delay_s := 0.0
@@ -1710,6 +1716,14 @@ static func restore_window_mode_after_aot_clear(wid: int, mode_before: int) -> b
 	return true
 
 
+## grab_focus on the title can un-maximize before AOT-clear. Prefer the mode
+## captured when AOT was raised (and the first F5 title of the session).
+static func aot_clear_restore_mode(mode_when_aot_raised: int, mode_now: int) -> int:
+	if mode_when_aot_raised == DisplayServer.WINDOW_MODE_MAXIMIZED:
+		return mode_when_aot_raised
+	return mode_now
+
+
 static func _queue_deferred_maximized_restore(wid: int, mode_before: int) -> void:
 	if mode_before != DisplayServer.WINDOW_MODE_MAXIMIZED:
 		return
@@ -1728,13 +1742,20 @@ func _set_live_always_on_top(on: bool) -> void:
 	if DisplayServer.get_window_list().size() <= 0:
 		return
 	var wid: int = int(DisplayServer.get_window_list()[0])
-	var mode_before: int = DisplayServer.window_get_mode(wid)
+	var mode_now: int = DisplayServer.window_get_mode(wid)
 	DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_ALWAYS_ON_TOP, on, wid)
 	_always_on_top_set = on
 	if on:
+		_mode_when_aot_raised = mode_now
+		if _session_mode_at_first_aot < 0:
+			_session_mode_at_first_aot = mode_now
 		return
-	restore_window_mode_after_aot_clear(wid, mode_before)
-	_queue_deferred_maximized_restore(wid, mode_before)
+	var raised: int = _session_mode_at_first_aot
+	if raised < 0:
+		raised = _mode_when_aot_raised
+	var restore_mode: int = aot_clear_restore_mode(raised, mode_now)
+	restore_window_mode_after_aot_clear(wid, restore_mode)
+	_queue_deferred_maximized_restore(wid, restore_mode)
 
 
 func _ensure_ui_cancel_binding() -> void:
@@ -1796,8 +1817,9 @@ func _on_window_input(event: InputEvent) -> void:
 func _ensure_live_window_key_focus() -> void:
 	if DisplayServer.get_name() == "headless" or OS.has_feature("dedicated_server"):
 		return
+	var wid: int = -1
 	if DisplayServer.get_window_list().size() > 0:
-		var wid: int = int(DisplayServer.get_window_list()[0])
+		wid = int(DisplayServer.get_window_list()[0])
 		if not DisplayServer.window_is_focused(wid):
 			DisplayServer.window_move_to_foreground(wid)
 	var win: Window = get_window()
@@ -1807,6 +1829,20 @@ func _ensure_live_window_key_focus() -> void:
 	# is not spent focusing the button. Do not do this every _process frame:
 	# HeadlessBegin1 T5 M3 relocates Begin, and a per-frame grab relayouts it.
 	_restore_begin_focus_if_idle()
+	# The same grab can drop xfwm4 maximize (Play #172 first-Return Begin).
+	# Re-assert now so AOT-clear still sees MAXIMIZED.
+	_restore_session_maximized(wid)
+
+
+func _restore_session_maximized(wid: int = -1) -> void:
+	var mode: int = _session_mode_at_first_aot
+	if mode < 0:
+		mode = _mode_when_aot_raised
+	if wid < 0 and DisplayServer.get_window_list().size() > 0:
+		wid = int(DisplayServer.get_window_list()[0])
+	if wid < 0:
+		return
+	restore_window_mode_after_aot_clear(wid, mode)
 
 
 ## First Return/Enter is ignored when the window steal-focus leaves no Control
@@ -2090,6 +2126,8 @@ func _finish(out: Dictionary) -> void:
 	_center_on_player(str(out.get("player_tag", _tag)))
 	_arm_startup_blank_leftover_swallow()
 	boot_closed.emit(out)
+	# Every Begin path (Return key, mouse, title after Return to Title).
+	_restore_session_maximized()
 	queue_free()
 
 

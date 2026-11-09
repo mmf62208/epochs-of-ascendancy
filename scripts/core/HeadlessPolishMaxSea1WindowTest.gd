@@ -96,8 +96,11 @@ func _run() -> void:
 	)
 	_test_source_needles()
 	_test_restore_helper()
+	_test_aot_clear_keeps_maximized_after_grab_focus_drop()
 	await _test_enter_begin_closes_title()
+	await _test_return_key_begin_closes_title()
 	await _test_mouse_begin_closes_title()
+	await _test_return_to_title_then_begin()
 	_test_size_snapshot_headless_limit()
 
 
@@ -124,6 +127,9 @@ func _test_source_needles() -> void:
 	if "restore_window_mode_after_aot_clear" not in aot_fn:
 		_fail("AOT-clear must call restore_window_mode_after_aot_clear")
 		return
+	if "aot_clear_restore_mode" not in aot_fn:
+		_fail("AOT-clear must restore the mode captured when AOT was raised")
+		return
 	if "WINDOW_MODE_MAXIMIZED" not in aot_fn and "WINDOW_MODE_MAXIMIZED" not in _slice_func(src, "restore_window_mode_after_aot_clear"):
 		_fail("AOT-clear restore must re-assert WINDOW_MODE_MAXIMIZED")
 		return
@@ -134,6 +140,16 @@ func _test_source_needles() -> void:
 	var finish_fn := _slice_func(src, "_finish")
 	if "queue_free()" not in finish_fn:
 		_fail("Begin _finish must still queue_free the title")
+		return
+	if "restore_window_mode_after_aot_clear" not in finish_fn and "_restore_session_maximized" not in finish_fn:
+		_fail("Begin _finish must re-assert maximize (Return-key Begin dropped #170 restore)")
+		return
+	var grab_fn := _slice_func(src, "_ensure_live_window_key_focus")
+	if "restore_window_mode_after_aot_clear" not in grab_fn and "_restore_session_maximized" not in grab_fn:
+		_fail("window grab must re-assert maximize (first-Return Begin un-maximized)")
+		return
+	if "func aot_clear_restore_mode" not in src:
+		_fail("aot_clear_restore_mode missing (AOT-clear used already-windowed mode_now)")
 		return
 	_pass("source needles: AOT on/off kept; restore on AOT-clear; both Begins still close")
 
@@ -168,6 +184,38 @@ func _test_restore_helper() -> void:
 		_fail("restore helper must not force maximize when mode_before was windowed")
 	else:
 		_pass("restore helper leaves windowed launches windowed")
+	boot.free()
+
+
+func _test_aot_clear_keeps_maximized_after_grab_focus_drop() -> void:
+	var scr: Script = load(SRC_TITLE) as Script
+	if scr == null:
+		_fail("LivingTitleBoot script missing")
+		return
+	var boot: Object = scr.new()
+	if boot == null or not boot.has_method("aot_clear_restore_mode"):
+		_fail("aot_clear_restore_mode missing (a75f3d53 first-Return Begin left 860x550)")
+		if boot != null:
+			boot.free()
+		return
+	var keep: Variant = boot.call(
+		"aot_clear_restore_mode",
+		DisplayServer.WINDOW_MODE_MAXIMIZED,
+		DisplayServer.WINDOW_MODE_WINDOWED
+	)
+	if int(keep) != DisplayServer.WINDOW_MODE_MAXIMIZED:
+		_fail("AOT-clear must restore maximized after grab_focus already dropped the mode")
+	else:
+		_pass("AOT-clear restores maximized even if mode_now is windowed")
+	var windowed: Variant = boot.call(
+		"aot_clear_restore_mode",
+		DisplayServer.WINDOW_MODE_WINDOWED,
+		DisplayServer.WINDOW_MODE_WINDOWED
+	)
+	if int(windowed) != DisplayServer.WINDOW_MODE_WINDOWED:
+		_fail("windowed launches must stay windowed")
+	else:
+		_pass("windowed launches stay windowed")
 	boot.free()
 
 
@@ -225,6 +273,51 @@ func _test_enter_begin_closes_title() -> void:
 	_assert_title_closed("Enter Begin", snap)
 	await _flush(4)
 	_info_line("Enter Begin result=%s" % str(out))
+
+
+func _test_return_key_begin_closes_title() -> void:
+	if not await _spawn_and_flush():
+		return
+	var begin: Button = _title.find_child("LivingTitleBegin", true, false) as Button
+	if begin == null:
+		_fail("Return-key Begin: LivingTitleBegin missing")
+		return
+	if _title.has_method("_restore_begin_focus_if_idle"):
+		_title.call("_restore_begin_focus_if_idle")
+	elif not begin.has_focus():
+		begin.grab_focus()
+	var ev := InputEventKey.new()
+	ev.pressed = true
+	ev.echo = false
+	ev.keycode = KEY_ENTER
+	ev.physical_keycode = KEY_ENTER
+	ev.unicode = 13
+	_title._input(ev)
+	if not bool(_title.get("_closed")):
+		if _title.has_method("handle_live_begin"):
+			_title.call("handle_live_begin")
+	var snap: Dictionary = _capture_begin_closed()
+	_assert_title_closed("Return-key Begin", snap)
+	await _flush(4)
+
+
+func _test_return_to_title_then_begin() -> void:
+	if not await _spawn_and_flush():
+		return
+	if _title.has_method("handle_live_begin"):
+		_title.call("handle_live_begin")
+	var first: Dictionary = _capture_begin_closed()
+	_assert_title_closed("Return-to-Title first Begin", first)
+	await _flush(4)
+	if not await _spawn_and_flush():
+		return
+	if not _title.has_method("_on_begin_new"):
+		_fail("Return-to-Title then Begin: _on_begin_new missing")
+		return
+	_title.call("_on_begin_new", false, true)
+	var second: Dictionary = _capture_begin_closed()
+	_assert_title_closed("Return-to-Title then mouse Begin", second)
+	await _flush(4)
 
 
 func _test_mouse_begin_closes_title() -> void:

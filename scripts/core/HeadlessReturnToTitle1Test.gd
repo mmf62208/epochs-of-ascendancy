@@ -54,6 +54,9 @@ func _run() -> void:
 		_finish()
 		return
 	_pass("board booted")
+	if not _begin_return_begin_modifiers():
+		_finish()
+		return
 	if tm.has_method("set_paused"):
 		tm.call("set_paused", false)
 	var bar := _spawn_clock_bar()
@@ -232,6 +235,56 @@ func _return_button(menu: Node) -> Button:
 		if str(b.get_meta("eoa_cc_action", "")) == "return_to_main":
 			return b
 	return null
+
+
+func _begin_return_begin_modifiers() -> bool:
+	# Play #172 FAIL B: second Begin after Return to Title SCRIPT ERRORed at
+	# NationalModifierManager.apply_national_effect (untyped Array leftover).
+	var menu_src := FileAccess.get_file_as_string("res://scripts/ui/MainMenu.gd")
+	if menu_src.find("func _return_to_title") < 0 or menu_src.find("clear_all_modifiers") < 0:
+		_fail("Begin/Return/Begin: Return to Title must reset NationalModifierManager")
+		return false
+	var nmm := root.get_node_or_null("NationalModifierManager")
+	if nmm == null or not nmm.has_method("apply_national_effect"):
+		_fail("Begin/Return/Begin: NationalModifierManager missing")
+		return false
+	var payload := {
+		"source": "test_agent_boost",
+		"source_detail": "boost_production mission test",
+		"modifiers": {"output_multiplier": 0.12, "resource_output_multiplier": 0.08},
+		"duration_months": 3,
+		"remaining_months": 3,
+	}
+	if not bool(nmm.call("apply_national_effect", "GER", payload)):
+		_fail("Begin/Return/Begin: first Begin apply failed")
+		return false
+	_pass("Begin/Return/Begin: first Begin applied")
+	# First game leftover as Dictionary/JSON untyped Array (a75f3d53).
+	var leftover: Array = []
+	var stored: Variant = nmm.get("country_modifiers").get("GER", [])
+	if stored is Array:
+		leftover.append_array(stored)
+	if leftover.is_empty():
+		leftover.append({"effect_id": "stale", "modifiers": {}, "remaining_months": 1})
+	nmm.country_modifiers["GER"] = leftover
+	if nmm.has_method("clear_all_modifiers"):
+		nmm.call("clear_all_modifiers")
+	# Plant leftover again: save/load and a75f3d53 Return leave an untyped Array.
+	nmm.country_modifiers["GER"] = leftover
+	var errors_before: int = _log.script_errors if _log != null else 0
+	var second: bool = bool(nmm.call("apply_national_effect", "GER", payload))
+	var errors_after: int = _log.script_errors if _log != null else 0
+	if errors_after > errors_before:
+		_fail(
+			"Begin/Return/Begin: second Begin SCRIPT ERROR (%d) %s"
+			% [errors_after - errors_before, " | ".join(_log.samples)]
+		)
+		return false
+	if not second:
+		_fail("Begin/Return/Begin: second Begin apply failed")
+		return false
+	_pass("Begin/Return/Begin: second Begin applied with 0 script errors")
+	return true
 
 
 func _title_scene() -> PackedScene:

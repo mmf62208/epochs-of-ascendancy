@@ -1587,6 +1587,10 @@ func _return_to_title() -> void:
 	# swap frees the old TopInfoBar; SupplyManager must not keep that ref.
 	if typeof(SupplyManager) != TYPE_NIL and SupplyManager.has_method("clear_clock_bar_for_scene_change"):
 		SupplyManager.call("clear_clock_bar_for_scene_change")
+	# Autoloads survive change_scene. Untyped leftover arrays SCRIPT ERROR
+	# on the next TestRunner apply_national_effect (second Begin).
+	if typeof(NationalModifierManager) != TYPE_NIL and NationalModifierManager.has_method("clear_all_modifiers"):
+		NationalModifierManager.clear_all_modifiers()
 	queue_free()
 	var tree := get_tree()
 	if tree == null:
