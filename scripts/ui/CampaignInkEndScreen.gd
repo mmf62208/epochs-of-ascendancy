@@ -6,6 +6,14 @@ extends CanvasLayer
 
 const PANEL_SIZE := Vector2(760, 520)
 
+## Option A (beta, Victory Paths off): capitulation or 1 Jan 1949.
+## Timeout copy names the calendar. It must not say `end_date` or promise a path.
+const WIN_SUBTITLE := "Your strategy prevailed.\nKeep playing to shape the decades ahead."
+const LOSS_SUBTITLE := "Your government has fallen.\nHistory isn't finished. Continue as another nation, or load a save."
+const TIMEOUT_SUBTITLE := "The campaign ended on 1 January 1949.\nKeep playing to shape what comes next."
+const TIMEOUT_REASON := "The campaign ended on 1 January 1949."
+const CAPITALS_REASON := "Every enemy capital you were at war with is under your control."
+
 static var present_log: Array = []
 static var _load_hooked: bool = false
 
@@ -150,10 +158,7 @@ func _ready() -> void:
 	var sub := Label.new()
 	sub.name = "OutcomeSubtitle"
 	sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	if win:
-		sub.text = "Your strategy prevailed.\nKeep playing to shape the decades ahead."
-	else:
-		sub.text = "Your government has fallen.\nHistory isn't finished. Continue as another nation, or load a save."
+	sub.text = player_subtitle(_outcome, _reason)
 	sub.add_theme_font_size_override("font_size", 16)
 	sub.add_theme_color_override("font_color", RetrowaveTheme.TEXT_PRIMARY)
 	box.add_child(sub)
@@ -174,11 +179,14 @@ func _ready() -> void:
 		RetrowaveTheme.style_body_label(winner)
 		box.add_child(winner)
 
-	if not _reason.strip_edges().is_empty():
+	var reason_txt := player_reason_text(_reason)
+	if not reason_txt.is_empty():
 		var why := Label.new()
 		why.name = "OutcomeReason"
-		why.text = _reason
+		why.text = reason_txt
 		why.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		why.custom_minimum_size = Vector2(680, 0)
+		why.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		RetrowaveTheme.style_body_label(why)
 		box.add_child(why)
 
@@ -248,6 +256,48 @@ func _format_iso(iso: String) -> String:
 		if slm != null and slm.has_method("format_game_date_display"):
 			return str(slm.call("format_game_date_display", iso))
 	return iso
+
+
+## Map Ink reason codes to Option A player copy. Unknown text (paths, tests) stays raw.
+static func player_reason_text(raw: String) -> String:
+	var codes := _reason_codes(raw)
+	if codes.is_empty():
+		return raw.strip_edges()
+	var parts: PackedStringArray = []
+	for c in codes:
+		var mapped := _map_reason_code(c)
+		if mapped.is_empty():
+			return raw.strip_edges()
+		parts.append(mapped)
+	return "\n".join(parts)
+
+
+static func player_subtitle(outcome: String, raw_reason: String) -> String:
+	if outcome != "win":
+		return LOSS_SUBTITLE
+	var codes := _reason_codes(raw_reason)
+	if codes.size() == 1 and codes[0] == "end_date":
+		return TIMEOUT_SUBTITLE
+	return WIN_SUBTITLE
+
+
+static func _reason_codes(raw: String) -> PackedStringArray:
+	var out: PackedStringArray = []
+	for part in raw.split(","):
+		var c := part.strip_edges()
+		if not c.is_empty():
+			out.append(c)
+	return out
+
+
+static func _map_reason_code(code: String) -> String:
+	match code:
+		"end_date":
+			return TIMEOUT_REASON
+		"enemy_capitals":
+			return CAPITALS_REASON
+		_:
+			return ""
 
 
 func _when_line() -> String:

@@ -32,6 +32,7 @@ func _run() -> void:
 	_test_command_center_pause_menu()
 	_test_save_browser_opens_command_center()
 	_test_live_win_then_loss()
+	_test_option_a_end_strings()
 	_test_clock_stays_paused_under_overlays()
 	_test_continue_as_closes_in_order()
 	_test_defeat_load_closes_end_screen()
@@ -459,6 +460,17 @@ func _test_live_win_then_loss() -> void:
 	if win_title == null or str(win_title.text) != "VICTORY":
 		_fail("win: title is not VICTORY")
 		return
+	var win_sub := win_screen.find_child("OutcomeSubtitle", true, false)
+	if win_sub == null or str(win_sub.text).find("1 January 1949") < 0 or str(win_sub.text).find("prevailed") >= 0:
+		_fail("win: 1949 timeout subtitle is '%s'" % (str(win_sub.text) if win_sub != null else "missing"))
+		return
+	var win_why := win_screen.find_child("OutcomeReason", true, false)
+	if win_why == null or str(win_why.text).find("1 January 1949") < 0 or str(win_why.text).find("end_date") >= 0:
+		_fail("win: 1949 timeout reason is '%s'" % (str(win_why.text) if win_why != null else "missing"))
+		return
+	if win_screen.find_child("PathTitle", true, false) != null:
+		_fail("win: PathTitle shown with Victory Paths off")
+		return
 	if win_screen.find_child("BtnKeepPlaying", true, false) == null:
 		_fail("win: Keep playing missing")
 		return
@@ -483,6 +495,10 @@ func _test_live_win_then_loss() -> void:
 	if loss_title == null or str(loss_title.text) != "DEFEAT":
 		_fail("loss: title is not DEFEAT")
 		return
+	var loss_sub := loss.find_child("OutcomeSubtitle", true, false)
+	if loss_sub == null or str(loss_sub.text).find("Continue as another nation") < 0:
+		_fail("loss: subtitle is '%s'" % (str(loss_sub.text) if loss_sub != null else "missing"))
+		return
 	if get_nodes_in_group("continuation_picker").size() != 0:
 		_fail("loss: picker opened before Continue as…")
 		return
@@ -504,6 +520,88 @@ func _test_live_win_then_loss() -> void:
 		_fail("loss: Continue as… did not open the picker")
 		return
 	_pass("loss: end screen before the continuation picker, clock paused")
+
+
+func _test_option_a_end_strings() -> void:
+	var screen: Script = load("res://scripts/ui/CampaignInkEndScreen.gd") as Script
+	if screen == null:
+		_fail("option-a: CampaignInkEndScreen missing")
+		return
+	var timeout_sub := str(screen.call("player_subtitle", "win", "end_date"))
+	var timeout_why := str(screen.call("player_reason_text", "end_date"))
+	var win_sub := str(screen.call("player_subtitle", "win", "enemy_capitals"))
+	var win_why := str(screen.call("player_reason_text", "enemy_capitals"))
+	var both_why := str(screen.call("player_reason_text", "end_date, enemy_capitals"))
+	var loss_sub := str(screen.call("player_subtitle", "loss", "capitulated"))
+	if timeout_why.find("1 January 1949") < 0 or timeout_why.find("end_date") >= 0:
+		_fail("option-a: timeout reason '%s'" % timeout_why)
+		return
+	if timeout_sub.find("1 January 1949") < 0 or timeout_sub.find("prevailed") >= 0:
+		_fail("option-a: timeout subtitle '%s'" % timeout_sub)
+		return
+	if win_sub.find("prevailed") < 0 or win_why.find("enemy capital") < 0:
+		_fail("option-a: win copy sub='%s' why='%s'" % [win_sub, win_why])
+		return
+	if both_why.find("1 January 1949") < 0 or both_why.find("enemy capital") < 0:
+		_fail("option-a: combined reason '%s'" % both_why)
+		return
+	if both_why.find("end_date") >= 0 or both_why.find("enemy_capitals") >= 0:
+		_fail("option-a: combined reason still jargon '%s'" % both_why)
+		return
+	if loss_sub.find("Continue as another nation") < 0:
+		_fail("option-a: loss subtitle '%s'" % loss_sub)
+		return
+	for bad in ["Atomic", "Arsenal of the World", "Victory Paths", "Satellite"]:
+		if timeout_sub.find(bad) >= 0 or timeout_why.find(bad) >= 0 or win_sub.find(bad) >= 0 or loss_sub.find(bad) >= 0:
+			_fail("option-a: default copy mentions %s" % bad)
+			return
+	_free_group("campaign_ink_end_screen")
+	_free_group("continuation_picker")
+	screen.call("clear_log")
+	screen.call("present_win", "GER", "end_date")
+	var win := _ink_screen()
+	if win == null:
+		_fail("option-a: timeout screen missing")
+		return
+	var shown_sub := win.find_child("OutcomeSubtitle", true, false)
+	var shown_why := win.find_child("OutcomeReason", true, false)
+	if shown_sub == null or str(shown_sub.text) != timeout_sub:
+		_fail("option-a: rendered timeout subtitle '%s'" % (str(shown_sub.text) if shown_sub != null else "missing"))
+		return
+	if shown_why == null or str(shown_why.text) != timeout_why:
+		_fail("option-a: rendered timeout reason '%s'" % (str(shown_why.text) if shown_why != null else "missing"))
+		return
+	if win.find_child("PathTitle", true, false) != null:
+		_fail("option-a: PathTitle on default timeout")
+		return
+	_free_group("campaign_ink_end_screen")
+	var gd := root.get_node_or_null("GameData")
+	var lm := root.get_node_or_null("LeaderManager")
+	if gd == null or lm == null:
+		_fail("option-a: autoload missing")
+		return
+	lm.call("set_player_country_tag", "GER")
+	gd.call("trigger_national_defeat_or_continuation", "GER", "option-a loss")
+	var loss := _ink_screen()
+	if loss == null:
+		_fail("option-a: DEFEAT missing")
+		return
+	var cont := loss.find_child("BtnContinueAs", true, false)
+	if not (cont is BaseButton):
+		_fail("option-a: Continue as… missing")
+		return
+	(cont as BaseButton).pressed.emit()
+	var picker := _picker()
+	if picker == null:
+		_fail("option-a: picker missing")
+		return
+	var header := _picker_header(picker)
+	if header.find("Choose nation to continue playing as") < 0:
+		_fail("option-a: picker header '%s'" % header)
+		return
+	_pass("option-a: 1949 timeout, win/loss, and Continue as… copy")
+	_free_group("continuation_picker")
+	_free_group("campaign_ink_end_screen")
 
 
 func _test_clock_stays_paused_under_overlays() -> void:
@@ -945,8 +1043,11 @@ func _test_victory_render() -> void:
 		_fail("victory: title is not VICTORY")
 		return
 	var reason := win.find_child("OutcomeReason", true, false)
-	if reason == null or str(reason.text).find("end_date") < 0:
-		_fail("victory: reasons text missing")
+	if reason == null or str(reason.text).find("1 January 1949") < 0:
+		_fail("victory: 1949 timeout wording missing")
+		return
+	if str(reason.text).find("end_date") >= 0 or str(reason.text).find("enemy_capitals") >= 0:
+		_fail("victory: still shows jargon '%s'" % str(reason.text))
 		return
 	var vp := Rect2(0, 0, 1280, 800)
 	for nm in ["OutcomeTitle", "OutcomeReason", "BtnKeepPlaying", "BtnSave", "BtnMainMenu"]:
@@ -1147,6 +1248,15 @@ func _picker() -> Node:
 				continue
 			return n
 	return null
+
+
+func _picker_header(picker: Node) -> String:
+	if picker == null:
+		return ""
+	for n in picker.find_children("*", "Label", true, false):
+		if n is Label and str((n as Label).text).find("Choose nation") >= 0:
+			return str((n as Label).text)
+	return ""
 
 
 func _free_group(group: String) -> void:
