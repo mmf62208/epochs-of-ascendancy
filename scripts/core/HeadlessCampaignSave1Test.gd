@@ -38,6 +38,7 @@ func _run() -> void:
 	_test_save_hint_and_f6_loyalty()
 	_test_save_list_polish()
 	_test_victory_render()
+	await _test_cc_polish_and_first_return()
 	var ok := _failures == 0
 	print("HeadlessCampaignSave1Test: ", "PASS" if ok else "FAIL", " (failures=", _failures, ")")
 	print("HeadlessCampaignSave1Test: RESULT=", "PASS" if ok else "FAIL")
@@ -806,6 +807,13 @@ func _test_save_hint_and_f6_loyalty() -> void:
 	if hint == null or str(hint.text).find("Ctrl+Shift+S") < 0:
 		_fail("hint: CC save/load section missing Ctrl+Shift+S")
 		return
+	if not (hint is Control) or (hint as Control).mouse_filter == Control.MOUSE_FILTER_IGNORE:
+		_fail("hint: SaveListHint mouse_filter IGNORE hides the tooltip")
+		return
+	var tip := str((hint as Control).tooltip_text)
+	if tip.find("Ctrl+Shift+S") < 0:
+		_fail("hint: SaveListHint tooltip missing Ctrl+Shift+S ('%s')" % tip)
+		return
 	var mr_src := FileAccess.get_file_as_string("res://scripts/map/MapRenderer.gd")
 	var f6 := mr_src.find("keycode == KEY_F6")
 	if f6 < 0:
@@ -957,6 +965,179 @@ func _test_victory_render() -> void:
 		win.call("_dismiss_end_screen")
 	else:
 		win.queue_free()
+
+
+func _test_cc_polish_and_first_return() -> void:
+	DisplayServer.window_set_size(Vector2i(1280, 800))
+	if root is Window:
+		(root as Window).size = Vector2i(1280, 800)
+	_free_menu()
+	var bar := _make_bar()
+	var menu := _make_menu()
+	if bar == null or menu == null:
+		_fail("polish2: bar or CC missing")
+		return
+	await process_frame
+	await process_frame
+	await process_frame
+	var hint := menu.find_child("SaveListHint", true, false) as Control
+	if hint == null or hint.mouse_filter == Control.MOUSE_FILTER_IGNORE or str(hint.tooltip_text).find("Ctrl+Shift+S") < 0:
+		_fail("polish2: save-list tooltip is not on a visible control")
+		return
+	var resume := menu.find_child("BtnResume", true, false) as Button
+	if resume == null or resume.action_mode != BaseButton.ACTION_MODE_BUTTON_PRESS:
+		_fail("polish2: Resume is not press-mode")
+		return
+	var ret := _return_to_title_button(menu)
+	if ret == null:
+		_fail("polish2: Return to Title missing")
+		return
+	if ret.action_mode != BaseButton.ACTION_MODE_BUTTON_PRESS:
+		_fail("polish2: Return to Title is not press-mode")
+		return
+	var scroll := menu.find_child("GameActionsScroll", true, false) as ScrollContainer
+	if scroll != null and scroll.is_ancestor_of(ret):
+		_fail("polish2: Return to Title is still inside the actions scroll")
+		return
+	var ret_rect := ret.get_global_rect()
+	var view := Rect2(Vector2.ZERO, Vector2(1280, 800))
+	if ret_rect.size.x < 8.0 or ret_rect.size.y < 8.0 or not view.encloses(ret_rect):
+		_fail("polish2: Return to Title rect %s not fully on 1280×800" % str(ret_rect))
+		return
+	var bar_rect := (bar as Control).get_global_rect()
+	var hud_pt := Vector2(640.0, clampf(bar_rect.get_center().y, 8.0, 48.0))
+	root.push_input(_mouse_button(hud_pt, true))
+	root.push_input(_mouse_button(hud_pt, false))
+	await process_frame
+	if menu == null or not is_instance_valid(menu) or menu.is_queued_for_deletion():
+		_fail("polish2: top-bar click dismissed Command Center")
+		return
+	var title := menu.find_child("CommandCenterTitle", true, false)
+	if title == null or str(title.text) != "Paused":
+		_fail("polish2: CC title after top-bar click '%s'" % (str(title.text) if title != null else "missing"))
+		return
+	_pass("polish2: tooltip visible; top-bar click does not dismiss Paused")
+	root.set_meta("eoa_return_title_scene", _dummy_title_scene())
+	var center := ret_rect.get_center()
+	root.push_input(_mouse_button(center, true))
+	var first := menu.is_queued_for_deletion()
+	root.push_input(_mouse_button(center + Vector2(2, 1), false))
+	if not first:
+		_fail("polish2: first Return to Title press did nothing rect=%s" % str(ret_rect))
+		return
+	_pass("polish2: first Return to Title press returned")
+	_free_menu()
+	await _test_pause_first_enter()
+	await _test_living_title_first_enter()
+
+
+func _test_pause_first_enter() -> void:
+	_free_menu()
+	var menu := _make_menu()
+	if menu == null:
+		_fail("enter: pause CC missing")
+		return
+	await process_frame
+	await process_frame
+	var resume := menu.find_child("BtnResume", true, false) as Button
+	if resume == null:
+		_fail("enter: Resume missing")
+		return
+	if not resume.has_focus():
+		resume.grab_focus()
+	await process_frame
+	root.push_input(_key(KEY_ENTER, true))
+	var closed := menu.is_queued_for_deletion()
+	root.push_input(_key(KEY_ENTER, false))
+	if not closed:
+		_fail("enter: first Return on Paused did not Resume")
+		return
+	_pass("enter: first Return on Paused Resumes")
+	_free_menu()
+
+
+func _test_living_title_first_enter() -> void:
+	var boot_scr: GDScript = load("res://scripts/ui/LivingTitleBoot.gd") as GDScript
+	if boot_scr == null:
+		_fail("title-enter: LivingTitleBoot missing")
+		return
+	var title: CanvasLayer = boot_scr.new() as CanvasLayer
+	title.name = "LivingTitleBoot"
+	root.add_child(title)
+	await process_frame
+	await process_frame
+	var begin := title.find_child("LivingTitleBegin", true, false) as Button
+	if begin == null:
+		_fail("title-enter: Begin missing")
+		title.queue_free()
+		return
+	var vp := title.get_viewport()
+	if vp != null:
+		vp.gui_release_focus()
+	await process_frame
+	if title.has_method("_restore_begin_focus_if_idle"):
+		title.call("_restore_begin_focus_if_idle")
+	if not begin.has_focus():
+		_fail("title-enter: idle focus restore did not grab Begin")
+		title.queue_free()
+		return
+	var ev := _key(KEY_ENTER, true)
+	if title.has_method("_input"):
+		title._input(ev)
+	var closed := bool(title.get("_closed")) or title.is_queued_for_deletion()
+	if not closed:
+		Input.parse_input_event(ev)
+		await process_frame
+		closed = bool(title.get("_closed")) or title.is_queued_for_deletion()
+	if not closed:
+		_fail("title-enter: first Return did not Begin")
+		title.queue_free()
+		return
+	_pass("title-enter: first Return Begins")
+	if is_instance_valid(title) and not title.is_queued_for_deletion():
+		title.queue_free()
+	await process_frame
+
+
+func _dummy_title_scene() -> PackedScene:
+	var title := Node.new()
+	title.name = "TitleIdle"
+	var packed := PackedScene.new()
+	packed.pack(title)
+	title.free()
+	return packed
+
+
+func _return_to_title_button(menu: Node) -> Button:
+	for n in menu.find_children("*", "Button", true, false):
+		if not (n is Button):
+			continue
+		var b := n as Button
+		if str(b.get_meta("eoa_cc_action", "")) == "return_to_main":
+			return b
+	return null
+
+
+func _mouse_button(pt: Vector2, pressed: bool) -> InputEventMouseButton:
+	var ev := InputEventMouseButton.new()
+	ev.device = 0
+	ev.button_index = MOUSE_BUTTON_LEFT
+	ev.pressed = pressed
+	ev.position = pt
+	ev.global_position = pt
+	ev.button_mask = MOUSE_BUTTON_MASK_LEFT if pressed else 0
+	return ev
+
+
+func _key(keycode: int, pressed: bool) -> InputEventKey:
+	var ev := InputEventKey.new()
+	ev.pressed = pressed
+	ev.echo = false
+	ev.keycode = keycode
+	ev.physical_keycode = keycode
+	if keycode == KEY_ENTER:
+		ev.unicode = 13
+	return ev
 
 
 func _picker() -> Node:

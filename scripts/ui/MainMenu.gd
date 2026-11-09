@@ -378,7 +378,7 @@ func _build_ui() -> void:
 	left_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	left_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 	# Default deadzone is 0, so a 1px twitch turns the press into a scroll
-	# and a release-mode button never emits. Return to Title lives in here.
+	# and a release-mode button never emits. Resume stays press-mode for that.
 	left_scroll.scroll_deadzone = 16
 	left.add_child(left_scroll)
 
@@ -401,16 +401,18 @@ func _build_ui() -> void:
 		resume.focus_mode = Control.FOCUS_ALL
 		resume.process_mode = Node.PROCESS_MODE_ALWAYS
 		resume.mouse_filter = Control.MOUSE_FILTER_STOP
+		# Same press-mode as the rest of GAME: a 1px twitch in the scroll
+		# used to eat the first click on a release-mode Resume.
+		resume.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
 		resume.pressed.connect(_force_close)
 		RetrowaveTheme.style_primary_button(resume)
 		left_inner.add_child(resume)
+		resume.call_deferred("grab_focus")
 	_add_action_button(left_inner, "Save Game (quicksave)", "save", not pause_menu)
 	_add_action_button(left_inner, "Save As…", "save_as", false)
 	_add_action_button(left_inner, "Refresh save list", "refresh", false)
 	_add_action_button(left_inner, "Trade Market", "trade_market", true)
 	_add_action_button(left_inner, "Help / About", "help", false)
-	_add_action_button(left_inner, "Return to Title", "return_to_main", false)
-	_add_action_button(left_inner, "Exit to Desktop", "exit", false, true)
 
 	var new_game := VBoxContainer.new()
 	new_game.name = "NewGameBlock"
@@ -470,7 +472,10 @@ func _build_ui() -> void:
 		left_inner.add_child(dbg_hdr)
 		_add_action_button(left_inner, "Open Debug Overlay (F10)", "debug", false)
 
-	# Pinned under the scroll so Mute is inside the panel at 1280×800.
+	# Pinned under the scroll so Mute / Return to Title stay clickable at
+	# 1280×800. Inside GameActionsScroll the first click was a drag-scroll
+	# and the second click fired the button.
+	_add_session_pin(left)
 	_add_audio_settings(left)
 
 	# --- Right: save browser ---
@@ -501,7 +506,9 @@ func _build_ui() -> void:
 	sav_hint.text = "Click Save on a slot to write · Load to restore · Save Game uses quicksave · Ctrl+Shift+S opens this list"
 	sav_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	sav_hint.custom_minimum_size = Vector2(280, 0)
-	sav_hint.tooltip_text = "Save / load slots. Ctrl+Shift+S opens this list. F6 is the loyalty mapmode."
+	# Labels default to IGNORE, which drops the tooltip. STOP so hover works.
+	sav_hint.mouse_filter = Control.MOUSE_FILTER_STOP
+	sav_hint.tooltip_text = "Save / Load · [Ctrl+Shift+S]"
 	RetrowaveTheme.style_body_label(sav_hint)
 	right_v.add_child(sav_hint)
 
@@ -532,6 +539,7 @@ func _build_ui() -> void:
 	close_btn.text = "Return to Game (ESC)"
 	close_btn.custom_minimum_size = Vector2(0, 40)
 	close_btn.mouse_filter = Control.MOUSE_FILTER_STOP
+	close_btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
 	close_btn.add_to_group("eoa_ui_close_x")
 	close_btn.button_down.connect(_on_close_x_button_down)
 	close_btn.pressed.connect(_force_close)
@@ -568,6 +576,11 @@ func _on_blocker_gui_input(event: InputEvent) -> void:
 			var local := _panel.get_global_rect()
 			if local.has_point(mb.global_position):
 				return
+		# CC-POLISH: the dimmer covers the HUD. A speed / Menu / date click
+		# must not dismiss Paused by accident.
+		if _top_bar_owns_point(mb.global_position):
+			_root.accept_event()
+			return
 		if mb.pressed:
 			_force_close()
 		_root.accept_event()
@@ -589,6 +602,27 @@ func _audio_node() -> Node:
 	if tree == null or tree.root == null:
 		return null
 	return tree.root.get_node_or_null("AudioManager")
+
+
+func _top_bar_owns_point(screen: Vector2) -> bool:
+	if get_tree() == null:
+		return false
+	var bar: Node = TopInfoBar.find_in_tree(get_tree())
+	if bar is Control:
+		var hud := bar as Control
+		if hud.visible and hud.get_global_rect().has_point(screen):
+			return true
+	return screen.y >= 0.0 and screen.y <= 56.0
+
+
+func _add_session_pin(parent: VBoxContainer) -> void:
+	var pin := VBoxContainer.new()
+	pin.name = "SessionPin"
+	pin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	pin.add_theme_constant_override("separation", 8)
+	parent.add_child(pin)
+	_add_action_button(pin, "Return to Title", "return_to_main", false)
+	_add_action_button(pin, "Exit to Desktop", "exit", false, true)
 
 
 func _add_audio_settings(parent: VBoxContainer) -> void:
@@ -815,6 +849,8 @@ func _add_action_button(parent: VBoxContainer, text: String, id: String, primary
 	btn.set_meta("eoa_cc_action", id)
 	if id == "refresh":
 		btn.name = "RefreshSaveList"
+	elif id == "return_to_main":
+		btn.name = "BtnReturnToTitle"
 	# Press, not release. GameActionsScroll used to eat the first click:
 	# deadzone 0 treated a 1px move as a drag, so `pressed` never fired
 	# until a second, still click. One emit on button-down.
@@ -1551,6 +1587,10 @@ func _return_to_title() -> void:
 	# swap frees the old TopInfoBar; SupplyManager must not keep that ref.
 	if typeof(SupplyManager) != TYPE_NIL and SupplyManager.has_method("clear_clock_bar_for_scene_change"):
 		SupplyManager.call("clear_clock_bar_for_scene_change")
+	# Autoloads survive change_scene. Untyped leftover arrays SCRIPT ERROR
+	# on the next TestRunner apply_national_effect (second Begin).
+	if typeof(NationalModifierManager) != TYPE_NIL and NationalModifierManager.has_method("clear_all_modifiers"):
+		NationalModifierManager.clear_all_modifiers()
 	queue_free()
 	var tree := get_tree()
 	if tree == null:

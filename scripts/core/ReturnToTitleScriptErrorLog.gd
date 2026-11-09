@@ -21,7 +21,13 @@ func _log_error(
 	_script_backtraces: Array[ScriptBacktrace]
 ) -> void:
 	var blob := "%s:%d %s %s" % [file, line, code, rationale]
-	if blob.find("SCRIPT ERROR") >= 0 or blob.find("previously freed") >= 0 or blob.find("freed instance") >= 0:
+	if (
+		blob.find("SCRIPT ERROR") >= 0
+		or blob.find("previously freed") >= 0
+		or blob.find("freed instance") >= 0
+		or blob.find("Array[Dictionary]") >= 0
+		or blob.find("Trying to assign an array") >= 0
+	):
 		_note(blob)
 
 
