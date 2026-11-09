@@ -1695,14 +1695,43 @@ func _ensure_living_begin_binding() -> void:
 		InputMap.action_add_event("eoa_living_begin", ev_b)
 
 
+## xfwm4 restores the pre-maximize client size when ALWAYS_ON_TOP is cleared.
+## Re-assert maximized so Begin (mouse or Enter) does not shrink the window.
+static func restore_window_mode_after_aot_clear(wid: int, mode_before: int) -> bool:
+	if mode_before != DisplayServer.WINDOW_MODE_MAXIMIZED:
+		return false
+	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_MAXIMIZED, wid)
+	var loop: SceneTree = Engine.get_main_loop() as SceneTree
+	if loop != null and loop.root != null:
+		loop.root.mode = Window.MODE_MAXIMIZED
+	return true
+
+
+static func _queue_deferred_maximized_restore(wid: int, mode_before: int) -> void:
+	if mode_before != DisplayServer.WINDOW_MODE_MAXIMIZED:
+		return
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
+	if tree == null:
+		return
+	tree.process_frame.connect(
+		restore_window_mode_after_aot_clear.bind(wid, DisplayServer.WINDOW_MODE_MAXIMIZED),
+		CONNECT_ONE_SHOT
+	)
+
+
 func _set_live_always_on_top(on: bool) -> void:
 	if DisplayServer.get_name() == "headless" or OS.has_feature("dedicated_server"):
 		return
 	if DisplayServer.get_window_list().size() <= 0:
 		return
 	var wid: int = int(DisplayServer.get_window_list()[0])
+	var mode_before: int = DisplayServer.window_get_mode(wid)
 	DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_ALWAYS_ON_TOP, on, wid)
 	_always_on_top_set = on
+	if on:
+		return
+	restore_window_mode_after_aot_clear(wid, mode_before)
+	_queue_deferred_maximized_restore(wid, mode_before)
 
 
 func _ensure_ui_cancel_binding() -> void:
