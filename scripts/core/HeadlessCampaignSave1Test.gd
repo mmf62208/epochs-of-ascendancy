@@ -39,6 +39,7 @@ func _run() -> void:
 	_test_save_hint_and_f6_loyalty()
 	_test_save_list_polish()
 	_test_victory_render()
+	await _test_1949_latch_one_overlay()
 	await _test_cc_polish_and_first_return()
 	var ok := _failures == 0
 	print("HeadlessCampaignSave1Test: ", "PASS" if ok else "FAIL", " (failures=", _failures, ")")
@@ -1068,6 +1069,210 @@ func _test_victory_render() -> void:
 		win.queue_free()
 
 
+func _test_1949_latch_one_overlay() -> void:
+	var mm := root.get_node_or_null("MapManager")
+	var sm := root.get_node_or_null("SupplyManager")
+	var tm := root.get_node_or_null("TimeManager")
+	var sl := root.get_node_or_null("SaveLoadManager")
+	var lm := root.get_node_or_null("LeaderManager")
+	var ev := root.get_node_or_null("LeaderEventUI")
+	var boot: GDScript = load("res://scripts/core/CampaignLoopTestBoot.gd") as GDScript
+	var war: GDScript = load("res://scripts/core/WarStateDomain.gd") as GDScript
+	var cap: GDScript = load("res://scripts/core/CapitulationDomain.gd") as GDScript
+	var end: GDScript = load("res://scripts/core/CampaignEndDomain.gd") as GDScript
+	var ink: GDScript = load("res://scripts/core/CampaignInkEndDomain.gd") as GDScript
+	var ink_screen: GDScript = load("res://scripts/ui/CampaignInkEndScreen.gd") as GDScript
+	if mm == null or tm == null or sl == null or lm == null or boot == null or war == null or cap == null or end == null or ink == null:
+		_fail("1949: autoload or domain missing")
+		return
+	_free_group("campaign_ink_end_screen")
+	_free_group("campaign_end_screen")
+	_free_group("continuation_picker")
+	if not bool(boot.call("boot", mm, sm, "GER")):
+		_fail("1949: board boot failed")
+		return
+	cap.call("apply_economy_factories_to_map")
+	war.call("reset_for_test")
+	cap.call("reset_for_test")
+	end.call("reset_for_test")
+	ink.call("reset_for_test")
+	if ink_screen != null and ink_screen.has_method("clear_log"):
+		ink_screen.call("clear_log")
+	lm.call("set_player_country_tag", "GER")
+	tm.current_year = 1949
+	tm.current_month = 1
+	tm.current_day = 1
+	tm.current_hour = 0
+	tm.total_days_elapsed = 13 * 365
+	if tm.has_method("set_paused"):
+		tm.call("set_paused", false)
+	else:
+		tm.paused = false
+	if not bool(war.call("loop_enabled")):
+		_fail("1949: campaign loop is off")
+		_cleanup_1949(end, ev, tm)
+		return
+	tm.call("_campaign_after_battles")
+	await process_frame
+	await process_frame
+	if not bool(end.call("latched")):
+		_fail("1949: campaign_end did not latch")
+		_cleanup_1949(end, ev, tm)
+		return
+	var model: Dictionary = end.call("view_model")
+	var ranked: Array = end.call("factory_rank")
+	var rank := 1
+	for i in range(ranked.size()):
+		if str(ranked[i]) == "GER":
+			rank = i + 1
+			break
+	var want_title := "Victory: Ascendant" if rank == 1 else "Defeat: Eclipsed (rank %d)" % rank
+	if str(model.get("kind", "")) != "time":
+		_fail("1949: kind=%s want time" % str(model.get("kind", "")))
+		_cleanup_1949(end, ev, tm)
+		return
+	if str(model.get("title", "")) != want_title:
+		_fail("1949: model title '%s' want '%s'" % [str(model.get("title", "")), want_title])
+		_cleanup_1949(end, ev, tm)
+		return
+	var cl1 := _cl1_screen()
+	var ink_n := _ink_screen()
+	var cl1_n := 0
+	for n in get_nodes_in_group("campaign_end_screen"):
+		if is_instance_valid(n) and not n.is_queued_for_deletion() and not str(n.name).ends_with("_dying"):
+			cl1_n += 1
+	var ink_count := 0
+	for n2 in get_nodes_in_group("campaign_ink_end_screen"):
+		if is_instance_valid(n2) and not n2.is_queued_for_deletion() and not str(n2.name).ends_with("_dying"):
+			ink_count += 1
+	if cl1 == null or cl1_n != 1:
+		_fail("1949: want exactly one CL1 panel got %d" % cl1_n)
+		_cleanup_1949(end, ev, tm)
+		return
+	if ink_n != null or ink_count != 0:
+		_fail("1949: Ink 1949 panel still showing (count=%d)" % ink_count)
+		_cleanup_1949(end, ev, tm)
+		return
+	var title := cl1.find_child("Title", true, false)
+	if title == null or str(title.text) != want_title:
+		_fail("1949: panel title '%s' want '%s'" % [str(title.text) if title != null else "missing", want_title])
+		_cleanup_1949(end, ev, tm)
+		return
+	if rank != 1 and str(title.text).find("VICTORY") >= 0:
+		_fail("1949: VICTORY label on Eclipsed/Defeat")
+		_cleanup_1949(end, ev, tm)
+		return
+	var date_l := cl1.find_child("Date", true, false)
+	if date_l == null or str(date_l.text).find("1 January 1949") < 0 or str(date_l.text).find("1949-01-01") >= 0:
+		_fail("1949: date '%s' is not 1 January 1949" % (str(date_l.text) if date_l != null else "missing"))
+		_cleanup_1949(end, ev, tm)
+		return
+	var stats_l := cl1.find_child("Stats", true, false)
+	if stats_l != null and str(stats_l.text).find("Provinces (controlled) 0 →") >= 0:
+		_fail("1949: provinces baseline still 0 (%s)" % str(stats_l.text))
+		_cleanup_1949(end, ev, tm)
+		return
+	if not bool(tm.paused) and not (tm.has_method("is_paused") and bool(tm.call("is_paused"))):
+		_fail("1949: clock not paused after latch")
+		_cleanup_1949(end, ev, tm)
+		return
+	if not bool(end.call("clock_locked")):
+		_fail("1949: clock_locked is false")
+		_cleanup_1949(end, ev, tm)
+		return
+	if ev != null and ev.has_method("hold_for_campaign_end"):
+		if ev.has_method("events_held_for_campaign_end") and not bool(ev.call("events_held_for_campaign_end")):
+			_fail("1949: LeaderEventUI hold not set")
+			_cleanup_1949(end, ev, tm)
+			return
+	if lm.has_signal("leader_retirement_offered"):
+		lm.emit_signal("leader_retirement_offered", "cs1_1949_fake_leader")
+	await process_frame
+	await process_frame
+	if _leadership_popup_visible():
+		_fail("1949: Leadership Transition popped after latch")
+		_cleanup_1949(end, ev, tm)
+		return
+	var year0 := int(tm.current_year)
+	var day0 := int(tm.current_day)
+	if tm.has_method("set_paused"):
+		tm.call("set_paused", false)
+	else:
+		tm.paused = false
+	if tm.has_method("advance_one_day"):
+		tm.call("advance_one_day")
+	if int(tm.current_year) != year0 or int(tm.current_day) != day0:
+		_fail("1949: clock moved after latch to %04d-%02d-%02d" % [int(tm.current_year), int(tm.current_month), int(tm.current_day)])
+		_cleanup_1949(end, ev, tm)
+		return
+	var saved: Dictionary = sl.call("save_game_detailed", "cs1_1949_latch")
+	if not bool(saved.get("ok", false)):
+		_fail("1949: save failed %s" % str(saved.get("error", "")))
+		_cleanup_1949(end, ev, tm)
+		return
+	var loaded: Dictionary = sl.call("load_game_detailed", "cs1_1949_latch")
+	if not bool(loaded.get("ok", false)):
+		_fail("1949: load failed %s" % str(loaded.get("error", "")))
+		_cleanup_1949(end, ev, tm)
+		return
+	_pass("1949: save/load after latch")
+	root.set_meta("eoa_return_title_scene", _dummy_title_scene())
+	_free_menu()
+	var menu := _make_menu()
+	if menu == null:
+		_fail("1949: Command Center missing for Return to Title")
+		_cleanup_1949(end, ev, tm)
+		return
+	await process_frame
+	await process_frame
+	await process_frame
+	var ret := _return_to_title_button(menu)
+	if ret == null:
+		_fail("1949: Return to Title missing")
+		_cleanup_1949(end, ev, tm)
+		return
+	ret.pressed.emit()
+	await process_frame
+	if is_instance_valid(menu) and not menu.is_queued_for_deletion():
+		_fail("1949: Return to Title did not close Command Center")
+		_cleanup_1949(end, ev, tm)
+		return
+	_pass("1949: one overlay, rank title, formatted date, paused, no event, save/load, Return to Title")
+	_cleanup_1949(end, ev, tm)
+
+
+func _cleanup_1949(end: GDScript, ev: Node, tm: Node) -> void:
+	_free_group("campaign_end_screen")
+	_free_group("campaign_ink_end_screen")
+	_free_group("continuation_picker")
+	_free_menu()
+	if end != null and end.has_method("reset_for_test"):
+		end.call("reset_for_test")
+	if ev != null and ev.has_method("restore_after_campaign_end"):
+		ev.call("restore_after_campaign_end")
+	if tm != null:
+		tm.current_year = 1936
+		tm.current_month = 1
+		tm.current_day = 1
+		tm.total_days_elapsed = 0
+		if tm.has_method("set_paused"):
+			tm.call("set_paused", true)
+	if root.has_meta("eoa_return_title_scene"):
+		root.remove_meta("eoa_return_title_scene")
+
+
+func _leadership_popup_visible() -> bool:
+	for n in root.get_children():
+		if n == null or not is_instance_valid(n):
+			continue
+		if n is Window and str((n as Window).title).find("Leadership Transition") >= 0:
+			return true
+		var scr: Script = n.get_script()
+		if scr != null and str(scr.resource_path).find("RetirementOfferPopup") >= 0:
+			return true
+	return false
+
+
 func _test_cc_polish_and_first_return() -> void:
 	DisplayServer.window_set_size(Vector2i(1280, 800))
 	if root is Window:
@@ -1360,6 +1565,13 @@ func _make_menu() -> Node:
 func _ink_screen() -> Node:
 	var nodes := get_nodes_in_group("campaign_ink_end_screen")
 	for n in nodes:
+		if is_instance_valid(n) and not n.is_queued_for_deletion() and not str(n.name).ends_with("_dying"):
+			return n
+	return null
+
+
+func _cl1_screen() -> Node:
+	for n in get_nodes_in_group("campaign_end_screen"):
 		if is_instance_valid(n) and not n.is_queued_for_deletion() and not str(n.name).ends_with("_dying"):
 			return n
 	return null

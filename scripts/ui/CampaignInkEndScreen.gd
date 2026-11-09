@@ -56,10 +56,19 @@ static func _on_any_load_completed(_slot_name: String) -> void:
 				scr.call("_dismiss_picker", p)
 	if scr != null and scr.has_method("_dismiss_ink_end_screens"):
 		scr.call("_dismiss_ink_end_screens")
-		return
-	for n in tree.get_nodes_in_group("campaign_ink_end_screen"):
-		if n != null and is_instance_valid(n) and n.has_method("_dismiss_end_screen"):
-			n.call("_dismiss_end_screen")
+	else:
+		for n in tree.get_nodes_in_group("campaign_ink_end_screen"):
+			if n != null and is_instance_valid(n) and n.has_method("_dismiss_end_screen"):
+				n.call("_dismiss_end_screen")
+	var cl1: Script = load("res://scripts/ui/CampaignEndScreen.gd") as Script
+	if cl1 != null and cl1.has_method("dismiss_all"):
+		cl1.call("dismiss_all")
+	if typeof(LeaderEventUI) != TYPE_NIL:
+		var locked := typeof(CampaignEndDomain) != TYPE_NIL and CampaignEndDomain.clock_locked()
+		if locked and LeaderEventUI.has_method("hold_for_campaign_end"):
+			LeaderEventUI.hold_for_campaign_end()
+		elif not locked and LeaderEventUI.has_method("restore_after_campaign_end"):
+			LeaderEventUI.restore_after_campaign_end()
 
 
 static func present_loss(tag: String, reason: String, detail: Dictionary = {}) -> Node:
@@ -250,6 +259,14 @@ func _nation_line() -> String:
 
 
 func _format_iso(iso: String) -> String:
+	if typeof(CampaignEndDomain) != TYPE_NIL:
+		var via_end := CampaignEndDomain.format_end_date(iso)
+		if not via_end.is_empty() and via_end.find("-") < 0:
+			return via_end
+	if typeof(GameDateDisplay) != TYPE_NIL:
+		var readable := GameDateDisplay.format_iso_date_readable(iso)
+		if not readable.is_empty():
+			return readable
 	var tree := get_tree()
 	if tree != null and tree.root != null:
 		var slm := tree.root.get_node_or_null("SaveLoadManager")

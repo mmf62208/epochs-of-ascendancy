@@ -36,6 +36,8 @@ var _toast_ptr_anchor: Vector2 = Vector2.ZERO
 ## Headless INPUT-1 / toast-click guards opt in. Product `post_news` / `show_toast`
 ## stay skipped in headless so Maginot / CompleteTest quit after RESULT=PASS.
 var force_toast_ui: bool = false
+## After campaign_end latches: no new event windows (retirement, replacement).
+var _campaign_end_hold: bool = false
 
 
 func _ready() -> void:
@@ -301,9 +303,52 @@ func hide_for_campaign_end() -> void:
 	_trim_toast_stack_to(0)
 
 
+func hold_for_campaign_end() -> void:
+	_campaign_end_hold = true
+	hide_for_campaign_end()
+	_dismiss_leader_popups()
+
+
 func restore_after_campaign_end() -> void:
+	_campaign_end_hold = false
 	if _toast_layer != null:
 		_toast_layer.visible = true
+
+
+func events_held_for_campaign_end() -> bool:
+	return _campaign_end_hold
+
+
+func _campaign_end_blocks_popups() -> bool:
+	if _campaign_end_hold:
+		return true
+	if typeof(CampaignEndDomain) != TYPE_NIL and CampaignEndDomain.clock_locked():
+		return true
+	return false
+
+
+func _dismiss_leader_popups() -> void:
+	_retirement_queue.clear()
+	_replacement_queue.clear()
+	if _active_retirement_popup != null and is_instance_valid(_active_retirement_popup):
+		_active_retirement_popup.hide()
+		_active_retirement_popup.queue_free()
+		_active_retirement_popup = null
+	if _active_replacement_popup != null and is_instance_valid(_active_replacement_popup):
+		_active_replacement_popup.hide()
+		_active_replacement_popup.queue_free()
+		_active_replacement_popup = null
+	var tree := get_tree()
+	if tree == null or tree.root == null:
+		return
+	for n in tree.root.get_children():
+		if n == null or not is_instance_valid(n):
+			continue
+		if n is RetirementOfferPopup:
+			n.queue_free()
+			continue
+		if n is Window and str((n as Window).title).find("Leadership Transition") >= 0:
+			n.queue_free()
 
 
 func post_news(title: String, body: String, category: String = "general") -> void:
@@ -344,6 +389,8 @@ func _should_skip_toast_ui() -> bool:
 	# Graphical F5 1x still shows capture toasts (PLAYTEST item 14).
 	# Guards set `force_toast_ui` on this node — do not read EOA_HEADLESS_TOAST_UI
 	# here (that env is a test/gate hook, not product news-path policy).
+	if _campaign_end_blocks_popups():
+		return true
 	if force_toast_ui:
 		return false
 	if DisplayServer.get_name() == "headless" or OS.has_feature("dedicated_server"):
@@ -714,12 +761,17 @@ func _on_toast_timer_expired(panel: Variant = null) -> void:
 func _on_retirement_offered(leader_id: String) -> void:
 	if leader_id.is_empty():
 		return
+	if _campaign_end_blocks_popups():
+		return
 	if leader_id not in _retirement_queue:
 		_retirement_queue.append(leader_id)
 	_try_show_next_retirement()
 
 
 func _try_show_next_retirement() -> void:
+	if _campaign_end_blocks_popups():
+		_retirement_queue.clear()
+		return
 	if _active_retirement_popup != null and is_instance_valid(_active_retirement_popup):
 		return
 	if _retirement_queue.is_empty():
@@ -759,6 +811,8 @@ func _on_retirement_popup_completed(resolved_leader_id: String, outcome: String)
 
 func _on_leader_replacement_needed(request: Dictionary) -> void:
 	# Only player countries emit this signal (AI vacancies auto-resolve in LeaderManager).
+	if _campaign_end_blocks_popups():
+		return
 	var request_id := str(request.get("request_id", ""))
 	var country_tag := str(request.get("country_tag", ""))
 	if request_id.is_empty() or not LeaderManager.is_player_country(country_tag):
@@ -769,6 +823,9 @@ func _on_leader_replacement_needed(request: Dictionary) -> void:
 
 
 func _try_show_next_replacement() -> void:
+	if _campaign_end_blocks_popups():
+		_replacement_queue.clear()
+		return
 	if DisplayServer.get_name() == "headless":
 		return
 	if _active_retirement_popup != null and is_instance_valid(_active_retirement_popup):
@@ -834,6 +891,8 @@ func _on_leader_captured(leader_id: String, cause: String) -> void:
 
 
 func _on_leader_introduced(leader_id: String) -> void:
+	if _campaign_end_blocks_popups():
+		return
 	var leader_name := _leader_display_name(leader_id)
 	post_news(
 		"New Commander: %s" % leader_name,

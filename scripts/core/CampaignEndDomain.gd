@@ -59,6 +59,18 @@ static func date_string() -> String:
 	return "%04d-%02d-%02d" % [int(TimeManager.current_year), int(TimeManager.current_month), int(TimeManager.current_day)]
 
 
+## Long form for every end screen ("1 January 1949"). Never a raw ISO date.
+static func format_end_date(iso: String = "") -> String:
+	var raw := iso.strip_edges()
+	if raw.is_empty():
+		raw = date_string()
+	if typeof(GameDateDisplay) != TYPE_NIL:
+		var out := GameDateDisplay.format_iso_date_readable(raw)
+		if not out.is_empty():
+			return out
+	return raw
+
+
 static func evaluate_and_latch(day_index: int) -> Dictionary:
 	if typeof(WarStateDomain) == TYPE_NIL or not WarStateDomain.loop_enabled():
 		return {}
@@ -91,7 +103,14 @@ static func _latch(model: Dictionary) -> Dictionary:
 	model["keep_playing"] = false
 	_store(model)
 	if typeof(TimeManager) != TYPE_NIL:
-		TimeManager.paused = true
+		if TimeManager.has_method("set_paused"):
+			TimeManager.set_paused(true)
+		else:
+			TimeManager.paused = true
+		if TimeManager.has_method("drop_pending_sim_events_on_campaign_end"):
+			TimeManager.drop_pending_sim_events_on_campaign_end()
+	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("hold_for_campaign_end"):
+		LeaderEventUI.hold_for_campaign_end()
 	if typeof(CampaignEndScreen) != TYPE_NIL:
 		CampaignEndScreen.present(model)
 	return model
@@ -110,7 +129,7 @@ static func _defeat_model(player: String, day_index: int) -> Dictionary:
 		return {}
 	var date := date_string()
 	var name := WarStateDomain.tag_name(player)
-	var reason := "%s capitulated on %s" % [name, date]
+	var reason := "%s capitulated on %s" % [name, format_end_date(date)]
 	return _pack("defeat", "defeat", player, day_index, "Defeat", reason, reason)
 
 
@@ -302,9 +321,11 @@ static func _pack(outcome: String, kind: String, player: String, day_index: int,
 static func _stats(player: String) -> Dictionary:
 	var start_n := 0
 	var end_n := 0
+	var snapshotted := false
 	if typeof(GameData) != TYPE_NIL:
 		var cap: Variant = GameData.peace_state.get("campaign_capitulation", {})
 		if cap is Dictionary:
+			snapshotted = bool((cap as Dictionary).get("snapshotted", false))
 			var owned: Variant = (cap as Dictionary).get("start_owned", {})
 			if owned is Dictionary:
 				var row: Variant = (owned as Dictionary).get(player, [])
@@ -315,6 +336,12 @@ static func _stats(player: String) -> Dictionary:
 			end_n = MapManager.get_provinces_by_controller(player).size()
 		elif MapManager.has_method("get_provinces_by_owner"):
 			end_n = MapManager.get_provinces_by_owner(player).size()
+	# Display baseline: start_owned is only snapshotted on the first war day.
+	# A peaceful 1949 timeout never snapshots, so the sheet read "0 → 421".
+	# Use the live controlled count when no snapshot exists. Wartime start vs
+	# 1936 Begin is backlog (snapshot-at-boot), not this display fix.
+	if start_n == 0 and not snapshotted:
+		start_n = end_n
 	var wars := 0
 	if typeof(GameData) != TYPE_NIL:
 		var ws: Variant = GameData.peace_state.get("campaign_wars", {})

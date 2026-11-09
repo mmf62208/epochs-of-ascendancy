@@ -209,8 +209,13 @@ static func _campaign_end_latched() -> bool:
 
 
 static func _present_win(result: Dictionary) -> void:
+	if _campaign_end_latched():
+		return
 	var tree := Engine.get_main_loop() as SceneTree
 	if tree != null:
+		for n in tree.get_nodes_in_group("campaign_end_screen"):
+			if is_instance_valid(n) and not n.is_queued_for_deletion():
+				return
 		for n in tree.get_nodes_in_group("campaign_ink_end_screen"):
 			if is_instance_valid(n):
 				return

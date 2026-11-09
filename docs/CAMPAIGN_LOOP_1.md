@@ -376,17 +376,17 @@ Mike, 9 Nov 2026. Docs + Ink timeout wording only. No rule, threshold, default, 
 |---------|-----------|--------|
 | Player tag capitulates | CL1 latches **defeat**; clock pauses | `CampaignEndScreen` title `Defeat`, reason `{nation} capitulated on {date}` · `CapitulationDomain._capitulate` `scripts/core/CapitulationDomain.gd:425` → `CampaignEndDomain.latch_defeat` `scripts/core/CampaignEndDomain.gd:79` / `_defeat_model` `:108` · present `:96` |
 | ≥2 scenario majors capitulated (`victory_min_majors_defeated`), not at war with an uncapitulated major | CL1 latches **victory** | `CampaignEndScreen` title `Victory`, reason `Decisive victory. N nation(s) capitulated.` · `_victory_model` `:117` via `evaluate_and_latch` `:62` from `TimeManager._campaign_after_battles` `scripts/autoload/TimeManager.gd:1602` |
-| Calendar ≥ `1949-01-01` (CL1) | Time-limit latch; factory-share rank 1 = Ascendant, else Eclipsed | `CampaignEndScreen` · `_time_reached` `scripts/core/CampaignEndDomain.gd:206` / `_time_model` `:213` · `end_date` `data/scenarios/campaign_rules_1936.json:19` |
-| Calendar ≥ `1949-01-01` (Ink) | Ink `win_if_end_date_reached` is a **win cue**. It does **not** latch `campaign_end` | `CampaignInkEndScreen` title `VICTORY` + timeout copy · `CampaignInkEndDomain.evaluate_day` `scripts/core/CampaignInkEndDomain.gd:72` / `_present_win` `:211` from `TimeManager._maybe_present_ink_victory` `scripts/autoload/TimeManager.gd:1569` **before** the CL1 latch |
+| Calendar ≥ `1949-01-01` (CL1) | Time-limit latch; factory-share rank 1 = Ascendant, else Eclipsed. **The 1949 verdict.** | `CampaignEndScreen` · `_time_reached` / `_time_model` `scripts/core/CampaignEndDomain.gd` · long-form Date `1 January 1949` |
+| Calendar ≥ `1949-01-01` (Ink) | Date cue **suppressed** when `campaign_end` is latched | CL1 latches first in `TimeManager._campaign_after_battles`; Ink `evaluate_day` / `_present_win` skip when latched or a CL1 panel is up |
 | All at-war enemy capitals held (Ink) | Same Ink win surface; province VP threshold stays **off** | `evaluate_rules` `scripts/core/CampaignInkEndDomain.gd:54` · `data/campaign/victory_conditions.json` (`victory_points.enabled` false) |
 | Victory Paths (opt-in) | Alternate Ink win/loss (Conquest / Atomic / Arsenal / Score). Satellite is a stub | `VictoryPathsDomain._present` `scripts/core/VictoryPathsDomain.gd:204` only if `GameData.victory_paths_enabled()` · `TimeManager._maybe_tick_victory_paths` `scripts/autoload/TimeManager.gd:1790` |
 | National-defeat hook | Ink **DEFEAT**, then Continue-as… picker on button | `GameData.trigger_national_defeat_or_continuation` `scripts/autoload/GameData.gd:645` / `_present_player_ink_defeat` `:671` · picker `PeaceConferenceWindow.open_continuation_picker` `scripts/ui/PeaceConferenceWindow.gd:94` |
 
-**Flags (code vs Option A story — documented, not changed):**
+**FIX #1 (Play 74e8ac6f):** one overlay / one verdict at 1949. CL1 factory-share rank decides. Ink 1949 VICTORY is not shown after `campaign_end` latches. Dates are long form on every end screen. After latch the clock pauses, pending sim events drop, and leader popups (Leadership Transition) are held — save, load, and Return to Title still work. Player-capitulation Defeat shows **Continue as…** (picker, no second verdict). `allow_continuation` in `campaign_rules_1936.json` stays **false**. Ink enemy-capitals / national-defeat paths stay.
 
-1. Ink 1949 is always a **VICTORY** screen. CL1 then ranks world factory share and may present **Victory: Ascendant** or **Defeat: Eclipsed** on the older sheet (windowed only; `CampaignEndScreen.present` is a no-op headless). Ink does not set `campaign_end`, so both can show.
-2. Ink Continue-as… is always offered on defeat. CL1 hides `Continue as another nation` because `allow_continuation` is false (`data/scenarios/campaign_rules_1936.json:20`).
-3. Holding every at-war enemy capital is an extra Ink win cue, not a Victory Path.
+**Provinces `0 → 421`:** display baseline. `CapitulationDomain.start_owned` is snapshotted on the first war day (`ensure_snapshot`), not at Begin, so a peaceful 1949 timeout had no start row. The sheet now uses the live controlled count when unsnapshotted. Snapshot-at-boot (true 1936 start vs wartime losses) is backlog.
+
+Play fixture: `tests/fixtures/campaign_save_1/` (README in that folder). Do not enable `dev_menu`.
 
 ### String audit (player-facing)
 
@@ -405,8 +405,8 @@ Mike, 9 Nov 2026. Docs + Ink timeout wording only. No rule, threshold, default, 
 | Ink stats | `:338` | `Day N · V victory points · P provinces held` | OK — VP rule is off; this is a count, not a path promise |
 | CL1 defeat | `scripts/core/CampaignEndDomain.gd:113` · screen `:84` | `Defeat` / `{nation} capitulated on {date}` | OK |
 | CL1 victory | `:141` | `Victory` / `Decisive victory. N nation(s) capitulated.` | OK |
-| CL1 1949 | `:222–227` | `Victory: Ascendant` / `Defeat: Eclipsed (rank N)` + Date label `:96` | OK — date is on the sheet; ranking is what the code does |
-| CL1 Continue as another nation | `scripts/ui/CampaignEndScreen.gd:118` | hidden unless `allow_continuation` | OK |
+| CL1 1949 | `_time_model` | `Victory: Ascendant` / `Defeat: Eclipsed (rank N)` + Date `1 January 1949` | **FIX #1** — never raw `1949-01-01`; Ink timeout panel suppressed |
+| CL1 Continue as… | `CampaignEndScreen` | visible on player-capitulation Defeat; hidden on 1949 / decisive victory | **FIX #1** — picker without a second verdict. Rules JSON `allow_continuation` still false |
 | Continue-as picker header | `scripts/ui/PeaceConferenceWindow.gd:137` | `Choose nation to continue playing as` | OK |
 | Continue-as pick buttons | `:159` | `Continue as {TAG}` | OK |
 | Picker Confirm / Cancel | `:169` / `:177` | `Confirm` / `Cancel` | OK |
