@@ -423,7 +423,8 @@ def build_first_session_hotkeys_product(
             and "_mark_left_pan_blocked_pick" in _slice_func(ren, "_unhandled_input")
             and "_capital_star_pid_at" in _slice_func(ren, "_unhandled_input")
             and "_left_drag_should_pan" in _slice_func(ren, "_handle_camera_input")
-            and "_left_drag_should_pan" in input_fn
+            and "_left_drag_should_pan" in _slice_func(ren, "_handle_pointer_motion_pan")
+            and "_handle_pointer_motion_pan" in input_fn
             and "_accumulate_left_drag_slop" in _slice_func(ren, "_handle_camera_input")
             and _slice_func(ren, "_handle_camera_input").find("_accumulate_left_drag_slop")
             < _slice_func(ren, "_handle_camera_input").find("modal_blocks_map_nav")
@@ -437,8 +438,9 @@ def build_first_session_hotkeys_product(
             and "_activate_left_drag_pan_from_slop" in _slice_func(ren, "_process")
             and "_left_drag_should_pan" in _slice_func(ren, "_process")
             and "_unlock_close_camera_for_left_drag_pan" in _slice_func(
-                ren, "_handle_camera_input"
+                ren, "_apply_pointer_drag_pan"
             )
+            and "_apply_pointer_drag_pan" in _slice_func(ren, "_handle_camera_input")
             and input_fn.find("_finish_close_click_guard_on_new_press")
             < input_fn.find("_left_map_pick_blocked")
             and "func _left_live_slop_is_drag" in ren
@@ -495,15 +497,16 @@ def build_first_session_hotkeys_product(
         )
         # eed9b5f Drag2 Labrador: mid-gesture live-slop skip latch before `_note`.
         latch_fn_hot = _slice_func(ren, "_latch_left_skip_pick_from_live_slop")
+        motion_pan_fn_hot = _slice_func(ren, "_handle_pointer_motion_pan")
         motion_i_hot = input_fn.find("InputEventMouseMotion")
         motion_latch_i_hot = (
-            input_fn.find("_latch_left_skip_pick_from_live_slop", motion_i_hot)
-            if motion_i_hot >= 0
+            motion_pan_fn_hot.find("_latch_left_skip_pick_from_live_slop")
+            if motion_pan_fn_hot
             else -1
         )
         motion_note_i_hot = (
-            input_fn.find("_note_left_gesture_motion", motion_i_hot)
-            if motion_i_hot >= 0
+            motion_pan_fn_hot.find("_note_left_gesture_motion")
+            if motion_pan_fn_hot
             else -1
         )
         wiring["early_live_slop_skip_latch"] = (
@@ -521,6 +524,7 @@ def build_first_session_hotkeys_product(
             and process_fn_hot.find("_latch_left_skip_pick_from_live_slop")
             < process_fn_hot.find("_accumulate_left_drag_slop")
             and motion_i_hot >= 0
+            and "_handle_pointer_motion_pan" in input_fn
             and 0 <= motion_latch_i_hot < motion_note_i_hot
             and "_latch_left_skip_pick_from_live_slop" in unh_fn_hot
             and unh_fn_hot.find("_latch_left_skip_pick_from_live_slop")
@@ -579,7 +583,7 @@ def build_first_session_hotkeys_product(
             else -1
         )
         begin_hot_i = (
-            input_fn.find("_begin_left_map_gesture(true)", input_hot_left)
+            input_fn.find("_begin_left_map_gesture(true", input_hot_left)
             if input_hot_left >= 0
             else -1
         )
