@@ -86,6 +86,9 @@ func _ready() -> void:
 	set_meta("eoa_open_seq", Time.get_ticks_msec())
 	RetrowaveTheme.style_popup_root(self)
 	RetrowaveTheme.style_title(title_label)
+	if main_vbox != null:
+		main_vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		main_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
 	# Player country
 	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_player_country_tag"):
@@ -146,7 +149,7 @@ func focus_country(tag: String) -> void:
 func _build_dynamic_ui() -> void:
 	# Player info
 	player_label = Label.new()
-	player_label.text = "Your Nation: " + _player_country
+	player_label.text = "Your Nation: " + _nation_label(_player_country)
 	RetrowaveTheme.style_row_label(player_label)
 	main_vbox.add_child(player_label)
 
@@ -161,10 +164,14 @@ func _build_dynamic_ui() -> void:
 	selector_hbox.add_child(sel_label)
 
 	country_selector = OptionButton.new()
-	country_selector.custom_minimum_size.x = 140
+	country_selector.custom_minimum_size.x = 220
 	RetrowaveTheme.style_filter_option(country_selector)
 	country_selector.item_selected.connect(_on_country_selected)
 	selector_hbox.add_child(country_selector)
+
+	# FIRST20-UX-WAR: Justify/Declare must sit on the main column at 1280x800,
+	# not inside LowerScroll (Play: the whole dip_actions row was unreachable).
+	_build_diplomatic_actions(main_vbox)
 
 	# Bilateral section header
 	bilateral_title = Label.new()
@@ -189,12 +196,12 @@ func _build_dynamic_ui() -> void:
 	# Deals + overview scroll so multiple bilateral deals and long treaty text stay readable.
 	lower_scroll = ScrollContainer.new()
 	lower_scroll.name = "LowerScroll"
-	lower_scroll.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	lower_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	lower_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	lower_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	lower_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 	lower_scroll.clip_contents = true
-	lower_scroll.custom_minimum_size = Vector2(0, 0)
+	lower_scroll.custom_minimum_size = Vector2(0, 180)
 	main_vbox.add_child(lower_scroll)
 
 	var lower_vbox := VBoxContainer.new()
@@ -289,56 +296,6 @@ func _build_dynamic_ui() -> void:
 	net_note.add_theme_color_override("font_color", Color(0.65, 0.7, 0.8))
 	agent_vbox.add_child(net_note)
 
-	# Diplomatic Action buttons (flesh more features: actions launch toasts/news + optional dialogue; stub opinion/alliances)
-	var dip_actions := HBoxContainer.new()
-	dip_actions.add_theme_constant_override("separation", 8)
-	agent_vbox.add_child(dip_actions)
-	var guarantee_btn := Button.new()
-	guarantee_btn.text = "Guarantee Independence"
-	guarantee_btn.custom_minimum_size.x = 140
-	RetrowaveTheme.style_secondary_button(guarantee_btn)
-	guarantee_btn.pressed.connect(func():
-		var player_g := ""
-		if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_player_country_tag"):
-			player_g = str(LeaderManager.get_player_country_tag()).to_upper()
-		var other_g := str(_selected_country).to_upper()
-		# Pass 24: formal independence guarantee on RelationsManager pair policy.
-		if typeof(RelationsManager) != TYPE_NIL and RelationsManager.has_method("set_guarantee") and not player_g.is_empty() and not other_g.is_empty():
-			RelationsManager.set_guarantee(player_g, other_g, true)
-		if typeof(LeaderEventUI) != TYPE_NIL:
-			LeaderEventUI.post_news("Diplomatic Guarantee", "You guarantee %s independence. Formal guarantee recorded — repair queue treaty scope can include them." % _selected_country, "diplomatic")
-			LeaderEventUI.show_toast("Guarantee issued to " + _selected_country + " — treaty recorded.", 4.0)
-	)
-	dip_actions.add_child(guarantee_btn)
-
-	var alliance_btn := Button.new()
-	alliance_btn.text = "Propose Alliance"
-	alliance_btn.custom_minimum_size.x = 120
-	RetrowaveTheme.style_secondary_button(alliance_btn)
-	alliance_btn.pressed.connect(_on_propose_alliance_pressed)
-	dip_actions.add_child(alliance_btn)
-
-	var intel_btn := Button.new()
-	intel_btn.text = "Request Intel Share"
-	intel_btn.custom_minimum_size.x = 120
-	RetrowaveTheme.style_secondary_button(intel_btn)
-	intel_btn.pressed.connect(func():
-		if typeof(LeaderEventUI) != TYPE_NIL:
-			LeaderEventUI.show_toast("Intel request to " + _selected_country + " (agent networks boost success chance).", 3.0)
-			LeaderEventUI.post_news("Intel Exchange", "Requesting shared intel from %s via diplomatic channel + agent support." % _selected_country, "espionage")
-	)
-	dip_actions.add_child(intel_btn)
-
-	var justify_btn := Button.new()
-	justify_btn.name = "BtnJustifyWar"
-	justify_btn.focus_mode = Control.FOCUS_NONE
-	justify_btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
-	justify_btn.custom_minimum_size.x = 160
-	RetrowaveTheme.style_primary_button(justify_btn)
-	justify_btn.pressed.connect(_on_justify_war_pressed)
-	dip_actions.add_child(justify_btn)
-	_sync_justify_button()
-
 	# Pass 25: alliance negotiation desk (pending in/out + accept/decline).
 	var nego_header := Label.new()
 	nego_header.text = "Alliance negotiation"
@@ -369,17 +326,91 @@ func _build_dynamic_ui() -> void:
 	trade_btn.text = "View Deals in Trade Market"
 	close_btn.text = "Close"
 
+func _nation_label(tag: String) -> String:
+	if typeof(CampaignWarChrome) != TYPE_NIL:
+		var pretty := str(CampaignWarChrome.display_name_for_tag(tag)).strip_edges()
+		if not pretty.is_empty():
+			return pretty
+	return tag.strip_edges().to_upper()
+
+
+func _build_diplomatic_actions(parent: Node) -> void:
+	var dip_actions := HBoxContainer.new()
+	dip_actions.name = "DipActions"
+	dip_actions.add_theme_constant_override("separation", 8)
+	dip_actions.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	dip_actions.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	dip_actions.custom_minimum_size = Vector2(0, 32)
+	dip_actions.clip_contents = false
+	parent.add_child(dip_actions)
+	var guarantee_btn := Button.new()
+	guarantee_btn.text = "Guarantee Independence"
+	guarantee_btn.custom_minimum_size = Vector2(140, 28)
+	RetrowaveTheme.style_secondary_button(guarantee_btn)
+	guarantee_btn.pressed.connect(func():
+		var player_g := ""
+		if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_player_country_tag"):
+			player_g = str(LeaderManager.get_player_country_tag()).to_upper()
+		var other_g := str(_selected_country).to_upper()
+		# Pass 24: formal independence guarantee on RelationsManager pair policy.
+		if typeof(RelationsManager) != TYPE_NIL and RelationsManager.has_method("set_guarantee") and not player_g.is_empty() and not other_g.is_empty():
+			RelationsManager.set_guarantee(player_g, other_g, true)
+		if typeof(LeaderEventUI) != TYPE_NIL:
+			var other_name := _nation_label(_selected_country)
+			LeaderEventUI.post_news("Diplomatic Guarantee", "You guarantee %s independence. Formal guarantee recorded — repair queue treaty scope can include them." % other_name, "diplomatic")
+			LeaderEventUI.show_toast("Guarantee issued to " + other_name + " — treaty recorded.", 4.0)
+	)
+	dip_actions.add_child(guarantee_btn)
+
+	var alliance_btn := Button.new()
+	alliance_btn.text = "Propose Alliance"
+	alliance_btn.custom_minimum_size = Vector2(120, 28)
+	RetrowaveTheme.style_secondary_button(alliance_btn)
+	alliance_btn.pressed.connect(_on_propose_alliance_pressed)
+	dip_actions.add_child(alliance_btn)
+
+	var intel_btn := Button.new()
+	intel_btn.text = "Request Intel Share"
+	intel_btn.custom_minimum_size = Vector2(120, 28)
+	RetrowaveTheme.style_secondary_button(intel_btn)
+	intel_btn.pressed.connect(func():
+		if typeof(LeaderEventUI) != TYPE_NIL:
+			var other_name := _nation_label(_selected_country)
+			LeaderEventUI.show_toast("Intel request to " + other_name + " (agent networks boost success chance).", 3.0)
+			LeaderEventUI.post_news("Intel Exchange", "Requesting shared intel from %s via diplomatic channel + agent support." % other_name, "espionage")
+	)
+	dip_actions.add_child(intel_btn)
+
+	var justify_btn := Button.new()
+	justify_btn.name = "BtnJustifyWar"
+	justify_btn.focus_mode = Control.FOCUS_NONE
+	justify_btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
+	justify_btn.custom_minimum_size = Vector2(200, 28)
+	justify_btn.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	justify_btn.clip_text = false
+	RetrowaveTheme.style_primary_button(justify_btn)
+	justify_btn.pressed.connect(_on_justify_war_pressed)
+	dip_actions.add_child(justify_btn)
+	_sync_justify_button()
+
+
 func listed_country_tags() -> Array:
 	var found: Dictionary = {}
 	for tag in MAJOR_POWERS:
 		found[str(tag)] = true
-	for tag in ALWAYS_LIST_TAGS:
-		found[str(tag)] = true
-	if typeof(WarStateDomain) != TYPE_NIL:
-		for n in WarStateDomain.land_neighbours(_player_country):
-			var nt := str(n).strip_edges().to_upper()
-			if not nt.is_empty():
-				found[nt] = true
+	if typeof(CampaignWarChrome) != TYPE_NIL:
+		for tag_v in CampaignWarChrome.inspector_justify_tags(_player_country):
+			var jt := str(tag_v).strip_edges().to_upper()
+			if not jt.is_empty():
+				found[jt] = true
+	else:
+		for tag in ALWAYS_LIST_TAGS:
+			found[str(tag)] = true
+		if typeof(WarStateDomain) != TYPE_NIL:
+			for n in WarStateDomain.land_neighbours(_player_country):
+				var nt := str(n).strip_edges().to_upper()
+				if not nt.is_empty():
+					found[nt] = true
 	var keys: Array = found.keys()
 	keys.sort()
 	return keys
@@ -390,10 +421,11 @@ func _populate_country_selector() -> void:
 	var idx := 0
 	var selected_idx := 0
 	for tag_v in listed_country_tags():
-		var tag := str(tag_v)
+		var tag := str(tag_v).strip_edges().to_upper()
 		if tag == _player_country:
 			continue
-		country_selector.add_item(tag)
+		country_selector.add_item(_nation_label(tag))
+		country_selector.set_item_metadata(idx, tag)
 		if tag == _selected_country:
 			selected_idx = idx
 		idx += 1
@@ -434,7 +466,7 @@ func _on_justify_war_pressed() -> void:
 	var pid := _pid_owned_by(other)
 	if pid <= 0:
 		if typeof(LeaderEventUI) != TYPE_NIL:
-			LeaderEventUI.show_toast("No province of %s to justify against" % other, 2.5)
+			LeaderEventUI.show_toast("No province of %s to justify against" % _nation_label(other), 2.5)
 		return
 	if WarStateDomain.player_justify_is_ready_for(other):
 		var declared: Dictionary = WarStateDomain.player_declare_from_province(pid)
@@ -449,7 +481,11 @@ func _on_justify_war_pressed() -> void:
 	_sync_justify_button()
 
 func _on_country_selected(_index: int) -> void:
-	_selected_country = country_selector.get_item_text(_index)
+	var meta: Variant = country_selector.get_item_metadata(_index)
+	if typeof(meta) == TYPE_STRING and not str(meta).strip_edges().is_empty():
+		_selected_country = str(meta).strip_edges().to_upper()
+	else:
+		_selected_country = country_selector.get_item_text(_index).strip_edges().to_upper()
 	_refresh_view()
 
 
@@ -1048,7 +1084,7 @@ func _refresh_view() -> void:
 	_sync_justify_button()
 
 	_refresh_relations_overview()
-	bilateral_title.text = "Bilateral Trade Activity — " + _selected_country
+	bilateral_title.text = "Bilateral Trade Activity — " + _nation_label(_selected_country)
 	# Pass 25: refresh negotiation + CRS readout.
 	_refresh_alliance_negotiation_ui()
 	if main_vbox != null:

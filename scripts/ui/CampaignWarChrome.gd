@@ -5,9 +5,10 @@
 ## neighbours stay on Justify (N days) or a disabled state — a ready POL
 ## claim must not relabel every border inspector as Declare.
 ##
-## FIRST20-UX-WAR: Justify is offered on any land province of a foreign
-## nation the player could justify against. The border-only gate was UI
-## chrome; WarStateDomain already accepts any owned pid of that tag.
+## FIRST20-UX-WAR: inspector Justify is offered on land provinces of POL
+## plus the player's land neighbours — the same nation set Diplomacy
+## always lists besides majors. Interior hexes of those nations still
+## count (no borders_tag province gate). WarStateDomain is unchanged.
 ##
 ## Press-on-down matches Prod-1: leftover MapRenderer left-up swallow must
 ## not eat ACTION_MODE_BUTTON_RELEASE.
@@ -23,6 +24,58 @@ extends RefCounted
 const BORDER_NOT_REQUIRED_HINT := "Border not required — claim is on the nation."
 
 
+## POL plus live land neighbours of the player. Diplomacy lists this set
+## alongside majors; the inspector Justify button uses only this set.
+static func inspector_justify_tags(player: String) -> Array:
+	var p := player.strip_edges().to_upper()
+	var found: Dictionary = {}
+	found["POL"] = true
+	if typeof(WarStateDomain) != TYPE_NIL:
+		for n in WarStateDomain.land_neighbours(p):
+			var nt := str(n).strip_edges().to_upper()
+			if nt.is_empty() or nt == p:
+				continue
+			found[nt] = true
+	var keys: Array = found.keys()
+	keys.sort()
+	return keys
+
+
+static func inspector_offers_justify(player: String, owner: String) -> bool:
+	var o := owner.strip_edges().to_upper()
+	var p := player.strip_edges().to_upper()
+	if o.is_empty() or o == p:
+		return false
+	for tag_v in inspector_justify_tags(p):
+		if str(tag_v) == o:
+			return true
+	return false
+
+
+static func display_name_for_tag(tag: String) -> String:
+	var t := tag.strip_edges().to_upper()
+	if t.is_empty():
+		return ""
+	if typeof(MapManager) != TYPE_NIL:
+		if MapManager.has_method("ensure_country_stub"):
+			MapManager.ensure_country_stub(t)
+		if MapManager.has_method("get_country"):
+			var c: Variant = MapManager.get_country(t)
+			if c is Dictionary:
+				var nm := str((c as Dictionary).get("name", "")).strip_edges()
+				if not nm.is_empty() and nm.to_upper() != t:
+					return nm
+	if typeof(WarStateDomain) != TYPE_NIL:
+		var wn := str(WarStateDomain.tag_name(t)).strip_edges()
+		if not wn.is_empty() and wn.to_upper() != t:
+			return wn
+	if typeof(SaveLoadManager) != TYPE_NIL and SaveLoadManager.has_method("nation_display_name"):
+		var sn := str(SaveLoadManager.nation_display_name(t)).strip_edges()
+		if not sn.is_empty() and sn.to_upper() != t:
+			return sn
+	return t
+
+
 static func button_state_for_owner(player: String, owner: String) -> Dictionary:
 	var p := player.strip_edges().to_upper()
 	var o := owner.strip_edges().to_upper()
@@ -32,14 +85,14 @@ static func button_state_for_owner(player: String, owner: String) -> Dictionary:
 		return {"visible": false, "disabled": true, "text": "", "tooltip": ""}
 	if WarStateDomain.is_at_war(p, o):
 		return {"visible": false, "disabled": true, "text": "", "tooltip": ""}
+	var name := display_name_for_tag(o)
 	if WarStateDomain.in_truce(p, o):
 		return {
 			"visible": true,
 			"disabled": true,
-			"text": "Truce with %s" % WarStateDomain.tag_name(o),
+			"text": "Truce with %s" % name,
 			"tooltip": BORDER_NOT_REQUIRED_HINT,
 		}
-	var name := WarStateDomain.tag_name(o)
 	var left := WarStateDomain.player_justify_days_left(o)
 	if WarStateDomain.player_justify_is_ready_for(o):
 		return {
@@ -100,6 +153,9 @@ static func mount(host: Node, province: Province) -> void:
 	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_player_country_tag"):
 		player = str(LeaderManager.get_player_country_tag()).strip_edges().to_upper()
 	var owner := str(province.owner_tag).strip_edges().to_upper()
+	if not inspector_offers_justify(player, owner):
+		btn.visible = false
+		return
 	apply_button(btn, button_state_for_owner(player, owner))
 	if btn.visible:
 		btn.set_meta("declare_pid", int(province.id))

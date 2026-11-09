@@ -1,8 +1,9 @@
 extends SceneTree
 
-## FIRST20-UX-WAR (a): Justify on any foreign land province (not border-only),
-## Diplomacy lists POL + land neighbours with the same Justify action, and
-## disabled Attack names the next step.
+## FIRST20-UX-WAR (a): inspector Justify on POL + land neighbours (not
+## border-hex-only, not far nations like SPA/USA), Diplomacy lists POL +
+## neighbours with a reachable Justify/Declare row, and disabled Attack
+## names the next step.
 ##
 ##   tools/run_godot.sh --headless --path . --resolution 1280x800 \
 ##     -s res://scripts/core/HeadlessFirst20UxWarJustifyVisibilityTest.gd
@@ -140,15 +141,22 @@ func _test_source_needles() -> void:
 	if "borders_tag" in mount_fn:
 		_fail("inspector Justify must not gate visibility on borders_tag")
 		return
+	if "inspector_offers_justify" not in mount_fn and "inspector_justify_tags" not in mount_fn:
+		_fail("inspector Justify must gate to POL + land neighbours (inspector_offers_justify)")
+		return
 	var dip := _read(SRC_DIPLO)
-	if "POL" not in dip or "BtnJustifyWar" not in dip:
-		_fail("Diplomacy must list POL and mount BtnJustifyWar")
+	if "POL" not in dip or "BtnJustifyWar" not in dip or "DipActions" not in dip:
+		_fail("Diplomacy must list POL and mount BtnJustifyWar on DipActions")
+		return
+	var dip_build := _slice_func(dip, "_build_diplomatic_actions")
+	if dip_build.is_empty() or "LowerScroll" in dip_build:
+		_fail("DipActions must be built on the main column, not inside LowerScroll")
 		return
 	var ren := _read(SRC_REN)
 	if "_attack_not_at_war_hint" not in ren:
 		_fail("Attack disabled path must use _attack_not_at_war_hint")
 		return
-	_pass("source needles: no border-only Justify gate; Diplomacy POL; Attack hint")
+	_pass("source needles: neighbour+POL inspector; DipActions on main column; Attack hint")
 
 
 func _assert_inspector_justify(mm: Node) -> bool:
@@ -172,6 +180,9 @@ func _assert_inspector_justify(mm: Node) -> bool:
 	if str(interior_btn.text).find("Justify war on") < 0 or str(interior_btn.text).find("Poland") < 0:
 		_fail("interior POL want Justify war on Poland got %s" % interior_btn.text)
 		return false
+	if str(interior_btn.text).find("POL") >= 0 and str(interior_btn.text).find("Poland") < 0:
+		_fail("inspector label used raw tag POL (%s)" % interior_btn.text)
+		return false
 	if str(interior_btn.tooltip_text).find("Border not required") < 0:
 		_fail("interior POL tooltip missing border-not-required hint (%s)" % interior_btn.tooltip_text)
 		return false
@@ -179,6 +190,8 @@ func _assert_inspector_justify(mm: Node) -> bool:
 		_fail("border POL Justify missing")
 		return false
 	_pass("inspector Justify on interior POL %d and border %d" % [_pol_interior, _pol_border])
+	if not _assert_inspector_hides_far_nations(mm):
+		return false
 	interior_btn.pressed.emit()
 	if not bool(_war.player_has_justify("POL")):
 		_fail("interior POL Justify press did not begin justify")
@@ -222,7 +235,74 @@ func _assert_attack_hint(mm: Node) -> bool:
 	return true
 
 
+func _assert_inspector_hides_far_nations(mm: Node) -> bool:
+	var spa_pid := _land_of(mm, "SPA")
+	var usa_pid := _land_of(mm, "USA")
+	if spa_pid <= 0 or usa_pid <= 0:
+		_fail("missing SPA/USA land pids spa=%d usa=%d" % [spa_pid, usa_pid])
+		return false
+	var host_spa := _make_host("InspectorSpa", Vector2(380, 80))
+	var host_usa := _make_host("InspectorUsa", Vector2(380, 280))
+	_ui.add_child(host_spa)
+	_ui.add_child(host_usa)
+	_chrome.mount(host_spa, mm.call("get_province", spa_pid))
+	_chrome.mount(host_usa, mm.call("get_province", usa_pid))
+	var spa_btn := host_spa.get_node_or_null("BtnDeclareWar") as Button
+	var usa_btn := host_usa.get_node_or_null("BtnDeclareWar") as Button
+	if spa_btn != null and spa_btn.visible:
+		_fail("GER inspector must not Justify SPA (non-neighbour) text=%s" % spa_btn.text)
+		return false
+	if usa_btn != null and usa_btn.visible:
+		_fail("GER inspector must not Justify USA (non-neighbour) text=%s" % usa_btn.text)
+		return false
+	if spa_btn != null and str(spa_btn.text).find("SPA") >= 0:
+		_fail("inspector used raw tag SPA (%s)" % spa_btn.text)
+		return false
+	_pass("inspector hides Justify on SPA %d and USA %d" % [spa_pid, usa_pid])
+	return true
+
+
+func _assert_control_on_panel(host: Node, btn: Control, label: String) -> bool:
+	if btn == null:
+		_fail("%s missing" % label)
+		return false
+	if not btn.is_visible_in_tree():
+		_fail("%s not visible_in_tree" % label)
+		return false
+	var r := btn.get_global_rect()
+	if r.size.x < 8.0 or r.size.y < 8.0:
+		_fail("%s zero size %s" % [label, str(r)])
+		return false
+	var panel_rect := Rect2()
+	if host is Window:
+		var win := host as Window
+		var vr: Rect2 = win.get_visible_rect()
+		if vr.size.x >= 8.0 and vr.size.y >= 8.0:
+			panel_rect = vr
+		else:
+			panel_rect = Rect2(Vector2.ZERO, Vector2(win.size))
+	elif host is Control:
+		panel_rect = (host as Control).get_global_rect()
+	if panel_rect.size.x < 8.0 or panel_rect.size.y < 8.0:
+		_fail("%s host has no visible rect %s" % [label, str(panel_rect)])
+		return false
+	if not panel_rect.grow(4.0).encloses(r) and not panel_rect.grow(4.0).intersects(r):
+		_fail("%s %s outside panel %s" % [label, str(r), str(panel_rect)])
+		return false
+	if not panel_rect.grow(8.0).encloses(r):
+		_fail("%s %s not inside panel visible rect %s" % [label, str(r), str(panel_rect)])
+		return false
+	var walk: Node = btn
+	while walk != null:
+		if str(walk.name) == "LowerScroll":
+			_fail("%s buried in LowerScroll (unreachable at 1280x800)" % label)
+			return false
+		walk = walk.get_parent()
+	return true
+
+
 func _assert_diplomacy_justify() -> void:
+	_war.reset_for_test()
 	if not ResourceLoader.exists("res://scenes/ui/DiplomacyView.tscn"):
 		_fail("DiplomacyView.tscn missing")
 		return
@@ -235,6 +315,14 @@ func _assert_diplomacy_justify() -> void:
 	if view.has_method("focus_country"):
 		view.call("focus_country", "POL")
 	root.add_child(view)
+	await _flush()
+	if view is Window:
+		var win := view as Window
+		win.min_size = Vector2i(1040, 720)
+		win.size = Vector2i(1040, 720)
+		if not win.visible:
+			win.popup_centered(Vector2i(1040, 720))
+	await _flush()
 	await _flush()
 	if not view.has_method("listed_country_tags"):
 		_fail("Diplomacy listed_country_tags missing")
@@ -257,14 +345,25 @@ func _assert_diplomacy_justify() -> void:
 			_fail("Diplomacy list missing neighbour %s" % nt)
 			view.queue_free()
 			return
-	_pass("Diplomacy lists POL and GER land neighbours")
+	if listed_s.has("SPA"):
+		_fail("Diplomacy dropdown should not list SPA (not a GER neighbour or major) %s" % str(listed))
+		view.queue_free()
+		return
+	_pass("Diplomacy lists POL and GER land neighbours; SPA omitted as expected")
 	var btn := view.find_child("BtnJustifyWar", true, false) as Button
-	if btn == null or not btn.visible:
-		_fail("Diplomacy BtnJustifyWar missing/hidden")
+	if not _assert_control_on_panel(view, btn, "Diplomacy BtnJustifyWar"):
+		view.queue_free()
+		return
+	var row := view.find_child("DipActions", true, false) as Control
+	if not _assert_control_on_panel(view, row, "Diplomacy DipActions"):
 		view.queue_free()
 		return
 	if str(btn.text).find("Justify") < 0 and str(btn.text).find("Declare") < 0:
 		_fail("Diplomacy Justify/Declare text got %s" % btn.text)
+		view.queue_free()
+		return
+	if str(btn.text).find("Poland") < 0:
+		_fail("Diplomacy Justify must use display name Poland, not a raw tag (%s)" % btn.text)
 		view.queue_free()
 		return
 	_war.reset_for_test()
@@ -276,7 +375,7 @@ func _assert_diplomacy_justify() -> void:
 		_fail("Diplomacy Justify press did not begin POL justify")
 		view.queue_free()
 		return
-	_pass("Diplomacy Justify on POL uses the same domain call")
+	_pass("Diplomacy Justify on POL is on-screen and uses the same domain call")
 	view.queue_free()
 
 
@@ -288,6 +387,20 @@ func _make_host(host_name: String, pos: Vector2) -> Panel:
 	host.custom_minimum_size = Vector2(320, 160)
 	host.mouse_filter = Control.MOUSE_FILTER_STOP
 	return host
+
+
+func _land_of(mm: Node, owner: String) -> int:
+	if mm == null or not mm.has_method("get_provinces_by_owner"):
+		return -1
+	var owned: Array = mm.call("get_provinces_by_owner", owner)
+	owned.sort()
+	for pid_v in owned:
+		var pid := int(pid_v)
+		var p: Object = mm.call("get_province", pid)
+		if p == null or bool(p.get("is_sea")):
+			continue
+		return pid
+	return -1
 
 
 func _interior_of(mm: Node, owner: String, not_border: String) -> int:
