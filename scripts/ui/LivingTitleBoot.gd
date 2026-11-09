@@ -813,6 +813,9 @@ static func is_live_begin_event(event: InputEvent) -> bool:
 			return true
 		if key.is_action("eoa_living_begin") or key.is_action("ui_accept"):
 			return true
+		# Some DisplayServer first-presses arrive as unicode CR/LF with no keycode.
+		if int(key.unicode) == 13 or int(key.unicode) == 10:
+			return true
 	if event.is_action_pressed("eoa_living_begin") or event.is_action_pressed("ui_accept"):
 		return true
 	return false
@@ -1800,6 +1803,32 @@ func _ensure_live_window_key_focus() -> void:
 	var win: Window = get_window()
 	if win != null and win.has_method("grab_focus"):
 		win.grab_focus()
+	# Window grab can drop Control focus. Put Begin back so the first Return
+	# is not spent focusing the button. Do not do this every _process frame:
+	# HeadlessBegin1 T5 M3 relocates Begin, and a per-frame grab relayouts it.
+	_restore_begin_focus_if_idle()
+
+
+## First Return/Enter is ignored when the window steal-focus leaves no Control
+## focused. Restore Begin unless the player is already on a title widget.
+func _restore_begin_focus_if_idle() -> void:
+	if _closed or _begin_btn == null or not is_instance_valid(_begin_btn):
+		return
+	var vp := get_viewport()
+	if vp == null:
+		return
+	var fo: Control = vp.gui_get_focus_owner()
+	if fo is LineEdit or fo is TextEdit or fo is CodeEdit:
+		return
+	if _focused_system_toggle() != null:
+		return
+	if fo != null and fo != _begin_btn:
+		if _panel != null and is_instance_valid(_panel) and _panel.is_ancestor_of(fo):
+			return
+		if fo == _cc_btn or fo == _esc_chip:
+			return
+	if not _begin_btn.has_focus():
+		_begin_btn.grab_focus()
 
 
 func _exit_tree() -> void:
