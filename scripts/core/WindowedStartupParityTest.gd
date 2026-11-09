@@ -354,6 +354,7 @@ func _tick_release_pointer() -> void:
 		Input.flush_buffered_events()
 	_pointer_released = true
 	_park_pointer_leftover_on_unmax_rim()
+	_rearm_blank_swallow_after_harness_unmax()
 	_phase = Phase.WAIT_BOOT_CLOSED
 
 
@@ -453,6 +454,7 @@ func _do_resize() -> void:
 		)
 		if _begin_mode == "pointer":
 			_park_pointer_leftover_on_unmax_rim()
+			_rearm_blank_swallow_after_harness_unmax()
 	else:
 		_force_window(RESIZE_W, RESIZE_H, false)
 		_log(
@@ -1643,6 +1645,23 @@ func _park_pointer_leftover_on_unmax_rim() -> void:
 	_leftover_rim = rim
 	_warp_mouse(rim)
 	_log("EOA_STARTUP_BLANK who=leftover_rim_park pt=(%.1f,%.1f) (live leftover y=800 on 800-tall window)" % [rim.x, rim.y])
+
+
+func _rearm_blank_swallow_after_harness_unmax() -> void:
+	# Product Begin now keeps maximize (POLISH-MAX-SEA-1). Harness leftover
+	# park / shrink would otherwise move leftover ≥6px and disarm the one-shot
+	# swallow. Re-arm so leftover-on-rim is still the #167 scenario.
+	var mr: Node = null
+	var loop: SceneTree = Engine.get_main_loop() as SceneTree
+	if loop != null:
+		mr = loop.get_first_node_in_group("map_renderer")
+	if mr == null:
+		mr = _find_named("MapRenderer")
+	if mr == null or not mr.has_method("arm_startup_blank_leftover_swallow"):
+		_log("EOA_STARTUP_BLANK who=rearm_swallow_missing mr=%s" % str(mr))
+		return
+	mr.call("arm_startup_blank_leftover_swallow")
+	_log("EOA_STARTUP_BLANK who=rearm_swallow_after_harness_unmax")
 
 
 func _force_window(w: int, h: int, maximize: bool, clamp_root: bool = true) -> void:

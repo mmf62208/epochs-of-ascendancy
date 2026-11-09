@@ -30518,9 +30518,12 @@ func _apply_unit_lod_count(icon: Node2D, pol: Dictionary) -> void:
 func _apply_unit_lod_fleet_anchor(icon: Node2D, pol: Dictionary) -> void:
 	var want := bool(pol.get("fleet_anchor", false))
 	var anchor := icon.get_node_or_null("FleetAnchor") as Polygon2D
+	var disk := icon.get_node_or_null("SeaNationDisk") as CanvasItem
 	if not want:
 		if anchor != null:
 			anchor.visible = false
+		if disk != null:
+			disk.visible = true
 		return
 	if anchor == null:
 		anchor = Polygon2D.new()
@@ -30539,6 +30542,9 @@ func _apply_unit_lod_fleet_anchor(icon: Node2D, pol: Dictionary) -> void:
 	anchor.color = col
 	if plate != null:
 		plate.visible = false
+	# STACK fleet_anchor: the nation rect reads as a stray square (North Sea 2x2).
+	if disk != null:
+		disk.visible = false
 
 
 
