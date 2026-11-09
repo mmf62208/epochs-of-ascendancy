@@ -1,9 +1,13 @@
 extends SceneTree
 
 ## SR1 test B. A save/load (and a fresh process) continues the same 60 days.
+## CAMPAIGN-SAVE-1 P1: SR1_DET_MODE=identity_twin proves mid-war gather hash
+## identity after a fresh-session load, then a 60-day no-save twin. Mutants that
+## drop land_war.marches or game_data.campaign_wars must change the hash.
 const _Hash = preload("res://scripts/core/SaveStateHash.gd")
 const _Io = preload("res://scripts/core/SaveReload1Io.gd")
 const N_DAYS := 60
+const _DIGEST_MISS := "map_ui,province_editor,metadata.timestamp/timestamp_unix/last_played/play_time_seconds/wall_time,time.paused,*.ms,*.total_ms"
 
 var _failures := 0
 var _sl
@@ -50,6 +54,8 @@ func _run() -> void:
 		_mode_diag(mode)
 	elif mode == "diag_pick_ref" or mode == "diag_pick_load":
 		_mode_diag_pick(mode)
+	elif mode == "identity_twin":
+		_mode_identity_twin()
 	else:
 		_mode_inproc()
 	_cleanup()
@@ -127,6 +133,60 @@ func _mode_inproc() -> void:
 	_tm.paused = false
 	var load_text := _trace(false)
 	_compare_traces("inproc", ref_text, load_text)
+
+
+func _mode_identity_twin() -> void:
+	if not _build("sr1test_id_pristine"):
+		return
+	var before: Dictionary = _sl._gather_save_data().duplicate(true)
+	var h0 := str(_Hash.state_hash(before))
+	_print_digest("before_save", before, h0)
+	if not _midwar_ready(before):
+		return
+	var t_save := Time.get_ticks_usec()
+	var saved: Dictionary = _sl.save_game_detailed("sr1test_id_mid")
+	var save_ms := float(Time.get_ticks_usec() - t_save) / 1000.0
+	_track("sr1test_id_mid")
+	if not bool(saved.get("ok", false)):
+		_fail("identity save failed: %s" % str(saved.get("error", "")))
+		return
+	print("SAVE_METRIC ms=%.1f bytes=%d hash=%s" % [save_ms, int(saved.get("bytes", 0)), h0])
+	var skip_twin := OS.get_environment("SR1_SKIP_TWIN").strip_edges() == "1"
+	var ref_text := ""
+	var h_end_ref := ""
+	if not skip_twin:
+		ref_text = _trace(false)
+		h_end_ref = _hash_now()
+		print("TWIN_REF days=%d end_hash=%s md5=%s" % [N_DAYS, h_end_ref, _md5(ref_text)])
+	if not _fresh_session():
+		return
+	var loaded: Dictionary = _sl.load_game_detailed("sr1test_id_mid")
+	if not bool(loaded.get("ok", false)):
+		_fail("identity fresh-session load failed: %s" % str(loaded.get("error", "")))
+		return
+	_tm.paused = false
+	var after: Dictionary = _sl._gather_save_data()
+	var h1 := str(_Hash.state_hash(after))
+	_print_digest("after_reload", after, h1)
+	if h0 != h1:
+		_fail("identity hash diverged before=%s after=%s" % [h0, h1])
+		_print_identity_diff(before, after)
+		return
+	_pass("identity hash identical %s (volatile stripped)" % h0)
+	print("IDENTITY MATCH hash=%s" % h0)
+	if not skip_twin:
+		var load_text := _trace(false)
+		var h_end_load := _hash_now()
+		print("TWIN_LOAD days=%d end_hash=%s md5=%s" % [N_DAYS, h_end_load, _md5(load_text)])
+		_compare_traces("identity-twin", ref_text, load_text)
+		if h_end_ref != h_end_load:
+			_fail("60-day twin end-state hash diverged ref=%s load=%s" % [h_end_ref, h_end_load])
+		else:
+			_pass("60-day twin end-state hash identical %s" % h_end_load)
+	if OS.get_environment("SR1_SKIP_MUTANT").strip_edges() == "1":
+		return
+	_assert_mutant_bites("drop_marches", h0, before)
+	_assert_mutant_bites("drop_wars", h0, before)
 
 
 func _mode_autosave() -> void:
@@ -431,6 +491,143 @@ func _compare_traces(label: String, a: String, b: String) -> void:
 
 func _hash_now() -> String:
 	return str(_Hash.state_hash(_sl._gather_save_data()))
+
+
+func _print_digest(label: String, data: Dictionary, hash_hex: String) -> void:
+	var sections: Dictionary = _Hash.section_hashes(data)
+	var keys: Array = sections.keys()
+	keys.sort()
+	var parts: PackedStringArray = []
+	for k in keys:
+		parts.append(str(k))
+	var joined := ",".join(parts)
+	print("DIGEST_COVERS label=%s hash=%s n=%d keys=%s" % [label, hash_hex, keys.size(), joined])
+	print("DIGEST_STRIPS %s" % _DIGEST_MISS)
+	for k in keys:
+		print("DIGEST_SECTION %s %s=%s" % [label, str(k), str(sections[k])])
+
+
+func _print_identity_diff(before: Dictionary, after: Dictionary) -> void:
+	var hs_b: Dictionary = _Hash.section_hashes(before)
+	var hs_a: Dictionary = _Hash.section_hashes(after)
+	var keys: Array = hs_b.keys()
+	for k in hs_a.keys():
+		if k not in keys:
+			keys.append(k)
+	keys.sort()
+	for k2 in keys:
+		if str(hs_b.get(k2, "")) != str(hs_a.get(k2, "")):
+			var sec_diff := str(_Hash.first_diff(before.get(k2, null), after.get(k2, null)))
+			print("IDENTITY_SECTION %s before=%s after=%s first=%s" % [
+				str(k2), str(hs_b.get(k2, "MISSING")), str(hs_a.get(k2, "MISSING")), sec_diff.substr(0, 400)
+			])
+	var diff := str(_Hash.first_diff(_Hash._strip(before), _Hash._strip(after)))
+	print("IDENTITY_DIFF %s" % diff.substr(0, 800))
+
+
+func _midwar_ready(data: Dictionary) -> bool:
+	var lw: Variant = data.get("land_war", {})
+	var marches: Dictionary = {}
+	var battles: Array = []
+	if lw is Dictionary:
+		var raw_m: Variant = (lw as Dictionary).get("marches", {})
+		if raw_m is Dictionary:
+			marches = raw_m
+		var raw_b: Variant = (lw as Dictionary).get("open_battles", [])
+		if raw_b is Array:
+			battles = raw_b
+	var wars: Dictionary = _campaign_wars(data)
+	if marches.is_empty():
+		_fail("mid-war fixture has no land_war.marches")
+		return false
+	if battles.is_empty():
+		_fail("mid-war fixture has no open land battles")
+		return false
+	if wars.is_empty():
+		_fail("mid-war fixture has no campaign_wars.wars")
+		return false
+	_pass("mid-war fixture marches=%d battles=%d wars=%d" % [marches.size(), battles.size(), wars.size()])
+	return true
+
+
+func _campaign_wars(data: Dictionary) -> Dictionary:
+	var gd: Variant = data.get("game_data", {})
+	if not (gd is Dictionary):
+		return {}
+	var cw: Variant = (gd as Dictionary).get("campaign_wars", {})
+	if not (cw is Dictionary):
+		return {}
+	var wars: Variant = (cw as Dictionary).get("wars", {})
+	return wars if wars is Dictionary else {}
+
+
+func _fresh_session() -> bool:
+	var lm := get_root().get_node_or_null("LeaderManager")
+	if lm != null and lm.has_method("clear_all_formations"):
+		lm.call("clear_all_formations")
+	var mw := load("res://scripts/core/SaveReload1Mw200.gd") as GDScript
+	if mw == null or not bool(mw._fresh_boot()):
+		_fail("fresh-session boot failed")
+		return false
+	_tm.run_seed = 0
+	return true
+
+
+func _assert_mutant_bites(kind: String, h0: String, before: Dictionary) -> void:
+	var slot := "sr1test_id_mut_%s" % kind
+	if not _write_mutant_slot("sr1test_id_mid", slot, kind):
+		return
+	if not _fresh_session():
+		return
+	var loaded: Dictionary = _sl.load_game_detailed(slot)
+	if not bool(loaded.get("ok", false)):
+		_fail("mutant %s load failed: %s" % [kind, str(loaded.get("error", ""))])
+		return
+	_tm.paused = false
+	var mutant_data: Dictionary = _sl._gather_save_data()
+	var h_mut := str(_Hash.state_hash(mutant_data))
+	if h_mut == h0:
+		_fail("mutant %s did not change identity hash (test does not bite)" % kind)
+		return
+	var diff := str(_Hash.first_diff(_Hash._strip(before), _Hash._strip(mutant_data)))
+	_pass("mutant %s identity hash diverged %s vs %s first=%s" % [kind, h0, h_mut, diff.substr(0, 200)])
+	print("MUTANT_FAIL %s before=%s after=%s" % [kind, h0, h_mut])
+
+
+func _write_mutant_slot(src_slot: String, dest_slot: String, kind: String) -> bool:
+	var src_path := str(_sl.get_save_path(src_slot))
+	if not FileAccess.file_exists(src_path):
+		_fail("mutant source missing %s" % src_path)
+		return false
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(src_path))
+	if typeof(parsed) != TYPE_DICTIONARY:
+		_fail("mutant source is not an object")
+		return false
+	var blob: Dictionary = parsed
+	if kind == "drop_marches":
+		if blob.get("land_war") is Dictionary:
+			(blob["land_war"] as Dictionary).erase("marches")
+		else:
+			_fail("mutant drop_marches: land_war missing")
+			return false
+	elif kind == "drop_wars":
+		if blob.get("game_data") is Dictionary:
+			(blob["game_data"] as Dictionary).erase("campaign_wars")
+		else:
+			_fail("mutant drop_wars: game_data missing")
+			return false
+	else:
+		_fail("unknown mutant %s" % kind)
+		return false
+	var dest_path := str(_sl.get_save_path(dest_slot))
+	var f := FileAccess.open(dest_path, FileAccess.WRITE)
+	if f == null:
+		_fail("cannot write mutant slot %s" % dest_path)
+		return false
+	f.store_string(JSON.stringify(blob, "\t"))
+	f.close()
+	_track(dest_slot)
+	return true
 
 
 func _write_trace(text: String) -> void:

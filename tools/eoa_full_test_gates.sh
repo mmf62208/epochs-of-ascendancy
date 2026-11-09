@@ -9,6 +9,7 @@
 #   tools/eoa_full_test_gates.sh --log DIR    # write logs under DIR
 #
 # --quick launches HeadlessGarrison1Test, HeadlessInkTooltips0Test, HeadlessCampaignSave1Test, HeadlessAudio1Test, HeadlessAudio2Test, HeadlessStabilityJustice1Test, HeadlessVictoryPaths1Test, HeadlessSettingsToggles1Test, then HeadlessFirst20P2StripPressTest.
+# Full path also runs launch_campaign_save1_identity (MW200 SaveStateHash identity + 60-day twin).
 # Full path calls tools/run_godot.sh, which exits 1 immediately if no binary
 # is found (fail-closed; it must not hang).
 # NE board/QC needs numpy+Pillow: pip install -r tools/map_generation/requirements.txt
@@ -356,6 +357,11 @@ else
     XDG_DATA_HOME="$(mktemp -d)" \
     tools/run_godot.sh --headless --path . \
     -s res://scripts/core/HeadlessCampaignSave1Test.gd || fail
+
+  # CAMPAIGN-SAVE-1 P1: MW200 identity hash + 60-day twin + mutants (~110s).
+  # Too heavy for --quick; this is the standing full-gate check.
+  run_step launch_campaign_save1_identity \
+    tools/eoa_campaign_save1_identity.sh || fail
 
   run_step launch_pick \
     tools/run_godot.sh --headless -s res://tools/map_manager_pick_harness_accurate.gd || fail

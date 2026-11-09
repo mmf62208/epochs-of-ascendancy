@@ -6,7 +6,7 @@
 class_name SaveStateHash
 extends RefCounted
 
-const _VOLATILE_META := ["timestamp", "last_played", "play_time_seconds", "wall_time"]
+const _VOLATILE_META := ["timestamp", "timestamp_unix", "last_played", "play_time_seconds", "wall_time"]
 const _VOLATILE_SECTIONS := ["map_ui", "province_editor"]
 ## Wall-clock samples stored inside the multi-AI day audit. Nothing in the sim
 ## reads them back; the next day overwrites the whole audit. They differ across
