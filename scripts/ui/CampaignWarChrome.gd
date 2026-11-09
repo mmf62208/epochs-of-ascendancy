@@ -5,6 +5,10 @@
 ## neighbours stay on Justify (N days) or a disabled state — a ready POL
 ## claim must not relabel every border inspector as Declare.
 ##
+## FIRST20-UX-WAR: Justify is offered on any land province of a foreign
+## nation the player could justify against. The border-only gate was UI
+## chrome; WarStateDomain already accepts any owned pid of that tag.
+##
 ## Press-on-down matches Prod-1: leftover MapRenderer left-up swallow must
 ## not eat ACTION_MODE_BUTTON_RELEASE.
 ##
@@ -14,6 +18,59 @@
 ## AI offensives stay on BattleManager.try_ai_start_land_battles (player skipped).
 class_name CampaignWarChrome
 extends RefCounted
+
+
+const BORDER_NOT_REQUIRED_HINT := "Border not required — claim is on the nation."
+
+
+static func button_state_for_owner(player: String, owner: String) -> Dictionary:
+	var p := player.strip_edges().to_upper()
+	var o := owner.strip_edges().to_upper()
+	if o.is_empty() or o == p:
+		return {"visible": false, "disabled": true, "text": "", "tooltip": ""}
+	if typeof(WarStateDomain) == TYPE_NIL or not WarStateDomain.loop_enabled():
+		return {"visible": false, "disabled": true, "text": "", "tooltip": ""}
+	if WarStateDomain.is_at_war(p, o):
+		return {"visible": false, "disabled": true, "text": "", "tooltip": ""}
+	if WarStateDomain.in_truce(p, o):
+		return {
+			"visible": true,
+			"disabled": true,
+			"text": "Truce with %s" % WarStateDomain.tag_name(o),
+			"tooltip": BORDER_NOT_REQUIRED_HINT,
+		}
+	var name := WarStateDomain.tag_name(o)
+	var left := WarStateDomain.player_justify_days_left(o)
+	if WarStateDomain.player_justify_is_ready_for(o):
+		return {
+			"visible": true,
+			"disabled": false,
+			"text": "Declare war on %s" % name,
+			"tooltip": BORDER_NOT_REQUIRED_HINT,
+		}
+	if WarStateDomain.player_has_justify(o) or WarStateDomain.player_justify_is_ready():
+		return {
+			"visible": true,
+			"disabled": true,
+			"text": "Justify (%d days)" % left,
+			"tooltip": BORDER_NOT_REQUIRED_HINT,
+		}
+	return {
+		"visible": true,
+		"disabled": false,
+		"text": "Justify war on %s" % name,
+		"tooltip": BORDER_NOT_REQUIRED_HINT,
+	}
+
+
+static func apply_button(btn: Button, state: Dictionary) -> void:
+	if btn == null:
+		return
+	btn.visible = bool(state.get("visible", false))
+	btn.disabled = bool(state.get("disabled", true))
+	btn.text = str(state.get("text", ""))
+	btn.tooltip_text = str(state.get("tooltip", ""))
+	btn.mouse_filter = Control.MOUSE_FILTER_STOP
 
 
 static func mount(host: Node, province: Province) -> void:
@@ -43,34 +100,9 @@ static func mount(host: Node, province: Province) -> void:
 	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_player_country_tag"):
 		player = str(LeaderManager.get_player_country_tag()).strip_edges().to_upper()
 	var owner := str(province.owner_tag).strip_edges().to_upper()
-	if owner.is_empty() or owner == player or not WarStateDomain.borders_tag(int(province.id), player):
-		btn.visible = false
-		return
-	if WarStateDomain.is_at_war(player, owner):
-		btn.visible = false
-		return
-	if WarStateDomain.in_truce(player, owner):
-		btn.visible = true
-		btn.disabled = true
-		btn.text = "Truce with %s" % WarStateDomain.tag_name(owner)
+	apply_button(btn, button_state_for_owner(player, owner))
+	if btn.visible:
 		btn.set_meta("declare_pid", int(province.id))
-		return
-	btn.visible = true
-	btn.set_meta("declare_pid", int(province.id))
-	var left := WarStateDomain.player_justify_days_left(owner)
-	var name := WarStateDomain.tag_name(owner)
-	if WarStateDomain.player_justify_is_ready_for(owner):
-		btn.disabled = false
-		btn.text = "Declare war on %s" % name
-	elif WarStateDomain.player_has_justify(owner):
-		btn.disabled = true
-		btn.text = "Justify (%d days)" % left
-	elif WarStateDomain.player_justify_is_ready():
-		btn.disabled = true
-		btn.text = "Justify (%d days)" % left
-	else:
-		btn.disabled = false
-		btn.text = "Justify war on %s" % name
 
 
 static func _on_pressed(host: Node) -> void:

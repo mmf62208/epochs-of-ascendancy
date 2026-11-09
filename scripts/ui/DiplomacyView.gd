@@ -53,6 +53,8 @@ extends Window
 
 const PLAYER_COUNTRY_FALLBACK := "USA"
 const MAJOR_POWERS := ["USA", "GER", "SOV", "ENG", "FRA", "JAP", "ITA"]
+## FIRST20-UX-WAR: always list Poland plus live land neighbours of the player.
+const ALWAYS_LIST_TAGS := ["POL"]
 
 var _player_country: String = PLAYER_COUNTRY_FALLBACK
 var _selected_country: String = ""
@@ -327,6 +329,16 @@ func _build_dynamic_ui() -> void:
 	)
 	dip_actions.add_child(intel_btn)
 
+	var justify_btn := Button.new()
+	justify_btn.name = "BtnJustifyWar"
+	justify_btn.focus_mode = Control.FOCUS_NONE
+	justify_btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
+	justify_btn.custom_minimum_size.x = 160
+	RetrowaveTheme.style_primary_button(justify_btn)
+	justify_btn.pressed.connect(_on_justify_war_pressed)
+	dip_actions.add_child(justify_btn)
+	_sync_justify_button()
+
 	# Pass 25: alliance negotiation desk (pending in/out + accept/decline).
 	var nego_header := Label.new()
 	nego_header.text = "Alliance negotiation"
@@ -357,18 +369,84 @@ func _build_dynamic_ui() -> void:
 	trade_btn.text = "View Deals in Trade Market"
 	close_btn.text = "Close"
 
+func listed_country_tags() -> Array:
+	var found: Dictionary = {}
+	for tag in MAJOR_POWERS:
+		found[str(tag)] = true
+	for tag in ALWAYS_LIST_TAGS:
+		found[str(tag)] = true
+	if typeof(WarStateDomain) != TYPE_NIL:
+		for n in WarStateDomain.land_neighbours(_player_country):
+			var nt := str(n).strip_edges().to_upper()
+			if not nt.is_empty():
+				found[nt] = true
+	var keys: Array = found.keys()
+	keys.sort()
+	return keys
+
+
 func _populate_country_selector() -> void:
 	country_selector.clear()
 	var idx := 0
 	var selected_idx := 0
-	for tag in MAJOR_POWERS:
+	for tag_v in listed_country_tags():
+		var tag := str(tag_v)
 		if tag == _player_country:
 			continue
 		country_selector.add_item(tag)
 		if tag == _selected_country:
 			selected_idx = idx
 		idx += 1
-	country_selector.selected = selected_idx
+	if country_selector.item_count > 0:
+		country_selector.selected = selected_idx
+
+
+func _pid_owned_by(tag: String) -> int:
+	if typeof(MapManager) == TYPE_NIL or not MapManager.has_method("get_provinces_by_owner"):
+		return -1
+	var owned: Array = MapManager.get_provinces_by_owner(tag)
+	owned.sort()
+	for pid_v in owned:
+		var pid := int(pid_v)
+		var p: Province = MapManager.get_province(pid) if MapManager.has_method("get_province") else null
+		if p == null or bool(p.is_sea):
+			continue
+		return pid
+	return -1
+
+
+func _sync_justify_button() -> void:
+	var btn := find_child("BtnJustifyWar", true, false) as Button
+	if btn == null:
+		return
+	var player := str(_player_country).strip_edges().to_upper()
+	var other := str(_selected_country).strip_edges().to_upper()
+	if typeof(CampaignWarChrome) == TYPE_NIL:
+		btn.visible = false
+		return
+	CampaignWarChrome.apply_button(btn, CampaignWarChrome.button_state_for_owner(player, other))
+
+
+func _on_justify_war_pressed() -> void:
+	var other := str(_selected_country).strip_edges().to_upper()
+	if other.is_empty() or typeof(WarStateDomain) == TYPE_NIL:
+		return
+	var pid := _pid_owned_by(other)
+	if pid <= 0:
+		if typeof(LeaderEventUI) != TYPE_NIL:
+			LeaderEventUI.show_toast("No province of %s to justify against" % other, 2.5)
+		return
+	if WarStateDomain.player_justify_is_ready_for(other):
+		var declared: Dictionary = WarStateDomain.player_declare_from_province(pid)
+		if typeof(LeaderEventUI) != TYPE_NIL:
+			LeaderEventUI.show_toast(str(declared.get("reason", "War declared")), 2.5)
+	else:
+		WarStateDomain.begin_player_justify_from_province(pid)
+		if typeof(GameData) != TYPE_NIL and GameData.has_method("apply_war_goal_live"):
+			GameData.apply_war_goal_live("justify", pid)
+		if typeof(LeaderEventUI) != TYPE_NIL:
+			LeaderEventUI.show_toast("Justification started", 2.5)
+	_sync_justify_button()
 
 func _on_country_selected(_index: int) -> void:
 	_selected_country = country_selector.get_item_text(_index)
@@ -967,6 +1045,7 @@ func _add_bilateral_filter_button(label: String, mode: String) -> void:
 func _refresh_view() -> void:
 	if _selected_country.is_empty():
 		return
+	_sync_justify_button()
 
 	_refresh_relations_overview()
 	bilateral_title.text = "Bilateral Trade Activity — " + _selected_country
