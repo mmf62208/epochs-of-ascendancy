@@ -2071,7 +2071,9 @@ func _on_begin_new(pending_press: bool = false, from_pointer: bool = false) -> v
 	print("LivingTitleBoot: live Begin · %s · %d" % [_tag, _year])
 	commit_setup_toggles()
 	var out: Dictionary = apply_living_title_boot(_tag, _year, "")
-	_finish(out)
+	# Startup-blank leftover swallow is pointer-Begin only. Keyboard
+	# Enter/Space/B must not eat the first real map click.
+	_finish(out, from_pointer or os_left_button_held())
 
 
 func _on_load(slot: String) -> void:
@@ -2115,7 +2117,7 @@ func _note_music(mode: String) -> void:
 		am.call("note_presentation", mode)
 
 
-func _finish(out: Dictionary) -> void:
+func _finish(out: Dictionary, arm_startup_blank: bool = true) -> void:
 	if _closed:
 		return
 	# CC-HANG-1: Begin must not leave the full-rect Command Center capturing input.
@@ -2124,7 +2126,10 @@ func _finish(out: Dictionary) -> void:
 	_note_music("game")
 	_clear_opened_from_title_meta()
 	_center_on_player(str(out.get("player_tag", _tag)))
-	_arm_startup_blank_leftover_swallow()
+	# Load / mouse Begin keep the leftover rim swallow. Keyboard Begin
+	# passes false so the first map click is a real pick.
+	if arm_startup_blank:
+		_arm_startup_blank_leftover_swallow()
 	boot_closed.emit(out)
 	# Every Begin path (Return key, mouse, title after Return to Title).
 	_restore_session_maximized()
