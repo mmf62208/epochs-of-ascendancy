@@ -71,6 +71,8 @@ def build_smoke_pan_esc_product(*, check_wiring: bool = True) -> Dict[str, Any]:
     unh_fn = _gd_func_slice(ren, "_unhandled_input")
     prov_fn = _gd_func_slice(ren, "_on_province_input")
     cam_fn = _gd_func_slice(ren, "_handle_camera_input")
+    motion_pan_fn = _gd_func_slice(ren, "_handle_pointer_motion_pan")
+    apply_pan_fn = _gd_func_slice(ren, "_apply_pointer_drag_pan")
     process_fn = _gd_func_slice(ren, "_process")
     hover_fn = _gd_func_slice(ren, "_update_spatial_hover")
     skip_fn = _gd_func_slice(ren, "_left_release_must_skip_pick")
@@ -134,7 +136,11 @@ def build_smoke_pan_esc_product(*, check_wiring: bool = True) -> Dict[str, Any]:
             < cam_fn.find("modal_blocks_map_nav")
         )
         wiring["input_motion_pans_from_slop"] = (
-            "_left_drag_should_pan" in input_fn and "_left_pan_active" in input_fn
+            "_handle_pointer_motion_pan" in input_fn
+            and bool(motion_pan_fn)
+            and "_left_drag_should_pan" in motion_pan_fn
+            and "_left_pan_active" in motion_pan_fn
+            and "mm.relative" in motion_pan_fn
         )
         wiring["empty_area_process_armed_to_camera"] = (
             bool(process_fn)
@@ -153,8 +159,10 @@ def build_smoke_pan_esc_product(*, check_wiring: bool = True) -> Dict[str, Any]:
             and bool(cam_fn)
             and "cam.global_position" in cam_fn
             and "_left_pan_active" in cam_fn
-            and "_unlock_close_camera_for_left_drag_pan" in cam_fn
-            and "_close_release_seen" in cam_fn
+            and "_apply_pointer_drag_pan" in cam_fn
+            and bool(apply_pan_fn)
+            and "_unlock_close_camera_for_left_drag_pan" in apply_pan_fn
+            and "_close_release_seen" in apply_pan_fn
             and bool(unlock_drag_fn)
             and "_unlock_close_camera" in unlock_drag_fn
             and "_close_suppress_edge" not in unlock_drag_fn
@@ -334,13 +342,13 @@ def build_smoke_pan_esc_product(*, check_wiring: bool = True) -> Dict[str, Any]:
         # Do not change rearm/activate/Esc/chip helpers.
         motion_i = input_fn.find("InputEventMouseMotion")
         motion_latch_i = (
-            input_fn.find("_latch_left_skip_pick_from_live_slop", motion_i)
-            if motion_i >= 0
+            motion_pan_fn.find("_latch_left_skip_pick_from_live_slop")
+            if motion_pan_fn
             else -1
         )
         motion_note_i = (
-            input_fn.find("_note_left_gesture_motion", motion_i)
-            if motion_i >= 0
+            motion_pan_fn.find("_note_left_gesture_motion")
+            if motion_pan_fn
             else -1
         )
         wiring["early_live_slop_skip_latch"] = (
@@ -362,6 +370,7 @@ def build_smoke_pan_esc_product(*, check_wiring: bool = True) -> Dict[str, Any]:
             and process_fn.find("_latch_left_skip_pick_from_live_slop")
             < process_fn.find("_accumulate_left_drag_slop")
             and motion_i >= 0
+            and "_handle_pointer_motion_pan" in input_fn
             and 0 <= motion_latch_i < motion_note_i
             and "_latch_left_skip_pick_from_live_slop" in input_fn
             and input_fn.find("_latch_left_skip_pick_from_live_slop")
@@ -457,7 +466,7 @@ def build_smoke_pan_esc_product(*, check_wiring: bool = True) -> Dict[str, Any]:
             input_fn.find("idle_up_for_repeat", left_i) if left_i >= 0 else -1
         )
         begin_press_i = (
-            input_fn.find("_begin_left_map_gesture(true)", left_i)
+            input_fn.find("_begin_left_map_gesture(true", left_i)
             if left_i >= 0
             else -1
         )

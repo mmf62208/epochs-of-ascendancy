@@ -513,6 +513,10 @@ else
     tools/run_godot.sh --headless --path . --resolution 1280x740 \
     -s res://scripts/core/HeadlessWheelDrift1Test.gd || fail
 
+  run_step launch_input_drag1 \
+    tools/run_godot.sh --headless --path . --resolution 1280x740 \
+    -s res://scripts/core/HeadlessInputDrag1OsPanTest.gd || fail
+
   run_step launch_edge2_rim_feel \
     tools/run_godot.sh --headless --path . --resolution 1280x740 \
     -s res://scripts/core/HeadlessEdge2RimFeelTest.gd || fail

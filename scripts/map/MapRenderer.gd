@@ -250,6 +250,16 @@ var _map_pick_block_until_msec: int = 0
 ## Close/Esc: do not move the camera (no snapshot restore — that still teleported).
 var _hold_camera_until_msec: int = 0
 var _last_mouse_pos := Vector2.ZERO
+## Event-authored pointer for the current gesture. Headless / OS-like
+## injects update event.position while get_viewport().get_mouse_position()
+## can stay at (0, 0) or already sit at the drag end.
+var _left_event_pointer_valid := false
+var _left_event_pointer_pos := Vector2.ZERO
+## True after a MouseMotion/button event applied camera pan this frame so
+## `_handle_camera_input` must not also poll a stale viewport mouse.
+var _pointer_event_pan_this_frame := false
+## Middle/right gesture: pan only — never open a unit/division panel.
+var _middle_block_pick := false
 ## STARTUP-BLANK: leftover pointer after living-title Begin (edge pan + leftover
 ## left-drag) until the cursor moves STARTUP_BLANK_MOVE_PX from the leftover.
 var _startup_blank_armed := false
@@ -1375,6 +1385,20 @@ const WHEEL_EDGE_SUPPRESS_MS := 350
 const WHEEL_EDGE_DWELL_MS := 150
 
 
+func _note_left_event_pointer(screen: Vector2) -> void:
+	_left_event_pointer_pos = screen
+	_left_event_pointer_valid = true
+
+
+func _left_pointer_screen() -> Vector2:
+	if _left_event_pointer_valid:
+		return _left_event_pointer_pos
+	var vp_ptr: Viewport = get_viewport()
+	if vp_ptr != null:
+		return vp_ptr.get_mouse_position()
+	return Vector2.ZERO
+
+
 func _left_live_slop_is_drag() -> bool:
 	# Read-only screen slop. Release/pick sites must not `_note`/`_begin`
 	# (that can reset origin before skip-pick latches — Rio Grande Rise).
@@ -1390,10 +1414,7 @@ func _left_live_slop_is_drag() -> bool:
 		or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
 	):
 		return false
-	var vp_live: Viewport = get_viewport()
-	if vp_live == null:
-		return false
-	var mouse_live: Vector2 = vp_live.get_mouse_position()
+	var mouse_live: Vector2 = _left_pointer_screen()
 	if _left_origin_valid and mouse_live.distance_squared_to(_left_origin_screen) >= slop_lim:
 		return true
 	if _left_origin_valid and mouse_live.distance_squared_to(_left_gesture_origin) >= slop_lim:
@@ -1474,10 +1495,7 @@ func _left_in_leftover_hold() -> bool:
 func _note_sticky_slop() -> void:
 	if not _left_sticky_valid:
 		return
-	var vp_st: Viewport = get_viewport()
-	if vp_st == null:
-		return
-	var slop_st: float = vp_st.get_mouse_position().distance_squared_to(_left_sticky_origin)
+	var slop_st: float = _left_pointer_screen().distance_squared_to(_left_sticky_origin)
 	if slop_st > _left_sticky_slop_sq:
 		_left_sticky_slop_sq = slop_st
 	if _left_sticky_slop_sq >= LEFT_PAN_SLOP_PX * LEFT_PAN_SLOP_PX:
@@ -1500,10 +1518,11 @@ func _reseed_left_origin_from_idle_up(mouse: Vector2) -> void:
 	_left_sticky_valid = true
 	_left_sticky_slop_sq = 0.0
 	_last_mouse_pos = mouse
+	_note_left_event_pointer(mouse)
 	_left_button_was_up = false
 
 
-func _begin_left_map_gesture(new_press: bool = false) -> void:
+func _begin_left_map_gesture(new_press: bool = false, press_screen: Vector2 = Vector2.INF) -> void:
 	# #134: a Command Center press is not a map gesture, including the process
 	# frame that sees Input still held after `_input` returned.
 	if _cc_overlay_blocks_map_pointer():
@@ -1521,8 +1540,12 @@ func _begin_left_map_gesture(new_press: bool = false) -> void:
 	# Product string: idle-up new press (Alicante) is never first-line-returned.
 	if new_press and _left_button_was_up:
 		pass
-	var vp: Viewport = get_viewport()
-	var mouse: Vector2 = vp.get_mouse_position() if vp != null else Vector2.ZERO
+	var mouse: Vector2 = press_screen
+	if mouse.x == INF or mouse.y == INF:
+		var vp: Viewport = get_viewport()
+		mouse = vp.get_mouse_position() if vp != null else Vector2.ZERO
+	else:
+		_note_left_event_pointer(mouse)
 	var physically_down: bool = Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
 	if not new_press:
 		_note_sticky_slop()
@@ -1609,10 +1632,7 @@ func _note_left_gesture_motion() -> void:
 				_begin_left_map_gesture()
 		else:
 			return
-	var vp: Viewport = get_viewport()
-	if vp == null:
-		return
-	var mouse_note: Vector2 = vp.get_mouse_position()
+	var mouse_note: Vector2 = _left_pointer_screen()
 	var slop_sq: float = mouse_note.distance_squared_to(_left_gesture_origin)
 	if _left_origin_valid:
 		slop_sq = maxf(slop_sq, mouse_note.distance_squared_to(_left_origin_screen))
@@ -1674,6 +1694,7 @@ func _reset_left_gesture_state(mouse: Vector2 = Vector2.INF) -> void:
 	_left_ready_for_still_click = true
 	_left_button_was_up = true
 	_last_mouse_pos = pos
+	_note_left_event_pointer(pos)
 
 
 func _clear_left_slop_after_still_click() -> void:
@@ -1695,6 +1716,7 @@ func _clear_left_slop_after_still_click() -> void:
 	_left_press_cam_valid = false
 	_left_release_frame = -1
 	_left_release_screen_valid = false
+	_left_event_pointer_valid = false
 
 
 func _rearm_left_drag_for_next_press() -> void:
@@ -2093,13 +2115,124 @@ func _finish_close_click_guard_on_new_press() -> void:
 		_map_pick_block_until_msec = 0
 
 
+func _motion_drag_delta(mm: InputEventMouseMotion) -> Vector2:
+	if mm.relative.length_squared() > 0.01:
+		return mm.relative
+	return mm.position - _last_mouse_pos
+
+
+func _apply_pointer_drag_pan(drag_delta: Vector2, from_left: bool) -> bool:
+	# Apply camera pan from a screen-space drag. Used from MouseMotion so
+	# coarse OS-level paths that finish before `_process` still move the view.
+	if drag_delta.length_squared() <= 0.01:
+		return false
+	if from_left and _startup_blank_swallow_pointer():
+		return false
+	if MapViewInput.modal_blocks_map_nav(get_viewport()):
+		_is_middle_dragging = false
+		_left_pan_armed = false
+		_left_pan_active = false
+		return false
+	var cam := get_viewport().get_camera_2d()
+	if cam == null:
+		return false
+	if from_left and _close_click_guard:
+		if _close_release_seen:
+			_unlock_close_camera_for_left_drag_pan()
+		else:
+			_left_pan_active = false
+			_left_pan_armed = false
+			return false
+	if from_left:
+		if not _close_click_guard:
+			_unlock_close_camera()
+		if _camera_is_held():
+			_hold_camera_until_msec = 0
+			_inspector_held_closed = false
+			_map_pick_block_until_msec = 0
+	else:
+		_unlock_close_camera()
+	var z: float = cam.zoom.x if cam.zoom.x != 0.0 else 1.0
+	cam.global_position -= drag_delta * middle_mouse_pan_speed / z
+	_pointer_event_pan_this_frame = true
+	if from_left:
+		_mark_left_pan_blocked_pick()
+	return true
+
+
+func _handle_middle_or_right_pointer(event: InputEvent) -> void:
+	if not (event is InputEventMouseButton):
+		return
+	var mb := event as InputEventMouseButton
+	if MapViewInput.modal_blocks_map_nav(get_viewport()):
+		_is_middle_dragging = false
+		_middle_block_pick = false
+		get_viewport().set_input_as_handled()
+		return
+	if mb.pressed:
+		_is_middle_dragging = true
+		_middle_block_pick = true
+		_middle_drag_start = mb.position
+		_last_mouse_pos = mb.position
+		get_viewport().set_input_as_handled()
+		return
+	_is_middle_dragging = false
+	get_viewport().set_input_as_handled()
+	_middle_block_pick = false
+
+
+func _handle_pointer_motion_pan(mm: InputEventMouseMotion) -> void:
+	var mid_mask: int = MOUSE_BUTTON_MASK_MIDDLE | MOUSE_BUTTON_MASK_RIGHT
+	var mid_held: bool = (mm.button_mask & mid_mask) != 0
+	if mid_held or _is_middle_dragging:
+		if MapViewInput.modal_blocks_map_nav(get_viewport()):
+			_is_middle_dragging = false
+			_middle_block_pick = false
+			return
+		if not _is_middle_dragging:
+			_is_middle_dragging = true
+			_middle_block_pick = true
+			_last_mouse_pos = mm.position - mm.relative
+		var mid_delta: Vector2 = _motion_drag_delta(mm)
+		if mid_delta.length_squared() > 0.01:
+			_apply_pointer_drag_pan(mid_delta, false)
+		_last_mouse_pos = mm.position
+		get_viewport().set_input_as_handled()
+		return
+	# CLOSE-1: leftover button_mask after card Close is not a new map press.
+	# Arm only from MouseButton press (`_begin_left_map_gesture`); motion
+	# continues a live gesture that press already started.
+	if _close_ignore_stale_left_down or _close_click_guard:
+		return
+	if not (_left_btn_down or _left_pan_armed or _left_pan_active):
+		return
+	if not _left_down_is_live_map_drag():
+		return
+	_note_left_event_pointer(mm.position)
+	_latch_left_skip_pick_from_live_slop()
+	_note_left_gesture_motion()
+	if not _left_pan_active and _left_drag_should_pan():
+		_activate_left_drag_pan_from_slop()
+		get_viewport().set_input_as_handled()
+	if _left_pan_active and not _startup_blank_swallow_pointer():
+		var left_delta: Vector2 = _motion_drag_delta(mm)
+		if left_delta.length_squared() > 0.01:
+			_apply_pointer_drag_pan(left_delta, true)
+		_last_mouse_pos = mm.position
+		get_viewport().set_input_as_handled()
+
+
 func _arm_left_map_press() -> void:
 	# Mid-drag re-arm must not reset the button-down origin (Play: Finistère after 80px).
 	# Empty-area / sea / paused: same arm — Area2D is not required.
 	_begin_left_map_gesture()
 	_left_pan_armed = true
 	if not _left_pan_active:
-		_last_mouse_pos = get_viewport().get_mouse_position()
+		if _left_event_pointer_valid:
+			_last_mouse_pos = _left_event_pointer_pos
+		else:
+			var vp_arm: Viewport = get_viewport()
+			_last_mouse_pos = vp_arm.get_mouse_position() if vp_arm != null else _last_mouse_pos
 	if _left_gesture_dragged:
 		_mark_left_pan_blocked_pick()
 
@@ -3350,15 +3483,9 @@ func _input(event: InputEvent) -> void:
 				get_viewport().set_input_as_handled()
 		elif event.button_index == MOUSE_BUTTON_MIDDLE or event.button_index == MOUSE_BUTTON_RIGHT:
 			# MMB/right-drag pan in _input so GUI focus cannot kill pan.
-			if MapViewInput.modal_blocks_map_nav(get_viewport()):
-				_is_middle_dragging = false
-			elif event.pressed:
-				_is_middle_dragging = true
-				_middle_drag_start = get_viewport().get_mouse_position()
-				_last_mouse_pos = _middle_drag_start
-				get_viewport().set_input_as_handled()
-			else:
-				_is_middle_dragging = false
+			# Consume press and release so a still-click never opens a unit card.
+			_handle_middle_or_right_pointer(event)
+			return
 		elif event.button_index == MOUSE_BUTTON_LEFT:
 			if _campaign_modal_consumes_pointer(event):
 				get_viewport().set_input_as_handled()
@@ -3501,7 +3628,7 @@ func _input(event: InputEvent) -> void:
 				# Genuine new button-down (slop 0): only place the pan skip is cleared.
 				# Mid-drag no-ops because _left_btn_down is still true.
 				var idle_up_for_repeat: bool = _left_button_was_up
-				_begin_left_map_gesture(true)
+				_begin_left_map_gesture(true, event.position)
 				# Drag2+3 leftover hold: `_begin(true)` keeps Drag1 origin.
 				# Reseed THIS press only after idle button-up (not mid-Drag1).
 				# `event.pressed` is THIS new left-down. Do not also require the
@@ -3512,9 +3639,7 @@ func _input(event: InputEvent) -> void:
 					and not event.ctrl_pressed
 					and not event.shift_pressed
 				):
-					var vp_rep: Viewport = get_viewport()
-					var mouse_rep: Vector2 = vp_rep.get_mouse_position() if vp_rep != null else Vector2.ZERO
-					_reseed_left_origin_from_idle_up(mouse_rep)
+					_reseed_left_origin_from_idle_up(event.position)
 				if not event.ctrl_pressed and not event.shift_pressed and _left_map_pick_blocked():
 					# Pan latch stays. Do not swallow Open fight / unit-card buttons
 					# (2d47d06: fold click was tooltip-only no-op after pan PASS).
@@ -3547,6 +3672,7 @@ func _input(event: InputEvent) -> void:
 				if _wheel_should_zoom_map() or not _gui_text_field_has_focus():
 					_arm_left_map_press()
 			elif not event.pressed:
+				_note_left_event_pointer(event.position)
 				_latch_left_skip_pick_from_live_slop()
 				_note_left_gesture_motion()
 				var did_left_pan: bool = (
@@ -3584,12 +3710,7 @@ func _input(event: InputEvent) -> void:
 						return
 	if event is InputEventMouseMotion:
 		_note_mouse_up_arms_still_click()
-		if _left_down_is_live_map_drag():
-			_latch_left_skip_pick_from_live_slop()
-			_note_left_gesture_motion()
-		if not _left_pan_active and _left_drag_should_pan():
-			_activate_left_drag_pan_from_slop()
-			get_viewport().set_input_as_handled()
+		_handle_pointer_motion_pan(event as InputEventMouseMotion)
 
 
 func _schedule_light_terrain_zoom_refresh() -> void:
@@ -3694,6 +3815,12 @@ func _unhandled_input(event: InputEvent) -> void:
 			_cc_map_press_latch = false
 		get_viewport().set_input_as_handled()
 		return
+	if event is InputEventMouseButton:
+		var mb_nav := event as InputEventMouseButton
+		if mb_nav.button_index == MOUSE_BUTTON_MIDDLE or mb_nav.button_index == MOUSE_BUTTON_RIGHT:
+			# Pan only. Never fall through to spatial chip/hex pick.
+			_handle_middle_or_right_pointer(mb_nav)
+			return
 	if event is InputEventKey and event.pressed and not event.echo:
 		if _gui_text_field_has_focus() and not _is_live_escape_event(event) and event.keycode != KEY_ESCAPE:
 			return
@@ -3931,7 +4058,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 		if not event.ctrl_pressed and not event.shift_pressed:
 			if event.pressed:
-				_begin_left_map_gesture(true)
+				_begin_left_map_gesture(true, event.position)
 			# Latch skip from live slop before `_note` can `_begin`-reset origin
 			# (eed9b5f Drag2 Labrador sea pick on the spatial release path).
 			_latch_left_skip_pick_from_live_slop()
@@ -4225,21 +4352,6 @@ func _unhandled_input(event: InputEvent) -> void:
 				get_viewport().set_input_as_handled()
 				return
 
-	# Middle or right mouse drag start (right-drag for laptop trackpads / no middle button)
-	if event is InputEventMouseButton:
-		if event.button_index == MOUSE_BUTTON_MIDDLE or event.button_index == MOUSE_BUTTON_RIGHT:
-			if event.pressed:
-				# Do not start map pan under Command Center / modal overlays.
-				if MapViewInput.modal_blocks_map_nav(get_viewport()):
-					_is_middle_dragging = false
-				else:
-					_is_middle_dragging = true
-					_middle_drag_start = get_viewport().get_mouse_position()
-					_last_mouse_pos = _middle_drag_start
-			else:
-				_is_middle_dragging = false
-
-
 func _process(delta: float) -> void:
 	if _perf != null and _perf.enabled:
 		_perf_frame_start_usec = Time.get_ticks_usec()
@@ -4451,30 +4563,26 @@ func _handle_camera_input(delta: float) -> void:
 	if not _startup_blank_swallow_pointer() and not _left_pan_active and _left_drag_should_pan():
 		_activate_left_drag_pan_from_slop()
 	# Middle / right / left-drag (pixel-based — works while paused). Drag up → camera north.
+	# Event-path pan already applied this frame: do not also poll a stale
+	# viewport mouse (headless (0,0) would reverse the drag).
 	if _is_middle_dragging or _left_pan_active:
 		var current_mouse := get_viewport().get_mouse_position()
-		var drag_delta := current_mouse - _last_mouse_pos
-		if drag_delta.length_squared() > 0.01:
-			if _close_click_guard and _left_pan_active:
-				if _close_release_seen:
-					# New empty-area drag after Close/Esc release — unlock and pan.
-					_unlock_close_camera_for_left_drag_pan()
-				else:
-					# Same button-down as Close — do not slide the camera.
-					_left_pan_active = false
-					_left_pan_armed = false
-			if _is_middle_dragging or _left_pan_active:
-				if _is_middle_dragging or not _close_click_guard:
-					_unlock_close_camera()
-				if _camera_is_held() and _left_pan_active:
-					_hold_camera_until_msec = 0
-					_inspector_held_closed = false
-					_map_pick_block_until_msec = 0
-				cam.global_position -= drag_delta * middle_mouse_pan_speed / cam.zoom.x
-				moved = true
-				if _left_pan_active:
-					_mark_left_pan_blocked_pick()
-		_last_mouse_pos = current_mouse
+		if _pointer_event_pan_this_frame:
+			_pointer_event_pan_this_frame = false
+			if current_mouse.length() >= 1.0:
+				_last_mouse_pos = current_mouse
+		else:
+			var drag_delta := current_mouse - _last_mouse_pos
+			# Headless / inject: viewport mouse parked at origin while the
+			# gesture lives on event.position — do not teleport the camera.
+			if current_mouse.length() < 1.0 and _last_mouse_pos.length() > 32.0:
+				drag_delta = Vector2.ZERO
+			if drag_delta.length_squared() > 0.01:
+				if _apply_pointer_drag_pan(drag_delta, _left_pan_active and not _is_middle_dragging):
+					moved = true
+			if current_mouse.length() >= 1.0:
+				_last_mouse_pos = current_mouse
+		_pointer_event_pan_this_frame = false
 
 	if move_dir != Vector2.ZERO:
 		if key_dir != Vector2.ZERO:
@@ -21382,6 +21490,12 @@ func _try_open_land_chip_from_input(ctrl_click: bool = false, event: InputEvent 
 	# Esc helpers + Dig2 / Drag2+3 pan helpers untouched.
 	# TipDismiss ×: this release must not open the counter under the button.
 	# Body clicks do not arm the swallow (the label ignores the mouse).
+	if _is_middle_dragging or _middle_block_pick:
+		return false
+	if event is InputEventMouseButton:
+		var mb_chip := event as InputEventMouseButton
+		if mb_chip.button_index == MOUSE_BUTTON_MIDDLE or mb_chip.button_index == MOUSE_BUTTON_RIGHT:
+			return false
 	if _first_session_tip_dismiss_blocks_map_pick():
 		return false
 	if _begin_title_release_blocks_map_pick():
