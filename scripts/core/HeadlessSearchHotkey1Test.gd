@@ -1,19 +1,23 @@
 extends SceneTree
 
-## SEARCH-HOTKEY-1 + NEXT-CHIP-LAYOUT.
+## SEARCH-HOTKEY-1 + NEXT-CHIP-LAYOUT (r2: click-focus + RtT AAR clear).
 ## Item 1: a focused Search LineEdit (or any LineEdit) must not fire pause,
-## speed, or map-mode hotkeys. Item 2: the NEXT war-goal box sits clear of
-## Map Mode and the top bar; NEXT and Why are separate unclipped lines;
-## an open inspector does not cover it.
+## speed, or map-mode hotkeys. A left click on the Search box must actually
+## focus the LineEdit before the next key. Item 2: the NEXT war-goal box sits
+## clear of Map Mode and the top bar; a leftover land AAR must not survive
+## Return to Title into a fresh Begin.
 ##
 ## Fails on 5c1b541b (empty Search still toggles Space; digits 1–4 change
-## speed; NEXT/Why share one box over Map Mode). Passes on this tip.
+## speed; NEXT/Why share one box over Map Mode). r2 click-focus / Bytomski
+## leftover fails on e1f1f813 and passes on this tip.
 ##
 ##   tools/run_godot.sh --headless --path . --resolution 1280x800 \
 ##     -s res://scripts/core/HeadlessSearchHotkey1Test.gd
 
 const PLAY_SIZE := Vector2i(1280, 800)
 const FLUSH_FRAMES := 4
+const KINGSTON := 903045
+const BYTOMSKI_PID := 711082
 
 var _failures: int = 0
 var _mr: Node = null
@@ -36,7 +40,9 @@ func _run() -> void:
 	if vp != null:
 		vp.size = PLAY_SIZE
 	await _case_search_hotkeys()
+	await _case_search_click_focus()
 	await _case_next_chip_layout()
+	await _case_next_chip_rtt_aar()
 	var ok := _failures == 0
 	print("HeadlessSearchHotkey1Test: ", "PASS" if ok else "FAIL", " (failures=", _failures, ")")
 	print("HeadlessSearchHotkey1Test: RESULT=", "PASS" if ok else "FAIL")
@@ -460,3 +466,387 @@ func _case_next_chip_layout() -> void:
 		await _frames(2)
 		await _assert_chip_layout(player, name, true)
 		_info.visible = false
+
+
+func _inspector_pid() -> int:
+	if _mr == null:
+		return -1
+	if "selected_province_id" in _mr:
+		return int(_mr.get("selected_province_id"))
+	return -1
+
+
+func _inspector_open() -> bool:
+	if _info != null and _info.visible:
+		return true
+	if _mr == null:
+		return false
+	var ip: Variant = _mr.get("info_panel")
+	return ip is CanvasItem and (ip as CanvasItem).visible
+
+
+func _cc_up() -> bool:
+	var mm := root.get_node_or_null("MainMenu")
+	if mm == null or not is_instance_valid(mm) or mm.is_queued_for_deletion():
+		return false
+	if str(mm.name) != "MainMenu":
+		return false
+	if bool(mm.get("_closing")):
+		return false
+	return true
+
+
+func _close_cc() -> void:
+	var mm := root.get_node_or_null("MainMenu")
+	if mm != null and is_instance_valid(mm) and mm.has_method("_force_close") and not bool(mm.get("_closing")):
+		mm.call("_force_close")
+
+
+func _hide_inspector() -> void:
+	if _info != null:
+		_info.visible = false
+	if _mr == null:
+		return
+	var ip: Variant = _mr.get("info_panel")
+	if ip is CanvasItem and is_instance_valid(ip):
+		(ip as CanvasItem).visible = false
+	if "selected_province_id" in _mr:
+		_mr.set("selected_province_id", -1)
+
+
+func _mouse_at(pt: Vector2, pressed: bool) -> InputEventMouseButton:
+	var mb := InputEventMouseButton.new()
+	mb.device = 0
+	mb.button_index = MOUSE_BUTTON_LEFT
+	mb.pressed = pressed
+	mb.position = pt
+	mb.global_position = pt
+	mb.button_mask = MOUSE_BUTTON_MASK_LEFT if pressed else 0
+	return mb
+
+
+func _click_at(pt: Vector2) -> void:
+	var vp: Viewport = root.get_viewport()
+	if vp != null:
+		vp.warp_mouse(pt)
+	var motion := InputEventMouseMotion.new()
+	motion.device = 0
+	motion.position = pt
+	motion.global_position = pt
+	motion.relative = Vector2(1, 1)
+	root.push_input(motion)
+	var down := _mouse_at(pt, true)
+	var up := _mouse_at(pt, false)
+	if _mr != null:
+		if _mr.has_method("_input"):
+			_mr.call("_input", down)
+		if _mr.has_method("_focus_search_from_point"):
+			_mr.call("_focus_search_from_point", pt)
+	var search := _search()
+	if search != null and search.has_method("_gui_input"):
+		search.call("_gui_input", down)
+	root.push_input(down)
+	if _mr != null and _mr.has_method("_input"):
+		_mr.call("_input", up)
+	root.push_input(up)
+
+
+## Left click on the Search chrome (LineEdit or padding), not Go / results.
+func _click_search_box() -> LineEdit:
+	var line := _line()
+	var search := _search()
+	if line == null or search == null or not (search is Control):
+		_fail("Search chrome missing for click")
+		return null
+	var sr := search as Control
+	# Chrome padding / grow-hit, not the LineEdit body, so a leftover
+	# `_suppress_line_grab_frame` cannot be rescued by native LineEdit grab.
+	var chrome_pt := sr.get_global_rect().position + Vector2(-4.0, maxf(8.0, sr.size.y * 0.5))
+	_click_at(chrome_pt)
+	await process_frame
+	return line
+
+
+func _assert_click_owns_keys(label: String) -> void:
+	_close_cc()
+	_hide_inspector()
+	_set_clock(true, 1)
+	var grabber := _search()
+	if grabber != null and grabber.has_method("_release_line_focus"):
+		grabber.call("_release_line_focus")
+	var line := await _click_search_box()
+	if line == null:
+		return
+	var fo: Control = root.get_viewport().gui_get_focus_owner() if root.get_viewport() != null else null
+	if not line.has_focus() and fo != line:
+		_fail("%s: Search click did not focus SearchLineEdit (focus=%s owner=%s)" % [label, str(line.has_focus()), str(fo)])
+		return
+	var before := _clock_snapshot()
+	var pid_before := _inspector_pid()
+	var insp_before := _inspector_open()
+	for code in [KEY_1, KEY_2]:
+		_dispatch_key(code as Key)
+	await _frames(2)
+	var after := _clock_snapshot()
+	if int(after.get("speed")) != int(before.get("speed")) or bool(after.get("paused")) != bool(before.get("paused")):
+		_fail("%s: digits after Search click changed clock pause=%s→%s speed=%s→%s" % [
+			label, str(before.get("paused")), str(after.get("paused")),
+			str(before.get("speed")), str(after.get("speed"))
+		])
+		return
+	if (not insp_before) and _inspector_open():
+		_fail("%s: digits after Search click opened the inspector pid=%s" % [label, str(_inspector_pid())])
+		return
+	if _inspector_pid() != pid_before and _inspector_pid() > 0 and pid_before > 0:
+		_fail("%s: digits after Search click changed inspector %s → %s" % [label, str(pid_before), str(_inspector_pid())])
+		return
+	_pass("%s: Search click focused the line; digits did not change speed or open inspector" % label)
+
+
+func _kingston_search() -> void:
+	var search := _search()
+	var line := _line()
+	if search == null or line == null:
+		return
+	line.text = "kingston"
+	if search.has_method("submit_from_live_ui"):
+		search.call("submit_from_live_ui", "kingston")
+	elif search.has_method("_on_submit"):
+		search.call("_on_submit", "kingston")
+
+
+func _begin_as(tag: String) -> bool:
+	_free_title(_find_title())
+	var title := _make_title()
+	await process_frame
+	await process_frame
+	await process_frame
+	var btns: Variant = title.get("_nation_btns")
+	if btns is Dictionary:
+		var nbtn: Button = (btns as Dictionary).get(tag) as Button
+		if nbtn != null:
+			nbtn.pressed.emit()
+			await process_frame
+	var begin: Button = title.get("_begin_btn") as Button
+	if begin == null:
+		_free_title(title)
+		return false
+	begin.pressed.emit()
+	for _i in 12:
+		await process_frame
+		if title == null or not is_instance_valid(title) or bool(title.get("_closed")):
+			return true
+	return bool(title.get("_closed")) if is_instance_valid(title) else true
+
+
+func _return_to_title() -> bool:
+	root.set_meta("eoa_return_title_scene", _dummy_title_scene())
+	_free_menu()
+	var packed: PackedScene = load("res://scenes/ui/MainMenu.tscn") as PackedScene
+	if packed == null:
+		return false
+	var menu := packed.instantiate()
+	menu.name = "MainMenu"
+	root.add_child(menu)
+	await process_frame
+	await process_frame
+	await process_frame
+	var ret: Button = null
+	for n in menu.find_children("*", "Button", true, false):
+		if n is Button and str((n as Button).get_meta("eoa_cc_action", "")) == "return_to_main":
+			ret = n as Button
+			break
+	if ret == null:
+		_free_menu()
+		return false
+	ret.pressed.emit()
+	var closed := not is_instance_valid(menu) or menu.is_queued_for_deletion()
+	await process_frame
+	await process_frame
+	return closed or not is_instance_valid(menu)
+
+
+func _make_title() -> Node:
+	_free_title(_find_title())
+	var scr: GDScript = load("res://scripts/ui/LivingTitleBoot.gd") as GDScript
+	var title: Node = scr.new() as Node
+	title.name = "LivingTitleBoot"
+	root.add_child(title)
+	return title
+
+
+func _find_title() -> Node:
+	return root.find_child("LivingTitleBoot", true, false)
+
+
+func _free_title(title: Node) -> void:
+	if title == null or not is_instance_valid(title):
+		return
+	if title.get_parent() != null:
+		title.get_parent().remove_child(title)
+	title.free()
+
+
+func _free_menu() -> void:
+	var menu := root.get_node_or_null("MainMenu")
+	if menu == null or not is_instance_valid(menu):
+		return
+	if menu.has_method("_release_clock_lock"):
+		menu.call("_release_clock_lock")
+	var parent := menu.get_parent()
+	if parent != null:
+		parent.remove_child(menu)
+	menu.free()
+
+
+func _dummy_title_scene() -> PackedScene:
+	var title := Node.new()
+	title.name = "TitleIdle"
+	var packed := PackedScene.new()
+	packed.pack(title)
+	title.free()
+	return packed
+
+
+func _inject_bytomski_aar() -> bool:
+	var bm := root.get_node_or_null("BattleManager")
+	if bm == null:
+		_fail("BattleManager missing")
+		return false
+	bm.set("_last_land_aar", {
+		"winner": "attacker",
+		"place": "Gdański",
+		"next_pid": BYTOMSKI_PID,
+		"next_place": "Bytomski",
+		"line": "Battle ended at Gdański",
+		"fid": "search_hotkey1_aar",
+		"from_id": KINGSTON,
+		"tag": "GER",
+	})
+	return true
+
+
+func _chip_text() -> String:
+	var chip := _next_chip()
+	if chip == null:
+		return ""
+	return str(chip.text)
+
+
+func _case_search_click_focus() -> void:
+	print("SEARCH_HOTKEY_1 case=search_click_focus")
+	if _mr == null:
+		if not _setup_map():
+			return
+		if not await _boot_top_bar():
+			return
+	if _mr.has_method("ensure_live_search_chrome"):
+		_mr.call("ensure_live_search_chrome")
+	await _frames(2)
+	var title := root.find_child("LivingTitleBoot", true, false)
+	if title != null and is_instance_valid(title):
+		title.set("_closed", true)
+	# Same-frame leftover after Go / result pick (Play ENG-after-Kingston).
+	var search := _search()
+	if search != null and search.has_method("_release_line_focus"):
+		search.call("_release_line_focus")
+	await _assert_click_owns_keys("after_release")
+	var mm := root.get_node_or_null("MapManager")
+	var sm := root.get_node_or_null("SupplyManager")
+	var boot: GDScript = load("res://scripts/core/CampaignLoopTestBoot.gd") as GDScript
+	if mm != null and boot != null:
+		boot.call("boot", mm, sm, "GER")
+	if not await _begin_as("SOV"):
+		_fail("SOV Begin failed")
+		return
+	if _mr.has_method("ensure_live_search_chrome"):
+		_mr.call("ensure_live_search_chrome")
+	await _assert_click_owns_keys("sov_begin")
+	if not await _begin_as("ENG"):
+		_fail("ENG Begin failed")
+		return
+	if _mr.has_method("ensure_live_search_chrome"):
+		_mr.call("ensure_live_search_chrome")
+	_kingston_search()
+	await _assert_click_owns_keys("eng_after_kingston")
+	_close_cc()
+	_hide_inspector()
+	_set_clock(true, 1)
+	await _frames(1)
+	var line := await _click_search_box()
+	if line == null:
+		return
+	line.text = ""
+	var paused_before := bool(_clock_snapshot().get("paused"))
+	_dispatch_key(KEY_ESCAPE)
+	await _frames(2)
+	var fo: Control = root.get_viewport().gui_get_focus_owner() if root.get_viewport() != null else null
+	if line.has_focus() or fo == line:
+		_fail("Esc after Search click left SearchLineEdit focused")
+		return
+	if _cc_up():
+		_fail("the Esc that unfocused Search also opened Paused")
+		return
+	if bool(_clock_snapshot().get("paused")) != paused_before:
+		_fail("Esc after Search click changed pause")
+		return
+	_pass("one Esc after Search click released focus and did not open Paused")
+	_dispatch_key(KEY_ESCAPE)
+	await _frames(4)
+	if not _cc_up():
+		_fail("Esc with Search unfocused did not open Paused")
+		return
+	_pass("later Esc with Search unfocused opened Paused")
+	_close_cc()
+
+
+func _case_next_chip_rtt_aar() -> void:
+	print("SEARCH_HOTKEY_1 case=next_chip_rtt_aar")
+	if _mr == null:
+		_fail("MapRenderer missing for AAR RtT")
+		return
+	var hook: GDScript = load("res://scripts/ui/PlayNextHook.gd") as GDScript
+	if hook == null:
+		_fail("PlayNextHook missing")
+		return
+	if not _inject_bytomski_aar():
+		return
+	var rec: Dictionary = hook.call("recommend", "GER")
+	var rec_label := str(rec.get("label", ""))
+	if rec_label.find("Bytomski") < 0:
+		_fail("injected AAR did not rank as Press Bytomski next (got '%s')" % rec_label)
+		return
+	_pass("injected AAR ranks as '%s'" % rec_label)
+	if _mr.has_method("refresh_next_hook_after_living_begin"):
+		_mr.call("refresh_next_hook_after_living_begin")
+	elif _mr.has_method("_refresh_next_hook_chip"):
+		_mr.call("_refresh_next_hook_chip")
+	await _frames(2)
+	var wants: Array[Dictionary] = [
+		{"tag": "USA", "needle": "Japan"},
+		{"tag": "SOV", "needle": "Poland"},
+		{"tag": "ENG", "needle": "English Channel"},
+	]
+	for row in wants:
+		var tag := str(row.get("tag"))
+		var needle := str(row.get("needle"))
+		if not _inject_bytomski_aar():
+			return
+		if not await _return_to_title():
+			_fail("Return to Title before Begin %s did not fire" % tag)
+			return
+		if not await _begin_as(tag):
+			_fail("Begin %s after RtT failed" % tag)
+			return
+		await _frames(3)
+		if _mr.has_method("refresh_next_hook_after_living_begin"):
+			_mr.call("refresh_next_hook_after_living_begin")
+		await _frames(2)
+		var shown := _chip_text()
+		if shown.find("Bytomski") >= 0 or shown.find("Press Bytomski") >= 0:
+			_fail("Begin %s after GER AAR RtT kept leftover '%s'" % [tag, shown])
+			return
+		if shown.find(needle) < 0:
+			_fail("Begin %s after RtT want '%s' in '%s'" % [tag, needle, shown])
+			return
+		_pass("after RtT Begin %s: %s" % [tag, shown])

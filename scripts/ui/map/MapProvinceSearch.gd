@@ -45,14 +45,15 @@ func _ready() -> void:
 	ensure_chrome_visible()
 
 
-## Esc layer: a focused query or a visible results list. An empty focused
-## line is not a layer — idle Esc must still open the Command Center.
+## Esc layer: a focused Search line (empty or not) or a visible results list.
+## One Esc unfocuses Search and must not open Paused. Idle Esc (unfocused)
+## still opens the pause menu.
 func esc_layer_open() -> bool:
 	var results := get_node_or_null("SearchResults") as CanvasItem
 	if results != null and is_instance_valid(results) and results.visible:
 		return true
 	if _line != null and is_instance_valid(_line) and _line.has_focus():
-		return not _line.text.strip_edges().is_empty()
+		return true
 	return false
 
 
@@ -66,8 +67,8 @@ func _block_line_grab() -> void:
 
 
 func dismiss_esc_layer() -> void:
-	# Close the layer and drop the query. An empty focused line is not a
-	# layer, so the next Esc can open the pause menu.
+	# Close the layer and drop the query. The next Esc (Search unfocused)
+	# can open the pause menu.
 	_block_line_grab()
 	var results := get_node_or_null("SearchResults") as CanvasItem
 	if results != null and is_instance_valid(results):
@@ -79,8 +80,12 @@ func dismiss_esc_layer() -> void:
 
 ## Click-to-type. A near miss on the search chrome still focuses the line so
 ## a real key (and xdotool) lands in the field. Does not clear the query.
-func focus_for_typing() -> void:
-	if _line_grab_blocked():
+## A left click on the box always focuses, even right after Go / a result
+## pick / Esc — those only block the leftover deferred grab, not a new click.
+func focus_for_typing(from_user_click: bool = false) -> void:
+	if from_user_click:
+		_suppress_line_grab_frame = -1
+	elif _line_grab_blocked():
 		return
 	ensure_chrome_visible()
 	if _line == null or not is_instance_valid(_line):
@@ -155,7 +160,7 @@ func _gui_input(event: InputEvent) -> void:
 	var results := get_node_or_null("SearchResults") as Control
 	if results != null and results.visible and results.get_global_rect().has_point(mb.global_position):
 		return
-	focus_for_typing()
+	focus_for_typing(true)
 
 
 func _input(event: InputEvent) -> void:

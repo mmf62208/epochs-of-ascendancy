@@ -2459,7 +2459,7 @@ func _focus_search_from_point(screen: Vector2) -> void:
 	if results != null and results.visible and results.get_global_rect().grow(2.0).has_point(screen):
 		return
 	if sr.has_method("focus_for_typing"):
-		sr.call("focus_for_typing")
+		sr.call("focus_for_typing", true)
 
 
 func _search_ui_owns_click() -> bool:
@@ -3146,9 +3146,12 @@ func _handle_escape_key() -> void:
 	# (hidden / dying) so idle Esc must open the pause menu.
 	if _campaign_end_overlay_is_up():
 		return
-	# Search field / results is its own layer. An empty focused line is not:
-	# idle Esc after +6d must still open Command Center (Play MIXED e36825b).
+	# Search field / results / focused line is its own layer. One Esc
+	# unfocuses Search (empty or not) and must not open Paused.
 	if _dismiss_search_esc_layer():
+		return
+	if _gui_text_field_has_focus():
+		_release_search_focus()
 		return
 	_release_search_focus()
 	# One Esc closes only the front play window. The next Esc can open pause.

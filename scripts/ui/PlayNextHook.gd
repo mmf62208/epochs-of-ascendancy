@@ -1100,10 +1100,14 @@ static func reset_goal_lock_for_test() -> void:
 	_chip_goal_lock = {}
 
 
-## Autoloads survive Return to Title. Drop the last foreign hex and the NEXT chip lock.
+## Autoloads survive Return to Title. Drop the last foreign hex, the NEXT
+## chip lock, and the last land AAR so a fresh Begin cannot keep
+## "Press Bytomski next" from the previous nation's war.
 static func reset_session() -> void:
 	last_diplomacy_pid = -1
 	reset_goal_lock_for_test()
+	if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("clear_last_land_aar"):
+		BattleManager.clear_last_land_aar()
 
 
 static func chip_goal_pinned() -> bool:
