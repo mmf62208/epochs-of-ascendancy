@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# STARTUP-PARITY: empty-board 575 vs live TestScenario skip + viewport shrink.
+# STARTUP-PARITY: empty-board 576 vs live TestScenario skip + viewport shrink.
 # TEST-ONLY. NOT live Play. NEVER claims live-startup PASS.
 # Does not add a standard gate. Does not change product Begin/camera/map code.
 #

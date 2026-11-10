@@ -2,14 +2,14 @@ extends SceneTree
 
 ## STARTUP-PARITY (test-only): empty-board 1936 garrison seed vs occupied skip.
 ## Does not launch TestScenario / living title. That live path is WindowedStartupParityTest.
-## Proves the required 575 baseline is seed_1936_start_garrisons on an empty formation
+## Proves the required 576 baseline is seed_1936_start_garrisons on an empty formation
 ## table (same world_accurate board files as F5). One occupied Berlin hex skips 1.
 ##
 ##   tools/run_godot.sh --headless --path . -s res://scripts/core/HeadlessStartupParityGarrisonTest.gd
 
 const BERLIN := 710300
 const EXPECT_PROVINCES := 3596
-const EXPECT_GARRISONS := 575
+const EXPECT_GARRISONS := 576
 const TAGS := ["GER", "FRA", "ENG", "SOV", "ITA", "JAP", "USA", "POL", "CZE"]
 
 var _failures := 0
@@ -101,7 +101,7 @@ func _assert_empty_seed(seeded: Dictionary) -> void:
 	if placed + skipped != targets:
 		_fail("empty identity placed+skipped=%d != targets=%d" % [placed + skipped, targets])
 		return
-	_pass("empty-board 575 garrisons, 0 occupied skips, 575 targets")
+	_pass("empty-board 576 garrisons, 0 occupied skips, 576 targets")
 
 
 func _assert_occupied_skip(seeded: Dictionary) -> void:
@@ -119,10 +119,10 @@ func _assert_occupied_skip(seeded: Dictionary) -> void:
 		_fail("occupied Berlin placed=%d skipped=%d targets=%d" % [placed, skipped, targets])
 		return
 	if placed != EXPECT_GARRISONS - skipped:
-		_fail("occupied identity placed=%d != 575-skipped=%d" % [placed, EXPECT_GARRISONS - skipped])
+		_fail("occupied identity placed=%d != 576-skipped=%d" % [placed, EXPECT_GARRISONS - skipped])
 		return
 	_pass(
-		"occupied hex skipped (placed %d + skipped %d = targets %d). Live F5 535 is this skip class, not a second board."
+		"occupied hex skipped (placed %d + skipped %d = targets %d). Live F5 536 is this skip class, not a second board."
 		% [placed, skipped, targets]
 	)
 
@@ -151,7 +151,7 @@ func _finish() -> void:
 	_out["expect_garrisons"] = EXPECT_GARRISONS
 	_out["expect_provinces"] = EXPECT_PROVINCES
 	_out["tags"] = TAGS
-	_out["note"] = "575 is empty-board seed_1936_start_garrisons. Live F5 skips OOB-occupied border/capital hexes."
+	_out["note"] = "576 is empty-board seed_1936_start_garrisons (ENG +1 at Kingston 903045). Live F5 skips OOB-occupied border/capital hexes (536+40)."
 	var out_dir := OS.get_environment("EOA_STARTUP_PARITY_OUT").strip_edges()
 	if not out_dir.is_empty():
 		DirAccess.make_dir_recursive_absolute(out_dir)
