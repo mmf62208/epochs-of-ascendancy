@@ -177,6 +177,10 @@ func _process(_delta: float) -> void:
 	if _smoke_stay_alive:
 		return
 	# Safety net: if deferred flush stalled (e.g. pause race), keep draining the queue.
+	if _campaign_clock_locked():
+		_pending_sim_events.clear()
+		_sim_flush_scheduled = false
+		return
 	if not paused and not _pending_sim_events.is_empty() and not _sim_flush_scheduled:
 		_schedule_sim_flush()
 	# Windowed Play only: if unpaused but TopInfoBar lost a tick (busy latch /
@@ -188,6 +192,8 @@ func _process(_delta: float) -> void:
 
 
 func maybe_run_windowed_backup_clock() -> bool:
+	if _campaign_clock_locked():
+		return false
 	if paused:
 		return false
 	if not _windowed_backup_clock_allowed():
@@ -1016,6 +1022,17 @@ func set_time_scale(scale: float) -> void:
 	# Future: this can affect advance rates when we have a real simulation loop.
 
 
+func drop_pending_sim_events_on_campaign_end() -> void:
+	_pending_sim_events.clear()
+	_sim_flush_scheduled = false
+
+
+func clear_overlay_clock_locks() -> void:
+	_overlay_clock_locks = 0
+	_overlay_saved_valid = false
+	_notify_overlay_clock_bar()
+
+
 func overlay_holds_clock() -> bool:
 	return _overlay_clock_locks > 0
 
@@ -1409,6 +1426,9 @@ func _flush_sim_events() -> void:
 	if _smoke_stay_alive:
 		_drop_smoke_deferred_load()
 		return
+	if _campaign_clock_locked():
+		_pending_sim_events.clear()
+		return
 	if paused:
 		# Keep queue; resume via set_paused(false) / _process.
 		return
@@ -1471,6 +1491,9 @@ func _flush_sim_events() -> void:
 		print("TimeManager: flushing month boundary %04d-%02d (interactive, isolated frame)" % [y, m])
 		_emit_month_year_boundary(y, m, bool(ev.get("crossed_year", false)))
 
+	if _campaign_clock_locked():
+		_pending_sim_events.clear()
+		return
 	if not _pending_sim_events.is_empty() and not _draining_f5_flush:
 		if n_res > 0 and is_interactive_light_sim():
 			# Extra idle frame so F5 capture never shares a frame with the next day.
@@ -1581,25 +1604,25 @@ func _maybe_present_ink_victory() -> void:
 
 func _campaign_after_battles() -> void:
 	var paths_presented := _maybe_tick_victory_paths()
+	if typeof(WarStateDomain) != TYPE_NIL and WarStateDomain.loop_enabled() and typeof(CampaignEndDomain) != TYPE_NIL:
+		var at_war := WarStateDomain.any_war()
+		if at_war and typeof(CapitulationDomain) != TYPE_NIL:
+			CapitulationDomain.check_all(int(total_days_elapsed))
+		# A day with no war, no surrender, and no end latch has nothing to score.
+		# Building the capitulation dict here showed up as the first day_battles
+		# sample. The capitulation day itself is covered by at_war, sampled
+		# before check_all closed those wars. A later peaceful day still scores
+		# if someone already surrendered or the end date has arrived.
+		var should_score := at_war or CampaignEndDomain.latched() or CampaignEndDomain.time_limit_due()
+		if not should_score:
+			if typeof(CapitulationDomain) != TYPE_NIL and CapitulationDomain.has_capitulated():
+				should_score = true
+		if should_score and not paths_presented:
+			CampaignEndDomain.evaluate_and_latch(int(total_days_elapsed))
+	# Ink after CL1 so a latched 1949 timeout suppresses the Ink VICTORY cue.
+	# Peace days still run the read-only Ink check (enemy capitals). Unlatched
+	# Ink non-date wins are unchanged.
 	_maybe_present_ink_victory()
-	if typeof(WarStateDomain) == TYPE_NIL or not WarStateDomain.loop_enabled():
-		return
-	var at_war := WarStateDomain.any_war()
-	if at_war and typeof(CapitulationDomain) != TYPE_NIL:
-		CapitulationDomain.check_all(int(total_days_elapsed))
-	if typeof(CampaignEndDomain) == TYPE_NIL:
-		return
-	# A day with no war, no surrender, and no end latch has nothing to score.
-	# Building the capitulation dict here showed up as the first day_battles
-	# sample. The capitulation day itself is covered by at_war, sampled
-	# before check_all closed those wars. A later peaceful day still scores
-	# if someone already surrendered or the end date has arrived.
-	if not at_war and not CampaignEndDomain.latched() and not CampaignEndDomain.time_limit_due():
-		if typeof(CapitulationDomain) == TYPE_NIL or not CapitulationDomain.has_capitulated():
-			return
-	if paths_presented:
-		return
-	CampaignEndDomain.evaluate_and_latch(int(total_days_elapsed))
 
 
 func _maybe_run_ai_land_battle_starts() -> void:

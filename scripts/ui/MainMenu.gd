@@ -1591,6 +1591,8 @@ func _return_to_title() -> void:
 	# on the next TestRunner apply_national_effect (second Begin).
 	if typeof(NationalModifierManager) != TYPE_NIL and NationalModifierManager.has_method("clear_all_modifiers"):
 		NationalModifierManager.clear_all_modifiers()
+	if typeof(CampaignEndDomain) != TYPE_NIL:
+		CampaignEndDomain.reset_session_for_new_game()
 	queue_free()
 	var tree := get_tree()
 	if tree == null:
