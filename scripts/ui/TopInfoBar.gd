@@ -1125,25 +1125,28 @@ func _is_live_escape_event(event: InputEvent) -> bool:
 	return false
 
 
-func _search_line_owns_typed_keys() -> bool:
+func _gui_text_field_has_focus() -> bool:
+	# SEARCH-HOTKEY-1: any focused LineEdit/TextEdit owns typing, including an
+	# empty Search field. Do not fire pause / speed / menu bindings through it.
 	var vp: Viewport = get_viewport()
 	if vp == null:
 		return false
 	var fo: Control = vp.gui_get_focus_owner()
-	if not (fo is LineEdit):
-		return false
-	# Empty Search leftover after Begin must not swallow Space.
-	return not str((fo as LineEdit).text).is_empty()
+	return fo is LineEdit or fo is TextEdit or fo is CodeEdit
+
+
+func _search_line_owns_typed_keys() -> bool:
+	return _gui_text_field_has_focus()
 
 
 func _input(event: InputEvent) -> void:
 	# Live F5: Search LineEdit focus makes Space/_unhandled_input a no-op.
 	if not (event is InputEventKey and event.pressed and not event.echo):
 		return
+	if _gui_text_field_has_focus():
+		return
 	var key: InputEventKey = event
 	if key.keycode == KEY_SPACE or key.keycode == KEY_PERIOD:
-		if _search_line_owns_typed_keys():
-			return
 		if _overlay_holds_clock():
 			get_viewport().set_input_as_handled()
 			return
@@ -1154,10 +1157,10 @@ func _input(event: InputEvent) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if not (event is InputEventKey and event.pressed and not event.echo):
 		return
+	if _gui_text_field_has_focus():
+		return
 	# Space / > : toggle pause (fallback if 1x click is blocked by an overlay)
 	if event.keycode == KEY_SPACE or event.keycode == KEY_PERIOD:
-		if _search_line_owns_typed_keys():
-			return
 		if _overlay_holds_clock():
 			get_viewport().set_input_as_handled()
 			return
