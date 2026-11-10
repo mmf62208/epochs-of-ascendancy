@@ -229,7 +229,13 @@ static func rank_from_snapshot(facts: Dictionary = {}) -> Dictionary:
 		var wname := wtag
 		if not wtag.is_empty() and typeof(WarStateDomain) != TYPE_NIL:
 			wname = WarStateDomain.tag_name(wtag)
-		if not bool(f.get("war_justified", false)):
+		var player_tag := ""
+		if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_player_country_tag"):
+			player_tag = str(LeaderManager.get_player_country_tag()).strip_edges().to_upper()
+		var self_goal := typeof(CampaignWarChrome) != TYPE_NIL and CampaignWarChrome.is_self_nation(player_tag, wtag)
+		if self_goal:
+			pass
+		elif not bool(f.get("war_justified", false)):
 			var jlabel := "Justify the war goal"
 			if not wname.is_empty():
 				jlabel = "Justify war on %s" % wname
@@ -244,7 +250,7 @@ static func rank_from_snapshot(facts: Dictionary = {}) -> Dictionary:
 				"target_tag": wtag,
 				"goal_name": wname,
 			}
-		if not bool(f.get("war_declared", false)):
+		elif not bool(f.get("war_declared", false)):
 			var dlabel := "Declare war"
 			if not wname.is_empty():
 				dlabel = "Declare war on %s" % wname
@@ -538,6 +544,8 @@ static func apply(rec: Dictionary = {}) -> Dictionary:
 		var dpid := int(r.get("to_id", 1))
 		if typeof(WarStateDomain) != TYPE_NIL and WarStateDomain.loop_enabled():
 			var loop_declared: Dictionary = WarStateDomain.player_declare_from_province(dpid)
+			if typeof(CampaignWarChrome) != TYPE_NIL:
+				CampaignWarChrome.refresh_top_bar_war_readout()
 			var fresh := bool(loop_declared.get("ok", false)) and not bool(loop_declared.get("already", false))
 			var summary := str(loop_declared.get("reason", r.get("hint", "Declare war")))
 			if fresh and _stability_enabled() and typeof(StabilityJusticeDomain) != TYPE_NIL:

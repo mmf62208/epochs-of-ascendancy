@@ -358,6 +358,12 @@ func _stats_line() -> String:
 	return "Day %d · %d victory points · %d provinces held" % [days, vp, held]
 
 
+func _mark_input_handled() -> void:
+	var vp := get_viewport() if is_inside_tree() else null
+	if vp != null:
+		vp.set_input_as_handled()
+
+
 func _input(event: InputEvent) -> void:
 	if not visible or is_queued_for_deletion() or str(name).ends_with("_dying"):
 		return
@@ -366,12 +372,12 @@ func _input(event: InputEvent) -> void:
 		if bool(vm.get("keep_playing", false)):
 			return
 	if _is_escape(event):
-		get_viewport().set_input_as_handled()
+		_mark_input_handled()
 
 
 func _swallow_input(event: InputEvent) -> void:
 	if _is_escape(event):
-		get_viewport().set_input_as_handled()
+		_mark_input_handled()
 
 
 func _is_escape(event: InputEvent) -> bool:

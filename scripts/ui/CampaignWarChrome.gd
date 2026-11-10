@@ -24,16 +24,34 @@ extends RefCounted
 const BORDER_NOT_REQUIRED_HINT := "Border not required — claim is on the nation."
 
 
+## True when `other` is the player's own nation (tag or display name).
+static func is_self_nation(player: String, other: String) -> bool:
+	var p := player.strip_edges().to_upper()
+	var o := other.strip_edges().to_upper()
+	if p.is_empty() or o.is_empty():
+		return false
+	if p == o:
+		return true
+	var pn := display_name_for_tag(p).strip_edges().to_upper()
+	var on := display_name_for_tag(o).strip_edges().to_upper()
+	if not pn.is_empty() and (pn == o or pn == on):
+		return true
+	if not on.is_empty() and on == p:
+		return true
+	return false
+
+
 ## POL plus live land neighbours of the player. Diplomacy lists this set
 ## alongside majors; the inspector Justify button uses only this set.
 static func inspector_justify_tags(player: String) -> Array:
 	var p := player.strip_edges().to_upper()
 	var found: Dictionary = {}
-	found["POL"] = true
+	if not is_self_nation(p, "POL"):
+		found["POL"] = true
 	if typeof(WarStateDomain) != TYPE_NIL:
 		for n in WarStateDomain.land_neighbours(p):
 			var nt := str(n).strip_edges().to_upper()
-			if nt.is_empty() or nt == p:
+			if nt.is_empty() or is_self_nation(p, nt):
 				continue
 			found[nt] = true
 	var keys: Array = found.keys()
@@ -44,7 +62,7 @@ static func inspector_justify_tags(player: String) -> Array:
 static func inspector_offers_justify(player: String, owner: String) -> bool:
 	var o := owner.strip_edges().to_upper()
 	var p := player.strip_edges().to_upper()
-	if o.is_empty() or o == p:
+	if o.is_empty() or is_self_nation(p, o):
 		return false
 	for tag_v in inspector_justify_tags(p):
 		if str(tag_v) == o:
@@ -83,7 +101,7 @@ static func display_name_for_tag(tag: String) -> String:
 static func button_state_for_owner(player: String, owner: String) -> Dictionary:
 	var p := player.strip_edges().to_upper()
 	var o := owner.strip_edges().to_upper()
-	if o.is_empty() or o == p:
+	if o.is_empty() or is_self_nation(p, o):
 		return {"visible": false, "disabled": true, "text": "", "tooltip": ""}
 	if typeof(WarStateDomain) == TYPE_NIL or not WarStateDomain.loop_enabled():
 		return {"visible": false, "disabled": true, "text": "", "tooltip": ""}
@@ -179,12 +197,22 @@ static func _on_pressed(host: Node) -> void:
 	if WarStateDomain.player_justify_is_ready_for(owner):
 		var declared: Dictionary = WarStateDomain.player_declare_from_province(pid)
 		_toast(str(declared.get("reason", "War declared")))
+		refresh_top_bar_war_readout()
 	else:
 		WarStateDomain.begin_player_justify_from_province(pid)
 		if typeof(GameData) != TYPE_NIL and GameData.has_method("apply_war_goal_live"):
 			GameData.apply_war_goal_live("justify", pid)
 		_toast("Justification started")
 	mount(host, p)
+
+
+static func refresh_top_bar_war_readout() -> void:
+	var tree := Engine.get_main_loop() as SceneTree
+	if tree == null:
+		return
+	var bar := tree.get_first_node_in_group("top_info_bar")
+	if bar != null and is_instance_valid(bar) and bar.has_method("refresh_campaign_war_readout"):
+		bar.call("refresh_campaign_war_readout")
 
 
 static func _toast(text: String) -> void:

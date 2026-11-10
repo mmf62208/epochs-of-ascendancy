@@ -203,9 +203,15 @@ func _stats_line() -> String:
 	]
 
 
+func _mark_input_handled() -> void:
+	var vp := get_viewport() if is_inside_tree() else null
+	if vp != null:
+		vp.set_input_as_handled()
+
+
 func _on_blocker_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
-		get_viewport().set_input_as_handled()
+		_mark_input_handled()
 
 
 func handle_pointer(event: InputEvent) -> String:
@@ -286,7 +292,7 @@ func _input(event: InputEvent) -> void:
 		if bool(vm.get("keep_playing", false)):
 			return
 	if _is_escape(event):
-		get_viewport().set_input_as_handled()
+		_mark_input_handled()
 
 
 func _is_escape(event: InputEvent) -> bool:

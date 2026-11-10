@@ -41,6 +41,9 @@ func _run() -> void:
 	await _test_esc_after_keep_opens_pause()
 	await _test_return_to_title_live_pointer()
 	await _test_overlay_main_menu_to_title()
+	await _test_input_path_script_errors()
+	_test_self_target_excluded()
+	await _test_top_bar_war_after_declare()
 	_document_item6_first_click()
 	var ok := _failures == 0
 	print("HeadlessRttSmallfix1Test: ", "PASS" if ok else "FAIL", " (failures=", _failures, ")")
@@ -105,6 +108,50 @@ func _test_source_needles() -> void:
 		return
 	if fight_fn.find("[attacker_tag, att_name, from_name]") >= 0:
 		_fail("Open fight sheet still interpolates raw attacker_tag")
+		return
+	var input_fn := _slice_func(ren_src, "_input")
+	if input_fn.find("_mark_input_handled") < 0:
+		_fail("MapRenderer._input must null-guard set_input_as_handled")
+		return
+	if input_fn.find("get_viewport().set_input_as_handled") >= 0:
+		_fail("MapRenderer._input still calls get_viewport().set_input_as_handled unguarded")
+		return
+	var rtt_fn := input_fn.find('tgt == "refresh" or tgt == "return_to_title"')
+	if rtt_fn < 0:
+		_fail("MapRenderer._input missing live Return to Title branch")
+		return
+	var rtt_slice := input_fn.substr(rtt_fn, 360)
+	var mark_at := rtt_slice.find("_mark_input_handled")
+	var act_at := rtt_slice.find("mm_ov.call(")
+	if mark_at < 0 or act_at < 0 or mark_at > act_at:
+		_fail("MapRenderer._input must mark handled before activating Return to Title")
+		return
+	if input_fn.find("_campaign_modal_is_up") < 0:
+		_fail("MapRenderer._input must mark handled before overlay Main menu frees the map")
+		return
+	var polish := _read(SRC_POLISH)
+	if polish.find("func province_ui_display_name") < 0 or polish.find(str(RUS_WEST_PID)) < 0:
+		_fail("MapPolishFormatters.province_ui_display_name must override 903492")
+		return
+	var settle_fn := _slice_func(ren_src, "_update_settle_button")
+	if settle_fn.find("_province_display_name") < 0:
+		_fail("_update_settle_button must use _province_display_name")
+		return
+	var insight := _read("res://scripts/map/ProvinceInsight.gd")
+	var top_fn := _slice_func(insight, "build_inspector_topline")
+	if top_fn.find("province_ui_display_name") < 0:
+		_fail("build_inspector_topline must use province_ui_display_name")
+		return
+	var chrome_src := _read("res://scripts/ui/CampaignWarChrome.gd")
+	if chrome_src.find("func is_self_nation") < 0:
+		_fail("CampaignWarChrome.is_self_nation missing")
+		return
+	if chrome_src.find("func refresh_top_bar_war_readout") < 0:
+		_fail("CampaignWarChrome.refresh_top_bar_war_readout missing")
+		return
+	var dip := _read("res://scripts/ui/DiplomacyView.gd")
+	if dip.find("is_self_nation") < 0:
+		_fail("DiplomacyView must skip the player's own nation")
 		return
 	var ctrl_s := _slice_func(bar_src, "_input")
 	if ctrl_s.find("Quicksave OK") >= 0:
@@ -172,6 +219,43 @@ func _test_display_names() -> void:
 	var pol := str(chrome.call("display_name_for_tag", "POL"))
 	if ger != "Germany" or pol != "Poland":
 		_fail("display_name_for_tag GER/POL want Germany/Poland got %s/%s" % [ger, pol])
+		return
+	var rus := _rus_west_province()
+	if rus == null:
+		_fail("could not make 903492 province for display-name surfaces")
+		return
+	var insight: GDScript = load("res://scripts/map/ProvinceInsight.gd") as GDScript
+	if insight == null:
+		_fail("ProvinceInsight.gd missing")
+		return
+	var topline_v: Variant = insight.call("build_inspector_topline", rus)
+	if not (topline_v is Dictionary):
+		_fail("build_inspector_topline missing")
+		return
+	var title := str((topline_v as Dictionary).get("title", ""))
+	if title.find("RUS West") >= 0 or title != RUS_WEST_LABEL:
+		_fail("inspector title want '%s' got '%s'" % [RUS_WEST_LABEL, title])
+		return
+	var compact := str(insight.call("build_compact_hover_tooltip", rus))
+	var strategic := str(insight.call("build_strategic_hover_tooltip", rus))
+	if compact.find("RUS West") >= 0 or compact.find(RUS_WEST_LABEL) < 0:
+		_fail("compact hover still raw RUS West: %s" % compact)
+		return
+	if strategic.find("RUS West") >= 0 or strategic.find(RUS_WEST_LABEL) < 0:
+		_fail("strategic hover still raw RUS West: %s" % strategic)
+		return
+	var panel := Panel.new()
+	panel.name = "InfoPanel"
+	root.add_child(panel)
+	var settle_mr: Node = mr_script.new() as Node
+	settle_mr.set("info_panel", panel)
+	settle_mr.call("_update_settle_button", rus)
+	var settle := panel.find_child("BtnSettleProvince", true, false) as Button
+	var settle_txt := str(settle.text) if settle != null else ""
+	settle_mr.free()
+	panel.queue_free()
+	if settle == null or settle_txt.find(RUS_WEST_LABEL) < 0 or settle_txt.find("RUS West") >= 0:
+		_fail("Settle button want Western Russia got '%s'" % settle_txt)
 		return
 	_pass("display names: Spain / Soviet Union / Germany / Poland / Western Russia")
 
@@ -364,6 +448,234 @@ func _test_overlay_main_menu_to_title() -> void:
 	_free_end_overlays()
 
 
+func _test_input_path_script_errors() -> void:
+	var log_scr: GDScript = load("res://scripts/core/ReturnToTitleScriptErrorLog.gd") as GDScript
+	if log_scr == null:
+		_fail("input-path: ReturnToTitleScriptErrorLog missing")
+		return
+	var elog: Logger = log_scr.new() as Logger
+	OS.add_logger(elog)
+	DisplayServer.window_set_size(Vector2i(1280, 800))
+	if root is Window:
+		(root as Window).size = Vector2i(1280, 800)
+	root.set_meta("eoa_return_title_scene", _dummy_title_scene())
+	if not await _drive_rtt_input_click(elog):
+		OS.remove_logger(elog)
+		return
+	if not await _drive_overlay_main_menu_input_click(elog):
+		OS.remove_logger(elog)
+		return
+	var n := int(elog.get("script_errors"))
+	var samples := PackedStringArray()
+	if "samples" in elog:
+		samples = elog.samples
+	OS.remove_logger(elog)
+	if n > 0:
+		_fail("input-path: %d SCRIPT ERRORs %s" % [n, ", ".join(samples)])
+		return
+	_pass("input-path: MapRenderer._input mouse click frees the map with 0 script errors")
+
+
+func _drive_rtt_input_click(elog: Logger) -> bool:
+	_free_menu()
+	_free_end_overlays()
+	var before := int(elog.get("script_errors"))
+	var mr_script: Script = load(SRC_REN) as Script
+	if mr_script == null:
+		_fail("input-path rtt: MapRenderer.gd missing")
+		return false
+	var mr: Node = mr_script.new() as Node
+	mr.name = "MapRenderer"
+	mr.set_process(false)
+	mr.set_physics_process(false)
+	mr.set_process_input(false)
+	mr.set_process_unhandled_input(false)
+	root.add_child(mr)
+	current_scene = mr
+	var menu := _make_menu()
+	if menu == null:
+		_fail("input-path rtt: Command Center missing")
+		return false
+	await process_frame
+	await process_frame
+	await process_frame
+	var ret: Button = _return_to_title_button(menu)
+	if ret == null:
+		_fail("input-path rtt: Return to Title missing")
+		_free_menu()
+		return false
+	var center := ret.get_global_rect().get_center()
+	var tgt := ""
+	if menu.has_method("live_pointer_target"):
+		tgt = str(menu.call("live_pointer_target", center))
+	if tgt != "return_to_title":
+		_fail("input-path rtt: live_pointer_target want return_to_title got '%s'" % tgt)
+		_free_menu()
+		return false
+	var ev := _mouse_left(center)
+	if is_instance_valid(mr) and mr.has_method("_input"):
+		mr.call("_input", ev)
+	await process_frame
+	await process_frame
+	var after := int(elog.get("script_errors"))
+	if after > before:
+		_fail("input-path rtt: SCRIPT ERROR on Return to Title click")
+		return false
+	_pass("input-path rtt: _input Return to Title click had 0 script errors")
+	return true
+
+
+func _drive_overlay_main_menu_input_click(elog: Logger) -> bool:
+	_free_menu()
+	_free_end_overlays()
+	var before := int(elog.get("script_errors"))
+	root.set_meta("eoa_return_title_scene", _dummy_title_scene())
+	var mr_script: Script = load(SRC_REN) as Script
+	if mr_script == null:
+		_fail("input-path overlay: MapRenderer.gd missing")
+		return false
+	var mr: Node = mr_script.new() as Node
+	mr.name = "MapRenderer"
+	mr.set_process(false)
+	mr.set_physics_process(false)
+	mr.set_process_input(false)
+	mr.set_process_unhandled_input(false)
+	root.add_child(mr)
+	current_scene = mr
+	var bar := _make_bar()
+	if bar == null:
+		_fail("input-path overlay: TopInfoBar missing")
+		return false
+	var end_scr: GDScript = load("res://scripts/ui/CampaignEndScreen.gd") as GDScript
+	if end_scr == null:
+		_fail("input-path overlay: CampaignEndScreen.gd missing")
+		return false
+	var screen: Node = end_scr.call("present", _defeat_model()) as Node
+	await process_frame
+	await process_frame
+	if screen == null:
+		_fail("input-path overlay: overlay missing")
+		return false
+	var menu_btn := screen.find_child("BtnMainMenu", true, false) as Button
+	if menu_btn == null:
+		_fail("input-path overlay: BtnMainMenu missing")
+		_free_end_overlays()
+		return false
+	var ev := _mouse_left(menu_btn.get_global_rect().get_center())
+	if is_instance_valid(mr) and mr.has_method("_input"):
+		mr.call("_input", ev)
+	await process_frame
+	await process_frame
+	var after := int(elog.get("script_errors"))
+	if after > before:
+		_fail("input-path overlay: SCRIPT ERROR on Main menu click")
+		_free_end_overlays()
+		return false
+	_pass("input-path overlay: _input Main menu click had 0 script errors")
+	return true
+
+
+func _test_self_target_excluded() -> void:
+	var chrome: GDScript = load("res://scripts/ui/CampaignWarChrome.gd") as GDScript
+	if chrome == null:
+		_fail("self-target: CampaignWarChrome missing")
+		return
+	if not bool(chrome.call("is_self_nation", "USA", "USA")):
+		_fail("is_self_nation USA/USA should be true")
+		return
+	if bool(chrome.call("inspector_offers_justify", "USA", "USA")):
+		_fail("inspector still offers Justify on the player's own USA land")
+		return
+	var st: Dictionary = chrome.call("button_state_for_owner", "USA", "USA")
+	if bool(st.get("visible", false)):
+		_fail("Justify/Declare still visible for USA on USA (%s)" % str(st.get("text", "")))
+		return
+	if str(st.get("text", "")).find("United States") >= 0:
+		_fail("self-target label leaked '%s'" % str(st.get("text", "")))
+		return
+	var lm := root.get_node_or_null("LeaderManager")
+	if lm != null and lm.has_method("set_player_country_tag"):
+		lm.call("set_player_country_tag", "USA")
+	if ResourceLoader.exists("res://scenes/ui/DiplomacyView.tscn"):
+		var packed: PackedScene = load("res://scenes/ui/DiplomacyView.tscn") as PackedScene
+		if packed != null:
+			var view: Node = packed.instantiate()
+			root.add_child(view)
+			if view.has_method("listed_country_tags"):
+				var listed: Array = view.call("listed_country_tags")
+				for tag_v in listed:
+					if str(tag_v).strip_edges().to_upper() == "USA":
+						_fail("Diplomacy listed_country_tags still includes the player USA")
+						view.queue_free()
+						if lm != null and lm.has_method("set_player_country_tag"):
+							lm.call("set_player_country_tag", "GER")
+						return
+			var btn := view.find_child("BtnJustifyWar", true, false) as Button
+			if btn != null and btn.visible and str(btn.text).find("United States") >= 0:
+				_fail("Diplomacy Justify still targets the player (%s)" % btn.text)
+				view.queue_free()
+				if lm != null and lm.has_method("set_player_country_tag"):
+					lm.call("set_player_country_tag", "GER")
+				return
+			view.queue_free()
+	if lm != null and lm.has_method("set_player_country_tag"):
+		lm.call("set_player_country_tag", "GER")
+	_pass("self-target: USA is excluded from Justify/Declare")
+
+
+func _test_top_bar_war_after_declare() -> void:
+	var mm := root.get_node_or_null("MapManager")
+	var sm := root.get_node_or_null("SupplyManager")
+	var lm := root.get_node_or_null("LeaderManager")
+	var boot: GDScript = load("res://scripts/core/CampaignLoopTestBoot.gd") as GDScript
+	var war: GDScript = load("res://scripts/core/WarStateDomain.gd") as GDScript
+	var chrome: GDScript = load("res://scripts/ui/CampaignWarChrome.gd") as GDScript
+	if mm == null or boot == null or war == null or chrome == null:
+		_fail("war-bar: autoloads missing")
+		return
+	if not bool(boot.call("boot", mm, sm, "GER")):
+		_fail("war-bar: campaign boot failed")
+		return
+	if lm != null and lm.has_method("set_player_country_tag"):
+		lm.call("set_player_country_tag", "GER")
+	war.call("reset_for_test")
+	war.call("clear_rule_overrides")
+	if not bool(war.call("loop_enabled")):
+		_fail("war-bar: campaign loop inactive")
+		return
+	var pol_pid := _land_pid(mm, "POL")
+	if pol_pid <= 0:
+		_fail("war-bar: no POL land")
+		return
+	var bar := _make_bar()
+	if bar == null:
+		_fail("war-bar: TopInfoBar missing")
+		return
+	await process_frame
+	var host := Panel.new()
+	host.name = "WarBarHost"
+	host.size = Vector2(320, 160)
+	root.add_child(host)
+	var pol_p: Object = mm.call("get_province", pol_pid)
+	chrome.call("mount", host, pol_p)
+	war.call("grant_ready_player_justify", "POL")
+	chrome.call("mount", host, pol_p)
+	var btn := host.get_node_or_null("BtnDeclareWar") as Button
+	if btn == null or not btn.visible:
+		_fail("war-bar: Declare button missing")
+		host.queue_free()
+		return
+	btn.pressed.emit()
+	await process_frame
+	var lbl := bar.find_child("CampaignWarReadout", true, false) as Label
+	var line := str(lbl.text) if lbl != null else ""
+	host.queue_free()
+	if line.find("At war") < 0 or line.find("Poland") < 0:
+		_fail("war-bar: after Declare want 'At war: Poland' got '%s'" % line)
+		return
+	_pass("war-bar: Declare refreshes At war: Poland without a save load")
+
+
 func _document_item6_first_click() -> void:
 	# Item 6 — documented, no product change.
 	# DiplomacyButton already ACTION_MODE_BUTTON_PRESS via TopInfoBar._connect_once
@@ -487,6 +799,53 @@ func _dummy_title_scene() -> PackedScene:
 	packed.pack(title)
 	title.free()
 	return packed
+
+
+func _rus_west_province() -> Object:
+	var mm := root.get_node_or_null("MapManager")
+	if mm != null and mm.has_method("get_province"):
+		var live: Variant = mm.call("get_province", RUS_WEST_PID)
+		if live is Object and live != null:
+			if "name" in live:
+				live.name = "RUS West"
+			if "id" in live:
+				live.id = RUS_WEST_PID
+			return live
+	var scr: Script = load("res://scripts/data/Province.gd") as Script
+	if scr == null or not scr.can_instantiate():
+		return null
+	var p: Object = scr.new() as Object
+	if p == null:
+		return null
+	p.set("id", RUS_WEST_PID)
+	p.set("name", "RUS West")
+	p.set("owner_tag", "SOV")
+	p.set("is_sea", false)
+	p.set("settlement_level", 0.0)
+	return p
+
+
+func _land_pid(mm: Node, owner: String) -> int:
+	if mm == null or not mm.has_method("get_provinces_by_owner"):
+		return -1
+	var owned: Array = mm.call("get_provinces_by_owner", owner)
+	owned.sort()
+	for pid_v in owned:
+		var pid := int(pid_v)
+		var p: Object = mm.call("get_province", pid)
+		if p == null or bool(p.get("is_sea")):
+			continue
+		return pid
+	return -1
+
+
+func _mouse_left(pos: Vector2) -> InputEventMouseButton:
+	var ev := InputEventMouseButton.new()
+	ev.button_index = MOUSE_BUTTON_LEFT
+	ev.pressed = true
+	ev.position = pos
+	ev.global_position = pos
+	return ev
 
 
 func _esc() -> InputEventKey:

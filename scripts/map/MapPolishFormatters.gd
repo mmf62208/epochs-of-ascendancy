@@ -657,6 +657,18 @@ static func format_sea_zone_control_badge(
 	return "%s🌊 Sea zone[/color] %s%s — controlled by %s%s[/color]" % [COLOR_TECH, COLOR_MUTED, zone, ctrl, mod_bit]
 
 
+## Display-only province label. data/provinces still store "RUS West" for 903492.
+static func province_ui_display_name(pid: int, raw_name: String = "") -> String:
+	if pid == 903492:
+		return "Western Russia"
+	var n := raw_name.strip_edges()
+	if not n.is_empty():
+		return n
+	if pid > 0:
+		return "#%d" % pid
+	return "Province"
+
+
 ## Inspector top-line identity (name / owner / region / sea zone). Pure strings only.
 static func format_inspector_topline(
 	province_name: String,

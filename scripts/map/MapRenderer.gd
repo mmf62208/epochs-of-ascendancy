@@ -3362,13 +3362,29 @@ func _esc_open_command_center() -> void:
 		tib.call_deferred("_on_menu_pressed")
 
 
-func _campaign_modal_consumes_pointer(event: InputEventMouseButton) -> bool:
+func _campaign_modal_is_up() -> bool:
 	var tree := get_tree()
 	if tree == null:
 		return false
 	for n in tree.get_nodes_in_group("campaign_end_screen"):
+		if n != null and is_instance_valid(n) and n.visible:
+			return true
+	for layer in tree.get_nodes_in_group("campaign_peace_sheet"):
+		if layer != null and is_instance_valid(layer) and layer.visible:
+			return true
+	return false
+
+
+func _campaign_modal_consumes_pointer(event: InputEventMouseButton) -> bool:
+	var tree := get_tree()
+	if tree == null:
+		return false
+	var vp := get_viewport() if is_inside_tree() else null
+	for n in tree.get_nodes_in_group("campaign_end_screen"):
 		if n == null or not is_instance_valid(n) or not n.visible:
 			continue
+		# handle_pointer → Main menu can change_scene and free this node.
+		MapRenderer._mark_input_handled(vp)
 		if n.has_method("handle_pointer"):
 			n.call("handle_pointer", event)
 		return true
@@ -3400,7 +3416,13 @@ func _collect_campaign_buttons(n: Node, out: Array) -> void:
 		_collect_campaign_buttons(c, out)
 
 
+static func _mark_input_handled(vp: Viewport) -> void:
+	if vp != null:
+		vp.set_input_as_handled()
+
+
 func _input(event: InputEvent) -> void:
+	var vp := get_viewport() if is_inside_tree() else null
 	# Esc / I / Home must beat GUI focus (search LineEdit) so a stuck inspector cannot eat keys.
 	if event is InputEventKey and event.pressed and not event.echo:
 		# Search / any LineEdit: do not steal letters (Play: typing "i" fired I-glyphs).
@@ -3408,7 +3430,7 @@ func _input(event: InputEvent) -> void:
 			return
 		if event.keycode == KEY_HOME:
 			_apply_home_key(event.shift_pressed)
-			get_viewport().set_input_as_handled()
+			MapRenderer._mark_input_handled(vp)
 			return
 		if event.keycode == KEY_END:
 			# Do not arm still-click / do not clamp-before-fit (Play: first End
@@ -3417,15 +3439,15 @@ func _input(event: InputEvent) -> void:
 			_close_click_guard = false
 			_close_release_seen = false
 			_focus_asia_view()
-			get_viewport().set_input_as_handled()
+			MapRenderer._mark_input_handled(vp)
 			return
 		if event.keycode == KEY_G and not event.ctrl_pressed and not event.alt_pressed:
 			_request_hang_safe_supply_corridor()
-			get_viewport().set_input_as_handled()
+			MapRenderer._mark_input_handled(vp)
 			return
 		if event.keycode == KEY_L and not event.ctrl_pressed and not event.alt_pressed:
 			_handle_supply_overlay_key()
-			get_viewport().set_input_as_handled()
+			MapRenderer._mark_input_handled(vp)
 			return
 		# U = view-only unit counters (default shown). Search LineEdit already
 		# returned above, so typing in Search cannot fire this.
@@ -3435,11 +3457,11 @@ func _input(event: InputEvent) -> void:
 				_show_map_layer_toast("Supply/sealane flow %s (Shift+U)" % ("ON" if onu else "OFF"))
 			else:
 				toggle_unit_counters()
-			get_viewport().set_input_as_handled()
+			MapRenderer._mark_input_handled(vp)
 			return
 		# Mapmodes in _input so toolbar/search focus cannot swallow F2–F4 / Ctrl+F9.
 		if _handle_mapmode_hotkey(event):
-			get_viewport().set_input_as_handled()
+			MapRenderer._mark_input_handled(vp)
 			return
 		if _is_live_escape_event(event) or event.keycode == KEY_ESCAPE:
 			# Full Esc chain in `_input` (Home-key pattern) so search/GUI cannot
@@ -3451,19 +3473,19 @@ func _input(event: InputEvent) -> void:
 				% [str(_living_title_boot_is_up()), str(process_mode)]
 			)
 			_handle_escape_key()
-			get_viewport().set_input_as_handled()
+			MapRenderer._mark_input_handled(vp)
 			return
 		if _living_title_boot_is_up() and _is_live_begin_key(event):
 			print("EOA_LIVE_RAW_KEY who=MapRenderer._input event=begin_key")
 			var boot_bk: Node = _living_title_boot_node()
 			if boot_bk != null and boot_bk.has_method("try_focused_system_toggle_key") and bool(boot_bk.call("try_focused_system_toggle_key", event)):
 				print("EOA_LIVE_PTR who=MapRenderer._input action=toggle_key")
-				get_viewport().set_input_as_handled()
+				MapRenderer._mark_input_handled(vp)
 				return
 			if boot_bk != null and boot_bk.has_method("handle_live_begin"):
 				boot_bk.call("handle_live_begin")
 				print("EOA_LIVE_PTR who=MapRenderer._input action=begin_key")
-			get_viewport().set_input_as_handled()
+			MapRenderer._mark_input_handled(vp)
 			return
 		if (
 			event.keycode == KEY_I
@@ -3481,14 +3503,14 @@ func _input(event: InputEvent) -> void:
 					str((gq_i.get("lod_policy", {}) as Dictionary).get("max_glyphs", "?")),
 				]
 			)
-			get_viewport().set_input_as_handled()
+			MapRenderer._mark_input_handled(vp)
 			return
 	if _living_title_boot_is_up() and event is InputEventScreenTouch:
 		# computerUse / remote desktop often delivers touch, not MouseButton.
 		if _is_live_pointer_press(event):
 			var touch_act: String = _route_living_title_pointer(event)
 			if LivingTitleBoot.consumes_live_action(touch_act):
-				get_viewport().set_input_as_handled()
+				MapRenderer._mark_input_handled(vp)
 		return
 	if event is InputEventMouseButton:
 		# Wheel zoom even when GUI has focus on non-scroll chrome (legend can steal wheel —
@@ -3512,15 +3534,18 @@ func _input(event: InputEvent) -> void:
 				_zoom_toward_mouse(factor, wheel_screen)
 				# NEVER call full _refresh_terrain_zoom_aware() / 3520 fill rebuild per notch.
 				_schedule_light_terrain_zoom_refresh()
-				get_viewport().set_input_as_handled()
+				MapRenderer._mark_input_handled(vp)
 		elif event.button_index == MOUSE_BUTTON_MIDDLE or event.button_index == MOUSE_BUTTON_RIGHT:
 			# MMB/right-drag pan in _input so GUI focus cannot kill pan.
 			# Consume press and release so a still-click never opens a unit card.
 			_handle_middle_or_right_pointer(event)
 			return
 		elif event.button_index == MOUSE_BUTTON_LEFT:
-			if _campaign_modal_consumes_pointer(event):
-				get_viewport().set_input_as_handled()
+			# Overlay Main menu can change_scene and free this node. Mark first.
+			if _campaign_modal_is_up():
+				MapRenderer._mark_input_handled(vp)
+				_campaign_modal_consumes_pointer(event)
+				MapRenderer._mark_input_handled(vp)
 				return
 			# xdotool / computerUse clicks do not refresh gui_get_hovered_control.
 			# Hit the inspector Close rect from the event position.
@@ -3530,7 +3555,7 @@ func _input(event: InputEvent) -> void:
 			# press and do not mark the press handled — the Control still closes.
 			if not event.pressed and _chrome_hold_swallowed:
 				_release_chrome_hold_without_pick()
-				get_viewport().set_input_as_handled()
+				MapRenderer._mark_input_handled(vp)
 				return
 			if event.pressed and _cc_chrome_consumes_point(event.position):
 				# Header click and CloseX. Do not mark handled: CloseX `pressed`
@@ -3552,9 +3577,10 @@ func _input(event: InputEvent) -> void:
 					if mm_ov != null and mm_ov.has_method("live_pointer_target"):
 						var tgt := str(mm_ov.call("live_pointer_target", event.position))
 						if tgt == "refresh" or tgt == "return_to_title":
+							# Mark first: Return to Title can change_scene and free this node.
+							MapRenderer._mark_input_handled(vp)
 							if mm_ov.has_method("activate_live_pointer"):
 								mm_ov.call("activate_live_pointer", event.position)
-							get_viewport().set_input_as_handled()
 							return
 					_cc_map_press_latch = true
 				else:
@@ -3587,7 +3613,7 @@ func _input(event: InputEvent) -> void:
 			# inspector + soft click-zoom 0.776→0.900). One-shot like TipDismiss.
 			if not event.pressed and _begin_title_release_blocks_map_pick():
 				call_deferred("_clear_begin_title_release_swallow")
-				get_viewport().set_input_as_handled()
+				MapRenderer._mark_input_handled(vp)
 				return
 			# INPUT-1: do not swallow leftover in `_input` (GUI must see the
 			# close release so `pressed` fires). `_unhandled_input` eats the
@@ -3606,7 +3632,7 @@ func _input(event: InputEvent) -> void:
 					_release_chrome_hold_without_pick()
 					call_deferred("_clear_begin_title_release_swallow")
 					call_deferred("_clear_ui_close_release_swallow")
-					get_viewport().set_input_as_handled()
+					MapRenderer._mark_input_handled(vp)
 					return
 				if event.pressed:
 					print(
@@ -3618,7 +3644,7 @@ func _input(event: InputEvent) -> void:
 					if LivingTitleBoot.consumes_live_action(title_act):
 						if title_act == "begin":
 							arm_begin_title_release_swallow()
-						get_viewport().set_input_as_handled()
+						MapRenderer._mark_input_handled(vp)
 						return
 					if title_act == "passthrough":
 						return
@@ -3639,7 +3665,7 @@ func _input(event: InputEvent) -> void:
 				if title_pid <= 0:
 					title_pid = _resolve_hex_pick_pid(title_world)
 				_try_living_title_map_pick(title_pid)
-				get_viewport().set_input_as_handled()
+				MapRenderer._mark_input_handled(vp)
 				return
 			if event.pressed and not _search_chrome_contains_point(event.position) and not _top_bar_owns_click(event.position):
 				# event.position, not the stale mouse. A search click keeps
@@ -3683,7 +3709,7 @@ func _input(event: InputEvent) -> void:
 					if not _is_mouse_over_blocking_ui():
 						_arm_left_map_press()
 						_mark_left_pan_blocked_pick()
-						get_viewport().set_input_as_handled()
+						MapRenderer._mark_input_handled(vp)
 						return
 			if not event.pressed and _consume_unit_card_press_release_if_armed():
 				return
@@ -3696,7 +3722,7 @@ func _input(event: InputEvent) -> void:
 				# Close on press so the release cannot pick the hex under the button.
 				if _mouse_over_close_control() and _inspector_stack_blocking_input():
 					_dismiss_close_control_from_input()
-					get_viewport().set_input_as_handled()
+					MapRenderer._mark_input_handled(vp)
 					return
 				if _top_bar_owns_click() or _mouse_over_search_control() or _search_ui_owns_click() or _road_spine_btn_owns_click():
 					return
@@ -3719,7 +3745,7 @@ func _input(event: InputEvent) -> void:
 				_note_close_button_release()
 				if did_left_pan:
 					_mark_left_pan_blocked_pick()
-					get_viewport().set_input_as_handled()
+					MapRenderer._mark_input_handled(vp)
 				else:
 					# Still-click (select / later commit) must drop leftover origin
 					# so hover-move cannot latch the next map click as a drag.
@@ -3731,7 +3757,7 @@ func _input(event: InputEvent) -> void:
 						if rel_pid <= 0:
 							rel_pid = _resolve_hex_pick_pid(rel_world)
 						_try_living_title_map_pick(rel_pid)
-						get_viewport().set_input_as_handled()
+						MapRenderer._mark_input_handled(vp)
 						return
 					elif (
 						not event.shift_pressed
@@ -6008,11 +6034,16 @@ func _province_display_name(pid: int) -> String:
 	# Display-only. data/provinces_world_accurate still stores "RUS West".
 	if pid == 903492:
 		return "Western Russia"
+	var raw := ""
 	if provinces.has(pid):
 		var p: Province = provinces[pid] as Province
-		if p != null and not str(p.name).is_empty():
-			return str(p.name)
-	return "#%d" % pid
+		if p != null:
+			raw = str(p.name)
+	elif typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province"):
+		var mp: Province = MapManager.get_province(pid) as Province
+		if mp != null:
+			raw = str(mp.name)
+	return _MapPolishFormatters.province_ui_display_name(pid, raw)
 
 
 ## Soft corridor fuel 0–1 from oil/fuel/rubber + hub factories (pure product parity).
@@ -21121,7 +21152,7 @@ func show_info_panel(province: Province, force_open: bool = false, keep_camera: 
 
 	# Top-line: name / owner / region / sea zone (always present when data exists).
 	var topline: Dictionary = ProvinceInsight.build_inspector_topline(province)
-	var name_text := str(topline.get("title", province.name))
+	var name_text := str(topline.get("title", _province_display_name(province.id)))
 	if selected_province_id >= 0 and selected_province_id != province.id:
 		var other := _battle_counterpart_for_hover(province)
 		if other != null:
@@ -26220,7 +26251,7 @@ func _update_settle_button(province: Province) -> void:
 			CampaignWarChrome.mount(info_panel, province)
 		return
 	_btn_settle.visible = true
-	var settle_nm := str(province.name).strip_edges()
+	var settle_nm := _province_display_name(province.id)
 	if settle_nm.is_empty():
 		settle_nm = "#%d" % province.id
 	_btn_settle.text = "🏠 Settle %s (+0.35, now %.2f)" % [settle_nm, province.settlement_level]

@@ -223,11 +223,17 @@ func _is_live_escape_event(event: InputEvent) -> bool:
 	return false
 
 
+func _mark_input_handled() -> void:
+	var vp := get_viewport() if is_inside_tree() else null
+	if vp != null:
+		vp.set_input_as_handled()
+
+
 func _input(event: InputEvent) -> void:
 	if _closing:
 		return
 	if _confirm_blocks_event(event):
-		get_viewport().set_input_as_handled()
+		_mark_input_handled()
 		return
 	if not _is_live_escape_event(event):
 		return
@@ -238,10 +244,10 @@ func _input(event: InputEvent) -> void:
 	)
 	if _living_title_is_up() or has_meta("eoa_opened_from_living_title"):
 		_close_for_living_title_esc()
-		get_viewport().set_input_as_handled()
+		_mark_input_handled()
 		return
 	_route_escape_to_stack()
-	get_viewport().set_input_as_handled()
+	_mark_input_handled()
 
 
 func _route_escape_to_stack() -> void:
@@ -259,7 +265,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if _closing:
 		return
 	if _confirm_blocks_event(event):
-		get_viewport().set_input_as_handled()
+		_mark_input_handled()
 		return
 	if not _is_live_escape_event(event):
 		return
@@ -269,10 +275,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	)
 	if _living_title_is_up() or has_meta("eoa_opened_from_living_title"):
 		_close_for_living_title_esc()
-		get_viewport().set_input_as_handled()
+		_mark_input_handled()
 		return
 	_route_escape_to_stack()
-	get_viewport().set_input_as_handled()
+	_mark_input_handled()
 
 
 func _build_ui() -> void:
