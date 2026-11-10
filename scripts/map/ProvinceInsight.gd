@@ -83,7 +83,50 @@ static func build_inspector_topline(province: Province) -> Dictionary:
 				sea_zone = "⚓ Naval chokepoint / strait"
 			elif "chokepoint" not in sea_zone.to_lower() and "strait" not in sea_zone.to_lower():
 				sea_zone = "%s · ⚓ chokepoint" % sea_zone
-	return _MapPolishFormatters.format_inspector_topline(province.name, owner, region, sea_zone)
+	return _apply_nation_display_names(_MapPolishFormatters.format_inspector_topline(province.name, owner, region, sea_zone), owner)
+
+
+static func nation_display_name(tag: String) -> String:
+	var t := tag.strip_edges()
+	if t.is_empty():
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("country_display_name"):
+		var pretty := str(MapManager.country_display_name(t)).strip_edges()
+		if not pretty.is_empty():
+			return pretty
+	return t
+
+
+static func core_for_line(province: Province) -> String:
+	if province == null or province.core_for.is_empty():
+		return "Core For: None"
+	var names: PackedStringArray = PackedStringArray()
+	for tag_v in province.core_for:
+		var pretty := nation_display_name(str(tag_v))
+		if pretty.is_empty():
+			continue
+		names.append(pretty)
+	if names.is_empty():
+		return "Core For: None"
+	return "Core For: " + ", ".join(names)
+
+
+static func _apply_nation_display_names(top: Dictionary, owner_tag: String) -> Dictionary:
+	var raw := owner_tag.strip_edges().to_upper()
+	if raw.is_empty():
+		return top
+	var pretty := nation_display_name(raw)
+	if pretty.is_empty() or pretty.to_upper() == raw:
+		return top
+	top["owner"] = pretty
+	top["owner_line"] = "Owner: %s" % pretty
+	var summary := str(top.get("plain_summary", ""))
+	if not summary.is_empty():
+		top["plain_summary"] = summary.replace(raw, pretty)
+	var bb := str(top.get("bbcode", ""))
+	if not bb.is_empty():
+		top["bbcode"] = bb.replace(raw, pretty)
+	return top
 
 
 static func build_strategic_hover_tooltip(province: Province) -> String:
@@ -92,11 +135,9 @@ static func build_strategic_hover_tooltip(province: Province) -> String:
 	var owner := province.owner_tag.strip_edges()
 	if owner.is_empty():
 		owner = country_tag_for_province(province)
-	var nation := owner
-	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_country") and not owner.is_empty():
-		var country = MapManager.get_country(owner)
-		if country is Dictionary and country.has("name"):
-			nation = str(country["name"])
+	var nation := nation_display_name(owner)
+	if nation.is_empty():
+		nation = owner
 	var region := ""
 	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_region_id"):
 		var rid: int = province.strategic_region_id if province.strategic_region_id > 0 else MapManager.get_province_region_id(province.id)
@@ -8138,7 +8179,7 @@ static func build_conflict_status_bbcode(province: Province) -> String:
 static func build_control_glance_bbcode(province: Province) -> String:
 	if province == null:
 		return ""
-	var owner := province.owner_tag if not province.owner_tag.is_empty() else "—"
+	var owner := nation_display_name(province.owner_tag) if not province.owner_tag.is_empty() else "—"
 	var region_line := ""
 	var rid: int = province.strategic_region_id
 	if rid <= 0 and typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_region_id"):
@@ -8150,7 +8191,7 @@ static func build_control_glance_bbcode(province: Province) -> String:
 	if is_province_contested(province):
 		return (
 			"%sOwner %s%s  ·  %s⚑ Held by %s[/color]"
-			% [COLOR_MUTED, owner, region_line, COLOR_WARN, province.controller_tag]
+			% [COLOR_MUTED, owner, region_line, COLOR_WARN, nation_display_name(str(province.controller_tag))]
 		)
 	return "%sOwner: %s%s[/color]" % [COLOR_MUTED, owner, region_line]
 
@@ -9290,8 +9331,8 @@ static func _nat_suffix_plain(nat: String) -> String:
 
 
 static func _owner_controller_bbcode(province: Province) -> String:
-	var owner := province.owner_tag if not province.owner_tag.is_empty() else "—"
-	var ctrl := province.controller_tag if not province.controller_tag.is_empty() else owner
+	var owner := nation_display_name(province.owner_tag) if not province.owner_tag.is_empty() else "—"
+	var ctrl := nation_display_name(province.controller_tag) if not province.controller_tag.is_empty() else owner
 	if ctrl == owner:
 		return "%sOwner: %s[/color]" % [COLOR_MUTED, owner]
 	return "%sOwner: %s  ·  %s⚑ Held by: %s[/color]" % [COLOR_MUTED, owner, COLOR_WARN, ctrl]
