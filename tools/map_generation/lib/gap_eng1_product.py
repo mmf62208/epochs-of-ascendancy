@@ -1,12 +1,14 @@
 """GAP-ENG-1: ENG 1936 land rings must not stay 36/72-vertex placeholders.
 
 Ship's count is about 268. The board at 925c2877 has 259 ENG-owned land
-placeholders (id < 950000, domain land, 36 vertices). geoBoundaries gbOpen
-has no ADM file for ATA, CYM, HMD, JEY, IMN, SGS, or FLK. Somaliland and
-Kashmir have no admin polygon that matches the blob. Potaro-Siparuni
-lies inside the Venezuelan claim zone, and cutting it out splits that
-province. Those twelve stay placeholders. Every other ring is the admin
-polygon it was simplified from, clipped the way GAP-USSR-WEST-2 clips.
+placeholders (id < 950000, domain land, 36 vertices). GAP-ENG-1 re-ringed
+247 from geoBoundaries. ENG-MAP-FINISH re-rings seven more from Natural
+Earth 10m admin-0 map units (Somaliland, Cayman, Heard, Jersey, Isle of
+Man, South Georgia, Falklands). Five stay placeholders: Potaro-Siparuni
+lies inside the Venezuelan claim, Siachen is an interior hole of both PAK
+North and IND North, Antarctica is south of the canvas floor, and Ayi has
+no Natural Earth unit. Every re-ringed ring is clipped the way
+GAP-USSR-WEST-2 clips.
 
 A ring this pass writes is strictly simple: no self-intersection and no
 self-touch. Overlap is the polygon intersection area, and also the pixel
@@ -39,23 +41,33 @@ POLY_OVERLAP_MAX = 1.0
 HOLE_PX_MAX = 250
 OWNER = "ENG"
 
+# Five leftovers after ENG-MAP-FINISH. The other seven SCOPE ids now have
+# Natural Earth map-unit rings (see eng_finish_product.RERING_ADMIN).
 UNKNOWN_PLACEHOLDER_IDS = (
-    900316, 900329, 902131, 902133, 902134, 902422, 902423, 902447,
-    902448, 902475, 902476, 905394,
+    900329, 902131, 902133, 902134, 905394,
 )
 UNKNOWN_REASONS = {
-    900316: "gbOpen SOM has no unit named Somaliland; Woqooyi Galbeed under the centroid is 0.18 of the blob",
-    900329: "Potaro-Siparuni lies inside VEN 903817 Zona en Reclamación (1085 px); removing it splits that province into 3951 and 2512 px pieces",
-    902131: "centroid is in PAK Ghanche, which is not a Kashmir polygon; Jammu and Kashmir and Azad Kashmir do not contain it",
-    902133: "gbOpen has no ATA ADM1 or ADM2 (API 404)",
-    902134: "gbOpen has no ATA ADM1 or ADM2 (API 404)",
-    902422: "gbOpen has no CYM ADM1 or ADM2 (API 404)",
-    902423: "gbOpen has no HMD ADM1 or ADM2 (API 404)",
-    902447: "gbOpen has no JEY ADM1 or ADM2 (API 404)",
-    902448: "gbOpen has no IMN ADM1 or ADM2 (API 404)",
-    902475: "gbOpen has no SGS ADM1 or ADM2 (API 404)",
-    902476: "gbOpen has no FLK ADM1 or ADM2 (API 404)",
-    905394: "Ayi is covered by Ma'an 905393 (36 of 38 px); no separate ring remains",
+    900329: (
+        "Potaro-Siparuni lies inside VEN 903817 Zona en Reclamación. "
+        "Natural Earth has no separate admin-0 unit to cut out without splitting that province."
+    ),
+    902131: (
+        "The centroid is inside NE Siachen Glacier, an interior hole of both PAK North "
+        "903576 and IND North 902676. A single ring cannot punch that hole. Jammu and "
+        "Kashmir and Azad Kashmir do not contain the centroid."
+    ),
+    902133: (
+        "NE Antarctica is entirely south of latitude -60.52, below the world canvas floor "
+        "of -56. There is no on-canvas sourced ring."
+    ),
+    902134: (
+        "NE has one Antarctica unit and no sourced split between 902133 and 902134. "
+        "Both stay placeholders."
+    ),
+    905394: (
+        "No Natural Earth unit is named Ayi. The circle sits on the Red Sea south of Ma'an "
+        "(polygon overlap with Ma'an is 0). Joining it to Ma'an would invent a corridor."
+    ),
 }
 
 # Every ENG 1936 land placeholder on 925c2877.
