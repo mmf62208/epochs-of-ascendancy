@@ -641,10 +641,15 @@ def choose_absorb_target(hole: dict) -> Optional[int]:
     """Province that should absorb this hole. None if it should stay.
 
     Real water goes to the existing lake or sea on its border (no new id).
+    A named great lake that does not share an edge cannot be extended: a
+    bridge would cross land. Lake Saint Clair has no lake province, so it
+    falls through to the longest bordering land edge.
     A land gap goes to the land neighbour with the longest shared edge.
     The Alaska wedge west of 141°W stays in Alaska. A gap south of the 49th
     parallel between the Pacific and Lake of the Woods stays in the US.
-    On the Quebec–Vermont 45th parallel, a near-tie prefers Canada.
+    On the Quebec–Vermont 45th parallel and the Quebec–Maine height of land,
+    a near-tie (Canada at least 85% of the longest foreign edge) stays with
+    Canada.
     """
     surround = hole.get("surrounding") or []
     waters = [s for s in surround if s.get("domain") in WATER_DOMAINS]
@@ -668,13 +673,20 @@ def choose_absorb_target(hole: dict) -> Optional[int]:
             return int(max(foreign, key=lambda s: s.get("edge_px") or 0)["id"])
     ranked = sorted(lands, key=lambda s: -(s.get("edge_px") or 0))
     best = ranked[0]
-    if best.get("adm0") != "CAN" and 44.9 <= lat <= 45.2 and lon < -71.0:
-        can = sorted(
-            [s for s in lands if s.get("adm0") == "CAN"],
-            key=lambda s: -(s.get("edge_px") or 0),
-        )
-        if can and (can[0].get("edge_px") or 0) >= (best.get("edge_px") or 0) * 0.85:
-            return int(can[0]["id"])
+    # 45th parallel (Quebec–Vermont / New York) and the Maine height of land.
+    # East of -71° is Maine, not the Vermont band. The St Lawrence (west of
+    # about -75°) is not this frontier.
+    on_vermont = 44.9 <= lat <= 45.2 and lon < -71.0
+    on_maine = -71.5 <= lon <= -66.9 and 45.2 < lat <= 47.6
+    if on_vermont or on_maine:
+        can = [s for s in lands if s.get("adm0") == "CAN"]
+        foreign = [s for s in lands if s.get("adm0") != "CAN"]
+        if can and foreign:
+            cbest = max(can, key=lambda s: s.get("edge_px") or 0)
+            fbest = max(foreign, key=lambda s: s.get("edge_px") or 0)
+            if (cbest.get("edge_px") or 0) + 1e-9 >= (fbest.get("edge_px") or 0) * 0.85:
+                return int(cbest["id"])
+            return int(fbest["id"])
     return int(best["id"])
 
 

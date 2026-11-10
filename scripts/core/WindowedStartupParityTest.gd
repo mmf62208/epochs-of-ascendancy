@@ -2,7 +2,7 @@ extends SceneTree
 
 ## STARTUP-PARITY windowed diagnostic. NOT a product fix. NOT live Play.
 ## Same TestScenario living-title → Begin path as desktop Play (GER 1936).
-## DATA invariants + garrison skip audit vs empty-board 575.
+## DATA invariants + garrison skip audit vs empty-board 576.
 ## Viewport shrink must actually change get_visible_rect (root.size + WM).
 ## Never claims live-startup PASS. Never labels a title-visible shot post_dismiss.
 ##
@@ -33,7 +33,7 @@ const GER_TAG := "GER"
 const EXPECT_YEAR := 1936
 const EXPECT_PROVINCES_MIN := 3500
 const EXPECT_PROVINCES := 3596
-const EXPECT_GARRISONS := 575
+const EXPECT_GARRISONS := 576
 const LIGHT_BLUE_R := 0.70
 const LIGHT_BLUE_G := 0.82
 const LIGHT_BLUE_B := 0.92
@@ -1322,7 +1322,7 @@ func _check_garrison_parity(src: Dictionary) -> void:
 		_data_pass.append("garrison_1936=%d (empty-board, no OOB skip)" % garr)
 	else:
 		_data_pass.append(
-			"garrison_1936_live=%d skipped_occupied=%d (575 is empty-board targets, not a second dataset)"
+			"garrison_1936_live=%d skipped_occupied=%d (576 is empty-board targets, not a second dataset)"
 			% [garr, skipped]
 		)
 

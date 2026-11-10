@@ -1,8 +1,9 @@
 """STARTUP-PARITY static board inventory (no Godot, no seed/perf suite).
 
 Reads shipped world_accurate files and reports counts + SHA-256.
-575 garrisons is a runtime empty-board seed_1936_start_garrisons count,
+576 garrisons is a runtime empty-board seed_1936_start_garrisons count,
 not a static file total. Live F5 occupancy skip is observed in Godot.
+The dict key stays garrison_575 from the earlier baseline.
 """
 from __future__ import annotations
 
@@ -26,7 +27,7 @@ BERLIN_PID = 710300
 MANIFEST_PROVINCES = 3596
 MANIFEST_LAND = 3256
 MANIFEST_SEA = 340
-EMPTY_BOARD_GARRISONS = 575
+EMPTY_BOARD_GARRISONS = 576
 
 
 def _sha256_file(path: Path) -> str:
@@ -106,10 +107,11 @@ def inventory_world_accurate_board(data_dir: Path | None = None) -> Dict[str, An
         "kind": "empty_board_runtime",
         "empty_board_targets": EMPTY_BOARD_GARRISONS,
         "note": (
-            "575 is seed_1936_start_garrisons on an empty formation table "
-            "(HeadlessStartupParityGarrisonTest / HeadlessGarrison1Test). "
+            "576 is seed_1936_start_garrisons on an empty formation table "
+            "(HeadlessGarrison1Test). MAP-2a residual added Kingston--Pembroke "
+            "903045 to New York West 800446, so ENG gained one border garrison. "
             "Live F5 TestScenario already has OOB land on some border/capital hexes; "
-            "those hexes are skipped, so placed < 575 while targets stay 575."
+            "those hexes are skipped, so placed < 576 while targets stay 576."
         ),
     }
     out["seed_20fe9063"] = {
