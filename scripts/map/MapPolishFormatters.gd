@@ -659,9 +659,9 @@ static func format_sea_zone_control_badge(
 
 ## Display-only province label. data/provinces still store "RUS West" for 903492.
 static func province_ui_display_name(pid: int, raw_name: String = "") -> String:
-	if pid == 903492:
-		return "Western Russia"
 	var n := raw_name.strip_edges()
+	if pid == 903492 or n == "RUS West":
+		return "Western Russia"
 	if not n.is_empty():
 		return n
 	if pid > 0:
@@ -8322,6 +8322,7 @@ static func tooltip_sfx_flair_strip(
 	var select: Dictionary = {}
 	var invest: Dictionary = {}
 	var assault: Dictionary = {}
+	var pname := province_ui_display_name(0, province_name)
 	var owner_shown := owner_tag
 	if typeof(CampaignWarChrome) != TYPE_NIL:
 		var dn := str(CampaignWarChrome.display_name_for_tag(owner_tag)).strip_edges()
@@ -8329,17 +8330,17 @@ static func tooltip_sfx_flair_strip(
 			owner_shown = dn
 	# Use MapNextListHelpers when available via direct formatters in this file if present
 	select = {
-		"toast": "Selected · %s · %s" % [province_name, owner_shown],
+		"toast": "Selected · %s · %s" % [pname, owner_shown],
 		"sfx": "confirm" if is_chokepoint or not sea_zone_name.is_empty() else "select",
-		"tooltip_chip": "Selected %s" % province_name,
+		"tooltip_chip": "Selected %s" % pname,
 	}
 	invest = {
-		"toast": "Infrastructure project complete in %s" % province_name,
+		"toast": "Infrastructure project complete in %s" % pname,
 		"sfx": "achievement",
 		"tooltip_chip": "Infrastructure complete",
 	}
 	assault = {
-		"toast": "Assault resolved in %s" % province_name,
+		"toast": "Assault resolved in %s" % pname,
 		"sfx": "confirm",
 		"tooltip_chip": "Assault",
 	}

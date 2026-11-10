@@ -315,6 +315,12 @@ func restore_after_campaign_end() -> void:
 		_toast_layer.visible = true
 
 
+## Return to Title: drop leftover notices so the next Begin is not still showing GER chips.
+func clear_session_notices() -> void:
+	_trim_toast_stack_to(0)
+	_dismiss_leader_popups()
+
+
 func events_held_for_campaign_end() -> bool:
 	return _campaign_end_hold
 

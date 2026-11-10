@@ -44,6 +44,8 @@ func _run() -> void:
 	await _test_input_path_script_errors()
 	_test_self_target_excluded()
 	await _test_top_bar_war_after_declare()
+	_test_leftover_toasts()
+	await _test_session_reset_after_return_to_title()
 	_document_item6_first_click()
 	var ok := _failures == 0
 	print("HeadlessRttSmallfix1Test: ", "PASS" if ok else "FAIL", " (failures=", _failures, ")")
@@ -158,10 +160,30 @@ func _test_source_needles() -> void:
 		_fail("TopInfoBar Ctrl+S still toasts Quicksave OK (duplicate)")
 		return
 	var save_fn := _slice_func(bar_src, "_on_save_pressed")
-	if save_fn.find("Saved quicksave") >= 0:
-		_fail("TopInfoBar Menu Save still toasts Saved quicksave (duplicate)")
+	if save_fn.find("Saved quicksave") < 0:
+		_fail("TopInfoBar Menu Save must toast Saved quicksave after opening Command Center")
 		return
-	_pass("source needles: overlay, title reload, display names, one toast")
+	var search_fn := _slice_func(ren_src, "open_province_inspector_from_search")
+	if search_fn.find("_province_display_name") < 0:
+		_fail("open_province_inspector_from_search must use _province_display_name")
+		return
+	if search_fn.find("province.name") >= 0:
+		_fail("open_province_inspector_from_search still toasts raw province.name")
+		return
+	var hook_src := _read("res://scripts/ui/PlayNextHook.gd")
+	if hook_src.find("func reset_session") < 0:
+		_fail("PlayNextHook.reset_session missing")
+		return
+	if hook_src.find("_nation_display") < 0 or hook_src.find("_relation_label") < 0:
+		_fail("PlayNextHook Influence toast must use display-name and war relation helpers")
+		return
+	if menu_src.find("func reset_session_leftovers") < 0:
+		_fail("MainMenu.reset_session_leftovers missing")
+		return
+	if chrome_src.find("func relation_label_for") < 0:
+		_fail("CampaignWarChrome.relation_label_for missing")
+		return
+	_pass("source needles: overlay, title reload, display names, leftover toasts, session reset")
 
 
 func _test_display_names() -> void:
@@ -674,6 +696,163 @@ func _test_top_bar_war_after_declare() -> void:
 		_fail("war-bar: after Declare want 'At war: Poland' got '%s'" % line)
 		return
 	_pass("war-bar: Declare refreshes At war: Poland without a save load")
+
+
+func _test_leftover_toasts() -> void:
+	var mm := root.get_node_or_null("MapManager")
+	var sm := root.get_node_or_null("SupplyManager")
+	var lm := root.get_node_or_null("LeaderManager")
+	var boot: GDScript = load("res://scripts/core/CampaignLoopTestBoot.gd") as GDScript
+	var hook: GDScript = load("res://scripts/ui/PlayNextHook.gd") as GDScript
+	var war: GDScript = load("res://scripts/core/WarStateDomain.gd") as GDScript
+	var polish: GDScript = load(SRC_POLISH) as GDScript
+	if mm == null or boot == null or hook == null or war == null or polish == null:
+		_fail("leftover-toast: autoloads missing")
+		return
+	if not bool(boot.call("boot", mm, sm, "GER")):
+		_fail("leftover-toast: campaign boot failed")
+		return
+	if lm != null and lm.has_method("set_player_country_tag"):
+		lm.call("set_player_country_tag", "GER")
+	if mm.has_method("ensure_country_stub"):
+		mm.call("ensure_country_stub", "SPA")
+		mm.call("ensure_country_stub", "SOV")
+		mm.call("ensure_country_stub", "POL")
+		mm.call("ensure_country_stub", "GER")
+	war.call("reset_for_test")
+	war.call("clear_rule_overrides")
+	var inspector := "%s · province inspector" % str(polish.call("province_ui_display_name", RUS_WEST_PID, "RUS West"))
+	if inspector.find("RUS West") >= 0 or inspector.find(RUS_WEST_LABEL) < 0:
+		_fail("leftover-toast: inspector toast still raw '%s'" % inspector)
+		return
+	var spa_pid := _land_pid(mm, "SPA")
+	var sov_pid := _land_pid(mm, "SOV")
+	var pol_pid := _land_pid(mm, "POL")
+	if spa_pid <= 0 or sov_pid <= 0 or pol_pid <= 0:
+		_fail("leftover-toast: missing SPA/SOV/POL land")
+		return
+	for row in [[spa_pid, "SPA", "Spain"], [sov_pid, "SOV", "Soviet Union"], [pol_pid, "POL", "Poland"]]:
+		var pid := int(row[0])
+		var tag := str(row[1])
+		var shown := str(row[2])
+		var dip: Dictionary = hook.call("living_diplomacy_from_province", pid, "GER")
+		var sentence := str(dip.get("sentence", ""))
+		if not bool(dip.get("ok", false)):
+			_fail("leftover-toast: Influence missing for %s pid=%d" % [tag, pid])
+			return
+		if sentence.find(tag) >= 0:
+			_fail("leftover-toast: Influence still uses raw tag %s in '%s'" % [tag, sentence])
+			return
+		if sentence.find(shown) < 0:
+			_fail("leftover-toast: Influence want %s got '%s'" % [shown, sentence])
+			return
+		if tag == "POL" and sentence.find("At war") >= 0:
+			_fail("leftover-toast: Poland Influence already At war before declare: %s" % sentence)
+			return
+	var rus: Dictionary = hook.call("living_diplomacy_from_province", RUS_WEST_PID, "GER")
+	var rus_place := str(rus.get("place", rus.get("sentence", "")))
+	if rus_place.find("RUS West") >= 0:
+		_fail("leftover-toast: 903492 Influence place still RUS West '%s'" % rus_place)
+		return
+	war.call("grant_ready_player_justify", "POL")
+	var declared: Dictionary = war.call("player_declare_from_province", pol_pid)
+	if not bool(declared.get("ok", false)):
+		_fail("leftover-toast: declare POL failed %s" % str(declared.get("reason", declared)))
+		return
+	var at_war: Dictionary = hook.call("living_diplomacy_from_province", pol_pid, "GER")
+	var war_sentence := str(at_war.get("sentence", ""))
+	if war_sentence.find("At war") < 0:
+		_fail("leftover-toast: Poland Influence want At war got '%s'" % war_sentence)
+		return
+	if war_sentence.find("Neutral") >= 0:
+		_fail("leftover-toast: Poland Influence still Neutral '%s'" % war_sentence)
+		return
+	if war_sentence.find("POL") >= 0 or war_sentence.find("Poland") < 0:
+		_fail("leftover-toast: Poland Influence want Poland not POL '%s'" % war_sentence)
+		return
+	_pass("leftover-toast: inspector Western Russia; Influence Spain/Soviet Union/Poland; At war after declare")
+
+
+func _test_session_reset_after_return_to_title() -> void:
+	var mm := root.get_node_or_null("MapManager")
+	var sm := root.get_node_or_null("SupplyManager")
+	var lm := root.get_node_or_null("LeaderManager")
+	var pm := root.get_node_or_null("ProductionManager")
+	var boot: GDScript = load("res://scripts/core/CampaignLoopTestBoot.gd") as GDScript
+	var hook: GDScript = load("res://scripts/ui/PlayNextHook.gd") as GDScript
+	var menu_scr: GDScript = load(SRC_MENU) as GDScript
+	var war: GDScript = load("res://scripts/core/WarStateDomain.gd") as GDScript
+	if mm == null or pm == null or boot == null or hook == null or menu_scr == null:
+		_fail("session-reset: autoloads missing")
+		return
+	if not bool(boot.call("boot", mm, sm, "GER")):
+		_fail("session-reset: GER boot failed")
+		return
+	if lm != null and lm.has_method("set_player_country_tag"):
+		lm.call("set_player_country_tag", "GER")
+	if war != null:
+		war.call("reset_for_test")
+		war.call("clear_rule_overrides")
+	pm.call("set_stockpile", {
+		"steel": 12029.0,
+		"aluminum": 4000.0,
+		"energy": 29.0,
+		"rubber": 2000.0,
+		"fuel": 4000.0,
+	})
+	var bar := _make_bar()
+	if bar == null:
+		_fail("session-reset: TopInfoBar missing")
+		return
+	await process_frame
+	if bar.has_method("_update_resources"):
+		bar.call("_update_resources")
+	var ger_steel := _chip_amount(bar, "SteelLabel")
+	if ger_steel != "12,029":
+		_fail("session-reset: GER leftover steel want 12,029 got '%s'" % ger_steel)
+		return
+	hook.call("reset_goal_lock_for_test")
+	var ger_rec := {
+		"ok": true,
+		"action": "justify",
+		"label": "Justify war on France",
+		"hint": "NEXT · Justify war on France",
+		"source": "war_goal",
+		"target_tag": "FRA",
+		"goal_name": "France",
+		"to_id": 710739,
+		"goal_score": 1.0,
+	}
+	hook.call("stick_chip_goal", ger_rec, 0)
+	menu_scr.call("reset_session_leftovers", self)
+	var usa: Dictionary = menu_scr.call("apply_living_campaign_pick", "USA", 1936)
+	if not bool(usa.get("ok", false)):
+		_fail("session-reset: USA pick failed")
+		return
+	await process_frame
+	if bar.has_method("_update_resources"):
+		bar.call("_update_resources")
+	var usa_steel := _chip_amount(bar, "SteelLabel")
+	var usa_energy := _chip_amount(bar, "EnergyLabel")
+	if usa_steel == "12,029" or usa_energy == "29":
+		_fail("session-reset: USA still showing GER stockpile steel=%s energy=%s" % [usa_steel, usa_energy])
+		return
+	if usa_steel != "12,000":
+		_fail("session-reset: USA start steel want 12,000 got '%s'" % usa_steel)
+		return
+	var after: Dictionary = hook.call("recommend", "USA")
+	var hint := "%s %s" % [str(after.get("label", "")), str(after.get("hint", ""))]
+	if hint.find("France") >= 0 or hint.find("Justify war on France") >= 0:
+		_fail("session-reset: USA NEXT still GER France leftover '%s'" % hint)
+		return
+	_pass("session-reset: USA start stockpile and NEXT chip are not GER leftovers")
+
+
+func _chip_amount(bar: Node, label_name: String) -> String:
+	var lab := bar.find_child(label_name, true, false) as Label
+	if lab == null:
+		return ""
+	return str(lab.text).strip_edges()
 
 
 func _document_item6_first_click() -> void:

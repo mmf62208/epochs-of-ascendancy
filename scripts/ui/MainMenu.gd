@@ -60,6 +60,8 @@ static func apply_living_campaign_pick(tag: String = "GER", year: int = 1936) ->
 		resolved = t
 	if typeof(SessionPlayers) != TYPE_NIL and SessionPlayers.has_method("adopt_living_human"):
 		SessionPlayers.adopt_living_human(resolved)
+	_seed_start_stockpile_if_empty()
+	_refresh_living_player_surfaces(resolved)
 	facts["ok"] = true
 	facts["applied"] = true
 	return facts
@@ -84,18 +86,116 @@ static func reload_to_living_title(host: Node = null) -> void:
 
 
 static func _reset_session_and_change_to_title(tree: SceneTree) -> void:
-	if typeof(SupplyManager) != TYPE_NIL and SupplyManager.has_method("clear_clock_bar_for_scene_change"):
-		SupplyManager.call("clear_clock_bar_for_scene_change")
-	if typeof(NationalModifierManager) != TYPE_NIL and NationalModifierManager.has_method("clear_all_modifiers"):
-		NationalModifierManager.clear_all_modifiers()
-	if typeof(CampaignEndDomain) != TYPE_NIL:
-		CampaignEndDomain.reset_session_for_new_game()
+	reset_session_leftovers(tree)
 	if tree.root != null and tree.root.has_meta("eoa_return_title_scene"):
 		var packed: Variant = tree.root.get_meta("eoa_return_title_scene")
 		if packed is PackedScene:
 			tree.change_scene_to_packed(packed)
 			return
 	tree.change_scene_to_file("res://scenes/TestScenario.tscn")
+
+
+## Drop autoload UI caches that survive change_scene (stockpile, NEXT chip, popups).
+static func reset_session_leftovers(tree: SceneTree = null) -> void:
+	if tree == null:
+		tree = Engine.get_main_loop() as SceneTree
+	if typeof(SupplyManager) != TYPE_NIL and SupplyManager.has_method("clear_clock_bar_for_scene_change"):
+		SupplyManager.call("clear_clock_bar_for_scene_change")
+	if typeof(NationalModifierManager) != TYPE_NIL and NationalModifierManager.has_method("clear_all_modifiers"):
+		NationalModifierManager.clear_all_modifiers()
+	if typeof(CampaignEndDomain) != TYPE_NIL:
+		CampaignEndDomain.reset_session_for_new_game()
+	if typeof(PlayNextHook) != TYPE_NIL:
+		PlayNextHook.reset_session()
+	if typeof(ProductionManager) != TYPE_NIL and ProductionManager.has_method("set_stockpile"):
+		ProductionManager.set_stockpile({})
+	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("clear_session_notices"):
+		LeaderEventUI.clear_session_notices()
+	if tree == null:
+		return
+	_close_session_root_popups(tree)
+	var mr: Node = tree.get_first_node_in_group("map_renderer")
+	if mr == null and tree.root != null:
+		mr = tree.root.find_child("MapRenderer", true, false)
+	if mr != null and is_instance_valid(mr):
+		if "selected_formation_id" in mr:
+			mr.selected_formation_id = ""
+		if mr.has_method("_hide_unit_card_keep_map_focus"):
+			mr.call("_hide_unit_card_keep_map_focus")
+		if mr.has_method("_refresh_next_hook_chip"):
+			mr.call("_refresh_next_hook_chip")
+	for bar in tree.get_nodes_in_group("top_info_bar"):
+		if bar == null or not is_instance_valid(bar):
+			continue
+		if bar.has_method("refresh_campaign_war_readout"):
+			bar.call("refresh_campaign_war_readout")
+		if bar.has_method("_update_resources"):
+			bar.call("_update_resources")
+		if bar.has_method("_close_overlay_screens"):
+			bar.call("_close_overlay_screens")
+
+
+static func _close_session_root_popups(tree: SceneTree) -> void:
+	if tree == null or tree.root == null:
+		return
+	var names := PackedStringArray([
+		"DiplomacyView",
+		"ProductionAssignmentScreen",
+		"LeaderAssignmentScreen",
+		"AgentAssignmentScreen",
+		"NationalSpiritsScreen",
+		"TechnologyScreen",
+		"OrderCommandPanel",
+		"PolicyLawScreen",
+		"UnitDetailPopup",
+		"PeaceConferenceWindow",
+	])
+	for nm in names:
+		var n: Node = tree.root.find_child(nm, true, false)
+		if n == null or not is_instance_valid(n) or n.is_queued_for_deletion():
+			continue
+		n.name = "%s_dying" % nm
+		n.queue_free()
+
+
+static func _seed_start_stockpile_if_empty() -> void:
+	if typeof(ProductionManager) == TYPE_NIL or not ProductionManager.has_method("add_stockpile"):
+		return
+	var steel := 0.0
+	if "national_stockpile" in ProductionManager:
+		steel = float(ProductionManager.national_stockpile.get("steel", 0.0))
+	if steel >= 500.0:
+		return
+	ProductionManager.add_stockpile(
+		{
+			"steel": 12000.0,
+			"aluminum": 4000.0,
+			"fuel": 4000.0,
+			"rubber": 2000.0,
+			"coal": 8000.0,
+		}
+	)
+
+
+static func _refresh_living_player_surfaces(player_tag: String) -> void:
+	var tree := Engine.get_main_loop() as SceneTree
+	if tree == null:
+		return
+	var tag := player_tag.strip_edges().to_upper()
+	for bar in tree.get_nodes_in_group("top_info_bar"):
+		if bar == null or not is_instance_valid(bar):
+			continue
+		if "player_country_tag" in bar and not tag.is_empty():
+			bar.player_country_tag = tag
+		if bar.has_method("_update_resources"):
+			bar.call("_update_resources")
+		if bar.has_method("refresh_campaign_war_readout"):
+			bar.call("refresh_campaign_war_readout")
+	var mr: Node = tree.get_first_node_in_group("map_renderer")
+	if mr == null and tree.root != null:
+		mr = tree.root.find_child("MapRenderer", true, false)
+	if mr != null and is_instance_valid(mr) and mr.has_method("_refresh_next_hook_chip"):
+		mr.call("_refresh_next_hook_chip")
 
 var _closing := false
 var _root: Control

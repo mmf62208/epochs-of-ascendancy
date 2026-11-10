@@ -4342,7 +4342,7 @@ func _unhandled_input(event: InputEvent) -> void:
 						attack_staging_province_id = pid
 						DebugOverlay.toast_map_debug(
 							"Attacker staging: %s (%d) → battle at selected %d"
-							% [resolved_province.name, pid, selected_province_id]
+							% [_province_display_name(pid), pid, selected_province_id]
 						)
 						get_viewport().set_input_as_handled()
 						return
@@ -20652,7 +20652,7 @@ func open_province_inspector_from_search(province_id: int) -> bool:
 	show_info_panel(province, true, true)
 	_raise_province_inspector_over_unit_card()
 	_reveal_ix1_road_spine_on_inspector(province, true)
-	_show_inspector_toast("%s · province inspector" % str(province.name), 2.2)
+	_show_inspector_toast("%s · province inspector" % _province_display_name(province.id), 2.2)
 	if typeof(MapManager) != TYPE_NIL:
 		MapManager.province_selected.emit(province_id)
 	return true
@@ -22246,7 +22246,7 @@ func _try_move_selected_unit_to_province(province: Province) -> bool:
 	if bool(res.get("already_here", false)):
 		_skip_inspector_after_march = true
 		_clear_march_destination_arm()
-		_show_inspector_toast("Already at %s" % province.name, 2.5)
+		_show_inspector_toast("Already at %s" % _province_display_name(province.id), 2.5)
 		return true
 	if not bool(res.get("ok", false)):
 		var reason := str(res.get("reason", ""))
@@ -22267,7 +22267,7 @@ func _try_move_selected_unit_to_province(province: Province) -> bool:
 		audio_mv.call("notify_mv1_move_committed")
 	_show_inspector_toast(
 		"March · %d hop%s · arrives in %d day%s · unpause to walk · %s"
-		% [hops_n, "s" if hops_n != 1 else "", cal, "s" if cal != 1 else "", province.name],
+		% [hops_n, "s" if hops_n != 1 else "", cal, "s" if cal != 1 else "", _province_display_name(province.id)],
 		5.0
 	)
 	_refresh_open_unit_card_for_selected()
@@ -22824,11 +22824,7 @@ func mv1_rebuild_unit_icons() -> void:
 
 
 func _on_march_hop_ui(to_pid: int, arrived: bool, dest_id: int = -1, hop: Dictionary = {}) -> void:
-	var pname := "province %d" % to_pid
-	if provinces.has(to_pid):
-		var p: Province = provinces[to_pid] as Province
-		if p != null:
-			pname = p.name
+	var pname := _province_display_name(to_pid)
 	var rf: Dictionary = hop.get("reinforce", {}) as Dictionary if hop is Dictionary else {}
 	if bool(rf.get("joined", false)):
 		_sync_land_battle_bubbles()
@@ -24483,9 +24479,7 @@ func _on_build_road_spine_pressed() -> void:
 	_log_smoke_spine_start(_ix1_last_spine_press)
 	if armed:
 		var eta := int(result.get("eta_days", 18))
-		var pname := ""
-		if provinces.has(pid):
-			pname = provinces[pid].name
+		var pname := _province_display_name(pid)
 		# Toast + Building… BEFORE any camera work. Play MIXED 002df244:
 		# focus_province_by_id defaulted to tactical 2.4 and the process died
 		# before the player saw start feedback.
@@ -24949,9 +24943,7 @@ func _on_build_rhine_bridge_pressed() -> void:
 	_log_smoke_rx1_start(_rx1_last_press)
 	if armed:
 		var eta := int(result.get("eta_days", 36))
-		var pname := ""
-		if provinces.has(pid):
-			pname = provinces[pid].name
+		var pname := _province_display_name(pid)
 		_apply_rx1_building_button_state(pid, 0, eta)
 		_show_inspector_toast("Rhine bridge started in %s · ETA %d days" % [pname, eta], 3.0)
 		if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
@@ -25116,9 +25108,7 @@ func _on_invest_infrastructure_pressed() -> void:
 	if result.get("success", false):
 		var eta := int(result.get("eta_days", 18))
 		var cost := int(result.get("cost_pp", 0))
-		var pname := ""
-		if provinces.has(selected_province_id):
-			pname = provinces[selected_province_id].name
+		var pname := _province_display_name(selected_province_id)
 		# Auto-center on the province where the infra change/project started so the player sees the update location.
 		focus_province_by_id(selected_province_id)
 		var flair: Dictionary = _MapNextListHelpers.format_infra_project_flair(
@@ -25186,9 +25176,7 @@ func _on_infra_progress_for_inspector(pid: int, _proj: Variant, _delta: float) -
 		ol.queue_redraw()
 
 func _on_infra_completed_for_inspector(pid: int, new_level: int, _axis: String, _proj: Variant) -> void:
-	var pname := ""
-	if provinces.has(pid):
-		pname = provinces[pid].name
+	var pname := _province_display_name(pid)
 	var spine := false
 	if _proj != null:
 		spine = bool(_proj.build_road_spine)
@@ -25302,7 +25290,7 @@ func _play_map_action_flair_select(province: Province) -> void:
 	)
 	# Brief toast — avoid spam if rapid re-select of same province
 	if _last_select_flair_pid != province.id or Time.get_ticks_msec() - _last_select_flair_msec > 900:
-		_show_inspector_toast(str(flair.get("toast", province.name)), float(flair.get("duration", 1.8)))
+		_show_inspector_toast(str(flair.get("toast", _province_display_name(province.id))), float(flair.get("duration", 1.8)))
 		_play_map_sfx(str(flair.get("sfx", "select")))
 		_last_select_flair_pid = province.id
 		_last_select_flair_msec = Time.get_ticks_msec()
@@ -25361,7 +25349,7 @@ func _try_set_attack_staging(province: Province) -> bool:
 		attack_staging_province_id = province.id
 		debug_combat_attacker_province_id = province.id
 		_show_inspector_toast(
-			"Attack staging: %s — Ctrl+click adjacent enemy province" % province.name,
+			"Attack staging: %s — Ctrl+click adjacent enemy province" % _province_display_name(province.id),
 			2.8,
 		)
 		return true

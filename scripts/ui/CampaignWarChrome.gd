@@ -70,6 +70,20 @@ static func inspector_offers_justify(player: String, owner: String) -> bool:
 	return false
 
 
+## Live diplomatic band for toasts. War outranks RelationsManager "Neutral".
+static func relation_label_for(player: String, other: String, fallback: String = "Neutral") -> String:
+	var p := player.strip_edges().to_upper()
+	var o := other.strip_edges().to_upper()
+	if p.is_empty() or o.is_empty():
+		return fallback.strip_edges() if not fallback.strip_edges().is_empty() else "Neutral"
+	if typeof(WarStateDomain) != TYPE_NIL and WarStateDomain.is_at_war(p, o):
+		return "At war"
+	var band := fallback.strip_edges()
+	if band.is_empty():
+		return "Neutral"
+	return band
+
+
 static func display_name_for_tag(tag: String) -> String:
 	var t := tag.strip_edges().to_upper()
 	if t.is_empty():

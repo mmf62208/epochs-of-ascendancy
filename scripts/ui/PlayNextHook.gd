@@ -226,9 +226,7 @@ static func rank_from_snapshot(facts: Dictionary = {}) -> Dictionary:
 	var wpid := int(f.get("war_goal_pid", -1))
 	if wpid > 0:
 		var wtag := str(f.get("war_goal_tag", "")).strip_edges()
-		var wname := wtag
-		if not wtag.is_empty() and typeof(WarStateDomain) != TYPE_NIL:
-			wname = WarStateDomain.tag_name(wtag)
+		var wname := _nation_display(wtag)
 		var player_tag := ""
 		if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_player_country_tag"):
 			player_tag = str(LeaderManager.get_player_country_tag()).strip_edges().to_upper()
@@ -341,7 +339,7 @@ static func rank_from_snapshot(facts: Dictionary = {}) -> Dictionary:
 		if crs > 0.001 and offers <= 0:
 			var trade_line := str(dip.get("sentence", "")).strip_edges()
 			if trade_line.is_empty() or trade_line.to_lower().begins_with("influence"):
-				trade_line = "Trade with %s" % other
+				trade_line = "Trade with %s" % _nation_display(other)
 			return {
 				"ok": true,
 				"action": "trade",
@@ -354,7 +352,7 @@ static func rank_from_snapshot(facts: Dictionary = {}) -> Dictionary:
 			}
 		var sentence := str(dip.get("sentence", "")).strip_edges()
 		if sentence.is_empty():
-			sentence = "Influence %s" % other
+			sentence = "Influence %s" % _nation_display(other)
 		return {
 			"ok": true,
 			"action": "influence",
@@ -900,7 +898,7 @@ static func _occupation_row(tag: String) -> Dictionary:
 		elif occupied and typeof(GameData) != TYPE_NIL and GameData.has_method("get_occupation_province_state"):
 			var st: Dictionary = GameData.get_occupation_province_state(pid)
 			resist = float(st.get("resistance_level", resist))
-		var place := str(p.get("name")).strip_edges()
+		var place := _province_display_name(pid, str(p.get("name")))
 		if place.is_empty():
 			place = "#%d" % pid
 		return {"pid": pid, "resistance": resist, "place": place, "owner": owner, "controller": ctrl}
@@ -937,10 +935,11 @@ static func living_diplomacy_from_province(province_id: int, player_tag: String 
 	if typeof(TradeManager) != TYPE_NIL and TradeManager.has_method("get_diplomatic_summary_with"):
 		var trade: Dictionary = TradeManager.get_diplomatic_summary_with(player, other)
 		offers = int(trade.get("active_offers", 0))
-	var place := str(p.get("name")).strip_edges()
+	var place := _province_display_name(pid, str(p.get("name")))
 	if place.is_empty():
-		place = other
-	var sentence := "Influence %s · %s · CRS %.0f · trade %d" % [other, band_label, crs, offers]
+		place = _nation_display(other)
+	band_label = _relation_label(player, other, band_label)
+	var sentence := "Influence %s · %s · CRS %.0f · trade %d" % [_nation_display(other), band_label, crs, offers]
 	if remember:
 		last_diplomacy_pid = pid
 	return {
@@ -977,8 +976,10 @@ static func apply_living_diplomacy(province_id: int, player_tag: String = "") ->
 				facts["band_label"] = str((band_v as Dictionary).get("label", facts.get("band_label", "")))
 	facts["crs_after"] = crs_after
 	facts["applied"] = true
+	var applied_band := _relation_label(player, other, str(facts.get("band_label", "Neutral")))
+	facts["band_label"] = applied_band
 	facts["sentence"] = "Influence %s · %s · CRS %.0f" % [
-		other, str(facts.get("band_label", "Neutral")), crs_after
+		_nation_display(other), applied_band, crs_after
 	]
 	return facts
 
@@ -1099,6 +1100,12 @@ static func reset_goal_lock_for_test() -> void:
 	_chip_goal_lock = {}
 
 
+## Autoloads survive Return to Title. Drop the last foreign hex and the NEXT chip lock.
+static func reset_session() -> void:
+	last_diplomacy_pid = -1
+	reset_goal_lock_for_test()
+
+
 static func chip_goal_pinned() -> bool:
 	return not _stability_war_goal_pin().is_empty()
 
@@ -1204,14 +1211,44 @@ static func _chip_goal_block_reason(tag: String, pid: int) -> String:
 
 
 static func _chip_goal_display_name(tag: String) -> String:
+	return _nation_display(tag)
+
+
+static func _nation_display(tag: String) -> String:
 	var t := tag.strip_edges().to_upper()
 	if t.is_empty():
 		return ""
-	if typeof(WarStateDomain) != TYPE_NIL:
-		var named := str(WarStateDomain.tag_name(t)).strip_edges()
+	if typeof(CampaignWarChrome) != TYPE_NIL:
+		var named := str(CampaignWarChrome.display_name_for_tag(t)).strip_edges()
 		if not named.is_empty():
 			return named
+	if typeof(WarStateDomain) != TYPE_NIL:
+		var wn := str(WarStateDomain.tag_name(t)).strip_edges()
+		if not wn.is_empty():
+			return wn
 	return t
+
+
+static func _province_display_name(pid: int, raw_name: String = "") -> String:
+	if typeof(MapPolishFormatters) != TYPE_NIL:
+		return MapPolishFormatters.province_ui_display_name(pid, raw_name)
+	var n := raw_name.strip_edges()
+	if not n.is_empty():
+		return n
+	if pid > 0:
+		return "#%d" % pid
+	return "Province"
+
+
+static func _relation_label(player: String, other: String, fallback: String = "Neutral") -> String:
+	if typeof(CampaignWarChrome) != TYPE_NIL:
+		return CampaignWarChrome.relation_label_for(player, other, fallback)
+	if typeof(WarStateDomain) != TYPE_NIL and WarStateDomain.is_at_war(player, other):
+		return "At war"
+	var band := fallback.strip_edges()
+	if band.is_empty():
+		return "Neutral"
+	return band
 
 
 static func _stability_enabled() -> bool:
