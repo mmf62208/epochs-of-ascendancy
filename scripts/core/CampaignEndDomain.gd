@@ -121,12 +121,29 @@ static func format_end_date(iso: String = "") -> String:
 	return raw
 
 
+static func is_observer() -> bool:
+	if typeof(WarStateDomain) != TYPE_NIL:
+		if bool(WarStateDomain.campaign_observer()):
+			return true
+	if typeof(SessionPlayers) != TYPE_NIL:
+		if bool(SessionPlayers.has_observer_seat()):
+			return true
+		for s in SessionPlayers.slots:
+			if s is Dictionary and str((s as Dictionary).get("control", "")) == SessionPlayers.CONTROL_OBSERVER:
+				return true
+	return false
+
+
 static func evaluate_and_latch(day_index: int) -> Dictionary:
 	if typeof(WarStateDomain) == TYPE_NIL or not WarStateDomain.loop_enabled():
 		return {}
 	if latched():
 		return _end()
 	var player := _player()
+	if is_observer():
+		if _time_reached():
+			return _latch(_time_model(player, day_index))
+		return {}
 	var defeat := _defeat_model(player, day_index)
 	if not defeat.is_empty():
 		return _latch(defeat)
@@ -287,13 +304,16 @@ static func _time_model(player: String, day_index: int) -> Dictionary:
 			rank = i + 1
 			break
 	var share := factory_share(player)
+	var reason := "Factory share %.1f%%." % (share * 100.0)
+	if is_observer():
+		var obs := _pack("neutral", "time", player, day_index, "Simulation ended", reason, reason)
+		obs["rank"] = rank
+		return obs
 	if rank == 1:
-		var reason := "Factory share %.1f%%." % (share * 100.0)
 		var model := _pack("victory", "time", player, day_index, "Victory: Ascendant", reason, reason)
 		model["rank"] = rank
 		return model
-	var reason2 := "Factory share %.1f%%." % (share * 100.0)
-	var model2 := _pack("defeat", "time", player, day_index, "Defeat: Eclipsed (rank %d)" % rank, reason2, reason2)
+	var model2 := _pack("defeat", "time", player, day_index, "Defeat: Eclipsed (rank %d)" % rank, reason, reason)
 	model2["rank"] = rank
 	return model2
 

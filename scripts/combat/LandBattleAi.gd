@@ -9,7 +9,7 @@ const HARD_MAX_STARTS_PER_DAY := 1
 const HARD_MAX_MARCHES_PER_DAY := 1
 const HARD_MAX_FOLLOW_ON := 1
 const HARD_MAX_OPEN_PER_TAG := 2
-const MIN_AGGRESSION_TO_START := 0.50
+const MIN_AGGRESSION_TO_START := 0.45
 const MIN_AGGRESSION_VS_PLAYER := 0.40
 const SCAN_TAGS_PER_DAY := 2
 ## SIM-1104-B: AI opens a defended hex only at this attacker:defender power ratio.
@@ -98,7 +98,7 @@ static func should_initiate(
 	return float(opp.get("score", 0.0)) >= 7.0
 
 
-static func attack_ratio_ok(opp: Dictionary) -> bool:
+static func attack_ratio_ok(opp: Dictionary, min_ratio: float = -1.0) -> bool:
 	if bool(opp.get("empty_hex", false)):
 		return true
 	if not opp.has("attacker_power"):
@@ -106,7 +106,12 @@ static func attack_ratio_ok(opp: Dictionary) -> bool:
 	var def_p := float(opp.get("defender_power", 0.0))
 	if def_p <= 1.0:
 		return true
-	return float(opp.get("attacker_power", 0.0)) + 0.0001 >= def_p * MIN_ATTACK_STRENGTH_RATIO
+	var need := MIN_ATTACK_STRENGTH_RATIO
+	if min_ratio > 0.0:
+		need = min_ratio
+	elif opp.has("min_ratio"):
+		need = maxf(float(opp.get("min_ratio", MIN_ATTACK_STRENGTH_RATIO)), 1.0)
+	return float(opp.get("attacker_power", 0.0)) + 0.0001 >= def_p * need
 
 
 static func plan_day(
@@ -289,7 +294,10 @@ static func plan_marches(
 	var player := player_tag.strip_edges().to_upper()
 	if player.is_empty():
 		player = "GER"
-	var cap := clampi(int(max_marches), 0, HARD_MAX_MARCHES_PER_DAY)
+	var hard := HARD_MAX_MARCHES_PER_DAY
+	if int(max_marches) > HARD_MAX_MARCHES_PER_DAY:
+		hard = mini(int(max_marches), 3)
+	var cap := clampi(int(max_marches), 0, hard)
 	var marching: Dictionary = {}
 	for raw_m in marching_fids:
 		var mid := str(raw_m).strip_edges()

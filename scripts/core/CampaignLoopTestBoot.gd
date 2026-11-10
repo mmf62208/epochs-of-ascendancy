@@ -135,6 +135,13 @@ static func _reset_clock() -> void:
 	TimeManager._accumulated_game_days = 0.0
 
 
+static func set_observer(player_tag: String = "USA") -> void:
+	if typeof(WarStateDomain) != TYPE_NIL:
+		WarStateDomain.set_campaign_observer(true)
+	if typeof(SessionPlayers) != TYPE_NIL:
+		SessionPlayers.setup_observer_play(player_tag)
+
+
 static func make_division(fid: String, tag: String, station: int) -> void:
 	if typeof(LeaderManager) == TYPE_NIL:
 		return

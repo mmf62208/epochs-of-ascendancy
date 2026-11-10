@@ -16,6 +16,7 @@ mkdir -p "$LOG" "$EVID"
 LOCK="${HOME}/.eoa_godot.lock"
 REF="${EVID}/sr1_ref.trace"
 LOAD="${EVID}/sr1_load.trace"
+# AI-WAR-1 freeze: seed reconfirmed unchanged after behaviour landed.
 EXPECT="20fe9063de285f19d4f9b8a105abfd31"
 PIDFILE="${SR1_OWN_PIDFILE:-${EVID}/sr1_own_godot.pid}"
 if [[ -z "${SR1_XDG:-}" ]]; then

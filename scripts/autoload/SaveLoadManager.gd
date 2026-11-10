@@ -1252,9 +1252,8 @@ func _gather_save_data() -> Dictionary:
 	var land_war := {"version": 1, "open_battles": [], "marches": {}, "next_seq": 1, "last_aar": {}}
 	if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("get_save_data"):
 		var bm_blob: Dictionary = BattleManager.get_save_data()
-		land_war["open_battles"] = bm_blob.get("open_battles", [])
-		land_war["next_seq"] = int(bm_blob.get("next_seq", 1))
-		land_war["last_aar"] = bm_blob.get("last_aar", {})
+		for k in bm_blob.keys():
+			land_war[k] = bm_blob[k]
 	if typeof(FormationMovement) != TYPE_NIL:
 		var fm_blob: Dictionary = FormationMovement.get_save_data()
 		land_war["marches"] = fm_blob.get("marches", {})
@@ -1363,11 +1362,7 @@ func _apply_save_data(data: Dictionary) -> void:
 	if data.has("land_war") and data["land_war"] is Dictionary:
 		var lw: Dictionary = data["land_war"]
 		if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("apply_save_data"):
-			BattleManager.apply_save_data({
-				"open_battles": lw.get("open_battles", []),
-				"next_seq": int(lw.get("next_seq", 1)),
-				"last_aar": lw.get("last_aar", {}),
-			})
+			BattleManager.apply_save_data(lw)
 		if typeof(FormationMovement) != TYPE_NIL:
 			FormationMovement.apply_save_data({"marches": lw.get("marches", {})})
 

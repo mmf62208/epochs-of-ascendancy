@@ -34,6 +34,35 @@ func setup_solo_play(human_tag: String = "USA") -> void:
 	setup_default_hotseat(human_tag, [])
 
 
+## Observer seat for soaks / SimSoak. Not a human; does not fight.
+func setup_observer_play(tag: String = "USA") -> void:
+	slots.clear()
+	var t := tag.strip_edges().to_upper()
+	if t.is_empty():
+		t = "USA"
+	slots.append({
+		"slot": 0,
+		"tag": t,
+		"control": CONTROL_OBSERVER,
+		"name": "Observer",
+		"ready": true,
+	})
+	active_index = 0
+	turn = 1
+	command_queue.clear()
+	lobby_ready = true
+	mode = "observer"
+	_sync_leader_player_tag()
+	lobby_ready_changed.emit(true)
+
+
+func has_observer_seat() -> bool:
+	for s in slots:
+		if s is Dictionary and str((s as Dictionary).get("control", "")) == CONTROL_OBSERVER:
+			return true
+	return false
+
+
 func setup_default_hotseat(
 	human_tag: String = "USA",
 	ai_tags: Array = ["GER", "SOV", "ENG"],

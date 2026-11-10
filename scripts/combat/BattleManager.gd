@@ -65,6 +65,17 @@ var _pending_light_captures: Array = []
 var _capture_flush_armed: bool = false
 ## tag -> {to_id, from_id, fid, days, last_day, need}
 var _empty_hex_siege: Dictionary = {}
+## AI-WAR-1: pid -> until_day; pid -> blocked tags. Missing key = no cooldown.
+var _retake_cooldown: Dictionary = {}
+var _retake_blocked: Dictionary = {}
+## tag -> {last_progress_day, commit_to_id, commit_from_id}
+var _ai_stall: Dictionary = {}
+var _attack_reject: Dictionary = {}
+const REJECT_LOG_ENV := "EOA_AI_REJECT_LOG"
+const AI_MASSING_MARCHES := 3
+const AI_MASSING_STACK := 3
+const AI_RELAX_RATIO := 1.2
+const AI_EVEN_RATIO := 1.0
 
 
 func _ready() -> void:
@@ -312,6 +323,9 @@ func can_assault_province(
 	if typeof(WarStateDomain) != TYPE_NIL and WarStateDomain.loop_enabled():
 		if not WarStateDomain.is_at_war(tag, defender_tag):
 			return {"ok": false, "reason": "Not at war with %s" % WarStateDomain.tag_name(defender_tag)}
+	if _retake_blocked_for(tag, target_province_id):
+		_bump_attack_reject("retake_cooldown")
+		return {"ok": false, "reason": "Retake cooldown"}
 
 	var source := find_attack_source(tag, target_province_id, from_province_id)
 	if not bool(source.get("ok", false)):
@@ -661,6 +675,9 @@ func start_land_battle(
 	if typeof(ProductionManager) != TYPE_NIL and ProductionManager.has_method("ensure_demo_combat_stock"):
 		ProductionManager.ensure_demo_combat_stock(fid, tag)
 		ProductionManager.ensure_demo_combat_stock(def_fid, def_tag)
+	if typeof(WarStateDomain) != TYPE_NIL:
+		WarStateDomain.note_battle_progress(tag, def_tag)
+	note_front_progress_tags([tag, def_tag])
 	return {"success": true, "instant": false, "opened": true, "battle": battle.duplicate()}
 
 
@@ -1074,6 +1091,7 @@ func try_ai_start_land_battles(day_index: int = 0) -> Dictionary:
 				marching_fids.append(mid)
 
 	var opportunities: Array = []
+	var under_ratio_opps: Array = []
 	var march_opps: Array = []
 	for i in range(scan_n):
 		var tag2 := str(candidates[i])
@@ -1088,6 +1106,12 @@ func try_ai_start_land_battles(day_index: int = 0) -> Dictionary:
 			var from_id := int(t.get("from_province_id", -1))
 			if to_id <= 0 or from_id <= 0:
 				continue
+			if _retake_blocked_for(tag2, to_id):
+				_bump_attack_reject("retake_cooldown")
+				continue
+			if not get_land_battle_at(to_id).is_empty() or not get_land_battle_at(from_id).is_empty():
+				_bump_attack_reject("already_open")
+				continue
 			var preview: Dictionary = can_assault_province(tag2, to_id, from_id)
 			var fid := str(preview.get("formation_id", "")).strip_edges()
 			if bool(preview.get("ok", false)) and not fid.is_empty():
@@ -1096,7 +1120,30 @@ func try_ai_start_land_battles(day_index: int = 0) -> Dictionary:
 				var empty_hex := bool(powers.get("empty_hex", false))
 				var att_p := float(powers.get("attacker_power", 0.0))
 				var def_p := float(powers.get("defender_power", 80.0))
-				var ratio_ok := empty_hex or att_p + 0.0001 >= def_p * _ai_min_attack_ratio()
+				var need := _ai_min_attack_ratio(tag2)
+				var ratio_ok := empty_hex or att_p + 0.0001 >= def_p * need
+				if not ratio_ok:
+					_bump_attack_reject("ratio")
+					if not empty_hex:
+						under_ratio_opps.append({
+							"tag": tag2,
+							"from_id": from_id,
+							"to_id": to_id,
+							"defender_tag": def_tag2,
+							"formation_id": fid,
+							"has_formation": true,
+							"defender_power": def_p,
+							"attacker_power": att_p,
+							"empty_hex": false,
+							"min_ratio": need,
+						})
+				var agr := LandBattleAi.personality_aggression(tag2)
+				var vs_player := not player_tag.is_empty() and def_tag2 == player_tag
+				if vs_player:
+					if agr < LandBattleAi.MIN_AGGRESSION_VS_PLAYER:
+						_bump_attack_reject("aggression")
+				elif agr < LandBattleAi.MIN_AGGRESSION_TO_START:
+					_bump_attack_reject("aggression")
 				if ratio_ok:
 					opportunities.append({
 						"tag": tag2,
@@ -1108,13 +1155,16 @@ func try_ai_start_land_battles(day_index: int = 0) -> Dictionary:
 						"defender_power": def_p,
 						"attacker_power": att_p,
 						"empty_hex": empty_hex,
+						"min_ratio": need,
 					})
 					continue
-				# Defended but under 1.5:1 — stack an adjacent spare onto from_id.
+				# Defended but under ratio — stack an adjacent spare onto from_id.
 				_collect_adjacent_stack_march(
 					tag2, from_id, to_id, def_tag2, marching_fids, combat_fids, march_opps
 				)
 				continue
+			if fid.is_empty():
+				_bump_attack_reject("no_formation")
 			# No adjacent formation: spare rear marches toward from_id (own-land dest).
 			var dest_own := false
 			if MapManager.has_method("get_province"):
@@ -1176,6 +1226,8 @@ func try_ai_start_land_battles(day_index: int = 0) -> Dictionary:
 					}
 			if not best_spare.is_empty():
 				march_opps.append(best_spare)
+	if scan_n > 0 and opportunities.is_empty() and under_ratio_opps.is_empty() and march_opps.is_empty():
+		_bump_attack_reject("scan_miss")
 
 	# Harness autopilot only. Live play passes the real player so plan_day
 	# will not order the human's divisions.
@@ -1235,13 +1287,24 @@ func try_ai_start_land_battles(day_index: int = 0) -> Dictionary:
 				"from_id": int(pick.get("from_id", -1)),
 				"defender_tag": str(pick.get("defender_tag", "")),
 			})
+			_ai_drop_commit_on_attack(str(pick.get("tag", "")), int(pick.get("to_id", -1)))
+			if int(plan.get("eligible_n", 0)) > started.size():
+				_bump_attack_reject("max_starts")
 	if not started.is_empty():
 		print("BattleManager: AI opened %d land battle(s) (start_land_battle, day=%d)" % [started.size(), int(day_index)])
 
+	_ai_refresh_massing_commits(under_ratio_opps, int(day_index))
 	var marched: Array = []
 	if true:
+		var mass_opps: Array = _ai_massing_march_opps(march_opps)
+		var use_mass := not mass_opps.is_empty()
 		var mplan: Dictionary = LandBattleAi.plan_marches(
-			march_opps, plan_player, int(day_index), marching_fids, combat_fids, 1
+			mass_opps if use_mass else march_opps,
+			plan_player,
+			int(day_index),
+			marching_fids,
+			combat_fids,
+			AI_MASSING_MARCHES if use_mass else 1
 		)
 		for raw_mp in mplan.get("picks", []):
 			if typeof(raw_mp) != TYPE_DICTIONARY:
@@ -1323,6 +1386,12 @@ func try_ai_follow_on_after_win(player_tag: String = "") -> Dictionary:
 	if picks.is_empty() or typeof(picks[0]) != TYPE_DICTIONARY:
 		return {"ok": true, "started_n": 0}
 	var pick: Dictionary = picks[0]
+	var held_pid := int(aar.get("from_id", aar.get("stage", 0)))
+	var follow_fid := str(pick.get("formation_id", "")).strip_edges()
+	var follow_tag := str(pick.get("tag", "")).strip_edges().to_upper()
+	if held_pid > 0 and not _hex_stays_occupied_after_follow_on(follow_tag, held_pid, follow_fid):
+		_bump_attack_reject("follow_on_blocked_garrison")
+		return {"ok": true, "started_n": 0, "reason": "garrison"}
 	var opened: Dictionary = start_land_battle(
 		str(pick.get("tag", "")),
 		int(pick.get("to_id", -1)),
@@ -1347,14 +1416,23 @@ func get_save_data() -> Dictionary:
 		"open_battles": get_open_land_battles(),
 		"next_seq": _next_land_battle_seq,
 		"last_aar": _last_land_aar.duplicate(true),
+		"retake_cooldown": _retake_cooldown_until_map(),
+		"retake_blocked": _retake_blocked.duplicate(true),
+		"ai_stall": _ai_stall.duplicate(true),
 	}
 
 
 func apply_save_data(data: Dictionary) -> void:
 	_open_land_battles.clear()
 	_last_land_aar = {}
+	_retake_cooldown.clear()
+	_retake_blocked.clear()
+	_ai_stall.clear()
 	if data.is_empty():
 		return
+	_load_retake_cooldown(data)
+	if data.get("ai_stall") is Dictionary:
+		_ai_stall = (data["ai_stall"] as Dictionary).duplicate(true)
 	var battles: Array = data.get("open_battles", []) as Array
 	for raw in battles:
 		if typeof(raw) != TYPE_DICTIONARY:
@@ -1844,6 +1922,9 @@ func _tick_one_open_land_battle(battle: Dictionary) -> Dictionary:
 		_finish_land_battle_hold(battle)
 	# Compact playtest clock still records AAR (next-hex is adjacent-only, hang-safe).
 	_record_land_aar(battle, winner, to_id)
+	if typeof(WarStateDomain) != TYPE_NIL:
+		WarStateDomain.note_battle_progress(str(battle.get("att_tag", "")), str(battle.get("def_tag", "")))
+	note_front_progress_tags([str(battle.get("att_tag", "")), str(battle.get("def_tag", ""))])
 	ev["aar"] = peek_last_land_aar()
 	return ev
 
@@ -2019,10 +2100,294 @@ func _active_empty_siege_opportunity(tag: String) -> Dictionary:
 	}
 
 
-func _ai_min_attack_ratio() -> float:
+func _ai_min_attack_ratio(tag: String = "") -> float:
+	var base := 1.5
 	if typeof(LandBattleAi) != TYPE_NIL:
-		return float(LandBattleAi.MIN_ATTACK_STRENGTH_RATIO)
-	return 1.5
+		base = float(LandBattleAi.MIN_ATTACK_STRENGTH_RATIO)
+	if tag.strip_edges().is_empty():
+		return base
+	var stalled := _ai_stall_days(_tag_up(tag))
+	var need := int(_ai_stall_threshold())
+	if stalled < need:
+		return base
+	if stalled >= need + 30:
+		return maxf(AI_EVEN_RATIO, 1.0)
+	return maxf(AI_RELAX_RATIO, 1.0)
+
+
+func ai_reject_counters(reset: bool = false) -> Dictionary:
+	var copy: Dictionary = _attack_reject.duplicate()
+	if reset:
+		_attack_reject = {}
+	return copy
+
+
+func reset_ai_war1_for_test() -> void:
+	_retake_cooldown.clear()
+	_retake_blocked.clear()
+	_ai_stall.clear()
+	_attack_reject.clear()
+
+
+func note_front_progress_tags(tags: Array) -> void:
+	var day := _ai_day()
+	for raw in tags:
+		var t := _tag_up(str(raw))
+		if t.is_empty():
+			continue
+		var row := _ensure_stall_row(t, day)
+		row["last_progress_day"] = day
+		_ai_stall[t] = row
+
+
+func note_war_ended(a: String, b: String) -> void:
+	for raw in [a, b]:
+		var t := _tag_up(str(raw))
+		if t.is_empty():
+			continue
+		if typeof(WarStateDomain) != TYPE_NIL and WarStateDomain.war_count(t) > 0:
+			continue
+		_ai_stall.erase(t)
+
+
+func _tag_up(raw: String) -> String:
+	return raw.strip_edges().to_upper()
+
+
+func _ai_day() -> int:
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("get_total_days_elapsed"):
+		return int(TimeManager.get_total_days_elapsed())
+	return 0
+
+
+func _ai_stall_threshold() -> int:
+	if typeof(WarStateDomain) != TYPE_NIL:
+		return maxi(1, int(WarStateDomain.rules().get("ai_attack_stall_days", 90)))
+	return 90
+
+
+func _ai_cooldown_days() -> int:
+	if typeof(WarStateDomain) != TYPE_NIL:
+		return maxi(1, int(WarStateDomain.rules().get("ai_retake_cooldown_days", 7)))
+	return 7
+
+
+func _ensure_stall_row(tag: String, day: int) -> Dictionary:
+	if _ai_stall.has(tag) and _ai_stall[tag] is Dictionary:
+		return (_ai_stall[tag] as Dictionary)
+	var start := day
+	if typeof(WarStateDomain) != TYPE_NIL:
+		var enemies: Array = WarStateDomain.enemies_of(tag)
+		if not enemies.is_empty():
+			var key := WarStateDomain.pair_key(tag, str(enemies[0]))
+			var wars: Dictionary = {}
+			if typeof(GameData) != TYPE_NIL:
+				var raw: Variant = GameData.peace_state.get("campaign_wars", {})
+				if raw is Dictionary:
+					var wv: Variant = (raw as Dictionary).get("wars", {})
+					if wv is Dictionary:
+						wars = wv
+			if wars.has(key) and wars[key] is Dictionary:
+				start = int((wars[key] as Dictionary).get("start_day", day))
+	var row := {
+		"last_progress_day": start,
+		"commit_to_id": -1,
+		"commit_from_id": -1,
+	}
+	_ai_stall[tag] = row
+	return row
+
+
+func _ai_stall_days(tag: String) -> int:
+	var t := _tag_up(tag)
+	if t.is_empty():
+		return 0
+	var day := _ai_day()
+	var row := _ensure_stall_row(t, day)
+	return maxi(0, day - int(row.get("last_progress_day", day)))
+
+
+func _ai_is_stalled(tag: String) -> bool:
+	return _ai_stall_days(tag) >= _ai_stall_threshold()
+
+
+func _ai_refresh_massing_commits(under_ratio_opps: Array, _day_index: int) -> void:
+	var by_tag: Dictionary = {}
+	for raw in under_ratio_opps:
+		if typeof(raw) != TYPE_DICTIONARY:
+			continue
+		var opp: Dictionary = raw
+		var t := _tag_up(str(opp.get("tag", "")))
+		if t.is_empty() or not _ai_is_stalled(t):
+			continue
+		if not by_tag.has(t):
+			by_tag[t] = []
+		(by_tag[t] as Array).append(opp)
+	for t2 in by_tag.keys():
+		var tag := str(t2)
+		var day := _ai_day()
+		var row := _ensure_stall_row(tag, day)
+		var opps: Array = by_tag[tag]
+		var keep_id := int(row.get("commit_to_id", -1))
+		var keep_from := int(row.get("commit_from_id", -1))
+		var still := false
+		if keep_id > 0:
+			for raw2 in opps:
+				var o2: Dictionary = raw2
+				if int(o2.get("to_id", -1)) == keep_id:
+					still = true
+					keep_from = int(o2.get("from_id", keep_from))
+					break
+		if still:
+			row["commit_to_id"] = keep_id
+			row["commit_from_id"] = keep_from
+			_ai_stall[tag] = row
+			continue
+		opps.sort_custom(func(a, b):
+			var sa := LandBattleAi.score_opportunity(a as Dictionary)
+			var sb := LandBattleAi.score_opportunity(b as Dictionary)
+			var ds := sb - sa
+			if absf(ds) > 0.0001:
+				return ds > 0.0
+			return int((a as Dictionary).get("to_id", 0)) < int((b as Dictionary).get("to_id", 0))
+		)
+		var pick: Dictionary = opps[0]
+		row["commit_to_id"] = int(pick.get("to_id", -1))
+		row["commit_from_id"] = int(pick.get("from_id", -1))
+		_ai_stall[tag] = row
+	var drop: Array = []
+	for t3 in _ai_stall.keys():
+		if by_tag.has(t3):
+			continue
+		if not _ai_is_stalled(str(t3)):
+			var r2: Dictionary = _ai_stall[t3]
+			if int(r2.get("commit_to_id", -1)) > 0:
+				drop.append(str(t3))
+	for t4 in drop:
+		_ai_drop_commit(str(t4))
+
+
+func _ai_massing_march_opps(march_opps: Array) -> Array:
+	var out: Array = []
+	for raw in march_opps:
+		if typeof(raw) != TYPE_DICTIONARY:
+			continue
+		var opp: Dictionary = raw
+		var tag := _tag_up(str(opp.get("tag", "")))
+		if not _ai_is_stalled(tag):
+			continue
+		var row: Dictionary = _ensure_stall_row(tag, _ai_day())
+		var dest := int(row.get("commit_from_id", -1))
+		var to_id := int(row.get("commit_to_id", -1))
+		if dest <= 0 or to_id <= 0:
+			continue
+		if _friendly_division_count(tag, dest) >= AI_MASSING_STACK:
+			continue
+		if int(opp.get("dest_id", -1)) != dest:
+			continue
+		out.append(opp)
+	return out
+
+
+func _ai_drop_commit(tag: String) -> void:
+	var t := _tag_up(tag)
+	if not _ai_stall.has(t):
+		return
+	var row: Dictionary = _ai_stall[t]
+	row["commit_to_id"] = -1
+	row["commit_from_id"] = -1
+	_ai_stall[t] = row
+
+
+func _ai_drop_commit_on_attack(tag: String, to_id: int) -> void:
+	var t := _tag_up(tag)
+	if not _ai_stall.has(t):
+		return
+	var row: Dictionary = _ai_stall[t]
+	if int(row.get("commit_to_id", -1)) == int(to_id) or int(to_id) > 0:
+		_ai_drop_commit(t)
+
+
+func _ai_drop_commit_if_hex_lost(to_id: int, new_holder: String) -> void:
+	var holder := _tag_up(new_holder)
+	for t in _ai_stall.keys():
+		var row: Dictionary = _ai_stall[t]
+		if int(row.get("commit_to_id", -1)) != int(to_id):
+			continue
+		if _tag_up(str(t)) != holder:
+			_ai_drop_commit(str(t))
+
+
+func _friendly_division_count(tag: String, pid: int) -> int:
+	return get_divisions_at_province(pid, tag).size()
+
+
+func _hex_stays_occupied_after_follow_on(tag: String, pid: int, follow_fid: String) -> bool:
+	var t := _tag_up(tag)
+	if t.is_empty() or pid <= 0:
+		return false
+	var skip := follow_fid.strip_edges()
+	for row in get_divisions_at_province(pid, t):
+		var fid := str(row.get("formation_id", "")).strip_edges()
+		if fid.is_empty() or fid == skip:
+			continue
+		return true
+	return false
+
+
+func _retake_blocked_for(tag: String, pid: int) -> bool:
+	var key := str(int(pid))
+	if not _retake_cooldown.has(key):
+		return false
+	var until := int(_retake_cooldown[key])
+	if _ai_day() >= until:
+		_retake_cooldown.erase(key)
+		_retake_blocked.erase(key)
+		return false
+	var blocked: Variant = _retake_blocked.get(key, [])
+	if not (blocked is Array):
+		return false
+	return (blocked as Array).has(_tag_up(tag))
+
+
+func _set_retake_cooldown(pid: int, previous_owner: String, previous_controller: String) -> void:
+	if pid <= 0:
+		return
+	var key := str(int(pid))
+	var until := _ai_day() + _ai_cooldown_days()
+	_retake_cooldown[key] = until
+	var tags: Array = []
+	for raw in [previous_owner, previous_controller]:
+		var t := _tag_up(str(raw))
+		if not t.is_empty() and not tags.has(t):
+			tags.append(t)
+	_retake_blocked[key] = tags
+
+
+func _retake_cooldown_until_map() -> Dictionary:
+	var out: Dictionary = {}
+	for k in _retake_cooldown.keys():
+		out[str(k)] = int(_retake_cooldown[k])
+	return out
+
+
+func _load_retake_cooldown(data: Dictionary) -> void:
+	var raw: Variant = data.get("retake_cooldown", {})
+	if raw is Dictionary:
+		for k in (raw as Dictionary).keys():
+			_retake_cooldown[str(k)] = int((raw as Dictionary)[k])
+	var blocked: Variant = data.get("retake_blocked", {})
+	if blocked is Dictionary:
+		_retake_blocked = (blocked as Dictionary).duplicate(true)
+
+
+func _bump_attack_reject(reason: String) -> void:
+	var key := reason.strip_edges()
+	if key.is_empty():
+		return
+	_attack_reject[key] = int(_attack_reject.get(key, 0)) + 1
+	if OS.get_environment(REJECT_LOG_ENV).strip_edges() == "1":
+		print("EOA_AI_REJECT attack %s n=%d" % [key, int(_attack_reject[key])])
 
 
 func _ai_front_powers(att_tag: String, from_id: int, def_tag: String, to_id: int) -> Dictionary:
@@ -2215,6 +2580,9 @@ func _apply_attacker_win_capture_light(att_tag: String, to_id: int, from_id: int
 	var owner_flipped := previous_owner != owner_now
 	var ctrl_flipped := previous_controller != ctrl_now
 	var attacker_holds := owner_now == tag or ctrl_now == tag
+	if attacker_holds and (owner_flipped or ctrl_flipped):
+		_set_retake_cooldown(to_id, previous_owner, previous_controller)
+		_ai_drop_commit_if_hex_lost(to_id, tag)
 	var liberation := previous_owner == tag and previous_controller != "" and previous_controller != tag and ctrl_now == tag
 	print(
 		"MAIN_FIX1_CAPTURE_SRC who=BattleManager._apply_attacker_win_capture_light pid=%d name=%s attacker=%s prev_owner=%s prev_ctrl=%s now_owner=%s now_ctrl=%s owner_flip=%s ctrl_flip=%s"
@@ -2405,6 +2773,44 @@ func close_land_battles_for_tag(tag: String) -> int:
 			keep.append(b)
 	_open_land_battles = keep
 	return closed
+
+
+func close_land_battles_for_pair(a: String, b: String) -> int:
+	var ta := a.strip_edges().to_upper()
+	var tb := b.strip_edges().to_upper()
+	if ta.is_empty() or tb.is_empty():
+		return 0
+	var keep: Array = []
+	var closed := 0
+	for raw in _open_land_battles:
+		if typeof(raw) != TYPE_DICTIONARY:
+			keep.append(raw)
+			continue
+		var battle: Dictionary = raw
+		var att := str(battle.get("att_tag", "")).strip_edges().to_upper()
+		var def := str(battle.get("def_tag", "")).strip_edges().to_upper()
+		var pair := (att == ta and def == tb) or (att == tb and def == ta)
+		if pair:
+			_finish_land_battle_hold(battle)
+			closed += 1
+		else:
+			keep.append(battle)
+	_open_land_battles = keep
+	return closed
+
+
+func pair_has_open_land_battle(a: String, b: String) -> bool:
+	var ta := a.strip_edges().to_upper()
+	var tb := b.strip_edges().to_upper()
+	for raw in _open_land_battles:
+		if typeof(raw) != TYPE_DICTIONARY:
+			continue
+		var battle: Dictionary = raw
+		var att := str(battle.get("att_tag", "")).strip_edges().to_upper()
+		var def := str(battle.get("def_tag", "")).strip_edges().to_upper()
+		if (att == ta and def == tb) or (att == tb and def == ta):
+			return true
+	return false
 
 
 func _finish_land_battle_hold(battle: Dictionary) -> void:
