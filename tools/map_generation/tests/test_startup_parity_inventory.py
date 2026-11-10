@@ -41,7 +41,7 @@ class TestStartupParityInventory(unittest.TestCase):
         self.assertEqual(p.get("status"), "PASS")
         self.assertEqual(p["inventory"]["has_berlin_710300"], True)
         self.assertEqual(BERLIN_PID, 710300)
-        self.assertEqual(EMPTY_BOARD_GARRISONS, 575)
+        self.assertEqual(EMPTY_BOARD_GARRISONS, 576)
 
     def test_missing_dir_fails(self) -> None:
         inv = inventory_world_accurate_board(ROOT / "data" / "does_not_exist_startup_parity")
