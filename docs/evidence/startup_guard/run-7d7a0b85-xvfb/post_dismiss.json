@@ -1,0 +1,106 @@
+{
+	"always_on_top": false,
+	"camera_pos": [
+		7601.29638671875,
+		1532.74560546875
+	],
+	"camera_zoom": 0.787418186664581,
+	"capital_in_visible_rect": true,
+	"chips": {
+		"aluminum": {
+			"stockpile": 4000.0,
+			"text": "0",
+			"visible": true
+		},
+		"energy": {
+			"stockpile": 0.0,
+			"text": "0",
+			"visible": true
+		},
+		"fuel": {
+			"stockpile": 4000.0,
+			"text": "0",
+			"visible": true
+		},
+		"layout_hides_below_1280": false,
+		"note": "hidden_chip_is_not_stockpile_zero",
+		"resources_container_visible": true,
+		"rubber": {
+			"stockpile": 2000.0,
+			"text": "0",
+			"visible": true
+		},
+		"steel": {
+			"stockpile": 12000.0,
+			"text": "0",
+			"visible": true
+		},
+		"vp_w": 1280.0
+	},
+	"elapsed_usec": 34353304,
+	"ger_capital_pid": 710300,
+	"ger_centroid": [
+		7603.83642578125,
+		1553.06518554688
+	],
+	"icons": {
+		"in_view": 100,
+		"nodes": 259,
+		"note": "node_visibility_not_pixel_proof",
+		"visible": 259
+	},
+	"image": {
+		"dark_frac": 0.4515,
+		"h": 800,
+		"looks_uniform_light": false,
+		"looks_varied_color": true,
+		"mean_rgb": [
+			0.271295100450516,
+			0.229341179132462,
+			0.313039213418961
+		],
+		"near_light_frac": 0.01525,
+		"note": "sampled_mean_not_pixel_oracle",
+		"ok": true,
+		"sample_n": 4000,
+		"saturated_frac": 0.795,
+		"w": 1280
+	},
+	"kind": "PRESENTATION_DIAGNOSTIC",
+	"mesh": {
+		"in_view": 1263,
+		"nodes": 3596,
+		"note": "counts_are_not_pixels_on_screen",
+		"visible": 3596
+	},
+	"monotonic_usec": 35256185,
+	"not_pixel_oracle": true,
+	"phase": "post_dismiss",
+	"png": "/tmp/eoa-startup-guard/post_dismiss.png",
+	"title_visible": false,
+	"underlay": {
+		"full_world_underlay_active": true,
+		"present": false,
+		"visible": false
+	},
+	"viewport_size": [
+		1280.0,
+		800.0
+	],
+	"visible_world_rect": [
+		6788.513671875,
+		1024.75634765625,
+		1625.56567382812,
+		1015.97857666016
+	],
+	"window": {
+		"always_on_top": false,
+		"display": "X11",
+		"mode": "windowed",
+		"mode_i": 0,
+		"size": [
+			1280,
+			800
+		]
+	}
+}
