@@ -83,7 +83,8 @@ static func build_inspector_topline(province: Province) -> Dictionary:
 				sea_zone = "⚓ Naval chokepoint / strait"
 			elif "chokepoint" not in sea_zone.to_lower() and "strait" not in sea_zone.to_lower():
 				sea_zone = "%s · ⚓ chokepoint" % sea_zone
-	return _apply_nation_display_names(_MapPolishFormatters.format_inspector_topline(province.name, owner, region, sea_zone), owner)
+	var pname := _MapPolishFormatters.province_ui_display_name(province.id, province.name)
+	return _apply_nation_display_names(_MapPolishFormatters.format_inspector_topline(pname, owner, region, sea_zone), owner)
 
 
 static func nation_display_name(tag: String) -> String:
@@ -149,13 +150,14 @@ static func build_strategic_hover_tooltip(province: Province) -> String:
 	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("has_strategic_chokepoint"):
 		if MapManager.has_strategic_chokepoint(province.id):
 			choke = "⚓ Naval chokepoint"
+	var pname := _MapPolishFormatters.province_ui_display_name(province.id, province.name)
 	if not choke.is_empty() and not region.is_empty():
-		return "%s\n%s · %s\n%s" % [nation, region, province.name, choke]
+		return "%s\n%s · %s\n%s" % [nation, region, pname, choke]
 	if not choke.is_empty():
-		return "%s\n%s\n%s" % [nation, province.name, choke]
+		return "%s\n%s\n%s" % [nation, pname, choke]
 	if not region.is_empty():
-		return "%s\n%s · %s" % [nation, region, province.name]
-	return "%s\n%s" % [nation, province.name]
+		return "%s\n%s · %s" % [nation, region, pname]
+	return "%s\n%s" % [nation, pname]
 
 
 static func build_hover_tooltip(
@@ -8410,7 +8412,8 @@ static func format_report_tooltip(report: Dictionary) -> String:
 	var pe: ProvinceEffects = report.get("province_effects") as ProvinceEffects
 	var lines: PackedStringArray = []
 	var tags := build_province_situation_tags(p)
-	var title := "%s%s (#%d)[/color]" % [COLOR_HEADER, p.name, p.id]
+	var pname := _MapPolishFormatters.province_ui_display_name(p.id, p.name)
+	var title := "%s%s (#%d)[/color]" % [COLOR_HEADER, pname, p.id]
 	if not tags.is_empty():
 		title += " " + tags
 	lines.append(title)

@@ -262,8 +262,11 @@ func _latch_shot(mm: Node, sm: Node, kind: String, player: String) -> void:
 		_fail("%s date is raw ISO '%s'" % [kind, date_l.text])
 		return
 	if kind == "defeat":
-		if cont == null or not cont.visible:
-			_fail("%s Continue as… missing on player defeat" % kind)
+		if keep == null or not keep.visible:
+			_fail("%s Continue as <nation> missing on player defeat" % kind)
+			return
+		if cont != null and cont.visible:
+			_fail("%s extra Continue as… still visible on capitulation" % kind)
 			return
 	elif cont == null or cont.visible:
 		_fail("%s Continue should stay hidden" % kind)

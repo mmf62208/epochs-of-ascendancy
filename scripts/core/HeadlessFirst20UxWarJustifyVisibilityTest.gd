@@ -134,6 +134,9 @@ func _run() -> void:
 		return
 	await _assert_diplomacy_justify()
 	await _assert_diplomacy_declare_flip()
+	if not await _assert_self_target_excluded(mm):
+		_cleanup()
+		return
 	_cleanup()
 
 
@@ -174,6 +177,12 @@ func _test_source_needles() -> void:
 	var insight := _read(SRC_INSIGHT)
 	if "core_for_line" not in insight or "country_display_name" not in insight:
 		_fail("ProvinceInsight must route Owner/Core For through country_display_name")
+		return
+	if "func is_self_nation" not in chrome:
+		_fail("CampaignWarChrome.is_self_nation missing")
+		return
+	if "is_self_nation" not in dip:
+		_fail("DiplomacyView must exclude the player's own nation")
 		return
 	_pass("source needles: neighbour+POL inspector; DipActions on main column; Attack hint; display names; day refresh")
 
@@ -533,6 +542,69 @@ func _assert_diplomacy_declare_flip() -> void:
 		return
 	_pass("Diplomacy flipped to Declare war on Poland without Refresh")
 	view.queue_free()
+
+
+func _assert_self_target_excluded(mm: Node) -> bool:
+	var lm := root.get_node_or_null("LeaderManager")
+	var sp := root.get_node_or_null("SessionPlayers")
+	if lm != null and lm.has_method("set_player_country_tag"):
+		lm.call("set_player_country_tag", "USA")
+	if sp != null and sp.has_method("setup_solo_play"):
+		sp.call("setup_solo_play", "USA")
+	if not bool(_chrome.call("is_self_nation", "USA", "USA")):
+		_fail("is_self_nation USA/USA should be true")
+		_restore_ger_player(lm, sp)
+		return false
+	if bool(_chrome.call("inspector_offers_justify", "USA", "USA")):
+		_fail("inspector_offers_justify still true for USA on USA")
+		_restore_ger_player(lm, sp)
+		return false
+	var usa_pid := _land_of(mm, "USA")
+	if usa_pid <= 0:
+		_fail("self-target: missing USA land")
+		_restore_ger_player(lm, sp)
+		return false
+	var host := _make_host("InspectorUsaSelf", Vector2(40, 640))
+	_ui.add_child(host)
+	_chrome.mount(host, mm.call("get_province", usa_pid))
+	var usa_btn := host.get_node_or_null("BtnDeclareWar") as Button
+	if usa_btn != null and usa_btn.visible:
+		_fail("USA player inspector still shows Justify on USA land (%s)" % usa_btn.text)
+		_restore_ger_player(lm, sp)
+		return false
+	if not ResourceLoader.exists("res://scenes/ui/DiplomacyView.tscn"):
+		_fail("DiplomacyView.tscn missing for self-target")
+		_restore_ger_player(lm, sp)
+		return false
+	var packed := load("res://scenes/ui/DiplomacyView.tscn") as PackedScene
+	var view: Node = packed.instantiate()
+	view.name = "DiplomacyViewSelf"
+	root.add_child(view)
+	await _flush()
+	var listed: Array = view.call("listed_country_tags") if view.has_method("listed_country_tags") else []
+	for tag_v in listed:
+		if str(tag_v).strip_edges().to_upper() == "USA":
+			_fail("Diplomacy listed_country_tags still includes player USA %s" % str(listed))
+			view.queue_free()
+			_restore_ger_player(lm, sp)
+			return false
+	var dip_btn := view.find_child("BtnJustifyWar", true, false) as Button
+	if dip_btn != null and dip_btn.visible and str(dip_btn.text).find("United States") >= 0:
+		_fail("Diplomacy Justify still self-targets USA (%s)" % dip_btn.text)
+		view.queue_free()
+		_restore_ger_player(lm, sp)
+		return false
+	view.queue_free()
+	_restore_ger_player(lm, sp)
+	_pass("self-target: USA excluded from inspector and Diplomacy Justify")
+	return true
+
+
+func _restore_ger_player(lm: Node, sp: Node) -> void:
+	if lm != null and lm.has_method("set_player_country_tag"):
+		lm.call("set_player_country_tag", "GER")
+	if sp != null and sp.has_method("setup_solo_play"):
+		sp.call("setup_solo_play", "GER")
 
 
 func _ensure_core_for(mm: Node, province: Object, tag: String) -> Object:

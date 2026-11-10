@@ -358,14 +358,26 @@ func _stats_line() -> String:
 	return "Day %d · %d victory points · %d provinces held" % [days, vp, held]
 
 
+func _mark_input_handled() -> void:
+	var vp := get_viewport() if is_inside_tree() else null
+	if vp != null:
+		vp.set_input_as_handled()
+
+
 func _input(event: InputEvent) -> void:
+	if not visible or is_queued_for_deletion() or str(name).ends_with("_dying"):
+		return
+	if typeof(CampaignEndDomain) != TYPE_NIL:
+		var vm: Dictionary = CampaignEndDomain.view_model()
+		if bool(vm.get("keep_playing", false)):
+			return
 	if _is_escape(event):
-		get_viewport().set_input_as_handled()
+		_mark_input_handled()
 
 
 func _swallow_input(event: InputEvent) -> void:
 	if _is_escape(event):
-		get_viewport().set_input_as_handled()
+		_mark_input_handled()
 
 
 func _is_escape(event: InputEvent) -> bool:
@@ -412,6 +424,8 @@ func _release_clock_lock() -> void:
 
 
 func _dismiss_end_screen() -> void:
+	set_process_input(false)
+	visible = false
 	remove_from_group("campaign_ink_end_screen")
 	name = "CampaignInkEndScreen_dying"
 	_release_clock_lock()
@@ -433,10 +447,9 @@ func _on_load() -> void:
 
 
 func _on_main_menu() -> void:
-	var tree := get_tree()
-	if tree == null:
-		return
-	tree.change_scene_to_file("res://scenes/TestScenario.tscn")
+	set_process_input(false)
+	visible = false
+	MainMenu.reload_to_living_title()
 
 
 func _open_command_center() -> void:

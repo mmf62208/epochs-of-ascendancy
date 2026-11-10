@@ -398,6 +398,7 @@ func _build_diplomatic_actions(parent: Node) -> void:
 
 
 func listed_country_tags() -> Array:
+	_refresh_player_country()
 	var found: Dictionary = {}
 	for tag in MAJOR_POWERS:
 		found[str(tag)] = true
@@ -414,18 +415,43 @@ func listed_country_tags() -> Array:
 				var nt := str(n).strip_edges().to_upper()
 				if not nt.is_empty():
 					found[nt] = true
-	var keys: Array = found.keys()
+	var keys: Array = []
+	var player := str(_player_country).strip_edges().to_upper()
+	for tag_v in found.keys():
+		var kt := str(tag_v).strip_edges().to_upper()
+		if kt.is_empty():
+			continue
+		if kt == player:
+			continue
+		if typeof(CampaignWarChrome) != TYPE_NIL and CampaignWarChrome.is_self_nation(player, kt):
+			continue
+		keys.append(kt)
 	keys.sort()
 	return keys
 
 
+func _refresh_player_country() -> void:
+	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_player_country_tag"):
+		var live := str(LeaderManager.get_player_country_tag()).strip_edges().to_upper()
+		if not live.is_empty():
+			_player_country = live
+			return
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_player_country_tag_fallback"):
+		var fb := str(MapManager.get_player_country_tag_fallback()).strip_edges().to_upper()
+		if not fb.is_empty():
+			_player_country = fb
+
+
 func _populate_country_selector() -> void:
 	country_selector.clear()
+	_refresh_player_country()
 	var idx := 0
 	var selected_idx := 0
 	for tag_v in listed_country_tags():
 		var tag := str(tag_v).strip_edges().to_upper()
 		if tag == _player_country:
+			continue
+		if typeof(CampaignWarChrome) != TYPE_NIL and CampaignWarChrome.is_self_nation(_player_country, tag):
 			continue
 		country_selector.add_item(_nation_label(tag))
 		country_selector.set_item_metadata(idx, tag)
@@ -433,6 +459,10 @@ func _populate_country_selector() -> void:
 			selected_idx = idx
 		idx += 1
 	if country_selector.item_count > 0:
+		var self_sel := typeof(CampaignWarChrome) != TYPE_NIL and CampaignWarChrome.is_self_nation(_player_country, _selected_country)
+		if self_sel or _selected_country == _player_country:
+			_selected_country = str(country_selector.get_item_metadata(0))
+			selected_idx = 0
 		country_selector.selected = selected_idx
 
 
@@ -454,17 +484,24 @@ func _sync_justify_button() -> void:
 	var btn := find_child("BtnJustifyWar", true, false) as Button
 	if btn == null:
 		return
+	_refresh_player_country()
 	var player := str(_player_country).strip_edges().to_upper()
 	var other := str(_selected_country).strip_edges().to_upper()
 	if typeof(CampaignWarChrome) == TYPE_NIL:
+		btn.visible = false
+		return
+	if CampaignWarChrome.is_self_nation(player, other):
 		btn.visible = false
 		return
 	CampaignWarChrome.apply_button(btn, CampaignWarChrome.button_state_for_owner(player, other))
 
 
 func _on_justify_war_pressed() -> void:
+	_refresh_player_country()
 	var other := str(_selected_country).strip_edges().to_upper()
 	if other.is_empty() or typeof(WarStateDomain) == TYPE_NIL:
+		return
+	if typeof(CampaignWarChrome) != TYPE_NIL and CampaignWarChrome.is_self_nation(_player_country, other):
 		return
 	var pid := _pid_owned_by(other)
 	if pid <= 0:
@@ -475,6 +512,8 @@ func _on_justify_war_pressed() -> void:
 		var declared: Dictionary = WarStateDomain.player_declare_from_province(pid)
 		if typeof(LeaderEventUI) != TYPE_NIL:
 			LeaderEventUI.show_toast(str(declared.get("reason", "War declared")), 2.5)
+		if typeof(CampaignWarChrome) != TYPE_NIL:
+			CampaignWarChrome.refresh_top_bar_war_readout()
 	else:
 		WarStateDomain.begin_player_justify_from_province(pid)
 		if typeof(GameData) != TYPE_NIL and GameData.has_method("apply_war_goal_live"):

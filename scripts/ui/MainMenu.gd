@@ -60,9 +60,142 @@ static func apply_living_campaign_pick(tag: String = "GER", year: int = 1936) ->
 		resolved = t
 	if typeof(SessionPlayers) != TYPE_NIL and SessionPlayers.has_method("adopt_living_human"):
 		SessionPlayers.adopt_living_human(resolved)
+	_seed_start_stockpile_if_empty()
+	_refresh_living_player_surfaces(resolved)
 	facts["ok"] = true
 	facts["applied"] = true
 	return facts
+
+
+## Overlay Main menu and in-game Return to Title share this path: reset
+## session leftovers, then reload the living title (TestScenario).
+static func reload_to_living_title(host: Node = null) -> void:
+	var tree := Engine.get_main_loop() as SceneTree
+	if tree == null:
+		return
+	if host is MainMenu:
+		(host as MainMenu)._return_to_title()
+		return
+	var existing: Node = null
+	if tree.root != null:
+		existing = tree.root.get_node_or_null("MainMenu")
+	if existing is MainMenu and is_instance_valid(existing) and not existing.is_queued_for_deletion():
+		(existing as MainMenu)._return_to_title()
+		return
+	_reset_session_and_change_to_title(tree)
+
+
+static func _reset_session_and_change_to_title(tree: SceneTree) -> void:
+	reset_session_leftovers(tree)
+	if tree.root != null and tree.root.has_meta("eoa_return_title_scene"):
+		var packed: Variant = tree.root.get_meta("eoa_return_title_scene")
+		if packed is PackedScene:
+			tree.change_scene_to_packed(packed)
+			return
+	tree.change_scene_to_file("res://scenes/TestScenario.tscn")
+
+
+## Drop autoload UI caches that survive change_scene (stockpile, NEXT chip, popups).
+static func reset_session_leftovers(tree: SceneTree = null) -> void:
+	if tree == null:
+		tree = Engine.get_main_loop() as SceneTree
+	if typeof(SupplyManager) != TYPE_NIL and SupplyManager.has_method("clear_clock_bar_for_scene_change"):
+		SupplyManager.call("clear_clock_bar_for_scene_change")
+	if typeof(NationalModifierManager) != TYPE_NIL and NationalModifierManager.has_method("clear_all_modifiers"):
+		NationalModifierManager.clear_all_modifiers()
+	if typeof(CampaignEndDomain) != TYPE_NIL:
+		CampaignEndDomain.reset_session_for_new_game()
+	if typeof(PlayNextHook) != TYPE_NIL:
+		PlayNextHook.reset_session()
+	if typeof(ProductionManager) != TYPE_NIL and ProductionManager.has_method("set_stockpile"):
+		ProductionManager.set_stockpile({})
+	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("clear_session_notices"):
+		LeaderEventUI.clear_session_notices()
+	if tree == null:
+		return
+	_close_session_root_popups(tree)
+	var mr: Node = tree.get_first_node_in_group("map_renderer")
+	if mr == null and tree.root != null:
+		mr = tree.root.find_child("MapRenderer", true, false)
+	if mr != null and is_instance_valid(mr):
+		if "selected_formation_id" in mr:
+			mr.selected_formation_id = ""
+		if mr.has_method("_hide_unit_card_keep_map_focus"):
+			mr.call("_hide_unit_card_keep_map_focus")
+		if mr.has_method("_refresh_next_hook_chip"):
+			mr.call("_refresh_next_hook_chip")
+	for bar in tree.get_nodes_in_group("top_info_bar"):
+		if bar == null or not is_instance_valid(bar):
+			continue
+		if bar.has_method("refresh_campaign_war_readout"):
+			bar.call("refresh_campaign_war_readout")
+		if bar.has_method("_update_resources"):
+			bar.call("_update_resources")
+		if bar.has_method("_close_overlay_screens"):
+			bar.call("_close_overlay_screens")
+
+
+static func _close_session_root_popups(tree: SceneTree) -> void:
+	if tree == null or tree.root == null:
+		return
+	var names := PackedStringArray([
+		"DiplomacyView",
+		"ProductionAssignmentScreen",
+		"LeaderAssignmentScreen",
+		"AgentAssignmentScreen",
+		"NationalSpiritsScreen",
+		"TechnologyScreen",
+		"OrderCommandPanel",
+		"PolicyLawScreen",
+		"UnitDetailPopup",
+		"PeaceConferenceWindow",
+	])
+	for nm in names:
+		var n: Node = tree.root.find_child(nm, true, false)
+		if n == null or not is_instance_valid(n) or n.is_queued_for_deletion():
+			continue
+		n.name = "%s_dying" % nm
+		n.queue_free()
+
+
+static func _seed_start_stockpile_if_empty() -> void:
+	if typeof(ProductionManager) == TYPE_NIL or not ProductionManager.has_method("add_stockpile"):
+		return
+	var steel := 0.0
+	if "national_stockpile" in ProductionManager:
+		steel = float(ProductionManager.national_stockpile.get("steel", 0.0))
+	if steel >= 500.0:
+		return
+	ProductionManager.add_stockpile(
+		{
+			"steel": 12000.0,
+			"aluminum": 4000.0,
+			"fuel": 4000.0,
+			"rubber": 2000.0,
+			"coal": 8000.0,
+		}
+	)
+
+
+static func _refresh_living_player_surfaces(player_tag: String) -> void:
+	var tree := Engine.get_main_loop() as SceneTree
+	if tree == null:
+		return
+	var tag := player_tag.strip_edges().to_upper()
+	for bar in tree.get_nodes_in_group("top_info_bar"):
+		if bar == null or not is_instance_valid(bar):
+			continue
+		if "player_country_tag" in bar and not tag.is_empty():
+			bar.player_country_tag = tag
+		if bar.has_method("_update_resources"):
+			bar.call("_update_resources")
+		if bar.has_method("refresh_campaign_war_readout"):
+			bar.call("refresh_campaign_war_readout")
+	var mr: Node = tree.get_first_node_in_group("map_renderer")
+	if mr == null and tree.root != null:
+		mr = tree.root.find_child("MapRenderer", true, false)
+	if mr != null and is_instance_valid(mr) and mr.has_method("_refresh_next_hook_chip"):
+		mr.call("_refresh_next_hook_chip")
 
 var _closing := false
 var _root: Control
@@ -190,11 +323,17 @@ func _is_live_escape_event(event: InputEvent) -> bool:
 	return false
 
 
+func _mark_input_handled() -> void:
+	var vp := get_viewport() if is_inside_tree() else null
+	if vp != null:
+		vp.set_input_as_handled()
+
+
 func _input(event: InputEvent) -> void:
 	if _closing:
 		return
 	if _confirm_blocks_event(event):
-		get_viewport().set_input_as_handled()
+		_mark_input_handled()
 		return
 	if not _is_live_escape_event(event):
 		return
@@ -205,10 +344,10 @@ func _input(event: InputEvent) -> void:
 	)
 	if _living_title_is_up() or has_meta("eoa_opened_from_living_title"):
 		_close_for_living_title_esc()
-		get_viewport().set_input_as_handled()
+		_mark_input_handled()
 		return
 	_route_escape_to_stack()
-	get_viewport().set_input_as_handled()
+	_mark_input_handled()
 
 
 func _route_escape_to_stack() -> void:
@@ -226,7 +365,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if _closing:
 		return
 	if _confirm_blocks_event(event):
-		get_viewport().set_input_as_handled()
+		_mark_input_handled()
 		return
 	if not _is_live_escape_event(event):
 		return
@@ -236,10 +375,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	)
 	if _living_title_is_up() or has_meta("eoa_opened_from_living_title"):
 		_close_for_living_title_esc()
-		get_viewport().set_input_as_handled()
+		_mark_input_handled()
 		return
 	_route_escape_to_stack()
-	get_viewport().set_input_as_handled()
+	_mark_input_handled()
 
 
 func _build_ui() -> void:
@@ -793,11 +932,14 @@ func _find_action_button(action_id: String) -> Button:
 	return null
 
 
-## "refresh", "close", "header", or "" for a screen point. Geometry only.
+## "refresh", "return_to_title", "close", "header", or "" for a screen point. Geometry only.
 func live_pointer_target(screen: Vector2) -> String:
 	var refresh := _find_action_button("refresh")
 	if refresh != null and _control_has_point(refresh, screen):
 		return "refresh"
+	var ret := _find_action_button("return_to_main")
+	if ret != null and _control_has_point(ret, screen):
+		return "return_to_title"
 	var close_b := close_x_button()
 	if close_b != null and _control_has_point(close_b, screen):
 		return "close"
@@ -818,6 +960,11 @@ func activate_live_pointer(screen: Vector2) -> String:
 		elif btn != null:
 			btn.pressed.emit()
 		return "refresh"
+	if kind == "return_to_title":
+		var ret := _find_action_button("return_to_main")
+		_play_live_click(ret)
+		_return_to_title()
+		return "return_to_title"
 	if kind == "close":
 		_play_live_click(close_x_button())
 		return "close"
@@ -1013,7 +1160,6 @@ func _write_slot(slot: String) -> void:
 		var abs_p := str(result.get("absolute_path", result.get("path", "")))
 		var kb := int(int(result.get("bytes", 0)) / 1024)
 		_set_status("Saved \"%s\" · %d KB · %s" % [slot, kb, abs_p])
-		_toast("Saved %s (%d KB)" % [slot, kb], 2.5)
 		print("MainMenu: save ok → %s (%d bytes)" % [abs_p, int(result.get("bytes", 0))])
 		call_deferred("_refresh_save_list")
 	else:
@@ -1583,28 +1729,11 @@ func _return_to_title() -> void:
 	_set_status("Reloading…")
 	_pause_game(false)
 	menu_closed.emit()
-	# Drop the cached clock bar while it is still a live node. The scene
-	# swap frees the old TopInfoBar; SupplyManager must not keep that ref.
-	if typeof(SupplyManager) != TYPE_NIL and SupplyManager.has_method("clear_clock_bar_for_scene_change"):
-		SupplyManager.call("clear_clock_bar_for_scene_change")
-	# Autoloads survive change_scene. Untyped leftover arrays SCRIPT ERROR
-	# on the next TestRunner apply_national_effect (second Begin).
-	if typeof(NationalModifierManager) != TYPE_NIL and NationalModifierManager.has_method("clear_all_modifiers"):
-		NationalModifierManager.clear_all_modifiers()
-	if typeof(CampaignEndDomain) != TYPE_NIL:
-		CampaignEndDomain.reset_session_for_new_game()
 	queue_free()
 	var tree := get_tree()
 	if tree == null:
 		return
-	# Play always reloads TestScenario. A headless guard may supply a
-	# PackedScene on the root so it can idle the title without the harness.
-	if tree.root != null and tree.root.has_meta("eoa_return_title_scene"):
-		var packed: Variant = tree.root.get_meta("eoa_return_title_scene")
-		if packed is PackedScene:
-			tree.change_scene_to_packed(packed)
-			return
-	tree.change_scene_to_file("res://scenes/TestScenario.tscn")
+	_reset_session_and_change_to_title(tree)
 
 
 func _map_renderer_for_close() -> Node:

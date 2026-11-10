@@ -3308,6 +3308,10 @@ func _dismiss_search_esc_layer() -> bool:
 
 
 func _campaign_end_overlay_is_up() -> bool:
+	if typeof(CampaignEndDomain) != TYPE_NIL:
+		var vm: Dictionary = CampaignEndDomain.view_model()
+		if bool(vm.get("keep_playing", false)):
+			return false
 	var tree := get_tree()
 	if tree == null:
 		return false
@@ -3358,13 +3362,29 @@ func _esc_open_command_center() -> void:
 		tib.call_deferred("_on_menu_pressed")
 
 
-func _campaign_modal_consumes_pointer(event: InputEventMouseButton) -> bool:
+func _campaign_modal_is_up() -> bool:
 	var tree := get_tree()
 	if tree == null:
 		return false
 	for n in tree.get_nodes_in_group("campaign_end_screen"):
+		if n != null and is_instance_valid(n) and n.visible:
+			return true
+	for layer in tree.get_nodes_in_group("campaign_peace_sheet"):
+		if layer != null and is_instance_valid(layer) and layer.visible:
+			return true
+	return false
+
+
+func _campaign_modal_consumes_pointer(event: InputEventMouseButton) -> bool:
+	var tree := get_tree()
+	if tree == null:
+		return false
+	var vp := get_viewport() if is_inside_tree() else null
+	for n in tree.get_nodes_in_group("campaign_end_screen"):
 		if n == null or not is_instance_valid(n) or not n.visible:
 			continue
+		# handle_pointer → Main menu can change_scene and free this node.
+		MapRenderer._mark_input_handled(vp)
 		if n.has_method("handle_pointer"):
 			n.call("handle_pointer", event)
 		return true
@@ -3396,7 +3416,13 @@ func _collect_campaign_buttons(n: Node, out: Array) -> void:
 		_collect_campaign_buttons(c, out)
 
 
+static func _mark_input_handled(vp: Viewport) -> void:
+	if vp != null:
+		vp.set_input_as_handled()
+
+
 func _input(event: InputEvent) -> void:
+	var vp := get_viewport() if is_inside_tree() else null
 	# Esc / I / Home must beat GUI focus (search LineEdit) so a stuck inspector cannot eat keys.
 	if event is InputEventKey and event.pressed and not event.echo:
 		# Search / any LineEdit: do not steal letters (Play: typing "i" fired I-glyphs).
@@ -3404,7 +3430,7 @@ func _input(event: InputEvent) -> void:
 			return
 		if event.keycode == KEY_HOME:
 			_apply_home_key(event.shift_pressed)
-			get_viewport().set_input_as_handled()
+			MapRenderer._mark_input_handled(vp)
 			return
 		if event.keycode == KEY_END:
 			# Do not arm still-click / do not clamp-before-fit (Play: first End
@@ -3413,15 +3439,15 @@ func _input(event: InputEvent) -> void:
 			_close_click_guard = false
 			_close_release_seen = false
 			_focus_asia_view()
-			get_viewport().set_input_as_handled()
+			MapRenderer._mark_input_handled(vp)
 			return
 		if event.keycode == KEY_G and not event.ctrl_pressed and not event.alt_pressed:
 			_request_hang_safe_supply_corridor()
-			get_viewport().set_input_as_handled()
+			MapRenderer._mark_input_handled(vp)
 			return
 		if event.keycode == KEY_L and not event.ctrl_pressed and not event.alt_pressed:
 			_handle_supply_overlay_key()
-			get_viewport().set_input_as_handled()
+			MapRenderer._mark_input_handled(vp)
 			return
 		# U = view-only unit counters (default shown). Search LineEdit already
 		# returned above, so typing in Search cannot fire this.
@@ -3431,11 +3457,11 @@ func _input(event: InputEvent) -> void:
 				_show_map_layer_toast("Supply/sealane flow %s (Shift+U)" % ("ON" if onu else "OFF"))
 			else:
 				toggle_unit_counters()
-			get_viewport().set_input_as_handled()
+			MapRenderer._mark_input_handled(vp)
 			return
 		# Mapmodes in _input so toolbar/search focus cannot swallow F2–F4 / Ctrl+F9.
 		if _handle_mapmode_hotkey(event):
-			get_viewport().set_input_as_handled()
+			MapRenderer._mark_input_handled(vp)
 			return
 		if _is_live_escape_event(event) or event.keycode == KEY_ESCAPE:
 			# Full Esc chain in `_input` (Home-key pattern) so search/GUI cannot
@@ -3447,19 +3473,19 @@ func _input(event: InputEvent) -> void:
 				% [str(_living_title_boot_is_up()), str(process_mode)]
 			)
 			_handle_escape_key()
-			get_viewport().set_input_as_handled()
+			MapRenderer._mark_input_handled(vp)
 			return
 		if _living_title_boot_is_up() and _is_live_begin_key(event):
 			print("EOA_LIVE_RAW_KEY who=MapRenderer._input event=begin_key")
 			var boot_bk: Node = _living_title_boot_node()
 			if boot_bk != null and boot_bk.has_method("try_focused_system_toggle_key") and bool(boot_bk.call("try_focused_system_toggle_key", event)):
 				print("EOA_LIVE_PTR who=MapRenderer._input action=toggle_key")
-				get_viewport().set_input_as_handled()
+				MapRenderer._mark_input_handled(vp)
 				return
 			if boot_bk != null and boot_bk.has_method("handle_live_begin"):
 				boot_bk.call("handle_live_begin")
 				print("EOA_LIVE_PTR who=MapRenderer._input action=begin_key")
-			get_viewport().set_input_as_handled()
+			MapRenderer._mark_input_handled(vp)
 			return
 		if (
 			event.keycode == KEY_I
@@ -3477,14 +3503,14 @@ func _input(event: InputEvent) -> void:
 					str((gq_i.get("lod_policy", {}) as Dictionary).get("max_glyphs", "?")),
 				]
 			)
-			get_viewport().set_input_as_handled()
+			MapRenderer._mark_input_handled(vp)
 			return
 	if _living_title_boot_is_up() and event is InputEventScreenTouch:
 		# computerUse / remote desktop often delivers touch, not MouseButton.
 		if _is_live_pointer_press(event):
 			var touch_act: String = _route_living_title_pointer(event)
 			if LivingTitleBoot.consumes_live_action(touch_act):
-				get_viewport().set_input_as_handled()
+				MapRenderer._mark_input_handled(vp)
 		return
 	if event is InputEventMouseButton:
 		# Wheel zoom even when GUI has focus on non-scroll chrome (legend can steal wheel —
@@ -3508,15 +3534,18 @@ func _input(event: InputEvent) -> void:
 				_zoom_toward_mouse(factor, wheel_screen)
 				# NEVER call full _refresh_terrain_zoom_aware() / 3520 fill rebuild per notch.
 				_schedule_light_terrain_zoom_refresh()
-				get_viewport().set_input_as_handled()
+				MapRenderer._mark_input_handled(vp)
 		elif event.button_index == MOUSE_BUTTON_MIDDLE or event.button_index == MOUSE_BUTTON_RIGHT:
 			# MMB/right-drag pan in _input so GUI focus cannot kill pan.
 			# Consume press and release so a still-click never opens a unit card.
 			_handle_middle_or_right_pointer(event)
 			return
 		elif event.button_index == MOUSE_BUTTON_LEFT:
-			if _campaign_modal_consumes_pointer(event):
-				get_viewport().set_input_as_handled()
+			# Overlay Main menu can change_scene and free this node. Mark first.
+			if _campaign_modal_is_up():
+				MapRenderer._mark_input_handled(vp)
+				_campaign_modal_consumes_pointer(event)
+				MapRenderer._mark_input_handled(vp)
 				return
 			# xdotool / computerUse clicks do not refresh gui_get_hovered_control.
 			# Hit the inspector Close rect from the event position.
@@ -3526,7 +3555,7 @@ func _input(event: InputEvent) -> void:
 			# press and do not mark the press handled — the Control still closes.
 			if not event.pressed and _chrome_hold_swallowed:
 				_release_chrome_hold_without_pick()
-				get_viewport().set_input_as_handled()
+				MapRenderer._mark_input_handled(vp)
 				return
 			if event.pressed and _cc_chrome_consumes_point(event.position):
 				# Header click and CloseX. Do not mark handled: CloseX `pressed`
@@ -3545,11 +3574,14 @@ func _input(event: InputEvent) -> void:
 			if _cc_overlay_blocks_map_pointer():
 				if event.pressed:
 					var mm_ov := _command_center_overlay()
-					if mm_ov != null and mm_ov.has_method("live_pointer_target") and str(mm_ov.call("live_pointer_target", event.position)) == "refresh":
-						if mm_ov.has_method("activate_live_pointer"):
-							mm_ov.call("activate_live_pointer", event.position)
-						get_viewport().set_input_as_handled()
-						return
+					if mm_ov != null and mm_ov.has_method("live_pointer_target"):
+						var tgt := str(mm_ov.call("live_pointer_target", event.position))
+						if tgt == "refresh" or tgt == "return_to_title":
+							# Mark first: Return to Title can change_scene and free this node.
+							MapRenderer._mark_input_handled(vp)
+							if mm_ov.has_method("activate_live_pointer"):
+								mm_ov.call("activate_live_pointer", event.position)
+							return
 					_cc_map_press_latch = true
 				else:
 					call_deferred("_clear_cc_map_press_latch")
@@ -3581,7 +3613,7 @@ func _input(event: InputEvent) -> void:
 			# inspector + soft click-zoom 0.776→0.900). One-shot like TipDismiss.
 			if not event.pressed and _begin_title_release_blocks_map_pick():
 				call_deferred("_clear_begin_title_release_swallow")
-				get_viewport().set_input_as_handled()
+				MapRenderer._mark_input_handled(vp)
 				return
 			# INPUT-1: do not swallow leftover in `_input` (GUI must see the
 			# close release so `pressed` fires). `_unhandled_input` eats the
@@ -3600,7 +3632,7 @@ func _input(event: InputEvent) -> void:
 					_release_chrome_hold_without_pick()
 					call_deferred("_clear_begin_title_release_swallow")
 					call_deferred("_clear_ui_close_release_swallow")
-					get_viewport().set_input_as_handled()
+					MapRenderer._mark_input_handled(vp)
 					return
 				if event.pressed:
 					print(
@@ -3612,7 +3644,7 @@ func _input(event: InputEvent) -> void:
 					if LivingTitleBoot.consumes_live_action(title_act):
 						if title_act == "begin":
 							arm_begin_title_release_swallow()
-						get_viewport().set_input_as_handled()
+						MapRenderer._mark_input_handled(vp)
 						return
 					if title_act == "passthrough":
 						return
@@ -3633,7 +3665,7 @@ func _input(event: InputEvent) -> void:
 				if title_pid <= 0:
 					title_pid = _resolve_hex_pick_pid(title_world)
 				_try_living_title_map_pick(title_pid)
-				get_viewport().set_input_as_handled()
+				MapRenderer._mark_input_handled(vp)
 				return
 			if event.pressed and not _search_chrome_contains_point(event.position) and not _top_bar_owns_click(event.position):
 				# event.position, not the stale mouse. A search click keeps
@@ -3677,7 +3709,7 @@ func _input(event: InputEvent) -> void:
 					if not _is_mouse_over_blocking_ui():
 						_arm_left_map_press()
 						_mark_left_pan_blocked_pick()
-						get_viewport().set_input_as_handled()
+						MapRenderer._mark_input_handled(vp)
 						return
 			if not event.pressed and _consume_unit_card_press_release_if_armed():
 				return
@@ -3690,7 +3722,7 @@ func _input(event: InputEvent) -> void:
 				# Close on press so the release cannot pick the hex under the button.
 				if _mouse_over_close_control() and _inspector_stack_blocking_input():
 					_dismiss_close_control_from_input()
-					get_viewport().set_input_as_handled()
+					MapRenderer._mark_input_handled(vp)
 					return
 				if _top_bar_owns_click() or _mouse_over_search_control() or _search_ui_owns_click() or _road_spine_btn_owns_click():
 					return
@@ -3713,7 +3745,7 @@ func _input(event: InputEvent) -> void:
 				_note_close_button_release()
 				if did_left_pan:
 					_mark_left_pan_blocked_pick()
-					get_viewport().set_input_as_handled()
+					MapRenderer._mark_input_handled(vp)
 				else:
 					# Still-click (select / later commit) must drop leftover origin
 					# so hover-move cannot latch the next map click as a drag.
@@ -3725,7 +3757,7 @@ func _input(event: InputEvent) -> void:
 						if rel_pid <= 0:
 							rel_pid = _resolve_hex_pick_pid(rel_world)
 						_try_living_title_map_pick(rel_pid)
-						get_viewport().set_input_as_handled()
+						MapRenderer._mark_input_handled(vp)
 						return
 					elif (
 						not event.shift_pressed
@@ -4310,7 +4342,7 @@ func _unhandled_input(event: InputEvent) -> void:
 						attack_staging_province_id = pid
 						DebugOverlay.toast_map_debug(
 							"Attacker staging: %s (%d) → battle at selected %d"
-							% [resolved_province.name, pid, selected_province_id]
+							% [_province_display_name(pid), pid, selected_province_id]
 						)
 						get_viewport().set_input_as_handled()
 						return
@@ -5999,11 +6031,19 @@ func _corridor_front_target_for_tag(owner_tag: String, capital_id: int) -> int:
 
 
 func _province_display_name(pid: int) -> String:
+	# Display-only. data/provinces_world_accurate still stores "RUS West".
+	if pid == 903492:
+		return "Western Russia"
+	var raw := ""
 	if provinces.has(pid):
 		var p: Province = provinces[pid] as Province
-		if p != null and not str(p.name).is_empty():
-			return str(p.name)
-	return "#%d" % pid
+		if p != null:
+			raw = str(p.name)
+	elif typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province"):
+		var mp: Province = MapManager.get_province(pid) as Province
+		if mp != null:
+			raw = str(mp.name)
+	return _MapPolishFormatters.province_ui_display_name(pid, raw)
 
 
 ## Soft corridor fuel 0–1 from oil/fuel/rubber + hub factories (pure product parity).
@@ -20612,7 +20652,7 @@ func open_province_inspector_from_search(province_id: int) -> bool:
 	show_info_panel(province, true, true)
 	_raise_province_inspector_over_unit_card()
 	_reveal_ix1_road_spine_on_inspector(province, true)
-	_show_inspector_toast("%s · province inspector" % str(province.name), 2.2)
+	_show_inspector_toast("%s · province inspector" % _province_display_name(province.id), 2.2)
 	if typeof(MapManager) != TYPE_NIL:
 		MapManager.province_selected.emit(province_id)
 	return true
@@ -21112,7 +21152,7 @@ func show_info_panel(province: Province, force_open: bool = false, keep_camera: 
 
 	# Top-line: name / owner / region / sea zone (always present when data exists).
 	var topline: Dictionary = ProvinceInsight.build_inspector_topline(province)
-	var name_text := str(topline.get("title", province.name))
+	var name_text := str(topline.get("title", _province_display_name(province.id)))
 	if selected_province_id >= 0 and selected_province_id != province.id:
 		var other := _battle_counterpart_for_hover(province)
 		if other != null:
@@ -22206,7 +22246,7 @@ func _try_move_selected_unit_to_province(province: Province) -> bool:
 	if bool(res.get("already_here", false)):
 		_skip_inspector_after_march = true
 		_clear_march_destination_arm()
-		_show_inspector_toast("Already at %s" % province.name, 2.5)
+		_show_inspector_toast("Already at %s" % _province_display_name(province.id), 2.5)
 		return true
 	if not bool(res.get("ok", false)):
 		var reason := str(res.get("reason", ""))
@@ -22227,7 +22267,7 @@ func _try_move_selected_unit_to_province(province: Province) -> bool:
 		audio_mv.call("notify_mv1_move_committed")
 	_show_inspector_toast(
 		"March · %d hop%s · arrives in %d day%s · unpause to walk · %s"
-		% [hops_n, "s" if hops_n != 1 else "", cal, "s" if cal != 1 else "", province.name],
+		% [hops_n, "s" if hops_n != 1 else "", cal, "s" if cal != 1 else "", _province_display_name(province.id)],
 		5.0
 	)
 	_refresh_open_unit_card_for_selected()
@@ -22784,11 +22824,7 @@ func mv1_rebuild_unit_icons() -> void:
 
 
 func _on_march_hop_ui(to_pid: int, arrived: bool, dest_id: int = -1, hop: Dictionary = {}) -> void:
-	var pname := "province %d" % to_pid
-	if provinces.has(to_pid):
-		var p: Province = provinces[to_pid] as Province
-		if p != null:
-			pname = p.name
+	var pname := _province_display_name(to_pid)
 	var rf: Dictionary = hop.get("reinforce", {}) as Dictionary if hop is Dictionary else {}
 	if bool(rf.get("joined", false)):
 		_sync_land_battle_bubbles()
@@ -24443,9 +24479,7 @@ func _on_build_road_spine_pressed() -> void:
 	_log_smoke_spine_start(_ix1_last_spine_press)
 	if armed:
 		var eta := int(result.get("eta_days", 18))
-		var pname := ""
-		if provinces.has(pid):
-			pname = provinces[pid].name
+		var pname := _province_display_name(pid)
 		# Toast + Building… BEFORE any camera work. Play MIXED 002df244:
 		# focus_province_by_id defaulted to tactical 2.4 and the process died
 		# before the player saw start feedback.
@@ -24909,9 +24943,7 @@ func _on_build_rhine_bridge_pressed() -> void:
 	_log_smoke_rx1_start(_rx1_last_press)
 	if armed:
 		var eta := int(result.get("eta_days", 36))
-		var pname := ""
-		if provinces.has(pid):
-			pname = provinces[pid].name
+		var pname := _province_display_name(pid)
 		_apply_rx1_building_button_state(pid, 0, eta)
 		_show_inspector_toast("Rhine bridge started in %s · ETA %d days" % [pname, eta], 3.0)
 		if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
@@ -25076,9 +25108,7 @@ func _on_invest_infrastructure_pressed() -> void:
 	if result.get("success", false):
 		var eta := int(result.get("eta_days", 18))
 		var cost := int(result.get("cost_pp", 0))
-		var pname := ""
-		if provinces.has(selected_province_id):
-			pname = provinces[selected_province_id].name
+		var pname := _province_display_name(selected_province_id)
 		# Auto-center on the province where the infra change/project started so the player sees the update location.
 		focus_province_by_id(selected_province_id)
 		var flair: Dictionary = _MapNextListHelpers.format_infra_project_flair(
@@ -25146,9 +25176,7 @@ func _on_infra_progress_for_inspector(pid: int, _proj: Variant, _delta: float) -
 		ol.queue_redraw()
 
 func _on_infra_completed_for_inspector(pid: int, new_level: int, _axis: String, _proj: Variant) -> void:
-	var pname := ""
-	if provinces.has(pid):
-		pname = provinces[pid].name
+	var pname := _province_display_name(pid)
 	var spine := false
 	if _proj != null:
 		spine = bool(_proj.build_road_spine)
@@ -25250,7 +25278,7 @@ func _play_map_action_flair_select(province: Province) -> void:
 			sea_zone = str(MapManager.get_sea_zone_name(province.id))
 	var is_coastal := _province_is_coastal_land(province)
 	var flair: Dictionary = _MapNextListHelpers.format_province_select_flair(
-		province.name,
+		_province_display_name(province.id),
 		province.owner_tag,
 		region,
 		province.terrain,
@@ -25262,7 +25290,7 @@ func _play_map_action_flair_select(province: Province) -> void:
 	)
 	# Brief toast — avoid spam if rapid re-select of same province
 	if _last_select_flair_pid != province.id or Time.get_ticks_msec() - _last_select_flair_msec > 900:
-		_show_inspector_toast(str(flair.get("toast", province.name)), float(flair.get("duration", 1.8)))
+		_show_inspector_toast(str(flair.get("toast", _province_display_name(province.id))), float(flair.get("duration", 1.8)))
 		_play_map_sfx(str(flair.get("sfx", "select")))
 		_last_select_flair_pid = province.id
 		_last_select_flair_msec = Time.get_ticks_msec()
@@ -25321,7 +25349,7 @@ func _try_set_attack_staging(province: Province) -> bool:
 		attack_staging_province_id = province.id
 		debug_combat_attacker_province_id = province.id
 		_show_inspector_toast(
-			"Attack staging: %s — Ctrl+click adjacent enemy province" % province.name,
+			"Attack staging: %s — Ctrl+click adjacent enemy province" % _province_display_name(province.id),
 			2.8,
 		)
 		return true
@@ -25827,9 +25855,19 @@ func _show_open_fight_sheet(
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	body.custom_minimum_size = Vector2(330, 0)
 	var lines: PackedStringArray = PackedStringArray()
-	lines.append("Attacker · %s · %s @ %s" % [attacker_tag, att_name, from_name])
+	var att_nation := attacker_tag
+	if typeof(CampaignWarChrome) != TYPE_NIL:
+		var att_shown := str(CampaignWarChrome.display_name_for_tag(attacker_tag)).strip_edges()
+		if not att_shown.is_empty():
+			att_nation = att_shown
+	var def_nation := def_tag
+	if typeof(CampaignWarChrome) != TYPE_NIL:
+		var def_shown := str(CampaignWarChrome.display_name_for_tag(def_tag)).strip_edges()
+		if not def_shown.is_empty():
+			def_nation = def_shown
+	lines.append("Attacker · %s · %s @ %s" % [att_nation, att_name, from_name])
 	if enemy_pid > 0:
-		lines.append("Defender · %s · %s" % [def_tag, def_name])
+		lines.append("Defender · %s · %s" % [def_nation, def_name])
 		if not terrain.is_empty():
 			lines.append("Terrain · %s" % terrain.capitalize())
 		if atk_p > 0.0 or def_p > 0.0:
@@ -26201,7 +26239,7 @@ func _update_settle_button(province: Province) -> void:
 			CampaignWarChrome.mount(info_panel, province)
 		return
 	_btn_settle.visible = true
-	var settle_nm := str(province.name).strip_edges()
+	var settle_nm := _province_display_name(province.id)
 	if settle_nm.is_empty():
 		settle_nm = "#%d" % province.id
 	_btn_settle.text = "🏠 Settle %s (+0.35, now %.2f)" % [settle_nm, province.settlement_level]
