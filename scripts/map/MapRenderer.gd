@@ -3139,6 +3139,10 @@ func _handle_escape_key() -> void:
 	if _living_title_boot_is_up():
 		_route_living_title_escape()
 		return
+	# End overlay swallows Esc while up. After Continue as <nation> it is gone
+	# (hidden / dying) so idle Esc must open the pause menu.
+	if _campaign_end_overlay_is_up():
+		return
 	# Search field / results is its own layer. An empty focused line is not:
 	# idle Esc after +6d must still open Command Center (Play MIXED e36825b).
 	if _dismiss_search_esc_layer():
@@ -3295,6 +3299,24 @@ func _dismiss_search_esc_layer() -> bool:
 	else:
 		_release_search_focus()
 	return true
+
+
+func _campaign_end_overlay_is_up() -> bool:
+	var tree := get_tree()
+	if tree == null:
+		return false
+	for group_name in ["campaign_end_screen", "campaign_ink_end_screen"]:
+		for n in tree.get_nodes_in_group(group_name):
+			if n == null or not is_instance_valid(n) or n.is_queued_for_deletion():
+				continue
+			if str(n.name).ends_with("_dying"):
+				continue
+			if n is CanvasLayer and not (n as CanvasLayer).visible:
+				continue
+			if n is CanvasItem and not (n as CanvasItem).visible:
+				continue
+			return true
+	return false
 
 
 func _esc_open_command_center() -> void:

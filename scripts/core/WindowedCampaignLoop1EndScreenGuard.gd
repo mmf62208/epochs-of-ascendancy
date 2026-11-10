@@ -258,7 +258,14 @@ func _latch_shot(mm: Node, sm: Node, kind: String, player: String) -> void:
 	if str(date_l.text).is_empty():
 		_fail("%s date empty" % kind)
 		return
-	if cont == null or cont.visible:
+	if str(date_l.text).find("-") >= 0:
+		_fail("%s date is raw ISO '%s'" % [kind, date_l.text])
+		return
+	if kind == "defeat":
+		if cont == null or not cont.visible:
+			_fail("%s Continue as… missing on player defeat" % kind)
+			return
+	elif cont == null or cont.visible:
 		_fail("%s Continue should stay hidden" % kind)
 		return
 	var stats_l := screen.find_child("Stats", true, false) as Label
@@ -303,6 +310,13 @@ func _latch_shot(mm: Node, sm: Node, kind: String, player: String) -> void:
 	else:
 		if keep == null or not keep.visible:
 			_fail("%s Keep playing should stay visible" % kind)
+			return
+		if not str(keep.text).begins_with("Continue as "):
+			_fail("%s Keep playing label '%s' want Continue as <nation>" % [kind, keep.text])
+			return
+	if str(title.text) == str(reason.text) or str(reason.text) == str(title.text) + ".":
+		if reason.visible:
+			_fail("%s verdict duplicated title+reason '%s'" % [kind, reason.text])
 			return
 	if kind == "victory":
 		if str(reason.text).find("1 nation capitulated") < 0:

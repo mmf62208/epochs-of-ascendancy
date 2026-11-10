@@ -12625,6 +12625,9 @@ func clear_for_load() -> void:
 	peace_state["notes"] = []
 	peace_state["crisis_responses"] = {}
 	peace_state.erase("pending_continuation")
+	peace_state["campaign_wars"] = {}
+	peace_state["campaign_capitulation"] = {}
+	peace_state["campaign_end"] = {}
 	peace_state["ascendancy"] = {}
 	peace_state["cohesion"] = {}
 	peace_state["mandate"] = {}

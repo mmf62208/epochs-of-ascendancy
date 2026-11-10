@@ -275,7 +275,7 @@ static func progress(tag: String) -> float:
 	for pid_v in owned:
 		var pid := int(pid_v)
 		if _held_by_enemy(t, pid):
-			held += float(by_pid.get(pid, 0.0))
+			held += _pid_weight(by_pid, pid)
 	var ratio := held / total
 	var bonus := float(WarStateDomain.rules()["capital_loss_bonus"])
 	if bonus > 0.0:
@@ -283,6 +283,15 @@ static func progress(tag: String) -> float:
 		if cap > 0 and _held_by_enemy(t, cap):
 			ratio += bonus
 	return ratio
+
+
+static func _pid_weight(by_pid: Dictionary, pid: int) -> float:
+	if by_pid.has(pid):
+		return float(by_pid[pid])
+	var as_str := str(pid)
+	if by_pid.has(as_str):
+		return float(by_pid[as_str])
+	return 0.0
 
 
 static func _held_by_enemy(tag: String, province_id: int) -> bool:
@@ -458,7 +467,7 @@ static func war_leader(tag: String, enemies: Array) -> String:
 			var owner := str(p.owner_tag).strip_edges().to_upper()
 			var ctrl := str(p.controller_tag).strip_edges().to_upper()
 			if owner == et or ctrl == et:
-				w += float(by_pid.get(pid, 0.0))
+				w += _pid_weight(by_pid, pid)
 		if w > best_w or (is_equal_approx(w, best_w) and (best.is_empty() or et < best)):
 			best_w = w
 			best = et

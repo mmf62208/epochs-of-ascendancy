@@ -24,6 +24,56 @@ static func reset_for_test() -> void:
 	GameData.peace_state["campaign_end"] = {}
 
 
+## Autoloads survive Return to Title. A new 1 Jan 1936 Begin must not
+## keep the previous campaign's wars, latch, or leader-event hold.
+static func reset_session_for_new_game() -> void:
+	if typeof(WarStateDomain) != TYPE_NIL:
+		WarStateDomain.reset_for_test()
+	if typeof(CapitulationDomain) != TYPE_NIL:
+		CapitulationDomain.reset_for_test()
+	reset_for_test()
+	if typeof(CampaignInkEndDomain) != TYPE_NIL:
+		CampaignInkEndDomain.reset_for_test()
+	if typeof(GameData) != TYPE_NIL:
+		GameData.peace_state.erase("pending_continuation")
+	if typeof(CampaignEndScreen) != TYPE_NIL:
+		CampaignEndScreen.dismiss_all()
+	var tree := Engine.get_main_loop() as SceneTree
+	if tree != null:
+		for n in tree.get_nodes_in_group("campaign_ink_end_screen"):
+			if n == null or not is_instance_valid(n):
+				continue
+			if n.has_method("_dismiss_end_screen"):
+				n.call("_dismiss_end_screen")
+			else:
+				n.queue_free()
+		for p in tree.get_nodes_in_group("continuation_picker"):
+			if p != null and is_instance_valid(p):
+				p.queue_free()
+		for bar in tree.get_nodes_in_group("top_info_bar"):
+			if bar != null and is_instance_valid(bar) and bar.has_method("refresh_campaign_war_readout"):
+				bar.call("refresh_campaign_war_readout")
+	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("restore_after_campaign_end"):
+		LeaderEventUI.restore_after_campaign_end()
+	if typeof(TimeManager) != TYPE_NIL:
+		if TimeManager.has_method("drop_pending_sim_events_on_campaign_end"):
+			TimeManager.drop_pending_sim_events_on_campaign_end()
+		if TimeManager.has_method("clear_overlay_clock_locks"):
+			TimeManager.clear_overlay_clock_locks()
+
+
+static func keep_playing_label(player: String = "") -> String:
+	var tag := player.strip_edges().to_upper()
+	if tag.is_empty():
+		tag = _player()
+	var name := tag
+	if typeof(WarStateDomain) != TYPE_NIL:
+		name = str(WarStateDomain.tag_name(tag)).strip_edges()
+	if name.is_empty():
+		name = tag if not tag.is_empty() else "Germany"
+	return "Continue as %s" % name
+
+
 static func latched() -> bool:
 	return _end().has("outcome")
 
@@ -59,6 +109,18 @@ static func date_string() -> String:
 	return "%04d-%02d-%02d" % [int(TimeManager.current_year), int(TimeManager.current_month), int(TimeManager.current_day)]
 
 
+## Long form for every end screen ("1 January 1949"). Never a raw ISO date.
+static func format_end_date(iso: String = "") -> String:
+	var raw := iso.strip_edges()
+	if raw.is_empty():
+		raw = date_string()
+	if typeof(GameDateDisplay) != TYPE_NIL:
+		var out := GameDateDisplay.format_iso_date_readable(raw)
+		if not out.is_empty():
+			return out
+	return raw
+
+
 static func evaluate_and_latch(day_index: int) -> Dictionary:
 	if typeof(WarStateDomain) == TYPE_NIL or not WarStateDomain.loop_enabled():
 		return {}
@@ -91,7 +153,14 @@ static func _latch(model: Dictionary) -> Dictionary:
 	model["keep_playing"] = false
 	_store(model)
 	if typeof(TimeManager) != TYPE_NIL:
-		TimeManager.paused = true
+		if TimeManager.has_method("set_paused"):
+			TimeManager.set_paused(true)
+		else:
+			TimeManager.paused = true
+		if TimeManager.has_method("drop_pending_sim_events_on_campaign_end"):
+			TimeManager.drop_pending_sim_events_on_campaign_end()
+	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("hold_for_campaign_end"):
+		LeaderEventUI.hold_for_campaign_end()
 	if typeof(CampaignEndScreen) != TYPE_NIL:
 		CampaignEndScreen.present(model)
 	return model
@@ -110,7 +179,7 @@ static func _defeat_model(player: String, day_index: int) -> Dictionary:
 		return {}
 	var date := date_string()
 	var name := WarStateDomain.tag_name(player)
-	var reason := "%s capitulated on %s" % [name, date]
+	var reason := "%s capitulated on %s" % [name, format_end_date(date)]
 	return _pack("defeat", "defeat", player, day_index, "Defeat", reason, reason)
 
 
@@ -219,11 +288,11 @@ static func _time_model(player: String, day_index: int) -> Dictionary:
 			break
 	var share := factory_share(player)
 	if rank == 1:
-		var reason := "Victory: Ascendant. Factory share %.1f%%." % (share * 100.0)
+		var reason := "Factory share %.1f%%." % (share * 100.0)
 		var model := _pack("victory", "time", player, day_index, "Victory: Ascendant", reason, reason)
 		model["rank"] = rank
 		return model
-	var reason2 := "Defeat: Eclipsed (rank %d)." % rank
+	var reason2 := "Factory share %.1f%%." % (share * 100.0)
 	var model2 := _pack("defeat", "time", player, day_index, "Defeat: Eclipsed (rank %d)" % rank, reason2, reason2)
 	model2["rank"] = rank
 	return model2
@@ -302,9 +371,11 @@ static func _pack(outcome: String, kind: String, player: String, day_index: int,
 static func _stats(player: String) -> Dictionary:
 	var start_n := 0
 	var end_n := 0
+	var snapshotted := false
 	if typeof(GameData) != TYPE_NIL:
 		var cap: Variant = GameData.peace_state.get("campaign_capitulation", {})
 		if cap is Dictionary:
+			snapshotted = bool((cap as Dictionary).get("snapshotted", false))
 			var owned: Variant = (cap as Dictionary).get("start_owned", {})
 			if owned is Dictionary:
 				var row: Variant = (owned as Dictionary).get(player, [])
@@ -315,6 +386,12 @@ static func _stats(player: String) -> Dictionary:
 			end_n = MapManager.get_provinces_by_controller(player).size()
 		elif MapManager.has_method("get_provinces_by_owner"):
 			end_n = MapManager.get_provinces_by_owner(player).size()
+	# Display baseline: start_owned is only snapshotted on the first war day.
+	# A peaceful 1949 timeout never snapshots, so the sheet read "0 → 421".
+	# Use the live controlled count when no snapshot exists. Wartime start vs
+	# 1936 Begin is backlog (snapshot-at-boot), not this display fix.
+	if start_n == 0 and not snapshotted:
+		start_n = end_n
 	var wars := 0
 	if typeof(GameData) != TYPE_NIL:
 		var ws: Variant = GameData.peace_state.get("campaign_wars", {})
