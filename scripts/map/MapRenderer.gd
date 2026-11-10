@@ -419,6 +419,9 @@ var _supply_route_highlight_host: Node2D = null
 var _supply_corridor_gem_a: Polygon2D = null
 var _supply_corridor_gem_b: Polygon2D = null
 var _next_hook_chip: Button = null
+## Armed only after living-title Begin. Map setup / Return to Title must not
+## paint a nation NEXT hint while the title is still up or about to appear.
+var _next_hook_after_begin: bool = false
 var _stability_load_hooked: bool = false
 var _current_theater_bounds: Rect2 = GRAND_THEATER_CANONICAL_BOUNDS  # updated on theater/chunk/world load; used for camera clamp to avoid gray lost space on pan/zoom to NA etc.
 
@@ -4922,6 +4925,8 @@ func _layout_map_ui() -> void:
 			ip.z_index = 40
 	_layout_info_panel_inner()
 	_layout_supply_legend()
+	if _next_hook_chip != null and is_instance_valid(_next_hook_chip):
+		_fit_next_hook_chip()
 
 
 ## Sit the Supply legend under Map Mode (not over the chips) at 1280x800+.
@@ -27428,6 +27433,10 @@ func _free_first_session_tip_strip() -> void:
 
 ## Cheap G / first-session order toast — never pathfinds.
 func _toast_easy_unit_orders() -> void:
+	# TestScenario reload after Return to Title re-parks Maginot chips while
+	# the living title is up. Do not paint GER first-session notices there.
+	if _living_title_boot_is_up() or _next_hook_should_stay_hidden():
+		return
 	var toast := (
 		"Click a GER chip (green org / amber str) · click own land to MARCH · "
 		+ "Ctrl+click France to ASSAULT · Esc clears"
@@ -27651,6 +27660,23 @@ func _setup_land_battle_bubble_layer() -> void:
 	_sync_land_battle_bubbles()
 
 
+func _hide_next_hook_chip() -> void:
+	if _next_hook_chip != null and is_instance_valid(_next_hook_chip):
+		_next_hook_chip.visible = false
+
+
+func refresh_next_hook_after_living_begin() -> void:
+	_next_hook_after_begin = true
+	_refresh_next_hook_chip()
+
+
+func _next_hook_should_stay_hidden() -> bool:
+	if _next_hook_after_begin:
+		return false
+	# Graphical F5 paints the chip during map setup before LivingTitleBoot exists.
+	return LivingTitleBoot.should_show_living_title()
+
+
 func _refresh_next_hook_chip() -> void:
 	var ui := get_node_or_null("UI") as CanvasLayer
 	if ui == null:
@@ -27662,6 +27688,8 @@ func _refresh_next_hook_chip() -> void:
 		_next_hook_chip.z_index = 80
 		_next_hook_chip.position = Vector2(18, 52)
 		_next_hook_chip.custom_minimum_size = Vector2(420, 28)
+		_next_hook_chip.clip_text = false
+		_next_hook_chip.text_overrun_behavior = TextServer.OVERRUN_NO_TRIMMING
 		if typeof(RetrowaveTheme) != TYPE_NIL:
 			RetrowaveTheme.style_primary_button(_next_hook_chip)
 			_next_hook_chip.add_theme_color_override("font_outline_color", Color(0.02, 0.03, 0.06, 1.0))
@@ -27692,8 +27720,8 @@ func _refresh_next_hook_chip() -> void:
 			_show_inspector_toast(str(out.get("summary", "Next")), 3.5)
 			_refresh_next_hook_chip()
 		)
-	if _living_title_boot_is_up():
-		_next_hook_chip.visible = false
+	if _living_title_boot_is_up() or _next_hook_should_stay_hidden():
+		_hide_next_hook_chip()
 		return
 	_next_hook_chip.visible = true
 	var rec: Dictionary = {}
@@ -27721,6 +27749,7 @@ func _refresh_next_hook_chip() -> void:
 		_next_hook_chip.text = "NEXT · %s · %s" % [str(rec.get("label", "Unpause a day")), stab_line]
 		_next_hook_chip.tooltip_text = "%s\n%s" % [hint, stab_line]
 	_paint_goal_chip_detail(rec, war_goal)
+	_fit_next_hook_chip()
 
 
 func _next_hook_campaign_day() -> int:
@@ -27787,13 +27816,9 @@ func _paint_goal_chip_detail(rec: Dictionary, war_goal: bool) -> void:
 	if not war_goal:
 		if why != null:
 			why.visible = false
-		var stab_wide := "Stability" in _next_hook_chip.text
-		_next_hook_chip.custom_minimum_size = Vector2(640, 28) if stab_wide else Vector2(420, 28)
 		_hide_goal_tooltip()
+		_fit_next_hook_chip()
 		return
-	_next_hook_chip.custom_minimum_size = Vector2(336, 44)
-	_next_hook_chip.clip_text = true
-	_next_hook_chip.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	if why == null:
 		why = Label.new()
 		why.name = "GoalWhy"
@@ -27801,8 +27826,8 @@ func _paint_goal_chip_detail(rec: Dictionary, war_goal: bool) -> void:
 		why.position = Vector2(8, 22)
 		why.add_theme_font_size_override("font_size", 12)
 		why.add_theme_color_override("font_color", RetrowaveTheme.TEXT_DIM)
-		why.clip_text = true
-		why.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		why.clip_text = false
+		why.text_overrun_behavior = TextServer.OVERRUN_NO_TRIMMING
 		why.custom_minimum_size = Vector2(320, 16)
 		_next_hook_chip.add_child(why)
 	why.visible = true
@@ -27813,6 +27838,61 @@ func _paint_goal_chip_detail(rec: Dictionary, war_goal: bool) -> void:
 	_next_hook_chip.tooltip_text = tip
 	_next_hook_chip.set_meta("eoa_goal_tooltip", tip)
 	_ensure_goal_tooltip(copy)
+	_fit_next_hook_chip()
+
+
+## Sit below TopInfoBar + Map Mode. Widen so "Justify war on France" is not ellipsized.
+func _fit_next_hook_chip() -> void:
+	if _next_hook_chip == null or not is_instance_valid(_next_hook_chip):
+		return
+	_next_hook_chip.clip_text = false
+	_next_hook_chip.text_overrun_behavior = TextServer.OVERRUN_NO_TRIMMING
+	_next_hook_chip.autowrap_mode = TextServer.AUTOWRAP_OFF
+	var y := _map_nav_top_clearance() + 6.0
+	_next_hook_chip.position = Vector2(18.0, y)
+	var vp_w := 1280.0
+	var vp := get_viewport()
+	if vp != null:
+		vp_w = maxf(640.0, vp.get_visible_rect().size.x)
+	var max_w := minf(720.0, vp_w - 36.0)
+	var pad := 32.0
+	var text_w := _control_text_width(_next_hook_chip, str(_next_hook_chip.text), 15)
+	var why := _next_hook_chip.get_node_or_null("GoalWhy") as Label
+	var why_w := 0.0
+	var why_h := 0.0
+	if why != null and why.visible:
+		why.clip_text = false
+		why.text_overrun_behavior = TextServer.OVERRUN_NO_TRIMMING
+		why_w = _control_text_width(why, str(why.text), 12)
+		why_h = 18.0
+	var inner := maxf(text_w, why_w) + pad
+	if inner > max_w:
+		_next_hook_chip.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		inner = max_w
+	var w := clampf(inner, 420.0, max_w)
+	var h := 28.0
+	if why != null and why.visible:
+		h = 48.0
+		why.custom_minimum_size = Vector2(maxf(8.0, w - 16.0), why_h)
+		why.size = why.custom_minimum_size
+	if _next_hook_chip.autowrap_mode != TextServer.AUTOWRAP_OFF:
+		h = maxf(h, 48.0)
+	_next_hook_chip.custom_minimum_size = Vector2(w, h)
+	_next_hook_chip.size = Vector2(w, h)
+
+
+func _control_text_width(ctrl: Control, text: String, fallback_px: int) -> float:
+	if ctrl == null:
+		return 0.0
+	var font: Font = ctrl.get_theme_font("font")
+	var fs := ctrl.get_theme_font_size("font_size")
+	if fs <= 0:
+		fs = fallback_px
+	if font == null:
+		font = ThemeDB.fallback_font
+	if font == null:
+		return float(text.length()) * float(fs) * 0.6
+	return font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
 
 
 func _ensure_goal_tooltip(copy: Dictionary) -> void:
