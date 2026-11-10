@@ -173,6 +173,8 @@ static func apply_living_title_boot(
 		loaded["slot"] = slot
 		loaded["live"] = true
 		return loaded
+	if typeof(CampaignEndDomain) != TYPE_NIL:
+		CampaignEndDomain.reset_session_for_new_game()
 	if typeof(MainMenu) != TYPE_NIL:
 		var picked: Dictionary = MainMenu.apply_living_campaign_pick(tag, year)
 		picked["mode"] = "new"

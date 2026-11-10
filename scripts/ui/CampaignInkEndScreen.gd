@@ -6,6 +6,14 @@ extends CanvasLayer
 
 const PANEL_SIZE := Vector2(760, 520)
 
+## Option A (beta, Victory Paths off): capitulation or 1 Jan 1949.
+## Timeout copy names the calendar. It must not say `end_date` or promise a path.
+const WIN_SUBTITLE := "Your strategy prevailed.\nKeep playing to shape the decades ahead."
+const LOSS_SUBTITLE := "Your government has fallen.\nHistory isn't finished. Continue as another nation, or load a save."
+const TIMEOUT_SUBTITLE := "The campaign ended on 1 January 1949.\nKeep playing to shape what comes next."
+const TIMEOUT_REASON := "The campaign ended on 1 January 1949."
+const CAPITALS_REASON := "Every enemy capital you were at war with is under your control."
+
 static var present_log: Array = []
 static var _load_hooked: bool = false
 
@@ -48,10 +56,19 @@ static func _on_any_load_completed(_slot_name: String) -> void:
 				scr.call("_dismiss_picker", p)
 	if scr != null and scr.has_method("_dismiss_ink_end_screens"):
 		scr.call("_dismiss_ink_end_screens")
-		return
-	for n in tree.get_nodes_in_group("campaign_ink_end_screen"):
-		if n != null and is_instance_valid(n) and n.has_method("_dismiss_end_screen"):
-			n.call("_dismiss_end_screen")
+	else:
+		for n in tree.get_nodes_in_group("campaign_ink_end_screen"):
+			if n != null and is_instance_valid(n) and n.has_method("_dismiss_end_screen"):
+				n.call("_dismiss_end_screen")
+	var cl1: Script = load("res://scripts/ui/CampaignEndScreen.gd") as Script
+	if cl1 != null and cl1.has_method("dismiss_all"):
+		cl1.call("dismiss_all")
+	if typeof(LeaderEventUI) != TYPE_NIL:
+		var locked := typeof(CampaignEndDomain) != TYPE_NIL and CampaignEndDomain.clock_locked()
+		if locked and LeaderEventUI.has_method("hold_for_campaign_end"):
+			LeaderEventUI.hold_for_campaign_end()
+		elif not locked and LeaderEventUI.has_method("restore_after_campaign_end"):
+			LeaderEventUI.restore_after_campaign_end()
 
 
 static func present_loss(tag: String, reason: String, detail: Dictionary = {}) -> Node:
@@ -150,10 +167,7 @@ func _ready() -> void:
 	var sub := Label.new()
 	sub.name = "OutcomeSubtitle"
 	sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	if win:
-		sub.text = "Your strategy prevailed.\nKeep playing to shape the decades ahead."
-	else:
-		sub.text = "Your government has fallen.\nHistory isn't finished. Continue as another nation, or load a save."
+	sub.text = player_subtitle(_outcome, _reason)
 	sub.add_theme_font_size_override("font_size", 16)
 	sub.add_theme_color_override("font_color", RetrowaveTheme.TEXT_PRIMARY)
 	box.add_child(sub)
@@ -174,11 +188,14 @@ func _ready() -> void:
 		RetrowaveTheme.style_body_label(winner)
 		box.add_child(winner)
 
-	if not _reason.strip_edges().is_empty():
+	var reason_txt := player_reason_text(_reason)
+	if not reason_txt.is_empty():
 		var why := Label.new()
 		why.name = "OutcomeReason"
-		why.text = _reason
+		why.text = reason_txt
 		why.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		why.custom_minimum_size = Vector2(680, 0)
+		why.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		RetrowaveTheme.style_body_label(why)
 		box.add_child(why)
 
@@ -197,7 +214,10 @@ func _ready() -> void:
 	row.add_theme_constant_override("separation", 12)
 	box.add_child(row)
 	if win:
-		row.add_child(_make_button("BtnKeepPlaying", "Keep playing", true, _on_keep))
+		var keep_label := "Continue as Germany"
+		if typeof(CampaignEndDomain) != TYPE_NIL:
+			keep_label = CampaignEndDomain.keep_playing_label(_tag)
+		row.add_child(_make_button("BtnKeepPlaying", keep_label, true, _on_keep))
 		row.add_child(_make_button("BtnSave", "Save", false, _on_save))
 		row.add_child(_make_button("BtnMainMenu", "Main menu", false, _on_main_menu))
 	else:
@@ -242,12 +262,62 @@ func _nation_line() -> String:
 
 
 func _format_iso(iso: String) -> String:
+	if typeof(CampaignEndDomain) != TYPE_NIL:
+		var via_end := CampaignEndDomain.format_end_date(iso)
+		if not via_end.is_empty() and via_end.find("-") < 0:
+			return via_end
+	if typeof(GameDateDisplay) != TYPE_NIL:
+		var readable := GameDateDisplay.format_iso_date_readable(iso)
+		if not readable.is_empty():
+			return readable
 	var tree := get_tree()
 	if tree != null and tree.root != null:
 		var slm := tree.root.get_node_or_null("SaveLoadManager")
 		if slm != null and slm.has_method("format_game_date_display"):
 			return str(slm.call("format_game_date_display", iso))
 	return iso
+
+
+## Map Ink reason codes to Option A player copy. Unknown text (paths, tests) stays raw.
+static func player_reason_text(raw: String) -> String:
+	var codes := _reason_codes(raw)
+	if codes.is_empty():
+		return raw.strip_edges()
+	var parts: PackedStringArray = []
+	for c in codes:
+		var mapped := _map_reason_code(c)
+		if mapped.is_empty():
+			return raw.strip_edges()
+		parts.append(mapped)
+	return "\n".join(parts)
+
+
+static func player_subtitle(outcome: String, raw_reason: String) -> String:
+	if outcome != "win":
+		return LOSS_SUBTITLE
+	var codes := _reason_codes(raw_reason)
+	if codes.size() == 1 and codes[0] == "end_date":
+		return TIMEOUT_SUBTITLE
+	return WIN_SUBTITLE
+
+
+static func _reason_codes(raw: String) -> PackedStringArray:
+	var out: PackedStringArray = []
+	for part in raw.split(","):
+		var c := part.strip_edges()
+		if not c.is_empty():
+			out.append(c)
+	return out
+
+
+static func _map_reason_code(code: String) -> String:
+	match code:
+		"end_date":
+			return TIMEOUT_REASON
+		"enemy_capitals":
+			return CAPITALS_REASON
+		_:
+			return ""
 
 
 func _when_line() -> String:

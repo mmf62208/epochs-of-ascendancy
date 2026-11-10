@@ -8,7 +8,7 @@
 #   tools/eoa_full_test_gates.sh --with-perf  # also map-tick perf sample
 #   tools/eoa_full_test_gates.sh --log DIR    # write logs under DIR
 #
-# --quick launches HeadlessGarrison1Test, HeadlessInkTooltips0Test, HeadlessCampaignSave1Test, HeadlessAudio1Test, HeadlessAudio2Test, HeadlessStabilityJustice1Test, HeadlessVictoryPaths1Test, HeadlessSettingsToggles1Test, then HeadlessFirst20P2StripPressTest.
+# --quick launches HeadlessGarrison1Test, HeadlessInkTooltips0Test, HeadlessCampaignSave1Test, HeadlessAudio1Test, HeadlessAudio2Test, HeadlessStabilityJustice1Test, HeadlessVictoryPaths1Test, HeadlessSettingsToggles1Test, HeadlessFirst20P2StripPressTest, then FIRST20-UX-WAR Open fight / Justify / March.
 # Full path also runs launch_campaign_save1_identity (MW200 SaveStateHash identity + 60-day twin).
 # Full path calls tools/run_godot.sh, which exits 1 immediately if no binary
 # is found (fail-closed; it must not hang).
@@ -217,6 +217,9 @@ if [[ "$QUICK" -eq 1 ]]; then
     log "FAIL headless_victory_paths1 GODOT_BUSY"
     log "FAIL headless_settings_toggles1 GODOT_BUSY"
     log "FAIL headless_first20_p2_strip_press GODOT_BUSY"
+    log "FAIL headless_first20_ux_war_open_fight GODOT_BUSY"
+    log "FAIL headless_first20_ux_war_justify GODOT_BUSY"
+    log "FAIL headless_first20_ux_war_march GODOT_BUSY"
     FAILED=1
   else
     run_step headless_garrison1 env \
@@ -332,6 +335,57 @@ if [[ "$QUICK" -eq 1 ]]; then
       fi
       if ! grep -q "RESULT=PASS" "$log"; then
         echo "[eoa-gates] FAIL headless_first20_p2_strip_press missing RESULT=PASS"
+        exit 1
+      fi
+      exit "$code"
+    ' || fail
+    run_step headless_first20_ux_war_open_fight bash -c '
+      log=$(mktemp)
+      XDG_DATA_HOME="$(mktemp -d)" flock -n "${HOME}/.eoa_godot.lock" \
+        tools/run_godot.sh --headless --path . \
+        -s res://scripts/core/HeadlessFirst20UxWarOpenFightTargetTest.gd >"$log" 2>&1
+      code=$?
+      cat "$log"
+      if grep -q "SCRIPT ERROR" "$log"; then
+        echo "[eoa-gates] FAIL headless_first20_ux_war_open_fight SCRIPT ERROR"
+        exit 1
+      fi
+      if ! grep -q "RESULT=PASS" "$log"; then
+        echo "[eoa-gates] FAIL headless_first20_ux_war_open_fight missing RESULT=PASS"
+        exit 1
+      fi
+      exit "$code"
+    ' || fail
+    run_step headless_first20_ux_war_justify bash -c '
+      log=$(mktemp)
+      XDG_DATA_HOME="$(mktemp -d)" flock -n "${HOME}/.eoa_godot.lock" \
+        tools/run_godot.sh --headless --path . --resolution 1280x800 \
+        -s res://scripts/core/HeadlessFirst20UxWarJustifyVisibilityTest.gd >"$log" 2>&1
+      code=$?
+      cat "$log"
+      if grep -q "SCRIPT ERROR" "$log"; then
+        echo "[eoa-gates] FAIL headless_first20_ux_war_justify SCRIPT ERROR"
+        exit 1
+      fi
+      if ! grep -q "RESULT=PASS" "$log"; then
+        echo "[eoa-gates] FAIL headless_first20_ux_war_justify missing RESULT=PASS"
+        exit 1
+      fi
+      exit "$code"
+    ' || fail
+    run_step headless_first20_ux_war_march bash -c '
+      log=$(mktemp)
+      XDG_DATA_HOME="$(mktemp -d)" flock -n "${HOME}/.eoa_godot.lock" \
+        tools/run_godot.sh --headless --path . \
+        -s res://scripts/core/HeadlessFirst20UxWarMarchArmTest.gd >"$log" 2>&1
+      code=$?
+      cat "$log"
+      if grep -q "SCRIPT ERROR" "$log"; then
+        echo "[eoa-gates] FAIL headless_first20_ux_war_march SCRIPT ERROR"
+        exit 1
+      fi
+      if ! grep -q "RESULT=PASS" "$log"; then
+        echo "[eoa-gates] FAIL headless_first20_ux_war_march missing RESULT=PASS"
         exit 1
       fi
       exit "$code"
@@ -658,6 +712,15 @@ else
 
   run_step launch_campaign_loop1_declare_click \
     tools/run_godot.sh --headless --path . --resolution 1280x800 -s res://scripts/core/HeadlessCampaignLoop1DeclareClickTest.gd || fail
+
+  run_step launch_first20_ux_war_open_fight \
+    tools/run_godot.sh --headless --path . -s res://scripts/core/HeadlessFirst20UxWarOpenFightTargetTest.gd || fail
+
+  run_step launch_first20_ux_war_justify \
+    tools/run_godot.sh --headless --path . --resolution 1280x800 -s res://scripts/core/HeadlessFirst20UxWarJustifyVisibilityTest.gd || fail
+
+  run_step launch_first20_ux_war_march \
+    tools/run_godot.sh --headless --path . -s res://scripts/core/HeadlessFirst20UxWarMarchArmTest.gd || fail
 
   run_step launch_campaign_loop1_topbar_fit \
     tools/run_godot.sh --headless --path . --resolution 1280x800 -s res://scripts/core/HeadlessCampaignLoop1TopBarFitTest.gd || fail

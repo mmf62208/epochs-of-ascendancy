@@ -3139,6 +3139,10 @@ func _handle_escape_key() -> void:
 	if _living_title_boot_is_up():
 		_route_living_title_escape()
 		return
+	# End overlay swallows Esc while up. After Continue as <nation> it is gone
+	# (hidden / dying) so idle Esc must open the pause menu.
+	if _campaign_end_overlay_is_up():
+		return
 	# Search field / results is its own layer. An empty focused line is not:
 	# idle Esc after +6d must still open Command Center (Play MIXED e36825b).
 	if _dismiss_search_esc_layer():
@@ -3155,6 +3159,11 @@ func _handle_escape_key() -> void:
 	]):
 		_close_release_seen = true
 		return
+	# FIRST20-UX-WAR: Esc cancels an armed March… without dropping the unit.
+	if _march_dest_armed:
+		_clear_march_destination_arm()
+		_show_inspector_toast("March cancelled", 2.0)
+		return
 	# Garrison / unit card first: Close/Esc restores province inspector (Köln spine)
 	# without GIS lock or a second search.
 	if _unit_detail_popup_is_visible():
@@ -3168,6 +3177,7 @@ func _handle_escape_key() -> void:
 		return
 	if not selected_formation_id.is_empty():
 		selected_formation_id = ""
+		_march_dest_armed = false
 		_clear_march_preview()
 		_refresh_selected_unit_chip()
 		_show_inspector_toast("Unit selection cleared", 2.0)
@@ -3295,6 +3305,24 @@ func _dismiss_search_esc_layer() -> bool:
 	else:
 		_release_search_focus()
 	return true
+
+
+func _campaign_end_overlay_is_up() -> bool:
+	var tree := get_tree()
+	if tree == null:
+		return false
+	for group_name in ["campaign_end_screen", "campaign_ink_end_screen"]:
+		for n in tree.get_nodes_in_group(group_name):
+			if n == null or not is_instance_valid(n) or n.is_queued_for_deletion():
+				continue
+			if str(n.name).ends_with("_dying"):
+				continue
+			if n is CanvasLayer and not (n as CanvasLayer).visible:
+				continue
+			if n is CanvasItem and not (n as CanvasItem).visible:
+				continue
+			return true
+	return false
 
 
 func _esc_open_command_center() -> void:
@@ -5671,6 +5699,10 @@ var _live_border_fronts_cache_msec: int = 0
 var _live_border_fronts_busy: bool = false
 const _LIVE_BORDER_FRONTS_CACHE_MS: int = 8000
 var _corridor_click_armed: bool = false
+## FIRST20-UX-WAR: optional March… arm. Next own-land still-click uses the
+## existing `_try_move_selected_unit_to_province` path. Not a right-click bind.
+var _march_dest_armed: bool = false
+var _march_select_hint: Label = null
 
 ## Instant B path: use precomputed/cached targets only; pan camera; toast. No outline, no scan.
 func _run_live_border_fronts_instant() -> void:
@@ -16255,6 +16287,7 @@ func _dismiss_inspector_and_restore_input() -> void:
 			(hover_tooltip as CanvasItem).visible = false
 	if not selected_formation_id.is_empty():
 		selected_formation_id = ""
+		_march_dest_armed = false
 		_clear_march_preview()
 		_refresh_selected_unit_chip()
 	_corridor_click_armed = false
@@ -21093,9 +21126,9 @@ func show_info_panel(province: Province, force_open: bool = false, keep_camera: 
 		_province_id_badge.tooltip_text = "Province id %d · use this number when reporting map issues" % int(province.id)
 	var ctrl_note := ""
 	if ProvinceInsight.is_province_contested(province):
-		ctrl_note = "  ⚑ held by %s" % province.controller_tag
+		ctrl_note = "  ⚑ held by %s" % ProvinceInsight.nation_display_name(str(province.controller_tag))
 	elif province.controller_tag != province.owner_tag and not province.controller_tag.is_empty():
-		ctrl_note = " (controlled by %s)" % province.controller_tag
+		ctrl_note = " (controlled by %s)" % ProvinceInsight.nation_display_name(str(province.controller_tag))
 	info_owner.text = str(topline.get("owner_line", "Owner: Unowned")) + ctrl_note
 	info_population.text = "Population: %s" % str(province.population)
 	var terrain_bits: PackedStringArray = ["Terrain: " + province.terrain.capitalize()]
@@ -21197,7 +21230,7 @@ func show_info_panel(province: Province, force_open: bool = false, keep_camera: 
 		if nat_bonus > 0 and info_resources != null:
 			info_resources.text += "  |  Trade Cap +%d (Special Sites)" % int(nat_bonus)
 
-	info_core.text = "Core For: " + (", ".join(province.core_for) if province.core_for.size() > 0 else "None")
+	info_core.text = ProvinceInsight.core_for_line(province)
 
 	var special_list := []
 	for feature in province.special_features.keys():
@@ -22017,6 +22050,7 @@ func _select_map_unit(formation: Object) -> void:
 ## Selected-chip ring via nation-frame helper. One pin per province — match by station pid
 ## (stack cycle keeps ring on the province pin even when selected_formation_id is not the rep).
 func _refresh_selected_unit_chip() -> void:
+	_refresh_march_select_hint()
 	if _demo_unit_icon_pids.is_empty():
 		return
 	var gold := Color(1.0, 0.85, 0.25, 1.0)
@@ -22165,11 +22199,13 @@ func _try_move_selected_unit_to_province(province: Province) -> bool:
 	# hop progress, do not duplicate MarchPathLine / _orders).
 	if _selected_unit_already_marching_to(dest):
 		_skip_inspector_after_march = true
+		_clear_march_destination_arm()
 		return true
 	var res: Dictionary = FormationMovement.enqueue_own_land_march(fid, dest, p_tag)
 	_clear_march_preview()
 	if bool(res.get("already_here", false)):
 		_skip_inspector_after_march = true
+		_clear_march_destination_arm()
 		_show_inspector_toast("Already at %s" % province.name, 2.5)
 		return true
 	if not bool(res.get("ok", false)):
@@ -22181,6 +22217,7 @@ func _try_move_selected_unit_to_province(province: Province) -> bool:
 		)
 		return true
 	_skip_inspector_after_march = true
+	_clear_march_destination_arm()
 	var hops_n := int(res.get("hops", 1))
 	var cal := int(res.get("calendar_days", 1))
 	var path: Array = res.get("path", []) as Array
@@ -22195,6 +22232,67 @@ func _try_move_selected_unit_to_province(province: Province) -> bool:
 	)
 	_refresh_open_unit_card_for_selected()
 	return true
+
+
+func _selected_unit_can_march() -> bool:
+	if selected_formation_id.is_empty():
+		return false
+	if typeof(LeaderManager) == TYPE_NIL or not LeaderManager.has_method("get_formation"):
+		return false
+	var fo: Object = LeaderManager.get_formation(selected_formation_id)
+	if fo == null:
+		return false
+	if not _formation_is_player_tag(fo):
+		return false
+	if _formation_type_blocks_land_open(fo):
+		return false
+	return true
+
+
+func _arm_march_destination() -> void:
+	if not _selected_unit_can_march():
+		return
+	_march_dest_armed = true
+	_refresh_march_select_hint()
+	_show_inspector_toast("Click own land to march", 4.0)
+	_refresh_open_unit_card_for_selected()
+
+
+func _clear_march_destination_arm() -> void:
+	if not _march_dest_armed:
+		return
+	_march_dest_armed = false
+	_refresh_march_select_hint()
+	_refresh_open_unit_card_for_selected()
+
+
+func _refresh_march_select_hint() -> void:
+	var ui := get_node_or_null("UI") as CanvasLayer
+	if ui == null:
+		return
+	if _march_select_hint == null or not is_instance_valid(_march_select_hint):
+		_march_select_hint = Label.new()
+		_march_select_hint.name = "MarchSelectHint"
+		_march_select_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_march_select_hint.z_index = 80
+		_march_select_hint.position = Vector2(18, 84)
+		_march_select_hint.custom_minimum_size = Vector2(520, 22)
+		_march_select_hint.autowrap_mode = TextServer.AUTOWRAP_OFF
+		if typeof(RetrowaveTheme) != TYPE_NIL:
+			RetrowaveTheme.style_body_label(_march_select_hint)
+			_march_select_hint.add_theme_color_override("font_color", RetrowaveTheme.CYAN)
+		_march_select_hint.add_theme_font_size_override("font_size", 13)
+		ui.add_child(_march_select_hint)
+	var show := _selected_unit_can_march()
+	if has_method("_living_title_boot_is_up") and _living_title_boot_is_up():
+		show = false
+	_march_select_hint.visible = show
+	if not show:
+		return
+	if _march_dest_armed:
+		_march_select_hint.text = "March armed · click own land to march · Esc cancels"
+	else:
+		_march_select_hint.text = "Selected · click own land to March (N days on hover) · Esc clears"
 
 
 func _highlight_march_path(province_path: Array) -> void:
@@ -23090,6 +23188,19 @@ func _show_unit_detail_popup(formation: Object) -> void:
 			_open_fight_from_formation_id(fight_fid)
 		)
 		fight_row.add_child(fight_btn)
+		if not _formation_type_blocks_land_open(formation):
+			var march_btn := Button.new()
+			march_btn.name = "BtnMarchArm"
+			march_btn.text = "March… ●" if _march_dest_armed else "March…"
+			march_btn.focus_mode = Control.FOCUS_NONE
+			march_btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
+			march_btn.tooltip_text = "Arm the next click on own land as a march destination. Esc cancels. Right-click still pans."
+			RetrowaveTheme.style_secondary_button(march_btn)
+			march_btn.pressed.connect(func() -> void:
+				_arm_unit_card_press_consume()
+				_arm_march_destination()
+			)
+			fight_row.add_child(march_btn)
 
 	var body := Label.new()
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -23376,13 +23487,14 @@ func _show_unit_detail_popup(formation: Object) -> void:
 		stack_row.add_child(next_btn)
 
 	var hint := Label.new()
-	hint.text = "March · Ctrl+assault · Esc"
-	hint.tooltip_text = "SELECTED · click friendly land to MARCH (arrives in N days) · Ctrl+click enemy to ASSAULT · Esc clears"
+	hint.name = "MarchHint"
+	hint.text = "Selected · click own land to March (N days on hover) · Esc clears"
+	hint.tooltip_text = "SELECTED · click own land to MARCH (arrives in N days on hover) · Ctrl+click enemy to ASSAULT · Esc clears. Right-click pans."
 	hint.autowrap_mode = TextServer.AUTOWRAP_OFF
 	hint.custom_minimum_size = Vector2(290, 0)
 	RetrowaveTheme.style_body_label(hint)
-	hint.add_theme_color_override("font_color", RetrowaveTheme.TEXT_DIM)
-	hint.add_theme_font_size_override("font_size", 11)
+	hint.add_theme_color_override("font_color", RetrowaveTheme.CYAN)
+	hint.add_theme_font_size_override("font_size", 13)
 	vbox.add_child(hint)
 
 	panel.gui_input.connect(func(ev: InputEvent) -> void:
@@ -23544,6 +23656,7 @@ func _hide_unit_card_keep_map_focus() -> void:
 				(unit_pop as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
 	if not selected_formation_id.is_empty():
 		selected_formation_id = ""
+		_march_dest_armed = false
 		_clear_march_preview()
 		_refresh_selected_unit_chip()
 
@@ -25362,6 +25475,13 @@ func _open_fight_block_reason(can_ok: bool, can_reason: String, enemy_pid: int) 
 	return why
 
 
+func _attack_not_at_war_hint(reason: String) -> String:
+	var why := reason.strip_edges()
+	if why.begins_with("Not at war") and not why.contains("justify"):
+		return "%s — Justify a war goal first (this inspector or Diplomacy), then Declare." % why
+	return why
+
+
 func _style_open_fight_blocked_button(btn: Button) -> void:
 	btn.disabled = true
 	var dim := RetrowaveTheme.TEXT_DIM
@@ -25416,7 +25536,10 @@ func _open_fight_from_formation_id(fid: String) -> void:
 		var tag_here := str(fo.country_tag).strip_edges().to_upper()
 		var here := int(fo.stationed_province_id) if "stationed_province_id" in fo else -1
 		var local_enemy := _adjacent_enemy_province_id(here, tag_here)
-		if local_enemy > 0 and here > 0:
+		if here > 0:
+			# FIRST20-UX-WAR: a stationed unit keeps its hex. Empty enemy
+			# opens the existing "No adjacent enemy" sheet — do not teleport
+			# to Maginot (first-session empty-fid fallback stays below).
 			from_pid = here
 			enemy_pid = local_enemy
 		elif tag_here == "GER":
@@ -25447,10 +25570,24 @@ func _open_fight_from_formation_id(fid: String) -> void:
 	_show_open_fight_sheet(att_fid, fo, from_pid, enemy_pid, str(fo.country_tag) if "country_tag" in fo else "GER")
 
 
+func _open_fight_owner_is_at_war(tag: String, other: String) -> bool:
+	if typeof(WarStateDomain) == TYPE_NIL:
+		return false
+	return bool(WarStateDomain.is_at_war(tag, other))
+
+
+func _open_fight_player_has_war(tag: String) -> bool:
+	if typeof(WarStateDomain) == TYPE_NIL:
+		return false
+	return int(WarStateDomain.war_count(tag)) > 0
+
+
 func _adjacent_enemy_province_id(from_pid: int, owner_tag: String = "") -> int:
 	# COMBAT-1: prefer a neighbor that already has defending units so Open
 	# fight → Start opens a real fight (empty Haut-Rhin was first-adjacent
 	# instant capture). Empty enemy is fallback only. Not a chip pick rule.
+	# FIRST20-UX-WAR: layer at-war preference on top via is_at_war. Never
+	# default to a neutral while the player is already at war.
 	var tag := owner_tag.strip_edges().to_upper()
 	if tag.is_empty():
 		tag = _player_tag()
@@ -25458,7 +25595,10 @@ func _adjacent_enemy_province_id(from_pid: int, owner_tag: String = "") -> int:
 		return -1
 	var adj: Array = MapManager.get_adjacent_provinces(from_pid, true)
 	var hop2: Array = []
-	var empty_adj := -1
+	var adj_war_def := -1
+	var adj_war_empty := -1
+	var adj_peace_def := -1
+	var adj_peace_empty := -1
 	for pid_v in adj:
 		var pid := int(pid_v)
 		if not provinces.has(pid):
@@ -25467,14 +25607,26 @@ func _adjacent_enemy_province_id(from_pid: int, owner_tag: String = "") -> int:
 		if p == null:
 			continue
 		var ot := str(p.owner_tag).strip_edges().to_upper()
-		if not ot.is_empty() and ot != tag:
-			if _province_has_defending_units(pid, ot):
-				return pid
-			if empty_adj < 0:
-				empty_adj = pid
 		hop2.append(pid)
+		if ot.is_empty() or ot == tag:
+			continue
+		var at_war := _open_fight_owner_is_at_war(tag, ot)
+		if _province_has_defending_units(pid, ot):
+			if at_war:
+				if adj_war_def < 0:
+					adj_war_def = pid
+			elif adj_peace_def < 0:
+				adj_peace_def = pid
+		elif at_war:
+			if adj_war_empty < 0:
+				adj_war_empty = pid
+		elif adj_peace_empty < 0:
+			adj_peace_empty = pid
 	# One extra hop (Milano → Swiss hinterland) — still not a 3520 scan.
-	var empty_hop2 := -1
+	var hop2_war_def := -1
+	var hop2_war_empty := -1
+	var hop2_peace_def := -1
+	var hop2_peace_empty := -1
 	for mid in hop2:
 		var adj2: Array = MapManager.get_adjacent_provinces(int(mid), true)
 		for pid2_v in adj2:
@@ -25487,13 +25639,36 @@ func _adjacent_enemy_province_id(from_pid: int, owner_tag: String = "") -> int:
 			var ot2 := str(p2.owner_tag).strip_edges().to_upper()
 			if ot2.is_empty() or ot2 == tag:
 				continue
+			var at_war2 := _open_fight_owner_is_at_war(tag, ot2)
 			if _province_has_defending_units(pid2, ot2):
-				return pid2
-			if empty_hop2 < 0:
-				empty_hop2 = pid2
-	if empty_adj > 0:
-		return empty_adj
-	return empty_hop2
+				if at_war2:
+					if hop2_war_def < 0:
+						hop2_war_def = pid2
+				elif hop2_peace_def < 0:
+					hop2_peace_def = pid2
+			elif at_war2:
+				if hop2_war_empty < 0:
+					hop2_war_empty = pid2
+			elif hop2_peace_empty < 0:
+				hop2_peace_empty = pid2
+	# Defended before empty, adj before hop-2, at-war before peace.
+	if adj_war_def > 0:
+		return adj_war_def
+	if hop2_war_def > 0:
+		return hop2_war_def
+	if adj_war_empty > 0:
+		return adj_war_empty
+	if hop2_war_empty > 0:
+		return hop2_war_empty
+	if _open_fight_player_has_war(tag):
+		return -1
+	if adj_peace_def > 0:
+		return adj_peace_def
+	if hop2_peace_def > 0:
+		return hop2_peace_def
+	if adj_peace_empty > 0:
+		return adj_peace_empty
+	return hop2_peace_empty
 
 
 func _province_has_defending_units(pid: int, owner_tag: String) -> bool:
@@ -25962,7 +26137,12 @@ func _update_attack_button(province: Province) -> void:
 			var reason := str(preview.get("reason", "")).strip_edges()
 			if reason.is_empty():
 				reason = "no friendly divs staged here — move units first"
-			_btn_attack.text = "Attack"
+			reason = _attack_not_at_war_hint(reason)
+			_btn_attack.mouse_filter = Control.MOUSE_FILTER_STOP
+			if reason.to_lower().contains("justify"):
+				_btn_attack.text = "Attack — justify first"
+			else:
+				_btn_attack.text = "Attack"
 			_btn_attack.tooltip_text = reason
 		return
 	_btn_attack.visible = can_attack
