@@ -3308,6 +3308,10 @@ func _dismiss_search_esc_layer() -> bool:
 
 
 func _campaign_end_overlay_is_up() -> bool:
+	if typeof(CampaignEndDomain) != TYPE_NIL:
+		var vm: Dictionary = CampaignEndDomain.view_model()
+		if bool(vm.get("keep_playing", false)):
+			return false
 	var tree := get_tree()
 	if tree == null:
 		return false
@@ -3545,11 +3549,13 @@ func _input(event: InputEvent) -> void:
 			if _cc_overlay_blocks_map_pointer():
 				if event.pressed:
 					var mm_ov := _command_center_overlay()
-					if mm_ov != null and mm_ov.has_method("live_pointer_target") and str(mm_ov.call("live_pointer_target", event.position)) == "refresh":
-						if mm_ov.has_method("activate_live_pointer"):
-							mm_ov.call("activate_live_pointer", event.position)
-						get_viewport().set_input_as_handled()
-						return
+					if mm_ov != null and mm_ov.has_method("live_pointer_target"):
+						var tgt := str(mm_ov.call("live_pointer_target", event.position))
+						if tgt == "refresh" or tgt == "return_to_title":
+							if mm_ov.has_method("activate_live_pointer"):
+								mm_ov.call("activate_live_pointer", event.position)
+							get_viewport().set_input_as_handled()
+							return
 					_cc_map_press_latch = true
 				else:
 					call_deferred("_clear_cc_map_press_latch")
@@ -5999,6 +6005,9 @@ func _corridor_front_target_for_tag(owner_tag: String, capital_id: int) -> int:
 
 
 func _province_display_name(pid: int) -> String:
+	# Display-only. data/provinces_world_accurate still stores "RUS West".
+	if pid == 903492:
+		return "Western Russia"
 	if provinces.has(pid):
 		var p: Province = provinces[pid] as Province
 		if p != null and not str(p.name).is_empty():
@@ -25250,7 +25259,7 @@ func _play_map_action_flair_select(province: Province) -> void:
 			sea_zone = str(MapManager.get_sea_zone_name(province.id))
 	var is_coastal := _province_is_coastal_land(province)
 	var flair: Dictionary = _MapNextListHelpers.format_province_select_flair(
-		province.name,
+		_province_display_name(province.id),
 		province.owner_tag,
 		region,
 		province.terrain,
@@ -25827,9 +25836,19 @@ func _show_open_fight_sheet(
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	body.custom_minimum_size = Vector2(330, 0)
 	var lines: PackedStringArray = PackedStringArray()
-	lines.append("Attacker · %s · %s @ %s" % [attacker_tag, att_name, from_name])
+	var att_nation := attacker_tag
+	if typeof(CampaignWarChrome) != TYPE_NIL:
+		var att_shown := str(CampaignWarChrome.display_name_for_tag(attacker_tag)).strip_edges()
+		if not att_shown.is_empty():
+			att_nation = att_shown
+	var def_nation := def_tag
+	if typeof(CampaignWarChrome) != TYPE_NIL:
+		var def_shown := str(CampaignWarChrome.display_name_for_tag(def_tag)).strip_edges()
+		if not def_shown.is_empty():
+			def_nation = def_shown
+	lines.append("Attacker · %s · %s @ %s" % [att_nation, att_name, from_name])
 	if enemy_pid > 0:
-		lines.append("Defender · %s · %s" % [def_tag, def_name])
+		lines.append("Defender · %s · %s" % [def_nation, def_name])
 		if not terrain.is_empty():
 			lines.append("Terrain · %s" % terrain.capitalize())
 		if atk_p > 0.0 or def_p > 0.0:

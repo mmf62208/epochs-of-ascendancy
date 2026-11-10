@@ -181,10 +181,10 @@ func _date_line() -> String:
 
 
 func _show_continue_as() -> bool:
-	if bool(_model.get("allow_continuation", false)):
-		return true
-	# Player-capitulation Defeat: one overlay, Ink picker without a second verdict.
-	return str(_model.get("kind", "")) == "defeat" and str(_model.get("outcome", "")) == "defeat"
+	# Continuation picker only when the latch model allows it. Capitulation
+	# already has BtnKeepPlaying ("Continue as Germany"); the extra
+	# "Continue as…" control was a duplicate on that overlay.
+	return bool(_model.get("allow_continuation", false))
 
 
 func _stats_line() -> String:
@@ -237,22 +237,9 @@ func _hit(btn: Button, pos: Vector2) -> bool:
 
 
 func _on_main_menu() -> void:
-	var tree := get_tree()
-	if tree == null:
-		return
-	var bar := tree.get_first_node_in_group("top_info_bar")
-	if bar != null and bar.has_method("open_command_center_stay"):
-		bar.call("open_command_center_stay")
-		return
-	var existing := tree.root.get_node_or_null("MainMenu")
-	if existing != null and is_instance_valid(existing) and not existing.is_queued_for_deletion():
-		return
-	var packed: PackedScene = load("res://scenes/ui/MainMenu.tscn") as PackedScene
-	if packed == null:
-		return
-	var menu := packed.instantiate()
-	menu.name = "MainMenu"
-	tree.root.add_child(menu)
+	set_process_input(false)
+	visible = false
+	MainMenu.reload_to_living_title()
 
 
 func _on_load() -> void:
@@ -292,8 +279,12 @@ func _exit_tree() -> void:
 
 
 func _input(event: InputEvent) -> void:
-	if not visible:
+	if not visible or is_queued_for_deletion() or str(name).ends_with("_dying"):
 		return
+	if typeof(CampaignEndDomain) != TYPE_NIL:
+		var vm: Dictionary = CampaignEndDomain.view_model()
+		if bool(vm.get("keep_playing", false)):
+			return
 	if _is_escape(event):
 		get_viewport().set_input_as_handled()
 
@@ -321,6 +312,7 @@ func _on_keep() -> void:
 		for n in tree.get_nodes_in_group("campaign_ink_end_screen"):
 			if n != null and is_instance_valid(n) and n.has_method("_dismiss_end_screen"):
 				n.call("_dismiss_end_screen")
+	set_process_input(false)
 	visible = false
 	remove_from_group("campaign_end_screen")
 	name = "CampaignEndScreen_dying"

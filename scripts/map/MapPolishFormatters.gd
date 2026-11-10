@@ -8310,9 +8310,14 @@ static func tooltip_sfx_flair_strip(
 	var select: Dictionary = {}
 	var invest: Dictionary = {}
 	var assault: Dictionary = {}
+	var owner_shown := owner_tag
+	if typeof(CampaignWarChrome) != TYPE_NIL:
+		var dn := str(CampaignWarChrome.display_name_for_tag(owner_tag)).strip_edges()
+		if not dn.is_empty():
+			owner_shown = dn
 	# Use MapNextListHelpers when available via direct formatters in this file if present
 	select = {
-		"toast": "Selected · %s · %s" % [province_name, owner_tag],
+		"toast": "Selected · %s · %s" % [province_name, owner_shown],
 		"sfx": "confirm" if is_chokepoint or not sea_zone_name.is_empty() else "select",
 		"tooltip_chip": "Selected %s" % province_name,
 	}

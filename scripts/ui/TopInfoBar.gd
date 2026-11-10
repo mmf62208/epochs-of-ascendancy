@@ -1209,20 +1209,17 @@ func _unhandled_input(event: InputEvent) -> void:
 		if typeof(SaveLoadManager) != TYPE_NIL:
 			var ok := false
 			var abs_p := ""
-			var kb := 0
 			if SaveLoadManager.has_method("save_game_detailed"):
 				var res: Dictionary = SaveLoadManager.save_game_detailed("quicksave")
 				ok = bool(res.get("ok", false))
 				abs_p = str(res.get("absolute_path", res.get("path", "")))
-				kb = int(int(res.get("bytes", 0)) / 1024)
 			elif SaveLoadManager.has_method("quicksave"):
 				ok = bool(SaveLoadManager.quicksave())
 			print("Ctrl+S QuickSave triggered ok=%s path=%s" % [str(ok), abs_p])
-			if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
-				if ok:
-					LeaderEventUI.show_toast("Quicksave OK · %d KB (slot: quicksave)" % kb, 2.8)
-				else:
-					LeaderEventUI.show_toast("Quicksave FAILED — see console", 3.5)
+			# SaveLoadManager.save_game_detailed already toasts success. Extra
+			# success toasts here painted a duplicate notice.
+			if not ok and typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
+				LeaderEventUI.show_toast("Quicksave FAILED — see console", 3.5)
 			# Refresh Command Center list if open.
 			var mm: Node = get_tree().root.find_child("MainMenu", true, false) if get_tree() else null
 			if mm != null and mm.has_method("_refresh_save_list"):
@@ -2569,8 +2566,6 @@ func _on_save_pressed() -> void:
 		if bool(res.get("ok", false)):
 			var kb := int(int(res.get("bytes", 0)) / 1024)
 			print("TopInfoBar: quicksave ok %d KB → %s" % [kb, str(res.get("absolute_path", ""))])
-			if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
-				LeaderEventUI.show_toast("Saved quicksave (%d KB)" % kb, 2.5)
 		else:
 			push_error("TopInfoBar: quicksave failed: %s" % str(res.get("error", "?")))
 			if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):

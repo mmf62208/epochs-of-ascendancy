@@ -209,8 +209,14 @@ static func format_province_select_flair(
 	if pname.is_empty():
 		pname = "Province"
 	var toast := "Selected - " + pname
+	var owner_shown := ""
 	if not owner_tag.is_empty():
-		toast += " - " + owner_tag.strip_edges().to_upper()
+		owner_shown = owner_tag.strip_edges().to_upper()
+		if typeof(CampaignWarChrome) != TYPE_NIL:
+			var dn := str(CampaignWarChrome.display_name_for_tag(owner_tag)).strip_edges()
+			if not dn.is_empty():
+				owner_shown = dn
+		toast += " - " + owner_shown
 	if not region_name.is_empty():
 		toast += " - " + region_name.strip_edges()
 	if not sea_zone_name.is_empty():
@@ -226,8 +232,8 @@ static func format_province_select_flair(
 	if hh_active:
 		toast += " - Hand activity here"
 	var tooltip_chip := "[color=#6eb5ff]Selected[/color] [color=#8899aa]%s[/color]" % pname
-	if not owner_tag.is_empty():
-		tooltip_chip += " [color=#a0c0ff]%s[/color]" % owner_tag.strip_edges().to_upper()
+	if not owner_shown.is_empty():
+		tooltip_chip += " [color=#a0c0ff]%s[/color]" % owner_shown
 	if not sea_zone_name.is_empty():
 		tooltip_chip += " [color=#5ec8ff]⚓ %s[/color]" % sea_zone_name.strip_edges()
 	elif is_chokepoint:

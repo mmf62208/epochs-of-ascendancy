@@ -64,6 +64,39 @@ static func apply_living_campaign_pick(tag: String = "GER", year: int = 1936) ->
 	facts["applied"] = true
 	return facts
 
+
+## Overlay Main menu and in-game Return to Title share this path: reset
+## session leftovers, then reload the living title (TestScenario).
+static func reload_to_living_title(host: Node = null) -> void:
+	var tree := Engine.get_main_loop() as SceneTree
+	if tree == null:
+		return
+	if host is MainMenu:
+		(host as MainMenu)._return_to_title()
+		return
+	var existing: Node = null
+	if tree.root != null:
+		existing = tree.root.get_node_or_null("MainMenu")
+	if existing is MainMenu and is_instance_valid(existing) and not existing.is_queued_for_deletion():
+		(existing as MainMenu)._return_to_title()
+		return
+	_reset_session_and_change_to_title(tree)
+
+
+static func _reset_session_and_change_to_title(tree: SceneTree) -> void:
+	if typeof(SupplyManager) != TYPE_NIL and SupplyManager.has_method("clear_clock_bar_for_scene_change"):
+		SupplyManager.call("clear_clock_bar_for_scene_change")
+	if typeof(NationalModifierManager) != TYPE_NIL and NationalModifierManager.has_method("clear_all_modifiers"):
+		NationalModifierManager.clear_all_modifiers()
+	if typeof(CampaignEndDomain) != TYPE_NIL:
+		CampaignEndDomain.reset_session_for_new_game()
+	if tree.root != null and tree.root.has_meta("eoa_return_title_scene"):
+		var packed: Variant = tree.root.get_meta("eoa_return_title_scene")
+		if packed is PackedScene:
+			tree.change_scene_to_packed(packed)
+			return
+	tree.change_scene_to_file("res://scenes/TestScenario.tscn")
+
 var _closing := false
 var _root: Control
 var _panel: PanelContainer
@@ -793,11 +826,14 @@ func _find_action_button(action_id: String) -> Button:
 	return null
 
 
-## "refresh", "close", "header", or "" for a screen point. Geometry only.
+## "refresh", "return_to_title", "close", "header", or "" for a screen point. Geometry only.
 func live_pointer_target(screen: Vector2) -> String:
 	var refresh := _find_action_button("refresh")
 	if refresh != null and _control_has_point(refresh, screen):
 		return "refresh"
+	var ret := _find_action_button("return_to_main")
+	if ret != null and _control_has_point(ret, screen):
+		return "return_to_title"
 	var close_b := close_x_button()
 	if close_b != null and _control_has_point(close_b, screen):
 		return "close"
@@ -818,6 +854,11 @@ func activate_live_pointer(screen: Vector2) -> String:
 		elif btn != null:
 			btn.pressed.emit()
 		return "refresh"
+	if kind == "return_to_title":
+		var ret := _find_action_button("return_to_main")
+		_play_live_click(ret)
+		_return_to_title()
+		return "return_to_title"
 	if kind == "close":
 		_play_live_click(close_x_button())
 		return "close"
@@ -1013,7 +1054,6 @@ func _write_slot(slot: String) -> void:
 		var abs_p := str(result.get("absolute_path", result.get("path", "")))
 		var kb := int(int(result.get("bytes", 0)) / 1024)
 		_set_status("Saved \"%s\" · %d KB · %s" % [slot, kb, abs_p])
-		_toast("Saved %s (%d KB)" % [slot, kb], 2.5)
 		print("MainMenu: save ok → %s (%d bytes)" % [abs_p, int(result.get("bytes", 0))])
 		call_deferred("_refresh_save_list")
 	else:
@@ -1583,28 +1623,11 @@ func _return_to_title() -> void:
 	_set_status("Reloading…")
 	_pause_game(false)
 	menu_closed.emit()
-	# Drop the cached clock bar while it is still a live node. The scene
-	# swap frees the old TopInfoBar; SupplyManager must not keep that ref.
-	if typeof(SupplyManager) != TYPE_NIL and SupplyManager.has_method("clear_clock_bar_for_scene_change"):
-		SupplyManager.call("clear_clock_bar_for_scene_change")
-	# Autoloads survive change_scene. Untyped leftover arrays SCRIPT ERROR
-	# on the next TestRunner apply_national_effect (second Begin).
-	if typeof(NationalModifierManager) != TYPE_NIL and NationalModifierManager.has_method("clear_all_modifiers"):
-		NationalModifierManager.clear_all_modifiers()
-	if typeof(CampaignEndDomain) != TYPE_NIL:
-		CampaignEndDomain.reset_session_for_new_game()
 	queue_free()
 	var tree := get_tree()
 	if tree == null:
 		return
-	# Play always reloads TestScenario. A headless guard may supply a
-	# PackedScene on the root so it can idle the title without the harness.
-	if tree.root != null and tree.root.has_meta("eoa_return_title_scene"):
-		var packed: Variant = tree.root.get_meta("eoa_return_title_scene")
-		if packed is PackedScene:
-			tree.change_scene_to_packed(packed)
-			return
-	tree.change_scene_to_file("res://scenes/TestScenario.tscn")
+	_reset_session_and_change_to_title(tree)
 
 
 func _map_renderer_for_close() -> Node:
