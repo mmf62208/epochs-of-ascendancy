@@ -13,6 +13,7 @@ const FLUSH_FRAMES := 6
 const SRC_CHROME := "res://scripts/ui/CampaignWarChrome.gd"
 const SRC_DIPLO := "res://scripts/ui/DiplomacyView.gd"
 const SRC_REN := "res://scripts/map/MapRenderer.gd"
+const SRC_INSIGHT := "res://scripts/map/ProvinceInsight.gd"
 
 var _failures := 0
 var _boot: GDScript
@@ -125,10 +126,14 @@ func _run() -> void:
 	if not _assert_inspector_justify(mm):
 		_cleanup()
 		return
+	if not _assert_display_names(mm):
+		_cleanup()
+		return
 	if not _assert_attack_hint(mm):
 		_cleanup()
 		return
 	await _assert_diplomacy_justify()
+	await _assert_diplomacy_declare_flip()
 	_cleanup()
 
 
@@ -156,7 +161,21 @@ func _test_source_needles() -> void:
 	if "_attack_not_at_war_hint" not in ren:
 		_fail("Attack disabled path must use _attack_not_at_war_hint")
 		return
-	_pass("source needles: neighbour+POL inspector; DipActions on main column; Attack hint")
+	if "core_for_line" not in ren:
+		_fail("inspector Core For must use ProvinceInsight.core_for_line")
+		return
+	var name_fn := _slice_func(chrome, "display_name_for_tag")
+	if name_fn.is_empty() or "country_display_name" not in name_fn:
+		_fail("display_name_for_tag must call MapManager.country_display_name")
+		return
+	if "_on_justify_day_advanced" not in dip or "game_day_advanced" not in dip:
+		_fail("Diplomacy must refresh Justify/Declare on TimeManager.game_day_advanced")
+		return
+	var insight := _read(SRC_INSIGHT)
+	if "core_for_line" not in insight or "country_display_name" not in insight:
+		_fail("ProvinceInsight must route Owner/Core For through country_display_name")
+		return
+	_pass("source needles: neighbour+POL inspector; DipActions on main column; Attack hint; display names; day refresh")
 
 
 func _assert_inspector_justify(mm: Node) -> bool:
@@ -377,6 +396,189 @@ func _assert_diplomacy_justify() -> void:
 		return
 	_pass("Diplomacy Justify on POL is on-screen and uses the same domain call")
 	view.queue_free()
+
+
+func _contains_raw_tag(text: String, tag: String) -> bool:
+	var t := tag.strip_edges().to_upper()
+	if t.is_empty():
+		return false
+	var cleaned := text.replace(",", " ").replace(":", " ").replace("\n", " ").replace("[/color]", " ")
+	for tok_v in cleaned.split(" ", false):
+		var tok := str(tok_v).strip_edges()
+		if tok.to_upper() == t:
+			return true
+	return false
+
+
+func _insight_call(method: String, arg: Object) -> Variant:
+	var insight: GDScript = load(SRC_INSIGHT) as GDScript
+	if insight == null or not insight.has_method(method):
+		return null
+	return insight.call(method, arg)
+
+
+func _assert_display_names(mm: Node) -> bool:
+	var spa_pid := _land_of(mm, "SPA")
+	var sov_pid := _named_owned(mm, "SOV", "Moscow")
+	var cze_pid := _land_of(mm, "CZE")
+	if spa_pid <= 0 or sov_pid <= 0 or cze_pid <= 0:
+		_fail("missing SPA/SOV/CZE pids spa=%d sov=%d cze=%d" % [spa_pid, sov_pid, cze_pid])
+		return false
+	var spa_p: Object = mm.call("get_province", spa_pid)
+	var sov_p: Object = mm.call("get_province", sov_pid)
+	var cze_p: Object = mm.call("get_province", cze_pid)
+	var pol_p: Object = mm.call("get_province", _pol_interior)
+	var pol_top_v: Variant = _insight_call("build_inspector_topline", pol_p)
+	if not (pol_top_v is Dictionary):
+		_fail("ProvinceInsight.build_inspector_topline missing")
+		return false
+	var pol_owner := str((pol_top_v as Dictionary).get("owner_line", ""))
+	if pol_owner.find("Poland") < 0 or _contains_raw_tag(pol_owner, "POL"):
+		_fail("inspector Owner line must use Poland, not POL (%s)" % pol_owner)
+		return false
+	var top_v: Variant = _insight_call("build_inspector_topline", spa_p)
+	if not (top_v is Dictionary):
+		_fail("ProvinceInsight.build_inspector_topline missing for SPA")
+		return false
+	var owner_line := str((top_v as Dictionary).get("owner_line", ""))
+	if owner_line.find("Spain") < 0 or _contains_raw_tag(owner_line, "SPA"):
+		_fail("inspector Owner line must use Spain, not SPA (%s)" % owner_line)
+		return false
+	spa_p = _ensure_core_for(mm, spa_p, "SPA")
+	var core_line := str(_insight_call("core_for_line", spa_p))
+	if core_line.find("Spain") < 0 or _contains_raw_tag(core_line, "SPA"):
+		_fail("inspector Core For must use Spain, not SPA (%s)" % core_line)
+		return false
+	_pass("inspector Owner/Core For use Spain/Poland, not SPA/POL")
+	var hover := str(_insight_call("build_compact_hover_tooltip", sov_p))
+	var hover2 := str(_insight_call("build_strategic_hover_tooltip", sov_p))
+	var hover3 := str(_insight_call("build_control_glance_bbcode", sov_p))
+	if hover.find("Soviet") < 0 or _contains_raw_tag(hover, "SOV"):
+		_fail("compact hover must use Soviet Union, not SOV (%s)" % hover)
+		return false
+	if hover2.find("Soviet") < 0 or _contains_raw_tag(hover2, "SOV"):
+		_fail("strategic hover must use Soviet Union, not SOV (%s)" % hover2)
+		return false
+	if hover3.find("Soviet") < 0 or _contains_raw_tag(hover3, "SOV"):
+		_fail("hover Owner glance must use Soviet Union, not SOV (%s)" % hover3)
+		return false
+	_pass("hover uses Soviet Union on %s %d" % [str(sov_p.get("name")), sov_pid])
+	var host_cze := _make_host("InspectorCze", Vector2(40, 480))
+	_ui.add_child(host_cze)
+	_chrome.mount(host_cze, cze_p)
+	var cze_btn := host_cze.get_node_or_null("BtnDeclareWar") as Button
+	if cze_btn == null or not cze_btn.visible:
+		_fail("CZE neighbour inspector Justify missing")
+		return false
+	if str(cze_btn.text).find("Czechoslovakia") < 0 or _contains_raw_tag(str(cze_btn.text), "CZE"):
+		_fail("CZE Justify must use Czechoslovakia, not CZE (%s)" % cze_btn.text)
+		return false
+	_pass("inspector Justify uses Czechoslovakia on CZE %d" % cze_pid)
+	return true
+
+
+func _assert_diplomacy_declare_flip() -> void:
+	_war.reset_for_test()
+	if not ResourceLoader.exists("res://scenes/ui/DiplomacyView.tscn"):
+		_fail("DiplomacyView.tscn missing for declare flip")
+		return
+	var packed := load("res://scenes/ui/DiplomacyView.tscn") as PackedScene
+	if packed == null:
+		_fail("DiplomacyView.tscn load failed for declare flip")
+		return
+	var view: Node = packed.instantiate()
+	view.name = "DiplomacyViewDeclareFlip"
+	if view.has_method("focus_country"):
+		view.call("focus_country", "POL")
+	root.add_child(view)
+	await _flush()
+	if view is Window:
+		(view as Window).size = Vector2i(1040, 720)
+	await _flush()
+	if view.has_method("_on_justify_war_pressed"):
+		view.call("_on_justify_war_pressed")
+	await _flush()
+	if not bool(_war.player_has_justify("POL")):
+		_fail("declare-flip: Justify press did not begin POL justify")
+		view.queue_free()
+		return
+	var btn := view.find_child("BtnJustifyWar", true, false) as Button
+	if btn == null:
+		_fail("declare-flip: BtnJustifyWar missing")
+		view.queue_free()
+		return
+	if str(btn.text).find("Declare") >= 0:
+		_fail("declare-flip: button already Declare before completion (%s)" % btn.text)
+		view.queue_free()
+		return
+	_war.grant_ready_player_justify("POL")
+	if not bool(_war.player_justify_is_ready_for("POL")):
+		_fail("declare-flip: grant_ready did not ready POL")
+		view.queue_free()
+		return
+	var tm := root.get_node_or_null("TimeManager")
+	if tm == null or not tm.has_signal("game_day_advanced"):
+		_fail("declare-flip: TimeManager.game_day_advanced missing")
+		view.queue_free()
+		return
+	tm.emit_signal("game_day_advanced", 1936, 1, 15)
+	await _flush()
+	if str(btn.text).find("Declare war on Poland") < 0:
+		_fail("Diplomacy must flip to Declare war on Poland without Refresh (got %s)" % btn.text)
+		view.queue_free()
+		return
+	if _contains_raw_tag(str(btn.text), "POL"):
+		_fail("Declare label used raw tag POL (%s)" % btn.text)
+		view.queue_free()
+		return
+	_pass("Diplomacy flipped to Declare war on Poland without Refresh")
+	view.queue_free()
+
+
+func _ensure_core_for(mm: Node, province: Object, tag: String) -> Object:
+	var t := tag.strip_edges().to_upper()
+	if _cores_include(province, t):
+		return province
+	if mm != null and mm.has_method("get_provinces_by_owner"):
+		var owned: Array = mm.call("get_provinces_by_owner", tag)
+		owned.sort()
+		for pid_v in owned:
+			var p: Object = mm.call("get_province", int(pid_v))
+			if p == null or bool(p.get("is_sea")):
+				continue
+			if _cores_include(p, t):
+				return p
+	if province != null and "core_for" in province:
+		var cores: Array[String] = [t]
+		province.core_for = cores
+	return province
+
+
+func _cores_include(province: Object, tag: String) -> bool:
+	if province == null or not ("core_for" in province):
+		return false
+	for tag_v in province.core_for:
+		if str(tag_v).strip_edges().to_upper() == tag:
+			return true
+	return false
+
+
+func _named_owned(mm: Node, owner: String, needle: String) -> int:
+	if mm == null or not mm.has_method("get_provinces_by_owner"):
+		return -1
+	var owned: Array = mm.call("get_provinces_by_owner", owner)
+	owned.sort()
+	var fallback := -1
+	for pid_v in owned:
+		var pid := int(pid_v)
+		var p: Object = mm.call("get_province", pid)
+		if p == null or bool(p.get("is_sea")):
+			continue
+		if fallback < 0:
+			fallback = pid
+		if str(p.get("name")).findn(needle) >= 0:
+			return pid
+	return fallback
 
 
 func _make_host(host_name: String, pos: Vector2) -> Panel:

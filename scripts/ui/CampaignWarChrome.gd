@@ -56,15 +56,19 @@ static func display_name_for_tag(tag: String) -> String:
 	var t := tag.strip_edges().to_upper()
 	if t.is_empty():
 		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("country_display_name"):
+		var nm := str(MapManager.country_display_name(t)).strip_edges()
+		if not nm.is_empty():
+			return nm
 	if typeof(MapManager) != TYPE_NIL:
 		if MapManager.has_method("ensure_country_stub"):
 			MapManager.ensure_country_stub(t)
 		if MapManager.has_method("get_country"):
 			var c: Variant = MapManager.get_country(t)
 			if c is Dictionary:
-				var nm := str((c as Dictionary).get("name", "")).strip_edges()
-				if not nm.is_empty() and nm.to_upper() != t:
-					return nm
+				var dn := str((c as Dictionary).get("name", "")).strip_edges()
+				if not dn.is_empty() and dn.to_upper() != t:
+					return dn
 	if typeof(WarStateDomain) != TYPE_NIL:
 		var wn := str(WarStateDomain.tag_name(t)).strip_edges()
 		if not wn.is_empty() and wn.to_upper() != t:

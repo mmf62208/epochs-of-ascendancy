@@ -352,6 +352,23 @@ func _default_country_display_name(tag: String) -> String:
 	}
 	return str(names.get(t, t))
 
+
+## Player-facing nation name. Never prefer a raw 3-letter tag when a
+## display name is known (CZE → Czechoslovakia, SPA → Spain, SOV → Soviet Union).
+func country_display_name(tag: String) -> String:
+	var t := tag.strip_edges().to_upper()
+	if t.is_empty():
+		return ""
+	var live := ""
+	var c: Variant = get_country(t)
+	if c is Dictionary:
+		live = str((c as Dictionary).get("name", "")).strip_edges()
+	elif c is Object and c != null and "name" in c:
+		live = str(c.name).strip_edges()
+	if not live.is_empty() and live.to_upper() != t:
+		return live
+	return _default_country_display_name(t)
+
 func get_player_country_tag_fallback() -> String:
 	# Useful for early UI before player selection is wired
 	for t in _countries.keys():

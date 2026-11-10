@@ -107,6 +107,9 @@ func _ready() -> void:
 
 	refresh_btn.pressed.connect(_refresh_view)
 	trade_btn.pressed.connect(_open_trade_market_filtered)
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_signal("game_day_advanced"):
+		if not TimeManager.game_day_advanced.is_connected(_on_justify_day_advanced):
+			TimeManager.game_day_advanced.connect(_on_justify_day_advanced)
 	# Space layer board — peer path next to Trade (orbital compact ledger)
 	if button_hbox and button_hbox.get_node_or_null("SpaceBoardButton") == null:
 		var space_btn: Button = Button.new()
@@ -1531,6 +1534,16 @@ func close_screen() -> void:
 		return
 	hide()
 	queue_free()
+
+
+func _on_justify_day_advanced(_year: int, _month: int, _day: int) -> void:
+	_sync_justify_button()
+
+
+func _exit_tree() -> void:
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_signal("game_day_advanced"):
+		if TimeManager.game_day_advanced.is_connected(_on_justify_day_advanced):
+			TimeManager.game_day_advanced.disconnect(_on_justify_day_advanced)
 
 
 func _input(event: InputEvent) -> void:

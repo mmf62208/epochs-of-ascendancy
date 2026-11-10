@@ -21126,9 +21126,9 @@ func show_info_panel(province: Province, force_open: bool = false, keep_camera: 
 		_province_id_badge.tooltip_text = "Province id %d · use this number when reporting map issues" % int(province.id)
 	var ctrl_note := ""
 	if ProvinceInsight.is_province_contested(province):
-		ctrl_note = "  ⚑ held by %s" % province.controller_tag
+		ctrl_note = "  ⚑ held by %s" % ProvinceInsight.nation_display_name(str(province.controller_tag))
 	elif province.controller_tag != province.owner_tag and not province.controller_tag.is_empty():
-		ctrl_note = " (controlled by %s)" % province.controller_tag
+		ctrl_note = " (controlled by %s)" % ProvinceInsight.nation_display_name(str(province.controller_tag))
 	info_owner.text = str(topline.get("owner_line", "Owner: Unowned")) + ctrl_note
 	info_population.text = "Population: %s" % str(province.population)
 	var terrain_bits: PackedStringArray = ["Terrain: " + province.terrain.capitalize()]
@@ -21230,7 +21230,7 @@ func show_info_panel(province: Province, force_open: bool = false, keep_camera: 
 		if nat_bonus > 0 and info_resources != null:
 			info_resources.text += "  |  Trade Cap +%d (Special Sites)" % int(nat_bonus)
 
-	info_core.text = "Core For: " + (", ".join(province.core_for) if province.core_for.size() > 0 else "None")
+	info_core.text = ProvinceInsight.core_for_line(province)
 
 	var special_list := []
 	for feature in province.special_features.keys():
