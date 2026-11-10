@@ -419,6 +419,9 @@ var _supply_route_highlight_host: Node2D = null
 var _supply_corridor_gem_a: Polygon2D = null
 var _supply_corridor_gem_b: Polygon2D = null
 var _next_hook_chip: Button = null
+## Armed only after living-title Begin. Map setup / Return to Title must not
+## paint a nation NEXT hint while the title is still up or about to appear.
+var _next_hook_after_begin: bool = false
 var _stability_load_hooked: bool = false
 var _current_theater_bounds: Rect2 = GRAND_THEATER_CANONICAL_BOUNDS  # updated on theater/chunk/world load; used for camera clamp to avoid gray lost space on pan/zoom to NA etc.
 
@@ -27651,6 +27654,23 @@ func _setup_land_battle_bubble_layer() -> void:
 	_sync_land_battle_bubbles()
 
 
+func _hide_next_hook_chip() -> void:
+	if _next_hook_chip != null and is_instance_valid(_next_hook_chip):
+		_next_hook_chip.visible = false
+
+
+func refresh_next_hook_after_living_begin() -> void:
+	_next_hook_after_begin = true
+	_refresh_next_hook_chip()
+
+
+func _next_hook_should_stay_hidden() -> bool:
+	if _next_hook_after_begin:
+		return false
+	# Graphical F5 paints the chip during map setup before LivingTitleBoot exists.
+	return LivingTitleBoot.should_show_living_title()
+
+
 func _refresh_next_hook_chip() -> void:
 	var ui := get_node_or_null("UI") as CanvasLayer
 	if ui == null:
@@ -27692,8 +27712,8 @@ func _refresh_next_hook_chip() -> void:
 			_show_inspector_toast(str(out.get("summary", "Next")), 3.5)
 			_refresh_next_hook_chip()
 		)
-	if _living_title_boot_is_up():
-		_next_hook_chip.visible = false
+	if _living_title_boot_is_up() or _next_hook_should_stay_hidden():
+		_hide_next_hook_chip()
 		return
 	_next_hook_chip.visible = true
 	var rec: Dictionary = {}

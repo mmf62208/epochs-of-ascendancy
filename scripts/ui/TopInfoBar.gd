@@ -2561,24 +2561,20 @@ func _toggle_screen(screen_name: String, scene_path: String, configure: Callable
 func _on_save_pressed() -> void:
 	# Immediate quicksave (user expectation: Menu→Save writes a file), then open Command Center.
 	print("TopInfoBar: Menu Save → quicksave + open Command Center")
-	var save_ok := false
-	var kb := 0
 	if typeof(SaveLoadManager) != TYPE_NIL and SaveLoadManager.has_method("save_game_detailed"):
 		var res: Dictionary = SaveLoadManager.save_game_detailed("quicksave")
 		if bool(res.get("ok", false)):
-			save_ok = true
-			kb = int(int(res.get("bytes", 0)) / 1024)
+			var kb := int(int(res.get("bytes", 0)) / 1024)
 			print("TopInfoBar: quicksave ok %d KB → %s" % [kb, str(res.get("absolute_path", ""))])
 		else:
 			push_error("TopInfoBar: quicksave failed: %s" % str(res.get("error", "?")))
 			if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
 				LeaderEventUI.show_toast("Save failed: %s" % str(res.get("error", "?")), 3.5, true)
 	elif typeof(SaveLoadManager) != TYPE_NIL and SaveLoadManager.has_method("quicksave"):
-		save_ok = bool(SaveLoadManager.quicksave())
+		SaveLoadManager.quicksave()
 	_open_command_center(true)
-	# Command Center opening covers SaveLoadManager's toast. One visible success toast here.
-	if save_ok and typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
-		LeaderEventUI.show_toast("Saved quicksave (%d KB)" % kb, 2.5)
+	# SaveLoadManager.save_game_detailed already toasts success. Extra
+	# success toasts here painted a duplicate notice (same as Ctrl+S).
 
 
 func _on_load_pressed() -> void:
