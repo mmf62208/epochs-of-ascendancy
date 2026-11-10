@@ -112,6 +112,7 @@ run_step unit_board_play_path \
     tools.map_generation.tests.test_gap_europe_resid1 \
     tools.map_generation.tests.test_gap_fra1 \
     tools.map_generation.tests.test_gap_eng1 \
+    tools.map_generation.tests.test_eng_finish \
     tools.map_generation.tests.test_canada_holes \
     tools.map_generation.tests.test_canada_residual_faces \
     tools.map_generation.tests.test_gap_jap1 \
