@@ -1608,6 +1608,7 @@ func _campaign_after_battles() -> void:
 		var at_war := WarStateDomain.any_war()
 		if at_war and typeof(CapitulationDomain) != TYPE_NIL:
 			CapitulationDomain.check_all(int(total_days_elapsed))
+		WarStateDomain.try_ai_stalemate_peace(int(total_days_elapsed))
 		# A day with no war, no surrender, and no end latch has nothing to score.
 		# Building the capitulation dict here showed up as the first day_battles
 		# sample. The capitulation day itself is covered by at_war, sampled

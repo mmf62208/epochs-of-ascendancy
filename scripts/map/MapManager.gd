@@ -1588,6 +1588,8 @@ func update_province_owner(
 	var p: Province = _provinces.get(province_id)
 	if p == null:
 		return false
+	var previous_owner := str(p.owner_tag)
+	var previous_controller := str(p.controller_tag)
 	var changed := false
 	if p.owner_tag != new_owner:
 		p.owner_tag = new_owner
@@ -1598,7 +1600,7 @@ func update_province_owner(
 	if changed:
 		_invalidate_owner_index()
 		if typeof(WarStateDomain) != TYPE_NIL:
-			WarStateDomain.note_province_owner_changed()
+			WarStateDomain.note_province_owner_changed(province_id, previous_owner, previous_controller)
 		if typeof(SupplyManager) != TYPE_NIL and SupplyManager.has_method("notify_province_control_changed"):
 			SupplyManager.notify_province_control_changed(province_id)
 		if not skip_emit:

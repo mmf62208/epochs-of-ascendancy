@@ -13,6 +13,11 @@ static var _file_cache: Dictionary = {}
 static var _file_loaded: bool = false
 static var _override: Dictionary = {}
 static var _booting: bool = false
+static var _reject_counters: Dictionary = {}
+
+const DEMOCRACY_TAGS := ["FRA", "ENG", "USA"]
+const DECLARE_EXTRA_TARGETS := ["POL", "CHI"]
+const REJECT_LOG_ENV := "EOA_AI_REJECT_LOG"
 
 
 static func loop_enabled() -> bool:
@@ -157,6 +162,7 @@ static func reset_for_test() -> void:
 		"booted": false,
 	}
 	_booting = false
+	_reject_counters = {}
 
 
 static func _apply_configured_wars() -> void:
@@ -201,6 +207,9 @@ static func declare_war(attacker: String, defender: String, goal: String = "") -
 		"attacker": a,
 		"defender": b,
 		"start_day": day,
+		"last_progress_day": day,
+		"last_cap_a": 0.0,
+		"last_cap_b": 0.0,
 		"goal": goal,
 	}
 	var wars := _wars()
@@ -382,6 +391,10 @@ static func make_peace(a: String, b: String, reason: String = "") -> Dictionary:
 	var truces := _truces()
 	truces[key] = until
 	_state()["truces"] = truces
+	_clear_pair_justifies(_tag(a), _tag(b))
+	_close_pair_fights(_tag(a), _tag(b))
+	if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("note_war_ended"):
+		BattleManager.note_war_ended(_tag(a), _tag(b))
 	_append_log("peace", _tag(a), _tag(b), _day(), reason)
 	_sync_at_war(_tag(a))
 	_sync_at_war(_tag(b))
@@ -731,6 +744,7 @@ static func try_ai_declare_wars(day_index: int) -> Array:
 	var day := int(day_index)
 	var min_day := int(r["ai_declare_min_day"])
 	if day < min_day and not _any_justify():
+		_bump_reject("min_day")
 		return []
 	var events: Array = _complete_ready_justifies(day)
 	if day < min_day:
@@ -751,15 +765,19 @@ static func try_ai_declare_wars(day_index: int) -> Array:
 	for i in range(checks):
 		var m := str(majors[(rot + i) % majors.size()])
 		if war_count(m) >= max_wars:
+			_bump_reject("max_wars")
 			continue
 		if typeof(LandBattleAi) == TYPE_NIL:
 			continue
 		if LandBattleAi.personality_aggression(m) < min_aggr:
+			_bump_reject("aggression")
 			continue
 		if _has_pending_justify(m):
+			_bump_reject("pending_justify")
 			continue
 		var target := _pick_declare_target(m, player, may_player, min_ratio)
 		if target.is_empty():
+			_bump_reject("no_target")
 			continue
 		_begin_justify(m, target, day + justify_days, "ai")
 		events.append({"action": "justify", "attacker": m, "defender": target, "day": day, "ready_day": day + justify_days})
@@ -862,13 +880,26 @@ static func _pick_declare_target(tag: String, player: String, may_player: bool, 
 	var mine := military_strength(tag)
 	for foe in ordered:
 		var f := str(foe)
-		if f == player and not may_player:
+		if not _declare_pool_ok(f):
 			continue
-		if is_at_war(tag, f) or in_truce(tag, f) or _formal_allies(tag, f):
+		if f == player and not may_player:
+			_bump_reject("player_excluded")
+			continue
+		if is_at_war(tag, f):
+			_bump_reject("already_at_war")
+			continue
+		if in_truce(tag, f):
+			_bump_reject("truce")
+			continue
+		if _formal_allies(tag, f):
+			_bump_reject("allied")
+			continue
+		if not _democracy_may_declare(tag, f):
 			continue
 		var theirs := military_strength(f)
 		var ratio := mine / maxf(theirs, 0.0001)
 		if ratio + 0.0000001 < min_ratio:
+			_bump_reject("ratio")
 			continue
 		return f
 	return ""
@@ -885,13 +916,279 @@ static func end_year() -> int:
 	return 1949
 
 
-static func note_province_owner_changed() -> void:
+static func note_province_owner_changed(
+	province_id: int = -1,
+	previous_owner: String = "",
+	previous_controller: String = "",
+) -> void:
 	if not loop_enabled():
 		return
 	# A captured hex is no longer a front. The precompute cache would keep
 	# offering it, and the next enemy hex would never be scanned.
 	invalidate_fronts()
-	var days: Variant = _override["stalemate_white_peace_days"] if _override.has("stalemate_white_peace_days") else _file_rules().get("stalemate_white_peace_days", null)
-	if days == null:
+	_state().erase("front_change_day")
+	var pid := int(province_id)
+	if pid <= 0:
 		return
-	_state()["front_change_day"] = _day()
+	var new_owner := ""
+	var new_ctrl := ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province"):
+		var p: Province = MapManager.get_province(pid)
+		if p != null:
+			new_owner = _tag(str(p.owner_tag))
+			new_ctrl = _tag(str(p.controller_tag))
+	_mark_wars_progress_for_capture(
+		_tag(previous_owner),
+		_tag(previous_controller),
+		new_owner,
+		new_ctrl,
+	)
+	if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("note_front_progress_tags"):
+		var tags: Array = []
+		for raw in [previous_owner, previous_controller, new_owner, new_ctrl]:
+			var t := _tag(str(raw))
+			if not t.is_empty() and not tags.has(t):
+				tags.append(t)
+		BattleManager.note_front_progress_tags(tags)
+
+
+static func set_campaign_observer(enabled: bool) -> void:
+	ensure_booted()
+	if enabled:
+		_state()["observer"] = true
+	else:
+		_state().erase("observer")
+
+
+static func campaign_observer() -> bool:
+	if typeof(GameData) != TYPE_NIL:
+		var raw: Variant = GameData.peace_state.get("campaign_wars", {})
+		if raw is Dictionary and bool((raw as Dictionary).get("observer", false)):
+			return true
+	if typeof(SessionPlayers) != TYPE_NIL and SessionPlayers.has_method("has_observer_seat"):
+		return bool(SessionPlayers.has_observer_seat())
+	if typeof(SessionPlayers) != TYPE_NIL:
+		for s in SessionPlayers.slots:
+			if s is Dictionary and str((s as Dictionary).get("control", "")) == SessionPlayers.CONTROL_OBSERVER:
+				return true
+	return false
+
+
+static func ai_reject_counters(reset: bool = false) -> Dictionary:
+	var copy: Dictionary = _reject_counters.duplicate()
+	if reset:
+		_reject_counters = {}
+	return copy
+
+
+static func note_battle_progress(attacker: String, defender: String) -> void:
+	if not loop_enabled():
+		return
+	_touch_war_progress(_tag(attacker), _tag(defender), _day())
+
+
+static func try_ai_stalemate_peace(day_index: int) -> Array:
+	if not loop_enabled():
+		return []
+	if ai_stopped():
+		return []
+	ensure_booted()
+	var n := int(rules().get("stalemate_white_peace_days", 0))
+	if n <= 0:
+		return []
+	var day := int(day_index)
+	var events: Array = []
+	var wars := _wars()
+	var keys: Array = wars.keys()
+	keys.sort()
+	for k in keys:
+		var row_v: Variant = wars[k]
+		if not (row_v is Dictionary):
+			continue
+		var row: Dictionary = row_v
+		var a := _tag(str(row.get("a", "")))
+		var b := _tag(str(row.get("b", "")))
+		if a.is_empty() or b.is_empty():
+			continue
+		if _is_player_or_human_nation(a) or _is_player_or_human_nation(b):
+			continue
+		_ensure_war_progress_fields(row, day)
+		if _cap_progress_moved(row, a, b):
+			row["last_progress_day"] = day
+		wars[k] = row
+		if _pair_has_open_fight(a, b):
+			continue
+		var last := int(row.get("last_progress_day", day))
+		if day - last < n:
+			continue
+		var peace: Dictionary = make_peace(a, b, "stalemate")
+		if not bool(peace.get("ok", false)):
+			continue
+		_post_stalemate_news(a, b)
+		events.append({
+			"action": "peace",
+			"a": a,
+			"b": b,
+			"day": day,
+			"reason": "stalemate",
+			"pair": str(peace.get("pair", k)),
+		})
+	return events
+
+
+static func _ensure_war_progress_fields(row: Dictionary, day: int) -> void:
+	if not row.has("last_progress_day"):
+		row["last_progress_day"] = day
+	if not row.has("last_cap_a"):
+		row["last_cap_a"] = 0.0
+	if not row.has("last_cap_b"):
+		row["last_cap_b"] = 0.0
+	if not row.has("start_day"):
+		row["start_day"] = day
+
+
+static func _cap_progress_moved(row: Dictionary, a: String, b: String) -> bool:
+	var cap_a := 0.0
+	var cap_b := 0.0
+	if typeof(CapitulationDomain) != TYPE_NIL:
+		cap_a = float(CapitulationDomain.progress(a))
+		cap_b = float(CapitulationDomain.progress(b))
+	var prev_a := float(row.get("last_cap_a", 0.0))
+	var prev_b := float(row.get("last_cap_b", 0.0))
+	var moved := (cap_a - prev_a) >= 0.01 or (cap_b - prev_b) >= 0.01
+	row["last_cap_a"] = cap_a
+	row["last_cap_b"] = cap_b
+	return moved
+
+
+static func _pair_has_open_fight(a: String, b: String) -> bool:
+	if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("pair_has_open_land_battle"):
+		return bool(BattleManager.pair_has_open_land_battle(a, b))
+	return false
+
+
+static func _mark_wars_progress_for_capture(
+	old_owner: String,
+	old_ctrl: String,
+	new_owner: String,
+	new_ctrl: String,
+) -> void:
+	var before: Dictionary = {}
+	for t in [old_owner, old_ctrl]:
+		if not t.is_empty():
+			before[t] = true
+	var after: Dictionary = {}
+	for t2 in [new_owner, new_ctrl]:
+		if not t2.is_empty():
+			after[t2] = true
+	if before.is_empty() and after.is_empty():
+		return
+	var day := _day()
+	var wars := _wars()
+	for k in wars.keys():
+		var row_v: Variant = wars[k]
+		if not (row_v is Dictionary):
+			continue
+		var row: Dictionary = row_v
+		var aa := _tag(str(row.get("a", "")))
+		var bb := _tag(str(row.get("b", "")))
+		var before_hit := before.has(aa) or before.has(bb)
+		var after_hit := after.has(aa) or after.has(bb)
+		if before_hit and after_hit:
+			row["last_progress_day"] = day
+			wars[k] = row
+	_state()["wars"] = wars
+
+
+static func _touch_war_progress(a: String, b: String, day: int) -> void:
+	var key := pair_key(a, b)
+	if key.is_empty():
+		return
+	var wars := _wars()
+	if not wars.has(key):
+		return
+	var row_v: Variant = wars[key]
+	if not (row_v is Dictionary):
+		return
+	var row: Dictionary = row_v
+	row["last_progress_day"] = day
+	wars[key] = row
+	_state()["wars"] = wars
+
+
+static func _declare_pool_ok(foe: String) -> bool:
+	var t := _tag(foe)
+	if t.is_empty():
+		return false
+	if DECLARE_EXTRA_TARGETS.has(t):
+		return true
+	var majors: Variant = rules().get("scenario_majors", [])
+	if majors is Array:
+		for m in majors:
+			if _tag(str(m)) == t:
+				return true
+	return false
+
+
+static func _is_democracy(tag: String) -> bool:
+	return DEMOCRACY_TAGS.has(_tag(tag))
+
+
+static func _is_scenario_major(tag: String) -> bool:
+	var t := _tag(tag)
+	var majors: Variant = rules().get("scenario_majors", [])
+	if majors is Array:
+		for m in majors:
+			if _tag(str(m)) == t:
+				return true
+	return false
+
+
+static func democracy_guard_allows(attacker: String, defender: String) -> bool:
+	return _democracy_may_declare(attacker, defender)
+
+
+static func _democracy_may_declare(attacker: String, defender: String) -> bool:
+	if not _is_democracy(attacker):
+		return true
+	var d := _tag(defender)
+	if d == "POL" or d == "CHI":
+		return false
+	if not _is_scenario_major(d):
+		return false
+	if war_count(d) <= 0:
+		return false
+	var year := 1936
+	if typeof(TimeManager) != TYPE_NIL:
+		year = int(TimeManager.current_year)
+	if year <= 1938 and not any_war():
+		return false
+	return true
+
+
+static func _clear_pair_justifies(a: String, b: String) -> void:
+	var just := _justifies()
+	just.erase("%s>%s" % [a, b])
+	just.erase("%s>%s" % [b, a])
+	_state()["justifies"] = just
+
+
+static func _close_pair_fights(a: String, b: String) -> void:
+	if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("close_land_battles_for_pair"):
+		BattleManager.close_land_battles_for_pair(a, b)
+
+
+static func _post_stalemate_news(a: String, b: String) -> void:
+	if typeof(LeaderEventUI) == TYPE_NIL or not LeaderEventUI.has_method("post_news"):
+		return
+	var body := "%s and %s agreed a stalemate white peace." % [tag_name(a), tag_name(b)]
+	LeaderEventUI.post_news("Peace", body, "war")
+
+
+static func _bump_reject(reason: String) -> void:
+	var key := reason.strip_edges()
+	if key.is_empty():
+		return
+	_reject_counters[key] = int(_reject_counters.get(key, 0)) + 1
+	if OS.get_environment(REJECT_LOG_ENV).strip_edges() == "1":
+		print("EOA_AI_REJECT declare %s n=%d" % [key, int(_reject_counters[key])])

@@ -8,7 +8,7 @@
 #   tools/eoa_full_test_gates.sh --with-perf  # also map-tick perf sample
 #   tools/eoa_full_test_gates.sh --log DIR    # write logs under DIR
 #
-# --quick launches HeadlessGarrison1Test, HeadlessInkTooltips0Test, HeadlessCampaignSave1Test, HeadlessRttSmallfix1Test, HeadlessRttReset2Test, HeadlessAudio1Test, HeadlessAudio2Test, HeadlessStabilityJustice1Test, HeadlessVictoryPaths1Test, HeadlessSettingsToggles1Test, HeadlessFirst20P2StripPressTest, then FIRST20-UX-WAR Open fight / Justify / March.
+# --quick launches HeadlessGarrison1Test, HeadlessAiWar1Test, HeadlessInkTooltips0Test, HeadlessCampaignSave1Test, HeadlessRttSmallfix1Test, HeadlessRttReset2Test, HeadlessAudio1Test, HeadlessAudio2Test, HeadlessStabilityJustice1Test, HeadlessVictoryPaths1Test, HeadlessSettingsToggles1Test, HeadlessFirst20P2StripPressTest, then FIRST20-UX-WAR Open fight / Justify / March.
 # Full path also runs launch_campaign_save1_identity (MW200 SaveStateHash identity + 60-day twin).
 # Full path calls tools/run_godot.sh, which exits 1 immediately if no binary
 # is found (fail-closed; it must not hang).
@@ -209,6 +209,7 @@ run_step air_physics_p1 \
 if [[ "$QUICK" -eq 1 ]]; then
   if pgrep -af '[g]odot|[G]odot|[g]amescope' >/dev/null; then
     log "FAIL headless_garrison1 GODOT_BUSY"
+    log "FAIL headless_ai_war1 GODOT_BUSY"
     log "FAIL headless_ink_tooltips0 GODOT_BUSY"
     log "FAIL headless_campaign_save1 GODOT_BUSY"
     log "FAIL headless_rtt_smallfix1 GODOT_BUSY"
@@ -229,6 +230,23 @@ if [[ "$QUICK" -eq 1 ]]; then
       flock -n "${HOME}/.eoa_godot.lock" \
       tools/run_godot.sh --headless --path . \
       -s res://scripts/core/HeadlessGarrison1Test.gd || fail
+    run_step headless_ai_war1 bash -c '
+      log=$(mktemp)
+      XDG_DATA_HOME="$(mktemp -d)" flock -n "${HOME}/.eoa_godot.lock" \
+        tools/run_godot.sh --headless --path . \
+        -s res://scripts/core/HeadlessAiWar1Test.gd >"$log" 2>&1
+      code=$?
+      cat "$log"
+      if grep -q "SCRIPT ERROR" "$log"; then
+        echo "[eoa-gates] FAIL headless_ai_war1 SCRIPT ERROR"
+        exit 1
+      fi
+      if ! grep -q "RESULT=PASS" "$log"; then
+        echo "[eoa-gates] FAIL headless_ai_war1 missing RESULT=PASS"
+        exit 1
+      fi
+      exit "$code"
+    ' || fail
     run_step headless_ink_tooltips0 env \
       XDG_DATA_HOME="$(mktemp -d)" \
       flock -n "${HOME}/.eoa_godot.lock" \
@@ -451,6 +469,8 @@ else
 
   # CAMPAIGN-SAVE-1 P1: MW200 identity hash + 60-day twin + mutants (~110s).
   # Too heavy for --quick; this is the standing full-gate check.
+  # AI-WAR-1 freeze: identity d22b87cf / twin-end 7abd07c2 (was a7b5bcd8 / d3340ab2 / 5a318137).
+  # Seed 20fe9063 unchanged. Mutants drop_marches 4a9c21e5, drop_wars 43e14082.
   run_step launch_campaign_save1_identity \
     tools/eoa_campaign_save1_identity.sh || fail
 
@@ -763,6 +783,24 @@ else
 
   run_step launch_campaign_loop1_capitulation \
     tools/run_godot.sh --headless --path . -s res://scripts/core/HeadlessCampaignLoop1CapitulationPeaceTest.gd || fail
+
+  run_step launch_ai_war1 bash -c '
+    log=$(mktemp)
+    XDG_DATA_HOME="$(mktemp -d)" flock -n "${HOME}/.eoa_godot.lock" \
+      tools/run_godot.sh --headless --path . \
+      -s res://scripts/core/HeadlessAiWar1Test.gd >"$log" 2>&1
+    code=$?
+    cat "$log"
+    if grep -q "SCRIPT ERROR" "$log"; then
+      echo "[eoa-gates] FAIL launch_ai_war1 SCRIPT ERROR"
+      exit 1
+    fi
+    if ! grep -q "RESULT=PASS" "$log"; then
+      echo "[eoa-gates] FAIL launch_ai_war1 missing RESULT=PASS"
+      exit 1
+    fi
+    exit "$code"
+  ' || fail
 
   run_step launch_campaign_loop1_soak \
     tools/eoa_campaign_loop1_soak.sh || fail
