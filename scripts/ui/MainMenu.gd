@@ -122,8 +122,11 @@ static func reset_session_leftovers(tree: SceneTree = null) -> void:
 			mr.selected_formation_id = ""
 		if mr.has_method("_hide_unit_card_keep_map_focus"):
 			mr.call("_hide_unit_card_keep_map_focus")
-		if mr.has_method("_refresh_next_hook_chip"):
-			mr.call("_refresh_next_hook_chip")
+		# Do not re-stick the previous nation's NEXT goal onto the still-live map.
+		if "_next_hook_after_begin" in mr:
+			mr._next_hook_after_begin = false
+		if mr.has_method("_hide_next_hook_chip"):
+			mr.call("_hide_next_hook_chip")
 	for bar in tree.get_nodes_in_group("top_info_bar"):
 		if bar == null or not is_instance_valid(bar):
 			continue
@@ -194,8 +197,26 @@ static func _refresh_living_player_surfaces(player_tag: String) -> void:
 	var mr: Node = tree.get_first_node_in_group("map_renderer")
 	if mr == null and tree.root != null:
 		mr = tree.root.find_child("MapRenderer", true, false)
-	if mr != null and is_instance_valid(mr) and mr.has_method("_refresh_next_hook_chip"):
+	if mr == null or not is_instance_valid(mr):
+		return
+	# Begin applies the pick while LivingTitleBoot is still up. Refreshing now
+	# hides the chip; LivingTitleBoot._finish deferred-shows it after close.
+	if _living_title_boot_open():
+		return
+	if mr.has_method("refresh_next_hook_after_living_begin"):
+		mr.call("refresh_next_hook_after_living_begin")
+	elif mr.has_method("_refresh_next_hook_chip"):
 		mr.call("_refresh_next_hook_chip")
+
+
+static func _living_title_boot_open() -> bool:
+	var tree := Engine.get_main_loop() as SceneTree
+	if tree == null or tree.root == null:
+		return false
+	var n: Node = tree.root.find_child("LivingTitleBoot", true, false)
+	if n == null or not is_instance_valid(n) or n.is_queued_for_deletion():
+		return false
+	return not bool(n.get("_closed"))
 
 var _closing := false
 var _root: Control

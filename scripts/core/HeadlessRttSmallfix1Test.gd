@@ -46,6 +46,7 @@ func _run() -> void:
 	await _test_top_bar_war_after_declare()
 	_test_leftover_toasts()
 	await _test_session_reset_after_return_to_title()
+	await _test_menu_save_one_toast()
 	_document_item6_first_click()
 	var ok := _failures == 0
 	print("HeadlessRttSmallfix1Test: ", "PASS" if ok else "FAIL", " (failures=", _failures, ")")
@@ -160,8 +161,11 @@ func _test_source_needles() -> void:
 		_fail("TopInfoBar Ctrl+S still toasts Quicksave OK (duplicate)")
 		return
 	var save_fn := _slice_func(bar_src, "_on_save_pressed")
-	if save_fn.find("Saved quicksave") < 0:
-		_fail("TopInfoBar Menu Save must toast Saved quicksave after opening Command Center")
+	if save_fn.find("Saved quicksave") >= 0:
+		_fail("TopInfoBar Menu Save still toasts Saved quicksave (duplicate)")
+		return
+	if save_fn.find("_open_command_center") < 0:
+		_fail("TopInfoBar Menu Save must still open Command Center")
 		return
 	var search_fn := _slice_func(ren_src, "open_province_inspector_from_search")
 	if search_fn.find("_province_display_name") < 0:
@@ -846,6 +850,72 @@ func _test_session_reset_after_return_to_title() -> void:
 		_fail("session-reset: USA NEXT still GER France leftover '%s'" % hint)
 		return
 	_pass("session-reset: USA start stockpile and NEXT chip are not GER leftovers")
+
+
+func _test_menu_save_one_toast() -> void:
+	var mm := root.get_node_or_null("MapManager")
+	var sm := root.get_node_or_null("SupplyManager")
+	var boot: GDScript = load("res://scripts/core/CampaignLoopTestBoot.gd") as GDScript
+	if mm == null or boot == null:
+		_fail("menu-save: autoloads missing")
+		return
+	if not bool(boot.call("boot", mm, sm, "GER")):
+		_fail("menu-save: campaign boot failed")
+		return
+	var leui: Node = root.get_node_or_null("LeaderEventUI")
+	if leui == null:
+		_fail("menu-save: LeaderEventUI missing")
+		return
+	if "force_toast_ui" in leui:
+		leui.set("force_toast_ui", true)
+	if leui.has_method("clear_session_notices"):
+		leui.call("clear_session_notices")
+	var bar := _make_bar()
+	if bar == null:
+		_fail("menu-save: TopInfoBar missing")
+		return
+	await process_frame
+	await process_frame
+	var mb: MenuButton = bar.get("menu_button") as MenuButton
+	if mb == null:
+		_fail("menu-save: Menu button missing")
+		return
+	var popup := mb.get_popup()
+	if popup == null:
+		_fail("menu-save: Menu popup missing")
+		return
+	popup.id_pressed.emit(0)
+	await process_frame
+	await process_frame
+	var n := _visible_save_toasts(leui)
+	if n != 1:
+		_fail("menu-save: visible save toasts want 1 got %d" % n)
+		return
+	var cc := root.get_node_or_null("MainMenu")
+	if cc == null or not is_instance_valid(cc) or cc.is_queued_for_deletion():
+		_fail("menu-save: Command Center did not open")
+		return
+	_pass("menu-save: exactly one visible save toast")
+
+
+func _visible_save_toasts(leui: Node) -> int:
+	if leui == null:
+		return 0
+	var container: Node = leui.get("_toast_container") as Node
+	if container == null:
+		return 0
+	var n := 0
+	for kid in container.get_children():
+		if kid == null or not is_instance_valid(kid):
+			continue
+		if kid is CanvasItem and not (kid as CanvasItem).visible:
+			continue
+		var blob := ""
+		for lab in kid.find_children("*", "Label", true, false):
+			blob += str(lab.text) + " "
+		if blob.find("Saved quicksave") >= 0:
+			n += 1
+	return n
 
 
 func _chip_amount(bar: Node, label_name: String) -> String:

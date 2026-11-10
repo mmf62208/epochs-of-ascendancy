@@ -9265,7 +9265,7 @@ static func _depot_bbcode_line(province_id: int) -> String:
 static func _province_short_name(province_id: int) -> String:
 	var p := _province_by_id(province_id)
 	if p != null and not p.name.is_empty():
-		return p.name
+		return _MapPolishFormatters.province_ui_display_name(province_id, p.name)
 	return "P%d" % province_id
 
 

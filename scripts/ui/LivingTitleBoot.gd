@@ -237,6 +237,9 @@ func _ready() -> void:
 	_ensure_ui_cancel_binding()
 	_ensure_living_begin_binding()
 	_build_ui()
+	_hide_map_next_hook_chip()
+	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("clear_session_notices"):
+		LeaderEventUI.clear_session_notices()
 	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("set_paused"):
 		TimeManager.set_paused(true)
 	_connect_window_input()
@@ -2133,9 +2136,44 @@ func _finish(out: Dictionary, arm_startup_blank: bool = true) -> void:
 	if arm_startup_blank:
 		_arm_startup_blank_leftover_swallow()
 	boot_closed.emit(out)
+	# Title is closed; show NEXT after this node is gone so the hide-while-title-up
+	# guard cannot eat the Begin refresh.
+	_refresh_map_next_hook_after_begin()
 	# Every Begin path (Return key, mouse, title after Return to Title).
 	_restore_session_maximized()
 	queue_free()
+
+
+func _map_renderer_for_next_hook() -> Node:
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
+	if tree == null:
+		return null
+	var mr: Node = tree.get_first_node_in_group("map_renderer")
+	if mr != null:
+		return mr
+	if tree.root != null:
+		return tree.root.find_child("MapRenderer", true, false)
+	return null
+
+
+func _hide_map_next_hook_chip() -> void:
+	var mr := _map_renderer_for_next_hook()
+	if mr == null or not is_instance_valid(mr):
+		return
+	if "_next_hook_after_begin" in mr:
+		mr._next_hook_after_begin = false
+	if mr.has_method("_hide_next_hook_chip"):
+		mr.call("_hide_next_hook_chip")
+
+
+func _refresh_map_next_hook_after_begin() -> void:
+	var mr := _map_renderer_for_next_hook()
+	if mr == null or not is_instance_valid(mr):
+		return
+	if mr.has_method("refresh_next_hook_after_living_begin"):
+		mr.call_deferred("refresh_next_hook_after_living_begin")
+	elif mr.has_method("_refresh_next_hook_chip"):
+		mr.call_deferred("_refresh_next_hook_chip")
 
 
 func _arm_startup_blank_leftover_swallow() -> void:

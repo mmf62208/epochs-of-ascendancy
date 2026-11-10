@@ -317,7 +317,11 @@ func restore_after_campaign_end() -> void:
 
 ## Return to Title: drop leftover notices so the next Begin is not still showing GER chips.
 func clear_session_notices() -> void:
-	_trim_toast_stack_to(0)
+	# _trim_toast_stack_to(0) keeps spine-start cards. RtT must drop every notice.
+	if _toast_container != null:
+		var kids: Array[Node] = _toast_container.get_children()
+		for kid in kids:
+			_dismiss_toast(kid)
 	_dismiss_leader_popups()
 
 

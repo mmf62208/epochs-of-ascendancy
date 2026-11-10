@@ -1628,6 +1628,9 @@ func register_division_formations_for_country(country_tag: String) -> void:
 
 func clear_all_formations() -> void:
 	formations.clear()
+	# ScenarioLoader respawns OOB on Return to Title. The 1936 garrison seed
+	# must run again on the next Begin; leaving this latched skips it.
+	_garrisons_1936_seeded = false
 
 
 ## Formations for [param country_tag] that do not have a leader assigned.
