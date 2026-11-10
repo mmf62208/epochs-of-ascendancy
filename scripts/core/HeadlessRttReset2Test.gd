@@ -34,6 +34,7 @@ func _pass(msg: String) -> void:
 func _run() -> void:
 	await _test_garrisons_reseed_after_rtt()
 	await _test_next_hint_begin_and_title()
+	await _test_rtt_clears_notice_toasts()
 	_test_western_russia_compare_hint()
 	await _test_menu_save_one_toast()
 	var ok := _failures == 0
@@ -178,6 +179,19 @@ func _test_next_hint_begin_and_title() -> void:
 			_fail("next: in-game NEXT missing after Begin %s chip='%s' vis=%s" % [tag, shown, str(chip != null and chip.visible)])
 			_free_mr(mr)
 			return
+		var want := _next_target_display(chip, tag)
+		if not want.is_empty() and shown.find(want) < 0:
+			_fail("next: Begin %s chip missing target '%s' in '%s'" % [tag, want, shown])
+			_free_mr(mr)
+			return
+		if not _chip_text_uncipped(chip):
+			_fail("next: Begin %s chip clipped '%s' size=%s clip=%s overrun=%s" % [tag, shown, str(chip.size), str(chip.clip_text), str(chip.text_overrun_behavior)])
+			_free_mr(mr)
+			return
+		if chip.position.y + 0.5 < 84.0:
+			_fail("next: Begin %s chip y=%.1f covers the top bar" % [tag, chip.position.y])
+			_free_mr(mr)
+			return
 		_pass("in-game NEXT after Begin %s: %s" % [tag, shown])
 	var leftover := ""
 	chip = _next_chip(mr)
@@ -214,6 +228,55 @@ func _test_next_hint_begin_and_title() -> void:
 		_free_mr(mr)
 		return
 	_pass("after RtT: title chip hidden/empty, no previous-nation goal")
+	_free_title(title)
+	_free_mr(mr)
+
+
+func _test_rtt_clears_notice_toasts() -> void:
+	var mm := root.get_node_or_null("MapManager")
+	var sm := root.get_node_or_null("SupplyManager")
+	var boot: GDScript = load("res://scripts/core/CampaignLoopTestBoot.gd") as GDScript
+	if mm == null or boot == null:
+		_fail("notices: autoloads missing")
+		return
+	if not bool(boot.call("boot", mm, sm, "ENG")):
+		_fail("notices: board boot failed")
+		return
+	var leui: Node = root.get_node_or_null("LeaderEventUI")
+	if leui == null:
+		_fail("notices: LeaderEventUI missing")
+		return
+	if "force_toast_ui" in leui:
+		leui.set("force_toast_ui", true)
+	var mr := _make_map_renderer()
+	if mr == null:
+		_fail("notices: MapRenderer missing")
+		return
+	if not await _begin_as("ENG"):
+		_fail("notices: ENG Begin did not close the title")
+		_free_mr(mr)
+		return
+	if mr.has_method("_toast_easy_unit_orders"):
+		mr.call("_toast_easy_unit_orders")
+	await process_frame
+	if not await _return_to_title():
+		_fail("notices: Return to Title did not fire")
+		_free_mr(mr)
+		return
+	var title := _make_title()
+	await process_frame
+	await process_frame
+	# TestScenario reload re-parks Maginot chips while the title is up.
+	if mr.has_method("_toast_easy_unit_orders"):
+		mr.call("_toast_easy_unit_orders")
+	await process_frame
+	var n := _visible_notice_toasts(leui)
+	if n != 0:
+		_fail("notices: title after RtT still shows %d notice toast(s)" % n)
+		_free_title(title)
+		_free_mr(mr)
+		return
+	_pass("after RtT: title shows 0 notice toasts")
 	_free_title(title)
 	_free_mr(mr)
 
@@ -554,6 +617,70 @@ func _free_mr(mr: Node) -> void:
 	if parent != null:
 		parent.remove_child(mr)
 	mr.free()
+
+
+func _next_target_display(chip: Button, _tag: String) -> String:
+	var rec: Dictionary = {}
+	if chip != null and chip.has_meta("play_next_rec"):
+		var any: Variant = chip.get_meta("play_next_rec")
+		if any is Dictionary:
+			rec = any as Dictionary
+	var name := str(rec.get("goal_name", "")).strip_edges()
+	if not name.is_empty():
+		return name
+	var ttag := str(rec.get("target_tag", "")).strip_edges().to_upper()
+	if ttag.is_empty():
+		return ""
+	var chrome: GDScript = load("res://scripts/ui/CampaignWarChrome.gd") as GDScript
+	if chrome != null and chrome.has_method("display_name_for_tag"):
+		var shown := str(chrome.call("display_name_for_tag", ttag)).strip_edges()
+		if not shown.is_empty():
+			return shown
+	return ttag
+
+
+func _chip_text_uncipped(chip: Button) -> bool:
+	if chip == null:
+		return false
+	if chip.clip_text:
+		return false
+	if chip.text_overrun_behavior != TextServer.OVERRUN_NO_TRIMMING:
+		return false
+	var why := chip.get_node_or_null("GoalWhy") as Label
+	if why != null and why.visible:
+		if why.clip_text or why.text_overrun_behavior != TextServer.OVERRUN_NO_TRIMMING:
+			return false
+	var font: Font = chip.get_theme_font("font")
+	var fs := chip.get_theme_font_size("font_size")
+	if fs <= 0:
+		fs = 15
+	if font == null:
+		font = ThemeDB.fallback_font
+	if font == null:
+		return true
+	var tw := font.get_string_size(str(chip.text), HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+	var inner := chip.size.x
+	if inner < 8.0:
+		inner = chip.custom_minimum_size.x
+	if chip.autowrap_mode != TextServer.AUTOWRAP_OFF:
+		return true
+	return tw + 32.0 <= inner + 1.5
+
+
+func _visible_notice_toasts(leui: Node) -> int:
+	if leui == null:
+		return 0
+	var container: Node = leui.get("_toast_container") as Node
+	if container == null:
+		return 0
+	var n := 0
+	for kid in container.get_children():
+		if kid == null or not is_instance_valid(kid):
+			continue
+		if kid is CanvasItem and not (kid as CanvasItem).visible:
+			continue
+		n += 1
+	return n
 
 
 func _visible_save_toasts(leui: Node) -> int:

@@ -238,6 +238,8 @@ func _ready() -> void:
 	_ensure_living_begin_binding()
 	_build_ui()
 	_hide_map_next_hook_chip()
+	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("clear_session_notices"):
+		LeaderEventUI.clear_session_notices()
 	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("set_paused"):
 		TimeManager.set_paused(true)
 	_connect_window_input()
