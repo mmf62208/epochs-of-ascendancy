@@ -39,6 +39,8 @@ var _submit_guard_msec: int = 0
 var _last_live_submit_pid: int = -1
 ## Frame until which a deferred grab must not undo Esc or a map click.
 var _suppress_line_grab_frame: int = -1
+## Frame until which a deferred map-press unfocus must not undo a Search click.
+var _keep_line_focus_frame: int = -1
 
 
 func _ready() -> void:
@@ -85,6 +87,9 @@ func dismiss_esc_layer() -> void:
 func focus_for_typing(from_user_click: bool = false) -> void:
 	if from_user_click:
 		_suppress_line_grab_frame = -1
+		# This frame and the next: inspector layout / leftover `_release_search_focus`
+		# from a map click must not undo typable focus before the next key.
+		_keep_line_focus_frame = Engine.get_process_frames() + 1
 	elif _line_grab_blocked():
 		return
 	ensure_chrome_visible()
@@ -97,13 +102,24 @@ func focus_for_typing(from_user_click: bool = false) -> void:
 	call_deferred("_grab_search_line_focus")
 
 
+## True after a user click on the Search box, while typable focus must stick.
+func keep_click_focus() -> bool:
+	return Engine.get_process_frames() <= _keep_line_focus_frame
+
+
+func has_typable_focus() -> bool:
+	return _line != null and is_instance_valid(_line) and _line.has_focus()
+
+
 func _grab_search_line_focus() -> void:
-	if _line_grab_blocked():
+	if _line_grab_blocked() and not keep_click_focus():
 		return
 	if not is_inside_tree():
 		return
 	if _line == null or not is_instance_valid(_line):
 		return
+	_line.focus_mode = Control.FOCUS_ALL
+	_line.editable = true
 	_line.grab_focus()
 
 

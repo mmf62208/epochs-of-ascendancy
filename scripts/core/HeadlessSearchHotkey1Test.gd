@@ -9,7 +9,8 @@ extends SceneTree
 ##
 ## Fails on 5c1b541b (empty Search still toggles Space; digits 1–4 change
 ## speed; NEXT/Why share one box over Map Mode). r2 click-focus / Bytomski
-## leftover fails on e1f1f813 and passes on this tip.
+## leftover fails on e1f1f813. r3 inspector-open / first-SOV click fails on
+## a16e1beb and passes on this tip.
 ##
 ##   tools/run_godot.sh --headless --path . --resolution 1280x800 \
 ##     -s res://scripts/core/HeadlessSearchHotkey1Test.gd
@@ -567,6 +568,112 @@ func _click_search_box() -> LineEdit:
 	return line
 
 
+func _open_inspector(pid: int = 710300) -> void:
+	if _info != null:
+		_info.visible = true
+		_info.mouse_filter = Control.MOUSE_FILTER_STOP
+		_info.z_index = 40
+		_info.position = Vector2(12, 140)
+		_info.size = Vector2(520, 360)
+	if _mr != null and "selected_province_id" in _mr:
+		_mr.set("selected_province_id", pid)
+	if _mr != null and _mr.has_method("_bring_info_panel_to_front"):
+		_mr.call("_bring_info_panel_to_front")
+	if _mr != null and _mr.has_method("_layout_map_ui"):
+		_mr.call("_layout_map_ui")
+
+
+func _type_digits_12() -> void:
+	for code in [KEY_1, KEY_2]:
+		_dispatch_key(code as Key)
+
+
+func _click_search_pointer_on_inspector() -> LineEdit:
+	var line := _line()
+	var search := _search()
+	if line == null or search == null:
+		_fail("Search chrome missing for inspector-open click")
+		return null
+	var insp_pt := Vector2(200, 280)
+	if _info != null:
+		insp_pt = _info.get_global_rect().get_center()
+	var vp: Viewport = root.get_viewport()
+	if vp != null:
+		vp.warp_mouse(insp_pt)
+	var line_pt := line.get_global_rect().get_center()
+	var down := _mouse_at(line_pt, true)
+	var up := _mouse_at(line_pt, false)
+	# event.position is Search; get_mouse_position stays on the inspector
+	# (Play r2: first SOV click after Western Russia).
+	if _mr != null:
+		if _mr.has_method("_input"):
+			_mr.call("_input", down)
+		if _mr.has_method("_focus_search_from_point"):
+			_mr.call("_focus_search_from_point", line_pt)
+		if _mr.has_method("_unhandled_input"):
+			_mr.call("_unhandled_input", down)
+	if search.has_method("_gui_input"):
+		search.call("_gui_input", down)
+	root.push_input(down)
+	if _mr != null:
+		if _mr.has_method("_input"):
+			_mr.call("_input", up)
+		if _mr.has_method("_unhandled_input"):
+			_mr.call("_unhandled_input", up)
+	root.push_input(up)
+	# Play r2: inspector-open map press queues deferred `_release_search_focus`
+	# after the Search grab (stale mouse still on the inspector).
+	if _mr != null and _mr.has_method("_release_search_on_map_press"):
+		_mr.call("_release_search_on_map_press")
+	if _mr != null and _mr.has_method("_layout_map_ui"):
+		_mr.call("_layout_map_ui")
+	return line
+
+
+func _assert_sov_inspector_open_click() -> void:
+	print("SEARCH_HOTKEY_1 case=sov_inspector_open_click")
+	_close_cc()
+	_open_inspector(903492)
+	_set_clock(true, 1)
+	if not _inspector_open():
+		_fail("sov_inspector_open: inspector was not open before Search click")
+		return
+	var pid_before := _inspector_pid()
+	var line := _click_search_pointer_on_inspector()
+	if line == null:
+		return
+	await process_frame
+	var fo: Control = root.get_viewport().gui_get_focus_owner() if root.get_viewport() != null else null
+	if not line.has_focus() and fo != line:
+		_fail("sov_inspector_open: Search click did not focus SearchLineEdit (focus=%s owner=%s)" % [str(line.has_focus()), str(fo)])
+		return
+	var before := _clock_snapshot()
+	line.text = ""
+	_type_digits_12()
+	await _frames(2)
+	fo = root.get_viewport().gui_get_focus_owner() if root.get_viewport() != null else null
+	if not line.has_focus() and fo != line:
+		_fail("sov_inspector_open: inspector stole typable focus before keys (owner=%s)" % str(fo))
+		return
+	if line.text.find("12") < 0 and line.text.find("1") < 0:
+		_fail("sov_inspector_open: typed 12 never landed (text='%s')" % line.text)
+		return
+	var after := _clock_snapshot()
+	if int(after.get("speed")) != int(before.get("speed")) or bool(after.get("paused")) != bool(before.get("paused")):
+		_fail("sov_inspector_open: digits changed clock pause=%s→%s speed=%s→%s" % [
+			str(before.get("paused")), str(after.get("paused")),
+			str(before.get("speed")), str(after.get("speed"))
+		])
+		return
+	if not _inspector_open():
+		_fail("sov_inspector_open: Search click closed the inspector")
+		return
+	if pid_before > 0 and _inspector_pid() > 0 and _inspector_pid() != pid_before:
+		_fail("sov_inspector_open: Search click retargeted inspector %s → %s" % [str(pid_before), str(_inspector_pid())])
+		return
+	_pass("sov_inspector_open: first SOV Search click typed 12 with inspector still open")
+
+
 func _assert_click_owns_keys(label: String) -> void:
 	_close_cc()
 	_hide_inspector()
@@ -761,6 +868,7 @@ func _case_search_click_focus() -> void:
 		return
 	if _mr.has_method("ensure_live_search_chrome"):
 		_mr.call("ensure_live_search_chrome")
+	await _assert_sov_inspector_open_click()
 	await _assert_click_owns_keys("sov_begin")
 	if not await _begin_as("ENG"):
 		_fail("ENG Begin failed")

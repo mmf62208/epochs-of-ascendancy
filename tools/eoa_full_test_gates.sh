@@ -8,7 +8,7 @@
 #   tools/eoa_full_test_gates.sh --with-perf  # also map-tick perf sample
 #   tools/eoa_full_test_gates.sh --log DIR    # write logs under DIR
 #
-# --quick launches HeadlessGarrison1Test, HeadlessAiWar1Test, HeadlessInkTooltips0Test, HeadlessCampaignSave1Test, HeadlessRttSmallfix1Test, HeadlessRttReset2Test, HeadlessAudio1Test, HeadlessAudio2Test, HeadlessStabilityJustice1Test, HeadlessVictoryPaths1Test, HeadlessSettingsToggles1Test, HeadlessFirst20P2StripPressTest, then FIRST20-UX-WAR Open fight / Justify / March, then HeadlessSearchHotkey1Test (r1 isolation + r2 click-focus / RtT AAR).
+# --quick launches HeadlessGarrison1Test, HeadlessAiWar1Test, HeadlessInkTooltips0Test, HeadlessCampaignSave1Test, HeadlessRttSmallfix1Test, HeadlessRttReset2Test, HeadlessAudio1Test, HeadlessAudio2Test, HeadlessStabilityJustice1Test, HeadlessVictoryPaths1Test, HeadlessSettingsToggles1Test, HeadlessFirst20P2StripPressTest, then FIRST20-UX-WAR Open fight / Justify / March, then HeadlessSearchHotkey1Test (r1 isolation + r2 click-focus / RtT AAR + r3 inspector-open / first-SOV click).
 # Full path also runs launch_campaign_save1_identity (MW200 SaveStateHash identity + 60-day twin).
 # Full path calls tools/run_godot.sh, which exits 1 immediately if no binary
 # is found (fail-closed; it must not hang).

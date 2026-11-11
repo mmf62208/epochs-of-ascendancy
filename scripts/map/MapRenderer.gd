@@ -2422,10 +2422,12 @@ func _mouse_over_close_control() -> bool:
 	return false
 
 
-func _mouse_over_search_control() -> bool:
+func _mouse_over_search_control(screen_pos: Vector2 = Vector2(-100000, -100000)) -> bool:
 	# Rect first: after +6d / living title, gui_get_hovered_control can miss the
 	# Go button (overlay, leftover pick-block) while the cursor is still on it.
-	if _search_ui_owns_click():
+	# Prefer event.position: get_mouse_position() can still sit on the inspector
+	# after the click that opened it (Play r2 first-SOV Search leak).
+	if _search_ui_owns_click(screen_pos):
 		return true
 	var vp_s: Viewport = get_viewport()
 	if vp_s == null:
@@ -2462,13 +2464,15 @@ func _focus_search_from_point(screen: Vector2) -> void:
 		sr.call("focus_for_typing", true)
 
 
-func _search_ui_owns_click() -> bool:
+func _search_ui_owns_click(screen_pos: Vector2 = Vector2(-100000, -100000)) -> bool:
 	if _map_search == null or not is_instance_valid(_map_search) or not (_map_search is Control):
 		return false
 	var vp_r: Viewport = get_viewport()
 	if vp_r == null:
 		return false
-	var mouse_r: Vector2 = vp_r.get_mouse_position()
+	var mouse_r: Vector2 = screen_pos
+	if mouse_r.x < -50000.0:
+		mouse_r = vp_r.get_mouse_position()
 	var sr: Control = _map_search as Control
 	if sr.get_global_rect().grow(6.0).has_point(mouse_r):
 		return true
@@ -3046,7 +3050,25 @@ func _layout_map_search_chrome() -> void:
 	sr.force_update_transform()
 
 
+func _search_keeps_click_focus() -> bool:
+	var search := _live_map_search()
+	return search != null and search.has_method("keep_click_focus") and bool(search.call("keep_click_focus"))
+
+
+func _search_has_typable_focus() -> bool:
+	if _search_keeps_click_focus():
+		return true
+	var search := _live_map_search()
+	if search != null and search.has_method("has_typable_focus") and bool(search.call("has_typable_focus")):
+		return true
+	return _gui_text_field_has_focus() and _mouse_over_search_control()
+
+
 func _release_search_focus() -> void:
+	# A Search-box click this frame must stay typable even if a leftover map
+	# press deferred this, or inspector layout ran after the grab.
+	if _search_keeps_click_focus():
+		return
 	var vp: Viewport = get_viewport()
 	if vp == null:
 		return
@@ -3077,6 +3099,8 @@ func _search_chrome_contains_point(screen: Vector2) -> bool:
 
 
 func _release_search_on_map_press() -> void:
+	if _search_keeps_click_focus():
+		return
 	var search := _live_map_search()
 	if search != null and search.has_method("esc_layer_open") and bool(search.call("esc_layer_open")):
 		if search.has_method("dismiss_esc_layer"):
@@ -3084,7 +3108,9 @@ func _release_search_on_map_press() -> void:
 	else:
 		_release_search_focus()
 	# LineEdit grabs focus again from the same click's gui_input, after _input.
-	call_deferred("_release_search_focus")
+	# Skip the undo when this press was a Search click (keep_click_focus).
+	if not _search_keeps_click_focus():
+		call_deferred("_release_search_focus")
 
 
 func _apply_home_key(shift_pressed: bool) -> void:
@@ -3598,7 +3624,7 @@ func _input(event: InputEvent) -> void:
 				_focus_search_from_point(event.position)
 			# Result row / line / Go: the release must reach the Button and must
 			# not still-click the province under the dropdown.
-			if not event.pressed and (_mouse_over_search_control() or _search_ui_owns_click()):
+			if not event.pressed and (_mouse_over_search_control(event.position) or _search_ui_owns_click(event.position)):
 				return
 			# The title node stays in the tree after Begin, so "boot is up" is
 			# the wrong guard. A chip or top-bar click must not run the unit
@@ -3678,9 +3704,9 @@ func _input(event: InputEvent) -> void:
 				# focus; a map click must drop it even if warp_mouse lagged.
 				_release_search_on_map_press()
 			if event.pressed and (
-				_top_bar_owns_click()
-				or _mouse_over_search_control()
-				or _search_ui_owns_click()
+				_top_bar_owns_click(event.position)
+				or _mouse_over_search_control(event.position)
+				or _search_ui_owns_click(event.position)
 				or _living_title_owns_click()
 				or _road_spine_btn_owns_click()
 			):
@@ -3710,7 +3736,7 @@ func _input(event: InputEvent) -> void:
 					# Pan latch stays. Do not swallow Open fight / unit-card buttons
 					# (2d47d06: fold click was tooltip-only no-op after pan PASS).
 					# Search LineEdit/Go already returned above — do not touch that path.
-					if _top_bar_owns_click() or _search_ui_owns_click() or _road_spine_btn_owns_click():
+					if _top_bar_owns_click(event.position) or _search_ui_owns_click(event.position) or _road_spine_btn_owns_click():
 						return
 					if not _is_mouse_over_blocking_ui():
 						_arm_left_map_press()
@@ -3730,7 +3756,7 @@ func _input(event: InputEvent) -> void:
 					_dismiss_close_control_from_input()
 					MapRenderer._mark_input_handled(vp)
 					return
-				if _top_bar_owns_click() or _mouse_over_search_control() or _search_ui_owns_click() or _road_spine_btn_owns_click():
+				if _top_bar_owns_click(event.position) or _mouse_over_search_control(event.position) or _search_ui_owns_click(event.position) or _road_spine_btn_owns_click():
 					return
 				_finish_close_click_guard_on_new_press()
 				# Arm pan on the map even if a HUD Control is hovered (search/toolbar).
@@ -4118,7 +4144,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				_dismiss_close_control_from_input()
 			get_viewport().set_input_as_handled()
 			return
-		if _top_bar_owns_click() or _mouse_over_search_control() or _search_ui_owns_click() or _living_title_owns_click() or _road_spine_btn_owns_click() or _map_mode_toolbar_owns_click(event.position):
+		if _top_bar_owns_click(event.position) or _mouse_over_search_control(event.position) or _search_ui_owns_click(event.position) or _living_title_owns_click() or _road_spine_btn_owns_click() or _map_mode_toolbar_owns_click(event.position):
 			# Toolbar owns the chip. Do not hex-pick under it, and do not mark
 			# the click handled — the Button still has to toggle the mode.
 			return
@@ -4201,7 +4227,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				_mark_left_pan_blocked_pick()
 				get_viewport().set_input_as_handled()
 				return
-		_release_search_focus()
+		if not _search_chrome_contains_point(event.position) and not _search_keeps_click_focus():
+			_release_search_focus()
 		var world_pos := _map_pick_world_from_event(event)
 		# Living title owns map clicks: never open inspector / chips / assault (window-exit class).
 		if _living_title_boot_is_up():
@@ -4906,7 +4933,10 @@ func _layout_map_ui() -> void:
 		tb.offset_right = minf(620.0, get_viewport().get_visible_rect().size.x - 16.0)
 		tb.offset_bottom = top_clearance + toolbar_h
 
-	_layout_map_search_chrome()
+	# Inspector refresh must not reparent Search while it has typable focus
+	# (Play r2: caret then keys leaked after Western Russia inspector).
+	if not _search_has_typable_focus():
+		_layout_map_search_chrome()
 
 	if info_panel is Control and not info_panel.has_meta("user_moved"):
 		var ip := info_panel as Control

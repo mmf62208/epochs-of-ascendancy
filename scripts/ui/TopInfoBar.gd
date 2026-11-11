@@ -174,7 +174,10 @@ func host_map_search_chrome(search: Control) -> void:
 		_right_container.visible = true
 		_right_container.mouse_filter = Control.MOUSE_FILTER_PASS
 	var slot: Control = _right_container if _right_container != null else self
-	if search.get_parent() != slot:
+	var keep_focus := search.has_method("keep_click_focus") and bool(search.call("keep_click_focus"))
+	if search.has_method("has_typable_focus") and bool(search.call("has_typable_focus")):
+		keep_focus = true
+	if search.get_parent() != slot and not keep_focus:
 		var old_p: Node = search.get_parent()
 		if old_p != null:
 			old_p.remove_child(search)
@@ -194,14 +197,15 @@ func host_map_search_chrome(search: Control) -> void:
 		search.size_flags_horizontal = Control.SIZE_SHRINK_END
 		search.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		# [Resources] [Search+Go] [Menu] — Search stays on the right through reflow.
-		if _resources_container != null and _resources_container.get_parent() == _right_container:
-			_right_container.move_child(_resources_container, 0)
-			_right_container.move_child(search, 1)
-		else:
-			_right_container.move_child(search, 0)
-		if _menu_container != null and _menu_container.get_parent() == _right_container:
-			_right_container.move_child(_menu_container, _right_container.get_child_count() - 1)
-	else:
+		if not keep_focus:
+			if _resources_container != null and _resources_container.get_parent() == _right_container:
+				_right_container.move_child(_resources_container, 0)
+				_right_container.move_child(search, 1)
+			else:
+				_right_container.move_child(search, 0)
+			if _menu_container != null and _menu_container.get_parent() == _right_container:
+				_right_container.move_child(_menu_container, _right_container.get_child_count() - 1)
+	elif not keep_focus:
 		move_child(search, get_child_count() - 1)
 	if search.has_method("ensure_chrome_visible"):
 		search.call("ensure_chrome_visible", search_w)
