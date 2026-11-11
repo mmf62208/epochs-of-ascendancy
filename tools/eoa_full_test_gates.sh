@@ -257,11 +257,23 @@ if [[ "$QUICK" -eq 1 ]]; then
       flock -n "${HOME}/.eoa_godot.lock" \
       tools/run_godot.sh --headless --path . \
       -s res://scripts/core/HeadlessInkTooltips0Test.gd || fail
-    run_step headless_campaign_save1 env \
-      XDG_DATA_HOME="$(mktemp -d)" \
-      flock -n "${HOME}/.eoa_godot.lock" \
-      tools/run_godot.sh --headless --path . \
-      -s res://scripts/core/HeadlessCampaignSave1Test.gd || fail
+    run_step headless_campaign_save1 bash -c '
+      log=$(mktemp)
+      XDG_DATA_HOME="$(mktemp -d)" flock -n "${HOME}/.eoa_godot.lock" \
+        tools/run_godot.sh --headless --path . \
+        -s res://scripts/core/HeadlessCampaignSave1Test.gd >"$log" 2>&1
+      code=$?
+      cat "$log"
+      if grep -q "SCRIPT ERROR" "$log"; then
+        echo "[eoa-gates] FAIL headless_campaign_save1 SCRIPT ERROR"
+        exit 1
+      fi
+      if ! grep -q "RESULT=PASS" "$log"; then
+        echo "[eoa-gates] FAIL headless_campaign_save1 missing RESULT=PASS"
+        exit 1
+      fi
+      exit "$code"
+    ' || fail
     run_step headless_autosave1 bash -c '
       log=$(mktemp)
       XDG_DATA_HOME="$(mktemp -d)" flock -n "${HOME}/.eoa_godot.lock" \
@@ -518,10 +530,23 @@ else
     tools/run_godot.sh --headless --path . \
     -s res://scripts/core/HeadlessInkTooltips0Test.gd || fail
 
-  run_step headless_campaign_save1 env \
+  run_step headless_campaign_save1 bash -c '
+    log=$(mktemp)
     XDG_DATA_HOME="$(mktemp -d)" \
-    tools/run_godot.sh --headless --path . \
-    -s res://scripts/core/HeadlessCampaignSave1Test.gd || fail
+      tools/run_godot.sh --headless --path . \
+      -s res://scripts/core/HeadlessCampaignSave1Test.gd >"$log" 2>&1
+    code=$?
+    cat "$log"
+    if grep -q "SCRIPT ERROR" "$log"; then
+      echo "[eoa-gates] FAIL headless_campaign_save1 SCRIPT ERROR"
+      exit 1
+    fi
+    if ! grep -q "RESULT=PASS" "$log"; then
+      echo "[eoa-gates] FAIL headless_campaign_save1 missing RESULT=PASS"
+      exit 1
+    fi
+    exit "$code"
+  ' || fail
 
   run_step headless_autosave1 env \
     XDG_DATA_HOME="$(mktemp -d)" \

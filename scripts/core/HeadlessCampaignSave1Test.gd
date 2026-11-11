@@ -324,13 +324,9 @@ func _test_load_warning_and_confirms() -> void:
 		_fail("confirm: overwrite button missing")
 		return
 	(danger as BaseButton).pressed.emit()
-	var del_btn := _button_named(card, "Delete")
-	if del_btn == null:
-		_fail("confirm: Delete button missing")
-		return
 	# The list may have been rebuilt. Find the card again.
 	card = menu.find_child("SlotCard_%s" % SLOT, true, false)
-	del_btn = _button_named(card, "Delete") if card != null else null
+	var del_btn = _button_named(card, "Delete") if card != null else null
 	if del_btn == null:
 		_fail("confirm: Delete button missing after overwrite")
 		return
