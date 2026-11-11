@@ -141,7 +141,9 @@ func _make_btn(text: String, primary: bool) -> Button:
 
 
 func _input(event: InputEvent) -> void:
-	if not visible:
+	# `visible` stays true under a hidden host. That host is not on screen,
+	# so Esc must not count as "I know the game".
+	if not is_visible_in_tree():
 		return
 	if _is_wheel(event):
 		_mark_handled()

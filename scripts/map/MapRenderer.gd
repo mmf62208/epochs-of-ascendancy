@@ -305,6 +305,8 @@ var _unit_card_latch_arm_sec := 0.0
 var _unit_card_eaten_frame: int = -1
 ## One Esc press = one stack step (TopInfoBar + MapRenderer `_input` / `_unhandled_input`).
 var _esc_stack_frame: int = -1
+## Level latch so a held Esc (or a key that never reached `_input`) steps once.
+var _esc_backstop_down: bool = false
 ## Close button sits in the north edge-pan strip — suppress edge until the mouse leaves that click.
 var _close_suppress_edge := false
 ## WHEELDRIFT-1: a wheel notch must not edge-pan. Hold 350 ms, then require a
@@ -2973,7 +2975,9 @@ func _layout_map_search_chrome() -> void:
 		if old_p != null:
 			old_p.remove_child(sr)
 		host.add_child(sr)
-	if host != null and host.has_method("host_map_search_chrome"):
+	# Reparenting Search drops LineEdit focus. A live typing session keeps the
+	# node where it is; MapProvinceSearch inserts any key that still arrives unfocused.
+	if host != null and host.has_method("host_map_search_chrome") and not _search_typing_session_open():
 		host.call("host_map_search_chrome", sr)
 	# Keep a width the top bar already fitted (>= 88). Forcing 308 here is
 	# what shoved Rubber and Fuel past 1280 after the bar had made room.
@@ -3064,10 +3068,19 @@ func _search_has_typable_focus() -> bool:
 	return _gui_text_field_has_focus() and _mouse_over_search_control()
 
 
-func _release_search_focus() -> void:
+func _search_typing_session_open() -> bool:
+	var search := _live_map_search()
+	return search != null and search.has_method("typing_session_open") and bool(search.call("typing_session_open"))
+
+
+func _release_search_focus(allow_during_session: bool = false) -> void:
 	# A Search-box click this frame must stay typable even if a leftover map
 	# press deferred this, or inspector layout ran after the grab.
+	# A typing session likewise keeps the caret unless this is Esc or a real
+	# map press outside the chrome (those pass allow_during_session).
 	if _search_keeps_click_focus():
+		return
+	if not allow_during_session and _search_typing_session_open():
 		return
 	var vp: Viewport = get_viewport()
 	if vp == null:
@@ -3102,15 +3115,21 @@ func _release_search_on_map_press() -> void:
 	if _search_keeps_click_focus():
 		return
 	var search := _live_map_search()
+	# Caller already rejected a point inside the search chrome. This press
+	# ends the typing session, then drops focus.
 	if search != null and search.has_method("esc_layer_open") and bool(search.call("esc_layer_open")):
 		if search.has_method("dismiss_esc_layer"):
 			search.call("dismiss_esc_layer")
+		elif search.has_method("end_typing_session"):
+			search.call("end_typing_session")
 	else:
-		_release_search_focus()
+		if search != null and search.has_method("end_typing_session"):
+			search.call("end_typing_session")
+		_release_search_focus(true)
 	# LineEdit grabs focus again from the same click's gui_input, after _input.
 	# Skip the undo when this press was a Search click (keep_click_focus).
 	if not _search_keeps_click_focus():
-		call_deferred("_release_search_focus")
+		call_deferred("_release_search_focus", true)
 
 
 func _apply_home_key(shift_pressed: bool) -> void:
@@ -3177,9 +3196,9 @@ func _handle_escape_key() -> void:
 	if _dismiss_search_esc_layer():
 		return
 	if _gui_text_field_has_focus():
-		_release_search_focus()
+		_release_search_focus(true)
 		return
-	_release_search_focus()
+	_release_search_focus(true)
 	# One Esc closes only the front play window. The next Esc can open pause.
 	# ProductionAssignmentScreen is in this list so it still closes first,
 	# ahead of any other open play window it outranks.
@@ -3266,6 +3285,10 @@ func _cc_chrome_consumes_point(screen: Vector2) -> bool:
 	var mm := _command_center_overlay()
 	if mm == null or bool(mm.get("_closing")):
 		return false
+	# A visible confirm sits on the dimmer, sometimes outside MenuPanel.
+	# That click belongs to the confirm, not to the chrome-hold swallow.
+	if mm.has_method("confirm_contains_point") and bool(mm.call("confirm_contains_point", screen)):
+		return false
 	var close_b := mm.find_child("CloseX", true, false) as Control
 	if close_b != null and close_b.is_visible_in_tree() and close_b.get_global_rect().has_point(screen):
 		return true
@@ -3335,7 +3358,9 @@ func _dismiss_search_esc_layer() -> bool:
 	if search.has_method("dismiss_esc_layer"):
 		search.call("dismiss_esc_layer")
 	else:
-		_release_search_focus()
+		if search.has_method("end_typing_session"):
+			search.call("end_typing_session")
+		_release_search_focus(true)
 	return true
 
 
@@ -3361,8 +3386,41 @@ func _campaign_end_overlay_is_up() -> bool:
 	return false
 
 
+## Esc that never reached `_input` (map input gated off, or the key lived only
+## on the Input singleton because another viewport had focus). TopInfoBar's
+## `_unhandled_input` already forwards a root event, and it sets
+## `_esc_stack_frame`, so this does not step twice. A wide backstop while
+## input is on would also open Paused on the Search Esc: Search consumes that
+## key without setting the frame guard.
+func _backstop_missed_escape() -> void:
+	var down := Input.is_action_pressed("ui_cancel") or Input.is_physical_key_pressed(KEY_ESCAPE)
+	var edge := down and not _esc_backstop_down
+	_esc_backstop_down = down
+	if not edge:
+		return
+	if is_processing_input() or is_processing_unhandled_input():
+		return
+	if _esc_stack_frame == Engine.get_process_frames():
+		return
+	if _living_title_boot_is_up() or _campaign_end_overlay_is_up():
+		return
+	if _gui_text_field_has_focus():
+		return
+	if _tutorial_prompt_blocks_esc_backstop():
+		return
+	_handle_escape_key()
+
+
+func _tutorial_prompt_blocks_esc_backstop() -> bool:
+	var tree := get_tree()
+	if tree == null or tree.root == null:
+		return false
+	var prompt := tree.root.find_child("TutorialPromptPopup", true, false) as CanvasItem
+	return prompt != null and is_instance_valid(prompt) and prompt.is_visible_in_tree()
+
+
 func _esc_open_command_center() -> void:
-	_release_search_focus()
+	_release_search_focus(true)
 	var vp_esc: Viewport = get_viewport()
 	if vp_esc != null:
 		vp_esc.gui_release_focus()
@@ -3606,6 +3664,12 @@ func _input(event: InputEvent) -> void:
 			if _cc_overlay_blocks_map_pointer():
 				if event.pressed:
 					var mm_ov := _command_center_overlay()
+					# The confirm panel can sit on top of Refresh / Return to
+					# Title. Those actions mark the press handled, so a
+					# release-mode Load button never sees it. Leave the event
+					# for the confirm.
+					if mm_ov != null and mm_ov.has_method("confirm_contains_point") and bool(mm_ov.call("confirm_contains_point", event.position)):
+						return
 					if mm_ov != null and mm_ov.has_method("live_pointer_target"):
 						var tgt := str(mm_ov.call("live_pointer_target", event.position))
 						if tgt == "refresh" or tgt == "return_to_title":
@@ -4446,6 +4510,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				return
 
 func _process(delta: float) -> void:
+	_backstop_missed_escape()
 	if _perf != null and _perf.enabled:
 		_perf_frame_start_usec = Time.get_ticks_usec()
 		_perf.begin("process_total")
@@ -4934,8 +4999,9 @@ func _layout_map_ui() -> void:
 		tb.offset_bottom = top_clearance + toolbar_h
 
 	# Inspector refresh must not reparent Search while it has typable focus
-	# (Play r2: caret then keys leaked after Western Russia inspector).
-	if not _search_has_typable_focus():
+	# or a typing session is open (a reparent drops the caret and the next
+	# digit leaks into speed / map hotkeys).
+	if not _search_has_typable_focus() and not _search_typing_session_open():
 		_layout_map_search_chrome()
 
 	if info_panel is Control and not info_panel.has_meta("user_moved"):
@@ -27331,6 +27397,14 @@ func _tick_begin_title_release_swallow() -> void:
 		return
 	if _begin_title_release_swallow_expired():
 		_clear_begin_title_release_swallow()
+
+
+## Prompt / modal gave MapRenderer its input back. The gesture must not keep
+## a missed release, a skip latch, or the Begin one-shot. Does not arm a swallow.
+func reset_left_gesture_after_modal() -> void:
+	_end_left_button_down()
+	_clear_left_slop_after_still_click()
+	_clear_begin_title_release_swallow()
 
 
 func _clear_begin_title_release_swallow() -> void:

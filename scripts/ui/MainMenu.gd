@@ -1592,8 +1592,29 @@ func _on_save_as_confirmed() -> void:
 	_save_to_slot(slot)
 
 
+## One confirm applies at most one Load / Save first / danger action.
+var _confirm_action_taken := false
+
+
 func _confirm_visible() -> bool:
 	return _confirm_layer != null and is_instance_valid(_confirm_layer) and _confirm_layer.visible
+
+
+## The confirm host covers the viewport and owns every click until it closes.
+## MapRenderer must not treat those points as Command Center chrome or actions.
+func confirm_contains_point(screen: Vector2) -> bool:
+	if not _confirm_visible():
+		return false
+	if not _confirm_layer.is_visible_in_tree():
+		return false
+	return _confirm_layer.get_global_rect().has_point(screen)
+
+
+func _begin_confirm_action() -> bool:
+	if _confirm_action_taken:
+		return false
+	_confirm_action_taken = true
+	return true
 
 
 func _dismiss_confirm() -> void:
@@ -1638,6 +1659,7 @@ func _activate_confirm() -> void:
 
 func _open_text_confirm(node_name: String, title: String, body: String, action_label: String, on_action: Callable, save_first_slot: String = "") -> void:
 	_dismiss_confirm()
+	_confirm_action_taken = false
 	if _root == null or not is_instance_valid(_root):
 		return
 	var host := Control.new()
@@ -1693,6 +1715,8 @@ func _open_text_confirm(node_name: String, title: String, body: String, action_l
 	cancel.custom_minimum_size = Vector2(104, 36)
 	cancel.focus_mode = Control.FOCUS_ALL
 	cancel.process_mode = Node.PROCESS_MODE_ALWAYS
+	# Press fires even when a later release is eaten by the map.
+	cancel.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
 	cancel.pressed.connect(func() -> void:
 		_pending_delete_slot = ""
 		_dismiss_confirm()
@@ -1706,7 +1730,10 @@ func _open_text_confirm(node_name: String, title: String, body: String, action_l
 		save_first.position = Vector2(150, 128)
 		save_first.custom_minimum_size = Vector2(140, 36)
 		var load_slot := save_first_slot
+		save_first.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
 		save_first.pressed.connect(func() -> void:
+			if not _begin_confirm_action():
+				return
 			_dismiss_confirm()
 			_write_slot("quicksave")
 			_load_slot_now(load_slot)
@@ -1718,7 +1745,10 @@ func _open_text_confirm(node_name: String, title: String, body: String, action_l
 		load_b.text = action_label
 		load_b.position = Vector2(16, 128)
 		load_b.custom_minimum_size = Vector2(120, 36)
+		load_b.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
 		load_b.pressed.connect(func() -> void:
+			if not _begin_confirm_action():
+				return
 			_dismiss_confirm()
 			on_action.call()
 		)
@@ -1730,7 +1760,10 @@ func _open_text_confirm(node_name: String, title: String, body: String, action_l
 		danger.text = action_label
 		danger.position = Vector2(16, 128)
 		danger.custom_minimum_size = Vector2(140, 36)
+		danger.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
 		danger.pressed.connect(func() -> void:
+			if not _begin_confirm_action():
+				return
 			_dismiss_confirm()
 			on_action.call()
 		)

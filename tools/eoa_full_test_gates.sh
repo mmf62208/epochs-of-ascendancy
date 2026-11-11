@@ -227,6 +227,7 @@ if [[ "$QUICK" -eq 1 ]]; then
     log "FAIL headless_first20_ux_war_march GODOT_BUSY"
     log "FAIL headless_search_hotkey1 GODOT_BUSY"
     log "FAIL headless_tutorial1 GODOT_BUSY"
+    log "FAIL headless_input_polish1 GODOT_BUSY"
     FAILED=1
   else
     run_step headless_garrison1 env \
@@ -478,6 +479,23 @@ if [[ "$QUICK" -eq 1 ]]; then
       fi
       if ! grep -q "RESULT=PASS" "$log"; then
         echo "[eoa-gates] FAIL headless_tutorial1 missing RESULT=PASS"
+        exit 1
+      fi
+      exit "$code"
+    ' || fail
+    run_step headless_input_polish1 bash -c '
+      log=$(mktemp)
+      XDG_DATA_HOME="$(mktemp -d)" flock -n "${HOME}/.eoa_godot.lock" \
+        tools/run_godot.sh --headless --path . --resolution 1280x800 \
+        -s res://scripts/core/HeadlessInputPolish1Test.gd >"$log" 2>&1
+      code=$?
+      cat "$log"
+      if grep -q "SCRIPT ERROR" "$log"; then
+        echo "[eoa-gates] FAIL headless_input_polish1 SCRIPT ERROR"
+        exit 1
+      fi
+      if ! grep -q "RESULT=PASS" "$log"; then
+        echo "[eoa-gates] FAIL headless_input_polish1 missing RESULT=PASS"
         exit 1
       fi
       exit "$code"
