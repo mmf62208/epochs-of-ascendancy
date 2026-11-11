@@ -29,7 +29,8 @@ var _loaded_save: bool = false
 var _title_closed: bool = false
 var _begin_msec: int = 0
 var _map_mode_at_step: String = ""
-var _step_log_mark: int = 0
+var _step_log_copy: Array = []
+var _map_input_gated: bool = false
 var _saw_day_unpaused: bool = false
 var _paused_for_justify: bool = false
 var _target_tag: String = "POL"
@@ -53,6 +54,7 @@ func _ready() -> void:
 	_connect_signals()
 	_scan_existing_title()
 	set_process(true)
+	set_process_input(true)
 
 
 func _scan_existing_title() -> void:
@@ -132,11 +134,12 @@ func _build_layer() -> void:
 	_leader.draw.connect(_draw_leader)
 	_host.add_child(_leader)
 	_blocker = ColorRect.new()
-	_blocker.name = "PromptBlocker"
+	_blocker.name = "TutorialPromptBlockerPopup"
 	_blocker.color = Color(0.02, 0.03, 0.08, 0.55)
 	_blocker.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_blocker.mouse_filter = Control.MOUSE_FILTER_STOP
 	_blocker.visible = false
+	_blocker.gui_input.connect(_on_blocker_gui_input)
 	_host.add_child(_blocker)
 	_card = TutorialCard.new()
 	_card.name = "TutorialCard"
@@ -151,8 +154,16 @@ func _build_layer() -> void:
 	_card.dont_show_again_toggled.connect(func(on: bool) -> void: _dont_show = on)
 	_host.add_child(_card)
 	_prompt = TutorialPrompt.new()
-	_prompt.name = "TutorialPrompt"
-	_prompt.set_anchors_preset(Control.PRESET_CENTER)
+	_prompt.name = "TutorialPromptPopup"
+	_prompt.anchor_left = 0.0
+	_prompt.anchor_top = 0.0
+	_prompt.anchor_right = 0.0
+	_prompt.anchor_bottom = 0.0
+	_prompt.set_anchors_preset(Control.PRESET_TOP_LEFT, false)
+	_prompt.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_prompt.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_prompt.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_prompt.grow_vertical = Control.GROW_DIRECTION_BOTH
 	_prompt.show_basics.connect(_on_show_basics)
 	_prompt.know_game.connect(_on_know_game)
 	_host.add_child(_prompt)
@@ -195,7 +206,10 @@ func _on_boot_closed(result: Dictionary) -> void:
 		_force_start = false
 		return
 	_begin_msec = Time.get_ticks_msec()
-	_progress["reshow_welcome"] = true
+	if bool(_progress.get("completed", false)):
+		_progress["reshow_welcome"] = false
+	else:
+		_progress["reshow_welcome"] = true
 	_reset_runtime_flags()
 	if TutorialGuideDomain.should_show_prompt(_snapshot_now(), _progress):
 		_show_prompt()
@@ -221,12 +235,14 @@ func _reset_session(keep_force: bool) -> void:
 
 func _reset_runtime_flags() -> void:
 	_map_mode_at_step = ""
-	_step_log_mark = _log_len()
+	_step_log_copy = _log_copy()
 	_saw_day_unpaused = false
 	_active_step = ""
 
 
 func _process(delta: float) -> void:
+	if _prompt != null and _prompt.visible:
+		_gate_map_input(true)
 	_pulse += delta
 	_tick_accum += delta
 	if _flash_left > 0.0:
@@ -296,7 +312,7 @@ func _on_step_enter(sid: String) -> void:
 	_press_next = false
 	_press_got_it = false
 	_map_mode_at_step = _current_map_mode()
-	_step_log_mark = _log_len()
+	_step_log_copy = _log_copy()
 	_saw_day_unpaused = false
 	if sid == "justify_wait":
 		_paused_for_justify = false
@@ -356,6 +372,9 @@ func _show_prompt() -> void:
 	if _prompt != null:
 		_prompt.present(_nation_line())
 		_center_prompt()
+		call_deferred("_center_prompt")
+		print("EOA_FIRST_SESSION_PROMPT shown=1")
+	_gate_map_input(true)
 
 
 func _hide_prompt() -> void:
@@ -363,17 +382,111 @@ func _hide_prompt() -> void:
 		_prompt.dismiss()
 	if _blocker != null:
 		_blocker.visible = false
+	_gate_map_input(false)
 
 
 func _center_prompt() -> void:
 	if _prompt == null or _host == null:
 		return
-	var size := _host.size
-	if size.x < 8.0:
-		size = Vector2(1280, 800)
+	var host_size := _host.size
+	if host_size.x < 8.0:
+		host_size = Vector2(1280, 800)
+	_prompt.anchor_left = 0.0
+	_prompt.anchor_top = 0.0
+	_prompt.anchor_right = 0.0
+	_prompt.anchor_bottom = 0.0
+	_prompt.set_anchors_preset(Control.PRESET_TOP_LEFT, false)
 	_prompt.reset_size()
 	var cs := _prompt.get_combined_minimum_size()
-	_prompt.position = Vector2((size.x - cs.x) * 0.5, (size.y - cs.y) * 0.5)
+	cs.x = maxf(cs.x, 520.0)
+	if cs.y < 8.0:
+		cs.y = maxf(_prompt.get_minimum_size().y, 1.0)
+	_prompt.size = cs
+	_prompt.position = Vector2((host_size.x - cs.x) * 0.5, (host_size.y - cs.y) * 0.5)
+
+
+func _input(event: InputEvent) -> void:
+	if _prompt == null or not _prompt.visible:
+		return
+	if _is_prompt_wheel(event):
+		_mark_input_handled()
+		return
+	if _is_prompt_enter(event):
+		_prompt._on_show()
+		_mark_input_handled()
+		return
+	if _is_prompt_escape(event):
+		_prompt._on_know()
+		_mark_input_handled()
+
+
+func _on_blocker_gui_input(event: InputEvent) -> void:
+	if _is_prompt_wheel(event):
+		_mark_input_handled()
+
+
+func _gate_map_input(block: bool) -> void:
+	var mr := _map_renderer()
+	if mr == null:
+		_map_input_gated = block
+		return
+	if block:
+		if mr.is_processing_input():
+			mr.set_process_input(false)
+		if mr.is_processing_unhandled_input():
+			mr.set_process_unhandled_input(false)
+		_map_input_gated = true
+	elif _map_input_gated:
+		mr.set_process_input(true)
+		mr.set_process_unhandled_input(true)
+		_map_input_gated = false
+
+
+func _is_prompt_enter(event: InputEvent) -> bool:
+	if not (event is InputEventKey):
+		return false
+	var key := event as InputEventKey
+	if not key.pressed or key.echo:
+		return false
+	if key.keycode == KEY_ENTER or key.keycode == KEY_KP_ENTER:
+		return true
+	if key.physical_keycode == KEY_ENTER or key.physical_keycode == KEY_KP_ENTER:
+		return true
+	return false
+
+
+func _is_prompt_escape(event: InputEvent) -> bool:
+	if event is InputEventAction:
+		var act := event as InputEventAction
+		return bool(act.pressed) and str(act.action) == "ui_cancel"
+	if event is InputEventKey:
+		var key := event as InputEventKey
+		if not key.pressed or key.echo:
+			return false
+		if key.keycode == KEY_ESCAPE or key.physical_keycode == KEY_ESCAPE:
+			return true
+		if key.key_label == KEY_ESCAPE:
+			return true
+		if int(key.unicode) == 27:
+			return true
+	if event != null and event.is_action_pressed("ui_cancel"):
+		return true
+	return false
+
+
+func _is_prompt_wheel(event: InputEvent) -> bool:
+	if not (event is InputEventMouseButton):
+		return false
+	var mb := event as InputEventMouseButton
+	return mb.pressed and (
+		mb.button_index == MOUSE_BUTTON_WHEEL_UP or mb.button_index == MOUSE_BUTTON_WHEEL_DOWN
+	)
+
+
+func _mark_input_handled() -> void:
+	var vp := get_viewport()
+	if vp != null:
+		vp.set_input_as_handled()
 
 
 func _on_show_basics() -> void:
@@ -519,7 +632,9 @@ func _snapshot_now() -> Dictionary:
 	if has_j:
 		days_left = int(WarStateDomain.player_justify_days_left(target))
 		ready = bool(WarStateDomain.player_justify_is_ready_for(target))
-	var log_new := _log_since(_step_log_mark)
+	if not _battle_player and _player_open_land_battle():
+		_battle_player = true
+	var log_new := _log_new_keys(_step_log_copy)
 	var minutes := 0.0
 	if _begin_msec > 0:
 		minutes = float(Time.get_ticks_msec() - _begin_msec) / 60000.0
@@ -567,7 +682,9 @@ func _snapshot_now() -> Dictionary:
 
 func _player_tag() -> String:
 	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_player_country_tag"):
-		return str(LeaderManager.get_player_country_tag()).strip_edges().to_upper()
+		var t := str(LeaderManager.get_player_country_tag()).strip_edges().to_upper()
+		if not t.is_empty():
+			return t
 	return "GER"
 
 
@@ -625,7 +742,47 @@ func _inspector_on_tag(tag: String) -> bool:
 
 
 func _own_unit_card_visible() -> bool:
-	return _find_named("BtnMarchArm") != null or _find_named("BtnOpenFight") != null
+	var pop := _find_named("UnitDetailPopup")
+	if pop != null and _node_visible_in_tree(pop) and not str(pop.name).ends_with("_dying"):
+		return true
+	var march := _find_named("BtnMarchArm")
+	if march != null and _node_visible_in_tree(march) and not _under_named(march, "InfoPanel"):
+		return true
+	return false
+
+
+func _under_named(n: Node, ancestor_name: String) -> bool:
+	var cur := n
+	while cur != null:
+		if str(cur.name) == ancestor_name:
+			return true
+		cur = cur.get_parent()
+	return false
+
+
+func _node_visible_in_tree(n: Node) -> bool:
+	if n == null or not n.is_inside_tree():
+		return false
+	if n is CanvasItem:
+		return (n as CanvasItem).is_visible_in_tree()
+	return true
+
+
+func _player_open_land_battle() -> bool:
+	if typeof(BattleManager) == TYPE_NIL or not BattleManager.has_method("get_open_land_battles"):
+		return false
+	var player := _player_tag()
+	if player.is_empty():
+		return false
+	for raw in BattleManager.get_open_land_battles():
+		if typeof(raw) != TYPE_DICTIONARY:
+			continue
+		var row: Dictionary = raw
+		var att := str(row.get("att_tag", row.get("attacker_tag", ""))).strip_edges().to_upper()
+		var dfn := str(row.get("def_tag", row.get("defender_tag", ""))).strip_edges().to_upper()
+		if att == player or dfn == player:
+			return true
+	return false
 
 
 func _unit_adjacent(player: String, target: String) -> bool:
@@ -648,22 +805,38 @@ func _unit_adjacent(player: String, target: String) -> bool:
 	return false
 
 
-func _log_len() -> int:
+func _log_copy() -> Array:
 	if typeof(AudioManager) != TYPE_NIL and AudioManager.has_method("request_log"):
-		return AudioManager.request_log().size()
-	return 0
+		return AudioManager.request_log()
+	return []
 
 
-func _log_since(mark: int) -> Dictionary:
+func _log_new_keys(prev: Array) -> Dictionary:
 	var found := {}
-	if typeof(AudioManager) == TYPE_NIL or not AudioManager.has_method("request_log"):
-		return found
-	var rows: Array = AudioManager.request_log()
-	var i := mark
-	while i < rows.size():
-		found[str(rows[i])] = true
+	var now := _log_copy()
+	var start := _log_overlap_start(prev, now)
+	var i := start
+	while i < now.size():
+		found[str(now[i])] = true
 		i += 1
 	return found
+
+
+func _log_overlap_start(prev: Array, now: Array) -> int:
+	var maxk := mini(prev.size(), now.size())
+	var k := maxk
+	while k > 0:
+		var ok := true
+		var j := 0
+		while j < k:
+			if str(prev[prev.size() - k + j]) != str(now[j]):
+				ok = false
+				break
+			j += 1
+		if ok:
+			return k
+		k -= 1
+	return 0
 
 
 func _play_step_sfx() -> void:

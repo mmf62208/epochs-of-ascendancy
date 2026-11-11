@@ -175,7 +175,7 @@ static func should_auto_start(snapshot: Dictionary, progress: Dictionary) -> boo
 		return false
 	if not bool(progress.get("enabled", false)):
 		return false
-	if bool(progress.get("completed", false)) and not bool(progress.get("reshow_welcome", false)):
+	if bool(progress.get("completed", false)):
 		return false
 	return true
 

@@ -28,6 +28,7 @@ func present(nation_line: String) -> void:
 	if _subtitle != null:
 		_subtitle.text = nation_line
 	visible = true
+	reset_size()
 	_acquire_clock_lock()
 
 
@@ -38,6 +39,16 @@ func dismiss() -> void:
 
 func dont_ask() -> bool:
 	return _dont != null and _dont.button_pressed
+
+
+func _gui_input(event: InputEvent) -> void:
+	if not visible:
+		return
+	if _is_wheel(event):
+		accept_event()
+		var vp := get_viewport()
+		if vp != null:
+			vp.set_input_as_handled()
 
 
 func _build() -> void:
@@ -132,19 +143,63 @@ func _make_btn(text: String, primary: bool) -> Button:
 func _input(event: InputEvent) -> void:
 	if not visible:
 		return
-	if not (event is InputEventKey and event.pressed and not event.echo):
+	if _is_wheel(event):
+		_mark_handled()
 		return
-	var key := event as InputEventKey
-	if key.keycode == KEY_ENTER or key.keycode == KEY_KP_ENTER:
+	if _is_enter(event):
 		_on_show()
-		var vp := get_viewport()
-		if vp != null:
-			vp.set_input_as_handled()
-	elif key.keycode == KEY_ESCAPE:
+		_mark_handled()
+	elif _is_escape(event):
 		_on_know()
-		var vp2 := get_viewport()
-		if vp2 != null:
-			vp2.set_input_as_handled()
+		_mark_handled()
+
+
+func _is_enter(event: InputEvent) -> bool:
+	if not (event is InputEventKey):
+		return false
+	var key := event as InputEventKey
+	if not key.pressed or key.echo:
+		return false
+	if key.keycode == KEY_ENTER or key.keycode == KEY_KP_ENTER:
+		return true
+	if key.physical_keycode == KEY_ENTER or key.physical_keycode == KEY_KP_ENTER:
+		return true
+	return false
+
+
+func _is_escape(event: InputEvent) -> bool:
+	if event is InputEventAction:
+		var act := event as InputEventAction
+		return bool(act.pressed) and str(act.action) == "ui_cancel"
+	if event is InputEventKey:
+		var key := event as InputEventKey
+		if not key.pressed or key.echo:
+			return false
+		if key.keycode == KEY_ESCAPE or key.physical_keycode == KEY_ESCAPE:
+			return true
+		if key.key_label == KEY_ESCAPE:
+			return true
+		if int(key.unicode) == 27:
+			return true
+	if event != null and event.is_action_pressed("ui_cancel"):
+		return true
+	return false
+
+
+func _is_wheel(event: InputEvent) -> bool:
+	if not (event is InputEventMouseButton):
+		return false
+	var mb := event as InputEventMouseButton
+	return mb.pressed and (
+		mb.button_index == MOUSE_BUTTON_WHEEL_UP or mb.button_index == MOUSE_BUTTON_WHEEL_DOWN
+	)
+
+
+func _mark_handled() -> void:
+	accept_event()
+	var vp := get_viewport()
+	if vp != null:
+		vp.set_input_as_handled()
 
 
 func _on_show() -> void:

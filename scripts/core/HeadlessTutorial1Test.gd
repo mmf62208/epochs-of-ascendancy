@@ -65,6 +65,10 @@ func _run() -> void:
 	_test_fence()
 	_test_replay_button()
 	await _test_card_and_prompt_nodes()
+	await _test_prompt_layout_and_keys()
+	_test_own_unit_card_not_inspector()
+	_test_cue_log_wrap_and_battle()
+	_test_completed_does_not_autostart()
 	_finish()
 
 
@@ -477,3 +481,240 @@ func _test_card_and_prompt_nodes() -> void:
 		_fail("FirstSessionGuide autoload missing")
 		return
 	_pass("prompt nodes + FirstSessionGuide autoload")
+
+
+func _guide() -> Node:
+	return root.get_node_or_null("FirstSessionGuide")
+
+
+func _key(physical: int, keycode: int = 0) -> InputEventKey:
+	var ev := InputEventKey.new()
+	ev.pressed = true
+	ev.echo = false
+	ev.keycode = keycode
+	ev.physical_keycode = physical
+	return ev
+
+
+func _test_prompt_layout_and_keys() -> void:
+	var guide := _guide()
+	if guide == null:
+		_fail("FirstSessionGuide autoload missing for layout")
+		return
+	var host: Control = guide.get_node_or_null("FirstSessionLayer/GuideHost") as Control
+	if host == null:
+		_fail("GuideHost missing")
+		return
+	host.size = Vector2(1280, 800)
+	host.custom_minimum_size = Vector2(1280, 800)
+	if not guide.has_method("_show_prompt"):
+		_fail("FirstSessionGuide missing _show_prompt")
+		return
+	guide.call("_show_prompt")
+	await process_frame
+	await process_frame
+	if guide.has_method("_center_prompt"):
+		guide.call("_center_prompt")
+		await process_frame
+	var title := guide.find_child("PromptTitle", true, false) as Control
+	var show_btn := guide.find_child("BtnShowBasics", true, false) as Control
+	var know_btn := guide.find_child("BtnKnowGame", true, false) as Control
+	var dont := guide.find_child("DontAskAgain", true, false) as Control
+	var prompt: Control = guide.get("_prompt") as Control
+	if title == null or show_btn == null or know_btn == null or dont == null or prompt == null:
+		_fail("prompt chrome missing after present/center")
+		guide.call("_hide_prompt")
+		return
+	var layout_ok := true
+	for pair in [
+		["PromptTitle", title],
+		["BtnShowBasics", show_btn],
+		["BtnKnowGame", know_btn],
+		["DontAskAgain", dont],
+	]:
+		var ctl := pair[1] as Control
+		if not ctl.visible or ctl.size.x < 8.0 or ctl.size.y < 8.0:
+			_fail("%s not visible/sized after real parent/anchor/center (size=%s vis=%s)" % [
+				str(pair[0]), str(ctl.size), str(ctl.visible)
+			])
+			layout_ok = false
+	if prompt.size.y >= host.size.y * 0.75 or prompt.size.y >= host.size.y - 80.0:
+		_fail("prompt height %s is not compact vs host %s" % [str(prompt.size.y), str(host.size.y)])
+		layout_ok = false
+	if prompt.size.x < 400.0 or prompt.size.x > host.size.x * 0.9:
+		_fail("prompt width %s is not compact ~520" % str(prompt.size.x))
+		layout_ok = false
+	if prompt.anchor_left > 0.01 or prompt.anchor_top > 0.01 or prompt.anchor_right > 0.01 or prompt.anchor_bottom > 0.01:
+		_fail("prompt anchors not top-left after present/center (L=%.3f T=%.3f R=%.3f B=%.3f)" % [
+			prompt.anchor_left, prompt.anchor_top, prompt.anchor_right, prompt.anchor_bottom
+		])
+		layout_ok = false
+	var know_hits := {"n": 0}
+	var show_hits := {"n": 0}
+	if prompt.has_signal("know_game"):
+		prompt.know_game.connect(func() -> void: know_hits["n"] = int(know_hits["n"]) + 1)
+	if prompt.has_signal("show_basics"):
+		prompt.show_basics.connect(func() -> void: show_hits["n"] = int(show_hits["n"]) + 1)
+	var esc := _key(KEY_ESCAPE, KEY_NONE)
+	if guide.has_method("_input"):
+		guide._input(esc)
+	if prompt.has_method("_input") and prompt.visible:
+		prompt._input(esc)
+	await process_frame
+	if prompt.visible or int(know_hits["n"]) < 1:
+		_fail("Esc did not emit know_game / dismiss prompt (visible=%s hits=%s)" % [
+			str(prompt.visible), str(know_hits["n"])
+		])
+		layout_ok = false
+	guide.call("_show_prompt")
+	await process_frame
+	await process_frame
+	var enter := _key(KEY_ENTER, KEY_ENTER)
+	if guide.has_method("_input"):
+		guide._input(enter)
+	if prompt.has_method("_input") and prompt.visible:
+		prompt._input(enter)
+	await process_frame
+	if int(show_hits["n"]) < 1:
+		_fail("Enter did not emit show_basics")
+		layout_ok = false
+	guide.set("_force_start", false)
+	guide.call("_hide_card")
+	guide.call("_hide_prompt")
+	if layout_ok:
+		_pass("prompt layout compact + Esc know_game + Enter show_basics")
+
+
+func _test_own_unit_card_not_inspector() -> void:
+	var guide := _guide()
+	if guide == null or not guide.has_method("_own_unit_card_visible"):
+		_fail("FirstSessionGuide missing _own_unit_card_visible")
+		return
+	var inspector := Control.new()
+	inspector.name = "InfoPanel"
+	var fight := Button.new()
+	fight.name = "BtnOpenFight"
+	fight.visible = true
+	inspector.add_child(fight)
+	root.add_child(inspector)
+	var inspector_only: bool = bool(guide.call("_own_unit_card_visible"))
+	var pop := Control.new()
+	pop.name = "UnitDetailPopup"
+	var march := Button.new()
+	march.name = "BtnMarchArm"
+	march.visible = true
+	pop.add_child(march)
+	root.add_child(pop)
+	var with_card: bool = bool(guide.call("_own_unit_card_visible"))
+	pop.queue_free()
+	inspector.queue_free()
+	if inspector_only:
+		_fail("own_unit_card_visible true for inspector InfoPanel BtnOpenFight")
+		return
+	if not with_card:
+		_fail("own_unit_card_visible false with UnitDetailPopup BtnMarchArm")
+		return
+	_pass("own_unit_card_visible ignores inspector BtnOpenFight")
+
+
+func _test_cue_log_wrap_and_battle() -> void:
+	var guide := _guide()
+	var am := root.get_node_or_null("AudioManager")
+	if guide == null or am == null:
+		_fail("guide or AudioManager missing for cue wrap")
+		return
+	if am.has_method("clear_request_log"):
+		am.call("clear_request_log")
+	var i := 0
+	while i < 48:
+		am.call("play", "ui_hover")
+		i += 1
+	if not guide.has_method("_on_step_enter"):
+		_fail("guide missing _on_step_enter")
+		return
+	guide.call("_on_step_enter", "march")
+	am.call("play", "order_move")
+	am.call("play", "order_attack")
+	am.call("play", "save_ok")
+	var snap: Dictionary = guide.call("_snapshot_now")
+	var cue_ok := true
+	if not bool(snap.get("cue_order_move", false)):
+		_fail("order_move cue missed after 48-cap wrap")
+		cue_ok = false
+	if not bool(snap.get("cue_save_ok", false)):
+		_fail("save_ok cue missed after 48-cap wrap")
+		cue_ok = false
+	if not bool(snap.get("cue_order_attack", false)):
+		_fail("order_attack cue missed after 48-cap wrap")
+		cue_ok = false
+	guide.set("_battle_player", false)
+	var injected := false
+	var bm := root.get_node_or_null("BattleManager")
+	if bm != null:
+		var open_v: Variant = bm.get("_open_land_battles")
+		if open_v is Array:
+			var player := str(guide.call("_player_tag"))
+			(open_v as Array).append({
+				"att_tag": player,
+				"def_tag": "POL",
+			})
+			injected = true
+	var battle_snap: Dictionary = guide.call("_snapshot_now")
+	if injected:
+		var open_after: Variant = bm.get("_open_land_battles")
+		if open_after is Array and not (open_after as Array).is_empty():
+			(open_after as Array).pop_back()
+	if not bool(battle_snap.get("battle_started_player", false)):
+		_fail("player open land battle did not set battle_started_player")
+		cue_ok = false
+	if am.has_method("clear_request_log"):
+		am.call("clear_request_log")
+	if cue_ok:
+		_pass("cue wrap + player battle completes fight")
+
+
+func _test_completed_does_not_autostart() -> void:
+	OS.set_environment("EOA_TUTORIAL", "")
+	var p: Dictionary = _domain.call("empty_progress")
+	p["answered"] = true
+	p["enabled"] = true
+	p["completed"] = true
+	p["reshow_welcome"] = true
+	var snap := _base_snap({"headless": false, "qa_run": false, "has_saves": true, "loaded_save": false})
+	if bool(_domain.call("should_auto_start", snap, p)):
+		_fail("completed+enabled auto-starts on fresh Begin")
+		return
+	var replay: Dictionary = _domain.call("reset_for_replay", p)
+	if not bool(_domain.call("should_auto_start", snap, replay)):
+		_fail("explicit replay did not auto-start at welcome")
+		return
+	if bool(replay.get("completed", true)):
+		_fail("reset_for_replay left completed true")
+		return
+	if str(_eval(snap, replay).get("step_id", "")) != "welcome":
+		_fail("explicit replay did not land on welcome / step 1")
+		return
+	var guide := _guide()
+	if guide != null:
+		guide.set("_progress", p.duplicate(true))
+		guide.set("_force_start", false)
+		guide.call("_on_boot_closed", {"mode": "begin"})
+		var after: Dictionary = guide.get("_progress")
+		if bool(after.get("reshow_welcome", false)):
+			_fail("fresh Begin after completed re-armed reshow_welcome")
+			return
+		if bool(guide.get("_force_start")):
+			_fail("fresh Begin after completed set force_start")
+			return
+		guide.call("replay", false)
+		if not bool(guide.get("_force_start")):
+			_fail("explicit replay did not set force_start")
+			return
+		var rp: Dictionary = guide.get("_progress")
+		if bool(rp.get("completed", true)) or str(_eval(snap, rp).get("step_id", "")) != "welcome":
+			_fail("explicit replay did not restart at welcome")
+			return
+		guide.set("_force_start", false)
+		guide.call("_hide_card")
+		guide.call("_hide_prompt")
+	_pass("completed Begin does not auto-start; replay still starts at 1")
