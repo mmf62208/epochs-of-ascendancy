@@ -10,8 +10,14 @@ Indian Basin North is clipped off the sea ring.
 No new province id. Adjacency is left as it is: the edited borders were
 already linked both ways.
 
+PR #181 r1 clips Central Indian Basin North off the inland NE-land gap
+west/SW of Hayma and leftover Yemen-coast land faces, then re-homes that
+sea onto uncovered ocean west of Central Indian Basin East. Hayma's ring
+is not rewritten.
+
   python3 tools/map_generation/scripts/apply_eng_finish.py --measure-only
   python3 tools/map_generation/scripts/apply_eng_finish.py --dry-run
+  python3 tools/map_generation/scripts/apply_eng_finish.py --r1-only
   python3 tools/map_generation/scripts/apply_eng_finish.py
 """
 from __future__ import annotations
@@ -35,7 +41,9 @@ from canada_hole_measure import (  # noqa: E402
     merge_positive_rings,
 )
 from eng_finish_product import (  # noqa: E402
+    CIBN_ID,
     DEFAULT_DIR,
+    HAYMA_ID,
     MAP_UNITS_SHA256,
     MAP_UNITS_URL,
     OMAN_HOLE_MIN,
@@ -44,7 +52,10 @@ from eng_finish_product import (  # noqa: E402
     RERING_ADMIN,
     SOMALILAND_NOTCH,
     avoid_placeholder_vertex_count,
+    choose_gap_land_target,
     choose_oman_target,
+    cibn_ocean_home_ring,
+    cibn_uncovered_land_faces_from_rings,
     ensure_clickable,
     measure_oman_holes,
     pair_overlap_area,
@@ -176,6 +187,200 @@ def _centroid(points):
     if abs(area) < 1e-12:
         return (sum(p[0] for p in points) / n, sum(p[1] for p in points) / n)
     return (cx / (3.0 * area), cy / (3.0 * area))
+
+
+def apply_r1_inland_gap(board: Path, rings, anchors, metas, remember, absorbed) -> None:
+    """Clip CIBN off the Hayma west/SW NE-land gap. Do not rewrite Hayma."""
+    land_id, _sea_id = OVERLAP_PAIR
+    base_provs = {
+        int(p["id"]): p
+        for p in json.loads((board / "provinces_base.json").read_text(encoding="utf-8"))["provinces"]
+    }
+    r1_faces = cibn_uncovered_land_faces_from_rings(rings, base_provs)
+    r1_absorbed = []
+    for hole in r1_faces:
+        pid = hole.get("target")
+        if pid is None:
+            pid = choose_gap_land_target(
+                hole.get("surrounding") or [],
+                skip_ids=(HAYMA_ID,),
+                face=hole.get("ring"),
+                rings=rings,
+                provs=base_provs,
+            )
+        if pid is None:
+            raise RuntimeError(
+                "no land target for CIBN inland face %.2f at %s"
+                % (hole["area_px2"], hole.get("interior"))
+            )
+        if pid == HAYMA_ID:
+            raise RuntimeError("refusing to rewrite Hayma %s" % HAYMA_ID)
+        if pid in (903053, 903054, 950333, 950335):
+            raise RuntimeError("refusing to edit a Canada lake ring %s" % pid)
+        src = rings[pid]
+        was = ring_is_raw_invalid(src)
+        hole_ring = [(float(p[0]), float(p[1])) for p in hole["ring"]]
+        # Muqshin sits inside the Hayma-corridor face. Union would leave the
+        # inner ring as a leftover loop; replacement is the grow.
+        if _poly(src, hole_ring) >= abs(_area(src)) - POLY_OVERLAP_MAX:
+            merged = _as_ring(hole_ring)
+        else:
+            merged = _absorb(src, hole_ring)
+        if ring_is_raw_invalid(merged) and not was:
+            raise RuntimeError("r1 absorb made %s self-crossing" % pid)
+        probe = _interior_point(hole_ring)
+        if probe is None or _winding(merged, probe[0], probe[1]) == 0:
+            raise RuntimeError("r1 hole interior left outside %s" % pid)
+        if not _anchor_inside(merged, anchors[pid]):
+            ip = _interior_point(merged)
+            if ip is None:
+                raise RuntimeError("r1 absorb lost the interior of %s" % pid)
+            anchors[pid] = [round(ip[0], 4), round(ip[1], 4)]
+        rings[pid] = merged
+        metas[pid]["eng_finish_r1_absorb"] = "cibn_inland_%.1f" % hole["area_px2"]
+        metas[pid]["vertex_n"] = len(merged)
+        metas[pid]["area"] = round(abs(_area(merged)), 2)
+        remember(pid, "absorb %.1f px²" % hole["area_px2"])
+        r1_absorbed.append({"area_px2": hole["area_px2"], "target": pid})
+    if r1_absorbed:
+        ocean = cibn_ocean_home_ring(rings, base_provs)
+        if len(ocean) < 3:
+            raise RuntimeError("CIBN ocean home ring too short")
+        if ring_is_raw_invalid(ocean):
+            raise RuntimeError("CIBN ocean home ring is self-crossing")
+        if _poly(rings[land_id], ocean) > POLY_OVERLAP_MAX:
+            raise RuntimeError("CIBN ocean home overlaps Abu Dhabi")
+        ip = _interior_point(ocean)
+        if ip is None:
+            raise RuntimeError("CIBN ocean home lost its interior")
+        rings[CIBN_ID] = ocean
+        anchors[CIBN_ID] = [round(ip[0], 4), round(ip[1], 4)]
+        metas[CIBN_ID]["eng_finish_clip"] = "r1_inland_gap_to_land"
+        metas[CIBN_ID]["eng_finish_r1"] = "ocean_west_of_950289"
+        metas[CIBN_ID]["vertex_n"] = len(ocean)
+        metas[CIBN_ID]["area"] = round(abs(_area(ocean)), 2)
+        remember(CIBN_ID, "rehome off inland NE land")
+    _fill_remaining_oman_faces(board, rings, anchors, metas, remember, r1_absorbed, base_provs)
+    if CIBN_ID in rings and _poly(rings[land_id], rings[CIBN_ID]) > POLY_OVERLAP_MAX:
+        raise RuntimeError("r1 leftover fill overlaps Abu Dhabi")
+    absorbed.extend(r1_absorbed)
+
+
+def _fill_remaining_oman_faces(board, rings, anchors, metas, remember, absorbed, provs) -> None:
+    """Absorb leftover Oman-touching faces after CIBN leaves the inland gap.
+
+    Re-homing CIBN off NE land can uncover a water notch on the Mahawt coast
+    that the old land-sitting CIBN used to cover. Land leftovers go to a
+    neighbour other than Hayma. Water leftovers go to CIBN when it owns an
+    edge. The existing Oman-faces test requires every face over 1 px² gone.
+    """
+    for _step in range(8):
+        report = measure_oman_holes(board, use_natural_earth=True, rings=rings, provs=provs)
+        leftover = [h for h in report["holes"] if h["area_px2"] > OMAN_HOLE_MIN]
+        if not leftover:
+            return
+        hole = leftover[0]
+        hole_ring = [(float(p[0]), float(p[1])) for p in hole["ring"]]
+        if hole.get("on_land") is True:
+            pid = choose_gap_land_target(
+                hole.get("surrounding") or [],
+                skip_ids=(HAYMA_ID,),
+                face=hole_ring,
+                rings=rings,
+                provs=provs,
+            )
+            if pid is None:
+                pid = choose_oman_target(hole)
+        else:
+            sea_ids = [
+                int(row["id"])
+                for row in hole.get("surrounding") or []
+                if int(row["id"]) >= 950000
+            ]
+            pid = CIBN_ID if CIBN_ID in sea_ids else (sea_ids[0] if sea_ids else None)
+        if pid is None:
+            raise RuntimeError(
+                "no target for leftover Oman face %.2f at %s"
+                % (hole["area_px2"], hole.get("interior"))
+            )
+        if pid == HAYMA_ID:
+            raise RuntimeError("refusing to rewrite Hayma %s" % HAYMA_ID)
+        if pid in (903053, 903054, 950333, 950335):
+            raise RuntimeError("refusing to edit a Canada lake ring %s" % pid)
+        src = rings[pid]
+        was = ring_is_raw_invalid(src)
+        if _poly(src, hole_ring) >= abs(_area(src)) - POLY_OVERLAP_MAX:
+            merged = _as_ring(hole_ring)
+        else:
+            merged = _absorb(src, hole_ring)
+        if ring_is_raw_invalid(merged) and not was:
+            raise RuntimeError("leftover absorb made %s self-crossing" % pid)
+        probe = _interior_point(hole_ring)
+        if probe is None or _winding(merged, probe[0], probe[1]) == 0:
+            raise RuntimeError("leftover hole interior left outside %s" % pid)
+        if not _anchor_inside(merged, anchors[pid]):
+            ip = _interior_point(merged)
+            if ip is None:
+                raise RuntimeError("leftover absorb lost the interior of %s" % pid)
+            anchors[pid] = [round(ip[0], 4), round(ip[1], 4)]
+        rings[pid] = merged
+        metas[pid]["eng_finish_r1_leftover"] = "oman_face_%.1f" % hole["area_px2"]
+        metas[pid]["vertex_n"] = len(merged)
+        metas[pid]["area"] = round(abs(_area(merged)), 2)
+        remember(pid, "absorb leftover %.1f px²" % hole["area_px2"])
+        absorbed.append({"area_px2": hole["area_px2"], "target": pid, "leftover": True})
+    raise RuntimeError("leftover Oman faces still open after 8 absorbs")
+
+
+def build_r1_only(board: Path) -> dict:
+    geo = json.loads((board / "provinces_geometry.json").read_text(encoding="utf-8"))
+    by_id = {int(g["id"]): g for g in geo["provinces"]}
+    rings = {
+        pid: [(float(p[0]), float(p[1])) for p in g["points"]]
+        for pid, g in by_id.items()
+        if len(g.get("points") or []) >= 3
+    }
+    anchors = {pid: [float(g["label_anchor"][0]), float(g["label_anchor"][1])] for pid, g in by_id.items()}
+    metas = {pid: dict(g.get("meta") or {}) for pid, g in by_id.items()}
+    changed = {}
+    absorbed: list = []
+
+    def remember(pid, why):
+        changed[pid] = why
+
+    apply_r1_inland_gap(board, rings, anchors, metas, remember, absorbed)
+    problems = []
+    for pid, why in changed.items():
+        if not str(why).startswith("absorb"):
+            continue
+        ring = rings[pid]
+        if pid >= 950000:
+            continue
+        bb = ring_bbox(ring)
+        for oid, other in rings.items():
+            if oid == pid or oid >= 950000:
+                continue
+            ob = ring_bbox(other)
+            if bb[2] < ob[0] or ob[2] < bb[0] or bb[3] < ob[1] or ob[3] < bb[1]:
+                continue
+            area = _poly(ring, other)
+            if area > POLY_OVERLAP_MAX:
+                problems.append((round(area, 3), pid, oid, why))
+            px = overlap_px(ring, other)
+            if px > 1:
+                problems.append(("px", px, pid, oid, why))
+    if problems:
+        problems.sort(key=lambda row: -row[0] if isinstance(row[0], (int, float)) else 0)
+        raise RuntimeError("land overlap after r1 %s" % (problems[:12],))
+    return {
+        "rings": rings,
+        "anchors": anchors,
+        "metas": metas,
+        "changed": changed,
+        "absorbed": absorbed,
+        "by_id": by_id,
+        "geo": geo,
+    }
 
 
 def build(board: Path) -> dict:
@@ -326,6 +531,8 @@ def build(board: Path) -> dict:
             metas[sea_id]["eng_finish_clip"] = "minus_%s_and_%s" % (land_id, pid)
             remember(sea_id, "clip overlap with %s" % pid)
 
+    apply_r1_inland_gap(board, rings, anchors, metas, remember, absorbed)
+
     # Yielded neighbours already overlapped their own neighbours. Notching
     # Somaliland out of them cannot be required to clear those old overlaps.
     # The new rings and the absorbed Oman provinces must tile.
@@ -437,6 +644,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Apply ENG-MAP-FINISH geometry")
     parser.add_argument("--dir", type=Path, default=DEFAULT_DIR)
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--r1-only", action="store_true", help="PR #181 r1 inland-gap fix on an already-finished board")
     parser.add_argument("--measure-only", action="store_true")
     parser.add_argument(
         "--before",
@@ -454,6 +662,18 @@ def main() -> int:
             "overlap",
             round(payload["overlap_905734_950283"]["poly_px2"], 4),
         )
+        return 0
+    if args.r1_only:
+        built = build_r1_only(args.dir)
+        print("changed", len(built["changed"]))
+        for pid, why in sorted(built["changed"].items()):
+            print(" ", pid, why, "verts", len(built["rings"][pid]))
+        print("absorbed", built["absorbed"])
+        if args.dry_run:
+            return 0
+        write_board(args.dir, built)
+        after = pair_overlap_area(args.dir)
+        print("overlap after", round(after["poly_px2"], 4), "px", after["px"])
         return 0
     for row in source_manifest():
         if not row["sha256_ok"]:
