@@ -2422,10 +2422,12 @@ func _mouse_over_close_control() -> bool:
 	return false
 
 
-func _mouse_over_search_control() -> bool:
+func _mouse_over_search_control(screen_pos: Vector2 = Vector2(-100000, -100000)) -> bool:
 	# Rect first: after +6d / living title, gui_get_hovered_control can miss the
 	# Go button (overlay, leftover pick-block) while the cursor is still on it.
-	if _search_ui_owns_click():
+	# Prefer event.position: get_mouse_position() can still sit on the inspector
+	# after the click that opened it (Play r2 first-SOV Search leak).
+	if _search_ui_owns_click(screen_pos):
 		return true
 	var vp_s: Viewport = get_viewport()
 	if vp_s == null:
@@ -2459,16 +2461,18 @@ func _focus_search_from_point(screen: Vector2) -> void:
 	if results != null and results.visible and results.get_global_rect().grow(2.0).has_point(screen):
 		return
 	if sr.has_method("focus_for_typing"):
-		sr.call("focus_for_typing")
+		sr.call("focus_for_typing", true)
 
 
-func _search_ui_owns_click() -> bool:
+func _search_ui_owns_click(screen_pos: Vector2 = Vector2(-100000, -100000)) -> bool:
 	if _map_search == null or not is_instance_valid(_map_search) or not (_map_search is Control):
 		return false
 	var vp_r: Viewport = get_viewport()
 	if vp_r == null:
 		return false
-	var mouse_r: Vector2 = vp_r.get_mouse_position()
+	var mouse_r: Vector2 = screen_pos
+	if mouse_r.x < -50000.0:
+		mouse_r = vp_r.get_mouse_position()
 	var sr: Control = _map_search as Control
 	if sr.get_global_rect().grow(6.0).has_point(mouse_r):
 		return true
@@ -3046,7 +3050,25 @@ func _layout_map_search_chrome() -> void:
 	sr.force_update_transform()
 
 
+func _search_keeps_click_focus() -> bool:
+	var search := _live_map_search()
+	return search != null and search.has_method("keep_click_focus") and bool(search.call("keep_click_focus"))
+
+
+func _search_has_typable_focus() -> bool:
+	if _search_keeps_click_focus():
+		return true
+	var search := _live_map_search()
+	if search != null and search.has_method("has_typable_focus") and bool(search.call("has_typable_focus")):
+		return true
+	return _gui_text_field_has_focus() and _mouse_over_search_control()
+
+
 func _release_search_focus() -> void:
+	# A Search-box click this frame must stay typable even if a leftover map
+	# press deferred this, or inspector layout ran after the grab.
+	if _search_keeps_click_focus():
+		return
 	var vp: Viewport = get_viewport()
 	if vp == null:
 		return
@@ -3077,6 +3099,8 @@ func _search_chrome_contains_point(screen: Vector2) -> bool:
 
 
 func _release_search_on_map_press() -> void:
+	if _search_keeps_click_focus():
+		return
 	var search := _live_map_search()
 	if search != null and search.has_method("esc_layer_open") and bool(search.call("esc_layer_open")):
 		if search.has_method("dismiss_esc_layer"):
@@ -3084,7 +3108,9 @@ func _release_search_on_map_press() -> void:
 	else:
 		_release_search_focus()
 	# LineEdit grabs focus again from the same click's gui_input, after _input.
-	call_deferred("_release_search_focus")
+	# Skip the undo when this press was a Search click (keep_click_focus).
+	if not _search_keeps_click_focus():
+		call_deferred("_release_search_focus")
 
 
 func _apply_home_key(shift_pressed: bool) -> void:
@@ -3146,9 +3172,12 @@ func _handle_escape_key() -> void:
 	# (hidden / dying) so idle Esc must open the pause menu.
 	if _campaign_end_overlay_is_up():
 		return
-	# Search field / results is its own layer. An empty focused line is not:
-	# idle Esc after +6d must still open Command Center (Play MIXED e36825b).
+	# Search field / results / focused line is its own layer. One Esc
+	# unfocuses Search (empty or not) and must not open Paused.
 	if _dismiss_search_esc_layer():
+		return
+	if _gui_text_field_has_focus():
+		_release_search_focus()
 		return
 	_release_search_focus()
 	# One Esc closes only the front play window. The next Esc can open pause.
@@ -3595,7 +3624,7 @@ func _input(event: InputEvent) -> void:
 				_focus_search_from_point(event.position)
 			# Result row / line / Go: the release must reach the Button and must
 			# not still-click the province under the dropdown.
-			if not event.pressed and (_mouse_over_search_control() or _search_ui_owns_click()):
+			if not event.pressed and (_mouse_over_search_control(event.position) or _search_ui_owns_click(event.position)):
 				return
 			# The title node stays in the tree after Begin, so "boot is up" is
 			# the wrong guard. A chip or top-bar click must not run the unit
@@ -3675,9 +3704,9 @@ func _input(event: InputEvent) -> void:
 				# focus; a map click must drop it even if warp_mouse lagged.
 				_release_search_on_map_press()
 			if event.pressed and (
-				_top_bar_owns_click()
-				or _mouse_over_search_control()
-				or _search_ui_owns_click()
+				_top_bar_owns_click(event.position)
+				or _mouse_over_search_control(event.position)
+				or _search_ui_owns_click(event.position)
 				or _living_title_owns_click()
 				or _road_spine_btn_owns_click()
 			):
@@ -3707,7 +3736,7 @@ func _input(event: InputEvent) -> void:
 					# Pan latch stays. Do not swallow Open fight / unit-card buttons
 					# (2d47d06: fold click was tooltip-only no-op after pan PASS).
 					# Search LineEdit/Go already returned above — do not touch that path.
-					if _top_bar_owns_click() or _search_ui_owns_click() or _road_spine_btn_owns_click():
+					if _top_bar_owns_click(event.position) or _search_ui_owns_click(event.position) or _road_spine_btn_owns_click():
 						return
 					if not _is_mouse_over_blocking_ui():
 						_arm_left_map_press()
@@ -3727,7 +3756,7 @@ func _input(event: InputEvent) -> void:
 					_dismiss_close_control_from_input()
 					MapRenderer._mark_input_handled(vp)
 					return
-				if _top_bar_owns_click() or _mouse_over_search_control() or _search_ui_owns_click() or _road_spine_btn_owns_click():
+				if _top_bar_owns_click(event.position) or _mouse_over_search_control(event.position) or _search_ui_owns_click(event.position) or _road_spine_btn_owns_click():
 					return
 				_finish_close_click_guard_on_new_press()
 				# Arm pan on the map even if a HUD Control is hovered (search/toolbar).
@@ -4115,7 +4144,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				_dismiss_close_control_from_input()
 			get_viewport().set_input_as_handled()
 			return
-		if _top_bar_owns_click() or _mouse_over_search_control() or _search_ui_owns_click() or _living_title_owns_click() or _road_spine_btn_owns_click() or _map_mode_toolbar_owns_click(event.position):
+		if _top_bar_owns_click(event.position) or _mouse_over_search_control(event.position) or _search_ui_owns_click(event.position) or _living_title_owns_click() or _road_spine_btn_owns_click() or _map_mode_toolbar_owns_click(event.position):
 			# Toolbar owns the chip. Do not hex-pick under it, and do not mark
 			# the click handled — the Button still has to toggle the mode.
 			return
@@ -4198,7 +4227,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				_mark_left_pan_blocked_pick()
 				get_viewport().set_input_as_handled()
 				return
-		_release_search_focus()
+		if not _search_chrome_contains_point(event.position) and not _search_keeps_click_focus():
+			_release_search_focus()
 		var world_pos := _map_pick_world_from_event(event)
 		# Living title owns map clicks: never open inspector / chips / assault (window-exit class).
 		if _living_title_boot_is_up():
@@ -4583,10 +4613,11 @@ func _handle_camera_input(delta: float) -> void:
 
 	# WASD / Arrow keys (simulation pause must not freeze map navigation)
 	var key_dir: Vector2 = Vector2.ZERO
-	if Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP):    key_dir.y -= 1
-	if Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN):  key_dir.y += 1
-	if Input.is_key_pressed(KEY_A) or Input.is_key_pressed(KEY_LEFT):  key_dir.x -= 1
-	if Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT): key_dir.x += 1
+	if not _gui_text_field_has_focus():
+		if Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP):    key_dir.y -= 1
+		if Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN):  key_dir.y += 1
+		if Input.is_key_pressed(KEY_A) or Input.is_key_pressed(KEY_LEFT):  key_dir.x -= 1
+		if Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT): key_dir.x += 1
 
 	# UI-1: true outer 6px of the *window* (screen pixels). The old 64px strip
 	# under the HUD (y≈200–264) and last-64px floor (y>676 @ 740) were wrong.
@@ -4902,7 +4933,10 @@ func _layout_map_ui() -> void:
 		tb.offset_right = minf(620.0, get_viewport().get_visible_rect().size.x - 16.0)
 		tb.offset_bottom = top_clearance + toolbar_h
 
-	_layout_map_search_chrome()
+	# Inspector refresh must not reparent Search while it has typable focus
+	# (Play r2: caret then keys leaked after Western Russia inspector).
+	if not _search_has_typable_focus():
+		_layout_map_search_chrome()
 
 	if info_panel is Control and not info_panel.has_meta("user_moved"):
 		var ip := info_panel as Control
@@ -27686,9 +27720,12 @@ func _refresh_next_hook_chip() -> void:
 		_next_hook_chip.name = "PlayNextHookChip"
 		_next_hook_chip.focus_mode = Control.FOCUS_NONE
 		_next_hook_chip.z_index = 80
+		_next_hook_chip.z_as_relative = false
 		_next_hook_chip.position = Vector2(18, 52)
 		_next_hook_chip.custom_minimum_size = Vector2(420, 28)
 		_next_hook_chip.clip_text = false
+		_next_hook_chip.clip_contents = false
+		_next_hook_chip.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		_next_hook_chip.text_overrun_behavior = TextServer.OVERRUN_NO_TRIMMING
 		if typeof(RetrowaveTheme) != TYPE_NIL:
 			RetrowaveTheme.style_primary_button(_next_hook_chip)
@@ -27806,29 +27843,24 @@ func _flash_goal_chip() -> void:
 		if int(_next_hook_chip.get_meta("goal_flash_token", -1)) != token:
 			return
 		RetrowaveTheme.style_primary_button(_next_hook_chip)
+		_mute_next_hook_native_caption()
 	)
 
 
 func _paint_goal_chip_detail(rec: Dictionary, war_goal: bool) -> void:
 	if _next_hook_chip == null or not is_instance_valid(_next_hook_chip):
 		return
+	_ensure_next_hook_line_labels()
 	var why := _next_hook_chip.get_node_or_null("GoalWhy") as Label
 	if not war_goal:
 		if why != null:
 			why.visible = false
+			why.text = ""
 		_hide_goal_tooltip()
 		_fit_next_hook_chip()
 		return
 	if why == null:
-		why = Label.new()
-		why.name = "GoalWhy"
-		why.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		why.position = Vector2(8, 22)
-		why.add_theme_font_size_override("font_size", 12)
-		why.add_theme_color_override("font_color", RetrowaveTheme.TEXT_DIM)
-		why.clip_text = false
-		why.text_overrun_behavior = TextServer.OVERRUN_NO_TRIMMING
-		why.custom_minimum_size = Vector2(320, 16)
+		why = _make_goal_why_label()
 		_next_hook_chip.add_child(why)
 	why.visible = true
 	var display := str(rec.get("goal_name", rec.get("target_tag", ""))).strip_edges()
@@ -27841,15 +27873,158 @@ func _paint_goal_chip_detail(rec: Dictionary, war_goal: bool) -> void:
 	_fit_next_hook_chip()
 
 
-## Sit below TopInfoBar + Map Mode. Widen so "Justify war on France" is not ellipsized.
+func _make_goal_why_label() -> Label:
+	var why := Label.new()
+	why.name = "GoalWhy"
+	why.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	why.add_theme_font_size_override("font_size", 12)
+	if typeof(RetrowaveTheme) != TYPE_NIL:
+		why.add_theme_color_override("font_color", RetrowaveTheme.TEXT_DIM)
+	why.clip_text = false
+	why.text_overrun_behavior = TextServer.OVERRUN_NO_TRIMMING
+	why.autowrap_mode = TextServer.AUTOWRAP_OFF
+	return why
+
+
+func _ensure_next_hook_line_labels() -> void:
+	if _next_hook_chip == null or not is_instance_valid(_next_hook_chip):
+		return
+	var next_lbl := _next_hook_chip.get_node_or_null("GoalNext") as Label
+	if next_lbl == null:
+		next_lbl = Label.new()
+		next_lbl.name = "GoalNext"
+		next_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		next_lbl.add_theme_font_size_override("font_size", 15)
+		next_lbl.add_theme_color_override("font_color", Color(0.95, 0.96, 1.0, 1.0))
+		next_lbl.add_theme_color_override("font_outline_color", Color(0.02, 0.03, 0.06, 1.0))
+		next_lbl.add_theme_constant_override("outline_size", 3)
+		next_lbl.clip_text = false
+		next_lbl.text_overrun_behavior = TextServer.OVERRUN_NO_TRIMMING
+		next_lbl.autowrap_mode = TextServer.AUTOWRAP_OFF
+		_next_hook_chip.add_child(next_lbl)
+	var why := _next_hook_chip.get_node_or_null("GoalWhy") as Label
+	if why == null:
+		return
+	if why.get_parent() != _next_hook_chip:
+		var old_p := why.get_parent()
+		if old_p != null:
+			old_p.remove_child(why)
+		_next_hook_chip.add_child(why)
+
+
+func _mute_next_hook_native_caption() -> void:
+	if _next_hook_chip == null or not is_instance_valid(_next_hook_chip):
+		return
+	var clear := Color(0, 0, 0, 0)
+	for key in ["font_color", "font_hover_color", "font_pressed_color", "font_disabled_color", "font_focus_color", "font_hover_pressed_color"]:
+		_next_hook_chip.add_theme_color_override(key, clear)
+	_next_hook_chip.add_theme_constant_override("outline_size", 0)
+
+
+func _map_mode_live_rect() -> Rect2:
+	if _map_mode_toolbar == null or not is_instance_valid(_map_mode_toolbar) or not (_map_mode_toolbar is Control):
+		return Rect2()
+	var tb := _map_mode_toolbar as Control
+	if not tb.is_visible_in_tree():
+		return Rect2()
+	if tb.has_method("get_live_panel_rect"):
+		var live: Variant = tb.call("get_live_panel_rect")
+		if live is Rect2:
+			return live as Rect2
+	return tb.get_global_rect()
+
+
+func _top_bar_live_rect() -> Rect2:
+	var tree := get_tree()
+	if tree == null:
+		return Rect2()
+	var tib: Node = TopInfoBar.find_in_tree(tree)
+	if tib == null:
+		tib = tree.get_first_node_in_group("top_info_bar")
+	if tib is Control and (tib as Control).is_visible_in_tree():
+		return (tib as Control).get_global_rect()
+	return Rect2()
+
+
+func _inspector_live_rect() -> Rect2:
+	if info_panel == null or not (info_panel is Control):
+		return Rect2()
+	var ip := info_panel as Control
+	if not ip.is_visible_in_tree():
+		return Rect2()
+	return ip.get_global_rect()
+
+
+func _next_hook_place_clear_of_hud(w: float, h: float) -> Vector2:
+	var vp_r := Rect2(Vector2.ZERO, Vector2(1280, 800))
+	if get_viewport() != null:
+		vp_r = get_viewport().get_visible_rect()
+	var gap := 8.0
+	var bar_r := _top_bar_live_rect()
+	var tb_r := _map_mode_live_rect()
+	var ip_r := _inspector_live_rect()
+	# RttReset2: chip.position.y must be >= 84 so the box cannot cover the top bar.
+	var y := 84.0
+	if bar_r.size.y > 1.0:
+		y = maxf(y, bar_r.end.y + gap)
+	var x := 18.0
+	var left_block := 0.0
+	if tb_r.size.x > 1.0:
+		left_block = maxf(left_block, tb_r.end.x)
+	if ip_r.size.x > 1.0:
+		left_block = maxf(left_block, ip_r.end.x)
+	var beside := left_block + gap
+	if left_block > 1.0 and beside + w <= vp_r.end.x - gap:
+		x = maxf(18.0, beside)
+	else:
+		if tb_r.size.y > 1.0:
+			y = maxf(y, tb_r.end.y + gap)
+		if ip_r.size.y > 1.0:
+			y = maxf(y, ip_r.end.y + gap)
+	var pos := Vector2(x, y)
+	var box := Rect2(pos, Vector2(w, h))
+	if tb_r.size.x > 1.0 and box.intersects(tb_r):
+		if tb_r.end.x + gap + w <= vp_r.end.x - gap:
+			pos.x = tb_r.end.x + gap
+		else:
+			pos.y = maxf(pos.y, tb_r.end.y + gap)
+		box = Rect2(pos, Vector2(w, h))
+	if ip_r.size.x > 1.0 and box.intersects(ip_r):
+		if ip_r.end.x + gap + w <= vp_r.end.x - gap:
+			pos.x = ip_r.end.x + gap
+		else:
+			pos.y = maxf(pos.y, ip_r.end.y + gap)
+		box = Rect2(pos, Vector2(w, h))
+	if bar_r.size.y > 1.0 and box.intersects(bar_r):
+		pos.y = maxf(pos.y, bar_r.end.y + gap)
+	if pos.y + 0.5 < 84.0:
+		pos.y = 84.0
+	if pos.x + w > vp_r.end.x - gap:
+		pos.x = maxf(8.0, vp_r.end.x - gap - w)
+	if pos.y + h > vp_r.end.y - gap:
+		pos.y = maxf(y, vp_r.end.y - gap - h)
+	return pos
+
+
+## Sit clear of TopInfoBar + Map Mode + inspector. NEXT and Why are stacked
+## labels so they cannot paint on top of each other. No ellipsis / clip_text.
+## Width still follows the #178 Button-font + 32px pad contract (RttReset2).
 func _fit_next_hook_chip() -> void:
 	if _next_hook_chip == null or not is_instance_valid(_next_hook_chip):
 		return
+	_ensure_next_hook_line_labels()
 	_next_hook_chip.clip_text = false
+	_next_hook_chip.clip_contents = false
 	_next_hook_chip.text_overrun_behavior = TextServer.OVERRUN_NO_TRIMMING
 	_next_hook_chip.autowrap_mode = TextServer.AUTOWRAP_OFF
-	var y := _map_nav_top_clearance() + 6.0
-	_next_hook_chip.position = Vector2(18.0, y)
+	_next_hook_chip.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	var next_lbl := _next_hook_chip.get_node_or_null("GoalNext") as Label
+	if next_lbl != null:
+		next_lbl.clip_text = false
+		next_lbl.text_overrun_behavior = TextServer.OVERRUN_NO_TRIMMING
+		next_lbl.autowrap_mode = TextServer.AUTOWRAP_OFF
+		next_lbl.text = str(_next_hook_chip.text)
+	_mute_next_hook_native_caption()
 	var vp_w := 1280.0
 	var vp := get_viewport()
 	if vp != null:
@@ -27857,28 +28032,51 @@ func _fit_next_hook_chip() -> void:
 	var max_w := minf(720.0, vp_w - 36.0)
 	var pad := 32.0
 	var text_w := _control_text_width(_next_hook_chip, str(_next_hook_chip.text), 15)
+	if next_lbl != null:
+		text_w = maxf(text_w, _control_text_width(next_lbl, str(next_lbl.text), 15))
 	var why := _next_hook_chip.get_node_or_null("GoalWhy") as Label
 	var why_w := 0.0
 	var why_h := 0.0
-	if why != null and why.visible:
+	var why_on := why != null and why.visible and not str(why.text).strip_edges().is_empty()
+	if why_on:
 		why.clip_text = false
 		why.text_overrun_behavior = TextServer.OVERRUN_NO_TRIMMING
+		why.autowrap_mode = TextServer.AUTOWRAP_OFF
 		why_w = _control_text_width(why, str(why.text), 12)
 		why_h = 18.0
 	var inner := maxf(text_w, why_w) + pad
 	if inner > max_w:
 		_next_hook_chip.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		if next_lbl != null:
+			next_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		if why_on:
+			why.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		inner = max_w
 	var w := clampf(inner, 420.0, max_w)
-	var h := 28.0
-	if why != null and why.visible:
-		h = 48.0
-		why.custom_minimum_size = Vector2(maxf(8.0, w - 16.0), why_h)
-		why.size = why.custom_minimum_size
+	var inner_w := maxf(8.0, w - 16.0)
+	var next_h := 22.0
+	if next_lbl != null and next_lbl.autowrap_mode != TextServer.AUTOWRAP_OFF:
+		next_h = 36.0
+	var top_pad := 4.0
+	var gap := 2.0
+	var bot_pad := 6.0
+	var h := top_pad + next_h + bot_pad
+	if why_on:
+		h = top_pad + next_h + gap + why_h + bot_pad
 	if _next_hook_chip.autowrap_mode != TextServer.AUTOWRAP_OFF:
 		h = maxf(h, 48.0)
+	if next_lbl != null:
+		next_lbl.position = Vector2(8.0, top_pad)
+		next_lbl.custom_minimum_size = Vector2(inner_w, next_h)
+		next_lbl.size = Vector2(inner_w, next_h)
+	if why_on:
+		why.position = Vector2(8.0, top_pad + next_h + gap)
+		why.custom_minimum_size = Vector2(inner_w, why_h)
+		why.size = Vector2(inner_w, why_h)
 	_next_hook_chip.custom_minimum_size = Vector2(w, h)
 	_next_hook_chip.size = Vector2(w, h)
+	var pos := _next_hook_place_clear_of_hud(w, h)
+	_next_hook_chip.position = pos
 
 
 func _control_text_width(ctrl: Control, text: String, fallback_px: int) -> float:

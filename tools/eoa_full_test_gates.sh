@@ -8,7 +8,7 @@
 #   tools/eoa_full_test_gates.sh --with-perf  # also map-tick perf sample
 #   tools/eoa_full_test_gates.sh --log DIR    # write logs under DIR
 #
-# --quick launches HeadlessGarrison1Test, HeadlessAiWar1Test, HeadlessInkTooltips0Test, HeadlessCampaignSave1Test, HeadlessRttSmallfix1Test, HeadlessRttReset2Test, HeadlessAudio1Test, HeadlessAudio2Test, HeadlessStabilityJustice1Test, HeadlessVictoryPaths1Test, HeadlessSettingsToggles1Test, HeadlessFirst20P2StripPressTest, then FIRST20-UX-WAR Open fight / Justify / March.
+# --quick launches HeadlessGarrison1Test, HeadlessAiWar1Test, HeadlessInkTooltips0Test, HeadlessCampaignSave1Test, HeadlessRttSmallfix1Test, HeadlessRttReset2Test, HeadlessAudio1Test, HeadlessAudio2Test, HeadlessStabilityJustice1Test, HeadlessVictoryPaths1Test, HeadlessSettingsToggles1Test, HeadlessFirst20P2StripPressTest, then FIRST20-UX-WAR Open fight / Justify / March, then HeadlessSearchHotkey1Test (r1 isolation + r2 click-focus / RtT AAR + r3 inspector-open / first-SOV click).
 # Full path also runs launch_campaign_save1_identity (MW200 SaveStateHash identity + 60-day twin).
 # Full path calls tools/run_godot.sh, which exits 1 immediately if no binary
 # is found (fail-closed; it must not hang).
@@ -223,6 +223,7 @@ if [[ "$QUICK" -eq 1 ]]; then
     log "FAIL headless_first20_ux_war_open_fight GODOT_BUSY"
     log "FAIL headless_first20_ux_war_justify GODOT_BUSY"
     log "FAIL headless_first20_ux_war_march GODOT_BUSY"
+    log "FAIL headless_search_hotkey1 GODOT_BUSY"
     FAILED=1
   else
     run_step headless_garrison1 env \
@@ -440,6 +441,23 @@ if [[ "$QUICK" -eq 1 ]]; then
       fi
       if ! grep -q "RESULT=PASS" "$log"; then
         echo "[eoa-gates] FAIL headless_first20_ux_war_march missing RESULT=PASS"
+        exit 1
+      fi
+      exit "$code"
+    ' || fail
+    run_step headless_search_hotkey1 bash -c '
+      log=$(mktemp)
+      XDG_DATA_HOME="$(mktemp -d)" flock -n "${HOME}/.eoa_godot.lock" \
+        tools/run_godot.sh --headless --path . --resolution 1280x800 \
+        -s res://scripts/core/HeadlessSearchHotkey1Test.gd >"$log" 2>&1
+      code=$?
+      cat "$log"
+      if grep -q "SCRIPT ERROR" "$log"; then
+        echo "[eoa-gates] FAIL headless_search_hotkey1 SCRIPT ERROR"
+        exit 1
+      fi
+      if ! grep -q "RESULT=PASS" "$log"; then
+        echo "[eoa-gates] FAIL headless_search_hotkey1 missing RESULT=PASS"
         exit 1
       fi
       exit "$code"

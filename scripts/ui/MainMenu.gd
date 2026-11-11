@@ -107,6 +107,8 @@ static func reset_session_leftovers(tree: SceneTree = null) -> void:
 		CampaignEndDomain.reset_session_for_new_game()
 	if typeof(PlayNextHook) != TYPE_NIL:
 		PlayNextHook.reset_session()
+	if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("clear_last_land_aar"):
+		BattleManager.clear_last_land_aar()
 	if typeof(ProductionManager) != TYPE_NIL and ProductionManager.has_method("set_stockpile"):
 		ProductionManager.set_stockpile({})
 	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("clear_session_notices"):

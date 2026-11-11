@@ -174,7 +174,10 @@ func host_map_search_chrome(search: Control) -> void:
 		_right_container.visible = true
 		_right_container.mouse_filter = Control.MOUSE_FILTER_PASS
 	var slot: Control = _right_container if _right_container != null else self
-	if search.get_parent() != slot:
+	var keep_focus := search.has_method("keep_click_focus") and bool(search.call("keep_click_focus"))
+	if search.has_method("has_typable_focus") and bool(search.call("has_typable_focus")):
+		keep_focus = true
+	if search.get_parent() != slot and not keep_focus:
 		var old_p: Node = search.get_parent()
 		if old_p != null:
 			old_p.remove_child(search)
@@ -194,14 +197,15 @@ func host_map_search_chrome(search: Control) -> void:
 		search.size_flags_horizontal = Control.SIZE_SHRINK_END
 		search.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		# [Resources] [Search+Go] [Menu] — Search stays on the right through reflow.
-		if _resources_container != null and _resources_container.get_parent() == _right_container:
-			_right_container.move_child(_resources_container, 0)
-			_right_container.move_child(search, 1)
-		else:
-			_right_container.move_child(search, 0)
-		if _menu_container != null and _menu_container.get_parent() == _right_container:
-			_right_container.move_child(_menu_container, _right_container.get_child_count() - 1)
-	else:
+		if not keep_focus:
+			if _resources_container != null and _resources_container.get_parent() == _right_container:
+				_right_container.move_child(_resources_container, 0)
+				_right_container.move_child(search, 1)
+			else:
+				_right_container.move_child(search, 0)
+			if _menu_container != null and _menu_container.get_parent() == _right_container:
+				_right_container.move_child(_menu_container, _right_container.get_child_count() - 1)
+	elif not keep_focus:
 		move_child(search, get_child_count() - 1)
 	if search.has_method("ensure_chrome_visible"):
 		search.call("ensure_chrome_visible", search_w)
@@ -1125,25 +1129,28 @@ func _is_live_escape_event(event: InputEvent) -> bool:
 	return false
 
 
-func _search_line_owns_typed_keys() -> bool:
+func _gui_text_field_has_focus() -> bool:
+	# SEARCH-HOTKEY-1: any focused LineEdit/TextEdit owns typing, including an
+	# empty Search field. Do not fire pause / speed / menu bindings through it.
 	var vp: Viewport = get_viewport()
 	if vp == null:
 		return false
 	var fo: Control = vp.gui_get_focus_owner()
-	if not (fo is LineEdit):
-		return false
-	# Empty Search leftover after Begin must not swallow Space.
-	return not str((fo as LineEdit).text).is_empty()
+	return fo is LineEdit or fo is TextEdit or fo is CodeEdit
+
+
+func _search_line_owns_typed_keys() -> bool:
+	return _gui_text_field_has_focus()
 
 
 func _input(event: InputEvent) -> void:
 	# Live F5: Search LineEdit focus makes Space/_unhandled_input a no-op.
 	if not (event is InputEventKey and event.pressed and not event.echo):
 		return
+	if _gui_text_field_has_focus():
+		return
 	var key: InputEventKey = event
 	if key.keycode == KEY_SPACE or key.keycode == KEY_PERIOD:
-		if _search_line_owns_typed_keys():
-			return
 		if _overlay_holds_clock():
 			get_viewport().set_input_as_handled()
 			return
@@ -1154,10 +1161,10 @@ func _input(event: InputEvent) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if not (event is InputEventKey and event.pressed and not event.echo):
 		return
+	if _gui_text_field_has_focus():
+		return
 	# Space / > : toggle pause (fallback if 1x click is blocked by an overlay)
 	if event.keycode == KEY_SPACE or event.keycode == KEY_PERIOD:
-		if _search_line_owns_typed_keys():
-			return
 		if _overlay_holds_clock():
 			get_viewport().set_input_as_handled()
 			return

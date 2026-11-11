@@ -140,6 +140,34 @@ func get_panel_height() -> float:
 	return EXPANDED_HEIGHT_PRESETS if _preset_row != null else EXPANDED_HEIGHT
 
 
+## Painted Map Mode chrome, including wrapped Preset/Overview chips that may
+## grow past get_panel_height(). NEXT sits outside this rect.
+func get_live_panel_rect() -> Rect2:
+	if not is_inside_tree():
+		return Rect2()
+	var r := get_global_rect()
+	var rows: Array[Control] = []
+	if _body is Control:
+		rows.append(_body as Control)
+	if _mode_row is Control:
+		rows.append(_mode_row as Control)
+	if _preset_row is Control:
+		rows.append(_preset_row as Control)
+	if _legend is Control:
+		rows.append(_legend as Control)
+	if _wx_row is Control:
+		rows.append(_wx_row as Control)
+	if _secondary_row is Control:
+		rows.append(_secondary_row as Control)
+	for row in rows:
+		if row == null or not row.is_visible_in_tree():
+			continue
+		var rr := row.get_global_rect()
+		if rr.size.x > 1.0 and rr.size.y > 1.0:
+			r = r.merge(rr)
+	return r
+
+
 func _build_ui() -> void:
 	var outer := HBoxContainer.new()
 	outer.add_theme_constant_override("separation", 6)
