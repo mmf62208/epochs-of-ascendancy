@@ -406,6 +406,7 @@ func _build_ui() -> void:
 	_begin_btn.gui_input.connect(_on_begin_gui_input)
 	RetrowaveTheme.style_primary_button(_begin_btn)
 	col.add_child(_begin_btn)
+	_add_tutorial_button(col)
 
 	_status = Label.new()
 	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -2061,6 +2062,49 @@ func _arm_begin_release_swallow(pending_press: bool = false, skip_held_check: bo
 		mr = tree.current_scene.find_child("MapRenderer", true, false)
 	if mr != null and mr.has_method("arm_begin_title_release_swallow"):
 		mr.call("arm_begin_title_release_swallow", pending_press)
+
+
+func _add_tutorial_button(col: VBoxContainer) -> void:
+	var btn := Button.new()
+	btn.name = "BtnTutorial"
+	btn.text = "?  Tutorial"
+	btn.tooltip_text = "Walk through the basics again: time, map modes, war, battle, saving and how the game ends."
+	btn.custom_minimum_size = Vector2(0, 52)
+	btn.mouse_filter = Control.MOUSE_FILTER_STOP
+	btn.focus_mode = Control.FOCUS_ALL
+	btn.process_mode = Node.PROCESS_MODE_ALWAYS
+	btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
+	btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	btn.pressed.connect(_on_tutorial_pressed)
+	RetrowaveTheme.style_secondary_button(btn)
+	col.add_child(btn)
+	var sub := Label.new()
+	sub.name = "BtnTutorialSubline"
+	sub.text = "Replay the first-session guide"
+	sub.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	sub.add_theme_font_size_override("font_size", 11)
+	sub.add_theme_color_override("font_color", RetrowaveTheme.TEXT_DIM)
+	col.add_child(sub)
+
+
+func start_tutorial_from_title() -> void:
+	var need_toast := _tag != "GER" or int(_year) != 1936
+	_tag = "GER"
+	_year = 1936
+	_refresh_choice_buttons()
+	if need_toast and typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
+		LeaderEventUI.show_toast("The guide uses Germany, 1936.", 3.0)
+	_on_begin_new()
+
+
+func _on_tutorial_pressed() -> void:
+	var tree := get_tree()
+	if tree != null and tree.root != null:
+		var guide := tree.root.get_node_or_null("FirstSessionGuide")
+		if guide != null and guide.has_method("replay"):
+			guide.call("replay", true)
+			return
+	start_tutorial_from_title()
 
 
 func _on_begin_new(pending_press: bool = false, from_pointer: bool = false) -> void:

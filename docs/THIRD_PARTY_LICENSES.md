@@ -121,6 +121,17 @@ CC0 1.0 files from OpenGameArt, plus one original victory sting. Manifest: `res:
 | `res://audio/music/mus_menu_loop_alt.ogg` | Menu Loop | Akikazer | CC0 1.0 | https://opengameart.org/content/menu-loop | 2026-11-04 |
 | `res://audio/sfx/end/end_victory_sting.ogg` | Original (synthesized by tools/audio/gen_victory_fanfare.py) | Epochs of Ascendancy | original, project-owned | `tools/audio/gen_victory_fanfare.py` | 2026-11-04 |
 
+## Fonts (TUTORIAL-1)
+
+- **Cinzel** (variable weight)
+  - Authors: The Cinzel Project Authors (Natanael Gama / NDISCOVER)
+  - License: SIL Open Font License 1.1
+  - Location: `assets/fonts/Cinzel-VariableFont_wght.ttf`
+  - Full license: `assets/fonts/OFL.txt`
+  - Usage: Tutorial card titles (END-ART-1 may reuse for campaign-end titles).
+
+Cinzel font, SIL Open Font License 1.1 (`assets/fonts/OFL.txt`).
+
 ## Other Third-Party / Future
 - Any additional Godot Asset Library items, Python tools in `tools/`, or external assets will be added here with license details.
 - For MCP / partner tools (e.g., if enabling Sentry, Cloudflare, etc., for dev assistance or future multiplayer): These are separate from game runtime. Review their individual terms of service for commercial/game use before relying on them in production. No automatic royalty-free game embedding assumed.
