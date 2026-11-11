@@ -210,6 +210,30 @@ def ring_from_lonlat(ring_lonlat: Sequence[Sequence[float]]) -> Ring:
     return pts
 
 
+def ne_named_lake_ring(name: str, lon0: float, lon1: float, lat0: float, lat1: float) -> Ring:
+    """Project the largest Natural Earth 10m lake outer ring named `name`.
+
+    Used so Lake Ontario paints as water from sourced shore, not a fake fill.
+    """
+    from canada_hole_measure import LAKES_GEOJSON, _area, _clean, _load_ne_polys  # noqa: E402
+
+    lakes = _load_ne_polys(LAKES_GEOJSON, lon0, lon1, lat0, lat1)
+    parts: List[Ring] = []
+    for lake_name, _bb, exterior, _holes in lakes:
+        if lake_name != name:
+            continue
+        ring = _clean([lonlat_to_canvas(float(lon), float(lat)) for lon, lat in exterior])
+        if len(ring) < 8:
+            continue
+        if _area(ring) < 0:
+            ring = list(reversed(ring))
+        parts.append([[float(p[0]), float(p[1])] for p in ring])
+    if not parts:
+        raise KeyError("Natural Earth 10m lake %r not in cache" % name)
+    parts.sort(key=lambda r: -abs(_area(r)))
+    return parts[0]
+
+
 def polygon_centroid(points: Sequence[Sequence[float]]) -> Tuple[float, float]:
     if not points:
         return 0.0, 0.0
