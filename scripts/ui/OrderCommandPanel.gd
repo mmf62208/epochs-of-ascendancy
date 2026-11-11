@@ -3176,6 +3176,21 @@ func _rebuild_industry_section() -> void:
 
 
 func _rebuild_saves_section() -> void:
+	var prev_active: VBoxContainer = _active_body
+	var host := _body.get_node_or_null("SavesSectionHost") as VBoxContainer if _body != null else null
+	if host != null and host.is_queued_for_deletion():
+		host = null
+	if host == null:
+		host = VBoxContainer.new()
+		host.name = "SavesSectionHost"
+		host.add_theme_constant_override("separation", 6)
+		if _body != null:
+			_body.add_child(host)
+	_clear_container_children(host)
+	_active_body = host
+	if typeof(SaveLoadManager) != TYPE_NIL and SaveLoadManager.has_signal("save_list_changed"):
+		if not SaveLoadManager.save_list_changed.is_connected(_rebuild_saves_section):
+			SaveLoadManager.save_list_changed.connect(_rebuild_saves_section)
 	_add_section_title("— Save browser campaign product (major #4) —")
 	var product: Dictionary = {}
 	if typeof(GameData) != TYPE_NIL and GameData.has_method("save_browser_campaign_product_live"):
@@ -3229,7 +3244,7 @@ func _rebuild_saves_section() -> void:
 		load_btn.disabled = not bool(r.get("can_load", false))
 		load_btn.pressed.connect(_on_action_pressed.bind("load_slot:%s" % slot))
 		row.add_child(load_btn)
-		_body.add_child(row)
+		_target_body().add_child(row)
 		shown += 1
 		if shown >= 8:
 			break
@@ -3242,11 +3257,12 @@ func _rebuild_saves_section() -> void:
 	open_slots.text = "Refresh slots"
 	open_slots.pressed.connect(refresh)
 	qs_row.add_child(open_slots)
-	_body.add_child(qs_row)
+	_target_body().add_child(qs_row)
 	if typeof(GameData) != TYPE_NIL and GameData.has_method("format_save_browser_campaign_product_plain"):
 		var sp := str(GameData.format_save_browser_campaign_product_plain()).strip_edges()
 		if not sp.is_empty():
 			_add_plain_label(sp.split("\n")[0], 260)
+	_active_body = prev_active
 
 
 func _rebuild_gpu_section() -> void:

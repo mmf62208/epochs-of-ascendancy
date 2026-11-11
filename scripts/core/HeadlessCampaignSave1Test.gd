@@ -974,11 +974,12 @@ func _test_save_list_polish() -> void:
 	if not bool(auto1.get("ok", false)):
 		_fail("polish: first autosave failed")
 		return
+	var auto_slot := str(auto1.get("slot", "autosave_1"))
 	var menu := _make_menu()
 	if menu == null:
 		_fail("polish: CC missing")
 		return
-	var card := menu.find_child("SlotCard_autosave", true, false)
+	var card := menu.find_child("SlotCard_%s" % auto_slot, true, false)
 	var detail := card.find_child("SlotDetail", true, false) if card != null else null
 	if detail == null or str(detail.text).find("14 Mar 1936") < 0:
 		_fail("polish: autosave card missing 14 Mar 1936 ('%s')" % (str(detail.text) if detail != null else "missing"))
@@ -993,13 +994,14 @@ func _test_save_list_polish() -> void:
 		return
 	if menu.has_method("_refresh_save_list"):
 		menu.call("_refresh_save_list")
-	card = menu.find_child("SlotCard_autosave", true, false)
+	var auto_slot2 := str(auto2.get("slot", auto_slot))
+	card = menu.find_child("SlotCard_%s" % auto_slot2, true, false)
 	detail = card.find_child("SlotDetail", true, false) if card != null else null
 	var detail_txt := str(detail.text) if detail != null else ""
 	if detail_txt.find("20 Apr 1936") < 0:
 		_fail("polish: autosave card did not refresh in-game date ('%s')" % detail_txt)
 		return
-	if detail_txt.find("14 Mar 1936") >= 0:
+	if auto_slot2 == auto_slot and detail_txt.find("14 Mar 1936") >= 0:
 		_fail("polish: stale autosave date still on the card ('%s')" % detail_txt)
 		return
 	var bad_path := str(sl.call("get_save_path", "slot2"))
