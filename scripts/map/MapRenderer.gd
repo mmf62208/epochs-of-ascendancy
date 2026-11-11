@@ -305,6 +305,8 @@ var _unit_card_latch_arm_sec := 0.0
 var _unit_card_eaten_frame: int = -1
 ## One Esc press = one stack step (TopInfoBar + MapRenderer `_input` / `_unhandled_input`).
 var _esc_stack_frame: int = -1
+## Level latch so a held Esc (or a key that never reached `_input`) steps once.
+var _esc_backstop_down: bool = false
 ## Close button sits in the north edge-pan strip — suppress edge until the mouse leaves that click.
 var _close_suppress_edge := false
 ## WHEELDRIFT-1: a wheel notch must not edge-pan. Hold 350 ms, then require a
@@ -3384,6 +3386,39 @@ func _campaign_end_overlay_is_up() -> bool:
 	return false
 
 
+## Esc that never reached `_input` (map input gated off, or the key lived only
+## on the Input singleton because another viewport had focus). TopInfoBar's
+## `_unhandled_input` already forwards a root event, and it sets
+## `_esc_stack_frame`, so this does not step twice. A wide backstop while
+## input is on would also open Paused on the Search Esc: Search consumes that
+## key without setting the frame guard.
+func _backstop_missed_escape() -> void:
+	var down := Input.is_action_pressed("ui_cancel") or Input.is_physical_key_pressed(KEY_ESCAPE)
+	var edge := down and not _esc_backstop_down
+	_esc_backstop_down = down
+	if not edge:
+		return
+	if is_processing_input() or is_processing_unhandled_input():
+		return
+	if _esc_stack_frame == Engine.get_process_frames():
+		return
+	if _living_title_boot_is_up() or _campaign_end_overlay_is_up():
+		return
+	if _gui_text_field_has_focus():
+		return
+	if _tutorial_prompt_blocks_esc_backstop():
+		return
+	_handle_escape_key()
+
+
+func _tutorial_prompt_blocks_esc_backstop() -> bool:
+	var tree := get_tree()
+	if tree == null or tree.root == null:
+		return false
+	var prompt := tree.root.find_child("TutorialPromptPopup", true, false) as CanvasItem
+	return prompt != null and is_instance_valid(prompt) and prompt.is_visible_in_tree()
+
+
 func _esc_open_command_center() -> void:
 	_release_search_focus(true)
 	var vp_esc: Viewport = get_viewport()
@@ -4475,6 +4510,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				return
 
 func _process(delta: float) -> void:
+	_backstop_missed_escape()
 	if _perf != null and _perf.enabled:
 		_perf_frame_start_usec = Time.get_ticks_usec()
 		_perf.begin("process_total")

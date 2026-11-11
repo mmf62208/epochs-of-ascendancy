@@ -170,6 +170,12 @@ func _close_from_cancel(event: InputEvent) -> void:
 		return
 	if is_queued_for_deletion() or _lead_escape_yields():
 		return
+	# Hidden-but-alive still receives `_input`. Do not close or mark handled.
+	if not is_visible_in_tree():
+		var vp_hidden := get_viewport()
+		if vp_hidden != null:
+			vp_hidden.gui_release_focus()
+		return
 	close_screen()
 	var vp := get_viewport()
 	if vp != null:

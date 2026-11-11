@@ -43,6 +43,7 @@ func _run() -> void:
 	await _case_load_confirm_three_clicks()
 	await _case_prompt_dismiss_first_click()
 	await _case_prompt_dismiss_wheel_zoom()
+	await _case_esc_mid_war_opens_paused()
 	var ok := _failures == 0
 	print("HeadlessInputPolish1Test: ", "PASS" if ok else "FAIL", " (failures=", _failures, ")")
 	print("HeadlessInputPolish1Test: RESULT=", "PASS" if ok else "FAIL")
@@ -795,3 +796,358 @@ func _case_prompt_dismiss_wheel_zoom() -> void:
 			return
 	_pass("prompt_dismiss_wheel_zoom: wheel-up zooms and selects no unit")
 	_restore_pick_grid()
+
+
+## Idle Esc must open Paused. A hidden play window, a prompt that is only
+## `visible` under a hidden host, or MapRenderer input left off must not eat it.
+func _case_esc_mid_war_opens_paused() -> void:
+	print("INPUT_POLISH_1 case=esc_mid_war_opens_paused")
+	if not await _prepare_esc_idle():
+		return
+	var before := _failures
+	_dump_esc_diag("idle")
+	if not await _expect_paused_on_esc("idle"):
+		_fail("esc_mid_war_opens_paused: idle Esc did not open Paused")
+	await _close_paused_if_up()
+	await _expect_hidden_diplomacy_esc()
+	await _close_paused_if_up()
+	await _expect_hidden_leader_esc()
+	await _close_paused_if_up()
+	await _expect_hidden_host_prompt_esc()
+	await _close_paused_if_up()
+	await _expect_input_forced_off_esc()
+	await _close_paused_if_up()
+	await _expect_action_press_backstop()
+	await _close_paused_if_up()
+	await _expect_visible_diplomacy_one_step()
+	await _close_paused_if_up()
+	await _expect_guide_exit_restores_input()
+	if _failures == before:
+		_pass("esc_mid_war_opens_paused: Esc opens Paused within 2 frames")
+
+
+func _prepare_esc_idle() -> bool:
+	if _mr == null and not _setup_map():
+		return false
+	if _bar == null and not await _boot_top_bar():
+		return false
+	await _close_command_center()
+	var search := _search()
+	if search != null and search.has_method("dismiss_esc_layer"):
+		search.call("dismiss_esc_layer")
+	elif search != null and search.has_method("end_typing_session"):
+		search.call("end_typing_session")
+	_soft_clear_inspector()
+	if _mr != null:
+		_mr.set("selected_formation_id", "")
+		_mr.set("supply_mode", false)
+		_mr.set("_march_dest_armed", false)
+		_mr.set_process_input(true)
+		_mr.set_process_unhandled_input(true)
+	if _bar != null:
+		_bar.visible = true
+	var guide := _guide()
+	if guide != null:
+		var host := guide.get("_host") as CanvasItem
+		if host != null:
+			host.visible = true
+		guide.set("_map_input_gated", false)
+		if guide.has_method("_hide_prompt"):
+			guide.call("_hide_prompt")
+	var vp := root.get_viewport()
+	if vp != null:
+		vp.gui_release_focus()
+	await _frames(2)
+	return true
+
+
+func _dump_esc_diag(tag: String) -> void:
+	var processing := _mr != null and _mr.is_processing_input()
+	var unhandled := _mr != null and _mr.is_processing_unhandled_input()
+	var vp := root.get_viewport()
+	var fo: Control = vp.gui_get_focus_owner() if vp != null else null
+	var window_name := ""
+	var walk: Node = fo
+	while walk != null:
+		if walk is Window:
+			window_name = str(walk.name)
+			break
+		walk = walk.get_parent()
+	var hidden: PackedStringArray = []
+	_collect_hidden_input(root, hidden)
+	var shown := hidden.slice(0, 8)
+	_info_line(
+		"diag %s map_input=%s unhandled=%s focus=%s window=%s hidden_input=%s"
+		% [
+			tag,
+			str(processing),
+			str(unhandled),
+			str(fo.name) if fo != null else "",
+			window_name,
+			",".join(shown),
+		]
+	)
+
+
+func _collect_hidden_input(n: Node, out: PackedStringArray) -> void:
+	if out.size() >= 8:
+		return
+	if n != root and n.get_script() != null and n.has_method("_input"):
+		var shown := true
+		if n is Window:
+			shown = (n as Window).visible and n.is_visible_in_tree()
+		elif n is CanvasItem:
+			shown = (n as CanvasItem).is_visible_in_tree()
+		if not shown:
+			out.append(str(n.name))
+	for child in n.get_children():
+		_collect_hidden_input(child, out)
+		if out.size() >= 8:
+			return
+
+
+func _paused_up() -> bool:
+	var mm := root.get_node_or_null("MainMenu")
+	if mm == null or not is_instance_valid(mm) or mm.is_queued_for_deletion():
+		return false
+	if str(mm.name) != "MainMenu":
+		return false
+	if bool(mm.get("_closing")):
+		return false
+	return true
+
+
+func _close_paused_if_up() -> void:
+	if _paused_up():
+		await _close_command_center()
+	var leftover := root.get_node_or_null("MainMenu")
+	if leftover != null and is_instance_valid(leftover):
+		leftover.queue_free()
+		await _frames(1)
+
+
+func _push_esc() -> void:
+	# parse_input_event is the OS path: it sets ui_cancel for the frame and
+	# delivers one _input. push_input alone does not set the Input singleton,
+	# which is what a missed-_input backstop has to read.
+	Input.parse_input_event(_key(KEY_ESCAPE, true))
+	Input.parse_input_event(_key(KEY_ESCAPE, false))
+
+
+func _expect_paused_on_esc(tag: String) -> bool:
+	_dump_esc_diag(tag)
+	var frame0 := Engine.get_process_frames()
+	_push_esc()
+	await _frames(2)
+	var up := _paused_up()
+	var frame1 := Engine.get_process_frames()
+	_info_line("esc %s paused=%s frames=%s→%s" % [tag, str(up), str(frame0), str(frame1)])
+	return up
+
+
+func _expect_hidden_diplomacy_esc() -> void:
+	var packed: PackedScene = load("res://scenes/ui/DiplomacyView.tscn") as PackedScene
+	if packed == null:
+		_fail("esc hidden diplomacy: scene missing")
+		return
+	var dip := packed.instantiate()
+	dip.name = "DiplomacyView"
+	dip.visible = false
+	root.add_child(dip)
+	await _frames(1)
+	if dip is Window:
+		(dip as Window).hide()
+	await _frames(1)
+	# A focused embedded window receives the key on its own viewport.
+	if dip is Window:
+		(dip as Window).push_input(_key(KEY_ESCAPE, true))
+	await _frames(1)
+	var ate := not is_instance_valid(dip) or dip.is_queued_for_deletion()
+	_info_line("hidden diplomacy window-esc ate=%s" % str(ate))
+	if ate:
+		_fail("esc hidden DiplomacyView: hidden window ate Esc")
+		return
+	var up := await _expect_paused_on_esc("hidden_diplomacy")
+	var still := is_instance_valid(dip) and not dip.is_queued_for_deletion()
+	_info_line("hidden diplomacy still_alive=%s visible=%s" % [str(still), str(dip.visible if still else false)])
+	if not up:
+		_fail("esc hidden DiplomacyView: Paused did not open")
+	if is_instance_valid(dip):
+		dip.queue_free()
+	await _frames(1)
+
+
+func _expect_hidden_leader_esc() -> void:
+	var packed: PackedScene = load("res://scenes/ui/LeaderAssignmentScreen.tscn") as PackedScene
+	if packed == null:
+		_fail("esc hidden leader: scene missing")
+		return
+	var lead := packed.instantiate()
+	lead.name = "LeaderAssignmentScreen"
+	lead.visible = false
+	root.add_child(lead)
+	await _frames(1)
+	var up := await _expect_paused_on_esc("hidden_leader")
+	var still := is_instance_valid(lead) and not lead.is_queued_for_deletion()
+	_info_line("hidden leader still_alive=%s" % str(still))
+	if not up:
+		_fail("esc hidden LeaderAssignmentScreen: Paused did not open")
+	if is_instance_valid(lead):
+		lead.queue_free()
+	await _frames(1)
+
+
+func _expect_hidden_host_prompt_esc() -> void:
+	var guide := _guide()
+	if guide == null or not guide.has_method("_show_prompt"):
+		_fail("esc hidden host: FirstSessionGuide missing")
+		return
+	guide.call("_show_prompt")
+	await _frames(1)
+	var host := guide.get("_host") as CanvasItem
+	var prompt := guide.get("_prompt") as CanvasItem
+	if host == null or prompt == null:
+		_fail("esc hidden host: prompt nodes missing")
+		return
+	host.visible = false
+	await _frames(2)
+	# Nit 2 ungates when the prompt is not visible in the tree. Pin input off
+	# without the guide's latch so a later _process does not turn it back on.
+	guide.set("_map_input_gated", false)
+	if _mr != null:
+		_mr.set_process_input(false)
+		_mr.set_process_unhandled_input(false)
+	await _frames(1)
+	if _mr != null and _mr.is_processing_input():
+		_fail("esc hidden host: map input came back on before Esc")
+		host.visible = true
+		if guide.has_method("_hide_prompt"):
+			guide.call("_hide_prompt")
+		return
+	var up := await _expect_paused_on_esc("hidden_host_prompt")
+	var prompt_still := prompt.visible
+	_info_line("hidden host prompt_visible_after=%s" % str(prompt_still))
+	if not up:
+		_fail("esc hidden host: Paused did not open")
+	if not prompt_still:
+		_fail("esc hidden host: hidden prompt ate Esc as I know the game")
+	host.visible = true
+	guide.set("_map_input_gated", false)
+	if _mr != null:
+		_mr.set_process_input(true)
+		_mr.set_process_unhandled_input(true)
+	if guide.has_method("_hide_prompt"):
+		guide.call("_hide_prompt")
+	await _frames(1)
+
+
+func _expect_input_forced_off_esc() -> void:
+	var guide := _guide()
+	if guide != null:
+		var host := guide.get("_host") as CanvasItem
+		if host != null:
+			host.visible = true
+		if guide.has_method("_hide_prompt"):
+			guide.call("_hide_prompt")
+		guide.set("_map_input_gated", false)
+	if _mr != null:
+		_mr.set_process_input(false)
+		_mr.set_process_unhandled_input(false)
+	await _frames(1)
+	if _mr != null and (_mr.is_processing_input() or _mr.is_processing_unhandled_input()):
+		_fail("esc input forced off: MapRenderer input did not stay off")
+		return
+	var up := await _expect_paused_on_esc("input_forced_off")
+	if not up:
+		_fail("esc input forced off: Paused did not open while MapRenderer input was off")
+	if _mr != null:
+		_mr.set_process_input(true)
+		_mr.set_process_unhandled_input(true)
+
+
+## No viewport event. Input state only. TopInfoBar never sees a key, so Paused
+## opens only if MapRenderer's _process backstop runs.
+func _expect_action_press_backstop() -> void:
+	var guide := _guide()
+	if guide != null:
+		if guide.has_method("_hide_prompt"):
+			guide.call("_hide_prompt")
+		guide.set("_map_input_gated", false)
+	if _mr != null:
+		_mr.set_process_input(false)
+		_mr.set_process_unhandled_input(false)
+	await _frames(1)
+	if _mr != null and (_mr.is_processing_input() or _mr.is_processing_unhandled_input()):
+		_fail("esc action backstop: MapRenderer input did not stay off")
+		return
+	_dump_esc_diag("action_press")
+	Input.action_release("ui_cancel")
+	Input.action_press("ui_cancel")
+	await _frames(2)
+	Input.action_release("ui_cancel")
+	var up := _paused_up()
+	_info_line("esc action_press paused=%s" % str(up))
+	if not up:
+		_fail("esc action without viewport event: Paused did not open")
+	if _mr != null:
+		_mr.set_process_input(true)
+		_mr.set_process_unhandled_input(true)
+
+
+func _expect_visible_diplomacy_one_step() -> void:
+	var packed: PackedScene = load("res://scenes/ui/DiplomacyView.tscn") as PackedScene
+	if packed == null:
+		_fail("esc visible diplomacy: scene missing")
+		return
+	var dip := packed.instantiate()
+	dip.name = "DiplomacyView"
+	root.add_child(dip)
+	await _frames(2)
+	if dip is Window:
+		(dip as Window).popup_centered()
+	await _frames(1)
+	if not is_instance_valid(dip) or not (dip as Window).visible:
+		_fail("esc visible diplomacy: window was not open")
+		if is_instance_valid(dip):
+			dip.queue_free()
+		return
+	# Same delivery First20 uses: the window viewport owns this Esc.
+	if dip is Window:
+		(dip as Window).push_input(_key(KEY_ESCAPE, true))
+	await _frames(2)
+	var dip_up := is_instance_valid(dip) and not dip.is_queued_for_deletion() and (dip as Window).visible
+	var menu := _paused_up()
+	_info_line("visible diplomacy still_up=%s paused=%s" % [str(dip_up), str(menu)])
+	if dip_up:
+		_fail("esc visible diplomacy: Esc did not close it")
+		dip.queue_free()
+	if menu:
+		_fail("esc visible diplomacy: Esc that closed it also opened Paused")
+	if is_instance_valid(dip):
+		dip.queue_free()
+	await _frames(1)
+
+
+func _expect_guide_exit_restores_input() -> void:
+	var guide := _guide()
+	if guide == null or _mr == null:
+		_fail("esc guide exit: guide or map missing")
+		return
+	guide.set("_map_input_gated", true)
+	_mr.set_process_input(false)
+	_mr.set_process_unhandled_input(false)
+	var parent := guide.get_parent()
+	if parent == null:
+		_fail("esc guide exit: guide has no parent")
+		return
+	parent.remove_child(guide)
+	await _frames(1)
+	var processing := _mr.is_processing_input() and _mr.is_processing_unhandled_input()
+	_info_line("guide exit map_input=%s" % str(processing))
+	if not processing:
+		_fail("esc guide exit: leaving the tree left MapRenderer input off")
+	if is_instance_valid(guide) and guide.get_parent() == null:
+		parent.add_child(guide)
+		guide.set("_map_input_gated", false)
+		_mr.set_process_input(true)
+		_mr.set_process_unhandled_input(true)

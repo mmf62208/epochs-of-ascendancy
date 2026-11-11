@@ -57,6 +57,11 @@ func _ready() -> void:
 	set_process_input(true)
 
 
+func _exit_tree() -> void:
+	# A guide freed by load / restart must not leave MapRenderer deaf.
+	_gate_map_input(false)
+
+
 func _scan_existing_title() -> void:
 	var boot := _find_open_title()
 	if boot != null:
