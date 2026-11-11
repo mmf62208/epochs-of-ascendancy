@@ -12,6 +12,7 @@ var _panel: PanelContainer
 func _ready() -> void:
 	layer = OVERLAY_LAYER
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	add_to_group("away_overlay")
 	_build()
 
 

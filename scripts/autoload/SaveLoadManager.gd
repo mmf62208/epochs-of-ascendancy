@@ -930,11 +930,24 @@ func _poll_idle_arm() -> void:
 func _trigger_idle_away() -> void:
 	# Write Last played BEFORE the pause takes effect.
 	write_last_played_now("idle")
-	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("set_paused"):
-		TimeManager.set_paused(true)
+	_apply_idle_pause_to_clock()
 	_show_away_overlay()
 	_away_armed = true
 	_idle_was_paused = true
+
+
+func _apply_idle_pause_to_clock() -> void:
+	# Pause through TopInfoBar so `_step_live_clock` does not fight TimeManager
+	# (player_owns_clock + 1x selected). Leave is_paused true after dismiss.
+	var tree := Engine.get_main_loop() as SceneTree
+	if tree != null:
+		for n in tree.get_nodes_in_group("top_info_bar"):
+			if n == null or not is_instance_valid(n):
+				continue
+			if n.has_method("pause") and not bool(n.get("is_paused")):
+				n.call("pause")
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("set_paused"):
+		TimeManager.set_paused(true)
 
 
 func _show_away_overlay() -> void:

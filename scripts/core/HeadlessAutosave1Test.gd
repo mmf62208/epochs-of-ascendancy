@@ -62,6 +62,7 @@ func _run() -> void:
 	_test_month_year_hooks(sl)
 	_test_load_list_signal(sl)
 	_test_idle_pause(sl)
+	_test_idle_pause_against_tib_watchdog(sl)
 	_test_product_day_retired(sl)
 
 
@@ -351,6 +352,78 @@ func _test_idle_pause(sl: Node) -> void:
 		_fail("idle armed from a deliberate pause")
 		return
 	_pass("idle writes last_played then pauses; dismiss leaves paused")
+
+
+func _test_idle_pause_against_tib_watchdog(sl: Node) -> void:
+	## Live ITEM 3 (log 3526–3527): TIB `_step_live_clock` unpaused TimeManager
+	## on the next tick because is_paused stayed false while 1x was selected.
+	var tm := _tm()
+	if tm == null:
+		_fail("TimeManager missing")
+		return
+	if tm.has_method("mark_living_title_closed"):
+		tm.call("mark_living_title_closed")
+	var bar := _make_bar()
+	if bar == null:
+		_fail("TopInfoBar missing for idle watchdog test")
+		return
+	bar.set_meta("player_owns_clock", true)
+	bar.set("is_paused", false)
+	bar.set("current_speed", 1)
+	tm.call("set_paused", false)
+	sl.call("set_idle_minutes", 10)
+	sl.call("inject_idle_clock_msec", 2000)
+	sl.call("note_qualifying_input_for_test")
+	sl.call("poll_idle_for_test")
+	if bool(tm.call("is_paused")):
+		_fail("tib idle: armed before N minutes")
+		return
+	sl.call("inject_idle_clock_msec", 2000 + 10 * 60 * 1000 + 5)
+	sl.call("poll_idle_for_test")
+	if not bool(sl.call("slot_is_occupied", LAST_PLAYED)):
+		_fail("tib idle: last_played was not written before pause")
+		return
+	if not bool(sl.call("is_away_overlay_visible")):
+		_fail("tib idle: away overlay missing")
+		return
+	if not bool(bar.get("is_paused")):
+		_fail("tib idle: bar is_paused stayed false (watchdog will unpause)")
+		return
+	if not bool(tm.call("is_paused")):
+		_fail("tib idle: TimeManager not paused after idle")
+		return
+	if not bar.has_method("_step_live_clock"):
+		_fail("tib idle: _step_live_clock missing")
+		return
+	bar.call("_step_live_clock")
+	if not bool(tm.call("is_paused")):
+		_fail("tib idle: TimeManager unpaused on next _step_live_clock")
+		return
+	sl.call("note_qualifying_input_for_test")
+	if bool(sl.call("is_away_overlay_visible")):
+		_fail("tib idle: overlay did not dismiss")
+		return
+	bar.call("_step_live_clock")
+	if not bool(tm.call("is_paused")):
+		_fail("tib idle: dismiss left TimeManager running")
+		return
+	if not bool(bar.get("is_paused")):
+		_fail("tib idle: dismiss cleared bar is_paused")
+		return
+	_pass("idle pause sticks against TopInfoBar _step_live_clock; dismiss stays paused")
+
+
+func _make_bar() -> Node:
+	var existing := root.find_child("TopInfoBar", true, false)
+	if existing is Control:
+		return existing
+	var packed: PackedScene = load("res://scenes/ui/TopInfoBar.tscn") as PackedScene
+	if packed == null:
+		return null
+	var bar: Node = packed.instantiate()
+	bar.name = "TopInfoBar"
+	root.add_child(bar)
+	return bar
 
 
 func _test_product_day_retired(sl: Node) -> void:

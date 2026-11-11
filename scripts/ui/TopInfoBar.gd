@@ -1268,7 +1268,7 @@ func _overlay_holds_clock() -> bool:
 	var tree := get_tree()
 	if tree == null:
 		return false
-	for group_name in ["campaign_ink_end_screen", "campaign_end_screen", "continuation_picker"]:
+	for group_name in ["campaign_ink_end_screen", "campaign_end_screen", "continuation_picker", "away_overlay"]:
 		for n in tree.get_nodes_in_group(group_name):
 			if n == null or not is_instance_valid(n) or n.is_queued_for_deletion():
 				continue
