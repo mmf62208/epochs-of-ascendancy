@@ -21,7 +21,10 @@ from eng_map_finish2_product import (  # noqa: E402
     GULF_NEW,
     GULF_OLD,
     HAMILTON_NIAGARA_ID,
+    LAKE_ERIE_ID,
+    LONDON_ID,
     NY_WEST_ID,
+    WINDSOR_SARNIA_ID,
     absorb_hole_into,
     build_plan,
     choose_absorb_target,
@@ -129,8 +132,15 @@ def absorb_specks(board: Path, rings, anchors, metas, changed, skip_targets=()) 
     skip = set(skip_targets)
     for hole in speck_holes(report):
         target = choose_absorb_target(hole)
-        if target is None:
-            raise RuntimeError("no absorb target for speck %.1f at %s" % (hole["area_px2"], hole["centroid"]))
+        surround = {int(s.get("id") or 0) for s in hole.get("surrounding") or []}
+        if target is None or target in skip:
+            # West Erie corridor: never Hamilton, never back onto London.
+            if WINDSOR_SARNIA_ID in surround and LAKE_ERIE_ID in surround:
+                target = WINDSOR_SARNIA_ID
+            elif target in skip:
+                continue
+            else:
+                raise RuntimeError("no absorb target for speck %.1f at %s" % (hole["area_px2"], hole["centroid"]))
         if target in skip:
             continue
         if target not in rings:
@@ -180,7 +190,12 @@ def main() -> int:
         if clipped:
             write_geometry(args.dir, rings, anchors, metas, changed, geo)
         specks = absorb_specks(
-            args.dir, rings, anchors, metas, changed, skip_targets=(HAMILTON_NIAGARA_ID,)
+            args.dir,
+            rings,
+            anchors,
+            metas,
+            changed,
+            skip_targets=(HAMILTON_NIAGARA_ID, LONDON_ID),
         )
         print("erie_tail_specks", specks)
         if specks:
@@ -227,7 +242,7 @@ def main() -> int:
             plan["anchors"],
             plan["metas"],
             plan["changed"],
-            skip_targets=(HAMILTON_NIAGARA_ID,),
+            skip_targets=(HAMILTON_NIAGARA_ID, LONDON_ID),
         )
         print("erie_tail_specks", tail_specks)
         if tail_specks:

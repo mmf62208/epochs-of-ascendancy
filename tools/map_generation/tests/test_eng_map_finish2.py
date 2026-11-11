@@ -39,12 +39,17 @@ from eng_map_finish2_product import (  # noqa: E402
     LAKE_ERIE_ID,
     LAKE_ONTARIO_ID,
     LEFTOVER_LAND_IDS,
+    LONDON_ID,
+    LONDON_ORIG_WEST_X,
     NY_WEST_ID,
     OVERLAP_PX_MAX,
+    WINDSOR_END_VERTEX,
+    WINDSOR_SARNIA_ID,
     erie_shore_tail_indices,
     gulf_name_hits,
     lake_america_hits,
     land_water_overlap_px,
+    leftover_erie_cutoff_x,
     measure_washington_faces,
     ny_west_city_hits,
     speck_holes,
@@ -137,7 +142,8 @@ class EngMapFinish2Test(unittest.TestCase):
             903045,
             903044,
             903046,
-            903050,
+            LONDON_ID,
+            WINDSOR_SARNIA_ID,
         }
         bad_ours = [row for row in inv.get("ids") or [] if int(row.get("id") or 0) in our]
         self.assertEqual(bad_ours, [])
@@ -150,7 +156,7 @@ class EngMapFinish2Test(unittest.TestCase):
         self.assertEqual(lake_pairs, [])
 
     def test_hamilton_niagara_not_in_erie(self) -> None:
-        """Fails on 2e1e6f98: #903049 sends a thin tail along Erie to Windsor."""
+        """Fails on 2e1e6f98 (#903049) and 5109bd41 (#903050 Erie corridor)."""
         geo, _base, _adj = _load()
         rings = {}
         anchors = {}
@@ -180,10 +186,42 @@ class EngMapFinish2Test(unittest.TestCase):
         for pid in LEFTOVER_LAND_IDS:
             if pid not in rings or pid == LAKE_ONTARIO_ID:
                 continue
-            hits = erie_shore_tail_indices(rings[pid], erie, probe, band=ERIE_TAIL_BAND_PX)
+            cutoff = leftover_erie_cutoff_x(pid, erie, probe)
+            if cutoff is None:
+                continue
+            hits = erie_shore_tail_indices(
+                rings[pid], erie, probe, band=ERIE_TAIL_BAND_PX, cutoff_x=cutoff
+            )
             if hits:
                 leftover_tails.append((pid, hits))
         self.assertEqual(leftover_tails, [])
+        london = rings[LONDON_ID]
+        windsor = rings[WINDSOR_SARNIA_ID]
+        self.assertGreaterEqual(min(p[0] for p in london), LONDON_ORIG_WEST_X - 0.05)
+        lx, ly = anchors[LONDON_ID]
+        self.assertNotEqual(_winding(london, lx, ly), 0)
+        wx, wy = anchors[WINDSOR_SARNIA_ID]
+        self.assertNotEqual(_winding(windsor, wx, wy), 0)
+        # London ON / St Thomas stay in London; the Windsor-end vertex does not.
+        lonx, lony = lonlat_to_canvas(-81.25, 42.98)
+        self.assertNotEqual(_winding(london, lonx, lony), 0)
+        self.assertEqual(_winding(windsor, lonx, lony), 0)
+        end_x, end_y = WINDSOR_END_VERTEX
+        self.assertEqual(_winding(london, end_x, end_y), 0)
+        self.assertEqual(_winding(ham, end_x, end_y), 0)
+        on_windsor = any(
+            abs(float(p[0]) - end_x) < 1e-3 and abs(float(p[1]) - end_y) < 1e-3 for p in windsor
+        )
+        self.assertTrue(on_windsor, msg="Windsor-end vertex must sit on #903051")
+        # Thin west corridor interior: Windsor, not London / Hamilton / Erie.
+        cx, cy = 2210.0, 1204.0
+        self.assertNotEqual(_winding(windsor, cx, cy), 0)
+        self.assertEqual(_winding(london, cx, cy), 0)
+        self.assertEqual(_winding(ham, cx, cy), 0)
+        self.assertEqual(_winding(erie, cx, cy), 0)
+        # Port Dover stays on London.
+        pdx, pdy = lonlat_to_canvas(-80.20, 42.78)
+        self.assertNotEqual(_winding(london, pdx, pdy), 0)
 
 
 if __name__ == "__main__":

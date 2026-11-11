@@ -58,6 +58,8 @@ DC_ID = 800792
 PA_EAST_ID = 801515
 MD_EAST_ID = 800273
 HAMILTON_NIAGARA_ID = 903049
+LONDON_ID = 903050
+WINDSOR_SARNIA_ID = 903051
 GULF_ACCURATE_ID = 950029
 GULF_FULL_ID = 20115
 GULF_PILOT_ID = 901121
@@ -77,26 +79,17 @@ SLIVER_AREA = 5.0
 KEEP_LOOP_MIN = 8.0
 # Near-water band for the Hamilton–Niagara sliver that followed Erie to Windsor.
 ERIE_TAIL_BAND_PX = 4.0
+# London #903050 original west edge on main / 2e1e6f98 (before r1 speck absorb).
+LONDON_ORIG_WEST_X = 2227.4681
+# r1 already clipped Hamilton; do not recut the Niagara/Port Dover coast.
+HAMILTON_KEEP_WEST_X = 2250.0
+# Erie-shore tip of the leftover corridor (Windsor-end vertex on 2e1e6f98 / 5109bd41).
+WINDSOR_END_VERTEX = (2204.4536, 1206.6906)
 LEFTOVER_LAND_IDS = (
     MD_EAST_ID,
     NY_WEST_ID,
     PA_EAST_ID,
-    903029,
-    903030,
-    903032,
-    903033,
-    903036,
-    903038,
-    903039,
-    903040,
-    903041,
-    903043,
-    903044,
-    903045,
-    903046,
-    903047,
-    HAMILTON_NIAGARA_ID,
-    903053,
+    *tuple(range(903029, 903054)),
 )
 
 GULF_NAME_FILES = (
@@ -216,30 +209,51 @@ def erie_peninsula_junction(erie, probe):
     return min(erie, key=lambda p: (float(p[0]) - px) ** 2 + (float(p[1]) - py) ** 2)
 
 
-def erie_shore_tail_indices(land, erie, probe, band: float = ERIE_TAIL_BAND_PX) -> List[int]:
-    """Land vertices that follow Erie west of the peninsula contact.
+def leftover_erie_cutoff_x(pid, erie, ham_probe) -> Optional[float]:
+    """West-of-body cutoff for a leftover land face. None means skip.
 
-    Fails on tip 2e1e6f98: Hamilton–Niagara #903049 traces Erie to Windsor.
-    Boundary vertices at the Port Dover junction are kept.
+    London keeps its original body (west ~2227.47) and any wider Port
+    Stanley / Port Dover shore east of that. Windsor already owns that
+    west coast — do not strip it. Hamilton stays at the r1 peninsula clip.
+    Other leftover land is flagged if it sends an Erie-shore run into the
+    same west-of-London corridor (x < 2227.47).
+    """
+    if pid == WINDSOR_SARNIA_ID:
+        return None
+    if pid == LONDON_ID:
+        return LONDON_ORIG_WEST_X
+    if pid == HAMILTON_NIAGARA_ID:
+        return HAMILTON_KEEP_WEST_X
+    if ham_probe is None:
+        return None
+    return LONDON_ORIG_WEST_X
+
+
+def erie_shore_tail_indices(land, erie, probe, band: float = ERIE_TAIL_BAND_PX, cutoff_x: Optional[float] = None) -> List[int]:
+    """Land vertices that follow Erie west of a body cutoff.
+
+    Fails on tip 2e1e6f98 for Hamilton and on 5109bd41 for London's
+    1–2 px Windsor corridor. Boundary vertices at the cutoff are kept.
     """
     if len(land) < 4 or len(erie) < 3:
         return []
-    junction = erie_peninsula_junction(erie, probe)
-    cutoff = float(junction[0]) - 0.05
+    if cutoff_x is None:
+        junction = erie_peninsula_junction(erie, probe)
+        cutoff_x = float(junction[0]) - 0.05
     hits = []
     for i, pt in enumerate(land):
-        if float(pt[0]) >= cutoff:
+        if float(pt[0]) >= float(cutoff_x):
             continue
         if dist_point_to_ring(pt, erie) < band:
             hits.append(i)
     return hits
 
 
-def clip_erie_shore_tail(land, erie, anchor, probe=None, band: float = ERIE_TAIL_BAND_PX):
+def clip_erie_shore_tail(land, erie, anchor, probe=None, band: float = ERIE_TAIL_BAND_PX, cutoff_x: Optional[float] = None):
     """Drop the west-along-Erie spike. Returns (ring, dropped_count)."""
     if probe is None:
         probe = anchor
-    drop = set(erie_shore_tail_indices(land, erie, probe, band=band))
+    drop = set(erie_shore_tail_indices(land, erie, probe, band=band, cutoff_x=cutoff_x))
     if not drop:
         return list(land), 0
     kept = [pt for i, pt in enumerate(land) if i not in drop]
@@ -255,31 +269,102 @@ def clip_erie_shore_tail(land, erie, anchor, probe=None, band: float = ERIE_TAIL
     return kept, len(drop)
 
 
+def split_ring_at_x(ring, x_cut: float, eps: float = 1e-9):
+    """Walk-ring split on a vertical line. On-cut body verts stay east-only."""
+    pts = [(float(p[0]), float(p[1])) for p in ring]
+    if len(pts) >= 2 and pts[0] == pts[-1]:
+        pts = pts[:-1]
+    east: List[Tuple[float, float]] = []
+    west: List[Tuple[float, float]] = []
+    crossings = 0
+    n = len(pts)
+    for i in range(n):
+        a = pts[i]
+        b = pts[(i + 1) % n]
+        sa = a[0] - float(x_cut)
+        sb = b[0] - float(x_cut)
+        if sa > eps:
+            east.append(a)
+        elif sa < -eps:
+            west.append(a)
+        else:
+            east.append(a)
+        if sa * sb < -1e-12:
+            den = a[0] - b[0]
+            t = (a[0] - float(x_cut)) / den if abs(den) > 1e-15 else 0.5
+            t = min(1.0, max(0.0, t))
+            hit = (a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t)
+            east.append(hit)
+            west.append(hit)
+            crossings += 1
+    return snap_ring(east), snap_ring(west), crossings
+
+
+def reassign_london_west_erie_corridor(rings: dict, anchors: dict, metas: dict, changed: dict) -> list:
+    """Move London's thin Erie corridor west of its original body onto Windsor.
+
+    Vertex-drop is the wrong clip here: it chords through Port Stanley shore.
+    Split at London's original west edge, keep the east body + thicker shore,
+    absorb only the west piece into #903051.
+    """
+    if LONDON_ID not in rings or WINDSOR_SARNIA_ID not in rings:
+        return []
+    east, west, crossings = split_ring_at_x(rings[LONDON_ID], LONDON_ORIG_WEST_X)
+    if len(west) < 3 or abs(_area(west)) < 0.5:
+        return []
+    if len(east) < 3:
+        raise RuntimeError("london west clip removed the land ring")
+    if abs(_area(east)) < KEEP_LOOP_MIN:
+        raise RuntimeError("london west clip left the land ring too small")
+    if ring_is_raw_invalid(east) and not ring_is_raw_invalid(rings[LONDON_ID]):
+        raise RuntimeError("london west clip made London self-crossing")
+    if not _anchor_inside(east, anchors[LONDON_ID]):
+        raise RuntimeError("london west clip left the label outside London")
+    if min(p[0] for p in east) < LONDON_ORIG_WEST_X - 0.05:
+        raise RuntimeError("london west clip left the Windsor corridor on London")
+    rings[LONDON_ID] = east
+    metas[LONDON_ID]["eng_map_finish2_erie_tail"] = "west_clip_%d" % crossings
+    changed[LONDON_ID] = ((changed.get(LONDON_ID) or "") + " clip erie west corridor").strip()
+    absorb_hole_into(rings, anchors, WINDSOR_SARNIA_ID, west)
+    metas[WINDSOR_SARNIA_ID]["eng_map_finish2_erie_corridor"] = "absorb_%.1f" % abs(_area(west))
+    changed[WINDSOR_SARNIA_ID] = (
+        (changed.get(WINDSOR_SARNIA_ID) or "") + " absorb erie corridor %.1f" % abs(_area(west))
+    ).strip()
+    return [
+        {"id": LONDON_ID, "dropped": len(west), "verts": len(east)},
+        {"id": WINDSOR_SARNIA_ID, "dropped": 0, "verts": len(rings[WINDSOR_SARNIA_ID])},
+    ]
+
+
 def clip_leftover_erie_tails(rings: dict, anchors: dict, metas: dict, changed: dict, leftover_ids=LEFTOVER_LAND_IDS) -> list:
     """Clip leftover land faces that send a thin tail into Lake Erie.
 
-    Cutoff is the Port Dover / Hamilton contact, not each land's own nearest
-    Erie vertex — NY West's Buffalo shore must stay flush.
+    London's west corridor is split onto Windsor. Hamilton keeps the r1
+    peninsula drop-vert. Other leftover ids are not rewritten here.
     """
+    clipped = reassign_london_west_erie_corridor(rings, anchors, metas, changed)
+    if HAMILTON_NIAGARA_ID not in leftover_ids or HAMILTON_NIAGARA_ID not in rings:
+        return clipped
     erie = rings[LAKE_ERIE_ID]
     probe = anchors.get(HAMILTON_NIAGARA_ID)
-    if probe is None and HAMILTON_NIAGARA_ID in rings:
-        probe = _poly_centroid(rings[HAMILTON_NIAGARA_ID])
     if probe is None:
-        return []
-    clipped = []
-    for pid in leftover_ids:
-        if pid not in rings:
-            continue
-        if pid == LAKE_ONTARIO_ID:
-            continue
-        kept, n_drop = clip_erie_shore_tail(rings[pid], erie, anchors[pid], probe=probe)
-        if n_drop <= 0:
-            continue
-        rings[pid] = kept
-        metas[pid]["eng_map_finish2_erie_tail"] = "drop_%d" % n_drop
-        changed[pid] = ((changed.get(pid) or "") + " clip erie tail %d" % n_drop).strip()
-        clipped.append({"id": pid, "dropped": n_drop, "verts": len(kept)})
+        probe = _poly_centroid(rings[HAMILTON_NIAGARA_ID])
+    kept, n_drop = clip_erie_shore_tail(
+        rings[HAMILTON_NIAGARA_ID],
+        erie,
+        anchors[HAMILTON_NIAGARA_ID],
+        probe=probe,
+        band=ERIE_TAIL_BAND_PX,
+        cutoff_x=HAMILTON_KEEP_WEST_X,
+    )
+    if n_drop <= 0:
+        return clipped
+    rings[HAMILTON_NIAGARA_ID] = kept
+    metas[HAMILTON_NIAGARA_ID]["eng_map_finish2_erie_tail"] = "drop_%d" % n_drop
+    changed[HAMILTON_NIAGARA_ID] = (
+        (changed.get(HAMILTON_NIAGARA_ID) or "") + " clip erie tail %d" % n_drop
+    ).strip()
+    clipped.append({"id": HAMILTON_NIAGARA_ID, "dropped": n_drop, "verts": len(kept)})
     return clipped
 
 
