@@ -5,6 +5,10 @@ Fails on the MAP-2a base: twelve ENG placeholders remain, three Oman-touching
 faces are still open, and Abu Dhabi still overlaps Central Indian Basin North
 by more than 1 px². Passes once those are closed. Province ids stay 3596
 in the same order. Canada lake rings are not part of this edit.
+
+PR #181 r1: the inland gap west/SW of Hayma and leftover Yemen-coast NE land
+must not be CIBN / Unowned / Sea. Those asserts fail on c60409ee (Hayma's
+own ring already tiles) and pass after CIBN is clipped off that land.
 """
 from __future__ import annotations
 
@@ -17,6 +21,10 @@ ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "tools" / "map_generation" / "lib"))
 
 from eng_finish_product import (  # noqa: E402
+    COAST_FRAGMENT_PROBES,
+    HAYMA_ID,
+    HAYMA_RING_SHA256,
+    INLAND_GAP_PROBES,
     MAP_UNITS_SHA256,
     MAP_UNITS_URL,
     OMAN_HOLE_MIN,
@@ -25,8 +33,12 @@ from eng_finish_product import (  # noqa: E402
     RERING_ADMIN,
     STILL_UNKNOWN,
     choose_oman_target,
+    coast_fragment_uncovered_sea_px,
+    hayma_ring_sha256,
+    inland_gap_uncovered_sea_px,
     measure_oman_holes,
     pair_overlap_area,
+    probe_hits,
 )
 from gap_eng1_product import META_RING, UNKNOWN_PLACEHOLDER_IDS, scope_placeholder_ids  # noqa: E402
 from gap_ussr_west2_product import is_placeholder_ring  # noqa: E402
@@ -101,6 +113,33 @@ class EngFinishTest(unittest.TestCase):
         water = dict(hole)
         water["on_land"] = False
         self.assertIsNone(choose_oman_target(water))
+
+    def test_hayma_ring_not_rewritten(self) -> None:
+        """Play: Hayma #905731 is already a complete land ring. Do not replace it."""
+        self.assertEqual(hayma_ring_sha256(BOARD), HAYMA_RING_SHA256)
+        geo, _base, _owners, _adj, _domains = _load()
+        by_id = {int(g["id"]): g for g in geo["provinces"]}
+        hay = by_id[HAYMA_ID]
+        self.assertEqual(len(hay["points"]), 183)
+        self.assertEqual((hay.get("meta") or {}).get("eng_finish_absorb"), "oman_face_110.4")
+
+    def test_inland_gap_west_of_hayma_is_land_not_cibn(self) -> None:
+        """Fails on c60409ee: probes west/SW of Hayma are CIBN / Unowned / Sea."""
+        self.assertEqual(inland_gap_uncovered_sea_px(BOARD), 0)
+        for hits in probe_hits(BOARD, INLAND_GAP_PROBES):
+            seas = [h for h in hits if h["domain"] in ("sea", "ocean", "lake", "strait") or h["id"] >= 950000]
+            lands = [h for h in hits if h["domain"] not in ("sea", "ocean", "lake", "strait") and h["id"] < 950000]
+            self.assertEqual(seas, [], hits)
+            self.assertTrue(lands, hits)
+
+    def test_oman_yemen_coast_has_no_cibn_land_faces(self) -> None:
+        """Fails on c60409ee: leftover CIBN on NE land along the Yemen coast."""
+        self.assertEqual(coast_fragment_uncovered_sea_px(BOARD), 0)
+        for hits in probe_hits(BOARD, COAST_FRAGMENT_PROBES):
+            seas = [h for h in hits if h["domain"] in ("sea", "ocean", "lake", "strait") or h["id"] >= 950000]
+            lands = [h for h in hits if h["domain"] not in ("sea", "ocean", "lake", "strait") and h["id"] < 950000]
+            self.assertEqual(seas, [], hits)
+            self.assertTrue(lands, hits)
 
 
 if __name__ == "__main__":

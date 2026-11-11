@@ -7,7 +7,10 @@ that hole. Potaro-Siparuni and Ayi stay placeholders: cutting them out would
 split another province or invent a corridor.
 
 Oman gaps on Natural Earth land go to the longest-edge land neighbour.
-Central Indian Basin North is clipped off Abu Dhabi. No new province id.
+Central Indian Basin North is clipped off Abu Dhabi. PR #181 r1 also clips
+CIBN off the inland NE-land gap west/SW of Hayma (Play MIXED on c60409ee)
+and re-homes that sea onto uncovered ocean west of Central Indian Basin East.
+No new province id. Hayma's own ring is not rewritten.
 """
 from __future__ import annotations
 
@@ -37,7 +40,8 @@ from canada_hole_measure import (  # noqa: E402
     arrange,
     canvas_to_lonlat,
 )
-from gap_china2_outline import snap  # noqa: E402
+from gap_china2_outline import _nz_pair_area, region_loops, snap  # noqa: E402
+from gap_ussr_west2_product import overlap_px, rasterize_centers  # noqa: E402
 from ne_full_geometry_align import lonlat_to_canvas  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -74,6 +78,28 @@ ISLAND_AREA_MIN = 4.0
 OMAN_HOLE_MIN = 1.0
 OVERLAP_PAIR = (905734, 950283)
 POLY_OVERLAP_MAX = 1.0
+HAYMA_ID = 905731
+CIBN_ID = 950283
+CIBE_ID = 950289
+# Play MIXED c60409ee: Hayma's ring already tiles. Do not replace it.
+HAYMA_RING_SHA256 = "2d5b58c4dc36579bab1c6d164f5c029adf8671e8a1743f1ba76fde6ba52d47e9"
+# Canvas probes that are CIBN / Unowned / Sea on c60409ee (west/SW of Hayma).
+INLAND_GAP_PROBES = (
+    (5311.0, 1854.5),
+    (5340.0, 1835.0),
+    (5324.0, 1894.0),
+)
+# Leftover CIBN face on NE land along the Yemen coast (Hawf / Shahin).
+COAST_FRAGMENT_PROBES = (
+    (5283.5, 1946.5),
+)
+# Raster windows used by the r1 headless assert (fails on c60409ee).
+INLAND_GAP_WINDOW = (5280.0, 1832.0, 5360.0, 1910.0)
+COAST_FRAGMENT_WINDOW = (5270.0, 1910.0, 5310.0, 1956.0)
+# Uncovered NE water west of CIBE. 1838 includes the 6 px Mahawt-coast
+# notch that sits just north of y=1840 (Play leftover water after re-home).
+CIBN_OCEAN_WEST = 5408.0
+CIBN_OCEAN_NORTH = 1838.0
 
 # Centroid part of ne_10m_admin_0_map_units. One ring per province.
 RERING_ADMIN = {
@@ -261,22 +287,35 @@ def _domain(prov: dict) -> str:
     return str(prov.get("domain") or "land")
 
 
-def measure_oman_holes(board: Path = DEFAULT_DIR, use_natural_earth: bool = True) -> dict:
+def measure_oman_holes(
+    board: Path = DEFAULT_DIR,
+    use_natural_earth: bool = True,
+    rings: Optional[Dict[int, list]] = None,
+    provs: Optional[Dict[int, dict]] = None,
+) -> dict:
     """Enclosed faces in the Oman/UAE/Aden window, padded like the Canada measure.
 
     A face is an Oman hole when an OMN land ring owns one of its edges and the
     face is not already inside a land or water ring. Syria, Jordan, Iraq, and
     the Levant are outside this filter even when the pad reaches them.
     """
-    base = _load(board / "provinces_base.json")
-    geo = _load(board / "provinces_geometry.json")
     adj = (_load(board / "province_adjacency.json").get("adjacency") or {})
-    provs = {int(p["id"]): p for p in base["provinces"]}
-    rings = {}
-    for g in geo["provinces"]:
-        pts = _clean([(float(p[0]), float(p[1])) for p in (g.get("points") or [])])
-        if len(pts) >= 3:
-            rings[int(g["id"])] = pts
+    if provs is None:
+        base = _load(board / "provinces_base.json")
+        provs = {int(p["id"]): p for p in base["provinces"]}
+    if rings is None:
+        geo = _load(board / "provinces_geometry.json")
+        rings = {}
+        for g in geo["provinces"]:
+            pts = _clean([(float(p[0]), float(p[1])) for p in (g.get("points") or [])])
+            if len(pts) >= 3:
+                rings[int(g["id"])] = pts
+    else:
+        rings = {
+            int(pid): _clean([(float(p[0]), float(p[1])) for p in ring])
+            for pid, ring in rings.items()
+            if len(ring) >= 3
+        }
     boxes = {pid: _bbox(ring) for pid, ring in rings.items()}
     seed = [
         pid
@@ -424,9 +463,6 @@ def choose_oman_target(hole: dict) -> Optional[int]:
 
 def pair_overlap_area(board: Path = DEFAULT_DIR) -> dict:
     """Polygon intersection of Abu Dhabi and Central Indian Basin North."""
-    from gap_china2_outline import _nz_pair_area
-    from gap_ussr_west2_product import overlap_px
-
     geo = _load(board / "provinces_geometry.json")
     by_id = {int(g["id"]): g for g in geo["provinces"]}
     land_id, sea_id = OVERLAP_PAIR
@@ -438,6 +474,292 @@ def pair_overlap_area(board: Path = DEFAULT_DIR) -> dict:
         "px": int(overlap_px(land, sea)),
         "poly_px2": float(_nz_pair_area(_clean(land), _clean(sea))),
     }
+
+
+def hayma_ring_sha256(board: Path = DEFAULT_DIR) -> str:
+    geo = _load(board / "provinces_geometry.json")
+    by_id = {int(g["id"]): g for g in geo["provinces"]}
+    blob = json.dumps(by_id[HAYMA_ID]["points"], separators=(",", ":"))
+    return hashlib.sha256(blob.encode("utf-8")).hexdigest()
+
+
+def _rings_and_domains(board: Path):
+    geo = _load(board / "provinces_geometry.json")
+    base = _load(board / "provinces_base.json")
+    provs = {int(p["id"]): p for p in base["provinces"]}
+    rings = {}
+    for g in geo["provinces"]:
+        pts = [(float(p[0]), float(p[1])) for p in (g.get("points") or [])]
+        if len(pts) >= 3:
+            rings[int(g["id"])] = pts
+    return rings, provs
+
+
+def _is_water_id(pid: int, provs: Dict[int, dict]) -> bool:
+    if pid >= 950000:
+        return True
+    return str((provs.get(pid) or {}).get("domain") or "land") in WATER_DOMAINS
+
+
+def owners_at(rings: Dict[int, list], provs: Dict[int, dict], x: float, y: float) -> List[dict]:
+    """Every ring that contains (x, y). Used by the r1 probe asserts."""
+    hits = []
+    for pid, ring in rings.items():
+        bb = _bbox(ring)
+        if x < bb[0] or x > bb[2] or y < bb[1] or y > bb[3]:
+            continue
+        if _winding(ring, x, y) == 0:
+            continue
+        prov = provs.get(pid) or {}
+        hits.append(
+            {
+                "id": pid,
+                "name": prov.get("name") or "",
+                "domain": "sea" if _is_water_id(pid, provs) else str(prov.get("domain") or "land"),
+                "adm0": str((prov.get("meta") or {}).get("adm0_a3") or ""),
+            }
+        )
+    return hits
+
+
+def choose_gap_land_target(
+    surrounding: Sequence[dict],
+    *,
+    skip_ids: Sequence[int] = (),
+    face: Optional[Sequence[Tuple[float, float]]] = None,
+    rings: Optional[Dict[int, list]] = None,
+    provs: Optional[Dict[int, dict]] = None,
+) -> Optional[int]:
+    """Land that should receive an uncovered CIBN face.
+
+    A land ring already sitting inside the face (Muqshin in the Hayma corridor)
+    wins, so the absorb is a grow rather than a paint-over. Otherwise the
+    longest-edge land neighbour wins. Hayma is skipped so its passing ring stays.
+    """
+    skip = set(int(s) for s in skip_ids)
+    if face is not None and rings is not None and provs is not None:
+        enclosed = []
+        face_c = _clean(face)
+        for pid, ring in rings.items():
+            if pid in skip or _is_water_id(pid, provs):
+                continue
+            if _nz_pair_area(face_c, _clean(ring)) > POLY_OVERLAP_MAX:
+                enclosed.append(pid)
+        if len(enclosed) == 1:
+            return int(enclosed[0])
+        if len(enclosed) > 1:
+            # Prefer the one that already fills the most of the face.
+            return int(max(enclosed, key=lambda pid: _nz_pair_area(face_c, _clean(rings[pid]))))
+    lands = [
+        row
+        for row in surrounding
+        if row.get("domain") not in WATER_DOMAINS
+        and int(row["id"]) < 950000
+        and int(row["id"]) not in skip
+    ]
+    if not lands:
+        return None
+    return int(max(lands, key=lambda row: row.get("edge_px") or 0)["id"])
+
+
+def cibn_uncovered_land_faces(board: Path = DEFAULT_DIR) -> List[dict]:
+    """CIBN minus nearby land rings. Faces whose interior is already land are skipped.
+
+    On c60409ee this is the inland gap west/SW of Hayma plus a Yemen-coast sliver.
+    Those interiors are CIBN, not a land ring, so overlap≤1 on Hayma does not catch them.
+    """
+    rings, provs = _rings_and_domains(board)
+    return cibn_uncovered_land_faces_from_rings(rings, provs)
+
+
+def cibn_uncovered_land_faces_from_rings(rings: Dict[int, list], provs: Dict[int, dict]) -> List[dict]:
+    cibn = rings[CIBN_ID]
+    cbb = _bbox(cibn)
+    land_ids = []
+    for pid, ring in rings.items():
+        if _is_water_id(pid, provs):
+            continue
+        bb = _bbox(ring)
+        if bb[2] < cbb[0] - 4 or bb[0] > cbb[2] + 4 or bb[3] < cbb[1] - 4 or bb[1] > cbb[3] + 4:
+            continue
+        land_ids.append(pid)
+    if not land_ids:
+        return []
+    faces = region_loops([cibn], [rings[pid] for pid in land_ids], "difference")
+    edge_grid = _edge_index({pid: rings[pid] for pid in land_ids})
+    out = []
+    for face in faces:
+        area = abs(_area(face))
+        if area <= OMAN_HOLE_MIN:
+            continue
+        pt = _interior_point(face) or _poly_centroid(face)
+        x, y = pt
+        already = None
+        for pid in land_ids:
+            ring = rings[pid]
+            bb = _bbox(ring)
+            if x < bb[0] or x > bb[2] or y < bb[1] or y > bb[3]:
+                continue
+            if _winding(ring, x, y) != 0:
+                already = pid
+                break
+        if already is not None:
+            continue
+        lengths: Dict[int, float] = defaultdict(float)
+        n = len(face)
+        for i in range(n):
+            u, v = face[i], face[(i + 1) % n]
+            for pid in _owners_of_edge(edge_grid, u, v):
+                lengths[pid] += math.hypot(v[0] - u[0], v[1] - u[1])
+        surround = []
+        for pid in sorted(lengths, key=lambda p: -lengths[p]):
+            prov = provs.get(pid) or {}
+            surround.append(
+                {
+                    "id": pid,
+                    "name": prov.get("name") or "",
+                    "domain": "sea" if _is_water_id(pid, provs) else str(prov.get("domain") or "land"),
+                    "adm0": str((prov.get("meta") or {}).get("adm0_a3") or ""),
+                    "edge_px": round(lengths[pid], 2),
+                }
+            )
+        lon, lat = canvas_to_lonlat(x, y)
+        out.append(
+            {
+                "area_px2": round(area, 2),
+                "area_exact": area,
+                "interior": [x, y],
+                "centroid": [_poly_centroid(face)[0], _poly_centroid(face)[1]],
+                "lon": round(lon, 4),
+                "lat": round(lat, 4),
+                "surrounding": surround,
+                "ring": face,
+                "target": choose_gap_land_target(
+                    surround,
+                    skip_ids=(HAYMA_ID,),
+                    face=face,
+                    rings=rings,
+                    provs=provs,
+                ),
+            }
+        )
+    out.sort(key=lambda h: -h["area_exact"])
+    return out
+
+
+def cibn_ocean_home_ring(rings: Dict[int, list], provs: Dict[int, dict]) -> List[Tuple[float, float]]:
+    """Uncovered ocean immediately west of Central Indian Basin East.
+
+    CIBN on c60409ee sits entirely on NE land. After the inland gap is given to
+    land neighbours the sea ring would be empty, so it moves here. Same id.
+    """
+    cibe = _bbox(rings[CIBE_ID])
+    x0 = CIBN_OCEAN_WEST
+    x1 = float(cibe[0])
+    y0 = CIBN_OCEAN_NORTH
+    y1 = float(cibe[3])
+    rect = [(x0, y0), (x1, y0), (x1, y1), (x0, y1)]
+    clips = []
+    for pid, ring in rings.items():
+        if pid == CIBN_ID:
+            continue
+        bb = _bbox(ring)
+        if bb[2] < x0 or bb[0] > x1 or bb[3] < y0 or bb[1] > y1:
+            continue
+        clips.append(ring)
+    faces = region_loops([rect], clips, "difference")
+    kept = []
+    for face in faces:
+        area = abs(_area(face))
+        if area < 100.0:
+            continue
+        pt = _interior_point(face) or _poly_centroid(face)
+        land_hit = False
+        for pid, ring in rings.items():
+            if _is_water_id(pid, provs) or pid == CIBN_ID:
+                continue
+            bb = _bbox(ring)
+            if pt[0] < bb[0] or pt[0] > bb[2] or pt[1] < bb[1] or pt[1] > bb[3]:
+                continue
+            if _winding(ring, pt[0], pt[1]) != 0:
+                land_hit = True
+                break
+        if land_hit:
+            continue
+        kept.append((area, face))
+    if not kept:
+        raise RuntimeError("no uncovered ocean west of CIBE for CIBN")
+    kept.sort(key=lambda row: -row[0])
+    return snap_ring(kept[0][1])
+
+
+def _window_uncovered_sea_px(
+    rings: Dict[int, list],
+    provs: Dict[int, dict],
+    window: Tuple[float, float, float, float],
+) -> int:
+    """CIBN (or any sea) pixels in the window that are NE land and not board land."""
+    minx, miny, maxx, maxy = [int(math.floor(v)) for v in window]
+    maxx, maxy = int(math.ceil(window[2])), int(math.ceil(window[3]))
+    w = maxx - minx
+    h = maxy - miny
+    if w <= 0 or h <= 0:
+        return 0
+    sea = None
+    land = None
+    for pid, ring in rings.items():
+        bb = _bbox(ring)
+        if bb[2] < minx or bb[0] > maxx or bb[3] < miny or bb[1] > maxy:
+            continue
+        mask = rasterize_centers(ring, minx, miny, w, h)
+        if _is_water_id(pid, provs):
+            sea = mask if sea is None else (sea | mask)
+        else:
+            land = mask if land is None else (land | mask)
+    if sea is None:
+        return 0
+    if land is None:
+        land = sea * 0
+    lon0, lat_top = canvas_to_lonlat(minx, miny)
+    lon1, lat_bot = canvas_to_lonlat(maxx, maxy)
+    ne = _load_ne_polys(
+        LAND_GEOJSON,
+        min(lon0, lon1) - 0.5,
+        max(lon0, lon1) + 0.5,
+        min(lat_bot, lat_top) - 0.5,
+        max(lat_bot, lat_top) + 0.5,
+    )
+    if not ne:
+        raise RuntimeError("NE land cache missing for inland-gap raster")
+    ne_mask = None
+    for rec in ne:
+        ext = rec[2]
+        canvas = [lonlat_to_canvas(float(lon), float(lat)) for lon, lat in ext]
+        if len(canvas) < 3:
+            continue
+        mask = rasterize_centers(canvas, minx, miny, w, h)
+        ne_mask = mask if ne_mask is None else (ne_mask | mask)
+    if ne_mask is None:
+        return 0
+    leak = (sea == 1) & (ne_mask == 1) & (land == 0)
+    return int(leak.sum())
+
+
+def inland_gap_uncovered_sea_px(board: Path = DEFAULT_DIR) -> int:
+    """Sea-on-NE-land pixels in the Hayma west/SW corridor. Thousands on c60409ee."""
+    rings, provs = _rings_and_domains(board)
+    return _window_uncovered_sea_px(rings, provs, INLAND_GAP_WINDOW)
+
+
+def coast_fragment_uncovered_sea_px(board: Path = DEFAULT_DIR) -> int:
+    """Sea-on-NE-land pixels along the Oman/Yemen coast near Hawf. Nonzero on c60409ee."""
+    rings, provs = _rings_and_domains(board)
+    return _window_uncovered_sea_px(rings, provs, COAST_FRAGMENT_WINDOW)
+
+
+def probe_hits(board: Path, probes: Sequence[Tuple[float, float]]) -> List[List[dict]]:
+    rings, provs = _rings_and_domains(board)
+    return [owners_at(rings, provs, x, y) for x, y in probes]
 
 
 def placeholder_snapshot(board: Path = DEFAULT_DIR) -> dict:

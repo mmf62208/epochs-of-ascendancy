@@ -46,3 +46,5 @@ Copied from the approved Ink pack. No CC-BY, CC-BY-SA, NC, Sonniss, Kenney, or S
 | `res://audio/music/mus_menu_alt.ogg` | Generic Strings | thisismyusername | CC0 1.0 | https://opengameart.org/content/generic-strings | 2026-11-04 |
 | `res://audio/music/mus_menu_loop_alt.ogg` | Menu Loop | Akikazer | CC0 1.0 | https://opengameart.org/content/menu-loop | 2026-11-04 |
 | `res://audio/sfx/end/end_victory_sting.ogg` | Original (synthesized by tools/audio/gen_victory_fanfare.py) | Epochs of Ascendancy | original, project-owned | `tools/audio/gen_victory_fanfare.py` | 2026-11-04 |
+
+Cinzel font, SIL Open Font License 1.1 (`assets/fonts/OFL.txt`).

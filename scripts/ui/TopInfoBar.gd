@@ -1341,6 +1341,20 @@ func _update_speed_buttons() -> void:
 		_speed_overflow.tooltip_text = _speed_tooltip()
 
 
+## Public clock API (TUTORIAL-1 / AUTOSAVE-1). Same path as Space. No-op if
+## already paused or an overlay holds the clock.
+## GDScript cannot declare both `var is_paused` and `func is_paused()`.
+## TimeManager (fenced) and existing tests read `bar.get("is_paused")`, so the
+## property stays the public read API. AUTOSAVE-1 can add the method when it
+## migrates those readers. The guide uses get("is_paused") / pause().
+func pause() -> void:
+	if is_paused:
+		return
+	if _overlay_holds_clock():
+		return
+	_on_pause_pressed()
+
+
 func _on_pause_pressed() -> void:
 	if _overlay_holds_clock():
 		return
