@@ -529,7 +529,7 @@ func _fill_save_rows(col: VBoxContainer) -> void:
 		stale.free()
 	if typeof(SaveLoadManager) != TYPE_NIL and SaveLoadManager.has_signal("save_list_changed"):
 		if not SaveLoadManager.save_list_changed.is_connected(_on_save_list_changed_fill):
-			SaveLoadManager.save_list_changed.connect(_on_save_list_changed_fill)
+			SaveLoadManager.save_list_changed.connect(_on_save_list_changed_fill, CONNECT_DEFERRED)
 	var n := 0
 	if typeof(SaveLoadManager) != TYPE_NIL and SaveLoadManager.has_method("list_slots_for_ui"):
 		var rows: Array = SaveLoadManager.list_slots_for_ui()

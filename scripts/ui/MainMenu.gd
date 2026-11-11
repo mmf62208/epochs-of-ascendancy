@@ -843,7 +843,7 @@ func _connect_save_list_changed() -> void:
 		return
 	if slm.is_connected("save_list_changed", _refresh_save_list):
 		return
-	slm.connect("save_list_changed", _refresh_save_list)
+	slm.connect("save_list_changed", _refresh_save_list, CONNECT_DEFERRED)
 
 
 func _add_autosave_settings(parent: VBoxContainer) -> void:
@@ -1427,6 +1427,7 @@ func _refresh_save_list() -> void:
 		return
 	# Free immediately so a rewritten autosave does not leave a stale card
 	# (queue_free keeps the old SlotCard_* in the tree until the frame ends).
+	# Callers must reach here after Apply/Save `pressed` returns (deferred notify).
 	while _save_list_vbox.get_child_count() > 0:
 		var stale: Node = _save_list_vbox.get_child(0)
 		_save_list_vbox.remove_child(stale)

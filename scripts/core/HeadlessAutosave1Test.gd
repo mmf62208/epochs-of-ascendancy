@@ -31,7 +31,7 @@ func _pass(msg: String) -> void:
 
 
 func _start() -> void:
-	_run()
+	await _run()
 	var ok := _failures == 0
 	print("HeadlessAutosave1Test: ", "PASS" if ok else "FAIL", " (failures=", _failures, ")")
 	print("HeadlessAutosave1Test: RESULT=", "PASS" if ok else "FAIL")
@@ -63,6 +63,7 @@ func _run() -> void:
 	_test_load_list_signal(sl)
 	_test_idle_pause(sl)
 	_test_idle_pause_against_tib_watchdog(sl)
+	await _test_s3_quicksave_apply_row(sl)
 	_test_product_day_retired(sl)
 
 
@@ -287,7 +288,13 @@ func _test_load_list_signal(sl: Node) -> void:
 		return
 	if not sl.save_list_changed.is_connected(_on_list_changed):
 		sl.save_list_changed.connect(_on_list_changed)
+	var sl_src := FileAccess.get_file_as_string("res://scripts/autoload/SaveLoadManager.gd")
+	if sl_src.find("call_deferred(\"_emit_save_list_changed\")") < 0:
+		_fail("save_list_changed still emits synchronously from notify")
+		return
 	sl.call("_notify_save_list_refresh")
+	if sl.has_method("_emit_save_list_changed"):
+		sl.call("_emit_save_list_changed")
 	if _signal_hits < 1:
 		_fail("save_list_changed did not fire")
 		return
@@ -297,11 +304,20 @@ func _test_load_list_signal(sl: Node) -> void:
 	if mm_src.find("save_list_changed") < 0:
 		_fail("S1 MainMenu does not listen to save_list_changed")
 		return
+	if mm_src.find("CONNECT_DEFERRED") < 0:
+		_fail("S1 MainMenu save_list_changed is not CONNECT_DEFERRED")
+		return
 	if ltb_src.find("save_list_changed") < 0:
 		_fail("S2 LivingTitleBoot does not listen to save_list_changed")
 		return
 	if ocp_src.find("save_list_changed") < 0:
 		_fail("S3 OrderCommandPanel does not listen to save_list_changed")
+		return
+	if ocp_src.find("CONNECT_DEFERRED") < 0:
+		_fail("S3 OrderCommandPanel save_list_changed is not CONNECT_DEFERRED")
+		return
+	if ocp_src.find("call_deferred(\"_rebuild_all_sections\")") < 0:
+		_fail("S3 still rebuilds all sections mid-Apply pressed")
 		return
 	_pass("load list signal reaches S1/S2/S3")
 
@@ -424,6 +440,98 @@ func _make_bar() -> Node:
 	bar.name = "TopInfoBar"
 	root.add_child(bar)
 	return bar
+
+
+func _test_s3_quicksave_apply_row(sl: Node) -> void:
+	## ITEM 6 S3: Quicksave Apply must not free() the emitting button, and the
+	## visible row must pick up the new game date after the deferred rebuild.
+	_write_probe(sl, "quicksave", 100, "1936-07-19", false, "old-qs")
+	var packed: PackedScene = load("res://scenes/ui/OrderCommandPanel.tscn") as PackedScene
+	if packed == null:
+		_fail("S3 OrderCommandPanel.tscn missing")
+		return
+	var ocp: Node = packed.instantiate()
+	ocp.name = "OrderCommandPanel"
+	root.add_child(ocp)
+	if ocp.has_method("_rebuild_saves_section"):
+		ocp.call("_rebuild_saves_section")
+	var stale := _find_s3_quicksave_row_label(ocp)
+	if stale == null or str(stale.text).find("19 Jul") < 0:
+		_fail("S3 quicksave probe row missing: %s" % (str(stale.text) if stale != null else "none"))
+		ocp.queue_free()
+		return
+	var apply_btn := _find_s3_quicksave_apply_button(ocp)
+	if apply_btn == null:
+		_fail("S3 Quicksave Apply/Save button missing")
+		ocp.queue_free()
+		return
+	var close_btn: Node = ocp.get("_close_btn")
+	apply_btn.pressed.emit()
+	if not is_instance_valid(apply_btn):
+		_fail("S3 Apply freed the button while pressed")
+		return
+	if close_btn != null and not is_instance_valid(close_btn):
+		_fail("S3 Close died during Apply")
+		return
+	await process_frame
+	await process_frame
+	var fresh := _find_s3_quicksave_row_label(ocp)
+	if fresh == null:
+		_fail("S3 quicksave row missing after Apply")
+		ocp.queue_free()
+		return
+	if str(fresh.text).find("19 Jul") >= 0:
+		_fail("S3 quicksave row still stale after Apply: %s" % str(fresh.text))
+		ocp.queue_free()
+		return
+	if ocp.has_method("refresh"):
+		ocp.call("refresh")
+	fresh = _find_s3_quicksave_row_label(ocp)
+	if fresh == null or str(fresh.text).find("19 Jul") >= 0:
+		_fail("S3 Refresh still stale: %s" % (str(fresh.text) if fresh != null else "none"))
+		ocp.queue_free()
+		return
+	close_btn = ocp.get("_close_btn")
+	if close_btn == null or not is_instance_valid(close_btn):
+		_fail("S3 Close unresponsive after Apply")
+		ocp.queue_free()
+		return
+	ocp.queue_free()
+	_pass("S3 Quicksave Apply updates the row without freeing mid-pressed")
+
+
+func _find_s3_quicksave_row_label(n: Node) -> Label:
+	if n == null or not is_instance_valid(n) or n.is_queued_for_deletion():
+		return null
+	if n is Label:
+		var t := str((n as Label).text).to_lower()
+		if t.begins_with("quicksave") and t.find(" · ") >= 0:
+			return n as Label
+	for c in n.get_children():
+		var found := _find_s3_quicksave_row_label(c)
+		if found != null:
+			return found
+	return null
+
+
+func _find_s3_quicksave_apply_button(n: Node) -> BaseButton:
+	if n == null or not is_instance_valid(n) or n.is_queued_for_deletion():
+		return null
+	if n is BaseButton:
+		var txt := str((n as BaseButton).text)
+		if txt == "Save" or txt == "Apply":
+			var row := n.get_parent()
+			if row != null:
+				for sib in row.get_children():
+					if sib is Label:
+						var t := str((sib as Label).text).to_lower()
+						if t.begins_with("quicksave"):
+							return n as BaseButton
+	for c in n.get_children():
+		var found := _find_s3_quicksave_apply_button(c)
+		if found != null:
+			return found
+	return null
 
 
 func _test_product_day_retired(sl: Node) -> void:

@@ -3190,7 +3190,7 @@ func _rebuild_saves_section() -> void:
 	_active_body = host
 	if typeof(SaveLoadManager) != TYPE_NIL and SaveLoadManager.has_signal("save_list_changed"):
 		if not SaveLoadManager.save_list_changed.is_connected(_rebuild_saves_section):
-			SaveLoadManager.save_list_changed.connect(_rebuild_saves_section)
+			SaveLoadManager.save_list_changed.connect(_rebuild_saves_section, CONNECT_DEFERRED)
 	_add_section_title("— Save browser campaign product (major #4) —")
 	var product: Dictionary = {}
 	if typeof(GameData) != TYPE_NIL and GameData.has_method("save_browser_campaign_product_live"):
@@ -3484,11 +3484,12 @@ func _on_action_pressed(action_id: String) -> void:
 		action_id,
 		"OK" if ok else str(res.get("reason", res.get("error", "blocked"))),
 	]
-	# Soft refresh surfaces without rebuilding province list from scratch if save/load
+	# Soft refresh surfaces without rebuilding province list from scratch if save/load.
+	# Defer rebuild so Apply/Save `pressed` can return before we free() the button.
 	if action_id.begins_with("load_slot:"):
 		refresh()
 	else:
-		_rebuild_all_sections()
+		call_deferred("_rebuild_all_sections")
 		var log_plain := ""
 		if typeof(GameData) != TYPE_NIL and GameData.has_method("format_command_result_log_plain"):
 			log_plain = str(GameData.format_command_result_log_plain(5))

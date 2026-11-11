@@ -1339,6 +1339,11 @@ func _notify_top_bar_speed_resync() -> void:
 
 
 func _notify_save_list_refresh() -> void:
+	# Defer so Apply/Save `pressed` can return before any listener free()s the button.
+	call_deferred("_emit_save_list_changed")
+
+
+func _emit_save_list_changed() -> void:
 	save_list_changed.emit()
 	var tree := Engine.get_main_loop() as SceneTree
 	if tree == null or tree.root == null:
