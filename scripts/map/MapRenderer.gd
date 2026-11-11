@@ -3283,6 +3283,10 @@ func _cc_chrome_consumes_point(screen: Vector2) -> bool:
 	var mm := _command_center_overlay()
 	if mm == null or bool(mm.get("_closing")):
 		return false
+	# A visible confirm sits on the dimmer, sometimes outside MenuPanel.
+	# That click belongs to the confirm, not to the chrome-hold swallow.
+	if mm.has_method("confirm_contains_point") and bool(mm.call("confirm_contains_point", screen)):
+		return false
 	var close_b := mm.find_child("CloseX", true, false) as Control
 	if close_b != null and close_b.is_visible_in_tree() and close_b.get_global_rect().has_point(screen):
 		return true
@@ -3625,6 +3629,12 @@ func _input(event: InputEvent) -> void:
 			if _cc_overlay_blocks_map_pointer():
 				if event.pressed:
 					var mm_ov := _command_center_overlay()
+					# The confirm panel can sit on top of Refresh / Return to
+					# Title. Those actions mark the press handled, so a
+					# release-mode Load button never sees it. Leave the event
+					# for the confirm.
+					if mm_ov != null and mm_ov.has_method("confirm_contains_point") and bool(mm_ov.call("confirm_contains_point", event.position)):
+						return
 					if mm_ov != null and mm_ov.has_method("live_pointer_target"):
 						var tgt := str(mm_ov.call("live_pointer_target", event.position))
 						if tgt == "refresh" or tgt == "return_to_title":

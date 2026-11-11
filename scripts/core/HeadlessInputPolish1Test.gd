@@ -31,6 +31,8 @@ func _run() -> void:
 	if vp != null:
 		vp.size = PLAY_SIZE
 	await _case_search_digits_no_leak()
+	await _case_load_confirm_quick_click()
+	await _case_load_confirm_three_clicks()
 	var ok := _failures == 0
 	print("HeadlessInputPolish1Test: ", "PASS" if ok else "FAIL", " (failures=", _failures, ")")
 	print("HeadlessInputPolish1Test: RESULT=", "PASS" if ok else "FAIL")
@@ -327,3 +329,130 @@ func _case_search_digits_no_leak() -> void:
 	_pass("search_digits_no_leak: 950337 landed, clock stayed paused, supply unchanged")
 
 
+func _load_count() -> int:
+	var slm := root.get_node_or_null("SaveLoadManager")
+	if slm == null:
+		return -1
+	return int(slm.get("eoa_load_apply_count"))
+
+
+func _write_min_quicksave() -> bool:
+	var slm := root.get_node_or_null("SaveLoadManager")
+	if slm == null or not slm.has_method("get_save_path"):
+		_fail("SaveLoadManager missing")
+		return false
+	var path := str(slm.call("get_save_path", "quicksave"))
+	var f := FileAccess.open(path, FileAccess.WRITE)
+	if f == null:
+		_fail("cannot write quicksave at %s" % path)
+		return false
+	f.store_string("{\"save_version\":2,\"metadata\":{\"slot\":\"quicksave\",\"player_tag\":\"GER\"}}\n")
+	f.close()
+	return true
+
+
+func _open_paused_load_confirm() -> Button:
+	if _bar == null or not _bar.has_method("open_command_center_stay"):
+		_fail("TopInfoBar missing for Paused")
+		return null
+	# Stay, do not toggle. A failed Load leaves Paused up; a second
+	# _on_menu_pressed would close it.
+	_bar.call("open_command_center_stay")
+	await _frames(3)
+	var menu := root.get_node_or_null("MainMenu")
+	if menu == null or not menu.has_method("_open_load_confirm"):
+		_fail("Paused MainMenu did not open")
+		return null
+	menu.call("_open_load_confirm", "quicksave")
+	await _frames(2)
+	var load_b := menu.find_child("BtnLoad", true, false) as Button
+	if load_b == null:
+		_fail("BtnLoad missing")
+		return null
+	var rect := load_b.get_global_rect()
+	if rect.size.x < 4.0 or rect.size.y < 4.0:
+		_fail("BtnLoad has no rect %s" % str(rect))
+		return null
+	var consumes := false
+	if _mr != null and _mr.has_method("_cc_chrome_consumes_point"):
+		consumes = bool(_mr.call("_cc_chrome_consumes_point", rect.get_center()))
+	_info_line("BtnLoad center=%s rect=%s action_mode=%s chrome_consumes=%s" % [
+		str(rect.get_center()), str(rect), str(load_b.action_mode), str(consumes)
+	])
+	return load_b
+
+
+## Press and release in the same call, no frame between them. A release-mode
+## button whose release MapRenderer eats never emits pressed.
+func _click_same_frame(pt: Vector2) -> void:
+	var vp: Viewport = root.get_viewport()
+	if vp != null:
+		vp.warp_mouse(pt)
+	var motion := InputEventMouseMotion.new()
+	motion.device = 0
+	motion.position = pt
+	motion.global_position = pt
+	motion.relative = Vector2(1, 0)
+	root.push_input(motion)
+	var down := _mouse_at(pt, true)
+	var up := _mouse_at(pt, false)
+	root.push_input(down)
+	root.push_input(up)
+
+
+func _confirm_open() -> bool:
+	var menu := root.get_node_or_null("MainMenu")
+	if menu == null or not is_instance_valid(menu):
+		return false
+	if menu.has_method("_confirm_visible"):
+		return bool(menu.call("_confirm_visible"))
+	return menu.find_child("LoadUnsavedConfirm", true, false) != null
+
+
+func _case_load_confirm_quick_click() -> void:
+	print("INPUT_POLISH_1 case=load_confirm_quick_click")
+	if _mr == null and not _setup_map():
+		return
+	if _bar == null and not await _boot_top_bar():
+		return
+	if not _write_min_quicksave():
+		return
+	var before := _load_count()
+	var load_b := await _open_paused_load_confirm()
+	if load_b == null:
+		return
+	_click_same_frame(load_b.get_global_rect().get_center())
+	await _frames(3)
+	var after := _load_count()
+	var open := _confirm_open()
+	_info_line("quick click loads %s→%s confirm_open=%s" % [str(before), str(after), str(open)])
+	if after != before + 1:
+		_fail("load_confirm_quick_click: expected one load apply, got %s→%s" % [str(before), str(after)])
+		return
+	if open:
+		_fail("load_confirm_quick_click: confirm stayed open after Load")
+		return
+	_pass("load_confirm_quick_click: one load apply and confirm closed")
+
+
+func _case_load_confirm_three_clicks() -> void:
+	print("INPUT_POLISH_1 case=load_confirm_three_clicks")
+	if not _write_min_quicksave():
+		return
+	var before := _load_count()
+	var load_b := await _open_paused_load_confirm()
+	if load_b == null:
+		return
+	var pt := load_b.get_global_rect().get_center()
+	# Three quick clicks before the frame ends, so a queued second press can
+	# still see the button (queue_free has not run).
+	_click_same_frame(pt)
+	_click_same_frame(pt)
+	_click_same_frame(pt)
+	await _frames(3)
+	var after := _load_count()
+	_info_line("three clicks loads %s→%s confirm_open=%s" % [str(before), str(after), str(_confirm_open())])
+	if after != before + 1:
+		_fail("load_confirm_three_clicks: expected exactly one load, got %s→%s" % [str(before), str(after)])
+		return
+	_pass("load_confirm_three_clicks: three quick clicks applied one load")
