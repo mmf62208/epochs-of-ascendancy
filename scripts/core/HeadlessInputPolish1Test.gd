@@ -9,11 +9,19 @@ extends SceneTree
 ##     --resolution 1280x800 -s res://scripts/core/HeadlessInputPolish1Test.gd
 
 const PLAY_SIZE := Vector2i(1280, 800)
+## Uelzen. Seeded under the click so the first post-prompt pick has a known pid.
+const GER_PID := 710382
+const PROMPT_HOVER := Vector2(40, 700)
+const PROMPT_CLICK := Vector2(180, 620)
 
 var _failures: int = 0
 var _mr: Node = null
 var _bar: Control = null
 var _info: Panel = null
+var _cam: Camera2D = null
+var _saved_pick_grid: Variant = null
+var _saved_centroids: Dictionary = {}
+var _centroids_saved: bool = false
 
 
 func _init() -> void:
@@ -33,6 +41,8 @@ func _run() -> void:
 	await _case_search_digits_no_leak()
 	await _case_load_confirm_quick_click()
 	await _case_load_confirm_three_clicks()
+	await _case_prompt_dismiss_first_click()
+	await _case_prompt_dismiss_wheel_zoom()
 	var ok := _failures == 0
 	print("HeadlessInputPolish1Test: ", "PASS" if ok else "FAIL", " (failures=", _failures, ")")
 	print("HeadlessInputPolish1Test: RESULT=", "PASS" if ok else "FAIL")
@@ -456,3 +466,332 @@ func _case_load_confirm_three_clicks() -> void:
 		_fail("load_confirm_three_clicks: expected exactly one load, got %s→%s" % [str(before), str(after)])
 		return
 	_pass("load_confirm_three_clicks: three quick clicks applied one load")
+
+
+func _close_command_center() -> void:
+	var menu := root.get_node_or_null("MainMenu")
+	if menu != null and is_instance_valid(menu) and menu.has_method("_force_close"):
+		menu.call("_force_close")
+	await _frames(2)
+	if _mr != null:
+		_mr.set("_cc_map_press_latch", false)
+		_mr.set("_chrome_hold_swallowed", false)
+
+
+func _wire_inspector_labels() -> void:
+	if _info == null or _mr == null:
+		return
+	for extra_name in [
+		"info_name", "info_owner", "info_population", "info_terrain", "info_factories",
+		"info_dev", "info_resources", "info_core", "info_special", "info_logistics",
+		"info_combat", "info_national",
+	]:
+		if _mr.get(extra_name) != null:
+			continue
+		var extra := Label.new()
+		extra.name = extra_name
+		_info.add_child(extra)
+		_mr.set(extra_name, extra)
+
+
+func _seed_uelzen(screen_pt: Vector2) -> bool:
+	if _mr == null:
+		_fail("MapRenderer missing for Uelzen seed")
+		return false
+	_cam = _mr.get_node_or_null("MapCamera") as Camera2D
+	if _cam == null:
+		_fail("MapCamera missing")
+		return false
+	_cam.make_current()
+	_cam.force_update_transform()
+	var world_under: Vector2 = _cam.get_canvas_transform().affine_inverse() * screen_pt
+	# load() so this -s script does not compile-depend on Province (GameData).
+	var prov_scr: Script = load("res://scripts/data/Province.gd") as Script
+	if prov_scr == null:
+		_fail("Province.gd missing")
+		return false
+	var prov: Object = prov_scr.new()
+	if prov == null:
+		_fail("Province create failed")
+		return false
+	prov.set("id", GER_PID)
+	prov.set("name", "Uelzen")
+	prov.set("owner_tag", "GER")
+	prov.set("controller_tag", "GER")
+	prov.set("terrain", "plains")
+	prov.set("is_sea", false)
+	prov.set("domain", "land")
+	if "provinces" in _mr:
+		_mr.provinces[GER_PID] = prov
+	if "province_centroids" in _mr:
+		_mr.province_centroids[GER_PID] = world_under
+	var mm := root.get_node_or_null("MapManager")
+	if mm != null:
+		if "pick_grid" in mm and _saved_pick_grid == null:
+			_saved_pick_grid = mm.pick_grid
+			mm.pick_grid = null
+		if "_centroids" in mm and mm._centroids is Dictionary:
+			var cents: Dictionary = mm._centroids
+			if not _centroids_saved:
+				_saved_centroids = cents.duplicate()
+				_centroids_saved = true
+			cents.clear()
+			cents[GER_PID] = world_under
+	if _mr.has_method("_still_click_province_pid"):
+		var got := int(_mr.call("_still_click_province_pid", world_under, false))
+		if got != GER_PID:
+			_fail("Uelzen seed did not resolve (pid=%s)" % str(got))
+			return false
+	return true
+
+
+func _restore_pick_grid() -> void:
+	var mm := root.get_node_or_null("MapManager")
+	if mm == null:
+		return
+	if "pick_grid" in mm and _saved_pick_grid != null:
+		mm.pick_grid = _saved_pick_grid
+		_saved_pick_grid = null
+	if _centroids_saved and "_centroids" in mm and mm._centroids is Dictionary:
+		var cents: Dictionary = mm._centroids
+		cents.clear()
+		for k in _saved_centroids.keys():
+			cents[k] = _saved_centroids[k]
+		_centroids_saved = false
+		_saved_centroids = {}
+
+
+func _guide() -> Node:
+	return root.get_node_or_null("FirstSessionGuide")
+
+
+func _hover_name() -> String:
+	var vp := root.get_viewport()
+	if vp == null:
+		return ""
+	var hov := vp.gui_get_hovered_control()
+	if hov == null:
+		return ""
+	return str(hov.name)
+
+
+func _push_motion(pt: Vector2) -> void:
+	var motion := InputEventMouseMotion.new()
+	motion.device = 0
+	motion.position = pt
+	motion.global_position = pt
+	motion.relative = Vector2(1, 0)
+	root.push_input(motion)
+
+
+func _push_left_at(pt: Vector2, pressed: bool) -> void:
+	root.push_input(_mouse_at(pt, pressed))
+
+
+func _push_wheel_up(pt: Vector2) -> void:
+	var mb := InputEventMouseButton.new()
+	mb.device = 0
+	mb.button_index = MOUSE_BUTTON_WHEEL_UP
+	mb.pressed = true
+	mb.position = pt
+	mb.global_position = pt
+	root.push_input(mb)
+
+
+func _zoom_x() -> float:
+	if _cam == null and _mr != null:
+		_cam = _mr.get_node_or_null("MapCamera") as Camera2D
+	if _cam == null:
+		return 0.0
+	return absf(_cam.zoom.x)
+
+
+func _soft_clear_inspector() -> void:
+	if _mr != null:
+		_mr.set("selected_province_id", -1)
+		_mr.set("selected_formation_id", "")
+	if _info != null:
+		_info.visible = false
+
+
+func _prepare_prompt_map() -> bool:
+	if _mr == null and not _setup_map():
+		return false
+	await _close_command_center()
+	# Headless leaves the OS cursor at (0, 0). The top bar owns that point, and
+	# _gui_blocks_map_pick follows the cursor, not the click's event.position.
+	if _bar != null:
+		_bar.visible = false
+		_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_wire_inspector_labels()
+	if not _seed_uelzen(PROMPT_CLICK):
+		return false
+	_soft_clear_inspector()
+	return true
+
+
+## A press the map sees, then the prompt gates input so the matching release
+## is missed. A motion while the blocker is up leaves the stale Popup hover.
+func _raise_prompt_with_stale_press() -> bool:
+	var guide := _guide()
+	if guide == null or not guide.has_method("_show_prompt"):
+		_fail("FirstSessionGuide missing")
+		return false
+	_soft_clear_inspector()
+	if _mr != null:
+		_mr.set_process_input(true)
+		_mr.set_process_unhandled_input(true)
+	_push_left_at(PROMPT_HOVER, true)
+	guide.call("_show_prompt")
+	await _frames(2)
+	if _mr != null and _mr.is_processing_input():
+		_fail("prompt did not gate MapRenderer input")
+		return false
+	_push_left_at(PROMPT_HOVER, false)
+	_push_motion(PROMPT_HOVER)
+	await _frames(1)
+	_info_line("prompt up hover=%s map_input=%s" % [
+		_hover_name(), str(_mr.is_processing_input() if _mr != null else false)
+	])
+	return true
+
+
+func _dismiss_prompt(how: String) -> bool:
+	var guide := _guide()
+	if guide == null:
+		_fail("FirstSessionGuide missing on dismiss")
+		return false
+	if how == "know":
+		if guide.has_method("_center_prompt"):
+			guide.call("_center_prompt")
+		await _frames(1)
+		var know := guide.find_child("BtnKnowGame", true, false) as Button
+		if know == null:
+			_fail("BtnKnowGame missing")
+			return false
+		var rect := know.get_global_rect()
+		if rect.size.x < 4.0:
+			_fail("BtnKnowGame has no rect %s" % str(rect))
+			return false
+		_click_same_frame(rect.get_center())
+	else:
+		_push_key(KEY_ESCAPE)
+	await _frames(3)
+	var prompt := guide.get("_prompt") as CanvasItem
+	if prompt != null and prompt.visible:
+		_fail("prompt still visible after %s" % how)
+		return false
+	return _assert_prompt_released(how)
+
+
+## Hidden blocker must not keep a STOP filter, and the map gesture must be
+## button-up and ready. Headless 4.7.1 clears hover when the blocker hides,
+## so the click itself can already land; live xdotool does not refresh hover.
+func _assert_prompt_released(how: String) -> bool:
+	var guide := _guide()
+	var blocker := guide.get("_blocker") as Control if guide != null else null
+	var filter := int(blocker.mouse_filter) if blocker != null else -1
+	var ready := bool(_mr.get("_left_ready_for_still_click")) if _mr != null else false
+	var down := bool(_mr.get("_left_btn_down")) if _mr != null else true
+	var processing := _mr != null and _mr.is_processing_input()
+	_info_line("dismiss=%s hover=%s filter=%s map_input=%s left_down=%s ready=%s" % [
+		how, _hover_name(), str(filter), str(processing), str(down), str(ready)
+	])
+	if blocker == null or blocker.visible or filter != int(Control.MOUSE_FILTER_IGNORE):
+		_fail("prompt dismiss (%s): blocker still takes the pointer (visible=%s filter=%s)" % [
+			how, str(blocker.visible if blocker != null else true), str(filter)
+		])
+		return false
+	if not processing or down or not ready:
+		_fail("prompt dismiss (%s): map input=%s left_down=%s ready=%s" % [
+			how, str(processing), str(down), str(ready)
+		])
+		return false
+	return true
+
+
+func _hide_top_bar_for_map_click() -> void:
+	# Inspector layout can show the bar again. (0, 0) is the stuck headless cursor.
+	if _bar != null:
+		_bar.visible = false
+		_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+
+func _case_prompt_dismiss_first_click() -> void:
+	print("INPUT_POLISH_1 case=prompt_dismiss_first_click")
+	if not await _prepare_prompt_map():
+		return
+	for how in ["esc", "know"]:
+		if not await _raise_prompt_with_stale_press():
+			return
+		if not await _dismiss_prompt(how):
+			return
+		_hide_top_bar_for_map_click()
+		_push_left_at(PROMPT_CLICK, true)
+		_push_left_at(PROMPT_CLICK, false)
+		await _frames(3)
+		var pid := int(_mr.get("selected_province_id")) if _mr != null else -1
+		var up := _info != null and _info.visible
+		_info_line("first click how=%s pid=%s inspector=%s" % [how, str(pid), str(up)])
+		if pid != GER_PID or not up:
+			_fail("prompt_dismiss_first_click (%s): first click pid=%s inspector=%s want %s" % [
+				how, str(pid), str(up), str(GER_PID)
+			])
+			return
+		_soft_clear_inspector()
+	if not await _assert_hidden_host_ungates():
+		return
+	_pass("prompt_dismiss_first_click: Esc and I know the game, inspector on first click")
+
+
+func _assert_hidden_host_ungates() -> bool:
+	if not await _raise_prompt_with_stale_press():
+		return false
+	var guide := _guide()
+	var host := guide.get("_host") as CanvasItem if guide != null else null
+	if host == null:
+		_fail("GuideHost missing")
+		return false
+	host.visible = false
+	await _frames(3)
+	var processing := _mr != null and _mr.is_processing_input()
+	_info_line("hidden host map_input=%s prompt_visible=%s" % [
+		str(processing),
+		str(bool(guide.get("_prompt").visible) if guide.get("_prompt") != null else false),
+	])
+	host.visible = true
+	if guide.has_method("_hide_prompt"):
+		guide.call("_hide_prompt")
+	await _frames(1)
+	if not processing:
+		_fail("prompt.visible under a hidden host kept MapRenderer input off")
+		return false
+	return true
+
+
+func _case_prompt_dismiss_wheel_zoom() -> void:
+	print("INPUT_POLISH_1 case=prompt_dismiss_wheel_zoom")
+	if _mr == null and not await _prepare_prompt_map():
+		return
+	if not _centroids_saved and not _seed_uelzen(PROMPT_CLICK):
+		return
+	for how in ["esc", "know"]:
+		if not await _raise_prompt_with_stale_press():
+			return
+		if not await _dismiss_prompt(how):
+			return
+		var z0 := _zoom_x()
+		var fid0 := str(_mr.get("selected_formation_id")) if _mr != null else ""
+		_push_wheel_up(PROMPT_CLICK)
+		await _frames(2)
+		var z1 := _zoom_x()
+		var fid1 := str(_mr.get("selected_formation_id")) if _mr != null else ""
+		_info_line("wheel how=%s zoom %.4f→%.4f unit '%s'→'%s'" % [how, z0, z1, fid0, fid1])
+		if absf(z1 - z0) < 0.001:
+			_fail("prompt_dismiss_wheel_zoom (%s): wheel-up did not zoom (%.4f)" % [how, z1])
+			return
+		if fid1 != fid0 or not fid1.is_empty():
+			_fail("prompt_dismiss_wheel_zoom (%s): wheel selected unit '%s'" % [how, fid1])
+			return
+	_pass("prompt_dismiss_wheel_zoom: wheel-up zooms and selects no unit")
+	_restore_pick_grid()

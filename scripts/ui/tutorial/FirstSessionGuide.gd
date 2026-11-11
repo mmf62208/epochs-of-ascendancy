@@ -241,8 +241,14 @@ func _reset_runtime_flags() -> void:
 
 
 func _process(delta: float) -> void:
-	if _prompt != null and _prompt.visible:
+	# `visible` stays true under a hidden host. Only a prompt the player can
+	# see may keep the map deaf. A dismiss click's release stays gated until
+	# the button is up so that release cannot still-click the map.
+	var prompt_up := _prompt != null and is_instance_valid(_prompt) and _prompt.is_visible_in_tree()
+	if prompt_up:
 		_gate_map_input(true)
+	else:
+		_release_map_after_prompt()
 	_pulse += delta
 	_tick_accum += delta
 	if _flash_left > 0.0:
@@ -368,6 +374,7 @@ func _hide_card() -> void:
 func _show_prompt() -> void:
 	_hide_card()
 	if _blocker != null:
+		_blocker.mouse_filter = Control.MOUSE_FILTER_STOP
 		_blocker.visible = true
 	if _prompt != null:
 		_prompt.present(_nation_line())
@@ -382,7 +389,33 @@ func _hide_prompt() -> void:
 		_prompt.dismiss()
 	if _blocker != null:
 		_blocker.visible = false
+		_blocker.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_release_map_after_prompt()
+
+
+func _release_map_after_prompt() -> void:
+	if not _map_input_gated:
+		return
+	if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+		return
 	_gate_map_input(false)
+	_refresh_hover_after_prompt()
+
+
+## Godot keeps gui_get_hovered_control on the hidden Popup until a motion.
+## xdotool clicks do not send one, so the next wheel or click still sees it.
+func _refresh_hover_after_prompt() -> void:
+	var vp := get_viewport()
+	if vp == null:
+		return
+	var pos := vp.get_mouse_position()
+	var motion := InputEventMouseMotion.new()
+	motion.position = pos
+	motion.global_position = pos
+	motion.relative = Vector2(0.25, 0.0)
+	vp.push_input(motion)
+	if vp.has_method("update_mouse_cursor_state"):
+		vp.call("update_mouse_cursor_state")
 
 
 func _center_prompt() -> void:
@@ -406,7 +439,7 @@ func _center_prompt() -> void:
 
 
 func _input(event: InputEvent) -> void:
-	if _prompt == null or not _prompt.visible:
+	if _prompt == null or not _prompt.is_visible_in_tree():
 		return
 	if _is_prompt_wheel(event):
 		_mark_input_handled()
@@ -440,6 +473,8 @@ func _gate_map_input(block: bool) -> void:
 		mr.set_process_input(true)
 		mr.set_process_unhandled_input(true)
 		_map_input_gated = false
+		if mr.has_method("reset_left_gesture_after_modal"):
+			mr.call("reset_left_gesture_after_modal")
 
 
 func _is_prompt_enter(event: InputEvent) -> bool:

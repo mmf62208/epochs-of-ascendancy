@@ -27363,6 +27363,14 @@ func _tick_begin_title_release_swallow() -> void:
 		_clear_begin_title_release_swallow()
 
 
+## Prompt / modal gave MapRenderer its input back. The gesture must not keep
+## a missed release, a skip latch, or the Begin one-shot. Does not arm a swallow.
+func reset_left_gesture_after_modal() -> void:
+	_end_left_button_down()
+	_clear_left_slop_after_still_click()
+	_clear_begin_title_release_swallow()
+
+
 func _clear_begin_title_release_swallow() -> void:
 	if has_meta("eoa_begin_swallow_release"):
 		remove_meta("eoa_begin_swallow_release")
