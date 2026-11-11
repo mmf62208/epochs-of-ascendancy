@@ -41,6 +41,10 @@ var _last_live_submit_pid: int = -1
 var _suppress_line_grab_frame: int = -1
 ## Frame until which a deferred map-press unfocus must not undo a Search click.
 var _keep_line_focus_frame: int = -1
+## Opens on a user click in the box. Closes on Esc, Enter/Go, a result pick,
+## or a map press outside the chrome. While open, a printable key that arrives
+## with the line unfocused is inserted here so it cannot set speed or a map hotkey.
+var _typing_session: bool = false
 
 
 func _ready() -> void:
@@ -50,7 +54,19 @@ func _ready() -> void:
 ## Esc layer: a focused Search line (empty or not) or a visible results list.
 ## One Esc unfocuses Search and must not open Paused. Idle Esc (unfocused)
 ## still opens the pause menu.
+func typing_session_open() -> bool:
+	return _typing_session
+
+
+func end_typing_session() -> void:
+	_typing_session = false
+
+
 func esc_layer_open() -> bool:
+	# A click started a session even if a later release stole LineEdit focus.
+	# That Esc still closes Search and must not open Paused.
+	if _typing_session:
+		return true
 	var results := get_node_or_null("SearchResults") as CanvasItem
 	if results != null and is_instance_valid(results) and results.visible:
 		return true
@@ -71,6 +87,7 @@ func _block_line_grab() -> void:
 func dismiss_esc_layer() -> void:
 	# Close the layer and drop the query. The next Esc (Search unfocused)
 	# can open the pause menu.
+	_typing_session = false
 	_block_line_grab()
 	var results := get_node_or_null("SearchResults") as CanvasItem
 	if results != null and is_instance_valid(results):
@@ -86,6 +103,7 @@ func dismiss_esc_layer() -> void:
 ## pick / Esc — those only block the leftover deferred grab, not a new click.
 func focus_for_typing(from_user_click: bool = false) -> void:
 	if from_user_click:
+		_typing_session = true
 		_suppress_line_grab_frame = -1
 		# This frame and the next: inspector layout / leftover `_release_search_focus`
 		# from a map click must not undo typable focus before the next key.
@@ -198,17 +216,18 @@ func _input(event: InputEvent) -> void:
 		if vp_esc != null:
 			vp_esc.set_input_as_handled()
 		return
-	if key.keycode != KEY_ENTER and key.keycode != KEY_KP_ENTER:
+	if key.keycode == KEY_ENTER or key.keycode == KEY_KP_ENTER:
+		if _line == null or not is_instance_valid(_line):
+			return
+		if not _line.has_focus() and not _search_owns_focus() and not _typing_session:
+			return
+		_on_submit(_line.text)
+		_release_line_focus()
+		var vp: Viewport = get_viewport()
+		if vp != null:
+			vp.set_input_as_handled()
 		return
-	if _line == null or not is_instance_valid(_line):
-		return
-	if not _line.has_focus() and not _search_owns_focus():
-		return
-	_on_submit(_line.text)
-	_release_line_focus()
-	var vp: Viewport = get_viewport()
-	if vp != null:
-		vp.set_input_as_handled()
+	_consume_typing_session_key(key)
 
 
 func bind(map_renderer: Node, _camera: Camera2D) -> void:
@@ -500,6 +519,50 @@ func _on_go_pressed() -> void:
 	_on_submit(_line.text if _line != null else "")
 
 
+func _printable_char(key: InputEventKey) -> String:
+	if key.ctrl_pressed or key.alt_pressed or key.meta_pressed:
+		return ""
+	var u := int(key.unicode)
+	if u >= 32 and u != 127:
+		return String.chr(u)
+	var code := int(key.keycode)
+	if code >= KEY_KP_0 and code <= KEY_KP_9:
+		return str(code - int(KEY_KP_0))
+	if code == KEY_KP_PERIOD:
+		return "."
+	if code == KEY_KP_SUBTRACT:
+		return "-"
+	if code >= KEY_SPACE and code <= KEY_ASCIITILDE:
+		return String.chr(code)
+	return ""
+
+
+## Focus was stolen mid-query (reparent, deferred release, inspector layout).
+## Put the character in the box and eat the key before speed / map hotkeys.
+func _consume_typing_session_key(key: InputEventKey) -> bool:
+	if not _typing_session:
+		return false
+	if _line == null or not is_instance_valid(_line):
+		return false
+	if _line.has_focus():
+		return false
+	var ch := _printable_char(key)
+	if ch == "":
+		return false
+	_line.focus_mode = Control.FOCUS_ALL
+	_line.editable = true
+	_line.mouse_filter = Control.MOUSE_FILTER_STOP
+	_line.grab_focus()
+	if _line.has_method("deselect"):
+		_line.deselect()
+	_line.insert_text_at_caret(ch)
+	_refresh_search_results(_line.text)
+	var vp := get_viewport()
+	if vp != null:
+		vp.set_input_as_handled()
+	return true
+
+
 func _on_search_text_changed(text: String) -> void:
 	_refresh_search_results(text)
 
@@ -572,6 +635,7 @@ func _refresh_search_results(text: String) -> void:
 
 
 func _on_result_row_pressed(pid: int) -> void:
+	_typing_session = false
 	_go_to_province(pid)
 	call_deferred("_release_focus_after_result_pick")
 
@@ -579,6 +643,7 @@ func _on_result_row_pressed(pid: int) -> void:
 func _on_submit(text: String) -> void:
 	# Enter / Go commit the query and close the search layer. A result-row
 	# click does not come through here, so the list stays an Esc layer.
+	_typing_session = false
 	_hide_search_results()
 	var now: int = Time.get_ticks_msec()
 	if now - _submit_guard_msec < SUBMIT_GUARD_MS:

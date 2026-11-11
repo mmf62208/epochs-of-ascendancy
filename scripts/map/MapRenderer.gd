@@ -2973,7 +2973,9 @@ func _layout_map_search_chrome() -> void:
 		if old_p != null:
 			old_p.remove_child(sr)
 		host.add_child(sr)
-	if host != null and host.has_method("host_map_search_chrome"):
+	# Reparenting Search drops LineEdit focus. A live typing session keeps the
+	# node where it is; MapProvinceSearch inserts any key that still arrives unfocused.
+	if host != null and host.has_method("host_map_search_chrome") and not _search_typing_session_open():
 		host.call("host_map_search_chrome", sr)
 	# Keep a width the top bar already fitted (>= 88). Forcing 308 here is
 	# what shoved Rubber and Fuel past 1280 after the bar had made room.
@@ -3064,10 +3066,19 @@ func _search_has_typable_focus() -> bool:
 	return _gui_text_field_has_focus() and _mouse_over_search_control()
 
 
-func _release_search_focus() -> void:
+func _search_typing_session_open() -> bool:
+	var search := _live_map_search()
+	return search != null and search.has_method("typing_session_open") and bool(search.call("typing_session_open"))
+
+
+func _release_search_focus(allow_during_session: bool = false) -> void:
 	# A Search-box click this frame must stay typable even if a leftover map
 	# press deferred this, or inspector layout ran after the grab.
+	# A typing session likewise keeps the caret unless this is Esc or a real
+	# map press outside the chrome (those pass allow_during_session).
 	if _search_keeps_click_focus():
+		return
+	if not allow_during_session and _search_typing_session_open():
 		return
 	var vp: Viewport = get_viewport()
 	if vp == null:
@@ -3102,15 +3113,21 @@ func _release_search_on_map_press() -> void:
 	if _search_keeps_click_focus():
 		return
 	var search := _live_map_search()
+	# Caller already rejected a point inside the search chrome. This press
+	# ends the typing session, then drops focus.
 	if search != null and search.has_method("esc_layer_open") and bool(search.call("esc_layer_open")):
 		if search.has_method("dismiss_esc_layer"):
 			search.call("dismiss_esc_layer")
+		elif search.has_method("end_typing_session"):
+			search.call("end_typing_session")
 	else:
-		_release_search_focus()
+		if search != null and search.has_method("end_typing_session"):
+			search.call("end_typing_session")
+		_release_search_focus(true)
 	# LineEdit grabs focus again from the same click's gui_input, after _input.
 	# Skip the undo when this press was a Search click (keep_click_focus).
 	if not _search_keeps_click_focus():
-		call_deferred("_release_search_focus")
+		call_deferred("_release_search_focus", true)
 
 
 func _apply_home_key(shift_pressed: bool) -> void:
@@ -3177,9 +3194,9 @@ func _handle_escape_key() -> void:
 	if _dismiss_search_esc_layer():
 		return
 	if _gui_text_field_has_focus():
-		_release_search_focus()
+		_release_search_focus(true)
 		return
-	_release_search_focus()
+	_release_search_focus(true)
 	# One Esc closes only the front play window. The next Esc can open pause.
 	# ProductionAssignmentScreen is in this list so it still closes first,
 	# ahead of any other open play window it outranks.
@@ -3335,7 +3352,9 @@ func _dismiss_search_esc_layer() -> bool:
 	if search.has_method("dismiss_esc_layer"):
 		search.call("dismiss_esc_layer")
 	else:
-		_release_search_focus()
+		if search.has_method("end_typing_session"):
+			search.call("end_typing_session")
+		_release_search_focus(true)
 	return true
 
 
@@ -3362,7 +3381,7 @@ func _campaign_end_overlay_is_up() -> bool:
 
 
 func _esc_open_command_center() -> void:
-	_release_search_focus()
+	_release_search_focus(true)
 	var vp_esc: Viewport = get_viewport()
 	if vp_esc != null:
 		vp_esc.gui_release_focus()
@@ -4934,8 +4953,9 @@ func _layout_map_ui() -> void:
 		tb.offset_bottom = top_clearance + toolbar_h
 
 	# Inspector refresh must not reparent Search while it has typable focus
-	# (Play r2: caret then keys leaked after Western Russia inspector).
-	if not _search_has_typable_focus():
+	# or a typing session is open (a reparent drops the caret and the next
+	# digit leaks into speed / map hotkeys).
+	if not _search_has_typable_focus() and not _search_typing_session_open():
 		_layout_map_search_chrome()
 
 	if info_panel is Control and not info_panel.has_meta("user_moved"):
