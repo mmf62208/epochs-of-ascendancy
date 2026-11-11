@@ -20,10 +20,12 @@ from eng_map_finish2_product import (  # noqa: E402
     DEFAULT_DIR,
     GULF_NEW,
     GULF_OLD,
+    HAMILTON_NIAGARA_ID,
     NY_WEST_ID,
     absorb_hole_into,
     build_plan,
     choose_absorb_target,
+    clip_leftover_erie_tails,
     gulf_name_hits,
     speck_holes,
 )
@@ -121,13 +123,16 @@ def load_rings(board: Path):
     return geo, rings, anchors, metas
 
 
-def absorb_specks(board: Path, rings, anchors, metas, changed) -> list:
+def absorb_specks(board: Path, rings, anchors, metas, changed, skip_targets=()) -> list:
     report = measure_canada_holes(board, use_natural_earth=True)
     absorbed = []
+    skip = set(skip_targets)
     for hole in speck_holes(report):
         target = choose_absorb_target(hole)
         if target is None:
             raise RuntimeError("no absorb target for speck %.1f at %s" % (hole["area_px2"], hole["centroid"]))
+        if target in skip:
+            continue
         if target not in rings:
             raise RuntimeError("speck target %s missing" % target)
         try:
@@ -148,6 +153,7 @@ def main() -> int:
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--names-only", action="store_true")
     parser.add_argument("--specks-only", action="store_true")
+    parser.add_argument("--erie-tails-only", action="store_true")
     args = parser.parse_args()
     if args.names_only:
         if args.dry_run:
@@ -163,6 +169,23 @@ def main() -> int:
         if args.dry_run or not specks:
             return 0
         write_geometry(args.dir, rings, anchors, metas, changed, geo)
+        return 0
+    if args.erie_tails_only:
+        geo, rings, anchors, metas = load_rings(args.dir)
+        changed = {}
+        clipped = clip_leftover_erie_tails(rings, anchors, metas, changed)
+        print("erie_tails", clipped)
+        if args.dry_run:
+            return 0
+        if clipped:
+            write_geometry(args.dir, rings, anchors, metas, changed, geo)
+        specks = absorb_specks(
+            args.dir, rings, anchors, metas, changed, skip_targets=(HAMILTON_NIAGARA_ID,)
+        )
+        print("erie_tail_specks", specks)
+        if specks:
+            geo2 = json.loads((args.dir / "provinces_geometry.json").read_text(encoding="utf-8"))
+            write_geometry(args.dir, rings, anchors, metas, {row["target"] for row in specks}, geo2)
         return 0
     plan = build_plan(args.dir)
     print("phase1 changed", len(plan["changed"]))
@@ -186,6 +209,37 @@ def main() -> int:
         write_geometry(args.dir, plan["rings"], plan["anchors"], plan["metas"], speck_changed, geo_mid)
         all_specks.extend(specks)
     print("specks total", len(all_specks))
+    erie_clipped = clip_leftover_erie_tails(plan["rings"], plan["anchors"], plan["metas"], plan["changed"])
+    print("erie_tails", erie_clipped)
+    if erie_clipped:
+        geo_tail = json.loads((args.dir / "provinces_geometry.json").read_text(encoding="utf-8"))
+        write_geometry(
+            args.dir,
+            plan["rings"],
+            plan["anchors"],
+            plan["metas"],
+            {row["id"] for row in erie_clipped},
+            geo_tail,
+        )
+        tail_specks = absorb_specks(
+            args.dir,
+            plan["rings"],
+            plan["anchors"],
+            plan["metas"],
+            plan["changed"],
+            skip_targets=(HAMILTON_NIAGARA_ID,),
+        )
+        print("erie_tail_specks", tail_specks)
+        if tail_specks:
+            geo_speck = json.loads((args.dir / "provinces_geometry.json").read_text(encoding="utf-8"))
+            write_geometry(
+                args.dir,
+                plan["rings"],
+                plan["anchors"],
+                plan["metas"],
+                {row["target"] for row in tail_specks},
+                geo_speck,
+            )
     print("renamed", rename_gulf())
     return 0
 

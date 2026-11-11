@@ -29,15 +29,19 @@ from canada_hole_measure import (  # noqa: E402
 from eng_map_finish2_product import (  # noqa: E402
     DC_FACE_MIN,
     DC_ID,
+    ERIE_TAIL_BAND_PX,
     GULF_ACCURATE_ID,
     GULF_FULL_ID,
     GULF_NEW,
     GULF_OLD,
+    HAMILTON_NIAGARA_ID,
     LAKE_AMERICA,
     LAKE_ERIE_ID,
     LAKE_ONTARIO_ID,
+    LEFTOVER_LAND_IDS,
     NY_WEST_ID,
     OVERLAP_PX_MAX,
+    erie_shore_tail_indices,
     gulf_name_hits,
     lake_america_hits,
     land_water_overlap_px,
@@ -122,7 +126,19 @@ class EngMapFinish2Test(unittest.TestCase):
 
     def test_map_integrity_not_up(self) -> None:
         inv = count_invalid_polygons(BOARD)
-        our = {NY_WEST_ID, LAKE_ONTARIO_ID, DC_ID, 801515, 800273, 903049, 903047, 903045, 903044, 903046}
+        our = {
+            NY_WEST_ID,
+            LAKE_ONTARIO_ID,
+            DC_ID,
+            801515,
+            800273,
+            HAMILTON_NIAGARA_ID,
+            903047,
+            903045,
+            903044,
+            903046,
+            903050,
+        }
         bad_ours = [row for row in inv.get("ids") or [] if int(row.get("id") or 0) in our]
         self.assertEqual(bad_ours, [])
         overlaps = count_land_sea_overlaps(BOARD, min_px=2)
@@ -132,6 +148,42 @@ class EngMapFinish2Test(unittest.TestCase):
             if int(row.get("water") or 0) == LAKE_ONTARIO_ID and int(row.get("px") or 0) > OVERLAP_PX_MAX
         ]
         self.assertEqual(lake_pairs, [])
+
+    def test_hamilton_niagara_not_in_erie(self) -> None:
+        """Fails on 2e1e6f98: #903049 sends a thin tail along Erie to Windsor."""
+        geo, _base, _adj = _load()
+        rings = {}
+        anchors = {}
+        for g in geo["provinces"]:
+            pts = _clean([(float(p[0]), float(p[1])) for p in (g.get("points") or [])])
+            if len(pts) >= 3:
+                rings[int(g["id"])] = pts
+            anchors[int(g["id"])] = [float(g["label_anchor"][0]), float(g["label_anchor"][1])]
+        erie = rings[LAKE_ERIE_ID]
+        ham = rings[HAMILTON_NIAGARA_ID]
+        tails = erie_shore_tail_indices(ham, erie, anchors[HAMILTON_NIAGARA_ID])
+        self.assertEqual(tails, [])
+        west_x = min(p[0] for p in ham)
+        # Peninsula stays east of London ON / Long Point; Windsor is ~2204.
+        self.assertGreater(west_x, 2250.0)
+        ax, ay = anchors[HAMILTON_NIAGARA_ID]
+        self.assertNotEqual(_winding(ham, ax, ay), 0)
+        self.assertEqual(_winding(erie, ax, ay), 0)
+        self.assertLessEqual(land_water_overlap_px(ham, erie), OVERLAP_PX_MAX)
+        hx, hy = lonlat_to_canvas(-79.87, 43.26)
+        nx, ny = lonlat_to_canvas(-79.08, 43.09)
+        self.assertNotEqual(_winding(ham, hx, hy), 0)
+        self.assertNotEqual(_winding(ham, nx, ny), 0)
+        self.assertEqual(_winding(erie, hx, hy), 0)
+        leftover_tails = []
+        probe = anchors[HAMILTON_NIAGARA_ID]
+        for pid in LEFTOVER_LAND_IDS:
+            if pid not in rings or pid == LAKE_ONTARIO_ID:
+                continue
+            hits = erie_shore_tail_indices(rings[pid], erie, probe, band=ERIE_TAIL_BAND_PX)
+            if hits:
+                leftover_tails.append((pid, hits))
+        self.assertEqual(leftover_tails, [])
 
 
 if __name__ == "__main__":

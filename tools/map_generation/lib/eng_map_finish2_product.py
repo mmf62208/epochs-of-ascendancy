@@ -13,6 +13,7 @@ province id. Nothing is renamed Lake America.
 from __future__ import annotations
 
 import json
+import math
 from collections import defaultdict
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
@@ -56,6 +57,7 @@ NY_WEST_ID = 800446
 DC_ID = 800792
 PA_EAST_ID = 801515
 MD_EAST_ID = 800273
+HAMILTON_NIAGARA_ID = 903049
 GULF_ACCURATE_ID = 950029
 GULF_FULL_ID = 20115
 GULF_PILOT_ID = 901121
@@ -73,6 +75,29 @@ OVERLAP_PX_MAX = 1
 POLY_OVERLAP_MAX = 1.0
 SLIVER_AREA = 5.0
 KEEP_LOOP_MIN = 8.0
+# Near-water band for the Hamilton–Niagara sliver that followed Erie to Windsor.
+ERIE_TAIL_BAND_PX = 4.0
+LEFTOVER_LAND_IDS = (
+    MD_EAST_ID,
+    NY_WEST_ID,
+    PA_EAST_ID,
+    903029,
+    903030,
+    903032,
+    903033,
+    903036,
+    903038,
+    903039,
+    903040,
+    903041,
+    903043,
+    903044,
+    903045,
+    903046,
+    903047,
+    HAMILTON_NIAGARA_ID,
+    903053,
+)
 
 GULF_NAME_FILES = (
     ROOT / "data" / "provinces_world_accurate" / "provinces_base.json",
@@ -162,6 +187,100 @@ def choose_keep_loop(loops: Sequence, original, anchor) -> List[Tuple[float, flo
 
 def land_water_overlap_px(land_ring, water_ring) -> int:
     return int(overlap_px([[p[0], p[1]] for p in land_ring], [[p[0], p[1]] for p in water_ring]))
+
+
+def dist_point_to_ring(pt, ring) -> float:
+    x, y = float(pt[0]), float(pt[1])
+    best = None
+    n = len(ring)
+    for i in range(n):
+        x1, y1 = float(ring[i][0]), float(ring[i][1])
+        x2, y2 = float(ring[(i + 1) % n][0]), float(ring[(i + 1) % n][1])
+        dx = x2 - x1
+        dy = y2 - y1
+        if dx == 0.0 and dy == 0.0:
+            d2 = (x - x1) ** 2 + (y - y1) ** 2
+        else:
+            t = max(0.0, min(1.0, ((x - x1) * dx + (y - y1) * dy) / (dx * dx + dy * dy)))
+            px = x1 + t * dx
+            py = y1 + t * dy
+            d2 = (x - px) ** 2 + (y - py) ** 2
+        if best is None or d2 < best:
+            best = d2
+    return math.sqrt(best) if best is not None else 0.0
+
+
+def erie_peninsula_junction(erie, probe):
+    """Erie vertex nearest the peninsula probe (label / Hamilton). Port Dover contact."""
+    px, py = float(probe[0]), float(probe[1])
+    return min(erie, key=lambda p: (float(p[0]) - px) ** 2 + (float(p[1]) - py) ** 2)
+
+
+def erie_shore_tail_indices(land, erie, probe, band: float = ERIE_TAIL_BAND_PX) -> List[int]:
+    """Land vertices that follow Erie west of the peninsula contact.
+
+    Fails on tip 2e1e6f98: Hamilton–Niagara #903049 traces Erie to Windsor.
+    Boundary vertices at the Port Dover junction are kept.
+    """
+    if len(land) < 4 or len(erie) < 3:
+        return []
+    junction = erie_peninsula_junction(erie, probe)
+    cutoff = float(junction[0]) - 0.05
+    hits = []
+    for i, pt in enumerate(land):
+        if float(pt[0]) >= cutoff:
+            continue
+        if dist_point_to_ring(pt, erie) < band:
+            hits.append(i)
+    return hits
+
+
+def clip_erie_shore_tail(land, erie, anchor, probe=None, band: float = ERIE_TAIL_BAND_PX):
+    """Drop the west-along-Erie spike. Returns (ring, dropped_count)."""
+    if probe is None:
+        probe = anchor
+    drop = set(erie_shore_tail_indices(land, erie, probe, band=band))
+    if not drop:
+        return list(land), 0
+    kept = [pt for i, pt in enumerate(land) if i not in drop]
+    kept = snap_ring(kept)
+    if len(kept) < 3:
+        raise RuntimeError("erie tail clip removed the land ring")
+    if abs(_area(kept)) < KEEP_LOOP_MIN:
+        raise RuntimeError("erie tail clip left the land ring too small")
+    if ring_is_raw_invalid(kept) and not ring_is_raw_invalid(land):
+        raise RuntimeError("erie tail clip made the land ring self-crossing")
+    if not _anchor_inside(kept, anchor):
+        raise RuntimeError("erie tail clip left the label outside the land ring")
+    return kept, len(drop)
+
+
+def clip_leftover_erie_tails(rings: dict, anchors: dict, metas: dict, changed: dict, leftover_ids=LEFTOVER_LAND_IDS) -> list:
+    """Clip leftover land faces that send a thin tail into Lake Erie.
+
+    Cutoff is the Port Dover / Hamilton contact, not each land's own nearest
+    Erie vertex — NY West's Buffalo shore must stay flush.
+    """
+    erie = rings[LAKE_ERIE_ID]
+    probe = anchors.get(HAMILTON_NIAGARA_ID)
+    if probe is None and HAMILTON_NIAGARA_ID in rings:
+        probe = _poly_centroid(rings[HAMILTON_NIAGARA_ID])
+    if probe is None:
+        return []
+    clipped = []
+    for pid in leftover_ids:
+        if pid not in rings:
+            continue
+        if pid == LAKE_ONTARIO_ID:
+            continue
+        kept, n_drop = clip_erie_shore_tail(rings[pid], erie, anchors[pid], probe=probe)
+        if n_drop <= 0:
+            continue
+        rings[pid] = kept
+        metas[pid]["eng_map_finish2_erie_tail"] = "drop_%d" % n_drop
+        changed[pid] = ((changed.get(pid) or "") + " clip erie tail %d" % n_drop).strip()
+        clipped.append({"id": pid, "dropped": n_drop, "verts": len(kept)})
+    return clipped
 
 
 def measure_washington_faces(board: Path = DEFAULT_DIR) -> dict:
