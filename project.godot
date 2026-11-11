@@ -44,6 +44,7 @@ SaveLoadManager="*res://scripts/autoload/SaveLoadManager.gd"
 BattleManager="*res://scripts/combat/BattleManager.gd"
 DialogueManager="*uid://c3rodes2l3gxb"
 AudioManager="*res://scripts/autoload/AudioManager.gd"
+FirstSessionGuide="*res://scripts/ui/tutorial/FirstSessionGuide.gd"
 
 [display]
 

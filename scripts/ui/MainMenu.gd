@@ -575,6 +575,7 @@ func _build_ui() -> void:
 	_add_action_button(left_inner, "Refresh save list", "refresh", false)
 	_add_action_button(left_inner, "Trade Market", "trade_market", true)
 	_add_action_button(left_inner, "Help / About", "help", false)
+	_add_tutorial_button(left_inner)
 
 	var new_game := VBoxContainer.new()
 	new_game.name = "NewGameBlock"
@@ -831,6 +832,7 @@ func _add_audio_settings(parent: VBoxContainer) -> void:
 	block.add_child(_audio_slider("UI", "UiVolume", _audio_db(audio, "get_ui_db", -12.0), "set_ui_db"))
 	block.add_child(_audio_slider("SFX", "SfxVolume", _audio_db(audio, "get_sfx_db", 0.0), "set_sfx_db"))
 	block.add_child(_audio_percent_slider("Music", "MusicVolume", _audio_music_percent(audio)))
+	_add_first_session_settings(block)
 
 
 func _audio_db(audio: Node, getter: String, fallback: float) -> float:
@@ -1007,6 +1009,127 @@ func _on_audio_mute_toggled(on: bool) -> void:
 	var audio := _audio_node()
 	if audio != null and audio.has_method("set_muted"):
 		audio.call("set_muted", on)
+
+
+func _add_tutorial_button(parent: VBoxContainer) -> void:
+	var btn := Button.new()
+	btn.name = "BtnTutorial"
+	btn.text = "?  Tutorial"
+	btn.tooltip_text = "Walk through the basics again: time, map modes, war, battle, saving and how the game ends."
+	btn.custom_minimum_size = Vector2(0, 38)
+	btn.focus_mode = Control.FOCUS_ALL
+	btn.process_mode = Node.PROCESS_MODE_ALWAYS
+	btn.mouse_filter = Control.MOUSE_FILTER_STOP
+	btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
+	btn.pressed.connect(_on_tutorial_pressed)
+	RetrowaveTheme.style_secondary_button(btn)
+	parent.add_child(btn)
+
+
+func _add_first_session_settings(parent: VBoxContainer) -> void:
+	var hdr := Label.new()
+	hdr.name = "GameSettingsHeader"
+	hdr.text = "GAME"
+	RetrowaveTheme.style_column_header(hdr)
+	parent.add_child(hdr)
+	var row := HBoxContainer.new()
+	row.name = "FirstSessionGuideRow"
+	row.custom_minimum_size = Vector2(0, 32)
+	parent.add_child(row)
+	var lab := Label.new()
+	lab.text = "First-session guide"
+	lab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	lab.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	RetrowaveTheme.style_body_label(lab)
+	row.add_child(lab)
+	var toggle := CheckButton.new()
+	toggle.name = "FirstSessionGuideToggle"
+	toggle.focus_mode = Control.FOCUS_ALL
+	toggle.button_pressed = _guide_enabled()
+	toggle.toggled.connect(_on_guide_toggled)
+	row.add_child(toggle)
+	var state := Label.new()
+	state.name = "FirstSessionGuideState"
+	state.text = "On" if toggle.button_pressed else "Off"
+	state.custom_minimum_size = Vector2(36, 0)
+	state.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	state.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	state.add_theme_color_override("font_color", RetrowaveTheme.TEXT_DIM)
+	row.add_child(state)
+	var hint := Label.new()
+	hint.text = "Off by default. Turning it on restarts at step 1 next Begin."
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hint.add_theme_font_size_override("font_size", 11)
+	hint.add_theme_color_override("font_color", RetrowaveTheme.TEXT_DIM)
+	parent.add_child(hint)
+	var restart := Button.new()
+	restart.name = "BtnRestartGuide"
+	restart.text = "Restart guide now"
+	restart.focus_mode = Control.FOCUS_ALL
+	restart.process_mode = Node.PROCESS_MODE_ALWAYS
+	restart.mouse_filter = Control.MOUSE_FILTER_STOP
+	restart.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
+	restart.custom_minimum_size = Vector2(0, 34)
+	restart.pressed.connect(_on_restart_guide)
+	RetrowaveTheme.style_secondary_button(restart)
+	parent.add_child(restart)
+
+
+func _guide_node() -> Node:
+	var tree := get_tree()
+	if tree == null or tree.root == null:
+		return null
+	return tree.root.get_node_or_null("FirstSessionGuide")
+
+
+func _guide_enabled() -> bool:
+	var g := _guide_node()
+	if g != null and g.has_method("is_guide_enabled"):
+		return bool(g.call("is_guide_enabled"))
+	return false
+
+
+func _on_guide_toggled(on: bool) -> void:
+	var g := _guide_node()
+	if g != null and g.has_method("set_guide_enabled"):
+		g.call("set_guide_enabled", on)
+	var state := find_child("FirstSessionGuideState", true, false) as Label
+	if state != null:
+		state.text = "On" if on else "Off"
+
+
+func _on_restart_guide() -> void:
+	var g := _guide_node()
+	if g != null and g.has_method("restart_now"):
+		g.call("restart_now")
+	if not _living_title_is_up():
+		_force_close()
+
+
+func _on_tutorial_pressed() -> void:
+	if _living_title_is_up():
+		_replay_tutorial(true)
+		return
+	var dlg := ConfirmationDialog.new()
+	dlg.title = "Tutorial"
+	dlg.dialog_text = "Restart the guide on this map? Your game keeps running as is."
+	dlg.ok_button_text = "Restart guide"
+	dlg.cancel_button_text = "Cancel"
+	dlg.confirmed.connect(func() -> void:
+		_replay_tutorial(false)
+		dlg.queue_free()
+	)
+	dlg.canceled.connect(dlg.queue_free)
+	add_child(dlg)
+	dlg.popup_centered()
+
+
+func _replay_tutorial(from_title: bool) -> void:
+	var g := _guide_node()
+	if g != null and g.has_method("replay"):
+		g.call("replay", from_title)
+	if not from_title:
+		_force_close()
 
 
 func _add_action_button(parent: VBoxContainer, text: String, id: String, primary: bool, danger: bool = false) -> void:
