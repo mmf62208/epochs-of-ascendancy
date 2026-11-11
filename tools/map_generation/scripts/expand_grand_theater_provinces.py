@@ -231,7 +231,7 @@ def seed_defs() -> List[Dict[str, Any]]:
         ("Indian Ocean Central", 70.0, -10.0, "sea", 85),
         ("South Atlantic Zone", -10.0, -20.0, "sea", 80),
         ("Caribbean Zone", -70.0, 15.0, "sea", 60),
-        ("Gulf of Mexico Zone", -90.0, 25.0, "sea", 55),
+        ("Gulf of America Zone", -90.0, 25.0, "sea", 55),
     ]
     for name, lon, lat, domain, half in seas:
         seeds.append(
