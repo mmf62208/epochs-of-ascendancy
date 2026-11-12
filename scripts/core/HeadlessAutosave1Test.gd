@@ -500,13 +500,40 @@ func _test_s3_quicksave_apply_row(sl: Node) -> void:
 	_pass("S3 Quicksave Apply updates the row without freeing mid-pressed")
 
 
+func _s3_quicksave_core(text: String) -> String:
+	## Occupied quicksave flair is "⚡ quicksave · …". Strip an optional leading
+	## mark + whitespace so the slot name still has to start with quicksave.
+	var t := str(text).strip_edges().to_lower()
+	var i := 0
+	while i < t.length():
+		var code := t.unicode_at(i)
+		if code == 32 or code == 9:
+			i += 1
+			continue
+		if (code >= 97 and code <= 122) or (code >= 48 and code <= 57):
+			break
+		i += 1
+		while i < t.length():
+			var follow := t.unicode_at(i)
+			if follow != 32 and follow != 9:
+				break
+			i += 1
+		break
+	return t.substr(i)
+
+
+func _is_s3_quicksave_row_text(text: String) -> bool:
+	var raw := str(text)
+	if raw.find(" · ") < 0:
+		return false
+	return _s3_quicksave_core(raw).begins_with("quicksave")
+
+
 func _find_s3_quicksave_row_label(n: Node) -> Label:
 	if n == null or not is_instance_valid(n) or n.is_queued_for_deletion():
 		return null
-	if n is Label:
-		var t := str((n as Label).text).to_lower()
-		if t.begins_with("quicksave") and t.find(" · ") >= 0:
-			return n as Label
+	if n is Label and _is_s3_quicksave_row_text((n as Label).text):
+		return n as Label
 	for c in n.get_children():
 		var found := _find_s3_quicksave_row_label(c)
 		if found != null:
@@ -523,10 +550,8 @@ func _find_s3_quicksave_apply_button(n: Node) -> BaseButton:
 			var row := n.get_parent()
 			if row != null:
 				for sib in row.get_children():
-					if sib is Label:
-						var t := str((sib as Label).text).to_lower()
-						if t.begins_with("quicksave"):
-							return n as BaseButton
+					if sib is Label and _s3_quicksave_core((sib as Label).text).begins_with("quicksave"):
+						return n as BaseButton
 	for c in n.get_children():
 		var found := _find_s3_quicksave_apply_button(c)
 		if found != null:
