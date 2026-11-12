@@ -212,6 +212,9 @@ var _away_armed: bool = false
 var _session_first_autosave_done: bool = false
 var _session_begin_seen: bool = false
 var _autosave_cfg_loaded: bool = false
+## path -> {mtime, result}. list_saves only needs metadata; a full JSON.parse of a
+## mid-campaign ~2.6 MB blob on every catalog rebuild stalls the Orders panel.
+var _inspect_cache: Dictionary = {}
 
 
 func _ready() -> void:
@@ -1472,18 +1475,206 @@ func _peek_metadata(path: String) -> Dictionary:
 	return _inspect_save_file(path).get("metadata", {}) as Dictionary
 
 
-func _inspect_save_file(path: String) -> Dictionary:
+func _inspect_cache_remember(path: String, result: Dictionary) -> void:
+	var mtime := 0
+	if FileAccess.file_exists(path):
+		mtime = int(FileAccess.get_modified_time(path))
+	_inspect_cache[path] = {
+		"mtime": mtime,
+		"result": result.duplicate(true),
+	}
+
+
+func _inspect_cache_forget(path: String) -> void:
+	_inspect_cache.erase(path)
+
+
+func _inspect_cache_lookup(path: String) -> Dictionary:
+	if not _inspect_cache.has(path):
+		return {}
+	var hit: Variant = _inspect_cache[path]
+	if typeof(hit) != TYPE_DICTIONARY:
+		return {}
+	var rec: Dictionary = hit
 	if not FileAccess.file_exists(path):
-		return {"readable": false, "metadata": {}, "error": "missing"}
-	var f := FileAccess.open(path, FileAccess.READ)
-	if f == null:
-		return {"readable": false, "metadata": {}, "error": "cannot open"}
-	var text := f.get_as_text()
-	f.close()
-	var parsed: Variant = JSON.parse_string(text)
-	if typeof(parsed) != TYPE_DICTIONARY:
-		return {"readable": false, "metadata": {}, "error": "unreadable"}
-	var d: Dictionary = parsed
+		_inspect_cache.erase(path)
+		return {}
+	if int(rec.get("mtime", -1)) != int(FileAccess.get_modified_time(path)):
+		_inspect_cache.erase(path)
+		return {}
+	var stored: Variant = rec.get("result", {})
+	if typeof(stored) != TYPE_DICTIONARY:
+		return {}
+	return (stored as Dictionary).duplicate(true)
+
+
+func _json_skip_ws(text: String, i: int) -> int:
+	while i < text.length():
+		var code := text.unicode_at(i)
+		if code != 32 and code != 9 and code != 10 and code != 13:
+			break
+		i += 1
+	return i
+
+
+func _json_read_string(text: String, i: int) -> Dictionary:
+	if i >= text.length() or text.unicode_at(i) != 34:
+		return {"ok": false, "value": "", "next": i}
+	i += 1
+	var out := ""
+	var escaped := false
+	while i < text.length():
+		var ch := text[i]
+		if escaped:
+			out += ch
+			escaped = false
+			i += 1
+			continue
+		if ch == "\\":
+			escaped = true
+			i += 1
+			continue
+		if ch == "\"":
+			return {"ok": true, "value": out, "next": i + 1}
+		out += ch
+		i += 1
+	return {"ok": false, "value": "", "next": i}
+
+
+func _json_read_number(text: String, i: int) -> Dictionary:
+	var start := i
+	if i < text.length() and text[i] == "-":
+		i += 1
+	var digits := 0
+	while i < text.length():
+		var code := text.unicode_at(i)
+		if code >= 48 and code <= 57:
+			digits += 1
+			i += 1
+			continue
+		if text[i] == "." or text[i] == "e" or text[i] == "E" or text[i] == "+" or text[i] == "-":
+			i += 1
+			continue
+		break
+	if digits <= 0:
+		return {"ok": false, "value": 0, "next": start}
+	return {"ok": true, "value": int(text.substr(start, i - start)), "next": i}
+
+
+func _json_skip_value(text: String, i: int) -> Dictionary:
+	i = _json_skip_ws(text, i)
+	if i >= text.length():
+		return {"ok": false, "next": i}
+	var ch := text[i]
+	if ch == "\"":
+		var s: Dictionary = _json_read_string(text, i)
+		return {"ok": bool(s.get("ok", false)), "next": int(s.get("next", i))}
+	if ch == "{" or ch == "[":
+		var depth := 1
+		var in_string := false
+		var escaped := false
+		i += 1
+		while i < text.length() and depth > 0:
+			var c := text[i]
+			if in_string:
+				if escaped:
+					escaped = false
+				elif c == "\\":
+					escaped = true
+				elif c == "\"":
+					in_string = false
+			else:
+				if c == "\"":
+					in_string = true
+				elif c == "{" or c == "[":
+					depth += 1
+				elif c == "}" or c == "]":
+					depth -= 1
+			i += 1
+		return {"ok": depth == 0, "next": i}
+	if text.substr(i, 4) == "true":
+		return {"ok": true, "next": i + 4}
+	if text.substr(i, 5) == "false":
+		return {"ok": true, "next": i + 5}
+	if text.substr(i, 4) == "null":
+		return {"ok": true, "next": i + 4}
+	var n: Dictionary = _json_read_number(text, i)
+	return {"ok": bool(n.get("ok", false)), "next": int(n.get("next", i))}
+
+
+func _json_read_object_text(text: String, i: int) -> Dictionary:
+	i = _json_skip_ws(text, i)
+	if i >= text.length() or text[i] != "{":
+		return {"ok": false, "raw": "", "next": i}
+	var start := i
+	var skipped: Dictionary = _json_skip_value(text, i)
+	if not bool(skipped.get("ok", false)):
+		return {"ok": false, "raw": "", "next": i}
+	var nxt := int(skipped.get("next", i))
+	return {"ok": true, "raw": text.substr(start, nxt - start), "next": nxt}
+
+
+func _peek_save_envelope(text: String) -> Dictionary:
+	var i := _json_skip_ws(text, 0)
+	if i >= text.length() or text[i] != "{":
+		return {}
+	i += 1
+	var save_version := -1
+	var meta: Dictionary = {}
+	var have_meta := false
+	while i < text.length():
+		i = _json_skip_ws(text, i)
+		if i >= text.length():
+			return {}
+		if text[i] == "}":
+			break
+		if text[i] != "\"":
+			return {}
+		var key_hold: Dictionary = _json_read_string(text, i)
+		if not bool(key_hold.get("ok", false)):
+			return {}
+		var key := str(key_hold.get("value", ""))
+		i = int(key_hold.get("next", i))
+		i = _json_skip_ws(text, i)
+		if i >= text.length() or text[i] != ":":
+			return {}
+		i += 1
+		i = _json_skip_ws(text, i)
+		if i >= text.length():
+			return {}
+		if key == "save_version":
+			var num_hold: Dictionary = _json_read_number(text, i)
+			if not bool(num_hold.get("ok", false)):
+				return {}
+			save_version = int(num_hold.get("value", -1))
+			i = int(num_hold.get("next", i))
+		elif key == "metadata":
+			var obj_hold: Dictionary = _json_read_object_text(text, i)
+			if not bool(obj_hold.get("ok", false)):
+				return {}
+			var raw := str(obj_hold.get("raw", ""))
+			i = int(obj_hold.get("next", i))
+			var parsed: Variant = JSON.parse_string(raw)
+			if typeof(parsed) != TYPE_DICTIONARY:
+				return {}
+			meta = (parsed as Dictionary).duplicate(true)
+			have_meta = true
+		else:
+			var skip_hold: Dictionary = _json_skip_value(text, i)
+			if not bool(skip_hold.get("ok", false)):
+				return {}
+			i = int(skip_hold.get("next", i))
+		if save_version > 0 and have_meta:
+			return {"complete": true, "metadata": meta, "save_version": save_version}
+		i = _json_skip_ws(text, i)
+		if i < text.length() and text[i] == ",":
+			i += 1
+	if save_version > 0 and have_meta:
+		return {"complete": true, "metadata": meta, "save_version": save_version}
+	return {}
+
+
+func _inspect_from_parsed(d: Dictionary) -> Dictionary:
 	if not _blob_looks_like_save(d):
 		return {"readable": false, "metadata": {}, "error": "unreadable"}
 	var meta: Dictionary = {}
@@ -1500,6 +1691,48 @@ func _inspect_save_file(path: String) -> Dictionary:
 			if y > 0 and mo > 0 and da > 0:
 				meta["game_date"] = "%04d-%02d-%02d" % [y, mo, da]
 	return {"readable": true, "metadata": meta, "error": ""}
+
+
+func _inspect_save_file(path: String) -> Dictionary:
+	if not FileAccess.file_exists(path):
+		_inspect_cache_forget(path)
+		return {"readable": false, "metadata": {}, "error": "missing"}
+	var cached := _inspect_cache_lookup(path)
+	if not cached.is_empty():
+		return cached
+	var f := FileAccess.open(path, FileAccess.READ)
+	if f == null:
+		return {"readable": false, "metadata": {}, "error": "cannot open"}
+	var head := f.get_buffer(32768).get_string_from_utf8()
+	var peeked := _peek_save_envelope(head)
+	if bool(peeked.get("complete", false)):
+		f.close()
+		var head_result: Dictionary = {
+			"readable": true,
+			"metadata": peeked.get("metadata", {}),
+			"error": "",
+		}
+		_inspect_cache_remember(path, head_result)
+		return head_result
+	f.seek(0)
+	var text := f.get_as_text()
+	f.close()
+	peeked = _peek_save_envelope(text)
+	if bool(peeked.get("complete", false)):
+		var peek_result: Dictionary = {
+			"readable": true,
+			"metadata": peeked.get("metadata", {}),
+			"error": "",
+		}
+		_inspect_cache_remember(path, peek_result)
+		return peek_result
+	var parsed: Variant = JSON.parse_string(text)
+	if typeof(parsed) != TYPE_DICTIONARY:
+		return {"readable": false, "metadata": {}, "error": "unreadable"}
+	var result := _inspect_from_parsed(parsed as Dictionary)
+	if bool(result.get("readable", false)):
+		_inspect_cache_remember(path, result)
+	return result
 
 
 func _blob_looks_like_save(data: Dictionary) -> bool:
@@ -1531,6 +1764,10 @@ func save_game(slot_name: String = DEFAULT_SLOT) -> bool:
 
 	_last_save_path = path
 	_note_save_elapsed()
+	var save_meta: Dictionary = {}
+	if data.get("metadata") is Dictionary:
+		save_meta = (data["metadata"] as Dictionary).duplicate(true)
+	_inspect_cache_remember(path, {"readable": true, "metadata": save_meta, "error": ""})
 	print("SaveLoadManager: Game saved → %s (v%d, %d bytes)" % [path, SAVE_VERSION, json_text.length()])
 	_notify_save_list_refresh()
 
@@ -2638,6 +2875,10 @@ func save_game_detailed(slot_name: String = DEFAULT_SLOT) -> Dictionary:
 	_last_save_path = path
 	_note_save_elapsed()
 	var bytes := json_text.length()
+	var meta_out: Dictionary = {}
+	if data.get("metadata") is Dictionary:
+		meta_out = (data["metadata"] as Dictionary).duplicate(true)
+	_inspect_cache_remember(path, {"readable": true, "metadata": meta_out, "error": ""})
 	print("SaveLoadManager: Game saved → %s (v%d, %d bytes, slot=%s)" % [abs_path, SAVE_VERSION, bytes, safe_slot])
 	_notify_save_list_refresh()
 	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
@@ -2650,6 +2891,7 @@ func save_game_detailed(slot_name: String = DEFAULT_SLOT) -> Dictionary:
 		"slot": safe_slot,
 		"bytes": bytes,
 		"version": SAVE_VERSION,
+		"metadata": meta_out,
 	}
 
 ## Enhanced load with migration + feedback.
@@ -2732,6 +2974,7 @@ func delete_save(slot_name: String) -> bool:
 		push_error("SaveLoadManager: Failed to delete %s (err %d)" % [path, err])
 		return false
 	print("SaveLoadManager: Deleted save %s" % slot_name)
+	_inspect_cache_forget(path)
 	_notify_save_list_refresh()
 	return true
 
@@ -2753,5 +2996,7 @@ func rename_save(old_slot: String, new_slot: String) -> bool:
 
 	DirAccess.remove_absolute(old_path)
 	print("SaveLoadManager: Renamed %s -> %s" % [old_slot, new_slot])
+	_inspect_cache_forget(old_path)
+	_inspect_cache_forget(new_path)
 	_notify_save_list_refresh()
 	return true

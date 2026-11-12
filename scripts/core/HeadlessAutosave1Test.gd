@@ -64,6 +64,7 @@ func _run() -> void:
 	_test_idle_pause(sl)
 	_test_idle_pause_against_tib_watchdog(sl)
 	await _test_s3_quicksave_apply_row(sl)
+	await _test_s3_heavy_quicksave_apply_live_budget(sl)
 	_test_product_day_retired(sl)
 
 
@@ -498,6 +499,275 @@ func _test_s3_quicksave_apply_row(sl: Node) -> void:
 		return
 	ocp.queue_free()
 	_pass("S3 Quicksave Apply updates the row without freeing mid-pressed")
+
+
+func _write_heavy_probe(sl: Node, slot: String, unix: int, game_date: String, marker: String) -> int:
+	## Mid-campaign-weight fixture (~2.6 MB). Live S3 overwrote a 2626853-byte
+	## quicksave; the tiny `_write_probe` used by `_test_s3_quicksave_apply_row`
+	## cannot see that hang.
+	if sl.has_method("_ensure_save_dir"):
+		sl.call("_ensure_save_dir")
+	var provinces: Array = []
+	for i in range(800):
+		provinces.append({
+			"id": 710000 + i,
+			"owner_tag": "GER",
+			"controller_tag": "GER",
+			"development_level": 4,
+			"infrastructure": 6,
+			"factories": 2,
+			"name": "HeavyProbeProvince_%d" % i,
+			"manpower": 12000 + i,
+			"victory_points": 1,
+		})
+	var data := {
+		"save_version": 2,
+		"metadata": {
+			"timestamp_unix": unix,
+			"timestamp": "1936-01-01T00:00:00",
+			"game_date": game_date,
+			"last_played": "1936-01-01T00:00:00",
+			"save_kind": str(sl.call("slot_kind", slot)),
+			"session_locked": false,
+			"player_tag": "GER",
+			"marker": marker,
+		},
+		"land_war": {"version": 1, "open_battles": [], "marches": {}, "next_seq": 1, "last_aar": {}},
+		"map": {"provinces": provinces},
+	}
+	var text := JSON.stringify(data)
+	var want := 2626853
+	if text.length() < want:
+		data["pad"] = "x".repeat(want - text.length())
+		text = JSON.stringify(data)
+	var path := str(sl.call("get_save_path", slot))
+	var f := FileAccess.open(path, FileAccess.WRITE)
+	if f == null:
+		_fail("heavy probe write failed for %s" % slot)
+		return 0
+	f.store_string(text)
+	f.close()
+	return text.length()
+
+
+func _pump_frames_until(pred: Callable, budget_ms: int, label: String) -> bool:
+	var t0 := Time.get_ticks_msec()
+	if pred.call():
+		return true
+	while Time.get_ticks_msec() - t0 <= budget_ms:
+		var frame_start := Time.get_ticks_msec()
+		await process_frame
+		var frame_ms := Time.get_ticks_msec() - frame_start
+		if frame_ms > budget_ms:
+			_fail("%s: process_frame stalled %dms (budget %dms)" % [label, frame_ms, budget_ms])
+			return false
+		if pred.call():
+			return true
+	if pred.call():
+		return true
+	_fail("%s: still not done after %dms" % [label, Time.get_ticks_msec() - t0])
+	return false
+
+
+func _panel_is_closed(ocp: Node) -> bool:
+	if ocp == null:
+		return true
+	if not is_instance_valid(ocp):
+		return true
+	if ocp.is_queued_for_deletion():
+		return true
+	if ocp is CanvasItem and not (ocp as CanvasItem).visible:
+		return true
+	return false
+
+
+func _make_ocp(node_name: String = "OrderCommandPanel") -> Node:
+	var packed: PackedScene = load("res://scenes/ui/OrderCommandPanel.tscn") as PackedScene
+	if packed == null:
+		return null
+	var ocp: Node = packed.instantiate()
+	ocp.name = node_name
+	root.add_child(ocp)
+	return ocp
+
+
+func _populate_orders_like_first_open(ocp: Node) -> Node:
+	## Live hang: Orders already populated (first-open 30–70s) then Apply. Drain
+	## the deferred first refresh, then leave a body marker a full rebuild would
+	## queue_free.
+	if ocp.has_method("_rebuild_saves_section"):
+		ocp.call("_rebuild_saves_section")
+	await process_frame
+	await process_frame
+	var body: Node = ocp.get("_body")
+	if body != null:
+		for i in range(400):
+			var dummy := Label.new()
+			dummy.name = "Autosave2Catalog_%d" % i
+			dummy.text = "catalog_row_%d" % i
+			body.add_child(dummy)
+		var marker := Label.new()
+		marker.name = "AUTOSAVE2_BODY_MARKER"
+		marker.text = "keep-me"
+		body.add_child(marker)
+	return body.get_node_or_null("AUTOSAVE2_BODY_MARKER") if body != null else null
+
+
+func _row_is_fresh(ocp: Node, stale_date: String, fresh_date: String) -> bool:
+	var row := _find_s3_quicksave_row_label(ocp)
+	if row == null:
+		return false
+	var txt := str(row.text)
+	if txt.find(stale_date) >= 0:
+		return false
+	return txt.find(fresh_date) >= 0
+
+
+func _resume_is_fresh(ocp: Node, stale_date: String, fresh_date: String) -> bool:
+	var resume: Node = ocp.find_child("ResumeLineLabel", true, false)
+	if resume == null or not (resume is Label):
+		return true
+	var txt := str((resume as Label).text)
+	if txt.is_empty():
+		return true
+	if txt.find(stale_date) >= 0:
+		return false
+	return txt.find(fresh_date) >= 0
+
+
+func _emit_escape(ocp: Node) -> void:
+	var ev := InputEventKey.new()
+	ev.pressed = true
+	ev.echo = false
+	ev.keycode = KEY_ESCAPE
+	ev.physical_keycode = KEY_ESCAPE
+	ev.key_label = KEY_ESCAPE
+	ev.unicode = 27
+	if ocp.has_method("_input"):
+		ocp.call("_input", ev)
+	if not _panel_is_closed(ocp) and ocp.has_method("_unhandled_input"):
+		ocp.call("_unhandled_input", ev)
+
+
+func _test_s3_heavy_quicksave_apply_live_budget(sl: Node) -> void:
+	## AUTOSAVE-2: wall-clock budget, real Close, real Esc, mid-campaign weight.
+	## The existing S3 case waits two frames on a tiny 19 Jul probe and never
+	## clicks Close. This case must FAIL on the 4565db63 product tree because
+	## Apply still call_deferred("_rebuild_all_sections") and drops the body
+	## marker / leaves the ⚡ row stale until that rebuild finishes.
+	var bytes := _write_heavy_probe(sl, "quicksave", 100, "1936-01-01", "old-heavy")
+	if bytes < 2500000:
+		_fail("heavy probe too small (%d bytes); need mid-campaign ~2.6MB" % bytes)
+		return
+	print("  HeadlessAutosave1Test: heavy probe %d bytes" % bytes)
+	var tm := _tm()
+	if tm != null:
+		tm.current_year = 1936
+		tm.current_month = 1
+		tm.current_day = 16
+		tm.total_days_elapsed = 15
+		if tm.has_method("set_paused"):
+			tm.call("set_paused", true)
+	var lm := root.get_node_or_null("LeaderManager")
+	if lm != null and lm.has_method("set_player_country_tag"):
+		lm.call("set_player_country_tag", "GER")
+	var stale_date := "1 Jan 1936"
+	var fresh_date := "16 Jan 1936"
+
+	var ocp := _make_ocp()
+	if ocp == null:
+		_fail("heavy Close: OrderCommandPanel.tscn missing")
+		return
+	var marker: Node = await _populate_orders_like_first_open(ocp)
+	var stale := _find_s3_quicksave_row_label(ocp)
+	if stale == null or str(stale.text).find(stale_date) < 0:
+		_fail("heavy Close: stale ⚡ row missing 1 Jan 1936: %s" % (str(stale.text) if stale != null else "none"))
+		ocp.queue_free()
+		return
+	var apply_btn := _find_s3_quicksave_apply_button(ocp)
+	if apply_btn == null:
+		_fail("heavy Close: Quicksave Apply/Save button missing")
+		ocp.queue_free()
+		return
+	apply_btn.pressed.emit()
+	if not is_instance_valid(apply_btn):
+		_fail("heavy Close: Apply freed the button while pressed")
+		return
+	var row_ok := await _pump_frames_until(
+		func() -> bool: return _row_is_fresh(ocp, stale_date, fresh_date),
+		2000,
+		"heavy Close: ⚡ row within 2s"
+	)
+	if not row_ok:
+		ocp.queue_free()
+		return
+	if not _resume_is_fresh(ocp, stale_date, fresh_date):
+		var resume_n: Node = ocp.find_child("ResumeLineLabel", true, false)
+		_fail("heavy Close: Resume line still stale: %s" % (str((resume_n as Label).text) if resume_n is Label else "missing"))
+		ocp.queue_free()
+		return
+	var result_lbl: Label = ocp.get("_result") as Label
+	if result_lbl == null or str(result_lbl.text).find("save_slot:quicksave") < 0 or str(result_lbl.text).find("OK") < 0:
+		_fail("heavy Close: Last result missing save_slot:quicksave → OK: %s" % (str(result_lbl.text) if result_lbl != null else "none"))
+		ocp.queue_free()
+		return
+	if marker == null or not is_instance_valid(marker) or marker.is_queued_for_deletion():
+		_fail("heavy Close: Apply rebuilt the whole Orders body (marker gone)")
+		ocp.queue_free()
+		return
+	var close_btn: Node = ocp.get("_close_btn")
+	if close_btn == null or not (close_btn is BaseButton):
+		_fail("heavy Close: Close button missing after Apply")
+		ocp.queue_free()
+		return
+	(close_btn as BaseButton).pressed.emit()
+	var closed := await _pump_frames_until(
+		func() -> bool: return _panel_is_closed(ocp),
+		1000,
+		"heavy Close: Close within 1s"
+	)
+	if not closed:
+		if is_instance_valid(ocp):
+			ocp.queue_free()
+		return
+	_pass("heavy Quicksave Apply: ⚡/Resume within 2s, Close within 1s, no full-body rebuild")
+
+	_write_heavy_probe(sl, "quicksave", 100, "1936-01-01", "old-heavy-esc")
+	var ocp_esc := _make_ocp("OrderCommandPanel_esc")
+	if ocp_esc == null:
+		_fail("heavy Esc: OrderCommandPanel.tscn missing")
+		return
+	await _populate_orders_like_first_open(ocp_esc)
+	var stale_esc := _find_s3_quicksave_row_label(ocp_esc)
+	if stale_esc == null or str(stale_esc.text).find(stale_date) < 0:
+		_fail("heavy Esc: stale ⚡ row missing 1 Jan 1936")
+		ocp_esc.queue_free()
+		return
+	var apply_esc := _find_s3_quicksave_apply_button(ocp_esc)
+	if apply_esc == null:
+		_fail("heavy Esc: Quicksave Apply/Save button missing")
+		ocp_esc.queue_free()
+		return
+	apply_esc.pressed.emit()
+	var row_esc_ok := await _pump_frames_until(
+		func() -> bool: return _row_is_fresh(ocp_esc, stale_date, fresh_date),
+		2000,
+		"heavy Esc: ⚡ row within 2s"
+	)
+	if not row_esc_ok:
+		ocp_esc.queue_free()
+		return
+	_emit_escape(ocp_esc)
+	var esc_closed := await _pump_frames_until(
+		func() -> bool: return _panel_is_closed(ocp_esc),
+		1000,
+		"heavy Esc: Esc within 1s"
+	)
+	if not esc_closed:
+		if is_instance_valid(ocp_esc):
+			ocp_esc.queue_free()
+		return
+	_pass("heavy Quicksave Apply: Esc dismisses the panel within 1s")
 
 
 func _s3_quicksave_core(text: String) -> String:
