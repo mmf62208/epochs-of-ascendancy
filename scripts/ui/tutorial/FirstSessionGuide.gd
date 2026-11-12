@@ -5,7 +5,10 @@ extends Node
 const LAYER := 118
 const TICK_S := 0.25
 const FLASH_S := 0.6
-const CARD_GAP := 12.0
+const TOP_CHROME := 56.0
+const VIEW_PAD := 8.0
+const AVOID_PAD := 16.0
+const COUNTER_W := 48.0
 const JUSTIFY_CANDIDATES: PackedStringArray = [
 	"POL", "CZE", "FRA", "BEL", "NLD", "DEN", "AUT", "LIT", "ENG", "SOV", "ITA", "USA", "HUN",
 ]
@@ -35,6 +38,8 @@ var _saw_day_unpaused: bool = false
 var _paused_for_justify: bool = false
 var _target_tag: String = "POL"
 var _battle_player: bool = false
+var _under_attack: bool = false
+var _leader_suppressed: bool = false
 var _press_next: bool = false
 var _press_got_it: bool = false
 var _boot_connected: Dictionary = {}
@@ -157,7 +162,11 @@ func _build_layer() -> void:
 	_card.close_pressed.connect(func() -> void: _confirm_skip = true; _eval_now())
 	_card.got_it_pressed.connect(_on_got_it)
 	_card.dont_show_again_toggled.connect(func(on: bool) -> void: _dont_show = on)
+	if not _card.reflow_requested.is_connected(_on_card_reflow):
+		_card.reflow_requested.connect(_on_card_reflow)
 	_host.add_child(_card)
+	if not _host.resized.is_connected(_on_host_resized):
+		_host.resized.connect(_on_host_resized)
 	_prompt = TutorialPrompt.new()
 	_prompt.name = "TutorialPromptPopup"
 	_prompt.anchor_left = 0.0
@@ -231,6 +240,7 @@ func _reset_session(keep_force: bool) -> void:
 	_target_tag = "POL"
 	_paused_for_justify = false
 	_battle_player = false
+	_under_attack = false
 	_press_next = false
 	_press_got_it = false
 	_reset_runtime_flags()
@@ -300,18 +310,20 @@ func _apply_result(result: Dictionary) -> void:
 	var state := str(result.get("state", "active"))
 	if state == "auto_skip":
 		_present_card(result)
+		_place_card(result)
 		_play_step_sfx()
 		_flash_id = sid
-		_flash_left = FLASH_S
+		_flash_left = _done_hold_s(result)
 		return
 	if state == "done":
 		_present_card(result)
+		_place_card(result)
 		_play_step_sfx()
 		if sid == "justify_wait":
 			_pause_clock_once()
 			_play_sfx("justify_ready")
 		_flash_id = sid
-		_flash_left = FLASH_S
+		_flash_left = _done_hold_s(result)
 		return
 	result["confirm_skip"] = _confirm_skip
 	_present_card(result)
@@ -327,6 +339,9 @@ func _on_step_enter(sid: String) -> void:
 	_saw_day_unpaused = false
 	if sid == "justify_wait":
 		_paused_for_justify = false
+	if sid == "fight":
+		# A battle from before this step must not stick. Open battles are re-read each tick.
+		_under_attack = false
 
 
 func _finish_flash() -> void:
@@ -638,8 +653,11 @@ func _on_battle(context: Dictionary) -> void:
 	var player := _player_tag()
 	var atk := str(context.get("attacker", context.get("attacker_tag", ""))).to_upper()
 	var dfn := str(context.get("defender", context.get("defender_tag", ""))).to_upper()
-	if atk == player or dfn == player:
+	# Step 10 completes only when the player starts the battle. Being the defender does not.
+	if atk == player:
 		_battle_player = true
+	if dfn == player:
+		_under_attack = true
 
 
 func _snapshot_now() -> Dictionary:
@@ -674,6 +692,7 @@ func _snapshot_now() -> Dictionary:
 		ready = bool(WarStateDomain.player_justify_is_ready_for(target))
 	if not _battle_player and _player_open_land_battle():
 		_battle_player = true
+	var under := _under_attack or _defender_open_land_battle()
 	var log_new := _log_new_keys(_step_log_copy)
 	var minutes := 0.0
 	if _begin_msec > 0:
@@ -713,6 +732,7 @@ func _snapshot_now() -> Dictionary:
 		"cue_order_attack": log_new.has("order_attack"),
 		"cue_save_ok": log_new.has("save_ok"),
 		"battle_started_player": _battle_player,
+		"player_under_attack": under,
 		"minutes_since_begin": minutes,
 		"press_next": _press_next,
 		"press_got_it": _press_got_it,
@@ -819,30 +839,119 @@ func _player_open_land_battle() -> bool:
 			continue
 		var row: Dictionary = raw
 		var att := str(row.get("att_tag", row.get("attacker_tag", ""))).strip_edges().to_upper()
+		if att == player:
+			return true
+	return false
+
+
+func _defender_open_land_battle() -> bool:
+	if typeof(BattleManager) == TYPE_NIL or not BattleManager.has_method("get_open_land_battles"):
+		return false
+	var player := _player_tag()
+	if player.is_empty():
+		return false
+	for raw in BattleManager.get_open_land_battles():
+		if typeof(raw) != TYPE_DICTIONARY:
+			continue
+		var row: Dictionary = raw
 		var dfn := str(row.get("def_tag", row.get("defender_tag", ""))).strip_edges().to_upper()
-		if att == player or dfn == player:
+		if dfn == player:
 			return true
 	return false
 
 
 func _unit_adjacent(player: String, target: String) -> bool:
+	return int(_border_unit(player, target).get("pid", -1)) > 0
+
+
+func _border_unit(player: String, target: String) -> Dictionary:
 	if typeof(LeaderManager) == TYPE_NIL or not LeaderManager.has_method("get_formations_for_country"):
-		return false
+		return {}
 	if typeof(MapManager) == TYPE_NIL or not MapManager.has_method("get_adjacent_provinces"):
-		return false
+		return {}
+	var want := target.strip_edges().to_upper()
+	if want.is_empty():
+		return {}
+	var idle: Array = []
+	var busy: Array = []
 	var forms: Array = LeaderManager.get_formations_for_country(player)
 	for f in forms:
 		if f == null:
 			continue
 		var pid := int(f.get("stationed_province_id")) if "stationed_province_id" in f else -1
-		if pid <= 0:
+		if pid <= 0 or not _province_touches_tag(pid, want):
 			continue
-		var adj: Array = MapManager.get_adjacent_provinces(pid, true)
-		for ap in adj:
-			var p: Variant = MapManager.get_province(int(ap)) if MapManager.has_method("get_province") else null
-			if p != null and str(p.get("owner_tag")).to_upper() == target.to_upper():
-				return true
+		var fid := str(f.get("formation_id")) if "formation_id" in f else ""
+		var row := {"pid": pid, "fid": fid}
+		if _formation_in_open_battle(fid):
+			busy.append(row)
+		else:
+			idle.append(row)
+	var pool: Array = idle if not idle.is_empty() else busy
+	if pool.is_empty():
+		return {}
+	var best: Dictionary = pool[0]
+	var cap := _capital_centroid(player)
+	if cap != Vector2.ZERO and MapManager.has_method("get_province_centroid"):
+		var best_d := INF
+		for raw in pool:
+			var row: Dictionary = raw
+			var c: Vector2 = MapManager.get_province_centroid(int(row.get("pid", -1)))
+			var d := c.distance_squared_to(cap)
+			if d < best_d:
+				best_d = d
+				best = row
+	return best
+
+
+func _province_touches_tag(pid: int, tag: String) -> bool:
+	if pid <= 0 or typeof(MapManager) == TYPE_NIL or not MapManager.has_method("get_adjacent_provinces"):
+		return false
+	var want := tag.to_upper()
+	for ap in MapManager.get_adjacent_provinces(pid, true):
+		var p: Variant = MapManager.get_province(int(ap)) if MapManager.has_method("get_province") else null
+		if p != null and str(p.get("owner_tag")).to_upper() == want:
+			return true
 	return false
+
+
+func _formation_in_open_battle(fid: String) -> bool:
+	if fid.is_empty() or typeof(BattleManager) == TYPE_NIL:
+		return false
+	if not BattleManager.has_method("get_land_battle_for_formation"):
+		return false
+	var battle: Dictionary = BattleManager.get_land_battle_for_formation(fid)
+	return not battle.is_empty()
+
+
+func _capital_centroid(player: String) -> Vector2:
+	if typeof(MapManager) == TYPE_NIL or not MapManager.has_method("get_country"):
+		return Vector2.ZERO
+	if not MapManager.has_method("get_province_centroid"):
+		return Vector2.ZERO
+	var country: Variant = MapManager.get_country(player)
+	var pid := -1
+	if country is Object and "capital_province_id" in country:
+		pid = int(country.capital_province_id)
+	elif country is Dictionary:
+		pid = int((country as Dictionary).get("capital_province_id", -1))
+	if pid <= 0:
+		return Vector2.ZERO
+	return MapManager.get_province_centroid(pid)
+
+
+func _active_target_tag() -> String:
+	var player := _player_tag()
+	var justify := _find_justify_tag(player)
+	var target := _target_tag if not _target_tag.is_empty() else "POL"
+	if not justify.is_empty():
+		target = justify
+	if typeof(WarStateDomain) != TYPE_NIL:
+		var at_target := bool(WarStateDomain.is_at_war(player, target))
+		var foes: Array = WarStateDomain.enemies_of(player)
+		if not foes.is_empty() and not at_target:
+			target = str(foes[0])
+	return target
 
 
 func _log_copy() -> Array:
@@ -956,62 +1065,283 @@ func _find_named(node_name: String) -> Node:
 	return tree.root.find_child(node_name, true, false)
 
 
+func _done_hold_s(result: Dictionary) -> float:
+	var h := float(result.get("p1_done_hold_s", 0.0))
+	if h > 0.0:
+		return h
+	return FLASH_S
+
+
+func _on_card_reflow() -> void:
+	if _card == null or not _card.visible:
+		return
+	var model: Dictionary = {}
+	var cur: Variant = _card.get("_current")
+	if cur is Dictionary:
+		model = cur
+	_place_card(model)
+
+
+func _on_host_resized() -> void:
+	_on_card_reflow()
+
+
 func _place_card(result: Dictionary) -> void:
 	if _card == null or _host == null:
 		return
 	var host_size := _host.size
 	if host_size.x < 8.0:
 		host_size = Vector2(1280, 800)
-	var card_size := _card.get_combined_minimum_size()
+	var card_size := _card.size
+	if card_size.y < 8.0:
+		card_size = _card.get_combined_minimum_size()
 	if card_size.x < 8.0:
-		card_size = Vector2(380, 220)
-	var target := _target_rect(result)
-	_highlight_rect = target
-	var pos := Vector2(host_size.x - card_size.x - 24.0, 96.0)
-	if target.size.x > 4.0:
-		pos = Vector2(target.end.x + CARD_GAP, target.position.y)
-		if pos.x + card_size.x > host_size.x - 8.0:
-			pos.x = target.position.x - card_size.x - CARD_GAP
-		if pos.x < 8.0:
-			pos.x = 8.0
-		if pos.y + card_size.y > host_size.y - 8.0:
-			pos.y = host_size.y - card_size.y - 8.0
-		if pos.y < 64.0:
-			pos.y = 64.0
+		card_size.x = 380.0
+	var target_global := _target_rect(result)
+	_highlight_rect = target_global
+	var target := _rect_to_host(target_global)
+	var has_target := target.size.x > 4.0 and target.size.y > 4.0
+	var avoids := _avoid_rects_host(target if has_target else Rect2())
+	var anchor := str(result.get("p1_anchor", ""))
+	var order: Array[String] = []
+	if not anchor.is_empty():
+		order.append(anchor)
+	if has_target:
+		for slot_name in ["right_of_target", "left_of_target", "below_target"]:
+			if not order.has(slot_name):
+				order.append(slot_name)
+	if not order.has("top_right"):
+		order.append("top_right")
+	var pos := _slot_top_right(card_size, host_size)
+	var placed := false
+	for slot_name in order:
+		if not has_target and slot_name != "top_right":
+			continue
+		var candidate := _slot_position(slot_name, target, card_size, host_size)
+		if _slot_fits(candidate, card_size, host_size, avoids):
+			pos = candidate
+			placed = true
+			break
 	_card.position = pos
+	_leader_suppressed = has_target and not placed
 	if _leader != null:
-		_leader.visible = target.size.x > 4.0
+		_leader.visible = has_target and not _leader_suppressed
 		_leader.queue_redraw()
 	if _highlight != null:
-		_highlight.visible = target.size.x > 4.0
+		_highlight.visible = has_target and str(result.get("state", "")) != "done"
 		_highlight.queue_redraw()
+
+
+func _slot_top_right(card_size: Vector2, host_size: Vector2) -> Vector2:
+	return Vector2(host_size.x - card_size.x - 24.0, 96.0)
+
+
+func _slot_position(slot_name: String, target: Rect2, card_size: Vector2, host_size: Vector2) -> Vector2:
+	match slot_name:
+		"right_of_target":
+			return Vector2(target.end.x + AVOID_PAD, target.position.y)
+		"left_of_target":
+			return Vector2(target.position.x - card_size.x - AVOID_PAD, target.position.y)
+		"below_target":
+			return Vector2(target.position.x, target.end.y + AVOID_PAD)
+		"above_target":
+			return Vector2(target.position.x, target.position.y - card_size.y - AVOID_PAD)
+		_:
+			return _slot_top_right(card_size, host_size)
+
+
+func _slot_fits(pos: Vector2, card_size: Vector2, host_size: Vector2, avoids: Array) -> bool:
+	if pos.x < VIEW_PAD or pos.y < TOP_CHROME:
+		return false
+	if pos.x + card_size.x > host_size.x - VIEW_PAD:
+		return false
+	if pos.y + card_size.y > host_size.y - VIEW_PAD:
+		return false
+	var card_r := Rect2(pos, card_size)
+	for raw in avoids:
+		if raw is Rect2 and card_r.intersects(raw as Rect2):
+			return false
+	return true
+
+
+func _avoid_rects_host(target_host: Rect2) -> Array:
+	var out: Array = []
+	if target_host.size.x > 1.0 and target_host.size.y > 1.0:
+		out.append(target_host.grow(AVOID_PAD))
+	for node_name in ["InfoPanel", "UnitDetailPopup", "OpenFightSheet"]:
+		var node := _find_named(node_name)
+		if node is Control and _node_visible_in_tree(node):
+			out.append(_rect_to_host((node as Control).get_global_rect()))
+	if _find_visible_control("OpenFightSheet") == null:
+		var sheet := _open_fight_sheet_control()
+		if sheet != null:
+			out.append(_rect_to_host(sheet.get_global_rect()))
+	return out
+
+
+func _find_visible_control(node_name: String) -> Control:
+	var node := _find_named(node_name)
+	if node is Control and _node_visible_in_tree(node):
+		return node as Control
+	return null
+
+
+func _open_fight_sheet_control() -> Control:
+	var named := _find_visible_control("OpenFightSheet")
+	if named != null:
+		return named
+	var btn := _find_named("BtnStartBattle")
+	if not (btn is Control) or not _node_visible_in_tree(btn):
+		return null
+	var cur: Node = btn
+	var hops := 0
+	while cur != null and hops < 8:
+		if cur != btn and cur is PanelContainer and _node_visible_in_tree(cur):
+			return cur as Control
+		cur = cur.get_parent()
+		hops += 1
+	return btn as Control
+
+
+func _rect_to_host(global_rect: Rect2) -> Rect2:
+	if _host == null:
+		return global_rect
+	if global_rect.size.x <= 0.0 and global_rect.size.y <= 0.0:
+		return global_rect
+	var inv := _host.get_global_transform_with_canvas().affine_inverse()
+	var a := inv * global_rect.position
+	var b := inv * global_rect.end
+	return Rect2(
+		Vector2(minf(a.x, b.x), minf(a.y, b.y)),
+		Vector2(absf(b.x - a.x), absf(b.y - a.y))
+	)
+
+
+func _point_to_host(global_pt: Vector2) -> Vector2:
+	if _host == null:
+		return global_pt
+	return _host.get_global_transform_with_canvas().affine_inverse() * global_pt
 
 
 func _target_rect(result: Dictionary) -> Rect2:
 	var spec_t: Variant = result.get("target", {})
-	if not (spec_t is Dictionary):
-		return Rect2()
-	var t: Dictionary = spec_t
+	var t: Dictionary = spec_t if spec_t is Dictionary else {}
+	var prefer := str(t.get("p1_prefer", ""))
+	if not prefer.is_empty():
+		var pref := _visible_control_rect(prefer)
+		if pref.size.x > 4.0:
+			return pref
+	var when := str(t.get("p1_target_when", ""))
+	if when == "inspector_on_target":
+		if _inspector_on_tag(_active_target_tag()):
+			var on_rect := _visible_control_rect(_path_tail(str(t.get("path", ""))))
+			if on_rect.size.x > 4.0:
+				return on_rect
+		else:
+			var else_rect := _visible_control_rect(_path_tail(str(t.get("p1_else", ""))))
+			if else_rect.size.x > 4.0:
+				return else_rect
 	var kind := str(t.get("kind", ""))
+	var p1_target: Variant = result.get("p1_target", {})
+	var border_kind := p1_target is Dictionary and str((p1_target as Dictionary).get("kind", "")) == "own_border_unit"
+	if kind == "node_in_unit_card":
+		var card_rect := _visible_control_rect(str(t.get("name", "")))
+		if card_rect.size.x > 4.0:
+			return card_rect
+		if border_kind:
+			return _own_border_unit_rect()
+	elif border_kind or kind == "own_border_unit":
+		return _own_border_unit_rect()
 	match kind:
 		"node":
-			var path := str(t.get("path", ""))
-			var node := _node_from_path(path)
-			if node is Control:
+			var node := _node_from_path(str(t.get("path", "")))
+			if node is Control and _node_visible_in_tree(node):
 				return (node as Control).get_global_rect()
 			if node is CanvasItem:
 				return Rect2((node as CanvasItem).get_global_transform_with_canvas().origin, Vector2(48, 48))
-		"node_in_unit_card":
-			var nm := str(t.get("name", ""))
-			var btn := _find_named(nm)
-			if btn is Control:
-				return (btn as Control).get_global_rect()
+		"own_border_unit":
+			return _own_border_unit_rect()
 		_:
 			pass
-	var dipl := _find_named("DiplomacyButton")
-	if dipl is Control and str(result.get("step_id", "")) == "justify":
-		return (dipl as Control).get_global_rect()
+	if str(result.get("step_id", "")) == "justify":
+		var dipl := _visible_control_rect("DiplomacyButton")
+		if dipl.size.x > 4.0:
+			return dipl
 	return Rect2()
+
+
+func _path_tail(path: String) -> String:
+	var last := path.get_file()
+	if last.is_empty():
+		last = path
+	if last.find(" ") >= 0:
+		last = last.split(" ")[0]
+	return last
+
+
+func _visible_control_rect(node_name: String) -> Rect2:
+	if node_name.is_empty():
+		return Rect2()
+	var node := _find_named(node_name)
+	if node is Control and _node_visible_in_tree(node):
+		return (node as Control).get_global_rect()
+	return Rect2()
+
+
+func _own_border_unit_rect() -> Rect2:
+	var unit := _border_unit(_player_tag(), _active_target_tag())
+	var pid := int(unit.get("pid", -1))
+	if pid <= 0:
+		return Rect2()
+	var mr := _map_renderer()
+	if mr == null or not (mr is CanvasItem):
+		return Rect2()
+	if typeof(MapManager) == TYPE_NIL or not MapManager.has_method("get_province_centroid"):
+		return Rect2()
+	var world: Vector2 = MapManager.get_province_centroid(pid)
+	var canvas_xf: Transform2D = (mr as CanvasItem).get_global_transform_with_canvas()
+	var screen: Vector2 = canvas_xf * world
+	var zoom := absf(canvas_xf.get_scale().x)
+	if zoom < 0.001:
+		zoom = 1.0
+	var box := clampf(56.0 * zoom, 40.0, 72.0)
+	var ring := Rect2(screen - Vector2(box, box) * 0.5, Vector2(box, box))
+	var fid := str(unit.get("fid", ""))
+	if mr.has_method("mv1_formation_screen_pos") and not fid.is_empty():
+		var counter: Vector2 = mr.call("mv1_formation_screen_pos", fid)
+		if counter != Vector2.ZERO and screen.distance_to(counter) > COUNTER_W:
+			print("EOA_P1A centroid off counter pid=%d fid=%s dist=%.1f; fallback province box" % [
+				pid, fid, screen.distance_to(counter)
+			])
+			var prov := _province_screen_box(mr, pid)
+			if prov.size.x > 4.0:
+				return prov
+	return ring
+
+
+func _province_screen_box(mr: Node, pid: int) -> Rect2:
+	if not mr.has_method("_province_node") or not mr.has_method("_get_province_polygon"):
+		return Rect2()
+	var node: Variant = mr.call("_province_node", pid)
+	if not (node is Node2D):
+		return Rect2()
+	var poly_v: Variant = mr.call("_get_province_polygon", node)
+	if not (poly_v is Polygon2D):
+		return Rect2()
+	var poly := poly_v as Polygon2D
+	if poly.polygon.is_empty():
+		return Rect2()
+	var xf := poly.get_global_transform_with_canvas()
+	var rect := Rect2()
+	var first := true
+	for pt in poly.polygon:
+		var sp: Vector2 = xf * pt
+		if first:
+			rect = Rect2(sp, Vector2.ZERO)
+			first = false
+		else:
+			rect = rect.expand(sp)
+	return rect
 
 
 func _node_from_path(path: String) -> Node:
@@ -1049,14 +1379,34 @@ func _draw_highlight() -> void:
 
 
 func _draw_leader() -> void:
-	if _card == null or not _card.visible or _highlight_rect.size.x < 4.0:
+	if _leader_suppressed or _card == null or not _card.visible or _highlight_rect.size.x < 4.0:
 		return
-	var from_pt := _card.position + Vector2(0, 28)
-	var to_pt := _highlight_rect.get_center()
+	var card_rect := Rect2(_card.position, _card.size)
+	var to_pt := _point_to_host(_highlight_rect.get_center())
+	var from_pt := _nearest_edge_point(card_rect, to_pt)
 	var col := RetrowaveTheme.CYAN
 	if str(_card._current.get("accent", "")) == "magenta":
 		col = RetrowaveTheme.MAGENTA
 	_draw_dash(_leader, from_pt, to_pt, col, 2.0)
+
+
+func _nearest_edge_point(rect: Rect2, pt: Vector2) -> Vector2:
+	var x := clampf(pt.x, rect.position.x, rect.end.x)
+	var y := clampf(pt.y, rect.position.y, rect.end.y)
+	if not rect.has_point(pt):
+		return Vector2(x, y)
+	var dl := pt.x - rect.position.x
+	var dr := rect.end.x - pt.x
+	var dt := pt.y - rect.position.y
+	var db := rect.end.y - pt.y
+	var m := minf(minf(dl, dr), minf(dt, db))
+	if is_equal_approx(m, dl):
+		return Vector2(rect.position.x, pt.y)
+	if is_equal_approx(m, dr):
+		return Vector2(rect.end.x, pt.y)
+	if is_equal_approx(m, dt):
+		return Vector2(pt.x, rect.position.y)
+	return Vector2(pt.x, rect.end.y)
 
 
 func _draw_dash(c: Control, a: Vector2, b: Vector2, col: Color, width: float) -> void:

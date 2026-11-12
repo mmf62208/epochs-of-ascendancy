@@ -12,6 +12,7 @@ signal skip_keep_pressed
 signal got_it_pressed
 signal close_pressed
 signal dont_show_again_toggled(on: bool)
+signal reflow_requested
 
 const CARD_WIDTH := 380.0
 const CARD_WIDTH_WAR := 400.0
@@ -54,6 +55,7 @@ func _ready() -> void:
 	_load_font()
 	_build()
 	visible = false
+	set_process(true)
 
 
 func present(model: Dictionary) -> void:
@@ -67,7 +69,12 @@ func present(model: Dictionary) -> void:
 	_body.text = str(model.get("body", ""))
 	_status.text = str(model.get("status_text", ""))
 	_status.visible = not _status.text.is_empty() and str(model.get("state", "")) != "done"
-	_status.add_theme_color_override("font_color", accent)
+	var status_col := accent
+	var status_hex := str(model.get("status_color", "")).strip_edges()
+	if not status_hex.is_empty():
+		status_col = Color(status_hex)
+	_status.add_theme_color_override("font_color", status_col)
+	_apply_status_weight(bool(model.get("status_bold", false)))
 	_fill_dots(n, accent)
 	_fill_keys(model.get("keys", []), accent)
 	var prog: Variant = model.get("progress", {})
@@ -100,6 +107,8 @@ func present(model: Dictionary) -> void:
 		_progress_wrap.visible = false
 	visible = bool(model.get("visible", true))
 	_fit_width(accent)
+	_hug_content()
+	call_deferred("_reflow")
 
 
 func set_dont_show_again(on: bool) -> void:
@@ -300,6 +309,9 @@ func _fill_dots(n: int, accent: Color) -> void:
 	for i in TutorialGuideDomain.STEP_COUNT:
 		var d := ColorRect.new()
 		d.custom_minimum_size = Vector2(6, 6)
+		d.size = Vector2(6, 6)
+		d.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		d.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		d.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		if i < n:
 			d.color = accent
@@ -352,6 +364,63 @@ func _apply_frame(accent: Color) -> void:
 	fill.set_corner_radius_all(3)
 	if _progress_bar != null:
 		_progress_bar.add_theme_stylebox_override("fill", fill)
+
+
+func _process(_delta: float) -> void:
+	# present() hugs immediately, but a Label's wrapped minimum arrives a frame later.
+	# Keep shrinking until the laid-out minimum is the card height.
+	var before := size
+	_hug_content()
+	if not size.is_equal_approx(before):
+		reflow_requested.emit()
+
+
+func _hug_content() -> void:
+	var w := custom_minimum_size.x
+	if w < 8.0:
+		w = CARD_WIDTH
+	update_minimum_size()
+	# Drop the stale height first so Godot recomputes the wrapped minimum.
+	size = Vector2(w, 0)
+	reset_size()
+	var fitted := get_combined_minimum_size()
+	var h := fitted.y
+	var limit := _height_limit()
+	if h > limit - 1.0:
+		h = maxf(1.0, limit - 1.0)
+	size = Vector2(maxf(w, fitted.x), h)
+
+
+func _height_limit() -> float:
+	# GuideHost is the full-screen parent, so 60% of the host is 60% of the viewport.
+	var parent := get_parent() as Control
+	var h := 0.0
+	if parent != null:
+		h = parent.size.y
+	if h < 32.0:
+		var vp := get_viewport()
+		if vp != null:
+			h = vp.get_visible_rect().size.y
+	if h < 32.0:
+		h = 800.0
+	return h * 0.6
+
+
+func _reflow() -> void:
+	_hug_content()
+	reflow_requested.emit()
+
+
+func _apply_status_weight(bold: bool) -> void:
+	if _status == null:
+		return
+	if not bold:
+		_status.remove_theme_font_override("font")
+		return
+	var fv := FontVariation.new()
+	fv.base_font = ThemeDB.fallback_font
+	fv.variation_opentype = {"wght": 700}
+	_status.add_theme_font_override("font", fv)
 
 
 func _fit_width(_accent: Color) -> void:

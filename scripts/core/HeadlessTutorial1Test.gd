@@ -69,6 +69,10 @@ func _run() -> void:
 	_test_own_unit_card_not_inspector()
 	_test_cue_log_wrap_and_battle()
 	_test_completed_does_not_autostart()
+	await _test_p1a_card_hugs_content()
+	_test_p1a_fight_copy_and_done_hold()
+	_test_p1a_under_attack_keeps_fight_open()
+	await _test_p1a_target_rings()
 	_finish()
 
 
@@ -718,3 +722,281 @@ func _test_completed_does_not_autostart() -> void:
 		guide.call("_hide_card")
 		guide.call("_hide_prompt")
 	_pass("completed Begin does not auto-start; replay still starts at 1")
+
+
+func _p1a_done_before(step_id: String) -> Array:
+	var done: Array = []
+	for sid in STEP_IDS:
+		if str(sid) == step_id:
+			break
+		done.append(str(sid))
+	return done
+
+
+func _p1a_active_model(step_id: String) -> Dictionary:
+	OS.set_environment("EOA_TUTORIAL", "1")
+	var extra := {}
+	if step_id == "fight":
+		extra["player_unit_adjacent_enemy"] = true
+	return _eval(_base_snap(extra), _prog(_p1a_done_before(step_id)))
+
+
+func _test_p1a_card_hugs_content() -> void:
+	var guide := _guide()
+	if guide == null:
+		_fail("P1a card hug: FirstSessionGuide missing")
+		return
+	var host: Control = guide.get_node_or_null("FirstSessionLayer/GuideHost") as Control
+	var card: TutorialCard = guide.get("_card") as TutorialCard
+	if host == null or card == null:
+		_fail("P1a card hug: host or card missing")
+		return
+	host.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	host.position = Vector2.ZERO
+	host.custom_minimum_size = Vector2(1280, 800)
+	host.size = Vector2(1280, 800)
+	await process_frame
+	var cases: Array = [
+		{"id": "welcome", "confirm": false},
+		{"id": "units", "confirm": false},
+		{"id": "fight", "confirm": false},
+		{"id": "ending", "confirm": false},
+		{"id": "welcome", "confirm": true},
+	]
+	for raw in cases:
+		var c: Dictionary = raw
+		var sid := str(c.get("id", ""))
+		var model := _p1a_active_model(sid)
+		if str(model.get("step_id", "")) != sid or not bool(model.get("visible", false)):
+			_fail("P1a card hug: model for %s missing (step=%s vis=%s)" % [
+				sid, str(model.get("step_id", "")), str(model.get("visible", false))
+			])
+			OS.set_environment("EOA_TUTORIAL", "")
+			return
+		model["confirm_skip"] = bool(c.get("confirm", false))
+		model["visible"] = true
+		card.size = Vector2(maxf(card.custom_minimum_size.x, 340.0), host.size.y * 0.85)
+		card.present(model)
+		await process_frame
+		await process_frame
+		await process_frame
+		var combined := card.get_combined_minimum_size()
+		var label := "step %s%s" % [str(model.get("n", 0)), " skip-confirm" if bool(c.get("confirm", false)) else ""]
+		if card.size.y > combined.y + 1.0:
+			_fail("P1a card hug: %s size.y=%.1f > combined_min.y+1 (%.1f)" % [label, card.size.y, combined.y])
+			OS.set_environment("EOA_TUTORIAL", "")
+			return
+		if card.size.y + 1.0 < combined.y:
+			_fail("P1a card hug: %s size.y=%.1f collapsed under combined_min.y %.1f" % [label, card.size.y, combined.y])
+			OS.set_environment("EOA_TUTORIAL", "")
+			return
+		if card.size.y >= host.size.y * 0.6:
+			_fail("P1a card hug: %s size.y=%.1f >= 0.6*host %.1f" % [label, card.size.y, host.size.y * 0.6])
+			OS.set_environment("EOA_TUTORIAL", "")
+			return
+	var dots := 0
+	for node in card.find_children("*", "ColorRect", true, false):
+		if node.is_queued_for_deletion():
+			continue
+		var dot := node as ColorRect
+		if dot.size_flags_horizontal != Control.SIZE_SHRINK_CENTER or dot.size_flags_vertical != Control.SIZE_SHRINK_CENTER:
+			_fail("P1a card hug: step dots are not SIZE_SHRINK_CENTER")
+			OS.set_environment("EOA_TUTORIAL", "")
+			return
+		dots += 1
+	if dots != TutorialGuideDomain.STEP_COUNT:
+		_fail("P1a card hug: dot count %d" % dots)
+		OS.set_environment("EOA_TUTORIAL", "")
+		return
+	OS.set_environment("EOA_TUTORIAL", "")
+	_pass("P1a card hugs content on steps 1, 5, 10, 12 and skip-confirm")
+
+
+func _test_p1a_fight_copy_and_done_hold() -> void:
+	OS.set_environment("EOA_TUTORIAL", "1")
+	var before := _p1a_done_before("fight")
+	var wait: Dictionary = _eval(_base_snap({"player_unit_adjacent_enemy": false}), _prog(before))
+	if str(wait.get("body", "")) != "Move a division onto the border with Poland":
+		_fail("P1a fight-wait body=%s" % str(wait.get("body", "")))
+		OS.set_environment("EOA_TUTORIAL", "")
+		return
+	var rows: Array = _domain.call("steps")
+	for raw in rows:
+		if not (raw is Dictionary):
+			continue
+		var row: Dictionary = raw
+		var sid := str(row.get("id", ""))
+		if sid == "units":
+			var keys: Array = row.get("keys", [])
+			if keys.has("U"):
+				_fail("P1a step 5 still has the U chip")
+				OS.set_environment("EOA_TUTORIAL", "")
+				return
+		elif sid == "ending":
+			var end_keys: Array = row.get("keys", [])
+			if not end_keys.is_empty():
+				_fail("P1a step 12 chip not dropped: %s" % str(end_keys))
+				OS.set_environment("EOA_TUTORIAL", "")
+				return
+		elif sid == "fight":
+			var body := str(row.get("body", ""))
+			if body.find("Polish troops") >= 0:
+				_fail("P1a step 10 still says Polish troops")
+				OS.set_environment("EOA_TUTORIAL", "")
+				return
+			if abs(float(row.get("p1_done_hold_s", 0.0)) - 3.0) > 0.01:
+				_fail("P1a step 10 p1_done_hold_s=%s" % str(row.get("p1_done_hold_s", "")))
+				OS.set_environment("EOA_TUTORIAL", "")
+				return
+	var done_res: Dictionary = _eval(_base_snap({
+		"player_unit_adjacent_enemy": true,
+		"battle_started_player": true,
+	}), _prog(before))
+	if str(done_res.get("state", "")) != "done":
+		_fail("P1a player battle did not complete fight (state=%s)" % str(done_res.get("state", "")))
+		OS.set_environment("EOA_TUTORIAL", "")
+		return
+	if abs(float(done_res.get("p1_done_hold_s", 0.0)) - 3.0) > 0.01:
+		_fail("P1a done result hold=%s want 3" % str(done_res.get("p1_done_hold_s", 0)))
+		OS.set_environment("EOA_TUTORIAL", "")
+		return
+	if str(done_res.get("title", "")) != "Battle started":
+		_fail("P1a done title=%s" % str(done_res.get("title", "")))
+		OS.set_environment("EOA_TUTORIAL", "")
+		return
+	var guide := _guide()
+	if guide == null:
+		_fail("P1a done hold: guide missing")
+		OS.set_environment("EOA_TUTORIAL", "")
+		return
+	guide.call("_apply_result", done_res)
+	var left := float(guide.get("_flash_left"))
+	guide.set("_flash_left", 0.0)
+	if abs(left - 3.0) > 0.05:
+		_fail("P1a guide done hold %.3f want 3" % left)
+		OS.set_environment("EOA_TUTORIAL", "")
+		return
+	OS.set_environment("EOA_TUTORIAL", "")
+	_pass("P1a fight-wait copy and step 10 done hold 3s")
+
+
+func _test_p1a_under_attack_keeps_fight_open() -> void:
+	var guide := _guide()
+	if guide == null:
+		_fail("P1a under attack: guide missing")
+		return
+	guide.set("_battle_player", false)
+	guide.set("_under_attack", false)
+	if guide.has_method("_on_step_enter"):
+		guide.call("_on_step_enter", "fight")
+	var bm := root.get_node_or_null("BattleManager")
+	if bm == null:
+		_fail("P1a under attack: BattleManager missing")
+		return
+	var open_v: Variant = bm.get("_open_land_battles")
+	if not (open_v is Array):
+		_fail("P1a under attack: open land battles missing")
+		return
+	var player := str(guide.call("_player_tag"))
+	(open_v as Array).append({
+		"att_tag": "POL",
+		"def_tag": player,
+	})
+	var snap: Dictionary = guide.call("_snapshot_now")
+	var open_after: Variant = bm.get("_open_land_battles")
+	if open_after is Array and not (open_after as Array).is_empty():
+		(open_after as Array).pop_back()
+	if bool(snap.get("battle_started_player", false)):
+		_fail("P1a under attack: defender battle set battle_started_player")
+		return
+	if not bool(snap.get("player_under_attack", false)):
+		_fail("P1a under attack: player_under_attack not set")
+		return
+	OS.set_environment("EOA_TUTORIAL", "1")
+	var eval_snap := _base_snap({
+		"player_unit_adjacent_enemy": true,
+		"player_under_attack": bool(snap.get("player_under_attack", false)),
+		"battle_started_player": bool(snap.get("battle_started_player", false)),
+	})
+	var res: Dictionary = _eval(eval_snap, _prog(_p1a_done_before("fight")))
+	OS.set_environment("EOA_TUTORIAL", "")
+	if str(res.get("step_id", "")) != "fight" or str(res.get("state", "")) == "done" or str(res.get("state", "")) == "hidden":
+		_fail("P1a under attack: step 10 did not stay open (step=%s state=%s)" % [
+			str(res.get("step_id", "")), str(res.get("state", ""))
+		])
+		return
+	if str(res.get("status_text", "")) != "You're under attack; now start your own battle":
+		_fail("P1a under attack status=%s" % str(res.get("status_text", "")))
+		return
+	if str(res.get("status_color", "")) != "#f2c94c":
+		_fail("P1a under attack status color=%s" % str(res.get("status_color", "")))
+		return
+	_pass("P1a defender battle leaves step 10 open and sets player_under_attack")
+
+
+func _test_p1a_target_rings() -> void:
+	var guide := _guide()
+	if guide == null:
+		_fail("P1a rings: guide missing")
+		return
+	var declare := Button.new()
+	declare.name = "BtnDeclareWar"
+	declare.position = Vector2(40, 200)
+	declare.size = Vector2(160, 32)
+	declare.custom_minimum_size = Vector2(160, 32)
+	root.add_child(declare)
+	var dipl := Button.new()
+	dipl.name = "DiplomacyButton"
+	dipl.position = Vector2(900, 8)
+	dipl.size = Vector2(72, 28)
+	dipl.custom_minimum_size = Vector2(72, 28)
+	root.add_child(dipl)
+	var open_fight := Button.new()
+	open_fight.name = "BtnOpenFight"
+	open_fight.position = Vector2(80, 520)
+	open_fight.size = Vector2(140, 32)
+	open_fight.custom_minimum_size = Vector2(140, 32)
+	root.add_child(open_fight)
+	var start := Button.new()
+	start.name = "BtnStartBattle"
+	start.position = Vector2(240, 520)
+	start.size = Vector2(140, 32)
+	start.custom_minimum_size = Vector2(140, 32)
+	root.add_child(start)
+	await process_frame
+	var justify := {
+		"step_id": "justify",
+		"target": {
+			"kind": "node",
+			"path": "WorldMap/UI/InfoPanel/BtnDeclareWar",
+			"p1_target_when": "inspector_on_target",
+			"p1_else": "TopInfoBar/ContentRow/CenterContainer/DiplomacyButton",
+		},
+	}
+	var got: Rect2 = guide.call("_target_rect", justify)
+	var dipl_r := dipl.get_global_rect()
+	if got.position.distance_to(dipl_r.position) > 2.0:
+		_fail("P1a ring: inspector off target got %s want Dipl %s" % [str(got), str(dipl_r)])
+		declare.queue_free()
+		dipl.queue_free()
+		open_fight.queue_free()
+		start.queue_free()
+		return
+	var fight := {
+		"step_id": "fight",
+		"target": {
+			"kind": "node_in_unit_card",
+			"name": "BtnOpenFight",
+			"p1_prefer": "BtnStartBattle",
+		},
+	}
+	var pref: Rect2 = guide.call("_target_rect", fight)
+	var start_r := start.get_global_rect()
+	declare.queue_free()
+	dipl.queue_free()
+	open_fight.queue_free()
+	start.queue_free()
+	if pref.position.distance_to(start_r.position) > 2.0:
+		_fail("P1a ring: visible Start battle got %s want %s" % [str(pref), str(start_r)])
+		return
+	_pass("P1a rings Dipl until the inspector is on target, and Start battle when it is open")
