@@ -212,9 +212,6 @@ var _away_armed: bool = false
 var _session_first_autosave_done: bool = false
 var _session_begin_seen: bool = false
 var _autosave_cfg_loaded: bool = false
-## path -> {mtime, result}. list_saves only needs metadata; a full JSON.parse of a
-## mid-campaign ~2.6 MB blob on every catalog rebuild stalls the Orders panel.
-var _inspect_cache: Dictionary = {}
 
 
 func _ready() -> void:
@@ -1475,39 +1472,6 @@ func _peek_metadata(path: String) -> Dictionary:
 	return _inspect_save_file(path).get("metadata", {}) as Dictionary
 
 
-func _inspect_cache_remember(path: String, result: Dictionary) -> void:
-	var mtime := 0
-	if FileAccess.file_exists(path):
-		mtime = int(FileAccess.get_modified_time(path))
-	_inspect_cache[path] = {
-		"mtime": mtime,
-		"result": result.duplicate(true),
-	}
-
-
-func _inspect_cache_forget(path: String) -> void:
-	_inspect_cache.erase(path)
-
-
-func _inspect_cache_lookup(path: String) -> Dictionary:
-	if not _inspect_cache.has(path):
-		return {}
-	var hit: Variant = _inspect_cache[path]
-	if typeof(hit) != TYPE_DICTIONARY:
-		return {}
-	var rec: Dictionary = hit
-	if not FileAccess.file_exists(path):
-		_inspect_cache.erase(path)
-		return {}
-	if int(rec.get("mtime", -1)) != int(FileAccess.get_modified_time(path)):
-		_inspect_cache.erase(path)
-		return {}
-	var stored: Variant = rec.get("result", {})
-	if typeof(stored) != TYPE_DICTIONARY:
-		return {}
-	return (stored as Dictionary).duplicate(true)
-
-
 func _json_skip_ws(text: String, i: int) -> int:
 	while i < text.length():
 		var code := text.unicode_at(i)
@@ -1695,44 +1659,36 @@ func _inspect_from_parsed(d: Dictionary) -> Dictionary:
 
 func _inspect_save_file(path: String) -> Dictionary:
 	if not FileAccess.file_exists(path):
-		_inspect_cache_forget(path)
 		return {"readable": false, "metadata": {}, "error": "missing"}
-	var cached := _inspect_cache_lookup(path)
-	if not cached.is_empty():
-		return cached
 	var f := FileAccess.open(path, FileAccess.READ)
 	if f == null:
 		return {"readable": false, "metadata": {}, "error": "cannot open"}
+	# Envelope peek only (save_version + metadata). A mtime cache of that peek
+	# made session_locked fail: _set_slot_session_locked rewrites the file in
+	# the same second, then slot_session_locked() returned the pre-write blob.
 	var head := f.get_buffer(32768).get_string_from_utf8()
 	var peeked := _peek_save_envelope(head)
 	if bool(peeked.get("complete", false)):
 		f.close()
-		var head_result: Dictionary = {
+		return {
 			"readable": true,
 			"metadata": peeked.get("metadata", {}),
 			"error": "",
 		}
-		_inspect_cache_remember(path, head_result)
-		return head_result
 	f.seek(0)
 	var text := f.get_as_text()
 	f.close()
 	peeked = _peek_save_envelope(text)
 	if bool(peeked.get("complete", false)):
-		var peek_result: Dictionary = {
+		return {
 			"readable": true,
 			"metadata": peeked.get("metadata", {}),
 			"error": "",
 		}
-		_inspect_cache_remember(path, peek_result)
-		return peek_result
 	var parsed: Variant = JSON.parse_string(text)
 	if typeof(parsed) != TYPE_DICTIONARY:
 		return {"readable": false, "metadata": {}, "error": "unreadable"}
-	var result := _inspect_from_parsed(parsed as Dictionary)
-	if bool(result.get("readable", false)):
-		_inspect_cache_remember(path, result)
-	return result
+	return _inspect_from_parsed(parsed as Dictionary)
 
 
 func _blob_looks_like_save(data: Dictionary) -> bool:
@@ -1764,10 +1720,6 @@ func save_game(slot_name: String = DEFAULT_SLOT) -> bool:
 
 	_last_save_path = path
 	_note_save_elapsed()
-	var save_meta: Dictionary = {}
-	if data.get("metadata") is Dictionary:
-		save_meta = (data["metadata"] as Dictionary).duplicate(true)
-	_inspect_cache_remember(path, {"readable": true, "metadata": save_meta, "error": ""})
 	print("SaveLoadManager: Game saved → %s (v%d, %d bytes)" % [path, SAVE_VERSION, json_text.length()])
 	_notify_save_list_refresh()
 
@@ -2878,7 +2830,6 @@ func save_game_detailed(slot_name: String = DEFAULT_SLOT) -> Dictionary:
 	var meta_out: Dictionary = {}
 	if data.get("metadata") is Dictionary:
 		meta_out = (data["metadata"] as Dictionary).duplicate(true)
-	_inspect_cache_remember(path, {"readable": true, "metadata": meta_out, "error": ""})
 	print("SaveLoadManager: Game saved → %s (v%d, %d bytes, slot=%s)" % [abs_path, SAVE_VERSION, bytes, safe_slot])
 	_notify_save_list_refresh()
 	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
@@ -2974,7 +2925,6 @@ func delete_save(slot_name: String) -> bool:
 		push_error("SaveLoadManager: Failed to delete %s (err %d)" % [path, err])
 		return false
 	print("SaveLoadManager: Deleted save %s" % slot_name)
-	_inspect_cache_forget(path)
 	_notify_save_list_refresh()
 	return true
 
@@ -2996,7 +2946,5 @@ func rename_save(old_slot: String, new_slot: String) -> bool:
 
 	DirAccess.remove_absolute(old_path)
 	print("SaveLoadManager: Renamed %s -> %s" % [old_slot, new_slot])
-	_inspect_cache_forget(old_path)
-	_inspect_cache_forget(new_path)
 	_notify_save_list_refresh()
 	return true

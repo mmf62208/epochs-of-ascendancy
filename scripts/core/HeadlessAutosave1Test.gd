@@ -587,18 +587,19 @@ func _make_ocp(node_name: String = "OrderCommandPanel") -> Node:
 		return null
 	var ocp: Node = packed.instantiate()
 	ocp.name = node_name
+	# Set before add_child: _ready schedules _deferred_first_refresh, which
+	# would otherwise rebuild the whole Orders catalogue on the next
+	# process_frame (dedicated runs hung here after the heavy probe print).
+	ocp.set_meta("eoa_skip_first_refresh", true)
 	root.add_child(ocp)
 	return ocp
 
 
 func _populate_orders_like_first_open(ocp: Node) -> Node:
-	## Live hang: Orders already populated (first-open 30–70s) then Apply. Drain
-	## the deferred first refresh, then leave a body marker a full rebuild would
-	## queue_free.
+	## Live hang: Orders already populated then Apply. Build the saves rows
+	## only — do not await process_frame (that ran the deferred full catalogue).
 	if ocp.has_method("_rebuild_saves_section"):
 		ocp.call("_rebuild_saves_section")
-	await process_frame
-	await process_frame
 	var body: Node = ocp.get("_body")
 	if body != null:
 		for i in range(400):

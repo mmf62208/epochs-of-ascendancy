@@ -887,6 +887,10 @@ func _ready() -> void:
 func _deferred_first_refresh() -> void:
 	if not is_inside_tree():
 		return
+	# Headless AUTOSAVE-2 heavy case sets this so first-open catalogue build
+	# cannot stall process_frame for tens of seconds before Apply.
+	if bool(get_meta("eoa_skip_first_refresh", false)):
+		return
 	refresh()
 
 
@@ -3571,30 +3575,69 @@ func _refresh_command_log() -> void:
 		_log_label.text = "[color=#5ec8ff]Command results[/color]\n" + log_plain
 
 
+func _live_saves_host() -> VBoxContainer:
+	if _body == null:
+		return null
+	for c in _body.get_children():
+		if str(c.name) == "SavesSectionHost" and is_instance_valid(c) and not c.is_queued_for_deletion():
+			return c as VBoxContainer
+	return null
+
+
+func _find_named_label(root: Node, node_name: String) -> Label:
+	if root == null or not is_instance_valid(root) or root.is_queued_for_deletion():
+		return null
+	if root is Label and str(root.name) == node_name:
+		return root as Label
+	for c in root.get_children():
+		var found := _find_named_label(c, node_name)
+		if found != null:
+			return found
+	return null
+
+
+func _metadata_from_save_action(res: Dictionary) -> Dictionary:
+	if res.get("metadata") is Dictionary:
+		var top: Dictionary = (res.get("metadata", {}) as Dictionary).duplicate(true)
+		if not top.is_empty():
+			return top
+	if res.get("save") is Dictionary:
+		var save_blob: Dictionary = res.get("save", {})
+		if save_blob.get("metadata") is Dictionary:
+			return (save_blob.get("metadata", {}) as Dictionary).duplicate(true)
+	return {}
+
+
+func _patch_slot_row_labels(root: Node, slot: String, flair_label: String) -> int:
+	if root == null or not is_instance_valid(root) or root.is_queued_for_deletion():
+		return 0
+	var n := 0
+	if root is Label and str(root.name) != "ResumeLineLabel":
+		var lbl := root as Label
+		var named := str(lbl.name) == "SlotRowLabel_%s" % slot
+		var txt := str(lbl.text)
+		var looks := txt.find(" · ") >= 0 and txt.to_lower().find(slot.to_lower()) >= 0
+		if named or looks:
+			lbl.text = flair_label
+			n += 1
+	for c in root.get_children():
+		n += _patch_slot_row_labels(c, slot, flair_label)
+	return n
+
+
 func _patch_saves_after_slot_write(action_id: String, res: Dictionary) -> void:
 	if not bool(res.get("ok", res.get("success", false))):
 		return
 	var slot := action_id.substr("save_slot:".length()).strip_edges()
 	if slot.is_empty():
 		slot = "quicksave"
-	var save_blob: Dictionary = {}
-	if res.get("save") is Dictionary:
-		save_blob = res.get("save", {})
-	var meta: Dictionary = {}
-	if save_blob.get("metadata") is Dictionary:
-		meta = (save_blob.get("metadata", {}) as Dictionary).duplicate(true)
+	var meta := _metadata_from_save_action(res)
 	if meta.is_empty() and typeof(SaveLoadManager) != TYPE_NIL and SaveLoadManager.has_method("_inspect_save_file"):
 		var inspected: Dictionary = SaveLoadManager._inspect_save_file(SaveLoadManager.get_save_path(slot))
 		if inspected.get("metadata") is Dictionary:
 			meta = (inspected.get("metadata", {}) as Dictionary).duplicate(true)
-	if _body == null:
-		return
-	var host := _body.get_node_or_null("SavesSectionHost") as VBoxContainer
-	if host == null or host.is_queued_for_deletion():
-		_rebuild_saves_section()
-		return
 	if typeof(SaveLoadManager) == TYPE_NIL or not SaveLoadManager.has_method("_format_slot_ui_row"):
-		_rebuild_saves_section()
+		call_deferred("_rebuild_saves_section")
 		return
 	var row: Dictionary = SaveLoadManager._format_slot_ui_row(slot, true, meta)
 	var flair_label := str(row.get("label", slot))
@@ -3603,15 +3646,17 @@ func _patch_saves_after_slot_write(action_id: String, res: Dictionary) -> void:
 		var flair_rows: Array = flair.get("rows", []) if flair is Dictionary else []
 		if not flair_rows.is_empty() and flair_rows[0] is Dictionary:
 			flair_label = str((flair_rows[0] as Dictionary).get("flair_label", flair_label))
-	var slot_lbl := host.find_child("SlotRowLabel_%s" % slot, true, false)
-	if slot_lbl is Label:
-		(slot_lbl as Label).text = flair_label
-	else:
-		_rebuild_saves_section()
-		return
-	var resume_lbl := host.find_child("ResumeLineLabel", true, false)
-	if resume_lbl is Label:
-		(resume_lbl as Label).text = "Resume · %s" % str(row.get("label", slot))
+	var host := _live_saves_host()
+	var patched := _patch_slot_row_labels(host, slot, flair_label)
+	if patched <= 0:
+		patched = _patch_slot_row_labels(_body, slot, flair_label)
+	var resume_root: Node = host if host != null else _body
+	var resume_lbl := _find_named_label(resume_root, "ResumeLineLabel")
+	if resume_lbl != null:
+		resume_lbl.text = "Resume · %s" % str(row.get("label", slot))
+	# Never _rebuild_saves_section() inside Apply `pressed` (frees the button).
+	if patched <= 0:
+		call_deferred("_rebuild_saves_section")
 
 
 func _on_quicksave() -> void:
