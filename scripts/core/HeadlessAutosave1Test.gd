@@ -14,6 +14,12 @@ const FENCED := [
 
 var _failures: int = 0
 var _signal_hits: int = 0
+var _wd_thread: Thread
+var _wd_armed: bool = false
+var _wd_fired: bool = false
+var _wd_deadline_msec: int = 0
+var _wd_start_msec: int = 0
+var _wd_label: String = ""
 
 
 func _init() -> void:
@@ -21,23 +27,72 @@ func _init() -> void:
 	call_deferred("_start")
 
 
+func _flush_log() -> void:
+	if OS.has_method("flush_stdout"):
+		OS.call("flush_stdout")
+
+
+func _progress(msg: String) -> void:
+	print("  HeadlessAutosave1Test: ", msg)
+	_flush_log()
+
+
 func _fail(msg: String) -> void:
 	_failures += 1
 	print("  [FAIL] HeadlessAutosave1Test: ", msg)
+	_flush_log()
 
 
 func _pass(msg: String) -> void:
 	print("  [PASS] HeadlessAutosave1Test: ", msg)
+	_flush_log()
+
+
+func _emit_result_and_die(ok: bool) -> void:
+	_wd_armed = false
+	print("HeadlessAutosave1Test: ", "PASS" if ok else "FAIL", " (failures=", _failures, ")")
+	print("HeadlessAutosave1Test: RESULT=", "PASS" if ok else "FAIL")
+	_flush_log()
+	quit(0 if ok else 1)
+
+
+func _watchdog_loop() -> void:
+	while true:
+		OS.delay_msec(50)
+		if not _wd_armed or _wd_fired:
+			continue
+		var now := Time.get_ticks_msec()
+		if now <= _wd_deadline_msec:
+			continue
+		_wd_fired = true
+		_wd_armed = false
+		var waited := now - _wd_start_msec
+		_failures += 1
+		print("  [FAIL] HeadlessAutosave1Test: %s: watchdog %dms (step or process_frame never returned)" % [_wd_label, waited])
+		print("HeadlessAutosave1Test: FAIL (failures=", _failures, ")")
+		print("HeadlessAutosave1Test: RESULT=FAIL")
+		_flush_log()
+		OS.kill(OS.get_process_id())
+
+
+func _arm_watchdog(budget_ms: int, label: String) -> void:
+	_wd_label = label
+	_wd_start_msec = Time.get_ticks_msec()
+	_wd_deadline_msec = _wd_start_msec + budget_ms
+	_wd_fired = false
+	_wd_armed = true
+	if _wd_thread == null:
+		_wd_thread = Thread.new()
+		_wd_thread.start(_watchdog_loop)
+
+
+func _disarm_watchdog() -> void:
+	_wd_armed = false
 
 
 func _start() -> void:
 	await _run()
-	var ok := _failures == 0
-	print("HeadlessAutosave1Test: ", "PASS" if ok else "FAIL", " (failures=", _failures, ")")
-	print("HeadlessAutosave1Test: RESULT=", "PASS" if ok else "FAIL")
-	if OS.has_method("flush_stdout"):
-		OS.call("flush_stdout")
-	quit(0 if ok else 1)
+	_emit_result_and_die(_failures == 0)
 
 
 func _sl() -> Node:
@@ -556,7 +611,10 @@ func _pump_frames_until(pred: Callable, budget_ms: int, label: String) -> bool:
 		return true
 	while Time.get_ticks_msec() - t0 <= budget_ms:
 		var frame_start := Time.get_ticks_msec()
+		# Watchdog fires if process_frame never returns (main-thread hang).
+		_arm_watchdog(budget_ms + 250, label)
 		await process_frame
+		_disarm_watchdog()
 		var frame_ms := Time.get_ticks_msec() - frame_start
 		if frame_ms > budget_ms:
 			_fail("%s: process_frame stalled %dms (budget %dms)" % [label, frame_ms, budget_ms])
@@ -587,19 +645,23 @@ func _make_ocp(node_name: String = "OrderCommandPanel") -> Node:
 		return null
 	var ocp: Node = packed.instantiate()
 	ocp.name = node_name
-	# Set before add_child: _ready schedules _deferred_first_refresh, which
-	# would otherwise rebuild the whole Orders catalogue on the next
-	# process_frame (dedicated runs hung here after the heavy probe print).
+	# Paper scope: Orders first-open catalogue (~30–70s) is not this slice.
+	# The 2.6 MB hang was list_saves/inspect during populate, not this skip.
 	ocp.set_meta("eoa_skip_first_refresh", true)
+	_arm_watchdog(2000, "heavy: add_child")
 	root.add_child(ocp)
+	_disarm_watchdog()
+	_progress("after add_child")
 	return ocp
 
 
 func _populate_orders_like_first_open(ocp: Node) -> Node:
 	## Live hang: Orders already populated then Apply. Build the saves rows
 	## only — do not await process_frame (that ran the deferred full catalogue).
+	_arm_watchdog(2000, "heavy: populate / list_saves")
 	if ocp.has_method("_rebuild_saves_section"):
 		ocp.call("_rebuild_saves_section")
+	_disarm_watchdog()
 	var body: Node = ocp.get("_body")
 	if body != null:
 		for i in range(400):
@@ -661,6 +723,7 @@ func _test_s3_heavy_quicksave_apply_live_budget(sl: Node) -> void:
 		_fail("heavy probe too small (%d bytes); need mid-campaign ~2.6MB" % bytes)
 		return
 	print("  HeadlessAutosave1Test: heavy probe %d bytes" % bytes)
+	_flush_log()
 	var tm := _tm()
 	if tm != null:
 		tm.current_year = 1936
@@ -675,11 +738,13 @@ func _test_s3_heavy_quicksave_apply_live_budget(sl: Node) -> void:
 	var stale_date := "1 Jan 1936"
 	var fresh_date := "16 Jan 1936"
 
+	_progress("before _make_ocp")
 	var ocp := _make_ocp()
 	if ocp == null:
 		_fail("heavy Close: OrderCommandPanel.tscn missing")
 		return
 	var marker: Node = await _populate_orders_like_first_open(ocp)
+	_progress("after populate")
 	var stale := _find_s3_quicksave_row_label(ocp)
 	if stale == null or str(stale.text).find(stale_date) < 0:
 		_fail("heavy Close: stale ⚡ row missing 1 Jan 1936: %s" % (str(stale.text) if stale != null else "none"))
@@ -690,7 +755,10 @@ func _test_s3_heavy_quicksave_apply_live_budget(sl: Node) -> void:
 		_fail("heavy Close: Quicksave Apply/Save button missing")
 		ocp.queue_free()
 		return
+	_progress("before Apply")
+	_arm_watchdog(2000, "heavy Close: Apply")
 	apply_btn.pressed.emit()
+	_disarm_watchdog()
 	if not is_instance_valid(apply_btn):
 		_fail("heavy Close: Apply freed the button while pressed")
 		return
@@ -721,6 +789,7 @@ func _test_s3_heavy_quicksave_apply_live_budget(sl: Node) -> void:
 		_fail("heavy Close: Close button missing after Apply")
 		ocp.queue_free()
 		return
+	_progress("before Close")
 	(close_btn as BaseButton).pressed.emit()
 	var closed := await _pump_frames_until(
 		func() -> bool: return _panel_is_closed(ocp),
@@ -734,11 +803,13 @@ func _test_s3_heavy_quicksave_apply_live_budget(sl: Node) -> void:
 	_pass("heavy Quicksave Apply: ⚡/Resume within 2s, Close within 1s, no full-body rebuild")
 
 	_write_heavy_probe(sl, "quicksave", 100, "1936-01-01", "old-heavy-esc")
+	_progress("before _make_ocp")
 	var ocp_esc := _make_ocp("OrderCommandPanel_esc")
 	if ocp_esc == null:
 		_fail("heavy Esc: OrderCommandPanel.tscn missing")
 		return
 	await _populate_orders_like_first_open(ocp_esc)
+	_progress("after populate")
 	var stale_esc := _find_s3_quicksave_row_label(ocp_esc)
 	if stale_esc == null or str(stale_esc.text).find(stale_date) < 0:
 		_fail("heavy Esc: stale ⚡ row missing 1 Jan 1936")
@@ -749,7 +820,10 @@ func _test_s3_heavy_quicksave_apply_live_budget(sl: Node) -> void:
 		_fail("heavy Esc: Quicksave Apply/Save button missing")
 		ocp_esc.queue_free()
 		return
+	_progress("before Apply")
+	_arm_watchdog(2000, "heavy Esc: Apply")
 	apply_esc.pressed.emit()
+	_disarm_watchdog()
 	var row_esc_ok := await _pump_frames_until(
 		func() -> bool: return _row_is_fresh(ocp_esc, stale_date, fresh_date),
 		2000,

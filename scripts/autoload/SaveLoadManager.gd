@@ -1525,13 +1525,36 @@ func _json_read_number(text: String, i: int) -> Dictionary:
 	return {"ok": true, "value": int(text.substr(start, i - start)), "next": i}
 
 
+func _json_skip_string(text: String, i: int) -> Dictionary:
+	## Skip a JSON string without building it. `_json_read_string` concatenates
+	## per character; a ~2.6 MB pad value is minutes of main-thread hang.
+	if i >= text.length() or text.unicode_at(i) != 34:
+		return {"ok": false, "next": i}
+	i += 1
+	var escaped := false
+	while i < text.length():
+		var ch := text[i]
+		if escaped:
+			escaped = false
+			i += 1
+			continue
+		if ch == "\\":
+			escaped = true
+			i += 1
+			continue
+		if ch == "\"":
+			return {"ok": true, "next": i + 1}
+		i += 1
+	return {"ok": false, "next": i}
+
+
 func _json_skip_value(text: String, i: int) -> Dictionary:
 	i = _json_skip_ws(text, i)
 	if i >= text.length():
 		return {"ok": false, "next": i}
 	var ch := text[i]
 	if ch == "\"":
-		var s: Dictionary = _json_read_string(text, i)
+		var s: Dictionary = _json_skip_string(text, i)
 		return {"ok": bool(s.get("ok", false)), "next": int(s.get("next", i))}
 	if ch == "{" or ch == "[":
 		var depth := 1
@@ -1628,12 +1651,14 @@ func _peek_save_envelope(text: String) -> Dictionary:
 			if not bool(skip_hold.get("ok", false)):
 				return {}
 			i = int(skip_hold.get("next", i))
-		if save_version > 0 and have_meta:
+		# Metadata is enough for list/lock. Godot JSON.stringify sorts keys, so
+		# save_version can sit after a multi-MB pad; do not scan that pad.
+		if have_meta:
 			return {"complete": true, "metadata": meta, "save_version": save_version}
 		i = _json_skip_ws(text, i)
 		if i < text.length() and text[i] == ",":
 			i += 1
-	if save_version > 0 and have_meta:
+	if have_meta:
 		return {"complete": true, "metadata": meta, "save_version": save_version}
 	return {}
 
@@ -1706,7 +1731,9 @@ func save_game(slot_name: String = DEFAULT_SLOT) -> bool:
 	var path := get_save_path(_redirect_autosave_slot(slot_name))
 	var data := _gather_save_data()
 	_stamp_slot_metadata(data, slot_name)
-	var json_text := JSON.stringify(data, "\t")   # Pretty for human debugging
+	# sort_keys=false keeps save_version + metadata at the front so a 32KB
+	# envelope peek never walks the map blob.
+	var json_text := JSON.stringify(data, "\t", false)
 
 	var f := FileAccess.open(path, FileAccess.WRITE)
 	if f == null:
@@ -2799,7 +2826,7 @@ func save_game_detailed(slot_name: String = DEFAULT_SLOT) -> Dictionary:
 	# Autosave / live F5: compact JSON (no tab indent). Pretty-print of the
 	# 3520-province blob doubled peak RSS on llvmpipe Play soaks.
 	var indent := "" if _compact_json_slot(safe_slot) else "\t"
-	var json_text := JSON.stringify(data, indent)
+	var json_text := JSON.stringify(data, indent, false)
 	if _compact_json_slot(safe_slot):
 		# Sample while the JSON string is still live so the day-7 peak is not
 		# hidden by freeing it before the after-read.
