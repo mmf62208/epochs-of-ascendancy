@@ -17,6 +17,7 @@ var _signal_hits: int = 0
 var _wd_thread: Thread
 var _wd_armed: bool = false
 var _wd_fired: bool = false
+var _wd_stop: bool = false
 var _wd_deadline_msec: int = 0
 var _wd_start_msec: int = 0
 var _wd_label: String = ""
@@ -48,17 +49,27 @@ func _pass(msg: String) -> void:
 	_flush_log()
 
 
-func _emit_result_and_die(ok: bool) -> void:
+func _join_watchdog() -> void:
 	_wd_armed = false
+	_wd_stop = true
+	if _wd_thread != null and _wd_thread.is_started():
+		_wd_thread.wait_to_finish()
+	_wd_thread = null
+
+
+func _emit_result_and_die(ok: bool) -> void:
 	print("HeadlessAutosave1Test: ", "PASS" if ok else "FAIL", " (failures=", _failures, ")")
 	print("HeadlessAutosave1Test: RESULT=", "PASS" if ok else "FAIL")
 	_flush_log()
+	_join_watchdog()
 	quit(0 if ok else 1)
 
 
 func _watchdog_loop() -> void:
-	while true:
+	while not _wd_stop:
 		OS.delay_msec(50)
+		if _wd_stop:
+			break
 		if not _wd_armed or _wd_fired:
 			continue
 		var now := Time.get_ticks_msec()
@@ -66,6 +77,7 @@ func _watchdog_loop() -> void:
 			continue
 		_wd_fired = true
 		_wd_armed = false
+		_wd_stop = true
 		var waited := now - _wd_start_msec
 		_failures += 1
 		print("  [FAIL] HeadlessAutosave1Test: %s: watchdog %dms (step or process_frame never returned)" % [_wd_label, waited])
@@ -73,6 +85,7 @@ func _watchdog_loop() -> void:
 		print("HeadlessAutosave1Test: RESULT=FAIL")
 		_flush_log()
 		OS.kill(OS.get_process_id())
+		return
 
 
 func _arm_watchdog(budget_ms: int, label: String) -> void:
@@ -80,6 +93,7 @@ func _arm_watchdog(budget_ms: int, label: String) -> void:
 	_wd_start_msec = Time.get_ticks_msec()
 	_wd_deadline_msec = _wd_start_msec + budget_ms
 	_wd_fired = false
+	_wd_stop = false
 	_wd_armed = true
 	if _wd_thread == null:
 		_wd_thread = Thread.new()
