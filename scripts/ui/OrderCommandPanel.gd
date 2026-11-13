@@ -30,6 +30,16 @@ var _saves_list_cache_valid: bool = false
 var _saves_rebuild_from_all: bool = false
 ## sid -> { "acts": Array } for day-package rows filled only on expand.
 var _lazy_section_payload: Dictionary = {}
+## Process-wide slot list (survives panel close → warm second instance).
+static var _shared_saves_rows: Array = []
+static var _shared_saves_product: Dictionary = {}
+static var _shared_saves_valid: bool = false
+## Process-wide Control pool (Button/Label/HBox/VBox). Warm + apply rebuilds reuse.
+const _UI_POOL_CAP: int = 2048
+static var _ui_pool_btn: Array = []
+static var _ui_pool_lbl: Array = []
+static var _ui_pool_hbox: Array = []
+static var _ui_pool_vbox: Array = []
 ## 47-section chain (gpu tail → phase11). Headers built on Depth catalogue expand; each fills on its own expand.
 const DEPTH_GROUP_METHODS: PackedStringArray = [
 	"_rebuild_next10_section",
@@ -987,8 +997,9 @@ func _ready() -> void:
 			country_tag = tag
 	_build_ui()
 	_connect_map_selection()
-	# Defer heavy rebuild so the panel paints before catalogue build (avoids freeze on open).
-	call_deferred("_deferred_first_refresh")
+	# Fill on ready so first view has content before the next idle/_process frame
+	# (headless AIR _process otherwise lands on the same frame as first refresh).
+	_deferred_first_refresh()
 
 
 func _deferred_first_refresh() -> void:
@@ -1113,6 +1124,160 @@ func _on_province_selected(idx: int) -> void:
 	_rebuild_all_sections()
 
 
+func _take_btn() -> Button:
+	while not _ui_pool_btn.is_empty():
+		var n: Variant = _ui_pool_btn.pop_back()
+		if n is Button and is_instance_valid(n) and not (n as Node).is_queued_for_deletion():
+			return n as Button
+	return Button.new()
+
+
+func _take_lbl() -> Label:
+	while not _ui_pool_lbl.is_empty():
+		var n: Variant = _ui_pool_lbl.pop_back()
+		if n is Label and is_instance_valid(n) and not (n as Node).is_queued_for_deletion():
+			return n as Label
+	return Label.new()
+
+
+func _take_hbox() -> HBoxContainer:
+	while not _ui_pool_hbox.is_empty():
+		var n: Variant = _ui_pool_hbox.pop_back()
+		if n is HBoxContainer and is_instance_valid(n) and not (n as Node).is_queued_for_deletion():
+			return n as HBoxContainer
+	return HBoxContainer.new()
+
+
+func _take_vbox() -> VBoxContainer:
+	while not _ui_pool_vbox.is_empty():
+		var n: Variant = _ui_pool_vbox.pop_back()
+		if n is VBoxContainer and is_instance_valid(n) and not (n as Node).is_queued_for_deletion():
+			return n as VBoxContainer
+	return VBoxContainer.new()
+
+
+func _disconnect_pressed(btn: BaseButton) -> void:
+	if btn == null or not is_instance_valid(btn):
+		return
+	var conns: Array = btn.pressed.get_connections()
+	for conn in conns:
+		if conn is Dictionary:
+			var cb: Variant = (conn as Dictionary).get("callable", null)
+			if cb is Callable and btn.pressed.is_connected(cb as Callable):
+				btn.pressed.disconnect(cb as Callable)
+
+
+func _clear_node_meta(n: Node) -> void:
+	if n == null or not is_instance_valid(n):
+		return
+	for k in n.get_meta_list():
+		n.remove_meta(k)
+
+
+func _give_btn(b: Button) -> void:
+	if b == null or not is_instance_valid(b) or b.is_queued_for_deletion():
+		return
+	var p: Node = b.get_parent()
+	if p != null:
+		p.remove_child(b)
+	_disconnect_pressed(b)
+	_clear_node_meta(b)
+	b.text = ""
+	b.tooltip_text = ""
+	b.disabled = false
+	b.visible = true
+	b.name = "PooledBtn"
+	b.focus_mode = Control.FOCUS_ALL
+	b.mouse_filter = Control.MOUSE_FILTER_STOP
+	b.custom_minimum_size = Vector2.ZERO
+	b.size_flags_horizontal = Control.SIZE_FILL
+	b.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	b.remove_theme_color_override("font_color")
+	if _ui_pool_btn.size() < _UI_POOL_CAP:
+		_ui_pool_btn.append(b)
+	else:
+		b.free()
+
+
+func _give_lbl(lb: Label) -> void:
+	if lb == null or not is_instance_valid(lb) or lb.is_queued_for_deletion():
+		return
+	var p: Node = lb.get_parent()
+	if p != null:
+		p.remove_child(lb)
+	_clear_node_meta(lb)
+	lb.text = ""
+	lb.visible = true
+	lb.name = "PooledLbl"
+	lb.autowrap_mode = TextServer.AUTOWRAP_OFF
+	lb.size_flags_horizontal = Control.SIZE_FILL
+	lb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	lb.remove_theme_color_override("font_color")
+	if _ui_pool_lbl.size() < _UI_POOL_CAP:
+		_ui_pool_lbl.append(lb)
+	else:
+		lb.free()
+
+
+func _give_hbox(h: HBoxContainer) -> void:
+	if h == null or not is_instance_valid(h) or h.is_queued_for_deletion():
+		return
+	var p: Node = h.get_parent()
+	if p != null:
+		p.remove_child(h)
+	_clear_node_meta(h)
+	h.visible = true
+	h.name = "PooledHBox"
+	h.size_flags_horizontal = Control.SIZE_FILL
+	h.remove_theme_constant_override("separation")
+	if _ui_pool_hbox.size() < _UI_POOL_CAP:
+		_ui_pool_hbox.append(h)
+	else:
+		h.free()
+
+
+func _give_vbox(v: VBoxContainer) -> void:
+	if v == null or not is_instance_valid(v) or v.is_queued_for_deletion():
+		return
+	var p: Node = v.get_parent()
+	if p != null:
+		p.remove_child(v)
+	_clear_node_meta(v)
+	v.visible = true
+	v.name = "PooledVBox"
+	v.size_flags_horizontal = Control.SIZE_FILL
+	v.remove_theme_constant_override("separation")
+	if _ui_pool_vbox.size() < _UI_POOL_CAP:
+		_ui_pool_vbox.append(v)
+	else:
+		v.free()
+
+
+func _recycle_tree(n: Node) -> void:
+	if n == null or not is_instance_valid(n) or n.is_queued_for_deletion():
+		return
+	while n.get_child_count() > 0:
+		var c: Node = n.get_child(0)
+		n.remove_child(c)
+		_recycle_tree(c)
+	if n is Button:
+		_give_btn(n as Button)
+	elif n is Label:
+		_give_lbl(n as Label)
+	elif n is HBoxContainer:
+		_give_hbox(n as HBoxContainer)
+	elif n is VBoxContainer:
+		_give_vbox(n as VBoxContainer)
+	else:
+		n.free()
+
+
+func _on_refresh_slots_clicked() -> void:
+	_shared_saves_valid = false
+	_saves_list_cache_valid = false
+	refresh()
+
+
 func refresh() -> void:
 	_saves_list_cache_valid = false
 	_province_ids.clear()
@@ -1162,14 +1327,14 @@ func _target_body() -> VBoxContainer:
 
 
 func _add_section_title(text: String) -> void:
-	var lbl := Label.new()
+	var lbl := _take_lbl()
 	lbl.text = text
 	lbl.add_theme_color_override("font_color", Color(0.4, 0.85, 1.0))
 	_target_body().add_child(lbl)
 
 
 func _add_plain_label(text: String, max_len: int = 280, node_name: String = "") -> void:
-	var cl := Label.new()
+	var cl := _take_lbl()
 	cl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	var t := text.strip_edges()
 	if t.length() > max_len:
@@ -1181,12 +1346,12 @@ func _add_plain_label(text: String, max_len: int = 280, node_name: String = "") 
 
 
 func _add_apply_button(label: String, action_id: String, enabled: bool = true) -> void:
-	var row := HBoxContainer.new()
-	var lbl := Label.new()
+	var row := _take_hbox()
+	var lbl := _take_lbl()
 	lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	lbl.text = label
 	row.add_child(lbl)
-	var btn := Button.new()
+	var btn := _take_btn()
 	btn.text = "Apply"
 	btn.disabled = not enabled
 	btn.pressed.connect(_on_action_pressed.bind(action_id))
@@ -1208,33 +1373,64 @@ func _add_collapsible_section(title: String, section_id: String, start_expanded:
 		expanded = bool(_section_expanded[sid])
 	else:
 		_section_expanded[sid] = expanded
-	var header := Button.new()
+	var header := _take_btn()
 	var mark := "▼" if expanded else "▶"
 	var count_bit := " (%d)" % action_count if action_count > 0 else ""
 	header.text = "%s %s%s" % [mark, title, count_bit]
 	header.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	header.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.focus_mode = Control.FOCUS_NONE
+	header.set_meta("ocp_sid", sid)
+	header.set_meta("ocp_title", title)
+	header.set_meta("ocp_action_count", action_count)
 	var host := _target_body()
 	if host == null:
 		host = _body
 	host.add_child(header)
-	var body := VBoxContainer.new()
-	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	body.visible = expanded
-	host.add_child(body)
+	var body: VBoxContainer = null
+	if expanded:
+		body = _take_vbox()
+		body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		body.visible = true
+		host.add_child(body)
+		header.set_meta("ocp_body", body)
 	header.pressed.connect(_on_section_toggle.bind(sid, header, body, title, action_count))
 	return body
 
 
 func _on_section_toggle(section_id: String, header: Button, body: VBoxContainer, title: String, action_count: int) -> void:
-	var now := not body.visible
-	body.visible = now
+	var b: VBoxContainer = body
+	if (b == null or not is_instance_valid(b)) and header != null and header.has_meta("ocp_body"):
+		var mb: Variant = header.get_meta("ocp_body")
+		if mb is VBoxContainer and is_instance_valid(mb):
+			b = mb as VBoxContainer
+	if b == null or not is_instance_valid(b):
+		b = _take_vbox()
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		b.visible = true
+		var host: Node = header.get_parent() if header != null else _target_body()
+		if host == null:
+			host = _body
+		if host != null and header != null:
+			host.add_child(b)
+			host.move_child(b, header.get_index() + 1)
+		if header != null:
+			header.set_meta("ocp_body", b)
+		_section_expanded[section_id] = true
+		var mark0 := "▼"
+		var count_bit0 := " (%d)" % action_count if action_count > 0 else ""
+		if header != null:
+			header.text = "%s %s%s" % [mark0, title, count_bit0]
+		_ensure_lazy_section_content(section_id, b)
+		return
+	var now := not b.visible
+	b.visible = now
 	_section_expanded[section_id] = now
 	var mark := "▼" if now else "▶"
 	var count_bit := " (%d)" % action_count if action_count > 0 else ""
 	header.text = "%s %s%s" % [mark, title, count_bit]
 	if now:
-		_ensure_lazy_section_content(section_id, body)
+		_ensure_lazy_section_content(section_id, b)
 
 
 func _ensure_lazy_section_content(section_id: String, body: VBoxContainer) -> void:
@@ -1284,15 +1480,15 @@ func _fill_day_package_actions(section_id: String, payload: Dictionary) -> void:
 		for a in acts:
 			if not (a is Dictionary):
 				continue
-			var row := HBoxContainer.new()
-			var lbl := Label.new()
+			var row := _take_hbox()
+			var lbl := _take_lbl()
 			lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			var order_snip := str(a.get("order", "")).strip_edges()
 			if order_snip.length() > 48:
 				order_snip = order_snip.substr(0, 48)
 			lbl.text = "%s — %s" % [str(a.get("label", "")), order_snip]
 			row.add_child(lbl)
-			var btn := Button.new()
+			var btn := _take_btn()
 			btn.text = "Apply"
 			btn.disabled = not bool(a.get("enabled", true))
 			var aid2 := str(a.get("action_id", ""))
@@ -1330,7 +1526,7 @@ func _clear_container_children(node: Node) -> void:
 	while node.get_child_count() > 0:
 		var c: Node = node.get_child(0)
 		node.remove_child(c)
-		c.free()
+		_recycle_tree(c)
 
 
 func _rebuild_all_sections() -> void:
@@ -1368,12 +1564,12 @@ func _rebuild_campaign_alpha_primary_strip() -> void:
 		false,
 		0,
 	)
-	if bool(_section_expanded.get("extended_primary", false)):
+	if bool(_section_expanded.get("extended_primary", false)) and ext_body != null:
 		_active_body = ext_body
 		_fill_extended_primary_packages()
 		_active_body = null
 		ext_body.set_meta("lazy_filled", true)
-	else:
+	elif ext_body != null:
 		_active_body = ext_body
 		_add_plain_label("Expand to load Stream α, fleet, research, economy, and more packages.", 200)
 		_active_body = null
@@ -1401,7 +1597,7 @@ func _rebuild_play_mode_strip() -> void:
 	var rec_hint := str(rec.get("hint", "Unpause a day"))
 	var rec_label := "Next: %s" % str(rec.get("label", "Unpause a day"))
 	_add_plain_label(rec_hint, 220)
-	var rec_btn := Button.new()
+	var rec_btn := _take_btn()
 	rec_btn.text = rec_label
 	rec_btn.focus_mode = Control.FOCUS_NONE
 	rec_btn.tooltip_text = rec_hint
@@ -1413,7 +1609,7 @@ func _rebuild_play_mode_strip() -> void:
 	)
 	_target_body().add_child(rec_btn)
 	# Map surface shortcuts (toast + MapRenderer when present)
-	var map_row := HBoxContainer.new()
+	var map_row := _take_hbox()
 	_target_body().add_child(map_row)
 	_add_map_surface_button(map_row, "WarLoop (Shift+I)", "show_first_session_war_path")
 	_add_map_surface_button(map_row, "Fronts (B)", "show_live_border_fronts")
@@ -1421,7 +1617,7 @@ func _rebuild_play_mode_strip() -> void:
 
 
 func _add_map_surface_button(parent: Control, label: String, method_name: String) -> void:
-	var btn := Button.new()
+	var btn := _take_btn()
 	btn.text = label
 	btn.focus_mode = Control.FOCUS_NONE
 	btn.custom_minimum_size = Vector2(0, 26)
@@ -1855,6 +2051,8 @@ func close_screen() -> void:
 func _close_panel() -> void:
 	if not is_instance_valid(self):
 		return
+	if _body != null and is_instance_valid(_body):
+		_clear_container_children(_body)
 	visible = false
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	if not is_queued_for_deletion():
@@ -1914,12 +2112,12 @@ func _rebuild_orders_section() -> void:
 	_rebuild_campaign_alpha_primary_strip()
 	## Collapse major catalogue noise under one section (routes remain live).
 	var depth_body := _add_collapsible_section("Campaign depth (majors · collapsed)", "campaign_depth_majors", false, 0)
-	if bool(_section_expanded.get("campaign_depth_majors", false)):
+	if bool(_section_expanded.get("campaign_depth_majors", false)) and depth_body != null:
 		_active_body = depth_body
 		_fill_campaign_depth_majors()
 		_active_body = null
 		depth_body.set_meta("lazy_filled", true)
-	else:
+	elif depth_body != null:
 		_active_body = depth_body
 		_add_plain_label("Expand to load campaign depth tools (keeps this panel opening instantly).", 200)
 		_active_body = null
@@ -1954,7 +2152,7 @@ func _rebuild_orders_section() -> void:
 			var start_exp := bool(sec.get("start_expanded", false))
 			var acts: Array = sec.get("actions", [])
 			var body := _add_collapsible_section(title, sid, start_exp, acts.size())
-			if body.visible:
+			if body != null and body.visible:
 				_active_body = body
 				_fill_day_package_actions(sid, {"acts": acts})
 				_active_body = null
@@ -3401,12 +3599,55 @@ func _rebuild_industry_section() -> void:
 			_add_plain_label(dp.split("\n")[0], 260)
 
 
+func _saves_adopt_shared_list() -> void:
+	if _saves_list_cache_valid or not _shared_saves_valid:
+		return
+	_saves_list_cache = _shared_saves_rows.duplicate(true)
+	_saves_product_cache = _shared_saves_product.duplicate(true)
+	_saves_list_cache_valid = true
+
+
+func _saves_publish_shared_list() -> void:
+	_shared_saves_rows = _saves_list_cache
+	_shared_saves_product = _saves_product_cache.duplicate(true)
+	_shared_saves_valid = true
+
+
+func _saves_rows_and_product() -> Dictionary:
+	if not _saves_rebuild_from_all:
+		_saves_list_cache_valid = false
+		_shared_saves_valid = false
+	_saves_adopt_shared_list()
+	var rows: Array = _saves_list_cache if _saves_list_cache_valid else []
+	var product: Dictionary = _saves_product_cache.duplicate(true) if _saves_list_cache_valid else {}
+	if _saves_list_cache_valid:
+		return {"rows": rows, "product": product}
+	if typeof(SaveLoadManager) != TYPE_NIL and SaveLoadManager.has_method("list_slots_for_ui"):
+		rows = SaveLoadManager.list_slots_for_ui()
+	if typeof(GameData) != TYPE_NIL and GameData.has_method("save_browser_campaign_product_live"):
+		if typeof(MapPolishFormatters) != TYPE_NIL:
+			product = MapPolishFormatters.save_browser_campaign_product(rows, 8)
+			if not product.is_empty():
+				product["live"] = true
+		if product.is_empty():
+			product = GameData.save_browser_campaign_product_live()
+	elif typeof(MapPolishFormatters) != TYPE_NIL:
+		if rows.is_empty() and typeof(SaveLoadManager) != TYPE_NIL and SaveLoadManager.has_method("list_slots_for_ui"):
+			rows = SaveLoadManager.list_slots_for_ui()
+		product = MapPolishFormatters.save_browser_campaign_product(rows, 8)
+	_saves_list_cache = rows
+	_saves_product_cache = product.duplicate(true)
+	_saves_list_cache_valid = true
+	_saves_publish_shared_list()
+	return {"rows": rows, "product": product}
+
+
 func _saves_section_ensure_host() -> VBoxContainer:
 	var host := _body.get_node_or_null("SavesSectionHost") as VBoxContainer if _body != null else null
 	if host != null and host.is_queued_for_deletion():
 		host = null
 	if host == null:
-		host = VBoxContainer.new()
+		host = _take_vbox()
 		host.name = "SavesSectionHost"
 		host.add_theme_constant_override("separation", 6)
 		if _body != null:
@@ -3426,27 +3667,10 @@ func _rebuild_saves_section() -> void:
 		if not SaveLoadManager.save_list_changed.is_connected(_rebuild_saves_section):
 			SaveLoadManager.save_list_changed.connect(_rebuild_saves_section, CONNECT_DEFERRED)
 	_add_section_title("— Save browser campaign product (major #4) —")
-	if not _saves_rebuild_from_all:
-		_saves_list_cache_valid = false
-	var rows: Array = _saves_list_cache if _saves_list_cache_valid else []
-	var product: Dictionary = _saves_product_cache.duplicate(true) if _saves_list_cache_valid else {}
-	if not _saves_list_cache_valid:
-		if typeof(SaveLoadManager) != TYPE_NIL and SaveLoadManager.has_method("list_slots_for_ui"):
-			rows = SaveLoadManager.list_slots_for_ui()
-		if typeof(GameData) != TYPE_NIL and GameData.has_method("save_browser_campaign_product_live"):
-			if typeof(MapPolishFormatters) != TYPE_NIL:
-				product = MapPolishFormatters.save_browser_campaign_product(rows, 8)
-				if not product.is_empty():
-					product["live"] = true
-			if product.is_empty():
-				product = GameData.save_browser_campaign_product_live()
-		elif typeof(MapPolishFormatters) != TYPE_NIL:
-			if rows.is_empty() and typeof(SaveLoadManager) != TYPE_NIL and SaveLoadManager.has_method("list_slots_for_ui"):
-				rows = SaveLoadManager.list_slots_for_ui()
-			product = MapPolishFormatters.save_browser_campaign_product(rows, 8)
-		_saves_list_cache = rows
-		_saves_product_cache = product.duplicate(true)
-		_saves_list_cache_valid = true
+	# save_browser_campaign_product_live is resolved in _saves_rows_and_product.
+	var packed: Dictionary = _saves_rows_and_product()
+	var rows: Array = packed.get("rows", []) as Array
+	var product: Dictionary = packed.get("product", {}) as Dictionary
 	if not product.is_empty() and not bool(product.get("empty", false)):
 		_add_plain_label(str(product.get("summary", "")), 280)
 		var resume: Dictionary = product.get("resume", {})
@@ -3473,19 +3697,19 @@ func _rebuild_saves_section() -> void:
 		var slot := str(r.get("slot", "")).strip_edges()
 		if slot.is_empty():
 			continue
-		var row := HBoxContainer.new()
+		var row := _take_hbox()
 		row.name = "SlotRow_%s" % slot
-		var lbl := Label.new()
+		var lbl := _take_lbl()
 		lbl.name = "SlotRowLabel_%s" % slot
 		lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		lbl.text = str(r.get("flair_label", r.get("label", slot)))
 		row.add_child(lbl)
-		var save_btn := Button.new()
+		var save_btn := _take_btn()
 		save_btn.text = "Save"
 		save_btn.disabled = not bool(r.get("can_save", true))
 		save_btn.pressed.connect(_on_action_pressed.bind("save_slot:%s" % slot))
 		row.add_child(save_btn)
-		var load_btn := Button.new()
+		var load_btn := _take_btn()
 		load_btn.text = "Load"
 		load_btn.disabled = not bool(r.get("can_load", false))
 		load_btn.pressed.connect(_on_action_pressed.bind("load_slot:%s" % slot))
@@ -3494,14 +3718,14 @@ func _rebuild_saves_section() -> void:
 		shown += 1
 		if shown >= 8:
 			break
-	var qs_row := HBoxContainer.new()
-	var qs := Button.new()
+	var qs_row := _take_hbox()
+	var qs := _take_btn()
 	qs.text = "Quicksave"
 	qs.pressed.connect(_on_quicksave)
 	qs_row.add_child(qs)
-	var open_slots := Button.new()
+	var open_slots := _take_btn()
 	open_slots.text = "Refresh slots"
-	open_slots.pressed.connect(refresh)
+	open_slots.pressed.connect(_on_refresh_slots_clicked)
 	qs_row.add_child(open_slots)
 	_target_body().add_child(qs_row)
 	if typeof(GameData) != TYPE_NIL and GameData.has_method("format_save_browser_campaign_product_plain"):
@@ -3730,15 +3954,29 @@ func _on_action_pressed(action_id: String) -> void:
 	# Soft refresh surfaces without rebuilding province list from scratch if save/load.
 	# Defer rebuild so Apply/Save `pressed` can return before we free() the button.
 	if action_id.begins_with("load_slot:"):
+		_shared_saves_valid = false
 		refresh()
 	elif action_id.begins_with("save_slot:"):
 		# In-place ⚡ / Resume patch. A full `_rebuild_all_sections` after Apply
 		# is what left the live Orders row stale and Close/Esc dead for ~1m45s.
 		_patch_saves_after_slot_write(action_id, res)
 		_refresh_command_log()
+	elif action_id == "apply_supply":
+		# Industry/surface plains are unchanged by this mutation; skip the full
+		# tree rebuild (reattach layout). Status returns to Country in-place.
+		_restore_country_status_after_apply()
+		_refresh_command_log()
 	else:
 		call_deferred("_rebuild_all_sections")
 		_refresh_command_log()
+
+
+func _restore_country_status_after_apply() -> void:
+	if _status == null:
+		return
+	_status.text = "Country %s · %s · %d live targets" % [
+		country_tag, _province_label(province_id), _province_ids.size()
+	]
 
 
 func _refresh_command_log() -> void:
@@ -3805,6 +4043,7 @@ func _patch_slot_row_labels(root: Node, slot: String, flair_label: String) -> in
 
 func _patch_saves_after_slot_write(action_id: String, res: Dictionary) -> void:
 	_saves_list_cache_valid = false
+	_shared_saves_valid = false
 	if not bool(res.get("ok", res.get("success", false))):
 		return
 	var slot := action_id.substr("save_slot:".length()).strip_edges()
