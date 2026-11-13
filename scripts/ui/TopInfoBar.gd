@@ -1224,13 +1224,10 @@ func _unhandled_input(event: InputEvent) -> void:
 				ok = bool(SaveLoadManager.quicksave())
 			print("Ctrl+S QuickSave triggered ok=%s path=%s" % [str(ok), abs_p])
 			# SaveLoadManager.save_game_detailed already toasts success. Extra
-			# success toasts here painted a duplicate notice.
+			# success toasts here painted a duplicate notice. Live list refresh
+			# is save_list_changed (S1/S2/S3), not a MainMenu-only lookup.
 			if not ok and typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
 				LeaderEventUI.show_toast("Quicksave FAILED — see console", 3.5)
-			# Refresh Command Center list if open.
-			var mm: Node = get_tree().root.find_child("MainMenu", true, false) if get_tree() else null
-			if mm != null and mm.has_method("_refresh_save_list"):
-				mm.call_deferred("_refresh_save_list")
 		get_viewport().set_input_as_handled()
 		return
 	if event.ctrl_pressed and not event.shift_pressed and event.keycode == KEY_L:
@@ -1271,7 +1268,7 @@ func _overlay_holds_clock() -> bool:
 	var tree := get_tree()
 	if tree == null:
 		return false
-	for group_name in ["campaign_ink_end_screen", "campaign_end_screen", "continuation_picker"]:
+	for group_name in ["campaign_ink_end_screen", "campaign_end_screen", "continuation_picker", "away_overlay"]:
 		for n in tree.get_nodes_in_group(group_name):
 			if n == null or not is_instance_valid(n) or n.is_queued_for_deletion():
 				continue

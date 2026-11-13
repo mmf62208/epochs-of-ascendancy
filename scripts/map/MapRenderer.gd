@@ -3184,6 +3184,7 @@ func _handle_escape_key() -> void:
 	# ProductionAssignmentScreen is in this list so it still closes first,
 	# ahead of any other open play window it outranks.
 	if _dismiss_top_play_window([
+		"OrderCommandPanel",
 		"LeaderAssignmentScreen",
 		"ProductionAssignmentScreen",
 		"TechnologyScreen",

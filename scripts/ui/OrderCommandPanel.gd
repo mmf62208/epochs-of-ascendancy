@@ -872,6 +872,8 @@ func _ready() -> void:
 	offset_top = -280
 	offset_right = 340
 	offset_bottom = 280
+	set_process_input(true)
+	set_process_unhandled_input(true)
 	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_player_country_tag"):
 		var tag := str(LeaderManager.get_player_country_tag()).to_upper()
 		if not tag.is_empty():
@@ -884,6 +886,10 @@ func _ready() -> void:
 
 func _deferred_first_refresh() -> void:
 	if not is_inside_tree():
+		return
+	# Headless AUTOSAVE-2 heavy case sets this so first-open catalogue build
+	# cannot stall process_frame for tens of seconds before Apply.
+	if bool(get_meta("eoa_skip_first_refresh", false)):
 		return
 	refresh()
 
@@ -940,7 +946,7 @@ func _build_ui() -> void:
 	title_row.add_child(_refresh_btn)
 	_close_btn = Button.new()
 	_close_btn.text = "Close"
-	_close_btn.pressed.connect(queue_free)
+	_close_btn.pressed.connect(_close_panel)
 	title_row.add_child(_close_btn)
 
 	var prov_row := HBoxContainer.new()
@@ -1055,13 +1061,15 @@ func _add_section_title(text: String) -> void:
 	_target_body().add_child(lbl)
 
 
-func _add_plain_label(text: String, max_len: int = 280) -> void:
+func _add_plain_label(text: String, max_len: int = 280, node_name: String = "") -> void:
 	var cl := Label.new()
 	cl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	var t := text.strip_edges()
 	if t.length() > max_len:
 		t = t.substr(0, max_len) + "…"
 	cl.text = t if not t.is_empty() else "(empty)"
+	if not node_name.is_empty():
+		cl.name = node_name
 	_target_body().add_child(cl)
 
 
@@ -1634,9 +1642,62 @@ func _rebuild_war_economy_primary_command() -> void:
 			_add_plain_label(wp, 240)
 
 
+func _is_escape_event(event: InputEvent) -> bool:
+	if event is InputEventAction:
+		var act: InputEventAction = event
+		return bool(act.pressed) and str(act.action) == "ui_cancel"
+	if event is InputEventKey:
+		var key: InputEventKey = event
+		if not key.pressed or key.echo:
+			return false
+		if key.keycode == KEY_ESCAPE or key.physical_keycode == KEY_ESCAPE:
+			return true
+		if key.key_label == KEY_ESCAPE:
+			return true
+		if int(key.unicode) == 27:
+			return true
+	if event != null and event.is_action_pressed("ui_cancel"):
+		return true
+	return false
+
+
+func close_screen() -> void:
+	_close_panel()
+
+
+func _close_panel() -> void:
+	if not is_instance_valid(self):
+		return
+	visible = false
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if not is_queued_for_deletion():
+		queue_free()
+
+
+func _mark_input_handled() -> void:
+	var vp := get_viewport() if is_inside_tree() else null
+	if vp != null:
+		vp.set_input_as_handled()
+
+
+func _input(event: InputEvent) -> void:
+	if not visible:
+		return
+	if not _is_escape_event(event):
+		return
+	_close_panel()
+	_mark_input_handled()
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	## Pack C — keyboard phase advance from selected province (primary path).
-	if not visible or not (event is InputEventKey):
+	if not visible:
+		return
+	if _is_escape_event(event):
+		_close_panel()
+		_mark_input_handled()
+		return
+	if not (event is InputEventKey):
 		return
 	var ke := event as InputEventKey
 	if not ke.pressed or ke.echo:
@@ -1647,16 +1708,18 @@ func _unhandled_input(event: InputEvent) -> void:
 	match ke.keycode:
 		KEY_A:
 			_on_action_pressed("phase_approach")
-			get_viewport().set_input_as_handled()
+			_mark_input_handled()
 		KEY_E:
 			_on_action_pressed("phase_engage")
-			get_viewport().set_input_as_handled()
+			_mark_input_handled()
 		KEY_D:
 			_on_action_pressed("phase_disengage")
-			get_viewport().set_input_as_handled()
+			_mark_input_handled()
 		KEY_N:
 			_on_action_pressed("combat_ops_close")
-			get_viewport().set_input_as_handled()
+			_mark_input_handled()
+		_:
+			pass
 
 
 func _rebuild_orders_section() -> void:
@@ -3176,6 +3239,21 @@ func _rebuild_industry_section() -> void:
 
 
 func _rebuild_saves_section() -> void:
+	var prev_active: VBoxContainer = _active_body
+	var host := _body.get_node_or_null("SavesSectionHost") as VBoxContainer if _body != null else null
+	if host != null and host.is_queued_for_deletion():
+		host = null
+	if host == null:
+		host = VBoxContainer.new()
+		host.name = "SavesSectionHost"
+		host.add_theme_constant_override("separation", 6)
+		if _body != null:
+			_body.add_child(host)
+	_clear_container_children(host)
+	_active_body = host
+	if typeof(SaveLoadManager) != TYPE_NIL and SaveLoadManager.has_signal("save_list_changed"):
+		if not SaveLoadManager.save_list_changed.is_connected(_rebuild_saves_section):
+			SaveLoadManager.save_list_changed.connect(_rebuild_saves_section, CONNECT_DEFERRED)
 	_add_section_title("— Save browser campaign product (major #4) —")
 	var product: Dictionary = {}
 	if typeof(GameData) != TYPE_NIL and GameData.has_method("save_browser_campaign_product_live"):
@@ -3190,7 +3268,7 @@ func _rebuild_saves_section() -> void:
 		var resume: Dictionary = product.get("resume", {})
 		var checkpoint: Dictionary = product.get("checkpoint", {})
 		if resume is Dictionary and not bool(resume.get("empty", true)):
-			_add_plain_label(str(resume.get("summary", "")), 220)
+			_add_plain_label(str(resume.get("summary", "")), 220, "ResumeLineLabel")
 		if checkpoint is Dictionary:
 			_add_plain_label(str(checkpoint.get("summary", "")), 200)
 		_add_apply_button("Run save browser campaign product", "save_browser_campaign_product", true)
@@ -3215,7 +3293,9 @@ func _rebuild_saves_section() -> void:
 		if slot.is_empty():
 			continue
 		var row := HBoxContainer.new()
+		row.name = "SlotRow_%s" % slot
 		var lbl := Label.new()
+		lbl.name = "SlotRowLabel_%s" % slot
 		lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		lbl.text = str(r.get("flair_label", r.get("label", slot)))
 		row.add_child(lbl)
@@ -3229,7 +3309,7 @@ func _rebuild_saves_section() -> void:
 		load_btn.disabled = not bool(r.get("can_load", false))
 		load_btn.pressed.connect(_on_action_pressed.bind("load_slot:%s" % slot))
 		row.add_child(load_btn)
-		_body.add_child(row)
+		_target_body().add_child(row)
 		shown += 1
 		if shown >= 8:
 			break
@@ -3242,11 +3322,12 @@ func _rebuild_saves_section() -> void:
 	open_slots.text = "Refresh slots"
 	open_slots.pressed.connect(refresh)
 	qs_row.add_child(open_slots)
-	_body.add_child(qs_row)
+	_target_body().add_child(qs_row)
 	if typeof(GameData) != TYPE_NIL and GameData.has_method("format_save_browser_campaign_product_plain"):
 		var sp := str(GameData.format_save_browser_campaign_product_plain()).strip_edges()
 		if not sp.is_empty():
 			_add_plain_label(sp.split("\n")[0], 260)
+	_active_body = prev_active
 
 
 func _rebuild_gpu_section() -> void:
@@ -3468,18 +3549,114 @@ func _on_action_pressed(action_id: String) -> void:
 		action_id,
 		"OK" if ok else str(res.get("reason", res.get("error", "blocked"))),
 	]
-	# Soft refresh surfaces without rebuilding province list from scratch if save/load
+	# Soft refresh surfaces without rebuilding province list from scratch if save/load.
+	# Defer rebuild so Apply/Save `pressed` can return before we free() the button.
 	if action_id.begins_with("load_slot:"):
 		refresh()
+	elif action_id.begins_with("save_slot:"):
+		# In-place ⚡ / Resume patch. A full `_rebuild_all_sections` after Apply
+		# is what left the live Orders row stale and Close/Esc dead for ~1m45s.
+		_patch_saves_after_slot_write(action_id, res)
+		_refresh_command_log()
 	else:
-		_rebuild_all_sections()
-		var log_plain := ""
-		if typeof(GameData) != TYPE_NIL and GameData.has_method("format_command_result_log_plain"):
-			log_plain = str(GameData.format_command_result_log_plain(5))
-		if log_plain.is_empty():
-			_log_label.text = "[color=#8899aa]Command log empty.[/color]"
-		else:
-			_log_label.text = "[color=#5ec8ff]Command results[/color]\n" + log_plain
+		call_deferred("_rebuild_all_sections")
+		_refresh_command_log()
+
+
+func _refresh_command_log() -> void:
+	if _log_label == null:
+		return
+	var log_plain := ""
+	if typeof(GameData) != TYPE_NIL and GameData.has_method("format_command_result_log_plain"):
+		log_plain = str(GameData.format_command_result_log_plain(5))
+	if log_plain.is_empty():
+		_log_label.text = "[color=#8899aa]Command log empty.[/color]"
+	else:
+		_log_label.text = "[color=#5ec8ff]Command results[/color]\n" + log_plain
+
+
+func _live_saves_host() -> VBoxContainer:
+	if _body == null:
+		return null
+	for c in _body.get_children():
+		if str(c.name) == "SavesSectionHost" and is_instance_valid(c) and not c.is_queued_for_deletion():
+			return c as VBoxContainer
+	return null
+
+
+func _find_named_label(root: Node, node_name: String) -> Label:
+	if root == null or not is_instance_valid(root) or root.is_queued_for_deletion():
+		return null
+	if root is Label and str(root.name) == node_name:
+		return root as Label
+	for c in root.get_children():
+		var found := _find_named_label(c, node_name)
+		if found != null:
+			return found
+	return null
+
+
+func _metadata_from_save_action(res: Dictionary) -> Dictionary:
+	if res.get("metadata") is Dictionary:
+		var top: Dictionary = (res.get("metadata", {}) as Dictionary).duplicate(true)
+		if not top.is_empty():
+			return top
+	if res.get("save") is Dictionary:
+		var save_blob: Dictionary = res.get("save", {})
+		if save_blob.get("metadata") is Dictionary:
+			return (save_blob.get("metadata", {}) as Dictionary).duplicate(true)
+	return {}
+
+
+func _patch_slot_row_labels(root: Node, slot: String, flair_label: String) -> int:
+	if root == null or not is_instance_valid(root) or root.is_queued_for_deletion():
+		return 0
+	var n := 0
+	if root is Label and str(root.name) != "ResumeLineLabel":
+		var lbl := root as Label
+		var named := str(lbl.name) == "SlotRowLabel_%s" % slot
+		var txt := str(lbl.text)
+		var looks := txt.find(" · ") >= 0 and txt.to_lower().find(slot.to_lower()) >= 0
+		if named or looks:
+			lbl.text = flair_label
+			n += 1
+	for c in root.get_children():
+		n += _patch_slot_row_labels(c, slot, flair_label)
+	return n
+
+
+func _patch_saves_after_slot_write(action_id: String, res: Dictionary) -> void:
+	if not bool(res.get("ok", res.get("success", false))):
+		return
+	var slot := action_id.substr("save_slot:".length()).strip_edges()
+	if slot.is_empty():
+		slot = "quicksave"
+	var meta := _metadata_from_save_action(res)
+	if meta.is_empty() and typeof(SaveLoadManager) != TYPE_NIL and SaveLoadManager.has_method("_inspect_save_file"):
+		var inspected: Dictionary = SaveLoadManager._inspect_save_file(SaveLoadManager.get_save_path(slot))
+		if inspected.get("metadata") is Dictionary:
+			meta = (inspected.get("metadata", {}) as Dictionary).duplicate(true)
+	if typeof(SaveLoadManager) == TYPE_NIL or not SaveLoadManager.has_method("_format_slot_ui_row"):
+		call_deferred("_rebuild_saves_section")
+		return
+	var row: Dictionary = SaveLoadManager._format_slot_ui_row(slot, true, meta)
+	var flair_label := str(row.get("label", slot))
+	if typeof(MapPolishFormatters) != TYPE_NIL:
+		var flair: Dictionary = MapPolishFormatters.save_slot_browser_flair([row], 8)
+		var flair_rows: Array = flair.get("rows", []) if flair is Dictionary else []
+		if not flair_rows.is_empty() and flair_rows[0] is Dictionary:
+			flair_label = str((flair_rows[0] as Dictionary).get("flair_label", flair_label))
+	var host := _live_saves_host()
+	var patched := _patch_slot_row_labels(host, slot, flair_label)
+	if patched <= 0:
+		patched = _patch_slot_row_labels(_body, slot, flair_label)
+	var resume_root: Node = host if host != null else _body
+	var resume_lbl := _find_named_label(resume_root, "ResumeLineLabel")
+	if resume_lbl != null:
+		resume_lbl.text = "Resume · %s" % str(row.get("label", slot))
+	# Never _rebuild_saves_section() inside Apply `pressed` (frees the button).
+	if patched <= 0:
+		call_deferred("_rebuild_saves_section")
 
 
 func _on_quicksave() -> void:

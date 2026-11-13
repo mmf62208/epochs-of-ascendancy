@@ -88,6 +88,7 @@ const BEGIN_HIT_GROW := 36.0
 const CC_HIT_GROW := 28.0
 const PANEL_HIT_GROW := 16.0
 const RAW_LOG_MIN_MSEC := 180
+var _save_rows_host: VBoxContainer = null
 
 
 ## False for Maginot / QA / env-chosen boots. True for a normal graphical F5.
@@ -511,6 +512,24 @@ func commit_setup_toggles() -> Dictionary:
 
 
 func _fill_save_rows(col: VBoxContainer) -> void:
+	var host := _save_rows_host
+	if host == null or not is_instance_valid(host):
+		host = col.get_node_or_null("SaveRowsHost") as VBoxContainer
+		if host == null and col != null:
+			host = VBoxContainer.new()
+			host.name = "SaveRowsHost"
+			host.add_theme_constant_override("separation", 4)
+			col.add_child(host)
+		_save_rows_host = host
+	if host == null:
+		return
+	while host.get_child_count() > 0:
+		var stale: Node = host.get_child(0)
+		host.remove_child(stale)
+		stale.free()
+	if typeof(SaveLoadManager) != TYPE_NIL and SaveLoadManager.has_signal("save_list_changed"):
+		if not SaveLoadManager.save_list_changed.is_connected(_on_save_list_changed_fill):
+			SaveLoadManager.save_list_changed.connect(_on_save_list_changed_fill, CONNECT_DEFERRED)
 	var n := 0
 	if typeof(SaveLoadManager) != TYPE_NIL and SaveLoadManager.has_method("list_slots_for_ui"):
 		var rows: Array = SaveLoadManager.list_slots_for_ui()
@@ -533,14 +552,19 @@ func _fill_save_rows(col: VBoxContainer) -> void:
 			btn.set_meta("eoa_load_slot", slot)
 			btn.pressed.connect(_on_load.bind(slot))
 			RetrowaveTheme.style_secondary_button(btn)
-			col.add_child(btn)
+			host.add_child(btn)
 			n += 1
 	if n == 0:
 		var empty := Label.new()
 		empty.text = "No saves yet — start a new campaign."
 		empty.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		RetrowaveTheme.style_body_label(empty)
-		col.add_child(empty)
+		host.add_child(empty)
+
+
+func _on_save_list_changed_fill() -> void:
+	if _save_rows_host != null and is_instance_valid(_save_rows_host):
+		_fill_save_rows(_save_rows_host.get_parent() as VBoxContainer)
 
 
 func select_from_province(province_id: int) -> Dictionary:
