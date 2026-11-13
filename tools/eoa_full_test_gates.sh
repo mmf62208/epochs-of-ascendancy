@@ -295,6 +295,7 @@ if [[ "$QUICK" -eq 1 ]]; then
     run_step headless_orders_perf1 bash -c '
       log=$(mktemp)
       XDG_DATA_HOME="$(mktemp -d)" flock -n "${HOME}/.eoa_godot.lock" \
+        timeout --kill-after=10 900 \
         tools/run_godot.sh --headless --path . \
         -s res://scripts/core/HeadlessOrdersPerf1Test.gd >"$log" 2>&1
       code=$?

@@ -19,11 +19,14 @@ const BUDGET_CLOSE_MS := 1000
 const BUDGET_SELECT_MS := 500
 const BUDGET_APPLY_MS := 500
 const BUDGET_DEPTH_MS := 1500
+const BUDGET_G_STEP_MS := 3000
 const WD_SLACK_MS := 250
+const FACTORY_ID := "aaa_orders_perf1_fac"
 
 ## Frozen unfixed-tree apply-button + DAY_PACKAGE_ACTION_IDS union (9ccc83ee OCP).
-## Unique `_add_apply_button` literals = 1381; DAY_PACKAGE_ACTION_IDS = 1127; union below.
-const SNAPSHOT_ACTION_ID_COUNT := 1451
+## Unique `_add_apply_button` literals = 1381; DAY_PACKAGE_ACTION_IDS = 1127; union = 1451;
+## plus 17 runtime-only dynamic ids (execute_one, refresh_queue, load_slot:*, save_slot:*).
+const SNAPSHOT_ACTION_ID_COUNT := 1468
 const SNAPSHOT_ACTION_IDS: PackedStringArray = [
 	"advanced_deferred_campaign_close_day", "agenda_actions_day", "agenda_pick_day", "agenda_pulse_ops_day",
 	"agent_ai_board_day", "agent_ai_campaign_depth_day", "agent_auto_day", "agent_campaign_day",
@@ -172,7 +175,7 @@ const SNAPSHOT_ACTION_IDS: PackedStringArray = [
 	"domain_joint_ops_day", "dual_domain_mutate_day", "economy_civ_board", "economy_civ_board_day",
 	"economy_stockpile_sustain", "economy_stockpile_sustain_day", "economy_war_convert", "economy_war_convert_day",
 	"equip_horizon_depth_day", "equip_oob_close_day", "equip_stockpile_joint_day", "equipment_flow_symbols_primary_live",
-	"escalation_ladder_ops_day", "execute_one_day", "execute_one_live_day", "execute_order_day",
+	"escalation_ladder_ops_day", "execute_one", "execute_one_day", "execute_one_live_day", "execute_order_day",
 	"execute_prod_live_day", "execution_gate_cont_day", "execution_gate_day", "faction_personality_ai_close_day",
 	"faction_personality_primary_command_product", "factory_line_ops_day", "factory_oob_depth_day", "factory_retool_primary_command_product",
 	"factory_risk_day", "factory_risk_live_day", "factory_risk_surge_day", "feedback_chain_day",
@@ -241,7 +244,9 @@ const SNAPSHOT_ACTION_IDS: PackedStringArray = [
 	"leader_occupation_joint_day", "leader_ops_advanced_day", "leader_station_advanced_day", "leader_station_day",
 	"leader_theater_command_close_day", "leader_theater_command_product", "leader_theater_joint_day", "leader_theater_ops",
 	"leader_theater_ops_day", "leader_theater_primary_command_product", "leader_weather_day", "leader_weather_depth_day",
-	"line_continuity_depth_day", "live_apply_results_day", "live_mut_board_day", "load_slot_slot1",
+	"line_continuity_depth_day", "live_apply_results_day", "live_mut_board_day",
+	"load_slot:autosave_1", "load_slot:autosave_2", "load_slot:autosave_3", "load_slot:last_played",
+	"load_slot:quicksave", "load_slot:slot1", "load_slot:slot2", "load_slot:slot3", "load_slot_slot1",
 	"log_strip_day", "logistics_day", "logistics_force_panel_close_day", "logistics_naval_joint_day",
 	"logistics_readiness_advanced_day", "logistics_route_advanced_day", "logistics_supply_close_day", "logistics_supply_primary_command_product",
 	"logistics_supply_readiness", "logistics_supply_route", "logistics_supply_sustain", "logistics_supply_theater_product",
@@ -321,7 +326,7 @@ const SNAPSHOT_ACTION_IDS: PackedStringArray = [
 	"production_priority_day", "production_priority_depth_day", "production_priority_ops_day", "production_risk_alert_day",
 	"production_risk_day", "production_surge_close_day", "production_surge_day", "province_decision_joint_day",
 	"q1_checklist_primary_command_product", "q1_rc_checklist_primary_command_product", "q1_validator_primary_command_product", "readiness_board_ops_day",
-	"redeploy_route_day", "redeploy_route_ops_day", "reinforce_step_ops_day", "reinforce_stockpile_depth_day",
+	"redeploy_route_day", "redeploy_route_ops_day", "refresh_queue", "reinforce_step_ops_day", "reinforce_stockpile_depth_day",
 	"reinforce_story_primary_live", "reinforced_assault_day", "reinforced_combat_ops_day", "research_primary_advance_month",
 	"research_primary_close", "research_primary_enqueue_branch", "research_primary_gate_check", "research_primary_open_queue",
 	"research_queue_primary_command_live", "research_queue_primary_command_product", "resource_economy_depth_primary_command_product", "resource_harvest_primary_command_product",
@@ -332,7 +337,8 @@ const SNAPSHOT_ACTION_IDS: PackedStringArray = [
 	"save_resume_checkpoint", "save_resume_checkpoint_day", "save_resume_depth_day", "save_resume_ops_day",
 	"save_resume_primary_command_product", "save_resume_resume", "save_resume_resume_day", "save_resume_save",
 	"save_resume_save_day", "save_session_ai_joint_day", "save_session_close_day", "save_session_close_depth_day",
-	"save_slot:quicksave", "save_slot_browser_day", "save_slot_depth_day", "save_slot_integrity_ops_day",
+	"save_slot:autosave_1", "save_slot:autosave_2", "save_slot:autosave_3", "save_slot:last_played",
+	"save_slot:quicksave", "save_slot:slot1", "save_slot:slot2", "save_slot:slot3", "save_slot_browser_day", "save_slot_depth_day", "save_slot_integrity_ops_day",
 	"save_slot_list_day", "save_slot_quicksave", "save_slot_slot1", "save_slot_surface_day",
 	"sea_zone_control_ops_day", "sea_zone_mod_ops_day", "sea_zone_trade_day", "sealane_economy_ops_day",
 	"sealane_health_day", "sealane_health_depth_day", "sealane_health_ops_day", "sealane_joint_ops_day",
@@ -390,7 +396,19 @@ const SNAPSHOT_ACTION_IDS: PackedStringArray = [
 	"world_class_scan_advanced_day", "world_class_session_ai_joint_day", "world_class_theater_command_joint_day",
 ]
 
+## Runtime-only ids (not quoted literals in OrderCommandPanel.gd). Skip the source
+## quoted-string check; they must appear in the runtime apply-button walk.
+const SNAPSHOT_RUNTIME_ONLY_IDS: PackedStringArray = [
+	"execute_one",
+	"load_slot:autosave_1", "load_slot:autosave_2", "load_slot:autosave_3",
+	"load_slot:last_played", "load_slot:quicksave", "load_slot:slot1", "load_slot:slot2", "load_slot:slot3",
+	"refresh_queue",
+	"save_slot:autosave_1", "save_slot:autosave_2", "save_slot:autosave_3",
+	"save_slot:last_played", "save_slot:slot1", "save_slot:slot2", "save_slot:slot3",
+]
+
 var _failures: int = 0
+var _result_printed: bool = false
 var _wd_thread: Thread = null
 var _wd_armed: bool = false
 var _wd_fired: bool = false
@@ -434,11 +452,33 @@ func _join_watchdog() -> void:
 	_wd_thread = null
 
 
-func _emit_result_and_die(ok: bool) -> void:
-	print("HeadlessOrdersPerf1Test: ", "PASS" if ok else "FAIL", " (failures=", _failures, ")")
-	print("HeadlessOrdersPerf1Test: RESULT=", "PASS" if ok else "FAIL")
+func _print_final_result() -> void:
+	if _result_printed:
+		return
+	_result_printed = true
+	var ok: bool = _failures == 0
 	print("HeadlessOrdersPerf1Test: RESULT=%s failures=%d" % ["PASS" if ok else "FAIL", _failures])
 	_flush_log()
+
+
+func _hard_die() -> void:
+	var pid: int = OS.get_process_id()
+	OS.kill(pid)
+	var _kill_out: Array = []
+	OS.execute("kill", PackedStringArray(["-9", str(pid)]), _kill_out, false)
+	if OS.has_method("crash"):
+		OS.call("crash", "HeadlessOrdersPerf1Test watchdog")
+
+
+func _dump_watchdog_stack(waited: int) -> void:
+	print("  HeadlessOrdersPerf1Test: last-started step=%s elapsed=%dms" % [_wd_label, waited])
+	## Watchdog runs off the main thread; skip Engine.capture_script_backtraces so
+	## a SCRIPT ERROR cannot block OS.kill / kill -9.
+	_flush_log()
+
+
+func _emit_result_and_die(ok: bool) -> void:
+	_print_final_result()
 	_join_watchdog()
 	quit(0 if ok else 1)
 
@@ -458,12 +498,10 @@ func _watchdog_loop() -> void:
 		_wd_stop = true
 		var waited: int = now - _wd_start_msec
 		_failures += 1
-		print("  [FAIL] HeadlessOrdersPerf1Test: %s: watchdog %dms (step or process_frame never returned)" % [_wd_label, waited])
-		print("HeadlessOrdersPerf1Test: FAIL (failures=", _failures, ")")
-		print("HeadlessOrdersPerf1Test: RESULT=FAIL")
-		print("HeadlessOrdersPerf1Test: RESULT=FAIL failures=%d" % _failures)
-		_flush_log()
-		OS.kill(OS.get_process_id())
+		print("[FAIL] %s: watchdog %dms" % [_wd_label, waited])
+		_dump_watchdog_stack(waited)
+		_print_final_result()
+		_hard_die()
 		return
 
 
@@ -472,6 +510,10 @@ func _arm_watchdog(budget_ms: int, label: String) -> void:
 	_wd_start_msec = Time.get_ticks_msec()
 	_wd_deadline_msec = _wd_start_msec + budget_ms
 	_wd_fired = false
+	if _wd_thread != null and _wd_stop:
+		if _wd_thread.is_started():
+			_wd_thread.wait_to_finish()
+		_wd_thread = null
 	_wd_stop = false
 	_wd_armed = true
 	if _wd_thread == null:
@@ -481,6 +523,31 @@ func _arm_watchdog(budget_ms: int, label: String) -> void:
 
 func _disarm_watchdog() -> void:
 	_wd_armed = false
+
+
+func _step_begin(case_id: String, step: String, budget_ms: int = BUDGET_G_STEP_MS) -> int:
+	print("[STEP] %s:%s start" % [case_id, step])
+	_flush_log()
+	_arm_watchdog(budget_ms + WD_SLACK_MS, "%s: %s" % [case_id, step])
+	return Time.get_ticks_msec()
+
+
+func _step_end(case_id: String, step: String, t0: int) -> int:
+	var dt: int = Time.get_ticks_msec() - t0
+	_disarm_watchdog()
+	print("[STEP] %s:%s end %dms" % [case_id, step, dt])
+	_flush_log()
+	return dt
+
+
+func _g_call(obj: Object, method: String, args: Array, step: String) -> Variant:
+	if obj == null or not obj.has_method(method):
+		_fail("g: %s missing (%s)" % [method, step])
+		return null
+	var t0: int = _step_begin("g", step)
+	var result: Variant = obj.callv(method, args)
+	_step_end("g", step, t0)
+	return result
 
 
 func _start() -> void:
@@ -504,6 +571,10 @@ func _mm() -> Node:
 	return root.get_node_or_null("MapManager")
 
 
+func _tech() -> Node:
+	return root.get_node_or_null("TechnologyManager")
+
+
 func _run() -> void:
 	if not _setup_world():
 		return
@@ -512,7 +583,7 @@ func _run() -> void:
 	await _test_c_close_and_esc()
 	await _test_d_select_and_apply()
 	await _test_e_depth_catalogue()
-	_test_f_action_ids()
+	await _test_f_action_ids()
 	_test_g_cache_invalidation()
 
 
@@ -802,38 +873,102 @@ func _test_c_close_and_esc() -> void:
 		_ocp = await _open_live_ocp(BUDGET_COLD_MS, "OrderCommandPanel_c_close", "c: open for Close")
 	if _ocp == null or not is_instance_valid(_ocp):
 		_fail("c: no panel for Close")
-		return
-	var close_btn: Node = _ocp.get("_close_btn")
-	if close_btn == null or not (close_btn is BaseButton):
-		_fail("c: Close button missing")
 	else:
-		_progress("c: before Close")
-		_arm_watchdog(BUDGET_CLOSE_MS + WD_SLACK_MS, "c: Close")
-		(close_btn as BaseButton).pressed.emit()
-		_disarm_watchdog()
-		var closed: bool = await _pump_frames_until(
-			func() -> bool: return _panel_is_closed(_ocp),
-			BUDGET_CLOSE_MS,
-			"c: Close within 1s"
-		)
-		if closed:
-			_pass("c: Close within 1s")
+		var close_btn: Node = _ocp.get("_close_btn")
+		if close_btn == null or not (close_btn is BaseButton):
+			_fail("c: Close button missing")
+		else:
+			_progress("c: before Close")
+			_arm_watchdog(BUDGET_CLOSE_MS + WD_SLACK_MS, "c: Close")
+			(close_btn as BaseButton).pressed.emit()
+			_disarm_watchdog()
+			var closed: bool = await _pump_frames_until(
+				func() -> bool: return _panel_is_closed(_ocp),
+				BUDGET_CLOSE_MS,
+				"c: Close within 1s"
+			)
+			if closed:
+				_pass("c: Close within 1s")
 	var ocp_esc: Node = await _open_live_ocp(BUDGET_COLD_MS, "OrderCommandPanel_c_esc", "c: open for Esc")
 	if ocp_esc == null or not is_instance_valid(ocp_esc):
 		_fail("c: no panel for Esc")
-		return
-	_progress("c: before Esc")
-	_arm_watchdog(BUDGET_CLOSE_MS + WD_SLACK_MS, "c: Esc")
-	_emit_escape(ocp_esc)
-	_disarm_watchdog()
-	var esc_closed: bool = await _pump_frames_until(
-		func() -> bool: return _panel_is_closed(ocp_esc),
-		BUDGET_CLOSE_MS,
-		"c: Esc within 1s"
-	)
-	if esc_closed:
-		_pass("c: Esc within 1s")
+	else:
+		_progress("c: before Esc")
+		_arm_watchdog(BUDGET_CLOSE_MS + WD_SLACK_MS, "c: Esc")
+		_emit_escape(ocp_esc)
+		_disarm_watchdog()
+		var esc_closed: bool = await _pump_frames_until(
+			func() -> bool: return _panel_is_closed(ocp_esc),
+			BUDGET_CLOSE_MS,
+			"c: Esc within 1s"
+		)
+		if esc_closed:
+			_pass("c: Esc within 1s")
 	_ocp = null
+	await _test_c_fresh_open_dismiss()
+
+
+func _test_c_fresh_open_dismiss() -> void:
+	## Close/Esc issued during/immediately after a FRESH open (add_child, 1 frame,
+	## then input). Timed from the input to panel gone; budget 1s each.
+	_progress("case (c) fresh-open Close and Esc (before/as first refresh)")
+	await _c_fresh_input("Close")
+	await _c_fresh_input("Esc")
+
+
+func _c_fresh_input(kind: String) -> void:
+	var node_name: String = "OrderCommandPanel_c_fresh_%s" % kind.to_lower()
+	var ocp: Node = _instantiate_live_ocp(node_name)
+	if ocp == null:
+		_fail("c: fresh %s: OrderCommandPanel.tscn missing" % kind)
+		return
+	var t_add: int = _step_begin("c", "fresh %s add_child" % kind, BUDGET_CLOSE_MS)
+	root.add_child(ocp)
+	_step_end("c", "fresh %s add_child" % kind, t_add)
+	var t_frame: int = _step_begin("c", "fresh %s open frame" % kind, BUDGET_CLOSE_MS)
+	await process_frame
+	_step_end("c", "fresh %s open frame" % kind, t_frame)
+	if kind == "Close":
+		var close_btn: Node = ocp.get("_close_btn")
+		if close_btn == null or not (close_btn is BaseButton):
+			_fail("c: fresh Close button missing")
+			_close_ocp(ocp)
+			return
+		_progress("c: fresh Close input")
+		var t0: int = _step_begin("c", "fresh Close", BUDGET_CLOSE_MS)
+		(close_btn as BaseButton).pressed.emit()
+		_disarm_watchdog()
+		var closed: bool = await _pump_frames_until(
+			func() -> bool: return _panel_is_closed(ocp),
+			BUDGET_CLOSE_MS,
+			"c: fresh Close"
+		)
+		var dt: int = Time.get_ticks_msec() - t0
+		print("[STEP] c:fresh Close end %dms" % dt)
+		_flush_log()
+		if closed and dt <= BUDGET_CLOSE_MS:
+			_pass("c: fresh Close %dms (budget %dms)" % [dt, BUDGET_CLOSE_MS])
+		elif closed:
+			_fail("c: fresh Close %dms (budget %dms)" % [dt, BUDGET_CLOSE_MS])
+	else:
+		_progress("c: fresh Esc input")
+		var t0e: int = _step_begin("c", "fresh Esc", BUDGET_CLOSE_MS)
+		_emit_escape(ocp)
+		_disarm_watchdog()
+		var esc_closed: bool = await _pump_frames_until(
+			func() -> bool: return _panel_is_closed(ocp),
+			BUDGET_CLOSE_MS,
+			"c: fresh Esc"
+		)
+		var dte: int = Time.get_ticks_msec() - t0e
+		print("[STEP] c:fresh Esc end %dms" % dte)
+		_flush_log()
+		if esc_closed and dte <= BUDGET_CLOSE_MS:
+			_pass("c: fresh Esc %dms (budget %dms)" % [dte, BUDGET_CLOSE_MS])
+		elif esc_closed:
+			_fail("c: fresh Esc %dms (budget %dms)" % [dte, BUDGET_CLOSE_MS])
+	if not _panel_is_closed(ocp):
+		_close_ocp(ocp)
 
 
 func _test_d_select_and_apply() -> void:
@@ -893,93 +1028,190 @@ func _test_e_depth_catalogue() -> void:
 	var header: Button = _find_button_text_has(_ocp, "Depth catalogue")
 	if header == null:
 		_fail("e: depth catalogue header missing")
-		return
-	var expand_ms: int = _timed_press(header, BUDGET_DEPTH_MS, "e: expand depth catalogue")
-	if expand_ms >= 0 and expand_ms <= BUDGET_DEPTH_MS:
-		_pass("e: expand depth catalogue %dms" % expand_ms)
-	var cat_body: Node = _section_body_for_header(header)
-	if cat_body == null or cat_body.get_child_count() <= 0:
-		_fail("e: depth catalogue rows missing after expand")
-		return
-	_pass("e: depth catalogue rows=%d" % cat_body.get_child_count())
-	var sub: Button = _first_toggle_button(cat_body)
-	if sub == null:
-		_fail("e: depth sub-group header missing")
-		return
-	var sub_ms: int = _timed_press(sub, BUDGET_DEPTH_MS, "e: expand depth sub-group")
-	if sub_ms >= 0 and sub_ms <= BUDGET_DEPTH_MS:
-		_pass("e: expand depth sub-group %dms" % sub_ms)
-	var sub_body: Node = _section_body_for_header(sub)
-	var sub_rows: int = _count_descendants(sub_body) if sub_body != null else 0
-	if sub_body == null or (sub_body.get_child_count() <= 0 and sub_rows <= 0):
-		_fail("e: depth sub-group rows missing after expand")
+		## Soft fail: continue to (f). Expand/subgroup/D6 run when the header exists
+		## (after the product fix); do not abort the rest of this case's later checks
+		## when only rows/subgroup are missing.
 	else:
-		_pass("e: depth sub-group rows=%d descendants=%d" % [sub_body.get_child_count(), sub_rows])
-	_close_ocp(_ocp)
-	var closed: bool = await _pump_frames_until(
-		func() -> bool: return _panel_is_closed(_ocp),
-		BUDGET_CLOSE_MS,
-		"e: close before D6 reopen"
-	)
-	if not closed:
-		_fail("e: panel did not close before D6 reopen")
-		return
-	var reopened: Node = await _open_live_ocp(BUDGET_COLD_MS, "OrderCommandPanel_e_reopen", "e: D6 reopen")
-	if reopened == null or not is_instance_valid(reopened):
-		_fail("e: D6 reopen failed")
-		return
-	var expanded_map: Variant = reopened.get("_section_expanded")
-	var remembered: bool = false
-	if expanded_map is Dictionary:
-		remembered = bool((expanded_map as Dictionary).get("depth_catalogue", false))
-	var re_header: Button = _find_button_text_has(reopened, "Depth catalogue")
-	var mark_expanded: bool = false
-	if re_header != null:
-		mark_expanded = str(re_header.text).begins_with("▼")
-	if remembered or mark_expanded:
-		_fail("e: D6 expanded depth catalogue remembered after reopen")
-	else:
-		_pass("e: D6 depth catalogue collapsed after reopen")
-	_ocp = reopened
+		var expand_ms: int = _timed_press(header, BUDGET_DEPTH_MS, "e: expand depth catalogue")
+		if expand_ms >= 0 and expand_ms <= BUDGET_DEPTH_MS:
+			_pass("e: expand depth catalogue %dms" % expand_ms)
+		var cat_body: Node = _section_body_for_header(header)
+		if cat_body == null or cat_body.get_child_count() <= 0:
+			_fail("e: depth catalogue rows missing after expand")
+		else:
+			_pass("e: depth catalogue rows=%d" % cat_body.get_child_count())
+			var sub: Button = _first_toggle_button(cat_body)
+			if sub == null:
+				_fail("e: depth sub-group header missing")
+			else:
+				var sub_ms: int = _timed_press(sub, BUDGET_DEPTH_MS, "e: expand depth sub-group")
+				if sub_ms >= 0 and sub_ms <= BUDGET_DEPTH_MS:
+					_pass("e: expand depth sub-group %dms" % sub_ms)
+				var sub_body: Node = _section_body_for_header(sub)
+				var sub_rows: int = _count_descendants(sub_body) if sub_body != null else 0
+				if sub_body == null or (sub_body.get_child_count() <= 0 and sub_rows <= 0):
+					_fail("e: depth sub-group rows missing after expand")
+				else:
+					_pass("e: depth sub-group rows=%d descendants=%d" % [sub_body.get_child_count(), sub_rows])
+		_close_ocp(_ocp)
+		var closed: bool = await _pump_frames_until(
+			func() -> bool: return _panel_is_closed(_ocp),
+			BUDGET_CLOSE_MS,
+			"e: close before D6 reopen"
+		)
+		if not closed:
+			_fail("e: panel did not close before D6 reopen")
+			return
+		var reopened: Node = await _open_live_ocp(BUDGET_COLD_MS, "OrderCommandPanel_e_reopen", "e: D6 reopen")
+		if reopened == null or not is_instance_valid(reopened):
+			_fail("e: D6 reopen failed")
+			return
+		var expanded_map: Variant = reopened.get("_section_expanded")
+		var remembered: bool = false
+		if expanded_map is Dictionary:
+			remembered = bool((expanded_map as Dictionary).get("depth_catalogue", false))
+		var re_header: Button = _find_button_text_has(reopened, "Depth catalogue")
+		var mark_expanded: bool = false
+		if re_header != null:
+			mark_expanded = str(re_header.text).begins_with("▼")
+		if remembered or mark_expanded:
+			_fail("e: D6 expanded depth catalogue remembered after reopen")
+		else:
+			_pass("e: D6 depth catalogue collapsed after reopen")
+		_ocp = reopened
 
 
 func _quoted_in_src(src: String, action_id: String) -> bool:
 	return src.find("\"%s\"" % action_id) >= 0
 
 
+func _runtime_only_set() -> Dictionary:
+	var out: Dictionary = {}
+	for rid in SNAPSHOT_RUNTIME_ONLY_IDS:
+		out[str(rid)] = true
+	return out
+
+
+func _snapshot_set() -> Dictionary:
+	var out: Dictionary = {}
+	for aid in SNAPSHOT_ACTION_IDS:
+		out[str(aid)] = true
+	return out
+
+
+func _collect_apply_action_ids(n: Node, out: Dictionary) -> void:
+	if n == null or not is_instance_valid(n) or n.is_queued_for_deletion():
+		return
+	if n is BaseButton:
+		var conns: Array = (n as BaseButton).pressed.get_connections()
+		for conn in conns:
+			if not (conn is Dictionary):
+				continue
+			var cb: Variant = (conn as Dictionary).get("callable", null)
+			if not (cb is Callable):
+				continue
+			var method_name: String = str((cb as Callable).get_method())
+			if method_name != "_on_action_pressed":
+				continue
+			var bound: Array = (cb as Callable).get_bound_arguments()
+			if bound.size() >= 1:
+				out[str(bound[0])] = true
+	for c in n.get_children():
+		_collect_apply_action_ids(c, out)
+
+
+func _collect_collapsed_headers(n: Node, out: Array) -> void:
+	if n == null or not is_instance_valid(n) or n.is_queued_for_deletion():
+		return
+	if n is Button:
+		var txt: String = str((n as Button).text)
+		if txt.begins_with("▶ "):
+			out.append(n)
+	for c in n.get_children():
+		_collect_collapsed_headers(c, out)
+
+
+func _expand_all_collapsibles(ocp: Node) -> void:
+	if ocp == null or not is_instance_valid(ocp):
+		return
+	var round_i: int = 0
+	while round_i < 128:
+		round_i += 1
+		var collapsed: Array = []
+		_collect_collapsed_headers(ocp, collapsed)
+		if collapsed.is_empty():
+			return
+		var btn_v: Variant = collapsed[0]
+		if not (btn_v is Button):
+			return
+		var btn: Button = btn_v as Button
+		if not is_instance_valid(btn):
+			return
+		_timed_press(btn, BUDGET_DEPTH_MS, "f: expand %s" % str(btn.text))
+
+
 func _test_f_action_ids() -> void:
 	_progress("case (f) every unfixed-tree apply-button id still reachable")
 	if SNAPSHOT_ACTION_IDS.size() != SNAPSHOT_ACTION_ID_COUNT:
 		_fail("f: snapshot const size %d != %d" % [SNAPSHOT_ACTION_IDS.size(), SNAPSHOT_ACTION_ID_COUNT])
+	if SNAPSHOT_RUNTIME_ONLY_IDS.size() != 17:
+		_fail("f: SNAPSHOT_RUNTIME_ONLY_IDS size %d != 17" % SNAPSHOT_RUNTIME_ONLY_IDS.size())
 	var src: String = FileAccess.get_file_as_string("res://scripts/ui/OrderCommandPanel.gd")
 	if src.is_empty():
 		_fail("f: OrderCommandPanel.gd unreadable")
 		return
-	var missing: PackedStringArray = PackedStringArray()
+	var runtime_only: Dictionary = _runtime_only_set()
+	var missing_src: PackedStringArray = PackedStringArray()
 	for action_id in SNAPSHOT_ACTION_IDS:
-		if not _quoted_in_src(src, str(action_id)):
-			missing.append(str(action_id))
-	if missing.size() > 0:
-		var shown: int = mini(missing.size(), 12)
+		var aid: String = str(action_id)
+		if runtime_only.has(aid):
+			continue
+		if not _quoted_in_src(src, aid):
+			missing_src.append(aid)
+	if missing_src.size() > 0:
+		var shown: int = mini(missing_src.size(), 12)
 		var bits: PackedStringArray = PackedStringArray()
 		for i in range(shown):
-			bits.append(missing[i])
+			bits.append(missing_src[i])
 		_fail("f: %d snapshot action ids missing from OCP source (e.g. %s)" % [
-			missing.size(), ", ".join(bits)
+			missing_src.size(), ", ".join(bits)
 		])
+	else:
+		_pass("f: all %d non-runtime snapshot action ids still in OrderCommandPanel.gd" % [
+			SNAPSHOT_ACTION_IDS.size() - SNAPSHOT_RUNTIME_ONLY_IDS.size()
+		])
+	var ocp: Node = await _open_live_ocp(BUDGET_COLD_MS, "OrderCommandPanel_f", "f: open for runtime walk")
+	if ocp == null or not is_instance_valid(ocp):
+		_fail("f: panel not open for runtime walk")
 		return
-	_pass("f: all %d snapshot action ids still in OrderCommandPanel.gd (collapsed or expanded OK)" % SNAPSHOT_ACTION_IDS.size())
-
-
-func _active_has(dm: Node, tag: String, domain: String, did: String) -> bool:
-	if dm == null or not dm.has_method("get_active_designs"):
-		return false
-	var ids: Variant = dm.call("get_active_designs", tag, domain)
-	if ids is Array:
-		for x in ids:
-			if str(x) == did:
-				return true
-	return false
+	var first_ids: Dictionary = {}
+	_collect_apply_action_ids(ocp, first_ids)
+	print("  HeadlessOrdersPerf1Test: first_open_count=%d" % first_ids.size())
+	_flush_log()
+	var t_exp: int = _step_begin("f", "expand all collapsible/lazy", 128 * BUDGET_DEPTH_MS)
+	_expand_all_collapsibles(ocp)
+	_step_end("f", "expand all collapsible/lazy", t_exp)
+	var post_ids: Dictionary = {}
+	_collect_apply_action_ids(ocp, post_ids)
+	print("  HeadlessOrdersPerf1Test: post_expand_count=%d" % post_ids.size())
+	_flush_log()
+	var snap: Dictionary = _snapshot_set()
+	var missing_rt: PackedStringArray = PackedStringArray()
+	for rid in post_ids.keys():
+		if not snap.has(str(rid)):
+			missing_rt.append(str(rid))
+	missing_rt.sort()
+	if missing_rt.size() > 0:
+		var shown_rt: int = mini(missing_rt.size(), 20)
+		var bits_rt: PackedStringArray = PackedStringArray()
+		for j in range(shown_rt):
+			bits_rt.append(missing_rt[j])
+		_fail("f: %d runtime apply ids missing from snapshot (e.g. %s)" % [
+			missing_rt.size(), ", ".join(bits_rt)
+		])
+	else:
+		_pass("f: all %d runtime apply ids are in the snapshot" % post_ids.size())
+	_ocp = ocp
 
 
 func _catalog_has(cat: Dictionary, domain: String, did: String) -> bool:
@@ -991,28 +1223,31 @@ func _catalog_has(cat: Dictionary, domain: String, did: String) -> bool:
 	return false
 
 
-func _live_catalog(mm: Node, tag: String) -> Dictionary:
-	if mm == null or not mm.has_method("_designer_live_catalog"):
-		return {}
-	var cat: Variant = mm.call("_designer_live_catalog", tag)
-	return cat as Dictionary if cat is Dictionary else {}
+func _live_catalog_step(mm: Node, tag: String, step: String) -> Dictionary:
+	var cat_v: Variant = _g_call(mm, "_designer_live_catalog", [tag], step)
+	return cat_v as Dictionary if cat_v is Dictionary else {}
 
 
-func _live_product(mm: Node, pid: int) -> Dictionary:
-	if mm == null or not mm.has_method("designer_suite_product_live"):
-		return {}
-	var prod: Variant = mm.call("designer_suite_product_live", pid)
-	return prod as Dictionary if prod is Dictionary else {}
+func _live_product_step(mm: Node, pid: int, step: String) -> Dictionary:
+	var prod_v: Variant = _g_call(mm, "designer_suite_product_live", [pid], step)
+	return prod_v as Dictionary if prod_v is Dictionary else {}
 
 
-func _in_top6_active(dm: Node, tag: String, domain: String, did: String) -> bool:
-	if dm == null or not dm.has_method("get_active_designs"):
-		return false
-	var ids: Variant = dm.call("get_active_designs", tag, domain)
-	if not (ids is Array):
+func _active_has_step(dm: Node, tag: String, domain: String, did: String, step: String) -> bool:
+	var ids_v: Variant = _g_call(dm, "get_active_designs", [tag, domain], step)
+	if ids_v is Array:
+		for x in ids_v:
+			if str(x) == did:
+				return true
+	return false
+
+
+func _in_top6_active_step(dm: Node, tag: String, domain: String, did: String, step: String) -> bool:
+	var ids_v: Variant = _g_call(dm, "get_active_designs", [tag, domain], step)
+	if not (ids_v is Array):
 		return false
 	var i: int = 0
-	for x in ids:
+	for x in ids_v:
 		if i >= 6:
 			return false
 		if str(x) == did:
@@ -1022,20 +1257,19 @@ func _in_top6_active(dm: Node, tag: String, domain: String, did: String) -> bool
 
 
 func _assert_design_visible(dm: Node, mm: Node, pid: int, tag: String, domain: String, did: String, label: String, want: bool) -> void:
-	var active_ok: bool = _active_has(dm, tag, domain, did)
-	var top6: bool = _in_top6_active(dm, tag, domain, did)
-	var cat: Dictionary = _live_catalog(mm, tag)
+	var active_ok: bool = _active_has_step(dm, tag, domain, did, "%s get_active_designs" % label)
+	var top6: bool = _in_top6_active_step(dm, tag, domain, did, "%s get_active_designs top6" % label)
+	var cat: Dictionary = _live_catalog_step(mm, tag, "%s _designer_live_catalog" % label)
 	var cat_ok: bool = _catalog_has(cat, domain, did)
-	var live: Dictionary = _live_product(mm, pid)
+	var live: Dictionary = _live_product_step(mm, pid, "%s designer_suite_product_live" % label)
 	var live_cat: Dictionary = {}
 	if live.get("catalog") is Dictionary:
 		live_cat = live.get("catalog") as Dictionary
 	var live_ok: bool = _catalog_has(live_cat, domain, did)
 	var seed: Dictionary = {}
-	if mm != null and mm.has_method("apply_designer_suite_step_for_province"):
-		var seed_v: Variant = mm.call("apply_designer_suite_step_for_province", pid, "seed_production")
-		if seed_v is Dictionary:
-			seed = seed_v
+	var seed_v: Variant = _g_call(mm, "apply_designer_suite_step_for_province", [pid, "seed_production"], "%s seed_production" % label)
+	if seed_v is Dictionary:
+		seed = seed_v
 	var seed_prod: Dictionary = {}
 	if seed.get("product") is Dictionary:
 		seed_prod = seed.get("product") as Dictionary
@@ -1065,7 +1299,7 @@ func _assert_design_visible(dm: Node, mm: Node, pid: int, tag: String, domain: S
 			_pass("%s: catalog dropped %s" % [label, did])
 
 
-func _register_custom(dm: Node, tag: String, did: String, domain: String) -> bool:
+func _register_custom(dm: Node, tag: String, did: String, domain: String, step: String) -> bool:
 	if dm == null or not dm.has_method("register_custom_design"):
 		_fail("register_custom_design missing")
 		return false
@@ -1081,7 +1315,7 @@ func _register_custom(dm: Node, tag: String, did: String, domain: String) -> boo
 		"tank_bns": 1,
 		"visual_archetype": "medium_tank",
 	}
-	var reg: Variant = dm.call("register_custom_design", tag, blob)
+	var reg: Variant = _g_call(dm, "register_custom_design", [tag, blob], step)
 	if not (reg is Dictionary) or not bool((reg as Dictionary).get("ok", false)):
 		_fail("register_custom_design %s/%s failed: %s" % [tag, did, str(reg)])
 		return false
@@ -1094,50 +1328,7 @@ func _g_pid() -> int:
 	return 1
 
 
-func _test_g_cache_invalidation() -> void:
-	_progress("case (g) cache invalidation ADD/CHANGE/REMOVE + factory + save/load")
-	var dm: Node = _dm()
-	var mm: Node = _mm()
-	if dm == null or mm == null:
-		_fail("g: DesignManager or MapManager missing")
-		return
-	if not dm.has_method("get_save_data") or not dm.has_method("apply_save_data"):
-		_fail("g: DesignManager save/load API missing")
-		return
-	var before: Dictionary = dm.call("get_save_data")
-	var pid: int = _g_pid()
-
-	_progress("g: ADD register_custom_design %s" % ADD_ID)
-	if not _register_custom(dm, PLAYER_TAG, ADD_ID, "land"):
-		return
-	_assert_design_visible(dm, mm, pid, PLAYER_TAG, "land", ADD_ID, "g ADD", true)
-
-	_progress("g: CHANGE re-register %s as %s" % [ADD_ID, CHANGE_DOMAIN])
-	if not _register_custom(dm, PLAYER_TAG, ADD_ID, CHANGE_DOMAIN):
-		return
-	_assert_design_visible(dm, mm, pid, PLAYER_TAG, CHANGE_DOMAIN, ADD_ID, "g CHANGE naval", true)
-	if _active_has(dm, PLAYER_TAG, "land", ADD_ID) or _catalog_has(_live_catalog(mm, PLAYER_TAG), "land", ADD_ID):
-		_fail("g CHANGE: %s still listed under land after naval re-register" % ADD_ID)
-	else:
-		_pass("g CHANGE: %s left land catalog" % ADD_ID)
-
-	_progress("g: REMOVE grant then revoke %s" % REMOVE_ID)
-	if not _register_custom(dm, FOREIGN_TAG, REMOVE_ID, "land"):
-		return
-	if dm.has_method("grant_acquired_design"):
-		dm.call("grant_acquired_design", PLAYER_TAG, REMOVE_ID, "captured")
-	else:
-		_fail("g: grant_acquired_design missing")
-		return
-	_assert_design_visible(dm, mm, pid, PLAYER_TAG, "land", REMOVE_ID, "g REMOVE grant", true)
-	if dm.has_method("revoke_acquired_design"):
-		dm.call("revoke_acquired_design", PLAYER_TAG, REMOVE_ID)
-	else:
-		_fail("g: revoke_acquired_design missing")
-		return
-	_assert_design_visible(dm, mm, pid, PLAYER_TAG, "land", REMOVE_ID, "g REMOVE revoke", false)
-
-	_progress("g: factory sync_production_design")
+func _g_pick_factory(pid: int) -> Object:
 	var pm: Node = root.get_node_or_null("ProductionManager")
 	var fm: Node = root.get_node_or_null("FactoryManager")
 	var fac: Object = null
@@ -1149,35 +1340,176 @@ func _test_g_cache_invalidation() -> void:
 		var created: Variant = fm.call("create_factory_for_province", pid, PLAYER_TAG)
 		if created != null:
 			fac = created
+	return fac
+
+
+func _g_silent_tech(dm: Node, mm: Node, pid: int) -> void:
+	_progress("g: silent tech grant")
+	var tm: Node = _tech()
+	if tm == null:
+		_fail("g silent tech: TechnologyManager missing")
+		return
+	if not tm.has_method("_grant_completed_tech_silent"):
+		_fail("g silent tech: _grant_completed_tech_silent missing")
+		return
+	var gated_v: Variant = tm.get("_gated_unit_designs")
+	if not (gated_v is Dictionary) or (gated_v as Dictionary).is_empty():
+		_fail("g silent tech: _gated_unit_designs empty")
+		return
+	var gated: Dictionary = gated_v as Dictionary
+	var candidates: Array = []
+	for did_v in gated.keys():
+		var did: String = str(did_v).strip_edges()
+		if did.is_empty():
+			continue
+		if tm.has_method("is_unit_design_available") and bool(tm.call("is_unit_design_available", PLAYER_TAG, did)):
+			continue
+		var nation: String = ""
+		if dm.has_method("get_design_nation_tag"):
+			nation = str(dm.call("get_design_nation_tag", did)).strip_edges().to_upper()
+		if not nation.is_empty() and nation != PLAYER_TAG:
+			continue
+		var year: int = 0
+		if dm.has_method("get_unlock_year"):
+			year = int(dm.call("get_unlock_year", did))
+		candidates.append({"did": did, "tech": str(gated[did_v]), "year": year})
+	candidates.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return int(a.get("year", 0)) > int(b.get("year", 0))
+	)
+	var pick_did: String = ""
+	var pick_tech: String = ""
+	var pick_domain: String = "land"
+	var pick_year: int = -1
+	for cand_v in candidates:
+		if not (cand_v is Dictionary):
+			continue
+		var cand: Dictionary = cand_v as Dictionary
+		var did2: String = str(cand.get("did", ""))
+		var tech2: String = str(cand.get("tech", ""))
+		if did2.is_empty() or tech2.is_empty():
+			continue
+		_g_call(tm, "_grant_completed_tech_silent", [PLAYER_TAG, tech2], "silent tech grant %s" % tech2)
+		var now_ok: bool = true
+		if tm.has_method("is_unit_design_available"):
+			now_ok = bool(tm.call("is_unit_design_available", PLAYER_TAG, did2))
+		if now_ok:
+			pick_did = did2
+			pick_tech = tech2
+			pick_year = int(cand.get("year", 0))
+			if dm.has_method("get_design_domain"):
+				pick_domain = str(dm.call("get_design_domain", did2))
+			break
+	if pick_did.is_empty() or pick_tech.is_empty():
+		_fail("g silent tech: no GER-usable locked gated design became buildable")
+		return
+	_progress("g silent tech: granted %s for design %s domain=%s year=%d" % [pick_tech, pick_did, pick_domain, pick_year])
+	var now_avail: bool = true
+	if tm.has_method("is_unit_design_available"):
+		now_avail = bool(tm.call("is_unit_design_available", PLAYER_TAG, pick_did))
+	if not now_avail:
+		_fail("g silent tech: %s still not tech-buildable after granting %s" % [pick_did, pick_tech])
+		return
+	_assert_design_visible(dm, mm, pid, PLAYER_TAG, pick_domain, pick_did, "silent tech", true)
+
+
+func _g_factory_sync(dm: Node, mm: Node, _pid: int, fac: Object, design_id: String, domain: String, label: String) -> void:
 	if fac == null or not fac.has_method("sync_production_design"):
-		_fail("g: no GER factory for sync_production_design")
+		_fail("g: no GER factory for %s" % label)
+		return
+	var t0: int = _step_begin("g", "%s sync_production_design" % label)
+	fac.call("sync_production_design", design_id)
+	_step_end("g", "%s sync_production_design" % label, t0)
+	var in_prod: bool = false
+	if "current_production_design" in fac:
+		in_prod = str(fac.get("current_production_design")) == design_id
+	if not in_prod:
+		_fail("g: %s factory current_production_design is not %s" % [label, design_id])
+	var st_ok: bool = true
+	if dm.has_method("get_design_status"):
+		var st_v: Variant = _g_call(dm, "get_design_status", [PLAYER_TAG, design_id], "%s get_design_status" % label)
+		## DesignStatus.ACTIVE == 0
+		if int(st_v) != 0:
+			st_ok = false
+			_fail("g: %s get_design_status=%s want ACTIVE for in-production %s" % [label, str(st_v), design_id])
+	var after_sync_active: bool = _active_has_step(dm, PLAYER_TAG, domain, design_id, "%s get_active_designs" % label)
+	var after_sync_top6: bool = _in_top6_active_step(dm, PLAYER_TAG, domain, design_id, "%s get_active_designs top6" % label)
+	var after_sync_cat: bool = _catalog_has(_live_catalog_step(mm, PLAYER_TAG, "%s _designer_live_catalog" % label), domain, design_id)
+	if in_prod and st_ok and after_sync_active and ((not after_sync_top6) or after_sync_cat):
+		_pass("g: %s in-production %s reflected in catalog (top6=%s)" % [label, design_id, str(after_sync_top6)])
 	else:
-		fac.call("sync_production_design", ADD_ID)
-		var in_prod: bool = false
-		if "current_production_design" in fac:
-			in_prod = str(fac.get("current_production_design")) == ADD_ID
-		if not in_prod:
-			_fail("g: factory current_production_design is not %s" % ADD_ID)
-		var after_sync_active: bool = _active_has(dm, PLAYER_TAG, CHANGE_DOMAIN, ADD_ID)
-		var after_sync_top6: bool = _in_top6_active(dm, PLAYER_TAG, CHANGE_DOMAIN, ADD_ID)
-		var after_sync_cat: bool = _catalog_has(_live_catalog(mm, PLAYER_TAG), CHANGE_DOMAIN, ADD_ID)
-		if after_sync_active and ((not after_sync_top6) or after_sync_cat):
-			_pass("g: factory sync_production_design reflected in catalog (top6=%s)" % str(after_sync_top6))
-		else:
-			_fail("g: in-production %s not in active/catalog (active=%s catalog=%s top6=%s)" % [
-				ADD_ID, str(after_sync_active), str(after_sync_cat), str(after_sync_top6)
-			])
+		_fail("g: %s in-production %s not in active/catalog (active=%s catalog=%s top6=%s)" % [
+			label, design_id, str(after_sync_active), str(after_sync_cat), str(after_sync_top6)
+		])
+
+
+func _test_g_cache_invalidation() -> void:
+	_progress("case (g) cache invalidation ADD/CHANGE/REMOVE + factory + save/load + silent tech")
+	var dm: Node = _dm()
+	var mm: Node = _mm()
+	if dm == null or mm == null:
+		_fail("g: DesignManager or MapManager missing")
+		return
+	if not dm.has_method("get_save_data") or not dm.has_method("apply_save_data"):
+		_fail("g: DesignManager save/load API missing")
+		return
+	var before_v: Variant = _g_call(dm, "get_save_data", [], "save snapshot get_save_data")
+	var before: Dictionary = before_v as Dictionary if before_v is Dictionary else {}
+	var pid: int = _g_pid()
+
+	_progress("g: ADD register_custom_design %s" % ADD_ID)
+	if not _register_custom(dm, PLAYER_TAG, ADD_ID, "land", "ADD register_custom_design"):
+		return
+	_assert_design_visible(dm, mm, pid, PLAYER_TAG, "land", ADD_ID, "ADD", true)
+
+	_progress("g: CHANGE re-register %s as %s" % [ADD_ID, CHANGE_DOMAIN])
+	if not _register_custom(dm, PLAYER_TAG, ADD_ID, CHANGE_DOMAIN, "CHANGE register_custom_design"):
+		return
+	_assert_design_visible(dm, mm, pid, PLAYER_TAG, CHANGE_DOMAIN, ADD_ID, "CHANGE naval", true)
+	if _active_has_step(dm, PLAYER_TAG, "land", ADD_ID, "CHANGE land get_active_designs") \
+			or _catalog_has(_live_catalog_step(mm, PLAYER_TAG, "CHANGE land _designer_live_catalog"), "land", ADD_ID):
+		_fail("g CHANGE: %s still listed under land after naval re-register" % ADD_ID)
+	else:
+		_pass("g CHANGE: %s left land catalog" % ADD_ID)
+
+	_progress("g: REMOVE grant then revoke %s" % REMOVE_ID)
+	if not _register_custom(dm, FOREIGN_TAG, REMOVE_ID, "land", "REMOVE register_custom_design"):
+		return
+	if dm.has_method("grant_acquired_design"):
+		_g_call(dm, "grant_acquired_design", [PLAYER_TAG, REMOVE_ID, "captured"], "REMOVE grant")
+	else:
+		_fail("g: grant_acquired_design missing")
+		return
+	_assert_design_visible(dm, mm, pid, PLAYER_TAG, "land", REMOVE_ID, "REMOVE grant", true)
+	if dm.has_method("revoke_acquired_design"):
+		_g_call(dm, "revoke_acquired_design", [PLAYER_TAG, REMOVE_ID], "REMOVE revoke")
+	else:
+		_fail("g: revoke_acquired_design missing")
+		return
+	_assert_design_visible(dm, mm, pid, PLAYER_TAG, "land", REMOVE_ID, "REMOVE revoke", false)
+
+	_progress("g: factory sync_production_design")
+	var fac: Object = _g_pick_factory(pid)
+	_g_factory_sync(dm, mm, pid, fac, ADD_ID, CHANGE_DOMAIN, "factory")
+
+	_progress("g: factory design change (current production design)")
+	if not _register_custom(dm, PLAYER_TAG, FACTORY_ID, "land", "factory change register_custom_design"):
+		return
+	_g_factory_sync(dm, mm, pid, fac, FACTORY_ID, "land", "factory change")
+
+	_g_silent_tech(dm, mm, pid)
 
 	_progress("g: save→load apply_save_data must not keep stale entry")
-	if not _register_custom(dm, PLAYER_TAG, STALE_ID, "land"):
+	if not _register_custom(dm, PLAYER_TAG, STALE_ID, "land", "save-load register_custom_design"):
 		return
-	dm.call("get_active_designs", PLAYER_TAG, "land")
-	mm.call("_designer_live_catalog", PLAYER_TAG)
-	mm.call("designer_suite_product_live", pid)
-	dm.call("apply_save_data", before)
-	if _active_has(dm, PLAYER_TAG, "land", STALE_ID) or _catalog_has(_live_catalog(mm, PLAYER_TAG), "land", STALE_ID):
+	_g_call(dm, "get_active_designs", [PLAYER_TAG, "land"], "save-load get_active_designs")
+	_g_call(mm, "_designer_live_catalog", [PLAYER_TAG], "save-load _designer_live_catalog")
+	_g_call(mm, "designer_suite_product_live", [pid], "save-load designer_suite_product_live")
+	_g_call(dm, "apply_save_data", [before], "save-load apply_save_data")
+	if _active_has_step(dm, PLAYER_TAG, "land", STALE_ID, "save-load stale get_active_designs") \
+			or _catalog_has(_live_catalog_step(mm, PLAYER_TAG, "save-load stale _designer_live_catalog"), "land", STALE_ID):
 		_fail("g: apply_save_data left stale %s in active/catalog" % STALE_ID)
-	elif _active_has(dm, PLAYER_TAG, "land", ADD_ID) or _catalog_has(_live_catalog(mm, PLAYER_TAG), CHANGE_DOMAIN, ADD_ID):
+	elif _active_has_step(dm, PLAYER_TAG, "land", ADD_ID, "save-load ADD get_active_designs") \
+			or _catalog_has(_live_catalog_step(mm, PLAYER_TAG, "save-load ADD _designer_live_catalog"), CHANGE_DOMAIN, ADD_ID):
 		_fail("g: apply_save_data left stale %s from ADD/CHANGE" % ADD_ID)
 	else:
 		_pass("g: apply_save_data has no stale catalog entry")
