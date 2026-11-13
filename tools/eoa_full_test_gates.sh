@@ -4,11 +4,11 @@
 #
 # Usage (from repo root):
 #   tools/eoa_full_test_gates.sh
-#   tools/eoa_full_test_gates.sh --quick      # pure python, plus garrison, ink, campaign save, audio, stability, victory, settings, first20-p2 strip press
+#   tools/eoa_full_test_gates.sh --quick      # pure python, plus garrison, ink, campaign save, autosave, orders-perf1, audio, stability, victory, settings, first20-p2 strip press
 #   tools/eoa_full_test_gates.sh --with-perf  # also map-tick perf sample
 #   tools/eoa_full_test_gates.sh --log DIR    # write logs under DIR
 #
-# --quick launches HeadlessGarrison1Test, HeadlessAiWar1Test, HeadlessInkTooltips0Test, HeadlessCampaignSave1Test, HeadlessAutosave1Test, HeadlessRttSmallfix1Test, HeadlessRttReset2Test, HeadlessAudio1Test, HeadlessAudio2Test, HeadlessStabilityJustice1Test, HeadlessVictoryPaths1Test, HeadlessSettingsToggles1Test, HeadlessFirst20P2StripPressTest, then FIRST20-UX-WAR Open fight / Justify / March, then HeadlessSearchHotkey1Test (r1 isolation + r2 click-focus / RtT AAR + r3 inspector-open / first-SOV click), then HeadlessTutorial1Test.
+# --quick launches HeadlessGarrison1Test, HeadlessAiWar1Test, HeadlessInkTooltips0Test, HeadlessCampaignSave1Test, HeadlessAutosave1Test, HeadlessOrdersPerf1Test, HeadlessRttSmallfix1Test, HeadlessRttReset2Test, HeadlessAudio1Test, HeadlessAudio2Test, HeadlessStabilityJustice1Test, HeadlessVictoryPaths1Test, HeadlessSettingsToggles1Test, HeadlessFirst20P2StripPressTest, then FIRST20-UX-WAR Open fight / Justify / March, then HeadlessSearchHotkey1Test (r1 isolation + r2 click-focus / RtT AAR + r3 inspector-open / first-SOV click), then HeadlessTutorial1Test.
 # Full path also runs launch_campaign_save1_identity (MW200 SaveStateHash identity + 60-day twin).
 # Full path calls tools/run_godot.sh, which exits 1 immediately if no binary
 # is found (fail-closed; it must not hang).
@@ -288,6 +288,23 @@ if [[ "$QUICK" -eq 1 ]]; then
       fi
       if ! grep -q "RESULT=PASS" "$log"; then
         echo "[eoa-gates] FAIL headless_autosave1 missing RESULT=PASS"
+        exit 1
+      fi
+      exit "$code"
+    ' || fail
+    run_step headless_orders_perf1 bash -c '
+      log=$(mktemp)
+      XDG_DATA_HOME="$(mktemp -d)" flock -n "${HOME}/.eoa_godot.lock" \
+        tools/run_godot.sh --headless --path . \
+        -s res://scripts/core/HeadlessOrdersPerf1Test.gd >"$log" 2>&1
+      code=$?
+      cat "$log"
+      if grep -q "SCRIPT ERROR" "$log"; then
+        echo "[eoa-gates] FAIL headless_orders_perf1 SCRIPT ERROR"
+        exit 1
+      fi
+      if ! grep -q "RESULT=PASS" "$log"; then
+        echo "[eoa-gates] FAIL headless_orders_perf1 missing RESULT=PASS"
         exit 1
       fi
       exit "$code"
