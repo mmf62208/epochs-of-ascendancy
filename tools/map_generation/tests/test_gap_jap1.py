@@ -2,9 +2,10 @@
 """GAP-JAP-1: JAP 1936 land rings are real admin outlines, except listed UNKNOWNs.
 
 Fails while any in-scope JAP 1936 land ring is still a 36/72-vertex
-placeholder. The re-ringed provinces must tile: pixel overlap ≤ 1, polygon
-intersection area ≤ 1 px², no new enclosed hole over 250 px², no
-self-intersection or self-touch, no zero-neighbour province.
+placeholder. Kinmen 903981 is a real ring after JAP-FOLLOWUPS-1. The
+re-ringed provinces must tile: pixel overlap ≤ 1, polygon intersection
+area ≤ 1 px², no new enclosed hole over 250 px², no self-intersection or
+self-touch, no zero-neighbour province.
 """
 from __future__ import annotations
 
@@ -43,8 +44,8 @@ class GapJap1Test(unittest.TestCase):
         geo, owners, _adj, domains = _load()
         self.assertEqual(len(geo["provinces"]), 3596)
         self.assertEqual(len(SCOPE_PLACEHOLDER_IDS), 114)
-        self.assertEqual(len(UNKNOWN_PLACEHOLDER_IDS), 1)
-        self.assertEqual(EXPECTED_RERINGS, 113)
+        self.assertEqual(len(UNKNOWN_PLACEHOLDER_IDS), 0)
+        self.assertEqual(EXPECTED_RERINGS, 114)
         remaining = scope_placeholder_ids(owners, geo["provinces"], domains)
         self.assertEqual(remaining, sorted(UNKNOWN_PLACEHOLDER_IDS))
         by_id = {int(g["id"]): g for g in geo["provinces"]}
