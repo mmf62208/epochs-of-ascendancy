@@ -28,18 +28,27 @@ var _saves_list_cache: Array = []
 var _saves_product_cache: Dictionary = {}
 var _saves_list_cache_valid: bool = false
 var _saves_rebuild_from_all: bool = false
+## Last save-dir fingerprint (file count + newest mtime) seen by this instance.
+var _saves_fp_last: String = ""
 ## sid -> { "acts": Array } for day-package rows filled only on expand.
 var _lazy_section_payload: Dictionary = {}
-## Process-wide slot list (survives panel close → warm second instance).
+## Process-wide slot list (data only; fingerprint-checked on every refresh).
 static var _shared_saves_rows: Array = []
 static var _shared_saves_product: Dictionary = {}
 static var _shared_saves_valid: bool = false
-## Process-wide Control pool (Button/Label/HBox/VBox). Warm + apply rebuilds reuse.
+static var _shared_saves_fp: String = ""
+## Day-package plan + sections-plain are process-wide data (no Nodes).
+static var _cached_day_plan: Dictionary = {}
+static var _cached_day_plan_ready: bool = false
+static var _cached_sections_plain: String = ""
+static var _cached_sections_plain_ready: bool = false
+## Panel-scoped Control pool (Button/Label/HBox/VBox). Freed in _exit_tree.
 const _UI_POOL_CAP: int = 2048
-static var _ui_pool_btn: Array = []
-static var _ui_pool_lbl: Array = []
-static var _ui_pool_hbox: Array = []
-static var _ui_pool_vbox: Array = []
+var _ui_pool_btn: Array = []
+var _ui_pool_lbl: Array = []
+var _ui_pool_hbox: Array = []
+var _ui_pool_vbox: Array = []
+var _ui_pools_freed: bool = false
 ## 47-section chain (gpu tail → phase11). Headers built on Depth catalogue expand; each fills on its own expand.
 const DEPTH_GROUP_METHODS: PackedStringArray = [
 	"_rebuild_next10_section",
@@ -1017,6 +1026,40 @@ func _exit_tree() -> void:
 		if MapManager.province_selected.is_connected(_on_map_province_selected):
 			MapManager.province_selected.disconnect(_on_map_province_selected)
 	_map_select_connected = false
+	if typeof(SaveLoadManager) != TYPE_NIL and SaveLoadManager.has_signal("save_list_changed"):
+		if SaveLoadManager.save_list_changed.is_connected(_rebuild_saves_section):
+			SaveLoadManager.save_list_changed.disconnect(_rebuild_saves_section)
+	_free_ui_pools()
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE:
+		_free_ui_pools()
+
+
+func _free_pool_array(arr: Array) -> void:
+	while not arr.is_empty():
+		var n: Variant = arr.pop_back()
+		if not (n is Node):
+			continue
+		var node: Node = n as Node
+		if not is_instance_valid(node) or node.is_queued_for_deletion():
+			continue
+		var p: Node = node.get_parent()
+		if p != null:
+			p.remove_child(node)
+		node.free()
+	arr.clear()
+
+
+func _free_ui_pools() -> void:
+	if _ui_pools_freed:
+		return
+	_ui_pools_freed = true
+	_free_pool_array(_ui_pool_btn)
+	_free_pool_array(_ui_pool_lbl)
+	_free_pool_array(_ui_pool_hbox)
+	_free_pool_array(_ui_pool_vbox)
 
 
 func _connect_map_selection() -> void:
@@ -1125,34 +1168,38 @@ func _on_province_selected(idx: int) -> void:
 
 
 func _take_btn() -> Button:
-	while not _ui_pool_btn.is_empty():
-		var n: Variant = _ui_pool_btn.pop_back()
-		if n is Button and is_instance_valid(n) and not (n as Node).is_queued_for_deletion():
-			return n as Button
+	if not _ui_pools_freed:
+		while not _ui_pool_btn.is_empty():
+			var n: Variant = _ui_pool_btn.pop_back()
+			if n is Button and is_instance_valid(n) and not (n as Node).is_queued_for_deletion():
+				return n as Button
 	return Button.new()
 
 
 func _take_lbl() -> Label:
-	while not _ui_pool_lbl.is_empty():
-		var n: Variant = _ui_pool_lbl.pop_back()
-		if n is Label and is_instance_valid(n) and not (n as Node).is_queued_for_deletion():
-			return n as Label
+	if not _ui_pools_freed:
+		while not _ui_pool_lbl.is_empty():
+			var n: Variant = _ui_pool_lbl.pop_back()
+			if n is Label and is_instance_valid(n) and not (n as Node).is_queued_for_deletion():
+				return n as Label
 	return Label.new()
 
 
 func _take_hbox() -> HBoxContainer:
-	while not _ui_pool_hbox.is_empty():
-		var n: Variant = _ui_pool_hbox.pop_back()
-		if n is HBoxContainer and is_instance_valid(n) and not (n as Node).is_queued_for_deletion():
-			return n as HBoxContainer
+	if not _ui_pools_freed:
+		while not _ui_pool_hbox.is_empty():
+			var n: Variant = _ui_pool_hbox.pop_back()
+			if n is HBoxContainer and is_instance_valid(n) and not (n as Node).is_queued_for_deletion():
+				return n as HBoxContainer
 	return HBoxContainer.new()
 
 
 func _take_vbox() -> VBoxContainer:
-	while not _ui_pool_vbox.is_empty():
-		var n: Variant = _ui_pool_vbox.pop_back()
-		if n is VBoxContainer and is_instance_valid(n) and not (n as Node).is_queued_for_deletion():
-			return n as VBoxContainer
+	if not _ui_pools_freed:
+		while not _ui_pool_vbox.is_empty():
+			var n: Variant = _ui_pool_vbox.pop_back()
+			if n is VBoxContainer and is_instance_valid(n) and not (n as Node).is_queued_for_deletion():
+				return n as VBoxContainer
 	return VBoxContainer.new()
 
 
@@ -1193,7 +1240,7 @@ func _give_btn(b: Button) -> void:
 	b.size_flags_horizontal = Control.SIZE_FILL
 	b.alignment = HORIZONTAL_ALIGNMENT_CENTER
 	b.remove_theme_color_override("font_color")
-	if _ui_pool_btn.size() < _UI_POOL_CAP:
+	if not _ui_pools_freed and _ui_pool_btn.size() < _UI_POOL_CAP:
 		_ui_pool_btn.append(b)
 	else:
 		b.free()
@@ -1213,7 +1260,7 @@ func _give_lbl(lb: Label) -> void:
 	lb.size_flags_horizontal = Control.SIZE_FILL
 	lb.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	lb.remove_theme_color_override("font_color")
-	if _ui_pool_lbl.size() < _UI_POOL_CAP:
+	if not _ui_pools_freed and _ui_pool_lbl.size() < _UI_POOL_CAP:
 		_ui_pool_lbl.append(lb)
 	else:
 		lb.free()
@@ -1230,7 +1277,7 @@ func _give_hbox(h: HBoxContainer) -> void:
 	h.name = "PooledHBox"
 	h.size_flags_horizontal = Control.SIZE_FILL
 	h.remove_theme_constant_override("separation")
-	if _ui_pool_hbox.size() < _UI_POOL_CAP:
+	if not _ui_pools_freed and _ui_pool_hbox.size() < _UI_POOL_CAP:
 		_ui_pool_hbox.append(h)
 	else:
 		h.free()
@@ -1247,7 +1294,7 @@ func _give_vbox(v: VBoxContainer) -> void:
 	v.name = "PooledVBox"
 	v.size_flags_horizontal = Control.SIZE_FILL
 	v.remove_theme_constant_override("separation")
-	if _ui_pool_vbox.size() < _UI_POOL_CAP:
+	if not _ui_pools_freed and _ui_pool_vbox.size() < _UI_POOL_CAP:
 		_ui_pool_vbox.append(v)
 	else:
 		v.free()
@@ -1278,8 +1325,33 @@ func _on_refresh_slots_clicked() -> void:
 	refresh()
 
 
+func _saves_dir_fingerprint() -> String:
+	var path := "user://saves"
+	if not DirAccess.dir_exists_absolute(path):
+		var glob := ProjectSettings.globalize_path(path + "/")
+		if not DirAccess.dir_exists_absolute(glob) and not DirAccess.dir_exists_absolute(path + "/"):
+			return "0:0"
+	var files: PackedStringArray = DirAccess.get_files_at(path)
+	var n: int = files.size()
+	var newest: int = 0
+	for fname in files:
+		var mt: int = int(FileAccess.get_modified_time(path.path_join(str(fname))))
+		if mt > newest:
+			newest = mt
+	return "%d:%d" % [n, newest]
+
+
+func _saves_sync_fingerprint() -> void:
+	var fp := _saves_dir_fingerprint()
+	if fp != _saves_fp_last:
+		_saves_list_cache_valid = false
+		_saves_fp_last = fp
+	if fp != _shared_saves_fp:
+		_shared_saves_valid = false
+
+
 func refresh() -> void:
-	_saves_list_cache_valid = false
+	_saves_sync_fingerprint()
 	_province_ids.clear()
 	_province_option.clear()
 	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("collect_live_theater_province_ids"):
@@ -1533,6 +1605,7 @@ func _rebuild_all_sections() -> void:
 	_active_body = null
 	_lazy_section_payload.clear()
 	_clear_body()
+	var hold: Dictionary = _detach_sections_body()
 	_rebuild_orders_section()
 	_rebuild_combat_section()
 	_rebuild_fleet_section()
@@ -1545,6 +1618,7 @@ func _rebuild_all_sections() -> void:
 	_rebuild_gpu_section()
 	_section_expanded["depth_catalogue"] = false
 	_add_collapsible_section("Depth catalogue", "depth_catalogue", false, 47)
+	_reattach_sections_body(hold)
 	_status.text = "Country %s · %s · %d live targets" % [
 		country_tag, _province_label(province_id), _province_ids.size()
 	]
@@ -2051,10 +2125,12 @@ func close_screen() -> void:
 func _close_panel() -> void:
 	if not is_instance_valid(self):
 		return
-	if _body != null and is_instance_valid(_body):
-		_clear_container_children(_body)
+	if typeof(SaveLoadManager) != TYPE_NIL and SaveLoadManager.has_signal("save_list_changed"):
+		if SaveLoadManager.save_list_changed.is_connected(_rebuild_saves_section):
+			SaveLoadManager.save_list_changed.disconnect(_rebuild_saves_section)
 	visible = false
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_free_ui_pools()
 	if not is_queued_for_deletion():
 		queue_free()
 
@@ -2107,7 +2183,59 @@ func _unhandled_input(event: InputEvent) -> void:
 			pass
 
 
+func _day_package_plan() -> Dictionary:
+	if _cached_day_plan_ready:
+		return _cached_day_plan
+	var plan: Dictionary = MapPolishFormatters.order_panel_section_plan(true, 1)
+	if plan.is_empty() and typeof(GameData) != TYPE_NIL and GameData.has_method("get_order_panel_section_plan"):
+		plan = GameData.get_order_panel_section_plan()
+	if not plan.is_empty():
+		_cached_day_plan = plan
+		_cached_day_plan_ready = true
+	return plan
+
+
+func _day_sections_plain() -> String:
+	if _cached_sections_plain_ready:
+		return _cached_sections_plain
+	if typeof(GameData) == TYPE_NIL or not GameData.has_method("format_order_panel_sections_plain"):
+		return ""
+	var osp := str(GameData.format_order_panel_sections_plain()).strip_edges()
+	_cached_sections_plain = osp
+	_cached_sections_plain_ready = true
+	return osp
+
+
+func _detach_sections_body() -> Dictionary:
+	var info: Dictionary = {"parent": null, "idx": 0}
+	if _body == null or not is_instance_valid(_body):
+		return info
+	var parent: Node = _body.get_parent()
+	if parent == null:
+		return info
+	info["parent"] = parent
+	info["idx"] = _body.get_index()
+	parent.remove_child(_body)
+	return info
+
+
+func _reattach_sections_body(info: Dictionary) -> void:
+	var parent: Node = info.get("parent") as Node
+	if parent == null or not is_instance_valid(parent):
+		return
+	if _body == null or not is_instance_valid(_body):
+		return
+	if _body.get_parent() == parent:
+		return
+	parent.add_child(_body)
+	var idx: int = int(info.get("idx", 0))
+	if idx >= 0 and idx < parent.get_child_count():
+		parent.move_child(_body, idx)
+
+
 func _rebuild_orders_section() -> void:
+	## Fill off-tree so VBox sort runs once on reattach (same widgets/order).
+	var hold: Dictionary = _detach_sections_body()
 	## Campaign Alpha: always-visible primary strip first (Tier A playability).
 	_rebuild_campaign_alpha_primary_strip()
 	## Collapse major catalogue noise under one section (routes remain live).
@@ -2125,9 +2253,7 @@ func _rebuild_orders_section() -> void:
 	_active_body = null
 	# Collapsible day-package groups from pure/GD section plan (live routes preserved)
 	## Campaign Alpha: max_expanded=1 to reduce day-package noise.
-	var plan: Dictionary = MapPolishFormatters.order_panel_section_plan(true, 1)
-	if plan.is_empty() and typeof(GameData) != TYPE_NIL and GameData.has_method("get_order_panel_section_plan"):
-		plan = GameData.get_order_panel_section_plan()
+	var plan: Dictionary = _day_package_plan()
 	var sections: Array = plan.get("sections", []) if plan is Dictionary else []
 	if sections.is_empty():
 		# Fallback flat list if formatter missing
@@ -2140,10 +2266,9 @@ func _rebuild_orders_section() -> void:
 		_add_apply_button("Run HH campaign day", "hh_campaign_day", true)
 		_add_apply_button("Run industry surge day", "industry_surge_day", true)
 	else:
-		if typeof(GameData) != TYPE_NIL and GameData.has_method("format_order_panel_sections_plain"):
-			var osp := str(GameData.format_order_panel_sections_plain()).strip_edges()
-			if not osp.is_empty():
-				_add_plain_label(osp, 180)
+		var osp := _day_sections_plain()
+		if not osp.is_empty():
+			_add_plain_label(osp, 180)
 		for sec in sections:
 			if not (sec is Dictionary):
 				continue
@@ -2171,6 +2296,7 @@ func _rebuild_orders_section() -> void:
 		var surf := str(GameData.format_order_panel_surface_plain(province_id)).strip_edges()
 		if not surf.is_empty():
 			_add_plain_label(surf, 200)
+	_reattach_sections_body(hold)
 
 
 
@@ -3602,6 +3728,8 @@ func _rebuild_industry_section() -> void:
 func _saves_adopt_shared_list() -> void:
 	if _saves_list_cache_valid or not _shared_saves_valid:
 		return
+	if not _saves_fp_last.is_empty() and _shared_saves_fp != _saves_fp_last:
+		return
 	_saves_list_cache = _shared_saves_rows.duplicate(true)
 	_saves_product_cache = _shared_saves_product.duplicate(true)
 	_saves_list_cache_valid = true
@@ -3611,6 +3739,9 @@ func _saves_publish_shared_list() -> void:
 	_shared_saves_rows = _saves_list_cache
 	_shared_saves_product = _saves_product_cache.duplicate(true)
 	_shared_saves_valid = true
+	if _saves_fp_last.is_empty():
+		_saves_fp_last = _saves_dir_fingerprint()
+	_shared_saves_fp = _saves_fp_last
 
 
 func _saves_rows_and_product() -> Dictionary:
