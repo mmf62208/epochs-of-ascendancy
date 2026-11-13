@@ -301,7 +301,7 @@ if [[ "$QUICK" -eq 1 ]]; then
       nfail=0
       failed_cases=""
       leftover_godot() {
-        ps -eo pid=,args= | awk '/HeadlessOrdersPerf1Test\.gd/ && /[Gg]odot/ && !/awk/ && !/eoa_full_test_gates/ {print $1}'
+        ps -eo pid=,args= | awk "/HeadlessOrdersPerf1Test\\.gd/ && /[Gg]odot/ && !/awk/ && !/eoa_full_test_gates/ {print \$1}"
       }
       run_one() {
         local case="$1"

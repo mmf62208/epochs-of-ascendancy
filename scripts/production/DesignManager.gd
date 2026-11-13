@@ -168,6 +168,23 @@ var _acquired_foreign_designs: Dictionary = {}
 ## country_tag (upper) -> design_id -> design_data Dictionary
 var _custom_designs: Dictionary = {}
 
+## Bumped on every add / remove / change / grant / load so catalog memos cannot go stale.
+var _designs_version: int = 0
+## tag|domain|version|templates|year|tech|factory_fp -> Array[String]
+var _active_designs_memo: Dictionary = {}
+## tag|version|templates|year|tech|factory_fp -> classification pack
+var _classification_pack_memo: Dictionary = {}
+
+
+func get_designs_version() -> int:
+	return _designs_version
+
+
+func _bump_designs_version() -> void:
+	_designs_version += 1
+	_active_designs_memo.clear()
+	_classification_pack_memo.clear()
+
 
 func _ready() -> void:
 	if typeof(TimeManager) != TYPE_NIL:
@@ -176,8 +193,8 @@ func _ready() -> void:
 
 
 func _on_game_year_advanced(_year: int) -> void:
-	# Classification is recomputed on demand; yearly hook reserved for future stockpile/trade rules.
-	pass
+	# Age/obsolete classification depends on the calendar year.
+	_bump_designs_version()
 
 
 func get_current_year() -> int:
@@ -200,6 +217,7 @@ func mark_design_used(country_tag: String, design_id: String, year: int = -1) ->
 		_last_used_year[tag] = {}
 	var y := year if year > 0 else get_current_year()
 	(_last_used_year[tag] as Dictionary)[did] = y
+	_bump_designs_version()
 
 
 func has_used_design(country_tag: String, design_id: String) -> bool:
@@ -216,7 +234,17 @@ func get_design_status(country_tag: String, design_id: String) -> DesignStatus:
 
 
 func get_active_designs(country_tag: String, domain: String = DOMAIN_ALL) -> Array[String]:
-	return _filter_ids_by_status(country_tag, DesignStatus.ACTIVE, domain)
+	var tag := _norm_tag(country_tag)
+	var key := _active_designs_memo_key(tag, domain)
+	if _active_designs_memo.has(key):
+		var cached: Array = _active_designs_memo[key]
+		var copy: Array[String] = []
+		for raw in cached:
+			copy.append(str(raw))
+		return copy
+	var ids := _filter_ids_by_status(country_tag, DesignStatus.ACTIVE, domain)
+	_active_designs_memo[key] = ids.duplicate()
+	return ids
 
 
 func get_previously_used_designs(country_tag: String, domain: String = DOMAIN_ALL) -> Array[String]:
@@ -425,6 +453,7 @@ func grant_acquired_design(
 
 	# Note: mark_design_acquired is legacy and now just forwards here for safety.
 	# Future code should call grant_acquired_design directly with the appropriate kind.
+	_bump_designs_version()
 
 
 func revoke_acquired_design(country_tag: String, design_id: String) -> void:
@@ -436,6 +465,7 @@ func revoke_acquired_design(country_tag: String, design_id: String) -> void:
 	var legacy_bucket: Variant = _acquired_foreign_designs.get(tag, {})
 	if typeof(legacy_bucket) == TYPE_DICTIONARY:
 		(legacy_bucket as Dictionary).erase(design_id)
+	_bump_designs_version()
 
 
 func acquisition_kind_label(kind: String) -> String:
@@ -676,6 +706,9 @@ func apply_save_data(data: Dictionary) -> void:
 	if data.has("custom_designs"):
 		_custom_designs = (data.get("custom_designs", {}) as Dictionary).duplicate(true)
 		_reregister_custom_templates()
+	# Cache only: bump so get_active_designs / catalog memos cannot keep pre-load rows.
+	# Restore contents are unchanged (SAVELOAD-DESIGN-1 owns dropping post-save templates).
+	_bump_designs_version()
 
 
 ## === Custom designer authoring (full designer duties) ===
@@ -761,6 +794,7 @@ func register_custom_design(country_tag: String, design_data: Dictionary) -> Dic
 	(_custom_designs[tag] as Dictionary)[design_id] = data.duplicate(true)
 	# Register as live UnitTemplate so ProductionLine/bootstrap do not WARN Unknown unit template.
 	var template_ok := _register_custom_as_unit_template(tag, design_id, data)
+	_bump_designs_version()
 	# Mark used + grant as domestic active path so picker / production see it.
 	mark_design_used(tag, design_id)
 	if typeof(GameData) != TYPE_NIL and GameData.has_method("unlock_design"):
@@ -1044,53 +1078,192 @@ func is_design_factory_compatible(design_id: String, factory: Factory) -> bool:
 
 # --- Internal classification ---
 
+func _template_count() -> int:
+	if typeof(GameData) == TYPE_NIL or GameData.design_data == null:
+		return 0
+	if not ("templates" in GameData.design_data):
+		return 0
+	return int(GameData.design_data.templates.size())
 
-func _filter_ids_by_status(
-	country_tag: String,
-	status: DesignStatus,
-	domain: String,
-) -> Array[String]:
-	var out: Array[String] = []
-	for design_id in _buildable_design_ids(_norm_tag(country_tag), null):
-		if get_design_status(country_tag, design_id) != status:
+
+func _completed_tech_count(country_tag: String) -> int:
+	if typeof(TechnologyManager) == TYPE_NIL:
+		return 0
+	var tag := _norm_tag(country_tag)
+	var completed: Dictionary = {}
+	if "country_state" in TechnologyManager:
+		var cs: Variant = TechnologyManager.country_state
+		if cs is Dictionary:
+			var st: Variant = (cs as Dictionary).get(tag, {})
+			if st is Dictionary:
+				var raw: Variant = (st as Dictionary).get("completed", {})
+				if raw is Dictionary:
+					completed = raw as Dictionary
+	return completed.size()
+
+
+func _in_production_id_set(country_tag: String) -> Dictionary:
+	var out: Dictionary = {}
+	if typeof(ProductionManager) == TYPE_NIL:
+		return out
+	if not ProductionManager.has_method("get_all_factories_for_country"):
+		return out
+	var factories: Variant = ProductionManager.get_all_factories_for_country(country_tag)
+	if not (factories is Array):
+		return out
+	for factory in factories:
+		if factory == null:
 			continue
-		if not _matches_domain(design_id, domain):
-			continue
-		out.append(design_id)
-	_sort_design_ids(out)
+		if "current_production_design" in factory:
+			var cur := str(factory.current_production_design).strip_edges()
+			if not cur.is_empty():
+				out[cur] = true
+		if "assigned_lines" in factory:
+			for line_id in factory.assigned_lines:
+				if not ProductionManager.has_method("get_line"):
+					continue
+				var line = ProductionManager.get_line(str(line_id))
+				if line != null and "design_id" in line:
+					var lid := str(line.design_id).strip_edges()
+					if not lid.is_empty():
+						out[lid] = true
 	return out
 
 
-func _classify_design(country_tag: String, design_id: String) -> Dictionary:
+func _production_fingerprint(country_tag: String) -> String:
+	if typeof(ProductionManager) == TYPE_NIL:
+		return "0"
+	if not ProductionManager.has_method("get_all_factories_for_country"):
+		return "0"
+	var factories: Variant = ProductionManager.get_all_factories_for_country(country_tag)
+	if not (factories is Array):
+		return "0"
+	var bits: PackedStringArray = PackedStringArray()
+	for factory in factories:
+		if factory == null:
+			continue
+		var fid := ""
+		if "id" in factory:
+			fid = str(factory.get("id"))
+		var cur := ""
+		if "current_production_design" in factory:
+			cur = str(factory.current_production_design)
+		bits.append("F%s:%s" % [fid, cur])
+		if "assigned_lines" in factory:
+			for line_id in factory.assigned_lines:
+				var did := ""
+				if ProductionManager.has_method("get_line"):
+					var line = ProductionManager.get_line(str(line_id))
+					if line != null and "design_id" in line:
+						did = str(line.design_id)
+				bits.append("L%s:%s" % [str(line_id), did])
+	bits.sort()
+	return "|".join(bits) if not bits.is_empty() else "0"
+
+
+func _active_designs_memo_key(tag: String, domain: String) -> String:
+	return "%s|%s|%d|%d|%d|%d|%s" % [
+		tag,
+		domain,
+		_designs_version,
+		_template_count(),
+		get_current_year(),
+		_completed_tech_count(tag),
+		_production_fingerprint(tag),
+	]
+
+
+func _classification_pack_key(tag: String) -> String:
+	return "%s|%d|%d|%d|%d|%s" % [
+		tag,
+		_designs_version,
+		_template_count(),
+		get_current_year(),
+		_completed_tech_count(tag),
+		_production_fingerprint(tag),
+	]
+
+
+func _classification_pack(country_tag: String) -> Dictionary:
 	var tag := _norm_tag(country_tag)
-	var role := get_lifecycle_role(design_id)
-	var unlock_year := get_unlock_year(design_id)
-	var current_year := get_current_year()
-	var in_use := _is_design_in_active_production(tag, design_id)
-	var used := has_used_design(tag, design_id) or in_use
-
-	var peers: Array[Dictionary] = []
-	for did in _buildable_design_ids(tag, null):
-		if get_lifecycle_role(did) != role:
-			continue
-		if not _is_tech_buildable(tag, did):
-			continue
-		peers.append({
+	var key := _classification_pack_key(tag)
+	if _classification_pack_memo.has(key):
+		return _classification_pack_memo[key]
+	var in_prod: Dictionary = _in_production_id_set(tag)
+	var buildable: Array[String] = _buildable_design_ids(tag, null)
+	var meta: Dictionary = {}
+	var peers_by_role: Dictionary = {}
+	for did in buildable:
+		var role := get_lifecycle_role(did)
+		var year := get_unlock_year(did)
+		var in_use := bool(in_prod.get(did, false))
+		var used := has_used_design(tag, did) or in_use
+		meta[did] = {
+			"role": role,
+			"year": year,
+			"in_use": in_use,
+			"used": used,
+		}
+		if not peers_by_role.has(role):
+			peers_by_role[role] = []
+		(peers_by_role[role] as Array).append({
 			"id": did,
-			"year": get_unlock_year(did),
-			"used": has_used_design(tag, did) or _is_design_in_active_production(tag, did),
+			"year": year,
+			"used": used,
 		})
+	for role in peers_by_role.keys():
+		var peers: Array = peers_by_role[role]
+		peers.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+			return int(a.get("year", 0)) > int(b.get("year", 0))
+		)
+		peers_by_role[role] = peers
+	var pack: Dictionary = {
+		"tag": tag,
+		"year": get_current_year(),
+		"in_prod": in_prod,
+		"buildable": buildable,
+		"meta": meta,
+		"peers": peers_by_role,
+	}
+	_classification_pack_memo.clear()
+	_classification_pack_memo[key] = pack
+	return pack
 
-	peers.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
-		return int(a.get("year", 0)) > int(b.get("year", 0))
-	)
+
+func _classify_from_pack(design_id: String, pack: Dictionary) -> Dictionary:
+	var tag := str(pack.get("tag", ""))
+	var current_year := int(pack.get("year", get_current_year()))
+	var meta: Dictionary = pack.get("meta", {}) if pack.get("meta") is Dictionary else {}
+	var in_prod: Dictionary = pack.get("in_prod", {}) if pack.get("in_prod") is Dictionary else {}
+	var role := ""
+	var unlock_year := 0
+	var in_use := false
+	var used := false
+	if meta.has(design_id):
+		var row: Dictionary = meta[design_id]
+		role = str(row.get("role", ""))
+		unlock_year = int(row.get("year", 0))
+		in_use = bool(row.get("in_use", false))
+		used = bool(row.get("used", false))
+	else:
+		role = get_lifecycle_role(design_id)
+		unlock_year = get_unlock_year(design_id)
+		in_use = bool(in_prod.get(design_id, false))
+		used = has_used_design(tag, design_id) or in_use
+	var peers_by_role: Dictionary = pack.get("peers", {}) if pack.get("peers") is Dictionary else {}
+	var peers: Array = peers_by_role.get(role, []) if peers_by_role.has(role) else []
 
 	if peers.is_empty():
 		return {"status": DesignStatus.ACTIVE, "only_in_role": true}
 
-	var newest_year := int(peers[0].get("year", unlock_year))
+	var newest_year := unlock_year
+	if not peers.is_empty() and peers[0] is Dictionary:
+		newest_year = int((peers[0] as Dictionary).get("year", unlock_year))
 	var has_newer_peer := false
-	for peer in peers:
+	for peer_v in peers:
+		if not (peer_v is Dictionary):
+			continue
+		var peer: Dictionary = peer_v
 		if str(peer.get("id", "")) == design_id:
 			continue
 		if int(peer.get("year", 0)) > unlock_year:
@@ -1115,6 +1288,30 @@ func _classify_design(country_tag: String, design_id: String) -> Dictionary:
 	if used:
 		return {"status": DesignStatus.PREVIOUSLY_USED, "only_in_role": false}
 	return {"status": DesignStatus.OBSOLETE, "only_in_role": false}
+
+
+func _filter_ids_by_status(
+	country_tag: String,
+	status: DesignStatus,
+	domain: String,
+) -> Array[String]:
+	var pack := _classification_pack(country_tag)
+	var buildable: Array = pack.get("buildable", []) if pack.get("buildable") is Array else []
+	var out: Array[String] = []
+	for raw in buildable:
+		var design_id := str(raw)
+		var info := _classify_from_pack(design_id, pack)
+		if int(info.get("status", DesignStatus.ACTIVE)) != int(status):
+			continue
+		if not _matches_domain(design_id, domain):
+			continue
+		out.append(design_id)
+	_sort_design_ids(out)
+	return out
+
+
+func _classify_design(country_tag: String, design_id: String) -> Dictionary:
+	return _classify_from_pack(design_id, _classification_pack(country_tag))
 
 
 func _eligible_design_ids(country_tag: String, factory: Factory = null) -> Array[String]:
