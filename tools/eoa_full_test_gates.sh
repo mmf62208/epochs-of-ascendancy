@@ -8,7 +8,7 @@
 #   tools/eoa_full_test_gates.sh --with-perf  # also map-tick perf sample
 #   tools/eoa_full_test_gates.sh --log DIR    # write logs under DIR
 #
-# --quick launches HeadlessGarrison1Test, HeadlessAiWar1Test, HeadlessInkTooltips0Test, HeadlessCampaignSave1Test, HeadlessAutosave1Test, HeadlessOrdersPerf1Test, HeadlessRttSmallfix1Test, HeadlessRttReset2Test, HeadlessAudio1Test, HeadlessAudio2Test, HeadlessStabilityJustice1Test, HeadlessVictoryPaths1Test, HeadlessSettingsToggles1Test, HeadlessFirst20P2StripPressTest, then FIRST20-UX-WAR Open fight / Justify / March, then HeadlessSearchHotkey1Test (r1 isolation + r2 click-focus / RtT AAR + r3 inspector-open / first-SOV click), then HeadlessTutorial1Test.
+# --quick launches HeadlessGarrison1Test, HeadlessAiWar1Test, HeadlessInkTooltips0Test, HeadlessCampaignSave1Test, HeadlessAutosave1Test, HeadlessOrdersPerf1Test (one Godot process per case a–g; expected wall unfixed: several minutes total; fixed: < ~70s total), HeadlessRttSmallfix1Test, HeadlessRttReset2Test, HeadlessAudio1Test, HeadlessAudio2Test, HeadlessStabilityJustice1Test, HeadlessVictoryPaths1Test, HeadlessSettingsToggles1Test, HeadlessFirst20P2StripPressTest, then FIRST20-UX-WAR Open fight / Justify / March, then HeadlessSearchHotkey1Test (r1 isolation + r2 click-focus / RtT AAR + r3 inspector-open / first-SOV click), then HeadlessTutorial1Test.
 # Full path also runs launch_campaign_save1_identity (MW200 SaveStateHash identity + 60-day twin).
 # Full path calls tools/run_godot.sh, which exits 1 immediately if no binary
 # is found (fail-closed; it must not hang).
@@ -292,23 +292,74 @@ if [[ "$QUICK" -eq 1 ]]; then
       fi
       exit "$code"
     ' || fail
+    # HeadlessOrdersPerf1Test: one Godot process per case a–g.
+    # Expected wall: unfixed several minutes total; fixed < ~70s total.
+    # Per-case timeout = cap + margin (150s a–f, 400s g); --kill-after=10 SIGKILL backstop.
     run_step headless_orders_perf1 bash -c '
-      log=$(mktemp)
-      XDG_DATA_HOME="$(mktemp -d)" flock -n "${HOME}/.eoa_godot.lock" \
-        timeout --kill-after=10 900 \
-        tools/run_godot.sh --headless --path . \
-        -s res://scripts/core/HeadlessOrdersPerf1Test.gd >"$log" 2>&1
-      code=$?
-      cat "$log"
-      if grep -q "SCRIPT ERROR" "$log"; then
-        echo "[eoa-gates] FAIL headless_orders_perf1 SCRIPT ERROR"
-        exit 1
+      exec 9>"${HOME}/.eoa_godot.lock"
+      flock -n 9 || exit 1
+      nfail=0
+      failed_cases=""
+      leftover_godot() {
+        ps -eo pid=,args= | awk '/HeadlessOrdersPerf1Test\.gd/ && /[Gg]odot/ && !/awk/ && !/eoa_full_test_gates/ {print $1}'
+      }
+      run_one() {
+        local case="$1"
+        local cap="$2"
+        local xdg log code leftover case_fail
+        xdg=$(mktemp -d)
+        log=$(mktemp)
+        echo "[eoa-gates] headless_orders_perf1 case=$case cap=${cap}s"
+        set +e
+        XDG_DATA_HOME="$xdg" timeout --kill-after=10 "$cap" \
+          tools/run_godot.sh --headless --path . \
+          -s res://scripts/core/HeadlessOrdersPerf1Test.gd \
+          -- --case="$case" >"$log" 2>&1
+        code=$?
+        set -e
+        cat "$log"
+        leftover=$(leftover_godot)
+        case_fail=0
+        if [ -n "$leftover" ]; then
+          echo "[eoa-gates] FAIL headless_orders_perf1 leftover godot after case=$case pids=$leftover"
+          kill -9 $leftover 2>/dev/null || true
+          case_fail=1
+        fi
+        if grep -q "SCRIPT ERROR" "$log"; then
+          echo "[eoa-gates] FAIL headless_orders_perf1 case=$case SCRIPT ERROR"
+          case_fail=1
+        fi
+        if ! grep -q "RESULT=PASS" "$log"; then
+          case_fail=1
+        fi
+        if [ "$code" -ne 0 ]; then
+          case_fail=1
+        fi
+        if [ "$case_fail" -eq 1 ]; then
+          nfail=$((nfail + 1))
+          if [ -n "$failed_cases" ]; then
+            failed_cases="${failed_cases},${case}"
+          else
+            failed_cases="$case"
+          fi
+          echo "HeadlessOrdersPerf1Test: case=$case FAIL (code=$code)"
+        else
+          echo "HeadlessOrdersPerf1Test: case=$case PASS"
+        fi
+      }
+      run_one a 150
+      run_one b 150
+      run_one c 150
+      run_one d 150
+      run_one e 150
+      run_one f 150
+      run_one g 400
+      if [ "$nfail" -eq 0 ]; then
+        echo "HeadlessOrdersPerf1Test: RESULT=PASS failures=0 cases_failed=[]"
+        exit 0
       fi
-      if ! grep -q "RESULT=PASS" "$log"; then
-        echo "[eoa-gates] FAIL headless_orders_perf1 missing RESULT=PASS"
-        exit 1
-      fi
-      exit "$code"
+      echo "HeadlessOrdersPerf1Test: RESULT=FAIL failures=$nfail cases_failed=[$failed_cases]"
+      exit 1
     ' || fail
     run_step headless_rtt_smallfix1 bash -c '
       log=$(mktemp)

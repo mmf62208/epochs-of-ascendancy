@@ -5,6 +5,11 @@ extends SceneTree
 ## frozen apply-id reachability, DesignManager/MapManager cache invalidation.
 ##
 ##   tools/run_godot.sh --headless --path . -s res://scripts/core/HeadlessOrdersPerf1Test.gd
+##   tools/run_godot.sh --headless --path . -s res://scripts/core/HeadlessOrdersPerf1Test.gd -- --case=a
+##
+## `--case=a|b|c|d|e|f|g` runs one case (gates: one Godot process per case).
+## No arg runs all in-process (local use). Soft FAIL at budget+250ms does not
+## die; hard-kill cap is 120s per step (300s for g REMOVE revoke).
 
 const PLAYER_TAG := "GER"
 const FOREIGN_TAG := "FRA"
@@ -21,7 +26,10 @@ const BUDGET_APPLY_MS := 500
 const BUDGET_DEPTH_MS := 1500
 const BUDGET_G_STEP_MS := 3000
 const WD_SLACK_MS := 250
+const WD_CAP_MS := 120000
+const WD_REVOKE_CAP_MS := 300000
 const FACTORY_ID := "aaa_orders_perf1_fac"
+const G_DOMAINS: PackedStringArray = ["land", "naval", "air", "space"]
 
 ## Frozen unfixed-tree apply-button + DAY_PACKAGE_ACTION_IDS union (9ccc83ee OCP).
 ## Unique `_add_apply_button` literals = 1381; DAY_PACKAGE_ACTION_IDS = 1127; union = 1451;
@@ -409,17 +417,43 @@ const SNAPSHOT_RUNTIME_ONLY_IDS: PackedStringArray = [
 
 var _failures: int = 0
 var _result_printed: bool = false
+var _run_case: String = "all"
 var _wd_thread: Thread = null
 var _wd_armed: bool = false
 var _wd_fired: bool = false
 var _wd_stop: bool = false
-var _wd_deadline_msec: int = 0
+var _wd_soft_deadline_msec: int = 0
+var _wd_cap_deadline_msec: int = 0
 var _wd_start_msec: int = 0
+var _wd_budget_ms: int = 0
+var _wd_cap_ms: int = WD_CAP_MS
 var _wd_label: String = ""
+var _wd_case: String = ""
+var _wd_step: String = ""
+var _wd_fail_recorded: bool = false
 var _ocp: Node = null
 
 
+func _parse_case_arg() -> String:
+	var blobs: PackedStringArray = PackedStringArray()
+	blobs.append_array(OS.get_cmdline_user_args())
+	blobs.append_array(OS.get_cmdline_args())
+	for a in blobs:
+		var s: String = str(a).strip_edges()
+		if s.begins_with("--case="):
+			var c: String = s.substr(7).strip_edges().to_lower()
+			if c == "a" or c == "b" or c == "c" or c == "d" or c == "e" or c == "f" or c == "g" or c == "all":
+				return c
+			return c
+	return "all"
+
+
+func _want_case(case_id: String) -> bool:
+	return _run_case == "all" or _run_case == case_id
+
+
 func _init() -> void:
+	_run_case = _parse_case_arg()
 	call_deferred("_start")
 
 
@@ -457,7 +491,8 @@ func _print_final_result() -> void:
 		return
 	_result_printed = true
 	var ok: bool = _failures == 0
-	print("HeadlessOrdersPerf1Test: RESULT=%s failures=%d" % ["PASS" if ok else "FAIL", _failures])
+	var tag: String = _run_case if not _run_case.is_empty() else "all"
+	print("HeadlessOrdersPerf1Test[case=%s]: RESULT=%s failures=%d" % [tag, "PASS" if ok else "FAIL", _failures])
 	_flush_log()
 
 
@@ -472,8 +507,6 @@ func _hard_die() -> void:
 
 func _dump_watchdog_stack(waited: int) -> void:
 	print("  HeadlessOrdersPerf1Test: last-started step=%s elapsed=%dms" % [_wd_label, waited])
-	## Watchdog runs off the main thread; skip Engine.capture_script_backtraces so
-	## a SCRIPT ERROR cannot block OS.kill / kill -9.
 	_flush_log()
 
 
@@ -481,6 +514,29 @@ func _emit_result_and_die(ok: bool) -> void:
 	_print_final_result()
 	_join_watchdog()
 	quit(0 if ok else 1)
+
+
+func _split_case_step(label: String) -> void:
+	var i: int = label.find(":")
+	if i <= 0:
+		_wd_case = _run_case if not _run_case.is_empty() else "?"
+		_wd_step = label
+		return
+	_wd_case = label.substr(0, i).strip_edges()
+	_wd_step = label.substr(i + 1).strip_edges()
+
+
+func _fail_slow(case_id: String, step: String, dt: int, budget_ms: int) -> void:
+	print("[FAIL-SLOW] %s:%s %dms budget %dms" % [case_id, step, dt, budget_ms])
+	if not _wd_fail_recorded:
+		_failures += 1
+		_wd_fail_recorded = true
+	_flush_log()
+
+
+func _fail_slow_from_wd(dt: int) -> void:
+	if dt > _wd_budget_ms and _wd_budget_ms > 0:
+		_fail_slow(_wd_case, _wd_step, dt, _wd_budget_ms)
 
 
 func _watchdog_loop() -> void:
@@ -491,24 +547,34 @@ func _watchdog_loop() -> void:
 		if not _wd_armed or _wd_fired:
 			continue
 		var now: int = Time.get_ticks_msec()
-		if now <= _wd_deadline_msec:
-			continue
-		_wd_fired = true
-		_wd_armed = false
-		_wd_stop = true
-		var waited: int = now - _wd_start_msec
-		_failures += 1
-		print("[FAIL] %s: watchdog %dms" % [_wd_label, waited])
-		_dump_watchdog_stack(waited)
-		_print_final_result()
-		_hard_die()
-		return
+		if now > _wd_cap_deadline_msec:
+			_wd_fired = true
+			_wd_armed = false
+			_wd_stop = true
+			var waited: int = now - _wd_start_msec
+			print("[FAIL-HUNG] %s:%s killed at cap %dms" % [_wd_case, _wd_step, _wd_cap_ms])
+			_dump_watchdog_stack(waited)
+			if not _wd_fail_recorded:
+				_failures += 1
+				_wd_fail_recorded = true
+			_print_final_result()
+			_hard_die()
+			return
+		if now > _wd_soft_deadline_msec and not _wd_fail_recorded:
+			## Record FAIL at budget+250ms but do not die; wait for return or cap.
+			_wd_fail_recorded = true
+			_failures += 1
 
 
-func _arm_watchdog(budget_ms: int, label: String) -> void:
+func _arm_watchdog(budget_ms: int, label: String, cap_ms: int = WD_CAP_MS) -> void:
+	_split_case_step(label)
 	_wd_label = label
+	_wd_budget_ms = budget_ms
+	_wd_cap_ms = cap_ms
 	_wd_start_msec = Time.get_ticks_msec()
-	_wd_deadline_msec = _wd_start_msec + budget_ms
+	_wd_soft_deadline_msec = _wd_start_msec + budget_ms + WD_SLACK_MS
+	_wd_cap_deadline_msec = _wd_start_msec + cap_ms
+	_wd_fail_recorded = false
 	_wd_fired = false
 	if _wd_thread != null and _wd_stop:
 		if _wd_thread.is_started():
@@ -525,10 +591,10 @@ func _disarm_watchdog() -> void:
 	_wd_armed = false
 
 
-func _step_begin(case_id: String, step: String, budget_ms: int = BUDGET_G_STEP_MS) -> int:
+func _step_begin(case_id: String, step: String, budget_ms: int = BUDGET_G_STEP_MS, cap_ms: int = WD_CAP_MS) -> int:
 	print("[STEP] %s:%s start" % [case_id, step])
 	_flush_log()
-	_arm_watchdog(budget_ms + WD_SLACK_MS, "%s: %s" % [case_id, step])
+	_arm_watchdog(budget_ms, "%s: %s" % [case_id, step], cap_ms)
 	return Time.get_ticks_msec()
 
 
@@ -536,15 +602,16 @@ func _step_end(case_id: String, step: String, t0: int) -> int:
 	var dt: int = Time.get_ticks_msec() - t0
 	_disarm_watchdog()
 	print("[STEP] %s:%s end %dms" % [case_id, step, dt])
+	_fail_slow_from_wd(dt)
 	_flush_log()
 	return dt
 
 
-func _g_call(obj: Object, method: String, args: Array, step: String) -> Variant:
+func _g_call(obj: Object, method: String, args: Array, step: String, cap_ms: int = WD_CAP_MS) -> Variant:
 	if obj == null or not obj.has_method(method):
 		_fail("g: %s missing (%s)" % [method, step])
 		return null
-	var t0: int = _step_begin("g", step)
+	var t0: int = _step_begin("g", step, BUDGET_G_STEP_MS, cap_ms)
 	var result: Variant = obj.callv(method, args)
 	_step_end("g", step, t0)
 	return result
@@ -576,15 +643,27 @@ func _tech() -> Node:
 
 
 func _run() -> void:
+	_progress("run case=%s" % _run_case)
+	if _run_case != "all" and _run_case != "a" and _run_case != "b" and _run_case != "c" \
+			and _run_case != "d" and _run_case != "e" and _run_case != "f" and _run_case != "g":
+		_fail("unknown --case=%s (want a|b|c|d|e|f|g)" % _run_case)
+		return
 	if not _setup_world():
 		return
-	await _test_a_cold_open()
-	await _test_b_warm_reopen()
-	await _test_c_close_and_esc()
-	await _test_d_select_and_apply()
-	await _test_e_depth_catalogue()
-	await _test_f_action_ids()
-	_test_g_cache_invalidation()
+	if _want_case("a"):
+		await _test_a_cold_open()
+	if _want_case("b"):
+		await _test_b_warm_reopen()
+	if _want_case("c"):
+		await _test_c_close_and_esc()
+	if _want_case("d"):
+		await _test_d_select_and_apply()
+	if _want_case("e"):
+		await _test_e_depth_catalogue()
+	if _want_case("f"):
+		await _test_f_action_ids()
+	if _want_case("g"):
+		_test_g_cache_invalidation()
 
 
 func _setup_world() -> bool:
@@ -687,12 +766,12 @@ func _pump_frames_until(pred: Callable, budget_ms: int, label: String) -> bool:
 		return true
 	while Time.get_ticks_msec() - t0 <= budget_ms:
 		var frame_start: int = Time.get_ticks_msec()
-		_arm_watchdog(budget_ms + WD_SLACK_MS, label)
+		_arm_watchdog(budget_ms, label)
 		await process_frame
 		_disarm_watchdog()
 		var frame_ms: int = Time.get_ticks_msec() - frame_start
 		if frame_ms > budget_ms:
-			_fail("%s: process_frame stalled %dms (budget %dms)" % [label, frame_ms, budget_ms])
+			_fail_slow_from_wd(frame_ms)
 			return false
 		if pred.call():
 			return true
@@ -721,9 +800,10 @@ func _open_live_ocp(budget_ms: int, node_name: String, label: String) -> Node:
 		return null
 	var t0: int = Time.get_ticks_msec()
 	_progress("%s: before add_child" % label)
-	_arm_watchdog(budget_ms + WD_SLACK_MS, "%s: add_child" % label)
+	_arm_watchdog(budget_ms, "%s: add_child" % label)
 	root.add_child(ocp)
 	_disarm_watchdog()
+	_fail_slow_from_wd(Time.get_ticks_msec() - t0)
 	_progress("%s: after add_child" % label)
 	var ok: bool = await _pump_frames_until(
 		func() -> bool: return _refresh_done(ocp),
@@ -816,13 +896,13 @@ func _timed_press(btn: BaseButton, budget_ms: int, label: String) -> int:
 	if btn == null:
 		_fail("%s: button missing" % label)
 		return -1
-	_arm_watchdog(budget_ms + WD_SLACK_MS, label)
+	_arm_watchdog(budget_ms, label)
 	var t0: int = Time.get_ticks_msec()
 	btn.pressed.emit()
 	var dt: int = Time.get_ticks_msec() - t0
 	_disarm_watchdog()
 	if dt > budget_ms:
-		_fail("%s: %dms (budget %dms)" % [label, dt, budget_ms])
+		_fail_slow_from_wd(dt)
 	return dt
 
 
@@ -830,13 +910,13 @@ func _timed_call(obj: Object, method: String, args: Array, budget_ms: int, label
 	if obj == null or not obj.has_method(method):
 		_fail("%s: %s missing" % [label, method])
 		return -1
-	_arm_watchdog(budget_ms + WD_SLACK_MS, label)
+	_arm_watchdog(budget_ms, label)
 	var t0: int = Time.get_ticks_msec()
 	obj.callv(method, args)
 	var dt: int = Time.get_ticks_msec() - t0
 	_disarm_watchdog()
 	if dt > budget_ms:
-		_fail("%s: %dms (budget %dms)" % [label, dt, budget_ms])
+		_fail_slow_from_wd(dt)
 	return dt
 
 
@@ -851,6 +931,8 @@ func _test_a_cold_open() -> void:
 
 func _test_b_warm_reopen() -> void:
 	_progress("case (b) close then warm second instance")
+	if _ocp == null or not is_instance_valid(_ocp):
+		_ocp = await _open_live_ocp(BUDGET_COLD_MS, "OrderCommandPanel_b_prime", "b: prime")
 	if _ocp != null and is_instance_valid(_ocp):
 		_close_ocp(_ocp)
 		var closed: bool = await _pump_frames_until(
@@ -879,7 +961,7 @@ func _test_c_close_and_esc() -> void:
 			_fail("c: Close button missing")
 		else:
 			_progress("c: before Close")
-			_arm_watchdog(BUDGET_CLOSE_MS + WD_SLACK_MS, "c: Close")
+			_arm_watchdog(BUDGET_CLOSE_MS, "c: Close")
 			(close_btn as BaseButton).pressed.emit()
 			_disarm_watchdog()
 			var closed: bool = await _pump_frames_until(
@@ -894,7 +976,7 @@ func _test_c_close_and_esc() -> void:
 		_fail("c: no panel for Esc")
 	else:
 		_progress("c: before Esc")
-		_arm_watchdog(BUDGET_CLOSE_MS + WD_SLACK_MS, "c: Esc")
+		_arm_watchdog(BUDGET_CLOSE_MS, "c: Esc")
 		_emit_escape(ocp_esc)
 		_disarm_watchdog()
 		var esc_closed: bool = await _pump_frames_until(
@@ -991,7 +1073,7 @@ func _test_d_select_and_apply() -> void:
 	if sel_ms >= 0 and sel_ms <= BUDGET_SELECT_MS:
 		_pass("d: _on_map_province_selected %dms" % sel_ms)
 	_progress("d: before apply_supply")
-	_arm_watchdog(BUDGET_APPLY_MS + WD_SLACK_MS, "d: apply_supply")
+	_arm_watchdog(BUDGET_APPLY_MS, "d: apply_supply")
 	var t0: int = Time.get_ticks_msec()
 	if _ocp.has_method("_on_action_pressed"):
 		_ocp.call("_on_action_pressed", "apply_supply")
@@ -1000,6 +1082,7 @@ func _test_d_select_and_apply() -> void:
 		_disarm_watchdog()
 		return
 	_disarm_watchdog()
+	_fail_slow_from_wd(Time.get_ticks_msec() - t0)
 	var rebuilt: bool = await _pump_frames_until(
 		func() -> bool:
 			if not _refresh_done(_ocp):
@@ -1328,6 +1411,35 @@ func _g_pid() -> int:
 	return 1
 
 
+func _g_timed_refresh(obj: Object, method: String, args: Array, name: String) -> void:
+	if obj == null or not obj.has_method(method):
+		_fail("g: %s missing (%s)" % [method, name])
+		return
+	_arm_watchdog(BUDGET_G_STEP_MS, "g: %s" % name)
+	var t0: int = Time.get_ticks_msec()
+	obj.callv(method, args)
+	var dt: int = Time.get_ticks_msec() - t0
+	_disarm_watchdog()
+	print("[CALL] g:%s %dms" % [name, dt])
+	_fail_slow_from_wd(dt)
+	_flush_log()
+
+
+func _g_refresh_calls(phase: String) -> void:
+	## Same calls the panel refresh makes, timed for before/after each mutation.
+	var dm: Node = _dm()
+	var mm: Node = _mm()
+	var pid: int = _g_pid()
+	if dm != null and dm.has_method("get_active_designs"):
+		for domain in G_DOMAINS:
+			_g_timed_refresh(dm, "get_active_designs", [PLAYER_TAG, str(domain)], "%s get_active_designs %s" % [phase, domain])
+	if mm != null:
+		if mm.has_method("_designer_live_catalog"):
+			_g_timed_refresh(mm, "_designer_live_catalog", [PLAYER_TAG], "%s _designer_live_catalog" % phase)
+		if mm.has_method("designer_suite_product_live"):
+			_g_timed_refresh(mm, "designer_suite_product_live", [pid], "%s designer_suite_product_live" % phase)
+
+
 func _g_pick_factory(pid: int) -> Object:
 	var pm: Node = root.get_node_or_null("ProductionManager")
 	var fm: Node = root.get_node_or_null("FactoryManager")
@@ -1443,7 +1555,8 @@ func _g_factory_sync(dm: Node, mm: Node, _pid: int, fac: Object, design_id: Stri
 
 
 func _test_g_cache_invalidation() -> void:
-	_progress("case (g) cache invalidation ADD/CHANGE/REMOVE + factory + save/load + silent tech")
+	## Own process; does not open OrderCommandPanel. Hits DesignManager / MapManager directly.
+	_progress("case (g) cache invalidation ADD/CHANGE/REMOVE + factory + save/load + silent tech (no panel)")
 	var dm: Node = _dm()
 	var mm: Node = _mm()
 	if dm == null or mm == null:
@@ -1455,16 +1568,19 @@ func _test_g_cache_invalidation() -> void:
 	var before_v: Variant = _g_call(dm, "get_save_data", [], "save snapshot get_save_data")
 	var before: Dictionary = before_v as Dictionary if before_v is Dictionary else {}
 	var pid: int = _g_pid()
+	_g_refresh_calls("before")
 
 	_progress("g: ADD register_custom_design %s" % ADD_ID)
 	if not _register_custom(dm, PLAYER_TAG, ADD_ID, "land", "ADD register_custom_design"):
 		return
 	_assert_design_visible(dm, mm, pid, PLAYER_TAG, "land", ADD_ID, "ADD", true)
+	_g_refresh_calls("after ADD")
 
 	_progress("g: CHANGE re-register %s as %s" % [ADD_ID, CHANGE_DOMAIN])
 	if not _register_custom(dm, PLAYER_TAG, ADD_ID, CHANGE_DOMAIN, "CHANGE register_custom_design"):
 		return
 	_assert_design_visible(dm, mm, pid, PLAYER_TAG, CHANGE_DOMAIN, ADD_ID, "CHANGE naval", true)
+	_g_refresh_calls("after CHANGE")
 	if _active_has_step(dm, PLAYER_TAG, "land", ADD_ID, "CHANGE land get_active_designs") \
 			or _catalog_has(_live_catalog_step(mm, PLAYER_TAG, "CHANGE land _designer_live_catalog"), "land", ADD_ID):
 		_fail("g CHANGE: %s still listed under land after naval re-register" % ADD_ID)
@@ -1480,23 +1596,28 @@ func _test_g_cache_invalidation() -> void:
 		_fail("g: grant_acquired_design missing")
 		return
 	_assert_design_visible(dm, mm, pid, PLAYER_TAG, "land", REMOVE_ID, "REMOVE grant", true)
+	_g_refresh_calls("after REMOVE grant")
 	if dm.has_method("revoke_acquired_design"):
-		_g_call(dm, "revoke_acquired_design", [PLAYER_TAG, REMOVE_ID], "REMOVE revoke")
+		_g_call(dm, "revoke_acquired_design", [PLAYER_TAG, REMOVE_ID], "REMOVE revoke", WD_REVOKE_CAP_MS)
 	else:
 		_fail("g: revoke_acquired_design missing")
 		return
 	_assert_design_visible(dm, mm, pid, PLAYER_TAG, "land", REMOVE_ID, "REMOVE revoke", false)
+	_g_refresh_calls("after REMOVE revoke")
 
 	_progress("g: factory sync_production_design")
 	var fac: Object = _g_pick_factory(pid)
 	_g_factory_sync(dm, mm, pid, fac, ADD_ID, CHANGE_DOMAIN, "factory")
+	_g_refresh_calls("after factory")
 
 	_progress("g: factory design change (current production design)")
 	if not _register_custom(dm, PLAYER_TAG, FACTORY_ID, "land", "factory change register_custom_design"):
 		return
 	_g_factory_sync(dm, mm, pid, fac, FACTORY_ID, "land", "factory change")
+	_g_refresh_calls("after factory change")
 
 	_g_silent_tech(dm, mm, pid)
+	_g_refresh_calls("after silent tech")
 
 	_progress("g: save→load apply_save_data must not keep stale entry")
 	if not _register_custom(dm, PLAYER_TAG, STALE_ID, "land", "save-load register_custom_design"):
@@ -1505,6 +1626,7 @@ func _test_g_cache_invalidation() -> void:
 	_g_call(mm, "_designer_live_catalog", [PLAYER_TAG], "save-load _designer_live_catalog")
 	_g_call(mm, "designer_suite_product_live", [pid], "save-load designer_suite_product_live")
 	_g_call(dm, "apply_save_data", [before], "save-load apply_save_data")
+	_g_refresh_calls("after save-load")
 	if _active_has_step(dm, PLAYER_TAG, "land", STALE_ID, "save-load stale get_active_designs") \
 			or _catalog_has(_live_catalog_step(mm, PLAYER_TAG, "save-load stale _designer_live_catalog"), "land", STALE_ID):
 		_fail("g: apply_save_data left stale %s in active/catalog" % STALE_ID)
