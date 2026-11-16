@@ -69,6 +69,12 @@ func _run() -> void:
 	_test_own_unit_card_not_inspector()
 	_test_cue_log_wrap_and_battle()
 	_test_completed_does_not_autostart()
+	await _test_p1a_card_hugs_content()
+	_test_p1a_fight_copy_and_done_hold()
+	_test_p1a_under_attack_keeps_fight_open()
+	await _test_p1a_target_rings()
+	await _test_p1a_step12_idle_layout_stable()
+	await _test_p1a_got_it_consumes_click()
 	_finish()
 
 
@@ -718,3 +724,498 @@ func _test_completed_does_not_autostart() -> void:
 		guide.call("_hide_card")
 		guide.call("_hide_prompt")
 	_pass("completed Begin does not auto-start; replay still starts at 1")
+
+
+func _p1a_done_before(step_id: String) -> Array:
+	var done: Array = []
+	for sid in STEP_IDS:
+		if str(sid) == step_id:
+			break
+		done.append(str(sid))
+	return done
+
+
+func _p1a_active_model(step_id: String) -> Dictionary:
+	OS.set_environment("EOA_TUTORIAL", "1")
+	var extra := {}
+	if step_id == "fight":
+		extra["player_unit_adjacent_enemy"] = true
+	return _eval(_base_snap(extra), _prog(_p1a_done_before(step_id)))
+
+
+func _test_p1a_card_hugs_content() -> void:
+	var guide := _guide()
+	if guide == null:
+		_fail("P1a card hug: FirstSessionGuide missing")
+		return
+	var host: Control = guide.get_node_or_null("FirstSessionLayer/GuideHost") as Control
+	var card: TutorialCard = guide.get("_card") as TutorialCard
+	if host == null or card == null:
+		_fail("P1a card hug: host or card missing")
+		return
+	host.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	host.position = Vector2.ZERO
+	host.custom_minimum_size = Vector2(1280, 800)
+	host.size = Vector2(1280, 800)
+	await process_frame
+	var cases: Array = [
+		{"id": "welcome", "confirm": false},
+		{"id": "units", "confirm": false},
+		{"id": "fight", "confirm": false},
+		{"id": "ending", "confirm": false},
+		{"id": "welcome", "confirm": true},
+	]
+	for raw in cases:
+		var c: Dictionary = raw
+		var sid := str(c.get("id", ""))
+		var model := _p1a_active_model(sid)
+		if str(model.get("step_id", "")) != sid or not bool(model.get("visible", false)):
+			_fail("P1a card hug: model for %s missing (step=%s vis=%s)" % [
+				sid, str(model.get("step_id", "")), str(model.get("visible", false))
+			])
+			OS.set_environment("EOA_TUTORIAL", "")
+			return
+		model["confirm_skip"] = bool(c.get("confirm", false))
+		model["visible"] = true
+		card.size = Vector2(maxf(card.custom_minimum_size.x, 340.0), host.size.y * 0.85)
+		card.present(model)
+		await process_frame
+		await process_frame
+		await process_frame
+		var combined := card.get_combined_minimum_size()
+		var label := "step %s%s" % [str(model.get("n", 0)), " skip-confirm" if bool(c.get("confirm", false)) else ""]
+		if card.size.y > combined.y + 1.0:
+			_fail("P1a card hug: %s size.y=%.1f > combined_min.y+1 (%.1f)" % [label, card.size.y, combined.y])
+			OS.set_environment("EOA_TUTORIAL", "")
+			return
+		if card.size.y + 1.0 < combined.y:
+			_fail("P1a card hug: %s size.y=%.1f collapsed under combined_min.y %.1f" % [label, card.size.y, combined.y])
+			OS.set_environment("EOA_TUTORIAL", "")
+			return
+		if card.size.y >= host.size.y * 0.6:
+			_fail("P1a card hug: %s size.y=%.1f >= 0.6*host %.1f" % [label, card.size.y, host.size.y * 0.6])
+			OS.set_environment("EOA_TUTORIAL", "")
+			return
+	var dots := 0
+	for node in card.find_children("*", "ColorRect", true, false):
+		if node.is_queued_for_deletion():
+			continue
+		var dot := node as ColorRect
+		if dot.size_flags_horizontal != Control.SIZE_SHRINK_CENTER or dot.size_flags_vertical != Control.SIZE_SHRINK_CENTER:
+			_fail("P1a card hug: step dots are not SIZE_SHRINK_CENTER")
+			OS.set_environment("EOA_TUTORIAL", "")
+			return
+		dots += 1
+	if dots != TutorialGuideDomain.STEP_COUNT:
+		_fail("P1a card hug: dot count %d" % dots)
+		OS.set_environment("EOA_TUTORIAL", "")
+		return
+	OS.set_environment("EOA_TUTORIAL", "")
+	_pass("P1a card hugs content on steps 1, 5, 10, 12 and skip-confirm")
+
+
+func _test_p1a_fight_copy_and_done_hold() -> void:
+	OS.set_environment("EOA_TUTORIAL", "1")
+	var before := _p1a_done_before("fight")
+	var wait: Dictionary = _eval(_base_snap({"player_unit_adjacent_enemy": false}), _prog(before))
+	if str(wait.get("body", "")) != "Move a division onto the border with Poland":
+		_fail("P1a fight-wait body=%s" % str(wait.get("body", "")))
+		OS.set_environment("EOA_TUTORIAL", "")
+		return
+	var rows: Array = _domain.call("steps")
+	for raw in rows:
+		if not (raw is Dictionary):
+			continue
+		var row: Dictionary = raw
+		var sid := str(row.get("id", ""))
+		if sid == "units":
+			var keys: Array = row.get("keys", [])
+			if keys.has("U"):
+				_fail("P1a step 5 still has the U chip")
+				OS.set_environment("EOA_TUTORIAL", "")
+				return
+		elif sid == "ending":
+			var end_keys: Array = row.get("keys", [])
+			if not end_keys.is_empty():
+				_fail("P1a step 12 chip not dropped: %s" % str(end_keys))
+				OS.set_environment("EOA_TUTORIAL", "")
+				return
+		elif sid == "fight":
+			var body := str(row.get("body", ""))
+			if body.find("Polish troops") >= 0:
+				_fail("P1a step 10 still says Polish troops")
+				OS.set_environment("EOA_TUTORIAL", "")
+				return
+			if abs(float(row.get("p1_done_hold_s", 0.0)) - 3.0) > 0.01:
+				_fail("P1a step 10 p1_done_hold_s=%s" % str(row.get("p1_done_hold_s", "")))
+				OS.set_environment("EOA_TUTORIAL", "")
+				return
+	var done_res: Dictionary = _eval(_base_snap({
+		"player_unit_adjacent_enemy": true,
+		"battle_started_player": true,
+	}), _prog(before))
+	if str(done_res.get("state", "")) != "done":
+		_fail("P1a player battle did not complete fight (state=%s)" % str(done_res.get("state", "")))
+		OS.set_environment("EOA_TUTORIAL", "")
+		return
+	if abs(float(done_res.get("p1_done_hold_s", 0.0)) - 3.0) > 0.01:
+		_fail("P1a done result hold=%s want 3" % str(done_res.get("p1_done_hold_s", 0)))
+		OS.set_environment("EOA_TUTORIAL", "")
+		return
+	if str(done_res.get("title", "")) != "Battle started":
+		_fail("P1a done title=%s" % str(done_res.get("title", "")))
+		OS.set_environment("EOA_TUTORIAL", "")
+		return
+	var guide := _guide()
+	if guide == null:
+		_fail("P1a done hold: guide missing")
+		OS.set_environment("EOA_TUTORIAL", "")
+		return
+	guide.call("_apply_result", done_res)
+	var left := float(guide.get("_flash_left"))
+	guide.set("_flash_left", 0.0)
+	if abs(left - 3.0) > 0.05:
+		_fail("P1a guide done hold %.3f want 3" % left)
+		OS.set_environment("EOA_TUTORIAL", "")
+		return
+	OS.set_environment("EOA_TUTORIAL", "")
+	_pass("P1a fight-wait copy and step 10 done hold 3s")
+
+
+func _test_p1a_under_attack_keeps_fight_open() -> void:
+	var guide := _guide()
+	if guide == null:
+		_fail("P1a under attack: guide missing")
+		return
+	guide.set("_battle_player", false)
+	guide.set("_under_attack", false)
+	if guide.has_method("_on_step_enter"):
+		guide.call("_on_step_enter", "fight")
+	var bm := root.get_node_or_null("BattleManager")
+	if bm == null:
+		_fail("P1a under attack: BattleManager missing")
+		return
+	var open_v: Variant = bm.get("_open_land_battles")
+	if not (open_v is Array):
+		_fail("P1a under attack: open land battles missing")
+		return
+	var player := str(guide.call("_player_tag"))
+	(open_v as Array).append({
+		"att_tag": "POL",
+		"def_tag": player,
+	})
+	var snap: Dictionary = guide.call("_snapshot_now")
+	var open_after: Variant = bm.get("_open_land_battles")
+	if open_after is Array and not (open_after as Array).is_empty():
+		(open_after as Array).pop_back()
+	if bool(snap.get("battle_started_player", false)):
+		_fail("P1a under attack: defender battle set battle_started_player")
+		return
+	if not bool(snap.get("player_under_attack", false)):
+		_fail("P1a under attack: player_under_attack not set")
+		return
+	OS.set_environment("EOA_TUTORIAL", "1")
+	var eval_snap := _base_snap({
+		"player_unit_adjacent_enemy": true,
+		"player_under_attack": bool(snap.get("player_under_attack", false)),
+		"battle_started_player": bool(snap.get("battle_started_player", false)),
+	})
+	var res: Dictionary = _eval(eval_snap, _prog(_p1a_done_before("fight")))
+	OS.set_environment("EOA_TUTORIAL", "")
+	if str(res.get("step_id", "")) != "fight" or str(res.get("state", "")) == "done" or str(res.get("state", "")) == "hidden":
+		_fail("P1a under attack: step 10 did not stay open (step=%s state=%s)" % [
+			str(res.get("step_id", "")), str(res.get("state", ""))
+		])
+		return
+	if str(res.get("status_text", "")) != "You're under attack; now start your own battle":
+		_fail("P1a under attack status=%s" % str(res.get("status_text", "")))
+		return
+	if str(res.get("status_color", "")) != "#f2c94c":
+		_fail("P1a under attack status color=%s" % str(res.get("status_color", "")))
+		return
+	_pass("P1a defender battle leaves step 10 open and sets player_under_attack")
+
+
+func _test_p1a_target_rings() -> void:
+	var guide := _guide()
+	if guide == null:
+		_fail("P1a rings: guide missing")
+		return
+	var declare := Button.new()
+	declare.name = "BtnDeclareWar"
+	declare.position = Vector2(40, 200)
+	declare.size = Vector2(160, 32)
+	declare.custom_minimum_size = Vector2(160, 32)
+	root.add_child(declare)
+	var dipl := Button.new()
+	dipl.name = "DiplomacyButton"
+	dipl.position = Vector2(900, 8)
+	dipl.size = Vector2(72, 28)
+	dipl.custom_minimum_size = Vector2(72, 28)
+	root.add_child(dipl)
+	var open_fight := Button.new()
+	open_fight.name = "BtnOpenFight"
+	open_fight.position = Vector2(80, 520)
+	open_fight.size = Vector2(140, 32)
+	open_fight.custom_minimum_size = Vector2(140, 32)
+	root.add_child(open_fight)
+	var start := Button.new()
+	start.name = "BtnStartBattle"
+	start.position = Vector2(240, 520)
+	start.size = Vector2(140, 32)
+	start.custom_minimum_size = Vector2(140, 32)
+	root.add_child(start)
+	await process_frame
+	var justify := {
+		"step_id": "justify",
+		"target": {
+			"kind": "node",
+			"path": "WorldMap/UI/InfoPanel/BtnDeclareWar",
+			"p1_target_when": "inspector_on_target",
+			"p1_else": "TopInfoBar/ContentRow/CenterContainer/DiplomacyButton",
+		},
+	}
+	var got: Rect2 = guide.call("_target_rect", justify)
+	var dipl_r := dipl.get_global_rect()
+	if got.position.distance_to(dipl_r.position) > 2.0:
+		_fail("P1a ring: inspector off target got %s want Dipl %s" % [str(got), str(dipl_r)])
+		declare.queue_free()
+		dipl.queue_free()
+		open_fight.queue_free()
+		start.queue_free()
+		return
+	var fight := {
+		"step_id": "fight",
+		"target": {
+			"kind": "node_in_unit_card",
+			"name": "BtnOpenFight",
+			"p1_prefer": "BtnStartBattle",
+		},
+	}
+	var pref: Rect2 = guide.call("_target_rect", fight)
+	var start_r := start.get_global_rect()
+	declare.queue_free()
+	dipl.queue_free()
+	open_fight.queue_free()
+	start.queue_free()
+	if pref.position.distance_to(start_r.position) > 2.0:
+		_fail("P1a ring: visible Start battle got %s want %s" % [str(pref), str(start_r)])
+		return
+	_pass("P1a rings Dipl until the inspector is on target, and Start battle when it is open")
+
+
+func _p1a_present_ending(guide: Node, host: Control, card: TutorialCard) -> Dictionary:
+	# Freeze the autoload tick so _eval_now cannot hide/re-present the card
+	# while we measure idle layout and the Got it click.
+	guide.set_process(false)
+	DisplayServer.window_set_size(Vector2i(1280, 800))
+	if root != null:
+		root.size = Vector2i(1280, 800)
+	var vp := root.get_viewport() if root != null else null
+	if vp != null:
+		vp.size = Vector2i(1280, 800)
+	host.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	host.position = Vector2.ZERO
+	host.custom_minimum_size = Vector2(1280, 800)
+	host.size = Vector2(1280, 800)
+	var model := _p1a_active_model("ending")
+	model["visible"] = true
+	model["confirm_skip"] = false
+	card.present(model)
+	if guide.has_method("_place_card"):
+		guide.call("_place_card", model)
+	return model
+
+
+func _test_p1a_step12_idle_layout_stable() -> void:
+	var guide := _guide()
+	if guide == null:
+		_fail("P1a step12 idle: FirstSessionGuide missing")
+		return
+	var host: Control = guide.get_node_or_null("FirstSessionLayer/GuideHost") as Control
+	var card: TutorialCard = guide.get("_card") as TutorialCard
+	if host == null or card == null:
+		_fail("P1a step12 idle: host or card missing")
+		return
+	var date := Label.new()
+	date.name = "DateTimeLabel"
+	date.text = "1 January 1936"
+	date.position = Vector2(40, 80)
+	date.size = Vector2(220, 32)
+	date.custom_minimum_size = Vector2(220, 32)
+	root.add_child(date)
+	await process_frame
+	_p1a_present_ending(guide, host, card)
+	await process_frame
+	await process_frame
+	await process_frame
+	var got := card.find_child("BtnGotIt", true, false) as Control
+	if got == null or not got.visible:
+		_fail("P1a step12 idle: Got it missing")
+		date.queue_free()
+		OS.set_environment("EOA_TUTORIAL", "")
+		return
+	var cam_before := Vector2.ZERO
+	var cam: Camera2D = root.find_child("MapCamera", true, false) as Camera2D
+	if cam != null:
+		cam_before = cam.global_position
+	# below_target of DateTimeLabel would sit near x=40. Step 12 has no map
+	# focus, so the card must stay on the top-right slot and not chase the date.
+	var top_right_x := host.size.x - card.size.x - 24.0
+	var chased := absf(card.position.x - top_right_x) > 8.0 or absf(card.position.x - 40.0) < 24.0
+	var w0 := card.size.x
+	var h0 := card.size.y
+	var got0 := got.get_global_rect().position
+	var i := 0
+	var w_min := w0
+	var w_max := w0
+	var got_shift := 0.0
+	while i < 120:
+		await process_frame
+		w_min = minf(w_min, card.size.x)
+		w_max = maxf(w_max, card.size.x)
+		got_shift = maxf(got_shift, got.get_global_rect().position.distance_to(got0))
+		i += 1
+	var cam_after := cam.global_position if cam != null else cam_before
+	date.queue_free()
+	OS.set_environment("EOA_TUTORIAL", "")
+	guide.call("_hide_card")
+	var idle_ok := true
+	if chased:
+		_fail("P1a step12 idle: card chased DateTimeLabel (pos=%s top_right_x=%.1f size=%s)" % [
+			str(card.position), top_right_x, str(card.size)
+		])
+		idle_ok = false
+	if card.is_processing():
+		_fail("P1a step12 idle: TutorialCard hug _process still running after settle (w=%.1f..%.1f)" % [
+			w_min, w_max
+		])
+		idle_ok = false
+	if w_max - w_min > 0.5 or absf(card.size.x - w0) > 0.5 or absf(card.size.y - h0) > 0.5:
+		_fail("P1a step12 idle: card size moved over 120 frames w=%.1f..%.1f start=%.1fx%.1f now=%s" % [
+			w_min, w_max, w0, h0, str(card.size)
+		])
+		idle_ok = false
+	if got_shift > 0.5:
+		_fail("P1a step12 idle: Got it moved %.1f px over 120 idle frames (start=%s now=%s)" % [
+			got_shift, str(got0), str(got.get_global_rect().position)
+		])
+		idle_ok = false
+	if cam != null and cam_after.distance_to(cam_before) > 0.5:
+		_fail("P1a step12 idle: camera panned %s → %s" % [str(cam_before), str(cam_after)])
+		idle_ok = false
+	if idle_ok:
+		_pass("P1a step12 card size and Got it stay put over 120 idle frames")
+
+
+func _test_p1a_got_it_consumes_click() -> void:
+	var guide := _guide()
+	if guide == null:
+		_fail("P1a Got it consume: FirstSessionGuide missing")
+		return
+	var host: Control = guide.get_node_or_null("FirstSessionLayer/GuideHost") as Control
+	var card: TutorialCard = guide.get("_card") as TutorialCard
+	if host == null or card == null:
+		_fail("P1a Got it consume: host or card missing")
+		return
+	var spy_scr := GDScript.new()
+	spy_scr.source_code = """extends Node
+var selected_province_id: int = -1
+var selected_formation_id: String = ""
+var events: Array = []
+func _input(event: InputEvent) -> void:
+	if not (event is InputEventMouseButton):
+		return
+	var mb := event as InputEventMouseButton
+	if mb.button_index != MOUSE_BUTTON_LEFT:
+		return
+	events.append({"pressed": mb.pressed, "pos": mb.position})
+	if mb.pressed:
+		selected_formation_id = "GER_formation_0"
+		selected_province_id = 710173
+"""
+	if spy_scr.reload() != OK:
+		_fail("P1a Got it consume: spy script did not compile")
+		return
+	var spy := Node.new()
+	spy.set_script(spy_scr)
+	spy.name = "MapRenderer"
+	root.add_child(spy)
+	spy.add_to_group("map_renderer")
+	spy.set_process_input(true)
+	spy.set_process_unhandled_input(true)
+	_p1a_present_ending(guide, host, card)
+	await process_frame
+	await process_frame
+	await process_frame
+	var got := card.find_child("BtnGotIt", true, false) as Control
+	if got == null or not got.visible or got.get_global_rect().size.x < 8.0:
+		_fail("P1a Got it consume: Got it not clickable (vis=%s rect=%s)" % [
+			str(got.visible if got != null else false),
+			str(got.get_global_rect() if got != null else Rect2()),
+		])
+		spy.queue_free()
+		OS.set_environment("EOA_TUTORIAL", "")
+		return
+	var pt := got.get_global_rect().get_center()
+	var motion := InputEventMouseMotion.new()
+	motion.position = pt
+	motion.global_position = pt
+	motion.relative = Vector2(1, 0)
+	root.push_input(motion)
+	await process_frame
+	var down := InputEventMouseButton.new()
+	down.button_index = MOUSE_BUTTON_LEFT
+	down.pressed = true
+	down.position = pt
+	down.global_position = pt
+	root.push_input(down)
+	await process_frame
+	var up := InputEventMouseButton.new()
+	up.button_index = MOUSE_BUTTON_LEFT
+	up.pressed = false
+	up.position = pt
+	up.global_position = pt
+	root.push_input(up)
+	await process_frame
+	await process_frame
+	var evs: Array = spy.get("events")
+	var fid := str(spy.get("selected_formation_id"))
+	var pid := int(spy.get("selected_province_id"))
+	var card_up := card.visible
+	var got_press := bool(guide.get("_press_got_it"))
+	var am := root.get_node_or_null("AudioManager")
+	var warn_step := 0
+	var warn_just := 0
+	if am != null:
+		warn_step = int(am.call("warning_count", "tutorial_step"))
+		warn_just = int(am.call("warning_count", "justify_ready"))
+		if guide.has_method("_play_sfx"):
+			guide.call("_play_sfx", "tutorial_step")
+			guide.call("_play_sfx", "justify_ready")
+		warn_step = int(am.call("warning_count", "tutorial_step")) - warn_step
+		warn_just = int(am.call("warning_count", "justify_ready")) - warn_just
+	spy.remove_from_group("map_renderer")
+	spy.queue_free()
+	OS.set_environment("EOA_TUTORIAL", "")
+	guide.set("_force_start", false)
+	guide.call("_hide_card")
+	guide.call("_hide_prompt")
+	var consume_ok := true
+	if not evs.is_empty() or fid == "GER_formation_0" or pid == 710173:
+		_fail("P1a Got it consume: map saw click events=%s fid=%s pid=%s" % [
+			str(evs), fid, str(pid)
+		])
+		consume_ok = false
+	if card_up and not got_press:
+		_fail("P1a Got it consume: click did not reach Got it (card_up=%s press=%s)" % [
+			str(card_up), str(got_press)
+		])
+		consume_ok = false
+	if warn_step != 0 or warn_just != 0:
+		_fail("P1a Got it consume: missing sfx still warned step=%s justify=%s" % [
+			str(warn_step), str(warn_just)
+		])
+		consume_ok = false
+	if consume_ok:
+		_pass("P1a Got it click is consumed; map/selection get no event")

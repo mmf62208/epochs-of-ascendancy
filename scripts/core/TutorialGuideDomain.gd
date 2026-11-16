@@ -11,7 +11,7 @@ const DEFAULT_TARGET := "POL"
 const DEFAULT_TARGET_NAME := "Poland"
 const STEP_COUNT := 12
 const SAVE_FALLBACK_MINUTES := 15.0
-const FIGHT_WAIT_BODY := "Keep marching to the border"
+const FIGHT_WAIT_BODY := "Move a division onto the border with Poland"
 const WAR_SKIP_TITLE := "You are at war with %s"
 const QA_ENVS: PackedStringArray = [
 	"EOA_SKIP_TITLE",
@@ -361,6 +361,20 @@ static func _card_result(
 	var status := str(step.get("status", ""))
 	if state == "waiting" and status.is_empty() and not body_override.is_empty():
 		status = "Waiting for you: " + body_override.to_lower()
+	var status_color := ""
+	var status_bold := false
+	# AI attacks do not finish step 10. The card stays open and the status turns amber.
+	if state != "done" and not complete:
+		var hint: Variant = step.get("p1_hint_under_attack", {})
+		if hint is Dictionary and not (hint as Dictionary).is_empty():
+			var when := str((hint as Dictionary).get("when", "")).strip_edges()
+			if when.is_empty() or _pred(when, snapshot, {}, []):
+				var hint_status := str((hint as Dictionary).get("status", "")).strip_edges()
+				if not hint_status.is_empty():
+					status = hint_status
+				if str((hint as Dictionary).get("accent_status", "")) == "warning":
+					status_color = "#f2c94c"
+					status_bold = true
 	var keys: Array = []
 	var raw_keys: Variant = step.get("keys", [])
 	if raw_keys is Array:
@@ -400,6 +414,11 @@ static func _card_result(
 		"show_dont_show_again": bool(step.get("show_dont_show_again", false)),
 		"show_skip_step": kind == "action" or kind == "wait",
 		"complete": complete,
+		"status_color": status_color,
+		"status_bold": status_bold,
+		"p1_anchor": str(step.get("p1_anchor", "")),
+		"p1_done_hold_s": float(step.get("p1_done_hold_s", 0.0)),
+		"p1_target": step.get("p1_target", {}),
 	}
 
 
@@ -452,6 +471,8 @@ static func _pred(expr: String, snapshot: Dictionary, progress: Dictionary, done
 
 static func _atom(atom: String, snapshot: Dictionary, _progress: Dictionary, done: Array) -> bool:
 	var a := atom.strip_edges()
+	if a.begins_with("NOT "):
+		return not _atom(a.substr(4).strip_edges(), snapshot, _progress, done)
 	if a.begins_with("step_done:"):
 		return done.has(a.substr("step_done:".length()))
 	if a.begins_with("cue:"):

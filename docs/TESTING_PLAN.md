@@ -8,6 +8,17 @@
 
 ## Recommended Testing Approach
 
+### 0-p1a. ONBOARDING-P1a FIX r1 (step-12 idle card / Got it consume)
+
+Live on `aaeef1e5`: step-12 width flipped while idle; one Got it click selected Division 0. `HeadlessTutorial1Test` now asserts 120 idle frames of constant card size + Got it global position (and hug `_process` off after settle), and that a Got it click never reaches a map spy / formation. **FAIL** on `aaeef1e5` product / **PASS** on the tip (22 PASS). `_play_sfx` skips missing `tutorial_step` / `justify_ready`; AudioManager still warn-once for other keys.
+
+```bash
+XDG_DATA_HOME=$(mktemp -d) flock -n "$HOME/.eoa_godot.lock" \
+  tools/run_godot.sh --headless --path . -s res://scripts/core/HeadlessTutorial1Test.gd
+```
+
+On `--quick` after `headless_search_hotkey1`. XFAIL SAVELOAD-DESIGN-1 on orders-perf1 case g is acceptable.
+
 ### 0. INK-TOOLTIPS-P0 theme / clamp / 1280 resources
 
 Play MIXED on `05bf7fb1`: engine tooltips near the bottom of 1280×800 were cut off; Search painted over Steel / Aluminum / Rubber and clipped Fuel. `RetrowaveTheme.clamp_tooltip_rect` flips or clamps every dressed tooltip inside the viewport. FIX #2 keeps five resource chips hoverable at 1280 (Steel, Aluminum, Energy, Rubber, Fuel), each with its own B2 tooltip, and Search in-flow. `HeadlessInkTooltips0Test` asserts each chip is visible, non-zero, fully inside the viewport and every clipping ancestor, does not overlap another chip or Search, and has a distinct tooltip. It checks 1280×800 at peace and at war, plus 1600×900 and 1920×1080. The same test fails on `93fd001b`.

@@ -12,6 +12,7 @@ signal skip_keep_pressed
 signal got_it_pressed
 signal close_pressed
 signal dont_show_again_toggled(on: bool)
+signal reflow_requested
 
 const CARD_WIDTH := 380.0
 const CARD_WIDTH_WAR := 400.0
@@ -45,15 +46,19 @@ var _confirm_wrap: HBoxContainer
 var _footer_right: HBoxContainer
 var _cinzel: FontFile
 var _current: Dictionary = {}
+var _hug_frames_left: int = 0
+var _locked_width: float = CARD_WIDTH
 
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	focus_mode = Control.FOCUS_NONE
+	set_meta("blocks_edge_pan", true)
 	custom_minimum_size = Vector2(CARD_WIDTH, 0)
 	_load_font()
 	_build()
 	visible = false
+	set_process(false)
 
 
 func present(model: Dictionary) -> void:
@@ -67,7 +72,12 @@ func present(model: Dictionary) -> void:
 	_body.text = str(model.get("body", ""))
 	_status.text = str(model.get("status_text", ""))
 	_status.visible = not _status.text.is_empty() and str(model.get("state", "")) != "done"
-	_status.add_theme_color_override("font_color", accent)
+	var status_col := accent
+	var status_hex := str(model.get("status_color", "")).strip_edges()
+	if not status_hex.is_empty():
+		status_col = Color(status_hex)
+	_status.add_theme_color_override("font_color", status_col)
+	_apply_status_weight(bool(model.get("status_bold", false)))
 	_fill_dots(n, accent)
 	_fill_keys(model.get("keys", []), accent)
 	var prog: Variant = model.get("progress", {})
@@ -100,6 +110,10 @@ func present(model: Dictionary) -> void:
 		_progress_wrap.visible = false
 	visible = bool(model.get("visible", true))
 	_fit_width(accent)
+	_hug_frames_left = 3
+	set_process(visible)
+	_hug_content()
+	call_deferred("_reflow")
 
 
 func set_dont_show_again(on: bool) -> void:
@@ -203,7 +217,11 @@ func _build() -> void:
 	_dont.text = "Don't show the guide again"
 	_dont.focus_mode = Control.FOCUS_NONE
 	_dont.mouse_filter = Control.MOUSE_FILTER_STOP
-	_dont.add_theme_color_override("font_color", RetrowaveTheme.TEXT_DIM)
+	_dont.add_theme_color_override("font_color", RetrowaveTheme.TEXT_PRIMARY)
+	_dont.add_theme_color_override("font_hover_color", RetrowaveTheme.CYAN)
+	_dont.add_theme_color_override("font_pressed_color", RetrowaveTheme.CYAN)
+	_dont.add_theme_constant_override("h_separation", 8)
+	_style_dont_show_box()
 	_dont.toggled.connect(_on_dont)
 	col.add_child(_dont)
 
@@ -290,6 +308,59 @@ func _style_focusless(btn: Button) -> void:
 	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 
 
+func _gui_input(event: InputEvent) -> void:
+	if not visible:
+		return
+	if event is InputEventMouseButton or event is InputEventMouseMotion:
+		accept_event()
+		var vp := get_viewport()
+		if vp != null:
+			vp.set_input_as_handled()
+
+
+func _style_dont_show_box() -> void:
+	if _dont == null:
+		return
+	var unchecked := _make_check_icon(false)
+	var checked := _make_check_icon(true)
+	for key in [
+		"unchecked", "unchecked_disabled", "unchecked_hover", "unchecked_pressed",
+		"checked", "checked_disabled", "checked_hover", "checked_pressed",
+	]:
+		_dont.add_theme_icon_override(str(key), checked if str(key).begins_with("checked") else unchecked)
+
+
+func _make_check_icon(on: bool) -> Texture2D:
+	var img := Image.create(16, 16, false, Image.FORMAT_RGBA8)
+	var bg := Color("#0f1528")
+	var border := RetrowaveTheme.CYAN
+	var fill := RetrowaveTheme.CYAN
+	img.fill(Color(0, 0, 0, 0))
+	var x := 0
+	while x < 16:
+		var y := 0
+		while y < 16:
+			var edge := x == 0 or y == 0 or x == 15 or y == 15
+			if edge:
+				img.set_pixel(x, y, border)
+			elif x >= 2 and y >= 2 and x <= 13 and y <= 13:
+				img.set_pixel(x, y, bg)
+			y += 1
+		x += 1
+	if on:
+		var i := 4
+		while i <= 7:
+			img.set_pixel(i, 8 + (7 - i), fill)
+			img.set_pixel(i, 9 + (7 - i), fill)
+			i += 1
+		i = 7
+		while i <= 12:
+			img.set_pixel(i, i - 2, fill)
+			img.set_pixel(i, i - 1, fill)
+			i += 1
+	return ImageTexture.create_from_image(img)
+
+
 func _arm_swallow() -> void:
 	_CloseReleaseSwallow.arm_from(self)
 
@@ -300,6 +371,9 @@ func _fill_dots(n: int, accent: Color) -> void:
 	for i in TutorialGuideDomain.STEP_COUNT:
 		var d := ColorRect.new()
 		d.custom_minimum_size = Vector2(6, 6)
+		d.size = Vector2(6, 6)
+		d.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		d.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		d.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		if i < n:
 			d.color = accent
@@ -354,6 +428,73 @@ func _apply_frame(accent: Color) -> void:
 		_progress_bar.add_theme_stylebox_override("fill", fill)
 
 
+func _process(_delta: float) -> void:
+	# One-shot wrap settle after present(). Idle hug was an autowrap fit loop:
+	# size=(w,0) + reset_size() flipped the wrap min-width every frame.
+	if not visible or _hug_frames_left <= 0:
+		set_process(false)
+		return
+	var before := size
+	_hug_content()
+	_hug_frames_left -= 1
+	if not size.is_equal_approx(before):
+		reflow_requested.emit()
+	if _hug_frames_left <= 0:
+		set_process(false)
+
+
+func _hug_content() -> void:
+	var w := _locked_width
+	if w < 8.0:
+		w = custom_minimum_size.x
+	if w < 8.0:
+		w = CARD_WIDTH
+	custom_minimum_size = Vector2(w, 0)
+	update_minimum_size()
+	var fitted := get_combined_minimum_size()
+	var h := fitted.y
+	var limit := _height_limit()
+	if h > limit - 1.0:
+		h = maxf(1.0, limit - 1.0)
+	if h < 1.0:
+		h = 1.0
+	# Width stays at the fitted slot. Never zero the size: that retriggers
+	# Label autowrap min-width and makes Got it slide.
+	size = Vector2(w, h)
+
+
+func _height_limit() -> float:
+	# GuideHost is the full-screen parent, so 60% of the host is 60% of the viewport.
+	var parent := get_parent() as Control
+	var h := 0.0
+	if parent != null:
+		h = parent.size.y
+	if h < 32.0:
+		var vp := get_viewport()
+		if vp != null:
+			h = vp.get_visible_rect().size.y
+	if h < 32.0:
+		h = 800.0
+	return h * 0.6
+
+
+func _reflow() -> void:
+	_hug_content()
+	reflow_requested.emit()
+
+
+func _apply_status_weight(bold: bool) -> void:
+	if _status == null:
+		return
+	if not bold:
+		_status.remove_theme_font_override("font")
+		return
+	var fv := FontVariation.new()
+	fv.base_font = ThemeDB.fallback_font
+	fv.variation_opentype = {"wght": 700}
+	_status.add_theme_font_override("font", fv)
+
+
 func _fit_width(_accent: Color) -> void:
 	var vp := get_viewport()
 	var w := CARD_WIDTH
@@ -361,8 +502,15 @@ func _fit_width(_accent: Color) -> void:
 		w = CARD_WIDTH_NARROW
 	elif str(_current.get("accent", "")) == "magenta":
 		w = CARD_WIDTH_WAR
-	custom_minimum_size.x = w
-	_body.custom_minimum_size.x = maxf(200.0, w - 32.0)
+	# Final card: checkbox + Skip tutorial + Got it need a stable floor.
+	if str(_current.get("kind", "")) == "final":
+		w = maxf(w, CARD_WIDTH)
+	_locked_width = w
+	custom_minimum_size = Vector2(w, 0)
+	var wrap_w := maxf(200.0, w - 32.0)
+	_body.custom_minimum_size.x = wrap_w
+	_title.custom_minimum_size.x = wrap_w
+	_status.custom_minimum_size.x = wrap_w
 
 
 func _accent_color(name: String) -> Color:
