@@ -8,6 +8,17 @@
 
 ## Recommended Testing Approach
 
+### 0-SIM-1110-A defender stack / threatened-sector / ramp
+
+AI Poland must not overrun AI Germany's 1936 Silesian border in the first two weeks. Guard `HeadlessSim1110aDefenceTest`: (a) 3-unit hex opens `def_n=3`; (b) a retreating unit joins an open defence; (c) AI GER vs AI POL by war day 5 Gliwicki `711058` and Bytomski `711057` each hold ≥2 garrisons from non-enemy-touching stations (THREAT_RATIO 1.2: POL masses Opolski first, so Gliwicki is ratio-2.0 on day 5 under 2 redeploys/day); (d) GER French border keeps ≥9 garrisons; (e) human GER: no cover/reinforce station changes except capture retreats over 30 days; (f) AI GER 0 new Polish-land captures before war day 21 and ≤3 by day 60; (g) 0 SCRIPT ERROR.
+
+```bash
+tools/run_godot.sh --headless --path . \
+  -s res://scripts/core/HeadlessSim1110aDefenceTest.gd
+```
+
+On `--quick` after HeadlessAiWar1Test. Prove FAIL on `26f9eb8f` (no helpers) / PASS on the tip. Identity/twin md5s are expected to change; do not re-baseline without OP OK.
+
 ### 0. INK-TOOLTIPS-P0 theme / clamp / 1280 resources
 
 Play MIXED on `05bf7fb1`: engine tooltips near the bottom of 1280×800 were cut off; Search painted over Steel / Aluminum / Rubber and clipped Fuel. `RetrowaveTheme.clamp_tooltip_rect` flips or clamps every dressed tooltip inside the viewport. FIX #2 keeps five resource chips hoverable at 1280 (Steel, Aluminum, Energy, Rubber, Fuel), each with its own B2 tooltip, and Search in-flow. `HeadlessInkTooltips0Test` asserts each chip is visible, non-zero, fully inside the viewport and every clipping ancestor, does not overlap another chip or Search, and has a distinct tooltip. It checks 1280×800 at peace and at war, plus 1600×900 and 1920×1080. The same test fails on `93fd001b`.
