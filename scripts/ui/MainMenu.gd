@@ -251,6 +251,7 @@ func _ready() -> void:
 	_acquire_clock_lock()
 	_set_status("Paused · Save / Load slots on the right · ESC or Close to resume")
 	_refresh_save_list()
+	_connect_save_list_changed()
 	set_process_input(true)
 	set_process_unhandled_input(true)
 	_note_music("menu")
@@ -833,6 +834,112 @@ func _add_audio_settings(parent: VBoxContainer) -> void:
 	block.add_child(_audio_slider("SFX", "SfxVolume", _audio_db(audio, "get_sfx_db", 0.0), "set_sfx_db"))
 	block.add_child(_audio_percent_slider("Music", "MusicVolume", _audio_music_percent(audio)))
 	_add_first_session_settings(block)
+	_add_autosave_settings(block)
+
+
+func _connect_save_list_changed() -> void:
+	var slm := _slm()
+	if slm == null or not slm.has_signal("save_list_changed"):
+		return
+	if slm.is_connected("save_list_changed", _refresh_save_list):
+		return
+	slm.connect("save_list_changed", _refresh_save_list, CONNECT_DEFERRED)
+
+
+func _add_autosave_settings(parent: VBoxContainer) -> void:
+	var hdr := Label.new()
+	hdr.name = "AutosaveSettingsHeader"
+	hdr.text = "AUTOSAVE"
+	RetrowaveTheme.style_column_header(hdr)
+	parent.add_child(hdr)
+	var slm := _slm()
+	var cadence := "monthly"
+	var idle_n := 10
+	if slm != null and slm.has_method("get_autosave_cadence"):
+		cadence = str(slm.call("get_autosave_cadence"))
+	if slm != null and slm.has_method("get_idle_minutes"):
+		idle_n = int(slm.call("get_idle_minutes"))
+	parent.add_child(_autosave_option_row(
+		"Cadence",
+		"AutosaveCadence",
+		PackedStringArray(["Off", "Monthly", "Yearly"]),
+		_cadence_index(cadence),
+		_on_autosave_cadence_selected
+	))
+	parent.add_child(_autosave_option_row(
+		"Idle pause",
+		"IdlePause",
+		PackedStringArray(["Off", "5 min", "10 min", "20 min"]),
+		_idle_index(idle_n),
+		_on_idle_minutes_selected
+	))
+	var hint := Label.new()
+	hint.text = "Idle pause writes Last played, then pauses. Dismissing the overlay leaves the clock paused."
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hint.add_theme_font_size_override("font_size", 11)
+	hint.add_theme_color_override("font_color", RetrowaveTheme.TEXT_DIM)
+	parent.add_child(hint)
+
+
+func _autosave_option_row(label_text: String, node_name: String, items: PackedStringArray, selected: int, cb: Callable) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.name = "%sRow" % node_name
+	row.custom_minimum_size = Vector2(0, 32)
+	var lab := Label.new()
+	lab.text = label_text
+	lab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	lab.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	RetrowaveTheme.style_body_label(lab)
+	row.add_child(lab)
+	var opt := OptionButton.new()
+	opt.name = node_name
+	opt.focus_mode = Control.FOCUS_ALL
+	for item in items:
+		opt.add_item(item)
+	opt.select(clampi(selected, 0, items.size() - 1))
+	opt.item_selected.connect(cb)
+	row.add_child(opt)
+	return row
+
+
+func _cadence_index(cadence: String) -> int:
+	match str(cadence).strip_edges().to_lower():
+		"off":
+			return 0
+		"yearly":
+			return 2
+		_:
+			return 1
+
+
+func _idle_index(minutes: int) -> int:
+	match int(minutes):
+		0:
+			return 0
+		5:
+			return 1
+		20:
+			return 3
+		_:
+			return 2
+
+
+func _on_autosave_cadence_selected(idx: int) -> void:
+	var slm := _slm()
+	if slm == null or not slm.has_method("set_autosave_cadence"):
+		return
+	var values: PackedStringArray = ["off", "monthly", "yearly"]
+	var pick := clampi(idx, 0, values.size() - 1)
+	slm.call("set_autosave_cadence", values[pick])
+
+
+func _on_idle_minutes_selected(idx: int) -> void:
+	var slm := _slm()
+	if slm == null or not slm.has_method("set_idle_minutes"):
+		return
+	var values: PackedInt32Array = [0, 5, 10, 20]
+	var pick := clampi(idx, 0, values.size() - 1)
+	slm.call("set_idle_minutes", values[pick])
 
 
 func _audio_db(audio: Node, getter: String, fallback: float) -> float:
@@ -1320,6 +1427,7 @@ func _refresh_save_list() -> void:
 		return
 	# Free immediately so a rewritten autosave does not leave a stale card
 	# (queue_free keeps the old SlotCard_* in the tree until the frame ends).
+	# Callers must reach here after Apply/Save `pressed` returns (deferred notify).
 	while _save_list_vbox.get_child_count() > 0:
 		var stale: Node = _save_list_vbox.get_child(0)
 		_save_list_vbox.remove_child(stale)

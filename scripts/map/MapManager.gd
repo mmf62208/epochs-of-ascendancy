@@ -4700,6 +4700,10 @@ func war_economy_day_for_province(province_id: int) -> Dictionary:
 
 ## Precomputed fronts cache (tag -> Array of target dicts). B must never re-scan board live.
 var _live_fronts_precompute: Dictionary = {}
+## Designer-suite live catalog: composite key of design version + templates + year + factory fingerprint + completed-tech count.
+var _designer_live_catalog_key: String = ""
+var _designer_live_catalog_cache: Dictionary = {}
+var _designer_live_catalog_ready: bool = false
 
 
 ## Call once after board+ownership ready (deferred from load). Makes B O(1).
@@ -9429,13 +9433,97 @@ func apply_multi_faction_strategic_ai_product(province_id: int = 1) -> Dictionar
 ## Designer suite product live wrappers (major #10)
 ## ---------------------------------------------------------------------------
 
+func _designer_template_count() -> int:
+	if typeof(GameData) == TYPE_NIL or GameData.design_data == null:
+		return 0
+	if not ("templates" in GameData.design_data):
+		return 0
+	return int(GameData.design_data.templates.size())
+
+
+func _designer_catalog_year() -> int:
+	if typeof(DesignManager) != TYPE_NIL and DesignManager.has_method("get_current_year"):
+		return int(DesignManager.get_current_year())
+	if typeof(TimeManager) != TYPE_NIL:
+		if TimeManager.has_method("get_current_year"):
+			return int(TimeManager.get_current_year())
+		if "current_year" in TimeManager:
+			return int(TimeManager.current_year)
+	return 1936
+
+
+func _designer_completed_tech_count(country_tag: String) -> int:
+	## Readable completed-tech count so silent _grant_completed_tech_silent still invalidates.
+	if typeof(TechnologyManager) == TYPE_NIL:
+		return 0
+	var tag := country_tag.strip_edges().to_upper()
+	var completed: Dictionary = {}
+	if "country_state" in TechnologyManager:
+		var cs: Variant = TechnologyManager.country_state
+		if cs is Dictionary:
+			var st: Variant = (cs as Dictionary).get(tag, {})
+			if st is Dictionary:
+				var raw: Variant = (st as Dictionary).get("completed", {})
+				if raw is Dictionary:
+					completed = raw as Dictionary
+	return completed.size()
+
+
+func _designer_factory_fingerprint(country_tag: String) -> String:
+	if typeof(ProductionManager) == TYPE_NIL:
+		return "0"
+	if not ProductionManager.has_method("get_all_factories_for_country"):
+		return "0"
+	var factories: Variant = ProductionManager.get_all_factories_for_country(country_tag)
+	if not (factories is Array):
+		return "0"
+	var bits: PackedStringArray = PackedStringArray()
+	for factory in factories:
+		if factory == null:
+			continue
+		var fid := ""
+		if "id" in factory:
+			fid = str(factory.get("id"))
+		var cur := ""
+		if "current_production_design" in factory:
+			cur = str(factory.current_production_design)
+		bits.append("F%s:%s" % [fid, cur])
+		if "assigned_lines" in factory:
+			for line_id in factory.assigned_lines:
+				var did := ""
+				if ProductionManager.has_method("get_line"):
+					var line = ProductionManager.get_line(str(line_id))
+					if line != null and "design_id" in line:
+						did = str(line.design_id)
+				bits.append("L%s:%s" % [str(line_id), did])
+	bits.sort()
+	return "|".join(bits) if not bits.is_empty() else "0"
+
+
+func _designer_live_catalog_cache_key(country_tag: String) -> String:
+	var ver := 0
+	if typeof(DesignManager) != TYPE_NIL and DesignManager.has_method("get_designs_version"):
+		ver = int(DesignManager.get_designs_version())
+	return "%s|%d|%d|%d|%s|%d" % [
+		country_tag,
+		ver,
+		_designer_template_count(),
+		_designer_catalog_year(),
+		_designer_factory_fingerprint(country_tag),
+		_designer_completed_tech_count(country_tag),
+	]
+
+
 func _designer_live_catalog(country_tag: String = "GER") -> Dictionary:
-	var cat: Dictionary = {
-		"land": [], "naval": [], "air": [], "space": [],
-	}
 	var tag := country_tag.strip_edges().to_upper()
 	if tag.is_empty():
 		tag = "GER"
+	var cache_key := _designer_live_catalog_cache_key(tag)
+	if _designer_live_catalog_ready and cache_key == _designer_live_catalog_key:
+		return _designer_live_catalog_cache.duplicate(true)
+	var cat: Dictionary = {
+		"land": [], "naval": [], "air": [], "space": [],
+	}
 	if typeof(DesignManager) == TYPE_NIL:
 		return {}
 	var domain_map := {
@@ -9480,7 +9568,11 @@ func _designer_live_catalog(country_tag: String = "GER") -> Dictionary:
 		if cat[k] is Array and not (cat[k] as Array).is_empty():
 			any = true
 			break
-	return cat if any else {}
+	var out: Dictionary = cat if any else {}
+	_designer_live_catalog_key = cache_key
+	_designer_live_catalog_cache = out.duplicate(true)
+	_designer_live_catalog_ready = true
+	return out.duplicate(true)
 
 
 func designer_suite_product_live(province_id: int = 1) -> Dictionary:

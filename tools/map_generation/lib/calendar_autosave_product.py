@@ -1,7 +1,8 @@
-"""Calendar autosave — every N days so a 20–60d 1936 session can resume.
+"""Calendar autosave — month/year product cadence (AUTOSAVE-1).
 
-Year-boundary autosave never fires before Jan 1937. This product is the
-7-day contract; SaveLoadManager still keeps year + quit autosaves.
+Product writes rotating autosave_1..3 on game_month_advanced (default) or
+game_year_advanced. The every-7-days day-advanced cadence is retired.
+EOA_CALENDAR_AUTOSAVE=0 remains the hard killswitch for harnesses.
 """
 from __future__ import annotations
 
@@ -11,8 +12,9 @@ from typing import Any, Dict, List
 ROOT = Path(__file__).resolve().parents[3]
 SL_GD = ROOT / "scripts" / "autoload" / "SaveLoadManager.gd"
 
-INTERVAL_DAYS = 7
 KILLSWITCH = "EOA_CALENDAR_AUTOSAVE=0"
+CADENCE_DEFAULT = "monthly"
+CADENCES = ("off", "monthly", "yearly")
 
 
 def extract_gd_func_body(src: str, func_name: str) -> str:
@@ -29,71 +31,70 @@ def extract_gd_func_body(src: str, func_name: str) -> str:
     return "\n".join(out)
 
 
-def should_calendar_autosave(days_elapsed: int, interval: int = INTERVAL_DAYS) -> bool:
-    day = int(days_elapsed)
-    step = max(1, int(interval))
-    if day <= 0:
+def should_calendar_autosave(cadence: str, hook: str) -> bool:
+    """True when this TimeManager hook should queue a product autosave."""
+    c = str(cadence or "").strip().lower()
+    h = str(hook or "").strip().lower()
+    if c == "off":
         return False
-    return day % step == 0
-
-
-def next_autosave_day(days_elapsed: int, interval: int = INTERVAL_DAYS) -> int:
-    day = max(0, int(days_elapsed))
-    step = max(1, int(interval))
-    return day + (step - (day % step))
+    if c == "monthly":
+        return h == "month"
+    if c == "yearly":
+        return h == "year"
+    return False
 
 
 def build_calendar_autosave_product() -> Dict[str, Any]:
     passes: List[str] = []
     fails: List[str] = []
-    if not should_calendar_autosave(0) and not should_calendar_autosave(3):
-        passes.append("skips_early_days")
+    if not should_calendar_autosave("off", "month") and not should_calendar_autosave("off", "year"):
+        passes.append("cadence_off_quiet")
     else:
-        fails.append("skips_early_days")
-    if should_calendar_autosave(7) and should_calendar_autosave(14) and should_calendar_autosave(21):
-        passes.append("fires_every_seven")
+        fails.append("cadence_off_quiet")
+    if should_calendar_autosave("monthly", "month") and not should_calendar_autosave("monthly", "year"):
+        passes.append("cadence_monthly_month_only")
     else:
-        fails.append("fires_every_seven")
-    if not should_calendar_autosave(8) and not should_calendar_autosave(20):
-        passes.append("off_days_quiet")
+        fails.append("cadence_monthly_month_only")
+    if should_calendar_autosave("yearly", "year") and not should_calendar_autosave("yearly", "month"):
+        passes.append("cadence_yearly_year_only")
     else:
-        fails.append("off_days_quiet")
-    if next_autosave_day(0) == 7 and next_autosave_day(7) == 14:
-        passes.append("next_day_math")
-    else:
-        fails.append("next_day_math")
+        fails.append("cadence_yearly_year_only")
 
     sl = SL_GD.read_text(encoding="utf-8") if SL_GD.is_file() else ""
-    if "func _on_day_advanced_for_autosave" in sl:
-        passes.append("sl_day_hook")
-    else:
-        fails.append("sl_day_hook")
     ready = extract_gd_func_body(sl, "_ready")
-    if ready and "game_day_advanced" in ready and "_on_day_advanced_for_autosave" in ready:
-        passes.append("sl_connects_day")
+    if ready and "game_month_advanced" in ready and "_on_month_advanced_for_autosave" in ready:
+        passes.append("sl_connects_month")
     else:
-        fails.append("sl_connects_day")
-    day_fn = extract_gd_func_body(sl, "_on_day_advanced_for_autosave")
-    deferred_fn = extract_gd_func_body(sl, "_deferred_calendar_autosave")
-    # Write may be deferred off day_emit so an IX-1 spine day tick cannot freeze at 20:00.
-    write_fn = deferred_fn if deferred_fn and "save_game_detailed" in deferred_fn else day_fn
-    if day_fn and "autosave" in day_fn and "save_game_detailed" in write_fn:
-        passes.append("sl_writes_autosave")
+        fails.append("sl_connects_month")
+    if ready and "game_year_advanced" in ready and "_on_year_advanced_for_autosave" in ready:
+        passes.append("sl_connects_year")
     else:
-        fails.append("sl_writes_autosave")
-    if write_fn and "show_toast" in write_fn and "Autosaved" in write_fn:
-        passes.append("sl_toast")
+        fails.append("sl_connects_year")
+    if "func _on_month_advanced_for_autosave" in sl:
+        passes.append("sl_month_hook")
     else:
-        fails.append("sl_toast")
-    if "EOA_CALENDAR_AUTOSAVE" in sl:
+        fails.append("sl_month_hook")
+    year_fn = extract_gd_func_body(sl, "_on_year_advanced_for_autosave")
+    if year_fn and "save_game_detailed" not in year_fn and ("_queue" in year_fn or "call_deferred" in year_fn):
+        passes.append("year_hook_not_inline")
+    else:
+        fails.append("year_hook_not_inline")
+    if "pick_rotator_slot" in sl and "autosave_1" in sl and "autosave_2" in sl and "autosave_3" in sl:
+        passes.append("rotator_slots")
+    else:
+        fails.append("rotator_slots")
+    if "EOA_CALENDAR_AUTOSAVE" in sl and KILLSWITCH.split("=")[0] in sl:
         passes.append("killswitch")
     else:
         fails.append("killswitch")
-    # Year + quit still exist.
-    if "func _on_year_advanced_for_autosave" in sl and "NOTIFICATION_WM_CLOSE_REQUEST" in sl:
-        passes.append("year_and_quit_kept")
+    if "LAST_PLAYED_BADGE" in sl and 'LAST PLAYED' in sl:
+        passes.append("last_played_badge")
     else:
-        fails.append("year_and_quit_kept")
+        fails.append("last_played_badge")
+    if "signal save_list_changed" in sl:
+        passes.append("save_list_changed")
+    else:
+        fails.append("save_list_changed")
 
     ok = len(fails) == 0
     return {
@@ -101,11 +102,12 @@ def build_calendar_autosave_product() -> Dict[str, Any]:
         "status": "PASS" if ok else "FAIL",
         "pass": passes,
         "fail": fails,
-        "interval_days": INTERVAL_DAYS,
+        "cadence_default": CADENCE_DEFAULT,
+        "cadences": list(CADENCES),
         "killswitch": KILLSWITCH,
-        "summary": "calendar_autosave · %s · every %dd · pass=%d fail=%d"
-        % ("PASS" if ok else "FAIL", INTERVAL_DAYS, len(passes), len(fails)),
-        "policy": "seven_day_autosave_1936_session",
+        "summary": "calendar_autosave · %s · month/year · pass=%d fail=%d"
+        % ("PASS" if ok else "FAIL", len(passes), len(fails)),
+        "policy": "month_year_autosave_rotator",
     }
 
 
