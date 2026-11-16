@@ -6,13 +6,13 @@ ADM2), Formosa (TWN ADM2), and Pohnpei (FSM). Karafuto and Kwantung are not
 JAP-owned land provinces on this board. Two Korea rings (Ganghwa-gun area
 903942 and Ulleung-gun 903946) are already real outlines and stay as they are.
 
-113 placeholders match a gbOpen admin name. 金湖鎮 903981 stays a circle:
-its 2 px lie inside CHI 902633. The ring is that polygon,
-clipped the way GAP-ENG-1 clips: neighbours yield, frozen rings are
-subtracted, and a ring this pass writes is strictly simple. Overlap is the
-polygon intersection area, and also the pixel count. FRA ids 905203, 904598,
-903903, 905610, and 905620 are not edited. CHI, ENG, and FRA rings are not
-rewritten.
+113 placeholders match a gbOpen admin name. Kinmen 903981 is re-ringed in
+JAP-FOLLOWUPS-1 (gbOpen TWN ADM1 Kinmen; CHI 902633 is C-notched). The ring
+is that polygon, clipped the way GAP-ENG-1 clips: neighbours yield, frozen
+rings are subtracted, and a ring this pass writes is strictly simple.
+Overlap is the polygon intersection area, and also the pixel count. FRA ids
+905203, 904598, 903903, 905610, and 905620 are not edited. CHI, ENG, and
+FRA rings are not rewritten except the JAP-FOLLOWUPS-1 Kinmen notch.
 """
 from __future__ import annotations
 
@@ -40,13 +40,9 @@ POLY_OVERLAP_MAX = 1.0
 HOLE_PX_MAX = 250
 OWNER = "JAP"
 
-# 金湖鎮 (Kinmen) is a real gbOpen township, but both of its pixel centers lie
-# inside CHI 902633. A single exterior ring cannot open a hole in that
-# province, and notching CHI is out of scope. The circle stays.
-UNKNOWN_PLACEHOLDER_IDS = (903981,)
-UNKNOWN_REASONS = {
-    903981: "gbOpen 金湖鎮 is 2 px and those centers lie inside CHI 902633 CHN South; a single ring cannot open a hole there",
-}
+# Kinmen 903981 is re-ringed in JAP-FOLLOWUPS-1 from gbOpen TWN ADM1 Kinmen.
+UNKNOWN_PLACEHOLDER_IDS = ()
+UNKNOWN_REASONS = {}
 
 # Every JAP 1936 land placeholder on af2c5b06. 903942 and 903946 are already real.
 SCOPE_PLACEHOLDER_IDS = (

@@ -140,14 +140,32 @@
 
 extends Node
 
+const _AwayOverlay := preload("res://scripts/ui/AwayOverlay.gd")
+
 ## Fired after a save actually applies. Same-frame duplicate deliveries and
 ## failed reads do not emit. Defeat / victory overlays listen and dismiss.
 signal load_completed(slot_name: String)
+## Fired after a slot is written, deleted, or renamed. S1/S2/S3 listen.
+signal save_list_changed
 
 const SAVE_DIR := "user://saves/"
 const SAVE_VERSION := 2
 const SAVE_GAME_VERSION := "0.2-dev"   # Bumped for richer metadata support
 const DEFAULT_SLOT := "quicksave"
+const LAST_PLAYED_BADGE := "LAST PLAYED"
+const LAST_PLAYED_SLOT := "last_played"
+const BARE_AUTOSAVE_SLOT := "autosave"
+const ROTATOR_SLOTS: PackedStringArray = ["autosave_1", "autosave_2", "autosave_3"]
+const AUTOSAVE_CFG_PATH := "user://autosave.cfg"
+const AUTOSAVE_CFG_SECTION := "autosave"
+const CADENCE_OFF := "off"
+const CADENCE_MONTHLY := "monthly"
+const CADENCE_YEARLY := "yearly"
+const IDLE_DEFAULT_MINUTES := 10
+const LAST_PLAYED_ACTIVE_MS := 30 * 60 * 1000
+const IDLE_MOTION_PX := 2.0
+## Ironman: no mode on this tree. Do not special-case. A future ironman flag
+## can skip rotator overwrite of a locked slot.
 
 var _last_save_path: String = ""
 ## Real load applications. A same-frame second delivery of the same slot does not count.
@@ -181,16 +199,39 @@ var _calendar_autosave_queued_off_interval: bool = false
 ## in the same drain, the second waits here and runs after the first.
 var _calendar_autosave_followup_elapsed: int = -1
 var _calendar_autosave_followup_off_interval: bool = false
+var _calendar_autosave_last_slot: String = ""
+var _autosave_cadence: String = CADENCE_MONTHLY
+var _idle_minutes: int = IDLE_DEFAULT_MINUTES
+var _idle_last_input_msec: int = 0
+var _idle_clock_override_msec: int = -1
+var _idle_last_mouse: Vector2 = Vector2.INF
+var _idle_was_paused: bool = true
+var _active_play_msec: int = 0
+var _away_overlay: CanvasLayer = null
+var _away_armed: bool = false
+var _session_first_autosave_done: bool = false
+var _session_begin_seen: bool = false
+var _autosave_cfg_loaded: bool = false
 
 
 func _ready() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	set_process(true)
+	set_process_input(true)
 	_ensure_save_dir()
+	_load_autosave_settings()
+	begin_autosave_session()
+	_session_begin_seen = true
 	print("SaveLoadManager: Initialized (JSON format v%d, user://saves/)" % SAVE_VERSION)
 
-	# Year boundary + every 7 calendar days (20–60d 1936 never hits a year tick).
+	# Product cadence is month / year. Day-advanced is harness-only (test
+	# interval env or live-F5-equiv soaks). Never save inline in a TM signal.
 	if typeof(TimeManager) != TYPE_NIL:
 		if not TimeManager.game_year_advanced.is_connected(_on_year_advanced_for_autosave):
 			TimeManager.game_year_advanced.connect(_on_year_advanced_for_autosave)
+		if TimeManager.has_signal("game_month_advanced") \
+				and not TimeManager.game_month_advanced.is_connected(_on_month_advanced_for_autosave):
+			TimeManager.game_month_advanced.connect(_on_month_advanced_for_autosave)
 		if TimeManager.has_signal("game_day_advanced") \
 				and not TimeManager.game_day_advanced.is_connected(_on_day_advanced_for_autosave):
 			TimeManager.game_day_advanced.connect(_on_day_advanced_for_autosave)
@@ -201,6 +242,10 @@ func _on_day_advanced_for_autosave(_year: int = 0, _month: int = 0, _day: int = 
 		return
 	if typeof(TimeManager) != TYPE_NIL and bool(TimeManager.get("_living_playtest_clock")):
 		# Compact 20d Maginot clock: save_game_detailed every 7d hung the -s harness.
+		return
+	# Product cadence is month/year only. Keep the 7-day path for harnesses
+	# (EOA_CALENDAR_AUTOSAVE_TEST_INTERVAL or TimeManager._live_f5_equiv_clock).
+	if not _harness_day_interval_enabled():
 		return
 	# Live editor/export Play used to return here. The old gather dumped the
 	# hierarchy and OOMed (~10 GB RSS) at day +5/+6. SAVE-FULL-1 omits that
@@ -281,10 +326,15 @@ func settle_deferred_calendar_autosave() -> void:
 	_deferred_calendar_autosave(_calendar_autosave_queued_elapsed)
 
 
-## File on disk after the day-7 gather. hier_keys 0 is the empty lean blob.
+## File on disk after the last calendar gather. hier_keys 0 is the empty lean blob.
 ## -1 means the key is absent. A positive count is the hierarchy dump.
 func calendar_autosave_file_report() -> Dictionary:
-	var path := get_save_path_global("autosave")
+	var slot := _calendar_autosave_last_slot
+	if slot.is_empty():
+		slot = str(ROTATOR_SLOTS[0])
+		if not FileAccess.file_exists(get_save_path(slot)) and FileAccess.file_exists(get_save_path(BARE_AUTOSAVE_SLOT)):
+			slot = BARE_AUTOSAVE_SLOT
+	var path := get_save_path_global(slot)
 	var nbytes := 0
 	var hier := -1
 	var parsed_ok := false
@@ -363,7 +413,7 @@ func _deferred_calendar_autosave(elapsed: int) -> void:
 	var rss_before := _vm_status_kb("VmRSS")
 	var hwm_before := _vm_status_kb("VmHWM")
 	var t0 := Time.get_ticks_usec()
-	var res := save_game_detailed("autosave")
+	var res := save_game_detailed(pick_rotator_slot())
 	var save_ms := float(Time.get_ticks_usec() - t0) / 1000.0
 	_calendar_autosave_last_ms = save_ms
 	_calendar_autosave_last_json_bytes = int(res.get("bytes", -1))
@@ -372,8 +422,10 @@ func _deferred_calendar_autosave(elapsed: int) -> void:
 	var rss_after := _vm_status_kb("VmRSS")
 	var hwm_after := _vm_status_kb("VmHWM")
 	if res.get("ok", false):
+		_calendar_autosave_last_slot = str(res.get("slot", ""))
+		_note_session_lock_after_rotator(_calendar_autosave_last_slot)
 		var toast_line := "Autosaved · day %d" % elapsed
-		print("SaveLoadManager: Calendar autosave day=%d -> autosave.json" % elapsed)
+		print("SaveLoadManager: Calendar autosave day=%d -> %s.json" % [elapsed, _calendar_autosave_last_slot])
 		print("SaveLoadManager: %s" % toast_line)
 		print(
 			"SAVEFULL1FIX4_METRIC ms=%.1f bytes=%d rss_before=%d rss_mid=%d rss_after=%d hwm_before=%d hwm_mid=%d hwm_after=%d lean_day=%s lean_gather=%s rearmed=%s"
@@ -448,46 +500,28 @@ func _chain_calendar_autosave_followup() -> void:
 	_queue_deferred_calendar_autosave(elapsed, off)
 
 
+func _on_month_advanced_for_autosave(year: int, month: int) -> void:
+	if not _product_calendar_autosave_allowed():
+		return
+	if _autosave_cadence != CADENCE_MONTHLY:
+		return
+	_queue_product_calendar_autosave(year, month, 1)
+
+
 func _on_year_advanced_for_autosave(year: int) -> void:
-	# Autosave to a fixed slot; keeps only the latest autosave for simplicity.
-	# Headless (not the live path) still writes immediately.
-	# Live F5 used to return here, so a session that crossed into 1937 never
-	# wrote. 1936 is not a leap year: 1937-01-01 is elapsed 365, and 365 % 7
-	# is 1, so the day-7 hook does not write that morning. Queue the same
-	# deferred lean gather as day 7. If that elapsed day already gathered, or
-	# is already queued, do not gather again. Quit stays on _skip_quit_autosave.
+	# Always call_deferred. The old headless path wrote inline inside this
+	# TimeManager signal; AUTOSAVE-1 never does that on the product path.
 	if OS.get_environment("EOA_CALENDAR_AUTOSAVE").strip_edges() == "0":
 		return
 	if typeof(TimeManager) != TYPE_NIL and bool(TimeManager.get("_living_playtest_clock")):
 		return
-	if not _should_skip_live_f5_calendar_autosave():
-		var res := save_game_detailed("autosave")
-		if res.get("ok", false):
-			print("SaveLoadManager: Autosaved on year change -> autosave.json")
-		else:
-			push_warning("SaveLoadManager: Autosave failed: %s" % res.get("error", "unknown"))
-			if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
-				LeaderEventUI.show_toast("Autosave failed", 2.0, true)
+	if _campaign_clock_is_locked() or _living_title_is_open():
 		return
-	var elapsed := _elapsed_for_emitted_calendar(year, 1, 1)
-	if elapsed <= 0 and typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("get_total_days_elapsed"):
-		elapsed = int(TimeManager.get_total_days_elapsed())
-	if elapsed <= 0:
+	# Monthly already queued from game_month_advanced on the same Jan 1 emit.
+	if _autosave_cadence != CADENCE_YEARLY:
 		return
-	# A rewound clock is a new timeline. Elapsed 7 gathered before the rewind
-	# must not suppress a later year morning, and must not suppress day 7.
-	if _calendar_autosave_gathered_elapsed >= 0 and elapsed < _calendar_autosave_gathered_elapsed:
-		_calendar_autosave_gathered_elapsed = -1
-	if elapsed == _calendar_autosave_gathered_elapsed:
-		return
-	if _calendar_autosave_pending and _calendar_autosave_queued_elapsed == elapsed:
-		return
-	_calendar_autosave_lean_live = true
-	if _calendar_autosave_pending:
-		_calendar_autosave_followup_elapsed = elapsed
-		_calendar_autosave_followup_off_interval = true
-		return
-	_queue_deferred_calendar_autosave(elapsed, true)
+	_queue_product_calendar_autosave(year, 1, 1)
+
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST or what == NOTIFICATION_EXIT_TREE:
@@ -499,7 +533,7 @@ func _notification(what: int) -> void:
 				return
 			var res := save_game_detailed("autosave")
 			if res.get("ok", false):
-				print("SaveLoadManager: Autosaved on exit/quit -> autosave.json")
+				print("SaveLoadManager: Autosaved on exit/quit -> %s.json" % str(res.get("slot", "autosave")))
 			else:
 				push_warning("SaveLoadManager: Quit autosave failed: %s" % res.get("error", "unknown"))
 				# No toast on shutdown to avoid UI issues
@@ -517,6 +551,445 @@ func _skip_quit_autosave() -> bool:
 	if _should_skip_live_f5_calendar_autosave():
 		return true
 	return false
+
+
+func _harness_day_interval_enabled() -> bool:
+	var env := OS.get_environment("EOA_CALENDAR_AUTOSAVE_TEST_INTERVAL").strip_edges()
+	if not env.is_empty() and env != "0":
+		return true
+	if typeof(TimeManager) != TYPE_NIL and bool(TimeManager.get("_live_f5_equiv_clock")):
+		return true
+	return false
+
+
+func _product_calendar_autosave_allowed() -> bool:
+	if OS.get_environment("EOA_CALENDAR_AUTOSAVE").strip_edges() == "0":
+		return false
+	if typeof(TimeManager) != TYPE_NIL and bool(TimeManager.get("_living_playtest_clock")):
+		return false
+	if _campaign_clock_is_locked() or _living_title_is_open():
+		return false
+	if _autosave_cadence == CADENCE_OFF:
+		return false
+	return true
+
+
+func _queue_product_calendar_autosave(year: int, month: int, day: int) -> void:
+	var elapsed := _elapsed_for_emitted_calendar(year, month, day)
+	if elapsed <= 0 and typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("get_total_days_elapsed"):
+		elapsed = int(TimeManager.get_total_days_elapsed())
+	if elapsed <= 0:
+		return
+	if _calendar_autosave_gathered_elapsed >= 0 and elapsed < _calendar_autosave_gathered_elapsed:
+		_calendar_autosave_gathered_elapsed = -1
+	if elapsed == _calendar_autosave_gathered_elapsed:
+		return
+	if _calendar_autosave_pending and _calendar_autosave_queued_elapsed == elapsed:
+		return
+	_calendar_autosave_lean_live = _should_skip_live_f5_calendar_autosave()
+	if _calendar_autosave_pending:
+		_calendar_autosave_followup_elapsed = elapsed
+		_calendar_autosave_followup_off_interval = true
+		return
+	_queue_deferred_calendar_autosave(elapsed, true)
+
+
+func _campaign_clock_is_locked() -> bool:
+	if typeof(TimeManager) == TYPE_NIL:
+		return false
+	if TimeManager.has_method("_campaign_clock_locked"):
+		return bool(TimeManager.call("_campaign_clock_locked"))
+	return false
+
+
+func _living_title_is_open() -> bool:
+	var tree := Engine.get_main_loop() as SceneTree
+	if tree == null or tree.root == null:
+		return false
+	for n in tree.root.get_children():
+		if n != null and is_instance_valid(n) and str(n.name).begins_with("LivingTitleBoot"):
+			if n.has_method("get") and bool(n.get("_closed")):
+				continue
+			return true
+	return false
+
+
+func _living_title_has_closed() -> bool:
+	if typeof(TimeManager) == TYPE_NIL:
+		return false
+	if TimeManager.has_method("living_title_has_closed"):
+		return bool(TimeManager.living_title_has_closed())
+	return false
+
+
+func begin_autosave_session() -> void:
+	_session_first_autosave_done = false
+	_active_play_msec = 0
+	_idle_last_input_msec = _idle_now_msec()
+	_clear_session_locks_on_disk()
+
+
+func _clear_session_locks_on_disk() -> void:
+	for slot in ROTATOR_SLOTS:
+		_set_slot_session_locked(slot, false)
+
+
+func _set_slot_session_locked(slot: String, locked: bool) -> void:
+	var path := get_save_path(slot)
+	if not FileAccess.file_exists(path):
+		return
+	var inspected := _inspect_save_file(path)
+	if not bool(inspected.get("readable", false)):
+		return
+	var f := FileAccess.open(path, FileAccess.READ)
+	if f == null:
+		return
+	var parsed: Variant = JSON.parse_string(f.get_as_text())
+	f.close()
+	if typeof(parsed) != TYPE_DICTIONARY:
+		return
+	var data: Dictionary = parsed
+	if typeof(data.get("metadata", null)) != TYPE_DICTIONARY:
+		data["metadata"] = {}
+	var meta: Dictionary = data["metadata"]
+	if bool(meta.get("session_locked", false)) == locked:
+		return
+	meta["session_locked"] = locked
+	data["metadata"] = meta
+	var out := FileAccess.open(path, FileAccess.WRITE)
+	if out == null:
+		return
+	out.store_string(JSON.stringify(data, ""))
+	out.close()
+
+
+func slot_session_locked(slot: String) -> bool:
+	if not FileAccess.file_exists(get_save_path(slot)):
+		return false
+	var meta: Dictionary = _peek_metadata(get_save_path(slot))
+	return bool(meta.get("session_locked", false))
+
+
+func _note_session_lock_after_rotator(slot: String) -> void:
+	var name := _sanitize_slot(slot)
+	if not ROTATOR_SLOTS.has(name):
+		return
+	if _session_first_autosave_done:
+		return
+	_set_slot_session_locked(name, true)
+	_session_first_autosave_done = true
+	_notify_save_list_refresh()
+
+
+func _migrate_bare_autosave_if_needed() -> void:
+	var bare := get_save_path(BARE_AUTOSAVE_SLOT)
+	var dest := get_save_path(str(ROTATOR_SLOTS[0]))
+	if not FileAccess.file_exists(bare):
+		return
+	if FileAccess.file_exists(dest):
+		return
+	var abs_bare := get_save_path_global(BARE_AUTOSAVE_SLOT)
+	var abs_dest := get_save_path_global(str(ROTATOR_SLOTS[0]))
+	var err := DirAccess.copy_absolute(abs_bare, abs_dest)
+	if err != OK:
+		var text := FileAccess.get_file_as_string(bare)
+		var f := FileAccess.open(dest, FileAccess.WRITE)
+		if f == null:
+			push_warning("SaveLoadManager: could not migrate autosave.json (err %d)" % err)
+			return
+		f.store_string(text)
+		f.close()
+	DirAccess.remove_absolute(abs_bare)
+	print("SaveLoadManager: migrated autosave.json -> autosave_1.json")
+
+
+func _slot_age_unix(slot: String) -> float:
+	var path := get_save_path(slot)
+	if not FileAccess.file_exists(path):
+		return -1.0
+	var meta: Dictionary = _peek_metadata(path)
+	var unix := float(meta.get("timestamp_unix", -1))
+	if unix >= 1.0:
+		return unix
+	var abs_path := get_save_path_global(slot)
+	if FileAccess.file_exists(abs_path):
+		return float(FileAccess.get_modified_time(abs_path))
+	return 0.0
+
+
+func pick_rotator_slot() -> String:
+	_migrate_bare_autosave_if_needed()
+	var unlocked: Array[String] = []
+	for slot in ROTATOR_SLOTS:
+		if slot_session_locked(slot):
+			continue
+		unlocked.append(slot)
+	var pool: Array[String] = unlocked
+	if pool.is_empty():
+		push_warning("SaveLoadManager: all rotator slots session-locked; falling back to oldest")
+		for slot2 in ROTATOR_SLOTS:
+			pool.append(slot2)
+	var best := str(pool[0])
+	var best_age := INF
+	for slot3 in pool:
+		if str(slot3) == LAST_PLAYED_SLOT:
+			continue
+		var age := _slot_age_unix(slot3)
+		if age < best_age:
+			best_age = age
+			best = str(slot3)
+	return best
+
+
+func _newest_rotator_occupied() -> String:
+	var best := ""
+	var best_age := -1.0
+	for slot in ROTATOR_SLOTS:
+		if not FileAccess.file_exists(get_save_path(slot)):
+			continue
+		var age := _slot_age_unix(slot)
+		if age > best_age:
+			best_age = age
+			best = slot
+	return best
+
+
+func _redirect_autosave_slot(slot_name: String) -> String:
+	var safe := _sanitize_slot(slot_name)
+	if safe == BARE_AUTOSAVE_SLOT:
+		return pick_rotator_slot()
+	return safe
+
+
+func _compact_json_slot(slot: String) -> bool:
+	var s := _sanitize_slot(slot)
+	if s == BARE_AUTOSAVE_SLOT or s == LAST_PLAYED_SLOT or s.begins_with("autosave"):
+		return true
+	return _should_skip_live_f5_calendar_autosave()
+
+
+func get_autosave_cadence() -> String:
+	_load_autosave_settings()
+	return _autosave_cadence
+
+
+func set_autosave_cadence(value: String) -> void:
+	var v := str(value).strip_edges().to_lower()
+	if v != CADENCE_OFF and v != CADENCE_MONTHLY and v != CADENCE_YEARLY:
+		v = CADENCE_MONTHLY
+	_autosave_cadence = v
+	_save_autosave_settings()
+
+
+func get_idle_minutes() -> int:
+	_load_autosave_settings()
+	return _idle_minutes
+
+
+func set_idle_minutes(value: int) -> void:
+	var n := int(value)
+	if n != 0 and n != 5 and n != 10 and n != 20:
+		n = IDLE_DEFAULT_MINUTES
+	_idle_minutes = n
+	_save_autosave_settings()
+
+
+func _load_autosave_settings() -> void:
+	if _autosave_cfg_loaded:
+		return
+	_autosave_cfg_loaded = true
+	var cf := ConfigFile.new()
+	if cf.load(AUTOSAVE_CFG_PATH) != OK:
+		return
+	var cadence := str(cf.get_value(AUTOSAVE_CFG_SECTION, "cadence", CADENCE_MONTHLY)).strip_edges().to_lower()
+	if cadence != CADENCE_OFF and cadence != CADENCE_MONTHLY and cadence != CADENCE_YEARLY:
+		cadence = CADENCE_MONTHLY
+	_autosave_cadence = cadence
+	var idle := int(cf.get_value(AUTOSAVE_CFG_SECTION, "idle_minutes", IDLE_DEFAULT_MINUTES))
+	if idle != 0 and idle != 5 and idle != 10 and idle != 20:
+		idle = IDLE_DEFAULT_MINUTES
+	_idle_minutes = idle
+
+
+func _save_autosave_settings() -> void:
+	var cf := ConfigFile.new()
+	cf.load(AUTOSAVE_CFG_PATH)
+	cf.set_value(AUTOSAVE_CFG_SECTION, "cadence", _autosave_cadence)
+	cf.set_value(AUTOSAVE_CFG_SECTION, "idle_minutes", _idle_minutes)
+	cf.save(AUTOSAVE_CFG_PATH)
+
+
+func _idle_now_msec() -> int:
+	if _idle_clock_override_msec >= 0:
+		return _idle_clock_override_msec
+	return Time.get_ticks_msec()
+
+
+func inject_idle_clock_msec(msec: int) -> void:
+	_idle_clock_override_msec = int(msec)
+
+
+func is_away_overlay_visible() -> bool:
+	return _away_armed and _away_overlay != null and is_instance_valid(_away_overlay)
+
+
+func note_qualifying_input_for_test() -> void:
+	_note_qualifying_input()
+
+
+func poll_idle_for_test() -> void:
+	_poll_idle_arm()
+
+
+func write_last_played_now(reason: String = "manual") -> Dictionary:
+	if _campaign_clock_is_locked():
+		return {"ok": false, "error": "clock locked", "reason": reason}
+	var res: Dictionary = save_game_detailed(LAST_PLAYED_SLOT)
+	if not bool(res.get("ok", false)):
+		if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
+			LeaderEventUI.show_toast("Last played save failed", 3.0, true)
+	return res
+
+
+func _note_qualifying_input() -> void:
+	var now := _idle_now_msec()
+	if _away_armed:
+		_dismiss_away_overlay()
+		_idle_last_input_msec = now
+		return
+	if _active_play_msec >= LAST_PLAYED_ACTIVE_MS and not _campaign_clock_is_locked() and not _living_title_is_open():
+		write_last_played_now("active")
+		_active_play_msec = 0
+	_idle_last_input_msec = now
+
+
+func _event_is_qualifying_input(event: InputEvent) -> bool:
+	if event == null:
+		return false
+	if event is InputEventMouseButton:
+		return true
+	if event is InputEventMouseMotion:
+		var motion := event as InputEventMouseMotion
+		if motion.relative.length() >= IDLE_MOTION_PX:
+			return true
+		if _idle_last_mouse != Vector2.INF and motion.position.distance_to(_idle_last_mouse) >= IDLE_MOTION_PX:
+			_idle_last_mouse = motion.position
+			return true
+		_idle_last_mouse = motion.position
+		return false
+	if event is InputEventKey:
+		return true
+	if event is InputEventJoypadButton:
+		return true
+	if event is InputEventJoypadMotion:
+		return absf((event as InputEventJoypadMotion).axis_value) >= 0.5
+	if event is InputEventPanGesture or event is InputEventMagnifyGesture:
+		return true
+	return false
+
+
+func _input(event: InputEvent) -> void:
+	if _event_is_qualifying_input(event):
+		_note_qualifying_input()
+
+
+func _can_idle_arm() -> bool:
+	if _idle_minutes <= 0:
+		return false
+	if _away_armed:
+		return false
+	if _campaign_clock_is_locked() or _living_title_is_open():
+		return false
+	if typeof(TimeManager) == TYPE_NIL:
+		return false
+	if TimeManager.is_paused():
+		return false
+	return true
+
+
+func _poll_idle_arm() -> void:
+	if typeof(TimeManager) != TYPE_NIL:
+		var paused := bool(TimeManager.is_paused())
+		if _idle_was_paused and not paused:
+			_idle_last_input_msec = _idle_now_msec()
+		if not paused and not _away_armed and not _living_title_is_open() and not _campaign_clock_is_locked():
+			# Accumulate active play between process ticks using the injected clock.
+			pass
+		_idle_was_paused = paused
+	if not _can_idle_arm():
+		return
+	var now := _idle_now_msec()
+	if _idle_last_input_msec <= 0:
+		_idle_last_input_msec = now
+		return
+	var limit_ms := _idle_minutes * 60 * 1000
+	if now - _idle_last_input_msec >= limit_ms:
+		_trigger_idle_away()
+
+
+func _trigger_idle_away() -> void:
+	# Write Last played BEFORE the pause takes effect.
+	write_last_played_now("idle")
+	_apply_idle_pause_to_clock()
+	_show_away_overlay()
+	_away_armed = true
+	_idle_was_paused = true
+
+
+func _apply_idle_pause_to_clock() -> void:
+	# Pause through TopInfoBar so `_step_live_clock` does not fight TimeManager
+	# (player_owns_clock + 1x selected). Leave is_paused true after dismiss.
+	var tree := Engine.get_main_loop() as SceneTree
+	if tree != null:
+		for n in tree.get_nodes_in_group("top_info_bar"):
+			if n == null or not is_instance_valid(n):
+				continue
+			if n.has_method("pause") and not bool(n.get("is_paused")):
+				n.call("pause")
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("set_paused"):
+		TimeManager.set_paused(true)
+
+
+func _show_away_overlay() -> void:
+	if _away_overlay != null and is_instance_valid(_away_overlay):
+		return
+	var overlay: CanvasLayer = _AwayOverlay.new() as CanvasLayer
+	overlay.name = "AwayOverlay"
+	var tree := Engine.get_main_loop() as SceneTree
+	if tree != null and tree.root != null:
+		tree.root.add_child(overlay)
+	else:
+		add_child(overlay)
+	_away_overlay = overlay
+
+
+func _dismiss_away_overlay() -> void:
+	_away_armed = false
+	if _away_overlay != null and is_instance_valid(_away_overlay):
+		_away_overlay.queue_free()
+	_away_overlay = null
+	# Leave the clock paused. Player hits space / 1x to resume.
+
+
+func _process(delta: float) -> void:
+	if _living_title_is_open():
+		_session_begin_seen = false
+	elif not _session_begin_seen and _living_title_has_closed():
+		begin_autosave_session()
+		_session_begin_seen = true
+	if typeof(TimeManager) != TYPE_NIL and not TimeManager.is_paused() and not _away_armed:
+		if _idle_clock_override_msec < 0:
+			_active_play_msec += int(delta * 1000.0)
+	_poll_idle_arm()
+
+
+func set_active_play_msec_for_test(msec: int) -> void:
+	_active_play_msec = maxi(0, int(msec))
+
+
+func reload_autosave_settings() -> void:
+	_autosave_cfg_loaded = false
+	_load_autosave_settings()
 
 
 ## PLAYTEST §0b 13 on the living Maginot 20d clock: gather time+land_war+map via
@@ -643,21 +1116,31 @@ func list_saves() -> Array[Dictionary]:
 
 ## Fixed browser slots always shown in Save Manager (empty vs occupied).
 const BROWSER_SLOTS: PackedStringArray = [
-	"quicksave", "autosave", "slot1", "slot2", "slot3", "slot4", "slot5"
+	"quicksave", "last_played", "autosave_1", "autosave_2", "autosave_3",
+	"slot1", "slot2", "slot3", "slot4", "slot5"
 ]
 
 
 ## Slot kind from the name. Old saves omit metadata.save_kind and use this.
+## The last_played *slot* is protected auto (can_save false). Distinct from
+## the metadata key also named last_played (a timestamp copy in _stamp_slot_metadata).
 func slot_kind(slot_name: String) -> String:
 	var s := str(slot_name).strip_edges().to_lower()
 	if s == "quicksave" or s.begins_with("quick"):
 		return "quick"
-	if s == "autosave" or s.begins_with("autosave"):
+	if s == LAST_PLAYED_SLOT:
+		return "auto"
+	if s == BARE_AUTOSAVE_SLOT or s.begins_with("autosave"):
 		return "auto"
 	return "manual"
 
 
-func kind_badge(kind: String) -> String:
+func kind_badge(kind: String, slot_name: String = "") -> String:
+	var s := _sanitize_slot(slot_name)
+	if s == LAST_PLAYED_SLOT:
+		return LAST_PLAYED_BADGE
+	if bool(_peek_metadata(get_save_path(s)).get("session_locked", false)) and s.begins_with("autosave"):
+		return "SESSION"
 	match kind:
 		"quick":
 			return "QUICK"
@@ -856,6 +1339,12 @@ func _notify_top_bar_speed_resync() -> void:
 
 
 func _notify_save_list_refresh() -> void:
+	# Defer so Apply/Save `pressed` can return before any listener free()s the button.
+	call_deferred("_emit_save_list_changed")
+
+
+func _emit_save_list_changed() -> void:
+	save_list_changed.emit()
 	var tree := Engine.get_main_loop() as SceneTree
 	if tree == null or tree.root == null:
 		return
@@ -942,14 +1431,18 @@ func _format_slot_ui_row(slot: String, occupied: bool, metadata: Variant, unread
 		when_line = "Save unreadable"
 	elif occupied:
 		status = "occupied"
-		var bits: PackedStringArray = [name]
-		var scenario := str(meta.get("scenario_id", "")).strip_edges()
-		if not scenario.is_empty():
-			bits.append(scenario)
-		if not player.is_empty():
-			bits.append(player)
-		if not saved_short.is_empty() and saved_short != "—":
-			bits.append(saved_short)
+		var title := name
+		if name == LAST_PLAYED_SLOT:
+			title = "Last played"
+		elif name.begins_with("autosave"):
+			title = "Session" if bool(meta.get("session_locked", false)) else "Autosave"
+		var bits: PackedStringArray = [title]
+		if game_date_label != "—":
+			bits.append(game_date_label)
+		if nation_line != "—" and not nation_line.is_empty():
+			bits.append(nation_line)
+		if saved_short != "—" and not saved_short.is_empty():
+			bits.append("saved %s" % saved_short)
 		label = " · ".join(bits)
 		when_line = "%s · Saved %s" % [game_date_label, saved_short]
 	else:
@@ -967,7 +1460,7 @@ func _format_slot_ui_row(slot: String, occupied: bool, metadata: Variant, unread
 		"api_save": "save_game_detailed",
 		"api_load": "load_game_detailed",
 		"kind": kind,
-		"kind_badge": kind_badge(kind),
+		"kind_badge": kind_badge(kind, name),
 		"nation_line": nation_line,
 		"game_date_label": game_date_label,
 		"when_line": when_line,
@@ -979,18 +1472,198 @@ func _peek_metadata(path: String) -> Dictionary:
 	return _inspect_save_file(path).get("metadata", {}) as Dictionary
 
 
-func _inspect_save_file(path: String) -> Dictionary:
-	if not FileAccess.file_exists(path):
-		return {"readable": false, "metadata": {}, "error": "missing"}
-	var f := FileAccess.open(path, FileAccess.READ)
-	if f == null:
-		return {"readable": false, "metadata": {}, "error": "cannot open"}
-	var text := f.get_as_text()
-	f.close()
-	var parsed: Variant = JSON.parse_string(text)
-	if typeof(parsed) != TYPE_DICTIONARY:
-		return {"readable": false, "metadata": {}, "error": "unreadable"}
-	var d: Dictionary = parsed
+func _json_skip_ws(text: String, i: int) -> int:
+	while i < text.length():
+		var code := text.unicode_at(i)
+		if code != 32 and code != 9 and code != 10 and code != 13:
+			break
+		i += 1
+	return i
+
+
+func _json_read_string(text: String, i: int) -> Dictionary:
+	if i >= text.length() or text.unicode_at(i) != 34:
+		return {"ok": false, "value": "", "next": i}
+	i += 1
+	var out := ""
+	var escaped := false
+	while i < text.length():
+		var ch := text[i]
+		if escaped:
+			out += ch
+			escaped = false
+			i += 1
+			continue
+		if ch == "\\":
+			escaped = true
+			i += 1
+			continue
+		if ch == "\"":
+			return {"ok": true, "value": out, "next": i + 1}
+		out += ch
+		i += 1
+	return {"ok": false, "value": "", "next": i}
+
+
+func _json_read_number(text: String, i: int) -> Dictionary:
+	var start := i
+	if i < text.length() and text[i] == "-":
+		i += 1
+	var digits := 0
+	while i < text.length():
+		var code := text.unicode_at(i)
+		if code >= 48 and code <= 57:
+			digits += 1
+			i += 1
+			continue
+		if text[i] == "." or text[i] == "e" or text[i] == "E" or text[i] == "+" or text[i] == "-":
+			i += 1
+			continue
+		break
+	if digits <= 0:
+		return {"ok": false, "value": 0, "next": start}
+	return {"ok": true, "value": int(text.substr(start, i - start)), "next": i}
+
+
+func _json_skip_string(text: String, i: int) -> Dictionary:
+	## Skip a JSON string without building it. `_json_read_string` concatenates
+	## per character; a ~2.6 MB pad value is minutes of main-thread hang.
+	if i >= text.length() or text.unicode_at(i) != 34:
+		return {"ok": false, "next": i}
+	i += 1
+	var escaped := false
+	while i < text.length():
+		var ch := text[i]
+		if escaped:
+			escaped = false
+			i += 1
+			continue
+		if ch == "\\":
+			escaped = true
+			i += 1
+			continue
+		if ch == "\"":
+			return {"ok": true, "next": i + 1}
+		i += 1
+	return {"ok": false, "next": i}
+
+
+func _json_skip_value(text: String, i: int) -> Dictionary:
+	i = _json_skip_ws(text, i)
+	if i >= text.length():
+		return {"ok": false, "next": i}
+	var ch := text[i]
+	if ch == "\"":
+		var s: Dictionary = _json_skip_string(text, i)
+		return {"ok": bool(s.get("ok", false)), "next": int(s.get("next", i))}
+	if ch == "{" or ch == "[":
+		var depth := 1
+		var in_string := false
+		var escaped := false
+		i += 1
+		while i < text.length() and depth > 0:
+			var c := text[i]
+			if in_string:
+				if escaped:
+					escaped = false
+				elif c == "\\":
+					escaped = true
+				elif c == "\"":
+					in_string = false
+			else:
+				if c == "\"":
+					in_string = true
+				elif c == "{" or c == "[":
+					depth += 1
+				elif c == "}" or c == "]":
+					depth -= 1
+			i += 1
+		return {"ok": depth == 0, "next": i}
+	if text.substr(i, 4) == "true":
+		return {"ok": true, "next": i + 4}
+	if text.substr(i, 5) == "false":
+		return {"ok": true, "next": i + 5}
+	if text.substr(i, 4) == "null":
+		return {"ok": true, "next": i + 4}
+	var n: Dictionary = _json_read_number(text, i)
+	return {"ok": bool(n.get("ok", false)), "next": int(n.get("next", i))}
+
+
+func _json_read_object_text(text: String, i: int) -> Dictionary:
+	i = _json_skip_ws(text, i)
+	if i >= text.length() or text[i] != "{":
+		return {"ok": false, "raw": "", "next": i}
+	var start := i
+	var skipped: Dictionary = _json_skip_value(text, i)
+	if not bool(skipped.get("ok", false)):
+		return {"ok": false, "raw": "", "next": i}
+	var nxt := int(skipped.get("next", i))
+	return {"ok": true, "raw": text.substr(start, nxt - start), "next": nxt}
+
+
+func _peek_save_envelope(text: String) -> Dictionary:
+	var i := _json_skip_ws(text, 0)
+	if i >= text.length() or text[i] != "{":
+		return {}
+	i += 1
+	var save_version := -1
+	var meta: Dictionary = {}
+	var have_meta := false
+	while i < text.length():
+		i = _json_skip_ws(text, i)
+		if i >= text.length():
+			return {}
+		if text[i] == "}":
+			break
+		if text[i] != "\"":
+			return {}
+		var key_hold: Dictionary = _json_read_string(text, i)
+		if not bool(key_hold.get("ok", false)):
+			return {}
+		var key := str(key_hold.get("value", ""))
+		i = int(key_hold.get("next", i))
+		i = _json_skip_ws(text, i)
+		if i >= text.length() or text[i] != ":":
+			return {}
+		i += 1
+		i = _json_skip_ws(text, i)
+		if i >= text.length():
+			return {}
+		if key == "save_version":
+			var num_hold: Dictionary = _json_read_number(text, i)
+			if not bool(num_hold.get("ok", false)):
+				return {}
+			save_version = int(num_hold.get("value", -1))
+			i = int(num_hold.get("next", i))
+		elif key == "metadata":
+			var obj_hold: Dictionary = _json_read_object_text(text, i)
+			if not bool(obj_hold.get("ok", false)):
+				return {}
+			var raw := str(obj_hold.get("raw", ""))
+			i = int(obj_hold.get("next", i))
+			var parsed: Variant = JSON.parse_string(raw)
+			if typeof(parsed) != TYPE_DICTIONARY:
+				return {}
+			meta = (parsed as Dictionary).duplicate(true)
+			have_meta = true
+		else:
+			var skip_hold: Dictionary = _json_skip_value(text, i)
+			if not bool(skip_hold.get("ok", false)):
+				return {}
+			i = int(skip_hold.get("next", i))
+		# Metadata is enough for list/lock. Godot JSON.stringify sorts keys, so
+		# save_version can sit after a multi-MB pad; do not scan that pad.
+		if have_meta:
+			return {"complete": true, "metadata": meta, "save_version": save_version}
+		i = _json_skip_ws(text, i)
+		if i < text.length() and text[i] == ",":
+			i += 1
+	if have_meta:
+		return {"complete": true, "metadata": meta, "save_version": save_version}
+	return {}
+
+
+func _inspect_from_parsed(d: Dictionary) -> Dictionary:
 	if not _blob_looks_like_save(d):
 		return {"readable": false, "metadata": {}, "error": "unreadable"}
 	var meta: Dictionary = {}
@@ -1009,6 +1682,40 @@ func _inspect_save_file(path: String) -> Dictionary:
 	return {"readable": true, "metadata": meta, "error": ""}
 
 
+func _inspect_save_file(path: String) -> Dictionary:
+	if not FileAccess.file_exists(path):
+		return {"readable": false, "metadata": {}, "error": "missing"}
+	var f := FileAccess.open(path, FileAccess.READ)
+	if f == null:
+		return {"readable": false, "metadata": {}, "error": "cannot open"}
+	# Envelope peek only (save_version + metadata). A mtime cache of that peek
+	# made session_locked fail: _set_slot_session_locked rewrites the file in
+	# the same second, then slot_session_locked() returned the pre-write blob.
+	var head := f.get_buffer(32768).get_string_from_utf8()
+	var peeked := _peek_save_envelope(head)
+	if bool(peeked.get("complete", false)):
+		f.close()
+		return {
+			"readable": true,
+			"metadata": peeked.get("metadata", {}),
+			"error": "",
+		}
+	f.seek(0)
+	var text := f.get_as_text()
+	f.close()
+	peeked = _peek_save_envelope(text)
+	if bool(peeked.get("complete", false)):
+		return {
+			"readable": true,
+			"metadata": peeked.get("metadata", {}),
+			"error": "",
+		}
+	var parsed: Variant = JSON.parse_string(text)
+	if typeof(parsed) != TYPE_DICTIONARY:
+		return {"readable": false, "metadata": {}, "error": "unreadable"}
+	return _inspect_from_parsed(parsed as Dictionary)
+
+
 func _blob_looks_like_save(data: Dictionary) -> bool:
 	if not data.has("save_version"):
 		return false
@@ -1021,10 +1728,12 @@ func _unreadable_load_error() -> String:
 	return "This save is unreadable."
 
 func save_game(slot_name: String = DEFAULT_SLOT) -> bool:
-	var path := get_save_path(slot_name)
+	var path := get_save_path(_redirect_autosave_slot(slot_name))
 	var data := _gather_save_data()
 	_stamp_slot_metadata(data, slot_name)
-	var json_text := JSON.stringify(data, "\t")   # Pretty for human debugging
+	# sort_keys=false keeps save_version + metadata at the front so a 32KB
+	# envelope peek never walks the map blob.
+	var json_text := JSON.stringify(data, "\t", false)
 
 	var f := FileAccess.open(path, FileAccess.WRITE)
 	if f == null:
@@ -2084,7 +2793,7 @@ func _get_infrastructure_save_data(save_root: Dictionary) -> Dictionary:
 ## Enhanced save with better error object (for future UI).
 func save_game_detailed(slot_name: String = DEFAULT_SLOT) -> Dictionary:
 	_ensure_save_dir()
-	var safe_slot := _sanitize_slot(slot_name)
+	var safe_slot := _redirect_autosave_slot(slot_name)
 	var path := get_save_path(safe_slot)
 	var abs_path := get_save_path_global(safe_slot)
 	print("SaveLoadManager: Saving slot=%s → %s" % [safe_slot, abs_path])
@@ -2116,9 +2825,9 @@ func save_game_detailed(slot_name: String = DEFAULT_SLOT) -> Dictionary:
 
 	# Autosave / live F5: compact JSON (no tab indent). Pretty-print of the
 	# 3520-province blob doubled peak RSS on llvmpipe Play soaks.
-	var indent := "" if (safe_slot == "autosave" or _should_skip_live_f5_calendar_autosave()) else "\t"
-	var json_text := JSON.stringify(data, indent)
-	if safe_slot == "autosave":
+	var indent := "" if _compact_json_slot(safe_slot) else "\t"
+	var json_text := JSON.stringify(data, indent, false)
+	if _compact_json_slot(safe_slot):
 		# Sample while the JSON string is still live so the day-7 peak is not
 		# hidden by freeing it before the after-read.
 		_calendar_autosave_rss_mid_kb = _vm_status_kb("VmRSS")
@@ -2145,6 +2854,9 @@ func save_game_detailed(slot_name: String = DEFAULT_SLOT) -> Dictionary:
 	_last_save_path = path
 	_note_save_elapsed()
 	var bytes := json_text.length()
+	var meta_out: Dictionary = {}
+	if data.get("metadata") is Dictionary:
+		meta_out = (data["metadata"] as Dictionary).duplicate(true)
 	print("SaveLoadManager: Game saved → %s (v%d, %d bytes, slot=%s)" % [abs_path, SAVE_VERSION, bytes, safe_slot])
 	_notify_save_list_refresh()
 	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
@@ -2157,10 +2869,15 @@ func save_game_detailed(slot_name: String = DEFAULT_SLOT) -> Dictionary:
 		"slot": safe_slot,
 		"bytes": bytes,
 		"version": SAVE_VERSION,
+		"metadata": meta_out,
 	}
 
 ## Enhanced load with migration + feedback.
 func load_game_detailed(slot_name: String = DEFAULT_SLOT) -> Dictionary:
+	if _sanitize_slot(slot_name) == BARE_AUTOSAVE_SLOT and not FileAccess.file_exists(get_save_path(BARE_AUTOSAVE_SLOT)):
+		var newest := _newest_rotator_occupied()
+		if not newest.is_empty():
+			slot_name = newest
 	var slot_key := str(slot_name)
 	var frame_now := Engine.get_process_frames()
 	if frame_now == _load_apply_frame and slot_key == _load_apply_slot:
@@ -2235,6 +2952,7 @@ func delete_save(slot_name: String) -> bool:
 		push_error("SaveLoadManager: Failed to delete %s (err %d)" % [path, err])
 		return false
 	print("SaveLoadManager: Deleted save %s" % slot_name)
+	_notify_save_list_refresh()
 	return true
 
 func rename_save(old_slot: String, new_slot: String) -> bool:
@@ -2255,4 +2973,5 @@ func rename_save(old_slot: String, new_slot: String) -> bool:
 
 	DirAccess.remove_absolute(old_path)
 	print("SaveLoadManager: Renamed %s -> %s" % [old_slot, new_slot])
+	_notify_save_list_refresh()
 	return true
