@@ -83,6 +83,10 @@ var _ai_hop_rebuild_hops: int = 0
 var _ai_hop_rebuild_facing: int = 0
 var _ai_raise_skip_cap_day: Dictionary = {}
 var _ai_ramp_sr_block_day: Dictionary = {}
+var _ai_unit_moved_day: Dictionary = {}
+var _ai_move_cooldown_skip_day: Dictionary = {}
+var _ai_skip_captured_logged: Dictionary = {}
+var _ai_r2_prints: Array = []
 const REJECT_LOG_ENV := "EOA_AI_REJECT_LOG"
 const AI_MASSING_MARCHES := 3
 const AI_MASSING_STACK := 3
@@ -94,6 +98,7 @@ const RAISE_WAR_BUDGET_FRAC := 0.10
 const RAISE_WAR_BUDGET_MIN := 1
 const RAISE_WAR_BUDGET_MAX := 10
 const RAISE_MIN_GAP_DAYS := 7
+const AI_UNIT_MOVE_COOLDOWN_DAYS := 5
 ## SIM-1110-A B: threatened-sector shift (AI nations only).
 const THREAT_RATIO := 1.2
 const REDEPLOY_PER_TAG_PER_DAY := 2
@@ -767,6 +772,7 @@ func start_land_battle(
 ## Fill empty own land that touches an enemy division. N = COVER_WITHIN_DAYS (same day).
 ## No-op unless a 1936 garrison exists, so scripted soaks do not scan the map.
 func try_ai_cover_threatened_borders() -> Dictionary:
+	_ai_r2_prints.clear()
 	var result := {
 		"ok": true,
 		"within_days": COVER_WITHIN_DAYS,
@@ -862,6 +868,9 @@ func try_ai_cover_threatened_borders() -> Dictionary:
 			var el2: Array = hex_eligible[psid] as Array
 			if not _station_touches_enemy(psid, tag2):
 				for spare_f in el2:
+					if _ai_unit_in_move_cooldown(str(spare_f.formation_id), tag2, psid):
+						_ai_note_move_cooldown_skip(tag2)
+						continue
 					pool.append(spare_f)
 				continue
 			if int(hex_garr_n.get(psid, 0)) < FRONT_STACK_TARGET:
@@ -870,7 +879,11 @@ func try_ai_cover_threatened_borders() -> Dictionary:
 				continue
 			var by_fid: Dictionary = {}
 			for spare_f2 in el2:
-				by_fid[str(spare_f2.formation_id)] = spare_f2
+				var fid2 := str(spare_f2.formation_id)
+				if _ai_unit_in_move_cooldown(fid2, tag2, psid):
+					_ai_note_move_cooldown_skip(tag2)
+					continue
+				by_fid[fid2] = spare_f2
 			var fids: Array = by_fid.keys()
 			fids.sort()
 			if not fids.is_empty():
@@ -887,6 +900,10 @@ func try_ai_cover_threatened_borders() -> Dictionary:
 				if np == null or bool(np.is_sea):
 					continue
 				if str(np.owner_tag).strip_edges().to_upper() != tag2:
+					continue
+				if _ai_is_war_captured(tag2, nid):
+					_ai_note_skip_captured("cover", tag2, nid)
+					seen_th[nid] = true
 					continue
 				seen_th[nid] = true
 				threatened.append(nid)
@@ -908,11 +925,13 @@ func try_ai_cover_threatened_borders() -> Dictionary:
 				if not pool.is_empty():
 					var spare = pool.pop_front()
 					var from_pid := int(spare.stationed_province_id)
+					var cover_fid := str(spare.formation_id)
 					spare.stationed_province_id = hole
 					friendly[hole] = true
-					_note_garrison_station(str(spare.formation_id), tag2, hole)
+					_note_garrison_station(cover_fid, tag2, hole)
+					_ai_stamp_unit_moved(cover_fid)
 					result["moved"] = int(result["moved"]) + 1
-					print("GARRISON_COVER move %s %d -> %d" % [str(spare.formation_id), from_pid, hole])
+					print("GARRISON_COVER move %s %d -> %d" % [cover_fid, from_pid, hole])
 					_join_defence_if_attacked(str(spare.formation_id), hole, tag2)
 					continue
 				var he: Dictionary = hole_enemy_tags.get(hole, {}) as Dictionary
@@ -1159,6 +1178,102 @@ func _ai_note_raise_skip_cap(tag: String, hole: int) -> void:
 	print("GARRISON_COVER raise_skip cap %s @ %d" % [t, hole])
 
 
+func ai_r2_prints() -> Array:
+	return _ai_r2_prints.duplicate()
+
+
+func _ai_r2_print(line: String) -> void:
+	_ai_r2_prints.append(line)
+	print(line)
+
+
+func _ai_stamp_unit_moved(fid: String) -> void:
+	var id := fid.strip_edges()
+	if id.is_empty():
+		return
+	_ai_unit_moved_day[id] = _ai_day()
+
+
+func _ai_province_is_open_defender(sid: int, tag: String) -> bool:
+	if sid <= 0:
+		return false
+	var t := tag.strip_edges().to_upper()
+	for raw in _open_land_battles:
+		if typeof(raw) != TYPE_DICTIONARY:
+			continue
+		var row: Dictionary = raw
+		if int(row.get("to_id", -1)) != sid:
+			continue
+		if str(row.get("def_tag", "")).strip_edges().to_upper() == t:
+			return true
+	return false
+
+
+func _ai_unit_in_move_cooldown(fid: String, tag: String, sid: int) -> bool:
+	var id := fid.strip_edges()
+	if id.is_empty() or not _ai_unit_moved_day.has(id):
+		return false
+	if _ai_day() - int(_ai_unit_moved_day[id]) >= AI_UNIT_MOVE_COOLDOWN_DAYS:
+		return false
+	if _ai_province_is_open_defender(sid, tag):
+		return false
+	return true
+
+
+func _ai_note_move_cooldown_skip(tag: String) -> void:
+	var t := tag.strip_edges().to_upper()
+	var day := _ai_day()
+	if int(_ai_move_cooldown_skip_day.get(t, -1)) == day:
+		return
+	_ai_move_cooldown_skip_day[t] = day
+	_ai_r2_print("AI_MOVE_COOLDOWN skip %s" % t)
+
+
+func _ai_war_key_for_captured(tag: String, pid: int) -> String:
+	if typeof(GameData) == TYPE_NIL:
+		return ""
+	var raw: Variant = GameData.peace_state.get("campaign_wars", {})
+	if not (raw is Dictionary):
+		return ""
+	var wars_v: Variant = (raw as Dictionary).get("wars", {})
+	if not (wars_v is Dictionary):
+		return ""
+	var t := tag.strip_edges().to_upper()
+	for key_v in (wars_v as Dictionary).keys():
+		var key := str(key_v)
+		var parts := key.split("|")
+		if parts.size() < 2:
+			continue
+		if t != str(parts[0]) and t != str(parts[1]):
+			continue
+		var row_v: Variant = (wars_v as Dictionary)[key]
+		if not (row_v is Dictionary):
+			continue
+		var caps_v: Variant = (row_v as Dictionary).get("captured_pids", {})
+		if not (caps_v is Dictionary):
+			continue
+		var arr_v: Variant = (caps_v as Dictionary).get(t, [])
+		if not (arr_v is Array):
+			continue
+		for pid_v in arr_v:
+			if int(pid_v) == pid:
+				return key
+	return ""
+
+
+func _ai_note_skip_captured(kind: String, tag: String, pid: int) -> void:
+	var t := tag.strip_edges().to_upper()
+	var war_key := _ai_war_key_for_captured(t, pid)
+	var k := "%s|%s|%d|%s" % [kind, t, pid, war_key]
+	if bool(_ai_skip_captured_logged.get(k, false)):
+		return
+	_ai_skip_captured_logged[k] = true
+	if kind == "reinforce":
+		_ai_r2_print("GARRISON_REINFORCE skip_captured %s @ %d" % [t, pid])
+	else:
+		_ai_r2_print("GARRISON_COVER skip_captured %s @ %d" % [t, pid])
+
+
 func _raise_capital_garrison_at(tag: String, pid: int) -> bool:
 	## Static capital garrison. Must not set garrison_1936 — that flag
 	## turns on full-border hole fill in try_ai_cover_threatened_borders.
@@ -1290,8 +1405,11 @@ func _ai_reinforce_threatened_sectors(tag: String, enemy_pids: Array[int]) -> in
 		return 0
 	var threats: Array = []
 	for pid in own_front:
+		if _ai_is_war_captured(tag, pid):
+			_ai_note_skip_captured("reinforce", tag, pid)
+			continue
 		var own_p := _ai_hex_power(pid, tag, "defend")
-		var foe_p := _ai_max_adjacent_enemy_stack_power(pid, tag)
+		var foe_p := _ai_local_threat(pid, tag)
 		var r := foe_p / maxf(own_p, 1.0)
 		var target_n := FRONT_STACK_TARGET
 		if r >= 2.0:
@@ -1331,25 +1449,60 @@ func _ai_reinforce_threatened_sectors(tag: String, enemy_pids: Array[int]) -> in
 	return moved
 
 
-func _ai_own_hexes_adjacent_to_enemy(tag: String, enemy_pids: Array[int]) -> Array[int]:
+func _ai_own_hexes_adjacent_to_enemy(tag: String, _enemy_pids: Array[int]) -> Array[int]:
 	var out: Array[int] = []
-	var seen: Dictionary = {}
-	for epid in enemy_pids:
-		if typeof(MapManager) == TYPE_NIL or not MapManager.has_method("get_adjacent_provinces"):
-			break
-		for nid_v in MapManager.get_adjacent_provinces(int(epid), true):
-			var nid := int(nid_v)
-			if nid <= 0 or nid >= 950000 or seen.has(nid):
-				continue
-			var np = MapManager.get_province(nid) if MapManager.has_method("get_province") else null
-			if np == null or bool(np.is_sea):
-				continue
-			if _province_controller_tag(np) != tag:
-				continue
-			seen[nid] = true
-			out.append(nid)
+	var adj: Dictionary = _ai_ensure_own_land_adj(tag)
+	for pid_v in adj.keys():
+		var pid := int(pid_v)
+		if _ai_has_adjacent_enemy_division(pid, tag):
+			out.append(pid)
 	out.sort()
 	return out
+
+
+func _ai_has_adjacent_enemy_division(pid: int, tag: String) -> bool:
+	return _ai_local_threat(pid, tag) > 0.0
+
+
+func _ai_local_threat(pid: int, tag: String) -> float:
+	var t := tag.strip_edges().to_upper()
+	if pid <= 0 or typeof(MapManager) == TYPE_NIL or not MapManager.has_method("get_adjacent_provinces"):
+		return 0.0
+	var enemies: Dictionary = {}
+	if typeof(WarStateDomain) != TYPE_NIL:
+		for e in WarStateDomain.enemies_of(t):
+			enemies[str(e).strip_edges().to_upper()] = true
+	if enemies.is_empty() or typeof(LeaderManager) == TYPE_NIL:
+		return 0.0
+	var adj: Dictionary = {}
+	for nid_v in MapManager.get_adjacent_provinces(pid, true):
+		var nid := int(nid_v)
+		if nid <= 0 or nid == pid or nid >= 950000:
+			continue
+		var np = MapManager.get_province(nid) if MapManager.has_method("get_province") else null
+		if np == null or bool(np.is_sea):
+			continue
+		adj[nid] = np
+	if adj.is_empty():
+		return 0.0
+	var total := 0.0
+	for etag_v in enemies.keys():
+		var etag := str(etag_v)
+		for f in LeaderManager.get_formations_for_country(etag):
+			if f == null:
+				continue
+			var ft := str(f.formation_type) if "formation_type" in f else ""
+			if ft != Formation.TYPE_DIVISION and ft != Formation.TYPE_GARRISON:
+				continue
+			var sid := int(f.stationed_province_id) if "stationed_province_id" in f else -1
+			if not adj.has(sid):
+				continue
+			var terrain := "plains"
+			var hex_p = adj[sid]
+			if hex_p != null and not str(hex_p.terrain).is_empty():
+				terrain = str(hex_p.terrain)
+			total += land_combat_power(f, terrain, "attack", null)
+	return total
 
 
 func _ai_hex_power(pid: int, tag: String, role: String) -> float:
@@ -1417,6 +1570,9 @@ func _ai_pick_quiet_spare(tag: String, dest: int) -> Variant:
 			continue
 		var sid := int(f.stationed_province_id) if "stationed_province_id" in f else -1
 		if sid <= 0 or sid == dest or bool(capitals.get(sid, false)):
+			continue
+		if _ai_unit_in_move_cooldown(sfid, tag, sid):
+			_ai_note_move_cooldown_skip(tag)
 			continue
 		if _station_touches_enemy(sid, tag):
 			continue
@@ -1576,6 +1732,7 @@ func _ai_move_garrison_to(spare: Variant, dest: int, tag: String) -> void:
 	if not marched:
 		spare.stationed_province_id = dest
 		_note_garrison_station(fid, tag, dest)
+	_ai_stamp_unit_moved(fid)
 
 
 func _ai_ensure_own_land_adj(tag: String) -> Dictionary:
@@ -2401,7 +2558,7 @@ func try_ai_follow_on_after_win(player_tag: String = "") -> Dictionary:
 
 
 func get_save_data() -> Dictionary:
-	return {
+	var out := {
 		"version": 1,
 		"open_battles": get_open_land_battles(),
 		"next_seq": _next_land_battle_seq,
@@ -2410,6 +2567,9 @@ func get_save_data() -> Dictionary:
 		"retake_blocked": _retake_blocked.duplicate(true),
 		"ai_stall": _ai_stall.duplicate(true),
 	}
+	if not _ai_unit_moved_day.is_empty():
+		out["ai_unit_moved_day"] = _ai_unit_moved_day.duplicate(true)
+	return out
 
 
 func apply_save_data(data: Dictionary) -> void:
@@ -2423,6 +2583,10 @@ func apply_save_data(data: Dictionary) -> void:
 	_ai_facing_by_pair.clear()
 	_ai_raise_skip_cap_day.clear()
 	_ai_ramp_sr_block_day.clear()
+	_ai_unit_moved_day.clear()
+	_ai_move_cooldown_skip_day.clear()
+	_ai_skip_captured_logged.clear()
+	_ai_r2_prints.clear()
 	reset_ai_hop_cache_counts()
 	bump_ai_board_epoch()
 	if data.is_empty():
@@ -2430,6 +2594,8 @@ func apply_save_data(data: Dictionary) -> void:
 	_load_retake_cooldown(data)
 	if data.get("ai_stall") is Dictionary:
 		_ai_stall = (data["ai_stall"] as Dictionary).duplicate(true)
+	if data.get("ai_unit_moved_day") is Dictionary:
+		_ai_unit_moved_day = (data["ai_unit_moved_day"] as Dictionary).duplicate(true)
 	var battles: Array = data.get("open_battles", []) as Array
 	for raw in battles:
 		if typeof(raw) != TYPE_DICTIONARY:
@@ -3131,6 +3297,10 @@ func reset_ai_war1_for_test() -> void:
 	_ai_facing_by_pair.clear()
 	_ai_raise_skip_cap_day.clear()
 	_ai_ramp_sr_block_day.clear()
+	_ai_unit_moved_day.clear()
+	_ai_move_cooldown_skip_day.clear()
+	_ai_skip_captured_logged.clear()
+	_ai_r2_prints.clear()
 	reset_ai_hop_cache_counts()
 	bump_ai_board_epoch()
 	if typeof(FormationMovement) != TYPE_NIL:
