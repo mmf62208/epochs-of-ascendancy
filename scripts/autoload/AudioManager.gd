@@ -294,6 +294,21 @@ func play(key: String) -> bool:
 	return _play(key, false)
 
 
+## Read-only: true when the key has a catalog path or fallback that exists.
+## Does not warn. Missing keys still warn if play() is called.
+func has_audio(key: String) -> bool:
+	if key.is_empty():
+		return false
+	if _streams.get(key) != null:
+		return true
+	var entry := _entry(key)
+	var path := str(entry.get("path", ""))
+	if not path.is_empty() and _res_exists(path):
+		return true
+	var fb := str(WAV_FALLBACK.get(key, ""))
+	return not fb.is_empty() and _res_exists(fb)
+
+
 func play_forced(key: String) -> bool:
 	return _play(key, true)
 
