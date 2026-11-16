@@ -3,8 +3,8 @@ extends SceneTree
 ## SIM-1110-A: defender stacking, AI threatened-sector shift, offensive ramp.
 ## (a) 3-unit hex opens with def_n=3
 ## (b) retreating unit onto an attacked hex joins the defence
-## (c) AI GER vs AI POL: by d4 Gliwicki and Bytomski each hold >=2 garrisons
-##     sourced from non-enemy-touching stations
+## (c) AI GER vs AI POL: by war day 5 Gliwicki and Bytomski each hold >=2
+##     garrisons sourced from non-enemy-touching stations (see checkpoint comment)
 ## (d) Germany's French border keeps >= ceil(18*0.5)=9 garrisons
 ## (e) human GER: 0 cover/reinforce of GER in 30 days; stations only change via retreat
 ## (f) AI GER: 0 new Polish-land captures before war day 21, <=3 by day 60
@@ -229,8 +229,9 @@ func _test_cdf_aivai(mm: Node, sm: Node, bm: Node, tm: Node, lm: Node) -> void:
 	var new_caps_d20 := -1
 	for day in range(1, RAMP_D60 + 1):
 		tm.call("advance_live_f5_equivalent_days", 1)
-		# POL masses on Opolski first (THREAT_RATIO 1.2 so 1v1 is not a threat).
-		# Gliwicki hits ratio 2.0 on war day 5 under REDEPLOY_PER_TAG_PER_DAY=2.
+		# Case (c) asserts on war day 5, not day 4: THREAT_RATIO 1.2 means a 1v1
+		# border is not a threat. Gliwicki only reaches ratio 2.0 after Poland
+		# masses on Opolski. Observed: d4 gliwicki=1 bytomski=2, d5 both 2.
 		if day == 4:
 			print(
 				"SIM1110A_C day4 gliwicki=%d bytomski=%d"
