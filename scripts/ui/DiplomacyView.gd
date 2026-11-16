@@ -1598,11 +1598,34 @@ func _close_from_cancel(event: InputEvent) -> void:
 		return
 	if is_queued_for_deletion():
 		return
+	# A hidden leftover must not eat Esc. Play mid-war: four presses and no
+	# EOA_LIVE_ESC while Menu still opened Paused. Window has no
+	# is_visible_in_tree(); `visible` plus hidden CanvasItem parents is the check.
+	# Releasing focus lets the next key hit the root viewport.
+	if not _diplomacy_window_is_showing():
+		var tree := get_tree()
+		if tree != null and tree.root is Window:
+			(tree.root as Window).grab_focus()
+		var vp_hidden := get_viewport()
+		if vp_hidden != null:
+			vp_hidden.gui_release_focus()
+		return
 	hide()
 	var vp := get_viewport()
 	if vp != null:
 		vp.set_input_as_handled()
 	close_screen()
+
+
+func _diplomacy_window_is_showing() -> bool:
+	if not is_inside_tree() or not visible:
+		return false
+	var parent := get_parent()
+	while parent != null:
+		if parent is CanvasItem and not (parent as CanvasItem).is_visible_in_tree():
+			return false
+		parent = parent.get_parent()
+	return true
 
 
 func _is_diplomacy_cancel(event: InputEvent) -> bool:
