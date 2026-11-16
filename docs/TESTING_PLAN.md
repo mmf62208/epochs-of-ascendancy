@@ -10,7 +10,7 @@
 
 ### 0-SIM-1110-A defender stack / threatened-sector / ramp
 
-AI Poland must not overrun AI Germany's 1936 Silesian border in the first two weeks. Guard `HeadlessSim1110aDefenceTest`: (a) 3-unit hex opens `def_n=3`; (b) a retreating unit joins an open defence; (c) AI GER vs AI POL by war day 5 Gliwicki `711058` and Bytomski `711057` each hold ≥2 garrisons from non-enemy-touching stations (THREAT_RATIO 1.2: POL masses Opolski first, so Gliwicki is ratio-2.0 on day 5 under 2 redeploys/day); (d) GER French border keeps ≥9 garrisons; (e) human GER: no cover/reinforce station changes except capture retreats over 30 days; (f) AI GER 0 new Polish-land captures before war day 21 and ≤3 by day 60; (g) 0 SCRIPT ERROR.
+AI Poland must not overrun AI Germany's 1936 Silesian border in the first two weeks. Guard `HeadlessSim1110aDefenceTest`: (a) 3-unit hex opens `def_n=3`; (b) a retreating unit joins an open defence; (c) AI GER vs AI POL by war day 5 Gliwicki `711058` and Bytomski `711057` each hold ≥2 garrisons from non-enemy-touching stations (THREAT_RATIO 1.2: POL masses Opolski first, so Gliwicki is ratio-2.0 on day 5 under 2 redeploys/day); (d) GER French border keeps ≥9 garrisons; (e) human GER: no cover/reinforce station changes except capture retreats over 30 days; (f) AI GER 0 new Polish-land captures before war day 21 and ≤3 by day 60; (g) 0 SCRIPT ERROR; (h) 0 raises on war-captured land, `captured_pids` save/load/retake/peace; (i) per-tag per-war raise cap `clampi(ceil(seed_n*0.10),1,10)` (POL=4) and ≥7 day gap; (j) `AI_HOP_CACHE` 0 rebuilds on a no-event day, rebuild after epoch.
 
 ```bash
 tools/run_godot.sh --headless --path . \

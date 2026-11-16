@@ -738,6 +738,8 @@ func seed_1936_start_garrisons(force: bool = false) -> Dictionary:
 		skipped_counts[tag] = skip_tag
 	_garrisons_1936_seeded = true
 	var counts := _garrison_1936_counts()
+	if typeof(GameData) != TYPE_NIL:
+		GameData.peace_state["garrison_seed_n"] = counts.duplicate()
 	var detail := _garrison_1936_seed_detail(placed_counts, target_counts, skipped_counts)
 	print(
 		"LeaderManager: 1936 garrisons placed=%d skipped_occupied=%d targets=%d %s"

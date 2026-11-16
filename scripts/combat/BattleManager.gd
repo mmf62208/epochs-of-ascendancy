@@ -74,8 +74,15 @@ var _attack_reject: Dictionary = {}
 ## SIM-1110-A: per-day military_strength cache and hop tables for B/B2.
 var _ai_str_cache_day: int = -1
 var _ai_str_cache: Dictionary = {}
-var _ai_hop_war_key: String = ""
-var _ai_own_land_adj: Dictionary = {}
+var _ai_board_epoch: int = 0
+var _ai_adj_by_tag: Dictionary = {}
+var _ai_hops_by_tag_dest: Dictionary = {}
+var _ai_facing_by_pair: Dictionary = {}
+var _ai_hop_rebuild_adj: int = 0
+var _ai_hop_rebuild_hops: int = 0
+var _ai_hop_rebuild_facing: int = 0
+var _ai_raise_skip_cap_day: Dictionary = {}
+var _ai_ramp_sr_block_day: Dictionary = {}
 const REJECT_LOG_ENV := "EOA_AI_REJECT_LOG"
 const AI_MASSING_MARCHES := 3
 const AI_MASSING_STACK := 3
@@ -83,6 +90,10 @@ const AI_RELAX_RATIO := 1.2
 const AI_EVEN_RATIO := 1.0
 ## SIM-1110-A: stack defenders the same way attackers already stack.
 const DEF_STACK_MAX := 3
+const RAISE_WAR_BUDGET_FRAC := 0.10
+const RAISE_WAR_BUDGET_MIN := 1
+const RAISE_WAR_BUDGET_MAX := 10
+const RAISE_MIN_GAP_DAYS := 7
 ## SIM-1110-A B: threatened-sector shift (AI nations only).
 const THREAT_RATIO := 1.2
 const REDEPLOY_PER_TAG_PER_DAY := 2
@@ -102,6 +113,43 @@ func _ready() -> void:
 	_resolver.name = "CombatResolver"
 	add_child(_resolver)
 	set_process(false)
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_signal("province_data_changed"):
+		if not MapManager.province_data_changed.is_connected(_on_ai_province_data_changed):
+			MapManager.province_data_changed.connect(_on_ai_province_data_changed)
+
+
+func _on_ai_province_data_changed(_province_id: int, what_changed: String) -> void:
+	if what_changed == "owner":
+		bump_ai_board_epoch()
+
+
+func bump_ai_board_epoch() -> void:
+	_ai_board_epoch += 1
+
+
+func ai_hop_cache_counts() -> Dictionary:
+	return {
+		"adj": _ai_hop_rebuild_adj,
+		"hops": _ai_hop_rebuild_hops,
+		"facing": _ai_hop_rebuild_facing,
+		"epoch": _ai_board_epoch,
+	}
+
+
+func reset_ai_hop_cache_counts() -> void:
+	_ai_hop_rebuild_adj = 0
+	_ai_hop_rebuild_hops = 0
+	_ai_hop_rebuild_facing = 0
+
+
+func flush_ai_hop_cache_profile() -> void:
+	if _ai_hop_rebuild_adj == 0 and _ai_hop_rebuild_hops == 0 and _ai_hop_rebuild_facing == 0:
+		return
+	print(
+		"AI_HOP_CACHE day=%d rebuild_adj=%d rebuild_hops=%d rebuild_facing=%d"
+		% [_ai_day(), _ai_hop_rebuild_adj, _ai_hop_rebuild_hops, _ai_hop_rebuild_facing]
+	)
+	reset_ai_hop_cache_counts()
 
 
 func _process(_delta: float) -> void:
@@ -759,6 +807,7 @@ func try_ai_cover_threatened_borders() -> Dictionary:
 			continue
 		var enemies: Array = WarStateDomain.enemies_of(tag2)
 		var enemy_pids: Array[int] = []
+		var enemy_hex_tags: Dictionary = {}
 		for enemy_v in enemies:
 			var enemy := str(enemy_v).strip_edges().to_upper()
 			for ef in LeaderManager.get_formations_for_country(enemy):
@@ -770,11 +819,16 @@ func try_ai_cover_threatened_borders() -> Dictionary:
 				var esid := int(ef.stationed_province_id) if "stationed_province_id" in ef else -1
 				if esid > 0:
 					enemy_pids.append(esid)
+					var etags: Dictionary = enemy_hex_tags.get(esid, {})
+					etags[enemy] = true
+					enemy_hex_tags[esid] = etags
 		if enemy_pids.is_empty():
 			continue
 		var friendly: Dictionary = {}
 		var pool: Array = []
 		var capitals: Dictionary = {}
+		var hex_garr_n: Dictionary = {}
+		var hex_eligible: Dictionary = {}
 		if LeaderManager.has_method("garrison_1936_capital_pids"):
 			for cap_v in LeaderManager.garrison_1936_capital_pids(tag2):
 				capitals[int(cap_v)] = true
@@ -789,6 +843,8 @@ func try_ai_cover_threatened_borders() -> Dictionary:
 				friendly[sid] = true
 			if not bool(f2.get_meta("garrison_1936", false)):
 				continue
+			if sid > 0:
+				hex_garr_n[sid] = int(hex_garr_n.get(sid, 0)) + 1
 			if "is_in_combat" in f2 and bool(f2.is_in_combat):
 				continue
 			var sfid := str(f2.formation_id) if "formation_id" in f2 else ""
@@ -798,11 +854,30 @@ func try_ai_cover_threatened_borders() -> Dictionary:
 				continue
 			if sid <= 0 or bool(capitals.get(sid, false)):
 				continue
-			if _station_touches_enemy(sid, tag2):
+			var el: Array = hex_eligible.get(sid, []) as Array
+			el.append(f2)
+			hex_eligible[sid] = el
+		for sid_v in hex_eligible.keys():
+			var psid := int(sid_v)
+			var el2: Array = hex_eligible[psid] as Array
+			if not _station_touches_enemy(psid, tag2):
+				for spare_f in el2:
+					pool.append(spare_f)
 				continue
-			pool.append(f2)
+			if int(hex_garr_n.get(psid, 0)) < FRONT_STACK_TARGET:
+				continue
+			if el2.size() < 1 or int(hex_garr_n.get(psid, 0)) < 2:
+				continue
+			var by_fid: Dictionary = {}
+			for spare_f2 in el2:
+				by_fid[str(spare_f2.formation_id)] = spare_f2
+			var fids: Array = by_fid.keys()
+			fids.sort()
+			if not fids.is_empty():
+				pool.append(by_fid[str(fids[0])])
 		var threatened: Array[int] = []
 		var seen_th: Dictionary = {}
+		var hole_enemy_tags: Dictionary = {}
 		for epid in enemy_pids:
 			for nid_v in MapManager.get_adjacent_provinces(epid, true):
 				var nid := int(nid_v)
@@ -815,6 +890,11 @@ func try_ai_cover_threatened_borders() -> Dictionary:
 					continue
 				seen_th[nid] = true
 				threatened.append(nid)
+				var hole_tags: Dictionary = hole_enemy_tags.get(nid, {}) as Dictionary
+				var src_tags: Dictionary = enemy_hex_tags.get(epid, {}) as Dictionary
+				for etag_v in src_tags.keys():
+					hole_tags[str(etag_v)] = true
+				hole_enemy_tags[nid] = hole_tags
 		if not threatened.is_empty():
 			threatened.sort()
 			pool.sort_custom(func(a, b):
@@ -835,7 +915,8 @@ func try_ai_cover_threatened_borders() -> Dictionary:
 					print("GARRISON_COVER move %s %d -> %d" % [str(spare.formation_id), from_pid, hole])
 					_join_defence_if_attacked(str(spare.formation_id), hole, tag2)
 					continue
-				if _raise_garrison_at(tag2, hole):
+				var he: Dictionary = hole_enemy_tags.get(hole, {}) as Dictionary
+				if _ai_try_raise_garrison(tag2, hole, he):
 					friendly[hole] = true
 					result["raised"] = int(result["raised"]) + 1
 		result["moved"] = int(result["moved"]) + _ai_reinforce_threatened_sectors(tag2, enemy_pids)
@@ -879,6 +960,203 @@ func _raise_garrison_at(tag: String, pid: int) -> bool:
 		print("GARRISON_COVER raise %s @ %d" % [fid, pid])
 		return true
 	return false
+
+
+func _ai_try_raise_garrison(tag: String, hole: int, hole_enemies: Dictionary) -> bool:
+	if _ai_is_war_captured(tag, hole):
+		_ai_note_raise_skip_captured(tag, hole)
+		return false
+	var charge_key := _ai_raise_charge_key(tag, hole_enemies)
+	if charge_key.is_empty() or not _ai_raise_budget_ok(tag, charge_key):
+		_ai_note_raise_skip_cap(tag, hole)
+		return false
+	if not _raise_garrison_at(tag, hole):
+		return false
+	_ai_charge_raise(tag, charge_key)
+	return true
+
+
+func _ai_is_war_captured(tag: String, pid: int) -> bool:
+	if pid <= 0:
+		return false
+	var t := tag.strip_edges().to_upper()
+	if t.is_empty() or typeof(GameData) == TYPE_NIL:
+		return false
+	var raw: Variant = GameData.peace_state.get("campaign_wars", {})
+	if not (raw is Dictionary):
+		return false
+	var wars_v: Variant = (raw as Dictionary).get("wars", {})
+	if not (wars_v is Dictionary):
+		return false
+	var wars: Dictionary = wars_v
+	for key_v in wars.keys():
+		var key := str(key_v)
+		var parts := key.split("|")
+		if parts.size() < 2:
+			continue
+		if t != str(parts[0]) and t != str(parts[1]):
+			continue
+		var row_v: Variant = wars[key]
+		if not (row_v is Dictionary):
+			continue
+		var caps_v: Variant = (row_v as Dictionary).get("captured_pids", {})
+		if not (caps_v is Dictionary):
+			continue
+		var arr_v: Variant = (caps_v as Dictionary).get(t, [])
+		if not (arr_v is Array):
+			continue
+		for pid_v in arr_v:
+			if int(pid_v) == pid:
+				return true
+	return false
+
+
+func _ai_raise_charge_key(tag: String, hole_enemies: Dictionary) -> String:
+	if typeof(WarStateDomain) == TYPE_NIL:
+		return ""
+	var t := tag.strip_edges().to_upper()
+	var keys: Array[String] = []
+	for e_v in hole_enemies.keys():
+		var k := WarStateDomain.pair_key(t, str(e_v))
+		if not k.is_empty():
+			keys.append(k)
+	if keys.is_empty():
+		return ""
+	keys.sort()
+	return keys[0]
+
+
+func _ai_garrison_seed_n(tag: String) -> int:
+	var t := tag.strip_edges().to_upper()
+	if t.is_empty() or typeof(GameData) == TYPE_NIL:
+		return 0
+	var seeds_v: Variant = GameData.peace_state.get("garrison_seed_n", {})
+	var seeds: Dictionary = {}
+	if seeds_v is Dictionary:
+		seeds = seeds_v
+	if seeds.has(t):
+		return int(seeds[t])
+	var n := 0
+	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_formations_for_country"):
+		for f in LeaderManager.get_formations_for_country(t):
+			if f != null and bool(f.get_meta("garrison_1936", false)):
+				n += 1
+	seeds[t] = n
+	GameData.peace_state["garrison_seed_n"] = seeds
+	return n
+
+
+func _ai_raise_budget(tag: String) -> int:
+	var seed_n := _ai_garrison_seed_n(tag)
+	var raw := int(ceil(float(seed_n) * RAISE_WAR_BUDGET_FRAC))
+	return clampi(raw, RAISE_WAR_BUDGET_MIN, RAISE_WAR_BUDGET_MAX)
+
+
+func _ai_raise_budget_ok(tag: String, pair_key: String) -> bool:
+	var row := _ai_war_row_by_key(pair_key)
+	if row.is_empty():
+		return false
+	var raises_v: Variant = row.get("raises_by_tag", {})
+	var raises: Dictionary = {}
+	if raises_v is Dictionary:
+		raises = raises_v
+	if int(raises.get(tag, 0)) >= _ai_raise_budget(tag):
+		return false
+	var last_v: Variant = row.get("last_raise_day", {})
+	var last_map: Dictionary = {}
+	if last_v is Dictionary:
+		last_map = last_v
+	var last_day := int(last_map.get(tag, -99999))
+	if _ai_day() - last_day < RAISE_MIN_GAP_DAYS:
+		return false
+	return true
+
+
+func _ai_charge_raise(tag: String, pair_key: String) -> void:
+	var packed := _ai_war_row_pack(pair_key)
+	if packed.is_empty():
+		return
+	var st: Dictionary = packed["st"] as Dictionary
+	var wars: Dictionary = packed["wars"] as Dictionary
+	var row: Dictionary = packed["row"] as Dictionary
+	var raises_v: Variant = row.get("raises_by_tag", {})
+	var raises: Dictionary = {}
+	if raises_v is Dictionary:
+		raises = raises_v
+	raises[tag] = int(raises.get(tag, 0)) + 1
+	row["raises_by_tag"] = raises
+	var last_v: Variant = row.get("last_raise_day", {})
+	var last_map: Dictionary = {}
+	if last_v is Dictionary:
+		last_map = last_v
+	last_map[tag] = _ai_day()
+	row["last_raise_day"] = last_map
+	wars[pair_key] = row
+	st["wars"] = wars
+	GameData.peace_state["campaign_wars"] = st
+
+
+func _ai_note_raise_skip_captured(tag: String, pid: int) -> void:
+	if typeof(WarStateDomain) == TYPE_NIL or typeof(GameData) == TYPE_NIL:
+		return
+	var t := tag.strip_edges().to_upper()
+	var raw: Variant = GameData.peace_state.get("campaign_wars", {})
+	if not (raw is Dictionary):
+		return
+	var st: Dictionary = raw
+	var wars_v: Variant = st.get("wars", {})
+	if not (wars_v is Dictionary):
+		return
+	var wars: Dictionary = wars_v
+	var printed_any := false
+	for key_v in wars.keys():
+		var key := str(key_v)
+		var parts := key.split("|")
+		if parts.size() < 2:
+			continue
+		if t != str(parts[0]) and t != str(parts[1]):
+			continue
+		var row_v: Variant = wars[key]
+		if not (row_v is Dictionary):
+			continue
+		var row: Dictionary = row_v
+		var caps_v: Variant = row.get("captured_pids", {})
+		var caps: Dictionary = {}
+		if caps_v is Dictionary:
+			caps = caps_v
+		var has_pid := false
+		var arr_v: Variant = caps.get(t, [])
+		if arr_v is Array:
+			for pid_v in arr_v:
+				if int(pid_v) == pid:
+					has_pid = true
+					break
+		if not has_pid:
+			continue
+		var printed_v: Variant = row.get("raise_skip_captured_printed", {})
+		var printed: Dictionary = {}
+		if printed_v is Dictionary:
+			printed = printed_v
+		var pk := str(pid)
+		if bool(printed.get(pk, false)):
+			continue
+		printed[pk] = true
+		row["raise_skip_captured_printed"] = printed
+		wars[key] = row
+		printed_any = true
+		print("GARRISON_COVER raise_skip captured %s @ %d" % [t, pid])
+	if printed_any:
+		st["wars"] = wars
+		GameData.peace_state["campaign_wars"] = st
+
+
+func _ai_note_raise_skip_cap(tag: String, hole: int) -> void:
+	var t := tag.strip_edges().to_upper()
+	var day := _ai_day()
+	if int(_ai_raise_skip_cap_day.get(t, -1)) == day:
+		return
+	_ai_raise_skip_cap_day[t] = day
+	print("GARRISON_COVER raise_skip cap %s @ %d" % [t, hole])
 
 
 func _raise_capital_garrison_at(tag: String, pid: int) -> bool:
@@ -1228,24 +1506,40 @@ func _ai_major_border_keep_ok(tag: String, station: int, spare_fid: String) -> b
 
 func _ai_hexes_facing_tag(tag: String, other: String) -> Array[int]:
 	var out: Array[int] = []
-	if typeof(MapManager) == TYPE_NIL or not MapManager.has_method("get_provinces_by_owner"):
+	var t := tag.strip_edges().to_upper()
+	var o := other.strip_edges().to_upper()
+	var pair_key := "%s|%s" % [t, o]
+	if _ai_facing_by_pair.has(pair_key):
+		var cached_v: Variant = _ai_facing_by_pair[pair_key]
+		if cached_v is Dictionary:
+			var cached: Dictionary = cached_v
+			if int(cached.get("epoch", -1)) == _ai_board_epoch:
+				var hexes_v: Variant = cached.get("hexes", [])
+				if hexes_v is Array:
+					for pid_v in hexes_v:
+						out.append(int(pid_v))
+					return out
+			_ai_hop_rebuild_facing += 1
+	var adj := _ai_ensure_own_land_adj(t)
+	if typeof(MapManager) == TYPE_NIL:
 		return out
-	for pid_v in MapManager.get_provinces_by_owner(tag):
-		var pid := int(pid_v)
-		var p = MapManager.get_province(pid) if MapManager.has_method("get_province") else null
-		if p == null or bool(p.is_sea):
-			continue
+	for pid_v2 in adj.keys():
+		var pid := int(pid_v2)
 		var faces := false
 		for nid_v in MapManager.get_adjacent_provinces(pid, true):
 			var np = MapManager.get_province(int(nid_v)) if MapManager.has_method("get_province") else null
 			if np == null or bool(np.is_sea):
 				continue
-			if _province_controller_tag(np) == other:
+			if _province_controller_tag(np) == o:
 				faces = true
 				break
 		if faces:
 			out.append(pid)
 	out.sort()
+	var stored: Array = []
+	for pid2 in out:
+		stored.append(pid2)
+	_ai_facing_by_pair[pair_key] = {"epoch": _ai_board_epoch, "hexes": stored}
 	return out
 
 
@@ -1284,23 +1578,23 @@ func _ai_move_garrison_to(spare: Variant, dest: int, tag: String) -> void:
 		_note_garrison_station(fid, tag, dest)
 
 
-func _ai_ensure_own_land_adj(tag: String) -> void:
-	var key := tag
-	if typeof(WarStateDomain) != TYPE_NIL:
-		var parts: PackedStringArray = PackedStringArray()
-		parts.append(tag)
-		for e in WarStateDomain.enemies_of(tag):
-			parts.append(str(e))
-			var row := _ai_war_row(tag, str(e))
-			parts.append(str(int(row.get("start_day", 0))))
-		key = ",".join(parts)
-	if _ai_hop_war_key == key and not _ai_own_land_adj.is_empty():
-		return
-	_ai_hop_war_key = key
-	_ai_own_land_adj.clear()
+func _ai_ensure_own_land_adj(tag: String) -> Dictionary:
+	var t := tag.strip_edges().to_upper()
+	var cached_v: Variant = _ai_adj_by_tag.get(t, {})
+	if cached_v is Dictionary:
+		var cached: Dictionary = cached_v
+		if int(cached.get("epoch", -1)) == _ai_board_epoch:
+			var adj_v: Variant = cached.get("adj", {})
+			if adj_v is Dictionary:
+				return adj_v
+		_ai_hop_rebuild_adj += 1
+	else:
+		_ai_hop_rebuild_adj += 1
+	var adj: Dictionary = {}
 	if typeof(MapManager) == TYPE_NIL or not MapManager.has_method("get_provinces_by_owner"):
-		return
-	for pid_v in MapManager.get_provinces_by_owner(tag):
+		_ai_adj_by_tag[t] = {"epoch": _ai_board_epoch, "adj": adj}
+		return adj
+	for pid_v in MapManager.get_provinces_by_owner(t):
 		var pid := int(pid_v)
 		var p = MapManager.get_province(pid) if MapManager.has_method("get_province") else null
 		if p == null or bool(p.is_sea):
@@ -1311,14 +1605,30 @@ func _ai_ensure_own_land_adj(tag: String) -> void:
 			var np = MapManager.get_province(nid) if MapManager.has_method("get_province") else null
 			if np == null or bool(np.is_sea):
 				continue
-			if _province_controller_tag(np) != tag:
+			if _province_controller_tag(np) != t:
 				continue
 			nbs.append(nid)
-		_ai_own_land_adj[pid] = nbs
+		adj[pid] = nbs
+	_ai_adj_by_tag[t] = {"epoch": _ai_board_epoch, "adj": adj}
+	return adj
 
 
 func _ai_hops_from(tag: String, dest: int) -> Dictionary:
-	_ai_ensure_own_land_adj(tag)
+	var t := tag.strip_edges().to_upper()
+	var by_dest_v: Variant = _ai_hops_by_tag_dest.get(t, {})
+	var by_dest: Dictionary = {}
+	if by_dest_v is Dictionary:
+		by_dest = by_dest_v
+	if by_dest.has(dest):
+		var cached_v: Variant = by_dest[dest]
+		if cached_v is Dictionary:
+			var cached: Dictionary = cached_v
+			if int(cached.get("epoch", -1)) == _ai_board_epoch:
+				var hops_v: Variant = cached.get("hops", {})
+				if hops_v is Dictionary:
+					return hops_v
+			_ai_hop_rebuild_hops += 1
+	var adj := _ai_ensure_own_land_adj(t)
 	var hops: Dictionary = {dest: 0}
 	var q: Array[int] = [dest]
 	var qi := 0
@@ -1326,7 +1636,7 @@ func _ai_hops_from(tag: String, dest: int) -> Dictionary:
 		var n := q[qi]
 		qi += 1
 		var nh := int(hops.get(n, 0))
-		var nbs_v: Variant = _ai_own_land_adj.get(n, [])
+		var nbs_v: Variant = adj.get(n, [])
 		if not (nbs_v is Array):
 			continue
 		for nid_v in nbs_v:
@@ -1335,6 +1645,8 @@ func _ai_hops_from(tag: String, dest: int) -> Dictionary:
 				continue
 			hops[nid] = nh + 1
 			q.append(nid)
+	by_dest[dest] = {"epoch": _ai_board_epoch, "hops": hops}
+	_ai_hops_by_tag_dest[t] = by_dest
 	return hops
 
 
@@ -1353,10 +1665,13 @@ func _ai_military_strength_cached(tag: String) -> float:
 
 
 func _ai_war_row(tag: String, other: String) -> Dictionary:
-	if typeof(WarStateDomain) == TYPE_NIL or typeof(GameData) == TYPE_NIL:
+	if typeof(WarStateDomain) == TYPE_NIL:
 		return {}
-	var key := WarStateDomain.pair_key(tag, other)
-	if key.is_empty():
+	return _ai_war_row_by_key(WarStateDomain.pair_key(tag, other))
+
+
+func _ai_war_row_by_key(key: String) -> Dictionary:
+	if key.is_empty() or typeof(GameData) == TYPE_NIL:
 		return {}
 	var raw: Variant = GameData.peace_state.get("campaign_wars", {})
 	if not (raw is Dictionary):
@@ -1368,6 +1683,120 @@ func _ai_war_row(tag: String, other: String) -> Dictionary:
 	if row_v is Dictionary:
 		return row_v
 	return {}
+
+
+func _ai_war_row_pack(key: String) -> Dictionary:
+	if key.is_empty() or typeof(GameData) == TYPE_NIL:
+		return {}
+	var raw: Variant = GameData.peace_state.get("campaign_wars", {})
+	if not (raw is Dictionary):
+		return {}
+	var st: Dictionary = raw
+	var wars_v: Variant = st.get("wars", {})
+	if not (wars_v is Dictionary):
+		return {}
+	var wars: Dictionary = wars_v
+	if not wars.has(key):
+		return {}
+	var row_v: Variant = wars[key]
+	if not (row_v is Dictionary):
+		return {}
+	return {"st": st, "wars": wars, "row": row_v}
+
+
+func _ai_sorted_unique_pids(raw: Array) -> Array:
+	var seen: Dictionary = {}
+	var out: Array = []
+	for v in raw:
+		var pid := int(v)
+		if pid <= 0 or seen.has(pid):
+			continue
+		seen[pid] = true
+		out.append(pid)
+	out.sort()
+	return out
+
+
+func _ai_record_war_capture(att_tag: String, prev_owner: String, pid: int) -> void:
+	var t := att_tag.strip_edges().to_upper()
+	var prev := prev_owner.strip_edges().to_upper()
+	if t.is_empty() or prev.is_empty() or prev == t or pid <= 0:
+		return
+	if typeof(WarStateDomain) == TYPE_NIL:
+		return
+	var key := WarStateDomain.pair_key(t, prev)
+	var packed := _ai_war_row_pack(key)
+	if packed.is_empty():
+		return
+	var st: Dictionary = packed["st"] as Dictionary
+	var wars: Dictionary = packed["wars"] as Dictionary
+	var row: Dictionary = packed["row"] as Dictionary
+	var caps_v: Variant = row.get("captured_pids", {})
+	var caps: Dictionary = {}
+	if caps_v is Dictionary:
+		caps = caps_v
+	var arr_v: Variant = caps.get(t, [])
+	var arr: Array = []
+	if arr_v is Array:
+		arr = arr_v.duplicate()
+	arr.append(pid)
+	caps[t] = _ai_sorted_unique_pids(arr)
+	row["captured_pids"] = caps
+	wars[key] = row
+	st["wars"] = wars
+	GameData.peace_state["campaign_wars"] = st
+
+
+func _ai_clear_war_capture_pid(tag: String, pid: int) -> void:
+	var t := tag.strip_edges().to_upper()
+	if t.is_empty() or pid <= 0 or typeof(GameData) == TYPE_NIL:
+		return
+	var raw: Variant = GameData.peace_state.get("campaign_wars", {})
+	if not (raw is Dictionary):
+		return
+	var st: Dictionary = raw
+	var wars_v: Variant = st.get("wars", {})
+	if not (wars_v is Dictionary):
+		return
+	var wars: Dictionary = wars_v
+	var changed := false
+	for key_v in wars.keys():
+		var key := str(key_v)
+		var parts := key.split("|")
+		if parts.size() < 2:
+			continue
+		if t != str(parts[0]) and t != str(parts[1]):
+			continue
+		var row_v: Variant = wars[key]
+		if not (row_v is Dictionary):
+			continue
+		var row: Dictionary = row_v
+		var caps_v: Variant = row.get("captured_pids", {})
+		if not (caps_v is Dictionary):
+			continue
+		var caps: Dictionary = caps_v
+		var arr_v: Variant = caps.get(t, [])
+		if not (arr_v is Array):
+			continue
+		var kept: Array = []
+		var dropped := false
+		for pid_v in arr_v:
+			if int(pid_v) == pid:
+				dropped = true
+				continue
+			kept.append(int(pid_v))
+		if not dropped:
+			continue
+		if kept.is_empty():
+			caps.erase(t)
+		else:
+			caps[t] = _ai_sorted_unique_pids(kept)
+		row["captured_pids"] = caps
+		wars[key] = row
+		changed = true
+	if changed:
+		st["wars"] = wars
+		GameData.peace_state["campaign_wars"] = st
 
 
 func _ai_war_day(tag: String, def_tag: String) -> int:
@@ -1440,12 +1869,26 @@ func _ai_offensive_ramp_ok(tag: String, def_tag: String, to_id: int) -> bool:
 	if sr < 1.0:
 		return true
 	var wd := _ai_war_day(tag, def_tag)
-	if wd < RAMP_HOLD_DAYS or sr < RAMP_SR_MIN:
+	if wd < RAMP_HOLD_DAYS:
+		return false
+	if sr < RAMP_SR_MIN:
+		_ai_log_ramp_sr_block(tag, def_tag, sr)
 		return false
 	var gap := _ai_ramp_gap(wd)
 	if sr >= RAMP_SR_FAST and wd >= 111:
 		gap = int(ceil(float(gap) * 2.0 / 3.0))
 	return _ai_day() - _ai_last_new_capture_day(tag, def_tag) >= gap
+
+
+func _ai_log_ramp_sr_block(tag: String, target: String, sr: float) -> void:
+	var t := tag.strip_edges().to_upper()
+	var o := target.strip_edges().to_upper()
+	var day := _ai_day()
+	var key := "%s|%s" % [t, o]
+	if int(_ai_ramp_sr_block_day.get(key, -1)) == day:
+		return
+	_ai_ramp_sr_block_day[key] = day
+	print("AI_RAMP_BLOCK day=%d tag=%s target=%s sr=%.3f min=%.3f" % [day, t, o, sr, RAMP_SR_MIN])
 
 
 func _province_owner(pid: int) -> String:
@@ -1975,6 +2418,13 @@ func apply_save_data(data: Dictionary) -> void:
 	_retake_cooldown.clear()
 	_retake_blocked.clear()
 	_ai_stall.clear()
+	_ai_adj_by_tag.clear()
+	_ai_hops_by_tag_dest.clear()
+	_ai_facing_by_pair.clear()
+	_ai_raise_skip_cap_day.clear()
+	_ai_ramp_sr_block_day.clear()
+	reset_ai_hop_cache_counts()
+	bump_ai_board_epoch()
 	if data.is_empty():
 		return
 	_load_retake_cooldown(data)
@@ -2676,8 +3126,13 @@ func reset_ai_war1_for_test() -> void:
 	_attack_reject.clear()
 	_ai_str_cache_day = -1
 	_ai_str_cache.clear()
-	_ai_hop_war_key = ""
-	_ai_own_land_adj.clear()
+	_ai_adj_by_tag.clear()
+	_ai_hops_by_tag_dest.clear()
+	_ai_facing_by_pair.clear()
+	_ai_raise_skip_cap_day.clear()
+	_ai_ramp_sr_block_day.clear()
+	reset_ai_hop_cache_counts()
+	bump_ai_board_epoch()
 	if typeof(FormationMovement) != TYPE_NIL:
 		FormationMovement.apply_save_data({})
 
@@ -3154,7 +3609,13 @@ func _apply_attacker_win_capture_light(att_tag: String, to_id: int, from_id: int
 		_ai_drop_commit_if_hex_lost(to_id, tag)
 		if previous_owner != tag:
 			_ai_stamp_last_new_capture_day(tag, previous_owner)
+			_ai_record_war_capture(tag, previous_owner, to_id)
+		_ai_clear_war_capture_pid(previous_owner, to_id)
+		if previous_controller != "" and previous_controller != previous_owner and previous_controller != tag:
+			_ai_clear_war_capture_pid(previous_controller, to_id)
 	var liberation := previous_owner == tag and previous_controller != "" and previous_controller != tag and ctrl_now == tag
+	if liberation:
+		_ai_clear_war_capture_pid(previous_controller, to_id)
 	print(
 		"MAIN_FIX1_CAPTURE_SRC who=BattleManager._apply_attacker_win_capture_light pid=%d name=%s attacker=%s prev_owner=%s prev_ctrl=%s now_owner=%s now_ctrl=%s owner_flip=%s ctrl_flip=%s"
 		% [to_id, pname, tag, previous_owner, previous_controller, owner_now, ctrl_now, str(owner_flipped), str(ctrl_flipped)]

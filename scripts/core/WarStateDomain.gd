@@ -163,6 +163,7 @@ static func reset_for_test() -> void:
 	}
 	_booting = false
 	_reject_counters = {}
+	_bump_ai_board_epoch()
 
 
 static func _apply_configured_wars() -> void:
@@ -223,6 +224,7 @@ static func declare_war(attacker: String, defender: String, goal: String = "") -
 	if goal != "call_to_arms":
 		called = _call_to_arms(a, b)
 	_note_war_audio()
+	_bump_ai_board_epoch()
 	return {"ok": true, "pair": key, "called": called, "day": day}
 
 
@@ -399,6 +401,7 @@ static func make_peace(a: String, b: String, reason: String = "") -> Dictionary:
 	_sync_at_war(_tag(a))
 	_sync_at_war(_tag(b))
 	invalidate_fronts()
+	_bump_ai_board_epoch()
 	return {"ok": true, "pair": key, "until_day": until, "reason": reason}
 
 
@@ -425,6 +428,13 @@ static func invalidate_fronts() -> void:
 		return
 	if "_live_fronts_precompute" in MapManager:
 		MapManager._live_fronts_precompute = {}
+
+
+static func _bump_ai_board_epoch() -> void:
+	if typeof(BattleManager) == TYPE_NIL:
+		return
+	if BattleManager.has_method("bump_ai_board_epoch"):
+		BattleManager.bump_ai_board_epoch()
 
 
 static func ai_stopped() -> bool:
@@ -921,6 +931,7 @@ static func note_province_owner_changed(
 	previous_owner: String = "",
 	previous_controller: String = "",
 ) -> void:
+	_bump_ai_board_epoch()
 	if not loop_enabled():
 		return
 	# A captured hex is no longer a front. The precompute cache would keep

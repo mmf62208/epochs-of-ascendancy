@@ -59,6 +59,9 @@ func _run() -> void:
 	_test_b_retreat_join(mm, sm, bm, lm)
 	_test_cdf_aivai(mm, sm, bm, tm, lm)
 	_test_e_human_ger(mm, sm, bm, tm, lm)
+	_test_h_captured_no_raise(mm, sm, bm, tm, lm)
+	_test_i_raise_cap(mm, sm, bm, tm, lm)
+	_test_j_hop_cache(mm, sm, bm, tm, lm)
 	_finish()
 
 
@@ -93,6 +96,21 @@ func _assert_source() -> void:
 		return
 	if "_is_player_or_human_nation(tag):" not in bm_src:
 		_fail("mutant: B0 human skip missing")
+		return
+	if "func _ai_is_war_captured" not in bm_src:
+		_fail("mutant: _ai_is_war_captured missing")
+		return
+	if "const RAISE_WAR_BUDGET_FRAC := 0.10" not in bm_src:
+		_fail("mutant: RAISE_WAR_BUDGET_FRAC missing")
+		return
+	if "const RAISE_MIN_GAP_DAYS := 7" not in bm_src:
+		_fail("mutant: RAISE_MIN_GAP_DAYS missing")
+		return
+	if "AI_HOP_CACHE day=" not in bm_src:
+		_fail("mutant: AI_HOP_CACHE print missing")
+		return
+	if "captured_pids" not in bm_src:
+		_fail("mutant: captured_pids missing")
 		return
 	_pass("source mutants killed")
 
@@ -219,6 +237,7 @@ func _test_cdf_aivai(mm: Node, sm: Node, bm: Node, tm: Node, lm: Node) -> void:
 		_fail("(c) declare GER-POL failed")
 		return
 	var start_pol: Dictionary = _owned_set(mm, "POL")
+	var start_ger: Dictionary = _owned_set(mm, "GER")
 	var start_stations: Dictionary = _ger_stations(lm)
 	var enemy_touch: Dictionary = {}
 	for fid in start_stations.keys():
@@ -239,6 +258,15 @@ func _test_cdf_aivai(mm: Node, sm: Node, bm: Node, tm: Node, lm: Node) -> void:
 			)
 		if day == 5:
 			d4_ok = _assert_c_d(mm, bm, lm, start_stations, enemy_touch)
+		if day == 14 or day == 21 or day == 30 or day == 60:
+			var ger_lost := 0
+			for pid_v in start_ger.keys():
+				if _owner(mm, int(pid_v)) != "GER":
+					ger_lost += 1
+			print(
+				"SIM1110A_AB d%d ger_net_lost=%d pol_divs=%d pol_garr=%d"
+				% [day, ger_lost, _div_n(lm, "POL"), _garrison_n(lm, "POL")]
+			)
 		if day == RAMP_HOLD_CHECK_DAY:
 			new_caps_d20 = _new_polish_captures(mm, start_pol)
 			print("SIM1110A_F d20 new_pol_caps=%d" % new_caps_d20)
@@ -357,6 +385,214 @@ func _test_e_human_ger(mm: Node, sm: Node, bm: Node, tm: Node, lm: Node) -> void
 		return
 	_pass("(e) human GER: no cover/reinforce/raise in %d days" % HUMAN_DAYS)
 	var _unused_bm := bm
+
+
+func _test_h_captured_no_raise(mm: Node, sm: Node, bm: Node, tm: Node, lm: Node) -> void:
+	if not bm.has_method("_ai_is_war_captured"):
+		_fail("(h) _ai_is_war_captured missing")
+		return
+	if not _boot_as(mm, sm, bm, lm, "USA", true):
+		return
+	if not lm.has_method("seed_1936_start_garrisons"):
+		_fail("(h) seed missing")
+		return
+	lm.call("seed_1936_start_garrisons", true)
+	if not bool(_war.declare_war("GER", "POL", "test").get("ok", false)):
+		_fail("(h) declare GER-POL failed")
+		return
+	var pair := _border_pair(mm, "GER", "POL")
+	if pair.size() < 2:
+		_fail("(h) no GER-POL border")
+		return
+	var ger_pid := int(pair[0])
+	var pol_pid := int(pair[1])
+	var ger_from := _first_own_land_neighbor(mm, ger_pid, "GER")
+	if ger_from <= 0:
+		ger_from = ger_pid
+	var before_fids: Dictionary = _garrison_fid_set(lm, "POL")
+	bm.call("_apply_attacker_win_capture_light", "POL", ger_pid, pol_pid, "")
+	if _owner(mm, ger_pid) != "POL":
+		_fail("(h) capture did not flip owner pid=%d owner=%s" % [ger_pid, _owner(mm, ger_pid)])
+		return
+	_vacate_tag_at(lm, "POL", ger_pid, pol_pid)
+	if not bool(bm.call("_ai_is_war_captured", "POL", ger_pid)):
+		_fail("(h) captured pid %d not in POL captured_pids" % ger_pid)
+		return
+	var caps := _captured_pids_for("POL", "GER")
+	if not caps.has(ger_pid):
+		_fail("(h) war row captured_pids missing %d got %s" % [ger_pid, str(caps.keys())])
+		return
+	var gd := get_root().get_node_or_null("GameData")
+	if gd == null:
+		_fail("(h) GameData missing")
+		return
+	var saved: Dictionary = gd.call("get_save_data")
+	var saved_cw_v: Variant = saved.get("campaign_wars", {})
+	if not (saved_cw_v is Dictionary):
+		_fail("(h) get_save_data missing campaign_wars")
+		return
+	var saved_cw: Dictionary = (saved_cw_v as Dictionary).duplicate(true)
+	var wars_live: Dictionary = ((gd.peace_state.get("campaign_wars", {}) as Dictionary).get("wars", {}) as Dictionary)
+	var key := "GER|POL"
+	if wars_live.has(key):
+		var row_wipe: Dictionary = wars_live[key] as Dictionary
+		row_wipe["captured_pids"] = {}
+		wars_live[key] = row_wipe
+	gd.call("apply_save_data", {"campaign_wars": saved_cw})
+	if not bool(bm.call("_ai_is_war_captured", "POL", ger_pid)):
+		_fail("(h) captured list did not survive save/load")
+		return
+	_pass("(h) captured list survived save/load pid=%d" % ger_pid)
+	bm.call("try_ai_cover_threatened_borders")
+	var after_fids: Dictionary = _garrison_fid_set(lm, "POL")
+	var raised_on_cap := 0
+	for fid_v in after_fids.keys():
+		if before_fids.has(fid_v):
+			continue
+		var f: Object = lm.call("get_formation", str(fid_v)) if lm.has_method("get_formation") else null
+		if f == null:
+			continue
+		if int(f.get("stationed_province_id")) == ger_pid:
+			raised_on_cap += 1
+	print("SIM1110A_H pid=%d raised_on_captured=%d pol_garr=%d" % [ger_pid, raised_on_cap, after_fids.size()])
+	if raised_on_cap > 0:
+		_fail("(h) raised %d new garrisons on captured pid %d" % [raised_on_cap, ger_pid])
+		return
+	bm.call("_apply_attacker_win_capture_light", "GER", ger_pid, ger_from, "")
+	if bool(bm.call("_ai_is_war_captured", "POL", ger_pid)):
+		_fail("(h) captured pid %d still listed after GER retake" % ger_pid)
+		return
+	_pass("(h) retake cleared captured pid")
+	bm.call("_apply_attacker_win_capture_light", "POL", ger_pid, pol_pid, "")
+	if not bool(bm.call("_ai_is_war_captured", "POL", ger_pid)):
+		_fail("(h) recapture did not re-list pid")
+		return
+	_war.make_peace("GER", "POL", "test")
+	if bool(bm.call("_ai_is_war_captured", "POL", ger_pid)):
+		_fail("(h) captured list survived peace")
+		return
+	_pass("(h) 0 raises on war-captured land; list clears on retake and peace")
+	var _unused_h := [sm, tm]
+
+
+func _test_i_raise_cap(mm: Node, sm: Node, bm: Node, tm: Node, lm: Node) -> void:
+	if not bm.has_method("_ai_raise_budget"):
+		_fail("(i) _ai_raise_budget missing")
+		return
+	if not _boot_as(mm, sm, bm, lm, "USA", true):
+		return
+	if not lm.has_method("seed_1936_start_garrisons"):
+		_fail("(i) seed missing")
+		return
+	lm.call("seed_1936_start_garrisons", true)
+	var seed_n := int(bm.call("_ai_garrison_seed_n", "POL"))
+	var budget := int(bm.call("_ai_raise_budget", "POL"))
+	var want := mini(10, maxi(1, int(ceil(float(seed_n) * 0.10))))
+	print("SIM1110A_I seed_n=%d budget=%d want=%d" % [seed_n, budget, want])
+	if budget != want:
+		_fail("(i) budget %d != clampi(ceil(seed_n*0.10),1,10)=%d seed_n=%d" % [budget, want, seed_n])
+		return
+	if seed_n == 33 and budget != 4:
+		_fail("(i) POL 33 seed should budget 4 got %d" % budget)
+		return
+	if not bool(_war.declare_war("GER", "POL", "test").get("ok", false)):
+		_fail("(i) declare GER-POL failed")
+		return
+	var pair := _border_pair(mm, "GER", "POL")
+	if pair.size() < 2:
+		_fail("(i) no GER-POL border")
+		return
+	var ger_pid := int(pair[0])
+	var pol_pid := int(pair[1])
+	var dest := _ger_facing_pol_pid(mm, pol_pid)
+	if dest <= 0:
+		_fail("(i) no POL dest to park vacated units")
+		return
+	_boot.make_division("sim1110a_i_ger", "GER", ger_pid)
+	var kept := false
+	for f in lm.call("get_formations_for_country", "POL"):
+		if f == null or not bool(f.get_meta("garrison_1936", false)):
+			continue
+		if not kept:
+			f.stationed_province_id = dest
+			kept = true
+			continue
+		f.set_meta("garrison_1936", false)
+	if not kept:
+		_fail("(i) POL had no garrison_1936 to keep cover active")
+		return
+	_keep_one_pol_garrison_1936(lm, dest)
+	_vacate_tag_at(lm, "POL", pol_pid, dest)
+	var start_n := _garrison_n(lm, "POL")
+	var raise_days: Array[int] = []
+	for day in range(0, 30):
+		tm.set("total_days_elapsed", day)
+		_vacate_tag_at(lm, "POL", pol_pid, dest)
+		_keep_one_pol_garrison_1936(lm, dest)
+		var n_before := _garrison_n(lm, "POL")
+		var cov: Dictionary = bm.call("try_ai_cover_threatened_borders")
+		var now_n := _garrison_n(lm, "POL")
+		if day < 3 or int(cov.get("raised", 0)) > 0:
+			print(
+				"SIM1110A_I day=%d raised=%s moved=%s pol_n=%d owner=%s"
+				% [day, str(cov.get("raised", -1)), str(cov.get("moved", -1)), now_n, _owner(mm, pol_pid)]
+			)
+		if now_n > n_before:
+			raise_days.append(day)
+	var row: Dictionary = bm.call("_ai_war_row", "POL", "GER")
+	var raises_map: Dictionary = row.get("raises_by_tag", {}) as Dictionary
+	var charged := int(raises_map.get("POL", 0))
+	print("SIM1110A_I raises_days=%s charged=%d start_n=%d now=%d" % [str(raise_days), charged, start_n, _garrison_n(lm, "POL")])
+	if charged < 1 and raise_days.is_empty():
+		_fail("(i) no POL raises observed; cap test did not bite")
+		return
+	if charged > budget:
+		_fail("(i) POL raises %d > budget %d" % [charged, budget])
+		return
+	if raise_days.size() > budget:
+		_fail("(i) observed %d POL raises > budget %d" % [raise_days.size(), budget])
+		return
+	for i in range(1, raise_days.size()):
+		if int(raise_days[i]) - int(raise_days[i - 1]) < 7:
+			_fail("(i) raise gap %d days < 7 (%s)" % [int(raise_days[i]) - int(raise_days[i - 1]), str(raise_days)])
+			return
+	_pass("(i) POL raises <= %d with >=7 day gap (charged=%d days=%s)" % [budget, charged, str(raise_days)])
+	var _unused_i := sm
+
+
+func _test_j_hop_cache(mm: Node, sm: Node, bm: Node, tm: Node, lm: Node) -> void:
+	if not bm.has_method("ai_hop_cache_counts") or not bm.has_method("reset_ai_hop_cache_counts"):
+		_fail("(j) hop cache counters missing")
+		return
+	if not _boot_as(mm, sm, bm, lm, "USA", true):
+		return
+	if not lm.has_method("seed_1936_start_garrisons"):
+		_fail("(j) seed missing")
+		return
+	lm.call("seed_1936_start_garrisons", true)
+	if not bool(_war.declare_war("GER", "POL", "test").get("ok", false)):
+		_fail("(j) declare GER-POL failed")
+		return
+	bm.call("_ai_hops_from", "GER", GLIWICKI)
+	bm.call("_ai_hexes_facing_tag", "GER", "FRA")
+	bm.call("reset_ai_hop_cache_counts")
+	bm.call("_ai_hops_from", "GER", GLIWICKI)
+	bm.call("_ai_hexes_facing_tag", "GER", "FRA")
+	var quiet: Dictionary = bm.call("ai_hop_cache_counts")
+	print("SIM1110A_J quiet adj=%s hops=%s facing=%s" % [str(quiet.get("adj", -1)), str(quiet.get("hops", -1)), str(quiet.get("facing", -1))])
+	if int(quiet.get("adj", -1)) != 0 or int(quiet.get("hops", -1)) != 0 or int(quiet.get("facing", -1)) != 0:
+		_fail("(j) rebuilds on a no-event day adj=%s hops=%s facing=%s" % [str(quiet.get("adj")), str(quiet.get("hops")), str(quiet.get("facing"))])
+		return
+	bm.call("bump_ai_board_epoch")
+	bm.call("_ai_hops_from", "GER", GLIWICKI)
+	bm.call("_ai_hexes_facing_tag", "GER", "FRA")
+	var after: Dictionary = bm.call("ai_hop_cache_counts")
+	print("SIM1110A_J after_epoch adj=%s hops=%s facing=%s" % [str(after.get("adj", -1)), str(after.get("hops", -1)), str(after.get("facing", -1))])
+	if int(after.get("adj", 0)) + int(after.get("hops", 0)) + int(after.get("facing", 0)) <= 0:
+		_fail("(j) no rebuild after epoch bump")
+		return
+	_pass("(j) hop cache quiet on no-event day; rebuilds after epoch")
+	var _unused_j := [sm, tm]
 
 
 func _retreat_join_fixture(mm: Node) -> Array[int]:
@@ -500,3 +736,119 @@ func _ctrl(mm: Node, pid: int) -> String:
 	if c.is_empty():
 		c = str(p.get("owner_tag")).strip_edges().to_upper()
 	return c
+
+
+func _garrison_fid_set(lm: Node, tag: String) -> Dictionary:
+	var out: Dictionary = {}
+	for f in lm.call("get_formations_for_country", tag):
+		if f == null or not bool(f.get_meta("garrison_1936", false)):
+			continue
+		out[str(f.formation_id)] = int(f.stationed_province_id)
+	return out
+
+
+func _garrison_n(lm: Node, tag: String) -> int:
+	return _garrison_fid_set(lm, tag).size()
+
+
+func _div_n(lm: Node, tag: String) -> int:
+	var n := 0
+	for f in lm.call("get_formations_for_country", tag):
+		if f == null:
+			continue
+		var ft := str(f.formation_type) if "formation_type" in f else ""
+		if ft == "division" or ft == "garrison":
+			n += 1
+	return n
+
+
+func _keep_one_pol_garrison_1936(lm: Node, dest: int) -> void:
+	var kept := false
+	for f in lm.call("get_formations_for_country", "POL"):
+		if f == null or not bool(f.get_meta("garrison_1936", false)):
+			continue
+		if not kept:
+			if dest > 0:
+				f.stationed_province_id = dest
+			kept = true
+			continue
+		f.set_meta("garrison_1936", false)
+
+
+func _vacate_tag_at(lm: Node, tag: String, pid: int, dest: int) -> void:
+	if dest <= 0 or dest == pid:
+		return
+	for f in lm.call("get_formations_for_country", tag):
+		if f == null:
+			continue
+		if int(f.stationed_province_id) != pid:
+			continue
+		f.stationed_province_id = dest
+
+
+func _captured_pids_for(tag: String, other: String) -> Dictionary:
+	var out: Dictionary = {}
+	var gd := get_root().get_node_or_null("GameData")
+	if gd == null:
+		return out
+	var raw: Variant = gd.peace_state.get("campaign_wars", {})
+	if not (raw is Dictionary):
+		return out
+	var wars_v: Variant = (raw as Dictionary).get("wars", {})
+	if not (wars_v is Dictionary):
+		return out
+	var key := "GER|POL"
+	if tag > other:
+		key = "%s|%s" % [other, tag]
+	else:
+		key = "%s|%s" % [tag, other]
+	var row_v: Variant = (wars_v as Dictionary).get(key, {})
+	if not (row_v is Dictionary):
+		return out
+	var caps_v: Variant = (row_v as Dictionary).get("captured_pids", {})
+	if not (caps_v is Dictionary):
+		return out
+	var arr_v: Variant = (caps_v as Dictionary).get(tag, [])
+	if not (arr_v is Array):
+		return out
+	for pid_v in arr_v:
+		out[int(pid_v)] = true
+	return out
+
+
+func _ger_facing_pol_pid(mm: Node, skip: int) -> int:
+	var owned: Array = mm.call("get_provinces_by_owner", "POL")
+	var ids: Array[int] = []
+	for pid_v in owned:
+		ids.append(int(pid_v))
+	ids.sort()
+	for pid in ids:
+		if pid == skip:
+			continue
+		var p: Object = mm.call("get_province", pid)
+		if p == null or bool(p.get("is_sea")):
+			continue
+		if _first_own_land_neighbor(mm, pid, "GER") > 0:
+			return pid
+	return _other_pol_pid(mm, skip)
+
+
+func _other_pol_pid(mm: Node, skip: int) -> int:
+	var owned: Array = mm.call("get_provinces_by_owner", "POL")
+	var ids: Array[int] = []
+	for pid_v in owned:
+		ids.append(int(pid_v))
+	ids.sort()
+	for pid in ids:
+		if pid == skip:
+			continue
+		var p: Object = mm.call("get_province", pid)
+		if p == null or bool(p.get("is_sea")):
+			continue
+		if _first_own_land_neighbor(mm, pid, "GER") > 0:
+			continue
+		return pid
+	for pid2 in ids:
+		if pid2 != skip:
+			return pid2
+	return -1
