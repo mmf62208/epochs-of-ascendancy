@@ -46,16 +46,19 @@ var _confirm_wrap: HBoxContainer
 var _footer_right: HBoxContainer
 var _cinzel: FontFile
 var _current: Dictionary = {}
+var _hug_frames_left: int = 0
+var _locked_width: float = CARD_WIDTH
 
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	focus_mode = Control.FOCUS_NONE
+	set_meta("blocks_edge_pan", true)
 	custom_minimum_size = Vector2(CARD_WIDTH, 0)
 	_load_font()
 	_build()
 	visible = false
-	set_process(true)
+	set_process(false)
 
 
 func present(model: Dictionary) -> void:
@@ -107,6 +110,8 @@ func present(model: Dictionary) -> void:
 		_progress_wrap.visible = false
 	visible = bool(model.get("visible", true))
 	_fit_width(accent)
+	_hug_frames_left = 3
+	set_process(visible)
 	_hug_content()
 	call_deferred("_reflow")
 
@@ -212,7 +217,11 @@ func _build() -> void:
 	_dont.text = "Don't show the guide again"
 	_dont.focus_mode = Control.FOCUS_NONE
 	_dont.mouse_filter = Control.MOUSE_FILTER_STOP
-	_dont.add_theme_color_override("font_color", RetrowaveTheme.TEXT_DIM)
+	_dont.add_theme_color_override("font_color", RetrowaveTheme.TEXT_PRIMARY)
+	_dont.add_theme_color_override("font_hover_color", RetrowaveTheme.CYAN)
+	_dont.add_theme_color_override("font_pressed_color", RetrowaveTheme.CYAN)
+	_dont.add_theme_constant_override("h_separation", 8)
+	_style_dont_show_box()
 	_dont.toggled.connect(_on_dont)
 	col.add_child(_dont)
 
@@ -299,6 +308,59 @@ func _style_focusless(btn: Button) -> void:
 	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 
 
+func _gui_input(event: InputEvent) -> void:
+	if not visible:
+		return
+	if event is InputEventMouseButton or event is InputEventMouseMotion:
+		accept_event()
+		var vp := get_viewport()
+		if vp != null:
+			vp.set_input_as_handled()
+
+
+func _style_dont_show_box() -> void:
+	if _dont == null:
+		return
+	var unchecked := _make_check_icon(false)
+	var checked := _make_check_icon(true)
+	for key in [
+		"unchecked", "unchecked_disabled", "unchecked_hover", "unchecked_pressed",
+		"checked", "checked_disabled", "checked_hover", "checked_pressed",
+	]:
+		_dont.add_theme_icon_override(str(key), checked if str(key).begins_with("checked") else unchecked)
+
+
+func _make_check_icon(on: bool) -> Texture2D:
+	var img := Image.create(16, 16, false, Image.FORMAT_RGBA8)
+	var bg := Color("#0f1528")
+	var border := RetrowaveTheme.CYAN
+	var fill := RetrowaveTheme.CYAN
+	img.fill(Color(0, 0, 0, 0))
+	var x := 0
+	while x < 16:
+		var y := 0
+		while y < 16:
+			var edge := x == 0 or y == 0 or x == 15 or y == 15
+			if edge:
+				img.set_pixel(x, y, border)
+			elif x >= 2 and y >= 2 and x <= 13 and y <= 13:
+				img.set_pixel(x, y, bg)
+			y += 1
+		x += 1
+	if on:
+		var i := 4
+		while i <= 7:
+			img.set_pixel(i, 8 + (7 - i), fill)
+			img.set_pixel(i, 9 + (7 - i), fill)
+			i += 1
+		i = 7
+		while i <= 12:
+			img.set_pixel(i, i - 2, fill)
+			img.set_pixel(i, i - 1, fill)
+			i += 1
+	return ImageTexture.create_from_image(img)
+
+
 func _arm_swallow() -> void:
 	_CloseReleaseSwallow.arm_from(self)
 
@@ -367,28 +429,38 @@ func _apply_frame(accent: Color) -> void:
 
 
 func _process(_delta: float) -> void:
-	# present() hugs immediately, but a Label's wrapped minimum arrives a frame later.
-	# Keep shrinking until the laid-out minimum is the card height.
+	# One-shot wrap settle after present(). Idle hug was an autowrap fit loop:
+	# size=(w,0) + reset_size() flipped the wrap min-width every frame.
+	if not visible or _hug_frames_left <= 0:
+		set_process(false)
+		return
 	var before := size
 	_hug_content()
+	_hug_frames_left -= 1
 	if not size.is_equal_approx(before):
 		reflow_requested.emit()
+	if _hug_frames_left <= 0:
+		set_process(false)
 
 
 func _hug_content() -> void:
-	var w := custom_minimum_size.x
+	var w := _locked_width
+	if w < 8.0:
+		w = custom_minimum_size.x
 	if w < 8.0:
 		w = CARD_WIDTH
+	custom_minimum_size = Vector2(w, 0)
 	update_minimum_size()
-	# Drop the stale height first so Godot recomputes the wrapped minimum.
-	size = Vector2(w, 0)
-	reset_size()
 	var fitted := get_combined_minimum_size()
 	var h := fitted.y
 	var limit := _height_limit()
 	if h > limit - 1.0:
 		h = maxf(1.0, limit - 1.0)
-	size = Vector2(maxf(w, fitted.x), h)
+	if h < 1.0:
+		h = 1.0
+	# Width stays at the fitted slot. Never zero the size: that retriggers
+	# Label autowrap min-width and makes Got it slide.
+	size = Vector2(w, h)
 
 
 func _height_limit() -> float:
@@ -430,8 +502,15 @@ func _fit_width(_accent: Color) -> void:
 		w = CARD_WIDTH_NARROW
 	elif str(_current.get("accent", "")) == "magenta":
 		w = CARD_WIDTH_WAR
-	custom_minimum_size.x = w
-	_body.custom_minimum_size.x = maxf(200.0, w - 32.0)
+	# Final card: checkbox + Skip tutorial + Got it need a stable floor.
+	if str(_current.get("kind", "")) == "final":
+		w = maxf(w, CARD_WIDTH)
+	_locked_width = w
+	custom_minimum_size = Vector2(w, 0)
+	var wrap_w := maxf(200.0, w - 32.0)
+	_body.custom_minimum_size.x = wrap_w
+	_title.custom_minimum_size.x = wrap_w
+	_status.custom_minimum_size.x = wrap_w
 
 
 func _accent_color(name: String) -> Color:

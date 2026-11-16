@@ -260,7 +260,8 @@ func _process(delta: float) -> void:
 	# see may keep the map deaf. A dismiss click's release stays gated until
 	# the button is up so that release cannot still-click the map.
 	var prompt_up := _prompt != null and is_instance_valid(_prompt) and _prompt.is_visible_in_tree()
-	if prompt_up:
+	var card_owns := _card_owns_pointer()
+	if prompt_up or card_owns:
 		_gate_map_input(true)
 	else:
 		_release_map_after_prompt()
@@ -374,7 +375,8 @@ func _finish_flash() -> void:
 func _present_card(result: Dictionary) -> void:
 	if _card == null:
 		return
-	_card.present(result)
+	if not _card_model_unchanged(result):
+		_card.present(result)
 	_card.set_dont_show_again(_dont_show)
 	_spotlight.visible = bool(result.get("spotlight", false))
 	_update_highlight(result)
@@ -459,18 +461,23 @@ func _center_prompt() -> void:
 
 
 func _input(event: InputEvent) -> void:
-	if _prompt == null or not _prompt.is_visible_in_tree():
+	if _prompt != null and _prompt.is_visible_in_tree():
+		if _is_prompt_wheel(event):
+			_mark_input_handled()
+			return
+		if _is_prompt_enter(event):
+			_prompt._on_show()
+			_mark_input_handled()
+			return
+		if _is_prompt_escape(event):
+			_prompt._on_know()
+			_mark_input_handled()
 		return
-	if _is_prompt_wheel(event):
-		_mark_input_handled()
-		return
-	if _is_prompt_enter(event):
-		_prompt._on_show()
-		_mark_input_handled()
-		return
-	if _is_prompt_escape(event):
-		_prompt._on_know()
-		_mark_input_handled()
+	if event is InputEventMouseButton or event is InputEventMouseMotion:
+		if _card_owns_event(event):
+			# Gate the map for this press. Do not mark handled: Got it still
+			# needs the GUI click. MapRenderer._input is what falls through.
+			_gate_map_input(true)
 
 
 func _on_blocker_gui_input(event: InputEvent) -> void:
@@ -542,6 +549,77 @@ func _mark_input_handled() -> void:
 	var vp := get_viewport()
 	if vp != null:
 		vp.set_input_as_handled()
+
+
+func _card_owns_pointer() -> bool:
+	if _card == null or not is_instance_valid(_card) or not _card.is_visible_in_tree():
+		return false
+	var vp := get_viewport()
+	if vp == null:
+		return false
+	var pos := vp.get_mouse_position()
+	if _card.get_global_rect().grow(2.0).has_point(pos):
+		return true
+	var hov: Control = vp.gui_get_hovered_control()
+	var n: Node = hov
+	while n != null:
+		if n == _card:
+			return true
+		n = n.get_parent()
+	return false
+
+
+func _card_owns_event(event: InputEvent) -> bool:
+	if _card == null or not is_instance_valid(_card) or not _card.is_visible_in_tree():
+		return false
+	if not (event is InputEventMouse):
+		return _card_owns_pointer()
+	var pos := (event as InputEventMouse).position
+	return _card.get_global_rect().grow(2.0).has_point(pos)
+
+
+func _card_model_unchanged(result: Dictionary) -> bool:
+	if _card == null or not _card.visible:
+		return false
+	var cur: Variant = _card.get("_current")
+	if not (cur is Dictionary):
+		return false
+	var prev: Dictionary = cur
+	for k in [
+		"step_id", "state", "title", "body", "status_text", "kind", "n",
+		"accent", "confirm_skip", "status_color", "status_bold",
+	]:
+		if str(prev.get(k, "")) != str(result.get(k, "")):
+			return false
+	if bool(prev.get("show_dont_show_again", false)) != bool(result.get("show_dont_show_again", false)):
+		return false
+	var prev_prog: Variant = prev.get("progress", {})
+	var next_prog: Variant = result.get("progress", {})
+	if str(prev_prog) != str(next_prog):
+		return false
+	return true
+
+
+func _has_map_focus_target(result: Dictionary) -> bool:
+	var spec_t: Variant = result.get("target", {})
+	var t: Dictionary = spec_t if spec_t is Dictionary else {}
+	var kind := str(t.get("kind", ""))
+	if kind == "own_border_unit" or kind == "node_in_unit_card" or kind == "map_province":
+		return true
+	var p1: Variant = result.get("p1_target", {})
+	if p1 is Dictionary and str((p1 as Dictionary).get("kind", "")) == "own_border_unit":
+		return true
+	var blob := "%s %s %s %s" % [
+		str(t.get("path", "")), str(t.get("name", "")),
+		str(t.get("p1_else", "")), str(t.get("p1_prefer", "")),
+	]
+	for needle in [
+		"DiplomacyButton", "BtnDeclareWar", "BtnOpenFight", "BtnStartBattle",
+		"TimeSpeedContainer", "BtnMarchArm",
+	]:
+		if blob.find(needle) >= 0:
+			return true
+	return false
 
 
 func _on_show_basics() -> void:
@@ -993,7 +1071,11 @@ func _play_step_sfx() -> void:
 
 
 func _play_sfx(key: String) -> void:
-	if typeof(AudioManager) != TYPE_NIL and AudioManager.has_method("play"):
+	if typeof(AudioManager) == TYPE_NIL:
+		return
+	if AudioManager.has_method("has_audio") and not bool(AudioManager.call("has_audio", key)):
+		return
+	if AudioManager.has_method("play"):
 		AudioManager.play(key)
 
 
@@ -1100,7 +1182,7 @@ func _place_card(result: Dictionary) -> void:
 	var target_global := _target_rect(result)
 	_highlight_rect = target_global
 	var target := _rect_to_host(target_global)
-	var has_target := target.size.x > 4.0 and target.size.y > 4.0
+	var has_target := target.size.x > 4.0 and target.size.y > 4.0 and _has_map_focus_target(result)
 	var avoids := _avoid_rects_host(target if has_target else Rect2())
 	var anchor := str(result.get("p1_anchor", ""))
 	var order: Array[String] = []
@@ -1359,7 +1441,11 @@ func _node_from_path(path: String) -> Node:
 func _update_highlight(result: Dictionary) -> void:
 	_highlight_rect = _target_rect(result)
 	if _highlight != null:
-		_highlight.visible = _highlight_rect.size.x > 4.0 and str(result.get("state", "")) != "done"
+		_highlight.visible = (
+			_has_map_focus_target(result)
+			and _highlight_rect.size.x > 4.0
+			and str(result.get("state", "")) != "done"
+		)
 		_highlight.queue_redraw()
 
 
