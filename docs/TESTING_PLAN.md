@@ -10,7 +10,7 @@
 
 ### 0-SIM-1110-A-R single-stack threat + cache
 
-Rescope of #192. `HeadlessSim1110aDefenceTest` keeps (k)(k2)(l)(m.2)(m.3) and **inverts m.1** (two adjacent stacks are not summed). New `HeadlessSim1110ARThreatCacheTest` T1–T5: not summed, 2-div stack still triggers, passive-human border no forward stacking, cache on/off same ctrl_md5 (with a real capture inside the window) + 0 quiet rebuilds, threat path never calls `get_formations_for_country` (live `_ai_threat_gffc_calls` + must-FAIL mutant). FIX r1 drops B2 offensive ramp (S1 soak regression). Wired on `--quick` after `HeadlessAiWar1Test` (same pattern as PR #193 `HeadlessCl1SiegeHold1Test`).
+Rescope of #192. `HeadlessSim1110aDefenceTest` keeps (k)(k2)(l)(m.2)(m.3) and **inverts m.1** (two adjacent stacks are not summed). New `HeadlessSim1110ARThreatCacheTest` T1–T5: not summed, 2-div stack still triggers, passive-human border no forward stacking, cache on/off same ctrl_md5 (with a real capture inside the window) + 0 quiet rebuilds, threat path never calls `get_formations_for_country` (live `_ai_threat_gffc_calls` + must-FAIL mutant). FIX r1: drop B2 ramp (S1 soak cause); keep DEF_STACK_MAX 3 (no soak delta); drop massing global one-dest (no soak delta). Wired on `--quick` after `HeadlessAiWar1Test` (same pattern as PR #193 `HeadlessCl1SiegeHold1Test`).
 
 ```bash
 XDG_DATA_HOME=$(mktemp -d) flock -n "$HOME/.eoa_godot.lock" \
