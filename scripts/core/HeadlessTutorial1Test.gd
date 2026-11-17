@@ -70,6 +70,7 @@ func _run() -> void:
 	_test_cue_log_wrap_and_battle()
 	_test_completed_does_not_autostart()
 	await _test_p1a_card_hugs_content()
+	await _test_p1a_card_hugs_late_wrap()
 	_test_p1a_fight_copy_and_done_hold()
 	_test_p1a_under_attack_keeps_fight_open()
 	await _test_p1a_target_rings()
@@ -823,6 +824,67 @@ func _test_p1a_card_hugs_content() -> void:
 	OS.set_environment("EOA_TUTORIAL", "")
 	print("  [INFO] HeadlessTutorial1Test: P1a card hug max wait frames=", hug_waited_max)
 	_pass("P1a card hugs content on steps 1, 5, 10, 12 and skip-confirm")
+
+
+func _test_p1a_card_hugs_late_wrap() -> void:
+	# Long→short, then leftover height after the original 3-frame hug window.
+	var guide := _guide()
+	var host: Control = null
+	var card: TutorialCard = null
+	if guide != null:
+		host = guide.get_node_or_null("FirstSessionLayer/GuideHost") as Control
+		card = guide.get("_card") as TutorialCard
+	if guide == null or host == null or card == null:
+		_fail("P1a late wrap hug: guide/host/card missing")
+		return
+	guide.set_process(false)
+	host.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	host.position = Vector2.ZERO
+	host.custom_minimum_size = Vector2(1280, 800)
+	host.size = Vector2(1280, 800)
+	await process_frame
+	var long_model := _p1a_active_model("welcome")
+	long_model["visible"] = true
+	long_model["title"] = "A long title that wraps onto two lines for the hug case"
+	long_model["body"] = "This is a deliberately long body so the card is tall before we switch to short copy and force a late wrap settle after the original three-frame hug window."
+	card.size = Vector2(maxf(card.custom_minimum_size.x, 340.0), host.size.y * 0.85)
+	card.present(long_model)
+	var waited := 0
+	while waited < 30 and card.size.y > card.get_combined_minimum_size().y + 1.0:
+		await process_frame
+		waited += 1
+	print("  [INFO] HeadlessTutorial1Test: P1a late wrap hug long waited %d frames" % waited)
+	var short_model := long_model.duplicate(true)
+	short_model["title"] = "Short"
+	short_model["body"] = "Short body."
+	card.present(short_model)
+	waited = 0
+	while waited < 3:
+		await process_frame
+		waited += 1
+	var body := card.find_child("Body", true, false) as Label
+	if body != null:
+		body.reset_size()
+	card.update_minimum_size()
+	var combined := card.get_combined_minimum_size()
+	card.size = Vector2(card.size.x, combined.y + 23.0)
+	waited = 0
+	while waited < 30 and card.size.y > card.get_combined_minimum_size().y + 1.0:
+		await process_frame
+		waited += 1
+	combined = card.get_combined_minimum_size()
+	print("  [INFO] HeadlessTutorial1Test: P1a late wrap hug after 3-frame window waited %d frames size.y=%.1f min.y=%.1f" % [
+		waited, card.size.y, combined.y
+	])
+	if card.size.y > combined.y + 1.0:
+		_fail("P1a late wrap hug: size.y=%.1f > combined_min.y+1 (%.1f) after late min drop" % [
+			card.size.y, combined.y
+		])
+	else:
+		_pass("P1a card shrinks when wrap min drops after the original 3-frame hug window")
+	OS.set_environment("EOA_TUTORIAL", "")
+	guide.set_process(true)
+	guide.call("_hide_card")
 
 
 func _test_p1a_fight_copy_and_done_hold() -> void:

@@ -20,6 +20,7 @@ const CARD_WIDTH_NARROW := 340.0
 const NARROW_VP := 1100.0
 const BODY_WRAP := 348.0
 const FONT_PATH := "res://assets/fonts/Cinzel-VariableFont_wght.ttf"
+const HUG_FRAME_CAP := 30
 
 const _CloseReleaseSwallow := preload("res://scripts/ui/CloseReleaseSwallow.gd")
 
@@ -110,7 +111,7 @@ func present(model: Dictionary) -> void:
 		_progress_wrap.visible = false
 	visible = bool(model.get("visible", true))
 	_fit_width(accent)
-	_hug_frames_left = 3
+	_hug_frames_left = HUG_FRAME_CAP
 	set_process(visible)
 	_hug_content()
 	call_deferred("_reflow")
@@ -429,13 +430,24 @@ func _apply_frame(accent: Color) -> void:
 
 
 func _process(_delta: float) -> void:
-	# One-shot wrap settle after present(). Idle hug was an autowrap fit loop:
+	# Shrink-only wrap settle after present(). Idle hug was an autowrap fit loop:
 	# size=(w,0) + reset_size() flipped the wrap min-width every frame.
+	# Keep polling for HUG_FRAME_CAP frames so a late autowrap min drop can
+	# still shrink; never reset_size() or zero size.x on the card.
 	if not visible or _hug_frames_left <= 0:
 		set_process(false)
 		return
+	update_minimum_size()
+	var combined := get_combined_minimum_size()
 	var before := size
-	_hug_content()
+	if size.y > combined.y + 1.0:
+		if _title != null:
+			_title.reset_size()
+		if _body != null:
+			_body.reset_size()
+		if _status != null:
+			_status.reset_size()
+		_hug_content()
 	_hug_frames_left -= 1
 	if not size.is_equal_approx(before):
 		reflow_requested.emit()
