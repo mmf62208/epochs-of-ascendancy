@@ -158,7 +158,8 @@ func _assert_readout(label: String, elapsed: int, sz: Vector2i) -> void:
 	if column == null:
 		_fail("%s %dx%d: parent column missing" % [label, sz.x, sz.y])
 	else:
-		_assert_fits(label, sz, readout, column, shown)
+		var panel := menu.find_child("MenuPanel", true, false) as Control
+		_assert_fits(label, sz, readout, column, panel, shown)
 	if sz.x == 1280 and sz.y == 800 and elapsed == 0:
 		await _shot(menu, readout)
 	_free_menu(menu)
@@ -194,7 +195,7 @@ func _column_for(readout: Control) -> Control:
 	return readout.get_parent() as Control
 
 
-func _assert_fits(label: String, sz: Vector2i, readout: Label, column: Control, shown: String) -> void:
+func _assert_fits(label: String, sz: Vector2i, readout: Label, column: Control, panel: Control, shown: String) -> void:
 	var col := column.get_global_rect()
 	var lab := readout.get_global_rect()
 	if lab.position.x + 0.05 < col.position.x:
@@ -202,11 +203,28 @@ func _assert_fits(label: String, sz: Vector2i, readout: Label, column: Control, 
 			"%s %dx%d: readout x=%.1f < column x=%.1f"
 			% [label, sz.x, sz.y, lab.position.x, col.position.x]
 		)
+	## menu_panel_frame_512 texture_margin is 48px. Content margin is 40, so a
+	## left-aligned "Conquest" sits under the chrome and the C is clipped.
+	const FRAME_INSET := 48.0
+	if panel != null:
+		var frame_inner := panel.get_global_rect().position.x + FRAME_INSET
+		var glyph_x := lab.position.x
+		var xf := readout.get_global_transform()
+		if shown.length() > 0:
+			var bounds := readout.get_character_bounds(0)
+			if bounds.size.x > 0.01:
+				glyph_x = (xf * bounds.position).x
+		if glyph_x + 0.05 < frame_inner:
+			_fail(
+				"%s %dx%d: first glyph clipped under panel frame x=%.1f frame_inner=%.1f"
+				% [label, sz.x, sz.y, glyph_x, frame_inner]
+			)
 	var font := readout.get_theme_font("font")
 	var fsize := readout.get_theme_font_size("font_size")
 	if fsize <= 0:
 		fsize = 14
 	var widest := 0.0
+	var clip_fail := false
 	for raw in shown.split("\n"):
 		var line := str(raw).strip_edges()
 		if line.is_empty():
@@ -218,20 +236,23 @@ func _assert_fits(label: String, sz: Vector2i, readout: Label, column: Control, 
 			tw = float(line.length()) * 8.0
 		widest = maxf(widest, tw)
 		if tw > col.size.x + 0.5:
+			clip_fail = true
 			_fail(
 				"%s %dx%d: line '%s' width %.1f > column width %.1f"
 				% [label, sz.x, sz.y, line, tw, col.size.x]
 			)
 	if lab.size.x > col.size.x + 0.5:
+		clip_fail = true
 		_fail(
 			"%s %dx%d: readout width %.1f > column width %.1f"
 			% [label, sz.x, sz.y, lab.size.x, col.size.x]
 		)
-	elif lab.position.x + 0.05 >= col.position.x and widest <= col.size.x + 0.5:
-		_pass(
-			"%s %dx%d: lines fit column x=%.1f w=%.1f widest=%.1f"
-			% [label, sz.x, sz.y, col.position.x, col.size.x, widest]
-		)
+	if not clip_fail and lab.position.x + 0.05 >= col.position.x and widest <= col.size.x + 0.5:
+		if panel == null or lab.position.x + 0.05 >= panel.get_global_rect().position.x + FRAME_INSET:
+			_pass(
+				"%s %dx%d: lines fit column x=%.1f w=%.1f widest=%.1f"
+				% [label, sz.x, sz.y, col.position.x, col.size.x, widest]
+			)
 
 
 func _shot(menu: Node, readout: Control) -> void:
