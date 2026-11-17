@@ -71,9 +71,7 @@ var _retake_blocked: Dictionary = {}
 ## tag -> {last_progress_day, commit_to_id, commit_from_id}
 var _ai_stall: Dictionary = {}
 var _attack_reject: Dictionary = {}
-## SIM-1110-A: per-day military_strength cache and hop tables for B/B2.
-var _ai_str_cache_day: int = -1
-var _ai_str_cache: Dictionary = {}
+## SIM-1110-A: hop tables keyed on board epoch.
 var _ai_board_epoch: int = 0
 var _ai_adj_by_tag: Dictionary = {}
 var _ai_hops_by_tag_dest: Dictionary = {}
@@ -82,7 +80,6 @@ var _ai_hop_rebuild_adj: int = 0
 var _ai_hop_rebuild_hops: int = 0
 var _ai_hop_rebuild_facing: int = 0
 var _ai_raise_skip_cap_day: Dictionary = {}
-var _ai_ramp_sr_block_day: Dictionary = {}
 var _ai_unit_moved_day: Dictionary = {}
 var _ai_move_cooldown_skip_day: Dictionary = {}
 var _ai_skip_captured_logged: Dictionary = {}
@@ -92,8 +89,12 @@ var _ai_threat_cache_enabled: bool = true
 var _ai_threat_cache: Dictionary = {}
 var _ai_station_gen_by_tag: Dictionary = {}
 var _ai_threat_rebuilds: int = 0
-var _ai_threat_computing: bool = false
 var _ai_threat_gffc_calls: int = 0
+## Per-hex stationed-division index. Invalidated by station-gen / board-epoch hooks.
+## tag -> pid -> Array[Dictionary]. Built from LeaderManager.formations + SM deployments
+## in one walk; threat helpers never scan all deployments or walk a nation roster.
+var _ai_hex_div_index: Dictionary = {}
+var _ai_hex_div_index_dirty: bool = true
 const REJECT_LOG_ENV := "EOA_AI_REJECT_LOG"
 const AI_MASSING_MARCHES := 3
 const AI_MASSING_STACK := 3
@@ -112,11 +113,6 @@ const REDEPLOY_PER_TAG_PER_DAY := 2
 const FRONT_STACK_TARGET := 2
 const QUIET_KEEP_MAJOR := 0.5
 const QUIET_KEEP_MINOR := 0.0
-## SIM-1110-A B2: offensive ramp for the stronger AI side.
-const RAMP_HOLD_DAYS := 21
-const RAMP_PHASES: Array = [[21, 15], [51, 10], [111, 7]]
-const RAMP_SR_MIN := 1.5
-const RAMP_SR_FAST := 2.5
 const SCENARIO_MAJOR_TAGS: Array = ["GER", "FRA", "ENG", "SOV", "ITA", "JAP", "USA", "POL"]
 
 
@@ -137,6 +133,7 @@ func _on_ai_province_data_changed(_province_id: int, what_changed: String) -> vo
 
 func bump_ai_board_epoch() -> void:
 	_ai_board_epoch += 1
+	_ai_invalidate_hex_div_index()
 
 
 func ai_hop_cache_counts() -> Dictionary:
@@ -186,12 +183,17 @@ func reset_ai_threat_cache_counts() -> void:
 	_ai_threat_gffc_calls = 0
 
 
+func note_ai_threat_gffc_call() -> void:
+	_ai_threat_gffc_calls += 1
+
+
 func ai_threat_gffc_calls() -> int:
 	return _ai_threat_gffc_calls
 
 
 func bump_ai_station_gen(tag: String = "") -> void:
 	var t := tag.strip_edges().to_upper()
+	_ai_invalidate_hex_div_index()
 	if t.is_empty():
 		for k_v in _ai_station_gen_by_tag.keys():
 			var k := str(k_v)
@@ -1560,10 +1562,7 @@ func _ai_ensure_threat_cache(tag: String) -> Dictionary:
 ## foe_p(pid) = MAX over 1-hop adjacent hexes of at-war enemy attack power on that hex.
 ## Per-hex lookups only (get_divisions_at_province per adjacent nid). No nation-wide scan.
 func _ai_compute_foe_p(pid: int, tag: String) -> float:
-	_ai_threat_computing = true
-	var best := _ai_max_adjacent_enemy_stack_power(pid, tag)
-	_ai_threat_computing = false
-	return best
+	return _ai_max_adjacent_enemy_stack_power(pid, tag)
 
 
 func _ai_local_threat(pid: int, tag: String) -> float:
@@ -1883,20 +1882,6 @@ func _ai_hops_from(tag: String, dest: int) -> Dictionary:
 	return hops
 
 
-func _ai_military_strength_cached(tag: String) -> float:
-	var day := _ai_day()
-	if _ai_str_cache_day != day:
-		_ai_str_cache_day = day
-		_ai_str_cache.clear()
-	if _ai_str_cache.has(tag):
-		return float(_ai_str_cache[tag])
-	var s := 0.0
-	if typeof(WarStateDomain) != TYPE_NIL:
-		s = float(WarStateDomain.military_strength(tag))
-	_ai_str_cache[tag] = s
-	return s
-
-
 func _ai_war_row(tag: String, other: String) -> Dictionary:
 	if typeof(WarStateDomain) == TYPE_NIL:
 		return {}
@@ -2032,19 +2017,6 @@ func _ai_clear_war_capture_pid(tag: String, pid: int) -> void:
 		GameData.peace_state["campaign_wars"] = st
 
 
-func _ai_war_day(tag: String, def_tag: String) -> int:
-	var row := _ai_war_row(tag, def_tag)
-	return _ai_day() - int(row.get("start_day", 0))
-
-
-func _ai_last_new_capture_day(tag: String, def_tag: String) -> int:
-	var row := _ai_war_row(tag, def_tag)
-	var stamp: Variant = row.get("last_new_capture_day", 0)
-	if stamp is Dictionary:
-		return int((stamp as Dictionary).get(tag, 0))
-	return int(stamp)
-
-
 func _ai_stamp_last_new_capture_day(att_tag: String, prev_owner: String) -> void:
 	var t := att_tag.strip_edges().to_upper()
 	var prev := prev_owner.strip_edges().to_upper()
@@ -2078,50 +2050,6 @@ func _ai_stamp_last_new_capture_day(att_tag: String, prev_owner: String) -> void
 	wars[key] = row
 	st["wars"] = wars
 	GameData.peace_state["campaign_wars"] = st
-
-
-func _ai_ramp_gap(wd: int) -> int:
-	var gap := 15
-	for raw in RAMP_PHASES:
-		if not (raw is Array):
-			continue
-		var row: Array = raw
-		if row.size() < 2:
-			continue
-		if wd >= int(row[0]):
-			gap = int(row[1])
-	return gap
-
-
-func _ai_offensive_ramp_ok(tag: String, def_tag: String, to_id: int) -> bool:
-	if typeof(WarStateDomain) != TYPE_NIL and WarStateDomain._is_player_or_human_nation(tag):
-		return true
-	if _province_owner(to_id) == tag:
-		return true
-	var sr := _ai_military_strength_cached(tag) / maxf(_ai_military_strength_cached(def_tag), 1.0)
-	if sr < 1.0:
-		return true
-	var wd := _ai_war_day(tag, def_tag)
-	if wd < RAMP_HOLD_DAYS:
-		return false
-	if sr < RAMP_SR_MIN:
-		_ai_log_ramp_sr_block(tag, def_tag, sr)
-		return false
-	var gap := _ai_ramp_gap(wd)
-	if sr >= RAMP_SR_FAST and wd >= 111:
-		gap = int(ceil(float(gap) * 2.0 / 3.0))
-	return _ai_day() - _ai_last_new_capture_day(tag, def_tag) >= gap
-
-
-func _ai_log_ramp_sr_block(tag: String, target: String, sr: float) -> void:
-	var t := tag.strip_edges().to_upper()
-	var o := target.strip_edges().to_upper()
-	var day := _ai_day()
-	var key := "%s|%s" % [t, o]
-	if int(_ai_ramp_sr_block_day.get(key, -1)) == day:
-		return
-	_ai_ramp_sr_block_day[key] = day
-	print("AI_RAMP_BLOCK day=%d tag=%s target=%s sr=%.3f min=%.3f" % [day, t, o, sr, RAMP_SR_MIN])
 
 
 func _province_owner(pid: int) -> String:
@@ -2340,27 +2268,6 @@ func try_ai_start_land_battles(day_index: int = 0) -> Dictionary:
 				elif agr < LandBattleAi.MIN_AGGRESSION_TO_START:
 					_bump_attack_reject("aggression")
 				if ratio_ok:
-					if not _ai_offensive_ramp_ok(tag2, def_tag2, to_id):
-						_bump_attack_reject("offensive_ramp")
-						# Hold-period: keep massing on the committed hex instead of
-						# spraying rear marches across the rest of the front.
-						if not empty_hex:
-							under_ratio_opps.append({
-								"tag": tag2,
-								"from_id": from_id,
-								"to_id": to_id,
-								"defender_tag": def_tag2,
-								"formation_id": fid,
-								"has_formation": true,
-								"defender_power": def_p,
-								"attacker_power": att_p,
-								"empty_hex": false,
-								"min_ratio": need,
-							})
-							_collect_adjacent_stack_march(
-								tag2, from_id, to_id, def_tag2, marching_fids, combat_fids, march_opps
-							)
-						continue
 					opportunities.append({
 						"tag": tag2,
 						"from_id": from_id,
@@ -2616,9 +2523,6 @@ func try_ai_follow_on_after_win(player_tag: String = "") -> Dictionary:
 	var follow_def := str(pick.get("defender_tag", "")).strip_edges().to_upper()
 	if follow_def.is_empty():
 		follow_def = _province_owner(follow_to)
-	if not follow_tag.is_empty() and not follow_def.is_empty() and not _ai_offensive_ramp_ok(follow_tag, follow_def, follow_to):
-		_bump_attack_reject("offensive_ramp")
-		return {"ok": true, "started_n": 0, "reason": "offensive_ramp"}
 	var opened: Dictionary = start_land_battle(
 		str(pick.get("tag", "")),
 		int(pick.get("to_id", -1)),
@@ -2662,7 +2566,6 @@ func apply_save_data(data: Dictionary) -> void:
 	_ai_hops_by_tag_dest.clear()
 	_ai_facing_by_pair.clear()
 	_ai_raise_skip_cap_day.clear()
-	_ai_ramp_sr_block_day.clear()
 	_ai_unit_moved_day.clear()
 	_ai_move_cooldown_skip_day.clear()
 	_ai_skip_captured_logged.clear()
@@ -3373,13 +3276,10 @@ func reset_ai_war1_for_test() -> void:
 	_retake_blocked.clear()
 	_ai_stall.clear()
 	_attack_reject.clear()
-	_ai_str_cache_day = -1
-	_ai_str_cache.clear()
 	_ai_adj_by_tag.clear()
 	_ai_hops_by_tag_dest.clear()
 	_ai_facing_by_pair.clear()
 	_ai_raise_skip_cap_day.clear()
-	_ai_ramp_sr_block_day.clear()
 	_ai_unit_moved_day.clear()
 	_ai_move_cooldown_skip_day.clear()
 	_ai_skip_captured_logged.clear()
@@ -5224,44 +5124,103 @@ func execute_naval_engagement(
 
 
 func get_divisions_at_province(province_id: int, country_tag: String) -> Array[Dictionary]:
-	## Prefer SupplyManager deployments (template-backed), then world_full OOB land stations
-	## on LeaderManager (formation_id like GER_formation_0 without DivisionTemplate).
-	var out: Array[Dictionary] = []
-	if typeof(SupplyManager) != TYPE_NIL and SupplyManager.has_method("get_land_divisions_at_province"):
-		out = SupplyManager.get_land_divisions_at_province(province_id, country_tag)
-	if not out.is_empty():
-		return out
+	## Per-hex index (cached). No whole-deployment scan and no nation-wide roster walk.
 	return _land_formations_stationed_at(province_id, country_tag)
 
 
-## Land divisions/garrisons stationed via Formation.stationed_province_id (scenario OOB path).
+## Land divisions/garrisons stationed via Formation.stationed_province_id (scenario OOB path)
+## plus SupplyManager deployments, served from the per-hex index.
 func _land_formations_stationed_at(province_id: int, country_tag: String) -> Array[Dictionary]:
 	var tag := country_tag.strip_edges().to_upper()
 	var out: Array[Dictionary] = []
-	if province_id <= 0 or tag.is_empty() or typeof(LeaderManager) == TYPE_NIL:
+	if province_id <= 0 or tag.is_empty():
 		return out
-	if not LeaderManager.has_method("get_formations_for_country"):
+	_ai_ensure_hex_div_index()
+	var by_pid_v: Variant = _ai_hex_div_index.get(tag, {})
+	if not (by_pid_v is Dictionary):
 		return out
-	for f in LeaderManager.get_formations_for_country(tag):
-		if f == null:
-			continue
-		var ftype := str(f.formation_type) if "formation_type" in f else ""
-		if ftype != Formation.TYPE_DIVISION and ftype != Formation.TYPE_GARRISON:
-			continue
-		var sid := int(f.stationed_province_id) if "stationed_province_id" in f else -1
-		if sid != province_id:
-			continue
-		var fid := str(f.formation_id) if "formation_id" in f else ""
-		if fid.is_empty():
-			continue
-		var display := str(f.name) if "name" in f and not str(f.name).is_empty() else fid
-		out.append({
-			"formation_id": fid,
-			"display_name": display,
-			"country_tag": tag,
-			"stationed_province_id": province_id,
-		})
+	var rows_v: Variant = (by_pid_v as Dictionary).get(province_id, [])
+	if not (rows_v is Array):
+		return out
+	for row_v in rows_v:
+		if row_v is Dictionary:
+			out.append(row_v as Dictionary)
 	return out
+
+
+func _ai_invalidate_hex_div_index() -> void:
+	_ai_hex_div_index_dirty = true
+	_ai_hex_div_index.clear()
+
+
+func _ai_hex_div_row(fid: String, tag: String, pid: int, display: String) -> Dictionary:
+	return {
+		"formation_id": fid,
+		"display_name": display,
+		"country_tag": tag,
+		"stationed_province_id": pid,
+	}
+
+
+func _ai_hex_index_append(by_tag: Dictionary, seen: Dictionary, tag: String, pid: int, fid: String, display: String) -> void:
+	if tag.is_empty() or pid <= 0 or fid.is_empty():
+		return
+	var seen_key := "%s|%s" % [tag, fid]
+	if bool(seen.get(seen_key, false)):
+		return
+	seen[seen_key] = true
+	var by_pid: Dictionary = {}
+	if by_tag.has(tag) and by_tag[tag] is Dictionary:
+		by_pid = by_tag[tag]
+	var rows: Array = []
+	if by_pid.has(pid) and by_pid[pid] is Array:
+		rows = by_pid[pid]
+	rows.append(_ai_hex_div_row(fid, tag, pid, display))
+	by_pid[pid] = rows
+	by_tag[tag] = by_pid
+
+
+func _ai_ensure_hex_div_index() -> void:
+	if not _ai_hex_div_index_dirty:
+		return
+	var by_tag: Dictionary = {}
+	var seen: Dictionary = {}
+	if typeof(LeaderManager) != TYPE_NIL and "formations" in LeaderManager:
+		var forms_v: Variant = LeaderManager.formations
+		if forms_v is Dictionary:
+			for fid_v in (forms_v as Dictionary).keys():
+				var f: Formation = (forms_v as Dictionary).get(fid_v) as Formation
+				if f == null:
+					continue
+				if "campaign_inactive" in f and bool(f.campaign_inactive):
+					continue
+				var ftype := str(f.formation_type) if "formation_type" in f else ""
+				if ftype != Formation.TYPE_DIVISION and ftype != Formation.TYPE_GARRISON:
+					continue
+				var pid := int(f.stationed_province_id) if "stationed_province_id" in f else -1
+				var fid := str(f.formation_id) if "formation_id" in f else str(fid_v)
+				var tag := str(f.country_tag).strip_edges().to_upper()
+				var display := str(f.name) if "name" in f and not str(f.name).is_empty() else fid
+				_ai_hex_index_append(by_tag, seen, tag, pid, fid, display)
+	if typeof(SupplyManager) != TYPE_NIL and "division_deployments" in SupplyManager:
+		var deps_v: Variant = SupplyManager.division_deployments
+		if deps_v is Dictionary:
+			for fid_v2 in (deps_v as Dictionary).keys():
+				var fid2 := str(fid_v2)
+				var dep_v: Variant = (deps_v as Dictionary).get(fid_v2, {})
+				if not (dep_v is Dictionary):
+					continue
+				var dep: Dictionary = dep_v
+				var pid2 := int(dep.get("province_id", -1))
+				var tag2 := str(dep.get("country_tag", "")).strip_edges().to_upper()
+				var display2 := fid2
+				if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_formation"):
+					var lf: Formation = LeaderManager.get_formation(fid2)
+					if lf != null and "name" in lf and not str(lf.name).is_empty():
+						display2 = str(lf.name)
+				_ai_hex_index_append(by_tag, seen, tag2, pid2, fid2, display2)
+	_ai_hex_div_index = by_tag
+	_ai_hex_div_index_dirty = false
 
 
 func _validate_attack_source(

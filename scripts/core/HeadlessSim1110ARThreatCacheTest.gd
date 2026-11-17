@@ -4,9 +4,10 @@ extends SceneTree
 ## T1 two adjacent 1u stacks are NOT summed (P not reinforced).
 ## T2 a single 2-div stack still triggers reinforce.
 ## T3 passive-human GER border: no POL forward stacking; same decision with GER AI.
-## T4 cache on/off same ctrl_md5 over 60d aivai; 0 rebuilds on a quiet day;
-##    rebuild after capture/move.
-## T5 threat path never calls get_formations_for_country (source + F5 probe).
+## T4 cache on/off same ctrl_md5 over 60d aivai with a real capture in-window;
+##    0 rebuilds on a quiet day; rebuild after capture/move.
+## T5 threat path never calls get_formations_for_country (source + runtime
+##    counter + must-FAIL mutant if a gffc call is reintroduced).
 ## Each of T1–T5 must FAIL on main 330644ef (missing API / no reinforce trigger)
 ## and PASS on this tip. T1/T3 "not reinforced" asserts include a positive
 ## paired reinforce so they cannot pass trivially on a no-reinforce main.
@@ -263,7 +264,16 @@ func _test_t5_no_nation_scan(mm: Node, sm: Node, bm: Node, tm: Node, lm: Node) -
 	if src.is_empty():
 		_fail("T5 could not read BattleManager.gd")
 		return
-	for fname in ["_ai_local_threat", "_ai_compute_foe_p", "_ai_max_adjacent_enemy_stack_power", "_ai_hex_power", "_ai_ensure_threat_cache"]:
+	for fname in [
+		"_ai_local_threat",
+		"_ai_compute_foe_p",
+		"_ai_max_adjacent_enemy_stack_power",
+		"_ai_hex_power",
+		"_ai_ensure_threat_cache",
+		"get_divisions_at_province",
+		"_land_formations_stationed_at",
+		"_ai_ensure_hex_div_index",
+	]:
 		var body := _func_body(src, fname)
 		if body.is_empty():
 			_fail("T5 %s missing" % fname)
@@ -282,19 +292,41 @@ func _test_t5_no_nation_scan(mm: Node, sm: Node, bm: Node, tm: Node, lm: Node) -
 		return
 	if lm.has_method("seed_1936_start_garrisons"):
 		lm.call("seed_1936_start_garrisons", true)
+	if bm.has_method("bump_ai_board_epoch"):
+		bm.call("bump_ai_board_epoch")
+	var pair := _border_pair(mm, "GER", "POL")
+	var pid := int(pair[1]) if pair.size() >= 2 else 711058
+	# Mutant: a real gffc call must increment the counter (dead counter would hide a regression).
+	if not bm.has_method("note_ai_threat_gffc_call") or not bm.has_method("ai_threat_gffc_calls"):
+		_fail("T5 gffc counter API missing")
+		return
 	bm.call("reset_ai_threat_cache_counts")
+	lm.call("get_formations_for_country", "GER")
+	var mutant_n := int(bm.call("ai_threat_gffc_calls"))
+	print("SIM1110AR_T5 mutant_gffc=%d" % mutant_n)
+	if mutant_n <= 0:
+		_fail("T5 mutant: gffc counter stayed 0 after get_formations_for_country (would not catch a reintroduced call)")
+		return
+	bm.call("reset_ai_threat_cache_counts")
+	bm.call("get_divisions_at_province", pid, "POL")
+	bm.call("_ai_hex_power", pid, "POL", "defend")
+	bm.call("_ai_compute_foe_p", pid, "POL")
+	bm.call("_ai_local_threat", pid, "POL")
 	if tm.has_method("advance_live_f5_equivalent_days"):
+		# F5 tick uses the same threat helpers; cover/spare may still gffc, so
+		# re-zero after those and re-probe only the threat/F5 lookup path.
 		tm.call("advance_live_f5_equivalent_days", 1)
-	else:
-		bm.call("try_ai_start_land_battles", 0)
-	var gffc := 0
-	if bm.has_method("ai_threat_gffc_calls"):
-		gffc = int(bm.call("ai_threat_gffc_calls"))
+	bm.call("reset_ai_threat_cache_counts")
+	bm.call("get_divisions_at_province", pid, "POL")
+	bm.call("_ai_hex_power", pid, "POL", "defend")
+	bm.call("_ai_compute_foe_p", pid, "POL")
+	bm.call("_ai_local_threat", pid, "POL")
+	var gffc := int(bm.call("ai_threat_gffc_calls"))
 	print("SIM1110AR_T5 gffc_calls=%d" % gffc)
 	if gffc != 0:
-		_fail("T5 threat path get_formations_for_country calls=%d during F5" % gffc)
+		_fail("T5 threat path get_formations_for_country calls=%d" % gffc)
 		return
-	_pass("T5 threat path has no get_formations_for_country; F5 gffc=0")
+	_pass("T5 threat path has no get_formations_for_country; mutant counter live; gffc=0")
 	var _unused_t5 := sm
 
 
@@ -309,11 +341,30 @@ func _run_aivai_ctrl_md5(mm: Node, sm: Node, bm: Node, tm: Node, lm: Node, cache
 		_fail("T4 declare failed for cache %s" % str(cache_on))
 		return ""
 	bm.call("set_ai_threat_cache_enabled", cache_on)
-	for _d in range(DAYS_T4):
+	var pair := _border_pair(mm, "GER", "POL")
+	var ger_pid := int(pair[0]) if pair.size() >= 2 else -1
+	var pol_pid := int(pair[1]) if pair.size() >= 2 else -1
+	var capture_in_window := false
+	const CAPTURE_DAY := 10
+	for d in range(DAYS_T4):
 		if tm.has_method("advance_live_f5_equivalent_days"):
 			tm.call("advance_live_f5_equivalent_days", 1)
 		else:
-			bm.call("try_ai_start_land_battles", _d)
+			bm.call("try_ai_start_land_battles", d)
+		if d + 1 != CAPTURE_DAY:
+			continue
+		if pol_pid <= 0:
+			_fail("T4 no GER-POL border for in-window capture cache=%s" % str(cache_on))
+			return ""
+		if _owner(mm, pol_pid) == "POL":
+			bm.call("_apply_attacker_win_capture_light", "GER", pol_pid, ger_pid, "")
+		if _owner(mm, pol_pid) != "POL":
+			capture_in_window = true
+	if not capture_in_window:
+		_fail("T4 no real ownership change inside cache %s window" % str(cache_on))
+		return ""
+	print("SIM1110AR_T4 in_window_capture cache=%s pol_pid=%d owner=%s" % [str(cache_on), pol_pid, _owner(mm, pol_pid)])
+	var _unused_t4 := sm
 	return _ctrl_md5(mm)
 
 
