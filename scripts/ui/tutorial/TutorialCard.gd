@@ -46,8 +46,9 @@ var _confirm_wrap: HBoxContainer
 var _footer_right: HBoxContainer
 var _cinzel: FontFile
 var _current: Dictionary = {}
-var _hug_frames_left: int = 0
 var _locked_width: float = CARD_WIDTH
+var _hug_signals_hooked: bool = false
+var _hug_deferred: bool = false
 
 
 func _ready() -> void:
@@ -57,6 +58,7 @@ func _ready() -> void:
 	custom_minimum_size = Vector2(CARD_WIDTH, 0)
 	_load_font()
 	_build()
+	_hook_hug_signals()
 	visible = false
 	set_process(false)
 
@@ -110,10 +112,10 @@ func present(model: Dictionary) -> void:
 		_progress_wrap.visible = false
 	visible = bool(model.get("visible", true))
 	_fit_width(accent)
-	_hug_frames_left = 3
-	set_process(visible)
+	set_process(false)
 	_hug_content()
 	call_deferred("_reflow")
+	_queue_shrink_hug()
 
 
 func set_dont_show_again(on: bool) -> void:
@@ -428,19 +430,43 @@ func _apply_frame(accent: Color) -> void:
 		_progress_bar.add_theme_stylebox_override("fill", fill)
 
 
-func _process(_delta: float) -> void:
-	# One-shot wrap settle after present(). Idle hug was an autowrap fit loop:
-	# size=(w,0) + reset_size() flipped the wrap min-width every frame.
-	if not visible or _hug_frames_left <= 0:
-		set_process(false)
+func _hook_hug_signals() -> void:
+	if _hug_signals_hooked:
+		return
+	_hug_signals_hooked = true
+	if not minimum_size_changed.is_connected(_on_min_size_changed):
+		minimum_size_changed.connect(_on_min_size_changed)
+	for n in [_title, _body, _status, _dont, _keys_row]:
+		var ctl := n as Control
+		if ctl == null:
+			continue
+		if not ctl.minimum_size_changed.is_connected(_on_min_size_changed):
+			ctl.minimum_size_changed.connect(_on_min_size_changed)
+
+
+func _on_min_size_changed() -> void:
+	_queue_shrink_hug()
+
+
+func _queue_shrink_hug() -> void:
+	if not visible or _hug_deferred:
+		return
+	_hug_deferred = true
+	call_deferred("_hug_shrink_only")
+
+
+func _hug_shrink_only() -> void:
+	_hug_deferred = false
+	if not visible:
+		return
+	update_minimum_size()
+	var combined := get_combined_minimum_size()
+	if size.y <= combined.y + 1.0:
 		return
 	var before := size
 	_hug_content()
-	_hug_frames_left -= 1
 	if not size.is_equal_approx(before):
 		reflow_requested.emit()
-	if _hug_frames_left <= 0:
-		set_process(false)
 
 
 func _hug_content() -> void:
@@ -458,9 +484,13 @@ func _hug_content() -> void:
 		h = maxf(1.0, limit - 1.0)
 	if h < 1.0:
 		h = 1.0
-	# Width stays at the fitted slot. Never zero the size: that retriggers
-	# Label autowrap min-width and makes Got it slide.
-	size = Vector2(w, h)
+	# Never shrink size.x: assigning the lock (380) over an allocated ~438
+	# re-wraps the body 410→348 and grows y 253→276. Never zero x either
+	# (Got it slide). Grow x up to the lock if the card is still narrower.
+	var sx := size.x
+	if sx < w:
+		sx = w
+	size = Vector2(sx, h)
 
 
 func _height_limit() -> float:

@@ -54,6 +54,10 @@ func _run() -> void:
 		_fail("TutorialGuideDomain missing")
 		_finish()
 		return
+	if not OS.get_environment("EOA_TUTORIAL_HUG_TRACE").is_empty():
+		await _trace_p1a_step11_to_12()
+		_finish()
+		return
 	_test_json_copy()
 	_test_default_off()
 	_test_prompt_rules()
@@ -70,6 +74,7 @@ func _run() -> void:
 	_test_cue_log_wrap_and_battle()
 	_test_completed_does_not_autostart()
 	await _test_p1a_card_hugs_content()
+	await _test_p1a_card_hugs_step11_to_12()
 	_test_p1a_fight_copy_and_done_hold()
 	_test_p1a_under_attack_keeps_fight_open()
 	await _test_p1a_target_rings()
@@ -825,6 +830,243 @@ func _test_p1a_card_hugs_content() -> void:
 	_pass("P1a card hugs content on steps 1, 5, 10, 12 and skip-confirm")
 
 
+func _hug_label_trace(lbl: Label) -> String:
+	if lbl == null:
+		return "-"
+	var mn := lbl.get_minimum_size()
+	return "sz=%.0fx%.0f min=%.0fx%.0f cms=%.0fx%.0f vis=%s len=%d" % [
+		lbl.size.x, lbl.size.y, mn.x, mn.y,
+		lbl.custom_minimum_size.x, lbl.custom_minimum_size.y,
+		str(lbl.visible), lbl.text.length(),
+	]
+
+
+func _hug_frame_trace(card: TutorialCard, frame: int) -> String:
+	var combined := card.get_combined_minimum_size()
+	var title := card.find_child("Title", true, false) as Label
+	var body := card.find_child("Body", true, false) as Label
+	var status := card.find_child("Status", true, false) as Label
+	var dont := card.find_child("DontShowAgain", true, false) as Control
+	var keys := card.find_child("KeysRow", true, false) as Control
+	var dont_s := "-"
+	if dont != null:
+		dont_s = "sz=%.0fx%.0f vis=%s" % [dont.size.x, dont.size.y, str(dont.visible)]
+	var keys_s := "-"
+	if keys != null:
+		keys_s = "sz=%.0fx%.0f vis=%s" % [keys.size.x, keys.size.y, str(keys.visible)]
+	return "f=%d card=%.1fx%.1f min=%.1f proc=%s keys=%s dont=%s title[%s] body[%s] status[%s]" % [
+		frame, card.size.x, card.size.y, combined.y, str(card.is_processing()),
+		keys_s, dont_s, _hug_label_trace(title), _hug_label_trace(body), _hug_label_trace(status),
+	]
+
+
+func _trace_present_and_log(card: TutorialCard, model: Dictionary, tag: String, nframes: int) -> Dictionary:
+	card.present(model)
+	print("  [TRACE] %s present n=%s title_len=%d body_len=%d" % [
+		tag, str(model.get("n", 0)), str(model.get("title", "")).length(), str(model.get("body", "")).length()
+	])
+	print("  [TRACE] %s f=0 %s" % [tag, _hug_frame_trace(card, 0)])
+	var frames: PackedStringArray = PackedStringArray()
+	frames.append(_hug_frame_trace(card, 0))
+	var settled_at := -1
+	var i := 0
+	var prev_min := card.get_combined_minimum_size().y
+	var prev_h := card.size.y
+	while i < nframes:
+		await process_frame
+		i += 1
+		var line := _hug_frame_trace(card, i)
+		var combined := card.get_combined_minimum_size().y
+		var h := card.size.y
+		var interesting := absf(combined - prev_min) > 0.5 or absf(h - prev_h) > 0.5 or h > combined + 1.0
+		if interesting or i == 1 or i == nframes:
+			print("  [TRACE] %s %s" % [tag, line])
+		frames.append(line)
+		if settled_at < 0 and h <= combined + 1.0:
+			settled_at = i
+		prev_min = combined
+		prev_h = h
+		if settled_at >= 0 and i >= settled_at + 8 and i >= 12:
+			break
+	var combined_end := card.get_combined_minimum_size().y
+	var miss := card.size.y > combined_end + 1.0
+	print("  [TRACE] %s RESULT miss=%s settled_at=%d size.y=%.1f min.y=%.1f proc=%s" % [
+		tag, str(miss), settled_at, card.size.y, combined_end, str(card.is_processing())
+	])
+	return {
+		"miss": miss,
+		"settled_at": settled_at,
+		"size_y": card.size.y,
+		"min_y": combined_end,
+		"frames": frames,
+	}
+
+
+func _trace_p1a_step11_to_12() -> void:
+	var trials := int(OS.get_environment("EOA_TUTORIAL_HUG_TRACE"))
+	if trials < 1:
+		trials = 50
+	var guide := _guide()
+	var host: Control = null
+	var card: TutorialCard = null
+	if guide != null:
+		host = guide.get_node_or_null("FirstSessionLayer/GuideHost") as Control
+		card = guide.get("_card") as TutorialCard
+	if guide == null or host == null or card == null:
+		_fail("hug trace: guide/host/card missing")
+		return
+	guide.set_process(false)
+	host.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	host.position = Vector2.ZERO
+	host.custom_minimum_size = Vector2(1280, 800)
+	host.size = Vector2(1280, 800)
+	await process_frame
+	var miss_n := 0
+	var pass_n := 0
+	var fail_dump := ""
+	var pass_dump := ""
+	var t := 0
+	while t < trials:
+		t += 1
+		var save_model := _p1a_active_model("save")
+		save_model["visible"] = true
+		save_model["confirm_skip"] = false
+		card.size = Vector2(maxf(card.custom_minimum_size.x, 340.0), host.size.y * 0.85)
+		card.present(save_model)
+		var w := 0
+		while w < 12:
+			await process_frame
+			w += 1
+			if card.size.y <= card.get_combined_minimum_size().y + 1.0:
+				break
+		var end_model := _p1a_active_model("ending")
+		end_model["visible"] = true
+		end_model["confirm_skip"] = false
+		print("  [TRACE] trial=%d/%d path=11->12 save_h=%.1f save_min=%.1f" % [
+			t, trials, card.size.y, card.get_combined_minimum_size().y
+		])
+		var rec: Dictionary = await _trace_present_and_log(card, end_model, "t%d-12" % t, 120)
+		if bool(rec.get("miss", false)):
+			miss_n += 1
+			if fail_dump.is_empty():
+				fail_dump = "\n".join(rec.get("frames", PackedStringArray()))
+		else:
+			pass_n += 1
+			if pass_dump.is_empty():
+				pass_dump = "\n".join(rec.get("frames", PackedStringArray()))
+	# Isolated ending with the hug-test stretch (the 2/10 gate path).
+	var u := 0
+	while u < trials:
+		u += 1
+		var iso := _p1a_active_model("ending")
+		iso["visible"] = true
+		iso["confirm_skip"] = false
+		card.size = Vector2(maxf(card.custom_minimum_size.x, 340.0), host.size.y * 0.85)
+		print("  [TRACE] trial=%d/%d path=iso12 stretch_h=%.1f" % [u, trials, card.size.y])
+		var rec_iso: Dictionary = await _trace_present_and_log(card, iso, "iso%d-12" % u, 120)
+		if bool(rec_iso.get("miss", false)):
+			miss_n += 1
+			if fail_dump.is_empty():
+				fail_dump = "ISO\n" + "\n".join(rec_iso.get("frames", PackedStringArray()))
+		else:
+			pass_n += 1
+			if pass_dump.is_empty():
+				pass_dump = "ISO\n" + "\n".join(rec_iso.get("frames", PackedStringArray()))
+	print("  [TRACE] SUMMARY trials_each=%d miss=%d pass=%d" % [trials, miss_n, pass_n])
+	if not fail_dump.is_empty():
+		print("  [TRACE] FAIL_DUMP_BEGIN")
+		print(fail_dump)
+		print("  [TRACE] FAIL_DUMP_END")
+	if not pass_dump.is_empty():
+		print("  [TRACE] PASS_DUMP_BEGIN")
+		print(pass_dump)
+		print("  [TRACE] PASS_DUMP_END")
+	OS.set_environment("EOA_TUTORIAL", "")
+	guide.set_process(true)
+	guide.call("_hide_card")
+	if miss_n > 0:
+		_fail("hug trace reproduced miss=%d pass=%d" % [miss_n, pass_n])
+	else:
+		_pass("hug trace no miss in %d 11->12 + %d iso12" % [trials, trials])
+
+
+func _test_p1a_card_hugs_step11_to_12() -> void:
+	# Real save→ending. After the original 3-frame window, recreate the
+	# extra wrap line (body 348px/89h → 410px/66h, card 276→253) and assert hug.
+	var guide := _guide()
+	var host: Control = null
+	var card: TutorialCard = null
+	if guide != null:
+		host = guide.get_node_or_null("FirstSessionLayer/GuideHost") as Control
+		card = guide.get("_card") as TutorialCard
+	if guide == null or host == null or card == null:
+		_fail("P1a step11→12 hug: guide/host/card missing")
+		return
+	guide.set_process(false)
+	host.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	host.position = Vector2.ZERO
+	host.custom_minimum_size = Vector2(1280, 800)
+	host.size = Vector2(1280, 800)
+	await process_frame
+	var repeats := 8
+	var max_wait := 0
+	var r := 0
+	while r < repeats:
+		r += 1
+		var save_model := _p1a_active_model("save")
+		save_model["visible"] = true
+		save_model["confirm_skip"] = false
+		card.size = Vector2(maxf(card.custom_minimum_size.x, 340.0), host.size.y * 0.85)
+		card.present(save_model)
+		var waited := 0
+		while waited < 30 and card.size.y > card.get_combined_minimum_size().y + 1.0:
+			await process_frame
+			waited += 1
+		var end_model := _p1a_active_model("ending")
+		end_model["visible"] = true
+		end_model["confirm_skip"] = false
+		card.present(end_model)
+		waited = 0
+		while waited < 3:
+			await process_frame
+			waited += 1
+		# After the original 3-frame window, replay the f=1 unwrap from the
+		# trace (card ~438, body cms 348→410, min 276→253). Base squeezes
+		# width back to 380 and cannot shrink y; event-driven hug can.
+		if card.size.x < 430.0:
+			card.size = Vector2(438.0, card.size.y)
+		var body := card.find_child("Body", true, false) as Label
+		var title := card.find_child("Title", true, false) as Label
+		if body != null:
+			body.custom_minimum_size.x = 410.0
+		if title != null:
+			title.custom_minimum_size.x = 410.0
+		card.update_minimum_size()
+		await process_frame
+		waited = 0
+		while waited < 120 and card.size.y > card.get_combined_minimum_size().y + 1.0:
+			await process_frame
+			waited += 1
+		if waited > max_wait:
+			max_wait = waited
+		var combined := card.get_combined_minimum_size()
+		print("  [INFO] HeadlessTutorial1Test: P1a step11→12 hug r=%d waited %d frames size.y=%.1f min.y=%.1f" % [
+			r, waited, card.size.y, combined.y
+		])
+		if card.size.y > combined.y + 1.0:
+			_fail("P1a step11→12 hug: r=%d size.y=%.1f > combined_min.y+1 (%.1f) after late wrap" % [
+				r, card.size.y, combined.y
+			])
+			OS.set_environment("EOA_TUTORIAL", "")
+			guide.set_process(true)
+			return
+	print("  [INFO] HeadlessTutorial1Test: P1a step11→12 hug max wait frames=", max_wait)
+	OS.set_environment("EOA_TUTORIAL", "")
+	guide.set_process(true)
+	guide.call("_hide_card")
+	_pass("P1a card hugs on real step 11→12 after a late wrap min drop")
+
+
 func _test_p1a_fight_copy_and_done_hold() -> void:
 	OS.set_environment("EOA_TUTORIAL", "1")
 	var before := _p1a_done_before("fight")
@@ -1057,9 +1299,12 @@ func _test_p1a_step12_idle_layout_stable() -> void:
 	root.add_child(date)
 	await process_frame
 	_p1a_present_ending(guide, host, card)
-	await process_frame
-	await process_frame
-	await process_frame
+	var settle := 0
+	while settle < 30:
+		await process_frame
+		settle += 1
+		if card.size.y <= card.get_combined_minimum_size().y + 1.0 and not card.is_processing():
+			break
 	var got := card.find_child("BtnGotIt", true, false) as Control
 	if got == null or not got.visible:
 		_fail("P1a step12 idle: Got it missing")
