@@ -170,6 +170,8 @@ const IDLE_MOTION_PX := 2.0
 var _last_save_path: String = ""
 ## Real load applications. A same-frame second delivery of the same slot does not count.
 var eoa_load_apply_count: int = 0
+## Runtime-only. Bumped on every successful write/delete/rename. Never saved to disk.
+var _save_generation: int = 0
 ## total_days_elapsed at the last successful save. -1 means this session has not saved.
 var _last_saved_elapsed: int = -1
 var _tag_names: Dictionary = {}
@@ -1338,7 +1340,13 @@ func _notify_top_bar_speed_resync() -> void:
 			n.call("resync_speed_from_time_manager")
 
 
+func get_save_generation() -> int:
+	return _save_generation
+
+
 func _notify_save_list_refresh() -> void:
+	# Generation is the event: count+mtime stay the fallback when this getter is absent.
+	_save_generation += 1
 	# Defer so Apply/Save `pressed` can return before any listener free()s the button.
 	call_deferred("_emit_save_list_changed")
 
@@ -1436,6 +1444,11 @@ func _format_slot_ui_row(slot: String, occupied: bool, metadata: Variant, unread
 			title = "Last played"
 		elif name.begins_with("autosave"):
 			title = "Session" if bool(meta.get("session_locked", false)) else "Autosave"
+			var token: String = name
+			if name.begins_with("autosave_"):
+				token = name.substr("autosave_".length())
+			if not token.is_empty():
+				title = "%s %s" % [title, token]
 		var bits: PackedStringArray = [title]
 		if game_date_label != "—":
 			bits.append(game_date_label)
