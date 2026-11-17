@@ -69,4 +69,17 @@ Base 1-arg check is SKIP_FIELDED (any Maginot/OOB chip). Tip evaluates the hold/
 ## Tests
 
 `scripts/core/HeadlessB2Live1Test.gd` is standalone (not in the gates runner).
-A1–A6, B1–B3, C1–C2, D1 FAIL on `95003ad3`, PASS on this tip.
+A1–A6, B1–B3, C1–C2, D1 FAIL on `95003ad3` (A4 already held on base: garrison-only
+was never fielded), PASS on this tip.
+
+## Bars (tip `0792aab9`)
+
+- Seed ×2 `20fe9063de285f19d4f9b8a105abfd31` (`grep -o` payload + newline).
+- Identity `d22b87cf21fdf3b5bd54753a36a56b8c` MATCH ×2; twin `5f87a16c300f2c9f57fad4059334ef40` MATCH ×2. No re-pin.
+- NE **0.9853** (3207/3255). Garrison **576**, ENG **188**.
+- `--quick` ALL PASSED `WALL_SEC=587.861`.
+- b/d map-select `--case=d`: 144 / 168 / 135 ms, max **168** < 480.
+- CL1 soak unmodified: S1 annex d**154**, S2/S2b PASS d139 md5 `b9cf8d506235342ff4693617a4d18b07`, S3 **0.4983@152** then stall 0.6098@218, failures=1.
+- #194 tests: Defence / ThreatCache T1–T5 / Cl1SiegeHold / AiWar1 RESULT=PASS. `DEF_STACK_MAX=3`. 0 SCRIPT ERROR.
+- (c) C2 same COVER map: rebuilds **2 / 2**, scanned **−1 (full own_land=421) → 38**. Tip Perf4 `worst_day_ai=5.3ms`.
+- Forbidden-file check: CLEAN. No `SaveLoadManager.gd`. CONFLICT: none.
