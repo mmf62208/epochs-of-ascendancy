@@ -26,7 +26,7 @@ XDG_DATA_HOME=$(mktemp -d) flock -n "$HOME/.eoa_godot.lock" \
   tools/run_godot.sh --headless --path . -s res://scripts/core/HeadlessTutorial1Test.gd
 ```
 
-On `--quick` after `headless_search_hotkey1`. XFAIL SAVELOAD-DESIGN-1 on orders-perf1 case g is acceptable.
+On `--quick` after `headless_search_hotkey1`. XFAIL SAVELOAD-DESIGN-1 on orders-perf1 case g is acceptable. P1a card-hug size wait is a bounded settle loop (≤30 frames, logged) so `--quick` layout races on steps 5/10 do not flake.
 
 ### 0. INK-TOOLTIPS-P0 theme / clamp / 1280 resources
 

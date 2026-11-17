@@ -765,6 +765,7 @@ func _test_p1a_card_hugs_content() -> void:
 		{"id": "ending", "confirm": false},
 		{"id": "welcome", "confirm": true},
 	]
+	var hug_waited_max: int = 0
 	for raw in cases:
 		var c: Dictionary = raw
 		var sid := str(c.get("id", ""))
@@ -779,11 +780,20 @@ func _test_p1a_card_hugs_content() -> void:
 		model["visible"] = true
 		card.size = Vector2(maxf(card.custom_minimum_size.x, 340.0), host.size.y * 0.85)
 		card.present(model)
-		await process_frame
-		await process_frame
-		await process_frame
-		var combined := card.get_combined_minimum_size()
 		var label := "step %s%s" % [str(model.get("n", 0)), " skip-confirm" if bool(c.get("confirm", false)) else ""]
+		# Layout-settle race: hug can take more than 3 frames on a loaded --quick
+		# process (steps 5/10). Wait until size.y hugs combined min, then assert.
+		var hug_waited: int = 0
+		while hug_waited < 30:
+			await process_frame
+			hug_waited += 1
+			var settled := card.get_combined_minimum_size()
+			if card.size.y <= settled.y + 1.0:
+				break
+		if hug_waited > hug_waited_max:
+			hug_waited_max = hug_waited
+		print("  [INFO] HeadlessTutorial1Test: P1a card hug %s waited %d frames" % [label, hug_waited])
+		var combined := card.get_combined_minimum_size()
 		if card.size.y > combined.y + 1.0:
 			_fail("P1a card hug: %s size.y=%.1f > combined_min.y+1 (%.1f)" % [label, card.size.y, combined.y])
 			OS.set_environment("EOA_TUTORIAL", "")
@@ -811,6 +821,7 @@ func _test_p1a_card_hugs_content() -> void:
 		OS.set_environment("EOA_TUTORIAL", "")
 		return
 	OS.set_environment("EOA_TUTORIAL", "")
+	print("  [INFO] HeadlessTutorial1Test: P1a card hug max wait frames=", hug_waited_max)
 	_pass("P1a card hugs content on steps 1, 5, 10, 12 and skip-confirm")
 
 
