@@ -105,13 +105,32 @@ class TestSim1110arNoCampaignLoopEnvFork(unittest.TestCase):
         )
 
     def test_r2_head_81b30cfa_still_reads_env(self) -> None:
+        if not (ROOT / ".git").exists():
+            self.skipTest(
+                "no .git directory (codeload/tarball checkout); cannot git-show 81b30cfa"
+            )
+        try:
+            probe = subprocess.run(
+                ["git", "cat-file", "-e", R2_HEAD],
+                cwd=str(ROOT),
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                check=False,
+            )
+        except OSError:
+            self.skipTest("git is unavailable; cannot git-show 81b30cfa")
+        if probe.returncode != 0:
+            self.skipTest("81b30cfa is not reachable; skip r2 env-read regression")
         hits: list[str] = []
-        for rel in (
-            "scripts/combat/BattleManager.gd",
-            "scripts/autoload/TimeManager.gd",
-        ):
-            src = _git_show(R2_HEAD, rel)
-            hits.extend(env_fork_hits_in_text(rel, src))
+        try:
+            for rel in (
+                "scripts/combat/BattleManager.gd",
+                "scripts/autoload/TimeManager.gd",
+            ):
+                src = _git_show(R2_HEAD, rel)
+                hits.extend(env_fork_hits_in_text(rel, src))
+        except (OSError, subprocess.SubprocessError):
+            self.skipTest("git show 81b30cfa failed; skip r2 env-read regression")
         self.assertTrue(
             hits,
             msg="expected 81b30cfa product to still read EOA_CAMPAIGN_LOOP",
