@@ -12425,6 +12425,9 @@ func get_save_data() -> Dictionary:
 		"peace_settlements": peace_state["peace_settlements"].duplicate(true) if peace_state.get("peace_settlements") is Array else [],
 		"version": 1
 	}
+	var seed_n_v: Variant = peace_state.get("garrison_seed_n", {})
+	if seed_n_v is Dictionary and not (seed_n_v as Dictionary).is_empty():
+		data["garrison_seed_n"] = (seed_n_v as Dictionary).duplicate(true)
 	if stability_justice_enabled():
 		var sj_blob: Dictionary = _StabilityJustice.export_save_blob()
 		if not sj_blob.is_empty():
@@ -12496,6 +12499,10 @@ func apply_save_data(data: Dictionary) -> void:
 		peace_state["pending_continuation"] = data.get("pending_continuation", {}).duplicate(true)
 	if data.has("campaign_wars") and data["campaign_wars"] is Dictionary:
 		peace_state["campaign_wars"] = data["campaign_wars"].duplicate(true)
+	if data.has("garrison_seed_n") and data["garrison_seed_n"] is Dictionary:
+		peace_state["garrison_seed_n"] = data["garrison_seed_n"].duplicate(true)
+	if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("bump_ai_board_epoch"):
+		BattleManager.bump_ai_board_epoch()
 	if data.has("campaign_capitulation") and data["campaign_capitulation"] is Dictionary:
 		peace_state["campaign_capitulation"] = data["campaign_capitulation"].duplicate(true)
 	if data.has("campaign_end") and data["campaign_end"] is Dictionary:
@@ -12626,6 +12633,7 @@ func clear_for_load() -> void:
 	peace_state["crisis_responses"] = {}
 	peace_state.erase("pending_continuation")
 	peace_state["campaign_wars"] = {}
+	peace_state["garrison_seed_n"] = {}
 	peace_state["campaign_capitulation"] = {}
 	peace_state["campaign_end"] = {}
 	peace_state["ascendancy"] = {}

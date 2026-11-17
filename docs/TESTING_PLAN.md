@@ -8,6 +8,21 @@
 
 ## Recommended Testing Approach
 
+### 0-SIM-1110-A-R single-stack threat + cache
+
+Rescope of #192. `HeadlessSim1110aDefenceTest` keeps (k)(k2)(l)(m.2)(m.3) and **inverts m.1** (two adjacent stacks are not summed). New `HeadlessSim1110ARThreatCacheTest` T1–T5: not summed, 2-div stack still triggers, passive-human border no forward stacking, cache on/off same ctrl_md5 + 0 quiet rebuilds, threat path never calls `get_formations_for_country`. Wired on `--quick` after `HeadlessAiWar1Test` (same pattern as PR #193 `HeadlessCl1SiegeHold1Test`).
+
+```bash
+XDG_DATA_HOME=$(mktemp -d) flock -n "$HOME/.eoa_godot.lock" \
+  tools/run_godot.sh --headless --path . \
+  -s res://scripts/core/HeadlessSim1110ARThreatCacheTest.gd
+XDG_DATA_HOME=$(mktemp -d) flock -n "$HOME/.eoa_godot.lock" \
+  tools/run_godot.sh --headless --path . \
+  -s res://scripts/core/HeadlessSim1110aDefenceTest.gd
+```
+
+T1–T5 must FAIL on main `330644ef` product and PASS on this tip.
+
 ### 0-p1a. ONBOARDING-P1a FIX r1 (step-12 idle card / Got it consume)
 
 Live on `aaeef1e5`: step-12 width flipped while idle; one Got it click selected Division 0. `HeadlessTutorial1Test` now asserts 120 idle frames of constant card size + Got it global position (and hug `_process` off after settle), and that a Got it click never reaches a map spy / formation. **FAIL** on `aaeef1e5` product / **PASS** on the tip (22 PASS). `_play_sfx` skips missing `tutorial_step` / `justify_ready`; AudioManager still warn-once for other keys.

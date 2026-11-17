@@ -582,6 +582,8 @@ static func _commit_ready_hops(order: Dictionary) -> Array:
 			var f: Formation = LeaderManager.get_formation(fid)
 			if f != null:
 				f.stationed_province_id = to_pid
+		if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("bump_ai_station_gen"):
+			BattleManager.bump_ai_station_gen(tag)
 		var arrived := hop_i >= path.size() - 1 or to_pid == dest_id
 		var hop_row := {
 			"formation_id": fid,
