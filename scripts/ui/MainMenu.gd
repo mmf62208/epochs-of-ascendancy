@@ -1295,19 +1295,97 @@ func _add_victory_paths_readout(parent: Node) -> void:
 		return
 	if not bool(GameData.victory_paths_enabled()):
 		return
-	var text := ""
-	if GameData.has_method("victory_paths_progress_text"):
-		text = str(GameData.victory_paths_progress_text())
-	if text.is_empty():
-		return
+	var text := _victory_paths_readout_text()
+	## menu_panel_frame_512 draws 48px of chrome; PanelContainer content
+	## margin is 40. Inset the block so the first glyph of Conquest is not
+	## painted under the frame at 1280.
+	var block := MarginContainer.new()
+	block.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	block.add_theme_constant_override("margin_left", 12)
+	block.add_theme_constant_override("margin_right", 12)
+	block.add_theme_constant_override("margin_top", 0)
+	block.add_theme_constant_override("margin_bottom", 0)
+	var col := VBoxContainer.new()
+	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	col.add_theme_constant_override("separation", 4)
+	var heading := Label.new()
+	heading.name = "VictoryPathsHeading"
+	heading.text = "Victory Paths"
+	heading.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	heading.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	RetrowaveTheme.style_column_header(heading)
 	var label := Label.new()
 	label.name = "VictoryPathsReadout"
 	label.text = text
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.clip_text = false
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	RetrowaveTheme.style_body_label(label)
-	parent.add_child(label)
+	col.add_child(heading)
+	col.add_child(label)
+	block.add_child(col)
+	parent.add_child(block)
+
+
+func _victory_paths_readout_text() -> String:
+	var text := ""
+	if typeof(GameData) != TYPE_NIL and GameData.has_method("victory_paths_progress_text"):
+		text = str(GameData.victory_paths_progress_text()).strip_edges()
+	if not text.is_empty():
+		return text
+	return _victory_paths_zero_state_text()
+
+
+func _victory_paths_zero_state_text() -> String:
+	var fallback := "Conquest · 0/6 enemy capitals\nAtomic · 0/30\nArsenal of the World · 0% · 0/90\nScore · 0"
+	var vp: GDScript = load("res://scripts/core/VictoryPathsDomain.gd") as GDScript
+	if vp == null or not vp.has_method("load_rules"):
+		return fallback
+	var loaded: Variant = vp.call("load_rules")
+	if not (loaded is Dictionary):
+		return fallback
+	var rules: Dictionary = loaded as Dictionary
+	var paths_v: Variant = rules.get("paths", {})
+	var paths: Dictionary = paths_v if paths_v is Dictionary else {}
+	var order: Array = []
+	var listed: Variant = rules.get("priority", [])
+	if listed is Array:
+		for item in listed as Array:
+			var pid := str(item).strip_edges()
+			if not pid.is_empty() and pid not in order:
+				order.append(pid)
+	for k in paths.keys():
+		var extra := str(k)
+		if extra not in order:
+			order.append(extra)
+	var enemy_n := 6
+	var majors_v: Variant = rules.get("majors", [])
+	if majors_v is Array:
+		enemy_n = maxi((majors_v as Array).size() - 1, 1)
+	var lines: PackedStringArray = PackedStringArray()
+	for pid_v in order:
+		var pid := str(pid_v)
+		if not paths.has(pid):
+			continue
+		var path_v: Variant = paths[pid]
+		if not (path_v is Dictionary):
+			continue
+		var path: Dictionary = path_v
+		if bool(path.get("disabled", false)) or not bool(path.get("enabled", false)):
+			continue
+		var title := str(path.get("title", pid))
+		if pid == "conquest":
+			lines.append("%s · 0/%d enemy capitals" % [title, enemy_n])
+		elif pid == "atomic":
+			lines.append("%s · 0/%d" % [title, int(path.get("hold_days", 30))])
+		elif pid == "arsenal":
+			lines.append("%s · 0%% · 0/%d" % [title, int(path.get("sustain_days", 90))])
+		else:
+			lines.append("%s · 0" % title)
+	if lines.is_empty():
+		return fallback
+	return "\n".join(lines)
 
 
 func _refresh_living_campaign_buttons() -> void:
