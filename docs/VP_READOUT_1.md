@@ -39,7 +39,17 @@ On that tree `GameData.victory_paths_progress_text()` is already non-empty at da
 
 ### PASS on tip
 
-See proof section below. Heading `'Victory Paths'`, four path lines with digits, `lines fit column x=200.0 w=432.0`, `RESULT=PASS`.
+```
+  [PASS] HeadlessVpReadout1Test: day 0: VictoryPathsHeading='Victory Paths'
+  [PASS] HeadlessVpReadout1Test: day 0: path 'Conquest' = 'Conquest 0/8'
+  [PASS] HeadlessVpReadout1Test: day 0: path 'Atomic' = 'Atomic 0/30'
+  [PASS] HeadlessVpReadout1Test: day 0: path 'Arsenal of the World' = 'Arsenal of the World 0% · 0/90'
+  [PASS] HeadlessVpReadout1Test: day 0: path 'Score' = 'Score 0'
+  [PASS] HeadlessVpReadout1Test: day 0 1280x720: lines fit column x=200.0 w=432.0 widest=203.0
+  [PASS] HeadlessVpReadout1Test: day 0 1280x800: lines fit column x=200.0 w=432.0 widest=203.0
+HeadlessVpReadout1Test: PASS (failures=0)
+HeadlessVpReadout1Test: RESULT=PASS
+```
 
 ## Screenshot
 
@@ -48,12 +58,13 @@ See proof section below. Heading `'Victory Paths'`, four path lines with digits,
 - `/opt/cursor/artifacts/vp-readout-1/vp_readout_1280x800.png`
 - `/opt/cursor/artifacts/vp-readout-1/vp_readout_column_1280x800.png`
 
-## Proof (fill after gates)
+## Proof
 
-- HeadlessVpReadout1Test: pending
-- HeadlessVictoryPaths1Test (unmodified): pending
-- HeadlessSettingsToggles1Test (unmodified): pending
-- `tools/eoa_full_test_gates.sh --quick`: pending
-- b / d map-select max of 3: pending
-- Seed `20fe9063de285f19d4f9b8a105abfd31` default and `EOA_VICTORY_PATHS=1`: pending
-- SCRIPT ERROR: pending
+- HeadlessVpReadout1Test: **RESULT=PASS** failures=0. 0 SCRIPT ERROR.
+- HeadlessVictoryPaths1Test (unmodified): **RESULT=PASS**
+- HeadlessSettingsToggles1Test (unmodified): **RESULT=PASS**
+- `tools/eoa_full_test_gates.sh --quick`: **ALL PASSED (quick)** wall **530 s**. 0 SCRIPT ERROR in the gate logs.
+- HeadlessOrdersPerf1Test case **b** warm reopen (3 runs): 136 / 135 / 155 ms, max **155 ms** (< 480). `--quick` also 178 ms.
+- HeadlessOrdersPerf1Test case **d** map-select (3 runs): 143 / 132 / 159 ms, max **159 ms** (< 480). `--quick` also 138 ms.
+- Seed `EOA_PERF4_SEED_ONLY=1` md5 of `multi_ai_decisions=` line: **`20fe9063de285f19d4f9b8a105abfd31`** default and with `EOA_VICTORY_PATHS=1`. Both RESULT=PASS. 0 SCRIPT ERROR.
+- Godot only via `tools/run_godot.sh` with a fresh `XDG_DATA_HOME`. Test not added to the gates script. No default `EOA_VICTORY_PATHS` change.
