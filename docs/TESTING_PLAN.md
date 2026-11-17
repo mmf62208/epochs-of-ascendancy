@@ -41,7 +41,7 @@ XDG_DATA_HOME=$(mktemp -d) flock -n "$HOME/.eoa_godot.lock" \
   tools/run_godot.sh --headless --path . -s res://scripts/core/HeadlessTutorial1Test.gd
 ```
 
-On `--quick` after `headless_search_hotkey1`. XFAIL SAVELOAD-DESIGN-1 on orders-perf1 case g is acceptable. P1a card-hug size wait is a bounded settle loop (≤30 frames, logged) so `--quick` layout races on steps 5/10 do not flake.
+On `--quick` after `headless_search_hotkey1`. XFAIL SAVELOAD-DESIGN-1 on orders-perf1 case g is acceptable. P1a card-hug size wait is a bounded settle loop (≤30 frames, logged) so `--quick` layout races on steps 5/10 do not flake. P1a step 11→12 hug: real save→ending, then a late wrap min drop after the original 3-frame window must shrink (`size.y <= combined_min.y+1`); **FAIL** on `e471e125` / **PASS** on the tip. Evidence `docs/evidence/tutorial_hug_r1/TRACE.md`.
 
 ### 0. INK-TOOLTIPS-P0 theme / clamp / 1280 resources
 
