@@ -3432,23 +3432,7 @@ func _ai_massing_march_opps(march_opps: Array) -> Array:
 		if int(opp.get("dest_id", -1)) != dest:
 			continue
 		out.append(opp)
-	# One dest globally: two stalled tags must not spray 3 marches across the front
-	# (HeadlessAiWar1Test stall massing). Prefer the lowest dest_id.
-	var by_dest: Dictionary = {}
-	for raw2 in out:
-		if typeof(raw2) != TYPE_DICTIONARY:
-			continue
-		var d := int((raw2 as Dictionary).get("dest_id", -1))
-		if d <= 0:
-			continue
-		if not by_dest.has(d):
-			by_dest[d] = []
-		(by_dest[d] as Array).append(raw2)
-	if by_dest.size() <= 1:
-		return out
-	var dest_ids: Array = by_dest.keys()
-	dest_ids.sort()
-	return by_dest[int(dest_ids[0])]
+	return out
 
 
 func _ai_drop_commit(tag: String) -> void:
