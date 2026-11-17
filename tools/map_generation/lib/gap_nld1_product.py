@@ -1046,9 +1046,16 @@ def _prior_allows(size: int, cells, origin) -> bool:
     return False
 
 
+# GAP-SIA-1 lands on this same branch. Its tagged rings are that slice's
+# re-rings and notches, so they are not an untagged area drift.
+_LATER_SLICE_META = ("gap_sia1", "gap_sia1_yield")
+
+
 def area_change_ok(before: float, after: float, meta: dict) -> bool:
     """True when this area change is a re-ring, a notch, or inside AREA_LOSS_MAX."""
     if meta.get(META_RING) or meta.get(META_YIELD):
+        return after > 1.0
+    if any(meta.get(key) for key in _LATER_SLICE_META):
         return after > 1.0
     if before <= 0.0:
         return after <= 1.0
