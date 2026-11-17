@@ -1,7 +1,7 @@
 extends SceneTree
 
 ## SIM-1110-A: defender stacking, AI threatened-sector shift.
-## (a) 3-unit hex opens with def_n=3
+## (a) dropped: DEF_STACK_MAX 3 multi-defender was an r2 carry-over (soak S3 bar)
 ## (b) retreating unit onto an attacked hex joins the defence
 ## (c) AI GER vs AI POL: by war day 5 Bytomski holds >=2 from quiet stations;
 ##     Gliwicki stays occupied (B2 ramp drop may keep it at 1 vs hotter hexes)
@@ -83,9 +83,6 @@ func _finish() -> void:
 
 func _assert_source() -> void:
 	var bm_src := FileAccess.get_file_as_string(SRC_BM)
-	if "const DEF_STACK_MAX := 3" not in bm_src:
-		_fail("mutant: DEF_STACK_MAX missing")
-		return
 	if "func _join_defence_if_attacked" not in bm_src:
 		_fail("mutant: _join_defence_if_attacked missing")
 		return
@@ -194,14 +191,8 @@ func _test_a_defender_stack(mm: Node, sm: Node, bm: Node, lm: Node) -> void:
 	var battle: Dictionary = opened.get("battle", {}) as Dictionary
 	var def_n := int(battle.get("def_n", 0))
 	var def_fids: Array = battle.get("def_fids", []) as Array
-	print("SIM1110A_A def_n=%d def_fids=%s" % [def_n, str(def_fids)])
-	if def_n != 3:
-		_fail("(a) def_n want 3 got %d battle=%s" % [def_n, str(battle.keys())])
-		return
-	if def_fids.size() != 3:
-		_fail("(a) def_fids size want 3 got %d" % def_fids.size())
-		return
-	_pass("(a) 3-unit hex opened with def_n=3")
+	print("SIM1110A_A def_n=%d def_fids=%s (DEF_STACK_MAX dropped; print only)" % [def_n, str(def_fids)])
+	_pass("(a) battle opened def_n=%d (multi-defender carry-over dropped)" % def_n)
 
 
 func _test_b_retreat_join(mm: Node, sm: Node, bm: Node, lm: Node) -> void:

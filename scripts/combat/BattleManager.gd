@@ -100,8 +100,6 @@ const AI_MASSING_MARCHES := 3
 const AI_MASSING_STACK := 3
 const AI_RELAX_RATIO := 1.2
 const AI_EVEN_RATIO := 1.0
-## SIM-1110-A: stack defenders the same way attackers already stack.
-const DEF_STACK_MAX := 3
 const RAISE_WAR_BUDGET_FRAC := 0.10
 const RAISE_WAR_BUDGET_MIN := 1
 const RAISE_WAR_BUDGET_MAX := 10
@@ -794,28 +792,12 @@ func start_land_battle(
 			continue
 		stacked.append(extra_fid)
 	battle["att_fids"] = stacked
-	var def_stacked: Array = [def_fid]
-	var def_extras: Array[String] = []
-	for extra_d in get_divisions_at_province(to_id, def_tag):
-		var efid := str(extra_d.get("formation_id", "")).strip_edges()
-		if efid.is_empty() or efid == def_fid or def_extras.has(efid):
-			continue
-		def_extras.append(efid)
-	def_extras.sort()
-	for efid2 in def_extras:
-		if def_stacked.has(efid2):
-			continue
-		if def_stacked.size() >= DEF_STACK_MAX:
-			break
-		def_stacked.append(efid2)
-	battle["def_fids"] = def_stacked
 	_rebuild_land_battle_powers(battle)
 	_next_land_battle_seq += 1
 	_open_land_battles.append(battle)
 	for stacked_fid in stacked:
 		_set_formation_in_combat(str(stacked_fid), true)
-	for def_stacked_fid in def_stacked:
-		_set_formation_in_combat(str(def_stacked_fid), true)
+	_set_formation_in_combat(def_fid, true)
 	if typeof(ProductionManager) != TYPE_NIL and ProductionManager.has_method("ensure_demo_combat_stock"):
 		ProductionManager.ensure_demo_combat_stock(fid, tag)
 		ProductionManager.ensure_demo_combat_stock(def_fid, def_tag)
