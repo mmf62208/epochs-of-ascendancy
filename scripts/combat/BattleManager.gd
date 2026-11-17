@@ -2161,13 +2161,13 @@ func _ai_has_committed_field_army(tag: String, def_tag: String = "") -> bool:
 			continue
 		if bool(f.get_meta("garrison_1936", false)):
 			continue
-		var fid := str(f.formation_id) if "formation_id" in f else ""
+		var fid := str(f.formation_id)
 		if fid.begins_with("capdef_"):
 			continue
-		var ft := str(f.formation_type) if "formation_type" in f else ""
+		var ft := str(f.formation_type)
 		if ft != Formation.TYPE_DIVISION and ft != Formation.TYPE_GARRISON:
 			continue
-		var sid := int(f.stationed_province_id) if "stationed_province_id" in f else -1
+		var sid := int(f.stationed_province_id)
 		if sid <= 0:
 			continue
 		if not _ai_hex_touches_def_land(sid, t, d):
@@ -2810,6 +2810,7 @@ func apply_save_data(data: Dictionary) -> void:
 	_ai_r2_prints.clear()
 	_ai_threat_cache.clear()
 	_ai_station_gen_by_tag.clear()
+	_ai_fielded_cache.clear()
 	reset_ai_hop_cache_counts()
 	reset_ai_threat_cache_counts()
 	bump_ai_board_epoch()
@@ -3527,6 +3528,7 @@ func reset_ai_war1_for_test() -> void:
 	_ai_r2_prints.clear()
 	_ai_threat_cache.clear()
 	_ai_station_gen_by_tag.clear()
+	_ai_fielded_cache.clear()
 	reset_ai_hop_cache_counts()
 	reset_ai_threat_cache_counts()
 	bump_ai_board_epoch()

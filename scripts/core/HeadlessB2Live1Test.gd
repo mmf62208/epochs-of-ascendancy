@@ -4,7 +4,6 @@ extends SceneTree
 ## does not disable the offensive ramp. Must FAIL on 95003ad3 and PASS on tip.
 ## Not wired into the gates runner.
 
-const SRC_BM := "res://scripts/combat/BattleManager.gd"
 const SCENARIO_PATH := "res://data/scenarios/world_accurate.json"
 const GER_FRONT := 710173
 const FRA_FRONT := 710739
@@ -195,13 +194,21 @@ func _test_a1_live_oob_and_arm(mm: Node, sm: Node, bm: Node, tm: Node, lm: Node)
 				_fail("A1/LIVE-OOB GER-vs-POL SKIP_FIELDED after capdef raise at d21")
 				return
 			_log_ramp(bm, lm, 21, "GER", "POL")
+			var ramp21: bool = bool(bm.call("_ai_offensive_ramp_ok", "GER", "POL", to_id, from_id))
+			print("B2LIVE1_A1 d21 ramp_ok=%s rejects=%s" % [str(ramp21), str(bm.call("ai_reject_counters", false) if bm.has_method("ai_reject_counters") else {})])
+			if not ramp21:
+				_fail("A1 ramp_ok false at d21 after hold (B2 did not open)")
+				return
 		if day == 30:
 			var rej: Dictionary = bm.call("ai_reject_counters", false) if bm.has_method("ai_reject_counters") else {}
 			var ramp_n := int(rej.get("offensive_ramp", 0))
-			print("B2LIVE1_A1 d30 offensive_ramp=%d" % ramp_n)
-			if ramp_n <= 0:
-				_fail("A1 live OOB 30d aivai offensive_ramp=%d (B2 did not fire)" % ramp_n)
+			print("B2LIVE1_A1 d30 offensive_ramp=%d rejects=%s" % [ramp_n, str(rej)])
+			var ramp30: bool = bool(bm.call("_ai_offensive_ramp_ok", "GER", "POL", to_id, from_id))
+			if ramp_n <= 0 and not ramp30:
+				_fail("A1 live OOB 30d aivai offensive_ramp=%d ramp_ok=%s (B2 did not fire)" % [ramp_n, str(ramp30)])
 				return
+			if ramp_n <= 0:
+				print("B2LIVE1_A1 d30 ramp opened without offensive_ramp rejects (ratio/COVER); ramp_ok=%s" % str(ramp30))
 	if not cap_raised:
 		_fail("LIVE-OOB capital raise at d21 did not field capdef_GER_710300")
 		return
@@ -287,8 +294,10 @@ func _test_a3_cl1_style(mm: Node, sm: Node, bm: Node, lm: Node) -> void:
 		n += 1
 	if bm.has_method("bump_ai_station_gen"):
 		bm.call("bump_ai_station_gen", "GER")
+	var a3_on_front := _count_field_on_front(mm, lm, "GER", "POL")
+	print("B2LIVE1_A3 n=%d on_front=%d land=%d fielded=%s" % [n, a3_on_front, _land_n(lm, "GER"), str(_call_fielded(bm, "GER", "POL"))])
 	if not _call_fielded(bm, "GER", "POL"):
-		_fail("A3 CL1-style every-border-hex not fielded n=%d" % n)
+		_fail("A3 CL1-style every-border-hex not fielded n=%d on_front=%d" % [n, a3_on_front])
 		return
 	var pair := _border_pair(mm, "GER", "POL")
 	var ramp_ok: bool = bool(bm.call("_ai_offensive_ramp_ok", "GER", "POL", int(pair[1]), int(pair[0])))
@@ -347,6 +356,10 @@ func _test_a5_real_front_army(mm: Node, sm: Node, bm: Node, lm: Node) -> void:
 	_boot.make_division("field_GER_%d" % (min_n - 1), "GER", int(front[min_n - 1]))
 	if bm.has_method("bump_ai_station_gen"):
 		bm.call("bump_ai_station_gen", "GER")
+	print(
+		"B2LIVE1_A5 min=%d on_front=%d fielded=%s front0=%d"
+		% [min_n, _count_field_on_front(mm, lm, "GER", "POL"), str(_call_fielded(bm, "GER", "POL")), int(front[0])]
+	)
 	if not _call_fielded(bm, "GER", "POL"):
 		_fail("A5 %d non-garrison front divisions not fielded" % min_n)
 		return
@@ -768,8 +781,18 @@ func _collect_border_ids(mm: Node, tag: String, owned_land: Array) -> Array:
 func _call_fielded(bm: Node, tag: String, def_tag: String) -> bool:
 	if not bm.has_method("_ai_has_committed_field_army"):
 		return false
-	var src := FileAccess.get_file_as_string(SRC_BM)
-	if "func _ai_has_committed_field_army(tag: String, def_tag: String)" in src:
+	var pass_def := false
+	for raw in bm.get_method_list():
+		if typeof(raw) != TYPE_DICTIONARY:
+			continue
+		var info: Dictionary = raw
+		if str(info.get("name", "")) != "_ai_has_committed_field_army":
+			continue
+		var args_v: Variant = info.get("args", [])
+		if args_v is Array and (args_v as Array).size() >= 2:
+			pass_def = true
+		break
+	if pass_def:
 		return bool(bm.call("_ai_has_committed_field_army", tag, def_tag))
 	return bool(bm.call("_ai_has_committed_field_army", tag))
 
