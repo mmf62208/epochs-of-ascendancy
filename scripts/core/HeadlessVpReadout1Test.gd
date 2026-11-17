@@ -260,6 +260,15 @@ func _shot(menu: Node, readout: Control) -> void:
 	if dir.is_empty():
 		return
 	var scroll := menu.find_child("GameActionsScroll", true, false) as ScrollContainer
+	var session := menu.find_child("SessionPin", true, false) as Control
+	var settings := menu.find_child("SettingsPin", true, false) as Control
+	if session != null:
+		session.visible = false
+	if settings != null:
+		settings.visible = false
+	if menu.has_method("_center_panel"):
+		menu.call("_center_panel")
+	await _flush()
 	if scroll != null and readout != null:
 		scroll.ensure_control_visible(readout)
 	await _flush()
@@ -278,13 +287,20 @@ func _shot(menu: Node, readout: Control) -> void:
 	DirAccess.make_dir_recursive_absolute(dir)
 	var full := dir.path_join("vp_readout_1280x800.png")
 	var err := img.save_png(full)
+	var heading_n := menu.find_child("VictoryPathsHeading", true, false) as Control
 	var column := _column_for(readout)
+	var r := readout.get_global_rect()
+	if heading_n != null:
+		r = heading_n.get_global_rect().merge(readout.get_global_rect())
 	if column != null:
-		var r := column.get_global_rect().grow(8.0)
-		var ri := Rect2i(int(r.position.x), int(r.position.y), int(r.size.x), int(r.size.y))
-		ri = ri.intersection(Rect2i(0, 0, img.get_width(), img.get_height()))
-		if ri.size.x > 0 and ri.size.y > 0:
-			img.get_region(ri).save_png(dir.path_join("vp_readout_column_1280x800.png"))
+		var colr := column.get_global_rect()
+		r.position.x = colr.position.x
+		r.size.x = colr.size.x
+	r = r.grow(16.0)
+	var ri := Rect2i(int(r.position.x), int(r.position.y), int(r.size.x), int(r.size.y))
+	ri = ri.intersection(Rect2i(0, 0, img.get_width(), img.get_height()))
+	if ri.size.x > 0 and ri.size.y > 0:
+		img.get_region(ri).save_png(dir.path_join("vp_readout_column_1280x800.png"))
 	print("  [INFO] HeadlessVpReadout1Test: shot err=%s %s" % [err, full])
 
 
