@@ -145,8 +145,6 @@ func _ready() -> void:
 
 
 func _warm_campaign_rules() -> void:
-	if OS.get_environment("EOA_CAMPAIGN_LOOP").strip_edges() == "0":
-		return
 	if typeof(WarStateDomain) == TYPE_NIL:
 		return
 	WarStateDomain.loop_enabled()

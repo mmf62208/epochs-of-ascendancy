@@ -4,16 +4,19 @@ extends SceneTree
 ## (a) 3-unit hex opens with def_n=3
 ## (b) retreating unit onto an attacked hex joins the defence
 ## (c) AI GER vs AI POL: by war day 5 Bytomski holds >=2 from quiet stations;
-##     Gliwicki stays occupied (CL1 CAMPAIGN_LOOP gates the B2 ramp)
+##     Gliwicki stays occupied (B2 ramp is game-state: 1-stack probe)
 ## (d) Germany's French border keeps >= ceil(18*0.5)=9 garrisons
 ## (e) human GER: 0 cover/reinforce of GER in 30 days; stations only change via retreat
-## (f) B2 offensive ramp restored and gated: 21d hold + 15/10/7 gaps, off when
-##     EOA_CAMPAIGN_LOOP=1 (this suite), expires at RAMP_END_DAYS. Source mutant.
+## (f) B2 offensive ramp: 21d hold + 15/10/7 gaps, skip when the attacking hex
+##     already has a concentrated stack (>=2). Expires at RAMP_END_DAYS.
+##     Product must not read EOA_CAMPAIGN_LOOP. Source mutant.
 ## (g) 0 SCRIPT ERROR
 ## (k) no GARRISON_REINFORCE onto war-captured land; control home hex is reinforced
 ## (k2) no GARRISON_COVER move onto war-captured land; control home hex is covered
 ## (l) 5-day AI unit move cooldown; join-defence-if-attacked is not blocked
 ## (m) 1-hop single-stack MAX (not summed); 2-hop ignored; human = AI
+## (n) threatened under-covered POL dest gets a reinforce (fires)
+## (n2) hold back: last defender on a front province is not pulled
 
 const SRC_BM := "res://scripts/combat/BattleManager.gd"
 const GLIWICKI := 711058
@@ -70,6 +73,8 @@ func _run() -> void:
 	_test_k2_no_cover_captured(mm, sm, bm, tm, lm)
 	_test_l_move_cooldown(mm, sm, bm, tm, lm)
 	_test_m_threat_radius(mm, sm, bm, tm, lm)
+	_test_n_pol_reinforce_fire(mm, sm, bm, tm, lm)
+	_test_n2_pol_reinforce_hold(mm, sm, bm, tm, lm)
 	_finish()
 
 
@@ -99,17 +104,29 @@ func _assert_source() -> void:
 	if "const RAMP_HOLD_DAYS := 21" not in bm_src:
 		_fail("mutant: RAMP_HOLD_DAYS missing")
 		return
-	if "EOA_CAMPAIGN_LOOP" not in bm_src:
-		_fail("mutant: EOA_CAMPAIGN_LOOP ramp gate missing")
+	if "EOA_CAMPAIGN_LOOP" in bm_src:
+		_fail("mutant: BattleManager still reads EOA_CAMPAIGN_LOOP")
+		return
+	if 'OS.get_environment("EOA_CAMPAIGN_LOOP")' in bm_src:
+		_fail("mutant: BattleManager OS.get_environment EOA_CAMPAIGN_LOOP")
 		return
 	if "Never pull the last defender" not in bm_src:
 		_fail("mutant: last-defender cover keep missing")
 		return
-	if "Empty holes are COVER" not in bm_src:
-		_fail("mutant: occupied-dest reinforce trigger missing")
+	if "Threatened empty dest: COVER is the reinforce" not in bm_src:
+		_fail("mutant: threatened COVER logs GARRISON_REINFORCE missing")
 		return
 	if "func _ai_cover_expired_for_hole" not in bm_src:
-		_fail("mutant: cover expiry after RAMP_END_DAYS missing")
+		_fail("mutant: cover expiry after COVER_EXPIRE_DAYS missing")
+		return
+	if "const COVER_EXPIRE_DAYS := 180" not in bm_src:
+		_fail("mutant: COVER_EXPIRE_DAYS missing")
+		return
+	if "_ai_friendly_division_count(tag, from_id) >= 2" not in bm_src:
+		_fail("mutant: concentrated-stack ramp skip missing")
+		return
+	if "func _ai_has_committed_field_army" not in bm_src:
+		_fail("mutant: committed field-army ramp skip missing")
 		return
 	if "GARRISON_REINFORCE" not in bm_src:
 		_fail("mutant: GARRISON_REINFORCE print missing")
@@ -310,12 +327,12 @@ func _test_cdf_aivai(mm: Node, sm: Node, bm: Node, tm: Node, lm: Node) -> void:
 			)
 		if day == 20:
 			new_caps_d20 = _new_polish_captures(mm, start_pol)
-			print("SIM1110A_F d20 new_pol_caps=%d (ramp gated off; CAMPAIGN_LOOP=1)" % new_caps_d20)
+			print("SIM1110A_F d20 new_pol_caps=%d (ramp game-state; 1-stack probe)" % new_caps_d20)
 	var new_caps_d60 := _new_polish_captures(mm, start_pol)
-	print("SIM1110A_F d60 new_pol_caps=%d (ramp gated off; CAMPAIGN_LOOP=1)" % new_caps_d60)
+	print("SIM1110A_F d60 new_pol_caps=%d (ramp game-state; 1-stack probe)" % new_caps_d60)
 	if not d4_ok:
 		return
-	_pass("(c)(d) aivai checkpoints; B2 ramp gated for CL1 S1")
+	_pass("(c)(d) aivai checkpoints; B2 ramp game-state")
 
 
 func _assert_c_d(
@@ -966,6 +983,109 @@ func _test_m_threat_radius(mm: Node, sm: Node, bm: Node, tm: Node, lm: Node) -> 
 		return
 	_pass("(m.3) human = AI threat %.3f and same reinforce decision" % threat_ai)
 	var _unused_m := [sm]
+
+
+func _test_n_pol_reinforce_fire(mm: Node, sm: Node, bm: Node, tm: Node, lm: Node) -> void:
+	if not _boot_as(mm, sm, bm, lm, "USA", true):
+		return
+	if not bool(_war.declare_war("GER", "POL", "test").get("ok", false)):
+		_fail("(n) declare GER-POL failed")
+		return
+	var fx: Dictionary = _threat_radius_fixture(mm)
+	if int(fx.get("p", 0)) <= 0:
+		_fail("(n) no P with two GER-owned neighbors")
+		return
+	var p_pid := int(fx["p"])
+	var g1 := int(fx["g1"])
+	var q := _quiet_pol_pid(mm, {p_pid: true})
+	if q <= 0:
+		_fail("(n) no quiet POL spare")
+		return
+	_vacate_tag_at(lm, "POL", p_pid, q)
+	_make_garr(lm, "sim1110a_n_own", "POL", p_pid, 1.0)
+	_make_garr(lm, "sim1110a_n_s", "POL", q, 1.0)
+	_boot.make_division("sim1110a_n_g1", "GER", g1)
+	_boot.make_division("sim1110a_n_g2", "GER", g1)
+	_keep_only_formations(lm, ["sim1110a_n_own", "sim1110a_n_s", "sim1110a_n_g1", "sim1110a_n_g2"])
+	_occupy_pol_holes_except(mm, lm, {g1: true}, {p_pid: true})
+	if bm.has_method("bump_ai_board_epoch"):
+		bm.call("bump_ai_board_epoch")
+	var threat := _threat_on(bm, p_pid, "POL")
+	var own_p := float(bm.call("_ai_hex_power", p_pid, "POL", "defend"))
+	var r := threat / maxf(own_p, 1.0)
+	tm.set("total_days_elapsed", 0)
+	bm.call("try_ai_cover_threatened_borders")
+	var s_at := _station_of(lm, "sim1110a_n_s")
+	var s_md := _march_dest("sim1110a_n_s")
+	var fired := s_at == p_pid or s_md == p_pid
+	var log_hit := _log_has(bm, "GARRISON_REINFORCE")
+	print(
+		"SIM1110A_N FIRE P=%d q=%d threat=%.3f own=%.3f r=%.3f s=%d md=%d fired=%s log=%s"
+		% [p_pid, q, threat, own_p, r, s_at, s_md, str(fired), str(log_hit)]
+	)
+	if r < 1.2:
+		_fail("(n) fire fixture r=%.3f < 1.2 (not under-covered)" % r)
+		return
+	if not fired:
+		_fail("(n) threatened under-covered POL P=%d was not reinforced s=%d md=%d" % [p_pid, s_at, s_md])
+		return
+	if not log_hit:
+		_fail("(n) missing GARRISON_REINFORCE print")
+		return
+	_pass("(n) threatened under-covered POL P=%d reinforced (fire)" % p_pid)
+	var _unused_n := sm
+
+
+func _test_n2_pol_reinforce_hold(mm: Node, sm: Node, bm: Node, tm: Node, lm: Node) -> void:
+	if not _boot_as(mm, sm, bm, lm, "USA", true):
+		return
+	if not bool(_war.declare_war("GER", "POL", "test").get("ok", false)):
+		_fail("(n2) declare GER-POL failed")
+		return
+	var fx: Dictionary = _threat_radius_fixture(mm)
+	if int(fx.get("p", 0)) <= 0:
+		_fail("(n2) no P with two GER-owned neighbors")
+		return
+	var p_pid := int(fx["p"])
+	var g1 := int(fx["g1"])
+	var other: Array[int] = _other_pol_front_distinct(mm, p_pid, g1)
+	if other.size() < 2:
+		_fail("(n2) no other POL front hex")
+		return
+	var f_pid := int(other[0])
+	var ger_f := int(other[1])
+	_vacate_tag_at(lm, "POL", p_pid, f_pid)
+	_vacate_tag_at(lm, "POL", f_pid, f_pid)
+	_make_garr(lm, "sim1110a_n2_last", "POL", f_pid, 1.0)
+	_boot.make_division("sim1110a_n2_g1", "GER", g1)
+	_boot.make_division("sim1110a_n2_g2", "GER", g1)
+	_boot.make_division("sim1110a_n2_gf", "GER", ger_f)
+	_keep_only_formations(lm, ["sim1110a_n2_last", "sim1110a_n2_g1", "sim1110a_n2_g2", "sim1110a_n2_gf"])
+	_occupy_pol_holes_except(mm, lm, {g1: true, ger_f: true}, {p_pid: true, f_pid: true})
+	if bm.has_method("bump_ai_board_epoch"):
+		bm.call("bump_ai_board_epoch")
+	var pick = bm.call("_ai_pick_quiet_spare", "POL", p_pid)
+	var pick_fid := str(pick.formation_id) if pick != null else ""
+	tm.set("total_days_elapsed", 0)
+	bm.call("try_ai_cover_threatened_borders")
+	var last_at := _station_of(lm, "sim1110a_n2_last")
+	var last_md := _march_dest("sim1110a_n2_last")
+	var pulled := last_at == p_pid or last_md == p_pid
+	print(
+		"SIM1110A_N2 HOLD P=%d F=%d last=%d/%d pick=%s pulled=%s"
+		% [p_pid, f_pid, last_at, last_md, pick_fid, str(pulled)]
+	)
+	if pulled:
+		_fail("(n2) pulled last front defender F=%d onto P=%d" % [f_pid, p_pid])
+		return
+	if last_at != f_pid:
+		_fail("(n2) last defender left F=%d station=%d" % [f_pid, last_at])
+		return
+	if pick_fid == "sim1110a_n2_last":
+		_fail("(n2) _ai_pick_quiet_spare returned the last front defender")
+		return
+	_pass("(n2) last front defender F=%d held (not pulled onto P=%d)" % [f_pid, p_pid])
+	var _unused_n2 := sm
 
 
 func _retreat_join_fixture(mm: Node) -> Array[int]:

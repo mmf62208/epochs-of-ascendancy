@@ -176,6 +176,7 @@ run_step unit_board_play_path \
     tools.map_generation.tests.test_map_resources_mapmode_product \
     tools.map_generation.tests.test_fac1a_airfield_icons \
     tools.map_generation.tests.test_startup_parity_inventory \
+    tools.map_generation.tests.test_sim1110ar_no_campaign_loop_env_fork \
     -v || fail
 
 run_step unit_save_path \
