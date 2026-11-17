@@ -263,7 +263,6 @@ func _shot(menu: Node, readout: Control) -> void:
 	if scroll != null and readout != null:
 		scroll.ensure_control_visible(readout)
 	await _flush()
-	await RenderingServer.frame_post_draw
 	var vp := root.get_viewport()
 	if vp == null:
 		print("  [INFO] HeadlessVpReadout1Test: no viewport for shot")
