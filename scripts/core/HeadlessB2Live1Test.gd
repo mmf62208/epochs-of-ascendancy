@@ -25,6 +25,7 @@ var _boot: GDScript
 var _war: GDScript
 var _cap: GDScript
 var _end: GDScript
+var _gd: Node
 var _live_fingerprint := ""
 var _live_approx := false
 var _budget_table: Dictionary = {}
@@ -52,11 +53,12 @@ func _run() -> void:
 	var bm := get_root().get_node_or_null("BattleManager")
 	var tm := get_root().get_node_or_null("TimeManager")
 	var lm := get_root().get_node_or_null("LeaderManager")
+	_gd = get_root().get_node_or_null("GameData")
 	_boot = load("res://scripts/core/CampaignLoopTestBoot.gd") as GDScript
 	_war = load("res://scripts/core/WarStateDomain.gd") as GDScript
 	_cap = load("res://scripts/core/CapitulationDomain.gd") as GDScript
 	_end = load("res://scripts/core/CampaignEndDomain.gd") as GDScript
-	if mm == null or bm == null or tm == null or lm == null or _boot == null or _war == null:
+	if mm == null or bm == null or tm == null or lm == null or _gd == null or _boot == null or _war == null:
 		_fail("autoloads missing")
 		_finish()
 		return
@@ -88,8 +90,10 @@ func _boot_as(mm: Node, sm: Node, bm: Node, lm: Node, player: String, observer: 
 		(lm.formations as Dictionary).clear()
 	if lm != null and "_garrisons_1936_seeded" in lm:
 		lm._garrisons_1936_seeded = false
-	if typeof(GameData) != TYPE_NIL:
-		GameData.peace_state["garrison_seed_n"] = {}
+	if _gd != null:
+		var ps: Variant = _gd.get("peace_state")
+		if ps is Dictionary:
+			(ps as Dictionary)["garrison_seed_n"] = {}
 	if bm != null:
 		bm.set("include_player_in_ai_land_battles", false)
 		if "_open_land_battles" in bm:
@@ -379,19 +383,20 @@ func _test_b_save(mm: Node, sm: Node, bm: Node, lm: Node) -> void:
 		if not bool(bm.call("_raise_garrison_at", "CZE", 710146)):
 			_fail("B1 CZE raise %d failed" % i)
 			return
-	var gd_blob: Dictionary = GameData.get_save_data()
+	var gd_blob: Dictionary = _gd.call("get_save_data")
 	var lm_blob: Dictionary = lm.call("get_save_data")
 	gd_blob.erase("garrison_seed_n")
 	lm_blob.erase("garrisons_1936_seeded")
 	var form_n_raised := _formation_count(lm)
-	GameData.clear_for_load()
+	_gd.call("clear_for_load")
 	if lm.formations is Dictionary:
 		(lm.formations as Dictionary).clear()
 	if "_garrisons_1936_seeded" in lm:
 		lm._garrisons_1936_seeded = false
-	GameData.apply_save_data(gd_blob)
+	_gd.call("apply_save_data", gd_blob)
 	lm.call("apply_save_data", lm_blob)
-	var after_seed: Variant = GameData.peace_state.get("garrison_seed_n", {})
+	var ps_after: Variant = _gd.get("peace_state")
+	var after_seed: Variant = (ps_after as Dictionary).get("garrison_seed_n", {}) if ps_after is Dictionary else {}
 	if after_seed is Dictionary and not (after_seed as Dictionary).is_empty():
 		var back := after_seed as Dictionary
 		if int(back.get("CZE", 0)) != int(seed_before.get("CZE", -1)):
@@ -399,7 +404,7 @@ func _test_b_save(mm: Node, sm: Node, bm: Node, lm: Node) -> void:
 			return
 	var old_budget := int(bm.call("_ai_raise_budget", "CZE"))
 	var want := int(fresh.get("CZE", -1))
-	print("B2LIVE1_B1 CZE budget old-save=%d fresh=%d seed_n=%s" % [old_budget, want, str(GameData.peace_state.get("garrison_seed_n", {}))])
+	print("B2LIVE1_B1 CZE budget old-save=%d fresh=%d seed_n=%s" % [old_budget, want, str(after_seed)])
 	if old_budget != want:
 		_fail("B1 CZE budget %d != fresh %d (old save counted raises)" % [old_budget, want])
 		return
@@ -422,7 +427,7 @@ func _test_b_save(mm: Node, sm: Node, bm: Node, lm: Node) -> void:
 	if not _boot_as(mm, sm, bm, lm, "USA", true):
 		return
 	lm.call("seed_1936_start_garrisons", true)
-	var gd2: Dictionary = GameData.get_save_data()
+	var gd2: Dictionary = _gd.call("get_save_data")
 	var lm2: Dictionary = lm.call("get_save_data")
 	if not gd2.has("garrison_seed_n"):
 		_fail("B3 new-format GameData missing garrison_seed_n")
@@ -430,12 +435,12 @@ func _test_b_save(mm: Node, sm: Node, bm: Node, lm: Node) -> void:
 	if not lm2.has("garrisons_1936_seeded"):
 		_fail("B3 new-format LeaderManager missing garrisons_1936_seeded")
 		return
-	GameData.clear_for_load()
+	_gd.call("clear_for_load")
 	if lm.formations is Dictionary:
 		(lm.formations as Dictionary).clear()
-	GameData.apply_save_data(gd2)
+	_gd.call("apply_save_data", gd2)
 	lm.call("apply_save_data", lm2)
-	var gd3: Dictionary = GameData.get_save_data()
+	var gd3: Dictionary = _gd.call("get_save_data")
 	var lm3: Dictionary = lm.call("get_save_data")
 	if not gd3.has("garrison_seed_n") or not lm3.has("garrisons_1936_seeded"):
 		_fail("B3 keys dropped on round-trip")
@@ -876,7 +881,12 @@ func _single_stack_from(mm: Node, lm: Node, tag: String, foe: String, fallback: 
 
 
 func _seed_n_copy() -> Dictionary:
-	var v: Variant = GameData.peace_state.get("garrison_seed_n", {})
+	if _gd == null:
+		return {}
+	var ps: Variant = _gd.get("peace_state")
+	if not (ps is Dictionary):
+		return {}
+	var v: Variant = (ps as Dictionary).get("garrison_seed_n", {})
 	if v is Dictionary:
 		return (v as Dictionary).duplicate(true)
 	return {}
