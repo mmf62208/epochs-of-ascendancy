@@ -151,6 +151,12 @@ func _test_a1_live_oob_and_arm(mm: Node, sm: Node, bm: Node, tm: Node, lm: Node)
 			int(spawned.get("fra_chips", 0)),
 		]
 	)
+	var ger_pol_n := _count_field_on_front(mm, lm, "GER", "POL")
+	var ger_fra_n := _count_field_on_front(mm, lm, "GER", "FRA")
+	print(
+		"B2LIVE1_FRONT_ARMY ger_pol=%d ger_fra=%d FIELD_ARMY_FRONT_MIN=%d"
+		% [ger_pol_n, ger_fra_n, _front_min(bm)]
+	)
 	if placed < 1 or targets != 576:
 		_fail("A1 seed did not run placed=%d targets=%d" % [placed, targets])
 		return
@@ -358,7 +364,19 @@ func _test_a6_per_pair(mm: Node, sm: Node, bm: Node, lm: Node) -> void:
 	if not bool(_war.declare_war("GER", "FRA", "test").get("ok", false)):
 		_fail("A6 declare FRA failed")
 		return
-	_apply_maginot_chips(lm, mm)
+	_boot.make_division("maginot_GER_a", "GER", GER_FRONT)
+	_boot.make_division("maginot_GER_b", "GER", GER_FRONT)
+	var ger_nbr := -1
+	for nv in mm.call("get_adjacent_provinces", GER_FRONT, true):
+		var nid := int(nv)
+		var np: Object = mm.call("get_province", nid)
+		if np == null or bool(np.get("is_sea")):
+			continue
+		if str(np.get("owner_tag")).strip_edges().to_upper() == "GER":
+			ger_nbr = nid
+			break
+	if ger_nbr > 0:
+		_boot.make_division("maginot_GER_c", "GER", ger_nbr)
 	if bm.has_method("bump_ai_station_gen"):
 		bm.call("bump_ai_station_gen", "GER")
 	if _call_fielded(bm, "GER", "POL"):
@@ -407,23 +425,21 @@ func _test_b_save(mm: Node, sm: Node, bm: Node, lm: Node) -> void:
 	print("B2LIVE1_B1 CZE budget old-save=%d fresh=%d seed_n=%s" % [old_budget, want, str(after_seed)])
 	if old_budget != want:
 		_fail("B1 CZE budget %d != fresh %d (old save counted raises)" % [old_budget, want])
-		return
-	print("B2LIVE1_B1_BUDGET_TABLE %s" % str(fresh))
+	else:
+		print("B2LIVE1_B1_BUDGET_TABLE %s" % str(fresh))
+		_pass("B1 old-format save budget matches fresh; not back-filled")
 	var again: Dictionary = lm.call("seed_1936_start_garrisons", false)
 	if not bool(again.get("already", false)):
 		_fail("B2 Continue seed_1936_start_garrisons(false) already=%s" % str(again.get("already")))
-		return
 	var seed_after: Dictionary = _seed_n_copy()
-	if str(seed_after) != str(_seed_n_copy_from(after_seed if after_seed is Dictionary else {})):
-		if seed_after.hash() != _seed_n_copy_from(after_seed if after_seed is Dictionary else {}).hash():
+	if after_seed is Dictionary:
+		if seed_after.hash() != _seed_n_copy_from(after_seed as Dictionary).hash():
 			_fail("B2 garrison_seed_n changed on Continue seed")
-			return
 	var form_after := _formation_count(lm)
 	if form_after != form_n_raised:
 		_fail("B2 formation count %d != %d after Continue seed" % [form_after, form_n_raised])
-		return
-	_pass("B1 old-format save budget matches fresh; not back-filled")
-	_pass("B2 Continue seed already=true; seed_n and formation count unchanged")
+	if bool(again.get("already", false)) and form_after == form_n_raised:
+		_pass("B2 Continue seed already=true; seed_n and formation count unchanged")
 	if not _boot_as(mm, sm, bm, lm, "USA", true):
 		return
 	lm.call("seed_1936_start_garrisons", true)
@@ -701,6 +717,23 @@ func _land_forms(lm: Node, tag: String) -> Array:
 
 func _land_n(lm: Node, tag: String) -> int:
 	return _land_forms(lm, tag).size()
+
+
+func _count_field_on_front(mm: Node, lm: Node, tag: String, foe: String) -> int:
+	var front: Dictionary = {}
+	for pid in _hexes_facing(mm, tag, foe):
+		front[int(pid)] = true
+	var n := 0
+	for f in _land_forms(lm, tag):
+		if f == null:
+			continue
+		var fid := str(f.formation_id)
+		if fid.begins_with("capdef_"):
+			continue
+		var sid := int(f.stationed_province_id) if "stationed_province_id" in f else -1
+		if front.has(sid):
+			n += 1
+	return n
 
 
 func _collect_border_ids(mm: Node, tag: String, owned_land: Array) -> Array:
