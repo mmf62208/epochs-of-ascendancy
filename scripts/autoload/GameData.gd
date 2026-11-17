@@ -285,7 +285,8 @@ func _init_peace_state_if_needed() -> void:
 		"space_race_competition": {},  # rival tags and progress for competition events
 		"mech_designer_unlocked": {},  # tag -> bool or level for mech designer alt path
 		"mech_variant_choice": {},  # tag -> "diesel"|"steam"|"steampunk" for simple designer choice (persisted, wires to div templates/special units)
-		"secret_fleet_combat_bonus": {}  # tag -> float for Expanse-style secret orbital navy combat edge (tied to secret programs/fleet events)
+		"secret_fleet_combat_bonus": {},  # tag -> float for Expanse-style secret orbital navy combat edge (tied to secret programs/fleet events)
+		"garrison_seed_n": {},  # per-tag 1936 garrison seed baseline for war-raise budget
 	}
 	# Seed baseline fertility (subtle real-world flavor: Western/developed lower due to education/welfare patterns; others higher baseline).
 	for t in ["GER", "FRA", "ENG", "USA", "SOV", "JAP", "ITA", "POL", "FIN", "NOR", "SWE", "DNK", "NLD", "BEL"]:
@@ -319,6 +320,8 @@ func _init_peace_state_if_needed() -> void:
 		peace_state["active_treaty_modifiers"] = []
 	if not peace_state.has("notes"):
 		peace_state["notes"] = []
+	if not peace_state.has("garrison_seed_n") or not (peace_state["garrison_seed_n"] is Dictionary):
+		peace_state["garrison_seed_n"] = {}
 	if not peace_state.has("crisis_responses"):
 		peace_state["crisis_responses"] = {}
 	if not peace_state.has("active_riots"):

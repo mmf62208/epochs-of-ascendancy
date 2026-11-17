@@ -180,6 +180,8 @@ var _fielded_seq: int = 0
 var _leader_id_seq: int = 0
 var _replacement_seq: int = 0
 var _garrisons_1936_seeded: bool = false
+var _gffc_note_resolved: bool = false
+var _gffc_note_ok: bool = false
 var country_positions: Dictionary = {}  # country_tag -> { position_id -> leader_id }
 var trait_definitions: Dictionary = {}
 var training_path_definitions: Dictionary = {}
@@ -698,22 +700,7 @@ func seed_1936_start_garrisons(force: bool = false) -> Dictionary:
 	var target_counts: Dictionary = {}
 	for tag in GARRISON_1936_TAGS:
 		var occupied := _land_pids_occupied(tag)
-		var targets: Array[int] = []
-		var seen: Dictionary = {}
-		for pid_v in MapManager.get_provinces_by_owner(tag):
-			var pid := int(pid_v)
-			if not _garrison_1936_border(tag, pid):
-				continue
-			seen[pid] = true
-			targets.append(pid)
-		for cap in garrison_1936_capital_pids(tag):
-			if seen.has(cap):
-				continue
-			if not _garrison_1936_own_land(tag, cap):
-				continue
-			seen[cap] = true
-			targets.append(cap)
-		targets.sort()
+		var targets: Array[int] = _garrison_1936_seed_targets(tag)
 		target_counts[tag] = targets.size()
 		target_n += targets.size()
 		var placed_tag := 0
@@ -743,7 +730,10 @@ func seed_1936_start_garrisons(force: bool = false) -> Dictionary:
 		BattleManager.bump_ai_station_gen()
 	var counts := _garrison_1936_counts()
 	if typeof(GameData) != TYPE_NIL:
-		GameData.peace_state["garrison_seed_n"] = counts.duplicate()
+		var existing: Variant = GameData.peace_state.get("garrison_seed_n", {})
+		var keep := (not force) and existing is Dictionary and not (existing as Dictionary).is_empty()
+		if not keep:
+			GameData.peace_state["garrison_seed_n"] = counts.duplicate()
 	var detail := _garrison_1936_seed_detail(placed_counts, target_counts, skipped_counts)
 	print(
 		"LeaderManager: 1936 garrisons placed=%d skipped_occupied=%d targets=%d %s"
@@ -926,6 +916,35 @@ func _fill_garrison_full_toe(f: Formation) -> void:
 	if toe.is_empty():
 		toe = {"infantry_equipment": 80}
 	ProductionManager.set_unit_equipment_stock(f.formation_id, toe)
+
+
+func garrison_1936_seed_target_n(tag: String) -> int:
+	return _garrison_1936_seed_targets(tag).size()
+
+
+func _garrison_1936_seed_targets(tag: String) -> Array[int]:
+	var t := tag.strip_edges().to_upper()
+	var targets: Array[int] = []
+	var seen: Dictionary = {}
+	if t.is_empty() or typeof(MapManager) == TYPE_NIL or not MapManager.has_method("get_provinces_by_owner"):
+		return targets
+	for pid_v in MapManager.get_provinces_by_owner(t):
+		var pid := int(pid_v)
+		if not _garrison_1936_border(t, pid):
+			continue
+		if seen.has(pid):
+			continue
+		seen[pid] = true
+		targets.append(pid)
+	for cap in garrison_1936_capital_pids(t):
+		if seen.has(cap):
+			continue
+		if not _garrison_1936_own_land(t, cap):
+			continue
+		seen[cap] = true
+		targets.append(cap)
+	targets.sort()
+	return targets
 
 
 func garrison_1936_capital_pids(tag: String) -> Array[int]:
@@ -1368,7 +1387,10 @@ func get_formation(formation_id: String) -> Formation:
 
 
 func get_formations_for_country(country_tag: String) -> Array[Formation]:
-	if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("note_ai_threat_gffc_call"):
+	if not _gffc_note_resolved:
+		_gffc_note_ok = typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("note_ai_threat_gffc_call")
+		_gffc_note_resolved = true
+	if _gffc_note_ok:
 		BattleManager.note_ai_threat_gffc_call()
 	var result: Array[Formation] = []
 	for formation_id in formations:
@@ -4150,7 +4172,7 @@ func get_save_data() -> Dictionary:
 				formation_blob["equipment_stock"] = ProductionManager.get_unit_equipment_stock(f.formation_id)
 		formations_data[str(fid)] = formation_blob
 
-	return {
+	var out := {
 		"leaders": leaders_data,
 		"formations": formations_data,
 		"country_positions": country_positions.duplicate(true),
@@ -4167,6 +4189,10 @@ func get_save_data() -> Dictionary:
 		"months_in_training": months_in_training.duplicate(true),
 		"officer_training_debuff_months": officer_training_debuff_months.duplicate(true),
 	}
+	# Emit only when true so identity hashes that never seeded 1936 garrisons stay put.
+	if _garrisons_1936_seeded:
+		out["garrisons_1936_seeded"] = true
+	return out
 
 func apply_save_data(data: Dictionary) -> void:
 	leaders.clear()
@@ -4358,6 +4384,17 @@ func apply_save_data(data: Dictionary) -> void:
 					"deploy_pid": int(ft2.stationed_province_id),
 				})
 		print("LeaderManager: Restored %d formation locations" % fdata.size())
+
+	if data.has("garrisons_1936_seeded"):
+		_garrisons_1936_seeded = bool(data.get("garrisons_1936_seeded", false))
+	else:
+		var any_garr := false
+		for fid_g in formations:
+			var fg: Formation = formations[fid_g] as Formation
+			if fg != null and bool(fg.get_meta("garrison_1936", false)):
+				any_garr = true
+				break
+		_garrisons_1936_seeded = any_garr
 
 	print("LeaderManager: Restored %d leaders + positions" % leaders.size())
 

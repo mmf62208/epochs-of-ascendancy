@@ -346,8 +346,8 @@ func _assert_c_d(
 	var byt := _garrison_fids_at(lm, "GER", BYTOMSKI)
 	print("SIM1110A_C day5 gliwicki=%d bytomski=%d gli=%s byt=%s" % [gli.size(), byt.size(), str(gli), str(byt)])
 	var c_ok := true
-	# CAMPAIGN_LOOP gates the B2 ramp here; hotter GER hexes may still consume
-	# the 2/day reinforce budget, so Gliwicki may stay at 1.
+	# B2 ramp is game-state (hold/gap / field-army skip). Hotter GER hexes
+	# may still consume the 2/day reinforce budget, so Gliwicki may stay at 1.
 	if gli.size() < 1:
 		_fail("(c) Gliwicki emptied owner=%s" % _owner(mm, GLIWICKI))
 		c_ok = false

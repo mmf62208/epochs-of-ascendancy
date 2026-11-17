@@ -93,6 +93,11 @@ var _ai_threat_cache: Dictionary = {}
 var _ai_station_gen_by_tag: Dictionary = {}
 var _ai_threat_rebuilds: int = 0
 var _ai_threat_gffc_calls: int = 0
+var _ai_threat_scanned: int = 0
+var _ai_defer_station_bump: bool = false
+var _ai_deferred_station_tags: Dictionary = {}
+var _ai_hop_last_print_day: int = -1
+var _ai_hop_last_print_sig: String = ""
 ## Per-hex stationed-division index. Invalidated by station-gen / board-epoch hooks.
 ## tag -> pid -> Array[Dictionary]. Built from LeaderManager.formations + SM deployments
 ## in one walk; threat helpers never scan all deployments or walk a nation roster.
@@ -118,16 +123,20 @@ const FRONT_STACK_TARGET := 2
 const QUIET_KEEP_MAJOR := 0.5
 const QUIET_KEEP_MINOR := 0.0
 ## SIM-1110-A B2: offensive ramp for the stronger AI side.
-## Game-state only (no harness env). 1936 1-stack garrisons probe: 21d hold
-## then 15/10/7 capture gaps until RAMP_END_DAYS. A hex that already has a
-## concentrated stack (>=2) skips the probe — CL1 extra border divisions and
-## shipped field armies. COVER leaves holes open after COVER_EXPIRE_DAYS so
-## later wars can empty-hex (A11). No infinite SR_MIN freeze.
+## Game-state only (no harness env). 1936 1-stack garrisons probe: 21d hold,
+## 15d gaps d21-50, 10d gaps d51-89, unrestricted from d90. A hex that already
+## has a concentrated stack (>=2) skips the probe — CL1 extra border divisions
+## and a committed per-war front army. COVER leaves holes open after
+## COVER_EXPIRE_DAYS so later wars can empty-hex (A11). No infinite SR_MIN freeze.
 const RAMP_HOLD_DAYS := 21
-const RAMP_PHASES: Array = [[21, 15], [51, 10], [111, 7]]
+const RAMP_PHASES: Array = [[21, 15], [51, 10]]
 const RAMP_SR_MIN := 1.5
-const RAMP_SR_FAST := 2.5
 const RAMP_END_DAYS := 90
+## Per-war front army: this many non-garrison_1936, non-capdef_ formations
+## stationed on own hexes touching that enemy skip the B2 probe. 3 sits above
+## the live 1936 Maginot chips (GER 710173×2 + neighbour) and the HOI spawn
+## leftover on a single border, so the shipped OOB does not disable B2.
+const FIELD_ARMY_FRONT_MIN := 3
 const COVER_EXPIRE_DAYS := 180
 const SCENARIO_MAJOR_TAGS: Array = ["GER", "FRA", "ENG", "SOV", "ITA", "JAP", "USA", "POL"]
 
@@ -170,10 +179,20 @@ func reset_ai_hop_cache_counts() -> void:
 func flush_ai_hop_cache_profile() -> void:
 	if _ai_hop_rebuild_adj == 0 and _ai_hop_rebuild_hops == 0 and _ai_hop_rebuild_facing == 0:
 		return
-	print(
-		"AI_HOP_CACHE day=%d rebuild_adj=%d rebuild_hops=%d rebuild_facing=%d"
-		% [_ai_day(), _ai_hop_rebuild_adj, _ai_hop_rebuild_hops, _ai_hop_rebuild_facing]
+	var sig := "%d|%d|%d" % [_ai_hop_rebuild_adj, _ai_hop_rebuild_hops, _ai_hop_rebuild_facing]
+	var day := _ai_day()
+	var due := (
+		sig != _ai_hop_last_print_sig
+		or _ai_hop_last_print_day < 0
+		or (day - _ai_hop_last_print_day) >= 30
 	)
+	if due:
+		print(
+			"AI_HOP_CACHE day=%d rebuild_adj=%d rebuild_hops=%d rebuild_facing=%d"
+			% [day, _ai_hop_rebuild_adj, _ai_hop_rebuild_hops, _ai_hop_rebuild_facing]
+		)
+		_ai_hop_last_print_sig = sig
+		_ai_hop_last_print_day = day
 	reset_ai_hop_cache_counts()
 
 
@@ -189,6 +208,7 @@ func ai_threat_cache_enabled() -> bool:
 func ai_threat_cache_counts() -> Dictionary:
 	return {
 		"rebuilds": _ai_threat_rebuilds,
+		"scanned": _ai_threat_scanned,
 		"epoch": _ai_board_epoch,
 		"enabled": _ai_threat_cache_enabled,
 	}
@@ -197,6 +217,7 @@ func ai_threat_cache_counts() -> Dictionary:
 func reset_ai_threat_cache_counts() -> void:
 	_ai_threat_rebuilds = 0
 	_ai_threat_gffc_calls = 0
+	_ai_threat_scanned = 0
 
 
 func note_ai_threat_gffc_call() -> void:
@@ -902,6 +923,7 @@ func try_ai_cover_threatened_borders() -> Dictionary:
 					enemy_hex_tags[esid] = etags
 		if enemy_pids.is_empty():
 			continue
+		_ai_defer_station_bump = true
 		var friendly: Dictionary = {}
 		var pool: Array = []
 		var capitals: Dictionary = {}
@@ -1020,12 +1042,25 @@ func try_ai_cover_threatened_borders() -> Dictionary:
 				if _ai_try_raise_garrison(tag2, hole, he):
 					friendly[hole] = true
 					result["raised"] = int(result["raised"]) + 1
+		_ai_flush_deferred_station_bumps()
 		result["moved"] = int(result["moved"]) + _ai_reinforce_threatened_sectors(tag2, enemy_pids)
 	return result
 
 
+func _ai_flush_deferred_station_bumps() -> void:
+	_ai_defer_station_bump = false
+	for tv in _ai_deferred_station_tags.keys():
+		bump_ai_station_gen(str(tv))
+	_ai_deferred_station_tags.clear()
+
+
 func _note_garrison_station(fid: String, tag: String, pid: int) -> void:
-	bump_ai_station_gen(tag)
+	var t := tag.strip_edges().to_upper()
+	if _ai_defer_station_bump:
+		if not t.is_empty():
+			_ai_deferred_station_tags[t] = true
+	else:
+		bump_ai_station_gen(tag)
 	if typeof(SupplyManager) == TYPE_NIL or not ("division_deployments" in SupplyManager):
 		return
 	var deps: Variant = SupplyManager.division_deployments
@@ -1139,14 +1174,11 @@ func _ai_garrison_seed_n(tag: String) -> int:
 		seeds = seeds_v
 	if seeds.has(t):
 		return int(seeds[t])
-	var n := 0
-	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_formations_for_country"):
-		for f in LeaderManager.get_formations_for_country(t):
-			if f != null and bool(f.get_meta("garrison_1936", false)):
-				n += 1
-	seeds[t] = n
-	GameData.peace_state["garrison_seed_n"] = seeds
-	return n
+	# Old save / empty blob: 1936 seed target, never current units (raises
+	# reuse garr1936_ ids). Do not write this baseline back into peace_state.
+	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("garrison_1936_seed_target_n"):
+		return int(LeaderManager.garrison_1936_seed_target_n(t))
+	return 0
 
 
 func _ai_raise_budget(tag: String) -> int:
@@ -1554,10 +1586,6 @@ func _ai_own_hexes_adjacent_to_enemy(tag: String, _enemy_pids: Array[int]) -> Ar
 	return out2
 
 
-func _ai_has_adjacent_enemy_division(pid: int, tag: String) -> bool:
-	return _ai_local_threat(pid, tag) > 0.0
-
-
 func _ai_ensure_threat_cache(tag: String) -> Dictionary:
 	var t := tag.strip_edges().to_upper()
 	var gen := int(_ai_station_gen_by_tag.get(t, 0))
@@ -1570,18 +1598,24 @@ func _ai_ensure_threat_cache(tag: String) -> Dictionary:
 	var front: Array[int] = []
 	var foe_p: Dictionary = {}
 	var adj: Dictionary = _ai_ensure_own_land_adj(t)
+	var scanned := 0
 	for pid_v in adj.keys():
 		var pid := int(pid_v)
+		if not _station_touches_enemy(pid, t):
+			continue
+		scanned += 1
 		var fp := _ai_compute_foe_p(pid, t)
 		if fp > 0.0:
 			foe_p[pid] = fp
 			front.append(pid)
+	_ai_threat_scanned += scanned
 	front.sort()
 	var row := {
 		"board_epoch": _ai_board_epoch,
 		"station_gen": gen,
 		"front": front,
 		"foe_p": foe_p,
+		"scanned": scanned,
 	}
 	_ai_threat_cache[t] = row
 	return row
@@ -2108,31 +2142,63 @@ func _ai_last_new_capture_day(tag: String, def_tag: String) -> int:
 	return int(stamp)
 
 
-func _ai_has_committed_field_army(tag: String) -> bool:
+func _ai_has_committed_field_army(tag: String, def_tag: String = "") -> bool:
 	var t := tag.strip_edges().to_upper()
-	if t.is_empty() or typeof(LeaderManager) == TYPE_NIL:
+	var d := def_tag.strip_edges().to_upper()
+	if t.is_empty() or d.is_empty() or typeof(LeaderManager) == TYPE_NIL:
 		return false
 	var gen := int(_ai_station_gen_by_tag.get(t, 0))
-	var cached_v: Variant = _ai_fielded_cache.get(t, {})
+	var key := "%s|%s" % [t, d]
+	var cached_v: Variant = _ai_fielded_cache.get(key, {})
 	if cached_v is Dictionary:
 		var cached: Dictionary = cached_v
 		if int(cached.get("gen", -1)) == gen and int(cached.get("epoch", -1)) == _ai_board_epoch:
 			return bool(cached.get("ok", false))
+	var n := 0
 	var ok := false
 	for f in LeaderManager.get_formations_for_country(t):
 		if f == null:
 			continue
 		if bool(f.get_meta("garrison_1936", false)):
 			continue
+		var fid := str(f.formation_id) if "formation_id" in f else ""
+		if fid.begins_with("capdef_"):
+			continue
 		var ft := str(f.formation_type) if "formation_type" in f else ""
 		if ft != Formation.TYPE_DIVISION and ft != Formation.TYPE_GARRISON:
 			continue
 		var sid := int(f.stationed_province_id) if "stationed_province_id" in f else -1
-		if sid > 0:
+		if sid <= 0:
+			continue
+		if not _ai_hex_touches_def_land(sid, t, d):
+			continue
+		n += 1
+		if n >= FIELD_ARMY_FRONT_MIN:
 			ok = true
 			break
-	_ai_fielded_cache[t] = {"gen": gen, "epoch": _ai_board_epoch, "ok": ok}
+	_ai_fielded_cache[key] = {"gen": gen, "epoch": _ai_board_epoch, "ok": ok}
 	return ok
+
+
+func _ai_hex_touches_def_land(pid: int, own_tag: String, def_tag: String) -> bool:
+	if pid <= 0 or def_tag.is_empty() or typeof(MapManager) == TYPE_NIL:
+		return false
+	if not MapManager.has_method("get_province") or not MapManager.has_method("get_adjacent_provinces"):
+		return false
+	var p = MapManager.get_province(pid)
+	if p == null or bool(p.is_sea):
+		return false
+	if str(p.owner_tag).strip_edges().to_upper() != own_tag:
+		return false
+	for nid_v in MapManager.get_adjacent_provinces(pid, true):
+		var np = MapManager.get_province(int(nid_v))
+		if np == null or bool(np.is_sea):
+			continue
+		if _province_controller_tag(np) == def_tag:
+			return true
+		if str(np.owner_tag).strip_edges().to_upper() == def_tag:
+			return true
+	return false
 
 
 func _ai_cover_expired_for_hole(tag: String, enemy_tags: Dictionary) -> bool:
@@ -2155,11 +2221,12 @@ func _ai_ramp_gap(wd: int) -> int:
 	return gap
 
 
-## Stronger AI side holds 21d then advances on 15/10/7 capture gaps.
-## Game-state only: a concentrated stack on the attacking hex (>=2) OR any
-## committed field army (non-garrison_1936) skips the probe — CL1 extra
-## border divisions and shipped field armies. 1936 1-stack garrisons keep
-## it. Expires at RAMP_END_DAYS so later wars (A11) can still capitulate.
+## Stronger AI side holds 21d then advances on 15/10 capture gaps.
+## Game-state only: a concentrated stack on the attacking hex (>=2) OR a
+## committed per-war front army (FIELD_ARMY_FRONT_MIN non-garrison_1936,
+## non-capdef_ on hexes touching that enemy) skips the probe — CL1 extra
+## border divisions still count. 1936 1-stack garrisons keep the hold.
+## Expires at RAMP_END_DAYS so later wars (A11) can still capitulate.
 ## No infinite RAMP_SR_MIN freeze.
 func _ai_offensive_ramp_ok(tag: String, def_tag: String, to_id: int, from_id: int = -1) -> bool:
 	if typeof(WarStateDomain) != TYPE_NIL and WarStateDomain._is_player_or_human_nation(tag):
@@ -2168,7 +2235,7 @@ func _ai_offensive_ramp_ok(tag: String, def_tag: String, to_id: int, from_id: in
 		return true
 	if from_id > 0 and _ai_friendly_division_count(tag, from_id) >= 2:
 		return true
-	if _ai_has_committed_field_army(tag):
+	if _ai_has_committed_field_army(tag, def_tag):
 		return true
 	var sr := _ai_military_strength_cached(tag) / maxf(_ai_military_strength_cached(def_tag), 1.0)
 	if sr < 1.0:
@@ -2181,8 +2248,6 @@ func _ai_offensive_ramp_ok(tag: String, def_tag: String, to_id: int, from_id: in
 	if sr < RAMP_SR_MIN:
 		_ai_log_ramp_sr_block(tag, def_tag, sr)
 	var gap := _ai_ramp_gap(wd)
-	if sr >= RAMP_SR_FAST and wd >= 111:
-		gap = int(ceil(float(gap) * 2.0 / 3.0))
 	return _ai_day() - _ai_last_new_capture_day(tag, def_tag) >= gap
 
 
@@ -2194,7 +2259,7 @@ func _ai_log_ramp_sr_block(tag: String, target: String, sr: float) -> void:
 	if int(_ai_ramp_sr_block_day.get(key, -1)) == day:
 		return
 	_ai_ramp_sr_block_day[key] = day
-	print("AI_RAMP_BLOCK day=%d tag=%s target=%s sr=%.3f min=%.3f" % [day, t, o, sr, RAMP_SR_MIN])
+	print("AI_RAMP_SR_LOW day=%d tag=%s target=%s sr=%.3f min=%.3f" % [day, t, o, sr, RAMP_SR_MIN])
 
 
 func _province_owner(pid: int) -> String:
@@ -3932,7 +3997,6 @@ func _apply_attacker_win_capture_light(att_tag: String, to_id: int, from_id: int
 		_ai_clear_war_capture_pid(previous_owner, to_id)
 		if previous_controller != "" and previous_controller != previous_owner and previous_controller != tag:
 			_ai_clear_war_capture_pid(previous_controller, to_id)
-		bump_ai_board_epoch()
 		bump_ai_station_gen(tag)
 	var liberation := previous_owner == tag and previous_controller != "" and previous_controller != tag and ctrl_now == tag
 	if liberation:
