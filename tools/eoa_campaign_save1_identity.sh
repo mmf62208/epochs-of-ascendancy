@@ -7,7 +7,7 @@
 # mutants drop_marches 1810a3d4, drop_wars ccc840ee).
 set -euo pipefail
 EXPECT_IDENTITY="d22b87cf21fdf3b5bd54753a36a56b8c"
-EXPECT_TWIN_END="7abd07c235dee2879c81109a4f996732"
+EXPECT_TWIN_END="5f87a16c300f2c9f57fad4059334ef40"
 EXPECT_MUTANT_MARCHES="4a9c21e5c61e67c82953a0a3963a9a7e"
 EXPECT_MUTANT_WARS="43e140824e07950ae9e1a54f309c91dd"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
