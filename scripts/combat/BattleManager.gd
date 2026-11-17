@@ -2409,6 +2409,10 @@ func try_ai_start_land_battles(day_index: int = 0) -> Dictionary:
 					continue
 				if "is_in_combat" in f and bool(f.is_in_combat):
 					continue
+				# CL1-S1-STALL-FIX: a division holding this tag's empty-hex siege
+				# is not a spare. One dict lookup, no board walk.
+				if str((_empty_hex_siege.get(tag2, {}) as Dictionary).get("fid", "")) == sfid:
+					continue
 				if typeof(FormationMovement) != TYPE_NIL:
 					if FormationMovement.has_march(sfid):
 						continue
@@ -3720,6 +3724,9 @@ func _collect_adjacent_stack_march(
 		if marching_fids.has(sfid) or combat_fids.has(sfid):
 			continue
 		if "is_in_combat" in f and bool(f.is_in_combat):
+			continue
+		# CL1-S1-STALL-FIX: same skip as the rear-spare picker.
+		if str((_empty_hex_siege.get(tag, {}) as Dictionary).get("fid", "")) == sfid:
 			continue
 		if typeof(FormationMovement) != TYPE_NIL and FormationMovement.has_march(sfid):
 			continue

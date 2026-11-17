@@ -23,6 +23,15 @@ XDG_DATA_HOME=$(mktemp -d) flock -n "$HOME/.eoa_godot.lock" \
 
 T1–T5 must FAIL on main `330644ef` product and PASS on this tip.
 
+### 0-cl1-s1. CL1-S1-STALL-FIX (siege holder is not a rear spare)
+
+Empty-hex capture needs 3 contiguous days. The AI spare-rear march used to pick the sieging division and move it 1 hop, erasing the siege on day 3. `HeadlessCl1SiegeHold1Test` stations GER X on 711069 sieging empty POL 711092, leaves GER staging 711062 empty (adjacent; second target 711063), and a control division on 711070. After 2 AI days: X never `has_march`, T is GER on day 3, and the control spare may still march. Wired on `--quick` after `HeadlessAiWar1Test`.
+
+```bash
+XDG_DATA_HOME=$(mktemp -d) flock -n "$HOME/.eoa_godot.lock" \
+  tools/run_godot.sh --headless --path . -s res://scripts/core/HeadlessCl1SiegeHold1Test.gd
+```
+
 ### 0-p1a. ONBOARDING-P1a FIX r1 (step-12 idle card / Got it consume)
 
 Live on `aaeef1e5`: step-12 width flipped while idle; one Got it click selected Division 0. `HeadlessTutorial1Test` now asserts 120 idle frames of constant card size + Got it global position (and hug `_process` off after settle), and that a Got it click never reaches a map spy / formation. **FAIL** on `aaeef1e5` product / **PASS** on the tip (22 PASS). `_play_sfx` skips missing `tutorial_step` / `justify_ready`; AudioManager still warn-once for other keys.
