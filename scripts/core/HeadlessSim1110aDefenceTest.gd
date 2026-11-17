@@ -4,10 +4,11 @@ extends SceneTree
 ## (a) 3-unit hex opens with def_n=3
 ## (b) retreating unit onto an attacked hex joins the defence
 ## (c) AI GER vs AI POL: by war day 5 Bytomski holds >=2 from quiet stations;
-##     Gliwicki stays occupied (B2 ramp drop may keep it at 1 vs hotter hexes)
+##     Gliwicki stays occupied (CL1 CAMPAIGN_LOOP gates the B2 ramp)
 ## (d) Germany's French border keeps >= ceil(18*0.5)=9 garrisons
 ## (e) human GER: 0 cover/reinforce of GER in 30 days; stations only change via retreat
-## (f) dropped: B2 offensive ramp (15/10/7) was an r2 carry-over that stalled S1
+## (f) B2 offensive ramp restored and gated: 21d hold + 15/10/7 gaps, off when
+##     EOA_CAMPAIGN_LOOP=1 (this suite), expires at RAMP_END_DAYS. Source mutant.
 ## (g) 0 SCRIPT ERROR
 ## (k) no GARRISON_REINFORCE onto war-captured land; control home hex is reinforced
 ## (k2) no GARRISON_COVER move onto war-captured land; control home hex is covered
@@ -91,6 +92,24 @@ func _assert_source() -> void:
 		return
 	if "func _ai_reinforce_threatened_sectors" not in bm_src:
 		_fail("mutant: _ai_reinforce_threatened_sectors missing")
+		return
+	if "func _ai_offensive_ramp_ok" not in bm_src:
+		_fail("mutant: _ai_offensive_ramp_ok missing")
+		return
+	if "const RAMP_HOLD_DAYS := 21" not in bm_src:
+		_fail("mutant: RAMP_HOLD_DAYS missing")
+		return
+	if "EOA_CAMPAIGN_LOOP" not in bm_src:
+		_fail("mutant: EOA_CAMPAIGN_LOOP ramp gate missing")
+		return
+	if "Never pull the last defender" not in bm_src:
+		_fail("mutant: last-defender cover keep missing")
+		return
+	if "Empty holes are COVER" not in bm_src:
+		_fail("mutant: occupied-dest reinforce trigger missing")
+		return
+	if "func _ai_cover_expired_for_hole" not in bm_src:
+		_fail("mutant: cover expiry after RAMP_END_DAYS missing")
 		return
 	if "GARRISON_REINFORCE" not in bm_src:
 		_fail("mutant: GARRISON_REINFORCE print missing")
@@ -291,12 +310,12 @@ func _test_cdf_aivai(mm: Node, sm: Node, bm: Node, tm: Node, lm: Node) -> void:
 			)
 		if day == 20:
 			new_caps_d20 = _new_polish_captures(mm, start_pol)
-			print("SIM1110A_F d20 new_pol_caps=%d (B2 ramp dropped)" % new_caps_d20)
+			print("SIM1110A_F d20 new_pol_caps=%d (ramp gated off; CAMPAIGN_LOOP=1)" % new_caps_d20)
 	var new_caps_d60 := _new_polish_captures(mm, start_pol)
-	print("SIM1110A_F d60 new_pol_caps=%d (B2 ramp dropped)" % new_caps_d60)
+	print("SIM1110A_F d60 new_pol_caps=%d (ramp gated off; CAMPAIGN_LOOP=1)" % new_caps_d60)
 	if not d4_ok:
 		return
-	_pass("(c)(d) aivai checkpoints; B2 ramp dropped (S1 soak)")
+	_pass("(c)(d) aivai checkpoints; B2 ramp gated for CL1 S1")
 
 
 func _assert_c_d(
@@ -310,8 +329,8 @@ func _assert_c_d(
 	var byt := _garrison_fids_at(lm, "GER", BYTOMSKI)
 	print("SIM1110A_C day5 gliwicki=%d bytomski=%d gli=%s byt=%s" % [gli.size(), byt.size(), str(gli), str(byt)])
 	var c_ok := true
-	# B2 ramp drop lets hotter GER hexes consume the 2/day reinforce budget, so
-	# Gliwicki may stay at 1 while Bytomski still stacks from quiet stations.
+	# CAMPAIGN_LOOP gates the B2 ramp here; hotter GER hexes may still consume
+	# the 2/day reinforce budget, so Gliwicki may stay at 1.
 	if gli.size() < 1:
 		_fail("(c) Gliwicki emptied owner=%s" % _owner(mm, GLIWICKI))
 		c_ok = false

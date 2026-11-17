@@ -80,6 +80,9 @@ var _ai_hop_rebuild_adj: int = 0
 var _ai_hop_rebuild_hops: int = 0
 var _ai_hop_rebuild_facing: int = 0
 var _ai_raise_skip_cap_day: Dictionary = {}
+var _ai_ramp_sr_block_day: Dictionary = {}
+var _ai_str_cache_day: int = -1
+var _ai_str_cache: Dictionary = {}
 var _ai_unit_moved_day: Dictionary = {}
 var _ai_move_cooldown_skip_day: Dictionary = {}
 var _ai_skip_captured_logged: Dictionary = {}
@@ -113,6 +116,14 @@ const REDEPLOY_PER_TAG_PER_DAY := 2
 const FRONT_STACK_TARGET := 2
 const QUIET_KEEP_MAJOR := 0.5
 const QUIET_KEEP_MINOR := 0.0
+## SIM-1110-A B2: offensive ramp for the stronger AI side.
+## Gated: off when EOA_CAMPAIGN_LOOP=1 (CL1 S1 must annex POL d146–166).
+## Ends at RAMP_END_DAYS so A11 can still capitulate; no infinite SR_MIN freeze.
+const RAMP_HOLD_DAYS := 21
+const RAMP_PHASES: Array = [[21, 15], [51, 10], [111, 7]]
+const RAMP_SR_MIN := 1.5
+const RAMP_SR_FAST := 2.5
+const RAMP_END_DAYS := 90
 const SCENARIO_MAJOR_TAGS: Array = ["GER", "FRA", "ENG", "SOV", "ITA", "JAP", "USA", "POL"]
 
 
@@ -923,12 +934,15 @@ func try_ai_cover_threatened_borders() -> Dictionary:
 			var psid := int(sid_v)
 			var el2: Array = hex_eligible[psid] as Array
 			if not _station_touches_enemy(psid, tag2):
+				# Interior last-1 is the T2/(l) quiet-spare path. Front last
+				# defender is kept below (hex_garr_n < 2).
 				for spare_f in el2:
 					if _ai_unit_in_move_cooldown(str(spare_f.formation_id), tag2, psid):
 						_ai_note_move_cooldown_skip(tag2)
 						continue
 					pool.append(spare_f)
 				continue
+			# Never pull the last defender off a front province.
 			if int(hex_garr_n.get(psid, 0)) < FRONT_STACK_TARGET:
 				continue
 			if el2.size() < 1 or int(hex_garr_n.get(psid, 0)) < 2:
@@ -978,6 +992,10 @@ func try_ai_cover_threatened_borders() -> Dictionary:
 				return sa < sb
 			)
 			for hole in threatened:
+				# After RAMP_END_DAYS, leave holes open so later wars can
+				# empty-hex (A11). CL1 keeps filling (gate matches the ramp).
+				if _ai_cover_expired_for_hole(tag2, hole_enemy_tags.get(hole, {}) as Dictionary):
+					continue
 				if not pool.is_empty():
 					var spare = pool.pop_front()
 					var from_pid := int(spare.stationed_province_id)
@@ -1466,17 +1484,18 @@ func _ai_reinforce_threatened_sectors(tag: String, enemy_pids: Array[int]) -> in
 		if _ai_is_war_captured(tag, pid):
 			_ai_note_skip_captured("reinforce", tag, pid)
 			continue
-		var own_p := _ai_hex_power(pid, tag, "defend")
-		var foe_p := _ai_local_threat(pid, tag)
-		var r := foe_p / maxf(own_p, 1.0)
-		var target_n := FRONT_STACK_TARGET
-		if r >= 2.0:
-			target_n = FRONT_STACK_TARGET + 1
 		var have_n := _ai_friendly_division_count(tag, pid)
-		if r >= THREAT_RATIO and have_n < target_n:
-			# Prefer filling to 2 before a 3rd on an already-stacked hex.
-			var need2 := 1 if have_n < FRONT_STACK_TARGET else 0
-			threats.append({"pid": pid, "ratio": r, "need2": need2})
+		# Empty holes are COVER's job. Reinforce only an occupied threatened hex.
+		if have_n < 1:
+			continue
+		var foe_p := _ai_local_threat(pid, tag)
+		if foe_p <= 0.0:
+			continue
+		var own_p := _ai_hex_power(pid, tag, "defend")
+		var r := foe_p / maxf(own_p, 1.0)
+		# Fill occupied threatened hexes to FRONT_STACK_TARGET (2). Do not pile a 3rd.
+		if r >= THREAT_RATIO and have_n < FRONT_STACK_TARGET:
+			threats.append({"pid": pid, "ratio": r, "need2": 1})
 	if threats.is_empty():
 		return 0
 	threats.sort_custom(func(a, b):
@@ -1647,6 +1666,7 @@ func _ai_pick_quiet_spare(tag: String, dest: int) -> Variant:
 		if _ai_unit_in_move_cooldown(sfid, tag, sid):
 			_ai_note_move_cooldown_skip(tag)
 			continue
+		# Never pull the last defender off a front province.
 		if _station_touches_enemy(sid, tag):
 			continue
 		var klass := _ai_station_peace_class(sid, tag)
@@ -2052,6 +2072,93 @@ func _ai_stamp_last_new_capture_day(att_tag: String, prev_owner: String) -> void
 	GameData.peace_state["campaign_wars"] = st
 
 
+func _ai_military_strength_cached(tag: String) -> float:
+	var day := _ai_day()
+	if _ai_str_cache_day != day:
+		_ai_str_cache_day = day
+		_ai_str_cache.clear()
+	if _ai_str_cache.has(tag):
+		return float(_ai_str_cache[tag])
+	var s := 0.0
+	if typeof(WarStateDomain) != TYPE_NIL:
+		s = float(WarStateDomain.military_strength(tag))
+	_ai_str_cache[tag] = s
+	return s
+
+
+func _ai_war_day(tag: String, def_tag: String) -> int:
+	var row := _ai_war_row(tag, def_tag)
+	return _ai_day() - int(row.get("start_day", 0))
+
+
+func _ai_last_new_capture_day(tag: String, def_tag: String) -> int:
+	var row := _ai_war_row(tag, def_tag)
+	var stamp: Variant = row.get("last_new_capture_day", 0)
+	if stamp is Dictionary:
+		return int((stamp as Dictionary).get(tag, 0))
+	return int(stamp)
+
+
+func _ai_cover_expired_for_hole(tag: String, enemy_tags: Dictionary) -> bool:
+	if OS.get_environment("EOA_CAMPAIGN_LOOP").strip_edges() == "1":
+		return false
+	for etag_v in enemy_tags.keys():
+		if _ai_war_day(tag, str(etag_v).strip_edges().to_upper()) >= RAMP_END_DAYS:
+			return true
+	return false
+
+
+func _ai_ramp_gap(wd: int) -> int:
+	var gap := 15
+	for raw in RAMP_PHASES:
+		if not (raw is Array):
+			continue
+		var row: Array = raw
+		if row.size() < 2:
+			continue
+		if wd >= int(row[0]):
+			gap = int(row[1])
+	return gap
+
+
+## Stronger AI side holds 21d then advances on 15/10/7 capture gaps.
+## Gated off when EOA_CAMPAIGN_LOOP=1 so CL1 S1 can annex POL in d146–166.
+## Expires at RAMP_END_DAYS so later wars (A11) can still capitulate.
+## No infinite RAMP_SR_MIN freeze — that stalled S1 once POL strength rose.
+func _ai_offensive_ramp_ok(tag: String, def_tag: String, to_id: int) -> bool:
+	if typeof(WarStateDomain) != TYPE_NIL and WarStateDomain._is_player_or_human_nation(tag):
+		return true
+	if _province_owner(to_id) == tag:
+		return true
+	if OS.get_environment("EOA_CAMPAIGN_LOOP").strip_edges() == "1":
+		return true
+	var sr := _ai_military_strength_cached(tag) / maxf(_ai_military_strength_cached(def_tag), 1.0)
+	if sr < 1.0:
+		return true
+	var wd := _ai_war_day(tag, def_tag)
+	if wd >= RAMP_END_DAYS:
+		return true
+	if wd < RAMP_HOLD_DAYS:
+		return false
+	if sr < RAMP_SR_MIN:
+		_ai_log_ramp_sr_block(tag, def_tag, sr)
+	var gap := _ai_ramp_gap(wd)
+	if sr >= RAMP_SR_FAST and wd >= 111:
+		gap = int(ceil(float(gap) * 2.0 / 3.0))
+	return _ai_day() - _ai_last_new_capture_day(tag, def_tag) >= gap
+
+
+func _ai_log_ramp_sr_block(tag: String, target: String, sr: float) -> void:
+	var t := tag.strip_edges().to_upper()
+	var o := target.strip_edges().to_upper()
+	var day := _ai_day()
+	var key := "%s|%s" % [t, o]
+	if int(_ai_ramp_sr_block_day.get(key, -1)) == day:
+		return
+	_ai_ramp_sr_block_day[key] = day
+	print("AI_RAMP_BLOCK day=%d tag=%s target=%s sr=%.3f min=%.3f" % [day, t, o, sr, RAMP_SR_MIN])
+
+
 func _province_owner(pid: int) -> String:
 	if pid <= 0 or typeof(MapManager) == TYPE_NIL or not MapManager.has_method("get_province"):
 		return ""
@@ -2268,6 +2375,27 @@ func try_ai_start_land_battles(day_index: int = 0) -> Dictionary:
 				elif agr < LandBattleAi.MIN_AGGRESSION_TO_START:
 					_bump_attack_reject("aggression")
 				if ratio_ok:
+					if not _ai_offensive_ramp_ok(tag2, def_tag2, to_id):
+						_bump_attack_reject("offensive_ramp")
+						# Hold-period: keep massing on the committed hex instead of
+						# spraying rear marches across the rest of the front.
+						if not empty_hex:
+							under_ratio_opps.append({
+								"tag": tag2,
+								"from_id": from_id,
+								"to_id": to_id,
+								"defender_tag": def_tag2,
+								"formation_id": fid,
+								"has_formation": true,
+								"defender_power": def_p,
+								"attacker_power": att_p,
+								"empty_hex": false,
+								"min_ratio": need,
+							})
+							_collect_adjacent_stack_march(
+								tag2, from_id, to_id, def_tag2, marching_fids, combat_fids, march_opps
+							)
+						continue
 					opportunities.append({
 						"tag": tag2,
 						"from_id": from_id,
@@ -2523,6 +2651,9 @@ func try_ai_follow_on_after_win(player_tag: String = "") -> Dictionary:
 	var follow_def := str(pick.get("defender_tag", "")).strip_edges().to_upper()
 	if follow_def.is_empty():
 		follow_def = _province_owner(follow_to)
+	if not follow_tag.is_empty() and not follow_def.is_empty() and not _ai_offensive_ramp_ok(follow_tag, follow_def, follow_to):
+		_bump_attack_reject("offensive_ramp")
+		return {"ok": true, "started_n": 0, "reason": "offensive_ramp"}
 	var opened: Dictionary = start_land_battle(
 		str(pick.get("tag", "")),
 		int(pick.get("to_id", -1)),
@@ -2566,6 +2697,9 @@ func apply_save_data(data: Dictionary) -> void:
 	_ai_hops_by_tag_dest.clear()
 	_ai_facing_by_pair.clear()
 	_ai_raise_skip_cap_day.clear()
+	_ai_ramp_sr_block_day.clear()
+	_ai_str_cache_day = -1
+	_ai_str_cache.clear()
 	_ai_unit_moved_day.clear()
 	_ai_move_cooldown_skip_day.clear()
 	_ai_skip_captured_logged.clear()
@@ -3280,6 +3414,9 @@ func reset_ai_war1_for_test() -> void:
 	_ai_hops_by_tag_dest.clear()
 	_ai_facing_by_pair.clear()
 	_ai_raise_skip_cap_day.clear()
+	_ai_ramp_sr_block_day.clear()
+	_ai_str_cache_day = -1
+	_ai_str_cache.clear()
 	_ai_unit_moved_day.clear()
 	_ai_move_cooldown_skip_day.clear()
 	_ai_skip_captured_logged.clear()
