@@ -33,3 +33,27 @@ python3 -m unittest tools.map_generation.tests.test_gap_nld1 -v
 ```
 
 Evidence (crops, rering table, garrison lists) is under `~/gapnld1/evidence/`.
+
+## FIX r1 (map-select performance)
+
+Ship box gate: 164 real rings (98 NLD + 66 SIA) slowed HeadlessOrdersPerf1Test case b (warm add_child → first refresh) and case d (`_on_map_province_selected`). OP fence (17 Nov 2026): MapRenderer map-select / warm-refresh only.
+
+`MapRenderer` now builds an AABB + cell index at province-create time (`_pick_cache_add` from `_create_province_node`, rebuilt by `gap_nld1_rebuild_pick_index` for the standalone harness). Spatial hover / click (`_resolve_map_pick_pid`, `_resolve_hex_pick_pid`) query that index instead of walking every ring. The draw loop is untouched.
+
+Standalone (not on `--quick`):
+
+```bash
+XDG_DATA_HOME=$(mktemp -d) tools/run_godot.sh --headless --path . \
+  -s res://scripts/core/HeadlessGapNld1PerfTest.gd
+```
+
+The test picks ≥2000 fixed world points (global grid, dense Europe / NLD / SIA, borders, sea). Index picks must match the same-run brute-force walk. Index wall time must be ≤ brute + 10%.
+
+Measured this sitting (Godot 4.7.1 via `tools/run_godot.sh`, fresh `XDG_DATA_HOME`):
+
+- Identity: **2205** points, **0** mismatches. Index **16.87 ms** vs brute **6416.63 ms** (cap brute+10% = 7058.30 ms). MapManager pick on the same points: **7567.73 ms**.
+- HeadlessOrdersPerf1Test case **b** (warm add_child→first refresh): **147 / 126 / 129 ms** (every pass ≤450). `--quick` also **133 ms**.
+- Case **d** (`_on_map_province_selected`): **137 / 169 / 156 ms**. `--quick` also **185 ms**.
+- `--quick`: **493 s**, ALL PASSED. NE **0.9871 (3213/3255)**. Garrison **576**, ENG **188**. Seed `20fe9063`. Identity `d22b87cf` / twin `7abd07c2` / `5fda7a57`. Mutants `4a9c21e5` / `43e14082`. 0 SCRIPT ERROR.
+
+NE land-hit pin in this PR: `tools/eoa_full_test_gates.sh` `map_qc --min-land-hit` **0.9871** (3213/3255). Seed `20fe9063de285f19d4f9b8a105abfd31` unchanged. MERGE HOLD.
