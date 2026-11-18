@@ -60,7 +60,9 @@ func _run() -> void:
 	if not await _case_killswitch():
 		_finish()
 		return
-	# Case 12 (CL1 host) lands with VS-1c.
+	if not await _case_cl1():
+		_finish()
+		return
 	_finish()
 
 

@@ -15,6 +15,7 @@ var _btn_continue: Button
 var _keep_reason: Label
 var _panel: Panel
 var _clock_lock_held: bool = false
+var _scene_stage: Control = null
 
 
 static func present(model: Dictionary) -> Node:
@@ -77,6 +78,24 @@ func _ready() -> void:
 	add_to_group("campaign_end_screen")
 	set_process_input(true)
 	_acquire_clock_lock()
+	var built := _victory_built()
+	if not VictorySceneModel.scene_enabled() or str(built.get("template", "")) == "SHEET":
+		_build_today_sheet()
+		return
+	_build_scene_host(built)
+
+
+func _victory_built() -> Dictionary:
+	return VictorySceneModel.build(
+		"cl1",
+		str(_model.get("outcome", "")),
+		str(_model.get("player_tag", "")),
+		str(_model.get("kind", "")),
+		_model
+	)
+
+
+func _build_today_sheet() -> void:
 	var blocker := ColorRect.new()
 	blocker.name = "Blocker"
 	blocker.color = Color(0.02, 0.03, 0.06, 0.92)
@@ -161,6 +180,115 @@ func _ready() -> void:
 	_keep_reason.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_keep_reason.custom_minimum_size = Vector2(500, 24)
 	box.add_child(_keep_reason)
+
+
+func _build_scene_host(built: Dictionary) -> void:
+	_panel = Panel.new()
+	_panel.name = "EndPanel"
+	_panel.custom_minimum_size = Vector2(560, 360)
+	_panel.position = Vector2(360, 180)
+	_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	_panel.visible = false
+	var panel_style := StyleBoxFlat.new()
+	panel_style.bg_color = Color(0.07, 0.08, 0.12, 1.0)
+	panel_style.border_color = Color(0.95, 0.86, 0.55, 1.0)
+	panel_style.set_border_width_all(2)
+	panel_style.set_corner_radius_all(6)
+	panel_style.content_margin_left = 8
+	panel_style.content_margin_right = 8
+	panel_style.content_margin_top = 8
+	panel_style.content_margin_bottom = 8
+	_panel.add_theme_stylebox_override("panel", panel_style)
+	add_child(_panel)
+	var box := VBoxContainer.new()
+	box.position = Vector2(24, 20)
+	box.custom_minimum_size = Vector2(512, 320)
+	box.add_theme_constant_override("separation", 10)
+	_panel.add_child(box)
+	var title_s := str(_model.get("title", "Campaign over"))
+	var reason_s := str(_model.get("reason", "")).strip_edges()
+	_title = Label.new()
+	_title.name = "Title"
+	_title.text = title_s
+	_title.add_theme_font_size_override("font_size", 28)
+	_title.add_theme_color_override("font_color", Color(0.95, 0.86, 0.55))
+	box.add_child(_title)
+	_reason = Label.new()
+	_reason.name = "Reason"
+	_reason.text = reason_s
+	_reason.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_reason.custom_minimum_size = Vector2(500, 48)
+	var reason_dup := reason_s.is_empty() or reason_s == title_s or reason_s == title_s + "."
+	_reason.visible = not reason_dup
+	box.add_child(_reason)
+	var date_l := Label.new()
+	date_l.name = "Date"
+	date_l.text = _date_line()
+	box.add_child(date_l)
+	_stats = Label.new()
+	_stats.name = "Stats"
+	_stats.text = _stats_line()
+	_stats.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(_stats)
+	_keep_reason = Label.new()
+	_keep_reason.name = "KeepPlayingReason"
+	var keep_reason := str(_model.get("keep_playing_reason", ""))
+	var allow_keep := bool(_model.get("allow_keep_playing", false))
+	_keep_reason.text = keep_reason
+	_keep_reason.visible = not allow_keep and not keep_reason.is_empty()
+	_keep_reason.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_keep_reason.custom_minimum_size = Vector2(500, 24)
+	box.add_child(_keep_reason)
+	var stage: Control
+	if str(built.get("template", "")) == "DEFEAT":
+		stage = DefeatSceneStage.new()
+	else:
+		stage = VictorySceneStage.new()
+	stage.configure(built, _cl1_buttons())
+	add_child(stage)
+	_scene_stage = stage
+	_btn_menu = stage.find_child("BtnMainMenu", true, false) as Button
+	_btn_load = stage.find_child("BtnLoad", true, false) as Button
+	_btn_keep = stage.find_child("BtnKeepPlaying", true, false) as Button
+	_btn_continue = stage.find_child("BtnContinue", true, false) as Button
+	_play_scene_sting(built)
+
+
+func _cl1_buttons() -> Array:
+	var keep_label := "Continue as Germany"
+	if typeof(CampaignEndDomain) != TYPE_NIL:
+		keep_label = CampaignEndDomain.keep_playing_label(str(_model.get("player_tag", "")))
+	var allow_keep := bool(_model.get("allow_keep_playing", false))
+	var win := str(_model.get("outcome", "")) == "victory"
+	return [
+		{"name": "BtnMainMenu", "text": "Main menu", "primary": false, "cb": _on_main_menu, "visible": true},
+		{"name": "BtnLoad", "text": "Load", "primary": not win and not allow_keep, "cb": _on_load, "visible": true},
+		{
+			"name": "BtnKeepPlaying",
+			"text": keep_label,
+			"primary": allow_keep,
+			"cb": _on_keep,
+			"visible": allow_keep,
+			"disabled": not allow_keep,
+		},
+		{
+			"name": "BtnContinue",
+			"text": "Continue as…",
+			"primary": false,
+			"cb": _on_continue,
+			"visible": _show_continue_as(),
+		},
+	]
+
+
+func _play_scene_sting(built: Dictionary) -> void:
+	var key := "end_victory_sting" if str(built.get("template", "")) == "WIN" else "end_defeat_sting"
+	var tree := get_tree()
+	if tree == null or tree.root == null:
+		return
+	var am := tree.root.get_node_or_null("AudioManager")
+	if am != null and am.has_method("play"):
+		am.call("play", key)
 
 
 func _button(text: String, cb: Callable) -> Button:
@@ -291,6 +419,10 @@ func _input(event: InputEvent) -> void:
 		var vm: Dictionary = CampaignEndDomain.view_model()
 		if bool(vm.get("keep_playing", false)):
 			return
+	if _scene_stage != null and is_instance_valid(_scene_stage) and _scene_stage.has_method("consume_skip"):
+		if bool(_scene_stage.call("consume_skip", event)):
+			_mark_input_handled()
+			return
 	if _is_escape(event):
 		_mark_input_handled()
 
@@ -324,6 +456,10 @@ func _on_keep() -> void:
 	name = "CampaignEndScreen_dying"
 	_release_clock_lock()
 	queue_free()
+
+
+func get_end_model() -> Dictionary:
+	return _model.duplicate(true)
 
 
 func _on_continue() -> void:
