@@ -1,0 +1,962 @@
+#!/usr/bin/env python3
+"""Replace PER 1936 placeholder rings with geoBoundaries admin rings.
+
+Source GeoJSON is gbOpen simplified geometry for Iran, downloaded into
+~/mappers/scratch/geoboundaries (not committed). Numpy only.
+
+  python3 tools/map_generation/scripts/apply_gap_per1.py
+  python3 tools/map_generation/scripts/apply_gap_per1.py --apply
+
+Matching keeps the admin name after diacritics, a trailing "area", and
+the words County and Shahrestan are stripped. Hyphen and space fold to
+the same key, so Gonbad-e-Kavus matches Gonbad-e Kavus. A multipolygon
+keeps the part of at least 1 px whose centroid is nearest the province
+and still inside max(80 px, 1.5 radii). A part farther than that limit
+is rejected. ADM2 (county) is tried before ADM1 (ostan).
+
+New rings win overlapping land pixels against PER neighbours (those
+neighbours are notched, never deleted). Sea zones keep their pixels.
+A non-PER province is clipped out of the new ring and is never notched.
+Old placeholder pixels that covered no other province stay with the
+province. The NLD stair shave runs on the France clipper, which calls
+_shave_new_border_slivers on each notch.
+
+--apply also writes meta gap_sia1_yield="exempt:gap_per1" on each PER
+re-ring and notch. That is the area exemption the NLD and SIA checks
+already recognize. It is not a Siam notch. See docs/MAP_2C_PER.md.
+
+Sarbaz keeps the adjacency edge to Baluchistan West. The traced rings
+do not touch after the sea clip. The edge is not dropped.
+
+Hormuz Approaches is omitted from the clip so the tracer can emit a
+ring, then a 1 px bay opens that sea out of Tabas. The sea ring is not
+written. Tabas covers none of its pixels.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import math
+import sys
+from collections import defaultdict, deque
+from pathlib import Path
+from typing import Dict, List, Sequence, Tuple
+
+ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(ROOT / "tools" / "map_generation" / "lib"))
+sys.path.insert(0, str(ROOT / "tools" / "map_generation" / "scripts"))
+
+import apply_gap_fra1 as fra  # noqa: E402
+import apply_gap_nld1 as nld  # noqa: E402
+from apply_gap_ussr_west2 import (  # noqa: E402
+    _canvas_ring,
+    _is_water,
+    _or_into,
+    _ring_from_mask,
+    _subtract,
+)
+from gap_per1_product import (  # noqa: E402
+    HORMUZ_APPROACHES_ID,
+    KEEP_ADJACENCY,
+    META_RING,
+    META_YIELD,
+    OWNER,
+    SCOPE_PLACEHOLDER_IDS,
+    TABAS_ID,
+    UNKNOWN_PLACEHOLDER_IDS,
+    UNKNOWN_REASONS,
+    audit_changed,
+    norm_name,
+    norm_name_keep,
+)
+from gap_ussr_west2_product import (  # noqa: E402
+    integer_bounds,
+    is_placeholder_ring,
+    open_ring,
+    overlap_px,
+    rasterize_centers,
+    ring_area,
+    self_crosses,
+    vertex_count,
+)
+from ne_full_geometry_align import lonlat_to_canvas, polygon_centroid  # noqa: E402
+
+BOARD = ROOT / "data" / "provinces_world_accurate"
+GEO_PATH = BOARD / "provinces_geometry.json"
+ADJ_PATH = BOARD / "province_adjacency.json"
+SRC = Path.home() / "mappers" / "scratch" / "geoboundaries"
+EVIDENCE = Path.home() / "mappers" / "evidence"
+MIN_PART_AREA = 1.0
+# Same capitals the NLD slice uses to preview the garrison border set.
+GARRISON_CAPITALS = nld.GARRISON_CAPITALS
+GARRISON_EXTRA = nld.GARRISON_EXTRA
+# Stop if the new rings add and remove more than this many undirected edges.
+ADJ_EDGE_STOP = 40
+# Hormuz Approaches sits inside Tabas. The clip omits it so the shared
+# tracer can emit a ring (a single ring cannot cut an interior hole).
+# _exclude_interior_sea then opens a 1 px bay so the written Tabas ring
+# covers none of those pixels. The sea ring is never written.
+CLIP_OMIT_IDS = (HORMUZ_APPROACHES_ID,)
+# Garrison pins. A move is a stop. Do not edit the garrison test.
+GARRISON_PLACED = 576
+GARRISON_ENG = 188
+NAIN_ID = 903342
+MESHKINSHAHR_ID = 903321
+# NLD area_change_ok exempts a later slice only when meta has gap_sia1 or
+# gap_sia1_yield. SIA area_change_ok exempts only those two keys. Both
+# products are outside this slice's fence, so each PER re-ring and notch
+# also carries gap_sia1_yield. The value is an exemption mark for this
+# slice. It is not a Siam notch. gap_sia1 stays unset, so SIA's ring audit
+# does not adopt these provinces.
+EXEMPT_KEY = "gap_sia1_yield"
+EXEMPT_VALUE = "exempt:gap_per1"
+# lon_min, lat_min, lon_max, lat_max
+CROPS = (
+    ("nw_iran", (43.6, 33.4, 49.6, 40.2)),
+    ("tehran_qazvin", (48.6, 33.8, 53.6, 37.2)),
+    ("khuzestan", (46.4, 29.8, 50.6, 34.2)),
+    ("fars_gulf", (50.4, 25.2, 58.2, 31.2)),
+    ("khorasan", (55.2, 33.2, 62.2, 38.6)),
+    ("sistan", (58.2, 24.8, 63.6, 32.2)),
+    ("kerman", (54.2, 26.2, 60.2, 32.6)),
+)
+
+
+def _outers(geom: dict):
+    return nld._outers(geom)
+
+
+def _source_levels(adm: str, level: str) -> List[Tuple[str, str]]:
+    """County (ADM2) first. Ostan (ADM1) only when the county name misses.
+
+    The scope names are Iranian counties. ADM0 is the whole country and
+    is not a province match.
+    """
+    del adm, level
+    return [("IRN", "ADM2"), ("IRN", "ADM1")]
+
+
+def load_parts() -> Dict[Tuple[str, str], List[dict]]:
+    out: Dict[Tuple[str, str], List[dict]] = defaultdict(list)
+    paths = sorted(SRC.glob("geoBoundaries-*_simplified.geojson"))
+    if not paths:
+        raise SystemExit("geoBoundaries cache missing under ~/mappers/scratch/geoboundaries")
+    for path in paths:
+        body = path.name[len("geoBoundaries-") : -len("_simplified.geojson")]
+        adm0, level = body.split("-")
+        doc = json.loads(path.read_text(encoding="utf-8"))
+        n = 0
+        for feat_i, feat in enumerate(doc.get("features") or []):
+            props = feat.get("properties") if isinstance(feat.get("properties"), dict) else {}
+            name = str(props.get("shapeName") or props.get("name") or "")
+            folded = norm_name(name)
+            kept = norm_name_keep(name)
+            if not folded and not kept:
+                continue
+            for part_i, outer in enumerate(_outers(feat.get("geometry") or {})):
+                lonlat = [[float(p[0]), float(p[1])] for p in outer]
+                if len(lonlat) >= 2 and lonlat[0] == lonlat[-1]:
+                    lonlat = lonlat[:-1]
+                if len(lonlat) < 3:
+                    continue
+                canvas = _canvas_ring(lonlat)
+                if len(open_ring(canvas)) < 3:
+                    continue
+                area = ring_area(canvas)
+                if area < 0.05:
+                    continue
+                cx, cy = polygon_centroid(canvas)
+                out[(adm0, level)].append(
+                    {
+                        "name": name,
+                        "norm": folded,
+                        "keep": kept,
+                        "canvas": canvas,
+                        "cx": float(cx),
+                        "cy": float(cy),
+                        "area": area,
+                        "src_n": len(lonlat),
+                        "part_id": (adm0, level, feat_i, part_i),
+                        "level": level,
+                    }
+                )
+                n += 1
+        print("loaded", adm0, level, "parts", n, flush=True)
+    return out
+
+
+def _within(parts, field: str, key: str, px: float, py: float, limit: float) -> List[tuple]:
+    if not key:
+        return []
+    hits = []
+    for part in parts:
+        if part.get(field) != key:
+            continue
+        dist = math.hypot(part["cx"] - px, part["cy"] - py)
+        if dist > limit or part["area"] < MIN_PART_AREA:
+            continue
+        hits.append((part, dist))
+    return hits
+
+
+def match_provinces(base, geo, owners, parts) -> Tuple[dict, List[dict]]:
+    """Name match, then the part nearest the province inside the distance limit."""
+    options = {}
+    skipped = []
+    considered = []
+    for pid in SCOPE_PLACEHOLDER_IDS:
+        if owners.get(str(pid)) != OWNER:
+            continue
+        if pid >= 950000 or _is_water(pid, base.get(pid, {})):
+            continue
+        g = geo.get(pid)
+        if g is None:
+            continue
+        meta = g.get("meta") if isinstance(g.get("meta"), dict) else {}
+        if meta.get(META_RING):
+            continue
+        considered.append(pid)
+        if pid in UNKNOWN_PLACEHOLDER_IDS:
+            skipped.append(
+                {"id": pid, "name": base[pid]["name"], "reason": UNKNOWN_REASONS.get(pid, "unknown")}
+            )
+            continue
+        adm = str(meta.get("adm0_a3") or "")
+        level = str(meta.get("level") or "")
+        pts = open_ring(g.get("points") or [])
+        px, py = polygon_centroid(pts)
+        limit = max(80.0, 1.5 * math.sqrt(max(ring_area(pts), 1.0) / math.pi))
+        keep = norm_name_keep(base[pid]["name"])
+        folded = norm_name(base[pid]["name"])
+        chosen = []
+        how = ""
+        used_level = ""
+        for adm_i, lv in _source_levels(adm, level):
+            chosen = _within(parts.get((adm_i, lv)) or [], "keep", keep, px, py, limit)
+            if chosen:
+                how = "keep"
+                used_level = "%s-%s" % (adm_i, lv)
+                break
+        if not chosen:
+            for adm_i, lv in _source_levels(adm, level):
+                chosen = _within(parts.get((adm_i, lv)) or [], "norm", folded, px, py, limit)
+                if chosen:
+                    how = "strip-admin"
+                    used_level = "%s-%s" % (adm_i, lv)
+                    break
+        if not chosen:
+            skipped.append(
+                {
+                    "id": pid,
+                    "name": base[pid]["name"],
+                    "adm0": adm,
+                    "reason": "no %s name within %.1f px" % (adm or "IRN", limit),
+                }
+            )
+            continue
+        names = {part["name"] for part, _dist in chosen}
+        if how == "strip-admin" and len(names) > 1:
+            skipped.append(
+                {
+                    "id": pid,
+                    "name": base[pid]["name"],
+                    "adm0": adm,
+                    "reason": "ambiguous after stripping County/Shahrestan: %s" % ", ".join(sorted(names)),
+                }
+            )
+            continue
+        # Nearest part inside the limit. A farther islet is not used.
+        chosen.sort(key=lambda row: (row[1], -row[0]["area"]))
+        part, dist = chosen[0]
+        options[pid] = [(part, dist, used_level)]
+    matched = {}
+    used = set()
+    pool = []
+    for pid, hits in options.items():
+        part, dist, used_level = hits[0]
+        pool.append((dist, -part["area"], pid, part, used_level))
+    pool.sort()
+    claimed = set()
+    for dist, _neg, pid, part, used_level in pool:
+        if pid in claimed or part["part_id"] in used:
+            continue
+        claimed.add(pid)
+        used.add(part["part_id"])
+        matched[pid] = {
+            "canvas": part["canvas"],
+            "adm": part["part_id"][0],
+            "level": part["level"],
+            "dist": dist,
+            "src_name": part["name"],
+            "src_n": part["src_n"],
+            "source_level": used_level,
+        }
+    for pid in options:
+        if pid not in matched:
+            skipped.append(
+                {"id": pid, "name": base[pid]["name"], "reason": "admin part already used by a closer province"}
+            )
+    skipped.sort(key=lambda row: row["id"])
+    print("matched", len(matched), "unknown", len(skipped), "open", len(considered), flush=True)
+    return matched, skipped
+
+
+def _frozen_ids(geo, owners) -> set:
+    """Non-PER rings, the unknown list, and later slices' placeholder circles.
+
+    A non-PER province is subtracted from the new ring inside clip_batch
+    and is never yielded. Sea zones are non-PER here as well.
+    """
+    frozen = set(UNKNOWN_PLACEHOLDER_IDS)
+    scope = set(SCOPE_PLACEHOLDER_IDS)
+    for pid, g in geo.items():
+        owner = owners.get(str(pid))
+        if owner != OWNER:
+            frozen.add(pid)
+            continue
+        if pid in scope:
+            continue
+        if is_placeholder_ring(g.get("points") or []):
+            frozen.add(pid)
+    return frozen
+
+
+def _garrison_targets(owners, domains, adj) -> Dict[str, set]:
+    borders = fra._garrison_borders(owners, domains, adj)
+    out = {}
+    for tag, ids in borders.items():
+        have = {int(pid) for pid in ids}
+        cap = GARRISON_CAPITALS.get(tag)
+        if cap and owners.get(str(cap)) == tag:
+            have.add(cap)
+        extra = GARRISON_EXTRA.get(tag)
+        if extra and owners.get(str(extra)) == tag:
+            have.add(extra)
+        out[tag] = have
+    return out
+
+
+def _print_garrison_delta(before: Dict[str, set], after: Dict[str, set]) -> None:
+    tags = sorted(set(before) | set(after))
+    total_b = sum(len(before.get(t) or ()) for t in tags)
+    total_a = sum(len(after.get(t) or ()) for t in tags)
+    print("garrison targets", total_b, "->", total_a, flush=True)
+    for tag in tags:
+        b = before.get(tag) or set()
+        a = after.get(tag) or set()
+        if b == a:
+            continue
+        print(
+            "garrison",
+            tag,
+            len(b),
+            "->",
+            len(a),
+            "added",
+            sorted(a - b),
+            "removed",
+            sorted(b - a),
+            flush=True,
+        )
+
+
+def _crop_window(box) -> Tuple[int, int, int, int]:
+    lon0, lat0, lon1, lat1 = box
+    x_west, y_south = lonlat_to_canvas(lon0, lat0)
+    x_east, y_north = lonlat_to_canvas(lon1, lat1)
+    x0 = int(math.floor(min(x_west, x_east)))
+    y0 = int(math.floor(min(y_south, y_north)))
+    x1 = int(math.ceil(max(x_west, x_east)))
+    y1 = int(math.ceil(max(y_south, y_north)))
+    return x0, y0, x1, y1
+
+
+def render_crops(tag: str, scope: Sequence[int]) -> None:
+    """Write one PNG per theater from the geometry currently on disk."""
+    try:
+        from PIL import Image, ImageDraw
+    except ImportError:
+        print("crops skipped: Pillow missing", flush=True)
+        return
+    geo = {
+        int(g["id"]): g
+        for g in json.loads(GEO_PATH.read_text(encoding="utf-8"))["provinces"]
+    }
+    owners = json.loads((BOARD / "province_ownership_1936.json").read_text(encoding="utf-8"))["owners"]
+    scope_set = set(int(pid) for pid in scope)
+    for name, box in CROPS:
+        x0, y0, x1, y1 = _crop_window(box)
+        w, h = x1 - x0, y1 - y0
+        if w < 8 or h < 8 or w * h > 4_000_000:
+            print("crop skip", name, w, h, flush=True)
+            continue
+        scale = 1
+        if max(w, h) < 420:
+            scale = 2
+        img = Image.new("RGB", (w * scale, h * scale), (18, 38, 58))
+        draw = ImageDraw.Draw(img)
+        drawn = 0
+        for pid, g in geo.items():
+            if pid >= 950000:
+                continue
+            pts = open_ring(g.get("points") or [])
+            if len(pts) < 3:
+                continue
+            xs = [p[0] for p in pts]
+            ys = [p[1] for p in pts]
+            if max(xs) < x0 or min(xs) > x1 or max(ys) < y0 or min(ys) > y1:
+                continue
+            if pid in scope_set:
+                color = (64, 196, 96) if tag == "after" else (210, 84, 64)
+            elif owners.get(str(pid)) == OWNER:
+                color = (40, 120, 70)
+            else:
+                color = (150, 132, 96)
+            poly = [((p[0] - x0) * scale, (p[1] - y0) * scale) for p in pts]
+            draw.polygon(poly, fill=color, outline=(20, 20, 20))
+            drawn += 1
+        path = EVIDENCE / ("%s_%s.png" % (tag, name))
+        img.save(path)
+        print("crop", path, "provinces", drawn, flush=True)
+
+
+def _edge_delta(adj_changes) -> Tuple[set, set]:
+    added, removed = set(), set()
+    for row in adj_changes:
+        pid = int(row["id"])
+        for oid in row["added"]:
+            added.add((min(pid, int(oid)), max(pid, int(oid))))
+        for oid in row["dropped"]:
+            removed.add((min(pid, int(oid)), max(pid, int(oid))))
+    return added, removed
+
+
+def _centroid_shift(before_pts, after_pts) -> float:
+    bx, by = polygon_centroid(open_ring(before_pts))
+    ax, ay = polygon_centroid(open_ring(after_pts))
+    return math.hypot(ax - bx, ay - by)
+
+
+def _exclude_interior_sea(ring, sea_pts):
+    """Open a 1 px bay so an interior sea sits outside this ring.
+
+    A single ring cannot punch a hole. The shortest land corridor from the
+    sea to the outside of the mask turns the sea into a bay. The corridor
+    is land given up. Sea pixels are not added to the ring, and the sea
+    ring itself is not modified. Returns (ring, overlap_before, corridor_px).
+    """
+    import numpy as np
+
+    pts = open_ring(ring)
+    sea = open_ring(sea_pts)
+    bb = integer_bounds(list(pts) + list(sea), 3)
+    width, height = bb[2] - bb[0], bb[3] - bb[1]
+    mask = rasterize_centers(pts, bb[0], bb[1], width, height)
+    sb = integer_bounds(sea, 1)
+    sm = rasterize_centers(sea, sb[0], sb[1], sb[2] - sb[0], sb[3] - sb[1])
+    sea_local = np.zeros_like(mask)
+    _or_into(bb, sea_local, sb, sm)
+    overlap = int(((mask == 1) & (sea_local == 1)).sum())
+    if overlap == 0:
+        return ring, 0, 0
+    _subtract(bb, mask, bb, sea_local)
+    sea_touches_out = False
+    for r, c in zip(*np.nonzero(sea_local)):
+        for nr, nc in ((r - 1, c), (r + 1, c), (r, c - 1), (r, c + 1)):
+            if nr < 0 or nc < 0 or nr >= height or nc >= width:
+                sea_touches_out = True
+                break
+            if mask[nr, nc] == 0 and sea_local[nr, nc] == 0:
+                sea_touches_out = True
+                break
+        if sea_touches_out:
+            break
+    corridor = []
+    if not sea_touches_out:
+        prev = {}
+        q = deque()
+        for r, c in zip(*np.nonzero(sea_local)):
+            for nr, nc in ((r - 1, c), (r + 1, c), (r, c - 1), (r, c + 1)):
+                if 0 <= nr < height and 0 <= nc < width and mask[nr, nc] == 1 and (nr, nc) not in prev:
+                    prev[(nr, nc)] = None
+                    q.append((int(nr), int(nc)))
+        found = None
+        while q:
+            r, c = q.popleft()
+            opened = False
+            for nr, nc in ((r - 1, c), (r + 1, c), (r, c - 1), (r, c + 1)):
+                if not (0 <= nr < height and 0 <= nc < width):
+                    continue
+                if mask[nr, nc] == 0 and sea_local[nr, nc] == 0:
+                    found = (r, c)
+                    opened = True
+                    break
+                if mask[nr, nc] == 1 and (nr, nc) not in prev:
+                    prev[(nr, nc)] = (r, c)
+                    q.append((int(nr), int(nc)))
+            if opened:
+                break
+        if found is None:
+            raise RuntimeError("interior sea has no path to the outside of the ring")
+        cur = found
+        seen = set()
+        while cur is not None and cur not in seen:
+            seen.add(cur)
+            corridor.append(cur)
+            cur = prev.get(cur)
+        if len(corridor) > 250:
+            raise RuntimeError("interior-sea corridor %d px exceeds the hole budget" % len(corridor))
+        for r, c in corridor:
+            mask[r, c] = 0
+    punched = _ring_from_mask(mask, bb)
+    if self_crosses(punched):
+        raise RuntimeError("interior-sea bay self-crosses")
+    back = rasterize_centers(punched, bb[0], bb[1], width, height)
+    still = int(((back == 1) & (sea_local == 1)).sum())
+    if still != 0:
+        raise RuntimeError("bay still covers %d sea px" % still)
+    return punched, overlap, len(corridor)
+
+
+def _empty_px_gained(ring, geo) -> int:
+    """Pixels of ring that no province on the pre-apply board covered."""
+    pts = open_ring(ring)
+    bb = integer_bounds(pts, 1)
+    mask = rasterize_centers(pts, bb[0], bb[1], bb[2] - bb[0], bb[3] - bb[1]).copy()
+    for g in geo.values():
+        old = open_ring(g.get("points") or [])
+        if len(old) < 3:
+            continue
+        ob = integer_bounds(old, 1)
+        if ob[2] <= bb[0] or bb[2] <= ob[0] or ob[3] <= bb[1] or bb[3] <= ob[1]:
+            continue
+        om = rasterize_centers(old, ob[0], ob[1], ob[2] - ob[0], ob[3] - ob[1])
+        _subtract(bb, mask, ob, om)
+    return int(mask.sum())
+
+
+def _keep_lost_edges(pid: int, lost: set) -> set:
+    """Drop tracer losses that this slice keeps as adjacency-only edges."""
+    keep = {frozenset(pair) for pair in KEEP_ADJACENCY}
+    forced = {int(oid) for oid in lost if frozenset((pid, int(oid))) in keep}
+    if forced:
+        print("keep adjacency", pid, sorted(forced), flush=True)
+    return lost - forced
+
+
+def build(apply: bool, limit: int, id_filter: Sequence[int], match_only: bool) -> int:
+    EVIDENCE.mkdir(parents=True, exist_ok=True)
+    fra.META_RING = META_RING
+    fra.META_YIELD = META_YIELD
+    fra.EVIDENCE = EVIDENCE
+    base_rows = json.loads((BOARD / "provinces_base.json").read_text(encoding="utf-8"))["provinces"]
+    base = {int(p["id"]): p for p in base_rows}
+    geo_doc = json.loads(GEO_PATH.read_text(encoding="utf-8"))
+    geo = {int(g["id"]): g for g in geo_doc["provinces"]}
+    owners = json.loads((BOARD / "province_ownership_1936.json").read_text(encoding="utf-8"))["owners"]
+    domains = {pid: row.get("domain") for pid, row in base.items()}
+    if len(base) != 3596 or len(geo_doc["provinces"]) != 3596:
+        print("refuse: province count", len(base), len(geo_doc["provinces"]))
+        return 2
+    id_order = [int(g["id"]) for g in geo_doc["provinces"]]
+    if len(set(id_order)) != 3596:
+        print("refuse: duplicate ids")
+        return 2
+    adj_doc_now = json.loads(ADJ_PATH.read_text(encoding="utf-8"))
+    adj_now = {k: [int(n) for n in v] for k, v in adj_doc_now["adjacency"].items()}
+    before_path = EVIDENCE / "garrison_border_before.json"
+    if not before_path.is_file():
+        before_path.write_text(
+            json.dumps(fra._garrison_borders(owners, domains, adj_now)) + "\n",
+            encoding="utf-8",
+        )
+        print("wrote", before_path, flush=True)
+    if not (EVIDENCE / "before_nw_iran.png").is_file():
+        render_crops("before", SCOPE_PLACEHOLDER_IDS)
+    parts = load_parts()
+    matched, unknown = match_provinces(base, geo, owners, parts)
+    (EVIDENCE / "unknown.json").write_text(
+        json.dumps({"rows": unknown}, indent=2) + "\n", encoding="utf-8"
+    )
+    honest_unknown = {int(row["id"]) for row in unknown}
+    extra_unknown = sorted(honest_unknown - set(UNKNOWN_PLACEHOLDER_IDS))
+    if extra_unknown:
+        print("REFUSE extra unknown", extra_unknown, flush=True)
+        for row in unknown:
+            if int(row["id"]) in extra_unknown:
+                print(" ", row, flush=True)
+        return 2
+    if id_filter:
+        want = {int(i) for i in id_filter}
+        matched = {pid: info for pid, info in matched.items() if pid in want}
+    ids = sorted(matched)
+    if limit > 0:
+        ids = ids[:limit]
+        matched = {pid: matched[pid] for pid in ids}
+    print("batch", len(matched), flush=True)
+    if match_only or not matched:
+        print("match-only" if match_only else "nothing to do")
+        if apply and not match_only:
+            return stamp_area_exemption()
+        return 0
+    fra.FROZEN = _frozen_ids(geo, owners)
+    print("frozen", len(fra.FROZEN), flush=True)
+    nld._install_nld_clip()
+    # Copies only. The files still contain the omitted sea zone, and no
+    # later write includes it, so its ring stays byte-identical.
+    clip_base = {pid: row for pid, row in base.items() if pid not in CLIP_OMIT_IDS}
+    clip_geo = {pid: g for pid, g in geo.items() if pid not in CLIP_OMIT_IDS}
+    new_rings, yields, stolen_from, _fm, _ym = fra.clip_batch(matched, clip_base, clip_geo)
+    if TABAS_ID not in new_rings:
+        print("STOP tabas ring missing")
+        return 3
+    sea_pts = open_ring(geo[HORMUZ_APPROACHES_ID].get("points") or [])
+    try:
+        bay, overlap_before, corridor_px = _exclude_interior_sea(new_rings[TABAS_ID], sea_pts)
+    except RuntimeError as exc:
+        print("STOP tabas bay", exc)
+        return 3
+    new_rings[TABAS_ID] = bay
+    tabas_overlap = overlap_px(bay, sea_pts)
+    print(
+        "tabas x %d overlap before-bay %d after %d corridor %d px"
+        % (HORMUZ_APPROACHES_ID, overlap_before, tabas_overlap, corridor_px),
+        flush=True,
+    )
+    if tabas_overlap != 0:
+        print("STOP tabas x %d overlap %d" % (HORMUZ_APPROACHES_ID, tabas_overlap))
+        return 3
+    # The bay only removes Tabas pixels. A neighbour overlap here means the
+    # retrace grew. Non-PER rings are still the file rings.
+    tabas_hits = []
+    for oid, g in geo.items():
+        if oid == TABAS_ID or oid == HORMUZ_APPROACHES_ID:
+            continue
+        if owners.get(str(oid)) == OWNER and oid in new_rings:
+            other = new_rings[oid]
+        elif owners.get(str(oid)) == OWNER and oid in yields:
+            other = yields[oid]
+        else:
+            other = g.get("points") or []
+        if overlap_px(bay, other) > 1:
+            tabas_hits.append((oid, overlap_px(bay, other)))
+    if tabas_hits:
+        print("STOP tabas bay overlaps", tabas_hits[:8])
+        return 3
+    updates = {}
+    updates.update(new_rings)
+    updates.update(yields)
+    id_set = set(id_order)
+    if set(updates) - id_set:
+        print("refuse: new id", sorted(set(updates) - id_set))
+        return 2
+    foreign_updates = sorted(pid for pid in updates if owners.get(str(pid)) != OWNER)
+    if foreign_updates:
+        print("refuse: non-PER geometry", foreign_updates)
+        return 2
+
+    adj = {k: [int(n) for n in v] for k, v in adj_doc_now["adjacency"].items()}
+    old_rings = {}
+    new_ring_map = {}
+    for pid, g in geo.items():
+        pts = open_ring(g.get("points") or [])
+        if len(pts) >= 3:
+            old_rings[pid] = pts
+            new_ring_map[pid] = pts
+    for pid, ring in updates.items():
+        new_ring_map[pid] = open_ring(ring)
+    adj_changes = []
+    for pid in sorted(updates):
+        old_list = list(adj.get(str(pid), []))
+        before_touch = fra._touches(pid, old_rings[pid], old_rings)
+        after_touch = fra._touches(pid, new_ring_map[pid], new_ring_map)
+        gained = after_touch - before_touch
+        lost = _keep_lost_edges(pid, before_touch - after_touch)
+        new_set = (set(old_list) - lost) | gained
+        if not new_set:
+            print("refuse: zero neighbours", pid)
+            return 2
+        updated, added, dropped = fra._order_preserving(old_list, new_set)
+        if added or dropped:
+            adj_changes.append(
+                {"id": pid, "added": added, "dropped": dropped, "name": base[pid]["name"]}
+            )
+            adj[str(pid)] = updated
+            for oid in dropped:
+                adj[str(oid)] = [n for n in adj.get(str(oid), []) if n != pid]
+            for oid in added:
+                cur = list(adj.get(str(oid), []))
+                if pid not in cur:
+                    adj[str(oid)] = cur + [pid]
+            print("adj", pid, "add", added, "drop", dropped, flush=True)
+    for pid in updates:
+        for nid in adj[str(pid)]:
+            if pid not in adj.get(str(nid), []):
+                print("refuse: asymmetric", pid, nid)
+                return 2
+    added_edges, removed_edges = _edge_delta(adj_changes)
+    print(
+        "adjacency undirected +%d -%d total %d"
+        % (len(added_edges), len(removed_edges), len(added_edges) + len(removed_edges)),
+        flush=True,
+    )
+    if len(added_edges) + len(removed_edges) > ADJ_EDGE_STOP:
+        print(
+            "STOP adjacency +%d -%d exceeds %d"
+            % (len(added_edges), len(removed_edges), ADJ_EDGE_STOP),
+            flush=True,
+        )
+        (EVIDENCE / "adjacency_stop.json").write_text(
+            json.dumps(
+                {
+                    "added": [list(p) for p in sorted(added_edges)],
+                    "removed": [list(p) for p in sorted(removed_edges)],
+                },
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        return 3
+    for a, b in KEEP_ADJACENCY:
+        if b not in adj.get(str(a), []) or a not in adj.get(str(b), []):
+            print("STOP kept edge missing", a, b)
+            return 3
+        print("kept edge", a, b, "present", flush=True)
+    before_targets = _garrison_targets(owners, domains, adj_now)
+    after_targets = _garrison_targets(owners, domains, adj)
+    _print_garrison_delta(before_targets, after_targets)
+    placed_after = sum(len(ids) for ids in after_targets.values())
+    eng_after = len(after_targets.get("ENG") or ())
+    if placed_after != GARRISON_PLACED or eng_after != GARRISON_ENG:
+        print(
+            "STOP garrison placed %d want %d ENG %d want %d"
+            % (placed_after, GARRISON_PLACED, eng_after, GARRISON_ENG),
+            flush=True,
+        )
+        return 3
+
+    rows = []
+    for pid, ring in sorted(new_rings.items()):
+        rows.append(
+            {
+                "id": pid,
+                "name": base[pid]["name"],
+                "role": "rering",
+                "verts_before": vertex_count(geo[pid]["points"]),
+                "verts_after": len(open_ring(ring)),
+                "area_before": round(ring_area(geo[pid]["points"]), 2),
+                "area_after": round(ring_area(ring), 2),
+                "source": "geoBoundaries-%s-%s:%s"
+                % (matched[pid]["adm"], matched[pid]["level"], matched[pid]["src_name"]),
+                "source_level": matched[pid]["source_level"],
+                "centroid_shift_px": round(_centroid_shift(geo[pid]["points"], ring), 2),
+                "source_centroid_shift_px": round(matched[pid]["dist"], 2),
+                "adm0": matched[pid]["adm"],
+            }
+        )
+    for pid, ring in sorted(yields.items()):
+        rows.append(
+            {
+                "id": pid,
+                "name": base[pid]["name"],
+                "role": "yield",
+                "owner": owners.get(str(pid)),
+                "verts_before": vertex_count(geo[pid]["points"]),
+                "verts_after": len(open_ring(ring)),
+                "area_before": round(ring_area(geo[pid]["points"]), 2),
+                "area_after": round(ring_area(ring), 2),
+                "stole_for": stolen_from[pid],
+            }
+        )
+    nain_fill = _empty_px_gained(new_rings[NAIN_ID], geo) if NAIN_ID in new_rings else -1
+    mesh_before = round(ring_area(geo[MESHKINSHAHR_ID]["points"]), 2)
+    mesh_ring = yields.get(MESHKINSHAHR_ID) or geo[MESHKINSHAHR_ID]["points"]
+    mesh_after = round(ring_area(mesh_ring), 2)
+    print(
+        "nain %d empty-px fill %d   meshkinshahr %d area %.2f -> %.2f"
+        % (NAIN_ID, nain_fill, MESHKINSHAHR_ID, mesh_before, mesh_after),
+        flush=True,
+    )
+    (EVIDENCE / "rering_table.json").write_text(
+        json.dumps({"rows": rows}, indent=2) + "\n", encoding="utf-8"
+    )
+    (EVIDENCE / "adjacency.json").write_text(
+        json.dumps(
+            {
+                "changes": adj_changes,
+                "undirected_added": len(added_edges),
+                "undirected_removed": len(removed_edges),
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    summary = {
+        "matched": len(new_rings),
+        "yields": len(yields),
+        "unknown": unknown,
+        "adjacency_rows": len(adj_changes),
+        "adjacency_added": len(added_edges),
+        "adjacency_removed": len(removed_edges),
+        "max_centroid_shift_px": max((row["centroid_shift_px"] for row in rows if row["role"] == "rering"), default=0),
+        "max_source_centroid_shift_px": max(
+            (row["source_centroid_shift_px"] for row in rows if row["role"] == "rering"), default=0
+        ),
+        "garrison_before": {tag: len(ids) for tag, ids in before_targets.items()},
+        "garrison_after": {tag: len(ids) for tag, ids in after_targets.items()},
+        "tabas_hormuz_overlap_before": overlap_before,
+        "tabas_hormuz_overlap_after": tabas_overlap,
+        "tabas_corridor_px": corridor_px,
+        "nain_empty_px_fill": nain_fill,
+        "meshkinshahr_area_before": mesh_before,
+        "meshkinshahr_area_after": mesh_after,
+        "keep_adjacency": [list(pair) for pair in KEEP_ADJACENCY],
+    }
+    (EVIDENCE / "summary.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
+    patched = []
+    for g in geo_doc["provinces"]:
+        pid = int(g["id"])
+        if pid not in updates:
+            patched.append(g)
+            continue
+        g2 = dict(g)
+        g2["points"] = updates[pid]
+        meta = dict(g.get("meta") or {})
+        if pid in new_rings:
+            meta[META_RING] = "batch"
+        else:
+            meta[META_YIELD] = "notch"
+        g2["meta"] = meta
+        patched.append(g2)
+    if [int(g["id"]) for g in patched] != id_order:
+        print("refuse: id order changed")
+        return 2
+    audit_problems = audit_changed(patched, domains, adj, sorted(new_rings))
+    if audit_problems:
+        print("AUDIT", audit_problems)
+        return 2
+    print("audit ok", flush=True)
+    print("evidence", EVIDENCE, "changes", len(adj_changes), flush=True)
+    if not apply:
+        print("dry-run: geometry not written")
+        return 0
+    fra._write_geometry(updates, new_rings, matched)
+    fra._write_adjacency(adj, adj_changes)
+    if stamp_area_exemption() != 0:
+        return 2
+    written = json.loads(GEO_PATH.read_text(encoding="utf-8"))
+    if [int(g["id"]) for g in written["provinces"]] != id_order:
+        print("refuse: written id order changed")
+        return 2
+    borders = fra._garrison_borders(owners, domains, adj)
+    (EVIDENCE / "garrison_border_after.json").write_text(
+        json.dumps(borders) + "\n", encoding="utf-8"
+    )
+    render_crops("after", SCOPE_PLACEHOLDER_IDS)
+    return 0
+
+
+def _insert_meta_key(raw: str, pid: int, insertion: str) -> str:
+    """Insert a compact key before the closing brace of this province's meta."""
+    start, end = fra._find_object(raw, pid)
+    chunk = raw[start:end]
+    token = '"meta":'
+    at = chunk.find(token)
+    if at < 0:
+        raise RuntimeError("missing meta %s" % pid)
+    val_at = at + len(token)
+    if chunk[val_at] != "{":
+        raise RuntimeError("meta not object %s" % pid)
+    depth = 0
+    in_str = False
+    esc = False
+    k = val_at
+    while k < len(chunk):
+        ch = chunk[k]
+        if in_str:
+            if esc:
+                esc = False
+            elif ch == "\\":
+                esc = True
+            elif ch == '"':
+                in_str = False
+        elif ch == '"':
+            in_str = True
+        elif ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                break
+        k += 1
+    else:
+        raise RuntimeError("unclosed meta %s" % pid)
+    new_chunk = chunk[:k] + insertion + chunk[k:]
+    return raw[:start] + new_chunk + raw[end:]
+
+
+def stamp_area_exemption() -> int:
+    """Mark PER re-rings and notches so the NLD and SIA area checks exempt them.
+
+    Touches only provinces that already carry gap_per1 or gap_per1_yield.
+    Other province objects stay byte-identical.
+    """
+    owners = json.loads((BOARD / "province_ownership_1936.json").read_text(encoding="utf-8"))["owners"]
+    raw = GEO_PATH.read_text(encoding="utf-8")
+    doc = json.loads(raw)
+    targets = []
+    for g in doc["provinces"]:
+        pid = int(g["id"])
+        meta = g.get("meta") if isinstance(g.get("meta"), dict) else {}
+        if not (meta.get(META_RING) or meta.get(META_YIELD)):
+            continue
+        if owners.get(str(pid)) != OWNER:
+            print("refuse: exemption on non-PER", pid)
+            return 2
+        if meta.get("gap_sia1"):
+            print("refuse: gap_sia1 already set", pid)
+            return 2
+        existing = meta.get(EXEMPT_KEY)
+        if existing == EXEMPT_VALUE:
+            continue
+        if existing not in (None, ""):
+            print("refuse: gap_sia1_yield already", pid, existing)
+            return 2
+        targets.append(pid)
+    insertion = ',"%s":"%s"' % (EXEMPT_KEY, EXEMPT_VALUE)
+    for pid in sorted(targets, reverse=True):
+        raw = _insert_meta_key(raw, pid, insertion)
+    if targets:
+        check = json.loads(raw)
+        if [int(g["id"]) for g in check["provinces"]] != [int(g["id"]) for g in doc["provinces"]]:
+            print("refuse: exemption changed id order")
+            return 2
+        by_id = {int(g["id"]): g for g in check["provinces"]}
+        for pid in targets:
+            meta = by_id[pid].get("meta") or {}
+            if meta.get(EXEMPT_KEY) != EXEMPT_VALUE:
+                print("refuse: stamp missing", pid)
+                return 2
+            if not (meta.get(META_RING) or meta.get(META_YIELD)):
+                print("refuse: stamp dropped per meta", pid)
+                return 2
+        GEO_PATH.write_text(raw, encoding="utf-8")
+    print("exemption stamped", len(targets), flush=True)
+    return 0
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--apply", action="store_true")
+    ap.add_argument("--limit", type=int, default=0)
+    ap.add_argument("--ids", default="")
+    ap.add_argument("--match-only", action="store_true")
+    args = ap.parse_args()
+    id_filter = [int(x) for x in args.ids.split(",") if x.strip()]
+    return build(args.apply, args.limit, id_filter, args.match_only)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

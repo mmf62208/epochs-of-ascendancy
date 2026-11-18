@@ -6,12 +6,17 @@ placeholder, other than the UNKNOWN list. Province ids stay the 3596
 set. A province may lose more than AREA_LOSS_MAX of its a34d23a7 area
 only when this slice re-ringed it or notched it. No new enclosed hole
 over 250 px². Every UNKNOWN id has a reason. Every non-USA ring is
-byte-identical to a34d23a7.
+byte-identical to a34d23a7, except later-slice owners listed in
+LATER_SLICE_EXEMPT_OWNERS (PER, applied after this base).
+
+Runtime tests read base ring md5s and areas only from the committed
+fixture tools/map_generation/tests/fixtures/gap_ring_base_hashes.json
+(owned by test_gap_per1.py). They must not call git or subprocess.
 """
 from __future__ import annotations
 
+import hashlib
 import json
-import subprocess
 import sys
 import unittest
 from pathlib import Path
@@ -20,7 +25,6 @@ ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "tools" / "map_generation" / "lib"))
 
 from gap_usa1_product import (  # noqa: E402
-    BASE_AREA,
     EXPECTED_RERINGS,
     HOLE_PX_MAX,
     META_RING,
@@ -38,6 +42,12 @@ from gap_ussr_west2_product import is_placeholder_ring  # noqa: E402
 
 BOARD = ROOT / "data" / "provinces_world_accurate"
 BASE_COMMIT = "a34d23a76af751c1c72239bc680a780662998e26"
+# PER rings were applied after a34d23a7 (MAP-2C-PER / #208). They are
+# not this slice's work, and must not fail the USA non-slice assertions.
+LATER_SLICE_EXEMPT_OWNERS = ("PER",)
+FIXTURE_PATH = (
+    Path(__file__).resolve().parent / "fixtures" / "gap_ring_base_hashes.json"
+)
 
 
 def _load():
@@ -49,12 +59,14 @@ def _load():
     return geo, base, owners, adj, domains
 
 
-def _base_geometry():
-    raw = subprocess.check_output(
-        ["git", "show", "%s:data/provinces_world_accurate/provinces_geometry.json" % BASE_COMMIT],
-        cwd=str(ROOT),
-    )
-    return json.loads(raw.decode("utf-8"))
+def _points_md5(points) -> str:
+    raw = json.dumps(points, separators=(",", ":"), ensure_ascii=True)
+    return hashlib.md5(raw.encode("utf-8")).hexdigest()
+
+
+def _fixture_base(sha: str):
+    data = json.loads(FIXTURE_PATH.read_text(encoding="utf-8"))
+    return data[sha]
 
 
 class GapUsa1Test(unittest.TestCase):
@@ -91,11 +103,15 @@ class GapUsa1Test(unittest.TestCase):
 
     def test_area_loss_only_on_rerings_and_notches(self) -> None:
         geo, _base, owners, _adj, _domains = _load()
-        self.assertEqual(set(BASE_AREA), {int(g["id"]) for g in geo["provinces"]})
+        fixture = _fixture_base(BASE_COMMIT)
+        self.assertEqual(set(int(pid) for pid in fixture), {int(g["id"]) for g in geo["provinces"]})
+        exempt = set(LATER_SLICE_EXEMPT_OWNERS)
         for g in geo["provinces"]:
             pid = int(g["id"])
+            if owners.get(str(pid)) in exempt:
+                continue
             meta = g.get("meta") if isinstance(g.get("meta"), dict) else {}
-            before = float(BASE_AREA[pid])
+            before = float(fixture[str(pid)]["area"])
             after = ring_area(g.get("points") or [])
             self.assertTrue(
                 area_change_ok(before, after, meta),
@@ -115,13 +131,14 @@ class GapUsa1Test(unittest.TestCase):
 
     def test_non_usa_rings_match_base_commit(self) -> None:
         geo, _base, owners, _adj, _domains = _load()
-        base_geo = {int(g["id"]): g for g in _base_geometry()["provinces"]}
-        self.assertEqual(set(base_geo), {int(g["id"]) for g in geo["provinces"]})
+        fixture = _fixture_base(BASE_COMMIT)
+        self.assertEqual(set(int(pid) for pid in fixture), {int(g["id"]) for g in geo["provinces"]})
+        exempt = set(LATER_SLICE_EXEMPT_OWNERS)
         for g in geo["provinces"]:
             pid = int(g["id"])
-            if owners.get(str(pid)) == OWNER:
+            if owners.get(str(pid)) == OWNER or owners.get(str(pid)) in exempt:
                 continue
-            self.assertEqual(g.get("points"), base_geo[pid].get("points"), pid)
+            self.assertEqual(_points_md5(g.get("points")), fixture[str(pid)]["md5"], pid)
 
 
 if __name__ == "__main__":
