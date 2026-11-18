@@ -1139,12 +1139,17 @@ func _add_first_session_settings(parent: VBoxContainer) -> void:
 	hdr.text = "GAME"
 	RetrowaveTheme.style_column_header(hdr)
 	parent.add_child(hdr)
+	var sub := Label.new()
+	sub.name = "TutorialSettingsHeader"
+	sub.text = "TUTORIAL"
+	RetrowaveTheme.style_column_header(sub)
+	parent.add_child(sub)
 	var row := HBoxContainer.new()
 	row.name = "FirstSessionGuideRow"
 	row.custom_minimum_size = Vector2(0, 32)
 	parent.add_child(row)
 	var lab := Label.new()
-	lab.text = "First-session guide"
+	lab.text = "Show on new Germany 1936 games"
 	lab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	lab.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	RetrowaveTheme.style_body_label(lab)
@@ -1164,22 +1169,82 @@ func _add_first_session_settings(parent: VBoxContainer) -> void:
 	state.add_theme_color_override("font_color", RetrowaveTheme.TEXT_DIM)
 	row.add_child(state)
 	var hint := Label.new()
-	hint.text = "Off by default. Turning it on restarts at step 1 next Begin."
+	hint.name = "FirstSessionGuideHelper"
+	hint.text = _first_session_helper_text()
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	hint.add_theme_font_size_override("font_size", 11)
 	hint.add_theme_color_override("font_color", RetrowaveTheme.TEXT_DIM)
 	parent.add_child(hint)
 	var restart := Button.new()
 	restart.name = "BtnRestartGuide"
-	restart.text = "Restart guide now"
+	restart.text = ""
+	restart.tooltip_text = "Start the tutorial again from step 1 on this map. Your game, units and date stay as they are."
 	restart.focus_mode = Control.FOCUS_ALL
 	restart.process_mode = Node.PROCESS_MODE_ALWAYS
 	restart.mouse_filter = Control.MOUSE_FILTER_STOP
 	restart.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
 	restart.custom_minimum_size = Vector2(0, 34)
-	restart.pressed.connect(_on_restart_guide)
+	restart.pressed.connect(_confirm_restart_tutorial)
 	RetrowaveTheme.style_secondary_button(restart)
+	_add_restart_tutorial_face(restart)
 	parent.add_child(restart)
+
+
+func _add_restart_tutorial_face(restart: Button) -> void:
+	var face := HBoxContainer.new()
+	face.name = "RestartTutorialFace"
+	face.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	face.set_anchors_preset(Control.PRESET_FULL_RECT)
+	face.offset_left = 8.0
+	face.offset_right = -8.0
+	face.alignment = BoxContainer.ALIGNMENT_CENTER
+	face.add_theme_constant_override("separation", 8)
+	restart.add_child(face)
+	var ring := Panel.new()
+	ring.name = "RestartTutorialMark"
+	ring.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ring.custom_minimum_size = Vector2(16, 16)
+	ring.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var ring_style := StyleBoxFlat.new()
+	ring_style.bg_color = Color(0, 0, 0, 0)
+	ring_style.border_color = RetrowaveTheme.CYAN
+	ring_style.set_border_width_all(1)
+	ring_style.set_corner_radius_all(8)
+	ring.add_theme_stylebox_override("panel", ring_style)
+	face.add_child(ring)
+	var mark := Label.new()
+	mark.text = "?"
+	mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	mark.set_anchors_preset(Control.PRESET_FULL_RECT)
+	mark.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	mark.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	mark.add_theme_font_size_override("font_size", 11)
+	mark.add_theme_color_override("font_color", RetrowaveTheme.CYAN)
+	ring.add_child(mark)
+	var words := HBoxContainer.new()
+	words.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	words.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	words.alignment = BoxContainer.ALIGNMENT_CENTER
+	words.add_theme_constant_override("separation", 6)
+	face.add_child(words)
+	var shown := Label.new()
+	shown.name = "RestartTutorialLabel"
+	shown.text = "Restart tutorial"
+	shown.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	shown.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	shown.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	shown.add_theme_font_size_override("font_size", 15)
+	shown.add_theme_color_override("font_color", RetrowaveTheme.TEXT_PRIMARY)
+	words.add_child(shown)
+	var suffix := Label.new()
+	suffix.name = "RestartTutorialSuffix"
+	suffix.text = "from step 1"
+	suffix.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	suffix.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	suffix.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	suffix.add_theme_font_size_override("font_size", 13)
+	suffix.add_theme_color_override("font_color", RetrowaveTheme.TEXT_DIM)
+	words.add_child(suffix)
 
 
 func _guide_node() -> Node:
@@ -1196,6 +1261,18 @@ func _guide_enabled() -> bool:
 	return false
 
 
+func _guide_completed() -> bool:
+	var g := _guide_node()
+	if g != null and g.has_method("is_guide_completed"):
+		return bool(g.call("is_guide_completed"))
+	return false
+
+
+func _first_session_helper_text() -> String:
+	var done := "yes" if _guide_completed() else "no"
+	return "Runs until you finish or skip it. Finished: %s" % done
+
+
 func _on_guide_toggled(on: bool) -> void:
 	var g := _guide_node()
 	if g != null and g.has_method("set_guide_enabled"):
@@ -1203,24 +1280,16 @@ func _on_guide_toggled(on: bool) -> void:
 	var state := find_child("FirstSessionGuideState", true, false) as Label
 	if state != null:
 		state.text = "On" if on else "Off"
+	var hint := find_child("FirstSessionGuideHelper", true, false) as Label
+	if hint != null:
+		hint.text = _first_session_helper_text()
 
 
-func _on_restart_guide() -> void:
-	var g := _guide_node()
-	if g != null and g.has_method("restart_now"):
-		g.call("restart_now")
-	if not _living_title_is_up():
-		_force_close()
-
-
-func _on_tutorial_pressed() -> void:
-	if _living_title_is_up():
-		_replay_tutorial(true)
-		return
+func _confirm_restart_tutorial() -> void:
 	var dlg := ConfirmationDialog.new()
 	dlg.title = "Tutorial"
-	dlg.dialog_text = "Restart the guide on this map? Your game keeps running as is."
-	dlg.ok_button_text = "Restart guide"
+	dlg.dialog_text = "Restart the tutorial on this map? Your game keeps running as is."
+	dlg.ok_button_text = "Restart tutorial"
 	dlg.cancel_button_text = "Cancel"
 	dlg.confirmed.connect(func() -> void:
 		_replay_tutorial(false)
@@ -1229,6 +1298,13 @@ func _on_tutorial_pressed() -> void:
 	dlg.canceled.connect(dlg.queue_free)
 	add_child(dlg)
 	dlg.popup_centered()
+
+
+func _on_tutorial_pressed() -> void:
+	if _living_title_is_up():
+		_replay_tutorial(true)
+		return
+	_confirm_restart_tutorial()
 
 
 func _replay_tutorial(from_title: bool) -> void:

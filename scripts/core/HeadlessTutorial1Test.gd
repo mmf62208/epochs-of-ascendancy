@@ -458,13 +458,58 @@ func _test_replay_button() -> void:
 	if title.find("start_tutorial_from_title") < 0:
 		_fail("LivingTitleBoot missing start_tutorial_from_title")
 		return
-	if menu.find("First-session guide") < 0 or menu.find("Restart guide now") < 0:
+	if menu.find("Show on new Germany 1936 games") < 0 or menu.find("Restart tutorial") < 0:
 		_fail("Settings GAME toggle/restart missing")
 		return
-	if menu.find("Restart the guide on this map?") < 0:
+	if menu.find("Restart the tutorial on this map?") < 0:
 		_fail("in-game confirm copy missing")
 		return
+	if not _btn_restart_uses_confirm_helper(menu):
+		_fail("BtnRestartGuide wired to restart_now, not the confirm helper")
+		return
 	_pass("BtnTutorial + Settings toggle + Restart")
+
+
+func _btn_restart_uses_confirm_helper(menu: String) -> bool:
+	var name_at := menu.find("name = \"BtnRestartGuide\"")
+	if name_at < 0:
+		return false
+	var connect_at := menu.find("pressed.connect", name_at)
+	if connect_at < 0:
+		return false
+	var line_end := menu.find("\n", connect_at)
+	if line_end < 0:
+		line_end = menu.length()
+	var connect_line := menu.substr(connect_at, line_end - connect_at)
+	if connect_line.find("_confirm_restart_tutorial") < 0:
+		return false
+	if connect_line.find("restart_now") >= 0 or connect_line.find("_on_restart_guide") >= 0:
+		return false
+	var helper_at := menu.find("func _confirm_restart_tutorial(")
+	if helper_at < 0:
+		return false
+	var helper_end := menu.find("\nfunc ", helper_at + 1)
+	if helper_end < 0:
+		helper_end = menu.length()
+	var helper := menu.substr(helper_at, helper_end - helper_at)
+	if helper.find("restart_now") >= 0:
+		return false
+	if helper.find("Restart the tutorial on this map?") < 0:
+		return false
+	if helper.find("_replay_tutorial(false)") < 0:
+		return false
+	var tut_at := menu.find("func _on_tutorial_pressed(")
+	if tut_at < 0:
+		return false
+	var tut_end := menu.find("\nfunc ", tut_at + 1)
+	if tut_end < 0:
+		tut_end = menu.length()
+	var tut := menu.substr(tut_at, tut_end - tut_at)
+	if tut.find("_confirm_restart_tutorial") < 0:
+		return false
+	if tut.find("_living_title_is_up") < 0 or tut.find("_replay_tutorial(true)") < 0:
+		return false
+	return true
 
 
 func _test_card_and_prompt_nodes() -> void:

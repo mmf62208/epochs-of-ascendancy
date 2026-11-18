@@ -107,6 +107,10 @@ func is_guide_enabled() -> bool:
 	return bool(_progress.get("enabled", false))
 
 
+func is_guide_completed() -> bool:
+	return bool(_progress.get("completed", false))
+
+
 func restart_now() -> void:
 	replay(_find_open_title() != null)
 

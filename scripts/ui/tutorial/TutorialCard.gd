@@ -106,7 +106,7 @@ func present(model: Dictionary) -> void:
 	_btn_keep.visible = confirm
 	if confirm:
 		_title.text = "Turn the guide off?"
-		_body.text = "You can turn it back on in Settings."
+		_body.text = "You can turn it back on in Menu → Settings → Tutorial."
 		_status.visible = false
 		_keys_row.visible = false
 		_progress_wrap.visible = false
