@@ -247,7 +247,7 @@ run_step unit_save_path \
 
 run_step map_qc \
   "$PYTHON" tools/map_generation/scripts/map_accuracy_qc.py \
-    --dir data/provinces_world_accurate --min-land-hit 0.90 || fail
+    --dir data/provinces_world_accurate --min-land-hit 0.985 || fail
 
 run_step hoi_matrix_product \
   "$PYTHON" -c "
