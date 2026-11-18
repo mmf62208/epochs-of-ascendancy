@@ -56,4 +56,4 @@ Measured this sitting (Godot 4.7.1 via `tools/run_godot.sh`, fresh `XDG_DATA_HOM
 - Case **d** (`_on_map_province_selected`): **137 / 169 / 156 ms**. `--quick` also **185 ms**.
 - `--quick`: **493 s**, ALL PASSED. NE **0.9871 (3213/3255)**. Garrison **576**, ENG **188**. Seed `20fe9063`. Identity `d22b87cf` / twin `7abd07c2` / `5fda7a57`. Mutants `4a9c21e5` / `43e14082`. 0 SCRIPT ERROR.
 
-NE land-hit pin in this PR: `tools/eoa_full_test_gates.sh` `map_qc --min-land-hit` **0.9871** (3213/3255). Seed `20fe9063de285f19d4f9b8a105abfd31` unchanged. MERGE HOLD.
+NE land-hit pin in this PR: `tools/eoa_full_test_gates.sh` `map_qc --min-land-hit` **0.985**. Seed `20fe9063de285f19d4f9b8a105abfd31` unchanged. MERGE HOLD.
