@@ -194,6 +194,13 @@ var _nato_sheet_tex: Texture2D = null
 ## This is the intended long-term default for performance and simplicity.
 @export var use_spatial_picking: bool = true
 @export var create_area_nodes_for_fallback: bool = false
+## GAP-NLD-1 FIX r1: AABB + cell index for map-select / spatial hover.
+## Filled at province-create time. Never walked from _draw.
+var _pick_poly: Dictionary = {}
+var _pick_aabb: Dictionary = {}
+var _pick_sea: Dictionary = {}
+var _pick_grid: Dictionary = {}
+var _pick_index_ready: bool = false
 #endregion
 
 @export var show_coarse_territory_overlays: bool = false  # Invisible hit regions for world pan; no grey boxes on map.
@@ -16858,6 +16865,7 @@ func _render_provinces_begin() -> Dictionary:
 	province_nodes.clear()
 	province_centroids.clear()
 	_province_name_labels.clear()
+	_pick_clear_index()
 	print("Rendering map with %d provinces using Polygon2D..." % provinces.size())
 	return raster_preserved
 
@@ -16895,6 +16903,7 @@ func _render_provinces_create_all_async(progress_cb: Callable) -> void:
 
 
 func _render_provinces_finish(raster_preserved: Dictionary) -> void:
+	_pick_index_ready = not _pick_poly.is_empty()
 	# Re-attach any preserved rasters so the map image is present for the new polys.
 	for rname in raster_preserved:
 		var r = raster_preserved[rname]
@@ -19282,6 +19291,7 @@ func _create_province_node(province: Province, geo: Dictionary) -> Node2D:
 
 	var center := _calculate_centroid(points)
 	province_centroids[province.id] = center
+	_pick_cache_add(int(province.id), points, bool(province.is_sea) or int(province.id) >= 950000)
 
 	if debug_draw_province_centroids:
 		var marker := _make_centroid_debug_marker(4.0)
@@ -21543,6 +21553,153 @@ func _capital_star_pid_at(world_pos: Vector2) -> int:
 	return int(MapManager.prefer_capital_province_at(world_pos, -1))
 
 
+func _pick_clear_index() -> void:
+	_pick_poly.clear()
+	_pick_aabb.clear()
+	_pick_sea.clear()
+	_pick_grid.clear()
+	_pick_index_ready = false
+
+
+func _pick_cache_add(pid: int, points: PackedVector2Array, is_sea: bool) -> void:
+	if points.size() < 3:
+		return
+	_pick_poly[pid] = points
+	var aabb: Rect2 = _sea_poly_aabb(points)
+	aabb = aabb.grow(0.05)
+	_pick_aabb[pid] = aabb
+	_pick_sea[pid] = is_sea
+	var cell: float = MapCanvasConfig.PICK_GRID_CELL_SIZE
+	var inv: float = 1.0 / cell
+	var x0: int = int(floor(aabb.position.x * inv))
+	var y0: int = int(floor(aabb.position.y * inv))
+	var x1: int = int(floor((aabb.position.x + aabb.size.x) * inv))
+	var y1: int = int(floor((aabb.position.y + aabb.size.y) * inv))
+	var y: int = y0
+	while y <= y1:
+		var x: int = x0
+		while x <= x1:
+			var key := Vector2i(x, y)
+			var arr: PackedInt32Array = _pick_grid.get(key, PackedInt32Array())
+			arr.append(pid)
+			_pick_grid[key] = arr
+			x += 1
+		y += 1
+
+
+func _pick_pid_is_sea(pid: int) -> bool:
+	if _pick_sea.has(pid):
+		return bool(_pick_sea[pid])
+	if pid >= 950000:
+		return true
+	if provinces.has(pid):
+		var p: Province = provinces[pid] as Province
+		if p != null:
+			return bool(p.is_sea)
+	return false
+
+
+func _pick_prefer_hit(hits: Array[int], world: Vector2) -> int:
+	if hits.is_empty():
+		return -1
+	var land: Array[int] = []
+	var sea: Array[int] = []
+	for pid in hits:
+		if _pick_pid_is_sea(pid):
+			sea.append(pid)
+		else:
+			land.append(pid)
+	var pool: Array[int] = land if not land.is_empty() else sea
+	var best: int = pool[0]
+	var best_d: float = INF
+	for pid2 in pool:
+		var c: Vector2 = province_centroids.get(pid2, Vector2.ZERO) as Vector2
+		if c == Vector2.ZERO and _pick_aabb.has(pid2):
+			var r: Rect2 = _pick_aabb[pid2]
+			c = r.position + r.size * 0.5
+		var d: float = world.distance_squared_to(c)
+		if d < best_d:
+			best_d = d
+			best = pid2
+	return best
+
+
+func _pick_province_at_world(world: Vector2, use_index: bool) -> int:
+	var hits: Array[int] = []
+	if use_index and _pick_index_ready:
+		var cell: float = MapCanvasConfig.PICK_GRID_CELL_SIZE
+		var key := Vector2i(int(floor(world.x / cell)), int(floor(world.y / cell)))
+		var cands: PackedInt32Array = _pick_grid.get(key, PackedInt32Array())
+		var seen: Dictionary = {}
+		for pid in cands:
+			if seen.has(pid):
+				continue
+			seen[pid] = true
+			if not _pick_poly.has(pid):
+				continue
+			var poly: PackedVector2Array = _pick_poly[pid]
+			if poly.size() >= 3 and Geometry2D.is_point_in_polygon(world, poly):
+				hits.append(pid)
+	else:
+		for pid_v in _pick_poly.keys():
+			var pid2: int = int(pid_v)
+			var poly2: PackedVector2Array = _pick_poly[pid2]
+			if poly2.size() >= 3 and Geometry2D.is_point_in_polygon(world, poly2):
+				hits.append(pid2)
+	return _pick_prefer_hit(hits, world)
+
+
+func gap_nld1_pick_index_ready() -> bool:
+	return _pick_index_ready
+
+
+func gap_nld1_pick_poly_count() -> int:
+	return _pick_poly.size()
+
+
+func gap_nld1_pick_at_world(world: Vector2, use_index: bool) -> int:
+	return _pick_province_at_world(world, use_index)
+
+
+func gap_nld1_rebuild_pick_index() -> int:
+	_pick_clear_index()
+	var wn: bool = false
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("is_geometry_world_native"):
+		wn = bool(MapManager.is_geometry_world_native())
+	var world_canvas: bool = _is_world_canvas_active()
+	var ids: Array = []
+	if not geometry.is_empty():
+		ids = geometry.keys()
+	elif typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_all_provinces"):
+		ids = MapManager.get_all_provinces().keys()
+	for pid_v in ids:
+		var pid: int = int(pid_v)
+		var geo: Dictionary = {}
+		if geometry.has(pid):
+			geo = geometry[pid]
+		elif typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_geometry"):
+			geo = MapManager.get_province_geometry(pid)
+		var points: PackedVector2Array = ProvincePolygonUtil.from_variant_points(geo.get("points", PackedVector2Array()))
+		if points.size() < 3:
+			continue
+		points = MapCanvasConfig.transform_province_points(points, world_canvas, true, wn)
+		points = ProvincePolygonUtil.make_drawable(points)
+		if points.size() < 3:
+			continue
+		var is_sea: bool = pid >= 950000
+		if provinces.has(pid):
+			var p: Province = provinces[pid] as Province
+			if p != null:
+				is_sea = bool(p.is_sea) or is_sea
+		elif typeof(MapManager) != TYPE_NIL and MapManager.has_method("province_is_sea_domain"):
+			is_sea = bool(MapManager.province_is_sea_domain(pid)) or is_sea
+		_pick_cache_add(pid, points, is_sea)
+		if not province_centroids.has(pid):
+			province_centroids[pid] = _calculate_centroid(points)
+	_pick_index_ready = not _pick_poly.is_empty()
+	return _pick_poly.size()
+
+
 ## Same resolve for hover tooltip and click (capital star disk, then facility icon, then hex pick).
 func _resolve_map_pick_pid(world_pos: Vector2) -> int:
 	var star_pid := _capital_star_pid_at(world_pos)
@@ -21551,6 +21708,8 @@ func _resolve_map_pick_pid(world_pos: Vector2) -> int:
 	var fac_pid := _facility_icon_pid_at(world_pos)
 	if fac_pid > 0:
 		return fac_pid
+	if _pick_index_ready:
+		return _pick_province_at_world(world_pos, true)
 	var pid := -1
 	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_at_world_pos"):
 		pid = MapManager.get_province_at_world_pos(world_pos, true)
@@ -21589,6 +21748,8 @@ func _facility_icon_pid_at(world_pos: Vector2) -> int:
 ## Hex/land under cursor only — no capital-star prefer.
 ## Land still-click miss_pid uses this so Berlin star cannot steal land-open.
 func _resolve_hex_pick_pid(world_pos: Vector2) -> int:
+	if _pick_index_ready:
+		return _pick_province_at_world(world_pos, true)
 	var pid := -1
 	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_at_world_pos"):
 		pid = MapManager.get_province_at_world_pos(world_pos, true)
