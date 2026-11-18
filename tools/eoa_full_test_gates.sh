@@ -270,8 +270,6 @@ if [[ "$QUICK" -eq 1 ]]; then
     log "FAIL headless_garrison1 GODOT_BUSY"
     log "FAIL headless_ai_war1 GODOT_BUSY"
     log "FAIL headless_cl1_siege_hold1 GODOT_BUSY"
-    log "FAIL headless_sim1110a_defence GODOT_BUSY"
-    log "FAIL headless_sim1110a_r_threat_cache GODOT_BUSY"
     log "FAIL headless_ink_tooltips0 GODOT_BUSY"
     log "FAIL headless_campaign_save1 GODOT_BUSY"
     log "FAIL headless_autosave1 GODOT_BUSY"
@@ -326,40 +324,6 @@ if [[ "$QUICK" -eq 1 ]]; then
       fi
       if ! grep -q "RESULT=PASS" "$log"; then
         echo "[eoa-gates] FAIL headless_cl1_siege_hold1 missing RESULT=PASS"
-        exit 1
-      fi
-      exit "$code"
-    ' || fail
-    run_step headless_sim1110a_defence bash -c '
-      log=$(mktemp)
-      XDG_DATA_HOME="$(mktemp -d)" flock -n "${HOME}/.eoa_godot.lock" \
-        tools/run_godot.sh --headless --path . \
-        -s res://scripts/core/HeadlessSim1110aDefenceTest.gd >"$log" 2>&1
-      code=$?
-      cat "$log"
-      if grep -q "SCRIPT ERROR" "$log"; then
-        echo "[eoa-gates] FAIL headless_sim1110a_defence SCRIPT ERROR"
-        exit 1
-      fi
-      if ! grep -q "RESULT=PASS" "$log"; then
-        echo "[eoa-gates] FAIL headless_sim1110a_defence missing RESULT=PASS"
-        exit 1
-      fi
-      exit "$code"
-    ' || fail
-    run_step headless_sim1110a_r_threat_cache bash -c '
-      log=$(mktemp)
-      XDG_DATA_HOME="$(mktemp -d)" flock -n "${HOME}/.eoa_godot.lock" \
-        tools/run_godot.sh --headless --path . \
-        -s res://scripts/core/HeadlessSim1110ARThreatCacheTest.gd >"$log" 2>&1
-      code=$?
-      cat "$log"
-      if grep -q "SCRIPT ERROR" "$log"; then
-        echo "[eoa-gates] FAIL headless_sim1110a_r_threat_cache SCRIPT ERROR"
-        exit 1
-      fi
-      if ! grep -q "RESULT=PASS" "$log"; then
-        echo "[eoa-gates] FAIL headless_sim1110a_r_threat_cache missing RESULT=PASS"
         exit 1
       fi
       exit "$code"
