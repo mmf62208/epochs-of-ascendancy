@@ -8,7 +8,7 @@
 #   tools/eoa_full_test_gates.sh --with-perf  # also map-tick perf sample
 #   tools/eoa_full_test_gates.sh --log DIR    # write logs under DIR (plus eoa-gates-step-timings.json)
 #
-# --quick launches HeadlessGarrison1Test, HeadlessAiWar1Test, HeadlessCl1SiegeHold1Test, HeadlessInkTooltips0Test, HeadlessCampaignSave1Test, HeadlessAutosave1Test, HeadlessOrdersPerf1Test (one Godot process per case a–g; expected wall unfixed: several minutes total; fixed: < ~70s total), HeadlessRttSmallfix1Test, HeadlessRttReset2Test, HeadlessAudio1Test, HeadlessAudio2Test, HeadlessStabilityJustice1Test, HeadlessVictoryPaths1Test, HeadlessSettingsToggles1Test, HeadlessFirst20P2StripPressTest, then FIRST20-UX-WAR Open fight / Justify / March, then HeadlessSearchHotkey1Test (r1 isolation + r2 click-focus / RtT AAR + r3 inspector-open / first-SOV click), then HeadlessTutorial1Test.
+# --quick launches HeadlessGarrison1Test, HeadlessAiWar1Test, HeadlessCl1SiegeHold1Test, HeadlessSim1110aDefenceTest, HeadlessSim1110ARThreatCacheTest, HeadlessInkTooltips0Test, HeadlessCampaignSave1Test, HeadlessAutosave1Test, HeadlessOrdersPerf1Test (one Godot process per case a–g; expected wall unfixed: several minutes total; fixed: < ~70s total), HeadlessRttSmallfix1Test, HeadlessRttReset2Test, HeadlessAudio1Test, HeadlessAudio2Test, HeadlessStabilityJustice1Test, HeadlessVictoryPaths1Test, HeadlessSettingsToggles1Test, HeadlessFirst20P2StripPressTest, then FIRST20-UX-WAR Open fight / Justify / March, then HeadlessSearchHotkey1Test (r1 isolation + r2 click-focus / RtT AAR + r3 inspector-open / first-SOV click), then HeadlessTutorial1Test.
 # Full path also runs launch_campaign_save1_identity (MW200 SaveStateHash identity + 60-day twin).
 # Full path calls tools/run_godot.sh, which exits 1 immediately if no binary
 # is found (fail-closed; it must not hang).
@@ -231,6 +231,7 @@ run_step unit_board_play_path \
     tools.map_generation.tests.test_map_resources_mapmode_product \
     tools.map_generation.tests.test_fac1a_airfield_icons \
     tools.map_generation.tests.test_startup_parity_inventory \
+    tools.map_generation.tests.test_sim1110ar_no_campaign_loop_env_fork \
     -v || fail
 
 run_step unit_save_path \
@@ -269,6 +270,8 @@ if [[ "$QUICK" -eq 1 ]]; then
     log "FAIL headless_garrison1 GODOT_BUSY"
     log "FAIL headless_ai_war1 GODOT_BUSY"
     log "FAIL headless_cl1_siege_hold1 GODOT_BUSY"
+    log "FAIL headless_sim1110a_defence GODOT_BUSY"
+    log "FAIL headless_sim1110a_r_threat_cache GODOT_BUSY"
     log "FAIL headless_ink_tooltips0 GODOT_BUSY"
     log "FAIL headless_campaign_save1 GODOT_BUSY"
     log "FAIL headless_autosave1 GODOT_BUSY"
@@ -323,6 +326,40 @@ if [[ "$QUICK" -eq 1 ]]; then
       fi
       if ! grep -q "RESULT=PASS" "$log"; then
         echo "[eoa-gates] FAIL headless_cl1_siege_hold1 missing RESULT=PASS"
+        exit 1
+      fi
+      exit "$code"
+    ' || fail
+    run_step headless_sim1110a_defence bash -c '
+      log=$(mktemp)
+      XDG_DATA_HOME="$(mktemp -d)" flock -n "${HOME}/.eoa_godot.lock" \
+        tools/run_godot.sh --headless --path . \
+        -s res://scripts/core/HeadlessSim1110aDefenceTest.gd >"$log" 2>&1
+      code=$?
+      cat "$log"
+      if grep -q "SCRIPT ERROR" "$log"; then
+        echo "[eoa-gates] FAIL headless_sim1110a_defence SCRIPT ERROR"
+        exit 1
+      fi
+      if ! grep -q "RESULT=PASS" "$log"; then
+        echo "[eoa-gates] FAIL headless_sim1110a_defence missing RESULT=PASS"
+        exit 1
+      fi
+      exit "$code"
+    ' || fail
+    run_step headless_sim1110a_r_threat_cache bash -c '
+      log=$(mktemp)
+      XDG_DATA_HOME="$(mktemp -d)" flock -n "${HOME}/.eoa_godot.lock" \
+        tools/run_godot.sh --headless --path . \
+        -s res://scripts/core/HeadlessSim1110ARThreatCacheTest.gd >"$log" 2>&1
+      code=$?
+      cat "$log"
+      if grep -q "SCRIPT ERROR" "$log"; then
+        echo "[eoa-gates] FAIL headless_sim1110a_r_threat_cache SCRIPT ERROR"
+        exit 1
+      fi
+      if ! grep -q "RESULT=PASS" "$log"; then
+        echo "[eoa-gates] FAIL headless_sim1110a_r_threat_cache missing RESULT=PASS"
         exit 1
       fi
       exit "$code"
@@ -1082,6 +1119,42 @@ else
     fi
     if ! grep -q "RESULT=PASS" "$log"; then
       echo "[eoa-gates] FAIL launch_cl1_siege_hold1 missing RESULT=PASS"
+      exit 1
+    fi
+    exit "$code"
+  ' || fail
+
+  run_step launch_sim1110a_defence bash -c '
+    log=$(mktemp)
+    XDG_DATA_HOME="$(mktemp -d)" flock -n "${HOME}/.eoa_godot.lock" \
+      tools/run_godot.sh --headless --path . \
+      -s res://scripts/core/HeadlessSim1110aDefenceTest.gd >"$log" 2>&1
+    code=$?
+    cat "$log"
+    if grep -q "SCRIPT ERROR" "$log"; then
+      echo "[eoa-gates] FAIL launch_sim1110a_defence SCRIPT ERROR"
+      exit 1
+    fi
+    if ! grep -q "RESULT=PASS" "$log"; then
+      echo "[eoa-gates] FAIL launch_sim1110a_defence missing RESULT=PASS"
+      exit 1
+    fi
+    exit "$code"
+  ' || fail
+
+  run_step launch_sim1110a_r_threat_cache bash -c '
+    log=$(mktemp)
+    XDG_DATA_HOME="$(mktemp -d)" flock -n "${HOME}/.eoa_godot.lock" \
+      tools/run_godot.sh --headless --path . \
+      -s res://scripts/core/HeadlessSim1110ARThreatCacheTest.gd >"$log" 2>&1
+    code=$?
+    cat "$log"
+    if grep -q "SCRIPT ERROR" "$log"; then
+      echo "[eoa-gates] FAIL launch_sim1110a_r_threat_cache SCRIPT ERROR"
+      exit 1
+    fi
+    if ! grep -q "RESULT=PASS" "$log"; then
+      echo "[eoa-gates] FAIL launch_sim1110a_r_threat_cache missing RESULT=PASS"
       exit 1
     fi
     exit "$code"

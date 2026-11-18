@@ -75,7 +75,13 @@ const LAND_MISSION_ARTILLERY_PREP := "ARTILLERY_PREP"  # Pre-bombard before assa
 @export var is_trained: bool = false  # reached threshold for combat bonus (readiness/org/xp)
 @export var combat_log: Array[Dictionary] = []  # per-unit combat history: {date, province_id, result, key_factors: Array[String], leader: String, outcome: String} - follows unit like leader logs
 ## Map province where this formation is stationed (division movement / engineer repair).
-@export var stationed_province_id: int = -1
+@export var stationed_province_id: int = -1:
+	set(value):
+		if stationed_province_id == value:
+			return
+		stationed_province_id = value
+		if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("_ai_invalidate_hex_div_index"):
+			BattleManager._ai_invalidate_hex_div_index()
 ## Air theater: player-assigned strategic region (0 = unassigned). CAS uses this vs the land battle hex region.
 @export var assigned_region_id: int = 0
 

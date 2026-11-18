@@ -8,6 +8,21 @@
 
 ## Recommended Testing Approach
 
+### 0-SIM-1110-A-R single-stack threat + cache
+
+Rescope of #192. `HeadlessSim1110aDefenceTest` keeps (k)(k2)(l)(m.2)(m.3) and **inverts m.1** (two adjacent stacks are not summed) plus (n) fire / (n2) last-defender hold. New `HeadlessSim1110ARThreatCacheTest` T1–T5: not summed, 2-div stack still triggers, passive-human border no forward stacking, cache on/off same ctrl_md5 (with a real capture inside the window) + 0 quiet rebuilds, threat path never calls `get_formations_for_country` (live `_ai_threat_gffc_calls` + must-FAIL mutant). FIX r3: B2 ramp is game-state only (no `EOA_CAMPAIGN_LOOP` product read). 1936 1-stack garrisons probe (21d hold + 15/10/7 gaps until `RAMP_END_DAYS` 90); concentrated attacking stacks (>=2) skip the probe. COVER expires at `COVER_EXPIRE_DAYS` 180. Threatened empty dests can `GARRISON_REINFORCE` (occupied r>=1.2 first); never pull a front last defender. `--quick` unit `test_sim1110ar_no_campaign_loop_env_fork` FAILs on 81b30cfa / PASSes on the tip. Wired on `--quick` after `HeadlessAiWar1Test` (same pattern as PR #193 `HeadlessCl1SiegeHold1Test`).
+
+```bash
+XDG_DATA_HOME=$(mktemp -d) flock -n "$HOME/.eoa_godot.lock" \
+  tools/run_godot.sh --headless --path . \
+  -s res://scripts/core/HeadlessSim1110ARThreatCacheTest.gd
+XDG_DATA_HOME=$(mktemp -d) flock -n "$HOME/.eoa_godot.lock" \
+  tools/run_godot.sh --headless --path . \
+  -s res://scripts/core/HeadlessSim1110aDefenceTest.gd
+```
+
+T1–T5 must FAIL on main `330644ef` product and PASS on this tip.
+
 ### 0-cl1-s1. CL1-S1-STALL-FIX (siege holder is not a rear spare)
 
 Empty-hex capture needs 3 contiguous days. The AI spare-rear march used to pick the sieging division and move it 1 hop, erasing the siege on day 3. `HeadlessCl1SiegeHold1Test` stations GER X on 711069 sieging empty POL 711092, leaves GER staging 711062 empty (adjacent; second target 711063), and a control division on 711070. After 2 AI days: X never `has_march`, T is GER on day 3, and the control spare may still march. Wired on `--quick` after `HeadlessAiWar1Test`.

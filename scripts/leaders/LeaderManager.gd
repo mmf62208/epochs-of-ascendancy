@@ -459,6 +459,8 @@ func register_formation(formation: Formation) -> void:
 		return
 	formations[formation.formation_id] = formation
 	invalidate_leader_cache(formation.country_tag)
+	if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("_ai_invalidate_hex_div_index"):
+		BattleManager._ai_invalidate_hex_div_index()
 
 
 func _alloc_fielded_formation_id(tag: String) -> String:
@@ -737,7 +739,11 @@ func seed_1936_start_garrisons(force: bool = false) -> Dictionary:
 		placed_counts[tag] = placed_tag
 		skipped_counts[tag] = skip_tag
 	_garrisons_1936_seeded = true
+	if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("bump_ai_station_gen"):
+		BattleManager.bump_ai_station_gen()
 	var counts := _garrison_1936_counts()
+	if typeof(GameData) != TYPE_NIL:
+		GameData.peace_state["garrison_seed_n"] = counts.duplicate()
 	var detail := _garrison_1936_seed_detail(placed_counts, target_counts, skipped_counts)
 	print(
 		"LeaderManager: 1936 garrisons placed=%d skipped_occupied=%d targets=%d %s"
@@ -1362,6 +1368,8 @@ func get_formation(formation_id: String) -> Formation:
 
 
 func get_formations_for_country(country_tag: String) -> Array[Formation]:
+	if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("note_ai_threat_gffc_call"):
+		BattleManager.note_ai_threat_gffc_call()
 	var result: Array[Formation] = []
 	for formation_id in formations:
 		var formation: Formation = formations[formation_id] as Formation

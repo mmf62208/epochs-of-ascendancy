@@ -453,6 +453,12 @@ func _assert_liberation_notice(mm: Node, bm: Node) -> void:
 
 
 func _assert_cover(mm: Node, bm: Node, lm: Node) -> void:
+	# SIM-1110-A B0: cover never moves a human nation's units. GER must be AI here.
+	if lm != null and lm.has_method("set_player_country_tag"):
+		lm.call("set_player_country_tag", "USA")
+	var sp := get_root().get_node_or_null("SessionPlayers")
+	if sp != null and sp.has_method("setup_observer_play"):
+		sp.call("setup_observer_play", "USA")
 	if not bool(_war.declare_war("GER", "POL", "test").get("ok", false)):
 		_fail("cover declare failed")
 		return
@@ -476,6 +482,10 @@ func _assert_cover(mm: Node, bm: Node, lm: Node) -> void:
 		_fail("cover did not fill %d (%s)" % [hole, str(covered)])
 		return
 	_pass("AI cover filled %d within %d day (moved=%s)" % [hole, int(covered.get("within_days", 1)), str(covered.get("moved", 0))])
+	if lm != null and lm.has_method("set_player_country_tag"):
+		lm.call("set_player_country_tag", "GER")
+	if sp != null and sp.has_method("setup_solo_play"):
+		sp.call("setup_solo_play", "GER")
 
 
 func _assert_save_roundtrip(lm: Node) -> void:

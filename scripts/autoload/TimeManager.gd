@@ -145,8 +145,6 @@ func _ready() -> void:
 
 
 func _warm_campaign_rules() -> void:
-	if OS.get_environment("EOA_CAMPAIGN_LOOP").strip_edges() == "0":
-		return
 	if typeof(WarStateDomain) == TYPE_NIL:
 		return
 	WarStateDomain.loop_enabled()
@@ -1888,6 +1886,8 @@ func _profile_day_ai_steps() -> void:
 	var total_ms := float(Time.get_ticks_usec() - t_all) / 1000.0
 	last_day_tick_profile["day_ai_ms"] = total_ms
 	last_day_tick_profile["day_ai_steps"] = steps
+	if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("flush_ai_hop_cache_profile"):
+		BattleManager.flush_ai_hop_cache_profile()
 	var sm_prof: Node = get_node_or_null("/root/SupplyManager")
 	var queued_n := 0
 	var slice_ms := 0.0
