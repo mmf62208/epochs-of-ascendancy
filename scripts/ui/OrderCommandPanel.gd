@@ -28,8 +28,10 @@ var _saves_list_cache: Array = []
 var _saves_product_cache: Dictionary = {}
 var _saves_list_cache_valid: bool = false
 var _saves_rebuild_from_all: bool = false
-## Last save-dir fingerprint (file count + newest mtime) seen by this instance.
+## Last save-dir fingerprint (file count + newest mtime + save generation) seen by this instance.
 var _saves_fp_last: String = ""
+## refresh() while not in the tree waits for _enter_tree, then call_deferred.
+var _refresh_when_in_tree: bool = false
 ## sid -> { "acts": Array } for day-package rows filled only on expand.
 var _lazy_section_payload: Dictionary = {}
 ## Process-wide slot list (data only; fingerprint-checked on every refresh).
@@ -1021,6 +1023,19 @@ func _deferred_first_refresh() -> void:
 	refresh()
 
 
+func _enter_tree() -> void:
+	if _refresh_when_in_tree:
+		call_deferred("_flush_pending_refresh")
+
+
+func _flush_pending_refresh() -> void:
+	if not _refresh_when_in_tree:
+		return
+	if not is_inside_tree():
+		return
+	refresh()
+
+
 func _exit_tree() -> void:
 	if _map_select_connected and typeof(MapManager) != TYPE_NIL:
 		if MapManager.province_selected.is_connected(_on_map_province_selected):
@@ -1330,6 +1345,8 @@ func _saves_dir_fingerprint() -> String:
 	if not DirAccess.dir_exists_absolute(path):
 		var glob := ProjectSettings.globalize_path(path + "/")
 		if not DirAccess.dir_exists_absolute(glob) and not DirAccess.dir_exists_absolute(path + "/"):
+			if typeof(SaveLoadManager) != TYPE_NIL and SaveLoadManager.has_method("get_save_generation"):
+				return "0:0:%d" % int(SaveLoadManager.get_save_generation())
 			return "0:0"
 	var files: PackedStringArray = DirAccess.get_files_at(path)
 	var n: int = files.size()
@@ -1338,6 +1355,9 @@ func _saves_dir_fingerprint() -> String:
 		var mt: int = int(FileAccess.get_modified_time(path.path_join(str(fname))))
 		if mt > newest:
 			newest = mt
+	# Event (save generation) plus count:mtime fallback when the getter is absent.
+	if typeof(SaveLoadManager) != TYPE_NIL and SaveLoadManager.has_method("get_save_generation"):
+		return "%d:%d:%d" % [n, newest, int(SaveLoadManager.get_save_generation())]
 	return "%d:%d" % [n, newest]
 
 
@@ -1351,6 +1371,10 @@ func _saves_sync_fingerprint() -> void:
 
 
 func refresh() -> void:
+	if not is_inside_tree():
+		_refresh_when_in_tree = true
+		return
+	_refresh_when_in_tree = false
 	_saves_sync_fingerprint()
 	_province_ids.clear()
 	_province_option.clear()
