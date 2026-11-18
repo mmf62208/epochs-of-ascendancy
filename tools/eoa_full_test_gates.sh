@@ -6,7 +6,7 @@
 #   tools/eoa_full_test_gates.sh
 #   tools/eoa_full_test_gates.sh --quick      # pure python, plus garrison, ink, campaign save, autosave, orders-perf1, audio, stability, victory, settings, first20-p2 strip press
 #   tools/eoa_full_test_gates.sh --with-perf  # also map-tick perf sample
-#   tools/eoa_full_test_gates.sh --log DIR    # write logs under DIR
+#   tools/eoa_full_test_gates.sh --log DIR    # write logs under DIR (plus eoa-gates-step-timings.json)
 #
 # --quick launches HeadlessGarrison1Test, HeadlessAiWar1Test, HeadlessCl1SiegeHold1Test, HeadlessInkTooltips0Test, HeadlessCampaignSave1Test, HeadlessAutosave1Test, HeadlessOrdersPerf1Test (one Godot process per case a–g; expected wall unfixed: several minutes total; fixed: < ~70s total), HeadlessRttSmallfix1Test, HeadlessRttReset2Test, HeadlessAudio1Test, HeadlessAudio2Test, HeadlessStabilityJustice1Test, HeadlessVictoryPaths1Test, HeadlessSettingsToggles1Test, HeadlessFirst20P2StripPressTest, then FIRST20-UX-WAR Open fight / Justify / March, then HeadlessSearchHotkey1Test (r1 isolation + r2 click-focus / RtT AAR + r3 inspector-open / first-SOV click), then HeadlessTutorial1Test.
 # Full path also runs launch_campaign_save1_identity (MW200 SaveStateHash identity + 60-day twin).
@@ -54,27 +54,82 @@ fi
 log() { echo "[eoa-gates] $*"; }
 log "python=$PYTHON"
 
+# Per-step wall times (GATES-TIMING-1). Existing STEP/OK/FAIL text is unchanged;
+# TIME / TIMING SUMMARY / TIMING JSON lines are additive only.
+TIMING_FILE="$(mktemp)"
+_timing_now() {
+  if [[ -n "${EPOCHREALTIME:-}" ]]; then
+    printf '%s' "$EPOCHREALTIME"
+  else
+    date +%s.%N
+  fi
+}
+_timing_elapsed() {
+  awk -v s="$1" -v e="$2" 'BEGIN { printf "%.3f", (e + 0) - (s + 0) }'
+}
+_timing_json_path() {
+  local stdout_target=""
+  if [[ -n "$LOG_DIR" ]]; then
+    printf '%s\n' "$LOG_DIR/eoa-gates-step-timings.json"
+    return
+  fi
+  if [[ -n "${EOA_GATES_TIMING_JSON:-}" ]]; then
+    printf '%s\n' "$EOA_GATES_TIMING_JSON"
+    return
+  fi
+  stdout_target="$(readlink -f /proc/self/fd/1 2>/dev/null || true)"
+  if [[ -n "$stdout_target" && -f "$stdout_target" ]]; then
+    printf '%s\n' "$(dirname "$stdout_target")/eoa-gates-step-timings.json"
+    return
+  fi
+  printf '%s\n' "$PWD/eoa-gates-step-timings.json"
+}
+emit_timing_report() {
+  local json_path rc
+  json_path="$(_timing_json_path)"
+  set +e
+  "$PYTHON" "$ROOT/tools/eoa_gates_step_timing.py" \
+    --rows-file "$TIMING_FILE" \
+    --json-out "$json_path"
+  rc=$?
+  set -e
+  if [[ "$rc" -ne 0 ]]; then
+    log "TIMING report skipped (formatter exit $rc)"
+  fi
+  rm -f "$TIMING_FILE"
+}
+
 run_step() {
   local name="$1"
   shift
   log "STEP $name"
+  local start_ts end_ts elapsed rc passed
+  start_ts="$(_timing_now)"
+  set +e
   if [[ -n "$LOG_DIR" ]]; then
-    if "$@" >"$LOG_DIR/${name}.log" 2>&1; then
-      log "OK   $name"
-      return 0
-    else
-      log "FAIL $name (see $LOG_DIR/${name}.log)"
-      return 1
-    fi
+    "$@" >"$LOG_DIR/${name}.log" 2>&1
+    rc=$?
   else
-    if "$@"; then
-      log "OK   $name"
-      return 0
+    "$@"
+    rc=$?
+  fi
+  set -e
+  end_ts="$(_timing_now)"
+  elapsed="$(_timing_elapsed "$start_ts" "$end_ts")"
+  if [[ "$rc" -eq 0 ]]; then
+    log "OK   $name"
+    passed=true
+  else
+    if [[ -n "$LOG_DIR" ]]; then
+      log "FAIL $name (see $LOG_DIR/${name}.log)"
     else
       log "FAIL $name"
-      return 1
     fi
+    passed=false
   fi
+  log "TIME $name ${elapsed}s passed=${passed}"
+  printf '%s\t%s\t%s\n' "$name" "$elapsed" "$passed" >>"$TIMING_FILE"
+  return "$rc"
 }
 
 FAILED=0
@@ -192,7 +247,7 @@ run_step unit_save_path \
 
 run_step map_qc \
   "$PYTHON" tools/map_generation/scripts/map_accuracy_qc.py \
-    --dir data/provinces_world_accurate --min-land-hit 0.90 || fail
+    --dir data/provinces_world_accurate --min-land-hit 0.985 || fail
 
 run_step hoi_matrix_product \
   "$PYTHON" -c "
@@ -621,9 +676,11 @@ if [[ "$QUICK" -eq 1 ]]; then
   fi
   if [[ "$FAILED" -eq 0 ]]; then
     log "ALL PASSED (quick)"
+    emit_timing_report
     exit 0
   fi
   log "FAILED (quick)"
+  emit_timing_report
   exit 1
 fi
 
@@ -1048,7 +1105,9 @@ fi
 
 if [[ "$FAILED" -eq 0 ]]; then
   log "ALL PASSED (full-test machine bar)"
+  emit_timing_report
   exit 0
 fi
 log "FAILED — see steps above"
+emit_timing_report
 exit 1
