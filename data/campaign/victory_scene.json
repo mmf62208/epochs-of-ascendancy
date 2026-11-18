@@ -1,0 +1,916 @@
+{
+  "version": 1,
+  "reference": [
+    1280,
+    800
+  ],
+  "nations": {
+    "FRA": {
+      "skyline": "res://assets/graphics/victory_scene/fra/skyline.png",
+      "skyline_tex": "res://assets/graphics/victory_scene/fra/skyline.png",
+      "flag": "res://assets/graphics/flags/fra.png",
+      "flag_ratio": 1.5,
+      "fire_points": [
+        [
+          358,
+          581
+        ],
+        [
+          491,
+          581
+        ],
+        [
+          649,
+          581
+        ],
+        [
+          805,
+          581
+        ],
+        [
+          985,
+          581
+        ],
+        [
+          1168,
+          581
+        ]
+      ],
+      "adj": "French",
+      "capital_display": "Paris",
+      "skyline_roof_tex": "res://assets/graphics/victory_scene/fra/skyline_roof.png",
+      "skyline_windows_tex": "res://assets/graphics/victory_scene/fra/skyline_windows.png",
+      "roof": "res://assets/graphics/victory_scene/fra/skyline_roof.png",
+      "windows": "res://assets/graphics/victory_scene/fra/skyline_windows.png",
+      "winner": {},
+      "defeat": {},
+      "eclipsed": {}
+    },
+    "ENG": {
+      "skyline": "res://assets/graphics/victory_scene/eng/skyline.png",
+      "skyline_tex": "res://assets/graphics/victory_scene/eng/skyline.png",
+      "flag": "res://assets/graphics/flags/eng.png",
+      "flag_ratio": 2.0,
+      "fire_points": [
+        [
+          394,
+          581
+        ],
+        [
+          583,
+          581
+        ],
+        [
+          645,
+          581
+        ],
+        [
+          880,
+          581
+        ],
+        [
+          1020,
+          581
+        ],
+        [
+          1150,
+          581
+        ]
+      ],
+      "adj": "British",
+      "capital_display": "London",
+      "skyline_roof_tex": "res://assets/graphics/victory_scene/eng/skyline_roof.png",
+      "skyline_windows_tex": "res://assets/graphics/victory_scene/eng/skyline_windows.png",
+      "roof": "res://assets/graphics/victory_scene/eng/skyline_roof.png",
+      "windows": "res://assets/graphics/victory_scene/eng/skyline_windows.png",
+      "winner": {},
+      "defeat": {},
+      "eclipsed": {}
+    },
+    "USA": {
+      "skyline": "res://assets/graphics/victory_scene/usa/skyline.png",
+      "skyline_tex": "res://assets/graphics/victory_scene/usa/skyline.png",
+      "flag": "res://assets/graphics/flags/usa.png",
+      "flag_ratio": 1.9,
+      "fire_points": [
+        [
+          376,
+          581
+        ],
+        [
+          485,
+          581
+        ],
+        [
+          645,
+          581
+        ],
+        [
+          805,
+          581
+        ],
+        [
+          999,
+          581
+        ],
+        [
+          1125,
+          581
+        ]
+      ],
+      "adj": "American",
+      "capital_display": "Washington",
+      "skyline_roof_tex": "res://assets/graphics/victory_scene/usa/skyline_roof.png",
+      "skyline_windows_tex": "res://assets/graphics/victory_scene/usa/skyline_windows.png",
+      "roof": "res://assets/graphics/victory_scene/usa/skyline_roof.png",
+      "windows": "res://assets/graphics/victory_scene/usa/skyline_windows.png",
+      "winner": {},
+      "defeat": {},
+      "eclipsed": {}
+    },
+    "SOV": {
+      "skyline": "res://assets/graphics/victory_scene/sov/skyline.png",
+      "skyline_tex": "res://assets/graphics/victory_scene/sov/skyline.png",
+      "flag": "res://assets/graphics/flags/sov.png",
+      "flag_ratio": 2.0,
+      "fire_points": [
+        [
+          422,
+          581
+        ],
+        [
+          485,
+          581
+        ],
+        [
+          645,
+          581
+        ],
+        [
+          860,
+          581
+        ],
+        [
+          980,
+          581
+        ],
+        [
+          1140,
+          581
+        ]
+      ],
+      "adj": "Soviet",
+      "capital_display": "Moscow",
+      "skyline_roof_tex": "res://assets/graphics/victory_scene/sov/skyline_roof.png",
+      "skyline_windows_tex": "res://assets/graphics/victory_scene/sov/skyline_windows.png",
+      "roof": "res://assets/graphics/victory_scene/sov/skyline_roof.png",
+      "windows": "res://assets/graphics/victory_scene/sov/skyline_windows.png",
+      "winner": {},
+      "defeat": {},
+      "eclipsed": {}
+    },
+    "GER": {
+      "skyline": "res://assets/graphics/victory_scene/ger/skyline.png",
+      "skyline_tex": "res://assets/graphics/victory_scene/ger/skyline.png",
+      "flag": "res://assets/graphics/flags/ger.png",
+      "flag_ratio": 1.6667,
+      "fire_points": [
+        [
+          342,
+          581
+        ],
+        [
+          590,
+          581
+        ],
+        [
+          645,
+          581
+        ],
+        [
+          820,
+          581
+        ],
+        [
+          965,
+          581
+        ],
+        [
+          1170,
+          581
+        ]
+      ],
+      "adj": "German",
+      "capital_display": "Berlin",
+      "skyline_roof_tex": "res://assets/graphics/victory_scene/ger/skyline_roof.png",
+      "skyline_windows_tex": "res://assets/graphics/victory_scene/ger/skyline_windows.png",
+      "roof": "res://assets/graphics/victory_scene/ger/skyline_roof.png",
+      "windows": "res://assets/graphics/victory_scene/ger/skyline_windows.png",
+      "winner": {},
+      "defeat": {},
+      "eclipsed": {}
+    },
+    "ITA": {
+      "skyline": "res://assets/graphics/victory_scene/ita/skyline.png",
+      "skyline_tex": "res://assets/graphics/victory_scene/ita/skyline.png",
+      "flag": "res://assets/graphics/flags/ita.png",
+      "flag_ratio": 1.5,
+      "fire_points": [
+        [
+          421,
+          581
+        ],
+        [
+          588,
+          581
+        ],
+        [
+          752,
+          581
+        ],
+        [
+          805,
+          581
+        ],
+        [
+          1073,
+          581
+        ],
+        [
+          1125,
+          581
+        ]
+      ],
+      "adj": "Italian",
+      "capital_display": "Rome",
+      "skyline_roof_tex": "res://assets/graphics/victory_scene/ita/skyline_roof.png",
+      "skyline_windows_tex": "res://assets/graphics/victory_scene/ita/skyline_windows.png",
+      "roof": "res://assets/graphics/victory_scene/ita/skyline_roof.png",
+      "windows": "res://assets/graphics/victory_scene/ita/skyline_windows.png",
+      "winner": {},
+      "defeat": {},
+      "eclipsed": {}
+    },
+    "JAP": {
+      "skyline": "res://assets/graphics/victory_scene/jap/skyline.png",
+      "skyline_tex": "res://assets/graphics/victory_scene/jap/skyline.png",
+      "flag": "res://assets/graphics/flags/jap.png",
+      "flag_ratio": 1.4286,
+      "fire_points": [
+        [
+          325,
+          581
+        ],
+        [
+          594,
+          581
+        ],
+        [
+          645,
+          581
+        ],
+        [
+          840,
+          581
+        ],
+        [
+          1000,
+          581
+        ],
+        [
+          1180,
+          581
+        ]
+      ],
+      "adj": "Japanese",
+      "capital_display": "Tokyo",
+      "skyline_roof_tex": "res://assets/graphics/victory_scene/jap/skyline_roof.png",
+      "skyline_windows_tex": "res://assets/graphics/victory_scene/jap/skyline_windows.png",
+      "roof": "res://assets/graphics/victory_scene/jap/skyline_roof.png",
+      "windows": "res://assets/graphics/victory_scene/jap/skyline_windows.png",
+      "winner": {},
+      "defeat": {},
+      "eclipsed": {}
+    },
+    "POL": {
+      "skyline": "res://assets/graphics/victory_scene/_default/skyline.png",
+      "skyline_tex": "res://assets/graphics/victory_scene/_default/skyline.png",
+      "flag": "res://assets/graphics/flags/pol.png",
+      "flag_ratio": 1.6,
+      "fire_points": [
+        [
+          418,
+          581
+        ],
+        [
+          594,
+          581
+        ],
+        [
+          675,
+          581
+        ],
+        [
+          860,
+          581
+        ],
+        [
+          1035,
+          581
+        ],
+        [
+          1180,
+          581
+        ]
+      ],
+      "adj": "Polish",
+      "capital_display": "",
+      "skyline_roof_tex": "res://assets/graphics/victory_scene/_default/skyline_roof.png",
+      "skyline_windows_tex": "res://assets/graphics/victory_scene/_default/skyline_windows.png",
+      "roof": "res://assets/graphics/victory_scene/_default/skyline_roof.png",
+      "windows": "res://assets/graphics/victory_scene/_default/skyline_windows.png",
+      "winner": {},
+      "defeat": {},
+      "eclipsed": {}
+    },
+    "NLD": {
+      "skyline": "res://assets/graphics/victory_scene/_default/skyline.png",
+      "skyline_tex": "res://assets/graphics/victory_scene/_default/skyline.png",
+      "flag": "res://assets/graphics/flags/nld.png",
+      "flag_ratio": 1.5,
+      "fire_points": [
+        [
+          418,
+          581
+        ],
+        [
+          594,
+          581
+        ],
+        [
+          675,
+          581
+        ],
+        [
+          860,
+          581
+        ],
+        [
+          1035,
+          581
+        ],
+        [
+          1180,
+          581
+        ]
+      ],
+      "adj": "Dutch",
+      "capital_display": "",
+      "skyline_roof_tex": "res://assets/graphics/victory_scene/_default/skyline_roof.png",
+      "skyline_windows_tex": "res://assets/graphics/victory_scene/_default/skyline_windows.png",
+      "roof": "res://assets/graphics/victory_scene/_default/skyline_roof.png",
+      "windows": "res://assets/graphics/victory_scene/_default/skyline_windows.png",
+      "winner": {},
+      "defeat": {},
+      "eclipsed": {}
+    },
+    "SPA": {
+      "skyline": "res://assets/graphics/victory_scene/_default/skyline.png",
+      "skyline_tex": "res://assets/graphics/victory_scene/_default/skyline.png",
+      "flag": "res://assets/graphics/flags/spa.png",
+      "flag_ratio": 1.5,
+      "fire_points": [
+        [
+          418,
+          581
+        ],
+        [
+          594,
+          581
+        ],
+        [
+          675,
+          581
+        ],
+        [
+          860,
+          581
+        ],
+        [
+          1035,
+          581
+        ],
+        [
+          1180,
+          581
+        ]
+      ],
+      "adj": "Spanish",
+      "capital_display": "",
+      "skyline_roof_tex": "res://assets/graphics/victory_scene/_default/skyline_roof.png",
+      "skyline_windows_tex": "res://assets/graphics/victory_scene/_default/skyline_windows.png",
+      "roof": "res://assets/graphics/victory_scene/_default/skyline_roof.png",
+      "windows": "res://assets/graphics/victory_scene/_default/skyline_windows.png",
+      "winner": {},
+      "defeat": {},
+      "eclipsed": {}
+    },
+    "TUR": {
+      "skyline": "res://assets/graphics/victory_scene/_default/skyline.png",
+      "skyline_tex": "res://assets/graphics/victory_scene/_default/skyline.png",
+      "flag": "res://assets/graphics/flags/tur.png",
+      "flag_ratio": 1.5,
+      "fire_points": [
+        [
+          418,
+          581
+        ],
+        [
+          594,
+          581
+        ],
+        [
+          675,
+          581
+        ],
+        [
+          860,
+          581
+        ],
+        [
+          1035,
+          581
+        ],
+        [
+          1180,
+          581
+        ]
+      ],
+      "adj": "Turkish",
+      "capital_display": "",
+      "skyline_roof_tex": "res://assets/graphics/victory_scene/_default/skyline_roof.png",
+      "skyline_windows_tex": "res://assets/graphics/victory_scene/_default/skyline_windows.png",
+      "roof": "res://assets/graphics/victory_scene/_default/skyline_roof.png",
+      "windows": "res://assets/graphics/victory_scene/_default/skyline_windows.png",
+      "winner": {},
+      "defeat": {},
+      "eclipsed": {}
+    },
+    "YUG": {
+      "skyline": "res://assets/graphics/victory_scene/_default/skyline.png",
+      "skyline_tex": "res://assets/graphics/victory_scene/_default/skyline.png",
+      "flag": "res://assets/graphics/flags/yug.png",
+      "flag_ratio": 2.0,
+      "fire_points": [
+        [
+          418,
+          581
+        ],
+        [
+          594,
+          581
+        ],
+        [
+          675,
+          581
+        ],
+        [
+          860,
+          581
+        ],
+        [
+          1035,
+          581
+        ],
+        [
+          1180,
+          581
+        ]
+      ],
+      "adj": "Yugoslav",
+      "capital_display": "",
+      "skyline_roof_tex": "res://assets/graphics/victory_scene/_default/skyline_roof.png",
+      "skyline_windows_tex": "res://assets/graphics/victory_scene/_default/skyline_windows.png",
+      "roof": "res://assets/graphics/victory_scene/_default/skyline_roof.png",
+      "windows": "res://assets/graphics/victory_scene/_default/skyline_windows.png",
+      "winner": {},
+      "defeat": {},
+      "eclipsed": {}
+    },
+    "BEL": {
+      "skyline": "res://assets/graphics/victory_scene/_default/skyline.png",
+      "skyline_tex": "res://assets/graphics/victory_scene/_default/skyline.png",
+      "flag": "res://assets/graphics/flags/bel.png",
+      "flag_ratio": 1.1538,
+      "fire_points": [
+        [
+          418,
+          581
+        ],
+        [
+          594,
+          581
+        ],
+        [
+          675,
+          581
+        ],
+        [
+          860,
+          581
+        ],
+        [
+          1035,
+          581
+        ],
+        [
+          1180,
+          581
+        ]
+      ],
+      "adj": "Belgian",
+      "capital_display": "",
+      "skyline_roof_tex": "res://assets/graphics/victory_scene/_default/skyline_roof.png",
+      "skyline_windows_tex": "res://assets/graphics/victory_scene/_default/skyline_windows.png",
+      "roof": "res://assets/graphics/victory_scene/_default/skyline_roof.png",
+      "windows": "res://assets/graphics/victory_scene/_default/skyline_windows.png",
+      "winner": {},
+      "defeat": {},
+      "eclipsed": {}
+    },
+    "_default": {
+      "skyline": "res://assets/graphics/victory_scene/_default/skyline.png",
+      "skyline_tex": "res://assets/graphics/victory_scene/_default/skyline.png",
+      "flag": "res://assets/graphics/flags/generic.png",
+      "flag_ratio": 1.5,
+      "fire_points": [
+        [
+          418,
+          581
+        ],
+        [
+          594,
+          581
+        ],
+        [
+          675,
+          581
+        ],
+        [
+          860,
+          581
+        ],
+        [
+          1035,
+          581
+        ],
+        [
+          1180,
+          581
+        ]
+      ],
+      "tint_with_nation_colour": 0.35,
+      "tint": {
+        "source": "MapManager.get_country_color(tag)",
+        "mix": 0.35,
+        "mask": "res://assets/graphics/flags/generic_field_mask.png",
+        "skip_if_stub_colour": [
+          "Color(0.45,0.55,0.65)",
+          "Color(0.5,0.5,0.6)"
+        ]
+      },
+      "capital_display": "",
+      "skyline_roof_tex": "res://assets/graphics/victory_scene/_default/skyline_roof.png",
+      "skyline_windows_tex": "res://assets/graphics/victory_scene/_default/skyline_windows.png",
+      "roof": "res://assets/graphics/victory_scene/_default/skyline_roof.png",
+      "windows": "res://assets/graphics/victory_scene/_default/skyline_windows.png",
+      "winner": {},
+      "defeat": {},
+      "eclipsed": {},
+      "adj": ""
+    }
+  },
+  "headlines": {
+    "win": {
+      "_default": {
+        "conquest": {
+          "eyebrow": "VICTORY \u00b7 CONQUEST",
+          "headline": "{NAME} / TRIUMPHANT",
+          "sub": "{held} of {total} great capitals now fly the {adj} flag."
+        },
+        "enemy_capitals": {
+          "fallback": "conquest",
+          "sub": "Every enemy capital now flies the {adj} flag."
+        },
+        "atomic": {
+          "eyebrow": "VICTORY \u00b7 ATOMIC",
+          "headline": "THE ATOMIC AGE / IS {ADJ}",
+          "sub": "The {adj} atomic project held for 30 days. No rival can answer it."
+        },
+        "arsenal": {
+          "eyebrow": "VICTORY \u00b7 ARSENAL OF THE WORLD",
+          "headline": "{NAME} / ARSENAL OF THE WORLD",
+          "sub": "{name} held {pct}% of the world's industry for 90 straight days."
+        },
+        "score": {
+          "eyebrow": "VICTORY \u00b7 FIRST AMONG NATIONS",
+          "headline": "{NAME} / STANDS FIRST",
+          "sub": "The highest score of all the powers on 1 January 1949."
+        },
+        "ascendant": {
+          "fallback": "score",
+          "eyebrow": "VICTORY \u00b7 1 JANUARY 1949",
+          "headline": "{NAME} / ASCENDANT",
+          "sub": "First in industry on 1 January 1949."
+        },
+        "endured": {
+          "eyebrow": "VICTORY \u00b7 1 JANUARY 1949",
+          "headline": "{NAME} / ENDURES",
+          "sub": "The campaign ended on 1 January 1949. Keep playing to shape what comes next."
+        }
+      }
+    },
+    "loss": {
+      "_default": {
+        "capitulation": {
+          "eyebrow": "DEFEAT \u00b7 CAPITULATION",
+          "headline": "{NAME} / HAS FALLEN",
+          "sub": "{name} capitulated on {date}. History isn't finished."
+        },
+        "rival_path": {
+          "eyebrow": "DEFEAT \u00b7 {WINNER} WON {TITLE} FIRST",
+          "headline": "{WINNER} / WINS THE WORLD",
+          "sub": "{winner} won {title} first. Our banner did not survive it."
+        },
+        "eclipsed": {
+          "eyebrow": "1 JANUARY 1949 \u00b7 ECLIPSED",
+          "headline": "{NAME} / ECLIPSED",
+          "sub": "The epoch closes with {name} {rank} among the powers. The flag is lowered, not lost."
+        }
+      }
+    }
+  },
+  "layout": {
+    "reference": [
+      1280,
+      800
+    ],
+    "note": "positions are top-left in the 1280x800 reference; scale the whole scene uniformly",
+    "skyline": {
+      "pos": [
+        0,
+        200
+      ],
+      "size": [
+        1280,
+        480
+      ],
+      "horizon_y": 585,
+      "hero_x": [
+        575,
+        715
+      ],
+      "channels": "R=far-only mask, G=mid mask, B=keep mask (protected hero core), A=far|mid silhouette"
+    },
+    "roof_tex": {
+      "size": [
+        1280,
+        2
+      ],
+      "rows": "0=mid, 1=far",
+      "decode": "y_local = round(R*255)*256 + round(G*255); B=1 if column has a building; 480 = empty"
+    },
+    "sun": [
+      1010,
+      567
+    ],
+    "light_sun_glow": {
+      "centre": [
+        1010,
+        567
+      ],
+      "radius_px": 760
+    },
+    "light_sun_core": {
+      "centre": [
+        1010,
+        567
+      ],
+      "radius_px": 70
+    },
+    "light_god_rays": {
+      "pos": [
+        0,
+        0
+      ]
+    },
+    "fx_mist_band": {
+      "centre_y": 575,
+      "height": 64
+    },
+    "fg_parapet": {
+      "pos": [
+        0,
+        592
+      ]
+    },
+    "fg_rubble": {
+      "pos": [
+        0,
+        616
+      ]
+    },
+    "prop_pole": {
+      "pos": [
+        178,
+        40
+      ],
+      "cloth_attach": [
+        193,
+        64
+      ],
+      "flag_top_y": 64,
+      "flag_rest_y_formula": "POLE_BASE(600) - cloth_h - 30"
+    },
+    "prop_pole_broken": {
+      "pos": [
+        0,
+        636
+      ]
+    },
+    "cloth_area_px": [
+      360,
+      240
+    ],
+    "generic_tint": {
+      "applies_to": "tags with no flag file (nations JSON row missing -> _default)",
+      "colour_source": "MapManager.get_country_color(tag) -> scenario countries[].color (data/scenarios/*.json); runtime stubs from MapManager.ensure_country_stub",
+      "formula": "field.rgb = mix(tex.rgb, map.rgb, 0.35 * mask.r)",
+      "mask": "res://assets/graphics/flags/generic_field_mask.png (white = slate field + rosette centre)",
+      "no_tint_when": "colour is a stub default: Color(0.45,0.55,0.65) or Color(0.5,0.5,0.6)",
+      "untouched": "gold hoist band, ivory stripe, gold frame, ivory rosette"
+    },
+    "ground_flag_quad_3x2": {
+      "TL": [
+        300,
+        596
+      ],
+      "TR": [
+        690,
+        610
+      ],
+      "BR": [
+        730,
+        704
+      ],
+      "BL": [
+        150,
+        690
+      ],
+      "scale_x_about": 440,
+      "scale": "clamp(flag_ratio/1.5, 0.92, 1.2)"
+    },
+    "folded_flag": {
+      "top_face_quad": {
+        "TL": [
+          262,
+          592
+        ],
+        "TR": [
+          548,
+          586
+        ],
+        "BR": [
+          566,
+          614
+        ],
+        "BL": [
+          248,
+          622
+        ]
+      },
+      "top_face_src": "flag texture, hoist 62% crop",
+      "front_face": "6 bands y 614..642, x 248..566, flag colours x0.62",
+      "crease": "props/fold_crease_multiply.png"
+    },
+    "palette": {
+      "win": {
+        "far_haze": [
+          214,
+          156,
+          140
+        ],
+        "mid": [
+          38,
+          38,
+          66
+        ],
+        "rim": [
+          255,
+          206,
+          128
+        ],
+        "windows": [
+          255,
+          214,
+          140
+        ],
+        "parapet_rim": [
+          255,
+          200,
+          120
+        ],
+        "mist": [
+          255,
+          214,
+          170
+        ]
+      },
+      "predawn": {
+        "far_haze": [
+          70,
+          60,
+          100
+        ],
+        "mid": [
+          14,
+          16,
+          32
+        ]
+      },
+      "eclipsed": {
+        "far_haze": [
+          120,
+          94,
+          114
+        ],
+        "mid": [
+          22,
+          24,
+          44
+        ],
+        "rim_strength": 0.35,
+        "grade_desat": 0.2,
+        "ruin": 0.15
+      },
+      "defeat": {
+        "far": [
+          104,
+          96,
+          102
+        ],
+        "far_alpha": 0.85,
+        "mid": [
+          26,
+          24,
+          30
+        ],
+        "ember_rim": [
+          255,
+          130,
+          60
+        ],
+        "mist": [
+          140,
+          112,
+          100
+        ],
+        "grade_desat": 0.35,
+        "ruin": 1.0
+      }
+    }
+  },
+  "shared": {
+    "parapet": "res://assets/graphics/victory_scene/_shared/fg_parapet.png",
+    "parapet_rim": "res://assets/graphics/victory_scene/_shared/fg_parapet_rim.png",
+    "rubble": "res://assets/graphics/victory_scene/_shared/fg_rubble.png",
+    "pole": "res://assets/graphics/victory_scene/_shared/props/prop_pole.png",
+    "pole_broken": "res://assets/graphics/victory_scene/_shared/props/prop_pole_broken.png",
+    "fold": "res://assets/graphics/victory_scene/_shared/props/fold_crease_multiply.png",
+    "flame": "res://assets/graphics/victory_scene/_shared/particles/flame.png",
+    "ember": "res://assets/graphics/victory_scene/_shared/particles/ember.png",
+    "ash": "res://assets/graphics/victory_scene/_shared/particles/ash.png",
+    "bird": "res://assets/graphics/victory_scene/_shared/particles/bird.png",
+    "bird_1": "res://assets/graphics/victory_scene/_shared/particles/bird_1.png",
+    "smoke": "res://assets/graphics/victory_scene/_shared/particles/smoke_puff.png",
+    "sky_dawn": "res://assets/graphics/victory_scene/_shared/sky_grad_dawn.png",
+    "sky_predawn": "res://assets/graphics/victory_scene/_shared/sky_grad_predawn.png",
+    "sky_defeat": "res://assets/graphics/victory_scene/_shared/sky_grad_defeat_dusk.png",
+    "sky_eclipsed": "res://assets/graphics/victory_scene/_shared/sky_grad_eclipsed_dusk.png",
+    "sun_glow": "res://assets/graphics/victory_scene/_shared/light_sun_glow.png",
+    "sun_core": "res://assets/graphics/victory_scene/_shared/light_sun_core.png",
+    "god_rays": "res://assets/graphics/victory_scene/_shared/light_god_rays.png",
+    "fire_glow": "res://assets/graphics/victory_scene/_shared/light_fire_glow.png",
+    "noise_clouds": "res://assets/graphics/victory_scene/_shared/noise_clouds_512.png",
+    "noise_smoke": "res://assets/graphics/victory_scene/_shared/noise_smoke_512.png",
+    "noise_burn": "res://assets/graphics/victory_scene/_shared/noise_burn_256.png",
+    "noise_fine": "res://assets/graphics/victory_scene/_shared/noise_fine_256.png",
+    "vignette": "res://assets/graphics/victory_scene/_shared/fx_vignette.png",
+    "mist": "res://assets/graphics/victory_scene/_shared/fx_mist_band.png",
+    "field_mask": "res://assets/graphics/flags/generic_field_mask.png",
+    "wordmark": "res://assets/graphics/branding/epochs_wordmark_512_alpha.png",
+    "font_sans": "res://assets/fonts/montserrat/Montserrat[wght].ttf",
+    "font_italic": "res://assets/fonts/gelasio/Gelasio-Italic[wght].ttf",
+    "font_display": "res://assets/fonts/Cinzel-VariableFont_wght.ttf"
+  }
+}

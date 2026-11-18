@@ -115,7 +115,7 @@ func _build() -> void:
 	_dont.toggled.connect(func(on: bool) -> void: dont_ask_changed.emit(on))
 	extra.add_child(_dont)
 	var hint := Label.new()
-	hint.text = "Menu → Settings → First-session guide"
+	hint.text = "Menu → Settings → Tutorial"
 	hint.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	hint.add_theme_font_size_override("font_size", 11)
