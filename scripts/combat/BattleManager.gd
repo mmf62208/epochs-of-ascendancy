@@ -84,6 +84,9 @@ var _ai_ramp_sr_block_day: Dictionary = {}
 var _ai_str_cache_day: int = -1
 var _ai_str_cache: Dictionary = {}
 var _ai_unit_moved_day: Dictionary = {}
+var _ai_def_anchor_day: Dictionary = {}
+var _ai_def_anchor_skip_day: Dictionary = {}
+var _ai_garrison_captured_src_skip_day: Dictionary = {}
 var _ai_move_cooldown_skip_day: Dictionary = {}
 var _ai_skip_captured_logged: Dictionary = {}
 var _ai_r2_prints: Array = []
@@ -116,6 +119,9 @@ const RAISE_WAR_BUDGET_MIN := 1
 const RAISE_WAR_BUDGET_MAX := 10
 const RAISE_MIN_GAP_DAYS := 7
 const AI_UNIT_MOVE_COOLDOWN_DAYS := 5
+const POL_REINF_ANCHOR_DAYS := 30
+const POL_REINF_ANCHOR_DAYS_MIN := 21
+const POL_REINF_ANCHOR_DAYS_MAX := 45
 ## SIM-1110-A B: threatened-sector shift (AI nations only).
 const THREAT_RATIO := 1.2
 const REDEPLOY_PER_TAG_PER_DAY := 2
@@ -1031,6 +1037,7 @@ func try_ai_cover_threatened_borders() -> Dictionary:
 					friendly[hole] = true
 					_note_garrison_station(cover_fid, tag2, hole)
 					_ai_stamp_unit_moved(cover_fid)
+					_ai_stamp_def_anchor(cover_fid)
 					result["moved"] = int(result["moved"]) + 1
 					print("GARRISON_COVER move %s %d -> %d" % [cover_fid, from_pid, hole])
 					# Threatened empty dest: COVER is the reinforce (A2 must fire,
@@ -1308,6 +1315,115 @@ func _ai_stamp_unit_moved(fid: String) -> void:
 	if id.is_empty():
 		return
 	_ai_unit_moved_day[id] = _ai_day()
+
+
+func _ai_stamp_def_anchor(fid: String) -> void:
+	var id := fid.strip_edges()
+	if id.is_empty():
+		return
+	_ai_def_anchor_day[id] = _ai_day()
+
+
+func _ai_anchor_hold_days() -> int:
+	return clampi(POL_REINF_ANCHOR_DAYS, POL_REINF_ANCHOR_DAYS_MIN, POL_REINF_ANCHOR_DAYS_MAX)
+
+
+func _ai_is_garrison_1936(fid: String) -> bool:
+	var id := fid.strip_edges()
+	if id.is_empty() or typeof(LeaderManager) == TYPE_NIL or not LeaderManager.has_method("get_formation"):
+		return false
+	var f: Formation = LeaderManager.get_formation(id)
+	if f == null:
+		return false
+	return bool(f.get_meta("garrison_1936", false))
+
+
+func _ai_garrison_is_def_anchored(fid: String) -> bool:
+	var id := fid.strip_edges()
+	if id.is_empty() or not _ai_def_anchor_day.has(id):
+		return false
+	if _ai_day() - int(_ai_def_anchor_day[id]) >= _ai_anchor_hold_days():
+		return false
+	return _ai_is_garrison_1936(id)
+
+
+func _ai_note_def_anchor_skip(tag: String, fid: String, pid: int) -> void:
+	var t := tag.strip_edges().to_upper()
+	var day := _ai_day()
+	if int(_ai_def_anchor_skip_day.get(t, -1)) == day:
+		return
+	_ai_def_anchor_skip_day[t] = day
+	_ai_r2_print("AI_DEF_ANCHOR skip %s %s @ %d" % [t, fid, pid])
+
+
+func _ai_note_garrison_captured_src_skip(tag: String, pid: int) -> void:
+	var t := tag.strip_edges().to_upper()
+	var day := _ai_day()
+	if int(_ai_garrison_captured_src_skip_day.get(t, -1)) == day:
+		return
+	_ai_garrison_captured_src_skip_day[t] = day
+	_ai_r2_print("AI_GARRISON_CAPTURED_SRC skip %s @ %d" % [t, pid])
+
+
+func _ai_offensive_power_at(from_id: int, tag: String, def_tag: String = "", to_id: int = -1) -> float:
+	var terrain := "plains"
+	if to_id > 0 and typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province"):
+		var tp: Province = MapManager.get_province(to_id)
+		if tp != null and not str(tp.terrain).is_empty():
+			terrain = str(tp.terrain)
+	var att_divs: Array[Dictionary] = get_divisions_at_province(from_id, tag)
+	var opp_def: Object = null
+	if to_id > 0 and not def_tag.strip_edges().is_empty():
+		var def_divs: Array[Dictionary] = get_divisions_at_province(to_id, def_tag)
+		if not def_divs.is_empty():
+			opp_def = _formation_from_id(str(def_divs[0].get("formation_id", "")), def_tag)
+	var att_p := 0.0
+	for row in att_divs:
+		var fid := str(row.get("formation_id", "")).strip_edges()
+		if _ai_garrison_is_def_anchored(fid):
+			continue
+		var f: Formation = _formation_from_id(fid, tag)
+		att_p += land_combat_power(f, terrain, "attack", opp_def)
+	return att_p
+
+
+func _ai_first_offensive_fid_at(from_id: int, tag: String, captured_src: bool) -> String:
+	for row in get_divisions_at_province(from_id, tag):
+		var fid := str(row.get("formation_id", "")).strip_edges()
+		if fid.is_empty():
+			continue
+		if _ai_garrison_is_def_anchored(fid):
+			continue
+		if captured_src and _ai_is_garrison_1936(fid):
+			continue
+		return fid
+	return ""
+
+
+func _ai_hex_garrison_attackers_only(from_id: int, tag: String) -> bool:
+	var any := false
+	for row in get_divisions_at_province(from_id, tag):
+		any = true
+		if not _ai_is_garrison_1936(str(row.get("formation_id", ""))):
+			return false
+	return any
+
+
+func _ai_resolve_offensive_fid(tag: String, from_id: int, preview_fid: String) -> String:
+	var captured := _ai_is_war_captured(tag, from_id)
+	var preview := preview_fid.strip_edges()
+	var fid := preview
+	if _ai_garrison_is_def_anchored(fid) or (captured and _ai_is_garrison_1936(fid)):
+		fid = _ai_first_offensive_fid_at(from_id, tag, captured)
+	if not fid.is_empty():
+		return fid
+	if _ai_garrison_is_def_anchored(preview):
+		_bump_attack_reject("def_anchor")
+		_ai_note_def_anchor_skip(tag, preview, from_id)
+	if captured and _ai_hex_garrison_attackers_only(from_id, tag):
+		_bump_attack_reject("garrison_captured_src")
+		_ai_note_garrison_captured_src_skip(tag, from_id)
+	return ""
 
 
 func _ai_province_is_open_defender(sid: int, tag: String) -> bool:
@@ -1871,6 +1987,7 @@ func _ai_move_garrison_to(spare: Variant, dest: int, tag: String) -> void:
 	else:
 		bump_ai_station_gen(tag)
 	_ai_stamp_unit_moved(fid)
+	_ai_stamp_def_anchor(fid)
 
 
 func _ai_ensure_own_land_adj(tag: String) -> Dictionary:
@@ -2448,10 +2565,16 @@ func try_ai_start_land_battles(day_index: int = 0) -> Dictionary:
 			var preview: Dictionary = can_assault_province(tag2, to_id, from_id)
 			var fid := str(preview.get("formation_id", "")).strip_edges()
 			if bool(preview.get("ok", false)) and not fid.is_empty():
+				fid = _ai_resolve_offensive_fid(tag2, from_id, fid)
+				if fid.is_empty():
+					_collect_adjacent_stack_march(
+						tag2, from_id, to_id, str(t.get("defender_tag", preview.get("defender_tag", ""))), marching_fids, combat_fids, march_opps
+					)
+					continue
 				var def_tag2 := str(t.get("defender_tag", preview.get("defender_tag", ""))).strip_edges().to_upper()
 				var powers: Dictionary = _ai_front_powers(tag2, from_id, def_tag2, to_id)
 				var empty_hex := bool(powers.get("empty_hex", false))
-				var att_p := float(powers.get("attacker_power", 0.0))
+				var att_p := _ai_offensive_power_at(from_id, tag2, def_tag2, to_id)
 				var def_p := float(powers.get("defender_power", 80.0))
 				var need := _ai_min_attack_ratio(tag2)
 				var ratio_ok := empty_hex or att_p + 0.0001 >= def_p * need
@@ -2545,6 +2668,8 @@ func try_ai_start_land_battles(day_index: int = 0) -> Dictionary:
 					continue
 				if marching_fids.has(sfid) or combat_fids.has(sfid):
 					continue
+				if _ai_garrison_is_def_anchored(sfid):
+					continue
 				if "is_in_combat" in f and bool(f.is_in_combat):
 					continue
 				# CL1-S1-STALL-FIX: a division holding this tag's empty-hex siege
@@ -2556,6 +2681,8 @@ func try_ai_start_land_battles(day_index: int = 0) -> Dictionary:
 						continue
 				var station := int(f.stationed_province_id) if "stationed_province_id" in f else -1
 				if station <= 0 or station == from_id:
+					continue
+				if _ai_is_garrison_1936(sfid) and _station_touches_enemy(station, tag2):
 					continue
 				var has_path := _provinces_adjacent(station, from_id)
 				if not has_path and not _interactive_light_sim() and typeof(FormationMovement) != TYPE_NIL:
@@ -2752,6 +2879,9 @@ func try_ai_follow_on_after_win(player_tag: String = "") -> Dictionary:
 		return {"ok": true, "started_n": 0, "reason": "garrison"}
 	var follow_to := int(pick.get("to_id", -1))
 	var follow_from := int(pick.get("from_id", -1))
+	follow_fid = _ai_resolve_offensive_fid(follow_tag, follow_from, follow_fid)
+	if follow_fid.is_empty():
+		return {"ok": true, "started_n": 0, "reason": "pol_reinf"}
 	var follow_def := str(pick.get("defender_tag", "")).strip_edges().to_upper()
 	if follow_def.is_empty():
 		follow_def = _province_owner(follow_to)
@@ -2762,7 +2892,7 @@ func try_ai_follow_on_after_win(player_tag: String = "") -> Dictionary:
 		str(pick.get("tag", "")),
 		int(pick.get("to_id", -1)),
 		int(pick.get("from_id", -1)),
-		str(pick.get("formation_id", "")),
+		follow_fid,
 	)
 	if bool(opened.get("success", false)):
 		clear_last_land_aar()
@@ -2805,6 +2935,9 @@ func apply_save_data(data: Dictionary) -> void:
 	_ai_str_cache_day = -1
 	_ai_str_cache.clear()
 	_ai_unit_moved_day.clear()
+	_ai_def_anchor_day.clear()
+	_ai_def_anchor_skip_day.clear()
+	_ai_garrison_captured_src_skip_day.clear()
 	_ai_move_cooldown_skip_day.clear()
 	_ai_skip_captured_logged.clear()
 	_ai_r2_prints.clear()
@@ -3523,6 +3656,9 @@ func reset_ai_war1_for_test() -> void:
 	_ai_str_cache_day = -1
 	_ai_str_cache.clear()
 	_ai_unit_moved_day.clear()
+	_ai_def_anchor_day.clear()
+	_ai_def_anchor_skip_day.clear()
+	_ai_garrison_captured_src_skip_day.clear()
 	_ai_move_cooldown_skip_day.clear()
 	_ai_skip_captured_logged.clear()
 	_ai_r2_prints.clear()
@@ -3850,6 +3986,8 @@ func _collect_adjacent_stack_march(
 			continue
 		if marching_fids.has(sfid) or combat_fids.has(sfid):
 			continue
+		if _ai_garrison_is_def_anchored(sfid):
+			continue
 		if "is_in_combat" in f and bool(f.is_in_combat):
 			continue
 		# CL1-S1-STALL-FIX: same skip as the rear-spare picker.
@@ -3859,6 +3997,8 @@ func _collect_adjacent_stack_march(
 			continue
 		var station := int(f.stationed_province_id) if "stationed_province_id" in f else -1
 		if station <= 0 or station == from_id:
+			continue
+		if _ai_is_garrison_1936(sfid) and _station_touches_enemy(station, tag):
 			continue
 		if not _provinces_adjacent(station, from_id):
 			continue
