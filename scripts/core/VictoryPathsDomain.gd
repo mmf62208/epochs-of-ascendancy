@@ -216,6 +216,7 @@ static func _present(result: Dictionary) -> bool:
 		"winner": str(result.get("winner", "")),
 		"stats": str(result.get("stats", "")),
 	}
+	_append_path_numbers(detail, result)
 	var tag := str(result.get("player_tag", ""))
 	var reason := str(result.get("reason", ""))
 	if str(result.get("outcome", "")) == "loss":
@@ -227,6 +228,33 @@ static func _present(result: Dictionary) -> bool:
 		scr.call("present_win", tag, reason, detail)
 		return true
 	return false
+
+
+## Display-only numbers for the victory scene. `stats` stays the legacy string.
+static func _append_path_numbers(detail: Dictionary, result: Dictionary) -> void:
+	var rules := load_rules()
+	var snap := _current_snapshot(rules)
+	var pid := str(result.get("path_id", ""))
+	var winner := str(result.get("winner", ""))
+	var row := _tag_row(snap, winner)
+	var path: Dictionary = {}
+	var path_v: Variant = _paths(rules).get(pid, {})
+	if path_v is Dictionary:
+		path = path_v
+	var prog: Dictionary = {}
+	if result.get("progress") is Dictionary:
+		prog = result.get("progress")
+	else:
+		prog = _read()
+	var vars := _vars(pid, path, row, snap, prog, str(path.get("title", pid)))
+	detail["held"] = int(vars.get("held", 0))
+	detail["total"] = int(vars.get("total", 0))
+	detail["hold"] = int(vars.get("hold", 0))
+	detail["need"] = int(vars.get("need", 0))
+	detail["pct"] = int(vars.get("pct", 0))
+	detail["streak"] = int(vars.get("streak", 0))
+	var score_s := str(vars.get("score", "0")).strip_edges()
+	detail["score"] = float(score_s) if score_s.is_valid_float() else 0.0
 
 
 static func _path_winner(pid: String, path: Dictionary, snapshot: Dictionary, rules: Dictionary, progress: Dictionary, tags: Array, player: String) -> Dictionary:

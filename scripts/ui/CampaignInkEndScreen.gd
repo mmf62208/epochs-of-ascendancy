@@ -22,6 +22,7 @@ var _tag: String = ""
 var _reason: String = ""
 var _detail: Dictionary = {}
 var _clock_lock_held: bool = false
+var _scene_stage: Control = null
 
 
 static func clear_log() -> void:
@@ -111,6 +112,65 @@ func _ready() -> void:
 	layer = 125
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_acquire_clock_lock()
+	var built := _victory_built()
+	if not VictorySceneModel.scene_enabled() or str(built.get("template", "")) == "SHEET":
+		_build_legacy_sheet()
+		return
+	_build_victory_scene(built)
+
+
+func _victory_built() -> Dictionary:
+	var source := "vp"
+	if str(_detail.get("path_id", "")).strip_edges().is_empty():
+		source = "ink" if _outcome == "win" else "gamedata"
+	return VictorySceneModel.build(source, _outcome, _tag, _reason, _detail)
+
+
+func _build_victory_scene(built: Dictionary) -> void:
+	var legacy := Control.new()
+	legacy.name = "LegacyReadout"
+	legacy.visible = false
+	legacy.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	legacy.position = Vector2(24, 24)
+	legacy.size = Vector2(720, 320)
+	add_child(legacy)
+	_add_legacy_readout(legacy)
+	var stage: Control
+	if str(built.get("template", "")) == "DEFEAT":
+		stage = DefeatSceneStage.new()
+	else:
+		stage = VictorySceneStage.new()
+	stage.configure(built, _scene_buttons())
+	add_child(stage)
+	_scene_stage = stage
+
+
+func _scene_buttons() -> Array:
+	var win := _outcome == "win"
+	var out: Array = []
+	if win:
+		var keep_label := "Continue as Germany"
+		if typeof(CampaignEndDomain) != TYPE_NIL:
+			keep_label = CampaignEndDomain.keep_playing_label(_tag)
+		out.append({"name": "BtnKeepPlaying", "text": keep_label, "primary": true, "cb": _on_keep})
+		out.append({"name": "BtnSave", "text": "Save", "primary": false, "cb": _on_save})
+		out.append({"name": "BtnLoadSave", "text": "Load", "primary": false, "cb": _on_load})
+		out.append({"name": "BtnMainMenu", "text": "Main menu", "primary": false, "cb": _on_main_menu})
+	else:
+		out.append({
+			"name": "BtnContinueAs",
+			"text": "Continue as…",
+			"primary": true,
+			"cb": _on_continue,
+			"tooltip": "Pick a successor nation and keep this world going.",
+		})
+		out.append({"name": "BtnLoadSave", "text": "Load save", "primary": false, "cb": _on_load})
+		out.append({"name": "BtnMainMenu", "text": "Main menu", "primary": false, "cb": _on_main_menu})
+	return out
+
+
+func _build_legacy_sheet() -> void:
+	_scene_stage = null
 	var dim := ColorRect.new()
 	dim.name = "Dimmer"
 	dim.color = Color(RetrowaveTheme.BG_DEEP.r, RetrowaveTheme.BG_DEEP.g, RetrowaveTheme.BG_DEEP.b, 0.8)
@@ -148,63 +208,7 @@ func _ready() -> void:
 	box.add_theme_constant_override("separation", 10)
 	panel.add_child(box)
 
-	var title := Label.new()
-	title.name = "OutcomeTitle"
-	title.text = "VICTORY" if win else "DEFEAT"
-	title.add_theme_font_size_override("font_size", 36)
-	title.add_theme_color_override("font_color", border)
-	box.add_child(title)
-
-	var path_title := str(_detail.get("path_title", "")).strip_edges()
-	if not path_title.is_empty():
-		var path_label := Label.new()
-		path_label.name = "PathTitle"
-		path_label.text = path_title
-		path_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		RetrowaveTheme.style_body_label(path_label)
-		box.add_child(path_label)
-
-	var sub := Label.new()
-	sub.name = "OutcomeSubtitle"
-	sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	sub.text = player_subtitle(_outcome, _reason)
-	sub.add_theme_font_size_override("font_size", 16)
-	sub.add_theme_color_override("font_color", RetrowaveTheme.TEXT_PRIMARY)
-	box.add_child(sub)
-
-	var when := Label.new()
-	when.name = "OutcomeWhen"
-	when.text = _when_line()
-	when.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	RetrowaveTheme.style_body_label(when)
-	box.add_child(when)
-
-	var winner_txt := str(_detail.get("winner", "")).strip_edges()
-	if not winner_txt.is_empty():
-		var winner := Label.new()
-		winner.name = "OutcomeWinner"
-		winner.text = winner_txt
-		winner.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		RetrowaveTheme.style_body_label(winner)
-		box.add_child(winner)
-
-	var reason_txt := player_reason_text(_reason)
-	if not reason_txt.is_empty():
-		var why := Label.new()
-		why.name = "OutcomeReason"
-		why.text = reason_txt
-		why.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		why.custom_minimum_size = Vector2(680, 0)
-		why.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		RetrowaveTheme.style_body_label(why)
-		box.add_child(why)
-
-	var stats := Label.new()
-	stats.name = "OutcomeStats"
-	var stats_override := str(_detail.get("stats", "")).strip_edges()
-	stats.text = stats_override if not stats_override.is_empty() else _stats_line()
-	RetrowaveTheme.style_body_label(stats)
-	box.add_child(stats)
+	_add_legacy_readout(box)
 
 	var spacer := Control.new()
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -226,6 +230,68 @@ func _ready() -> void:
 		row.add_child(cont)
 		row.add_child(_make_button("BtnLoadSave", "Load save", false, _on_load))
 		row.add_child(_make_button("BtnMainMenu", "Main menu", false, _on_main_menu))
+
+
+func _add_legacy_readout(parent: Node) -> void:
+	var win := _outcome == "win"
+	var border := RetrowaveTheme.SUCCESS if win else RetrowaveTheme.WARNING
+	var title := Label.new()
+	title.name = "OutcomeTitle"
+	title.text = "VICTORY" if win else "DEFEAT"
+	title.add_theme_font_size_override("font_size", 36)
+	title.add_theme_color_override("font_color", border)
+	parent.add_child(title)
+
+	var path_title := str(_detail.get("path_title", "")).strip_edges()
+	if not path_title.is_empty():
+		var path_label := Label.new()
+		path_label.name = "PathTitle"
+		path_label.text = path_title
+		path_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		RetrowaveTheme.style_body_label(path_label)
+		parent.add_child(path_label)
+
+	var sub := Label.new()
+	sub.name = "OutcomeSubtitle"
+	sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	sub.text = player_subtitle(_outcome, _reason)
+	sub.add_theme_font_size_override("font_size", 16)
+	sub.add_theme_color_override("font_color", RetrowaveTheme.TEXT_PRIMARY)
+	parent.add_child(sub)
+
+	var when := Label.new()
+	when.name = "OutcomeWhen"
+	when.text = _when_line()
+	when.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	RetrowaveTheme.style_body_label(when)
+	parent.add_child(when)
+
+	var winner_txt := str(_detail.get("winner", "")).strip_edges()
+	if not winner_txt.is_empty():
+		var winner := Label.new()
+		winner.name = "OutcomeWinner"
+		winner.text = winner_txt
+		winner.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		RetrowaveTheme.style_body_label(winner)
+		parent.add_child(winner)
+
+	var reason_txt := player_reason_text(_reason)
+	if not reason_txt.is_empty():
+		var why := Label.new()
+		why.name = "OutcomeReason"
+		why.text = reason_txt
+		why.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		why.custom_minimum_size = Vector2(680, 0)
+		why.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		RetrowaveTheme.style_body_label(why)
+		parent.add_child(why)
+
+	var stats := Label.new()
+	stats.name = "OutcomeStats"
+	var stats_override := str(_detail.get("stats", "")).strip_edges()
+	stats.text = stats_override if not stats_override.is_empty() else _stats_line()
+	RetrowaveTheme.style_body_label(stats)
+	parent.add_child(stats)
 
 
 func _place_panel(panel: Control) -> void:
@@ -370,6 +436,10 @@ func _input(event: InputEvent) -> void:
 	if typeof(CampaignEndDomain) != TYPE_NIL:
 		var vm: Dictionary = CampaignEndDomain.view_model()
 		if bool(vm.get("keep_playing", false)):
+			return
+	if _scene_stage != null and is_instance_valid(_scene_stage) and _scene_stage.has_method("consume_skip"):
+		if bool(_scene_stage.call("consume_skip", event)):
+			_mark_input_handled()
 			return
 	if _is_escape(event):
 		_mark_input_handled()
