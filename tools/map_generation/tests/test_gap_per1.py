@@ -3,15 +3,57 @@
 
 Fails while any in-scope PER 1936 land ring is still a 36/72-vertex
 placeholder, other than the UNKNOWN list. Province ids stay the 3596
-set. A province may lose more than AREA_LOSS_MAX of its 76408b80 area
+set. A province may lose more than AREA_LOSS_MAX of its e0388c58 area
 only when this slice re-ringed it or notched it. No new enclosed hole
 over 250 px². Every UNKNOWN id has a reason. Every non-PER ring is
-byte-identical to 76408b80.
+byte-identical to e0388c58.
+
+Runtime tests read base ring md5s and areas only from the committed
+fixture tools/map_generation/tests/fixtures/gap_ring_base_hashes.json.
+They must not call git or subprocess.
+
+This test owns that fixture. Regenerate it from the repo root (git is
+allowed only at authoring time; the command must reproduce the file
+byte-for-byte):
+
+    python3 - <<'PY'
+    import hashlib, json, subprocess, sys
+    from pathlib import Path
+    ROOT = Path.cwd()
+    sys.path.insert(0, str(ROOT / "tools" / "map_generation" / "lib"))
+    from gap_ussr_west2_product import ring_area
+    BASES = (
+        "e0388c58fb3a72d38084a9ff812a4d99d518e543",
+        "a34d23a76af751c1c72239bc680a780662998e26",
+    )
+    GEO = "data/provinces_world_accurate/provinces_geometry.json"
+    OUT = ROOT / "tools/map_generation/tests/fixtures/gap_ring_base_hashes.json"
+
+    def points_md5(points):
+        raw = json.dumps(points, separators=(",", ":"), ensure_ascii=True)
+        return hashlib.md5(raw.encode("utf-8")).hexdigest()
+
+    payload = {}
+    for sha in BASES:
+        raw = subprocess.check_output(["git", "show", "%s:%s" % (sha, GEO)], cwd=str(ROOT))
+        recs = {}
+        for g in json.loads(raw.decode("utf-8"))["provinces"]:
+            pts = g.get("points") or []
+            recs[str(int(g["id"]))] = {
+                "md5": points_md5(pts),
+                "area": round(ring_area(pts), 2),
+            }
+        payload[sha] = {k: recs[k] for k in sorted(recs, key=int)}
+    text = json.dumps(payload, indent=2, ensure_ascii=True) + "\n"
+    OUT.parent.mkdir(parents=True, exist_ok=True)
+    OUT.write_text(text, encoding="utf-8")
+    print(OUT)
+    PY
 """
 from __future__ import annotations
 
+import hashlib
 import json
-import subprocess
 import sys
 import unittest
 from pathlib import Path
@@ -20,7 +62,6 @@ ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "tools" / "map_generation" / "lib"))
 
 from gap_per1_product import (  # noqa: E402
-    BASE_AREA,
     EXPECTED_RERINGS,
     HOLE_PX_MAX,
     HORMUZ_APPROACHES_ID,
@@ -41,7 +82,12 @@ from gap_per1_product import (  # noqa: E402
 from gap_ussr_west2_product import is_placeholder_ring, overlap_px  # noqa: E402
 
 BOARD = ROOT / "data" / "provinces_world_accurate"
-BASE_COMMIT = "76408b80d7ef9d02914398b3e0b3db28170fd25d"
+BASE_COMMIT = "e0388c58fb3a72d38084a9ff812a4d99d518e543"
+# PER is the later slice on this base; no later-slice owners to exempt.
+LATER_SLICE_EXEMPT_OWNERS = ()
+FIXTURE_PATH = (
+    Path(__file__).resolve().parent / "fixtures" / "gap_ring_base_hashes.json"
+)
 
 
 def _load():
@@ -53,12 +99,14 @@ def _load():
     return geo, base, owners, adj, domains
 
 
-def _base_geometry():
-    raw = subprocess.check_output(
-        ["git", "show", "%s:data/provinces_world_accurate/provinces_geometry.json" % BASE_COMMIT],
-        cwd=str(ROOT),
-    )
-    return json.loads(raw.decode("utf-8"))
+def _points_md5(points) -> str:
+    raw = json.dumps(points, separators=(",", ":"), ensure_ascii=True)
+    return hashlib.md5(raw.encode("utf-8")).hexdigest()
+
+
+def _fixture_base(sha: str):
+    data = json.loads(FIXTURE_PATH.read_text(encoding="utf-8"))
+    return data[sha]
 
 
 class GapPer1Test(unittest.TestCase):
@@ -95,11 +143,15 @@ class GapPer1Test(unittest.TestCase):
 
     def test_area_loss_only_on_rerings_and_notches(self) -> None:
         geo, _base, owners, _adj, _domains = _load()
-        self.assertEqual(set(BASE_AREA), {int(g["id"]) for g in geo["provinces"]})
+        fixture = _fixture_base(BASE_COMMIT)
+        self.assertEqual(set(int(pid) for pid in fixture), {int(g["id"]) for g in geo["provinces"]})
+        exempt = set(LATER_SLICE_EXEMPT_OWNERS)
         for g in geo["provinces"]:
             pid = int(g["id"])
+            if owners.get(str(pid)) in exempt:
+                continue
             meta = g.get("meta") if isinstance(g.get("meta"), dict) else {}
-            before = float(BASE_AREA[pid])
+            before = float(fixture[str(pid)]["area"])
             after = ring_area(g.get("points") or [])
             self.assertTrue(
                 area_change_ok(before, after, meta),
@@ -119,13 +171,14 @@ class GapPer1Test(unittest.TestCase):
 
     def test_non_per_rings_match_base_commit(self) -> None:
         geo, _base, owners, _adj, _domains = _load()
-        base_geo = {int(g["id"]): g for g in _base_geometry()["provinces"]}
-        self.assertEqual(set(base_geo), {int(g["id"]) for g in geo["provinces"]})
+        fixture = _fixture_base(BASE_COMMIT)
+        self.assertEqual(set(int(pid) for pid in fixture), {int(g["id"]) for g in geo["provinces"]})
+        exempt = set(LATER_SLICE_EXEMPT_OWNERS)
         for g in geo["provinces"]:
             pid = int(g["id"])
-            if owners.get(str(pid)) == OWNER:
+            if owners.get(str(pid)) == OWNER or owners.get(str(pid)) in exempt:
                 continue
-            self.assertEqual(g.get("points"), base_geo[pid].get("points"), pid)
+            self.assertEqual(_points_md5(g.get("points")), fixture[str(pid)]["md5"], pid)
 
     def test_sarbaz_baluchistan_edge_kept(self) -> None:
         self.assertEqual(KEEP_ADJACENCY, ((903351, 903586),))
@@ -139,11 +192,11 @@ class GapPer1Test(unittest.TestCase):
 
     def test_hormuz_approaches_ring_unchanged_and_tabas_misses_it(self) -> None:
         geo, _base, _owners, _adj, _domains = _load()
-        base_geo = {int(g["id"]): g for g in _base_geometry()["provinces"]}
+        fixture = _fixture_base(BASE_COMMIT)
         by_id = {int(g["id"]): g for g in geo["provinces"]}
         self.assertEqual(
-            by_id[HORMUZ_APPROACHES_ID].get("points"),
-            base_geo[HORMUZ_APPROACHES_ID].get("points"),
+            _points_md5(by_id[HORMUZ_APPROACHES_ID].get("points")),
+            fixture[str(HORMUZ_APPROACHES_ID)]["md5"],
         )
         self.assertEqual(
             overlap_px(by_id[TABAS_ID]["points"], by_id[HORMUZ_APPROACHES_ID]["points"]),
