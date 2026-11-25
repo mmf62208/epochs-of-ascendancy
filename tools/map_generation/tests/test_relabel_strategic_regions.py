@@ -44,9 +44,22 @@ class TestRelabelStrategicRegions(unittest.TestCase):
 class TestRoadVisibilityPolish(unittest.TestCase):
     def test_road_layer_earlier_zoom(self) -> None:
         src = INFRA.read_text(encoding="utf-8")
-        self.assertIn("road_layer.visible = show_roads and z > 0.10", src)
+        # RT-1 split the road check across lines. Zoom threshold stays 0.10.
+        self.assertRegex(
+            src,
+            r"road_layer\.visible = \(\s*"
+            r"show_roads or _road_layer_has_explicit_lines\(\) or not _road_edge_cache\.is_empty\(\)\s*"
+            r"\) and z > 0\.10",
+        )
         self.assertIn("rail_layer.visible = show_rails and z > 0.14", src)
-        self.assertIn("1.15", src)  # arterial width multiplier
+        # Arterial width is screen-px tiers, not the old 1.15 multiplier.
+        self.assertIn("const ROAD_EXPLICIT_SCREEN_PX := 7.0", src)
+        self.assertIn("line.width = _road_world_width(ROAD_EXPLICIT_SCREEN_PX)", src)
+        self.assertIn("RoadTierVisualScript.HIGHWAY_SCREEN_PX", src)
+        tier = (ROOT / "scripts" / "map" / "RoadTierVisual.gd").read_text(encoding="utf-8")
+        self.assertIn("static func screen_width_for_tier", tier)
+        self.assertIn("const HIGHWAY_CASING_SCREEN_PX := 12.0", tier)
+        self.assertIn("const DIRT_SCREEN_PX := 2.6", tier)
 
 
 if __name__ == "__main__":

@@ -121,12 +121,13 @@ class TestLiveWiring(unittest.TestCase):
         self.assertIn("func format_order_panel_plain", gd)
         self.assertIn("func format_order_panel_surface_plain", gd)
         aidx = gd.find("func apply_order_panel_action")
-        # Function grows with product-depth day routes; keep core mutation routes in window.
-        # Function grows with product-depth day routes (next-280+); keep core mutation routes in window.
-        chunk = gd[aidx : aidx + 90000]
+        self.assertGreaterEqual(aidx, 0)
+        # Production priority routes near the end of this function, past a fixed prefix.
+        nxt = gd.find("\nfunc ", aidx + 1)
+        chunk = gd[aidx : len(gd) if nxt < 0 else nxt]
         self.assertIn("apply_execute_one_order", chunk)
         self.assertIn("apply_fleet_station_mutation", chunk)
-        self.assertIn("apply_production_priority_mutation", chunk)
+        self.assertIn('return apply_production_priority_mutation("primary", "primary")', chunk)
 
         tib = GD_TIB.read_text(encoding="utf-8")
         self.assertIn("func _on_orders_pressed", tib)

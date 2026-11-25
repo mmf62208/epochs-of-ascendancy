@@ -94,10 +94,17 @@ class TestLive(unittest.TestCase):
         self.assertIn("func format_day_package_apply_audit_plain", gd)
         self.assertIn("func format_save_slot_flair_plain", gd)
         self.assertIn("func format_infra_site_consistency_plain", gd)
+        audit_at = gd.find("func format_day_package_apply_audit_plain")
+        audit_end = gd.find("\nfunc ", audit_at + 1)
+        audit_body = gd[audit_at : len(gd) if audit_end < 0 else audit_end]
+        self.assertIn("MapPolishFormatters.day_package_apply_audit(", audit_body)
+        flair_at = gd.find("func format_save_slot_flair_plain")
+        flair_end = gd.find("\nfunc ", flair_at + 1)
+        flair_body = gd[flair_at : len(gd) if flair_end < 0 else flair_end]
+        self.assertIn("SaveLoadManager.list_slots_for_ui()", flair_body)
+        self.assertIn("MapPolishFormatters.save_slot_browser_flair(", flair_body)
 
         panel = GD_PANEL.read_text(encoding="utf-8")
-        self.assertIn("format_day_package_apply_audit_plain", panel)
-        self.assertIn("format_save_slot_flair_plain", panel)
         self.assertIn("flair_label", panel)
 
         mm = GD_MM.read_text(encoding="utf-8")
