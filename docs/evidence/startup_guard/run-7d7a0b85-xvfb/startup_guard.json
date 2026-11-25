@@ -1,0 +1,757 @@
+{
+	"base_sha_expected": "7d7a0b856efba61c04364f123b6a7f37c3e310c8",
+	"begin_path": "LivingTitleBoot.handle_live_begin",
+	"begin_return": {
+		"closed": true,
+		"mode": "new",
+		"ok": true,
+		"player_tag": "GER",
+		"year": 1936
+	},
+	"boot_closed_payload": {
+		"applied": true,
+		"default_1936": true,
+		"default_ger": true,
+		"defaulted": false,
+		"era": 1936,
+		"era_boot": {
+			"era": 1936,
+			"live": true,
+			"ok": true,
+			"year": 1936
+		},
+		"eras": [
+			1918,
+			1936,
+			2026
+		],
+		"live": true,
+		"mode": "new",
+		"nation": {
+			"default_ger": true,
+			"defaulted": false,
+			"live": true,
+			"ok": true,
+			"player_tag": "GER"
+		},
+		"nations": [
+			"GER",
+			"ENG",
+			"FRA",
+			"JAP",
+			"USA",
+			"SOV",
+			"ITA",
+			"POL"
+		],
+		"ok": true,
+		"player_tag": "GER",
+		"slot": "",
+		"year": 1936
+	},
+	"coverage_gaps": [
+		"xvfb_llvmpipe_not_live_desktop",
+		"did_not_use_pair_maximized_launch",
+		"one_run_only",
+		"seed_20fe9063_not_recomputed_here"
+	],
+	"data_fail": [],
+	"data_pass": [
+		"pre_begin→post_dismiss player_tag=GER",
+		"pre_begin→post_dismiss year=1936",
+		"pre_begin→post_dismiss month=1",
+		"pre_begin→post_dismiss day=1",
+		"pre_begin→post_dismiss province_n=3596",
+		"pre_begin→post_dismiss berlin_owner=GER",
+		"pre_begin→post_dismiss formation_n=828",
+		"pre_begin→post_dismiss garrison_n=535",
+		"pre_begin→post_dismiss identity_fp=828:636003609",
+		"pre_begin→post_dismiss stockpile_fp=3210958319",
+		"pre_begin→post_dismiss unit_icon_nodes=259",
+		"post_dismiss→post_resize player_tag=GER",
+		"post_dismiss→post_resize year=1936",
+		"post_dismiss→post_resize month=1",
+		"post_dismiss→post_resize day=1",
+		"post_dismiss→post_resize province_n=3596",
+		"post_dismiss→post_resize berlin_owner=GER",
+		"post_dismiss→post_resize formation_n=828",
+		"post_dismiss→post_resize garrison_n=535",
+		"post_dismiss→post_resize identity_fp=828:636003609",
+		"post_dismiss→post_resize stockpile_fp=3210958319",
+		"post_dismiss→post_resize unit_icon_nodes=259",
+		"player_tag=GER",
+		"year=1936",
+		"province_n=3596 (shipped expect 3596)",
+		"berlin_710300_owner=GER",
+		"garrison_1936_nonzero=535"
+	],
+	"data_post": {
+		"berlin_owner": "GER",
+		"date": {
+			"date_day_only": "1936-01-01",
+			"date_string": "1936-01-01 00:00",
+			"day": 1,
+			"hour": 0,
+			"month": 1,
+			"year": 1936
+		},
+		"formations": {
+			"by_tag": {
+				"AFG": 4,
+				"ALB": 4,
+				"ARG": 4,
+				"AUS": 4,
+				"BEL": 4,
+				"BHU": 4,
+				"BOL": 4,
+				"BRA": 4,
+				"BUL": 4,
+				"CHI": 4,
+				"CHL": 4,
+				"COL": 4,
+				"COS": 4,
+				"CUB": 4,
+				"CYP": 4,
+				"CZE": 20,
+				"DNK": 4,
+				"DOM": 4,
+				"ECU": 4,
+				"ELS": 4,
+				"ENG": 190,
+				"EST": 4,
+				"FIN": 4,
+				"FRA": 125,
+				"GER": 105,
+				"GRE": 4,
+				"GUA": 4,
+				"HAI": 4,
+				"HON": 4,
+				"HUN": 4,
+				"ICE": 4,
+				"IRE": 4,
+				"ITA": 32,
+				"JAP": 17,
+				"LAT": 4,
+				"LIB": 4,
+				"LIE": 4,
+				"LIT": 4,
+				"LUX": 4,
+				"MEX": 4,
+				"MLT": 4,
+				"MON": 4,
+				"NEP": 4,
+				"NIC": 4,
+				"NLD": 4,
+				"NOR": 4,
+				"NZL": 4,
+				"PAN": 4,
+				"PAR": 4,
+				"PER": 4,
+				"POL": 36,
+				"POR": 4,
+				"ROM": 4,
+				"SAU": 4,
+				"SIA": 4,
+				"SOV": 36,
+				"SPA": 4,
+				"SWE": 4,
+				"SWI": 4,
+				"TUR": 4,
+				"URG": 4,
+				"USA": 43,
+				"VEN": 4,
+				"YEM": 4,
+				"YUG": 4
+			},
+			"garrison_1936": 535,
+			"identity_fp": "828:636003609",
+			"total": 828
+		},
+		"kind": "DATA",
+		"phase": "post_dismiss",
+		"player_tag": "GER",
+		"province_n": 3596,
+		"stockpile": {
+			"fp": "3210958319",
+			"keys": [
+				"aluminum",
+				"coal",
+				"fuel",
+				"rubber",
+				"steel"
+			],
+			"n": 5,
+			"values": {
+				"aluminum": 4000.0,
+				"coal": 8000.0,
+				"fuel": 4000.0,
+				"rubber": 2000.0,
+				"steel": 12000.0
+			}
+		},
+		"unit_icon_nodes": 259
+	},
+	"data_pre": {
+		"berlin_owner": "GER",
+		"date": {
+			"date_day_only": "1936-01-01",
+			"date_string": "1936-01-01 00:00",
+			"day": 1,
+			"hour": 0,
+			"month": 1,
+			"year": 1936
+		},
+		"formations": {
+			"by_tag": {
+				"AFG": 4,
+				"ALB": 4,
+				"ARG": 4,
+				"AUS": 4,
+				"BEL": 4,
+				"BHU": 4,
+				"BOL": 4,
+				"BRA": 4,
+				"BUL": 4,
+				"CHI": 4,
+				"CHL": 4,
+				"COL": 4,
+				"COS": 4,
+				"CUB": 4,
+				"CYP": 4,
+				"CZE": 20,
+				"DNK": 4,
+				"DOM": 4,
+				"ECU": 4,
+				"ELS": 4,
+				"ENG": 190,
+				"EST": 4,
+				"FIN": 4,
+				"FRA": 125,
+				"GER": 105,
+				"GRE": 4,
+				"GUA": 4,
+				"HAI": 4,
+				"HON": 4,
+				"HUN": 4,
+				"ICE": 4,
+				"IRE": 4,
+				"ITA": 32,
+				"JAP": 17,
+				"LAT": 4,
+				"LIB": 4,
+				"LIE": 4,
+				"LIT": 4,
+				"LUX": 4,
+				"MEX": 4,
+				"MLT": 4,
+				"MON": 4,
+				"NEP": 4,
+				"NIC": 4,
+				"NLD": 4,
+				"NOR": 4,
+				"NZL": 4,
+				"PAN": 4,
+				"PAR": 4,
+				"PER": 4,
+				"POL": 36,
+				"POR": 4,
+				"ROM": 4,
+				"SAU": 4,
+				"SIA": 4,
+				"SOV": 36,
+				"SPA": 4,
+				"SWE": 4,
+				"SWI": 4,
+				"TUR": 4,
+				"URG": 4,
+				"USA": 43,
+				"VEN": 4,
+				"YEM": 4,
+				"YUG": 4
+			},
+			"garrison_1936": 535,
+			"identity_fp": "828:636003609",
+			"total": 828
+		},
+		"kind": "DATA",
+		"phase": "pre_begin",
+		"player_tag": "GER",
+		"province_n": 3596,
+		"stockpile": {
+			"fp": "3210958319",
+			"keys": [
+				"aluminum",
+				"coal",
+				"fuel",
+				"rubber",
+				"steel"
+			],
+			"n": 5,
+			"values": {
+				"aluminum": 4000.0,
+				"coal": 8000.0,
+				"fuel": 4000.0,
+				"rubber": 2000.0,
+				"steel": 12000.0
+			}
+		},
+		"unit_icon_nodes": 259
+	},
+	"data_resize": {
+		"berlin_owner": "GER",
+		"date": {
+			"date_day_only": "1936-01-01",
+			"date_string": "1936-01-01 00:00",
+			"day": 1,
+			"hour": 0,
+			"month": 1,
+			"year": 1936
+		},
+		"formations": {
+			"by_tag": {
+				"AFG": 4,
+				"ALB": 4,
+				"ARG": 4,
+				"AUS": 4,
+				"BEL": 4,
+				"BHU": 4,
+				"BOL": 4,
+				"BRA": 4,
+				"BUL": 4,
+				"CHI": 4,
+				"CHL": 4,
+				"COL": 4,
+				"COS": 4,
+				"CUB": 4,
+				"CYP": 4,
+				"CZE": 20,
+				"DNK": 4,
+				"DOM": 4,
+				"ECU": 4,
+				"ELS": 4,
+				"ENG": 190,
+				"EST": 4,
+				"FIN": 4,
+				"FRA": 125,
+				"GER": 105,
+				"GRE": 4,
+				"GUA": 4,
+				"HAI": 4,
+				"HON": 4,
+				"HUN": 4,
+				"ICE": 4,
+				"IRE": 4,
+				"ITA": 32,
+				"JAP": 17,
+				"LAT": 4,
+				"LIB": 4,
+				"LIE": 4,
+				"LIT": 4,
+				"LUX": 4,
+				"MEX": 4,
+				"MLT": 4,
+				"MON": 4,
+				"NEP": 4,
+				"NIC": 4,
+				"NLD": 4,
+				"NOR": 4,
+				"NZL": 4,
+				"PAN": 4,
+				"PAR": 4,
+				"PER": 4,
+				"POL": 36,
+				"POR": 4,
+				"ROM": 4,
+				"SAU": 4,
+				"SIA": 4,
+				"SOV": 36,
+				"SPA": 4,
+				"SWE": 4,
+				"SWI": 4,
+				"TUR": 4,
+				"URG": 4,
+				"USA": 43,
+				"VEN": 4,
+				"YEM": 4,
+				"YUG": 4
+			},
+			"garrison_1936": 535,
+			"identity_fp": "828:636003609",
+			"total": 828
+		},
+		"kind": "DATA",
+		"phase": "post_resize",
+		"player_tag": "GER",
+		"province_n": 3596,
+		"stockpile": {
+			"fp": "3210958319",
+			"keys": [
+				"aluminum",
+				"coal",
+				"fuel",
+				"rubber",
+				"steel"
+			],
+			"n": 5,
+			"values": {
+				"aluminum": 4000.0,
+				"coal": 8000.0,
+				"fuel": 4000.0,
+				"rubber": 2000.0,
+				"steel": 12000.0
+			}
+		},
+		"unit_icon_nodes": 259
+	},
+	"display": "X11",
+	"engine_version": "4.4.7.1-stable (official).stable.a13da4feb8d8aefc283c3763d33a2f170a18d541",
+	"fixture_fail": [],
+	"guard": "WindowedStartupGuardTest",
+	"import_policy": "separate_headless_import_then_one_windowed_run",
+	"kind": "TEST_ONLY_DIAGNOSTIC",
+	"labels": {
+		"DATA_INVARIANT": "PASS",
+		"FIXTURE": "PASS",
+		"LIVE_BLANK": "NOT_REPRODUCED",
+		"LIVE_STARTUP": "NOT_CLAIMED",
+		"PRESENTATION": "DIAGNOSTIC"
+	},
+	"live_startup_pass_claimed": false,
+	"presentation_notes": [
+		"garrison_1936_observed=535 shipped_expect=575 (reported, not invented)",
+		"post_field_still_varied_color"
+	],
+	"snapshots": [
+		{
+			"always_on_top": true,
+			"camera_pos": [
+				7603.83642578125,
+				1553.06518554688
+			],
+			"camera_zoom": 0.344262599945068,
+			"capital_in_visible_rect": true,
+			"chips": {
+				"aluminum": {
+					"stockpile": 4000.0,
+					"text": "0",
+					"visible": true
+				},
+				"energy": {
+					"stockpile": 0.0,
+					"text": "0",
+					"visible": true
+				},
+				"fuel": {
+					"stockpile": 4000.0,
+					"text": "0",
+					"visible": true
+				},
+				"layout_hides_below_1280": false,
+				"note": "hidden_chip_is_not_stockpile_zero",
+				"resources_container_visible": true,
+				"rubber": {
+					"stockpile": 2000.0,
+					"text": "0",
+					"visible": true
+				},
+				"steel": {
+					"stockpile": 12000.0,
+					"text": "0",
+					"visible": true
+				},
+				"vp_w": 1280.0
+			},
+			"elapsed_usec": 32237127,
+			"ger_capital_pid": 710300,
+			"ger_centroid": [
+				7603.83642578125,
+				1553.06518554688
+			],
+			"icons": {
+				"in_view": 136,
+				"nodes": 259,
+				"note": "node_visibility_not_pixel_proof",
+				"visible": 259
+			},
+			"image": {
+				"dark_frac": 0.7185,
+				"h": 800,
+				"looks_uniform_light": false,
+				"looks_varied_color": true,
+				"mean_rgb": [
+					0.169255882501602,
+					0.193352952599525,
+					0.265106856822968
+				],
+				"near_light_frac": 0.01375,
+				"note": "sampled_mean_not_pixel_oracle;title_visible_so_not_post_dismiss",
+				"ok": true,
+				"sample_n": 4000,
+				"saturated_frac": 0.79175,
+				"w": 1280
+			},
+			"kind": "PRESENTATION_DIAGNOSTIC",
+			"mesh": {
+				"in_view": 1915,
+				"nodes": 3596,
+				"note": "counts_are_not_pixels_on_screen",
+				"visible": 3596
+			},
+			"monotonic_usec": 33140007,
+			"not_pixel_oracle": true,
+			"phase": "pre_begin",
+			"png": "/tmp/eoa-startup-guard/pre_begin.png",
+			"title_visible": true,
+			"underlay": {
+				"full_world_underlay_active": true,
+				"present": false,
+				"visible": false
+			},
+			"viewport_size": [
+				1280.0,
+				800.0
+			],
+			"visible_world_rect": [
+				5744.79052734375,
+				391.161499023438,
+				3718.09204101562,
+				2323.80737304688
+			],
+			"window": {
+				"always_on_top": true,
+				"display": "X11",
+				"mode": "windowed",
+				"mode_i": 0,
+				"size": [
+					1280,
+					800
+				]
+			}
+		},
+		{
+			"always_on_top": false,
+			"camera_pos": [
+				7601.29638671875,
+				1532.74560546875
+			],
+			"camera_zoom": 0.787418186664581,
+			"capital_in_visible_rect": true,
+			"chips": {
+				"aluminum": {
+					"stockpile": 4000.0,
+					"text": "0",
+					"visible": true
+				},
+				"energy": {
+					"stockpile": 0.0,
+					"text": "0",
+					"visible": true
+				},
+				"fuel": {
+					"stockpile": 4000.0,
+					"text": "0",
+					"visible": true
+				},
+				"layout_hides_below_1280": false,
+				"note": "hidden_chip_is_not_stockpile_zero",
+				"resources_container_visible": true,
+				"rubber": {
+					"stockpile": 2000.0,
+					"text": "0",
+					"visible": true
+				},
+				"steel": {
+					"stockpile": 12000.0,
+					"text": "0",
+					"visible": true
+				},
+				"vp_w": 1280.0
+			},
+			"elapsed_usec": 34353304,
+			"ger_capital_pid": 710300,
+			"ger_centroid": [
+				7603.83642578125,
+				1553.06518554688
+			],
+			"icons": {
+				"in_view": 100,
+				"nodes": 259,
+				"note": "node_visibility_not_pixel_proof",
+				"visible": 259
+			},
+			"image": {
+				"dark_frac": 0.4515,
+				"h": 800,
+				"looks_uniform_light": false,
+				"looks_varied_color": true,
+				"mean_rgb": [
+					0.271295100450516,
+					0.229341179132462,
+					0.313039213418961
+				],
+				"near_light_frac": 0.01525,
+				"note": "sampled_mean_not_pixel_oracle",
+				"ok": true,
+				"sample_n": 4000,
+				"saturated_frac": 0.795,
+				"w": 1280
+			},
+			"kind": "PRESENTATION_DIAGNOSTIC",
+			"mesh": {
+				"in_view": 1263,
+				"nodes": 3596,
+				"note": "counts_are_not_pixels_on_screen",
+				"visible": 3596
+			},
+			"monotonic_usec": 35256185,
+			"not_pixel_oracle": true,
+			"phase": "post_dismiss",
+			"png": "/tmp/eoa-startup-guard/post_dismiss.png",
+			"title_visible": false,
+			"underlay": {
+				"full_world_underlay_active": true,
+				"present": false,
+				"visible": false
+			},
+			"viewport_size": [
+				1280.0,
+				800.0
+			],
+			"visible_world_rect": [
+				6788.513671875,
+				1024.75634765625,
+				1625.56567382812,
+				1015.97857666016
+			],
+			"window": {
+				"always_on_top": false,
+				"display": "X11",
+				"mode": "windowed",
+				"mode_i": 0,
+				"size": [
+					1280,
+					800
+				]
+			}
+		},
+		{
+			"always_on_top": false,
+			"camera_pos": [
+				7601.29638671875,
+				1532.74560546875
+			],
+			"camera_zoom": 0.787418186664581,
+			"capital_in_visible_rect": true,
+			"chips": {
+				"aluminum": {
+					"stockpile": 4000.0,
+					"text": "0",
+					"visible": true
+				},
+				"energy": {
+					"stockpile": 0.0,
+					"text": "0",
+					"visible": true
+				},
+				"fuel": {
+					"stockpile": 4000.0,
+					"text": "0",
+					"visible": true
+				},
+				"layout_hides_below_1280": false,
+				"note": "hidden_chip_is_not_stockpile_zero",
+				"resources_container_visible": true,
+				"rubber": {
+					"stockpile": 2000.0,
+					"text": "0",
+					"visible": true
+				},
+				"steel": {
+					"stockpile": 12000.0,
+					"text": "0",
+					"visible": true
+				},
+				"vp_w": 1280.0
+			},
+			"elapsed_usec": 36761402,
+			"ger_capital_pid": 710300,
+			"ger_centroid": [
+				7603.83642578125,
+				1553.06518554688
+			],
+			"icons": {
+				"in_view": 100,
+				"nodes": 259,
+				"note": "node_visibility_not_pixel_proof",
+				"visible": 259
+			},
+			"image": {
+				"dark_frac": 0.45075,
+				"h": 800,
+				"looks_uniform_light": false,
+				"looks_varied_color": true,
+				"mean_rgb": [
+					0.271146088838577,
+					0.2290049046278,
+					0.312530398368835
+				],
+				"near_light_frac": 0.015,
+				"note": "sampled_mean_not_pixel_oracle",
+				"ok": true,
+				"sample_n": 4000,
+				"saturated_frac": 0.7955,
+				"w": 1280
+			},
+			"kind": "PRESENTATION_DIAGNOSTIC",
+			"mesh": {
+				"in_view": 1263,
+				"nodes": 3596,
+				"note": "counts_are_not_pixels_on_screen",
+				"visible": 3596
+			},
+			"monotonic_usec": 37664283,
+			"not_pixel_oracle": true,
+			"phase": "post_resize",
+			"png": "/tmp/eoa-startup-guard/post_resize.png",
+			"title_visible": false,
+			"underlay": {
+				"full_world_underlay_active": true,
+				"present": false,
+				"visible": false
+			},
+			"viewport_size": [
+				1280.0,
+				800.0
+			],
+			"visible_world_rect": [
+				6788.513671875,
+				1024.75634765625,
+				1625.56567382812,
+				1015.97857666016
+			],
+			"window": {
+				"always_on_top": false,
+				"display": "X11",
+				"mode": "windowed",
+				"mode_i": 0,
+				"size": [
+					860,
+					550
+				]
+			}
+		}
+	],
+	"timing_note": "monotonic Time.get_ticks_usec since engine start; not wall 4x30s waits",
+	"timing_usec": {
+		"begin_usec": 33207227,
+		"boot_closed_usec": 33288004,
+		"guard_start_usec": 902881,
+		"overlay_gone_usec": 33900548,
+		"post_dismiss_usec": 34486644,
+		"post_resize_usec": 36204812,
+		"pre_begin_usec": 31852740,
+		"resize_usec": 35312206,
+		"tree_exit_usec": 33797577,
+		"world_ready_usec": 29237294
+	}
+}
