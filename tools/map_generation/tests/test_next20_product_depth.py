@@ -152,13 +152,19 @@ class TestLiveWiring(unittest.TestCase):
         panel = GD_PANEL.read_text(encoding="utf-8")
         self.assertIn("phase_rows", panel)
         self.assertIn("fleet_autonomy", panel)
-        self.assertIn("Agent AI", panel)
+        self.assertIn("format_agent_ai_board_day_plain", panel)
+        self.assertIn(
+            '_add_apply_button("Run agent AI board day", "agent_ai_board_day", true)',
+            panel,
+        )
+        self.assertIn("apply_agent_dispatch", panel)
         self.assertIn("apply_assault", panel)
 
         fmt = GD_FMT.read_text(encoding="utf-8")
         self.assertIn("func multi_phase_combat_ui_product", fmt)
         self.assertIn("func fleet_autonomy_plan", fmt)
         self.assertIn("func agent_ai_board", fmt)
+        self.assertIn("Agent AI board", fmt)
         self.assertIn("func agent_ai_decision_quality", fmt)
 
         ci = CI.read_text(encoding="utf-8")
