@@ -29,8 +29,11 @@ const LOADING_ART_QUARTERS: Array[Dictionary] = [
 	},
 ]
 
-const WORDMARK_PATH := "res://assets/graphics/branding/epochs_wordmark.png"
-const WORDMARK_PATH_512 := "res://assets/graphics/branding/epochs_wordmark_512.png"
+# Alpha first (same family as the victory scene). Opaque PNGs stay as fallback.
+const WORDMARK_PATH := "res://assets/graphics/branding/epochs_wordmark_alpha.png"
+const WORDMARK_PATH_512 := "res://assets/graphics/branding/epochs_wordmark_512_alpha.png"
+const WORDMARK_PATH_OPAQUE := "res://assets/graphics/branding/epochs_wordmark.png"
+const WORDMARK_PATH_512_OPAQUE := "res://assets/graphics/branding/epochs_wordmark_512.png"
 
 var _hero_art: TextureRect
 var _bottom_scrim: ColorRect
@@ -146,11 +149,7 @@ func _build_fullscreen_ui() -> void:
 	_wordmark.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	_wordmark.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	_wordmark.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var wm_tex: Texture2D = null
-	if ResourceLoader.exists(WORDMARK_PATH):
-		wm_tex = load(WORDMARK_PATH) as Texture2D
-	elif ResourceLoader.exists(WORDMARK_PATH_512):
-		wm_tex = load(WORDMARK_PATH_512) as Texture2D
+	var wm_tex := _load_wordmark_texture()
 	if wm_tex != null:
 		_wordmark.texture = wm_tex
 		vbox.add_child(_wordmark)
@@ -204,6 +203,22 @@ func _build_fullscreen_ui() -> void:
 	vbox.add_child(tip_label)
 	_bind_loading_title_fit()
 	_fit_loading_title()
+
+
+## Alpha 768, else alpha 512, else opaque 768, else opaque 512.
+func _load_wordmark_texture() -> Texture2D:
+	var candidates: Array[String] = [
+		WORDMARK_PATH,
+		WORDMARK_PATH_512,
+		WORDMARK_PATH_OPAQUE,
+		WORDMARK_PATH_512_OPAQUE,
+	]
+	for path in candidates:
+		if ResourceLoader.exists(path):
+			var tex := load(path) as Texture2D
+			if tex != null:
+				return tex
+	return null
 
 
 func show_loading(_option: String = "cycle", initial_tip: String = "Forging the Epochs of Ascendancy...") -> void:
