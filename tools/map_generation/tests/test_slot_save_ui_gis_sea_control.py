@@ -81,8 +81,11 @@ class TestSlotSaveUi(unittest.TestCase):
         self.assertIn("load_game_detailed", menu)
         top = GD_TOP.read_text(encoding="utf-8")
         self.assertIn("list_slots_for_ui", top)
-        self.assertIn("load_game_detailed", top)
         self.assertIn("save_game_detailed", top)
+        # Load calls live on MainMenu and the title boot, not TopInfoBar.
+        self.assertIn('slm.call("load_game_detailed", slot)', menu)
+        boot = (ROOT / "scripts" / "ui" / "LivingTitleBoot.gd").read_text(encoding="utf-8")
+        self.assertIn("SaveLoadManager.load_game_detailed(slot)", boot)
 
 
 class TestGisCoastlineDesign(unittest.TestCase):

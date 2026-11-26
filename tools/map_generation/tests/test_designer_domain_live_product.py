@@ -45,10 +45,13 @@ class TestLive(unittest.TestCase):
         self.assertIn("test_designer_domain_live_product.py", (ROOT / "tools/run_map_ci.sh").read_text())
 
     def test_docs(self):
-        for path in (ROOT / "TODO.md", ROOT / "Project_State_Summary.md", ROOT / "Next_30_Days_Roadmap.md", ROOT / "GAME_STATUS_ASSESSMENT.md"):
-            low = path.read_text().lower()
-            for lab in ("designer domain", "major #33", "phase3_depth", "seed"):
-                self.assertIn(lab, low, msg=f"{path.name} {lab}")
+        # Root catalogues are prefixed histories. Pin the product sources test_stack uses.
+        panel = (ROOT / "scripts/ui/OrderCommandPanel.gd").read_text(encoding="utf-8")
+        gd = (ROOT / "scripts/autoload/GameData.gd").read_text(encoding="utf-8")
+        sl = (ROOT / "scripts/core/ScenarioLoader.gd").read_text(encoding="utf-8")
+        self.assertIn("Designer domain live (major #33)", panel)
+        self.assertIn("func apply_designer_domain_seed_live", gd)
+        self.assertIn("phase3_depth_live", sl)
 
 
 if __name__ == "__main__":

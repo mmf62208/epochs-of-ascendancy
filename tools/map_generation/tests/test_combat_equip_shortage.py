@@ -22,12 +22,13 @@ class TestCombatEquipWiring(unittest.TestCase):
             "daily_formation_reinforce_from_stockpile()",
         ):
             self.assertIn(needle, pm, msg=needle)
-        # Daily tick runs reinforce after production
+        # Light-path return sits before the full-sim tick. Pin the whole function.
         idx = pm.find("func _on_game_day_advanced")
         self.assertGreaterEqual(idx, 0)
-        slice_ = pm[idx : idx + 350]
-        self.assertIn("daily_production_tick", slice_)
-        self.assertIn("daily_formation_reinforce_from_stockpile", slice_)
+        nxt = pm.find("\nfunc ", idx + 1)
+        slice_ = pm[idx : len(pm) if nxt < 0 else nxt]
+        self.assertIn("daily_production_tick()", slice_)
+        self.assertIn("daily_formation_reinforce_from_stockpile()", slice_)
 
     def test_combat_resolver_uses_formation_equipment_stats(self) -> None:
         cr = (ROOT / "scripts" / "combat" / "CombatResolver.gd").read_text(encoding="utf-8")

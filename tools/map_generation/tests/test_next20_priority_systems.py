@@ -152,12 +152,21 @@ class TestLiveWiring(unittest.TestCase):
             msg="panel must surface fleet AI/autonomy",
         )
         self.assertIn("HH agenda", panel)
-        self.assertTrue(
-            "Agent AI" in panel or "Agent campaign" in panel or "apply_agent_dispatch" in panel,
-            msg="panel must surface agent AI",
+        self.assertIn("apply_agent_dispatch", panel)
+        self.assertIn(
+            '_add_apply_button("Run agent campaign depth day", "agent_campaign_depth_day", true)',
+            panel,
         )
-        self.assertIn("Industry / economy", panel)
-        self.assertIn("Save slots", panel)
+        self.assertIn("industry_economy_depth_for_province", panel)
+        self.assertIn("format_industry_economy_plain", panel)
+        self.assertIn(
+            '_add_apply_button("Run industry economy day", "industry_economy_day", true)',
+            panel,
+        )
+        self.assertIn(
+            '_add_apply_button("Run save slot browser day", "save_slot_browser_day", true)',
+            panel,
+        )
         self.assertIn("GPU / pan-zoom", panel)
         # Also require GIS floor soft label somewhere in docs
         _todo_gis = TODO.read_text(encoding="utf-8")
