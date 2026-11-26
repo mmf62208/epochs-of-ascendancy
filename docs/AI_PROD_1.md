@@ -2,7 +2,7 @@
 
 Headless campaign boots report `factories=3256` and still create **zero** AI production lines. Live `ScenarioLoader` already creates the lines. This slice adds an **opt-in** bootstrap. `CampaignLoopTestBoot.boot()` does not call it.
 
-Base for this branch: `0c1122ae70414922b2b882afaace41f8f0318f62` (LOAD-SCREEN-1 #209 on `main`). The brief’s `e0388c58` pin was superseded by that merge. Branch `grok/ai-prod-1`.
+Base for this branch: `22d8acb0dbf83ae36b2d35b67441dc66812c5b9e` (STALE-DISCOVER-1 #217 on `main`, merged, not rebased). That SHA replaces the brief’s `e0388c58` and the earlier `0c1122ae` pin. The delta from `0c1122ae` to `22d8acb0` is map-generation tests and docs only. Branch `grok/ai-prod-1`.
 
 ## Diagnosis
 
@@ -69,4 +69,15 @@ XDG_DATA_HOME=$(mktemp -d) XDG_CONFIG_HOME=$(mktemp -d) XDG_CACHE_HOME=$(mktemp 
 
 ## Measured numbers
 
-Filled in the session report `~/ai_prod_1_REPORT.md` (diagnosis, soft-credit tables, gates, d180). This file states the contract. The report holds the run tables.
+Session report: `~/ai_prod_1_REPORT.md`. Evidence: `~/ai-prod-1_evidence/`.
+
+`boot()` is not changed. `HeadlessCampaignLoop1SoakTest` does not call the helper. Tip CL1 matches the pre-edit base: S2/S2b day 139 md5 `b9cf8d506235342ff4693617a4d18b07`, S1 day 156, S3 FAIL at day 152 progress `0.4460` (POL stall, pre-existing). `--quick` ALL PASSED in 509s, 0 SCRIPT ERROR.
+
+d180 aivai, live OOB, Sim harness. Base row matches Sim’s Nov 25 main row (`ctrl_md5` `6b7fe902cfb5e26c68ae7053c56910d9`, battles 26, total_changes 35, net_ger_loss −11, undefended 2) with AI lines 0. Tip calls `boot_ai_production(player)` once. `completed_count` stays 0; completions are `units_produced` on the F5 day path.
+
+| Arm | lines d0/d180 | units d180 (ENG FRA GER ITA JAP POL SOV) | soft days | battles | changes | front flips | net GER | undef | capitulated | ctrl_md5 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| base s20fe9063 | 0/0 | none | 180 | 26 | 35 | 33 | −11 | 2 | none | `6b7fe902cfb5e26c68ae7053c56910d9` |
+| tip s20fe9063, s1, s2, s3 | 13/13 | 30 31 32 37 33 5 33 | 0 | 24 | 36 | 34 | −10 | 1 | none | `b081be2ae62329fa44eab875affbce78` |
+
+No capitulation. No capital flip, and Warsaw `711112` does not flip, on any arm. Tip seeds 1/2/3 (and the tip `20fe9063` arm) share one `ctrl_md5`. That seed-invariance note is out of scope; it was not changed. Soft-credit behavior is unchanged: with no lines it fires 3 tags/day (540 fires / 180 days on the base arm); with Fix A lines it fires 0.
