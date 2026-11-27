@@ -129,6 +129,10 @@ The live draws are `ProvinceInsight.get_battle_preview:9481–9592`, called from
 
 Recommendation: stop after this diagnosis. Do not add the `LandBattleAi` tie hook. Do not edit `BattleManager` or `ProvinceInsight` in this branch.
 
+## OP decision (Nov 26, after #220 KEEP)
+
+**A accepted as a caveat for the old d180 soaks only:** a multi-seed aivai d180 writeup whose seeds shared one `ctrl_md5` counts as one sample, not three independent worlds. This d30 harness with AI lines on already differs across seeds 1/2/3 and is not covered by A. **B rejected.** Do not add the `LandBattleAi.plan_day` tie-hash hook. It is not the measured lever. **C deferred** to its own slice (gating the preview `randf` calls). Not in this PR. Any later C needs its own OP GO, with a before/after on the seed pin, identity/twin/trace pins, and the d180 bands. This note does not re-run d180 and does not claim the old d180 map has started to move.
+
 ## Measured (d30, AI lines on)
 
 Harness: `HeadlessSeedInvar1Test`. Player USA. `boot_ai_production("USA")` (13 lines, kept). `seed(1)` and `run_seed = 0` during boot, then `run_seed` in {1, 2, 3, 1}. Stockpiles snapshotted once and restored each seed. `seed_1936_start_garrisons`. GER declares on POL. Each day is `advance_live_f5_equivalent_days(1)` plus two idle frames. `ctrl_md5` is md5 of sorted `pid=controller` land lines. It is not the unsorted `JSON.stringify` the d180 sim prints, so it will not equal `b081be2a` even when the map matches that run. Compare seeds to each other.
@@ -147,3 +151,46 @@ The phase split above is from the temporary counter (`/tmp/seed-invar-1-meas/mea
 `start_str_md5=a4c671c1fb981c707e4f81c8a6ca0067` on all four. Seed-1 `str_md5` is `cbac3af9e53766e51e08ed66aba01914`. The repeat is `b13c60e0d7868002700ea89e89224007` (ctrl identical, str fingerprint not). Seed 2 `str_md5=073e94d3d68b0aef13da9b6e73a507c1`. Seed 3 `str_md5=62a42d36761346e6b176cee54e9f390f`.
 
 `SEED_VARIANCE=differs`. `REPEAT seed=1 ctrl=identical str=differs`. `RESULT=PASS`. 0 SCRIPT ERROR on that log.
+
+## STRMD5-DRIFT-1 (Nov 26, after #220 KEEP)
+
+Measuring harness: `HeadlessStrMd5Drift1Test`. Same boot/wipe as `HeadlessSeedInvar1Test` (copied, that file not edited). Player USA, AI lines on, GER declares on POL, `run_seed = 1` twice in one process, d30. `RESULT=PASS` means both runs finished and the per-unit / id diff was printed. No assert on drift.
+
+### Measured (in-process seed 1 ×2)
+
+`start_str_md5=a4c671c1fb981c707e4f81c8a6ca0067` on both. `start_ctrl_md5=88d8432561d7b781976f8b874a83cf62` on both. `run_seed` stayed 1 on both (day 1 and day 30). `hash([1,1])` and `hash([2,1])` were stable across passes. Daily reseed ran (4 calls/day). All 557 FORM_TAGS units are `garr1936_*`. `fielded_seq=0`, `leader_id_seq=0`, `replacement_seq=0`, `equipment_flow_seq=0` at start and end of both runs. No id only on one run.
+
+| Pass | ctrl_md5 | battles | changes | org_sum | str_sum | str_md5 | next_land_battle_seq end | reseed_calls start→end |
+|---|---|---:|---:|---:|---:|---|---:|---|
+| 1 | `2d960fd86cbfef86c84b015077af627d` | 6 | 6 | 549.079975 | 554.630000 | `cbac3af9e53766e51e08ed66aba01914` | 7 | 0→120 |
+| 2 | `c62ea066c6e75005149393086214e0ff` | 8 | 12 | 543.684343 | 554.480000 | `073e94d3d68b0aef13da9b6e73a507c1` | 16 | 120→240 |
+
+Pass 1 matches the #220 seed-1 row (including `str_md5`). Pass 2 matches the #220 **in-process seed-2** row (`ctrl_md5`, battles, changes, sums, `str_md5`), not the #220 seed-1-repeat row (`str_md5=b13c60e0…` with identical ctrl). This 1→1 repeat is a different war, not a same-map fingerprint drift. `str_sum` d=−0.150000 and `org_sum` d=−5.395631 do **not** cancel. 24 same-id GER/POL garrisons changed strength and/or org (and several changed `stationed_province_id`). `_unit_equipment_stock` has the same 576 keys; 24 of those keys changed, matching the 24 units. 0 SCRIPT ERROR on the clean re-run (`/tmp/strmd5-drift-1-r1.log`).
+
+The #220 leftover-in-process-state reading still holds. The missed state is not a formation-id or equipment-flow allocator on this path: `LeaderManager._alloc_fielded_formation_id` (`scripts/leaders/LeaderManager.gd:464–469`) never ran, and `ProductionManager._equipment_flow_seq` (`scripts/autoload/ProductionManager.gd:76`, `:1688`) stayed 0. `_next_land_battle_seq` (`scripts/combat/BattleManager.gd:46`) is reset to 1 by `_clear_battle_residue` and then diverges because the wars diverge.
+
+### What the copied wipe does not touch (file:line)
+
+`HeadlessSeedInvar1Test._wipe_sim_state` / `_clear_battle_residue` (copied into the new test) clear formations, production lines, factories, open battles, pending captures, empty-hex sieges, land-battle seq, pending sim events, infra projects, and `_garrisons_1936_seeded`. Boot reloads the board (`MapManager.initialize_from_map_data` `:146`) and `SupplyManager.build_network` (`scripts/supply/SupplyManager.gd:212`) rebuilds hubs and depots. That is why start ctrl and start `str_md5` match.
+
+It does **not** reset:
+
+- `SupplyManager.division_deployments` (`scripts/supply/SupplyManager.gd:22`). `build_network` (`:212–236`) does not clear it. Keys are formation ids. Garrison ids are stable (`garr1936_{TAG}_{pid}`, `LeaderManager.gd:726` / `field_1936_garrison` `:800`). Pass 1’s end-of-war stations can still be in the dict when pass 2 reseeds the same ids.
+- `SupplyManager.force_registry` (`:18`, a process-lifetime `CombatPresenceRegistry`) and `attrition_ledger` (`:23`).
+- `LeaderManager._fielded_seq` / `_leader_id_seq` / `_replacement_seq` (`scripts/leaders/LeaderManager.gd:177–181`). `clear_all_formations` (`:1629–1633`) clears the formation dict and the garrison latch only. Latent: not the lever here because those seqs stayed 0.
+- `LeaderManager.leader_pool` (`:170`; count 18 both passes, values not hashed).
+- `ProductionManager` interactive-AI caches (`_interactive_ai_day_cache_ready` `:86`, `:350–372`). Stockpiles and `_equipment_flow_seq` are restored from the pre-run snapshot; the cache flag is not.
+- `TimeManager._reseed_calls` (`scripts/autoload/TimeManager.gd:82`; 0 vs 120 at ALLOC_START). Cosmetic; `_reseed_sim_day` (`:2063`) does not read it.
+- `TimeManager._playtest_ai_started_to_ids` (`:95`).
+
+The 24 changed units are the GER/POL garrisons that fought. Same ids, different str/org/station at d30, sums do not cancel. That matches leftover per-unit supply/combat/station state keyed by stable `garr1936_*` ids, not a new-id allocator.
+
+The #220 fourth row (seed 1 after seeds 1/2/3) matching ctrl with a `str_md5`-only drift is a milder leftover at a different in-process position. This slice did not re-run that 1/2/3/1 order.
+
+### Fix options (not applied)
+
+No option is applied here. Any product wipe/allocator fix needs its own OP GO.
+
+1. **Clear `SupplyManager.division_deployments` (and `force_registry` / `attrition_ledger`) in the test wipe, or at the start of `build_network`.** Expected: the in-process seed-1 repeat keeps pass 1’s ctrl/sums/`str_md5`. Risk: `build_network` is on the live F5 reload path; clearing presence there can move identity/twin/trace and the d180 bands if those runs rebuild the network mid-process. A test-only wipe is the smaller first check.
+2. **Reset `_fielded_seq` / `_leader_id_seq` / `_replacement_seq` in `clear_all_formations`.** Hygiene for a later fielded-unit path. Not the measured d30 lever (`fielded_seq` stayed 0).
+3. **Option C** (gate preview `randf` in `can_assault_province` / `get_battle_preview`) stays deferred. It is a different lever. Own OP GO, with a before/after on the seed pin, identity/twin/trace, and the d180 bands.
