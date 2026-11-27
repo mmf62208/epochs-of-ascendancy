@@ -60,6 +60,9 @@ static func reset_session_for_new_game() -> void:
 			TimeManager.drop_pending_sim_events_on_campaign_end()
 		if TimeManager.has_method("clear_overlay_clock_locks"):
 			TimeManager.clear_overlay_clock_locks()
+	# Absolute retake until-days outlive a clock that returns to day 0.
+	if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("reset_ai_war1"):
+		BattleManager.reset_ai_war1()
 
 
 static func keep_playing_label(player: String = "") -> String:

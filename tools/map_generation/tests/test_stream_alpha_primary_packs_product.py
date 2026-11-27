@@ -51,9 +51,23 @@ class TestLive(unittest.TestCase):
         self.assertIn("HH Agenda", top)
         self.assertIn("apply_hh_agenda_close_live", gd)
         self.assertIn('aid == "hh_agenda_close"', gd)
-        # Pack G — save via product APIs
-        self.assertIn("apply_save_browser_resume", top)
-        self.assertIn("apply_save_browser_checkpoint", top)
+        # Pack G — save resume/checkpoint route through GameData, the order panel, and formatters.
+        self.assertIn('aid == "apply_save_browser_resume"', gd)
+        self.assertIn("return apply_save_browser_resume()", gd)
+        self.assertIn("func apply_save_browser_resume(", gd)
+        self.assertIn('aid == "apply_save_browser_checkpoint"', gd)
+        self.assertIn("return apply_save_browser_checkpoint()", gd)
+        self.assertIn("func apply_save_browser_checkpoint(", gd)
+        self.assertIn(
+            '_add_apply_button("Save resume", "apply_save_browser_resume", true)',
+            panel,
+        )
+        self.assertIn(
+            '_add_apply_button("Save checkpoint", "apply_save_browser_checkpoint", true)',
+            panel,
+        )
+        self.assertIn('"save_browser_resume": "apply_save_browser_resume"', fmt)
+        self.assertIn('"save_checkpoint": "apply_save_browser_checkpoint"', fmt)
         self.assertIn("static func stream_alpha_primary_packs_product(", fmt)
         ci = (ROOT / "tools/run_map_ci.sh").read_text()
         self.assertIn("test_stream_alpha_primary_packs_product.py", ci)

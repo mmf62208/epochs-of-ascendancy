@@ -76,8 +76,8 @@ class TestWorldClassMapReviewDocs(unittest.TestCase):
         land_n = len(p2s)
         self.assertEqual(len(p2r), base_n)
         self.assertEqual(land_n, base_n - 340)  # seas stay 340
-        self.assertGreaterEqual(base_n, 5000)
-        # Post US merge ~5670; docs may still mention historical 8761
+        # Live accurate board: 3596 provinces, 340 seas, 3256 land.
+        self.assertEqual(base_n, 3596)
 
         sr = json.loads((D / "strategic_regions.json").read_text(encoding="utf-8"))
         rows = sr.get("regions") or []

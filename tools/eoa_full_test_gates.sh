@@ -4,11 +4,11 @@
 #
 # Usage (from repo root):
 #   tools/eoa_full_test_gates.sh
-#   tools/eoa_full_test_gates.sh --quick      # pure python, plus garrison, ink, campaign save, autosave, orders-perf1, audio, stability, victory, settings, first20-p2 strip press
+#   tools/eoa_full_test_gates.sh --quick      # pure python, plus garrison, ink, campaign save, autosave, orders-perf1, audio, stability, victory, settings, first20-p2 strip press, ai-prod1
 #   tools/eoa_full_test_gates.sh --with-perf  # also map-tick perf sample
 #   tools/eoa_full_test_gates.sh --log DIR    # write logs under DIR (plus eoa-gates-step-timings.json)
 #
-# --quick launches HeadlessGarrison1Test, HeadlessAiWar1Test, HeadlessCl1SiegeHold1Test, HeadlessInkTooltips0Test, HeadlessCampaignSave1Test, HeadlessAutosave1Test, HeadlessOrdersPerf1Test (one Godot process per case a–g; expected wall unfixed: several minutes total; fixed: < ~70s total), HeadlessRttSmallfix1Test, HeadlessRttReset2Test, HeadlessAudio1Test, HeadlessAudio2Test, HeadlessStabilityJustice1Test, HeadlessVictoryPaths1Test, HeadlessSettingsToggles1Test, HeadlessFirst20P2StripPressTest, then FIRST20-UX-WAR Open fight / Justify / March, then HeadlessSearchHotkey1Test (r1 isolation + r2 click-focus / RtT AAR + r3 inspector-open / first-SOV click), then HeadlessTutorial1Test.
+# --quick launches HeadlessGarrison1Test, HeadlessAiWar1Test, HeadlessCl1SiegeHold1Test, HeadlessInkTooltips0Test, HeadlessCampaignSave1Test, HeadlessAutosave1Test, HeadlessOrdersPerf1Test (one Godot process per case a–g; expected wall unfixed: several minutes total; fixed: < ~70s total), HeadlessRttSmallfix1Test, HeadlessRttReset2Test, HeadlessAudio1Test, HeadlessAudio2Test, HeadlessStabilityJustice1Test, HeadlessVictoryPaths1Test, HeadlessSettingsToggles1Test, HeadlessFirst20P2StripPressTest, then FIRST20-UX-WAR Open fight / Justify / March, then HeadlessSearchHotkey1Test (r1 isolation + r2 click-focus / RtT AAR + r3 inspector-open / first-SOV click), then HeadlessTutorial1Test, then HeadlessAiProd1Test.
 # Full path also runs launch_campaign_save1_identity (MW200 SaveStateHash identity + 60-day twin).
 # Full path calls tools/run_godot.sh, which exits 1 immediately if no binary
 # is found (fail-closed; it must not hang).
@@ -673,6 +673,23 @@ if [[ "$QUICK" -eq 1 ]]; then
       fi
       exit "$code"
     ' || fail
+    run_step headless_ai_prod1 bash -c '
+      log=$(mktemp)
+      XDG_DATA_HOME="$(mktemp -d)" flock -n "${HOME}/.eoa_godot.lock" \
+        tools/run_godot.sh --headless --path . \
+        -s res://scripts/core/HeadlessAiProd1Test.gd >"$log" 2>&1
+      code=$?
+      cat "$log"
+      if grep -q "SCRIPT ERROR" "$log"; then
+        echo "[eoa-gates] FAIL headless_ai_prod1 SCRIPT ERROR"
+        exit 1
+      fi
+      if ! grep -q "HeadlessAiProd1Test: RESULT=PASS" "$log"; then
+        echo "[eoa-gates] FAIL headless_ai_prod1 missing RESULT=PASS"
+        exit 1
+      fi
+      exit "$code"
+    ' || fail
   fi
   if [[ "$FAILED" -eq 0 ]]; then
     log "ALL PASSED (quick)"
@@ -1025,6 +1042,24 @@ else
     fi
     if ! grep -q "RESULT=PASS" "$log"; then
       echo "[eoa-gates] FAIL launch_settings_toggles1 missing RESULT=PASS"
+      exit 1
+    fi
+    exit "$code"
+  ' || fail
+
+  run_step headless_ai_prod1 bash -c '
+    log=$(mktemp)
+    XDG_DATA_HOME="$(mktemp -d)" flock -n "${HOME}/.eoa_godot.lock" \
+      tools/run_godot.sh --headless --path . \
+      -s res://scripts/core/HeadlessAiProd1Test.gd >"$log" 2>&1
+    code=$?
+    cat "$log"
+    if grep -q "SCRIPT ERROR" "$log"; then
+      echo "[eoa-gates] FAIL headless_ai_prod1 SCRIPT ERROR"
+      exit 1
+    fi
+    if ! grep -q "HeadlessAiProd1Test: RESULT=PASS" "$log"; then
+      echo "[eoa-gates] FAIL headless_ai_prod1 missing RESULT=PASS"
       exit 1
     fi
     exit "$code"

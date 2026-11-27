@@ -2080,13 +2080,17 @@ func _apply_save_data(data: Dictionary) -> void:
 	if data.has("supply") and typeof(SupplyManager) != TYPE_NIL:
 		_apply_supply_deployments_state(data["supply"])
 
-	# 7c. Open land battles + march queues (after formations exist)
+	# 7c. Open land battles + march queues (after formations exist).
+	# A present land_war dict still restores absolute until-days. Missing or
+	# non-dict land_war (older or partial blobs) drops leftover until-days.
 	if data.has("land_war") and data["land_war"] is Dictionary:
 		var lw: Dictionary = data["land_war"]
 		if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("apply_save_data"):
 			BattleManager.apply_save_data(lw)
 		if typeof(FormationMovement) != TYPE_NIL:
 			FormationMovement.apply_save_data({"marches": lw.get("marches", {})})
+	elif typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("reset_ai_war1"):
+		BattleManager.reset_ai_war1()
 
 	# 8. Production + Factories (factories feed lines; apply after map provinces)
 	if data.has("factories") and typeof(FactoryManager) != TYPE_NIL:

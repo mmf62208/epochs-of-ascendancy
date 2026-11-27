@@ -234,8 +234,18 @@ class TestLiveWiring(unittest.TestCase):
         self.assertNotIn("delivery = clampf(delivery * float(sea_wx.get", sm)
         tm = GD_TM.read_text(encoding="utf-8")
         self.assertIn("trade_supply_weather_chain", tm)
-        # Sole mult: chain includes sea×wx; must not multiply sea_trade then chain.
-        self.assertIn("Sole mult: trade_supply_weather_chain", tm)
+        # Sole mult: sea and weather enter the chain once inside advance_trade_flows.
+        # Amount is scaled by chain health only — not sea_trade or wx_trade again.
+        idx = tm.find("func advance_trade_flows")
+        self.assertGreaterEqual(idx, 0)
+        nxt = tm.find("\nfunc ", idx + 1)
+        flows = tm[idx : len(tm) if nxt < 0 else nxt]
+        self.assertRegex(
+            flows,
+            r"MapPolishFormatters\.trade_supply_weather_chain\(\s*"
+            r"sea_trade,\s*\"dry\",\s*clampf\(1\.0 - wx_trade",
+        )
+        self.assertIn('amount *= float(chain.get("health", 1.0))', flows)
         self.assertNotIn("amount *= sea_trade", tm)
         self.assertNotIn("amount *= wx_trade", tm)
         insight = GD_INSIGHT.read_text(encoding="utf-8")
