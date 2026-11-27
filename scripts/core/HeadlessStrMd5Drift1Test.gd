@@ -1,7 +1,8 @@
 extends SceneTree
 ## STRMD5-DRIFT-1 measurement. Same-process seed 1 ×2 at d30.
-## RESULT=PASS means both runs finished and the per-unit / id diff was printed.
-## Does not assert that str_md5 matches (and does not fail when it happens to).
+## TEST-FOLLOWUPS-1: RESULT=PASS means pass 2 ctrl_md5 and battle count match
+## pass 1 and the #220 seed-1 row (a true seed-1 repeat). str_md5 is printed
+## and is not asserted.
 ##
 ##   tools/run_godot.sh --headless --path . -s res://scripts/core/HeadlessStrMd5Drift1Test.gd
 ##   STRMD5_DRIFT_1_DAYS=30   window (default 30)
@@ -9,6 +10,9 @@ extends SceneTree
 ## Boot/wipe copied from HeadlessSeedInvar1Test. That file is not edited.
 
 const FORM_TAGS: Array[String] = ["GER", "FRA", "ENG", "SOV", "ITA", "JAP", "POL", "USA"]
+## #220 in-process seed-1 row. Pass 2 must match this ctrl and battle count.
+const _SEED1_CTRL := "2d960fd86cbfef86c84b015077af627d"
+const _SEED1_BATTLES := 6
 
 const _STOCK_PROPS: Array[String] = [
 	"national_stockpile",
@@ -58,6 +62,17 @@ func _run() -> void:
 	var run1: Dictionary = await _run_seed(1, days, 1)
 	var run2: Dictionary = await _run_seed(1, days, 2)
 	_print_diff(run1, run2)
+	# Pass 2 used to reproduce #220 seed-2 because the copied wipe left
+	# SupplyManager presence keyed by stable garr1936_* ids. str_md5 is
+	# intentionally not compared.
+	var ctrl1 := str(run1.get("ctrl_md5", ""))
+	var ctrl2 := str(run2.get("ctrl_md5", ""))
+	var battles1 := int(run1.get("battles", -1))
+	var battles2 := int(run2.get("battles", -1))
+	if ctrl1 != _SEED1_CTRL or battles1 != _SEED1_BATTLES:
+		_fail("pass 1 is not #220 seed-1 ctrl=%s battles=%d" % [ctrl1, battles1])
+	if ctrl2 != ctrl1 or battles2 != battles1:
+		_fail("pass 2 is not a true seed-1 repeat ctrl=%s battles=%d (pass1 ctrl=%s battles=%d)" % [ctrl2, battles2, ctrl1, battles1])
 	var ok := _failures == 0
 	print("HeadlessStrMd5Drift1Test: ", "PASS" if ok else "FAIL", " (failures=", _failures, ")")
 	print("HeadlessStrMd5Drift1Test: RESULT=", "PASS" if ok else "FAIL")
@@ -98,6 +113,7 @@ func _run_seed(seed_v: int, days: int, pass_n: int) -> Dictionary:
 	seed(1)
 	tm.run_seed = 0
 	_restore_stock(pm)
+	print("HeadlessStrMd5Drift1Test: pass=%d PRE_WIPE %s" % [pass_n, _supply_leftover_counts()])
 	_wipe_sim_state(bm, pm, fm, lm, tm)
 	if bm != null:
 		bm.set("include_player_in_ai_land_battles", false)
@@ -118,6 +134,7 @@ func _run_seed(seed_v: int, days: int, pass_n: int) -> Dictionary:
 	_clear_battle_residue(bm, tm)
 	if lm.has_method("seed_1936_start_garrisons"):
 		lm.call("seed_1936_start_garrisons", true)
+	print("HeadlessStrMd5Drift1Test: pass=%d POST_SEED %s" % [pass_n, _supply_leftover_counts()])
 	tm.run_seed = seed_v
 	_cap.ensure_snapshot()
 	var dec: Dictionary = _war.declare_war("GER", "POL", "strmd5_drift_1")
@@ -594,6 +611,17 @@ func _stock_keys(pm: Node) -> Dictionary:
 
 
 func _wipe_sim_state(bm: Node, pm: Node, fm: Node, lm: Node, tm: Node) -> void:
+	# TEST-FOLLOWUPS-1. Pass 2 was #220 seed-2 (ctrl c62ea066…, 8 battles)
+	# while run_seed stayed 1. Start fingerprints match; mid-run decisions
+	# do not. division_deployments / force_registry / attrition_ledger survive
+	# this wipe and SupplyManager.build_network (scripts/supply/SupplyManager.gd:212).
+	# Garrison ids are stable, so pass-1 stations still key the same garr1936_* ids.
+	# Supply maps were not sufficient (pass 2 still matched seed-2 after that clear).
+	# FormationMovement._orders is static and keyed by those same ids. AI march
+	# uses has_march / list_marches / enqueue_own_land_march. clear_all_formations
+	# does not drop the orders, so pass 2 keeps pass 1's marches.
+	_wipe_supply_leftover()
+	_wipe_march_orders()
 	if pm != null and pm.has_method("get_line_ids") and pm.has_method("remove_line"):
 		for lid_v in pm.get_line_ids():
 			pm.remove_line(str(lid_v))
@@ -626,6 +654,62 @@ func _wipe_sim_state(bm: Node, pm: Node, fm: Node, lm: Node, tm: Node) -> void:
 	var idm := get_root().get_node_or_null("InfrastructureDevelopmentManager")
 	if idm != null and "active_projects" in idm and idm.active_projects is Dictionary:
 		(idm.active_projects as Dictionary).clear()
+
+
+func _wipe_supply_leftover() -> void:
+	var sm := get_root().get_node_or_null("SupplyManager")
+	if sm == null:
+		return
+	if "division_deployments" in sm and sm.division_deployments is Dictionary:
+		(sm.division_deployments as Dictionary).clear()
+	if sm.has_method("clear_force_registry"):
+		sm.call("clear_force_registry")
+	elif "force_registry" in sm and sm.force_registry != null and sm.force_registry.has_method("clear"):
+		sm.force_registry.clear()
+	if "attrition_ledger" in sm and sm.attrition_ledger != null and sm.attrition_ledger.has_method("clear"):
+		sm.attrition_ledger.clear()
+
+
+func _march_script() -> GDScript:
+	# Load by path. A class_name reference from this -s script compiles
+	# FormationMovement before the SupplyManager autoload exists.
+	return load("res://scripts/formations/FormationMovement.gd") as GDScript
+
+
+func _wipe_march_orders() -> void:
+	var scr := _march_script()
+	if scr != null and scr.has_method("apply_save_data"):
+		scr.call("apply_save_data", {})
+
+
+func _march_order_count() -> int:
+	var scr := _march_script()
+	if scr == null or not scr.has_method("get_save_data"):
+		return -1
+	var data: Variant = scr.call("get_save_data")
+	if data is Dictionary:
+		var marches: Variant = (data as Dictionary).get("marches", {})
+		if marches is Dictionary:
+			return (marches as Dictionary).size()
+	return -1
+
+
+func _supply_leftover_counts() -> String:
+	var sm := get_root().get_node_or_null("SupplyManager")
+	if sm == null:
+		return "sm=null"
+	var dep_n := -1
+	if "division_deployments" in sm and sm.division_deployments is Dictionary:
+		dep_n = (sm.division_deployments as Dictionary).size()
+	var reg_n := -1
+	if "force_registry" in sm and sm.force_registry != null and sm.force_registry.has_method("all_province_ids"):
+		reg_n = sm.force_registry.all_province_ids().size()
+	var loss_n := -1
+	if "attrition_ledger" in sm and sm.attrition_ledger != null and "_losses" in sm.attrition_ledger:
+		var losses: Variant = sm.attrition_ledger._losses
+		if losses is Dictionary:
+			loss_n = (losses as Dictionary).size()
+	return "dep_n=%d registry_provinces=%d attrition_n=%d march_n=%d" % [dep_n, reg_n, loss_n, _march_order_count()]
 
 
 func _clear_battle_residue(bm: Node, tm: Node) -> void:
