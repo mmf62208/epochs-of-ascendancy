@@ -116,3 +116,7 @@ CL1_S3_POL_1_WIPE=1    # optional extra wipe after boot; default off (soak-ident
 ```
 
 Not wired into `tools/eoa_full_test_gates.sh`.
+
+## TEST-FOLLOWUPS-1 (Nov 27)
+
+Test-only note. Diagnosis above is unchanged. `HeadlessCampaignLoop1SoakTest._boot_as` now calls `BattleManager.reset_ai_war1_for_test()` after the open-battle clear. `_empty_hex_siege` and `SupplyManager.division_deployments` were not added. In-suite S3 PASS day 154 (still 0.4460 owned=31 at day 108, then 0.4599 at day 112, progress 0.0000 at the end). S2 and S2b PASS day 139, determinism md5 `b9cf8d506235342ff4693617a4d18b07`. S1 PASS day 156. 0 SCRIPT ERROR. No product edit.

@@ -81,6 +81,11 @@ func _boot_as(mm: Node, sm: Node, bm: Node, lm: Node, player: String) -> bool:
 		bm.set("include_player_in_ai_land_battles", false)
 		if "_open_land_battles" in bm:
 			bm._open_land_battles = []
+		# TEST-FOLLOWUPS-1. _set_retake_cooldown stores an absolute until-day.
+		# After the clock resets to 0, leftover until-days from the previous
+		# scenario stay in the future and stall in-suite S3 (docs/CL1_S3_POL_1.md).
+		if bm.has_method("reset_ai_war1_for_test"):
+			bm.call("reset_ai_war1_for_test")
 	if not _boot.boot(mm, sm, player):
 		_fail("boot %s failed" % player)
 		return false

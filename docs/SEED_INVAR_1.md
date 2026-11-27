@@ -194,3 +194,24 @@ No option is applied here. Any product wipe/allocator fix needs its own OP GO.
 1. **Clear `SupplyManager.division_deployments` (and `force_registry` / `attrition_ledger`) in the test wipe, or at the start of `build_network`.** Expected: the in-process seed-1 repeat keeps pass 1’s ctrl/sums/`str_md5`. Risk: `build_network` is on the live F5 reload path; clearing presence there can move identity/twin/trace and the d180 bands if those runs rebuild the network mid-process. A test-only wipe is the smaller first check.
 2. **Reset `_fielded_seq` / `_leader_id_seq` / `_replacement_seq` in `clear_all_formations`.** Hygiene for a later fielded-unit path. Not the measured d30 lever (`fielded_seq` stayed 0).
 3. **Option C** (gate preview `randf` in `can_assault_province` / `get_battle_preview`) stays deferred. It is a different lever. Own OP GO, with a before/after on the seed pin, identity/twin/trace, and the d180 bands.
+
+## TEST-FOLLOWUPS-1 measured (Nov 27, test wipe only)
+
+Same harness, still `HeadlessStrMd5Drift1Test`. Both passes request `seed_v = 1`. `run_seed` stayed 1. `hash([1,1])` / `hash([2,1])` stayed stable. Elapsed was 0 at start and 30 at end on both passes. `RESULT=PASS` now requires pass 2 `ctrl_md5` and battle count to equal pass 1 and the #220 seed-1 row. `str_md5` is still not asserted.
+
+The Nov 26 table above is the pre-fix measurement. Pass 2 there was #220 seed-2, not a seed-1 repeat. The copied wipe does not touch `FormationMovement._orders` (`scripts/formations/FormationMovement.gd:20`, static, keyed by formation id). AI land-battle start reads `has_march` / `list_marches` and writes `enqueue_own_land_march` (`BattleManager.gd:1086`, `:1201`, `:1319`). `LeaderManager.clear_all_formations` does not drop those orders. Garrison ids are stable, so one leftover march from pass 1 was still on a `garr1936_*` id at pass 2 boot (`march_n=1`).
+
+Supply-only clear was measured first and was not sufficient. Pass 2 `PRE_WIPE` was `dep_n=12 registry_provinces=428 attrition_n=0`. After clearing `division_deployments`, `force_registry`, and `attrition_ledger`, `POST_SEED` was all zeros, and pass 2 was still seed-2: `ctrl_md5 c62ea066c6e75005149393086214e0ff`, 8 battles, `str_md5 073e94d3d68b0aef13da9b6e73a507c1`. Log `/tmp/test-followups-1/drift.log`.
+
+The test wipe now also calls `FormationMovement.apply_save_data({})` (loaded by path so this `-s` script does not compile `FormationMovement` before the `SupplyManager` autoload). It still clears the three supply maps. Pass 2 `PRE_WIPE march_n=1`, `POST_SEED march_n=0`. This slice did not re-run with the march clear alone.
+
+### Measured (true seed-1 repeat)
+
+`start_str_md5=a4c671c1fb981c707e4f81c8a6ca0067` and `start_ctrl_md5=88d8432561d7b781976f8b874a83cf62` on both. 0 SCRIPT ERROR. Log `/tmp/test-followups-1/drift3.log`.
+
+| Pass | ctrl_md5 | battles | changes | org_sum | str_sum | str_md5 | next_land_battle_seq end | reseed_calls start→end |
+|---|---|---:|---:|---:|---:|---|---:|---|
+| 1 | `2d960fd86cbfef86c84b015077af627d` | 6 | 6 | 549.079975 | 554.630000 | `cbac3af9e53766e51e08ed66aba01914` | 7 | 0→120 |
+| 2 | `2d960fd86cbfef86c84b015077af627d` | 6 | 6 | 549.079975 | 554.630000 | `cbac3af9e53766e51e08ed66aba01914` | 7 | 120→240 |
+
+Pass 2 matches pass 1 and the #220 seed-1 row on `ctrl_md5` and battle count. `str_md5` also matches pass 1 (`cbac3af9…`), which is tighter than the #220 in-process seed-1-repeat row (`b13c60e0…`, same ctrl, different str). Do not assert `str_md5`. `_reseed_calls` still differs at `ALLOC_START` (0 vs 120). `_reseed_sim_day` does not read it. No product wipe.
