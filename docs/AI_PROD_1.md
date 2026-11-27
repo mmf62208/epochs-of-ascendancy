@@ -46,7 +46,7 @@ The F5 day path (`advance_days`) increments `DesignLineState.units_produced`. It
 
 ## Test
 
-`scripts/core/HeadlessAiProd1Test.gd` (not added to `tools/eoa_full_test_gates.sh`):
+`scripts/core/HeadlessAiProd1Test.gd` (Gates: now in `tools/eoa_full_test_gates.sh --quick` and the full lane):
 
 ```bash
 XDG_DATA_HOME=$(mktemp -d) XDG_CONFIG_HOME=$(mktemp -d) XDG_CACHE_HOME=$(mktemp -d) \
