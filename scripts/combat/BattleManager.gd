@@ -2133,6 +2133,14 @@ func reset_ai_war1_for_test() -> void:
 	_attack_reject.clear()
 
 
+## Product session reset. Absolute until-days must not survive a new game
+## or a load that has no land_war dictionary. The helper already clears
+## _attack_reject; the second clear stays if that ever changes.
+func reset_ai_war1() -> void:
+	reset_ai_war1_for_test()
+	_attack_reject.clear()
+
+
 func note_front_progress_tags(tags: Array) -> void:
 	var day := _ai_day()
 	for raw in tags:
