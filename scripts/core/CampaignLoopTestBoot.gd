@@ -11,6 +11,8 @@ const ADJ_PATH := "res://data/provinces_world_accurate/province_adjacency.json"
 const CITY_PATH := "res://data/provinces_world_accurate/province_city_layer.json"
 const PROV_SCRIPT := "res://scripts/data/Province.gd"
 const MAP_DATA_SCRIPT := "res://scripts/data/MapScenarioData.gd"
+const SCENARIO_PATH := "res://data/scenarios/world_accurate.json"
+const AI_PROD_MAJORS: Array[String] = ["GER", "FRA", "ENG", "USA", "SOV", "ITA", "JAP"]
 
 
 static func load_json(path: String) -> Dictionary:
@@ -159,3 +161,104 @@ static func make_division(fid: String, tag: String, station: int) -> void:
 	f.readiness = 1.0
 	f.name = "%s %s" % [tag, fid]
 	LeaderManager.formations[fid] = f
+
+
+## Opt-in OOB lines for headless campaign boots. boot() does not call this.
+## Same first-land-design rule as ScenarioLoader._start_demo_production_lines.
+## Sim and soak harnesses must call it explicitly or they keep the soft-credit path.
+static func boot_ai_production(skip_tag: String = "") -> Dictionary:
+	var factories := 0
+	var lines := 0
+	var by_tag := {}
+	var skip := skip_tag.strip_edges().to_upper()
+	var doc := load_json(SCENARIO_PATH)
+	var block: Variant = doc.get("countries", [])
+	if typeof(block) != TYPE_ARRAY or typeof(FactoryManager) == TYPE_NIL or typeof(ProductionManager) == TYPE_NIL:
+		_print_ai_production(factories, lines, by_tag)
+		return {"factories": factories, "lines": lines, "by_tag": by_tag}
+	for entry_v in block as Array:
+		if typeof(entry_v) != TYPE_DICTIONARY:
+			continue
+		var entry: Dictionary = entry_v
+		var tag := str(entry.get("tag", "")).strip_edges().to_upper()
+		if tag.is_empty() or tag == skip:
+			continue
+		var oob_v: Variant = entry.get("starting_oob", {})
+		if typeof(oob_v) != TYPE_DICTIONARY:
+			continue
+		var land: Variant = (oob_v as Dictionary).get("land_designs", [])
+		if typeof(land) != TYPE_ARRAY or (land as Array).is_empty():
+			continue
+		var design := str((land as Array)[0]).strip_edges()
+		if design.is_empty():
+			continue
+		var lid := "oob_%s_%s" % [tag, design]
+		var fid := _ai_prod_existing_factory(lid)
+		if not ProductionManager.has_line(lid):
+			var pid := _ai_prod_province(tag, int(entry.get("capital_province_id", 0)))
+			if pid <= 0:
+				continue
+			var created: Array = FactoryManager.register_factories_for_province(pid, tag, 1)
+			if created.is_empty():
+				continue
+			fid = int(created[0].factory_id)
+			if not ProductionManager.bootstrap_line_on_factory(lid, design, fid):
+				continue
+			factories += 1
+			lines += 1
+		var ids: Array = [lid]
+		var is_major := bool(entry.get("major_power", false)) or tag in AI_PROD_MAJORS
+		if is_major and fid > 0:
+			var infantry := "infantry_m1_garand" if (tag == "USA" or tag == "ENG") else "infantry_k98_bolt_action"
+			var ilid := "oob_%s_%s" % [tag, infantry]
+			if ProductionManager.has_line(ilid):
+				ids.append(ilid)
+			else:
+				var fac: Factory = FactoryManager.get_factory(fid)
+				if fac != null:
+					fac.max_production_lines = maxi(int(fac.max_production_lines), 2)
+				if ProductionManager.bootstrap_line_on_factory(ilid, infantry, fid):
+					lines += 1
+					ids.append(ilid)
+		by_tag[tag] = {"factory": fid, "lines": ids}
+	_print_ai_production(factories, lines, by_tag)
+	return {"factories": factories, "lines": lines, "by_tag": by_tag}
+
+
+static func _print_ai_production(factories: int, lines: int, by_tag: Dictionary) -> void:
+	print(
+		"CampaignLoopTestBoot: AI production boot lines=%d factories=%d by_tag=%s"
+		% [lines, factories, JSON.stringify(by_tag)]
+	)
+
+
+static func _ai_prod_existing_factory(line_id: String) -> int:
+	if not ProductionManager.has_line(line_id):
+		return 0
+	var line: Variant = ProductionManager.get_line(line_id)
+	if line == null or not ("factory_id" in line):
+		return 0
+	return int(line.factory_id)
+
+
+static func _ai_prod_province(tag: String, capital_pid: int) -> int:
+	if typeof(MapManager) == TYPE_NIL:
+		return 0
+	if capital_pid > 0 and str(MapManager.get_province_owner(capital_pid)).strip_edges().to_upper() == tag:
+		if _ai_prod_is_land(capital_pid):
+			return capital_pid
+	var best := 0
+	for pid_v in MapManager.get_provinces_by_owner(tag):
+		var pid := int(pid_v)
+		if pid <= 0 or not _ai_prod_is_land(pid):
+			continue
+		if best == 0 or pid < best:
+			best = pid
+	return best
+
+
+static func _ai_prod_is_land(pid: int) -> bool:
+	var p: Province = MapManager.get_province(pid)
+	if p == null:
+		return false
+	return not bool(p.is_sea)
